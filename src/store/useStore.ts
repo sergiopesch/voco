@@ -28,9 +28,9 @@ const defaultModels = {
         category: 'Speech-to-Text' as const,
     },
     textGeneration: {
-        id: 'gpt-3.5-turbo',
-        name: 'GPT-3.5 Turbo',
-        provider: 'openai' as const,
+        id: 'mistral-small',
+        name: 'Mistral AI',
+        provider: 'mistral' as const,
         description: 'Fast and efficient for most conversations.',
         maxTokens: 150,
         contextWindow: 4096,

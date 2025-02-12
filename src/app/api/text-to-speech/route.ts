@@ -3,7 +3,7 @@ import { TextToSpeechClient } from '@google-cloud/text-to-speech';
 import { protos } from '@google-cloud/text-to-speech';
 
 // Initialize Text-to-Speech client with proper error handling
-let client: TextToSpeechClient;
+let client: TextToSpeechClient | null = null;
 try {
     if (!process.env.GOOGLE_CLOUD_CREDENTIALS) {
         throw new Error('GOOGLE_CLOUD_CREDENTIALS environment variable is not set');
@@ -18,9 +18,9 @@ try {
         credentials,
         projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
     });
+    console.log('Google Cloud Text-to-Speech client initialized successfully');
 } catch (error) {
     console.error('Failed to initialize Text-to-Speech client:', error);
-    // We'll handle the error in the route handler
 }
 
 export async function POST(req: Request) {
@@ -30,6 +30,7 @@ export async function POST(req: Request) {
         }
 
         const { text } = await req.json();
+        console.log('Received text-to-speech request:', { textLength: text?.length });
 
         if (!text) {
             return NextResponse.json(
@@ -40,11 +41,14 @@ export async function POST(req: Request) {
 
         // Check if the Text-to-Speech API is enabled
         try {
+            console.log('Checking Text-to-Speech API status...');
             const [listVoicesResponse] = await client.listVoices({});
             if (!listVoicesResponse.voices?.length) {
                 throw new Error('No voices available. The Text-to-Speech API might not be enabled.');
             }
+            console.log('Text-to-Speech API is enabled and responding');
         } catch (error) {
+            console.error('Error checking Text-to-Speech API:', error);
             if (error instanceof Error && error.message.includes('PERMISSION_DENIED')) {
                 return NextResponse.json(
                     {
@@ -57,6 +61,7 @@ export async function POST(req: Request) {
             throw error;
         }
 
+        console.log('Synthesizing speech...');
         const request: protos.google.cloud.texttospeech.v1.ISynthesizeSpeechRequest = {
             input: { text },
             voice: {
@@ -82,9 +87,10 @@ export async function POST(req: Request) {
             throw new Error('No audio content generated');
         }
 
-        // Convert Buffer to Base64
+        console.log('Successfully generated audio response');
         const audioBuffer = Buffer.from(audioContent);
 
+        // Try browser's built-in speech synthesis as fallback
         return new NextResponse(audioBuffer, {
             headers: {
                 'Content-Type': 'audio/mpeg',
@@ -93,12 +99,33 @@ export async function POST(req: Request) {
         });
     } catch (error) {
         console.error('Text-to-speech error:', error);
+
+        // Provide more specific error messages
+        let errorMessage = 'Failed to convert text to speech';
+        let statusCode = 500;
+
+        if (error instanceof Error) {
+            if (error.message.includes('API not enabled')) {
+                errorMessage = 'Text-to-Speech API is not enabled. Please enable it in your Google Cloud Console.';
+                statusCode = 403;
+            } else if (error.message.includes('credentials')) {
+                errorMessage = 'Invalid Google Cloud credentials. Please check your configuration.';
+                statusCode = 401;
+            } else if (error.message.includes('quota')) {
+                errorMessage = 'API quota exceeded. Please check your Google Cloud Console.';
+                statusCode = 429;
+            } else {
+                errorMessage = error.message;
+            }
+        }
+
         return NextResponse.json(
             {
-                error: error instanceof Error ? error.message : 'Failed to convert text to speech',
-                details: error instanceof Error ? error.stack : undefined
+                error: errorMessage,
+                details: error instanceof Error ? error.stack : undefined,
+                fallback: 'browser'  // Indicate that browser speech synthesis should be used
             },
-            { status: 500 }
+            { status: statusCode }
         );
     }
 } 

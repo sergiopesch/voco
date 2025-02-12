@@ -54,6 +54,84 @@ export const useVoiceInteraction = () => {
     const recognition = useRef<SpeechRecognition | null>(null);
     const silenceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const [isAIResponding, setIsAIResponding] = useState(false);
+    const currentTranscriptRef = useRef<string>('');
+    const lastProcessedTranscriptRef = useRef<string>('');
+    const minSpeechConfidence = 0.3; // Lowered confidence threshold for better sensitivity
+    const silenceTimeout = 2000; // Increased to 2 seconds
+    const isSpeakingRef = useRef<boolean>(false);
+
+    // Add function to handle text-to-speech with fallback
+    const speakText = async (text: string): Promise<void> => {
+        try {
+            console.log('Attempting to speak text:', text);
+            // Try Google Cloud Text-to-Speech first
+            console.log('Calling Google Cloud Text-to-Speech API...');
+            const speechResponse = await fetch('/api/text-to-speech', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text }),
+            });
+
+            if (!speechResponse.ok) {
+                // If Google Cloud fails, throw error to trigger fallback
+                const errorData = await speechResponse.json();
+                console.warn('Google Cloud TTS failed:', errorData);
+                throw new Error(errorData.error || 'Failed to convert response to speech');
+            }
+
+            console.log('Got successful response from Google Cloud TTS');
+            const responseAudioBlob = await speechResponse.blob();
+            const audioUrl = URL.createObjectURL(responseAudioBlob);
+            const audio = new Audio(audioUrl);
+
+            return new Promise((resolve, reject) => {
+                audio.onended = () => {
+                    console.log('Audio playback completed');
+                    URL.revokeObjectURL(audioUrl);
+                    resolve();
+                };
+                audio.onerror = (error) => {
+                    console.error('Audio playback error:', error);
+                    URL.revokeObjectURL(audioUrl);
+                    reject(error);
+                };
+                console.log('Starting audio playback...');
+                audio.play().catch(reject);
+            });
+        } catch (error) {
+            console.warn('Falling back to browser speech synthesis:', error);
+
+            // Fallback to browser's speech synthesis
+            return new Promise((resolve, reject) => {
+                if (!window.speechSynthesis) {
+                    console.error('Speech synthesis not supported');
+                    reject(new Error('Speech synthesis not supported'));
+                    return;
+                }
+
+                // Cancel any ongoing speech
+                window.speechSynthesis.cancel();
+
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'en-US';
+                utterance.rate = 1.0;
+                utterance.pitch = 1.0;
+                utterance.volume = 1.0;
+
+                utterance.onend = () => {
+                    console.log('Browser speech synthesis completed');
+                    resolve();
+                };
+                utterance.onerror = (event) => {
+                    console.error('Browser speech synthesis error:', event);
+                    reject(event.error);
+                };
+
+                console.log('Starting browser speech synthesis...');
+                window.speechSynthesis.speak(utterance);
+            });
+        }
+    };
 
     const initializeSpeechRecognition = () => {
         if (!recognition.current) {
@@ -65,29 +143,76 @@ export const useVoiceInteraction = () => {
                 recognition.current.lang = 'en-US';
 
                 recognition.current.onresult = (event: SpeechRecognitionEvent) => {
-                    const transcript = Array.from(event.results)
-                        .map(result => result[0]?.transcript || '')
-                        .join(' ');
+                    let finalTranscript = '';
+                    let interimTranscript = '';
+                    let isSpeaking = false;
 
-                    updateVoiceState({
-                        transcription: transcript,
-                        showTranscription: true
-                    });
+                    for (let i = event.resultIndex; i < event.results.length; i++) {
+                        const result = event.results[i];
+                        const transcript = result[0].transcript;
+                        const confidence = result[0].confidence;
 
-                    // Reset silence timeout when user speaks
-                    if (silenceTimeoutRef.current) {
-                        clearTimeout(silenceTimeoutRef.current);
+                        // More lenient confidence check
+                        if (confidence > minSpeechConfidence) {
+                            if (result.isFinal) {
+                                finalTranscript += transcript;
+                                // Add final transcript to current transcript
+                                currentTranscriptRef.current += ' ' + transcript;
+                                currentTranscriptRef.current = currentTranscriptRef.current.trim();
+                                isSpeaking = true;
+                            } else {
+                                interimTranscript += transcript;
+                                isSpeaking = true;
+                            }
+                        }
                     }
 
-                    // Set new silence timeout
-                    silenceTimeoutRef.current = setTimeout(() => {
-                        if (!isAIResponding && recognition.current) {
-                            processAudio(audioChunks.current);
+                    // Update the transcription state with both final and interim results
+                    if (finalTranscript || interimTranscript) {
+                        const displayTranscript = (currentTranscriptRef.current + ' ' + interimTranscript).trim();
+                        updateVoiceState({
+                            transcription: displayTranscript,
+                            showTranscription: true
+                        });
+
+                        // Reset silence timeout when user speaks
+                        if (silenceTimeoutRef.current) {
+                            clearTimeout(silenceTimeoutRef.current);
                         }
-                    }, 1500); // 1.5 seconds of silence triggers processing
+
+                        if (isSpeaking) {
+                            isSpeakingRef.current = true;
+                            // Only set silence timeout if we have new content
+                            if (currentTranscriptRef.current !== lastProcessedTranscriptRef.current) {
+                                silenceTimeoutRef.current = setTimeout(() => {
+                                    if (!isAIResponding && recognition.current &&
+                                        currentTranscriptRef.current !== lastProcessedTranscriptRef.current &&
+                                        currentTranscriptRef.current.trim().length > 0) {
+                                        console.log('Silence detected for 2 seconds, processing audio...');
+                                        isSpeakingRef.current = false;
+                                        lastProcessedTranscriptRef.current = currentTranscriptRef.current;
+                                        processAudio(audioChunks.current);
+                                    }
+                                }, silenceTimeout);
+                            }
+                        }
+                    }
                 };
 
                 recognition.current.onerror = (event: SpeechRecognitionEvent) => {
+                    if (event.error === 'no-speech') {
+                        // Only handle no-speech error if we were previously speaking
+                        if (isSpeakingRef.current) {
+                            console.log('No speech detected after speaking, processing audio...');
+                            if (currentTranscriptRef.current !== lastProcessedTranscriptRef.current &&
+                                currentTranscriptRef.current.trim().length > 0) {
+                                lastProcessedTranscriptRef.current = currentTranscriptRef.current;
+                                processAudio(audioChunks.current);
+                            }
+                            isSpeakingRef.current = false;
+                        }
+                        return;
+                    }
                     console.error('Speech recognition error:', event.error);
                     updateVoiceState({ error: 'Speech recognition error: ' + event.error });
                 };
@@ -95,7 +220,11 @@ export const useVoiceInteraction = () => {
                 recognition.current.onend = () => {
                     if (!isAIResponding && voiceState.isListening) {
                         // Restart recognition if it ends unexpectedly
-                        recognition.current?.start();
+                        try {
+                            recognition.current?.start();
+                        } catch (error) {
+                            console.error('Error restarting recognition:', error);
+                        }
                     }
                 };
             }
@@ -104,50 +233,38 @@ export const useVoiceInteraction = () => {
 
     const processAudio = useCallback(async (audioData: Blob[]) => {
         try {
+            // Don't process if there's no new content
+            if (currentTranscriptRef.current === lastProcessedTranscriptRef.current ||
+                !currentTranscriptRef.current.trim()) {
+                console.log('No new content to process');
+                return;
+            }
+
+            console.log('Processing audio with transcript:', currentTranscriptRef.current);
             setIsAIResponding(true);
             updateVoiceState({ isProcessing: true, error: null });
-            const audioBlob = new Blob(audioData, { type: mimeTypeRef.current });
 
-            // Create form data with audio blob
-            const formData = new FormData();
-            formData.append('audio', audioBlob);
-
-            // Get final transcription from Google Cloud
-            const transcribeResponse = await fetch('/api/transcribe', {
-                method: 'POST',
-                body: formData,
-            });
-
-            if (!transcribeResponse.ok) {
-                const errorData = await transcribeResponse.json();
-                throw new Error(errorData.error || 'Failed to transcribe audio');
-            }
-
-            const transcribeData = await transcribeResponse.json();
-
-            if (!transcribeData.text) {
-                throw new Error('No speech detected. Please try speaking again.');
-            }
-
-            // Add user message
+            // Add user message with current transcript
             addMessage({
                 id: Date.now().toString(),
                 role: 'user',
-                content: transcribeData.text,
+                content: currentTranscriptRef.current,
                 timestamp: Date.now(),
             });
 
             // Get AI response
+            console.log('Fetching AI response...');
             const aiResponse = await fetch('/api/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    message: transcribeData.text,
+                    message: currentTranscriptRef.current,
                     model: selectedModel
                 }),
             });
 
             const aiData = await aiResponse.json();
+            console.log('AI response received:', aiData);
 
             if (!aiResponse.ok || !aiData.response) {
                 throw new Error(aiData.error || 'Failed to get AI response');
@@ -161,30 +278,15 @@ export const useVoiceInteraction = () => {
                 timestamp: Date.now(),
             });
 
-            // Convert to speech and play
-            const speechResponse = await fetch('/api/text-to-speech', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text: aiData.response }),
-            });
+            // Speak the response
+            console.log('Attempting to speak AI response...');
+            await speakText(aiData.response);
 
-            if (!speechResponse.ok) {
-                const errorData = await speechResponse.json();
-                throw new Error(errorData.error || 'Failed to convert response to speech');
-            }
-
-            const responseAudioBlob = await speechResponse.blob();
-            const audioUrl = URL.createObjectURL(responseAudioBlob);
-            const audio = new Audio(audioUrl);
-
-            audio.onended = () => {
-                URL.revokeObjectURL(audioUrl);
-                setIsAIResponding(false);
-                // Clear audio chunks for the next interaction
-                audioChunks.current = [];
-            };
-
-            await audio.play();
+            // Clear for next interaction
+            currentTranscriptRef.current = '';
+            lastProcessedTranscriptRef.current = '';
+            audioChunks.current = [];
+            setIsAIResponding(false);
 
         } catch (error) {
             console.error('Voice processing error:', error);
@@ -196,17 +298,19 @@ export const useVoiceInteraction = () => {
         } finally {
             updateVoiceState({ isProcessing: false });
         }
-    }, [updateVoiceState, addMessage, selectedModel, voiceState.isListening]);
+    }, [updateVoiceState, addMessage, selectedModel]);
 
     const startListening = useCallback(async () => {
         try {
-            // Clear previous transcription and state
+            // Clear previous state
             updateVoiceState({
                 transcription: '',
                 error: null,
                 isProcessing: false
             });
             setIsAIResponding(false);
+            currentTranscriptRef.current = '';
+            lastProcessedTranscriptRef.current = '';
             audioChunks.current = [];
 
             // Initialize and start speech recognition
