@@ -10,6 +10,8 @@ export interface User {
 
 export type AIProvider = 'openai' | 'google' | 'mistral';
 
+export type ModelCategory = 'Speech-to-Text' | 'Text Generation' | 'Text-to-Speech';
+
 export interface AIModel {
     id: string;
     name: string;
@@ -17,6 +19,7 @@ export interface AIModel {
     description: string;
     maxTokens: number;
     contextWindow?: number;
+    category?: ModelCategory;
 }
 
 export interface VoiceState {

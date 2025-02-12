@@ -53,8 +53,8 @@ export function AuthProvider({
           id: initialSession.user.id,
           email: initialSession.user.email || '',
           role: 'user',
-          name: initialSession.user.user_metadata.name,
-          avatar_url: initialSession.user.user_metadata.avatar_url,
+          name: initialSession.user.user_metadata?.full_name || initialSession.user.user_metadata?.name,
+          avatar_url: initialSession.user.user_metadata?.avatar_url || initialSession.user.user_metadata?.picture,
         });
       } else {
         setUser(null);
@@ -72,8 +72,8 @@ export function AuthProvider({
             id: session.user.id,
             email: session.user.email || '',
             role: 'user',
-            name: session.user.user_metadata.name,
-            avatar_url: session.user.user_metadata.avatar_url,
+            name: session.user.user_metadata?.full_name || session.user.user_metadata?.name,
+            avatar_url: session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture,
           });
         } else {
           setUser(null);

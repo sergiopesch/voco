@@ -1,13 +1,17 @@
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
-import { MistralClient } from '@mistralai/mistralai';
+import { Mistral } from '@mistralai/mistralai';
 import { AIModel } from '@/types';
 
+// Initialize OpenAI client
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
 });
 
-const mistral = new MistralClient(process.env.MISTRAL_API_KEY || '');
+// Initialize Mistral client
+const mistral = process.env.MISTRAL_API_KEY ?
+    new Mistral({ apiKey: process.env.MISTRAL_API_KEY }) :
+    null;
 
 export async function POST(req: Request) {
     try {
@@ -21,46 +25,51 @@ export async function POST(req: Request) {
             );
         }
 
-        let response: string;
+        const messages = [
+            {
+                role: 'system' as const,
+                content: 'You are a helpful AI assistant engaging in voice conversation. Keep responses concise and natural, as they will be spoken aloud.',
+            },
+            {
+                role: 'user' as const,
+                content: message,
+            },
+        ];
 
         switch (selectedModel.provider) {
-            case 'openai':
+            case 'openai': {
                 const completion = await openai.chat.completions.create({
                     model: selectedModel.id,
-                    messages: [
-                        {
-                            role: 'system',
-                            content: 'You are a helpful AI assistant engaging in voice conversation. Keep responses concise and natural, as they will be spoken aloud.',
-                        },
-                        {
-                            role: 'user',
-                            content: message,
-                        },
-                    ],
+                    messages,
                     max_tokens: selectedModel.maxTokens,
                     temperature: 0.7,
                 });
-                response = completion.choices[0]?.message?.content || '';
-                break;
 
-            case 'mistral':
-                const mistralResponse = await mistral.chat({
+                return NextResponse.json({
+                    response: completion.choices[0]?.message?.content || ''
+                });
+            }
+
+            case 'mistral': {
+                if (!mistral) {
+                    throw new Error('Mistral API key not configured');
+                }
+
+                const response = await mistral.chat.complete({
                     model: selectedModel.id,
-                    messages: [
-                        {
-                            role: 'system',
-                            content: 'You are a helpful AI assistant engaging in voice conversation. Keep responses concise and natural, as they will be spoken aloud.',
-                        },
-                        {
-                            role: 'user',
-                            content: message,
-                        },
-                    ],
-                    max_tokens: selectedModel.maxTokens,
+                    messages: messages.map(msg => ({
+                        role: msg.role === 'system' ? 'system' : 'user',
+                        content: msg.content,
+                    })),
+                    maxTokens: selectedModel.maxTokens,
                     temperature: 0.7,
                 });
-                response = mistralResponse.choices[0]?.message?.content || '';
-                break;
+
+                const content = response.choices?.[0]?.message?.content;
+                return NextResponse.json({
+                    response: typeof content === 'string' ? content : ''
+                });
+            }
 
             case 'google':
                 // Handle Google models (implementation depends on Gemini API)
@@ -69,12 +78,10 @@ export async function POST(req: Request) {
             default:
                 throw new Error('Unsupported model provider');
         }
-
-        return NextResponse.json({ response });
     } catch (error) {
         console.error('Chat error:', error);
         return NextResponse.json(
-            { error: 'Failed to get AI response' },
+            { error: error instanceof Error ? error.message : 'Failed to get AI response' },
             { status: 500 }
         );
     }
