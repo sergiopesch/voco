@@ -161,8 +161,10 @@ export function useDictation() {
       await appWindow.show();
       setStatus("idle");
     } catch (err) {
-      setError(`Transcription failed: ${err}`);
+      const detail = err instanceof Error ? err.message : String(err);
+      setError(`Transcription failed: ${detail} (${merged.length} samples)`);
       setInterimTranscript("");
+      setStatus("idle");
     }
   }, [setStatus, setTranscript, setInterimTranscript, setError]);
 

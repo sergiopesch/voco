@@ -15,8 +15,9 @@ Free Linux- and macOS-native desktop dictation application. Local-first, privacy
 - **Frontend**: React 19, Vite, TypeScript 5, Tailwind CSS 4
 - **State**: Zustand
 - **Backend language**: Rust (Tauri commands, native integrations)
-- **ASR candidates**: whisper.cpp, faster-whisper, sherpa-onnx (benchmark before locking in)
-- **Text insertion**: Platform-specific (xdotool/wtype on Linux, Accessibility API on macOS, clipboard fallback)
+- **ASR engine**: whisper.cpp (via whisper-rs bindings, ggml-base.en model)
+- **Text insertion**: Platform-specific (ydotool/xdotool on Linux, clipboard fallback)
+- **Global hotkey**: Tauri global-shortcut plugin (primary), evdev (Linux fallback), Unix socket (external trigger)
 
 ## Core Commands
 ```bash
@@ -105,9 +106,12 @@ docs/
 - [x] Rust backend compiles with config commands
 - [x] Frontend builds with Vite (React + Tailwind)
 - [x] TypeScript checks pass across all packages
+- [x] Local ASR engine integrated (whisper.cpp via whisper-rs)
+- [x] Text insertion works on Linux (ydotool/xdotool + clipboard fallback)
+- [x] Global hotkey (Alt+D) via Tauri plugin + evdev + socket fallbacks
+- [x] Tauri capabilities configured for window/event/shortcut permissions
 - [ ] Tauri dev mode runs (needs system deps: pkg-config, libglib2.0-dev)
-- [ ] Audio capture works via packages/audio
-- [ ] Local ASR engine integrated
-- [ ] Text insertion works on at least one platform
+- [ ] Audio capture tested end-to-end
 - [ ] Settings persist via Rust config
 - [ ] Full vertical slice: dictate → transcribe → insert
+- [ ] macOS text insertion (Accessibility API)

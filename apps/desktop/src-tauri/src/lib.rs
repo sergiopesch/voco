@@ -120,6 +120,12 @@ pub struct InsertResult {
 }
 
 #[tauri::command]
+fn test_toggle(app: tauri::AppHandle) -> Result<String, String> {
+    eval_toggle(&app);
+    Ok("toggled".to_string())
+}
+
+#[tauri::command]
 fn insert_text(text: String, strategy: String) -> Result<InsertResult, String> {
     let result = insertion::insert_text(&text, &strategy)?;
     Ok(InsertResult {
@@ -148,6 +154,148 @@ fn grant_webview_permissions(app: &tauri::App) {
     }
 }
 
+// --- Invoke toggle on the frontend via JS eval ---
+
+fn eval_toggle(app_handle: &tauri::AppHandle) {
+    use tauri::Manager;
+    if let Some(window) = app_handle.get_webview_window("main") {
+        if let Err(e) = window.eval("window.__toggleDictation && window.__toggleDictation()") {
+            eprintln!("JS eval failed: {e}");
+        }
+    } else {
+        eprintln!("Window 'main' not found");
+    }
+}
+
+// --- Register global shortcut via Tauri plugin (primary mechanism) ---
+
+fn register_global_shortcut(app: &tauri::App) {
+    use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
+
+    let shortcut: Shortcut = "Alt+D".parse().expect("valid shortcut");
+    let handle = app.handle().clone();
+
+    if let Err(e) = app.global_shortcut().on_shortcut(shortcut, move |_app, _shortcut, event| {
+        if event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed {
+            eprintln!("Alt+D detected via global shortcut plugin");
+            eval_toggle(&handle);
+        }
+    }) {
+        eprintln!("Failed to register global shortcut: {e}");
+        eprintln!("Falling back to evdev/socket listeners");
+    } else {
+        eprintln!("Global shortcut Alt+D registered");
+    }
+}
+
+// --- Socket listener for GNOME custom keybinding (fallback) ---
+
+fn socket_path() -> std::path::PathBuf {
+    let runtime_dir = std::env::var("XDG_RUNTIME_DIR").unwrap_or_else(|_| "/tmp".to_string());
+    std::path::PathBuf::from(runtime_dir).join("voice-dictation.sock")
+}
+
+fn start_socket_listener(app_handle: tauri::AppHandle) {
+    use std::os::unix::net::UnixListener;
+
+    let path = socket_path();
+    let _ = std::fs::remove_file(&path);
+
+    let listener = match UnixListener::bind(&path) {
+        Ok(l) => l,
+        Err(e) => {
+            eprintln!("Failed to create socket at {}: {e}", path.display());
+            return;
+        }
+    };
+
+    eprintln!("Socket listener ready: {}", path.display());
+
+    std::thread::spawn(move || {
+        for stream in listener.incoming() {
+            match stream {
+                Ok(_) => {
+                    eprintln!("Toggle received via socket");
+                    eval_toggle(&app_handle);
+                }
+                Err(e) => {
+                    eprintln!("Socket error: {e}");
+                    break;
+                }
+            }
+        }
+    });
+}
+
+// --- Global hotkey via evdev (Wayland fallback, needs input group) ---
+
+#[cfg(target_os = "linux")]
+fn start_hotkey_listener(app_handle: tauri::AppHandle) {
+    use evdev::{Device, InputEventKind, Key};
+
+    std::thread::spawn(move || {
+        let devices = evdev::enumerate()
+            .filter_map(|(_, device)| {
+                let keys = device.supported_keys()?;
+                if keys.contains(Key::KEY_A) && keys.contains(Key::KEY_LEFTALT) {
+                    Some(device)
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<Device>>();
+
+        if devices.is_empty() {
+            eprintln!("No keyboard found for evdev hotkey listener. Add user to 'input' group:");
+            eprintln!("  sudo usermod -aG input $USER");
+            eprintln!("  (then log out and back in)");
+            return;
+        }
+
+        eprintln!("evdev hotkey listener started on {} keyboard(s)", devices.len());
+
+        let alt_held = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+
+        for device in devices {
+            let app = app_handle.clone();
+            let alt = alt_held.clone();
+
+            std::thread::spawn(move || {
+                let mut dev = device;
+                loop {
+                    match dev.fetch_events() {
+                        Ok(events) => {
+                            for ev in events {
+                                if let InputEventKind::Key(key) = ev.kind() {
+                                    let pressed = ev.value() == 1;
+                                    let repeat = ev.value() == 2;
+
+                                    match key {
+                                        Key::KEY_LEFTALT | Key::KEY_RIGHTALT => {
+                                            alt.store(pressed, std::sync::atomic::Ordering::Relaxed);
+                                        }
+                                        Key::KEY_D if pressed && !repeat => {
+                                            if alt.load(std::sync::atomic::Ordering::Relaxed) {
+                                                eprintln!("Alt+D detected via evdev");
+                                                eval_toggle(&app);
+                                            }
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("Keyboard read error: {e}");
+                            break;
+                        }
+                    }
+                }
+            });
+        }
+    });
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -162,10 +310,15 @@ pub fn run() {
             download_model,
             transcribe_audio,
             insert_text,
+            test_toggle,
         ])
         .setup(|app| {
             #[cfg(target_os = "linux")]
             grant_webview_permissions(app);
+            register_global_shortcut(app);
+            start_socket_listener(app.handle().clone());
+            #[cfg(target_os = "linux")]
+            start_hotkey_listener(app.handle().clone());
             Ok(())
         })
         .run(tauri::generate_context!())

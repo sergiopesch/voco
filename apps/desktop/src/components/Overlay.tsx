@@ -97,7 +97,7 @@ export function Overlay() {
             <p className="text-xs text-green-700 truncate">{transcript}</p>
           ) : (
             <p className="text-xs text-gray-500">
-              Ctrl+Shift+Space to dictate
+              Alt+D to dictate
             </p>
           )}
         </div>
