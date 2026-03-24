@@ -175,6 +175,9 @@ fn register_global_shortcut(app: &tauri::App) {
     let shortcut: Shortcut = "Alt+D".parse().expect("valid shortcut");
     let handle = app.handle().clone();
 
+    // Unregister first in case a previous instance left it registered
+    let _ = app.global_shortcut().unregister(shortcut);
+
     if let Err(e) = app.global_shortcut().on_shortcut(shortcut, move |_app, _shortcut, event| {
         if event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed {
             eprintln!("Alt+D detected via global shortcut plugin");
