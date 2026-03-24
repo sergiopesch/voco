@@ -113,6 +113,8 @@ docs/
 - [x] Tauri dev mode runs (requires system deps and `sg input` for evdev on Wayland)
 - [x] Audio capture tested end-to-end (WebView getUserMedia → ScriptProcessorNode)
 - [x] Full vertical slice: dictate → transcribe → insert (confirmed working 2026-03-24)
+- [x] System tray integration with dynamic icon (white=idle, red=recording)
+- [x] Invisible window — tray-only UX, no visible rectangle
 - [ ] Settings persist via Rust config
 - [ ] macOS text insertion (Accessibility API)
 - [ ] ydotoold setup documentation for Wayland text insertion

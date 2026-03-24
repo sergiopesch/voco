@@ -4,19 +4,23 @@ Free, local-first desktop dictation for Linux and macOS. Speak, and your words a
 
 ## How It Works
 
-1. Press **Alt+D** to start dictating
-2. Speak into your microphone
-3. Press **Alt+D** again to stop
-4. Text is transcribed locally via whisper.cpp and inserted into whatever app has focus
+1. Launch the app — it lives in the **system tray** (top bar, next to volume/battery)
+2. Press **Alt+D** to start dictating
+3. Speak into your microphone — the tray icon turns red while recording
+4. Press **Alt+D** again to stop
+5. Text is transcribed locally via whisper.cpp and inserted where your cursor is
+
+No visible window. The app runs entirely from the system tray.
 
 ## Features
 
 - **Fully local** — audio never leaves your machine
 - **No account or sign-in required**
+- **System tray app** — no visible window, only a tray icon
 - **Global hotkey** (Alt+D) works from any application
 - **Local ASR** via whisper.cpp (base.en model, ~142 MB one-time download)
 - **Smart text insertion** — types directly into the focused app (ydotool/xdotool), falls back to clipboard paste
-- **Minimal overlay UI** — small always-on-top widget shows recording/processing status
+- **Tray icon feedback** — white mic (idle), red mic (recording)
 
 ## Requirements
 
@@ -24,7 +28,8 @@ Free, local-first desktop dictation for Linux and macOS. Speak, and your words a
 - System dependencies for building:
   ```bash
   sudo apt install pkg-config libglib2.0-dev libsoup-3.0-dev \
-    libjavascriptcoregtk-4.1-dev libwebkit2gtk-4.1-dev
+    libjavascriptcoregtk-4.1-dev libwebkit2gtk-4.1-dev \
+    libayatana-appindicator3-dev
   ```
 - For text insertion: `ydotool` (Wayland) or `xdotool` (X11), with `wl-copy`/`xclip` as clipboard fallback
 - For evdev hotkey fallback (Wayland): add user to `input` group and log out/in:
@@ -66,9 +71,10 @@ npm run check     # TypeScript check all workspaces
 
 ```
 apps/desktop/               Tauri 2 desktop application
-  src/                      React frontend (overlay UI)
+  src/                      React frontend (model setup UI)
   src-tauri/                Rust backend
     src/lib.rs              App setup, hotkey registration, commands
+    src/tray.rs             System tray icon and menu
     src/transcribe.rs       whisper.cpp integration
     src/insertion.rs        Text insertion (ydotool/xdotool/clipboard)
     src/config.rs           Settings persistence

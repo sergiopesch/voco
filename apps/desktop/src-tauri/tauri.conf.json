@@ -14,14 +14,17 @@
       {
         "label": "main",
         "title": "Voice Dictation",
-        "width": 300,
-        "height": 120,
+        "width": 1,
+        "height": 1,
+        "x": -100,
+        "y": -100,
         "resizable": false,
-        "alwaysOnTop": true,
+        "alwaysOnTop": false,
         "decorations": false,
         "transparent": true,
         "skipTaskbar": true,
-        "center": true
+        "visible": true,
+        "center": false
       }
     ],
     "security": {
@@ -40,7 +43,7 @@
     ],
     "linux": {
       "deb": {
-        "depends": ["libwebkit2gtk-4.1-0", "libgtk-3-0"]
+        "depends": ["libwebkit2gtk-4.1-0", "libgtk-3-0", "libayatana-appindicator3-1"]
       },
       "appimage": {
         "bundleMediaFramework": true

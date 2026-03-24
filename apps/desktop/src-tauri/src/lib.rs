@@ -1,6 +1,7 @@
 mod config;
 mod insertion;
 mod transcribe;
+mod tray;
 
 use config::AppConfig;
 use std::sync::Mutex;
@@ -120,9 +121,9 @@ pub struct InsertResult {
 }
 
 #[tauri::command]
-fn test_toggle(app: tauri::AppHandle) -> Result<String, String> {
-    eval_toggle(&app);
-    Ok("toggled".to_string())
+fn set_recording_state(app: tauri::AppHandle, recording: bool) -> Result<(), String> {
+    tray::update_tray_icon(&app, recording);
+    Ok(())
 }
 
 #[tauri::command]
@@ -156,9 +157,13 @@ fn grant_webview_permissions(app: &tauri::App) {
 
 // --- Invoke toggle on the frontend via JS eval ---
 
-fn eval_toggle(app_handle: &tauri::AppHandle) {
+pub fn eval_toggle(app_handle: &tauri::AppHandle) {
     use tauri::Manager;
     if let Some(window) = app_handle.get_webview_window("main") {
+        // Window must be "shown" for WebKitGTK to run JS and getUserMedia.
+        // We keep it at 1x1 off-screen so user never sees it.
+        let _ = window.show();
+        std::thread::sleep(std::time::Duration::from_millis(100));
         if let Err(e) = window.eval("window.__toggleDictation && window.__toggleDictation()") {
             eprintln!("JS eval failed: {e}");
         }
@@ -175,7 +180,6 @@ fn register_global_shortcut(app: &tauri::App) {
     let shortcut: Shortcut = "Alt+D".parse().expect("valid shortcut");
     let handle = app.handle().clone();
 
-    // Unregister first in case a previous instance left it registered
     let _ = app.global_shortcut().unregister(shortcut);
 
     if let Err(e) = app.global_shortcut().on_shortcut(shortcut, move |_app, _shortcut, event| {
@@ -185,13 +189,12 @@ fn register_global_shortcut(app: &tauri::App) {
         }
     }) {
         eprintln!("Failed to register global shortcut: {e}");
-        eprintln!("Falling back to evdev/socket listeners");
     } else {
         eprintln!("Global shortcut Alt+D registered");
     }
 }
 
-// --- Socket listener for GNOME custom keybinding (fallback) ---
+// --- Socket listener for external triggers ---
 
 fn socket_path() -> std::path::PathBuf {
     let runtime_dir = std::env::var("XDG_RUNTIME_DIR").unwrap_or_else(|_| "/tmp".to_string());
@@ -230,7 +233,7 @@ fn start_socket_listener(app_handle: tauri::AppHandle) {
     });
 }
 
-// --- Global hotkey via evdev (Wayland fallback, needs input group) ---
+// --- Global hotkey via evdev (Wayland, needs input group) ---
 
 #[cfg(target_os = "linux")]
 fn start_hotkey_listener(app_handle: tauri::AppHandle) {
@@ -251,7 +254,6 @@ fn start_hotkey_listener(app_handle: tauri::AppHandle) {
         if devices.is_empty() {
             eprintln!("No keyboard found for evdev hotkey listener. Add user to 'input' group:");
             eprintln!("  sudo usermod -aG input $USER");
-            eprintln!("  (then log out and back in)");
             return;
         }
 
@@ -313,7 +315,7 @@ pub fn run() {
             download_model,
             transcribe_audio,
             insert_text,
-            test_toggle,
+            set_recording_state,
         ])
         .setup(|app| {
             #[cfg(target_os = "linux")]
@@ -322,6 +324,11 @@ pub fn run() {
             start_socket_listener(app.handle().clone());
             #[cfg(target_os = "linux")]
             start_hotkey_listener(app.handle().clone());
+
+            if let Err(e) = tray::setup_tray(app) {
+                eprintln!("Failed to setup tray: {e}");
+            }
+
             Ok(())
         })
         .run(tauri::generate_context!())

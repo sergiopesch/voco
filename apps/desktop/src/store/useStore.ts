@@ -16,6 +16,7 @@ interface AppState {
   // Audio
   audioDevices: AudioDevice[];
   selectedDeviceId: string | null;
+  audioLevel: number;
 
   // Config
   config: AppConfig | null;
@@ -37,6 +38,7 @@ interface AppState {
   setError: (error: string | null) => void;
   setAudioDevices: (devices: AudioDevice[]) => void;
   setSelectedDevice: (deviceId: string | null) => void;
+  setAudioLevel: (level: number) => void;
   setConfig: (config: AppConfig) => void;
   setPlatform: (platform: PlatformInfo) => void;
   setView: (view: "main" | "settings") => void;
@@ -50,6 +52,7 @@ export const useStore = create<AppState>((set) => ({
   error: null,
   audioDevices: [],
   selectedDeviceId: null,
+  audioLevel: 0,
   config: null,
   platform: null,
   modelReady: false,
@@ -62,6 +65,7 @@ export const useStore = create<AppState>((set) => ({
   setError: (error) => set({ error, status: error ? "error" : "idle" }),
   setAudioDevices: (devices) => set({ audioDevices: devices }),
   setSelectedDevice: (deviceId) => set({ selectedDeviceId: deviceId }),
+  setAudioLevel: (level) => set({ audioLevel: level }),
   setConfig: (config) => set({ config }),
   setPlatform: (platform) => set({ platform }),
   setView: (view) => set({ view }),

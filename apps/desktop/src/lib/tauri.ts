@@ -42,3 +42,7 @@ export async function insertText(
 ): Promise<InsertResult> {
   return invoke<InsertResult>("insert_text", { text, strategy });
 }
+
+export async function setRecordingState(recording: boolean): Promise<void> {
+  return invoke("set_recording_state", { recording });
+}

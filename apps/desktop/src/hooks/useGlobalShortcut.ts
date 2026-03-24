@@ -7,9 +7,7 @@ export function useGlobalShortcut() {
   toggleRef.current = toggle;
 
   useEffect(() => {
-    // Expose toggle function globally so Rust can call it via window.eval()
     (window as unknown as Record<string, unknown>).__toggleDictation = () => {
-      console.log("__toggleDictation called from Rust");
       toggleRef.current();
     };
 

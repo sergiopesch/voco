@@ -1,7 +1,8 @@
 import { useCallback, useRef } from "react";
 import { useStore } from "@/store/useStore";
-import { transcribeAudio, insertText } from "@/lib/tauri";
+import { transcribeAudio, insertText, setRecordingState } from "@/lib/tauri";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { LogicalSize, LogicalPosition } from "@tauri-apps/api/dpi";
 
 const TARGET_SAMPLE_RATE = 16000;
 
@@ -12,6 +13,7 @@ export function useDictation() {
     setTranscript,
     setInterimTranscript,
     setError,
+    setAudioLevel,
     clearTranscript,
   } = useStore();
 
@@ -20,6 +22,29 @@ export function useDictation() {
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const samplesRef = useRef<Float32Array[]>([]);
+
+  const moveWindowOffScreen = useCallback(async () => {
+    try {
+      const w = getCurrentWindow();
+      await w.setSize(new LogicalSize(1, 1));
+      await w.setPosition(new LogicalPosition(-100, -100));
+      await w.show(); // Must stay "shown" for WebKitGTK to allow getUserMedia
+    } catch (e) {
+      console.warn("Failed to move window off-screen:", e);
+    }
+  }, []);
+
+  const showWindowLarge = useCallback(async () => {
+    try {
+      const w = getCurrentWindow();
+      await w.setSize(new LogicalSize(300, 200));
+      await w.center();
+      await w.show();
+      await w.setFocus();
+    } catch (e) {
+      console.warn("Failed to show window:", e);
+    }
+  }, []);
 
   const startRecording = useCallback(async () => {
     try {
@@ -45,24 +70,31 @@ export function useDictation() {
       const audioContext = new AudioContext({ sampleRate: TARGET_SAMPLE_RATE });
       audioContextRef.current = audioContext;
 
-      // If browser gave us a different sample rate, we'll resample later
       const source = audioContext.createMediaStreamSource(stream);
       sourceRef.current = source;
 
-      // Use ScriptProcessorNode to capture raw PCM
-      // (AudioWorklet would be better but requires separate file + more setup)
       const processor = audioContext.createScriptProcessor(4096, 1, 1);
       processorRef.current = processor;
 
       processor.onaudioprocess = (e) => {
         const input = e.inputBuffer.getChannelData(0);
         samplesRef.current.push(new Float32Array(input));
+
+        let sum = 0;
+        for (let i = 0; i < input.length; i++) {
+          sum += input[i]! * input[i]!;
+        }
+        const rms = Math.sqrt(sum / input.length);
+        const level = Math.min(1, rms * 8);
+        setAudioLevel(level);
       };
 
       source.connect(processor);
       processor.connect(audioContext.destination);
 
       setStatus("recording");
+      // Update tray icon to red (recording)
+      setRecordingState(true).catch(() => {});
     } catch (err) {
       if (err instanceof DOMException) {
         if (err.name === "NotAllowedError") {
@@ -76,7 +108,7 @@ export function useDictation() {
         setError(`Failed to start recording: ${err}`);
       }
     }
-  }, [clearTranscript, setError, setStatus]);
+  }, [clearTranscript, setError, setStatus, setAudioLevel]);
 
   const stopRecording = useCallback(async () => {
     // Stop audio capture
@@ -92,6 +124,10 @@ export function useDictation() {
       streamRef.current.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
     }
+
+    setAudioLevel(0);
+    // Update tray icon back to white (idle)
+    setRecordingState(false).catch(() => {});
 
     const sampleRate = audioContextRef.current?.sampleRate ?? TARGET_SAMPLE_RATE;
 
@@ -132,7 +168,6 @@ export function useDictation() {
     setInterimTranscript("Transcribing...");
 
     try {
-      // Send to Rust for transcription
       const transcript = await transcribeAudio(Array.from(merged));
       setInterimTranscript("");
 
@@ -144,21 +179,16 @@ export function useDictation() {
 
       setTranscript(transcript);
 
-      // Hide overlay so the previous app regains focus, then insert text
-      const appWindow = getCurrentWindow();
-      try {
-        await appWindow.hide();
-        // Wait for compositor to refocus the previous window
-        await new Promise((r) => setTimeout(r, 250));
+      // Small delay to let focus return to the previous app
+      await new Promise((r) => setTimeout(r, 250));
 
-        const strategy = useStore.getState().config?.insertionStrategy ?? "auto";
+      const strategy = useStore.getState().config?.insertionStrategy ?? "auto";
+      try {
         await insertText(transcript, strategy);
       } catch (insertErr) {
         console.warn("Text insertion failed:", insertErr);
       }
 
-      // Show overlay again briefly with the result
-      await appWindow.show();
       setStatus("idle");
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err);
@@ -166,7 +196,7 @@ export function useDictation() {
       setInterimTranscript("");
       setStatus("idle");
     }
-  }, [setStatus, setTranscript, setInterimTranscript, setError]);
+  }, [setStatus, setTranscript, setInterimTranscript, setError, setAudioLevel]);
 
   const toggle = useCallback(() => {
     if (status === "recording") {
@@ -180,6 +210,8 @@ export function useDictation() {
     toggle,
     startRecording,
     stopRecording,
+    showWindowLarge,
+    moveWindowOffScreen,
     isRecording: status === "recording",
     isProcessing: status === "processing",
   };
