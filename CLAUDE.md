@@ -21,41 +21,30 @@ Free Linux- and macOS-native desktop dictation application. Local-first, privacy
 
 ## Core Commands
 ```bash
-npm run dev       # Start Tauri dev (frontend + Rust backend)
-npm run build     # Production Tauri build
-npm run lint      # ESLint (desktop frontend)
-npm run check     # TypeScript check all workspaces
-npm run test      # Run tests across workspaces
+./scripts/setup.sh  # One-command setup (deps + npm install)
+npm run dev          # Start Tauri dev (frontend + Rust backend)
+npm run build        # Production Tauri build
+npm run check        # TypeScript check
 ```
 
 ## Architecture
 ```
-apps/
-  desktop/              # Tauri desktop application
-    src/                # React frontend
-      components/       # UI components
-      hooks/            # React hooks
-      store/            # Zustand store
-      lib/              # Tauri bridge, utilities
-      types/            # TypeScript types
-    src-tauri/          # Rust backend
-      src/              # Tauri commands, config, platform logic
-
-packages/
-  shared/               # Shared types and constants
-  audio/                # Microphone capture, device enumeration, buffering
-  asr/                  # ASR engine abstraction, local transcription
-  insertion/            # Text insertion strategies (X11, Wayland, macOS, clipboard)
-  formatting/           # Transcript cleanup, punctuation
-  config/               # Typed config, defaults
-  logging/              # Structured logging
-
-docs/
-  architecture/         # Architecture docs
-  security/             # Security docs
-  testing/              # Testing docs
-  decisions/            # ADRs
-  platform/             # Platform-specific docs
+apps/desktop/              # Tauri desktop application
+  src/                     # React frontend
+    components/            # Overlay, ModelSetup
+    hooks/                 # useDictation, useGlobalShortcut
+    store/                 # Zustand store
+    lib/                   # Tauri bridge
+    types/                 # TypeScript types
+  src-tauri/               # Rust backend
+    src/lib.rs             # App setup, hotkey registration, commands
+    src/tray.rs            # System tray icon and menu
+    src/transcribe.rs      # whisper.cpp integration
+    src/insertion.rs        # Text insertion (ydotool/xdotool/clipboard)
+    src/config.rs          # Settings persistence
+    capabilities/          # Tauri 2 permission declarations
+scripts/
+  setup.sh                 # One-command dependency setup
 ```
 
 ## Coding Conventions
@@ -64,13 +53,10 @@ docs/
 - Tailwind utility classes; no CSS modules
 - Path aliases via `@/` prefix in desktop app
 - Rust: idiomatic Rust with serde for Tauri command serialization
-- Packages expose types and functions via `src/index.ts`
-- npm workspaces for monorepo management
 
 ## Testing Expectations
 - Vitest for unit/integration tests
 - Playwright for E2E tests
-- Test packages independently
 - Mock Tauri commands in frontend tests
 - Create harnesses for system-level boundaries (mic, insertion)
 
@@ -102,19 +88,17 @@ docs/
 - Package targets: .dmg, signed + notarized
 
 ## Completion Checklist
-- [x] Monorepo structure with Tauri app and packages
-- [x] Rust backend compiles with config commands
+- [x] Tauri desktop app with Rust backend
 - [x] Frontend builds with Vite (React + Tailwind)
-- [x] TypeScript checks pass across all packages
 - [x] Local ASR engine integrated (whisper.cpp via whisper-rs)
 - [x] Text insertion works on Linux (ydotool/xdotool + clipboard fallback)
 - [x] Global hotkey (Alt+D) via Tauri plugin + evdev + socket fallbacks
 - [x] Tauri capabilities configured for window/event/shortcut permissions
-- [x] Tauri dev mode runs (requires system deps and `sg input` for evdev on Wayland)
-- [x] Audio capture tested end-to-end (WebView getUserMedia → ScriptProcessorNode)
+- [x] Audio capture end-to-end (WebView getUserMedia → ScriptProcessorNode)
 - [x] Full vertical slice: dictate → transcribe → insert (confirmed working 2026-03-24)
 - [x] System tray integration with dynamic icon (white=idle, red=recording)
 - [x] Invisible window — tray-only UX, no visible rectangle
+- [x] Setup script for one-command installation
 - [ ] Settings persist via Rust config
 - [ ] macOS text insertion (Accessibility API)
 - [ ] ydotoold setup documentation for Wayland text insertion

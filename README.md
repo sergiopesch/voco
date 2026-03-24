@@ -1,114 +1,91 @@
 # Voice Dictation
 
-Free, local-first desktop dictation for Linux and macOS. Speak, and your words are transcribed locally and inserted into the active application. No account, no subscription, no cloud dependency.
+Free, local-first desktop dictation for Linux and macOS. Press a hotkey, speak, and your words appear wherever your cursor is. No account, no cloud, no subscription.
+
+## Quick Start
+
+```bash
+git clone https://github.com/sergiopesch/voice.git
+cd voice
+./scripts/setup.sh   # installs all dependencies
+npm run dev           # launches the app
+```
+
+On first launch, the app prompts to download the speech model (~142 MB, one-time). After that, press **Alt+D** to dictate.
 
 ## How It Works
 
-1. Launch the app — it lives in the **system tray** (top bar, next to volume/battery)
-2. Press **Alt+D** to start dictating
-3. Speak into your microphone — the tray icon turns red while recording
-4. Press **Alt+D** again to stop
-5. Text is transcribed locally via whisper.cpp and inserted where your cursor is
+1. The app lives in your **system tray** (top bar, next to volume/battery)
+2. Press **Alt+D** → speak → press **Alt+D** again
+3. Text is transcribed locally and inserted where your cursor is
 
-No visible window. The app runs entirely from the system tray.
+No visible window. No network calls. Everything runs on your machine.
 
 ## Features
 
 - **Fully local** — audio never leaves your machine
-- **No account or sign-in required**
-- **System tray app** — no visible window, only a tray icon
-- **Global hotkey** (Alt+D) works from any application
-- **Local ASR** via whisper.cpp (base.en model, ~142 MB one-time download)
-- **Smart text insertion** — types directly into the focused app (ydotool/xdotool), falls back to clipboard paste
-- **Tray icon feedback** — white mic (idle), red mic (recording)
+- **No sign-in** — works immediately after install
+- **Global hotkey** (Alt+D) — works from any application
+- **System tray** — white mic (idle), red mic (recording)
+- **Local ASR** — whisper.cpp (base.en model)
+- **Smart insertion** — types into the focused app, clipboard fallback
 
 ## Requirements
 
-### Linux
-- System dependencies for building:
-  ```bash
-  sudo apt install pkg-config libglib2.0-dev libsoup-3.0-dev \
-    libjavascriptcoregtk-4.1-dev libwebkit2gtk-4.1-dev \
-    libayatana-appindicator3-dev
-  ```
-- For text insertion: `ydotool` (Wayland) or `xdotool` (X11), with `wl-copy`/`xclip` as clipboard fallback
-- For evdev hotkey fallback (Wayland): add user to `input` group and log out/in:
-  ```bash
-  sudo usermod -aG input $USER
-  ```
-- Rust toolchain (rustup)
-- Node.js 18+
+The setup script handles most of this, but for reference:
 
-### macOS
-- Xcode command line tools
-- Rust toolchain (rustup)
-- Node.js 18+
+| | Linux | macOS |
+|---|---|---|
+| **Runtime** | Node.js 18+, Rust | Node.js 18+, Rust, Xcode CLI |
+| **Text insertion** | ydotool (Wayland) or xdotool (X11) | — |
+| **Hotkey (Wayland)** | User in `input` group | — |
 
-## Getting Started
+<details>
+<summary>Manual dependency install (if not using setup script)</summary>
 
+**Linux (apt)**:
 ```bash
-# Clone and install
-git clone <repository-url>
-cd voice
-npm install
-
-# Start in development mode
-npm run dev
-
-# On first launch, click "Download Model" to fetch the whisper base.en model (~142 MB)
-# Then press Alt+D to start dictating
+sudo apt install pkg-config libglib2.0-dev libsoup-3.0-dev \
+  libjavascriptcoregtk-4.1-dev libwebkit2gtk-4.1-dev \
+  libayatana-appindicator3-dev
 ```
+
+**Wayland text insertion**:
+```bash
+sudo apt install ydotool wl-clipboard
+sudo usermod -aG input $USER  # then log out/in
+```
+
+**X11 text insertion**:
+```bash
+sudo apt install xdotool xclip
+```
+</details>
 
 ## Commands
 
 ```bash
 npm run dev       # Start Tauri dev (frontend + Rust backend)
 npm run build     # Production build
-npm run check     # TypeScript check all workspaces
+npm run check     # TypeScript type-check
 ```
 
 ## Architecture
 
 ```
-apps/desktop/               Tauri 2 desktop application
-  src/                      React frontend (model setup UI)
-  src-tauri/                Rust backend
-    src/lib.rs              App setup, hotkey registration, commands
-    src/tray.rs             System tray icon and menu
-    src/transcribe.rs       whisper.cpp integration
-    src/insertion.rs        Text insertion (ydotool/xdotool/clipboard)
-    src/config.rs           Settings persistence
-    capabilities/           Tauri 2 permission declarations
-
-packages/                   Shared libraries (types, audio, config, etc.)
+apps/desktop/
+  src/                React frontend (model setup)
+  src-tauri/          Rust backend
+    src/lib.rs        App setup, hotkey, commands
+    src/tray.rs       System tray icon + menu
+    src/transcribe.rs whisper.cpp integration
+    src/insertion.rs  Text insertion (ydotool/xdotool/clipboard)
+    src/config.rs     Settings persistence
 ```
-
-### Global Hotkey
-
-Three mechanisms ensure Alt+D works across environments:
-
-| Mechanism | Platform | Notes |
-|-----------|----------|-------|
-| Tauri global-shortcut plugin | X11, XWayland | Primary — registers via GDK/X11 |
-| evdev raw input listener | Linux (any) | Reads hardware keyboard directly, needs `input` group |
-| Unix socket | Linux | External trigger via `$XDG_RUNTIME_DIR/voice-dictation.sock` |
-
-### Text Insertion
-
-| Session | Primary | Fallback |
-|---------|---------|----------|
-| Wayland | ydotool type | wl-copy + ydotool Ctrl+V |
-| X11 | xdotool type | xclip + xdotool Ctrl+V |
-
-Clipboard contents are saved and restored after paste fallback.
 
 ## Stack
 
-- **Desktop shell**: Tauri 2 (Rust + WebView)
-- **Frontend**: React 19, Vite, TypeScript, Tailwind CSS 4
-- **State**: Zustand
-- **ASR**: whisper.cpp via whisper-rs
-- **Audio capture**: Web Audio API (getUserMedia + ScriptProcessorNode)
+Tauri 2 (Rust + WebView) · React 19 · Vite · TypeScript · Tailwind CSS 4 · Zustand · whisper.cpp via whisper-rs
 
 ## License
 
