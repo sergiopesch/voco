@@ -1,6 +1,27 @@
 use std::path::PathBuf;
 use std::sync::Mutex;
+use std::sync::Once;
 use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters};
+
+static INIT_LOG: Once = Once::new();
+
+/// No-op callback to suppress whisper.cpp's verbose C-level logging
+unsafe extern "C" fn whisper_log_noop(
+    _level: std::os::raw::c_uint,
+    _text: *const std::ffi::c_char,
+    _user_data: *mut std::ffi::c_void,
+) {
+}
+
+fn suppress_whisper_logging() {
+    INIT_LOG.call_once(|| {
+        // SAFETY: Setting a no-op log callback to silence whisper.cpp debug output.
+        // This is called once before any whisper context is created.
+        unsafe {
+            whisper_rs::set_log_callback(Some(whisper_log_noop), std::ptr::null_mut());
+        }
+    });
+}
 
 pub struct WhisperState {
     ctx: Option<WhisperContext>,
@@ -19,6 +40,8 @@ impl WhisperState {
         if self.model_path.as_deref() == Some(path) && self.ctx.is_some() {
             return Ok(());
         }
+
+        suppress_whisper_logging();
 
         let ctx = WhisperContext::new_with_params(
             path.to_str().ok_or("Invalid model path")?,
@@ -43,6 +66,7 @@ impl WhisperState {
         params.set_print_timestamps(false);
         params.set_print_special(false);
         params.set_suppress_blank(true);
+        params.set_suppress_nst(true);
         params.set_no_speech_thold(0.6);
         params.set_single_segment(false);
         params.set_n_threads(num_cpus());
@@ -59,7 +83,17 @@ impl WhisperState {
             }
         }
 
-        Ok(text.trim().to_string())
+        let trimmed = text.trim();
+
+        // Filter out whisper hallucination artifacts on silence/noise
+        let cleaned = trimmed
+            .replace("[BLANK_AUDIO]", "")
+            .replace("[Music]", "")
+            .replace("(music)", "")
+            .replace("[MUSIC]", "");
+        let cleaned = cleaned.trim();
+
+        Ok(cleaned.to_string())
     }
 }
 
