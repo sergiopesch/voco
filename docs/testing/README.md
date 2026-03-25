@@ -1,38 +1,38 @@
 # Testing
 
 ## Current State
-No test suite exists yet. This document outlines the planned testing strategy.
+No automated test suite exists yet. This document outlines the planned testing strategy.
 
 ## Planned Stack
-- **Unit/Integration**: Vitest
-- **E2E**: Playwright (or Tauri's WebDriver support)
-- **Rust**: cargo test for backend logic
+- **Unit/Integration**: Vitest (frontend), cargo test (Rust)
+- **E2E**: Playwright or Tauri's WebDriver support
+- **Manual**: Socket-based trigger testing
 
 ## Priority Test Targets
 
 ### High Priority
-1. **packages/formatting** — Pure functions, easy to test
-2. **packages/config** — Config merging and defaults
-3. **packages/logging** — Log level filtering
-4. **Rust config** (src-tauri/src/config.rs) — Serialize/deserialize, default creation
+1. **Rust insertion logic** (`insertion.rs`) — Strategy selection, shell command construction, fallback chain
+2. **Rust transcription** (`transcribe.rs`) — Model loading, audio processing, hallucination filtering
+3. **Rust config** (`config.rs`) — Serialize/deserialize, default creation, XDG path resolution
 
 ### Medium Priority
-5. **packages/audio** — Mock getUserMedia, test capture lifecycle
-6. **packages/asr** — Mock ASR backends, test interface contract
-7. **Zustand store** — Test all actions produce correct state
+4. **Frontend dictation hook** (`useDictation.ts`) — State machine, audio capture lifecycle, resampling
+5. **Zustand store** (`useStore.ts`) — All actions produce correct state transitions
+6. **Frontend bridge** (`tauri.ts`) — Invoke contracts match Rust command signatures
 
 ### Lower Priority (system boundaries)
-8. **packages/insertion** — Requires mocking platform APIs
-9. **E2E dictation flow** — Requires mic + ASR + insertion mocks
+7. **Tray state** — Recording/idle transitions, menu text updates
+8. **E2E dictation flow** — Requires mic + ASR + insertion (manual or mocked)
 
-## Difficult-to-Automate Boundaries
+## Manual Verification
 For system-level features that are hard to automate:
-- Create manual verification scripts in `scripts/`
-- Document expected behavior in test docs
-- Use Tauri's mock runtime for IPC testing
+- Trigger via Unix socket: `printf "toggle" | socat - UNIX-CONNECT:$XDG_RUNTIME_DIR/voice.sock`
+- Check tray icon state visually
+- Verify insertion in a text editor
+- State the distro, desktop environment, compositor, and insertion path used
 
 ## Setup Required
 - Install: `npm install -D vitest`
 - Add `vitest.config.ts` to apps/desktop
-- Add `test` scripts to relevant packages
+- Add `test` script to apps/desktop/package.json
 - Add `#[cfg(test)]` modules in Rust code
