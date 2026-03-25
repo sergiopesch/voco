@@ -12,12 +12,11 @@
 
 ## Performance
 - Avoid unnecessary re-renders: memoize where profiling shows benefit
-- API routes must respond within 5s or stream partial results
 - Audio processing must not block the main thread
 - Monitor bundle size; lazy-load heavy components
 
 ## UX Standards
 - Voice feedback must be immediate (visual indicator within 100ms of mic activation)
-- Errors must be user-readable, not stack traces
+- Errors must be user-readable and Linux-aware, not stack traces
 - Transcription display must update in real-time without jank
-- TTS playback must not overlap with active recording
+- The app is tray-first: it should feel invisible when idle and dependable when invoked

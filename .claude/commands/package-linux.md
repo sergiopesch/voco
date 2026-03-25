@@ -1,20 +1,22 @@
 # Package for Linux
 
-Evaluate and plan Linux desktop packaging.
+Evaluate and improve Linux desktop packaging.
 
 ## Steps
-1. Assess current deployment target (Vercel web app)
-2. Evaluate desktop packaging options:
-   - Electron (heavy but mature)
-   - Tauri (lighter, Rust-based)
-   - PWA with service worker (lightest)
-3. For each option, check:
-   - Audio permission model (PulseAudio/PipeWire access)
-   - Microphone access through sandbox
-   - Web Speech API availability
-   - Distribution format (.deb, .rpm, AppImage, Flatpak, Snap)
-4. Identify blockers:
-   - Web Speech API only works in Chromium
-   - Google Cloud credentials management in desktop context
-   - Auto-update mechanism
-5. Recommend the most viable path with tradeoffs
+1. Assess current packaging state:
+   - Does `./scripts/setup.sh --install` produce a working .deb?
+   - Is the desktop entry correct?
+   - Does the app appear in the Ubuntu launcher?
+2. Review `tauri.conf.json` for:
+   - Bundle identifiers and metadata
+   - Linux-specific Tauri features (tray, shell, global shortcut)
+   - Package targets (.deb, AppImage)
+3. Check install/uninstall flow:
+   - Clean install on Ubuntu
+   - Binary location and permissions
+   - XDG directory creation on first run
+4. Identify packaging gaps:
+   - Missing dependencies in the .deb control file
+   - AppImage build status
+   - Desktop entry icon and categories
+5. Recommend improvements with specific file changes

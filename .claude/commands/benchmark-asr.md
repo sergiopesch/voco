@@ -1,20 +1,21 @@
 # Benchmark ASR/Transcription Path
 
-Analyze the speech-to-text pipeline for performance characteristics.
+Analyse the local speech-to-text pipeline for performance characteristics.
 
 ## Steps
-1. Read `src/hooks/useVoiceInteraction.ts` and `src/app/api/transcribe/route.ts`
+1. Read `apps/desktop/src/hooks/useDictation.ts` and `apps/desktop/src-tauri/src/transcribe.rs`
 2. Identify the full latency path:
-   - Silence detection timeout (currently 2000ms)
-   - Audio chunk accumulation
-   - Network round-trip to `/api/transcribe`
-   - Google Cloud STT processing time
-   - Response parsing
+   - Audio capture stop to data transfer (WebView to Rust)
+   - Audio format conversion (if any)
+   - whisper.cpp model inference time
+   - Text return to frontend
+   - Text insertion via ydotool/xdotool/clipboard
 3. Identify memory concerns:
-   - Audio chunk accumulation in `audioChunks.current`
-   - No cleanup between utterances?
-   - Buffer size for long sessions
-4. Check for streaming opportunities:
-   - Is streaming STT available and would it reduce latency?
-   - Can interim results from Web Speech API eliminate server STT calls?
+   - Audio buffer accumulation during recording
+   - whisper model memory footprint
+   - Buffer cleanup between dictation sessions
+4. Check for optimisation opportunities:
+   - Is model loading lazy or eager?
+   - Can audio be streamed to whisper incrementally?
+   - Are there unnecessary copies in the audio pipeline?
 5. Report findings with specific latency estimates and improvement suggestions

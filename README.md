@@ -1,6 +1,8 @@
 # Voice
 
-Free, local-first desktop dictation for Linux and macOS. Press a hotkey, speak, and your words appear wherever your cursor is. No account, no cloud, no subscription.
+Free, local-first desktop dictation for Linux. Press a hotkey, speak, and your words appear wherever your cursor is. No account, no cloud, no subscription.
+
+> Tested on Ubuntu. Likely to work on similar Debian/Ubuntu-based systems. Other distributions are experimental.
 
 ## Install
 
@@ -12,24 +14,15 @@ cd voice
 
 This installs dependencies, builds the app, and adds **Voice** to your application launcher. Find it next to your other apps, double-click to launch, and it appears in the system tray.
 
-> First launch downloads the speech model (~142 MB, one-time).
+> First launch downloads the speech model (~142 MB, one-time). After that, everything runs offline.
 
 ## How It Works
 
 1. Open **Voice** from your app launcher — it appears in the **system tray**
-2. Press **Alt+D** → speak → press **Alt+D** again
+2. Press **Alt+D** — speak — press **Alt+D** again
 3. Text is transcribed locally and typed where your cursor is
 
-No visible window. No network calls. Everything runs on your machine.
-
-## Development
-
-```bash
-./scripts/setup.sh    # install deps only (no build)
-npm run dev           # run in dev mode with hot reload
-npm run build         # production build
-npm run check         # TypeScript type-check
-```
+No visible window. Everything runs on your machine.
 
 ## Features
 
@@ -44,16 +37,17 @@ npm run check         # TypeScript type-check
 
 The setup script handles most of this, but for reference:
 
-| | Linux | macOS |
-|---|---|---|
-| **Runtime** | Node.js 20+, Rust | Node.js 20+, Rust, Xcode CLI |
-| **Text insertion** | ydotool (Wayland) or xdotool (X11) | — |
-| **Hotkey (Wayland)** | User in `input` group | — |
+| Requirement | Details |
+|---|---|
+| **Runtime** | Node.js 20+, Rust |
+| **Text insertion (Wayland)** | ydotool, wl-clipboard; user in `input` group |
+| **Text insertion (X11)** | xdotool, xclip |
+| **Audio** | PulseAudio or PipeWire |
 
 <details>
-<summary>Manual dependency install</summary>
+<summary>Manual dependency install (Ubuntu/Debian)</summary>
 
-**Linux (apt)**:
+**System libraries**:
 ```bash
 sudo apt install pkg-config libglib2.0-dev libsoup-3.0-dev \
   libjavascriptcoregtk-4.1-dev libwebkit2gtk-4.1-dev \
@@ -72,6 +66,15 @@ sudo apt install xdotool xclip
 ```
 </details>
 
+## Development
+
+```bash
+./scripts/setup.sh    # install deps only (no build)
+npm run dev           # run in dev mode with hot reload
+npm run build         # production build
+npm run check         # TypeScript type-check
+```
+
 ## Architecture
 
 ```
@@ -88,6 +91,12 @@ apps/desktop/
 ## Stack
 
 Tauri 2 · React 19 · Vite · TypeScript · Tailwind CSS 4 · Zustand · whisper.cpp
+
+## Known Limitations
+
+- **Wayland insertion** depends on ydotool and may require `ydotoold` running or `input` group membership. Behaviour varies by compositor.
+- **First launch requires internet** to download the whisper model (~142 MB). After that, fully offline.
+- Only tested on Ubuntu. Other distributions and desktop environments may have different behaviour with text insertion, audio, or tray integration.
 
 ## License
 

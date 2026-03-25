@@ -1,22 +1,22 @@
 # Test Insertion Strategy
 
-Analyze the codebase and recommend where to add tests.
+Analyse the codebase and recommend where to add tests.
 
 ## Steps
 1. Inventory all testable units:
-   - API routes: `src/app/api/chat/route.ts`, `transcribe/route.ts`, `text-to-speech/route.ts`
-   - Store: `src/store/useStore.ts`
-   - Hook: `src/hooks/useVoiceInteraction.ts`
-   - Middleware: `src/middleware.ts`
-   - Types: `src/types/index.ts`
-2. Prioritize by risk and complexity:
-   - High: API routes (external API integration, error handling)
-   - High: Voice interaction hook (complex state machine)
-   - Medium: Middleware (auth logic)
-   - Low: Store (simple Zustand actions)
+   - Rust: `transcribe.rs`, `insertion.rs`, `config.rs`, `tray.rs`
+   - Frontend: `useDictation.ts`, `useGlobalShortcut.ts`, `useStore.ts`
+   - Bridge: `tauri.ts`
+   - Types: `types/index.ts`
+2. Prioritise by risk and complexity:
+   - High: insertion logic (shell command construction, fallback chain)
+   - High: transcription flow (audio format conversion, model loading)
+   - Medium: dictation hook (state machine, audio capture lifecycle)
+   - Medium: config persistence (round-trip serialisation)
+   - Low: store (simple Zustand actions)
 3. For each target, recommend:
    - Test file location
    - Key test cases
-   - Required mocks
-   - Testing library (Vitest + React Testing Library)
+   - Required mocks (Tauri commands, system tools)
+   - Testing library (Vitest for frontend, cargo test for Rust)
 4. Output a concrete test insertion plan

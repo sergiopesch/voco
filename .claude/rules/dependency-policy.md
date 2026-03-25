@@ -21,15 +21,15 @@
 | Crate | Purpose | Justification |
 |-------|---------|---------------|
 | tauri | Desktop shell | Core desktop runtime |
-| tauri-plugin-shell | Shell access | Process spawning, URL opening |
+| tauri-plugin-shell | Shell access | Process spawning for insertion tools |
 | tauri-plugin-global-shortcut | Global hotkey | Register Alt+D system-wide shortcut |
 | serde/serde_json | Serialization | Tauri command data exchange |
-| dirs | Path resolution | XDG/macOS standard directory resolution |
+| dirs | Path resolution | XDG standard directory resolution |
 | whisper-rs | ASR engine | Local speech-to-text via whisper.cpp bindings |
 | reqwest | HTTP client | One-time model download from Hugging Face |
-| evdev (Linux) | Input events | Fallback global hotkey via raw keyboard on Wayland |
-| webkit2gtk (Linux) | WebView control | Auto-grant mic permissions in WebKitGTK |
-| glib (Linux) | GTK bindings | Required by webkit2gtk for type casting |
+| evdev | Input events | Fallback global hotkey via raw keyboard on Wayland |
+| webkit2gtk | WebView control | Auto-grant mic permissions in WebKitGTK |
+| glib | GTK bindings | Required by webkit2gtk for type casting |
 
 ## Adding Dependencies
 - Check if the need can be met with existing deps or native APIs first

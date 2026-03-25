@@ -8,7 +8,9 @@ Review all changes on the current branch compared to master.
 3. For each changed file, check:
    - Code correctness and edge cases
    - TypeScript type safety (no `any` without justification)
-   - Security: no leaked secrets, proper input validation
+   - Rust idioms (error propagation, no panics)
+   - Security: no leaked secrets, safe shell command usage, input validation
    - Performance: no unnecessary re-renders or blocking calls
+   - Linux behaviour: insertion strategy, session detection, XDG paths
    - Style: consistent with project conventions
 4. Report findings as a structured list with file:line references

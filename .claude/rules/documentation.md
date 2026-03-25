@@ -6,11 +6,12 @@
 - Architecture docs must reflect actual module boundaries
 
 ## What Must Be Documented
-- API route contracts (request/response shapes)
-- Environment variable requirements and formats
+- Tauri command contracts (argument/return shapes)
+- Linux prerequisites and permission requirements
+- Wayland/X11 behavioural differences
 - Architectural decisions and their rationale (in `docs/decisions/`)
 - Security-sensitive design choices (in `docs/security/`)
-- Known limitations and browser compatibility
+- Known limitations and distribution compatibility
 
 ## Format
 - Use Markdown for all docs
@@ -19,5 +20,6 @@
 - Link to source files where helpful
 
 ## No Drift
-- If code changes make a doc inaccurate, fix the doc in the same PR
-- CI should eventually validate that critical docs are up-to-date
+- If code changes make a doc inaccurate, fix the doc in the same change
+- Do not leave aspirational claims in documentation
+- If a feature is partial, say so explicitly

@@ -4,12 +4,13 @@
 Review code changes for correctness, maintainability, and adherence to project conventions.
 
 ## Scope
-- TypeScript type safety (minimize `any`, use proper generics)
-- React patterns (proper hook usage, effect cleanup, key props)
+- TypeScript type safety (minimise `any`, use proper generics)
+- React patterns (functional components, proper hook usage, effect cleanup)
+- Rust idioms (explicit error propagation, no panics, narrow Tauri commands)
 - Error handling completeness
 - State management correctness (Zustand store mutations)
-- API route contract consistency
-- Code duplication
+- Tauri command contract consistency
+- Code duplication and clarity
 
 ## Tools
 Read, Grep, Glob
@@ -21,4 +22,4 @@ For each finding:
 - **Issue**: One-line description
 - **Fix**: Concrete recommendation
 
-Keep findings actionable. Skip style nitpicks covered by ESLint.
+Keep findings actionable. Focus on correctness and maintainability.
