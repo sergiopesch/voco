@@ -4,6 +4,7 @@ mod transcribe;
 mod tray;
 
 use config::AppConfig;
+use log::{debug, error, info, warn};
 use std::sync::Mutex;
 use transcribe::{WhisperMutex, WhisperState};
 
@@ -174,7 +175,7 @@ fn ensure_model_downloaded(app_handle: &tauri::AppHandle) -> Result<(), String> 
     };
 
     set_tray_tooltip("Voice — Downloading model...");
-    eprintln!("Downloading speech model (one-time, ~142 MB)...");
+    info!("Downloading speech model (one-time, ~142 MB)...");
     let url = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin";
 
     let client = reqwest::blocking::Client::builder()
@@ -237,7 +238,7 @@ fn ensure_model_downloaded(app_handle: &tauri::AppHandle) -> Result<(), String> 
         .map_err(|e| format!("Failed to finalize model file: {e}"))?;
 
     set_tray_tooltip("Voice");
-    eprintln!("Model downloaded and verified: {}", path.display());
+    info!("Model downloaded and verified: {}", path.display());
     Ok(())
 }
 
@@ -253,11 +254,11 @@ pub fn eval_toggle(app_handle: &tauri::AppHandle) {
             let _ = window.show();
             std::thread::sleep(std::time::Duration::from_millis(100));
             if let Err(e) = window.eval("window.__toggleDictation && window.__toggleDictation()") {
-                eprintln!("JS eval failed: {e}");
+                error!("JS eval failed: {e}");
             }
         });
     } else {
-        eprintln!("Window 'main' not found");
+        error!("Window 'main' not found");
     }
 }
 
@@ -276,7 +277,7 @@ fn register_global_shortcut(app: &tauri::App, hotkey: &str) {
     let shortcut: Shortcut = match hotkey.parse() {
         Ok(s) => s,
         Err(e) => {
-            eprintln!("Failed to parse shortcut {hotkey}: {e}");
+            error!("Failed to parse shortcut {hotkey}: {e}");
             return;
         }
     };
@@ -287,13 +288,13 @@ fn register_global_shortcut(app: &tauri::App, hotkey: &str) {
 
     if let Err(e) = app.global_shortcut().on_shortcut(shortcut, move |_app, _shortcut, event| {
         if event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed {
-            eprintln!("{hotkey_label} detected via global shortcut plugin");
+            debug!("{hotkey_label} detected via global shortcut plugin");
             eval_toggle(&handle);
         }
     }) {
-        eprintln!("Failed to register global shortcut: {e}");
+        error!("Failed to register global shortcut: {e}");
     } else {
-        eprintln!("Global shortcut {hotkey} registered");
+        info!("Global shortcut {hotkey} registered");
     }
 }
 
@@ -313,7 +314,7 @@ fn start_socket_listener(app_handle: tauri::AppHandle) {
     let listener = match UnixListener::bind(&path) {
         Ok(l) => l,
         Err(e) => {
-            eprintln!("Failed to create socket at {}: {e}", path.display());
+            error!("Failed to create socket at {}: {e}", path.display());
             return;
         }
     };
@@ -322,17 +323,17 @@ fn start_socket_listener(app_handle: tauri::AppHandle) {
     use std::os::unix::fs::PermissionsExt;
     let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600));
 
-    eprintln!("Socket listener ready: {}", path.display());
+    info!("Socket listener ready: {}", path.display());
 
     std::thread::spawn(move || {
         for stream in listener.incoming() {
             match stream {
                 Ok(_) => {
-                    eprintln!("Toggle received via socket");
+                    debug!("Toggle received via socket");
                     eval_toggle(&app_handle);
                 }
                 Err(e) => {
-                    eprintln!("Socket error: {e}");
+                    error!("Socket error: {e}");
                     break;
                 }
             }
@@ -359,12 +360,11 @@ fn start_hotkey_listener(app_handle: tauri::AppHandle) {
             .collect::<Vec<Device>>();
 
         if devices.is_empty() {
-            eprintln!("No keyboard found for evdev hotkey listener. Add user to 'input' group:");
-            eprintln!("  sudo usermod -aG input $USER");
+            warn!("No keyboard found for evdev hotkey listener. Add user to 'input' group: sudo usermod -aG input $USER");
             return;
         }
 
-        eprintln!("evdev hotkey listener started on {} keyboard(s)", devices.len());
+        info!("evdev hotkey listener started on {} keyboard(s)", devices.len());
 
         let alt_held = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
 
@@ -388,7 +388,7 @@ fn start_hotkey_listener(app_handle: tauri::AppHandle) {
                                         }
                                         Key::KEY_D if pressed && !repeat => {
                                             if alt.load(std::sync::atomic::Ordering::Relaxed) {
-                                                eprintln!("Alt+D detected via evdev");
+                                                debug!("Alt+D detected via evdev");
                                                 eval_toggle(&app);
                                             }
                                         }
@@ -398,7 +398,7 @@ fn start_hotkey_listener(app_handle: tauri::AppHandle) {
                             }
                         }
                         Err(e) => {
-                            eprintln!("Keyboard read error: {e}");
+                            error!("Keyboard read error: {e}");
                             break;
                         }
                     }
@@ -409,6 +409,10 @@ fn start_hotkey_listener(app_handle: tauri::AppHandle) {
 }
 
 pub fn run() {
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
+        .format_timestamp_millis()
+        .init();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
@@ -433,14 +437,14 @@ pub fn run() {
             start_hotkey_listener(app.handle().clone());
 
             if let Err(e) = tray::setup_tray(app, &hotkey) {
-                eprintln!("Failed to setup tray: {e}");
+                error!("Failed to setup tray: {e}");
             }
 
             // Auto-download model in background if not present
             let download_handle = app.handle().clone();
             std::thread::spawn(move || {
                 if let Err(e) = ensure_model_downloaded(&download_handle) {
-                    eprintln!("Model auto-download failed: {e}");
+                    error!("Model auto-download failed: {e}");
                 }
             });
 

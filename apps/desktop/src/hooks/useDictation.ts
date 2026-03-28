@@ -24,6 +24,7 @@ export function useDictation() {
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const workletRef = useRef<AudioWorkletNode | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const samplesRef = useRef<Float32Array[]>([]);
@@ -38,6 +39,53 @@ export function useDictation() {
       console.warn("Failed to move window off-screen:", e);
     }
   }, []);
+
+  const connectWorklet = async (
+    audioContext: AudioContext,
+    source: MediaStreamAudioSourceNode,
+  ): Promise<boolean> => {
+    try {
+      await audioContext.audioWorklet.addModule("/audio-processor.js");
+      const worklet = new AudioWorkletNode(
+        audioContext,
+        "audio-capture-processor",
+      );
+      worklet.port.onmessage = (e) => {
+        if (e.data.type === "samples") {
+          samplesRef.current.push(e.data.data as Float32Array);
+        } else if (e.data.type === "level") {
+          setAudioLevel(e.data.data as number);
+        }
+      };
+      source.connect(worklet);
+      worklet.connect(audioContext.destination);
+      workletRef.current = worklet;
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const connectScriptProcessor = (
+    audioContext: AudioContext,
+    source: MediaStreamAudioSourceNode,
+  ) => {
+    const processor = audioContext.createScriptProcessor(4096, 1, 1);
+    processor.onaudioprocess = (e) => {
+      const input = e.inputBuffer.getChannelData(0);
+      samplesRef.current.push(new Float32Array(input));
+
+      let sum = 0;
+      for (let i = 0; i < input.length; i++) {
+        sum += input[i]! * input[i]!;
+      }
+      const rms = Math.sqrt(sum / input.length);
+      setAudioLevel(Math.min(1, rms * 8));
+    };
+    source.connect(processor);
+    processor.connect(audioContext.destination);
+    processorRef.current = processor;
+  };
 
   const startRecording = useCallback(async () => {
     try {
@@ -66,27 +114,13 @@ export function useDictation() {
       const source = audioContext.createMediaStreamSource(stream);
       sourceRef.current = source;
 
-      const processor = audioContext.createScriptProcessor(4096, 1, 1);
-      processorRef.current = processor;
-
-      processor.onaudioprocess = (e) => {
-        const input = e.inputBuffer.getChannelData(0);
-        samplesRef.current.push(new Float32Array(input));
-
-        let sum = 0;
-        for (let i = 0; i < input.length; i++) {
-          sum += input[i]! * input[i]!;
-        }
-        const rms = Math.sqrt(sum / input.length);
-        const level = Math.min(1, rms * 8);
-        setAudioLevel(level);
-      };
-
-      source.connect(processor);
-      processor.connect(audioContext.destination);
+      // Prefer AudioWorklet (off main thread), fall back to ScriptProcessorNode
+      const workletOk = await connectWorklet(audioContext, source);
+      if (!workletOk) {
+        connectScriptProcessor(audioContext, source);
+      }
 
       setStatus("recording");
-      // Update tray icon to red (recording)
       setRecordingState(true).catch(() => {});
     } catch (err) {
       if (err instanceof DOMException) {
@@ -104,7 +138,10 @@ export function useDictation() {
   }, [clearTranscript, setError, setStatus, setAudioLevel]);
 
   const stopRecording = useCallback(async () => {
-    // Stop audio capture
+    if (workletRef.current) {
+      workletRef.current.disconnect();
+      workletRef.current = null;
+    }
     if (processorRef.current) {
       processorRef.current.disconnect();
       processorRef.current = null;
@@ -119,7 +156,6 @@ export function useDictation() {
     }
 
     setAudioLevel(0);
-    // Update tray icon back to white (idle)
     setRecordingState(false).catch(() => {});
 
     const sampleRate = audioContextRef.current?.sampleRate ?? TARGET_SAMPLE_RATE;
@@ -129,7 +165,6 @@ export function useDictation() {
       audioContextRef.current = null;
     }
 
-    // Merge all captured chunks
     const chunks = samplesRef.current;
     samplesRef.current = [];
 
@@ -139,16 +174,16 @@ export function useDictation() {
     }
 
     const totalLength = chunks.reduce((sum, c) => sum + c.length, 0);
-    let merged = new Float32Array(totalLength);
+    let merged: Float32Array = new Float32Array(totalLength);
     let offset = 0;
     for (const chunk of chunks) {
       merged.set(chunk, offset);
       offset += chunk.length;
     }
 
-    // Resample to 16kHz if needed
+    // Resample to 16kHz if needed using OfflineAudioContext for proper quality
     if (Math.abs(sampleRate - TARGET_SAMPLE_RATE) > 1) {
-      merged = resample(merged, sampleRate, TARGET_SAMPLE_RATE);
+      merged = await resample(merged, sampleRate, TARGET_SAMPLE_RATE);
     }
 
     // Skip very short recordings (< 0.3s)
@@ -212,26 +247,23 @@ export function useDictation() {
   };
 }
 
-function resample(
-  input: Float32Array<ArrayBuffer>,
+/**
+ * Resample audio using OfflineAudioContext for proper anti-aliased,
+ * browser-native resampling (replaces naive linear interpolation).
+ */
+async function resample(
+  input: Float32Array,
   fromRate: number,
   toRate: number,
-): Float32Array<ArrayBuffer> {
-  const ratio = fromRate / toRate;
-  const outputLength = Math.round(input.length / ratio);
-  const output = new Float32Array(outputLength);
-
-  for (let i = 0; i < outputLength; i++) {
-    const srcIndex = i * ratio;
-    const idx = Math.floor(srcIndex);
-    const frac = srcIndex - idx;
-
-    if (idx + 1 < input.length) {
-      output[i] = input[idx]! * (1 - frac) + input[idx + 1]! * frac;
-    } else {
-      output[i] = input[idx] ?? 0;
-    }
-  }
-
-  return output;
+): Promise<Float32Array> {
+  const duration = input.length / fromRate;
+  const offlineCtx = new OfflineAudioContext(1, Math.ceil(duration * toRate), toRate);
+  const buffer = offlineCtx.createBuffer(1, input.length, fromRate);
+  buffer.getChannelData(0).set(input);
+  const source = offlineCtx.createBufferSource();
+  source.buffer = buffer;
+  source.connect(offlineCtx.destination);
+  source.start(0);
+  const rendered = await offlineCtx.startRendering();
+  return new Float32Array(rendered.getChannelData(0));
 }

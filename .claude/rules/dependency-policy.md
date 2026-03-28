@@ -28,6 +28,8 @@
 | whisper-rs | ASR engine | Local speech-to-text via whisper.cpp bindings |
 | reqwest | HTTP client | One-time model download from Hugging Face |
 | evdev | Input events | Fallback global hotkey via raw keyboard on Wayland |
+| log | Logging facade | Structured log levels (info, warn, error, debug) |
+| env_logger | Log output | Level-filtered stderr logging, configurable via RUST_LOG |
 | base64 | Binary encoding | Decode base64-encoded audio from frontend IPC |
 | sha2 | Integrity check | SHA256 verification of downloaded model |
 | webkit2gtk | WebView control | Auto-grant mic permissions in WebKitGTK |

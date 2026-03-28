@@ -65,7 +65,7 @@ pub fn update_tray_icon(app: &tauri::AppHandle, recording: bool) {
 
     let state = app.state::<TrayMutex>();
     let Ok(tray_state) = state.lock() else {
-        eprintln!("Failed to lock tray state");
+        log::error!("Failed to lock tray state");
         return;
     };
 

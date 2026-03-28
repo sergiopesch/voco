@@ -1,3 +1,4 @@
+use log::warn;
 use std::io::Write;
 use std::process::Command;
 
@@ -25,12 +26,12 @@ pub fn insert_text(text: &str, preferred: &str) -> Result<InsertionResult, Strin
                 if try_ydotool(text) {
                     return Ok(InsertionResult { strategy: ActiveStrategy::Ydotool, success: true });
                 }
-                eprintln!("ydotool type failed, falling back to clipboard paste");
+                warn!("ydotool type failed, falling back to clipboard paste");
             } else {
                 if try_xdotool(text) {
                     return Ok(InsertionResult { strategy: ActiveStrategy::Xdotool, success: true });
                 }
-                eprintln!("xdotool type failed, falling back to clipboard paste");
+                warn!("xdotool type failed, falling back to clipboard paste");
             }
             clipboard_paste(text)?;
             Ok(InsertionResult { strategy: ActiveStrategy::Clipboard, success: true })
@@ -131,7 +132,7 @@ fn clipboard_paste(text: &str) -> Result<(), String> {
             .map(|s| s.success())
             .unwrap_or(false);
         if !paste_ok {
-            eprintln!("Warning: ydotool Ctrl+V failed — text is in clipboard, paste manually with Ctrl+V");
+            warn!("Warning: ydotool Ctrl+V failed — text is in clipboard, paste manually with Ctrl+V");
         }
     } else {
         let _ = Command::new("xdotool")
