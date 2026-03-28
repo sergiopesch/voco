@@ -9,9 +9,6 @@ use std::sync::Mutex;
 const HOTKEY_PRESETS: &[&str] = &[
     "Alt+D",
     "Alt+Shift+D",
-    "Ctrl+Shift+V",
-    "Ctrl+Shift+D",
-    "Super+D",
 ];
 
 /// Holds the tray icon ID and toggle menu item for runtime updates
@@ -45,7 +42,7 @@ pub fn setup_tray(app: &tauri::App, hotkey_label: &str) -> Result<(), Box<dyn st
     }
 
     hotkey_submenu = hotkey_submenu.separator();
-    let edit_config = MenuItemBuilder::with_id("edit_config", "Edit config file...").build(app)?;
+    let edit_config = MenuItemBuilder::with_id("edit_config", "Custom...").build(app)?;
     hotkey_submenu = hotkey_submenu.item(&edit_config);
 
     let hotkey_menu = hotkey_submenu.build()?;

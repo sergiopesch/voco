@@ -11,8 +11,10 @@ use tauri::Manager;
 use transcribe::{WhisperMutex, WhisperState};
 
 // Debounce: ignore eval_toggle calls within 300ms of each other.
-// Prevents double-fire from global-shortcut + evdev detecting the same keypress.
 static LAST_TOGGLE_MS: AtomicI64 = AtomicI64::new(0);
+
+// Flag to enable/disable evdev listener (disabled when hotkey is not Alt+D)
+static EVDEV_ENABLED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(true);
 
 fn now_ms() -> i64 {
     std::time::SystemTime::now()
@@ -223,7 +225,6 @@ fn ensure_model_downloaded(app_handle: &tauri::AppHandle) -> Result<(), String> 
 
 pub fn eval_toggle(app_handle: &tauri::AppHandle) {
     // Debounce: ignore if called within 300ms of last toggle.
-    // Prevents double-fire from global-shortcut + evdev or multiple keyboards.
     let now = now_ms();
     let last = LAST_TOGGLE_MS.swap(now, Ordering::Relaxed);
     if (now - last).abs() < 300 {
@@ -234,8 +235,16 @@ pub fn eval_toggle(app_handle: &tauri::AppHandle) {
     if let Some(window) = app_handle.get_webview_window("main") {
         std::thread::spawn(move || {
             let _ = window.show();
-            std::thread::sleep(std::time::Duration::from_millis(100));
-            if let Err(e) = window.eval("window.__toggleDictation && window.__toggleDictation()") {
+            std::thread::sleep(std::time::Duration::from_millis(150));
+            // Self-retrying JS: if __toggleDictation isn't set yet (cold start),
+            // retry every 100ms up to 5 times until React mounts.
+            let js = r#"
+                (function tryToggle(n) {
+                    if (window.__toggleDictation) { window.__toggleDictation(); }
+                    else if (n > 0) { setTimeout(function() { tryToggle(n-1); }, 100); }
+                })(5);
+            "#;
+            if let Err(e) = window.eval(js) {
                 error!("JS eval failed: {e}");
             }
         });
@@ -285,6 +294,9 @@ pub fn change_hotkey_runtime(app: &tauri::AppHandle, new_hotkey: &str) -> Result
 
     let _ = app.global_shortcut().unregister_all();
     register_global_shortcut_on_handle(app, new_hotkey);
+
+    // evdev can only detect Alt+D — disable it for other hotkeys
+    EVDEV_ENABLED.store(new_hotkey == "Alt+D", Ordering::Relaxed);
 
     let mut config = AppConfig::load().map_err(|e| e.to_string())?;
     config.hotkey = new_hotkey.to_string();
@@ -386,7 +398,9 @@ fn start_hotkey_listener(app_handle: tauri::AppHandle) {
                                             alt.store(pressed, Ordering::Relaxed);
                                         }
                                         Key::KEY_D if pressed && !repeat => {
-                                            if alt.load(Ordering::Relaxed) {
+                                            if alt.load(Ordering::Relaxed)
+                                                && EVDEV_ENABLED.load(Ordering::Relaxed)
+                                            {
                                                 debug!("Alt+D detected via evdev");
                                                 eval_toggle(&app);
                                             }
@@ -425,6 +439,9 @@ pub fn run() {
         ])
         .setup(|app| {
             let hotkey = configured_hotkey();
+
+            // evdev can only detect Alt+D — disable for other hotkeys
+            EVDEV_ENABLED.store(hotkey == "Alt+D", Ordering::Relaxed);
 
             #[cfg(target_os = "linux")]
             grant_webview_permissions(app);
