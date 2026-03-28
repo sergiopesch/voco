@@ -39,11 +39,10 @@ jobs:
       - name: Configure mold linker
         run: |
           mkdir -p apps/desktop/src-tauri/.cargo
-          cat > apps/desktop/src-tauri/.cargo/config.toml <<'TOML'
-          [target.x86_64-unknown-linux-gnu]
-          linker = "clang"
-          rustflags = ["-C", "link-arg=-fuse-ld=mold"]
-          TOML
+          printf '[target.x86_64-unknown-linux-gnu]\nlinker = "clang"\nrustflags = ["-C", "link-arg=-fuse-ld=mold"]\n' > apps/desktop/src-tauri/.cargo/config.toml
+
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli --version "^2"
 
       - name: Build
         working-directory: apps/desktop
