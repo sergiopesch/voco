@@ -8,11 +8,9 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/platform-Linux-black?style=flat-square&logo=linux&logoColor=white" alt="Linux">
-  <img src="https://img.shields.io/badge/node-%3E%3D20-black?style=flat-square&logo=node.js&logoColor=white" alt="Node.js >=20">
-  <img src="https://img.shields.io/badge/rust-stable-black?style=flat-square&logo=rust&logoColor=white" alt="Rust">
-  <img src="https://img.shields.io/badge/license-MIT-0EA5E9?style=flat-square" alt="MIT License">
-  <img src="https://img.shields.io/github/actions/workflow/status/sergiopesch/voice/ci.yml?style=flat-square&label=CI" alt="CI">
+  <a href="#requirements"><img src="https://img.shields.io/badge/platform-Linux-black?style=for-the-badge&logo=linux&logoColor=white" alt="Linux"></a>
+  <a href="https://github.com/sergiopesch/voice/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/sergiopesch/voice/ci.yml?style=for-the-badge&label=CI" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-0EA5E9?style=for-the-badge" alt="MIT License"></a>
 </p>
 
 ---

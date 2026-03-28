@@ -5,81 +5,88 @@ set -euo pipefail
 # Usage: ./scripts/setup.sh           (dev mode)
 #        ./scripts/setup.sh --install  (build + install as desktop app)
 
-# ─── Colors & Symbols ──────────────────────────────────
+# ─── Colors ─────────────────────────────────────────────
 BOLD='\033[1m'
 DIM='\033[2m'
-CYAN='\033[0;36m'
-GREEN='\033[0;32m'
-YELLOW='\033[0;33m'
-RED='\033[0;31m'
+CYAN='\033[36m'
+GREEN='\033[32m'
+YELLOW='\033[33m'
+RED='\033[31m'
+WHITE='\033[37m'
 NC='\033[0m'
 
-ok()   { echo -e "  ${GREEN}✓${NC} $*"; }
-warn() { echo -e "  ${YELLOW}!${NC} $*"; }
-err()  { echo -e "  ${RED}✗${NC} $*"; }
-dim()  { echo -e "  ${DIM}$*${NC}"; }
+ok()   { printf "  ${GREEN}✓${NC} %s\n" "$*"; }
+warn() { printf "  ${YELLOW}⚠${NC} %s\n" "$*"; }
+err()  { printf "  ${RED}✗${NC} %s\n" "$*"; }
+dim()  { printf "  ${DIM}%s${NC}\n" "$*"; }
+
+step() {
+  STEP_NUM=$((STEP_NUM + 1))
+  echo
+  printf "  ${BOLD}${CYAN}[%d/%d]${NC} ${BOLD}%s${NC}\n" "$STEP_NUM" "$TOTAL_STEPS" "$1"
+}
 
 # ─── Spinner ────────────────────────────────────────────
 SPINNER_PID=""
 spinner_start() {
   local msg="$1"
-  local frames=("⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏")
   (
+    local frames=("⣾" "⣽" "⣻" "⢿" "⡿" "⣟" "⣯" "⣷")
+    local i=0
     while true; do
-      for f in "${frames[@]}"; do
-        printf "\r  ${CYAN}%s${NC} %s" "$f" "$msg"
-        sleep 0.08
-      done
+      printf "\r    ${CYAN}${frames[$i]}${NC} ${DIM}%s${NC}" "$msg"
+      i=$(( (i + 1) % ${#frames[@]} ))
+      sleep 0.07
     done
   ) &
   SPINNER_PID=$!
 }
 
 spinner_stop() {
-  if [[ -n "$SPINNER_PID" ]]; then
-    kill "$SPINNER_PID" 2>/dev/null || true
-    wait "$SPINNER_PID" 2>/dev/null || true
-    printf "\r\033[K"
-    SPINNER_PID=""
-  fi
+  [[ -z "$SPINNER_PID" ]] && return
+  kill "$SPINNER_PID" 2>/dev/null; wait "$SPINNER_PID" 2>/dev/null || true
+  printf "\r\033[K"
+  SPINNER_PID=""
 }
 
-# Run a command with a spinner, show ✓ on success, ✗ on failure
-run_with_spinner() {
-  local msg="$1"
-  shift
+run_step() {
+  local msg="$1"; shift
   spinner_start "$msg"
-  local tmplog
-  tmplog=$(mktemp)
-  if "$@" > "$tmplog" 2>&1; then
+  local log; log=$(mktemp)
+  if "$@" > "$log" 2>&1; then
     spinner_stop
     ok "$msg"
-    rm -f "$tmplog"
-    return 0
+    rm -f "$log"
   else
-    local code=$?
+    local rc=$?
     spinner_stop
     err "$msg"
     echo
-    dim "─── Error output ───"
-    tail -15 "$tmplog" | while IFS= read -r line; do dim "  $line"; done
-    dim "─── End ───"
-    rm -f "$tmplog"
-    return $code
+    tail -20 "$log" | while IFS= read -r l; do dim "  $l"; done
+    rm -f "$log"
+    return $rc
   fi
 }
 
 trap 'spinner_stop' EXIT
 
-# ─── Parse Args ─────────────────────────────────────────
+# ─── Args ───────────────────────────────────────────────
 INSTALL_MODE=false
 [[ "${1:-}" == "--install" ]] && INSTALL_MODE=true
 
+if $INSTALL_MODE; then TOTAL_STEPS=5; else TOTAL_STEPS=3; fi
+STEP_NUM=0
+
 # ─── Header ─────────────────────────────────────────────
 echo
-echo -e "${BOLD}${CYAN}  ╔═══════════════════════════════════════╗${NC}"
-echo -e "${BOLD}${CYAN}  ║${NC}${BOLD}    VOICE — Local Dictation for Linux  ${CYAN}║${NC}"
-echo -e "${BOLD}${CYAN}  ╚═══════════════════════════════════════╝${NC}"
+echo -e "  ${CYAN}${BOLD}██╗   ██╗ ██████╗ ██╗ ██████╗███████╗${NC}"
+echo -e "  ${CYAN}${BOLD}██║   ██║██╔═══██╗██║██╔════╝██╔════╝${NC}"
+echo -e "  ${CYAN}${BOLD}██║   ██║██║   ██║██║██║     █████╗  ${NC}"
+echo -e "  ${CYAN}${BOLD}╚██╗ ██╔╝██║   ██║██║██║     ██╔══╝  ${NC}"
+echo -e "  ${CYAN}${BOLD} ╚████╔╝ ╚██████╔╝██║╚██████╗███████╗${NC}"
+echo -e "  ${CYAN}${BOLD}  ╚═══╝   ╚═════╝ ╚═╝ ╚═════╝╚══════╝${NC}"
+echo
+echo -e "  ${DIM}Free, local-first desktop dictation for Linux${NC}"
 echo
 
 SECONDS=0
@@ -90,8 +97,8 @@ if [[ "$(uname)" != "Linux" ]]; then
   exit 1
 fi
 
-# ─── Prerequisites ──────────────────────────────────────
-echo -e "${BOLD}  Prerequisites${NC}"
+# ─── Step 1: Prerequisites ──────────────────────────────
+step "Prerequisites"
 
 if command -v node &>/dev/null; then
   NODE_VER=$(node -v | sed 's/v//' | cut -d. -f1)
@@ -106,73 +113,104 @@ else
   exit 1
 fi
 
-if command -v rustc &>/dev/null || command -v "$HOME/.cargo/bin/rustc" &>/dev/null; then
+if command -v rustc &>/dev/null || [[ -f "$HOME/.cargo/bin/rustc" ]]; then
   RUSTC="${HOME}/.cargo/bin/rustc"
   command -v rustc &>/dev/null && RUSTC="rustc"
   ok "Rust $($RUSTC --version | awk '{print $2}')"
 else
-  echo
-  run_with_spinner "Installing Rust via rustup" \
+  run_step "Installing Rust via rustup" \
     bash -c 'curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y'
   source "$HOME/.cargo/env"
 fi
 
-# ─── System Libraries ───────────────────────────────────
-echo
-echo -e "${BOLD}  System Dependencies${NC}"
+# ─── Step 2: System Dependencies ────────────────────────
+step "System dependencies"
 
 if command -v apt &>/dev/null; then
-  run_with_spinner "Installing system libraries" \
+  run_step "System libraries (apt)" \
     bash -c 'sudo apt update -qq 2>/dev/null && sudo apt install -y -qq \
       pkg-config libglib2.0-dev libsoup-3.0-dev \
       libjavascriptcoregtk-4.1-dev libwebkit2gtk-4.1-dev \
       libayatana-appindicator3-dev 2>/dev/null'
 else
-  warn "Not using apt — install these manually:"
-  dim "pkg-config libglib2.0-dev libsoup-3.0-dev"
-  dim "libjavascriptcoregtk-4.1-dev libwebkit2gtk-4.1-dev"
-  dim "libayatana-appindicator3-dev"
+  warn "Not using apt — install manually: pkg-config libglib2.0-dev libsoup-3.0-dev"
+  warn "libjavascriptcoregtk-4.1-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev"
 fi
 
-# ─── Text Insertion Tools ───────────────────────────────
 SESSION="${XDG_SESSION_TYPE:-x11}"
 if [[ "$SESSION" == "wayland" ]]; then
-  command -v ydotool &>/dev/null && ok "ydotool found" || warn "ydotool not found — sudo apt install ydotool"
-  command -v wl-copy &>/dev/null && ok "wl-clipboard found" || warn "wl-copy not found — sudo apt install wl-clipboard"
-  if groups | grep -q '\binput\b'; then
-    ok "User in 'input' group"
-  else
-    warn "Add to input group: sudo usermod -aG input \$USER"
-  fi
+  command -v ydotool &>/dev/null && ok "ydotool" || warn "Missing: sudo apt install ydotool"
+  command -v wl-copy &>/dev/null && ok "wl-clipboard" || warn "Missing: sudo apt install wl-clipboard"
+  groups | grep -q '\binput\b' && ok "input group" || warn "Run: sudo usermod -aG input \$USER"
 else
-  command -v xdotool &>/dev/null && ok "xdotool found" || warn "xdotool not found — sudo apt install xdotool"
-  command -v xclip &>/dev/null  && ok "xclip found" || warn "xclip not found — sudo apt install xclip"
+  command -v xdotool &>/dev/null && ok "xdotool" || warn "Missing: sudo apt install xdotool"
+  command -v xclip &>/dev/null && ok "xclip" || warn "Missing: sudo apt install xclip"
 fi
 
-# ─── npm Install ────────────────────────────────────────
-echo
-echo -e "${BOLD}  Dependencies${NC}"
+# ─── Step 3: npm Dependencies ───────────────────────────
+step "Node dependencies"
 
-run_with_spinner "Installing npm packages" \
-  npm install --silent --prefer-offline
+run_step "npm install" npm install --silent --prefer-offline
 
-# ─── Build & Install ────────────────────────────────────
+# ─── Step 4 & 5: Build & Install ────────────────────────
 if [[ "$INSTALL_MODE" == true ]]; then
-  echo
-  echo -e "${BOLD}  Build${NC}"
-
   export PATH="$HOME/.cargo/bin:$PATH"
 
-  # Build everything via cargo tauri build (handles frontend + backend + packaging)
-  run_with_spinner "Compiling & packaging (this takes a few minutes)" \
-    bash -c 'cd apps/desktop && cargo tauri build 2>&1'
+  step "Build"
+
+  # Show live build progress by tailing cargo output
+  BUILD_START=$SECONDS
+  BUILD_LOG=$(mktemp)
+
+  # Start the build in background
+  (cd apps/desktop && cargo tauri build 2>&1) > "$BUILD_LOG" &
+  BUILD_PID=$!
+
+  # Show animated progress while build runs
+  CRATE_COUNT=0
+  FRAMES=("⣾" "⣽" "⣻" "⢿" "⡿" "⣟" "⣯" "⣷")
+  FRAME_I=0
+  LAST_CRATE=""
+  while kill -0 "$BUILD_PID" 2>/dev/null; do
+    # Count compiled crates so far
+    NEW_COUNT=$(grep -c "Compiling\|Checking" "$BUILD_LOG" 2>/dev/null || echo 0)
+    NEW_CRATE=$(grep -oP "(?:Compiling|Checking) \K\S+" "$BUILD_LOG" 2>/dev/null | tail -1 || true)
+    if [[ "$NEW_COUNT" != "$CRATE_COUNT" ]] || [[ "$NEW_CRATE" != "$LAST_CRATE" ]]; then
+      CRATE_COUNT=$NEW_COUNT
+      LAST_CRATE=$NEW_CRATE
+    fi
+    ELAPSED=$((SECONDS - BUILD_START))
+    if [[ -n "$LAST_CRATE" ]]; then
+      printf "\r    ${CYAN}${FRAMES[$FRAME_I]}${NC} ${DIM}Compiling (%d crates, %ds) · %s${NC}    " "$CRATE_COUNT" "$ELAPSED" "$LAST_CRATE"
+    else
+      printf "\r    ${CYAN}${FRAMES[$FRAME_I]}${NC} ${DIM}Starting build...${NC}    "
+    fi
+    FRAME_I=$(( (FRAME_I + 1) % ${#FRAMES[@]} ))
+    sleep 0.15
+  done
+
+  printf "\r\033[K"
+
+  # Check if build succeeded
+  if wait "$BUILD_PID"; then
+    BUILD_ELAPSED=$((SECONDS - BUILD_START))
+    ok "Built in ${BUILD_ELAPSED}s (${CRATE_COUNT} crates compiled)"
+  else
+    err "Build failed"
+    echo
+    tail -20 "$BUILD_LOG" | while IFS= read -r l; do dim "  $l"; done
+    rm -f "$BUILD_LOG"
+    exit 1
+  fi
+  rm -f "$BUILD_LOG"
+
+  # ─── Install ──────────────────────────────────────────
+  step "Install"
 
   DEB=$(find apps/desktop/src-tauri/target/release/bundle/deb -name "*.deb" 2>/dev/null | head -1)
   if [[ -n "$DEB" ]]; then
-    echo
-    echo -e "${BOLD}  Install${NC}"
-    # Run dpkg directly (not via spinner) so sudo can prompt for password
-    echo -e "  ${CYAN}⠋${NC} Installing Voice..."
+    DEB_SIZE=$(du -h "$DEB" | cut -f1)
+    printf "    ${DIM}Package: %s (%s)${NC}\n" "$(basename "$DEB")" "$DEB_SIZE"
     if sudo dpkg -i "$DEB" > /dev/null 2>&1; then
       ok "Voice installed"
     else
@@ -181,41 +219,39 @@ if [[ "$INSTALL_MODE" == true ]]; then
     fi
   else
     err "No .deb package found"
-    dim "Run directly: apps/desktop/src-tauri/target/release/voice"
     exit 1
   fi
 
+  # ─── Done ─────────────────────────────────────────────
   ELAPSED=$SECONDS
   MINS=$((ELAPSED / 60))
   SECS=$((ELAPSED % 60))
-  if (( MINS > 0 )); then
-    TIME_STR="${MINS}m ${SECS}s"
-  else
-    TIME_STR="${SECS}s"
-  fi
+  [[ $MINS -gt 0 ]] && TIME_STR="${MINS}m ${SECS}s" || TIME_STR="${SECS}s"
 
   echo
-  echo -e "${BOLD}${CYAN}  ╔═══════════════════════════════════════╗${NC}"
-  printf  "  ${BOLD}${CYAN}║${NC}${BOLD}${GREEN}  %-37s ${BOLD}${CYAN}║${NC}\n" "Installed in ${TIME_STR}!"
-  echo -e "${BOLD}${CYAN}  ╚═══════════════════════════════════════╝${NC}"
+  echo -e "  ${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  echo -e "  ${GREEN}${BOLD}  Done in ${TIME_STR}!${NC}"
+  echo -e "  ${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
   echo
-  echo -e "  Open ${BOLD}Voice${NC} from your app launcher"
-  echo -e "  or run: ${CYAN}voice${NC}"
+  echo -e "  ${WHITE}${BOLD}▸${NC} Open ${BOLD}Voice${NC} from your app launcher"
+  echo -e "  ${WHITE}${BOLD}▸${NC} Or run: ${CYAN}voice${NC}"
   echo
-  echo -e "  ${DIM}First launch downloads the speech model (~142 MB)${NC}"
-  echo -e "  ${DIM}Then press Alt+D to dictate!${NC}"
+  echo -e "  ${DIM}First launch downloads the speech model (~142 MB, one-time).${NC}"
+  echo -e "  ${DIM}Then press ${BOLD}Alt+D${NC}${DIM} to dictate!${NC}"
   echo
+
 else
+  # ─── Dev mode done ────────────────────────────────────
   ELAPSED=$SECONDS
   echo
-  echo -e "${BOLD}${CYAN}  ╔═══════════════════════════════════════╗${NC}"
-  printf  "  ${BOLD}${CYAN}║${NC}${BOLD}${GREEN}  %-37s ${BOLD}${CYAN}║${NC}\n" "Ready in ${ELAPSED}s!"
-  echo -e "${BOLD}${CYAN}  ╚═══════════════════════════════════════╝${NC}"
+  echo -e "  ${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  echo -e "  ${GREEN}${BOLD}  Ready in ${ELAPSED}s!${NC}"
+  echo -e "  ${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
   echo
-  echo -e "  Development:   ${CYAN}npm run dev${NC}"
-  echo -e "  Full install:  ${CYAN}./scripts/setup.sh --install${NC}"
+  echo -e "  ${WHITE}${BOLD}▸${NC} Development:   ${CYAN}npm run dev${NC}"
+  echo -e "  ${WHITE}${BOLD}▸${NC} Full install:  ${CYAN}./scripts/setup.sh --install${NC}"
   echo
-  echo -e "  ${DIM}First launch downloads the speech model (~142 MB)${NC}"
-  echo -e "  ${DIM}Then press Alt+D to dictate!${NC}"
+  echo -e "  ${DIM}First launch downloads the speech model (~142 MB, one-time).${NC}"
+  echo -e "  ${DIM}Then press ${BOLD}Alt+D${NC}${DIM} to dictate!${NC}"
   echo
 fi

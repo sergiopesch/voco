@@ -7,7 +7,7 @@ edition = "2021"
 
 [lib]
 name = "voice_lib"
-crate-type = ["lib", "cdylib", "staticlib"]
+crate-type = ["lib"]
 
 [[bin]]
 name = "voice"
@@ -29,6 +29,12 @@ whisper-rs = "0.14"
 base64 = "0.22"
 sha2 = "0.10"
 reqwest = { version = "0.12", features = ["blocking", "rustls-tls"], default-features = false }
+
+[profile.release]
+opt-level = 2        # Nearly same perf as 3, significantly faster compile
+lto = "thin"         # Fast link-time optimization (full LTO is much slower)
+codegen-units = 16   # Parallelize codegen (default, but explicit)
+strip = true         # Strip debug symbols from binary
 
 [target.'cfg(target_os = "linux")'.dependencies]
 webkit2gtk = { version = "2.0", features = ["v2_40"] }
