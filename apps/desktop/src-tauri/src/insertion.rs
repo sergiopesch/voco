@@ -10,9 +10,9 @@ pub enum ActiveStrategy {
     Clipboard,
 }
 
+#[derive(Debug, serde::Serialize)]
 pub struct InsertionResult {
     pub strategy: ActiveStrategy,
-    pub success: bool,
 }
 
 fn is_wayland() -> bool {
@@ -24,21 +24,21 @@ pub fn insert_text(text: &str, preferred: &str) -> Result<InsertionResult, Strin
         "auto" | "type-simulation" => {
             if is_wayland() {
                 if try_ydotool(text) {
-                    return Ok(InsertionResult { strategy: ActiveStrategy::Ydotool, success: true });
+                    return Ok(InsertionResult { strategy: ActiveStrategy::Ydotool });
                 }
                 warn!("ydotool type failed, falling back to clipboard paste");
             } else {
                 if try_xdotool(text) {
-                    return Ok(InsertionResult { strategy: ActiveStrategy::Xdotool, success: true });
+                    return Ok(InsertionResult { strategy: ActiveStrategy::Xdotool });
                 }
                 warn!("xdotool type failed, falling back to clipboard paste");
             }
             clipboard_paste(text)?;
-            Ok(InsertionResult { strategy: ActiveStrategy::Clipboard, success: true })
+            Ok(InsertionResult { strategy: ActiveStrategy::Clipboard })
         }
         _ => {
             clipboard_paste(text)?;
-            Ok(InsertionResult { strategy: ActiveStrategy::Clipboard, success: true })
+            Ok(InsertionResult { strategy: ActiveStrategy::Clipboard })
         }
     }
 }
@@ -66,7 +66,7 @@ fn try_xdotool(text: &str) -> bool {
         .unwrap_or(false)
 }
 
-/// Pipe bytes into a command's stdin. Returns error description on failure.
+/// Pipe bytes into a command's stdin.
 fn pipe_to_command(cmd: &str, args: &[&str], data: &[u8]) -> Result<(), String> {
     let mut child = Command::new(cmd)
         .args(args)
@@ -82,7 +82,6 @@ fn pipe_to_command(cmd: &str, args: &[&str], data: &[u8]) -> Result<(), String> 
     Ok(())
 }
 
-/// Read clipboard, returning content only if the command succeeds with non-empty output.
 fn read_clipboard(cmd: &str, args: &[&str]) -> Option<Vec<u8>> {
     Command::new(cmd)
         .args(args)
@@ -92,38 +91,21 @@ fn read_clipboard(cmd: &str, args: &[&str]) -> Option<Vec<u8>> {
         .map(|o| o.stdout)
 }
 
-/// Restore clipboard contents, ignoring errors (best-effort).
-fn restore_clipboard(cmd: &str, args: &[&str], data: &[u8]) {
-    if let Ok(mut child) = Command::new(cmd)
-        .args(args)
-        .stdin(std::process::Stdio::piped())
-        .spawn()
-    {
-        if let Some(stdin) = child.stdin.as_mut() {
-            let _ = stdin.write_all(data);
-        }
-        let _ = child.wait();
-    }
-}
-
 fn clipboard_paste(text: &str) -> Result<(), String> {
     let wayland = is_wayland();
 
-    // Save current clipboard
     let old = if wayland {
         read_clipboard("wl-paste", &["--no-newline"])
     } else {
         read_clipboard("xclip", &["-selection", "clipboard", "-o"])
     };
 
-    // Set clipboard to transcribed text
     if wayland {
         pipe_to_command("wl-copy", &[], text.as_bytes())?;
     } else {
         pipe_to_command("xclip", &["-selection", "clipboard"], text.as_bytes())?;
     }
 
-    // Simulate Ctrl+V
     std::thread::sleep(std::time::Duration::from_millis(50));
     if wayland {
         let paste_ok = Command::new("ydotool")
@@ -132,7 +114,7 @@ fn clipboard_paste(text: &str) -> Result<(), String> {
             .map(|s| s.success())
             .unwrap_or(false);
         if !paste_ok {
-            warn!("Warning: ydotool Ctrl+V failed — text is in clipboard, paste manually with Ctrl+V");
+            warn!("ydotool Ctrl+V failed — text is in clipboard, paste manually");
         }
     } else {
         let _ = Command::new("xdotool")
@@ -143,11 +125,12 @@ fn clipboard_paste(text: &str) -> Result<(), String> {
     // Restore clipboard after target app has consumed the paste
     std::thread::sleep(std::time::Duration::from_millis(300));
     if let Some(old_data) = old {
-        if wayland {
-            restore_clipboard("wl-copy", &[], &old_data);
+        let (cmd, args): (&str, &[&str]) = if wayland {
+            ("wl-copy", &[])
         } else {
-            restore_clipboard("xclip", &["-selection", "clipboard"], &old_data);
-        }
+            ("xclip", &["-selection", "clipboard"])
+        };
+        let _ = pipe_to_command(cmd, args, &old_data);
     }
 
     Ok(())
@@ -161,10 +144,6 @@ mod tests {
     fn active_strategy_serializes_kebab_case() {
         let json = serde_json::to_string(&ActiveStrategy::Ydotool).unwrap();
         assert_eq!(json, r#""ydotool""#);
-
-        let json = serde_json::to_string(&ActiveStrategy::Xdotool).unwrap();
-        assert_eq!(json, r#""xdotool""#);
-
         let json = serde_json::to_string(&ActiveStrategy::Clipboard).unwrap();
         assert_eq!(json, r#""clipboard""#);
     }

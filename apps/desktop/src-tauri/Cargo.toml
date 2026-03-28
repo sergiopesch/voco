@@ -17,8 +17,7 @@ path = "src/main.rs"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["tray-icon", "image-png"] }
-tauri-plugin-shell = "2"
+tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-global-shortcut = "2"
 log = "0.4"
 env_logger = "0.11"

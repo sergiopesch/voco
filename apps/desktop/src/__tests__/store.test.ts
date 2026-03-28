@@ -11,7 +11,6 @@ describe("useStore", () => {
       selectedDeviceId: null,
       audioLevel: 0,
       config: null,
-      platform: null,
     });
   });
 
@@ -70,16 +69,5 @@ describe("useStore", () => {
     };
     useStore.getState().setConfig(config);
     expect(useStore.getState().config).toEqual(config);
-  });
-
-  it("setPlatform stores platform info", () => {
-    const platform = {
-      os: "linux",
-      arch: "x86_64",
-      sessionType: "wayland",
-      desktop: "GNOME",
-    };
-    useStore.getState().setPlatform(platform);
-    expect(useStore.getState().platform).toEqual(platform);
   });
 });

@@ -1,23 +1,18 @@
 import { useEffect } from "react";
 import { useStore } from "@/store/useStore";
-import { getConfig, getPlatformInfo } from "@/lib/tauri";
+import { getConfig } from "@/lib/tauri";
 import { useGlobalShortcut } from "@/hooks/useGlobalShortcut";
 import { useDictation } from "@/hooks/useDictation";
 
 export function App() {
-  const { setConfig, setPlatform, setError } = useStore();
+  const { setConfig, setError } = useStore();
   const { toggle, moveWindowOffScreen } = useDictation();
   useGlobalShortcut(toggle);
 
   useEffect(() => {
     async function init() {
       try {
-        const [config, platform] = await Promise.all([
-          getConfig(),
-          getPlatformInfo(),
-        ]);
-        setConfig(config);
-        setPlatform(platform);
+        setConfig(await getConfig());
         moveWindowOffScreen();
       } catch (err) {
         setError(
@@ -26,7 +21,7 @@ export function App() {
       }
     }
     init();
-  }, [setConfig, setPlatform, setError, moveWindowOffScreen]);
+  }, [setConfig, setError, moveWindowOffScreen]);
 
   return null;
 }

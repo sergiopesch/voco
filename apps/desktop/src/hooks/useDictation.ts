@@ -237,14 +237,7 @@ export function useDictation() {
     }
   }, [status, startRecording, stopRecording]);
 
-  return {
-    toggle,
-    startRecording,
-    stopRecording,
-    moveWindowOffScreen,
-    isRecording: status === "recording",
-    isProcessing: status === "processing",
-  };
+  return { toggle, moveWindowOffScreen };
 }
 
 /**
