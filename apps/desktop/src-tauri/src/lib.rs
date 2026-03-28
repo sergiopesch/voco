@@ -100,6 +100,17 @@ fn set_recording_state(app: tauri::AppHandle, recording: bool) -> Result<(), Str
 }
 
 #[tauri::command]
+fn show_notification(summary: String, body: String) {
+    let _ = std::process::Command::new("notify-send")
+        .arg("--app-name=Voice")
+        .arg("--icon=audio-input-microphone")
+        .arg("--")
+        .arg(&summary)
+        .arg(&body)
+        .spawn();
+}
+
+#[tauri::command]
 fn insert_text(text: String, strategy: String) -> Result<InsertResult, String> {
     if text.is_empty() {
         return Err("No text to insert".to_string());
@@ -148,7 +159,7 @@ fn grant_webview_permissions(app: &tauri::App) {
 
 const MODEL_SHA256: &str = "a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002";
 
-fn ensure_model_downloaded() -> Result<(), String> {
+fn ensure_model_downloaded(app_handle: &tauri::AppHandle) -> Result<(), String> {
     let path = transcribe::default_model_path()?;
     if path.exists() {
         return Ok(());
@@ -158,6 +169,11 @@ fn ensure_model_downloaded() -> Result<(), String> {
     let tmp_path = path.with_extension("bin.tmp");
     let _ = std::fs::remove_file(&tmp_path);
 
+    let set_tray_tooltip = |msg: &str| {
+        tray::update_tray_tooltip(app_handle, msg);
+    };
+
+    set_tray_tooltip("Voice — Downloading model...");
     eprintln!("Downloading speech model (one-time, ~142 MB)...");
     let url = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin";
 
@@ -171,17 +187,42 @@ fn ensure_model_downloaded() -> Result<(), String> {
         .map_err(|e| format!("Download failed: {e}"))?;
 
     if !response.status().is_success() {
+        set_tray_tooltip("Voice — Download failed");
         return Err(format!("Download failed with status: {}", response.status()));
     }
 
-    let bytes = response
-        .bytes()
-        .map_err(|e| format!("Failed to read response: {e}"))?;
+    let total_size = response.content_length().unwrap_or(0);
+
+    // Stream the download to track progress
+    use std::io::Read;
+    let mut reader = response;
+    let mut bytes = Vec::with_capacity(total_size as usize);
+    let mut downloaded: u64 = 0;
+    let mut last_pct: u64 = 0;
+    let mut buf = [0u8; 65536];
+
+    loop {
+        let n = reader.read(&mut buf).map_err(|e| format!("Download read error: {e}"))?;
+        if n == 0 {
+            break;
+        }
+        bytes.extend_from_slice(&buf[..n]);
+        downloaded += n as u64;
+
+        if total_size > 0 {
+            let pct = (downloaded * 100) / total_size;
+            if pct != last_pct {
+                last_pct = pct;
+                set_tray_tooltip(&format!("Voice — Downloading model {}%", pct));
+            }
+        }
+    }
 
     // Verify integrity before writing
     use sha2::Digest;
     let hash = format!("{:x}", sha2::Sha256::digest(&bytes));
     if hash != MODEL_SHA256 {
+        set_tray_tooltip("Voice — Download corrupt, retry on next launch");
         return Err(format!(
             "Model integrity check failed (expected {}, got {}). Download may be corrupt.",
             &MODEL_SHA256[..16], &hash[..16]
@@ -189,14 +230,13 @@ fn ensure_model_downloaded() -> Result<(), String> {
     }
 
     // Write to a temporary file first, then atomically rename to the final path.
-    // This prevents a partial file from being treated as a valid model if the
-    // process is interrupted mid-write.
     std::fs::write(&tmp_path, &bytes)
         .map_err(|e| format!("Failed to save model (tmp): {e}"))?;
 
     std::fs::rename(&tmp_path, &path)
         .map_err(|e| format!("Failed to finalize model file: {e}"))?;
 
+    set_tray_tooltip("Voice");
     eprintln!("Model downloaded and verified: {}", path.display());
     Ok(())
 }
@@ -223,29 +263,37 @@ pub fn eval_toggle(app_handle: &tauri::AppHandle) {
 
 // --- Register global shortcut via Tauri plugin (primary mechanism) ---
 
-fn register_global_shortcut(app: &tauri::App) {
+/// Read the configured hotkey, falling back to "Alt+D" on error.
+fn configured_hotkey() -> String {
+    AppConfig::load()
+        .map(|c| c.hotkey)
+        .unwrap_or_else(|_| "Alt+D".to_string())
+}
+
+fn register_global_shortcut(app: &tauri::App, hotkey: &str) {
     use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 
-    let shortcut: Shortcut = match "Alt+D".parse() {
+    let shortcut: Shortcut = match hotkey.parse() {
         Ok(s) => s,
         Err(e) => {
-            eprintln!("Failed to parse shortcut Alt+D: {e}");
+            eprintln!("Failed to parse shortcut {hotkey}: {e}");
             return;
         }
     };
     let handle = app.handle().clone();
+    let hotkey_label = hotkey.to_string();
 
     let _ = app.global_shortcut().unregister(shortcut);
 
     if let Err(e) = app.global_shortcut().on_shortcut(shortcut, move |_app, _shortcut, event| {
         if event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed {
-            eprintln!("Alt+D detected via global shortcut plugin");
+            eprintln!("{hotkey_label} detected via global shortcut plugin");
             eval_toggle(&handle);
         }
     }) {
         eprintln!("Failed to register global shortcut: {e}");
     } else {
-        eprintln!("Global shortcut Alt+D registered");
+        eprintln!("Global shortcut {hotkey} registered");
     }
 }
 
@@ -372,22 +420,26 @@ pub fn run() {
             transcribe_audio,
             insert_text,
             set_recording_state,
+            show_notification,
         ])
         .setup(|app| {
+            let hotkey = configured_hotkey();
+
             #[cfg(target_os = "linux")]
             grant_webview_permissions(app);
-            register_global_shortcut(app);
+            register_global_shortcut(app, &hotkey);
             start_socket_listener(app.handle().clone());
             #[cfg(target_os = "linux")]
             start_hotkey_listener(app.handle().clone());
 
-            if let Err(e) = tray::setup_tray(app) {
+            if let Err(e) = tray::setup_tray(app, &hotkey) {
                 eprintln!("Failed to setup tray: {e}");
             }
 
             // Auto-download model in background if not present
-            std::thread::spawn(|| {
-                if let Err(e) = ensure_model_downloaded() {
+            let download_handle = app.handle().clone();
+            std::thread::spawn(move || {
+                if let Err(e) = ensure_model_downloaded(&download_handle) {
                     eprintln!("Model auto-download failed: {e}");
                 }
             });

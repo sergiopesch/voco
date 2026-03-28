@@ -13,9 +13,9 @@ pub struct TrayState {
 
 pub type TrayMutex = Mutex<TrayState>;
 
-pub fn setup_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
+pub fn setup_tray(app: &tauri::App, hotkey_label: &str) -> Result<(), Box<dyn std::error::Error>> {
     let quit = MenuItemBuilder::with_id("quit", "Quit Voice").build(app)?;
-    let hotkey = MenuItemBuilder::with_id("hotkey", "Hotkey: Alt+D")
+    let hotkey = MenuItemBuilder::with_id("hotkey", format!("Hotkey: {hotkey_label}"))
         .enabled(false)
         .build(app)?;
     let toggle = MenuItemBuilder::with_id("toggle", "Start Dictation").build(app)?;
@@ -82,6 +82,15 @@ pub fn update_tray_icon(app: &tauri::AppHandle, recording: bool) {
     // Update the menu toggle text
     let label = if recording { "Stop Dictation" } else { "Start Dictation" };
     let _ = tray_state.toggle_item.set_text(label);
+}
+
+/// Update just the tray tooltip (used for download progress, etc.)
+pub fn update_tray_tooltip(app: &tauri::AppHandle, tooltip: &str) {
+    let state = app.state::<TrayMutex>();
+    let Ok(tray_state) = state.lock() else { return };
+    if let Some(tray) = app.tray_by_id(&tray_state.tray_id) {
+        let _ = tray.set_tooltip(Some(tooltip));
+    }
 }
 
 fn create_mic_icon(size: u32, color: [u8; 4]) -> Vec<u8> {

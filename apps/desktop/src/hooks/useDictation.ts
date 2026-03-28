@@ -1,6 +1,11 @@
 import { useCallback, useRef } from "react";
 import { useStore } from "@/store/useStore";
-import { transcribeAudio, insertText, setRecordingState } from "@/lib/tauri";
+import {
+  transcribeAudio,
+  insertText,
+  setRecordingState,
+  showNotification,
+} from "@/lib/tauri";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { LogicalSize, LogicalPosition } from "@tauri-apps/api/dpi";
 
@@ -174,7 +179,10 @@ export function useDictation() {
       try {
         await insertText(transcript, strategy);
       } catch (insertErr) {
-        console.warn("Text insertion failed:", insertErr);
+        showNotification(
+          "Text insertion failed",
+          "Your transcript is in the clipboard — paste with Ctrl+V",
+        ).catch(() => {});
       }
 
       setStatus("idle");

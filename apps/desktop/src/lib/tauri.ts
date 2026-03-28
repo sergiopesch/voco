@@ -40,3 +40,10 @@ export async function insertText(
 export async function setRecordingState(recording: boolean): Promise<void> {
   return invoke("set_recording_state", { recording });
 }
+
+export async function showNotification(
+  summary: string,
+  body: string,
+): Promise<void> {
+  return invoke("show_notification", { summary, body });
+}
