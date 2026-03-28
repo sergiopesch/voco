@@ -237,6 +237,51 @@ TOML
     exit 1
   fi
 
+  # ─── Onboarding ───────────────────────────────────────
+  echo
+  echo -e "  ${BOLD}${CYAN}Quick Setup${NC}"
+  echo
+  echo -e "  Voice uses a global hotkey to start/stop dictation."
+  echo -e "  The default is ${BOLD}Alt+D${NC} — press it anywhere to dictate."
+  echo
+
+  HOTKEY="Alt+D"
+  CONFIG_DIR="${HOME}/.config/voice"
+  CONFIG_FILE="${CONFIG_DIR}/config.json"
+
+  if [[ -t 0 ]]; then
+    printf "  ${WHITE}${BOLD}▸${NC} Happy with ${BOLD}Alt+D${NC}? [Y/n] "
+    read -r ANSWER </dev/tty 2>/dev/null || ANSWER="y"
+    ANSWER="${ANSWER:-y}"
+
+    if [[ "$ANSWER" =~ ^[Nn] ]]; then
+      echo
+      echo -e "  ${DIM}Examples: Ctrl+Shift+V, Super+D, Alt+Shift+R${NC}"
+      printf "  ${WHITE}${BOLD}▸${NC} Enter your preferred hotkey: "
+      read -r CUSTOM_HOTKEY </dev/tty 2>/dev/null || CUSTOM_HOTKEY=""
+      if [[ -n "$CUSTOM_HOTKEY" ]]; then
+        HOTKEY="$CUSTOM_HOTKEY"
+        ok "Hotkey set to ${BOLD}${HOTKEY}${NC}"
+      else
+        ok "Keeping default ${BOLD}Alt+D${NC}"
+      fi
+    else
+      ok "Hotkey: ${BOLD}Alt+D${NC}"
+    fi
+  else
+    ok "Hotkey: ${BOLD}Alt+D${NC} (default)"
+  fi
+
+  mkdir -p "$CONFIG_DIR"
+  cat > "$CONFIG_FILE" << EOF
+{
+  "hotkey": "${HOTKEY}",
+  "selectedMic": null,
+  "insertionStrategy": "auto"
+}
+EOF
+  dim "Config saved to ${CONFIG_FILE}"
+
   # ─── Done ─────────────────────────────────────────────
   ELAPSED=$SECONDS
   MINS=$((ELAPSED / 60))
@@ -252,7 +297,10 @@ TOML
   echo -e "  ${WHITE}${BOLD}▸${NC} Or run: ${CYAN}voice${NC}"
   echo
   echo -e "  ${DIM}First launch downloads the speech model (~142 MB, one-time).${NC}"
-  echo -e "  ${DIM}Then press ${BOLD}Alt+D${NC}${DIM} to dictate!${NC}"
+  echo -e "  ${DIM}Then press ${BOLD}${HOTKEY}${NC}${DIM} to dictate!${NC}"
+  echo
+  echo -e "  ${DIM}You can change the hotkey anytime from the system tray icon${NC}"
+  echo -e "  ${DIM}or edit ${CONFIG_FILE}${NC}"
   echo
 
 else
