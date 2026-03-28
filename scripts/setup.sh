@@ -74,7 +74,7 @@ trap 'spinner_stop' EXIT
 INSTALL_MODE=false
 [[ "${1:-}" == "--install" ]] && INSTALL_MODE=true
 
-if $INSTALL_MODE; then TOTAL_STEPS=5; else TOTAL_STEPS=3; fi
+if $INSTALL_MODE; then TOTAL_STEPS=4; else TOTAL_STEPS=3; fi
 STEP_NUM=0
 
 # ─── Header ─────────────────────────────────────────────
@@ -173,14 +173,11 @@ TOML
     ok "mold linker enabled"
   fi
 
-  # Build frontend first (fast, ~1s), then cargo in parallel with packaging
-  run_step "Frontend (Vite)" npm run build:frontend -w apps/desktop
-
   # Show live build progress by tailing cargo output
   BUILD_START=$SECONDS
   BUILD_LOG=$(mktemp)
 
-  # Start cargo tauri build (frontend already built, so beforeBuildCommand is a no-op)
+  # Single cargo tauri build handles frontend (beforeBuildCommand) + backend + packaging
   (cd apps/desktop && cargo tauri build 2>&1) > "$BUILD_LOG" &
   BUILD_PID=$!
 
