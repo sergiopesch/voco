@@ -18,7 +18,7 @@
 ## Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/sergiopesch/voice/master/scripts/install.sh | bash
+bash <(curl -s https://raw.githubusercontent.com/sergiopesch/voice/master/install)
 ```
 
 That's it. The installer checks your system, downloads the app, and walks you through setup.
