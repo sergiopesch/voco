@@ -271,7 +271,7 @@ fn configured_hotkey() -> String {
         .unwrap_or_else(|_| "Alt+D".to_string())
 }
 
-fn register_global_shortcut(app: &tauri::App, hotkey: &str) {
+fn register_global_shortcut_on_handle(app: &tauri::AppHandle, hotkey: &str) {
     use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 
     let shortcut: Shortcut = match hotkey.parse() {
@@ -281,7 +281,7 @@ fn register_global_shortcut(app: &tauri::App, hotkey: &str) {
             return;
         }
     };
-    let handle = app.handle().clone();
+    let handle = app.clone();
     let hotkey_label = hotkey.to_string();
 
     let _ = app.global_shortcut().unregister(shortcut);
@@ -296,6 +296,42 @@ fn register_global_shortcut(app: &tauri::App, hotkey: &str) {
     } else {
         info!("Global shortcut {hotkey} registered");
     }
+}
+
+fn register_global_shortcut(app: &tauri::App, hotkey: &str) {
+    register_global_shortcut_on_handle(app.handle(), hotkey);
+}
+
+/// Change the hotkey at runtime: unregister old, register new, save config, update tray.
+pub fn change_hotkey_runtime(app: &tauri::AppHandle, new_hotkey: &str) -> Result<(), String> {
+    use tauri_plugin_global_shortcut::GlobalShortcutExt;
+
+    // Unregister all existing shortcuts
+    let _ = app.global_shortcut().unregister_all();
+
+    // Register the new one
+    register_global_shortcut_on_handle(app, new_hotkey);
+
+    // Save to config
+    let mut config = AppConfig::load().map_err(|e| e.to_string())?;
+    config.hotkey = new_hotkey.to_string();
+    config.save().map_err(|e| e.to_string())?;
+
+    // Update tray checkmarks
+    tray::update_hotkey_display(app, new_hotkey);
+
+    info!("Hotkey changed to {new_hotkey}");
+
+    // Notify the user
+    let _ = std::process::Command::new("notify-send")
+        .arg("--app-name=Voice")
+        .arg("--icon=audio-input-microphone")
+        .arg("--")
+        .arg("Hotkey changed")
+        .arg(format!("Voice will now respond to {new_hotkey}"))
+        .spawn();
+
+    Ok(())
 }
 
 // --- Socket listener for external triggers ---
