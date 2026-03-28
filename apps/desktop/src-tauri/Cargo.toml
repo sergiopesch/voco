@@ -31,8 +31,8 @@ sha2 = "0.10"
 reqwest = { version = "0.12", features = ["blocking", "rustls-tls"], default-features = false }
 
 [profile.release]
-opt-level = 2        # Nearly same perf as 3, significantly faster compile
-lto = "thin"         # Fast link-time optimization (full LTO is much slower)
+opt-level = 2        # Good balance: fast compile, good transcription perf
+lto = false          # Skip LTO for faster builds (thin LTO adds ~10s)
 codegen-units = 16   # Parallelize codegen (default, but explicit)
 strip = true         # Strip debug symbols from binary
 

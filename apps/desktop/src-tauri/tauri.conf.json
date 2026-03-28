@@ -33,7 +33,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["deb", "rpm"],
+    "targets": ["deb"],
     "category": "Utility",
     "shortDescription": "Speak and type anywhere — local voice dictation",
     "icon": [
