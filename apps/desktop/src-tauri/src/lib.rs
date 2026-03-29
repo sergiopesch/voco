@@ -13,8 +13,17 @@ use transcribe::{WhisperMutex, WhisperState};
 // Debounce: ignore eval_toggle calls within 300ms of each other.
 static LAST_TOGGLE_MS: AtomicI64 = AtomicI64::new(0);
 
-// Flag to enable/disable evdev listener (disabled when hotkey is not Alt+D)
-static EVDEV_ENABLED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(true);
+// Evdev hotkey config: which modifier+key combo to detect.
+// 0 = Alt+D, 1 = Alt+Shift+D, 255 = disabled (custom hotkey evdev can't detect)
+static EVDEV_HOTKEY_MODE: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
+
+fn hotkey_to_evdev_mode(hotkey: &str) -> u8 {
+    match hotkey {
+        "Alt+D" => 0,
+        "Alt+Shift+D" => 1,
+        _ => 255, // custom hotkey — evdev can't detect it
+    }
+}
 
 fn now_ms() -> i64 {
     std::time::SystemTime::now()
@@ -295,8 +304,7 @@ pub fn change_hotkey_runtime(app: &tauri::AppHandle, new_hotkey: &str) -> Result
     let _ = app.global_shortcut().unregister_all();
     register_global_shortcut_on_handle(app, new_hotkey);
 
-    // evdev can only detect Alt+D — disable it for other hotkeys
-    EVDEV_ENABLED.store(new_hotkey == "Alt+D", Ordering::Relaxed);
+    EVDEV_HOTKEY_MODE.store(hotkey_to_evdev_mode(new_hotkey), Ordering::Relaxed);
 
     let mut config = AppConfig::load().map_err(|e| e.to_string())?;
     config.hotkey = new_hotkey.to_string();
@@ -376,12 +384,13 @@ fn start_hotkey_listener(app_handle: tauri::AppHandle) {
 
         info!("evdev hotkey listener started on {} keyboard(s)", devices.len());
 
-        // Listen on all keyboards — the debounce in eval_toggle prevents double-fires
         let alt_held = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let shift_held = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
 
         for device in devices {
             let app = app_handle.clone();
             let alt = alt_held.clone();
+            let shift = shift_held.clone();
 
             std::thread::spawn(move || {
                 let mut dev = device;
@@ -397,11 +406,22 @@ fn start_hotkey_listener(app_handle: tauri::AppHandle) {
                                         Key::KEY_LEFTALT | Key::KEY_RIGHTALT => {
                                             alt.store(pressed, Ordering::Relaxed);
                                         }
+                                        Key::KEY_LEFTSHIFT | Key::KEY_RIGHTSHIFT => {
+                                            shift.store(pressed, Ordering::Relaxed);
+                                        }
                                         Key::KEY_D if pressed && !repeat => {
-                                            if alt.load(Ordering::Relaxed)
-                                                && EVDEV_ENABLED.load(Ordering::Relaxed)
-                                            {
-                                                debug!("Alt+D detected via evdev");
+                                            let mode = EVDEV_HOTKEY_MODE.load(Ordering::Relaxed);
+                                            let alt_down = alt.load(Ordering::Relaxed);
+                                            let shift_down = shift.load(Ordering::Relaxed);
+
+                                            let matched = match mode {
+                                                0 => alt_down && !shift_down, // Alt+D (no shift)
+                                                1 => alt_down && shift_down,  // Alt+Shift+D
+                                                _ => false,                    // custom — evdev disabled
+                                            };
+
+                                            if matched {
+                                                debug!("Hotkey detected via evdev (mode {})", mode);
                                                 eval_toggle(&app);
                                             }
                                         }
@@ -440,8 +460,7 @@ pub fn run() {
         .setup(|app| {
             let hotkey = configured_hotkey();
 
-            // evdev can only detect Alt+D — disable for other hotkeys
-            EVDEV_ENABLED.store(hotkey == "Alt+D", Ordering::Relaxed);
+            EVDEV_HOTKEY_MODE.store(hotkey_to_evdev_mode(&hotkey), Ordering::Relaxed);
 
             #[cfg(target_os = "linux")]
             grant_webview_permissions(app);
