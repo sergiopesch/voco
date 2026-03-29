@@ -464,6 +464,14 @@ pub fn run() {
 
             #[cfg(target_os = "linux")]
             grant_webview_permissions(app);
+
+            // Force the WebView to load eagerly by showing the window during setup.
+            // On Wayland, off-screen windows may not load content until shown.
+            // This ensures window.__toggleDictation is set before the first keypress.
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+            }
+
             register_global_shortcut_on_handle(app.handle(), &hotkey);
             start_socket_listener(app.handle().clone());
             #[cfg(target_os = "linux")]
