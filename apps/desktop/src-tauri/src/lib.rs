@@ -244,14 +244,14 @@ pub fn eval_toggle(app_handle: &tauri::AppHandle) {
     if let Some(window) = app_handle.get_webview_window("main") {
         std::thread::spawn(move || {
             let _ = window.show();
-            std::thread::sleep(std::time::Duration::from_millis(150));
+            std::thread::sleep(std::time::Duration::from_millis(200));
             // Self-retrying JS: if __toggleDictation isn't set yet (cold start),
-            // retry every 100ms up to 5 times until React mounts.
+            // retry every 200ms up to 10 times (2s total window) until React mounts.
             let js = r#"
                 (function tryToggle(n) {
                     if (window.__toggleDictation) { window.__toggleDictation(); }
-                    else if (n > 0) { setTimeout(function() { tryToggle(n-1); }, 100); }
-                })(5);
+                    else if (n > 0) { setTimeout(function() { tryToggle(n-1); }, 200); }
+                })(10);
             "#;
             if let Err(e) = window.eval(js) {
                 error!("JS eval failed: {e}");
