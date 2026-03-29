@@ -10,26 +10,26 @@ use std::sync::Mutex;
 use tauri::Manager;
 use transcribe::{WhisperMutex, WhisperState};
 
-// Debounce: ignore eval_toggle calls within 300ms of each other.
+// Debounce: ignore eval_toggle calls within 500ms of each other.
+// Prevents double-fire from multiple evdev keyboard devices.
 static LAST_TOGGLE_MS: AtomicI64 = AtomicI64::new(0);
 
-// Evdev hotkey config: which modifier+key combo to detect.
-// 0 = Alt+D, 1 = Alt+Shift+D, 255 = disabled (custom hotkey evdev can't detect)
+// Evdev hotkey mode: 0 = Alt+D, 1 = Alt+Shift+D, 255 = custom (disabled)
 static EVDEV_HOTKEY_MODE: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
-
-fn hotkey_to_evdev_mode(hotkey: &str) -> u8 {
-    match hotkey {
-        "Alt+D" => 0,
-        "Alt+Shift+D" => 1,
-        _ => 255, // custom hotkey — evdev can't detect it
-    }
-}
 
 fn now_ms() -> i64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis() as i64
+}
+
+fn hotkey_to_evdev_mode(hotkey: &str) -> u8 {
+    match hotkey {
+        "Alt+D" => 0,
+        "Alt+Shift+D" => 1,
+        _ => 255,
+    }
 }
 
 #[tauri::command]
@@ -44,7 +44,6 @@ fn save_config(config: AppConfig) -> Result<(), String> {
 
 // --- Transcription ---
 
-/// Decode base64-encoded little-endian f32 audio samples.
 fn decode_audio_base64(encoded: &str) -> Result<Vec<f32>, String> {
     use base64::Engine;
     let bytes = base64::engine::general_purpose::STANDARD
@@ -55,12 +54,10 @@ fn decode_audio_base64(encoded: &str) -> Result<Vec<f32>, String> {
         return Err("Audio data length is not a multiple of 4 bytes".to_string());
     }
 
-    let samples: Vec<f32> = bytes
+    Ok(bytes
         .chunks_exact(4)
         .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]]))
-        .collect();
-
-    Ok(samples)
+        .collect())
 }
 
 #[tauri::command]
@@ -73,7 +70,6 @@ fn transcribe_audio(
     if samples.is_empty() {
         return Err("No audio samples provided".to_string());
     }
-
     if samples.len() > 16000 * 300 {
         return Err("Audio too long (max 5 minutes)".to_string());
     }
@@ -91,7 +87,7 @@ fn transcribe_audio(
     whisper.transcribe(&samples)
 }
 
-// --- Text insertion ---
+// --- Text insertion & notifications ---
 
 #[tauri::command]
 fn set_recording_state(app: tauri::AppHandle, recording: bool) -> Result<(), String> {
@@ -194,9 +190,7 @@ fn ensure_model_downloaded(app_handle: &tauri::AppHandle) -> Result<(), String> 
 
     loop {
         let n = reader.read(&mut buf).map_err(|e| format!("Download read error: {e}"))?;
-        if n == 0 {
-            break;
-        }
+        if n == 0 { break; }
         bytes.extend_from_slice(&buf[..n]);
         downloaded += n as u64;
 
@@ -221,7 +215,6 @@ fn ensure_model_downloaded(app_handle: &tauri::AppHandle) -> Result<(), String> 
 
     std::fs::write(&tmp_path, &bytes)
         .map_err(|e| format!("Failed to save model (tmp): {e}"))?;
-
     std::fs::rename(&tmp_path, &path)
         .map_err(|e| format!("Failed to finalize model file: {e}"))?;
 
@@ -230,13 +223,13 @@ fn ensure_model_downloaded(app_handle: &tauri::AppHandle) -> Result<(), String> 
     Ok(())
 }
 
-// --- Invoke toggle on the frontend via JS eval ---
+// --- Toggle dictation via JS eval ---
 
 pub fn eval_toggle(app_handle: &tauri::AppHandle) {
-    // Debounce: ignore if called within 300ms of last toggle.
+    // Debounce with SeqCst to guarantee cross-thread visibility.
     let now = now_ms();
-    let last = LAST_TOGGLE_MS.swap(now, Ordering::Relaxed);
-    if (now - last).abs() < 300 {
+    let last = LAST_TOGGLE_MS.swap(now, Ordering::SeqCst);
+    if (now - last).abs() < 500 {
         debug!("eval_toggle debounced ({}ms since last)", now - last);
         return;
     }
@@ -244,16 +237,8 @@ pub fn eval_toggle(app_handle: &tauri::AppHandle) {
     if let Some(window) = app_handle.get_webview_window("main") {
         std::thread::spawn(move || {
             let _ = window.show();
-            std::thread::sleep(std::time::Duration::from_millis(200));
-            // Self-retrying JS: if __toggleDictation isn't set yet (cold start),
-            // retry every 200ms up to 10 times (2s total window) until React mounts.
-            let js = r#"
-                (function tryToggle(n) {
-                    if (window.__toggleDictation) { window.__toggleDictation(); }
-                    else if (n > 0) { setTimeout(function() { tryToggle(n-1); }, 200); }
-                })(10);
-            "#;
-            if let Err(e) = window.eval(js) {
+            std::thread::sleep(std::time::Duration::from_millis(50));
+            if let Err(e) = window.eval("window.__toggleDictation && window.__toggleDictation()") {
                 error!("JS eval failed: {e}");
             }
         });
@@ -262,7 +247,7 @@ pub fn eval_toggle(app_handle: &tauri::AppHandle) {
     }
 }
 
-// --- Register global shortcut via Tauri plugin (primary mechanism) ---
+// --- Hotkey configuration ---
 
 fn configured_hotkey() -> String {
     AppConfig::load()
@@ -270,41 +255,9 @@ fn configured_hotkey() -> String {
         .unwrap_or_else(|_| "Alt+D".to_string())
 }
 
-fn register_global_shortcut_on_handle(app: &tauri::AppHandle, hotkey: &str) {
-    use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
-
-    let shortcut: Shortcut = match hotkey.parse() {
-        Ok(s) => s,
-        Err(e) => {
-            error!("Failed to parse shortcut {hotkey}: {e}");
-            return;
-        }
-    };
-    let handle = app.clone();
-    let hotkey_label = hotkey.to_string();
-
-    let _ = app.global_shortcut().unregister(shortcut);
-
-    if let Err(e) = app.global_shortcut().on_shortcut(shortcut, move |_app, _shortcut, event| {
-        if event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed {
-            debug!("{hotkey_label} detected via global shortcut plugin");
-            eval_toggle(&handle);
-        }
-    }) {
-        error!("Failed to register global shortcut: {e}");
-    } else {
-        info!("Global shortcut {hotkey} registered");
-    }
-}
-
-/// Change the hotkey at runtime: unregister old, register new, save config, update tray.
+/// Change the hotkey at runtime.
 pub fn change_hotkey_runtime(app: &tauri::AppHandle, new_hotkey: &str) -> Result<(), String> {
-    use tauri_plugin_global_shortcut::GlobalShortcutExt;
-
-    let _ = app.global_shortcut().unregister_all();
-    register_global_shortcut_on_handle(app, new_hotkey);
-
-    EVDEV_HOTKEY_MODE.store(hotkey_to_evdev_mode(new_hotkey), Ordering::Relaxed);
+    EVDEV_HOTKEY_MODE.store(hotkey_to_evdev_mode(new_hotkey), Ordering::SeqCst);
 
     let mut config = AppConfig::load().map_err(|e| e.to_string())?;
     config.hotkey = new_hotkey.to_string();
@@ -317,7 +270,7 @@ pub fn change_hotkey_runtime(app: &tauri::AppHandle, new_hotkey: &str) -> Result
     Ok(())
 }
 
-// --- Socket listener for external triggers ---
+// --- Socket listener ---
 
 fn socket_path() -> std::path::PathBuf {
     let runtime_dir = std::env::var("XDG_RUNTIME_DIR").unwrap_or_else(|_| "/tmp".to_string());
@@ -340,7 +293,6 @@ fn start_socket_listener(app_handle: tauri::AppHandle) {
 
     use std::os::unix::fs::PermissionsExt;
     let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600));
-
     info!("Socket listener ready: {}", path.display());
 
     std::thread::spawn(move || {
@@ -359,7 +311,7 @@ fn start_socket_listener(app_handle: tauri::AppHandle) {
     });
 }
 
-// --- Global hotkey via evdev (fallback for Wayland) ---
+// --- evdev hotkey listener (primary mechanism on Wayland) ---
 
 #[cfg(target_os = "linux")]
 fn start_hotkey_listener(app_handle: tauri::AppHandle) {
@@ -378,7 +330,7 @@ fn start_hotkey_listener(app_handle: tauri::AppHandle) {
             .collect::<Vec<Device>>();
 
         if devices.is_empty() {
-            warn!("No keyboard found for evdev hotkey listener. Add user to 'input' group: sudo usermod -aG input $USER");
+            warn!("No keyboard found for evdev. Add user to 'input' group: sudo usermod -aG input $USER");
             return;
         }
 
@@ -404,20 +356,20 @@ fn start_hotkey_listener(app_handle: tauri::AppHandle) {
 
                                     match key {
                                         Key::KEY_LEFTALT | Key::KEY_RIGHTALT => {
-                                            alt.store(pressed, Ordering::Relaxed);
+                                            alt.store(pressed, Ordering::SeqCst);
                                         }
                                         Key::KEY_LEFTSHIFT | Key::KEY_RIGHTSHIFT => {
-                                            shift.store(pressed, Ordering::Relaxed);
+                                            shift.store(pressed, Ordering::SeqCst);
                                         }
                                         Key::KEY_D if pressed && !repeat => {
-                                            let mode = EVDEV_HOTKEY_MODE.load(Ordering::Relaxed);
-                                            let alt_down = alt.load(Ordering::Relaxed);
-                                            let shift_down = shift.load(Ordering::Relaxed);
+                                            let mode = EVDEV_HOTKEY_MODE.load(Ordering::SeqCst);
+                                            let alt_down = alt.load(Ordering::SeqCst);
+                                            let shift_down = shift.load(Ordering::SeqCst);
 
                                             let matched = match mode {
-                                                0 => alt_down && !shift_down, // Alt+D (no shift)
-                                                1 => alt_down && shift_down,  // Alt+Shift+D
-                                                _ => false,                    // custom — evdev disabled
+                                                0 => alt_down && !shift_down,
+                                                1 => alt_down && shift_down,
+                                                _ => false,
                                             };
 
                                             if matched {
@@ -459,21 +411,34 @@ pub fn run() {
         ])
         .setup(|app| {
             let hotkey = configured_hotkey();
-
-            EVDEV_HOTKEY_MODE.store(hotkey_to_evdev_mode(&hotkey), Ordering::Relaxed);
+            EVDEV_HOTKEY_MODE.store(hotkey_to_evdev_mode(&hotkey), Ordering::SeqCst);
 
             #[cfg(target_os = "linux")]
             grant_webview_permissions(app);
 
-            // Force the WebView to load eagerly by showing the window during setup.
-            // On Wayland, off-screen windows may not load content until shown.
-            // This ensures window.__toggleDictation is set before the first keypress.
+            // Force WebView to load eagerly (required for Wayland)
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.show();
             }
 
-            register_global_shortcut_on_handle(app.handle(), &hotkey);
+            // Register Tauri global shortcut (works on X11, may not work on Wayland)
+            {
+                use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
+                if let Ok(shortcut) = hotkey.parse::<Shortcut>() {
+                    let handle = app.handle().clone();
+                    let label = hotkey.clone();
+                    let _ = app.global_shortcut().on_shortcut(shortcut, move |_app, _shortcut, event| {
+                        if event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed {
+                            debug!("{label} detected via global shortcut plugin");
+                            eval_toggle(&handle);
+                        }
+                    });
+                    info!("Global shortcut {hotkey} registered");
+                }
+            }
+
             start_socket_listener(app.handle().clone());
+
             #[cfg(target_os = "linux")]
             start_hotkey_listener(app.handle().clone());
 
@@ -506,13 +471,10 @@ mod tests {
     #[test]
     fn decode_audio_base64_valid() {
         use base64::Engine;
-        let sample1 = 0.5f32.to_le_bytes();
-        let sample2 = (-0.5f32).to_le_bytes();
         let mut bytes = Vec::new();
-        bytes.extend_from_slice(&sample1);
-        bytes.extend_from_slice(&sample2);
+        bytes.extend_from_slice(&0.5f32.to_le_bytes());
+        bytes.extend_from_slice(&(-0.5f32).to_le_bytes());
         let encoded = base64::engine::general_purpose::STANDARD.encode(&bytes);
-
         let samples = decode_audio_base64(&encoded).unwrap();
         assert_eq!(samples.len(), 2);
         assert!((samples[0] - 0.5).abs() < f32::EPSILON);
@@ -523,44 +485,35 @@ mod tests {
     fn decode_audio_base64_empty() {
         use base64::Engine;
         let encoded = base64::engine::general_purpose::STANDARD.encode(b"");
-        let samples = decode_audio_base64(&encoded).unwrap();
-        assert!(samples.is_empty());
+        assert!(decode_audio_base64(&encoded).unwrap().is_empty());
     }
 
     #[test]
     fn decode_audio_base64_invalid_length() {
         use base64::Engine;
         let encoded = base64::engine::general_purpose::STANDARD.encode(b"abc");
-        let result = decode_audio_base64(&encoded);
-        assert!(result.is_err());
-        assert!(result.unwrap_err().contains("not a multiple of 4"));
+        assert!(decode_audio_base64(&encoded).unwrap_err().contains("not a multiple of 4"));
     }
 
     #[test]
     fn decode_audio_base64_invalid_encoding() {
-        let result = decode_audio_base64("not-valid-base64!!!");
-        assert!(result.is_err());
+        assert!(decode_audio_base64("not-valid-base64!!!").is_err());
     }
 
     #[test]
     fn socket_path_uses_xdg_runtime_dir() {
-        let path = socket_path();
-        assert!(path.to_str().unwrap().ends_with("voice.sock"));
+        assert!(socket_path().to_str().unwrap().ends_with("voice.sock"));
     }
 
     #[test]
-    fn configured_hotkey_returns_default_on_missing_config() {
-        let hotkey = configured_hotkey();
-        assert!(!hotkey.is_empty());
+    fn configured_hotkey_returns_nonempty() {
+        assert!(!configured_hotkey().is_empty());
     }
 
     #[test]
-    fn debounce_prevents_rapid_toggles() {
-        LAST_TOGGLE_MS.store(now_ms(), Ordering::Relaxed);
-        // A call within 300ms should be debounced (we can't test eval_toggle directly
-        // without a Tauri app, but we can verify the timestamp logic)
-        let now = now_ms();
-        let last = LAST_TOGGLE_MS.load(Ordering::Relaxed);
-        assert!((now - last).abs() < 300);
+    fn hotkey_modes() {
+        assert_eq!(hotkey_to_evdev_mode("Alt+D"), 0);
+        assert_eq!(hotkey_to_evdev_mode("Alt+Shift+D"), 1);
+        assert_eq!(hotkey_to_evdev_mode("Ctrl+Shift+V"), 255);
     }
 }
