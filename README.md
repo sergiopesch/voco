@@ -51,6 +51,8 @@ cd voice
 2. **Press Alt+D** — speak naturally.
 3. **Press Alt+D again** — your words are typed wherever your cursor is.
 
+A small overlay appears near your cursor while Voice is listening and while it is transcribing, so the next step is always visible before text lands.
+
 No account. No cloud. Audio never leaves your machine.
 
 > First launch downloads the speech model (~142 MB, one-time). After that, fully offline.
@@ -62,6 +64,7 @@ No account. No cloud. Audio never leaves your machine.
 | **Fully local** | whisper.cpp runs on your machine — audio never leaves it |
 | **Global hotkey** | Works from any app. Default `Alt+D`, customizable on install |
 | **System tray** | Mic icon turns red while recording |
+| **Cursor-side status overlay** | Shows listening and transcribing states right beside your cursor |
 | **Smart insertion** | Types directly into the focused app, clipboard fallback |
 | **No account needed** | No sign-up, no API key, no subscription, ever |
 

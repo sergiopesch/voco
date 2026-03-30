@@ -17,6 +17,13 @@ static LAST_TOGGLE_MS: AtomicI64 = AtomicI64::new(0);
 // Evdev hotkey mode: 0 = Alt+D, 1 = Alt+Shift+D, 255 = custom (disabled)
 static EVDEV_HOTKEY_MODE: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
 
+const HIDDEN_WINDOW_POS_X: i32 = -100;
+const HIDDEN_WINDOW_POS_Y: i32 = -100;
+const HIDDEN_WINDOW_SIZE: u32 = 1;
+const OVERLAY_CURSOR_OFFSET_X: i32 = 20;
+const OVERLAY_CURSOR_OFFSET_Y: i32 = 24;
+const OVERLAY_MARGIN: i32 = 16;
+
 fn now_ms() -> i64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -121,6 +128,116 @@ fn insert_text(text: String, strategy: String) -> Result<insertion::InsertionRes
     insertion::insert_text(&text, &strategy)
 }
 
+fn main_window(app: &tauri::AppHandle) -> Result<tauri::WebviewWindow<tauri::Wry>, String> {
+    app.get_webview_window("main")
+        .ok_or_else(|| "Window 'main' not found".to_string())
+}
+
+fn hide_overlay_window(window: &tauri::WebviewWindow<tauri::Wry>) -> Result<(), String> {
+    window
+        .set_size(tauri::Size::Physical(tauri::PhysicalSize::new(
+            HIDDEN_WINDOW_SIZE,
+            HIDDEN_WINDOW_SIZE,
+        )))
+        .map_err(|e| format!("Failed to shrink overlay window: {e}"))?;
+
+    window
+        .set_position(tauri::Position::Physical(tauri::PhysicalPosition::new(
+            HIDDEN_WINDOW_POS_X,
+            HIDDEN_WINDOW_POS_Y,
+        )))
+        .map_err(|e| format!("Failed to move overlay window off-screen: {e}"))?;
+
+    Ok(())
+}
+
+fn clamp_overlay_position(
+    cursor_x: i32,
+    cursor_y: i32,
+    bounds: Option<(i32, i32, u32, u32)>,
+    width: u32,
+    height: u32,
+) -> (i32, i32) {
+    let mut x = cursor_x + OVERLAY_CURSOR_OFFSET_X;
+    let mut y = cursor_y + OVERLAY_CURSOR_OFFSET_Y;
+
+    if let Some((monitor_x, monitor_y, monitor_width, monitor_height)) = bounds {
+        let min_x = monitor_x + OVERLAY_MARGIN;
+        let min_y = monitor_y + OVERLAY_MARGIN;
+        let max_x = (monitor_x + monitor_width as i32 - width as i32 - OVERLAY_MARGIN).max(min_x);
+        let max_y = (monitor_y + monitor_height as i32 - height as i32 - OVERLAY_MARGIN).max(min_y);
+
+        x = x.clamp(min_x, max_x);
+        y = y.clamp(min_y, max_y);
+    }
+
+    (x, y)
+}
+
+fn show_overlay_window(
+    window: &tauri::WebviewWindow<tauri::Wry>,
+    width: u32,
+    height: u32,
+) -> Result<(), String> {
+    let cursor = window
+        .cursor_position()
+        .map_err(|e| format!("Failed to read cursor position: {e}"))?;
+
+    let monitor = window
+        .monitor_from_point(cursor.x, cursor.y)
+        .ok()
+        .flatten()
+        .or_else(|| window.current_monitor().ok().flatten())
+        .or_else(|| window.primary_monitor().ok().flatten());
+
+    let bounds = monitor.as_ref().map(|monitor| {
+        (
+            monitor.position().x,
+            monitor.position().y,
+            monitor.size().width,
+            monitor.size().height,
+        )
+    });
+
+    let (x, y) = clamp_overlay_position(
+        cursor.x.round() as i32,
+        cursor.y.round() as i32,
+        bounds,
+        width,
+        height,
+    );
+
+    window
+        .set_size(tauri::Size::Physical(tauri::PhysicalSize::new(
+            width, height,
+        )))
+        .map_err(|e| format!("Failed to resize overlay window: {e}"))?;
+
+    window
+        .set_position(tauri::Position::Physical(tauri::PhysicalPosition::new(
+            x, y,
+        )))
+        .map_err(|e| format!("Failed to position overlay window: {e}"))?;
+
+    Ok(())
+}
+
+#[tauri::command]
+fn show_status_overlay(app: tauri::AppHandle, width: u32, height: u32) -> Result<(), String> {
+    let window = main_window(&app)?;
+    show_overlay_window(
+        &window,
+        width.max(HIDDEN_WINDOW_SIZE),
+        height.max(HIDDEN_WINDOW_SIZE),
+    )
+}
+
+#[tauri::command]
+fn hide_status_overlay(app: tauri::AppHandle) -> Result<(), String> {
+    let window = main_window(&app)?;
+    hide_overlay_window(&window)
+}
+
 #[cfg(target_os = "linux")]
 fn grant_webview_permissions(app: &tauri::App) {
     use glib::object::Cast;
@@ -128,19 +245,24 @@ fn grant_webview_permissions(app: &tauri::App) {
     use webkit2gtk::WebViewExt;
 
     if let Some(window) = app.get_webview_window("main") {
-        window.with_webview(move |wv| {
-            let webview: webkit2gtk::WebView = wv.inner().clone().downcast().unwrap();
-            webview.connect_permission_request(
-                |_wv, request: &webkit2gtk::PermissionRequest| {
-                    if request.downcast_ref::<webkit2gtk::UserMediaPermissionRequest>().is_some() {
-                        request.allow();
-                        true
-                    } else {
-                        false
-                    }
-                },
-            );
-        }).ok();
+        window
+            .with_webview(move |wv| {
+                let webview: webkit2gtk::WebView = wv.inner().clone().downcast().unwrap();
+                webview.connect_permission_request(
+                    |_wv, request: &webkit2gtk::PermissionRequest| {
+                        if request
+                            .downcast_ref::<webkit2gtk::UserMediaPermissionRequest>()
+                            .is_some()
+                        {
+                            request.allow();
+                            true
+                        } else {
+                            false
+                        }
+                    },
+                );
+            })
+            .ok();
     }
 }
 
@@ -171,12 +293,17 @@ fn ensure_model_downloaded(app_handle: &tauri::AppHandle) -> Result<(), String> 
         .build()
         .map_err(|e| format!("HTTP client error: {e}"))?;
 
-    let response = client.get(url).send()
+    let response = client
+        .get(url)
+        .send()
         .map_err(|e| format!("Download failed: {e}"))?;
 
     if !response.status().is_success() {
         set_tray_tooltip("Voice — Download failed");
-        return Err(format!("Download failed with status: {}", response.status()));
+        return Err(format!(
+            "Download failed with status: {}",
+            response.status()
+        ));
     }
 
     let total_size = response.content_length().unwrap_or(0);
@@ -189,8 +316,12 @@ fn ensure_model_downloaded(app_handle: &tauri::AppHandle) -> Result<(), String> 
     let mut buf = [0u8; 65536];
 
     loop {
-        let n = reader.read(&mut buf).map_err(|e| format!("Download read error: {e}"))?;
-        if n == 0 { break; }
+        let n = reader
+            .read(&mut buf)
+            .map_err(|e| format!("Download read error: {e}"))?;
+        if n == 0 {
+            break;
+        }
         bytes.extend_from_slice(&buf[..n]);
         downloaded += n as u64;
 
@@ -209,14 +340,13 @@ fn ensure_model_downloaded(app_handle: &tauri::AppHandle) -> Result<(), String> 
         set_tray_tooltip("Voice — Download corrupt, retry on next launch");
         return Err(format!(
             "Model integrity check failed (expected {}, got {}). Download may be corrupt.",
-            &MODEL_SHA256[..16], &hash[..16]
+            &MODEL_SHA256[..16],
+            &hash[..16]
         ));
     }
 
-    std::fs::write(&tmp_path, &bytes)
-        .map_err(|e| format!("Failed to save model (tmp): {e}"))?;
-    std::fs::rename(&tmp_path, &path)
-        .map_err(|e| format!("Failed to finalize model file: {e}"))?;
+    std::fs::write(&tmp_path, &bytes).map_err(|e| format!("Failed to save model (tmp): {e}"))?;
+    std::fs::rename(&tmp_path, &path).map_err(|e| format!("Failed to finalize model file: {e}"))?;
 
     set_tray_tooltip("Voice");
     info!("Model downloaded and verified: {}", path.display());
@@ -236,8 +366,6 @@ pub fn eval_toggle(app_handle: &tauri::AppHandle) {
 
     if let Some(window) = app_handle.get_webview_window("main") {
         std::thread::spawn(move || {
-            let _ = window.show();
-            std::thread::sleep(std::time::Duration::from_millis(50));
             if let Err(e) = window.eval("window.__toggleDictation && window.__toggleDictation()") {
                 error!("JS eval failed: {e}");
             }
@@ -265,7 +393,10 @@ pub fn change_hotkey_runtime(app: &tauri::AppHandle, new_hotkey: &str) -> Result
 
     tray::update_hotkey_display(app, new_hotkey);
     info!("Hotkey changed to {new_hotkey}");
-    send_notification("Hotkey changed", &format!("Voice will now respond to {new_hotkey}"));
+    send_notification(
+        "Hotkey changed",
+        &format!("Voice will now respond to {new_hotkey}"),
+    );
 
     Ok(())
 }
@@ -334,7 +465,10 @@ fn start_hotkey_listener(app_handle: tauri::AppHandle) {
             return;
         }
 
-        info!("evdev hotkey listener started on {} keyboard(s)", devices.len());
+        info!(
+            "evdev hotkey listener started on {} keyboard(s)",
+            devices.len()
+        );
 
         let alt_held = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
         let shift_held = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
@@ -407,6 +541,8 @@ pub fn run() {
             transcribe_audio,
             insert_text,
             set_recording_state,
+            show_status_overlay,
+            hide_status_overlay,
             show_notification,
         ])
         .setup(|app| {
@@ -419,6 +555,9 @@ pub fn run() {
             // Force WebView to load eagerly (required for Wayland)
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.show();
+                let _ = window.set_always_on_top(true);
+                let _ = window.set_ignore_cursor_events(true);
+                let _ = hide_overlay_window(&window);
             }
 
             // Register Tauri global shortcut (works on X11, may not work on Wayland)
@@ -427,12 +566,15 @@ pub fn run() {
                 if let Ok(shortcut) = hotkey.parse::<Shortcut>() {
                     let handle = app.handle().clone();
                     let label = hotkey.clone();
-                    let _ = app.global_shortcut().on_shortcut(shortcut, move |_app, _shortcut, event| {
-                        if event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed {
-                            debug!("{label} detected via global shortcut plugin");
-                            eval_toggle(&handle);
-                        }
-                    });
+                    let _ = app.global_shortcut().on_shortcut(
+                        shortcut,
+                        move |_app, _shortcut, event| {
+                            if event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed {
+                                debug!("{label} detected via global shortcut plugin");
+                                eval_toggle(&handle);
+                            }
+                        },
+                    );
                     info!("Global shortcut {hotkey} registered");
                 }
             }
@@ -492,7 +634,9 @@ mod tests {
     fn decode_audio_base64_invalid_length() {
         use base64::Engine;
         let encoded = base64::engine::general_purpose::STANDARD.encode(b"abc");
-        assert!(decode_audio_base64(&encoded).unwrap_err().contains("not a multiple of 4"));
+        assert!(decode_audio_base64(&encoded)
+            .unwrap_err()
+            .contains("not a multiple of 4"));
     }
 
     #[test]
@@ -515,5 +659,26 @@ mod tests {
         assert_eq!(hotkey_to_evdev_mode("Alt+D"), 0);
         assert_eq!(hotkey_to_evdev_mode("Alt+Shift+D"), 1);
         assert_eq!(hotkey_to_evdev_mode("Ctrl+Shift+V"), 255);
+    }
+
+    #[test]
+    fn overlay_position_uses_cursor_offset_without_monitor_bounds() {
+        assert_eq!(clamp_overlay_position(100, 150, None, 252, 112), (120, 174));
+    }
+
+    #[test]
+    fn overlay_position_stays_inside_monitor_bounds() {
+        assert_eq!(
+            clamp_overlay_position(1900, 1060, Some((0, 0, 1920, 1080)), 252, 112),
+            (1652, 952)
+        );
+    }
+
+    #[test]
+    fn overlay_position_handles_small_monitor_bounds() {
+        assert_eq!(
+            clamp_overlay_position(20, 20, Some((0, 0, 120, 90)), 252, 112),
+            (16, 16)
+        );
     }
 }

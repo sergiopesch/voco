@@ -13,6 +13,7 @@ User speaks -> Audio Capture -> Local ASR -> Text Insertion
 ```
 apps/desktop/           Tauri application
   src/                  React + TypeScript frontend (Vite)
+    components/         Cursor-side status overlay UI
     hooks/              useDictation (audio capture), useGlobalShortcut
     store/              Zustand state management
     lib/                Tauri IPC bridge
@@ -31,8 +32,9 @@ apps/desktop/           Tauri application
 1. **Audio Capture**: WebView `getUserMedia` -> AudioWorklet (with ScriptProcessorNode fallback) -> Float32Array samples
 2. **Resampling**: If mic sample rate != 16kHz, resample via OfflineAudioContext
 3. **ASR**: Float32Array bytes base64-encoded, sent to Rust via Tauri invoke, decoded to `Vec<f32>` -> whisper-rs -> transcript string
-4. **Insertion**: Transcript -> ydotool/xdotool type simulation or clipboard paste
-5. **Fallback**: If direct typing fails, text is placed on clipboard and Ctrl+V is simulated. Desktop notification informs user.
+4. **Status Feedback**: Transparent overlay window is moved near the cursor while recording and processing so the user can see that Voice is listening or transcribing
+5. **Insertion**: Transcript -> ydotool/xdotool type simulation or clipboard paste
+6. **Fallback**: If direct typing fails, text is placed on clipboard and Ctrl+V is simulated. Desktop notification informs user.
 
 ## Tauri IPC Commands
 

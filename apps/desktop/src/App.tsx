@@ -3,25 +3,33 @@ import { useStore } from "@/store/useStore";
 import { getConfig } from "@/lib/tauri";
 import { useGlobalShortcut } from "@/hooks/useGlobalShortcut";
 import { useDictation } from "@/hooks/useDictation";
+import { StatusOverlay } from "@/components/StatusOverlay";
 
 export function App() {
-  const { setConfig, setError } = useStore();
-  const { toggle, moveWindowOffScreen } = useDictation();
+  const status = useStore((state) => state.status);
+  const setConfig = useStore((state) => state.setConfig);
+  const setError = useStore((state) => state.setError);
+  const { prepareWindow, syncIndicatorWindow, toggle } = useDictation();
+
   useGlobalShortcut(toggle);
 
   useEffect(() => {
     async function init() {
       try {
         setConfig(await getConfig());
-        moveWindowOffScreen();
+        await prepareWindow();
       } catch (err) {
         setError(
           `Failed to initialize: ${err instanceof Error ? err.message : String(err)}`,
         );
       }
     }
-    init();
-  }, [setConfig, setError, moveWindowOffScreen]);
+    void init();
+  }, [prepareWindow, setConfig, setError]);
 
-  return null;
+  useEffect(() => {
+    void syncIndicatorWindow(status);
+  }, [status, syncIndicatorWindow]);
+
+  return <StatusOverlay />;
 }

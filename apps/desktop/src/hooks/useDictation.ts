@@ -1,26 +1,30 @@
 import { useCallback, useRef } from "react";
 import { useStore } from "@/store/useStore";
 import {
+  hideStatusOverlay,
   transcribeAudio,
   insertText,
   setRecordingState,
   showNotification,
+  showStatusOverlay,
 } from "@/lib/tauri";
-import { getCurrentWindow } from "@tauri-apps/api/window";
-import { LogicalSize, LogicalPosition } from "@tauri-apps/api/dpi";
+import type { DictationStatus } from "@/types";
 
 const TARGET_SAMPLE_RATE = 16000;
+const STATUS_OVERLAY_WIDTH = 252;
+const STATUS_OVERLAY_HEIGHT = 112;
+const TOGGLE_DEDUPE_MS = 150;
+
+type DictationPhase = DictationStatus | "starting" | "stopping";
+type QueuedAction = "start" | "stop" | null;
 
 export function useDictation() {
-  const {
-    status,
-    setStatus,
-    setTranscript,
-    setInterimTranscript,
-    setError,
-    setAudioLevel,
-    clearTranscript,
-  } = useStore();
+  const setStatus = useStore((state) => state.setStatus);
+  const setTranscript = useStore((state) => state.setTranscript);
+  const setInterimTranscript = useStore((state) => state.setInterimTranscript);
+  const setError = useStore((state) => state.setError);
+  const setAudioLevel = useStore((state) => state.setAudioLevel);
+  const clearTranscript = useStore((state) => state.clearTranscript);
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
@@ -28,15 +32,27 @@ export function useDictation() {
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const samplesRef = useRef<Float32Array[]>([]);
+  const phaseRef = useRef<DictationPhase>("idle");
+  const queuedActionRef = useRef<QueuedAction>(null);
+  const lastToggleRequestMsRef = useRef(0);
 
-  const moveWindowOffScreen = useCallback(async () => {
+  const prepareWindow = useCallback(async () => {
     try {
-      const w = getCurrentWindow();
-      await w.setSize(new LogicalSize(1, 1));
-      await w.setPosition(new LogicalPosition(-100, -100));
-      await w.show(); // Must stay "shown" for WebKitGTK to allow getUserMedia
-    } catch (e) {
-      console.warn("Failed to move window off-screen:", e);
+      await hideStatusOverlay();
+    } catch (error) {
+      console.warn("Failed to prepare status overlay window:", error);
+    }
+  }, []);
+
+  const syncIndicatorWindow = useCallback(async (status: DictationStatus) => {
+    try {
+      if (status === "recording" || status === "processing") {
+        await showStatusOverlay(STATUS_OVERLAY_WIDTH, STATUS_OVERLAY_HEIGHT);
+      } else {
+        await hideStatusOverlay();
+      }
+    } catch (error) {
+      console.warn("Failed to sync status overlay window:", error);
     }
   }, []);
 
@@ -87,10 +103,65 @@ export function useDictation() {
     processorRef.current = processor;
   };
 
-  const startRecording = useCallback(async () => {
+  async function teardownAudioGraph() {
+    if (workletRef.current) {
+      workletRef.current.disconnect();
+      workletRef.current = null;
+    }
+    if (processorRef.current) {
+      processorRef.current.disconnect();
+      processorRef.current = null;
+    }
+    if (sourceRef.current) {
+      sourceRef.current.disconnect();
+      sourceRef.current = null;
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+
+    const sampleRate = audioContextRef.current?.sampleRate ?? TARGET_SAMPLE_RATE;
+
+    if (audioContextRef.current) {
+      try {
+        await audioContextRef.current.close();
+      } catch {
+        // Closing an already-closed context is safe to ignore here.
+      }
+      audioContextRef.current = null;
+    }
+
+    return sampleRate;
+  }
+
+  function finalizeIdleState() {
+    setInterimTranscript("");
+    phaseRef.current = "idle";
+    setStatus("idle");
+
+    const queuedAction = queuedActionRef.current;
+    queuedActionRef.current = null;
+
+    if (queuedAction === "start") {
+      void startRecording();
+    }
+  }
+
+  async function startRecording() {
+    const phase = phaseRef.current;
+    if (phase !== "idle" && phase !== "error") {
+      return;
+    }
+
+    phaseRef.current = "starting";
+    queuedActionRef.current = null;
+
     try {
       clearTranscript();
-      setError(null);
+      setInterimTranscript("");
+      setStatus("recording");
+      setAudioLevel(0);
       samplesRef.current = [];
 
       const deviceId = useStore.getState().selectedDeviceId;
@@ -120,9 +191,21 @@ export function useDictation() {
         connectScriptProcessor(audioContext, source);
       }
 
-      setStatus("recording");
+      phaseRef.current = "recording";
       setRecordingState(true).catch(() => {});
+
+      if (queuedActionRef.current === "stop") {
+        queuedActionRef.current = null;
+        void stopRecording();
+      }
     } catch (err) {
+      await teardownAudioGraph();
+      setAudioLevel(0);
+      setRecordingState(false).catch(() => {});
+      setInterimTranscript("");
+      queuedActionRef.current = null;
+      phaseRef.current = "error";
+
       if (err instanceof DOMException) {
         if (err.name === "NotAllowedError") {
           setError("Microphone access denied. Check your system permissions.");
@@ -135,41 +218,26 @@ export function useDictation() {
         setError(`Failed to start recording: ${err}`);
       }
     }
-  }, [clearTranscript, setError, setStatus, setAudioLevel]);
+  }
 
-  const stopRecording = useCallback(async () => {
-    if (workletRef.current) {
-      workletRef.current.disconnect();
-      workletRef.current = null;
-    }
-    if (processorRef.current) {
-      processorRef.current.disconnect();
-      processorRef.current = null;
-    }
-    if (sourceRef.current) {
-      sourceRef.current.disconnect();
-      sourceRef.current = null;
-    }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
+  async function stopRecording() {
+    if (phaseRef.current !== "recording") {
+      return;
     }
 
+    phaseRef.current = "stopping";
+    setStatus("processing");
+    setInterimTranscript("Wrapping up...");
+
+    const sampleRate = await teardownAudioGraph();
     setAudioLevel(0);
     setRecordingState(false).catch(() => {});
-
-    const sampleRate = audioContextRef.current?.sampleRate ?? TARGET_SAMPLE_RATE;
-
-    if (audioContextRef.current) {
-      await audioContextRef.current.close();
-      audioContextRef.current = null;
-    }
 
     const chunks = samplesRef.current;
     samplesRef.current = [];
 
     if (chunks.length === 0) {
-      setStatus("idle");
+      finalizeIdleState();
       return;
     }
 
@@ -188,24 +256,24 @@ export function useDictation() {
 
     // Skip very short recordings (< 0.3s)
     if (merged.length < TARGET_SAMPLE_RATE * 0.3) {
-      setStatus("idle");
+      finalizeIdleState();
       return;
     }
 
-    setStatus("processing");
+    phaseRef.current = "processing";
     setInterimTranscript("Transcribing...");
 
     try {
       const transcript = await transcribeAudio(merged);
-      setInterimTranscript("");
 
       if (!transcript || transcript.trim().length === 0) {
         setTranscript("(no speech detected)");
-        setStatus("idle");
+        finalizeIdleState();
         return;
       }
 
       setTranscript(transcript);
+      setInterimTranscript("Typing at your cursor...");
 
       // Small delay to let focus return to the previous app
       await new Promise((r) => setTimeout(r, 250));
@@ -220,24 +288,47 @@ export function useDictation() {
         ).catch(() => {});
       }
 
-      setStatus("idle");
+      finalizeIdleState();
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err);
+      phaseRef.current = "error";
       setError(`Transcription failed: ${detail} (${merged.length} samples)`);
       setInterimTranscript("");
-      setStatus("idle");
+
+      const queuedAction = queuedActionRef.current;
+      queuedActionRef.current = null;
+      if (queuedAction === "start") {
+        void startRecording();
+      }
     }
-  }, [setStatus, setTranscript, setInterimTranscript, setError, setAudioLevel]);
+  }
 
   const toggle = useCallback(() => {
-    if (status === "recording") {
-      stopRecording();
-    } else if (status === "idle" || status === "error") {
-      startRecording();
+    const now = Date.now();
+    if (now - lastToggleRequestMsRef.current < TOGGLE_DEDUPE_MS) {
+      return;
     }
-  }, [status, startRecording, stopRecording]);
+    lastToggleRequestMsRef.current = now;
 
-  return { toggle, moveWindowOffScreen };
+    switch (phaseRef.current) {
+      case "idle":
+      case "error":
+        void startRecording();
+        break;
+      case "starting":
+        queuedActionRef.current = "stop";
+        break;
+      case "recording":
+        void stopRecording();
+        break;
+      case "stopping":
+      case "processing":
+        queuedActionRef.current = "start";
+        break;
+    }
+  }, []);
+
+  return { prepareWindow, syncIndicatorWindow, toggle };
 }
 
 /**

@@ -22,6 +22,17 @@ export async function setRecordingState(recording: boolean): Promise<void> {
   return invoke("set_recording_state", { recording });
 }
 
+export async function showStatusOverlay(
+  width: number,
+  height: number,
+): Promise<void> {
+  return invoke("show_status_overlay", { width, height });
+}
+
+export async function hideStatusOverlay(): Promise<void> {
+  return invoke("hide_status_overlay");
+}
+
 export async function showNotification(summary: string, body: string): Promise<void> {
   return invoke("show_notification", { summary, body });
 }
