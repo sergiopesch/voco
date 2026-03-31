@@ -5,8 +5,8 @@ mod tray;
 
 use config::AppConfig;
 use log::{debug, error, info, warn};
-use std::sync::atomic::{AtomicI64, Ordering};
-use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
+use std::sync::{LazyLock, Mutex};
 use tauri::{Emitter, Manager};
 use transcribe::{WhisperMutex, WhisperState};
 
@@ -17,6 +17,10 @@ static LAST_TOGGLE_MS: AtomicI64 = AtomicI64::new(0);
 
 // Evdev hotkey mode: 0 = Alt+D, 1 = Alt+Shift+D, 255 = custom (disabled)
 static EVDEV_HOTKEY_MODE: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
+static USE_EVDEV_HOTKEY: AtomicBool = AtomicBool::new(false);
+static HOTKEY_BINDING_VERSION: AtomicU64 = AtomicU64::new(0);
+static REGISTERED_PLUGIN_SHORTCUT: LazyLock<Mutex<Option<String>>> =
+    LazyLock::new(|| Mutex::new(None));
 
 const TOGGLE_DICTATION_EVENT: &str = "voice:toggle-dictation";
 const TOGGLE_DEBOUNCE_MS: i64 = 120;
@@ -50,6 +54,10 @@ fn is_wayland_session() -> bool {
 
 fn prefers_evdev_hotkey(session_is_wayland: bool, hotkey: &str) -> bool {
     session_is_wayland && hotkey_to_evdev_mode(hotkey) != 255
+}
+
+fn should_register_global_shortcut(use_evdev_hotkey: bool) -> bool {
+    !use_evdev_hotkey
 }
 
 #[tauri::command]
@@ -111,7 +119,13 @@ fn transcribe_audio(
 
 #[tauri::command]
 fn set_recording_state(app: tauri::AppHandle, recording: bool) -> Result<(), String> {
-    tray::update_tray_icon(&app, recording);
+    tray::set_recording_state(&app, recording);
+    Ok(())
+}
+
+#[tauri::command]
+fn set_microphone_ready(app: tauri::AppHandle, ready: bool) -> Result<(), String> {
+    tray::update_microphone_ready(&app, ready);
     Ok(())
 }
 
@@ -260,7 +274,10 @@ fn grant_webview_permissions(app: &tauri::App) {
     if let Some(window) = app.get_webview_window("main") {
         window
             .with_webview(move |wv| {
-                let webview: webkit2gtk::WebView = wv.inner().clone().downcast().unwrap();
+                let Ok(webview) = wv.inner().clone().downcast::<webkit2gtk::WebView>() else {
+                    warn!("Failed to downcast webview for permission hookup");
+                    return;
+                };
                 webview.connect_permission_request(
                     |_wv, request: &webkit2gtk::PermissionRequest| {
                         if request
@@ -390,8 +407,86 @@ fn configured_hotkey() -> String {
         .unwrap_or_else(|_| "Alt+D".to_string())
 }
 
+fn register_global_shortcut_listener(app: &tauri::AppHandle, hotkey: &str) -> Result<(), String> {
+    use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
+
+    let shortcut = hotkey
+        .parse::<Shortcut>()
+        .map_err(|e| format!("Invalid hotkey '{hotkey}': {e}"))?;
+    let handle = app.clone();
+    let label = hotkey.to_string();
+    let binding_version = HOTKEY_BINDING_VERSION.fetch_add(1, Ordering::SeqCst) + 1;
+
+    app.global_shortcut()
+        .on_shortcut(shortcut, move |_app, _shortcut, event| {
+            if event.state != tauri_plugin_global_shortcut::ShortcutState::Pressed {
+                return;
+            }
+
+            let current_version = HOTKEY_BINDING_VERSION.load(Ordering::SeqCst);
+            if current_version != binding_version {
+                debug!(
+                    "Ignoring stale global shortcut callback for {label} (binding version {}, latest {})",
+                    binding_version, current_version
+                );
+                return;
+            }
+
+            if USE_EVDEV_HOTKEY.load(Ordering::SeqCst) {
+                debug!("{label} detected via global shortcut plugin but evdev is preferred");
+                return;
+            }
+
+            debug!("{label} detected via global shortcut plugin");
+            eval_toggle(&handle);
+        })
+        .map_err(|e| format!("Failed to register global shortcut {hotkey}: {e}"))
+}
+
+fn sync_global_shortcut_binding(
+    app: &tauri::AppHandle,
+    hotkey: &str,
+    enable_plugin_shortcut: bool,
+) -> Result<(), String> {
+    use tauri_plugin_global_shortcut::GlobalShortcutExt;
+
+    let mut current = REGISTERED_PLUGIN_SHORTCUT
+        .lock()
+        .map_err(|_| "Failed to lock shortcut binding state".to_string())?;
+
+    if let Some(existing) = current.clone() {
+        if !enable_plugin_shortcut || existing != hotkey {
+            if app.global_shortcut().is_registered(existing.as_str()) {
+                app.global_shortcut()
+                    .unregister(existing.as_str())
+                    .map_err(|e| format!("Failed to unregister global shortcut {existing}: {e}"))?;
+            }
+            *current = None;
+            HOTKEY_BINDING_VERSION.fetch_add(1, Ordering::SeqCst);
+            info!("Unregistered previous global shortcut {existing}");
+        }
+    }
+
+    if !enable_plugin_shortcut {
+        return Ok(());
+    }
+
+    if current.as_deref() == Some(hotkey) {
+        return Ok(());
+    }
+
+    register_global_shortcut_listener(app, hotkey)?;
+    *current = Some(hotkey.to_string());
+    info!("Registered global shortcut {hotkey}");
+    Ok(())
+}
+
 /// Change the hotkey at runtime.
 pub fn change_hotkey_runtime(app: &tauri::AppHandle, new_hotkey: &str) -> Result<(), String> {
+    let use_evdev_hotkey = prefers_evdev_hotkey(is_wayland_session(), new_hotkey);
+    sync_global_shortcut_binding(app, new_hotkey, should_register_global_shortcut(use_evdev_hotkey))?;
+
+    USE_EVDEV_HOTKEY.store(use_evdev_hotkey, Ordering::SeqCst);
     EVDEV_HOTKEY_MODE.store(hotkey_to_evdev_mode(new_hotkey), Ordering::SeqCst);
 
     let mut config = AppConfig::load().map_err(|e| e.to_string())?;
@@ -400,6 +495,10 @@ pub fn change_hotkey_runtime(app: &tauri::AppHandle, new_hotkey: &str) -> Result
 
     tray::update_hotkey_display(app, new_hotkey);
     info!("Hotkey changed to {new_hotkey}");
+    info!(
+        "Hotkey runtime backend preference: {}",
+        if use_evdev_hotkey { "evdev" } else { "global-shortcut" }
+    );
     send_notification(
         "Hotkey changed",
         &format!("Voice will now respond to {new_hotkey}"),
@@ -418,31 +517,35 @@ fn socket_path() -> std::path::PathBuf {
 fn start_socket_listener(app_handle: tauri::AppHandle) {
     use std::os::unix::net::UnixListener;
 
-    let path = socket_path();
-    let _ = std::fs::remove_file(&path);
-
-    let listener = match UnixListener::bind(&path) {
-        Ok(l) => l,
-        Err(e) => {
-            error!("Failed to create socket at {}: {e}", path.display());
-            return;
-        }
-    };
-
-    use std::os::unix::fs::PermissionsExt;
-    let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600));
-    info!("Socket listener ready: {}", path.display());
-
     std::thread::spawn(move || {
-        for stream in listener.incoming() {
-            match stream {
-                Ok(_) => {
-                    debug!("Toggle received via socket");
-                    eval_toggle(&app_handle);
-                }
+        let path = socket_path();
+
+        loop {
+            let _ = std::fs::remove_file(&path);
+
+            let listener = match UnixListener::bind(&path) {
+                Ok(l) => l,
                 Err(e) => {
-                    error!("Socket error: {e}");
-                    break;
+                    error!("Failed to create socket at {}: {e}", path.display());
+                    std::thread::sleep(std::time::Duration::from_secs(2));
+                    continue;
+                }
+            };
+
+            use std::os::unix::fs::PermissionsExt;
+            let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600));
+            info!("Socket listener ready: {}", path.display());
+
+            for stream in listener.incoming() {
+                match stream {
+                    Ok(_) => {
+                        debug!("Toggle received via socket");
+                        eval_toggle(&app_handle);
+                    }
+                    Err(e) => {
+                        warn!("Socket accept error (will rebind): {e}");
+                        break;
+                    }
                 }
             }
         }
@@ -548,15 +651,19 @@ pub fn run() {
             transcribe_audio,
             insert_text,
             set_recording_state,
+            set_microphone_ready,
             show_status_overlay,
             hide_status_overlay,
             show_notification,
         ])
         .setup(|app| {
+            let startup_ms = now_ms();
             let hotkey = configured_hotkey();
+            let app_handle = app.handle().clone();
             EVDEV_HOTKEY_MODE.store(hotkey_to_evdev_mode(&hotkey), Ordering::SeqCst);
             let wayland_session = is_wayland_session();
             let use_evdev_hotkey = prefers_evdev_hotkey(wayland_session, &hotkey);
+            USE_EVDEV_HOTKEY.store(use_evdev_hotkey, Ordering::SeqCst);
 
             #[cfg(target_os = "linux")]
             grant_webview_permissions(app);
@@ -569,32 +676,31 @@ pub fn run() {
                 let _ = hide_overlay_window(&window);
             }
 
-            // Use a single hotkey backend per session to avoid duplicate toggles.
-            if !use_evdev_hotkey {
-                use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
-                if let Ok(shortcut) = hotkey.parse::<Shortcut>() {
-                    let handle = app.handle().clone();
-                    let label = hotkey.clone();
-                    let _ = app.global_shortcut().on_shortcut(
-                        shortcut,
-                        move |_app, _shortcut, event| {
-                            if event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed {
-                                debug!("{label} detected via global shortcut plugin");
-                                eval_toggle(&handle);
-                            }
-                        },
-                    );
-                    info!("Global shortcut backend active for {hotkey}");
-                }
-            } else {
-                info!("evdev hotkey backend active for {hotkey}");
+            if let Err(e) = sync_global_shortcut_binding(
+                &app_handle,
+                &hotkey,
+                should_register_global_shortcut(use_evdev_hotkey),
+            ) {
+                warn!("{e}");
             }
 
-            start_socket_listener(app.handle().clone());
+            if use_evdev_hotkey {
+                info!("evdev hotkey backend active for {hotkey}");
+            } else {
+                info!("global shortcut backend active for {hotkey}");
+            }
+
+            info!("Hotkey listener attached");
+            info!(
+                "[timing] app start -> hotkey backend attachment: {}ms",
+                now_ms() - startup_ms
+            );
+
+            start_socket_listener(app_handle.clone());
 
             #[cfg(target_os = "linux")]
             if use_evdev_hotkey {
-                start_hotkey_listener(app.handle().clone());
+                start_hotkey_listener(app_handle);
             }
 
             if let Err(e) = tray::setup_tray(app, &hotkey) {
@@ -680,6 +786,12 @@ mod tests {
         assert!(prefers_evdev_hotkey(true, "Alt+Shift+D"));
         assert!(!prefers_evdev_hotkey(true, "Ctrl+Shift+V"));
         assert!(!prefers_evdev_hotkey(false, "Alt+D"));
+    }
+
+    #[test]
+    fn global_shortcut_registration_depends_on_backend_selection() {
+        assert!(should_register_global_shortcut(false));
+        assert!(!should_register_global_shortcut(true));
     }
 
     #[test]

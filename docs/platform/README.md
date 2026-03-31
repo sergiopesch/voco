@@ -1,16 +1,19 @@
+<!-- markdownlint-disable MD031 MD032 MD060 -->
 # Platform Support
 
 ## Supported Platforms
-| Platform | Status | Notes |
-|----------|--------|-------|
-| Ubuntu (X11) | Tested | xdotool for text insertion |
-| Ubuntu (Wayland) | Tested | ydotool for text insertion, clipboard fallback |
-| Debian-derived | Best-effort | Likely to work, not regularly tested |
-| Other Linux | Experimental | May work, not supported |
-| macOS | Not targeted | Not in scope |
-| Windows | Not targeted | Not in scope |
+
+| Platform         | Status      | Notes                                            |
+| ---------------- | ----------- | ------------------------------------------------ |
+| Ubuntu (X11)     | Tested      | xdotool for text insertion                       |
+| Ubuntu (Wayland) | Tested      | ydotool for text insertion, clipboard fallback   |
+| Debian-derived   | Best-effort | Likely to work, not regularly tested             |
+| Other Linux      | Experimental | May work, not supported                          |
+| macOS            | Not targeted | Not in scope                                     |
+| Windows          | Not targeted | Not in scope                                     |
 
 ## Requirements
+
 - Tauri runtime dependencies: libwebkit2gtk-4.1, libgtk-3, libayatana-appindicator3
 - Node.js 20+ and Rust (for building from source)
 - PulseAudio or PipeWire for microphone access
@@ -18,12 +21,21 @@
 - No root privileges needed for normal operation
 
 ## Session Detection
+
 The app detects session type via `XDG_SESSION_TYPE`:
+
 - `x11` -> use xdotool for text insertion
 - `wayland` -> use ydotool, fall back to clipboard paste
 - Desktop environment detected via `XDG_CURRENT_DESKTOP`
 
+Hotkey backend selection:
+
+- Wayland + `Alt+D` / `Alt+Shift+D` -> evdev hotkey backend (preferred)
+- Other combinations -> Tauri global-shortcut backend
+- Runtime hotkey changes update backend preference immediately
+
 ## Wayland Caveats
+
 - ydotool works via uinput (kernel-level, compositor-independent)
 - Requires user in `input` group: `sudo usermod -aG input $USER` (then log out and back in)
 - Clipboard fallback uses wl-copy + ydotool Ctrl+V simulation
@@ -59,11 +71,13 @@ pgrep -x ydotoold > /dev/null || ydotoold &
 - If ydotool type-simulation fails, Voice falls back to clipboard paste automatically
 
 ## X11
+
 - xdotool works via X11 protocol (compositor-independent)
 - No special group membership needed
 - Clipboard fallback uses xclip + xdotool Ctrl+V simulation
 
 ## Known Limitations
+
 - Wayland text insertion depends on compositor support for uinput
 - Flatpak may require portal permissions for mic access
 - Some Wayland compositors block simulated input
@@ -71,15 +85,17 @@ pgrep -x ydotoold > /dev/null || ydotoold &
 - AppImage build requires linuxdeploy tool installed separately
 
 ## Packaging
-| Format | Status | Notes |
-|--------|--------|-------|
-| .deb | Working | Built via `./scripts/setup.sh --install` or GitHub Releases |
-| .rpm | Not configured | Can be added to tauri.conf.json targets |
-| AppImage | Not configured | Requires linuxdeploy |
+
+| Format   | Status         | Notes                                                        |
+| -------- | -------------- | ------------------------------------------------------------ |
+| .deb     | Working        | Built via `./scripts/setup.sh --install` or GitHub Releases |
+| .rpm     | Not configured | Can be added to tauri.conf.json targets                     |
+| AppImage | Not configured | Requires linuxdeploy                                         |
 
 ## Data Locations
-| Data | Path |
-|------|------|
-| Config | `~/.config/voice/config.json` |
-| Models | `~/.local/share/voice/models/` |
-| Socket | `$XDG_RUNTIME_DIR/voice.sock` |
+
+| Data   | Path                             |
+| ------ | -------------------------------- |
+| Config | `~/.config/voice/config.json`    |
+| Models | `~/.local/share/voice/models/`   |
+| Socket | `$XDG_RUNTIME_DIR/voice.sock`    |

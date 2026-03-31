@@ -33,6 +33,10 @@ export const useStore = create<AppState>((set) => ({
   setInterimTranscript: (interim) => set({ interimTranscript: interim }),
   setError: (error) => set({ error, status: error ? "error" : "idle" }),
   setAudioLevel: (level) => set({ audioLevel: level }),
-  setConfig: (config) => set({ config }),
+  setConfig: (config) =>
+    set({
+      config,
+      selectedDeviceId: config.selectedMic,
+    }),
   clearTranscript: () => set({ transcript: "", interimTranscript: "" }),
 }));

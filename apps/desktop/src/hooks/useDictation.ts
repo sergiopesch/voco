@@ -5,6 +5,7 @@ import {
   transcribeAudio,
   insertText,
   setRecordingState,
+  setMicrophoneReady,
   showNotification,
   showStatusOverlay,
 } from "@/lib/tauri";
@@ -13,13 +14,25 @@ import type { DictationStatus } from "@/types";
 const TARGET_SAMPLE_RATE = 16000;
 const STATUS_OVERLAY_WIDTH = 252;
 const STATUS_OVERLAY_HEIGHT = 112;
-const TOGGLE_DEDUPE_MS = 120;
 const AUDIO_LEVEL_ATTACK = 0.68;
 const AUDIO_LEVEL_RELEASE = 0.24;
 const AUDIO_LEVEL_FLOOR = 0.01;
 
 type DictationPhase = DictationStatus | "starting" | "stopping";
 type QueuedAction = "start" | "stop" | null;
+
+function buildAudioConstraints(
+  deviceId: string | null,
+): MediaTrackConstraints {
+  return {
+    deviceId: deviceId ? { exact: deviceId } : undefined,
+    channelCount: 1,
+    sampleRate: { ideal: TARGET_SAMPLE_RATE },
+    echoCancellation: false,
+    noiseSuppression: false,
+    autoGainControl: true,
+  };
+}
 
 export function useDictation() {
   const setStatus = useStore((state) => state.setStatus);
@@ -38,8 +51,10 @@ export function useDictation() {
   const samplesRef = useRef<Float32Array[]>([]);
   const phaseRef = useRef<DictationPhase>("idle");
   const queuedActionRef = useRef<QueuedAction>(null);
-  const lastToggleRequestMsRef = useRef(0);
   const smoothedAudioLevelRef = useRef(0);
+  const firstHotkeyPressMsRef = useRef<number | null>(null);
+  const initialHotkeyPressLoggedRef = useRef(false);
+  const initialHotkeyLatencyLoggedRef = useRef(false);
 
   const prepareWindow = useCallback(async () => {
     try {
@@ -48,6 +63,47 @@ export function useDictation() {
       console.warn("Failed to prepare status overlay window:", error);
     }
   }, []);
+
+  const initializeMicrophone = useCallback(
+    async (appStartMs: number) => {
+      try {
+        const deviceId = useStore.getState().selectedDeviceId;
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: buildAudioConstraints(deviceId),
+        });
+        stream.getTracks().forEach((track) => track.stop());
+
+        await setMicrophoneReady(true);
+        console.info("Microphone ready");
+        console.info(
+          `[timing] app start -> microphone ready: ${Math.round(
+            performance.now() - appStartMs,
+          )}ms`,
+        );
+      } catch (err) {
+        await setMicrophoneReady(false).catch(() => {});
+        showNotification(
+          "Microphone not ready",
+          "Press Alt+D to re-initialize microphone access.",
+        ).catch(() => {});
+
+        if (err instanceof DOMException) {
+          if (err.name === "NotAllowedError") {
+            setError(
+              "Microphone access denied on startup. Press Alt+D to retry after granting permission.",
+            );
+          } else if (err.name === "NotFoundError") {
+            setError("No microphone found. Connect one and press Alt+D to retry.");
+          } else {
+            setError(`Microphone startup error: ${err.message}`);
+          }
+        } else {
+          setError(`Microphone startup failed: ${err}`);
+        }
+      }
+    },
+    [setError],
+  );
 
   const syncIndicatorWindow = useCallback(async (status: DictationStatus) => {
     try {
@@ -200,25 +256,32 @@ export function useDictation() {
 
     try {
       clearTranscript();
-      setInterimTranscript("");
+      setInterimTranscript("Listening...");
       setStatus("recording");
       resetAudioLevel();
       samplesRef.current = [];
+      setRecordingState(true).catch(() => {});
 
       const deviceId = useStore.getState().selectedDeviceId;
 
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          deviceId: deviceId ? { exact: deviceId } : undefined,
-          channelCount: 1,
-          sampleRate: { ideal: TARGET_SAMPLE_RATE },
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: true,
-        },
+        audio: buildAudioConstraints(deviceId),
       });
 
       streamRef.current = stream;
+      setMicrophoneReady(true).catch(() => {});
+      console.info("Recording started");
+      if (
+        firstHotkeyPressMsRef.current !== null &&
+        !initialHotkeyLatencyLoggedRef.current
+      ) {
+        initialHotkeyLatencyLoggedRef.current = true;
+        console.info(
+          `[timing] first hotkey press -> recording starts: ${Math.round(
+            performance.now() - firstHotkeyPressMsRef.current,
+          )}ms`,
+        );
+      }
 
       const audioContext = new AudioContext({
         latencyHint: "interactive",
@@ -236,7 +299,6 @@ export function useDictation() {
       }
 
       phaseRef.current = "recording";
-      setRecordingState(true).catch(() => {});
 
       if (queuedActionRef.current === "stop") {
         queuedActionRef.current = null;
@@ -246,15 +308,22 @@ export function useDictation() {
       await teardownAudioGraph();
       resetAudioLevel();
       setRecordingState(false).catch(() => {});
+      setMicrophoneReady(false).catch(() => {});
       setInterimTranscript("");
       queuedActionRef.current = null;
       phaseRef.current = "error";
+      showNotification(
+        "Microphone initialization failed",
+        "Press Alt+D to try microphone initialization again.",
+      ).catch(() => {});
 
       if (err instanceof DOMException) {
         if (err.name === "NotAllowedError") {
-          setError("Microphone access denied. Check your system permissions.");
+          setError(
+            "Microphone access denied. Check system permissions and press Alt+D to retry.",
+          );
         } else if (err.name === "NotFoundError") {
-          setError("No microphone found.");
+          setError("No microphone found. Connect a microphone and press Alt+D.");
         } else {
           setError(`Microphone error: ${err.message}`);
         }
@@ -325,10 +394,13 @@ export function useDictation() {
       const strategy = useStore.getState().config?.insertionStrategy ?? "auto";
       try {
         await insertText(transcript, strategy);
-      } catch {
+      } catch (err) {
+        const detail = err instanceof Error ? err.message : String(err);
         showNotification(
           "Text insertion failed",
-          "Your transcript is in the clipboard — paste with Ctrl+V",
+          detail.includes("clipboard")
+            ? detail
+            : "Voice could not insert text automatically. Please try again.",
         ).catch(() => {});
       }
 
@@ -348,12 +420,6 @@ export function useDictation() {
   }
 
   const toggle = useCallback(() => {
-    const now = Date.now();
-    if (now - lastToggleRequestMsRef.current < TOGGLE_DEDUPE_MS) {
-      return;
-    }
-    lastToggleRequestMsRef.current = now;
-
     switch (phaseRef.current) {
       case "idle":
       case "error":
@@ -372,7 +438,23 @@ export function useDictation() {
     }
   }, []);
 
-  return { prepareWindow, syncIndicatorWindow, toggle };
+  const onHotkeyPressed = useCallback(() => {
+    if (initialHotkeyPressLoggedRef.current) {
+      return;
+    }
+
+    initialHotkeyPressLoggedRef.current = true;
+    firstHotkeyPressMsRef.current = performance.now();
+    console.info("Hotkey pressed: initial trigger.");
+  }, []);
+
+  return {
+    prepareWindow,
+    initializeMicrophone,
+    syncIndicatorWindow,
+    toggle,
+    onHotkeyPressed,
+  };
 }
 
 /**

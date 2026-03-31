@@ -1,23 +1,26 @@
+<!-- markdownlint-disable MD032 MD060 -->
 # Testing
 
 ## Current State
 
 Automated tests are in place for both frontend and backend.
 
-### Rust (17 tests)
+### Rust (19 tests)
+
 Run with `cargo test` from `apps/desktop/src-tauri/`.
 
-| Module | Tests | What's Covered |
-|--------|-------|----------------|
-| `config` | 4 | Default values, serialization round-trip, deserialization with defaults, kebab-case strategy |
-| `insertion` | 2 | Strategy serialization (kebab-case), session detection |
-| `lib` | 11 | Base64 audio decoding, socket path, hotkey config, hotkey backend selection, hotkey modes, overlay placement clamping |
+| Module      | Tests | What's Covered                                                                                                              |
+| ----------- | ----- | --------------------------------------------------------------------------------------------------------------------------- |
+| `config`    | 4     | Default values, serialization round-trip, deserialization with defaults, kebab-case strategy                              |
+| `insertion` | 3     | Strategy serialization (kebab-case), session detection, command failure on non-zero exit                                  |
+| `lib`       | 12    | Base64 audio decoding, socket path, hotkey config, hotkey backend selection, hotkey modes, global-shortcut backend logic |
 
 ### Frontend (8 tests)
+
 Run with `npm test` from project root.
 
-| File | Tests | What's Covered |
-|------|-------|----------------|
+| File            | Tests | What's Covered                                                                                      |
+| --------------- | ----- | --------------------------------------------------------------------------------------------------- |
 | `store.test.ts` | 8 | All store actions: status transitions, error handling, transcript management, audio level, config storage |
 
 ## Running Tests
@@ -43,9 +46,18 @@ GitHub Actions (`.github/workflows/ci.yml`) runs on every push and PR to master:
 ## Manual Verification
 
 For system-level features that are hard to automate:
+
+- Startup readiness:
+  - launch app and confirm tray icon transitions gray -> green after mic init
+  - confirm log lines for `Hotkey listener attached` and `Microphone ready`
+- Hotkey behavior:
+  - first press should immediately show listening state and red tray icon
+  - switch hotkey at runtime from tray menu and verify new binding triggers dictation
 - Trigger via Unix socket: `socat - UNIX-CONNECT:$XDG_RUNTIME_DIR/voice.sock < /dev/null`
-- Check tray icon state visually
-- Verify insertion in a text editor
+- Insertion behavior:
+  - verify direct type simulation in a text editor
+  - verify fallback path messaging when paste simulation fails
+
 - State the distro, desktop environment, compositor, and insertion path used
 
 ## Future Test Targets

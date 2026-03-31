@@ -1,4 +1,3 @@
-use log::warn;
 use std::io::Write;
 use std::process::Command;
 
@@ -78,7 +77,12 @@ fn pipe_to_command(cmd: &str, args: &[&str], data: &[u8]) -> Result<(), String> 
         stdin.write_all(data)
             .map_err(|e| format!("Failed to write to {cmd}: {e}"))?;
     }
-    child.wait().map_err(|e| format!("{cmd} failed: {e}"))?;
+    let status = child
+        .wait()
+        .map_err(|e| format!("{cmd} failed while waiting for completion: {e}"))?;
+    if !status.success() {
+        return Err(format!("{cmd} exited with status {status}"));
+    }
     Ok(())
 }
 
@@ -114,12 +118,17 @@ fn clipboard_paste(text: &str) -> Result<(), String> {
             .map(|s| s.success())
             .unwrap_or(false);
         if !paste_ok {
-            warn!("ydotool Ctrl+V failed — text is in clipboard, paste manually");
+            return Err("Failed to simulate paste on Wayland; transcript remains in clipboard.".to_string());
         }
     } else {
-        let _ = Command::new("xdotool")
+        let paste_ok = Command::new("xdotool")
             .args(["key", "--clearmodifiers", "ctrl+v"])
-            .status();
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false);
+        if !paste_ok {
+            return Err("Failed to simulate paste on X11; transcript remains in clipboard.".to_string());
+        }
     }
 
     // Restore clipboard after target app has consumed the paste
@@ -151,5 +160,12 @@ mod tests {
     #[test]
     fn is_wayland_returns_bool() {
         let _ = is_wayland();
+    }
+
+    #[test]
+    fn pipe_to_command_returns_error_for_nonzero_exit() {
+        let result = pipe_to_command("sh", &["-c", "exit 3"], b"");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("exited with status"));
     }
 }

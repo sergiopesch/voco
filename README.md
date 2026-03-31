@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD031 MD033 MD041 MD060 -->
 <p align="center">
   <img src="assets/voice-logo.svg" alt="Voice" width="400">
 </p>
@@ -6,6 +7,7 @@
   <strong>Free, local-first desktop dictation for Linux.</strong><br>
   Press a hotkey, speak, and your words appear wherever your cursor is.
 </p>
+<!-- markdownlint-enable MD041 -->
 
 <p align="center">
   <a href="#requirements"><img src="https://img.shields.io/badge/platform-Linux-black?style=for-the-badge&logo=linux&logoColor=white" alt="Linux"></a>
@@ -35,7 +37,7 @@ cd voice
 
 <p align="center">
 
-```
+```text
          ╭────────────╮          ╭────────────╮          ╭────────────╮
          │            │          │            │          │            │
          │  🎙️ Speak  │ ──────> │ 🔍 Transcribe ──────> │  ⌨️ Type   │
@@ -59,25 +61,25 @@ No account. No cloud. Audio never leaves your machine.
 
 ## Features
 
-| | |
-|---|---|
-| **Fully local** | whisper.cpp runs on your machine — audio never leaves it |
-| **Global hotkey** | Works from any app. Default `Alt+D`, customizable on install |
-| **System tray** | Mic icon turns red while recording |
-| **Cursor-side status overlay** | Shows listening and transcribing states right beside your cursor |
-| **Smart insertion** | Types directly into the focused app, clipboard fallback |
-| **No account needed** | No sign-up, no API key, no subscription, ever |
+| Feature                     | Details                                                                         |
+| --------------------------- | ------------------------------------------------------------------------------- |
+| **Fully local**             | whisper.cpp runs on your machine — audio never leaves it                       |
+| **Global hotkey**           | Works from any app. Default `Alt+D`, customizable on install                   |
+| **System tray**             | Mic icon shows readiness: gray (not ready), green (ready), red (recording)    |
+| **Cursor-side status overlay** | Shows listening and transcribing states right beside your cursor            |
+| **Smart insertion**         | Types directly into the focused app, clipboard fallback                         |
+| **No account needed**       | No sign-up, no API key, no subscription, ever                                  |
 
 ## Requirements
 
 The installer handles everything, but for reference:
 
-| What | Why |
-|------|-----|
-| Ubuntu / Debian | Primary supported platform |
-| PulseAudio or PipeWire | Microphone access |
-| Wayland: `ydotool`, `wl-clipboard` | Text insertion + clipboard |
-| X11: `xdotool`, `xclip` | Text insertion + clipboard |
+| What                              | Why                      |
+| --------------------------------- | ------------------------ |
+| Ubuntu / Debian                   | Primary supported platform |
+| PulseAudio or PipeWire            | Microphone access        |
+| Wayland: `ydotool`, `wl-clipboard`| Text insertion + clipboard |
+| X11: `xdotool`, `xclip`           | Text insertion + clipboard |
 
 > Other Linux distributions may work but are not officially tested.
 
@@ -95,13 +97,15 @@ The installer lets you pick your hotkey. You can change it anytime from the **sy
 <details>
 <summary>All settings</summary>
 
-| Setting | Default | Options |
-|---------|---------|---------|
-| `hotkey` | `Alt+D` | Any key combo (`Ctrl+Shift+V`, `Super+D`, etc.) |
-| `selectedMic` | `null` | Specific mic device ID, or null for system default |
-| `insertionStrategy` | `auto` | `auto`, `clipboard`, `type-simulation` |
+| Setting            | Default | Options                                            |
+| ------------------ | ------- | -------------------------------------------------- |
+| `hotkey`           | `Alt+D` | Any key combo (`Ctrl+Shift+V`, `Super+D`, etc.)   |
+| `selectedMic`      | `null`  | Specific mic device ID, or null for system default |
+| `insertionStrategy` | `auto` | `auto`, `clipboard`, `type-simulation`            |
 
 </details>
+
+> Hotkey note: on Wayland, `Alt+D` and `Alt+Shift+D` are the most reliable options because they use the evdev backend. Other custom combos use the global-shortcut backend and may behave differently depending on compositor/session support.
 
 ## Development
 
@@ -119,7 +123,7 @@ cargo test               # rust tests (from apps/desktop/src-tauri/)
 <details>
 <summary>Project structure</summary>
 
-```
+```text
 apps/desktop/
   src/                  React + TypeScript frontend
   public/               AudioWorklet processor

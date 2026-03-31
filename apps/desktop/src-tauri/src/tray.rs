@@ -17,6 +17,8 @@ pub struct TrayState {
     pub toggle_item: MenuItem<tauri::Wry>,
     pub current_hotkey: String,
     pub hotkey_items: Vec<(String, MenuItem<tauri::Wry>)>,
+    pub recording: bool,
+    pub microphone_ready: bool,
 }
 
 pub type TrayMutex = Mutex<TrayState>;
@@ -55,13 +57,13 @@ pub fn setup_tray(app: &tauri::App, hotkey_label: &str) -> Result<(), Box<dyn st
         .item(&quit)
         .build()?;
 
-    let icon_rgba = create_mic_icon(32, [255, 255, 255, 220]);
+    let icon_rgba = create_mic_icon(32, [140, 140, 140, 235]);
     let icon = tauri::image::Image::new_owned(icon_rgba, 32, 32);
 
     let tray = TrayIconBuilder::new()
         .icon(icon)
         .menu(&menu)
-        .tooltip("Voice")
+        .tooltip("Voice — Initializing microphone...")
         .on_menu_event(move |app, event| {
             let id = event.id().as_ref();
             match id {
@@ -91,6 +93,8 @@ pub fn setup_tray(app: &tauri::App, hotkey_label: &str) -> Result<(), Box<dyn st
         toggle_item: toggle,
         current_hotkey: hotkey_label.to_string(),
         hotkey_items,
+        recording: false,
+        microphone_ready: false,
     }));
 
     Ok(())
@@ -132,30 +136,52 @@ fn open_config_file() {
     }
 }
 
-/// Update the tray icon and menu to reflect recording state
-pub fn update_tray_icon(app: &tauri::AppHandle, recording: bool) {
-    let color = if recording {
-        [255, 80, 80, 240]
+/// Update the tray icon and menu to reflect recording state.
+pub fn set_recording_state(app: &tauri::AppHandle, recording: bool) {
+    let state = app.state::<TrayMutex>();
+    let Ok(mut tray_state) = state.lock() else {
+        error!("Failed to lock tray state");
+        return;
+    };
+
+    tray_state.recording = recording;
+    apply_tray_state(app, &tray_state);
+}
+
+/// Update microphone readiness state in tray icon and tooltip.
+pub fn update_microphone_ready(app: &tauri::AppHandle, ready: bool) {
+    let state = app.state::<TrayMutex>();
+    let Ok(mut tray_state) = state.lock() else {
+        error!("Failed to lock tray state");
+        return;
+    };
+
+    tray_state.microphone_ready = ready;
+    apply_tray_state(app, &tray_state);
+}
+
+fn apply_tray_state(app: &tauri::AppHandle, tray_state: &TrayState) {
+    let (color, tooltip) = if tray_state.recording {
+        ([255, 80, 80, 240], "Voice — Recording...")
+    } else if tray_state.microphone_ready {
+        ([76, 201, 124, 240], "Voice — Ready")
     } else {
-        [255, 255, 255, 220]
+        ([140, 140, 140, 235], "Voice — Microphone not ready")
     };
 
     let icon_rgba = create_mic_icon(32, color);
     let icon = tauri::image::Image::new_owned(icon_rgba, 32, 32);
 
-    let state = app.state::<TrayMutex>();
-    let Ok(tray_state) = state.lock() else {
-        error!("Failed to lock tray state");
-        return;
-    };
-
     if let Some(tray) = app.tray_by_id(&tray_state.tray_id) {
-        let tooltip = if recording { "Voice — Recording..." } else { "Voice" };
         let _ = tray.set_icon(Some(icon));
         let _ = tray.set_tooltip(Some(tooltip));
     }
 
-    let label = if recording { "Stop Dictation" } else { "Start Dictation" };
+    let label = if tray_state.recording {
+        "Stop Dictation"
+    } else {
+        "Start Dictation"
+    };
     let _ = tray_state.toggle_item.set_text(label);
 }
 

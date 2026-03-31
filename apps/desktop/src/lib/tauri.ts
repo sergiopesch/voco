@@ -22,6 +22,10 @@ export async function setRecordingState(recording: boolean): Promise<void> {
   return invoke("set_recording_state", { recording });
 }
 
+export async function setMicrophoneReady(ready: boolean): Promise<void> {
+  return invoke("set_microphone_ready", { ready });
+}
+
 export async function showStatusOverlay(
   width: number,
   height: number,
