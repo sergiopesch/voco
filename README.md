@@ -1,6 +1,6 @@
 <!-- markdownlint-disable MD031 MD033 MD041 -->
 <p align="center">
-  <img src="assets/voco-logo.svg" alt="VOCO" width="400">
+  <img src="assets/voco-readme-header.svg" alt="VOCO" width="920">
 </p>
 
 <p align="center">
@@ -10,10 +10,12 @@
 <!-- markdownlint-enable MD041 -->
 
 <p align="center">
-  <a href="#requirements"><img src="https://img.shields.io/badge/platform-Linux-black?style=for-the-badge&logo=linux&logoColor=white" alt="Linux"></a>
-  <a href="https://github.com/sergiopesch/voco/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/sergiopesch/voco/ci.yml?style=for-the-badge&label=CI" alt="CI"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-6C4CF5?style=for-the-badge" alt="MIT License"></a>
+  <a href="#requirements"><img src="https://img.shields.io/badge/platform-Linux-black?style=flat-square&logo=linux&logoColor=white" alt="Linux"></a>
+  <a href="https://github.com/sergiopesch/voco/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/sergiopesch/voco/ci.yml?style=flat-square&label=CI" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-6C4CF5?style=flat-square" alt="MIT License"></a>
 </p>
+
+---
 
 VOCO is a Linux desktop dictation tool built for low friction and high trust. It lives in your tray, listens on demand, keeps audio local, and surfaces clear state while it works.
 

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { AppConfig, AudioDeviceOption, UpdateCheckState } from "@/types";
-import { calculateVisualAudioLevel } from "@/lib/audioLevel";
+import { calculateVisualAudioLevelFromSamples } from "@/lib/audioLevel";
 
 interface ControlPanelProps {
   surface: "onboarding" | "settings" | "popover";
@@ -157,13 +157,7 @@ export function ControlPanel({
         return;
       }
       analyser.getFloatTimeDomainData(data as unknown as Float32Array<ArrayBuffer>);
-      let sum = 0;
-      for (let i = 0; i < data.length; i += 1) {
-        sum += data[i]! * data[i]!;
-      }
-      const rms = Math.sqrt(sum / data.length);
-      const level = calculateVisualAudioLevel(rms);
-      setPreviewLevel(level);
+      setPreviewLevel(calculateVisualAudioLevelFromSamples(data));
       previewFrameRef.current = window.requestAnimationFrame(tick);
     };
 

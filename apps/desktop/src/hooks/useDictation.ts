@@ -9,7 +9,10 @@ import {
   showNotification,
   showStatusOverlay,
 } from "@/lib/tauri";
-import { calculateVisualAudioLevel } from "@/lib/audioLevel";
+import {
+  calculateVisualAudioLevelFromSamples,
+  removeDcOffset,
+} from "@/lib/audioLevel";
 import type { DictationStatus } from "@/types";
 
 const TARGET_SAMPLE_RATE = 16000;
@@ -212,13 +215,7 @@ export function useDictation() {
     processor.onaudioprocess = (e) => {
       const input = e.inputBuffer.getChannelData(0);
       samplesRef.current.push(new Float32Array(input));
-
-      let sum = 0;
-      for (let i = 0; i < input.length; i++) {
-        sum += input[i]! * input[i]!;
-      }
-      const rms = Math.sqrt(sum / input.length);
-      updateAudioLevel(calculateVisualAudioLevel(rms));
+      updateAudioLevel(calculateVisualAudioLevelFromSamples(input));
     };
     source.connect(processor);
     connectSilentSink(audioContext, processor);
@@ -389,6 +386,8 @@ export function useDictation() {
       merged.set(chunk, offset);
       offset += chunk.length;
     }
+
+    merged = removeDcOffset(merged);
 
     // Resample to 16kHz if needed using OfflineAudioContext for proper quality
     if (Math.abs(sampleRate - TARGET_SAMPLE_RATE) > 1) {
