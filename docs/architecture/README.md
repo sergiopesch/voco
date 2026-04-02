@@ -2,7 +2,7 @@
 
 ## Overview
 
-Voice is a free, local-first desktop dictation app for Linux, built with Tauri 2.
+VOCO is a voice-first, local-first desktop dictation app for Linux, built with Tauri 2.
 
 ```
 User speaks -> Audio Capture -> Local ASR -> Text Insertion
@@ -32,7 +32,7 @@ apps/desktop/           Tauri application
 1. **Audio Capture**: WebView `getUserMedia` -> AudioWorklet (with ScriptProcessorNode fallback) -> Float32Array samples
 2. **Resampling**: If mic sample rate != 16kHz, resample via OfflineAudioContext
 3. **ASR**: Float32Array bytes base64-encoded, sent to Rust via Tauri invoke, decoded to `Vec<f32>` -> whisper-rs -> transcript string
-4. **Status Feedback**: Transparent overlay window is moved near the cursor while recording and processing so the user can see that Voice is listening or transcribing
+4. **Status Feedback**: Transparent overlay window is moved near the cursor while recording and processing so the user can see that VOCO is listening or processing
 5. **Insertion**: Transcript -> ydotool/xdotool type simulation or clipboard paste
 6. **Fallback**: If direct typing fails, text is placed on clipboard and Ctrl+V is simulated. Desktop notification informs user.
 
@@ -46,7 +46,7 @@ apps/desktop/           Tauri application
 | `insert_text` | Frontend -> Rust | Insert transcript into active app |
 | `set_recording_state` | Frontend -> Rust | Update tray icon and menu |
 | `show_notification` | Frontend -> Rust | Desktop notification via notify-send |
-| `emit_to("main", "voice:toggle-dictation", ())` | Rust -> Frontend | Toggle dictation from hotkey |
+| `emit_to("main", "voco:toggle-dictation", ())` | Rust -> Frontend | Toggle dictation from hotkey |
 
 ## Trigger Mechanisms
 
@@ -54,7 +54,7 @@ All three call `eval_toggle()` which emits a targeted Tauri window event to the 
 
 1. **Tauri global-shortcut plugin** (configurable, default Alt+D) — primary
 2. **evdev listener** — Linux fallback for Wayland, needs `input` group
-3. **Unix socket** (`$XDG_RUNTIME_DIR/voice.sock`, 0600) — external triggers
+3. **Unix socket** (`$XDG_RUNTIME_DIR/voco.sock`, 0600) — external triggers
 
 ## Insertion Strategy
 

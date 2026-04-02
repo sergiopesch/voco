@@ -11,6 +11,17 @@ describe("useStore", () => {
       selectedDeviceId: null,
       audioLevel: 0,
       config: null,
+      surface: "hidden",
+      onboardingStep: 0,
+      availableDevices: [],
+      microphonePermission: "unknown",
+      updateState: {
+        status: "idle",
+        currentVersion: null,
+        latestRelease: null,
+        lastCheckedAt: null,
+        error: null,
+      },
     });
   });
 
@@ -66,8 +77,34 @@ describe("useStore", () => {
       hotkey: "Alt+D",
       selectedMic: null,
       insertionStrategy: "auto" as const,
+      showHud: true,
+      onboardingCompleted: false,
+      updateChannel: "stable" as const,
+      installChannel: "github-release" as const,
+      voiceProfile: "default" as const,
     };
     useStore.getState().setConfig(config);
     expect(useStore.getState().config).toEqual(config);
+    expect(useStore.getState().surface).toBe("onboarding");
+  });
+
+  it("setUpdateState stores the latest release result", () => {
+    const updateState = {
+      status: "available" as const,
+      currentVersion: "0.1.0",
+      latestRelease: {
+        version: "0.2.0",
+        name: "VOCO 0.2.0",
+        url: "https://github.com/sergiopesch/voco/releases/tag/v0.2.0",
+        publishedAt: "2026-04-02T10:30:00Z",
+        prerelease: false,
+      },
+      lastCheckedAt: "2026-04-02T11:00:00Z",
+      error: null,
+    };
+
+    useStore.getState().setUpdateState(updateState);
+
+    expect(useStore.getState().updateState).toEqual(updateState);
   });
 });

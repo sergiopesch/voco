@@ -24,21 +24,29 @@ pub fn insert_text(text: &str, preferred: &str) -> Result<InsertionResult, Strin
         "auto" | "type-simulation" => {
             if is_wayland() {
                 if try_ydotool(text) {
-                    return Ok(InsertionResult { strategy: ActiveStrategy::Ydotool });
+                    return Ok(InsertionResult {
+                        strategy: ActiveStrategy::Ydotool,
+                    });
                 }
                 warn!("ydotool type failed, falling back to clipboard paste");
             } else {
                 if try_xdotool(text) {
-                    return Ok(InsertionResult { strategy: ActiveStrategy::Xdotool });
+                    return Ok(InsertionResult {
+                        strategy: ActiveStrategy::Xdotool,
+                    });
                 }
                 warn!("xdotool type failed, falling back to clipboard paste");
             }
             clipboard_paste(text)?;
-            Ok(InsertionResult { strategy: ActiveStrategy::Clipboard })
+            Ok(InsertionResult {
+                strategy: ActiveStrategy::Clipboard,
+            })
         }
         _ => {
             clipboard_paste(text)?;
-            Ok(InsertionResult { strategy: ActiveStrategy::Clipboard })
+            Ok(InsertionResult {
+                strategy: ActiveStrategy::Clipboard,
+            })
         }
     }
 }
@@ -75,7 +83,8 @@ fn pipe_to_command(cmd: &str, args: &[&str], data: &[u8]) -> Result<(), String> 
         .map_err(|e| format!("Failed to run {cmd}: {e}"))?;
 
     if let Some(stdin) = child.stdin.as_mut() {
-        stdin.write_all(data)
+        stdin
+            .write_all(data)
             .map_err(|e| format!("Failed to write to {cmd}: {e}"))?;
     }
     let status = child
@@ -119,7 +128,9 @@ fn clipboard_paste(text: &str) -> Result<(), String> {
             .map(|s| s.success())
             .unwrap_or(false);
         if !paste_ok {
-            return Err("Failed to simulate paste on Wayland; transcript remains in clipboard.".to_string());
+            return Err(
+                "Failed to simulate paste on Wayland; transcript remains in clipboard.".to_string(),
+            );
         }
     } else {
         let paste_ok = Command::new("xdotool")
@@ -128,7 +139,9 @@ fn clipboard_paste(text: &str) -> Result<(), String> {
             .map(|s| s.success())
             .unwrap_or(false);
         if !paste_ok {
-            return Err("Failed to simulate paste on X11; transcript remains in clipboard.".to_string());
+            return Err(
+                "Failed to simulate paste on X11; transcript remains in clipboard.".to_string(),
+            );
         }
     }
 

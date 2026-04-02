@@ -1,0 +1,33 @@
+app-id: com.sergiopesch.voco
+runtime: org.freedesktop.Platform
+runtime-version: "24.08"
+sdk: org.freedesktop.Sdk
+command: voco
+finish-args:
+  - --share=network
+  - --share=ipc
+  - --socket=fallback-x11
+  - --socket=wayland
+  - --socket=pulseaudio
+  - --device=dri
+  - --filesystem=xdg-run
+  - --talk-name=org.freedesktop.Notifications
+cleanup:
+  - /include
+  - /lib/pkgconfig
+  - /share/doc
+  - /share/man
+modules:
+  - name: voco
+    buildsystem: simple
+    build-commands:
+      - npm ci
+      - npm --workspace @voco/desktop run build:frontend
+      - cargo build --manifest-path apps/desktop/src-tauri/Cargo.toml --release
+      - install -Dm755 apps/desktop/src-tauri/target/release/voco /app/bin/voco
+      - install -Dm644 packaging/flatpak/com.sergiopesch.voco.desktop /app/share/applications/com.sergiopesch.voco.desktop
+      - install -Dm644 packaging/flatpak/com.sergiopesch.voco.metainfo.xml /app/share/metainfo/com.sergiopesch.voco.metainfo.xml
+      - install -Dm644 apps/desktop/src-tauri/icons/128x128.png /app/share/icons/hicolor/128x128/apps/com.sergiopesch.voco.png
+    sources:
+      - type: dir
+        path: ../../

@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Voice — quick install from pre-built release
-# Usage: bash <(curl -s https://raw.githubusercontent.com/sergiopesch/voice/master/install)
+# VOCO — quick install from pre-built release
+# Usage: bash <(curl -s https://raw.githubusercontent.com/sergiopesch/voco/master/install)
 
 VERSION="0.1.0"
-DEB_URL="https://github.com/sergiopesch/voice/releases/download/v${VERSION}/Voice_${VERSION}_amd64.deb"
+DEB_URL="https://github.com/sergiopesch/voco/releases/download/v${VERSION}/voco_${VERSION}_amd64.deb"
 
 # ─── Colors ─────────────────────────────────────────────
 BOLD='\033[1m'
 DIM='\033[2m'
-CYAN='\033[36m'
+PURPLE='\033[38;2;108;76;245m'
+PURPLE_SOFT='\033[38;2;138;114;255m'
 GREEN='\033[32m'
 YELLOW='\033[33m'
 RED='\033[31m'
@@ -30,7 +31,7 @@ spinner_start() {
     local frames=("⣾" "⣽" "⣻" "⢿" "⡿" "⣟" "⣯" "⣷")
     local i=0
     while true; do
-      printf "\r    ${CYAN}${frames[$i]}${NC} ${DIM}%s${NC}" "$msg"
+      printf "\r    ${PURPLE_SOFT}${frames[$i]}${NC} ${DIM}%s${NC}" "$msg"
       i=$(( (i + 1) % ${#frames[@]} ))
       sleep 0.07
     done
@@ -64,22 +65,23 @@ SECONDS=0
 
 # ─── Header ─────────────────────────────────────────────
 echo
-echo -e "  ${CYAN}${BOLD}██╗   ██╗ ██████╗ ██╗ ██████╗███████╗${NC}"
-echo -e "  ${CYAN}${BOLD}██║   ██║██╔═══██╗██║██╔════╝██╔════╝${NC}"
-echo -e "  ${CYAN}${BOLD}██║   ██║██║   ██║██║██║     █████╗  ${NC}"
-echo -e "  ${CYAN}${BOLD}╚██╗ ██╔╝██║   ██║██║██║     ██╔══╝  ${NC}"
-echo -e "  ${CYAN}${BOLD} ╚████╔╝ ╚██████╔╝██║╚██████╗███████╗${NC}"
-echo -e "  ${CYAN}${BOLD}  ╚═══╝   ╚═════╝ ╚═╝ ╚═════╝╚══════╝${NC}"
+echo -e "  ${PURPLE_SOFT}${BOLD}██╗   ██╗ ██████╗  ██████╗ ██████╗ ${NC}"
+echo -e "  ${PURPLE_SOFT}${BOLD}██║   ██║██╔═══██╗██╔════╝██╔═══██╗${NC}"
+echo -e "  ${PURPLE_SOFT}${BOLD}██║   ██║██║   ██║██║     ██║   ██║${NC}"
+echo -e "  ${PURPLE_SOFT}${BOLD}╚██╗ ██╔╝██║   ██║██║     ██║   ██║${NC}"
+echo -e "  ${PURPLE}${BOLD} ╚████╔╝ ╚██████╔╝╚██████╗╚██████╔╝${NC}"
+echo -e "  ${PURPLE}${BOLD}  ╚═══╝   ╚═════╝  ╚═════╝ ╚═════╝ ${NC}"
 echo
-echo -e "  ${DIM}Free, local-first desktop dictation for Linux${NC}"
+echo -e "  ${DIM}A voice-native interface layer designed for speed and precision${NC}"
+echo -e "  ${DIM}────────────────────────────────────────────────────────────${NC}"
 echo -e "  ${DIM}v${VERSION}${NC}"
 echo
 
 # ─── Checks ─────────────────────────────────────────────
-echo -e "  ${BOLD}${CYAN}[1/3]${NC} ${BOLD}Checks${NC}"
+echo -e "  ${BOLD}${PURPLE}[1/3]${NC} ${BOLD}Checks${NC}"
 
 if [[ "$(uname)" != "Linux" ]]; then
-  err "Voice only supports Linux. Detected: $(uname)"
+  err "VOCO only supports Linux. Detected: $(uname)"
 fi
 
 if [[ "$(dpkg --print-architecture 2>/dev/null)" != "amd64" ]]; then
@@ -109,27 +111,27 @@ fi
 
 # ─── Download ───────────────────────────────────────────
 echo
-echo -e "  ${BOLD}${CYAN}[2/3]${NC} ${BOLD}Download${NC}"
+echo -e "  ${BOLD}${PURPLE}[2/3]${NC} ${BOLD}Download${NC}"
 
 TMPDIR=$(mktemp -d)
-DEB_FILE="${TMPDIR}/Voice_${VERSION}_amd64.deb"
+DEB_FILE="${TMPDIR}/voco_${VERSION}_amd64.deb"
 
-run_step "Downloading Voice v${VERSION} (~5 MB)" \
+run_step "Downloading VOCO v${VERSION} (~5 MB)" \
   wget -q -O "$DEB_FILE" "$DEB_URL"
 
 DEB_SIZE=$(du -h "$DEB_FILE" | cut -f1)
-dim "Package: Voice_${VERSION}_amd64.deb (${DEB_SIZE})"
+dim "Package: voco_${VERSION}_amd64.deb (${DEB_SIZE})"
 
 # ─── Install ────────────────────────────────────────────
 echo
-echo -e "  ${BOLD}${CYAN}[3/3]${NC} ${BOLD}Install${NC}"
+echo -e "  ${BOLD}${PURPLE}[3/3]${NC} ${BOLD}Install${NC}"
 
 if sudo dpkg -i "$DEB_FILE" > /dev/null 2>&1; then
-  ok "Voice installed"
+  ok "VOCO installed"
 else
   # Try to fix missing dependencies
   if sudo apt-get install -f -y -qq > /dev/null 2>&1; then
-    ok "Voice installed (dependencies resolved)"
+    ok "VOCO installed (dependencies resolved)"
   else
     err "Installation failed. Try: sudo apt install -f"
   fi
@@ -139,14 +141,14 @@ rm -rf "$TMPDIR"
 
 # ─── Onboarding ─────────────────────────────────────────
 echo
-echo -e "  ${BOLD}${CYAN}Quick Setup${NC}"
+echo -e "  ${BOLD}${PURPLE}Quick Setup${NC}"
 echo
-echo -e "  Voice uses a global hotkey to start/stop dictation."
+echo -e "  VOCO uses a global hotkey to start and stop listening."
 echo -e "  The default is ${BOLD}Alt+D${NC} — press it anywhere to dictate."
 echo
 
 HOTKEY="Alt+D"
-CONFIG_DIR="${HOME}/.config/voice"
+CONFIG_DIR="${HOME}/.config/voco"
 CONFIG_FILE="${CONFIG_DIR}/config.json"
 
 # Only ask if running interactively (not piped without terminal)
@@ -192,8 +194,8 @@ echo -e "  ${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━
 echo -e "  ${GREEN}${BOLD}  Installed in ${ELAPSED}s!${NC}"
 echo -e "  ${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo
-echo -e "  ${WHITE}${BOLD}▸${NC} Open ${BOLD}Voice${NC} from your app launcher"
-echo -e "  ${WHITE}${BOLD}▸${NC} Or run: ${CYAN}voice${NC}"
+echo -e "  ${WHITE}${BOLD}▸${NC} Open ${BOLD}VOCO${NC} from your app launcher"
+echo -e "  ${WHITE}${BOLD}▸${NC} Or run: ${PURPLE_SOFT}voco${NC}"
 echo
 echo -e "  ${DIM}First launch downloads the speech model (~142 MB, one-time).${NC}"
 echo -e "  ${DIM}Then press ${BOLD}${HOTKEY}${NC}${DIM} to dictate!${NC}"

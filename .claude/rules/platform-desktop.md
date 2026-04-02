@@ -48,7 +48,7 @@
 - Distinguish between tested, likely compatible, and experimental
 
 ## Paths
-- Config: XDG config dir (`~/.config/voice`)
-- Data: XDG data dir (`~/.local/share/voice`)
-- Cache: XDG cache dir (`~/.cache/voice`)
+- Config: XDG config dir (`~/.config/voco`)
+- Data: XDG data dir (`~/.local/share/voco`)
+- Cache: XDG cache dir (`~/.cache/voco`)
 - Never write outside XDG-standard locations

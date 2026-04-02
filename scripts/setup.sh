@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Voice — one-command setup
+# VOCO — one-command setup
 # Usage: ./scripts/setup.sh           (dev mode)
 #        ./scripts/setup.sh --install  (build + install as desktop app)
 
 # ─── Colors ─────────────────────────────────────────────
 BOLD='\033[1m'
 DIM='\033[2m'
-CYAN='\033[36m'
+PURPLE='\033[38;2;108;76;245m'
+PURPLE_SOFT='\033[38;2;138;114;255m'
 GREEN='\033[32m'
 YELLOW='\033[33m'
 RED='\033[31m'
@@ -23,7 +24,7 @@ dim()  { printf "  ${DIM}%s${NC}\n" "$*"; }
 step() {
   STEP_NUM=$((STEP_NUM + 1))
   echo
-  printf "  ${BOLD}${CYAN}[%d/%d]${NC} ${BOLD}%s${NC}\n" "$STEP_NUM" "$TOTAL_STEPS" "$1"
+  printf "  ${BOLD}${PURPLE}[%d/%d]${NC} ${BOLD}%s${NC}\n" "$STEP_NUM" "$TOTAL_STEPS" "$1"
 }
 
 # ─── Spinner ────────────────────────────────────────────
@@ -34,7 +35,7 @@ spinner_start() {
     local frames=("⣾" "⣽" "⣻" "⢿" "⡿" "⣟" "⣯" "⣷")
     local i=0
     while true; do
-      printf "\r    ${CYAN}${frames[$i]}${NC} ${DIM}%s${NC}" "$msg"
+      printf "\r    ${PURPLE_SOFT}${frames[$i]}${NC} ${DIM}%s${NC}" "$msg"
       i=$(( (i + 1) % ${#frames[@]} ))
       sleep 0.07
     done
@@ -79,21 +80,22 @@ STEP_NUM=0
 
 # ─── Header ─────────────────────────────────────────────
 echo
-echo -e "  ${CYAN}${BOLD}██╗   ██╗ ██████╗ ██╗ ██████╗███████╗${NC}"
-echo -e "  ${CYAN}${BOLD}██║   ██║██╔═══██╗██║██╔════╝██╔════╝${NC}"
-echo -e "  ${CYAN}${BOLD}██║   ██║██║   ██║██║██║     █████╗  ${NC}"
-echo -e "  ${CYAN}${BOLD}╚██╗ ██╔╝██║   ██║██║██║     ██╔══╝  ${NC}"
-echo -e "  ${CYAN}${BOLD} ╚████╔╝ ╚██████╔╝██║╚██████╗███████╗${NC}"
-echo -e "  ${CYAN}${BOLD}  ╚═══╝   ╚═════╝ ╚═╝ ╚═════╝╚══════╝${NC}"
+echo -e "  ${PURPLE_SOFT}${BOLD}██╗   ██╗ ██████╗  ██████╗ ██████╗ ${NC}"
+echo -e "  ${PURPLE_SOFT}${BOLD}██║   ██║██╔═══██╗██╔════╝██╔═══██╗${NC}"
+echo -e "  ${PURPLE_SOFT}${BOLD}██║   ██║██║   ██║██║     ██║   ██║${NC}"
+echo -e "  ${PURPLE_SOFT}${BOLD}╚██╗ ██╔╝██║   ██║██║     ██║   ██║${NC}"
+echo -e "  ${PURPLE}${BOLD} ╚████╔╝ ╚██████╔╝╚██████╗╚██████╔╝${NC}"
+echo -e "  ${PURPLE}${BOLD}  ╚═══╝   ╚═════╝  ╚═════╝ ╚═════╝ ${NC}"
 echo
-echo -e "  ${DIM}Free, local-first desktop dictation for Linux${NC}"
+echo -e "  ${DIM}A voice-native interface layer designed for speed and precision${NC}"
+echo -e "  ${DIM}────────────────────────────────────────────────────────────${NC}"
 echo
 
 SECONDS=0
 
 # ─── OS Check ───────────────────────────────────────────
 if [[ "$(uname)" != "Linux" ]]; then
-  err "Voice only supports Linux. Detected: $(uname)"
+  err "VOCO only supports Linux. Detected: $(uname)"
   exit 1
 fi
 
@@ -158,6 +160,10 @@ if [[ "$INSTALL_MODE" == true ]]; then
 
   step "Build"
 
+  # Remove stale bundle artifacts so install picks the package from this build only.
+  rm -rf apps/desktop/src-tauri/target/release/bundle/deb
+  rm -rf apps/desktop/src-tauri/target/release/bundle/appimage
+
   # Maximize parallelism
   export CMAKE_BUILD_PARALLEL_LEVEL=$(nproc)
   export CARGO_BUILD_JOBS=$(nproc)
@@ -177,8 +183,8 @@ TOML
   BUILD_START=$SECONDS
   BUILD_LOG=$(mktemp)
 
-  # Single cargo tauri build handles frontend (beforeBuildCommand) + backend + packaging
-  (cd apps/desktop && cargo tauri build 2>&1) > "$BUILD_LOG" &
+  # Local install only needs the Debian bundle. AppImage packaging is handled separately.
+  (cd apps/desktop && cargo tauri build --bundles deb 2>&1) > "$BUILD_LOG" &
   BUILD_PID=$!
 
   # Show animated progress while build runs
@@ -196,9 +202,9 @@ TOML
     fi
     ELAPSED=$((SECONDS - BUILD_START))
     if [[ -n "$LAST_CRATE" ]]; then
-      printf "\r    ${CYAN}${FRAMES[$FRAME_I]}${NC} ${DIM}Compiling (%d crates, %ds) · %s${NC}    " "$CRATE_COUNT" "$ELAPSED" "$LAST_CRATE"
+      printf "\r    ${PURPLE_SOFT}${FRAMES[$FRAME_I]}${NC} ${DIM}Compiling (%d crates, %ds) · %s${NC}    " "$CRATE_COUNT" "$ELAPSED" "$LAST_CRATE"
     else
-      printf "\r    ${CYAN}${FRAMES[$FRAME_I]}${NC} ${DIM}Starting build...${NC}    "
+      printf "\r    ${PURPLE_SOFT}${FRAMES[$FRAME_I]}${NC} ${DIM}Starting build...${NC}    "
     fi
     FRAME_I=$(( (FRAME_I + 1) % ${#FRAMES[@]} ))
     sleep 0.15
@@ -222,12 +228,12 @@ TOML
   # ─── Install ──────────────────────────────────────────
   step "Install"
 
-  DEB=$(find apps/desktop/src-tauri/target/release/bundle/deb -name "*.deb" 2>/dev/null | head -1)
+  DEB=$(find apps/desktop/src-tauri/target/release/bundle/deb -maxdepth 1 -name "VOCO_*.deb" 2>/dev/null | sort | tail -1)
   if [[ -n "$DEB" ]]; then
     DEB_SIZE=$(du -h "$DEB" | cut -f1)
     printf "    ${DIM}Package: %s (%s)${NC}\n" "$(basename "$DEB")" "$DEB_SIZE"
     if sudo dpkg -i "$DEB" > /dev/null 2>&1; then
-      ok "Voice installed"
+      ok "VOCO installed"
     else
       err "dpkg install failed"
       exit 1
@@ -239,14 +245,14 @@ TOML
 
   # ─── Onboarding ───────────────────────────────────────
   echo
-  echo -e "  ${BOLD}${CYAN}Quick Setup${NC}"
+  echo -e "  ${BOLD}${PURPLE}Quick Setup${NC}"
   echo
-  echo -e "  Voice uses a global hotkey to start/stop dictation."
+  echo -e "  VOCO uses a global hotkey to start and stop listening."
   echo -e "  The default is ${BOLD}Alt+D${NC} — press it anywhere to dictate."
   echo
 
   HOTKEY="Alt+D"
-  CONFIG_DIR="${HOME}/.config/voice"
+  CONFIG_DIR="${HOME}/.config/voco"
   CONFIG_FILE="${CONFIG_DIR}/config.json"
 
   if [[ -t 0 ]]; then
@@ -293,8 +299,8 @@ EOF
   echo -e "  ${GREEN}${BOLD}  Done in ${TIME_STR}!${NC}"
   echo -e "  ${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
   echo
-  echo -e "  ${WHITE}${BOLD}▸${NC} Open ${BOLD}Voice${NC} from your app launcher"
-  echo -e "  ${WHITE}${BOLD}▸${NC} Or run: ${CYAN}voice${NC}"
+  echo -e "  ${WHITE}${BOLD}▸${NC} Open ${BOLD}VOCO${NC} from your app launcher"
+  echo -e "  ${WHITE}${BOLD}▸${NC} Or run: ${PURPLE_SOFT}voco${NC}"
   echo
   echo -e "  ${DIM}First launch downloads the speech model (~142 MB, one-time).${NC}"
   echo -e "  ${DIM}Then press ${BOLD}${HOTKEY}${NC}${DIM} to dictate!${NC}"
@@ -311,8 +317,8 @@ else
   echo -e "  ${GREEN}${BOLD}  Ready in ${ELAPSED}s!${NC}"
   echo -e "  ${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
   echo
-  echo -e "  ${WHITE}${BOLD}▸${NC} Development:   ${CYAN}npm run dev${NC}"
-  echo -e "  ${WHITE}${BOLD}▸${NC} Full install:  ${CYAN}./scripts/setup.sh --install${NC}"
+  echo -e "  ${WHITE}${BOLD}▸${NC} Development:   ${PURPLE_SOFT}npm run dev${NC}"
+  echo -e "  ${WHITE}${BOLD}▸${NC} Full install:  ${PURPLE_SOFT}./scripts/setup.sh --install${NC}"
   echo
   echo -e "  ${DIM}First launch downloads the speech model (~142 MB, one-time).${NC}"
   echo -e "  ${DIM}Then press ${BOLD}Alt+D${NC}${DIM} to dictate!${NC}"

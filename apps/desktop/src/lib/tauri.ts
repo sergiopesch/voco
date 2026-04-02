@@ -1,8 +1,12 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { AppConfig } from "@/types";
+import type { AppConfig, CachedUpdateCheck } from "@/types";
 
 export async function getConfig(): Promise<AppConfig> {
   return invoke<AppConfig>("get_config");
+}
+
+export async function saveConfig(config: AppConfig): Promise<void> {
+  return invoke("save_config", { config });
 }
 
 export async function transcribeAudio(samples: Float32Array): Promise<string> {
@@ -39,4 +43,16 @@ export async function hideStatusOverlay(): Promise<void> {
 
 export async function showNotification(summary: string, body: string): Promise<void> {
   return invoke("show_notification", { summary, body });
+}
+
+export async function openExternalUrl(url: string): Promise<void> {
+  return invoke("open_external_url", { url });
+}
+
+export async function loadCachedUpdateState(): Promise<CachedUpdateCheck | null> {
+  return invoke<CachedUpdateCheck | null>("load_cached_update_state");
+}
+
+export async function saveCachedUpdateState(cache: CachedUpdateCheck): Promise<void> {
+  return invoke("save_cached_update_state", { cache });
 }

@@ -68,7 +68,7 @@ pgrep -x ydotoold > /dev/null || ydotoold &
 **Troubleshooting:**
 - `Permission denied`: ensure user is in `input` group and has uinput access
 - `Socket not found`: ydotoold is not running — start it manually
-- If ydotool type-simulation fails, Voice falls back to clipboard paste automatically
+- If ydotool type-simulation fails, VOCO falls back to clipboard paste automatically
 
 ## X11
 
@@ -96,6 +96,6 @@ pgrep -x ydotoold > /dev/null || ydotoold &
 
 | Data   | Path                             |
 | ------ | -------------------------------- |
-| Config | `~/.config/voice/config.json`    |
-| Models | `~/.local/share/voice/models/`   |
-| Socket | `$XDG_RUNTIME_DIR/voice.sock`    |
+| Config | `~/.config/voco/config.json`     |
+| Models | `~/.local/share/voco/models/`    |
+| Socket | `$XDG_RUNTIME_DIR/voco.sock`     |

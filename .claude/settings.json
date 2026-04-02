@@ -16,7 +16,7 @@
       "Bash(npm install *)",
       "Bash(npx *)",
       "Bash(cargo:*)",
-      "Bash(cd ~/voice*cargo*)",
+      "Bash(cd ~/voco*cargo*)",
       "Bash(tauri *)",
       "Bash(git status*)",
       "Bash(git diff*)",

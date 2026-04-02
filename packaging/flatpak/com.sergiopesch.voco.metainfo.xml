@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>com.sergiopesch.voco</id>
+  <name>VOCO</name>
+  <summary>A voice-native interface layer designed for speed and precision</summary>
+  <metadata_license>MIT</metadata_license>
+  <project_license>MIT</project_license>
+  <developer id="com.sergiopesch">
+    <name>Sergio Pesch</name>
+  </developer>
+  <launchable type="desktop-id">com.sergiopesch.voco.desktop</launchable>
+  <description>
+    <p>VOCO is a Linux desktop dictation tool built for low friction and high trust.</p>
+    <p>It stays in the tray, listens on demand, keeps visible state compact, and defaults to a local-first workflow for voice capture.</p>
+    <ul>
+      <li>Tray-first workflow with a compact command panel</li>
+      <li>Onboarding for microphone setup, hotkeys, and voice profile selection</li>
+      <li>GitHub Release update checks for manual install channels</li>
+      <li>Clear Linux-specific install, upgrade, and troubleshooting guidance</li>
+    </ul>
+  </description>
+  <categories>
+    <category>Utility</category>
+    <category>AudioVideo</category>
+  </categories>
+  <url type="homepage">https://github.com/sergiopesch/voco</url>
+  <url type="bugtracker">https://github.com/sergiopesch/voco/issues</url>
+  <url type="vcs-browser">https://github.com/sergiopesch/voco</url>
+  <content_rating type="oars-1.1" />
+  <releases>
+    <release version="0.1.0" date="2026-04-02">
+      <description>
+        <p>Initial VOCO-branded release with onboarding, update awareness, and Linux packaging groundwork.</p>
+      </description>
+    </release>
+  </releases>
+</component>

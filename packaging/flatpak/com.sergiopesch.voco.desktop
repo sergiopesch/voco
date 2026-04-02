@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=VOCO
+Comment=A voice-native interface layer designed for speed and precision
+Exec=voco
+Icon=com.sergiopesch.voco
+Terminal=false
+Categories=Utility;AudioVideo;
+StartupNotify=true

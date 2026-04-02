@@ -23,6 +23,8 @@ Run with `npm test` from project root.
 | --------------- | ----- | --------------------------------------------------------------------------------------------------- |
 | `store.test.ts` | 8 | All store actions: status transitions, error handling, transcript management, audio level, config storage |
 
+Current manual product coverage is broader than the automated test count. The onboarding flow, update surface, and tray interactions still need manual verification on Linux.
+
 ## Running Tests
 
 ```bash
@@ -48,12 +50,17 @@ GitHub Actions (`.github/workflows/ci.yml`) runs on every push and PR to master:
 For system-level features that are hard to automate:
 
 - Startup readiness:
-  - launch app and confirm tray icon transitions gray -> green after mic init
+  - launch app and confirm the tray icon moves from muted idle to the VOCO ready state after mic init
   - confirm log lines for `Hotkey listener attached` and `Microphone ready`
+- Onboarding:
+  - confirm the first-run flow shows the VOCO mic mark in the header
+  - confirm microphone check uses the intended input device
+  - confirm the level meter stays low at rest and moves through the middle during normal speech
+  - confirm accent-aware is visible as a disabled future feature, not an active option
 - Hotkey behavior:
-  - first press should immediately show listening state and red tray icon
+  - first press should immediately show listening state and the active tray indicator
   - switch hotkey at runtime from tray menu and verify new binding triggers dictation
-- Trigger via Unix socket: `socat - UNIX-CONNECT:$XDG_RUNTIME_DIR/voice.sock < /dev/null`
+- Trigger via Unix socket: `socat - UNIX-CONNECT:$XDG_RUNTIME_DIR/voco.sock < /dev/null`
 - Insertion behavior:
   - verify direct type simulation in a text editor
   - verify fallback path messaging when paste simulation fails

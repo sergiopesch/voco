@@ -1,4 +1,4 @@
-# Voice — Claude Code Project Instructions
+# VOCO — Claude Code Project Instructions
 
 ## Mission
 Build a free, local-first desktop dictation app for Linux.

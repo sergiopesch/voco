@@ -3,6 +3,8 @@ use std::sync::Mutex;
 use std::sync::Once;
 use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters};
 
+use crate::config::{APP_DIR_NAME, LEGACY_APP_DIR_NAME};
+
 static INIT_LOG: Once = Once::new();
 
 /// No-op callback to suppress whisper.cpp's verbose C-level logging
@@ -57,7 +59,9 @@ impl WhisperState {
     pub fn transcribe(&self, samples: &[f32]) -> Result<String, String> {
         let ctx = self.ctx.as_ref().ok_or("Model not loaded")?;
 
-        let mut state = ctx.create_state().map_err(|e| format!("Failed to create state: {e}"))?;
+        let mut state = ctx
+            .create_state()
+            .map_err(|e| format!("Failed to create state: {e}"))?;
 
         let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
         params.set_language(Some("en"));
@@ -75,7 +79,9 @@ impl WhisperState {
             .full(params, samples)
             .map_err(|e| format!("Transcription failed: {e}"))?;
 
-        let num_segments = state.full_n_segments().map_err(|e| format!("Failed to get segments: {e}"))?;
+        let num_segments = state
+            .full_n_segments()
+            .map_err(|e| format!("Failed to get segments: {e}"))?;
         let mut text = String::new();
         for i in 0..num_segments {
             if let Ok(segment) = state.full_get_segment_text(i) {
@@ -105,11 +111,51 @@ fn num_cpus() -> i32 {
 }
 
 fn model_dir() -> Result<PathBuf, String> {
-    let data_dir = dirs::data_dir()
-        .ok_or("Cannot find data directory (XDG_DATA_HOME)")?
-        .join("voice/models");
+    let base_dir = dirs::data_dir().ok_or("Cannot find data directory (XDG_DATA_HOME)")?;
+    let data_dir = base_dir.join(APP_DIR_NAME).join("models");
+    migrate_legacy_models(&base_dir, &data_dir)?;
     std::fs::create_dir_all(&data_dir).map_err(|e| format!("Failed to create model dir: {e}"))?;
     Ok(data_dir)
+}
+
+fn migrate_legacy_models(
+    base_dir: &std::path::Path,
+    new_model_dir: &std::path::Path,
+) -> Result<(), String> {
+    let old_model_dir = base_dir.join(LEGACY_APP_DIR_NAME).join("models");
+    if new_model_dir.exists() || !old_model_dir.exists() {
+        return Ok(());
+    }
+
+    let new_parent = new_model_dir
+        .parent()
+        .ok_or("Failed to determine model directory parent")?;
+    std::fs::create_dir_all(new_parent).map_err(|e| format!("Failed to prepare model dir: {e}"))?;
+    std::fs::rename(&old_model_dir, new_model_dir)
+        .or_else(|_| copy_model_dir(&old_model_dir, new_model_dir))
+        .map_err(|e| format!("Failed to migrate model dir: {e}"))?;
+    Ok(())
+}
+
+fn copy_model_dir(
+    old_model_dir: &std::path::Path,
+    new_model_dir: &std::path::Path,
+) -> Result<(), std::io::Error> {
+    std::fs::create_dir_all(new_model_dir)?;
+    for entry in walkdir::WalkDir::new(old_model_dir) {
+        let entry = entry.map_err(std::io::Error::other)?;
+        let relative = entry.path().strip_prefix(old_model_dir).unwrap();
+        let destination = new_model_dir.join(relative);
+        if entry.file_type().is_dir() {
+            std::fs::create_dir_all(&destination)?;
+        } else {
+            if let Some(parent) = destination.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            std::fs::copy(entry.path(), &destination)?;
+        }
+    }
+    Ok(())
 }
 
 pub fn default_model_path() -> Result<PathBuf, String> {

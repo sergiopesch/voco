@@ -46,8 +46,8 @@ export function StatusOverlay() {
       <section
         className={shellClassName}
         aria-live="polite"
-        aria-label={isRecording ? "Voice is listening" : "Voice is transcribing"}
-        style={{ "--voice-level": `${level}` } as CSSProperties}
+        aria-label={isRecording ? "VOCO is listening" : "VOCO is processing"}
+        style={{ "--voco-level": `${level}` } as CSSProperties}
       >
         <div className="status-overlay__orb" aria-hidden="true">
           <div className="status-overlay__orb-core">

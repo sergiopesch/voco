@@ -1,71 +1,81 @@
 #!/usr/bin/env python3
-"""Generate app icons for Voice Dictation.
+"""Generate app icons for VOCO.
 
 Creates PNG icons at required sizes for Tauri (Linux .deb packaging).
 Uses only the Python standard library — no external deps needed.
 """
-import struct
-import zlib
 import os
 import math
+import struct
+import zlib
 
 ICON_DIR = os.path.join(os.path.dirname(__file__), "..", "apps", "desktop", "src-tauri", "icons")
 
-def mic_shape(nx: float, ny: float) -> float:
-    """Returns opacity 0.0..1.0 for a studio condenser mic shape."""
-    cx = 0.5
-
-    # Capsule (head)
-    cap_cx, cap_cy = cx, 0.30
-    cap_rx, cap_ry = 0.18, 0.22
-    dx = (nx - cap_cx) / cap_rx
-    dy = (ny - cap_cy) / cap_ry
-    cap_dist = dx * dx + dy * dy
-    if cap_dist <= 1.0:
-        return min(1.0, (1.0 - cap_dist) / 0.08)
-
-    # Pickup arc
-    arc_cy, arc_rx, arc_ry = 0.58, 0.24, 0.09
-    adx = (nx - cx) / arc_rx
-    ady = (ny - arc_cy) / arc_ry
-    arc_dist = adx * adx + ady * ady
-    if 0.7 <= arc_dist <= 1.0 and ny > 0.52:
-        return min(1.0, (1.0 - abs(arc_dist - 0.85) / 0.15) / 0.3)
-
-    # Stand
-    stand_hw = 0.035
-    if abs(nx - cx) < stand_hw and 0.58 < ny < 0.74:
-        return min(1.0, (1.0 - abs(nx - cx) / stand_hw) / 0.3)
-
-    # Base
-    base_hw, base_h, base_y = 0.16, 0.05, 0.74
-    if abs(nx - cx) < base_hw and base_y <= ny < base_y + base_h:
-        edge_x = min(1.0, (1.0 - abs(nx - cx) / base_hw) / 0.15)
-        edge_y = min(1.0, (1.0 - abs(ny - base_y - base_h / 2) / (base_h / 2)) / 0.3)
-        return min(edge_x, edge_y)
-
-    return 0.0
+def smoothstep(edge0: float, edge1: float, value: float) -> float:
+    if edge0 == edge1:
+        return 1.0 if value >= edge1 else 0.0
+    t = max(0.0, min(1.0, (value - edge0) / (edge1 - edge0)))
+    return t * t * (3.0 - 2.0 * t)
 
 
-def rounded_rect(nx: float, ny: float, radius: float = 0.15) -> float:
-    """Returns 1.0 inside a rounded rectangle, 0.0 outside, with soft edges."""
-    # Map to -0.5..0.5
-    x = nx - 0.5
-    y = ny - 0.5
-    half = 0.5
-    r = radius
-
-    # Distance to rounded rect boundary
-    dx = max(abs(x) - (half - r), 0.0)
-    dy = max(abs(y) - (half - r), 0.0)
-    dist = math.sqrt(dx * dx + dy * dy) - r
-
-    if dist < -0.02:
-        return 1.0
-    elif dist > 0.02:
+def ellipse_alpha(nx: float, ny: float, cx: float, cy: float, rx: float, ry: float, feather: float = 0.08) -> float:
+    dx = (nx - cx) / rx
+    dy = (ny - cy) / ry
+    dist = dx * dx + dy * dy
+    if dist >= 1.0 + feather:
         return 0.0
-    else:
-        return 1.0 - (dist + 0.02) / 0.04
+    if dist <= 1.0:
+        return 1.0
+    return 1.0 - smoothstep(1.0, 1.0 + feather, dist)
+
+
+def circle_alpha(nx: float, ny: float, cx: float, cy: float, radius: float, feather: float = 0.03) -> float:
+    dist = math.sqrt((nx - cx) ** 2 + (ny - cy) ** 2)
+    if dist <= radius:
+        return 1.0
+    if dist >= radius + feather:
+        return 0.0
+    return 1.0 - smoothstep(radius, radius + feather, dist)
+
+
+def rect_alpha(nx: float, ny: float, x0: float, y0: float, x1: float, y1: float, feather: float = 0.02) -> float:
+    if x0 <= nx <= x1 and y0 <= ny <= y1:
+        return 1.0
+    dx = 0.0
+    dy = 0.0
+    if nx < x0:
+        dx = x0 - nx
+    elif nx > x1:
+        dx = nx - x1
+    if ny < y0:
+        dy = y0 - ny
+    elif ny > y1:
+        dy = ny - y1
+    dist = math.sqrt(dx * dx + dy * dy)
+    if dist >= feather:
+        return 0.0
+    return 1.0 - smoothstep(0.0, feather, dist)
+
+
+def mic_shape(nx: float, ny: float) -> float:
+    """Returns opacity 0.0..1.0 for a premium condenser mic silhouette."""
+    body = ellipse_alpha(nx, ny, 0.5, 0.39, 0.16, 0.23, feather=0.1)
+
+    # Flat lower body for a more engineered silhouette.
+    if body > 0.0 and ny > 0.56:
+        body = max(0.0, body * (1.0 - smoothstep(0.56, 0.62, ny)))
+
+    stem = rect_alpha(nx, ny, 0.472, 0.56, 0.528, 0.72, feather=0.015)
+    base = rect_alpha(nx, ny, 0.36, 0.73, 0.64, 0.79, feather=0.02)
+
+    dx = (nx - 0.5) / 0.24
+    dy = (ny - 0.56) / 0.16
+    yoke_dist = dx * dx + dy * dy
+    yoke = 0.0
+    if 0.7 <= yoke_dist <= 1.06 and ny <= 0.62:
+        yoke = 1.0 - abs(yoke_dist - 0.88) / 0.18
+
+    return max(body, stem, base, max(0.0, yoke))
 
 
 def generate_icon(size: int) -> bytes:
@@ -73,9 +83,11 @@ def generate_icon(size: int) -> bytes:
     pixels = bytearray(size * size * 4)
 
     # Colors
-    bg_r, bg_g, bg_b = 30, 27, 50       # Dark indigo background
-    mic_r, mic_g, mic_b = 165, 180, 252  # Light indigo mic (#A5B4FC)
-    glow_r, glow_g, glow_b = 99, 102, 241  # Glow color (#6366F1)
+    bg_r, bg_g, bg_b = 17, 17, 26
+    bg2_r, bg2_g, bg2_b = 26, 26, 38
+    purple_r, purple_g, purple_b = 108, 76, 245
+    lavender_r, lavender_g, lavender_b = 183, 167, 255
+    mic_r, mic_g, mic_b = 244, 239, 255
 
     for py in range(size):
         for px in range(size):
@@ -84,32 +96,51 @@ def generate_icon(size: int) -> bytes:
 
             idx = (py * size + px) * 4
 
-            # Rounded rectangle background
-            bg_alpha = rounded_rect(nx, ny, radius=0.18)
-            if bg_alpha <= 0:
+            orb_alpha = circle_alpha(nx, ny, 0.5, 0.5, 0.46, feather=0.025)
+            if orb_alpha <= 0:
                 pixels[idx:idx+4] = bytes([0, 0, 0, 0])
                 continue
 
-            # Mic shape
+            # Background orb with restrained inner glow.
+            top_light = max(0.0, 1.0 - math.sqrt((nx - 0.38) ** 2 + (ny - 0.32) ** 2) / 0.58)
+            glow = max(0.0, 1.0 - math.sqrt((nx - 0.5) ** 2 + (ny - 0.42) ** 2) / 0.46)
+            rim = max(0.0, 1.0 - abs(math.sqrt((nx - 0.5) ** 2 + (ny - 0.5) ** 2) - 0.43) / 0.035)
+
+            r = int(bg_r * (1.0 - top_light * 0.32) + bg2_r * (top_light * 0.32))
+            g = int(bg_g * (1.0 - top_light * 0.32) + bg2_g * (top_light * 0.32))
+            b = int(bg_b * (1.0 - top_light * 0.32) + bg2_b * (top_light * 0.32))
+
+            r = int(r * (1.0 - glow * 0.6) + purple_r * glow * 0.6)
+            g = int(g * (1.0 - glow * 0.6) + purple_g * glow * 0.6)
+            b = int(b * (1.0 - glow * 0.6) + purple_b * glow * 0.6)
+
+            r = int(r * (1.0 - rim * 0.35) + lavender_r * rim * 0.35)
+            g = int(g * (1.0 - rim * 0.35) + lavender_g * rim * 0.35)
+            b = int(b * (1.0 - rim * 0.35) + lavender_b * rim * 0.35)
+
+            # Premium highlight to keep the icon crisp at small sizes.
+            highlight = ellipse_alpha(nx, ny, 0.38, 0.28, 0.16, 0.11, feather=0.16) * 0.28
+            r = int(r * (1.0 - highlight) + 255 * highlight)
+            g = int(g * (1.0 - highlight) + 255 * highlight)
+            b = int(b * (1.0 - highlight) + 255 * highlight)
+
             mic_alpha = mic_shape(nx, ny)
-
-            # Subtle glow behind mic
-            glow_cx, glow_cy = 0.5, 0.35
-            glow_dist = math.sqrt((nx - glow_cx) ** 2 + (ny - glow_cy) ** 2)
-            glow_alpha = max(0, 1.0 - glow_dist / 0.35) * 0.15
-
-            # Composite: background + glow + mic
-            r = bg_r + int((glow_r - bg_r) * glow_alpha)
-            g = bg_g + int((glow_g - bg_g) * glow_alpha)
-            b = bg_b + int((glow_b - bg_b) * glow_alpha)
-
-            if mic_alpha > 0:
+            if mic_alpha > 0.0:
                 ma = min(1.0, mic_alpha)
-                r = int(r * (1 - ma) + mic_r * ma)
-                g = int(g * (1 - ma) + mic_g * ma)
-                b = int(b * (1 - ma) + mic_b * ma)
+                r = int(r * (1.0 - ma) + mic_r * ma)
+                g = int(g * (1.0 - ma) + mic_g * ma)
+                b = int(b * (1.0 - ma) + mic_b * ma)
 
-            a = int(bg_alpha * 255)
+                # Grille lines in the capsule.
+                if 0.405 <= nx <= 0.595 and 0.25 <= ny <= 0.52:
+                    line_mod = abs(((nx - 0.405) / 0.038) % 1.0 - 0.5)
+                    if line_mod < 0.14:
+                        groove = 1.0 - line_mod / 0.14
+                        r = int(r * (1.0 - groove * 0.25) + purple_r * groove * 0.25)
+                        g = int(g * (1.0 - groove * 0.18) + purple_g * groove * 0.18)
+                        b = int(b * (1.0 - groove * 0.32) + purple_b * groove * 0.32)
+
+            a = int(orb_alpha * 255)
             pixels[idx] = min(255, r)
             pixels[idx+1] = min(255, g)
             pixels[idx+2] = min(255, b)

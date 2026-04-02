@@ -17,9 +17,9 @@
 - Tauri CSP must be restrictive: no remote script loading in default config
 
 ## Safe Local Storage
-- Config: XDG config dir (`~/.config/voice`)
-- Data: XDG data dir (`~/.local/share/voice`)
-- Cache: XDG cache dir (`~/.cache/voice`)
+- Config: XDG config dir (`~/.config/voco`)
+- Data: XDG data dir (`~/.local/share/voco`)
+- Cache: XDG cache dir (`~/.cache/voco`)
 - Document retention behaviour for all stored data
 
 ## Input Validation

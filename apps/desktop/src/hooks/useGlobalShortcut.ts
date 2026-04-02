@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
-const TOGGLE_EVENT = "voice:toggle-dictation";
+const TOGGLE_EVENT = "voco:toggle-dictation";
 
 export function useGlobalShortcut(
   toggle: () => void,

@@ -3,8 +3,9 @@ mod insertion;
 mod transcribe;
 mod tray;
 
-use config::AppConfig;
+use config::{load_cached_update_check, save_cached_update_check, AppConfig, CachedUpdateCheck};
 use log::{debug, error, info, warn};
+use serde::Serialize;
 use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
 use std::sync::{LazyLock, Mutex};
 use tauri::{Emitter, Manager};
@@ -22,7 +23,8 @@ static HOTKEY_BINDING_VERSION: AtomicU64 = AtomicU64::new(0);
 static REGISTERED_PLUGIN_SHORTCUT: LazyLock<Mutex<Option<String>>> =
     LazyLock::new(|| Mutex::new(None));
 
-const TOGGLE_DICTATION_EVENT: &str = "voice:toggle-dictation";
+const TOGGLE_DICTATION_EVENT: &str = "voco:toggle-dictation";
+const LEGACY_TOGGLE_DICTATION_EVENT: &str = "voice:toggle-dictation";
 const TOGGLE_DEBOUNCE_MS: i64 = 120;
 const HIDDEN_WINDOW_POS_X: i32 = -100;
 const HIDDEN_WINDOW_POS_Y: i32 = -100;
@@ -30,6 +32,15 @@ const HIDDEN_WINDOW_SIZE: u32 = 1;
 const OVERLAY_CURSOR_OFFSET_X: i32 = 20;
 const OVERLAY_CURSOR_OFFSET_Y: i32 = 24;
 const OVERLAY_MARGIN: i32 = 16;
+
+#[derive(Debug, Clone, Copy, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TrayPopoverAnchor {
+    pub rect_position_x: i32,
+    pub rect_position_y: i32,
+    pub rect_width: u32,
+    pub rect_height: u32,
+}
 
 fn now_ms() -> i64 {
     std::time::SystemTime::now()
@@ -68,6 +79,16 @@ fn get_config() -> Result<AppConfig, String> {
 #[tauri::command]
 fn save_config(config: AppConfig) -> Result<(), String> {
     config.save().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn load_cached_update_state() -> Result<Option<CachedUpdateCheck>, String> {
+    load_cached_update_check().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn save_cached_update_state(cache: CachedUpdateCheck) -> Result<(), String> {
+    save_cached_update_check(&cache).map_err(|e| e.to_string())
 }
 
 // --- Transcription ---
@@ -131,7 +152,7 @@ fn set_microphone_ready(app: tauri::AppHandle, ready: bool) -> Result<(), String
 
 fn send_notification(summary: &str, body: &str) {
     let _ = std::process::Command::new("notify-send")
-        .arg("--app-name=Voice")
+        .arg("--app-name=VOCO")
         .arg("--icon=audio-input-microphone")
         .arg("--")
         .arg(summary)
@@ -142,6 +163,24 @@ fn send_notification(summary: &str, body: &str) {
 #[tauri::command]
 fn show_notification(summary: String, body: String) {
     send_notification(&summary, &body);
+}
+
+#[tauri::command]
+fn open_external_url(url: String) -> Result<(), String> {
+    if !url.starts_with("https://") {
+        return Err("Only https URLs are supported".to_string());
+    }
+
+    let status = std::process::Command::new("xdg-open")
+        .arg(&url)
+        .status()
+        .map_err(|error| format!("Failed to open external URL: {error}"))?;
+
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!("xdg-open exited with status {status}"))
+    }
 }
 
 #[tauri::command]
@@ -269,6 +308,7 @@ fn hide_status_overlay(app: tauri::AppHandle) -> Result<(), String> {
 fn grant_webview_permissions(app: &tauri::App) {
     use glib::object::Cast;
     use webkit2gtk::PermissionRequestExt;
+    use webkit2gtk::UserMediaPermissionRequestExt;
     use webkit2gtk::WebViewExt;
 
     if let Some(window) = app.get_webview_window("main") {
@@ -280,11 +320,17 @@ fn grant_webview_permissions(app: &tauri::App) {
                 };
                 webview.connect_permission_request(
                     |_wv, request: &webkit2gtk::PermissionRequest| {
-                        if request
-                            .downcast_ref::<webkit2gtk::UserMediaPermissionRequest>()
-                            .is_some()
+                        if let Some(user_media_request) =
+                            request.downcast_ref::<webkit2gtk::UserMediaPermissionRequest>()
                         {
-                            request.allow();
+                            let wants_audio = user_media_request.is_for_audio_device();
+                            let wants_video = user_media_request.is_for_video_device();
+
+                            if wants_audio && !wants_video {
+                                request.allow();
+                            } else {
+                                request.deny();
+                            }
                             true
                         } else {
                             false
@@ -313,7 +359,7 @@ fn ensure_model_downloaded(app_handle: &tauri::AppHandle) -> Result<(), String> 
         tray::update_tray_tooltip(app_handle, msg);
     };
 
-    set_tray_tooltip("Voice — Downloading model...");
+    set_tray_tooltip("VOCO — Downloading model...");
     info!("Downloading speech model (one-time, ~142 MB)...");
     let url = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin";
 
@@ -329,7 +375,7 @@ fn ensure_model_downloaded(app_handle: &tauri::AppHandle) -> Result<(), String> 
         .map_err(|e| format!("Download failed: {e}"))?;
 
     if !response.status().is_success() {
-        set_tray_tooltip("Voice — Download failed");
+        set_tray_tooltip("VOCO — Download failed");
         return Err(format!(
             "Download failed with status: {}",
             response.status()
@@ -359,7 +405,7 @@ fn ensure_model_downloaded(app_handle: &tauri::AppHandle) -> Result<(), String> 
             let pct = (downloaded * 100) / total_size;
             if pct != last_pct {
                 last_pct = pct;
-                set_tray_tooltip(&format!("Voice — Downloading model {}%", pct));
+                set_tray_tooltip(&format!("VOCO — Downloading model {}%", pct));
             }
         }
     }
@@ -367,7 +413,7 @@ fn ensure_model_downloaded(app_handle: &tauri::AppHandle) -> Result<(), String> 
     use sha2::Digest;
     let hash = format!("{:x}", sha2::Sha256::digest(&bytes));
     if hash != MODEL_SHA256 {
-        set_tray_tooltip("Voice — Download corrupt, retry on next launch");
+        set_tray_tooltip("VOCO — Download corrupt, retry on next launch");
         return Err(format!(
             "Model integrity check failed (expected {}, got {}). Download may be corrupt.",
             &MODEL_SHA256[..16],
@@ -378,7 +424,7 @@ fn ensure_model_downloaded(app_handle: &tauri::AppHandle) -> Result<(), String> 
     std::fs::write(&tmp_path, &bytes).map_err(|e| format!("Failed to save model (tmp): {e}"))?;
     std::fs::rename(&tmp_path, &path).map_err(|e| format!("Failed to finalize model file: {e}"))?;
 
-    set_tray_tooltip("Voice");
+    set_tray_tooltip("VOCO");
     info!("Model downloaded and verified: {}", path.display());
     Ok(())
 }
@@ -397,6 +443,7 @@ pub fn eval_toggle(app_handle: &tauri::AppHandle) {
     if let Err(e) = app_handle.emit_to("main", TOGGLE_DICTATION_EVENT, ()) {
         error!("Failed to emit toggle event: {e}");
     }
+    let _ = app_handle.emit_to("main", LEGACY_TOGGLE_DICTATION_EVENT, ());
 }
 
 // --- Hotkey configuration ---
@@ -484,7 +531,11 @@ fn sync_global_shortcut_binding(
 /// Change the hotkey at runtime.
 pub fn change_hotkey_runtime(app: &tauri::AppHandle, new_hotkey: &str) -> Result<(), String> {
     let use_evdev_hotkey = prefers_evdev_hotkey(is_wayland_session(), new_hotkey);
-    sync_global_shortcut_binding(app, new_hotkey, should_register_global_shortcut(use_evdev_hotkey))?;
+    sync_global_shortcut_binding(
+        app,
+        new_hotkey,
+        should_register_global_shortcut(use_evdev_hotkey),
+    )?;
 
     USE_EVDEV_HOTKEY.store(use_evdev_hotkey, Ordering::SeqCst);
     EVDEV_HOTKEY_MODE.store(hotkey_to_evdev_mode(new_hotkey), Ordering::SeqCst);
@@ -497,11 +548,15 @@ pub fn change_hotkey_runtime(app: &tauri::AppHandle, new_hotkey: &str) -> Result
     info!("Hotkey changed to {new_hotkey}");
     info!(
         "Hotkey runtime backend preference: {}",
-        if use_evdev_hotkey { "evdev" } else { "global-shortcut" }
+        if use_evdev_hotkey {
+            "evdev"
+        } else {
+            "global-shortcut"
+        }
     );
     send_notification(
         "Hotkey changed",
-        &format!("Voice will now respond to {new_hotkey}"),
+        &format!("VOCO will now respond to {new_hotkey}"),
     );
 
     Ok(())
@@ -511,16 +566,20 @@ pub fn change_hotkey_runtime(app: &tauri::AppHandle, new_hotkey: &str) -> Result
 
 fn socket_path() -> std::path::PathBuf {
     let runtime_dir = std::env::var("XDG_RUNTIME_DIR").unwrap_or_else(|_| "/tmp".to_string());
+    std::path::PathBuf::from(runtime_dir).join("voco.sock")
+}
+
+fn legacy_socket_path() -> std::path::PathBuf {
+    let runtime_dir = std::env::var("XDG_RUNTIME_DIR").unwrap_or_else(|_| "/tmp".to_string());
     std::path::PathBuf::from(runtime_dir).join("voice.sock")
 }
 
 fn start_socket_listener(app_handle: tauri::AppHandle) {
     use std::os::unix::net::UnixListener;
 
-    std::thread::spawn(move || {
-        let path = socket_path();
-
-        loop {
+    for path in [socket_path(), legacy_socket_path()] {
+        let handle = app_handle.clone();
+        std::thread::spawn(move || loop {
             let _ = std::fs::remove_file(&path);
 
             let listener = match UnixListener::bind(&path) {
@@ -540,7 +599,7 @@ fn start_socket_listener(app_handle: tauri::AppHandle) {
                 match stream {
                     Ok(_) => {
                         debug!("Toggle received via socket");
-                        eval_toggle(&app_handle);
+                        eval_toggle(&handle);
                     }
                     Err(e) => {
                         warn!("Socket accept error (will rebind): {e}");
@@ -548,8 +607,8 @@ fn start_socket_listener(app_handle: tauri::AppHandle) {
                     }
                 }
             }
-        }
-    });
+        });
+    }
 }
 
 // --- evdev hotkey listener (primary mechanism on Wayland) ---
@@ -648,6 +707,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_config,
             save_config,
+            load_cached_update_state,
+            save_cached_update_state,
             transcribe_audio,
             insert_text,
             set_recording_state,
@@ -655,6 +716,7 @@ pub fn run() {
             show_status_overlay,
             hide_status_overlay,
             show_notification,
+            open_external_url,
         ])
         .setup(|app| {
             let startup_ms = now_ms();
@@ -721,6 +783,7 @@ pub fn run() {
         .run(|_app, event| {
             if let tauri::RunEvent::Exit = event {
                 let _ = std::fs::remove_file(socket_path());
+                let _ = std::fs::remove_file(legacy_socket_path());
             }
         });
 }
@@ -765,7 +828,7 @@ mod tests {
 
     #[test]
     fn socket_path_uses_xdg_runtime_dir() {
-        assert!(socket_path().to_str().unwrap().ends_with("voice.sock"));
+        assert!(socket_path().to_str().unwrap().ends_with("voco.sock"));
     }
 
     #[test]

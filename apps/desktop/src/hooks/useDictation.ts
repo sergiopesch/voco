@@ -9,6 +9,7 @@ import {
   showNotification,
   showStatusOverlay,
 } from "@/lib/tauri";
+import { calculateVisualAudioLevel } from "@/lib/audioLevel";
 import type { DictationStatus } from "@/types";
 
 const TARGET_SAMPLE_RATE = 16000;
@@ -29,10 +30,9 @@ function buildAudioConstraints(
   return {
     deviceId: deviceId ? { exact: deviceId } : undefined,
     channelCount: 1,
-    sampleRate: { ideal: TARGET_SAMPLE_RATE },
     echoCancellation: false,
     noiseSuppression: false,
-    autoGainControl: true,
+    autoGainControl: false,
   };
 }
 
@@ -150,11 +150,10 @@ export function useDictation() {
   const updateAudioLevel = useCallback(
     (rawLevel: number) => {
       const clamped = Math.min(1, Math.max(0, rawLevel));
-      const emphasized = Math.min(1, Math.pow(clamped, 0.72) * 1.12);
       const previous = smoothedAudioLevelRef.current;
       const blend =
-        emphasized >= previous ? AUDIO_LEVEL_ATTACK : AUDIO_LEVEL_RELEASE;
-      const next = previous + (emphasized - previous) * blend;
+        clamped >= previous ? AUDIO_LEVEL_ATTACK : AUDIO_LEVEL_RELEASE;
+      const next = previous + (clamped - previous) * blend;
       const finalLevel = next < AUDIO_LEVEL_FLOOR ? 0 : next;
 
       smoothedAudioLevelRef.current = finalLevel;
@@ -315,7 +314,6 @@ export function useDictation() {
 
       const audioContext = new AudioContext({
         latencyHint: "interactive",
-        sampleRate: TARGET_SAMPLE_RATE,
       });
       audioContextRef.current = audioContext;
 
@@ -441,7 +439,7 @@ export function useDictation() {
           "Text insertion failed",
           detail.includes("clipboard")
             ? detail
-            : "Voice could not insert text automatically. Please try again.",
+            : "VOCO could not insert text automatically. Please try again.",
         ).catch(() => {});
       }
 
@@ -520,9 +518,4 @@ async function resample(
   source.start(0);
   const rendered = await offlineCtx.startRendering();
   return new Float32Array(rendered.getChannelData(0));
-}
-
-function calculateVisualAudioLevel(rms: number): number {
-  const scaled = Math.max(0, rms) * 18;
-  return Math.min(1, Math.pow(scaled, 0.78));
 }

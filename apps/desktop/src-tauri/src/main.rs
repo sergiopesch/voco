@@ -1,3 +1,3 @@
 fn main() {
-    voice_lib::run();
+    voco_lib::run();
 }

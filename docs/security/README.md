@@ -36,8 +36,8 @@ The app runs entirely locally with no authentication, no cloud accounts, and no 
 ## Data Storage Locations
 | Data | Location |
 |------|----------|
-| Config | `~/.config/voice/config.json` |
-| Models | `~/.local/share/voice/models/` |
+| Config | `~/.config/voco/config.json` |
+| Models | `~/.local/share/voco/models/` |
 
 ## Privacy
 - Audio is processed locally and never sent to external services

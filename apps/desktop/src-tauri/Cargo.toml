@@ -1,16 +1,16 @@
 [package]
-name = "voice"
+name = "voco"
 version = "0.1.0"
-description = "Free local-first voice dictation for Linux"
-authors = ["Voice Contributors"]
+description = "A voice-native interface layer designed for speed and precision"
+authors = ["VOCO Contributors"]
 edition = "2021"
 
 [lib]
-name = "voice_lib"
+name = "voco_lib"
 crate-type = ["lib"]
 
 [[bin]]
-name = "voice"
+name = "voco"
 path = "src/main.rs"
 
 [build-dependencies]
@@ -28,6 +28,7 @@ whisper-rs = "0.14"
 base64 = "0.22"
 sha2 = "0.10"
 reqwest = { version = "0.12", features = ["blocking", "rustls-tls"], default-features = false }
+walkdir = "2"
 
 [profile.release]
 opt-level = 2        # Good balance: fast compile, good transcription perf
