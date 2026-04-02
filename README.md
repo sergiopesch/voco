@@ -30,6 +30,8 @@ GitHub Releases now target:
 - `.AppImage` for portable Linux installs when bundled by the release build
 - checksums for verification
 
+Current stable release: `voco.2026.0.2`
+
 An initial Flatpak packaging baseline is also included in `packaging/flatpak/` for local validation and Flathub preparation.
 For AppImage fallback packaging, the repo also includes `scripts/package-appimage.sh` to finalize an AppDir when Tauri stops before emitting the final `.AppImage` file.
 
