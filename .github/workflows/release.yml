@@ -2,7 +2,9 @@ name: Release
 
 on:
   push:
-    tags: ["v*"]
+    tags:
+      - "v*"
+      - "voco.*"
 
 permissions:
   contents: write
@@ -50,9 +52,26 @@ jobs:
           CMAKE_BUILD_PARALLEL_LEVEL: "4"
         run: cargo tauri build
 
-      - name: Get version from tag
+      - name: Resolve release metadata from tag
         id: version
-        run: echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+        shell: bash
+        run: |
+          TAG_NAME="${GITHUB_REF_NAME}"
+
+          if [[ "$TAG_NAME" == voco.* ]]; then
+            VERSION="${TAG_NAME#voco.}"
+            RELEASE_NAME="$TAG_NAME"
+          elif [[ "$TAG_NAME" == v* ]]; then
+            VERSION="${TAG_NAME#v}"
+            RELEASE_NAME="VOCO v${VERSION}"
+          else
+            VERSION="$TAG_NAME"
+            RELEASE_NAME="VOCO ${VERSION}"
+          fi
+
+          echo "tag_name=${TAG_NAME}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "release_name=${RELEASE_NAME}" >> "$GITHUB_OUTPUT"
 
       - name: Collect release artifacts
         run: |
@@ -73,7 +92,7 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: VOCO v${{ steps.version.outputs.version }}
+          name: ${{ steps.version.outputs.release_name }}
           body: |
             ## Summary
 
@@ -85,8 +104,8 @@ jobs:
 
             ```bash
             # Download and install
-            wget https://github.com/sergiopesch/voco/releases/download/v${{ steps.version.outputs.version }}/voco_${{ steps.version.outputs.version }}_amd64.deb
-            wget https://github.com/sergiopesch/voco/releases/download/v${{ steps.version.outputs.version }}/voco_checksums.txt
+            wget https://github.com/sergiopesch/voco/releases/download/${{ steps.version.outputs.tag_name }}/voco_${{ steps.version.outputs.version }}_amd64.deb
+            wget https://github.com/sergiopesch/voco/releases/download/${{ steps.version.outputs.tag_name }}/voco_checksums.txt
             sha256sum --check voco_checksums.txt
             sudo dpkg -i voco_${{ steps.version.outputs.version }}_amd64.deb
             ```
@@ -94,7 +113,7 @@ jobs:
             ### Portable AppImage
 
             ```bash
-            wget https://github.com/sergiopesch/voco/releases/download/v${{ steps.version.outputs.version }}/VOCO-${{ steps.version.outputs.version }}-x86_64.AppImage
+            wget https://github.com/sergiopesch/voco/releases/download/${{ steps.version.outputs.tag_name }}/VOCO-${{ steps.version.outputs.version }}-x86_64.AppImage
             chmod +x VOCO-${{ steps.version.outputs.version }}-x86_64.AppImage
             ./VOCO-${{ steps.version.outputs.version }}-x86_64.AppImage
             ```
