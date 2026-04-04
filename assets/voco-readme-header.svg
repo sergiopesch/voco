@@ -5,32 +5,32 @@
   <rect width="1200" height="640" rx="40" fill="#0B0C12"/>
   <rect x="1" y="1" width="1198" height="638" rx="39" stroke="#23263A"/>
 
-  <ellipse cx="188" cy="160" rx="118" ry="88" fill="#6C4CF5" opacity="0.11"/>
-  <ellipse cx="188" cy="160" rx="68" ry="50" fill="#9B8BFF" opacity="0.05"/>
+  <ellipse cx="166" cy="160" rx="92" ry="68" fill="#6C4CF5" opacity="0.08"/>
+  <ellipse cx="166" cy="160" rx="48" ry="36" fill="#9B8BFF" opacity="0.04"/>
 
-  <g transform="translate(64 108)">
-    <rect x="0" y="0" width="84" height="84" rx="24" fill="#10131D"/>
-    <rect x="1" y="1" width="82" height="82" rx="23" stroke="#2B2F46"/>
-    <circle cx="42" cy="42" r="25" fill="url(#orb)"/>
-    <circle cx="42" cy="42" r="24.5" stroke="#ECE8FF" stroke-opacity="0.36"/>
-    <rect x="35" y="22" width="14" height="22" rx="7" fill="#FFFFFF" fill-opacity="0.92"/>
-    <path d="M28 40C28 48.8366 34.7157 56 43 56C51.2843 56 58 48.8366 58 40" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round" stroke-opacity="0.9"/>
-    <rect x="40" y="46" width="4" height="10" rx="2" fill="#FFFFFF" fill-opacity="0.88"/>
-    <rect x="32" y="62" width="20" height="4" rx="2" fill="#FFFFFF" fill-opacity="0.78"/>
+  <g transform="translate(48 106)">
+    <rect x="0" y="0" width="80" height="80" rx="22" fill="#10131D"/>
+    <rect x="1" y="1" width="78" height="78" rx="21" stroke="#2B2F46"/>
+    <circle cx="40" cy="40" r="23" fill="url(#orb)"/>
+    <circle cx="40" cy="40" r="22.5" stroke="#ECE8FF" stroke-opacity="0.28"/>
+    <rect x="34" y="22" width="12" height="18" rx="6" fill="#FFFFFF" fill-opacity="0.9"/>
+    <path d="M28 38C28 45.732 34.268 52 42 52C49.732 52 56 45.732 56 38" stroke="#FFFFFF" stroke-width="3.5" stroke-linecap="round" stroke-opacity="0.86"/>
+    <rect x="38.5" y="44" width="3" height="9" rx="1.5" fill="#FFFFFF" fill-opacity="0.84"/>
+    <rect x="31" y="58" width="18" height="3.5" rx="1.75" fill="#FFFFFF" fill-opacity="0.72"/>
   </g>
 
-  <g transform="translate(286 156)" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">
-    <text x="0" y="42" font-size="24" letter-spacing="8" fill="#A89DD8">VOCO</text>
-    <text x="0" y="122" font-size="70" font-weight="700" fill="#FFFFFF">Linux dictation.</text>
-    <text x="0" y="178" font-size="70" font-weight="700" fill="#FFFFFF">Local-first.</text>
-    <text x="2" y="238" font-size="24" fill="#C9CCDB">Press a hotkey, speak naturally, and VOCO inserts text at the cursor.</text>
+  <g transform="translate(312 148)" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">
+    <text x="0" y="38" font-size="22" letter-spacing="8" fill="#A89DD8">VOCO</text>
+    <text x="0" y="114" font-size="54" font-weight="700" fill="#FFFFFF">Voice-native interface layer.</text>
+    <text x="0" y="166" font-size="54" font-weight="700" fill="#FFFFFF">Built for Linux.</text>
+    <text x="2" y="224" font-size="22" fill="#C9CCDB">Local-first dictation with tray-native control and fast insertion at the cursor.</text>
   </g>
 
-  <path d="M286 474H956" stroke="#23263A" stroke-width="2"/>
-  <path d="M286 474H470" stroke="#6C4CF5" stroke-width="2"/>
+  <path d="M312 474H956" stroke="#23263A" stroke-width="2"/>
+  <path d="M312 474H486" stroke="#6C4CF5" stroke-width="2"/>
 
-  <g transform="translate(286 500)" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">
-    <text x="0" y="28" font-size="18" letter-spacing="3.5" fill="#8C90A8">TRAY-NATIVE · LOCAL ASR · WAYLAND / X11</text>
+  <g transform="translate(312 500)" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">
+    <text x="0" y="28" font-size="18" letter-spacing="3.5" fill="#8C90A8">LOCAL FIRST · TRAY NATIVE · WAYLAND / X11</text>
   </g>
 
   <defs>

@@ -4,8 +4,8 @@
 </p>
 
 <p align="center">
-  <strong>Linux dictation, local-first.</strong><br>
-  Press a hotkey, speak naturally, and VOCO inserts text at the cursor.
+  <strong>Voice-native interface layer for Linux.</strong><br>
+  Local-first dictation with tray-native control and fast insertion at the cursor.
 </p>
 <!-- markdownlint-enable MD041 -->
 
