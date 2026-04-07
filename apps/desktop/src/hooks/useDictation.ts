@@ -1,13 +1,11 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useRef } from "react";
 import { useStore } from "@/store/useStore";
 import {
-  hideStatusOverlay,
   transcribeAudio,
   insertText,
-  setRecordingState,
+  setDictationStatus,
   setMicrophoneReady,
   showNotification,
-  showStatusOverlay,
 } from "@/lib/tauri";
 import {
   calculateVisualAudioLevelFromSamples,
@@ -16,13 +14,9 @@ import {
 import type { DictationStatus } from "@/types";
 
 const TARGET_SAMPLE_RATE = 16000;
-const STATUS_OVERLAY_WIDTH = 252;
-const STATUS_OVERLAY_HEIGHT = 112;
 const AUDIO_LEVEL_ATTACK = 0.68;
 const AUDIO_LEVEL_RELEASE = 0.24;
 const AUDIO_LEVEL_FLOOR = 0.01;
-const OVERLAY_REFRESH_MS = 120;
-const MIN_PROCESSING_OVERLAY_MS = 420;
 
 type DictationPhase = DictationStatus | "starting" | "stopping";
 type QueuedAction = "start" | "stop" | null;
@@ -60,41 +54,6 @@ export function useDictation() {
   const firstHotkeyPressMsRef = useRef<number | null>(null);
   const initialHotkeyPressLoggedRef = useRef(false);
   const initialHotkeyLatencyLoggedRef = useRef(false);
-  const overlayTrackingTimerRef = useRef<number | null>(null);
-
-  const stopOverlayTracking = useCallback(() => {
-    if (overlayTrackingTimerRef.current !== null) {
-      window.clearInterval(overlayTrackingTimerRef.current);
-      overlayTrackingTimerRef.current = null;
-    }
-  }, []);
-
-  const startOverlayTracking = useCallback(() => {
-    stopOverlayTracking();
-
-    const syncOverlay = () => {
-      void showStatusOverlay(STATUS_OVERLAY_WIDTH, STATUS_OVERLAY_HEIGHT).catch(
-        (error) => {
-          console.warn("Failed to refresh status overlay position:", error);
-        },
-      );
-    };
-
-    syncOverlay();
-    overlayTrackingTimerRef.current = window.setInterval(
-      syncOverlay,
-      OVERLAY_REFRESH_MS,
-    );
-  }, [stopOverlayTracking]);
-
-  const prepareWindow = useCallback(async () => {
-    try {
-      stopOverlayTracking();
-      await hideStatusOverlay();
-    } catch (error) {
-      console.warn("Failed to prepare status overlay window:", error);
-    }
-  }, [stopOverlayTracking]);
 
   const initializeMicrophone = useCallback(
     async (appStartMs: number) => {
@@ -106,6 +65,7 @@ export function useDictation() {
         stream.getTracks().forEach((track) => track.stop());
 
         await setMicrophoneReady(true);
+        await setDictationStatus("idle");
         console.info("Microphone ready");
         console.info(
           `[timing] app start -> microphone ready: ${Math.round(
@@ -113,6 +73,7 @@ export function useDictation() {
           )}ms`,
         );
       } catch (err) {
+        await setDictationStatus("error").catch(() => {});
         await setMicrophoneReady(false).catch(() => {});
         showNotification(
           "Microphone not ready",
@@ -136,19 +97,6 @@ export function useDictation() {
     },
     [setError],
   );
-
-  const syncIndicatorWindow = useCallback(async (status: DictationStatus) => {
-    try {
-      if (status === "recording" || status === "processing") {
-        startOverlayTracking();
-      } else {
-        stopOverlayTracking();
-        await hideStatusOverlay();
-      }
-    } catch (error) {
-      console.warn("Failed to sync status overlay window:", error);
-    }
-  }, [startOverlayTracking, stopOverlayTracking]);
 
   const updateAudioLevel = useCallback(
     (rawLevel: number) => {
@@ -262,6 +210,7 @@ export function useDictation() {
     setInterimTranscript("");
     phaseRef.current = "idle";
     setStatus("idle");
+    setDictationStatus("idle").catch(() => {});
 
     const queuedAction = queuedActionRef.current;
     queuedActionRef.current = null;
@@ -286,7 +235,7 @@ export function useDictation() {
       setStatus("recording");
       resetAudioLevel();
       samplesRef.current = [];
-      setRecordingState(true).catch(() => {});
+      setDictationStatus("recording").catch(() => {});
 
       const deviceId = useStore.getState().selectedDeviceId;
 
@@ -332,7 +281,7 @@ export function useDictation() {
     } catch (err) {
       await teardownAudioGraph();
       resetAudioLevel();
-      setRecordingState(false).catch(() => {});
+      setDictationStatus("error").catch(() => {});
       setMicrophoneReady(false).catch(() => {});
       setInterimTranscript("");
       queuedActionRef.current = null;
@@ -366,10 +315,10 @@ export function useDictation() {
     phaseRef.current = "stopping";
     setStatus("processing");
     setInterimTranscript("Wrapping up...");
+    setDictationStatus("processing").catch(() => {});
 
     const sampleRate = await teardownAudioGraph();
     resetAudioLevel();
-    setRecordingState(false).catch(() => {});
 
     const chunks = samplesRef.current;
     samplesRef.current = [];
@@ -402,22 +351,11 @@ export function useDictation() {
 
     phaseRef.current = "processing";
     setInterimTranscript("Transcribing...");
-    const processingStartMs = performance.now();
-
-    const ensureProcessingVisible = async () => {
-      const elapsed = performance.now() - processingStartMs;
-      if (elapsed < MIN_PROCESSING_OVERLAY_MS) {
-        await new Promise((resolve) =>
-          setTimeout(resolve, MIN_PROCESSING_OVERLAY_MS - elapsed),
-        );
-      }
-    };
 
     try {
       const transcript = await transcribeAudio(merged);
 
       if (!transcript || transcript.trim().length === 0) {
-        await ensureProcessingVisible();
         setTranscript("(no speech detected)");
         finalizeIdleState();
         return;
@@ -442,13 +380,13 @@ export function useDictation() {
         ).catch(() => {});
       }
 
-      await ensureProcessingVisible();
       finalizeIdleState();
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err);
       phaseRef.current = "error";
       setError(`Transcription failed: ${detail} (${merged.length} samples)`);
       setInterimTranscript("");
+      setDictationStatus("error").catch(() => {});
 
       const queuedAction = queuedActionRef.current;
       queuedActionRef.current = null;
@@ -487,12 +425,8 @@ export function useDictation() {
     console.info("Hotkey pressed: initial trigger.");
   }, []);
 
-  useEffect(() => stopOverlayTracking, [stopOverlayTracking]);
-
   return {
-    prepareWindow,
     initializeMicrophone,
-    syncIndicatorWindow,
     toggle,
     onHotkeyPressed,
   };

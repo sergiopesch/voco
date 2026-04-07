@@ -16,17 +16,26 @@ pub struct TrayState {
     pub toggle_item: MenuItem<tauri::Wry>,
     pub current_hotkey: String,
     pub hotkey_items: Vec<(String, MenuItem<tauri::Wry>)>,
-    pub recording: bool,
+    pub dictation_status: DictationStatus,
     pub microphone_ready: bool,
 }
 
 pub type TrayMutex = Mutex<TrayState>;
+
+#[derive(Copy, Clone, PartialEq, Eq)]
+pub enum DictationStatus {
+    Idle,
+    Recording,
+    Processing,
+    Error,
+}
 
 #[derive(Copy, Clone)]
 enum TrayVisualState {
     NotReady,
     Ready,
     Recording,
+    Processing,
 }
 
 fn tray_debug_enabled() -> bool {
@@ -46,6 +55,7 @@ fn tray_state_label(state: TrayVisualState) -> &'static str {
         TrayVisualState::NotReady => "not-ready",
         TrayVisualState::Ready => "ready",
         TrayVisualState::Recording => "recording",
+        TrayVisualState::Processing => "processing",
     }
 }
 
@@ -161,7 +171,7 @@ pub fn setup_tray(app: &tauri::App, hotkey_label: &str) -> Result<(), Box<dyn st
         toggle_item: toggle,
         current_hotkey: hotkey_label.to_string(),
         hotkey_items,
-        recording: false,
+        dictation_status: DictationStatus::Idle,
         microphone_ready: false,
     }));
 
@@ -204,15 +214,17 @@ fn open_config_file() {
     }
 }
 
-/// Update the tray icon and menu to reflect recording state.
-pub fn set_recording_state(app: &tauri::AppHandle, recording: bool) {
+pub fn set_dictation_status(
+    app: &tauri::AppHandle,
+    status: DictationStatus,
+) {
     let state = app.state::<TrayMutex>();
     let Ok(mut tray_state) = state.lock() else {
         error!("Failed to lock tray state");
         return;
     };
 
-    tray_state.recording = recording;
+    tray_state.dictation_status = status;
     apply_tray_state(app, &tray_state);
 }
 
@@ -229,12 +241,17 @@ pub fn update_microphone_ready(app: &tauri::AppHandle, ready: bool) {
 }
 
 fn apply_tray_state(app: &tauri::AppHandle, tray_state: &TrayState) {
-    let (state, tooltip) = if tray_state.recording {
-        (TrayVisualState::Recording, "VOCO — Listening")
-    } else if tray_state.microphone_ready {
-        (TrayVisualState::Ready, "VOCO — Ready to listen")
-    } else {
+    let (state, tooltip) = if !tray_state.microphone_ready {
         (TrayVisualState::NotReady, "VOCO — Microphone not ready")
+    } else {
+        match tray_state.dictation_status {
+            DictationStatus::Recording => (TrayVisualState::Recording, "VOCO — Listening"),
+            DictationStatus::Processing => {
+                (TrayVisualState::Processing, "VOCO — Transcribing")
+            }
+            DictationStatus::Error => (TrayVisualState::NotReady, "VOCO — Needs attention"),
+            DictationStatus::Idle => (TrayVisualState::Ready, "VOCO — Ready to listen"),
+        }
     };
 
     let debug_enabled = tray_debug_enabled();
@@ -259,14 +276,14 @@ fn apply_tray_state(app: &tauri::AppHandle, tray_state: &TrayState) {
             info!(
                 "Tray update -> state={}, recording={}, microphone_ready={}, tooltip='{}'",
                 tray_state_label(state),
-                tray_state.recording,
+                matches!(tray_state.dictation_status, DictationStatus::Recording),
                 tray_state.microphone_ready,
                 effective_tooltip
             );
         }
     }
 
-    let label = if tray_state.recording {
+    let label = if matches!(tray_state.dictation_status, DictationStatus::Recording) {
         "Stop Dictation"
     } else {
         "Start Dictation"
@@ -285,14 +302,15 @@ pub fn update_tray_tooltip(app: &tauri::AppHandle, tooltip: &str) {
 
 fn create_mic_icon(size: u32, state: TrayVisualState) -> Vec<u8> {
     let icon_bytes = match state {
-        TrayVisualState::NotReady => {
-            include_bytes!("../../../../assets/voco logo yellow v1.png").as_slice()
-        }
+        TrayVisualState::NotReady => include_bytes!("../../../../assets/voco-logo.png").as_slice(),
         TrayVisualState::Ready => {
             include_bytes!("../../../../assets/voco logo green v1.png").as_slice()
         }
         TrayVisualState::Recording => {
             include_bytes!("../../../../assets/voco logo red v1.png").as_slice()
+        }
+        TrayVisualState::Processing => {
+            include_bytes!("../../../../assets/voco logo yellow v1.png").as_slice()
         }
     };
 

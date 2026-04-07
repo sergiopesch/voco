@@ -12,7 +12,6 @@ import {
 import { useGlobalShortcut } from "@/hooks/useGlobalShortcut";
 import { useDictation } from "@/hooks/useDictation";
 import { ControlPanel } from "@/components/ControlPanel";
-import { StatusOverlay } from "@/components/StatusOverlay";
 import type { AppConfig, AudioDeviceOption } from "@/types";
 
 const PANEL_SIZE = new LogicalSize(1040, 760);
@@ -47,9 +46,7 @@ export function App() {
   const updateState = useStore((state) => state.updateState);
   const setUpdateState = useStore((state) => state.setUpdateState);
   const {
-    prepareWindow,
     initializeMicrophone,
-    syncIndicatorWindow,
     toggle,
     onHotkeyPressed,
   } = useDictation();
@@ -241,7 +238,6 @@ export function App() {
           error: null,
         });
         setOnboardingStep(0);
-        await prepareWindow();
         await initializeMicrophone(appStartMsRef.current);
         await refreshDevices();
         await runUpdateCheck(loadedConfig.updateChannel, appVersion);
@@ -256,7 +252,6 @@ export function App() {
     void init();
   }, [
     initializeMicrophone,
-    prepareWindow,
     refreshDevices,
     setConfig,
     setError,
@@ -264,10 +259,6 @@ export function App() {
     setUpdateState,
     runUpdateCheck,
   ]);
-
-  useEffect(() => {
-    void syncIndicatorWindow(config?.showHud !== false ? status : "idle");
-  }, [config?.showHud, status, syncIndicatorWindow]);
 
   useEffect(() => {
     if (!initComplete || !config?.updateChannel) {
@@ -419,9 +410,7 @@ export function App() {
     return null;
   }
 
-  return surface === "hidden" ? (
-    <StatusOverlay />
-  ) : (
+  return surface === "hidden" ? null : (
     <ControlPanel
       surface={surface}
       onboardingStep={onboardingStep}

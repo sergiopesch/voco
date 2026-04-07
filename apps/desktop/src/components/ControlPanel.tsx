@@ -459,7 +459,7 @@ export function ControlPanel({
 
             {onboardingStep === 2 ? (
               <section className="voco-onboarding__step">
-                <h2>Hotkey and HUD</h2>
+                <h2>Hotkey</h2>
                 <p>
                   VOCO listens when you press your hotkey. The current default is{" "}
                   <code>{config.hotkey}</code>.
@@ -487,16 +487,10 @@ export function ControlPanel({
                     {hotkeyError}
                   </div>
                 ) : null}
-                <label className="voco-toggle">
-                  <input
-                    type="checkbox"
-                    checked={config.showHud}
-                    onChange={(event) =>
-                      void savePatch({ showHud: event.target.checked })
-                    }
-                  />
-                  <span>Show the listening HUD while VOCO is active</span>
-                </label>
+                <div className="voco-inline-note">
+                  The tray icon shows VOCO state directly: green when ready, red while
+                  listening, yellow while transcribing, and graphite when attention is needed.
+                </div>
                 <div className="voco-onboarding__actions">
                   <button
                     className="voco-button voco-button--secondary"
@@ -607,18 +601,13 @@ export function ControlPanel({
               {activeSection === "General" ? (
                 <section className="voco-settings__section">
                   <h2>General</h2>
-                  <label className="voco-toggle">
-                    <input
-                      type="checkbox"
-                      checked={config.showHud}
-                      onChange={(event) =>
-                        void savePatch({ showHud: event.target.checked })
-                      }
-                    />
-                    <span>Show the listening HUD during capture and processing</span>
-                  </label>
                   <div className="voco-inline-note">
                     VOCO stays in the tray and keeps the visible UI lightweight.
+                  </div>
+                  <div className="voco-inline-note">
+                    The tray icon reflects runtime state directly: green when ready, red
+                    while listening, yellow while transcribing, and graphite when VOCO
+                    needs attention.
                   </div>
                   <div className="voco-inline-note">
                     On Linux, the command panel opens from the tray menu because tray click
@@ -858,7 +847,7 @@ export function ControlPanel({
                 </section>
               ) : null}
 
-              <div className="voco-settings__actions">
+              <div className="voco-settings__footer-actions">
                 <button
                   className="voco-button voco-button--secondary"
                   onClick={() => onSurfaceChange("hidden")}

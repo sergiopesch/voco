@@ -153,8 +153,16 @@ fn transcribe_audio(
 // --- Text insertion & notifications ---
 
 #[tauri::command]
-fn set_recording_state(app: tauri::AppHandle, recording: bool) -> Result<(), String> {
-    tray::set_recording_state(&app, recording);
+fn set_dictation_status(app: tauri::AppHandle, status: String) -> Result<(), String> {
+    let status = match status.as_str() {
+        "idle" => tray::DictationStatus::Idle,
+        "recording" => tray::DictationStatus::Recording,
+        "processing" => tray::DictationStatus::Processing,
+        "error" => tray::DictationStatus::Error,
+        _ => return Err(format!("Unknown dictation status: {status}")),
+    };
+
+    tray::set_dictation_status(&app, status);
     Ok(())
 }
 
@@ -741,7 +749,7 @@ pub fn run() {
             save_cached_update_state,
             transcribe_audio,
             insert_text,
-            set_recording_state,
+            set_dictation_status,
             set_microphone_ready,
             show_status_overlay,
             hide_status_overlay,
