@@ -28,9 +28,9 @@
   <url type="vcs-browser">https://github.com/sergiopesch/voco</url>
   <content_rating type="oars-1.1" />
   <releases>
-    <release version="2026.0.4" date="2026-04-07">
+    <release version="2026.0.5" date="2026-04-07">
       <description>
-        <p>Packaging, release, and install workflows were tightened so GitHub Releases remain the primary end-user path.</p>
+        <p>Fixed the remote install path so the GitHub Releases install command works correctly from the published README instructions.</p>
       </description>
     </release>
   </releases>

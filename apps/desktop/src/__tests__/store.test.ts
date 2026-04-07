@@ -91,11 +91,11 @@ describe("useStore", () => {
   it("setUpdateState stores the latest release result", () => {
     const updateState = {
       status: "available" as const,
-      currentVersion: "2026.0.4",
+      currentVersion: "2026.0.5",
       latestRelease: {
-        version: "2026.0.5",
-        name: "VOCO 2026.0.5",
-        url: "https://github.com/sergiopesch/voco/releases/tag/voco.2026.0.5",
+        version: "2026.0.6",
+        name: "VOCO 2026.0.6",
+        url: "https://github.com/sergiopesch/voco/releases/tag/voco.2026.0.6",
         publishedAt: "2026-04-02T10:30:00Z",
         prerelease: false,
       },

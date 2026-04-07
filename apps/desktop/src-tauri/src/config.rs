@@ -308,12 +308,12 @@ mod tests {
             channel: UpdateChannel::Beta,
             state: UpdateCheckState {
                 status: UpdateCheckStatus::Available,
-                current_version: Some("2026.0.4".to_string()),
+                current_version: Some("2026.0.5".to_string()),
                 latest_release: Some(ReleaseInfo {
-                    version: "2026.0.5-beta.1".to_string(),
-                    name: "VOCO 2026.0.5 beta 1".to_string(),
+                    version: "2026.0.6-beta.1".to_string(),
+                    name: "VOCO 2026.0.6 beta 1".to_string(),
                     url:
-                        "https://github.com/sergiopesch/voco/releases/tag/voco.2026.0.5-beta.1"
+                        "https://github.com/sergiopesch/voco/releases/tag/voco.2026.0.6-beta.1"
                             .to_string(),
                     published_at: Some("2026-04-02T10:00:00Z".to_string()),
                     prerelease: true,
@@ -333,7 +333,7 @@ mod tests {
                 .latest_release
                 .as_ref()
                 .map(|release| release.version.as_str()),
-            Some("2026.0.5-beta.1")
+            Some("2026.0.6-beta.1")
         );
     }
 }
