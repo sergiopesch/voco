@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APPIMAGE_DIR="${ROOT_DIR}/apps/desktop/src-tauri/target/release/bundle/appimage"
 APPDIR_PATH="${APPIMAGE_DIR}/VOCO.AppDir"
-APPIMAGE_VERSION="${VOCO_APPIMAGE_VERSION:-0.1.0}"
+APPIMAGE_VERSION="${VOCO_APPIMAGE_VERSION:-$(node -p "require('${ROOT_DIR}/apps/desktop/package.json').version")}"
 OUTPUT_PATH="${APPIMAGE_DIR}/VOCO-${APPIMAGE_VERSION}-x86_64.AppImage"
 APPIMAGETOOL_PATH="${ROOT_DIR}/.tmp/appimagetool-x86_64.AppImage"
 

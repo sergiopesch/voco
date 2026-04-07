@@ -77,8 +77,22 @@ fn get_config() -> Result<AppConfig, String> {
 }
 
 #[tauri::command]
-fn save_config(config: AppConfig) -> Result<(), String> {
-    config.save().map_err(|e| e.to_string())
+fn save_config(app: tauri::AppHandle, config: AppConfig) -> Result<(), String> {
+    let previous = AppConfig::load().unwrap_or_default();
+    let hotkey_changed = previous.hotkey != config.hotkey;
+
+    if hotkey_changed {
+        apply_hotkey_runtime_state(&app, &config.hotkey, false)?;
+    }
+
+    if let Err(error) = config.save() {
+        if hotkey_changed {
+            let _ = apply_hotkey_runtime_state(&app, &previous.hotkey, false);
+        }
+        return Err(error.to_string());
+    }
+
+    Ok(())
 }
 
 #[tauri::command]
@@ -528,8 +542,11 @@ fn sync_global_shortcut_binding(
     Ok(())
 }
 
-/// Change the hotkey at runtime.
-pub fn change_hotkey_runtime(app: &tauri::AppHandle, new_hotkey: &str) -> Result<(), String> {
+fn apply_hotkey_runtime_state(
+    app: &tauri::AppHandle,
+    new_hotkey: &str,
+    notify: bool,
+) -> Result<(), String> {
     let use_evdev_hotkey = prefers_evdev_hotkey(is_wayland_session(), new_hotkey);
     sync_global_shortcut_binding(
         app,
@@ -539,10 +556,6 @@ pub fn change_hotkey_runtime(app: &tauri::AppHandle, new_hotkey: &str) -> Result
 
     USE_EVDEV_HOTKEY.store(use_evdev_hotkey, Ordering::SeqCst);
     EVDEV_HOTKEY_MODE.store(hotkey_to_evdev_mode(new_hotkey), Ordering::SeqCst);
-
-    let mut config = AppConfig::load().map_err(|e| e.to_string())?;
-    config.hotkey = new_hotkey.to_string();
-    config.save().map_err(|e| e.to_string())?;
 
     tray::update_hotkey_display(app, new_hotkey);
     info!("Hotkey changed to {new_hotkey}");
@@ -554,10 +567,27 @@ pub fn change_hotkey_runtime(app: &tauri::AppHandle, new_hotkey: &str) -> Result
             "global-shortcut"
         }
     );
-    send_notification(
-        "Hotkey changed",
-        &format!("VOCO will now respond to {new_hotkey}"),
-    );
+
+    if notify {
+        send_notification(
+            "Hotkey changed",
+            &format!("VOCO will now respond to {new_hotkey}"),
+        );
+    }
+
+    Ok(())
+}
+
+/// Change the hotkey at runtime.
+pub fn change_hotkey_runtime(app: &tauri::AppHandle, new_hotkey: &str) -> Result<(), String> {
+    let mut config = AppConfig::load().map_err(|e| e.to_string())?;
+    let previous_hotkey = config.hotkey.clone();
+    apply_hotkey_runtime_state(app, new_hotkey, true)?;
+    config.hotkey = new_hotkey.to_string();
+    if let Err(error) = config.save() {
+        let _ = apply_hotkey_runtime_state(app, &previous_hotkey, false);
+        return Err(error.to_string());
+    }
 
     Ok(())
 }

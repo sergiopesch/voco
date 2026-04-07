@@ -10,7 +10,7 @@
   </developer>
   <launchable type="desktop-id">com.sergiopesch.voco.desktop</launchable>
   <description>
-    <p>VOCO is a Linux desktop dictation tool built for low friction and high trust.</p>
+    <p>VOCO is a Linux desktop dictation tool for people who want fast voice capture without handing speech data to a cloud service.</p>
     <p>It stays in the tray, listens on demand, keeps visible state compact, and defaults to a local-first workflow for voice capture.</p>
     <ul>
       <li>Tray-first workflow with a compact command panel</li>
@@ -28,7 +28,7 @@
   <url type="vcs-browser">https://github.com/sergiopesch/voco</url>
   <content_rating type="oars-1.1" />
   <releases>
-    <release version="0.1.0" date="2026-04-02">
+    <release version="2026.0.3" date="2026-04-02">
       <description>
         <p>Initial VOCO-branded release with onboarding, update awareness, and Linux packaging groundwork.</p>
       </description>

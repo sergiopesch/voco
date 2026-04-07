@@ -4,7 +4,7 @@ set -euo pipefail
 # VOCO — quick install from pre-built release
 # Usage: bash <(curl -s https://raw.githubusercontent.com/sergiopesch/voco/master/install)
 
-VERSION="2026.0.2"
+VERSION="2026.0.3"
 RELEASE_TAG="voco.${VERSION}"
 DEB_URL="https://github.com/sergiopesch/voco/releases/download/${RELEASE_TAG}/voco_${VERSION}_amd64.deb"
 

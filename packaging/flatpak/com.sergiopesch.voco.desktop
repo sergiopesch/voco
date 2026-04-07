@@ -5,5 +5,5 @@ Comment=A voice-native interface layer designed for speed and precision
 Exec=voco
 Icon=com.sergiopesch.voco
 Terminal=false
-Categories=Utility;AudioVideo;
+Categories=AudioVideo;Audio;
 StartupNotify=true

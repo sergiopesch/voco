@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { AppConfig, AudioDeviceOption, UpdateCheckState } from "@/types";
 import { calculateVisualAudioLevelFromSamples } from "@/lib/audioLevel";
-import vocoBrandImage from "@/assets/voco-brand.jpg";
+import vocoBrandImage from "../../../../assets/voco-logo.png";
 
 interface ControlPanelProps {
   surface: "onboarding" | "settings" | "popover";
   onboardingStep: number;
   config: AppConfig;
+  errorMessage: string | null;
   statusLabel: string;
   updateState: UpdateCheckState;
   isDictationActive: boolean;
@@ -39,6 +40,7 @@ export function ControlPanel({
   surface,
   onboardingStep,
   config,
+  errorMessage,
   statusLabel,
   updateState,
   isDictationActive,
@@ -59,6 +61,8 @@ export function ControlPanel({
   const isOnboarding = surface === "onboarding";
   const [activeSection, setActiveSection] = useState<PanelSection>("General");
   const [saving, setSaving] = useState(false);
+  const [hotkeyDraft, setHotkeyDraft] = useState(config.hotkey);
+  const [hotkeyError, setHotkeyError] = useState<string | null>(null);
   const [previewLevel, setPreviewLevel] = useState(0);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const previewFrameRef = useRef<number | null>(null);
@@ -137,6 +141,11 @@ export function ControlPanel({
   }, [onRefreshDevices, surface]);
 
   useEffect(() => {
+    setHotkeyDraft(config.hotkey);
+    setHotkeyError(null);
+  }, [config.hotkey]);
+
+  useEffect(() => {
     const shouldPreview =
       (surface === "onboarding" && onboardingStep === 1) ||
       (surface === "settings" && activeSection === "Audio");
@@ -208,13 +217,36 @@ export function ControlPanel({
     };
   }, [activeSection, onboardingStep, selectedDeviceId, surface]);
 
-  async function savePatch(patch: Partial<AppConfig>) {
+  async function savePatch(
+    patch: Partial<AppConfig>,
+  ): Promise<{ ok: true } | { ok: false; message: string }> {
     setSaving(true);
     try {
       await onConfigChange(patch);
+      return { ok: true };
+    } catch (error) {
+      return {
+        ok: false,
+        message:
+          error instanceof Error ? error.message : "VOCO could not save those settings.",
+      };
     } finally {
       setSaving(false);
     }
+  }
+
+  async function saveHotkey(): Promise<boolean> {
+    const normalizedHotkey = hotkeyDraft.trim() || "Alt+D";
+    setHotkeyDraft(normalizedHotkey);
+    setHotkeyError(null);
+
+    const result = await savePatch({ hotkey: normalizedHotkey });
+    if (result.ok) {
+      return true;
+    }
+
+    setHotkeyError(result.message);
+    return false;
   }
 
   return (
@@ -247,6 +279,12 @@ export function ControlPanel({
             </button>
           </div>
         </header>
+
+        {errorMessage ? (
+          <section className="voco-panel__error" aria-live="polite">
+            {errorMessage}
+          </section>
+        ) : null}
 
         {showMainUpdateBanner ? (
           <section className="voco-update-banner" aria-live="polite">
@@ -429,12 +467,26 @@ export function ControlPanel({
                 <label className="voco-field">
                   <span>Hotkey</span>
                   <input
-                    value={config.hotkey}
-                    onChange={(event) =>
-                      void savePatch({ hotkey: event.target.value || "Alt+D" })
-                    }
+                    value={hotkeyDraft}
+                    onChange={(event) => setHotkeyDraft(event.target.value)}
+                    onBlur={() => {
+                      if (hotkeyDraft !== config.hotkey) {
+                        void saveHotkey();
+                      }
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        void saveHotkey();
+                      }
+                    }}
                   />
                 </label>
+                {hotkeyError ? (
+                  <div className="voco-inline-note voco-inline-note--error">
+                    {hotkeyError}
+                  </div>
+                ) : null}
                 <label className="voco-toggle">
                   <input
                     type="checkbox"
@@ -454,7 +506,12 @@ export function ControlPanel({
                   </button>
                   <button
                     className="voco-button voco-button--primary"
-                    onClick={() => onOnboardingStepChange(3)}
+                    onClick={async () => {
+                      const saved = await saveHotkey();
+                      if (saved) {
+                        onOnboardingStepChange(3);
+                      }
+                    }}
                   >
                     Continue
                   </button>
@@ -631,12 +688,34 @@ export function ControlPanel({
                   <label className="voco-field">
                     <span>Start and stop listening</span>
                     <input
-                      value={config.hotkey}
-                      onChange={(event) =>
-                        void savePatch({ hotkey: event.target.value || "Alt+D" })
-                      }
+                      value={hotkeyDraft}
+                      onChange={(event) => setHotkeyDraft(event.target.value)}
+                      onBlur={() => {
+                        if (hotkeyDraft !== config.hotkey) {
+                          void saveHotkey();
+                        }
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          void saveHotkey();
+                        }
+                      }}
                     />
                   </label>
+                  {hotkeyError ? (
+                    <div className="voco-inline-note voco-inline-note--error">
+                      {hotkeyError}
+                    </div>
+                  ) : null}
+                  <div className="voco-settings__actions">
+                    <button
+                      className="voco-button voco-button--primary"
+                      onClick={() => void saveHotkey()}
+                    >
+                      Save hotkey
+                    </button>
+                  </div>
                   <div className="voco-inline-note">
                     The current backend is most reliable with <code>Alt+D</code> and{" "}
                     <code>Alt+Shift+D</code> on Wayland.

@@ -1,6 +1,6 @@
 {
   "name": "voco",
-  "version": "0.1.0",
+  "version": "2026.0.3",
   "private": true,
   "workspaces": [
     "apps/*"
@@ -10,7 +10,8 @@
     "build": "npm run build -w apps/desktop",
     "lint": "npm run lint -w apps/desktop",
     "check": "npm run check --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present"
+    "test": "npm run test --workspaces --if-present",
+    "verify:versions": "node scripts/check-version-consistency.mjs"
   },
   "engines": {
     "node": ">=20"

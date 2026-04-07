@@ -1,7 +1,7 @@
 # Security
 
 ## Design Principle: Local-First, Zero-Auth
-The app runs entirely locally with no authentication, no cloud accounts, and no network calls after first-run model download.
+The app runs entirely locally with no authentication and no cloud accounts. Network access is limited to first-run model download and optional GitHub Release checks for update awareness.
 
 ## Threat Model
 
@@ -17,9 +17,10 @@ The app runs entirely locally with no authentication, no cloud accounts, and no 
 - Text insertion via shell commands (ydotool, xdotool, xclip, wl-copy)
 - ASR model loading (local files)
 - First-run model download (HTTPS from Hugging Face)
+- Optional GitHub Release checks (HTTPS to api.github.com)
 
 ## Current Protections
-- **Minimal network**: Only first-run model download (HTTPS, with timeouts)
+- **Minimal network**: First-run model download and optional GitHub Release checks only
 - **Model integrity**: SHA256 verification of downloaded model before use
 - **No auth**: No credentials to steal
 - **Tauri CSP**: Restrictive content security policy, no remote scripts
@@ -45,6 +46,7 @@ The app runs entirely locally with no authentication, no cloud accounts, and no 
 - Transcripts are not persisted (in-memory only)
 - Config contains only user preferences, no PII
 - whisper.cpp logging is suppressed (no audio content logged)
+- Update checks only request GitHub release metadata; they do not upload audio or transcripts
 
 ## Permissions Required
 | Permission | Purpose |

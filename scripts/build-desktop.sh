@@ -5,7 +5,6 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_DIR="${ROOT_DIR}/apps/desktop"
 APPIMAGE_DIR="${APP_DIR}/src-tauri/target/release/bundle/appimage"
 APPDIR_PATH="${APPIMAGE_DIR}/VOCO.AppDir"
-APPIMAGE_PATH="${APPIMAGE_DIR}/VOCO_0.1.0_amd64.AppImage"
 LOG_PATH="$(mktemp)"
 
 cleanup() {

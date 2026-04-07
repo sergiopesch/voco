@@ -46,20 +46,14 @@ flatpak-builder --user --install --force-clean build-flatpak packaging/flatpak/c
 
 This path is still packaging work in progress. Treat it as a local validation path before Flathub submission, not a finished public channel.
 
-## Snap Preparation
+## Snap / Ubuntu App Center Status
 
-VOCO now includes an initial Snap draft under `snap/`.
-
-Start from:
-
-```bash
-snapcraft
-```
+VOCO is not yet claiming a publish-ready Snap channel.
 
 Current note:
-- the draft uses `classic` confinement intentionally
-- this matches VOCO's current host-integration model for hotkeys, text insertion, notifications, and URL opening
-- treat this as Ubuntu App Center preparation work, not a published Snap channel yet
+- the Ubuntu App Center path still needs explicit Snap work and store review
+- classic confinement is the honest current fit because VOCO depends on host-level hotkeys, text insertion, notifications, and URL opening
+- treat this as packaging work in progress, not an available install path yet
 
 ## AppImage Fallback Packaging
 

@@ -30,6 +30,7 @@ type TrayPopoverAnchor = {
 
 export function App() {
   const status = useStore((state) => state.status);
+  const error = useStore((state) => state.error);
   const surface = useStore((state) => state.surface);
   const onboardingStep = useStore((state) => state.onboardingStep);
   const selectedDeviceId = useStore((state) => state.selectedDeviceId);
@@ -127,14 +128,28 @@ export function App() {
       if (!current) {
         return;
       }
+
       const nextConfig = { ...current, ...patch };
       useStore.getState().setConfig(nextConfig);
       if ("selectedMic" in patch) {
         setSelectedDeviceId(nextConfig.selectedMic);
       }
-      await saveConfig(nextConfig);
+
+      try {
+        await saveConfig(nextConfig);
+        setError(null);
+      } catch (error) {
+        useStore.getState().setConfig(current);
+        if ("selectedMic" in patch) {
+          setSelectedDeviceId(current.selectedMic);
+        }
+        setError(
+          `Failed to save settings: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        throw error;
+      }
     },
-    [setSelectedDeviceId],
+    [setError, setSelectedDeviceId],
   );
 
   const runUpdateCheck = useCallback(
@@ -411,6 +426,7 @@ export function App() {
       surface={surface}
       onboardingStep={onboardingStep}
       config={config}
+      errorMessage={error}
       statusLabel={statusLabel}
       updateState={updateState}
       isDictationActive={status === "recording" || status === "processing"}

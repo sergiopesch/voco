@@ -20,7 +20,7 @@ const RELEASES_API_URL =
 const UPDATE_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 
 function normalizeVersion(rawVersion: string): string {
-  return rawVersion.trim().replace(/^v/i, "");
+  return rawVersion.trim().replace(/^voco\./i, "").replace(/^v/i, "");
 }
 
 function parseVersion(version: string) {

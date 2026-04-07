@@ -22,6 +22,11 @@ describe("compareVersions", () => {
     expect(compareVersions("1.2.0", "1.10.0")).toBeLessThan(0);
     expect(compareVersions("2.0.0", "1.9.9")).toBeGreaterThan(0);
   });
+
+  it("normalizes voco-prefixed release tags before comparing", () => {
+    expect(compareVersions("voco.2026.0.3", "0.1.0")).toBeGreaterThan(0);
+    expect(compareVersions("voco.2026.0.3", "2026.0.3")).toBe(0);
+  });
 });
 
 describe("selectReleaseForChannel", () => {
