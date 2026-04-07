@@ -49,7 +49,8 @@ On first launch, VOCO opens its setup flow so you can:
 - confirm microphone access
 - choose an input device
 - confirm the default hotkey
-- decide whether the listening HUD should stay visible
+- pick the Linux insertion path that fits your desktop session
+- understand the tray-first workflow before the window hides
 
 ## Flatpak / Flathub Preparation
 

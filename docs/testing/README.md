@@ -73,9 +73,11 @@ For system-level features that are hard to automate:
   - confirm log lines for `Hotkey listener attached` and `Microphone ready`
 - Onboarding:
   - confirm the first-run flow shows the VOCO mic mark in the header
+  - confirm the welcome step explains the local-first, tray-first workflow clearly
   - confirm microphone check uses the intended input device
   - confirm the level meter stays low at rest and moves through the middle during normal speech
-  - confirm accent-aware is visible as a disabled future feature, not an active option
+  - confirm the hotkey step explains tray-state feedback clearly
+  - confirm the insertion step surfaces the current Linux session and the chosen insertion strategy
 - Hotkey behavior:
   - first press should immediately show listening state and the active tray indicator
   - switch hotkey at runtime from settings and tray menu, then verify the new binding triggers dictation immediately

@@ -31,8 +31,7 @@ It stays out of the way until you trigger it, then moves through a small set of 
 
 Key product points:
 - tray-first workflow with a compact command panel
-- onboarding flow for microphone setup, hotkeys, and HUD preferences
-- a voice-profile step that communicates future accent-aware work without pretending it ships today
+- branded first-run setup for microphone, hotkey, insertion strategy, and tray workflow
 - local-first transcription path
 - explicit Linux install and upgrade guidance
 - settings that remain compact instead of sprawling
@@ -90,8 +89,8 @@ Capture these surfaces on a clean Linux desktop with legible text and restrained
 
 1. First-run welcome screen
 2. Microphone check with live level meter
-3. Hotkey and HUD onboarding step
-4. Voice profile onboarding step with the future feature visibly disabled
+3. Hotkey and tray-state onboarding step
+4. Linux insertion strategy onboarding step
 5. Compact command panel with current state visible
 6. Settings window on the Updates section
 7. Listening HUD in-context on a desktop

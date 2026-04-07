@@ -310,7 +310,24 @@ code {
 .voco-onboarding__progress {
   display: flex;
   gap: 10px;
+  flex-wrap: wrap;
   padding: 28px 30px 0;
+}
+
+.voco-onboarding__progress-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(199, 204, 213, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.voco-onboarding__progress-item--active,
+.voco-onboarding__progress-item--complete {
+  background: rgba(225, 229, 236, 0.06);
+  border-color: rgba(199, 204, 213, 0.14);
 }
 
 .voco-onboarding__dot {
@@ -324,6 +341,18 @@ code {
 .voco-onboarding__dot--complete {
   background: var(--voco-accent-highlight);
   box-shadow: 0 0 16px rgba(225, 229, 236, 0.24);
+}
+
+.voco-onboarding__progress-label {
+  font-size: 0.74rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--voco-text-muted);
+}
+
+.voco-onboarding__progress-item--active .voco-onboarding__progress-label,
+.voco-onboarding__progress-item--complete .voco-onboarding__progress-label {
+  color: var(--voco-text-secondary);
 }
 
 .voco-onboarding__step,
@@ -342,6 +371,7 @@ code {
   padding-top: 20px;
   padding-bottom: 28px;
   gap: 14px;
+  max-width: 860px;
 }
 
 .voco-onboarding__step h2,
@@ -390,9 +420,88 @@ code {
   gap: 10px;
 }
 
+.voco-onboarding__hero-grid,
+.voco-onboarding__detail-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.voco-onboarding__hero-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.voco-onboarding__detail-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.voco-onboarding__hero-card,
+.voco-inline-card {
+  border: 1px solid rgba(199, 204, 213, 0.12);
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at top left, rgba(225, 229, 236, 0.08), transparent 45%),
+    rgba(255, 255, 255, 0.03);
+  padding: 18px;
+  display: grid;
+  gap: 10px;
+}
+
+.voco-onboarding__hero-card--lead {
+  background:
+    radial-gradient(circle at top left, rgba(225, 229, 236, 0.14), transparent 48%),
+    linear-gradient(180deg, rgba(31, 35, 43, 0.9), rgba(18, 20, 26, 0.94));
+  box-shadow: 0 18px 40px rgba(4, 5, 9, 0.22);
+}
+
+.voco-onboarding__hero-eyebrow,
+.voco-inline-card span {
+  font-size: 0.74rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--voco-text-muted);
+}
+
+.voco-onboarding__hero-card strong,
+.voco-inline-card strong {
+  color: var(--voco-text);
+  font-size: 1rem;
+  line-height: 1.35;
+}
+
+.voco-onboarding__hero-card p {
+  margin: 0;
+  color: var(--voco-text-secondary);
+  line-height: 1.55;
+}
+
+.voco-command-preview {
+  display: grid;
+  gap: 8px;
+  padding: 18px 20px;
+  border-radius: 20px;
+  border: 1px solid rgba(199, 204, 213, 0.12);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.voco-command-preview__eyebrow {
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--voco-text-muted);
+}
+
+.voco-command-preview code {
+  font-size: 0.98rem;
+  line-height: 1.6;
+  white-space: normal;
+  color: var(--voco-accent-highlight);
+}
+
 .voco-profile-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
 }
 
@@ -455,6 +564,7 @@ code {
   text-align: left;
   display: grid;
   gap: 10px;
+  min-height: 148px;
 }
 
 .voco-profile-card strong {
@@ -731,6 +841,11 @@ code {
   }
 
   .voco-tray-state-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .voco-onboarding__hero-grid,
+  .voco-onboarding__detail-grid {
     grid-template-columns: 1fr;
   }
 

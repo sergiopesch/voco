@@ -38,14 +38,14 @@ Checksums, AppImage notes, packaging status, and uninstall steps live in [docs/i
 2. Press `Alt+D` to start listening.
 3. Press `Alt+D` again and VOCO types the transcript at your cursor.
 
-VOCO stays in the tray, shows a compact listening HUD, and opens with a short first-run setup for microphone access, device selection, hotkeys, and HUD preferences.
+VOCO stays in the tray, shows a compact listening HUD, and opens with a branded first-run setup for microphone access, hotkeys, Linux insertion strategy, and tray workflow.
 
 ## Features
 
 - Local-first transcription with `whisper.cpp`
 - Tray-native workflow with clear ready, listening, and blocked states
 - Default `Alt+D` hotkey with runtime configuration
-- Guided onboarding for microphone, hotkey, and HUD setup
+- Branded onboarding for microphone, hotkey, insertion strategy, and tray workflow
 - Text insertion with documented Wayland and X11 behavior
 - In-app GitHub Release update checks for manual installs
 
@@ -71,7 +71,7 @@ Existing `voice` installs are migrated automatically on startup:
 - `~/.local/share/voice/models/` -> `~/.local/share/voco/models/`
 
 On Wayland, `Alt+D` and `Alt+Shift+D` remain the most reliable built-in presets because they can use the evdev backend.
-The voice-profile step is present in onboarding, but accent-aware recognition is still intentionally disabled in the current release.
+The first-run flow tailors setup around your Linux desktop session and install channel, while keeping all configuration local on disk.
 
 ## Development
 
