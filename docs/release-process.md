@@ -14,10 +14,12 @@ This checks:
 - version metadata consistency across shipped manifests
 - shell helper syntax for install and packaging scripts
 - public install docs still require checksum verification and do not recommend `curl | bash`
+- the README keeps a stable `releases/latest/download/voco_latest_amd64.deb` install path
 - the release helper comment stays pinned to the exact release tag
 - generated GitHub release notes for the current version
 - expected asset names:
   - `voco_<version>_amd64.deb`
+  - `voco_latest_amd64.deb`
   - `VOCO-<version>-x86_64.AppImage`
   - `voco_checksums.txt`
 

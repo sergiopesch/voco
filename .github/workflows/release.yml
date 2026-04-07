@@ -87,6 +87,7 @@ jobs:
         run: |
           DEB=$(find apps/desktop/src-tauri/target/release/bundle/deb -name "*.deb" | sort | tail -1)
           cp "$DEB" "voco_${{ steps.version.outputs.version }}_amd64.deb"
+          cp "$DEB" "voco_latest_amd64.deb"
           APPIMAGE=$(find apps/desktop/src-tauri/target/release/bundle/appimage -name "*.AppImage" | sort | tail -1 || true)
           if [ -z "$APPIMAGE" ] && [ -d apps/desktop/src-tauri/target/release/bundle/appimage/VOCO.AppDir ]; then
             APPIMAGE=$(VOCO_APPIMAGE_VERSION="${{ steps.version.outputs.version }}" bash ./scripts/package-appimage.sh | tail -n 1)
@@ -117,6 +118,7 @@ jobs:
           else
             sha256sum "voco_${{ steps.version.outputs.version }}_amd64.deb" > voco_checksums.txt
           fi
+          cp voco_checksums.txt voco_latest_checksums.txt
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -125,7 +127,9 @@ jobs:
           body_path: release-body.md
           files: |
             voco_${{ steps.version.outputs.version }}_amd64.deb
+            voco_latest_amd64.deb
             voco_checksums.txt
+            voco_latest_checksums.txt
           draft: false
           prerelease: false
 
