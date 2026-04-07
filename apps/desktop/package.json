@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "cargo tauri dev",
     "dev:frontend": "vite",
-    "build": "cargo tauri build",
+    "build": "bash ../../scripts/build-desktop.sh", 
     "build:frontend": "tsc -b && vite build",
     "lint": "eslint src/",
     "check": "tsc --noEmit",

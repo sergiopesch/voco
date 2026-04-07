@@ -1,6 +1,6 @@
 <!-- markdownlint-disable MD031 MD033 MD041 -->
 <h1 align="center">
-  <img src="assets/voco-logo.svg" alt="voco logo" width="30" valign="middle"> voco
+  <img src="assets/voco-logo.jpg" alt="voco logo" width="38" valign="middle">&nbsp;voco
 </h1>
 <!-- markdownlint-enable MD041 -->
 
@@ -31,7 +31,7 @@ Current stable release: `voco.2026.0.3`
 
 An initial Flatpak packaging baseline is also included in `packaging/flatpak/` for local validation and Flathub preparation.
 An initial Snap draft is also included in `snap/` for Ubuntu App Center preparation, currently using classic confinement because VOCO depends on host-level desktop automation.
-For AppImage fallback packaging, the repo also includes `scripts/package-appimage.sh` to finalize an AppDir when Tauri stops before emitting the final `.AppImage` file.
+For AppImage fallback packaging, the repo includes `scripts/package-appimage.sh`, and local `npm run build` now uses that fallback automatically when Tauri stops at the final `linuxdeploy` step.
 
 ### Build from source
 

@@ -63,7 +63,9 @@ Current note:
 
 ## AppImage Fallback Packaging
 
-If Tauri leaves `VOCO.AppDir` in `apps/desktop/src-tauri/target/release/bundle/appimage/` without creating the final `.AppImage`, run:
+Local `npm run build` now falls back to `scripts/package-appimage.sh` automatically when Tauri stops at the final `linuxdeploy` step.
+
+If you still need to finish AppImage packaging manually from an existing `VOCO.AppDir` in `apps/desktop/src-tauri/target/release/bundle/appimage/`, run:
 
 ```bash
 bash ./scripts/package-appimage.sh

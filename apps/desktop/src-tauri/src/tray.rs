@@ -308,15 +308,15 @@ fn create_mic_icon(size: u32, color: [u8; 4], state: TrayVisualState) -> Vec<u8>
 fn create_base_mic_icon(size: u32, color: [u8; 4]) -> Vec<u8> {
     let mut pixels = vec![0u8; (size * size * 4) as usize];
     let s = size as f32;
-    let orb_fill = match color {
-        [225, 229, 236, _] => [48, 52, 60, 255],
-        [170, 176, 186, _] => [38, 42, 50, 255],
-        _ => [28, 28, 36, 245],
+    let panel_fill = match color {
+        [225, 229, 236, _] => [34, 37, 43, 255],
+        [170, 176, 186, _] => [28, 31, 36, 255],
+        _ => [22, 24, 29, 248],
     };
-    let rim = match color {
-        [225, 229, 236, _] => [236, 239, 244, 235],
-        [170, 176, 186, _] => [200, 206, 214, 220],
-        _ => [120, 120, 132, 205],
+    let panel_rim = match color {
+        [225, 229, 236, _] => [188, 194, 202, 220],
+        [170, 176, 186, _] => [154, 160, 170, 205],
+        _ => [104, 108, 116, 190],
     };
 
     for py in 0..size {
@@ -328,39 +328,37 @@ fn create_base_mic_icon(size: u32, color: [u8; 4]) -> Vec<u8> {
             let ny = y / s;
             let idx = ((py * size + px) * 4) as usize;
 
-            let orb_alpha = circle_alpha(nx, ny, 0.5, 0.5, 0.46, 0.028);
-            if orb_alpha <= 0.0 {
+            let panel_alpha = rounded_rect_alpha(nx, ny, 0.16, 0.09, 0.84, 0.91, 0.15, 0.03);
+            if panel_alpha <= 0.0 {
                 continue;
             }
 
-            let glow_dist = ((nx - 0.5).powi(2) + (ny - 0.42).powi(2)).sqrt();
-            let glow = (1.0 - glow_dist / 0.48).clamp(0.0, 1.0);
+            let top_light = ellipse_alpha(nx, ny, 0.5, 0.20, 0.34, 0.18, 0.22) * 0.22;
+            let center_glow = ellipse_alpha(nx, ny, 0.5, 0.48, 0.28, 0.34, 0.2) * 0.12;
+            let rim_outer = rounded_rect_alpha(nx, ny, 0.16, 0.09, 0.84, 0.91, 0.15, 0.03);
+            let rim_inner = rounded_rect_alpha(nx, ny, 0.20, 0.13, 0.80, 0.87, 0.12, 0.03);
+            let rim_strength = (rim_outer - rim_inner).clamp(0.0, 1.0);
 
-            let rim_dist = ((nx - 0.5).powi(2) + (ny - 0.5).powi(2)).sqrt();
-            let rim_strength = (1.0 - ((rim_dist - 0.43).abs() / 0.042)).clamp(0.0, 1.0);
+            let mut red = panel_fill[0] as f32;
+            let mut green = panel_fill[1] as f32;
+            let mut blue = panel_fill[2] as f32;
 
-            let top_highlight = ellipse_alpha(nx, ny, 0.38, 0.28, 0.15, 0.10, 0.18) * 0.18;
+            red = red * (1.0 - center_glow * 0.5) + color[0] as f32 * center_glow * 0.18;
+            green = green * (1.0 - center_glow * 0.5) + color[1] as f32 * center_glow * 0.18;
+            blue = blue * (1.0 - center_glow * 0.5) + color[2] as f32 * center_glow * 0.18;
 
-            let mut red = orb_fill[0] as f32;
-            let mut green = orb_fill[1] as f32;
-            let mut blue = orb_fill[2] as f32;
+            red = red * (1.0 - top_light) + 255.0 * top_light;
+            green = green * (1.0 - top_light) + 255.0 * top_light;
+            blue = blue * (1.0 - top_light) + 255.0 * top_light;
 
-            red = red * (1.0 - glow * 0.34) + color[0] as f32 * glow * 0.34;
-            green = green * (1.0 - glow * 0.34) + color[1] as f32 * glow * 0.34;
-            blue = blue * (1.0 - glow * 0.34) + color[2] as f32 * glow * 0.34;
-
-            red = red * (1.0 - rim_strength * 0.3) + rim[0] as f32 * rim_strength * 0.3;
-            green = green * (1.0 - rim_strength * 0.3) + rim[1] as f32 * rim_strength * 0.3;
-            blue = blue * (1.0 - rim_strength * 0.3) + rim[2] as f32 * rim_strength * 0.3;
-
-            red = red * (1.0 - top_highlight) + 255.0 * top_highlight;
-            green = green * (1.0 - top_highlight) + 255.0 * top_highlight;
-            blue = blue * (1.0 - top_highlight) + 255.0 * top_highlight;
+            red = red * (1.0 - rim_strength * 0.45) + panel_rim[0] as f32 * rim_strength * 0.45;
+            green = green * (1.0 - rim_strength * 0.45) + panel_rim[1] as f32 * rim_strength * 0.45;
+            blue = blue * (1.0 - rim_strength * 0.45) + panel_rim[2] as f32 * rim_strength * 0.45;
 
             pixels[idx] = red.round().clamp(0.0, 255.0) as u8;
             pixels[idx + 1] = green.round().clamp(0.0, 255.0) as u8;
             pixels[idx + 2] = blue.round().clamp(0.0, 255.0) as u8;
-            pixels[idx + 3] = (orb_alpha * 255.0).round().clamp(0.0, 255.0) as u8;
+            pixels[idx + 3] = (panel_alpha * 255.0).round().clamp(0.0, 255.0) as u8;
 
             let alpha = mic_shape(nx, ny);
             if alpha > 0.0 {
@@ -544,17 +542,6 @@ fn smoothstep(edge0: f32, edge1: f32, value: f32) -> f32 {
     t * t * (3.0 - 2.0 * t)
 }
 
-fn circle_alpha(nx: f32, ny: f32, cx: f32, cy: f32, radius: f32, feather: f32) -> f32 {
-    let dist = ((nx - cx).powi(2) + (ny - cy).powi(2)).sqrt();
-    if dist <= radius {
-        return 1.0;
-    }
-    if dist >= radius + feather {
-        return 0.0;
-    }
-    1.0 - smoothstep(radius, radius + feather, dist)
-}
-
 fn ellipse_alpha(nx: f32, ny: f32, cx: f32, cy: f32, rx: f32, ry: f32, feather: f32) -> f32 {
     let dx = (nx - cx) / rx;
     let dy = (ny - cy) / ry;
@@ -592,4 +579,51 @@ fn rect_alpha(nx: f32, ny: f32, x0: f32, y0: f32, x1: f32, y1: f32, feather: f32
         return 0.0;
     }
     1.0 - smoothstep(0.0, feather, dist)
+}
+
+fn rounded_rect_alpha(
+    nx: f32,
+    ny: f32,
+    x0: f32,
+    y0: f32,
+    x1: f32,
+    y1: f32,
+    radius: f32,
+    feather: f32,
+) -> f32 {
+    let inner_x0 = x0 + radius;
+    let inner_x1 = x1 - radius;
+    let inner_y0 = y0 + radius;
+    let inner_y1 = y1 - radius;
+
+    if (inner_x0..=inner_x1).contains(&nx) && (y0..=y1).contains(&ny) {
+        return 1.0;
+    }
+    if (x0..=x1).contains(&nx) && (inner_y0..=inner_y1).contains(&ny) {
+        return 1.0;
+    }
+
+    let cx = if nx < inner_x0 {
+        inner_x0
+    } else if nx > inner_x1 {
+        inner_x1
+    } else {
+        nx
+    };
+    let cy = if ny < inner_y0 {
+        inner_y0
+    } else if ny > inner_y1 {
+        inner_y1
+    } else {
+        ny
+    };
+
+    let dist = ((nx - cx).powi(2) + (ny - cy).powi(2)).sqrt();
+    if dist <= radius {
+        return 1.0;
+    }
+    if dist >= radius + feather {
+        return 0.0;
+    }
+    1.0 - smoothstep(radius, radius + feather, dist)
 }

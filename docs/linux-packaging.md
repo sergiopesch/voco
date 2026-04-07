@@ -96,4 +96,6 @@ This helper:
 - downloads `appimagetool` if needed
 - runs `appimagetool` in extract-and-run mode so it does not require host FUSE 2
 
-Use it after `cargo tauri build` or `npm run build` if no final `.AppImage` file was emitted automatically.
+Local `npm run build` now falls back to this helper automatically when Tauri stops at the final `linuxdeploy` step.
+
+Use it manually after `cargo tauri build` if no final `.AppImage` file was emitted automatically.
