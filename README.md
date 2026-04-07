@@ -13,7 +13,7 @@
 
 ---
 
-VOCO is a Linux local-first voice native interface control and fast insertion at the cursor.It lives in your tray, listens on demand while keeping audio local.
+VOCO is a Linux local-first voice native interface control and fast insertion at the cursor. It lives in your tray, listens on demand while keeping audio local.
 
 ## Install
 
