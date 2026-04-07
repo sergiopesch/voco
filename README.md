@@ -1,6 +1,6 @@
 <!-- markdownlint-disable MD031 MD033 MD041 -->
 <h1 align="center">
-  <img src="assets/voco logo V1.png" alt="voco logo" width="38" valign="middle">&nbsp;voco
+  <img src="assets/voco-readme-header.svg" alt="VOCO" width="720">
 </h1>
 <!-- markdownlint-enable MD041 -->
 
@@ -12,7 +12,7 @@
 
 ---
 
-VOCO is a Linux local-first voice native interface control and fast insertion at the cursor. It lives in your tray, listens on demand while keeping audio local.
+VOCO is a Linux local-first voice interface for fast control and insertion at the cursor. It lives in your tray, listens on demand while keeping audio local.
 
 ## Install
 

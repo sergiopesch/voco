@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Generate VOCO app icons from the branded V1 logo source.
+"""Generate VOCO app icons from the canonical VOCO logo source.
 
 Uses ffmpeg (already present in the dev environment) to create the PNG icons
-needed by Tauri plus the frontend favicon from assets/voco logo V1.png.
+needed by Tauri plus the frontend favicon from assets/voco-logo.png.
 """
 import os
 import shutil
@@ -10,7 +10,7 @@ import subprocess
 import sys
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-SOURCE = os.path.join(ROOT, "assets", "voco logo V1.png")
+SOURCE = os.path.join(ROOT, "assets", "voco-logo.png")
 ICON_DIR = os.path.join(ROOT, "apps", "desktop", "src-tauri", "icons")
 FAVICON = os.path.join(ROOT, "apps", "desktop", "public", "favicon.png")
 
@@ -75,7 +75,7 @@ def main() -> None:
 
     shutil.copy(os.path.join(ICON_DIR, "128x128.png"), os.path.join(ICON_DIR, "icon.ico"))
     shutil.copy(os.path.join(ICON_DIR, "128x128@2x.png"), os.path.join(ICON_DIR, "icon.icns"))
-    print("Generated Tauri icons and favicon from assets/voco logo V1.png")
+    print("Generated Tauri icons and favicon from assets/voco-logo.png")
 
 
 if __name__ == "__main__":

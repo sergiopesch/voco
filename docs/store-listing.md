@@ -55,9 +55,9 @@ Current release priorities:
 - `.AppImage`
 - checksums
 
-Planned store path:
-- Flathub first
-- Ubuntu App Center review after the tracked Snap packaging path is validated
+Current store path:
+- Ubuntu App Center remains a classic-confinement review candidate after local install and runtime validation
+- Flathub is deferred until the sandbox and host-integration story is proven workable
 
 Current Snap note:
 - use `classic` confinement for the honest v1 draft because VOCO depends on host-level hotkeys and text insertion helpers
