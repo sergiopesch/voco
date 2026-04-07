@@ -47,6 +47,9 @@ cd apps/desktop/src-tauri && cargo check && cargo clippy -- -D warnings && cargo
 # Snap draft validation when changing snap/
 # Requires either root-capable destructive mode or an LXD-backed Snapcraft setup.
 cd snap && snapcraft --destructive-mode
+
+# Release rehearsal before tagging
+npm run rehearse:release
 ```
 
 ## CI
