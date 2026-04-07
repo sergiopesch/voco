@@ -3,10 +3,6 @@
   <img src="assets/voco-readme-header.svg" alt="VOCO" width="920">
 </p>
 
-<p align="center">
-  <strong>Voice-native interface layer for Linux.</strong><br>
-  Local-first dictation with tray-native control and fast insertion at the cursor.
-</p>
 <!-- markdownlint-enable MD041 -->
 
 <p align="center">
@@ -17,7 +13,7 @@
 
 ---
 
-VOCO is a Linux desktop dictation tool built for low friction and high trust. It lives in your tray, listens on demand, keeps audio local, and surfaces clear state while it works.
+VOCO is a Linux local-first voice native interface control and fast insertion at the cursor.It lives in your tray, listens on demand while keeping audio local.
 
 ## Install
 
