@@ -26,7 +26,6 @@ VOCO's v1 packaging plan is intentionally staged.
 Branding note:
 - package and listing assets should use VOCO's graphite microphone branding rather than the older purple treatment
 
-
 - `voco_<version>_amd64.deb`
 - `voco_checksums.txt`
 
@@ -49,6 +48,7 @@ Current primary validation target:
 ## Listing Assets
 
 Store copy, release-note structure, and screenshot requirements live in [docs/store-listing.md](store-listing.md).
+Submission status and release gating live in [docs/submission-readiness.md](submission-readiness.md).
 
 ## Flatpak Baseline
 

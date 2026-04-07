@@ -118,6 +118,7 @@ VOCO_TRAY_DEBUG=1 npm run dev
 
 - [docs/install.md](docs/install.md)
 - [docs/linux-packaging.md](docs/linux-packaging.md)
+- [docs/submission-readiness.md](docs/submission-readiness.md)
 - [docs/store-listing.md](docs/store-listing.md)
 - [docs/troubleshooting.md](docs/troubleshooting.md)
 - [docs/contributing.md](docs/contributing.md)
