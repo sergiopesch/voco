@@ -18,6 +18,7 @@ interface CheckForUpdatesOptions {
 const RELEASES_API_URL =
   "https://api.github.com/repos/sergiopesch/voco/releases?per_page=12";
 const UPDATE_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
+const UPDATE_REQUEST_TIMEOUT_MS = 15_000;
 
 function isReusableCachedUpdateState(state: UpdateCheckState): boolean {
   return state.status === "available" || state.status === "up-to-date";
@@ -129,11 +130,25 @@ export async function checkForUpdates({
   currentVersion,
   channel,
 }: CheckForUpdatesOptions): Promise<UpdateCheckState> {
-  const response = await fetch(RELEASES_API_URL, {
-    headers: {
-      Accept: "application/vnd.github+json",
-    },
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), UPDATE_REQUEST_TIMEOUT_MS);
+  let response: Response;
+
+  try {
+    response = await fetch(RELEASES_API_URL, {
+      headers: {
+        Accept: "application/vnd.github+json",
+      },
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error("GitHub release lookup timed out.");
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   if (!response.ok) {
     throw new Error(`GitHub release lookup failed with status ${response.status}.`);

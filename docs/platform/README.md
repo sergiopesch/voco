@@ -25,7 +25,7 @@
 The app detects session type via `XDG_SESSION_TYPE`:
 
 - `x11` -> use xdotool for text insertion
-- `wayland` -> use ydotool, fall back to clipboard paste
+- `wayland` -> use ydotool, with clipboard insertion still relying on ydotool for the paste gesture
 - Desktop environment detected via `XDG_CURRENT_DESKTOP`
 
 Hotkey backend selection:
@@ -33,6 +33,7 @@ Hotkey backend selection:
 - Wayland + `Alt+D` / `Alt+Shift+D` -> evdev hotkey backend (preferred)
 - Other combinations -> Tauri global-shortcut backend
 - Runtime hotkey changes update backend preference immediately
+- Settings -> Advanced shows the detected session and whether insertion helpers are currently available
 
 ## Wayland Caveats
 
@@ -68,7 +69,8 @@ pgrep -x ydotoold > /dev/null || ydotoold &
 **Troubleshooting:**
 - `Permission denied`: ensure user is in `input` group and has uinput access
 - `Socket not found`: ydotoold is not running — start it manually
-- If ydotool type-simulation fails, VOCO falls back to clipboard paste automatically
+- In `auto` mode, VOCO falls back to clipboard insertion if direct typing fails
+- In strict `type-simulation` mode, VOCO reports the failure instead of touching the clipboard
 
 ## X11
 
@@ -98,4 +100,4 @@ pgrep -x ydotoold > /dev/null || ydotoold &
 | ------ | -------------------------------- |
 | Config | `~/.config/voco/config.json`     |
 | Models | `~/.local/share/voco/models/`    |
-| Socket | `$XDG_RUNTIME_DIR/voco.sock`     |
+| Socket | `$XDG_RUNTIME_DIR/voco.sock` or `${TMPDIR:-/tmp}/voco-$(id -u)/voco.sock` |

@@ -5,15 +5,32 @@ VOCO currently ships through GitHub Releases first. `.deb` is the primary releas
 ## GitHub Release
 
 ```bash
-bash <(curl -s https://raw.githubusercontent.com/sergiopesch/voco/master/install)
+wget https://github.com/sergiopesch/voco/releases/download/voco.<version>/voco_<version>_amd64.deb
+wget https://github.com/sergiopesch/voco/releases/download/voco.<version>/voco_checksums.txt
+grep ' voco_<version>_amd64.deb$' voco_checksums.txt | sha256sum --check
+sudo dpkg -i voco_<version>_amd64.deb
 ```
 
 Manual install:
 
 ```bash
 wget https://github.com/sergiopesch/voco/releases/download/voco.<version>/voco_<version>_amd64.deb
+wget https://github.com/sergiopesch/voco/releases/download/voco.<version>/voco_checksums.txt
+grep ' voco_<version>_amd64.deb$' voco_checksums.txt | sha256sum --check
 sudo dpkg -i voco_<version>_amd64.deb
 ```
+
+Optional helper path if you prefer the guided installer:
+
+```bash
+TAG="voco.<version>"
+wget "https://raw.githubusercontent.com/sergiopesch/voco/${TAG}/install" -O voco-install
+chmod +x voco-install
+less ./voco-install
+./voco-install
+```
+
+Download the helper first, inspect it locally, then run it. Do not execute it directly from `curl`.
 
 Current stable release naming:
 - tag: `voco.<version>`
@@ -93,7 +110,7 @@ This validates version alignment, shell helper syntax, and the generated GitHub 
 
 - Config: `~/.config/voco/config.json`
 - Models: `~/.local/share/voco/models/`
-- Socket: `$XDG_RUNTIME_DIR/voco.sock`
+- Socket: `$XDG_RUNTIME_DIR/voco.sock` when `XDG_RUNTIME_DIR` is set, otherwise `${TMPDIR:-/tmp}/voco-$(id -u)/voco.sock`
 
 Legacy `voice` config and model paths are migrated automatically on startup when possible.
 

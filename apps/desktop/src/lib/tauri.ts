@@ -1,5 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { AppConfig, CachedUpdateCheck, DictationStatus } from "@/types";
+import type {
+  AppConfig,
+  CachedUpdateCheck,
+  DictationStatus,
+  RuntimeDiagnostics,
+} from "@/types";
 
 export async function getConfig(): Promise<AppConfig> {
   return invoke<AppConfig>("get_config");
@@ -52,4 +57,8 @@ export async function loadCachedUpdateState(): Promise<CachedUpdateCheck | null>
 
 export async function saveCachedUpdateState(cache: CachedUpdateCheck): Promise<void> {
   return invoke("save_cached_update_state", { cache });
+}
+
+export async function getRuntimeDiagnostics(): Promise<RuntimeDiagnostics> {
+  return invoke<RuntimeDiagnostics>("get_runtime_diagnostics");
 }

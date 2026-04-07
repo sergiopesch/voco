@@ -23,6 +23,9 @@ static EVDEV_LISTENER_STARTED: AtomicBool = AtomicBool::new(false);
 static HOTKEY_BINDING_VERSION: AtomicU64 = AtomicU64::new(0);
 static REGISTERED_PLUGIN_SHORTCUT: LazyLock<Mutex<Option<String>>> =
     LazyLock::new(|| Mutex::new(None));
+#[cfg(target_os = "linux")]
+static EVDEV_WATCHED_PATHS: LazyLock<Mutex<std::collections::HashSet<std::path::PathBuf>>> =
+    LazyLock::new(|| Mutex::new(std::collections::HashSet::new()));
 
 const TOGGLE_DICTATION_EVENT: &str = "voco:toggle-dictation";
 const LEGACY_TOGGLE_DICTATION_EVENT: &str = "voice:toggle-dictation";
@@ -219,6 +222,11 @@ fn insert_text(text: String, strategy: String) -> Result<insertion::InsertionRes
         return Err("Text too long for insertion (max 100KB)".to_string());
     }
     insertion::insert_text(&text, &strategy)
+}
+
+#[tauri::command]
+fn get_runtime_diagnostics() -> insertion::RuntimeDiagnostics {
+    insertion::runtime_diagnostics()
 }
 
 fn main_window(app: &tauri::AppHandle) -> Result<tauri::WebviewWindow<tauri::Wry>, String> {
@@ -616,14 +624,102 @@ pub fn change_hotkey_runtime(app: &tauri::AppHandle, new_hotkey: &str) -> Result
 
 // --- Socket listener ---
 
+fn socket_base_dir_from(runtime_dir: Option<std::ffi::OsString>) -> std::path::PathBuf {
+    if let Some(runtime_dir) = runtime_dir {
+        return std::path::PathBuf::from(runtime_dir);
+    }
+
+    std::env::temp_dir().join(format!("voco-{}", current_effective_uid()))
+}
+
+#[cfg(target_os = "linux")]
+fn current_effective_uid() -> u32 {
+    // SAFETY: `geteuid` has no preconditions and simply returns the current process euid.
+    unsafe { libc::geteuid() as u32 }
+}
+
+#[cfg(not(target_os = "linux"))]
+fn current_effective_uid() -> u32 {
+    0
+}
+
+fn socket_base_dir() -> std::path::PathBuf {
+    socket_base_dir_from(std::env::var_os("XDG_RUNTIME_DIR"))
+}
+
 fn socket_path() -> std::path::PathBuf {
-    let runtime_dir = std::env::var("XDG_RUNTIME_DIR").unwrap_or_else(|_| "/tmp".to_string());
-    std::path::PathBuf::from(runtime_dir).join("voco.sock")
+    socket_base_dir().join("voco.sock")
 }
 
 fn legacy_socket_path() -> std::path::PathBuf {
-    let runtime_dir = std::env::var("XDG_RUNTIME_DIR").unwrap_or_else(|_| "/tmp".to_string());
-    std::path::PathBuf::from(runtime_dir).join("voice.sock")
+    socket_base_dir().join("voice.sock")
+}
+
+fn cleanup_socket_paths<I>(paths: I)
+where
+    I: IntoIterator<Item = std::path::PathBuf>,
+{
+    for path in paths {
+        match std::fs::remove_file(&path) {
+            Ok(_) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => warn!("Failed to remove socket {}: {error}", path.display()),
+        }
+    }
+}
+
+fn cleanup_socket_files() {
+    cleanup_socket_paths([socket_path(), legacy_socket_path()]);
+}
+
+#[cfg(target_os = "linux")]
+fn install_socket_cleanup_signal_handler() {
+    let mut signals = std::mem::MaybeUninit::<libc::sigset_t>::uninit();
+    // SAFETY: `sigemptyset`, `sigaddset`, and `pthread_sigmask` are called with valid pointers,
+    // and the signal set is fully initialized before it is used by `sigwait`.
+    unsafe {
+        libc::sigemptyset(signals.as_mut_ptr());
+        libc::sigaddset(signals.as_mut_ptr(), libc::SIGINT);
+        libc::sigaddset(signals.as_mut_ptr(), libc::SIGTERM);
+
+        let signals = signals.assume_init();
+        let mask_status = libc::pthread_sigmask(libc::SIG_BLOCK, &signals, std::ptr::null_mut());
+        if mask_status != 0 {
+            warn!("Failed to install socket cleanup signal mask: {mask_status}");
+            return;
+        }
+
+        std::thread::spawn(move || loop {
+            let mut received_signal = 0;
+            let wait_status = libc::sigwait(&signals, &mut received_signal);
+            if wait_status != 0 {
+                warn!("sigwait failed while waiting for shutdown signal: {wait_status}");
+                continue;
+            }
+
+            cleanup_socket_files();
+            std::process::exit(128 + received_signal);
+        });
+    }
+}
+
+fn ensure_socket_parent_dir(path: &std::path::Path) -> Result<(), String> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| format!("Socket path has no parent: {}", path.display()))?;
+    std::fs::create_dir_all(parent)
+        .map_err(|e| format!("Failed to create socket dir {}: {e}", parent.display()))?;
+
+    if std::env::var_os("XDG_RUNTIME_DIR").is_none() {
+        #[cfg(target_os = "linux")]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(parent, std::fs::Permissions::from_mode(0o700))
+                .map_err(|e| format!("Failed to secure socket dir {}: {e}", parent.display()))?;
+        }
+    }
+
+    Ok(())
 }
 
 fn start_socket_listener(app_handle: tauri::AppHandle) {
@@ -632,6 +728,12 @@ fn start_socket_listener(app_handle: tauri::AppHandle) {
     for path in [socket_path(), legacy_socket_path()] {
         let handle = app_handle.clone();
         std::thread::spawn(move || loop {
+            if let Err(e) = ensure_socket_parent_dir(&path) {
+                error!("{e}");
+                std::thread::sleep(std::time::Duration::from_secs(2));
+                continue;
+            }
+
             let _ = std::fs::remove_file(&path);
 
             let listener = match UnixListener::bind(&path) {
@@ -666,40 +768,97 @@ fn start_socket_listener(app_handle: tauri::AppHandle) {
 // --- evdev hotkey listener (primary mechanism on Wayland) ---
 
 #[cfg(target_os = "linux")]
-fn start_hotkey_listener(app_handle: tauri::AppHandle) -> bool {
-    use evdev::{Device, InputEventKind, Key};
-
-    let devices = evdev::enumerate()
-        .filter_map(|(_, device)| {
-            let keys = device.supported_keys()?;
-            if keys.contains(Key::KEY_A) && keys.contains(Key::KEY_LEFTALT) {
-                Some(device)
-            } else {
-                None
-            }
-        })
-        .collect::<Vec<Device>>();
-
-    if devices.is_empty() {
-        warn!("No keyboard found for evdev. Add user to 'input' group: sudo usermod -aG input $USER");
+fn supports_evdev_hotkey(device: &evdev::Device) -> bool {
+    let Some(keys) = device.supported_keys() else {
         return false;
+    };
+
+    let has_alt = keys.contains(evdev::Key::KEY_LEFTALT) || keys.contains(evdev::Key::KEY_RIGHTALT);
+    let has_d = keys.contains(evdev::Key::KEY_D);
+    has_alt && has_d
+}
+
+#[cfg(target_os = "linux")]
+fn supported_evdev_keyboard_paths() -> Vec<std::path::PathBuf> {
+    evdev::enumerate()
+        .filter_map(|(path, device)| supports_evdev_hotkey(&device).then_some(path))
+        .collect()
+}
+
+#[cfg(target_os = "linux")]
+fn mark_evdev_path_watched(path: &std::path::Path) -> bool {
+    let Ok(mut watched_paths) = EVDEV_WATCHED_PATHS.lock() else {
+        error!("Failed to lock evdev watched path set");
+        return false;
+    };
+
+    watched_paths.insert(path.to_path_buf())
+}
+
+#[cfg(target_os = "linux")]
+fn spawn_supported_evdev_device_workers(
+    app_handle: &tauri::AppHandle,
+    alt_held: &std::sync::Arc<std::sync::atomic::AtomicBool>,
+    shift_held: &std::sync::Arc<std::sync::atomic::AtomicBool>,
+) -> usize {
+    let mut discovered = 0;
+
+    for path in supported_evdev_keyboard_paths() {
+        if mark_evdev_path_watched(&path) {
+            discovered += 1;
+            info!("Discovered evdev keyboard: {}", path.display());
+            spawn_evdev_device_worker(
+                app_handle.clone(),
+                path,
+                alt_held.clone(),
+                shift_held.clone(),
+            );
+        }
     }
 
-    info!(
-        "evdev hotkey listener started on {} keyboard(s)",
-        devices.len()
-    );
+    discovered
+}
 
-    let alt_held = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-    let shift_held = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+#[cfg(target_os = "linux")]
+fn spawn_evdev_device_worker(
+    app_handle: tauri::AppHandle,
+    path: std::path::PathBuf,
+    alt_held: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    shift_held: std::sync::Arc<std::sync::atomic::AtomicBool>,
+) {
+    use evdev::{Device, InputEventKind, Key};
 
-    for device in devices {
-        let app = app_handle.clone();
-        let alt = alt_held.clone();
-        let shift = shift_held.clone();
+    std::thread::spawn(move || {
+        let mut reopen_logged = false;
 
-        std::thread::spawn(move || {
-            let mut dev = device;
+        loop {
+            let mut dev = match Device::open(&path) {
+                Ok(device) => {
+                    if reopen_logged {
+                        info!("Reconnected evdev keyboard at {}", path.display());
+                        reopen_logged = false;
+                    }
+                    device
+                }
+                Err(e) => {
+                    if !reopen_logged {
+                        warn!(
+                            "Failed to open evdev keyboard {}: {e}. Retrying in 2s",
+                            path.display()
+                        );
+                        reopen_logged = true;
+                    }
+                    std::thread::sleep(std::time::Duration::from_secs(2));
+                    continue;
+                }
+            };
+
+            info!(
+                "Watching evdev keyboard: {} ({})",
+                dev.name().unwrap_or("Unnamed device"),
+                path.display()
+            );
+
             loop {
                 match dev.fetch_events() {
                     Ok(events) => {
@@ -710,15 +869,15 @@ fn start_hotkey_listener(app_handle: tauri::AppHandle) -> bool {
 
                                 match key {
                                     Key::KEY_LEFTALT | Key::KEY_RIGHTALT => {
-                                        alt.store(pressed, Ordering::SeqCst);
+                                        alt_held.store(pressed, Ordering::SeqCst);
                                     }
                                     Key::KEY_LEFTSHIFT | Key::KEY_RIGHTSHIFT => {
-                                        shift.store(pressed, Ordering::SeqCst);
+                                        shift_held.store(pressed, Ordering::SeqCst);
                                     }
                                     Key::KEY_D if pressed && !repeat => {
                                         let mode = EVDEV_HOTKEY_MODE.load(Ordering::SeqCst);
-                                        let alt_down = alt.load(Ordering::SeqCst);
-                                        let shift_down = shift.load(Ordering::SeqCst);
+                                        let alt_down = alt_held.load(Ordering::SeqCst);
+                                        let shift_down = shift_held.load(Ordering::SeqCst);
 
                                         let matched = match mode {
                                             0 => alt_down && !shift_down,
@@ -728,7 +887,7 @@ fn start_hotkey_listener(app_handle: tauri::AppHandle) -> bool {
 
                                         if matched {
                                             debug!("Hotkey detected via evdev (mode {})", mode);
-                                            eval_toggle(&app);
+                                            eval_toggle(&app_handle);
                                         }
                                     }
                                     _ => {}
@@ -737,13 +896,129 @@ fn start_hotkey_listener(app_handle: tauri::AppHandle) -> bool {
                         }
                     }
                     Err(e) => {
-                        error!("Keyboard read error: {e}");
+                        warn!(
+                            "Keyboard read error on {}: {e}. Reopening device",
+                            path.display()
+                        );
                         break;
                     }
                 }
             }
-        });
+
+            std::thread::sleep(std::time::Duration::from_millis(500));
+        }
+    });
+}
+
+#[cfg(target_os = "linux")]
+fn spawn_evdev_polling_supervisor(
+    app_handle: tauri::AppHandle,
+    alt_held: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    shift_held: std::sync::Arc<std::sync::atomic::AtomicBool>,
+) {
+    std::thread::spawn(move || loop {
+        let discovered = spawn_supported_evdev_device_workers(&app_handle, &alt_held, &shift_held);
+        if discovered > 0 {
+            info!(
+                "evdev polling fallback attached {} newly discovered keyboard(s)",
+                discovered
+            );
+        }
+
+        std::thread::sleep(std::time::Duration::from_secs(3));
+    });
+}
+
+#[cfg(target_os = "linux")]
+fn spawn_evdev_device_watcher(
+    app_handle: tauri::AppHandle,
+    alt_held: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    shift_held: std::sync::Arc<std::sync::atomic::AtomicBool>,
+) {
+    use inotify::{EventMask, Inotify, WatchMask};
+
+    std::thread::spawn(move || {
+        let mut inotify = match Inotify::init() {
+            Ok(inotify) => inotify,
+            Err(e) => {
+                warn!(
+                    "Failed to initialize inotify for /dev/input watching: {e}. Falling back to polling."
+                );
+                spawn_evdev_polling_supervisor(app_handle, alt_held, shift_held);
+                return;
+            }
+        };
+
+        if let Err(e) = inotify.watches().add(
+            "/dev/input",
+            WatchMask::CREATE
+                | WatchMask::ATTRIB
+                | WatchMask::MOVED_TO
+                | WatchMask::DELETE_SELF
+                | WatchMask::MOVE_SELF,
+        ) {
+            warn!("Failed to watch /dev/input for hotkey devices: {e}. Falling back to polling.");
+            spawn_evdev_polling_supervisor(app_handle, alt_held, shift_held);
+            return;
+        }
+
+        info!("Watching /dev/input for evdev hotkey device changes");
+
+        let mut buffer = [0u8; 4096];
+        loop {
+            let events = match inotify.read_events_blocking(&mut buffer) {
+                Ok(events) => events.collect::<Vec<_>>(),
+                Err(e) => {
+                    warn!("evdev device watcher failed: {e}. Falling back to polling discovery.");
+                    spawn_evdev_polling_supervisor(app_handle, alt_held, shift_held);
+                    return;
+                }
+            };
+
+            let should_rescan = events.iter().any(|event| {
+                event
+                    .mask
+                    .intersects(EventMask::DELETE_SELF | EventMask::MOVE_SELF)
+                    || event
+                        .name
+                        .as_ref()
+                        .map(|name| name.to_string_lossy().starts_with("event"))
+                        .unwrap_or(false)
+            });
+
+            if should_rescan {
+                let discovered =
+                    spawn_supported_evdev_device_workers(&app_handle, &alt_held, &shift_held);
+                if discovered > 0 {
+                    info!(
+                        "evdev watcher attached {} newly discovered keyboard(s)",
+                        discovered
+                    );
+                }
+            }
+        }
+    });
+}
+
+#[cfg(target_os = "linux")]
+fn start_hotkey_listener(app_handle: tauri::AppHandle) -> bool {
+    let alt_held = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let shift_held = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+
+    let initial_discovered =
+        spawn_supported_evdev_device_workers(&app_handle, &alt_held, &shift_held);
+    if initial_discovered == 0 {
+        warn!(
+            "No keyboard found for evdev at startup. Add user to 'input' group if needed; VOCO will keep watching for devices."
+        );
+    } else {
+        info!(
+            "evdev hotkey listener started on {} keyboard(s)",
+            initial_discovered
+        );
     }
+
+    spawn_evdev_device_watcher(app_handle, alt_held, shift_held);
 
     true
 }
@@ -767,6 +1042,9 @@ pub fn run() {
         .format_timestamp_millis()
         .init();
 
+    #[cfg(target_os = "linux")]
+    install_socket_cleanup_signal_handler();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .manage(Mutex::new(WhisperState::new()) as WhisperMutex)
@@ -777,6 +1055,7 @@ pub fn run() {
             save_cached_update_state,
             transcribe_audio,
             insert_text,
+            get_runtime_diagnostics,
             set_dictation_status,
             set_microphone_ready,
             show_status_overlay,
@@ -848,8 +1127,7 @@ pub fn run() {
         .expect("error while building tauri application")
         .run(|_app, event| {
             if let tauri::RunEvent::Exit = event {
-                let _ = std::fs::remove_file(socket_path());
-                let _ = std::fs::remove_file(legacy_socket_path());
+                cleanup_socket_files();
             }
         });
 }
@@ -895,6 +1173,42 @@ mod tests {
     #[test]
     fn socket_path_uses_xdg_runtime_dir() {
         assert!(socket_path().to_str().unwrap().ends_with("voco.sock"));
+    }
+
+    #[test]
+    fn socket_base_dir_uses_private_tmp_fallback_without_runtime_dir() {
+        let path = socket_base_dir_from(None);
+        assert!(path.starts_with(std::env::temp_dir()));
+        assert!(path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or_default()
+            .starts_with("voco-"));
+    }
+
+    #[test]
+    fn cleanup_socket_paths_removes_existing_files() {
+        let unique = format!(
+            "voco-cleanup-test-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        );
+        let temp_dir = std::env::temp_dir().join(unique);
+        std::fs::create_dir_all(&temp_dir).unwrap();
+
+        let primary = temp_dir.join("voco.sock");
+        let legacy = temp_dir.join("voice.sock");
+        std::fs::write(&primary, b"").unwrap();
+        std::fs::write(&legacy, b"").unwrap();
+
+        cleanup_socket_paths([primary.clone(), legacy.clone()]);
+
+        assert!(!primary.exists());
+        assert!(!legacy.exists());
+        std::fs::remove_dir_all(temp_dir).unwrap();
     }
 
     #[test]

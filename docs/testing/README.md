@@ -5,27 +5,27 @@
 
 Automated tests are in place for both frontend and backend.
 
-### Rust (23 tests)
+### Rust (33 tests)
 
 Run with `cargo test` from `apps/desktop/src-tauri/`.
 
 | Module      | Tests | What's Covered                                                                                                              |
 | ----------- | ----- | --------------------------------------------------------------------------------------------------------------------------- |
-| `config`    | 8     | Default values, serialization round-trip, deserialization with defaults, enum casing, cached update state                 |
-| `insertion` | 3     | Strategy serialization (kebab-case), session detection, command failure on non-zero exit                                  |
-| `lib`       | 12    | Base64 audio decoding, socket path, hotkey config, hotkey backend selection, hotkey modes, global-shortcut backend logic |
+| `config`    | 10    | Default values, serialization round-trip, deserialization with defaults, enum casing, cached update state, atomic writes |
+| `insertion` | 8     | Strategy parsing, session detection, runtime diagnostics, helper requirements, and command failure handling               |
+| `lib`       | 15    | Base64 audio decoding, socket path fallback, socket cleanup, hotkey config, hotkey backend selection, hotkey modes, global-shortcut logic |
 
-### Frontend (19 tests)
+### Frontend (23 tests)
 
 Run with `npm test` from project root.
 
-| File               | Tests | What's Covered                                                                                                     |
-| ------------------ | ----- | ------------------------------------------------------------------------------------------------------------------ |
-| `store.test.ts`    | 9     | Store actions: status transitions, error handling, transcript management, audio level, config storage, update state |
-| `audioLevel.test.ts` | 3   | DC-offset removal, centered RMS calculation, visual level behavior                                                 |
-| `updates.test.ts`  | 7     | Version comparison, channel selection, update lookup, and update cache helpers                                     |
+| File                 | Tests | What's Covered                                                                                                        |
+| -------------------- | ----- | --------------------------------------------------------------------------------------------------------------------- |
+| `store.test.ts`      | 11    | Store actions: status transitions, error handling, transcript management, audio level, config storage, update state |
+| `audioLevel.test.ts` | 3     | DC-offset removal, centered RMS calculation, visual level behavior                                                    |
+| `updates.test.ts`    | 9     | Version comparison, channel selection, timeout behavior, update lookup, and update cache helpers                     |
 
-Current manual product coverage is broader than the automated test count. The onboarding flow, tray interactions, and Linux insertion behavior still need manual verification on Linux.
+Current manual product coverage is broader than the automated test count. The onboarding flow, tray interactions, global hotkeys, microphone permissions, and compositor-specific insertion behavior still need Linux runtime validation.
 
 ## Running Tests
 
@@ -50,6 +50,9 @@ cd snap && snapcraft --destructive-mode
 
 # Release rehearsal before tagging
 npm run rehearse:release
+
+# Linux runtime preflight for manual end-to-end validation
+npm run report:linux-runtime
 ```
 
 ## CI
@@ -76,15 +79,24 @@ For system-level features that are hard to automate:
 - Hotkey behavior:
   - first press should immediately show listening state and the active tray indicator
   - switch hotkey at runtime from settings and tray menu, then verify the new binding triggers dictation immediately
-- Trigger via Unix socket: `socat - UNIX-CONNECT:$XDG_RUNTIME_DIR/voco.sock < /dev/null`
+- Trigger via Unix socket:
+  `SOCKET_DIR="${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}/voco-$(id -u)}"; socat - UNIX-CONNECT:"${SOCKET_DIR}/voco.sock" < /dev/null`
 - Insertion behavior:
   - verify direct type simulation in a text editor
-  - verify fallback path messaging when paste simulation fails
+  - verify `auto` falls back to clipboard insertion when direct typing fails
+  - verify strict `type-simulation` reports a failure instead of touching the clipboard
+- Runtime diagnostics:
+  - open Settings -> Advanced and confirm the detected session matches the desktop session
+  - confirm missing helper commands are surfaced accurately after pressing `Refresh runtime checks`
+- Capture environment details:
+  - run `npm run report:linux-runtime` and attach the output to the test note
 
 - State the distro, desktop environment, compositor, and insertion path used
 
-## Future Test Targets
+Use [linux-e2e.md](./linux-e2e.md) as the release sign-off checklist. It is the current end-to-end test path for Ubuntu-class Linux environments.
 
-- E2E dictation flow (requires mic + ASR + insertion — Playwright or Tauri WebDriver)
+## Automated Gaps
+
+- Full desktop E2E dictation remains manual because microphone capture, tray behavior, global hotkeys, and simulated input are not reliable CI targets on headless Linux
 - Frontend dictation hook with mocked Tauri commands
 - Whisper transcription with a known audio sample

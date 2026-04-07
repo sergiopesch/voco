@@ -33,6 +33,7 @@ describe("useStore", () => {
   });
 
   it("setStatus updates status and clears error", () => {
+    useStore.getState().setStatus("error");
     useStore.getState().setError("some error");
     expect(useStore.getState().status).toBe("error");
 
@@ -42,16 +43,18 @@ describe("useStore", () => {
   });
 
   it("setError sets error and status to error", () => {
+    useStore.getState().setStatus("error");
     useStore.getState().setError("mic failed");
     expect(useStore.getState().error).toBe("mic failed");
     expect(useStore.getState().status).toBe("error");
   });
 
-  it("setError with null clears error and sets idle", () => {
+  it("setError with null clears error without forcing idle", () => {
+    useStore.getState().setStatus("recording");
     useStore.getState().setError("something");
     useStore.getState().setError(null);
     expect(useStore.getState().error).toBeNull();
-    expect(useStore.getState().status).toBe("idle");
+    expect(useStore.getState().status).toBe("recording");
   });
 
   it("setTranscript updates transcript", () => {

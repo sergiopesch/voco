@@ -13,6 +13,8 @@ npm run rehearse:release
 This checks:
 - version metadata consistency across shipped manifests
 - shell helper syntax for install and packaging scripts
+- public install docs still require checksum verification and do not recommend `curl | bash`
+- the release helper comment stays pinned to the exact release tag
 - generated GitHub release notes for the current version
 - expected asset names:
   - `voco_<version>_amd64.deb`

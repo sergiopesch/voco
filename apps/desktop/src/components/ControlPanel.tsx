@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { AppConfig, AudioDeviceOption, UpdateCheckState } from "@/types";
+import type {
+  AppConfig,
+  AudioDeviceOption,
+  RuntimeDiagnostics,
+  UpdateCheckState,
+} from "@/types";
 import { calculateVisualAudioLevelFromSamples } from "@/lib/audioLevel";
+import { openMicrophoneStream } from "@/lib/audioInput";
 import vocoBrandImage from "../../../../assets/voco-logo.png";
 import vocoTrayReadyImage from "../../../../assets/voco logo green v1.png";
 import vocoTrayRecordingImage from "../../../../assets/voco logo red v1.png";
@@ -13,6 +19,7 @@ interface ControlPanelProps {
   errorMessage: string | null;
   statusLabel: string;
   updateState: UpdateCheckState;
+  runtimeDiagnostics: RuntimeDiagnostics | null;
   isDictationActive: boolean;
   selectedDeviceId: string | null;
   availableDevices: AudioDeviceOption[];
@@ -25,6 +32,7 @@ interface ControlPanelProps {
   onRequestMicrophoneAccess: () => Promise<void>;
   onCheckForUpdates: () => Promise<void>;
   onOpenReleasePage: (url: string) => Promise<void>;
+  onRefreshRuntimeDiagnostics: () => Promise<void>;
   onToggleDictation: () => void;
 }
 
@@ -69,6 +77,7 @@ export function ControlPanel({
   errorMessage,
   statusLabel,
   updateState,
+  runtimeDiagnostics,
   isDictationActive,
   selectedDeviceId,
   availableDevices,
@@ -81,6 +90,7 @@ export function ControlPanel({
   onRequestMicrophoneAccess,
   onCheckForUpdates,
   onOpenReleasePage,
+  onRefreshRuntimeDiagnostics,
   onToggleDictation,
 }: ControlPanelProps) {
   const isPopover = surface === "popover";
@@ -159,6 +169,32 @@ export function ControlPanel({
       ? "VOCO"
       : "VOCO settings";
   const panelEyebrow = isPopover ? "Command panel" : "VOCO";
+  const runtimeSessionLabel = useMemo(() => {
+    switch (runtimeDiagnostics?.sessionType) {
+      case "wayland":
+        return "Wayland";
+      case "x11-or-other":
+        return "X11 or other";
+      default:
+        return "Unavailable";
+    }
+  }, [runtimeDiagnostics?.sessionType]);
+  const typeSimulationLabel = useMemo(() => {
+    if (!runtimeDiagnostics) {
+      return "Runtime checks unavailable.";
+    }
+    return runtimeDiagnostics.typeSimulation.available
+      ? "Ready"
+      : `Missing: ${runtimeDiagnostics.typeSimulation.missingCommands.join(", ")}`;
+  }, [runtimeDiagnostics]);
+  const clipboardLabel = useMemo(() => {
+    if (!runtimeDiagnostics) {
+      return "Runtime checks unavailable.";
+    }
+    return runtimeDiagnostics.clipboard.available
+      ? "Ready"
+      : `Missing: ${runtimeDiagnostics.clipboard.missingCommands.join(", ")}`;
+  }, [runtimeDiagnostics]);
 
   useEffect(() => {
     if (surface === "onboarding") {
@@ -197,16 +233,7 @@ export function ControlPanel({
       previewFrameRef.current = window.requestAnimationFrame(tick);
     };
 
-    void navigator.mediaDevices
-      .getUserMedia({
-        audio: {
-          deviceId: selectedDeviceId ? { exact: selectedDeviceId } : undefined,
-          channelCount: 1,
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false,
-        },
-      })
+    void openMicrophoneStream(selectedDeviceId)
       .then(async (nextStream) => {
         if (cancelled) {
           nextStream.getTracks().forEach((track) => track.stop());
@@ -403,8 +430,10 @@ export function ControlPanel({
                   <button
                     className="voco-button voco-button--secondary"
                     onClick={async () => {
-                      await savePatch({ onboardingCompleted: true });
-                      onSurfaceChange("hidden");
+                      const result = await savePatch({ onboardingCompleted: true });
+                      if (result.ok) {
+                        onSurfaceChange("hidden");
+                      }
                     }}
                   >
                     Skip for now
@@ -473,8 +502,10 @@ export function ControlPanel({
                   <button
                     className="voco-button voco-button--primary"
                     onClick={async () => {
-                      await savePatch({ selectedMic: selectedDeviceId });
-                      onOnboardingStepChange(2);
+                      const result = await savePatch({ selectedMic: selectedDeviceId });
+                      if (result.ok) {
+                        onOnboardingStepChange(2);
+                      }
                     }}
                   >
                     Continue
@@ -575,8 +606,10 @@ export function ControlPanel({
                   <button
                     className="voco-button voco-button--primary"
                     onClick={async () => {
-                      await savePatch({ voiceProfile: "default" });
-                      onOnboardingStepChange(4);
+                      const result = await savePatch({ voiceProfile: "default" });
+                      if (result.ok) {
+                        onOnboardingStepChange(4);
+                      }
                     }}
                   >
                     Continue
@@ -613,8 +646,10 @@ export function ControlPanel({
                   <button
                     className="voco-button voco-button--primary"
                     onClick={async () => {
-                      await savePatch({ onboardingCompleted: true });
-                      onSurfaceChange("hidden");
+                      const result = await savePatch({ onboardingCompleted: true });
+                      if (result.ok) {
+                        onSurfaceChange("hidden");
+                      }
                     }}
                   >
                     Finish setup
@@ -653,8 +688,8 @@ export function ControlPanel({
                     needs attention.
                   </div>
                   <div className="voco-inline-note">
-                    On Linux, the command panel opens from the tray menu because tray click
-                    events are not exposed reliably by the current Tauri stack.
+                    On Linux, the command panel opens from the tray icon or tray menu, with
+                    the tray menu kept as a reliable fallback path.
                   </div>
                 </section>
               ) : null}
@@ -874,6 +909,33 @@ export function ControlPanel({
                   <div className="voco-inline-note">
                     Settings are stored locally and can be reset by deleting the VOCO config directory.
                   </div>
+                  <div className="voco-inline-note">
+                    <strong>Session:</strong> {runtimeSessionLabel}
+                  </div>
+                  <div className="voco-inline-note">
+                    <strong>Type simulation:</strong> {typeSimulationLabel}
+                  </div>
+                  {runtimeDiagnostics ? (
+                    <div className="voco-inline-note">
+                      {runtimeDiagnostics.typeSimulation.detail}
+                    </div>
+                  ) : null}
+                  <div className="voco-inline-note">
+                    <strong>Clipboard insertion:</strong> {clipboardLabel}
+                  </div>
+                  {runtimeDiagnostics ? (
+                    <div className="voco-inline-note">
+                      {runtimeDiagnostics.clipboard.detail}
+                    </div>
+                  ) : null}
+                  <div className="voco-settings__actions">
+                    <button
+                      className="voco-button voco-button--secondary"
+                      onClick={() => void onRefreshRuntimeDiagnostics()}
+                    >
+                      Refresh runtime checks
+                    </button>
+                  </div>
                   <label className="voco-field">
                     <span>Voice profile</span>
                     <select
@@ -909,9 +971,11 @@ export function ControlPanel({
               <button
                 className="voco-button voco-button--ghost"
                 onClick={async () => {
-                  await savePatch({ onboardingCompleted: false });
-                  onOnboardingStepChange(0);
-                  onSurfaceChange("onboarding");
+                  const result = await savePatch({ onboardingCompleted: false });
+                  if (result.ok) {
+                    onOnboardingStepChange(0);
+                    onSurfaceChange("onboarding");
+                  }
                 }}
               >
                 Re-run onboarding

@@ -1,12 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# VOCO — quick install from pre-built release
-# Usage: bash <(curl -s https://raw.githubusercontent.com/sergiopesch/voco/master/install)
+# VOCO — release install helper
+# Usage:
+#   wget https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.8/install -O voco-install
+#   chmod +x voco-install
+#   less ./voco-install
+#   ./voco-install
 
-VERSION="2026.0.7"
+VERSION="2026.0.8"
 RELEASE_TAG="voco.${VERSION}"
 DEB_URL="https://github.com/sergiopesch/voco/releases/download/${RELEASE_TAG}/voco_${VERSION}_amd64.deb"
+CHECKSUMS_URL="https://github.com/sergiopesch/voco/releases/download/${RELEASE_TAG}/voco_checksums.txt"
 
 # ─── Colors ─────────────────────────────────────────────
 BOLD='\033[1m'
@@ -241,9 +246,27 @@ echo -e "  ${BOLD}${GRAPHITE}[2/3]${NC} ${BOLD}Download${NC}"
 
 TMPDIR=$(mktemp -d)
 DEB_FILE="${TMPDIR}/voco_${VERSION}_amd64.deb"
+CHECKSUM_FILE="${TMPDIR}/voco_checksums.txt"
+DEB_CHECKSUM_FILE="${TMPDIR}/voco_${VERSION}_amd64.deb.sha256"
 
 run_step "Downloading VOCO v${VERSION} (~5 MB)" \
   wget -q -O "$DEB_FILE" "$DEB_URL"
+run_step "Downloading release checksums" \
+  wget -q -O "$CHECKSUM_FILE" "$CHECKSUMS_URL"
+
+if ! command -v sha256sum >/dev/null 2>&1; then
+  err "sha256sum is required to verify the downloaded package"
+fi
+
+if ! grep -F "  $(basename "$DEB_FILE")" "$CHECKSUM_FILE" > "$DEB_CHECKSUM_FILE"; then
+  err "Could not find a checksum entry for $(basename "$DEB_FILE")"
+fi
+
+if (cd "$TMPDIR" && sha256sum --check "$(basename "$DEB_CHECKSUM_FILE")" >/dev/null 2>&1); then
+  ok "Package checksum verified"
+else
+  err "Package checksum verification failed"
+fi
 
 DEB_SIZE=$(du -h "$DEB_FILE" | cut -f1)
 dim "Package: voco_${VERSION}_amd64.deb (${DEB_SIZE})"

@@ -2,6 +2,8 @@
 
 ## VOCO does not type text on Wayland
 
+Open Settings -> Advanced and press `Refresh runtime checks` first. VOCO should report a Wayland session and show whether `ydotool` or `wl-copy` are missing.
+
 Check that `ydotool` and `wl-clipboard` are installed and that your user is in the `input` group.
 
 ```bash
@@ -12,6 +14,8 @@ sudo usermod -aG input "$USER"
 Then log out and back in.
 
 ## VOCO does not type text on X11
+
+Open Settings -> Advanced and press `Refresh runtime checks` first. VOCO should report `X11 or other` and show whether `xdotool` or `xclip` are missing.
 
 Install the X11 helpers:
 
@@ -44,5 +48,12 @@ If the migration did not happen automatically, copy those files into the `voco` 
 ## Trigger VOCO manually through the socket
 
 ```bash
-socat - UNIX-CONNECT:$XDG_RUNTIME_DIR/voco.sock < /dev/null
+SOCKET_DIR="${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}/voco-$(id -u)}"
+socat - UNIX-CONNECT:"${SOCKET_DIR}/voco.sock" < /dev/null
+```
+
+## Capture Linux runtime details for a bug report or release check
+
+```bash
+npm run report:linux-runtime
 ```

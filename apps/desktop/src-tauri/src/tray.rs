@@ -214,10 +214,7 @@ fn open_config_file() {
     }
 }
 
-pub fn set_dictation_status(
-    app: &tauri::AppHandle,
-    status: DictationStatus,
-) {
+pub fn set_dictation_status(app: &tauri::AppHandle, status: DictationStatus) {
     let state = app.state::<TrayMutex>();
     let Ok(mut tray_state) = state.lock() else {
         error!("Failed to lock tray state");
@@ -246,9 +243,7 @@ fn apply_tray_state(app: &tauri::AppHandle, tray_state: &TrayState) {
     } else {
         match tray_state.dictation_status {
             DictationStatus::Recording => (TrayVisualState::Recording, "VOCO — Listening"),
-            DictationStatus::Processing => {
-                (TrayVisualState::Processing, "VOCO — Transcribing")
-            }
+            DictationStatus::Processing => (TrayVisualState::Processing, "VOCO — Transcribing"),
             DictationStatus::Error => (TrayVisualState::NotReady, "VOCO — Needs attention"),
             DictationStatus::Idle => (TrayVisualState::Ready, "VOCO — Ready to listen"),
         }

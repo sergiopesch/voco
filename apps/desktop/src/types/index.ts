@@ -54,3 +54,17 @@ export interface CachedUpdateCheck {
   channel: UpdateChannel;
   state: UpdateCheckState;
 }
+
+export interface InsertionSupport {
+  available: boolean;
+  requiredCommands: string[];
+  missingCommands: string[];
+  optionalMissingCommands: string[];
+  detail: string;
+}
+
+export interface RuntimeDiagnostics {
+  sessionType: string;
+  typeSimulation: InsertionSupport;
+  clipboard: InsertionSupport;
+}

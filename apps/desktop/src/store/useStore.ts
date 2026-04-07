@@ -79,7 +79,7 @@ export const useStore = create<AppState>((set) => ({
   setStatus: (status) => set({ status, error: null }),
   setTranscript: (transcript) => set({ transcript }),
   setInterimTranscript: (interim) => set({ interimTranscript: interim }),
-  setError: (error) => set({ error, status: error ? "error" : "idle" }),
+  setError: (error) => set({ error }),
   setAudioLevel: (level) => set({ audioLevel: level }),
   setConfig: (config) =>
     set((state) => ({

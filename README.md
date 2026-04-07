@@ -19,8 +19,23 @@ VOCO is a Linux local-first voice interface for fast control and insertion at th
 ### GitHub Releases
 
 ```bash
-bash <(curl -s https://raw.githubusercontent.com/sergiopesch/voco/master/install)
+wget https://github.com/sergiopesch/voco/releases/download/voco.<version>/voco_<version>_amd64.deb
+wget https://github.com/sergiopesch/voco/releases/download/voco.<version>/voco_checksums.txt
+grep ' voco_<version>_amd64.deb$' voco_checksums.txt | sha256sum --check
+sudo dpkg -i voco_<version>_amd64.deb
 ```
+
+Optional helper path:
+
+```bash
+TAG="voco.<version>"
+wget "https://raw.githubusercontent.com/sergiopesch/voco/${TAG}/install" -O voco-install
+chmod +x voco-install
+less ./voco-install
+./voco-install
+```
+
+The helper should be downloaded and inspected locally before you run it. It verifies the published `.deb` checksum before installation.
 
 GitHub Releases now target:
 - `.deb` for Debian / Ubuntu
@@ -107,6 +122,7 @@ npm run lint
 npm test
 cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml
 npm run rehearse:release
+npm run report:linux-runtime
 ```
 
 Optional tray diagnostics:
@@ -122,6 +138,7 @@ VOCO_TRAY_DEBUG=1 npm run dev
 - [docs/submission-readiness.md](docs/submission-readiness.md)
 - [docs/store-listing.md](docs/store-listing.md)
 - [docs/release-process.md](docs/release-process.md)
+- [docs/testing/README.md](docs/testing/README.md)
 - [docs/troubleshooting.md](docs/troubleshooting.md)
 - [docs/contributing.md](docs/contributing.md)
 - [docs/architecture/README.md](docs/architecture/README.md)

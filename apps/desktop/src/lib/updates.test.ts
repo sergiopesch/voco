@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   checkForUpdates,
   compareVersions,
@@ -11,6 +11,11 @@ import * as tauriLib from "@/lib/tauri";
 beforeEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  vi.useRealTimers();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe("compareVersions", () => {
@@ -85,6 +90,37 @@ describe("checkForUpdates", () => {
         version: "2026.0.6",
       },
     });
+  });
+
+  it("times out stalled release checks", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn().mockImplementation((_url: string, init?: RequestInit) => {
+      return new Promise((_, reject) => {
+        const signal = init?.signal;
+        if (!(signal instanceof AbortSignal)) {
+          reject(new Error("expected abort signal"));
+          return;
+        }
+
+        signal.addEventListener("abort", () => {
+          const abortError = new Error("aborted");
+          abortError.name = "AbortError";
+          reject(abortError);
+        });
+      });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const promise = checkForUpdates({
+      currentVersion: "2026.0.4",
+      channel: "stable",
+    });
+    const assertion = expect(promise).rejects.toThrow("GitHub release lookup timed out.");
+
+    await vi.advanceTimersByTimeAsync(15_000);
+
+    await assertion;
   });
 });
 

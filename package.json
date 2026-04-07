@@ -1,6 +1,6 @@
 {
   "name": "voco",
-  "version": "2026.0.7",
+  "version": "2026.0.8",
   "private": true,
   "workspaces": [
     "apps/*"
@@ -12,7 +12,8 @@
     "check": "npm run check --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "verify:versions": "node scripts/check-version-consistency.mjs",
-    "rehearse:release": "bash ./scripts/rehearse-release.sh"
+    "rehearse:release": "bash ./scripts/rehearse-release.sh",
+    "report:linux-runtime": "bash ./scripts/report-linux-runtime.sh"
   },
   "engines": {
     "node": ">=20"

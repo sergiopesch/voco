@@ -11,6 +11,7 @@ import {
   calculateVisualAudioLevelFromSamples,
   removeDcOffset,
 } from "@/lib/audioLevel";
+import { openMicrophoneStream, probeMicrophoneAccess } from "@/lib/audioInput";
 import type { DictationStatus } from "@/types";
 
 const TARGET_SAMPLE_RATE = 16000;
@@ -20,18 +21,6 @@ const AUDIO_LEVEL_FLOOR = 0.01;
 
 type DictationPhase = DictationStatus | "starting" | "stopping";
 type QueuedAction = "start" | "stop" | null;
-
-function buildAudioConstraints(
-  deviceId: string | null,
-): MediaTrackConstraints {
-  return {
-    deviceId: deviceId ? { exact: deviceId } : undefined,
-    channelCount: 1,
-    echoCancellation: false,
-    noiseSuppression: false,
-    autoGainControl: false,
-  };
-}
 
 export function useDictation() {
   const setStatus = useStore((state) => state.setStatus);
@@ -59,11 +48,9 @@ export function useDictation() {
     async (appStartMs: number) => {
       try {
         const deviceId = useStore.getState().selectedDeviceId;
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: buildAudioConstraints(deviceId),
-        });
-        stream.getTracks().forEach((track) => track.stop());
+        await probeMicrophoneAccess(deviceId);
 
+        setStatus("idle");
         setError(null);
         setInterimTranscript("");
         await setMicrophoneReady(true);
@@ -75,6 +62,7 @@ export function useDictation() {
           )}ms`,
         );
       } catch (err) {
+        setStatus("error");
         await setDictationStatus("error").catch(() => {});
         await setMicrophoneReady(false).catch(() => {});
         showNotification(
@@ -241,9 +229,7 @@ export function useDictation() {
 
       const deviceId = useStore.getState().selectedDeviceId;
 
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: buildAudioConstraints(deviceId),
-      });
+      const stream = await openMicrophoneStream(deviceId);
 
       streamRef.current = stream;
       setMicrophoneReady(true).catch(() => {});
@@ -283,6 +269,7 @@ export function useDictation() {
     } catch (err) {
       await teardownAudioGraph();
       resetAudioLevel();
+      setStatus("error");
       setDictationStatus("error").catch(() => {});
       setMicrophoneReady(false).catch(() => {});
       setInterimTranscript("");
@@ -386,6 +373,7 @@ export function useDictation() {
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err);
       phaseRef.current = "error";
+      setStatus("error");
       setError(`Transcription failed: ${detail} (${merged.length} samples)`);
       setInterimTranscript("");
       setDictationStatus("error").catch(() => {});

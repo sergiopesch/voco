@@ -5,9 +5,12 @@ import { availableMonitors, getCurrentWindow } from "@tauri-apps/api/window";
 import { useStore } from "@/store/useStore";
 import {
   getConfig,
+  getRuntimeDiagnostics,
   hideStatusOverlay,
   openExternalUrl,
   saveConfig,
+  setDictationStatus,
+  setMicrophoneReady,
   showNotification,
   showStatusOverlay,
 } from "@/lib/tauri";
@@ -19,7 +22,13 @@ import {
 import { useGlobalShortcut } from "@/hooks/useGlobalShortcut";
 import { useDictation } from "@/hooks/useDictation";
 import { ControlPanel } from "@/components/ControlPanel";
-import type { AppConfig, AudioDeviceOption, DictationStatus } from "@/types";
+import { probeMicrophoneAccess } from "@/lib/audioInput";
+import type {
+  AppConfig,
+  AudioDeviceOption,
+  DictationStatus,
+  RuntimeDiagnostics,
+} from "@/types";
 
 const PANEL_SIZE = new LogicalSize(1040, 760);
 const POPOVER_SIZE = new LogicalSize(420, 520);
@@ -86,6 +95,7 @@ export function App() {
   const config = useStore((state) => state.config);
   const setConfig = useStore((state) => state.setConfig);
   const setError = useStore((state) => state.setError);
+  const setStatus = useStore((state) => state.setStatus);
   const setSurface = useStore((state) => state.setSurface);
   const setOnboardingStep = useStore((state) => state.setOnboardingStep);
   const setAvailableDevices = useStore((state) => state.setAvailableDevices);
@@ -99,6 +109,7 @@ export function App() {
     onHotkeyPressed,
   } = useDictation();
   const [initComplete, setInitComplete] = useState(false);
+  const [runtimeDiagnostics, setRuntimeDiagnostics] = useState<RuntimeDiagnostics | null>(null);
   const appStartMsRef = useRef(performance.now());
   const initStartedRef = useRef(false);
   const trayPopoverAnchorRef = useRef<TrayPopoverAnchor | null>(null);
@@ -152,32 +163,38 @@ export function App() {
 
   const requestMicrophoneAccess = useCallback(async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          deviceId: selectedDeviceId ? { exact: selectedDeviceId } : undefined,
-          channelCount: 1,
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false,
-        },
-      });
-      stream.getTracks().forEach((track) => track.stop());
+      await probeMicrophoneAccess(selectedDeviceId);
+      setStatus("idle");
+      setError(null);
       setMicrophonePermission("granted");
       await refreshDevices();
-      await initializeMicrophone(performance.now());
+      await setMicrophoneReady(true);
+      await setDictationStatus("idle");
     } catch (error) {
+      setStatus("error");
       setMicrophonePermission("denied");
+      await setMicrophoneReady(false).catch(() => {});
+      await setDictationStatus("error").catch(() => {});
       setError(
         `Microphone access is blocked. ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }, [
-    initializeMicrophone,
     refreshDevices,
     selectedDeviceId,
     setError,
     setMicrophonePermission,
+    setStatus,
   ]);
+
+  const refreshRuntimeDiagnostics = useCallback(async () => {
+    try {
+      const diagnostics = await getRuntimeDiagnostics();
+      setRuntimeDiagnostics(diagnostics);
+    } catch (error) {
+      console.warn("Failed to load runtime diagnostics:", error);
+    }
+  }, []);
 
   const applyConfigPatch = useCallback(
     async (patch: Partial<AppConfig>) => {
@@ -300,8 +317,10 @@ export function App() {
         setOnboardingStep(0);
         await initializeMicrophone(appStartMsRef.current);
         await refreshDevices();
+        await refreshRuntimeDiagnostics();
         await runUpdateCheck(loadedConfig.updateChannel, appVersion);
       } catch (err) {
+        setStatus("error");
         setError(
           `Failed to initialize: ${err instanceof Error ? err.message : String(err)}`,
         );
@@ -316,7 +335,9 @@ export function App() {
     setConfig,
     setError,
     setOnboardingStep,
+    setStatus,
     setUpdateState,
+    refreshRuntimeDiagnostics,
     runUpdateCheck,
   ]);
 
@@ -443,6 +464,7 @@ export function App() {
     void getCurrentWindow()
       .listen("voco:open-settings", () => {
         void refreshDevices();
+        void refreshRuntimeDiagnostics();
         setSurface("settings");
       })
       .then((cleanup) => {
@@ -452,7 +474,7 @@ export function App() {
     return () => {
       unlisten?.();
     };
-  }, [refreshDevices, setSurface]);
+  }, [refreshDevices, refreshRuntimeDiagnostics, setSurface]);
 
   useEffect(() => {
     let unlisten: (() => void) | null = null;
@@ -502,6 +524,7 @@ export function App() {
       errorMessage={error}
       statusLabel={statusLabel}
       updateState={updateState}
+      runtimeDiagnostics={runtimeDiagnostics}
       isDictationActive={status === "recording" || status === "processing"}
       selectedDeviceId={selectedDeviceId}
       availableDevices={availableDevices}
@@ -514,6 +537,7 @@ export function App() {
       onRequestMicrophoneAccess={requestMicrophoneAccess}
       onCheckForUpdates={() => runUpdateCheck(config.updateChannel, undefined, true)}
       onOpenReleasePage={(url) => openExternalUrl(url)}
+      onRefreshRuntimeDiagnostics={refreshRuntimeDiagnostics}
       onToggleDictation={toggle}
     />
   );

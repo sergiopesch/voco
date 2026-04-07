@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
+use std::io::Write;
 use std::path::PathBuf;
 
 pub const APP_DIR_NAME: &str = "voco";
@@ -165,7 +166,7 @@ impl AppConfig {
     pub fn save(&self) -> Result<(), Box<dyn std::error::Error>> {
         let path = Self::config_path()?;
         let content = serde_json::to_string_pretty(self)?;
-        fs::write(&path, content)?;
+        atomic_write(&path, &content)?;
         Ok(())
     }
 }
@@ -185,7 +186,57 @@ pub fn save_cached_update_check(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let path = AppConfig::update_cache_path()?;
     let content = serde_json::to_string_pretty(cache)?;
-    fs::write(path, content)?;
+    atomic_write(&path, &content)?;
+    Ok(())
+}
+
+fn atomic_write(path: &std::path::Path, content: &str) -> Result<(), std::io::Error> {
+    let parent = path.parent().ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            format!("Path has no parent: {}", path.display()),
+        )
+    })?;
+    fs::create_dir_all(parent)?;
+
+    let file_name = path.file_name().ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            format!("Path has no file name: {}", path.display()),
+        )
+    })?;
+    let unique_suffix = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let tmp_path = parent.join(format!(
+        ".{}.tmp-{}-{}",
+        file_name.to_string_lossy(),
+        std::process::id(),
+        unique_suffix
+    ));
+
+    let write_result = (|| {
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&tmp_path)?;
+        file.write_all(content.as_bytes())?;
+        file.sync_all()?;
+        Ok::<(), std::io::Error>(())
+    })();
+
+    if let Err(error) = write_result {
+        let _ = fs::remove_file(&tmp_path);
+        return Err(error);
+    }
+
+    fs::rename(&tmp_path, path)?;
+
+    if let Ok(dir) = fs::File::open(parent) {
+        let _ = dir.sync_all();
+    }
+
     Ok(())
 }
 
@@ -316,9 +367,8 @@ mod tests {
                 latest_release: Some(ReleaseInfo {
                     version: "2026.0.7-beta.1".to_string(),
                     name: "VOCO 2026.0.7 beta 1".to_string(),
-                    url:
-                        "https://github.com/sergiopesch/voco/releases/tag/voco.2026.0.7-beta.1"
-                            .to_string(),
+                    url: "https://github.com/sergiopesch/voco/releases/tag/voco.2026.0.7-beta.1"
+                        .to_string(),
                     published_at: Some("2026-04-02T10:00:00Z".to_string()),
                     prerelease: true,
                 }),
@@ -339,5 +389,26 @@ mod tests {
                 .map(|release| release.version.as_str()),
             Some("2026.0.7-beta.1")
         );
+    }
+
+    #[test]
+    fn atomic_write_replaces_existing_file_contents() {
+        let test_dir = std::env::temp_dir().join(format!(
+            "voco-config-test-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&test_dir).unwrap();
+        let path = test_dir.join("config.json");
+        fs::write(&path, "old").unwrap();
+
+        atomic_write(&path, "{\"new\":true}").unwrap();
+
+        assert_eq!(fs::read_to_string(&path).unwrap(), "{\"new\":true}");
+
+        let _ = fs::remove_dir_all(&test_dir);
     }
 }

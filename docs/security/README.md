@@ -29,7 +29,7 @@ The app runs entirely locally with no authentication and no cloud accounts. Netw
 - **Local storage only**: Config in XDG dirs, no cloud sync
 - **Shell safety**: Text passed as arguments (not interpolated), `--` separators used
 - **Clipboard preservation**: Original clipboard contents restored after fallback insertion (only when prior content was text and save succeeded)
-- **Socket security**: Unix socket restricted to owner (0600 permissions)
+- **Socket security**: Unix socket restricted to owner (0600 permissions) with a private per-user fallback dir when `XDG_RUNTIME_DIR` is unavailable
 - **Concurrency safety**: Transcription uses try_lock to fail fast if already in progress
 - **Atomic downloads**: Model written to .tmp then renamed, preventing corrupt partial files
 - **Structured logging**: No audio content logged, level-filtered output via env_logger

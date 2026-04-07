@@ -34,7 +34,7 @@ apps/desktop/           Tauri application
 3. **ASR**: Float32Array bytes base64-encoded, sent to Rust via Tauri invoke, decoded to `Vec<f32>` -> whisper-rs -> transcript string
 4. **Status Feedback**: Transparent overlay window is moved near the cursor while recording and processing so the user can see that VOCO is listening or processing
 5. **Insertion**: Transcript -> ydotool/xdotool type simulation or clipboard paste
-6. **Fallback**: If direct typing fails, text is placed on clipboard and Ctrl+V is simulated. Desktop notification informs user.
+6. **Fallback**: In `auto` mode, if direct typing fails, text is placed on clipboard and Ctrl+V is simulated. Strict `type-simulation` mode reports the failure instead of modifying the clipboard.
 
 ## Tauri IPC Commands
 
@@ -54,7 +54,7 @@ All three call `eval_toggle()` which emits a targeted Tauri window event to the 
 
 1. **Tauri global-shortcut plugin** (configurable, default Alt+D) — primary
 2. **evdev listener** — Linux fallback for Wayland, needs `input` group
-3. **Unix socket** (`$XDG_RUNTIME_DIR/voco.sock`, 0600) — external triggers
+3. **Unix socket** (`$XDG_RUNTIME_DIR/voco.sock` or `${TMPDIR:-/tmp}/voco-$(id -u)/voco.sock`, 0600) — external triggers
 
 ## Insertion Strategy
 
