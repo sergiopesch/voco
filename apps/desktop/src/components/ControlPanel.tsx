@@ -276,7 +276,7 @@ export function ControlPanel({
   }
 
   return (
-    <main className="voco-panel">
+    <main className="voco-panel" data-surface={surface}>
       <section className="voco-panel__shell">
         <header className="voco-panel__hero">
           <div className="voco-panel__brand" data-tauri-drag-region>
