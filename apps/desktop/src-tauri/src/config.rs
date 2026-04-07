@@ -14,8 +14,6 @@ pub struct AppConfig {
     pub selected_mic: Option<String>,
     #[serde(default = "default_insertion_strategy")]
     pub insertion_strategy: InsertionStrategy,
-    #[serde(default = "default_show_hud")]
-    pub show_hud: bool,
     #[serde(default)]
     pub onboarding_completed: bool,
     #[serde(default = "default_update_channel")]
@@ -59,10 +57,6 @@ fn default_hotkey() -> String {
 
 fn default_insertion_strategy() -> InsertionStrategy {
     InsertionStrategy::Auto
-}
-
-fn default_show_hud() -> bool {
-    true
 }
 
 fn default_update_channel() -> UpdateChannel {
@@ -130,7 +124,6 @@ impl Default for AppConfig {
             hotkey: default_hotkey(),
             selected_mic: None,
             insertion_strategy: InsertionStrategy::Auto,
-            show_hud: default_show_hud(),
             onboarding_completed: false,
             update_channel: default_update_channel(),
             install_channel: default_install_channel(),
@@ -222,7 +215,6 @@ mod tests {
         assert_eq!(config.hotkey, "Alt+D");
         assert!(config.selected_mic.is_none());
         assert!(matches!(config.insertion_strategy, InsertionStrategy::Auto));
-        assert!(config.show_hud);
         assert!(!config.onboarding_completed);
         assert!(matches!(config.update_channel, UpdateChannel::Stable));
         assert!(matches!(
@@ -238,7 +230,6 @@ mod tests {
             hotkey: "Ctrl+Shift+V".to_string(),
             selected_mic: Some("test-mic".to_string()),
             insertion_strategy: InsertionStrategy::Clipboard,
-            show_hud: false,
             onboarding_completed: true,
             update_channel: UpdateChannel::Beta,
             install_channel: InstallChannel::Appimage,
@@ -252,7 +243,6 @@ mod tests {
             parsed.insertion_strategy,
             InsertionStrategy::Clipboard
         ));
-        assert!(!parsed.show_hud);
         assert!(parsed.onboarding_completed);
         assert!(matches!(parsed.update_channel, UpdateChannel::Beta));
         assert!(matches!(parsed.install_channel, InstallChannel::Appimage));
@@ -265,7 +255,21 @@ mod tests {
         let config: AppConfig = serde_json::from_str(json).unwrap();
         assert_eq!(config.hotkey, "Alt+D");
         assert!(matches!(config.insertion_strategy, InsertionStrategy::Auto));
-        assert!(config.show_hud);
+        assert!(!config.onboarding_completed);
+        assert!(matches!(config.update_channel, UpdateChannel::Stable));
+        assert!(matches!(
+            config.install_channel,
+            InstallChannel::GithubRelease
+        ));
+        assert!(matches!(config.voice_profile, VoiceProfile::Default));
+    }
+
+    #[test]
+    fn config_deserializes_legacy_show_hud_field() {
+        let json = r#"{"showHud":false,"hotkey":"Alt+Shift+D"}"#;
+        let config: AppConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(config.hotkey, "Alt+Shift+D");
+        assert!(matches!(config.insertion_strategy, InsertionStrategy::Auto));
         assert!(!config.onboarding_completed);
         assert!(matches!(config.update_channel, UpdateChannel::Stable));
         assert!(matches!(

@@ -77,7 +77,6 @@ describe("useStore", () => {
       hotkey: "Alt+D",
       selectedMic: null,
       insertionStrategy: "auto" as const,
-      showHud: true,
       onboardingCompleted: false,
       updateChannel: "stable" as const,
       installChannel: "github-release" as const,

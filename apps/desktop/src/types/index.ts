@@ -12,7 +12,6 @@ export interface AppConfig {
   hotkey: string;
   selectedMic: string | null;
   insertionStrategy: InsertionStrategy;
-  showHud: boolean;
   onboardingCompleted: boolean;
   updateChannel: UpdateChannel;
   installChannel: InstallChannel;
