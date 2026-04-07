@@ -19,6 +19,10 @@ const RELEASES_API_URL =
   "https://api.github.com/repos/sergiopesch/voco/releases?per_page=12";
 const UPDATE_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 
+function isReusableCachedUpdateState(state: UpdateCheckState): boolean {
+  return state.status === "available" || state.status === "up-to-date";
+}
+
 function normalizeVersion(rawVersion: string): string {
   return rawVersion.trim().replace(/^voco\./i, "").replace(/^v/i, "");
 }
@@ -172,6 +176,9 @@ export async function readCachedUpdateState(
 
   try {
     if (cache.channel !== channel) {
+      return null;
+    }
+    if (!isReusableCachedUpdateState(cache.state)) {
       return null;
     }
     if (cache.state.currentVersion !== normalizeVersion(currentVersion)) {

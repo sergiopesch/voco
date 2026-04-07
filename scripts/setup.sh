@@ -231,7 +231,7 @@ TOML
   # ─── Install ──────────────────────────────────────────
   step "Install"
 
-  DEB=$(find apps/desktop/src-tauri/target/release/bundle/deb -maxdepth 1 -name "VOCO_*.deb" 2>/dev/null | sort | tail -1)
+  DEB=$(find apps/desktop/src-tauri/target/release/bundle/deb -maxdepth 1 \( -name "voco_*.deb" -o -name "VOCO_*.deb" \) 2>/dev/null | sort | tail -1)
   if [[ -n "$DEB" ]]; then
     DEB_SIZE=$(du -h "$DEB" | cut -f1)
     printf "    ${DIM}Package: %s (%s)${NC}\n" "$(basename "$DEB")" "$DEB_SIZE"

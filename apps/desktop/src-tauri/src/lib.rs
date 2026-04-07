@@ -19,6 +19,7 @@ static LAST_TOGGLE_MS: AtomicI64 = AtomicI64::new(0);
 // Evdev hotkey mode: 0 = Alt+D, 1 = Alt+Shift+D, 255 = custom (disabled)
 static EVDEV_HOTKEY_MODE: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
 static USE_EVDEV_HOTKEY: AtomicBool = AtomicBool::new(false);
+static EVDEV_LISTENER_STARTED: AtomicBool = AtomicBool::new(false);
 static HOTKEY_BINDING_VERSION: AtomicU64 = AtomicU64::new(0);
 static REGISTERED_PLUGIN_SHORTCUT: LazyLock<Mutex<Option<String>>> =
     LazyLock::new(|| Mutex::new(None));
@@ -69,6 +70,10 @@ fn prefers_evdev_hotkey(session_is_wayland: bool, hotkey: &str) -> bool {
 
 fn should_register_global_shortcut(use_evdev_hotkey: bool) -> bool {
     !use_evdev_hotkey
+}
+
+fn should_start_evdev_listener(use_evdev_hotkey: bool, listener_started: bool) -> bool {
+    use_evdev_hotkey && !listener_started
 }
 
 #[tauri::command]
@@ -556,6 +561,15 @@ fn apply_hotkey_runtime_state(
     notify: bool,
 ) -> Result<(), String> {
     let use_evdev_hotkey = prefers_evdev_hotkey(is_wayland_session(), new_hotkey);
+
+    #[cfg(target_os = "linux")]
+    if should_start_evdev_listener(
+        use_evdev_hotkey,
+        EVDEV_LISTENER_STARTED.load(Ordering::SeqCst),
+    ) {
+        ensure_evdev_hotkey_listener(app);
+    }
+
     sync_global_shortcut_binding(
         app,
         new_hotkey,
@@ -652,86 +666,100 @@ fn start_socket_listener(app_handle: tauri::AppHandle) {
 // --- evdev hotkey listener (primary mechanism on Wayland) ---
 
 #[cfg(target_os = "linux")]
-fn start_hotkey_listener(app_handle: tauri::AppHandle) {
+fn start_hotkey_listener(app_handle: tauri::AppHandle) -> bool {
     use evdev::{Device, InputEventKind, Key};
 
-    std::thread::spawn(move || {
-        let devices = evdev::enumerate()
-            .filter_map(|(_, device)| {
-                let keys = device.supported_keys()?;
-                if keys.contains(Key::KEY_A) && keys.contains(Key::KEY_LEFTALT) {
-                    Some(device)
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<Device>>();
+    let devices = evdev::enumerate()
+        .filter_map(|(_, device)| {
+            let keys = device.supported_keys()?;
+            if keys.contains(Key::KEY_A) && keys.contains(Key::KEY_LEFTALT) {
+                Some(device)
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<Device>>();
 
-        if devices.is_empty() {
-            warn!("No keyboard found for evdev. Add user to 'input' group: sudo usermod -aG input $USER");
-            return;
-        }
+    if devices.is_empty() {
+        warn!("No keyboard found for evdev. Add user to 'input' group: sudo usermod -aG input $USER");
+        return false;
+    }
 
-        info!(
-            "evdev hotkey listener started on {} keyboard(s)",
-            devices.len()
-        );
+    info!(
+        "evdev hotkey listener started on {} keyboard(s)",
+        devices.len()
+    );
 
-        let alt_held = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-        let shift_held = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let alt_held = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let shift_held = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
 
-        for device in devices {
-            let app = app_handle.clone();
-            let alt = alt_held.clone();
-            let shift = shift_held.clone();
+    for device in devices {
+        let app = app_handle.clone();
+        let alt = alt_held.clone();
+        let shift = shift_held.clone();
 
-            std::thread::spawn(move || {
-                let mut dev = device;
-                loop {
-                    match dev.fetch_events() {
-                        Ok(events) => {
-                            for ev in events {
-                                if let InputEventKind::Key(key) = ev.kind() {
-                                    let pressed = ev.value() == 1;
-                                    let repeat = ev.value() == 2;
+        std::thread::spawn(move || {
+            let mut dev = device;
+            loop {
+                match dev.fetch_events() {
+                    Ok(events) => {
+                        for ev in events {
+                            if let InputEventKind::Key(key) = ev.kind() {
+                                let pressed = ev.value() == 1;
+                                let repeat = ev.value() == 2;
 
-                                    match key {
-                                        Key::KEY_LEFTALT | Key::KEY_RIGHTALT => {
-                                            alt.store(pressed, Ordering::SeqCst);
-                                        }
-                                        Key::KEY_LEFTSHIFT | Key::KEY_RIGHTSHIFT => {
-                                            shift.store(pressed, Ordering::SeqCst);
-                                        }
-                                        Key::KEY_D if pressed && !repeat => {
-                                            let mode = EVDEV_HOTKEY_MODE.load(Ordering::SeqCst);
-                                            let alt_down = alt.load(Ordering::SeqCst);
-                                            let shift_down = shift.load(Ordering::SeqCst);
-
-                                            let matched = match mode {
-                                                0 => alt_down && !shift_down,
-                                                1 => alt_down && shift_down,
-                                                _ => false,
-                                            };
-
-                                            if matched {
-                                                debug!("Hotkey detected via evdev (mode {})", mode);
-                                                eval_toggle(&app);
-                                            }
-                                        }
-                                        _ => {}
+                                match key {
+                                    Key::KEY_LEFTALT | Key::KEY_RIGHTALT => {
+                                        alt.store(pressed, Ordering::SeqCst);
                                     }
+                                    Key::KEY_LEFTSHIFT | Key::KEY_RIGHTSHIFT => {
+                                        shift.store(pressed, Ordering::SeqCst);
+                                    }
+                                    Key::KEY_D if pressed && !repeat => {
+                                        let mode = EVDEV_HOTKEY_MODE.load(Ordering::SeqCst);
+                                        let alt_down = alt.load(Ordering::SeqCst);
+                                        let shift_down = shift.load(Ordering::SeqCst);
+
+                                        let matched = match mode {
+                                            0 => alt_down && !shift_down,
+                                            1 => alt_down && shift_down,
+                                            _ => false,
+                                        };
+
+                                        if matched {
+                                            debug!("Hotkey detected via evdev (mode {})", mode);
+                                            eval_toggle(&app);
+                                        }
+                                    }
+                                    _ => {}
                                 }
                             }
                         }
-                        Err(e) => {
-                            error!("Keyboard read error: {e}");
-                            break;
-                        }
+                    }
+                    Err(e) => {
+                        error!("Keyboard read error: {e}");
+                        break;
                     }
                 }
-            });
-        }
-    });
+            }
+        });
+    }
+
+    true
+}
+
+#[cfg(target_os = "linux")]
+fn ensure_evdev_hotkey_listener(app_handle: &tauri::AppHandle) {
+    if EVDEV_LISTENER_STARTED
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        return;
+    }
+
+    if !start_hotkey_listener(app_handle.clone()) {
+        EVDEV_LISTENER_STARTED.store(false, Ordering::SeqCst);
+    }
 }
 
 pub fn run() {
@@ -800,7 +828,7 @@ pub fn run() {
 
             #[cfg(target_os = "linux")]
             if use_evdev_hotkey {
-                start_hotkey_listener(app_handle);
+                ensure_evdev_hotkey_listener(&app_handle);
             }
 
             if let Err(e) = tray::setup_tray(app, &hotkey) {
@@ -893,6 +921,13 @@ mod tests {
     fn global_shortcut_registration_depends_on_backend_selection() {
         assert!(should_register_global_shortcut(false));
         assert!(!should_register_global_shortcut(true));
+    }
+
+    #[test]
+    fn evdev_listener_only_starts_once_for_supported_runtime_hotkeys() {
+        assert!(should_start_evdev_listener(true, false));
+        assert!(!should_start_evdev_listener(true, true));
+        assert!(!should_start_evdev_listener(false, false));
     }
 
     #[test]

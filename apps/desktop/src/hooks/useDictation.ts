@@ -64,6 +64,8 @@ export function useDictation() {
         });
         stream.getTracks().forEach((track) => track.stop());
 
+        setError(null);
+        setInterimTranscript("");
         await setMicrophoneReady(true);
         await setDictationStatus("idle");
         console.info("Microphone ready");
@@ -95,7 +97,7 @@ export function useDictation() {
         }
       }
     },
-    [setError],
+    [setError, setInterimTranscript],
   );
 
   const updateAudioLevel = useCallback(

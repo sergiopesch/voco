@@ -3,7 +3,14 @@ import { getVersion } from "@tauri-apps/api/app";
 import { LogicalPosition, LogicalSize } from "@tauri-apps/api/dpi";
 import { availableMonitors, getCurrentWindow } from "@tauri-apps/api/window";
 import { useStore } from "@/store/useStore";
-import { getConfig, openExternalUrl, saveConfig, showNotification } from "@/lib/tauri";
+import {
+  getConfig,
+  hideStatusOverlay,
+  openExternalUrl,
+  saveConfig,
+  showNotification,
+  showStatusOverlay,
+} from "@/lib/tauri";
 import {
   checkForUpdates,
   readCachedUpdateState,
@@ -12,10 +19,12 @@ import {
 import { useGlobalShortcut } from "@/hooks/useGlobalShortcut";
 import { useDictation } from "@/hooks/useDictation";
 import { ControlPanel } from "@/components/ControlPanel";
-import type { AppConfig, AudioDeviceOption } from "@/types";
+import type { AppConfig, AudioDeviceOption, DictationStatus } from "@/types";
 
 const PANEL_SIZE = new LogicalSize(1040, 760);
 const POPOVER_SIZE = new LogicalSize(420, 520);
+const STATUS_OVERLAY_WIDTH = 280;
+const STATUS_OVERLAY_HEIGHT = 132;
 const HIDDEN_SIZE = new LogicalSize(1, 1);
 const HIDDEN_POSITION = new LogicalPosition(-100, -100);
 const POPOVER_MARGIN = 16;
@@ -27,9 +36,48 @@ type TrayPopoverAnchor = {
   rectHeight: number;
 };
 
+function StatusOverlay({
+  status,
+  interimTranscript,
+  transcript,
+  audioLevel,
+}: {
+  status: DictationStatus;
+  interimTranscript: string;
+  transcript: string;
+  audioLevel: number;
+}) {
+  const headline = status === "recording" ? "Listening" : "Transcribing";
+  const copy =
+    interimTranscript ||
+    (status === "processing" && transcript
+      ? transcript
+      : "VOCO is following your voice and keeping the action visible.");
+  const meterLevel = status === "recording" ? Math.max(audioLevel, 0.06) : 1;
+
+  return (
+    <main className="voco-overlay" data-state={status} aria-live="polite">
+      <span className="voco-overlay__eyebrow">
+        {status === "recording" ? "Live Dictation" : "Local Processing"}
+      </span>
+      <strong className="voco-overlay__headline">{headline}</strong>
+      <p className="voco-overlay__copy">{copy}</p>
+      <div className="voco-overlay__meter" aria-hidden="true">
+        <div
+          className="voco-overlay__meter-fill"
+          style={{ transform: `scaleX(${meterLevel})` }}
+        />
+      </div>
+    </main>
+  );
+}
+
 export function App() {
   const status = useStore((state) => state.status);
   const error = useStore((state) => state.error);
+  const transcript = useStore((state) => state.transcript);
+  const interimTranscript = useStore((state) => state.interimTranscript);
+  const audioLevel = useStore((state) => state.audioLevel);
   const surface = useStore((state) => state.surface);
   const onboardingStep = useStore((state) => state.onboardingStep);
   const selectedDeviceId = useStore((state) => state.selectedDeviceId);
@@ -56,6 +104,8 @@ export function App() {
   const trayPopoverAnchorRef = useRef<TrayPopoverAnchor | null>(null);
   const lastCheckedChannelRef = useRef<AppConfig["updateChannel"] | null>(null);
   const notifiedReleaseVersionRef = useRef<string | null>(null);
+  const overlayVisible =
+    surface === "hidden" && (status === "recording" || status === "processing");
 
   useGlobalShortcut(
     toggle,
@@ -222,7 +272,7 @@ export function App() {
               ? error.message
               : "VOCO could not check GitHub Releases right now.",
         };
-        await writeCachedUpdateState(channel, errorState);
+        lastCheckedChannelRef.current = channel;
         setUpdateState(errorState);
       }
     },
@@ -376,6 +426,19 @@ export function App() {
   }, [surface]);
 
   useEffect(() => {
+    if (surface !== "hidden") {
+      return;
+    }
+
+    if (overlayVisible) {
+      void showStatusOverlay(STATUS_OVERLAY_WIDTH, STATUS_OVERLAY_HEIGHT).catch(() => {});
+      return;
+    }
+
+    void hideStatusOverlay().catch(() => {});
+  }, [overlayVisible, surface]);
+
+  useEffect(() => {
     let unlisten: (() => void) | null = null;
     void getCurrentWindow()
       .listen("voco:open-settings", () => {
@@ -420,7 +483,18 @@ export function App() {
     return null;
   }
 
-  return surface === "hidden" ? null : (
+  if (surface === "hidden") {
+    return overlayVisible ? (
+      <StatusOverlay
+        status={status}
+        interimTranscript={interimTranscript}
+        transcript={transcript}
+        audioLevel={audioLevel}
+      />
+    ) : null;
+  }
+
+  return (
     <ControlPanel
       surface={surface}
       onboardingStep={onboardingStep}

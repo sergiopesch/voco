@@ -116,4 +116,19 @@ describe("update cache helpers", () => {
       status: "up-to-date",
     });
   });
+
+  it("ignores cached error states so the next automatic check can retry", async () => {
+    vi.spyOn(tauriLib, "loadCachedUpdateState").mockResolvedValue({
+      channel: "stable",
+      state: {
+        status: "error",
+        currentVersion: "2026.0.6",
+        latestRelease: null,
+        lastCheckedAt: new Date().toISOString(),
+        error: "temporary network issue",
+      },
+    });
+
+    await expect(readCachedUpdateState("stable", "2026.0.6")).resolves.toBeNull();
+  });
 });

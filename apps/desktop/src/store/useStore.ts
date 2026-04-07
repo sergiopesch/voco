@@ -7,6 +7,26 @@ import type {
   UpdateCheckState,
 } from "@/types";
 
+export function deriveSurfaceForConfig(
+  currentSurface: AppSurface,
+  previousConfig: AppConfig | null,
+  nextConfig: AppConfig,
+): AppSurface {
+  if (!previousConfig) {
+    return nextConfig.onboardingCompleted ? "hidden" : "onboarding";
+  }
+
+  if (currentSurface === "onboarding" && nextConfig.onboardingCompleted) {
+    return "hidden";
+  }
+
+  if (currentSurface === "hidden" && !nextConfig.onboardingCompleted) {
+    return "onboarding";
+  }
+
+  return currentSurface;
+}
+
 interface AppState {
   status: DictationStatus;
   transcript: string;
@@ -62,14 +82,11 @@ export const useStore = create<AppState>((set) => ({
   setError: (error) => set({ error, status: error ? "error" : "idle" }),
   setAudioLevel: (level) => set({ audioLevel: level }),
   setConfig: (config) =>
-    set({
+    set((state) => ({
       config,
       selectedDeviceId: config.selectedMic,
-      surface:
-        config.onboardingCompleted && useStore.getState().surface !== "settings"
-          ? "hidden"
-          : "onboarding",
-    }),
+      surface: deriveSurfaceForConfig(state.surface, state.config, config),
+    })),
   setSurface: (surface) => set({ surface }),
   setOnboardingStep: (step) => set({ onboardingStep: step }),
   setAvailableDevices: (devices) => set({ availableDevices: devices }),

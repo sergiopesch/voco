@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { useStore } from "@/store/useStore";
+import { deriveSurfaceForConfig, useStore } from "@/store/useStore";
 
 describe("useStore", () => {
   beforeEach(() => {
@@ -85,6 +85,49 @@ describe("useStore", () => {
     useStore.getState().setConfig(config);
     expect(useStore.getState().config).toEqual(config);
     expect(useStore.getState().surface).toBe("onboarding");
+  });
+
+  it("keeps the settings surface when saving an updated config", () => {
+    const config = {
+      hotkey: "Alt+D",
+      selectedMic: null,
+      insertionStrategy: "auto" as const,
+      onboardingCompleted: true,
+      updateChannel: "stable" as const,
+      installChannel: "github-release" as const,
+      voiceProfile: "default" as const,
+    };
+
+    useStore.setState({
+      config,
+      surface: "settings",
+    });
+
+    useStore.getState().setConfig({
+      ...config,
+      updateChannel: "beta",
+    });
+
+    expect(useStore.getState().surface).toBe("settings");
+  });
+
+  it("hides the window after onboarding is completed", () => {
+    const previousConfig = {
+      hotkey: "Alt+D",
+      selectedMic: null,
+      insertionStrategy: "auto" as const,
+      onboardingCompleted: false,
+      updateChannel: "stable" as const,
+      installChannel: "github-release" as const,
+      voiceProfile: "default" as const,
+    };
+
+    expect(
+      deriveSurfaceForConfig("onboarding", previousConfig, {
+        ...previousConfig,
+        onboardingCompleted: true,
+      }),
+    ).toBe("hidden");
   });
 
   it("setUpdateState stores the latest release result", () => {
