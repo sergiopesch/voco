@@ -85,18 +85,29 @@ jobs:
         id: artifacts
         shell: bash
         run: |
-          DEB=$(find apps/desktop/src-tauri/target/release/bundle/deb -name "*.deb" | head -1)
+          DEB=$(find apps/desktop/src-tauri/target/release/bundle/deb -name "*.deb" | sort | tail -1)
           cp "$DEB" "voco_${{ steps.version.outputs.version }}_amd64.deb"
-          APPIMAGE=$(find apps/desktop/src-tauri/target/release/bundle/appimage -name "*.AppImage" | head -1 || true)
+          APPIMAGE=$(find apps/desktop/src-tauri/target/release/bundle/appimage -name "*.AppImage" | sort | tail -1 || true)
           if [ -z "$APPIMAGE" ] && [ -d apps/desktop/src-tauri/target/release/bundle/appimage/VOCO.AppDir ]; then
             APPIMAGE=$(VOCO_APPIMAGE_VERSION="${{ steps.version.outputs.version }}" bash ./scripts/package-appimage.sh | tail -n 1)
           fi
           if [ -n "$APPIMAGE" ]; then
-            cp "$APPIMAGE" "VOCO-${{ steps.version.outputs.version }}-x86_64.AppImage"
+            APPIMAGE_NAME="VOCO-${{ steps.version.outputs.version }}-x86_64.AppImage"
+            cp "$APPIMAGE" "${APPIMAGE_NAME}"
             echo "has_appimage=true" >> "$GITHUB_OUTPUT"
+            echo "appimage_name=${APPIMAGE_NAME}" >> "$GITHUB_OUTPUT"
           else
             echo "has_appimage=false" >> "$GITHUB_OUTPUT"
+            echo "appimage_name=" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Render release notes
+        shell: bash
+        run: |
+          bash ./scripts/render-release-body.sh \
+            "${{ steps.version.outputs.version }}" \
+            "${{ steps.version.outputs.tag_name }}" \
+            "${{ steps.artifacts.outputs.appimage_name }}" > release-body.md
 
       - name: Generate checksums
         shell: bash
@@ -111,47 +122,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           name: ${{ steps.version.outputs.release_name }}
-          body: |
-            ## Summary
-
-            Voice-native interface layer for Linux, shipped as a local-first desktop install.
-
-            ## Install
-
-            ### Debian / Ubuntu
-
-            ```bash
-            # Download and install
-            wget https://github.com/sergiopesch/voco/releases/download/${{ steps.version.outputs.tag_name }}/voco_${{ steps.version.outputs.version }}_amd64.deb
-            wget https://github.com/sergiopesch/voco/releases/download/${{ steps.version.outputs.tag_name }}/voco_checksums.txt
-            sha256sum --check voco_checksums.txt
-            sudo dpkg -i voco_${{ steps.version.outputs.version }}_amd64.deb
-            ```
-
-            ### Portable AppImage
-
-            ```bash
-            wget https://github.com/sergiopesch/voco/releases/download/${{ steps.version.outputs.tag_name }}/VOCO-${{ steps.version.outputs.version }}-x86_64.AppImage
-            chmod +x VOCO-${{ steps.version.outputs.version }}-x86_64.AppImage
-            ./VOCO-${{ steps.version.outputs.version }}-x86_64.AppImage
-            ```
-
-            **Requirements:** Ubuntu/Debian with `libwebkit2gtk-4.1-0`, `libgtk-3-0`, `libayatana-appindicator3-1`
-
-            **Wayland users:** `sudo apt install ydotool wl-clipboard && sudo usermod -aG input $USER`
-
-            **X11 users:** `sudo apt install xdotool xclip`
-
-            ## Upgrade notes
-
-            - Existing `voice` config is migrated to `~/.config/voco`
-            - Existing local models are reused from the prior install when present
-            - Restart VOCO after upgrading if it is already running
-
-            ## Known issues
-
-            - First launch still downloads the speech model (~142 MB, one-time)
-            - Wayland text insertion depends on `ydotool` and compositor support
+          body_path: release-body.md
           files: |
             voco_${{ steps.version.outputs.version }}_amd64.deb
             voco_checksums.txt
@@ -164,6 +135,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release upload "${{ steps.version.outputs.tag_name }}" \
-            "VOCO-${{ steps.version.outputs.version }}-x86_64.AppImage" \
+            "${{ steps.artifacts.outputs.appimage_name }}" \
             --repo "${{ github.repository }}" \
             --clobber
