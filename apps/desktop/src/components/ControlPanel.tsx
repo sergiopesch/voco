@@ -2,6 +2,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { AppConfig, AudioDeviceOption, UpdateCheckState } from "@/types";
 import { calculateVisualAudioLevelFromSamples } from "@/lib/audioLevel";
 import vocoBrandImage from "../../../../assets/voco-logo.png";
+import vocoTrayReadyImage from "../../../../assets/voco logo green v1.png";
+import vocoTrayRecordingImage from "../../../../assets/voco logo red v1.png";
+import vocoTrayProcessingImage from "../../../../assets/voco logo yellow v1.png";
 
 interface ControlPanelProps {
   surface: "onboarding" | "settings" | "popover";
@@ -35,6 +38,29 @@ const PANEL_SECTIONS = [
 ] as const;
 
 type PanelSection = (typeof PANEL_SECTIONS)[number];
+
+const TRAY_STATE_EXPLAINERS = [
+  {
+    label: "Ready",
+    image: vocoTrayReadyImage,
+    description: "Green means VOCO is armed and waiting for your hotkey.",
+  },
+  {
+    label: "Listening",
+    image: vocoTrayRecordingImage,
+    description: "Red means the microphone is live and VOCO is recording.",
+  },
+  {
+    label: "Transcribing",
+    image: vocoTrayProcessingImage,
+    description: "Yellow means VOCO is turning your speech into text.",
+  },
+  {
+    label: "Needs attention",
+    image: vocoBrandImage,
+    description: "Graphite means the microphone or transcription flow needs attention.",
+  },
+] as const;
 
 export function ControlPanel({
   surface,
@@ -563,9 +589,26 @@ export function ControlPanel({
               <section className="voco-onboarding__step">
                 <h2>VOCO is ready</h2>
                 <p>
-                  Press <code>{config.hotkey}</code> any time to begin. Settings stay
-                  available from the tray.
+                  Press <code>{config.hotkey}</code> any time to begin. Watch the tray
+                  icon as you work so you always know whether VOCO is ready, listening,
+                  transcribing, or needs attention.
                 </p>
+                <div className="voco-tray-state-grid" aria-label="Tray icon states">
+                  {TRAY_STATE_EXPLAINERS.map((state) => (
+                    <article key={state.label} className="voco-tray-state-card">
+                      <div className="voco-tray-state-card__icon" aria-hidden="true">
+                        <img src={state.image} alt="" />
+                      </div>
+                      <div className="voco-tray-state-card__copy">
+                        <strong>{state.label}</strong>
+                        <span>{state.description}</span>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+                <div className="voco-inline-note">
+                  Settings and the command panel stay available from the tray after setup.
+                </div>
                 <div className="voco-onboarding__actions">
                   <button
                     className="voco-button voco-button--primary"

@@ -59,7 +59,17 @@ export function App() {
 
   useGlobalShortcut(
     toggle,
-    initComplete && surface === "hidden",
+    () => {
+      if (!initComplete) {
+        return false;
+      }
+
+      if (surface === "hidden") {
+        return true;
+      }
+
+      return status === "recording" || status === "processing";
+    },
     appStartMsRef.current,
     onHotkeyPressed,
   );

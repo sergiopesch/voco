@@ -299,6 +299,56 @@ code {
   gap: 14px;
 }
 
+.voco-tray-state-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.voco-tray-state-card {
+  border: 1px solid rgba(199, 204, 213, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 16px 18px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+}
+
+.voco-tray-state-card__icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(199, 204, 213, 0.1);
+  display: grid;
+  place-items: center;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.voco-tray-state-card__icon img {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  display: block;
+}
+
+.voco-tray-state-card__copy {
+  display: grid;
+  gap: 6px;
+}
+
+.voco-tray-state-card__copy strong {
+  color: var(--voco-text);
+  font-size: 0.98rem;
+}
+
+.voco-tray-state-card__copy span {
+  color: var(--voco-text-secondary);
+  line-height: 1.5;
+}
+
 .voco-profile-card {
   border: 1px solid rgba(199, 204, 213, 0.12);
   border-radius: 18px;
@@ -576,6 +626,10 @@ code {
   }
 
   .voco-profile-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .voco-tray-state-grid {
     grid-template-columns: 1fr;
   }
 

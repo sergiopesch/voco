@@ -5,24 +5,27 @@ const TOGGLE_EVENT = "voco:toggle-dictation";
 
 export function useGlobalShortcut(
   toggle: () => void,
-  enabled: boolean,
+  shouldHandleHotkey: () => boolean,
   appStartMs: number,
   onHotkeyPressed: () => void,
 ) {
   const toggleRef = useRef(toggle);
   toggleRef.current = toggle;
+  const shouldHandleHotkeyRef = useRef(shouldHandleHotkey);
+  shouldHandleHotkeyRef.current = shouldHandleHotkey;
+  const onHotkeyPressedRef = useRef(onHotkeyPressed);
+  onHotkeyPressedRef.current = onHotkeyPressed;
 
   useEffect(() => {
-    if (!enabled) {
-      return;
-    }
-
     let unlisten: (() => void) | null = null;
     let disposed = false;
 
     void getCurrentWindow()
       .listen(TOGGLE_EVENT, () => {
-        onHotkeyPressed();
+        onHotkeyPressedRef.current();
+        if (!shouldHandleHotkeyRef.current()) {
+          return;
+        }
         toggleRef.current();
       })
       .then((cleanup) => {
@@ -48,5 +51,5 @@ export function useGlobalShortcut(
         unlisten();
       }
     };
-  }, [appStartMs, enabled, onHotkeyPressed]);
+  }, [appStartMs]);
 }
