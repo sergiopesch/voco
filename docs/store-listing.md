@@ -8,7 +8,7 @@ This file is the current VOCO copy pack for GitHub Releases, Flathub preparation
 
 ## Subtitle
 
-`A voice-native interface layer designed for speed and precision`
+`Voice-native interface layer. Built for Linux.`
 
 ## One-Line Summary
 

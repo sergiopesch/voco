@@ -1,6 +1,6 @@
 <!-- markdownlint-disable MD031 MD033 MD041 -->
 <h1 align="center">
-  <img src="assets/voco-readme-header.svg" alt="VOCO" width="720">
+  <img src="assets/voco-logo.png" alt="VOCO" width="320">
 </h1>
 <!-- markdownlint-enable MD041 -->
 

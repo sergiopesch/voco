@@ -11,8 +11,8 @@ DEB_URL="https://github.com/sergiopesch/voco/releases/download/${RELEASE_TAG}/vo
 # ─── Colors ─────────────────────────────────────────────
 BOLD='\033[1m'
 DIM='\033[2m'
-PURPLE='\033[38;2;108;76;245m'
-PURPLE_SOFT='\033[38;2;138;114;255m'
+GRAPHITE='\033[38;2;122;128;138m'
+GRAPHITE_SOFT='\033[38;2;199;204;212m'
 GREEN='\033[32m'
 YELLOW='\033[33m'
 RED='\033[31m'
@@ -32,7 +32,7 @@ spinner_start() {
     local frames=("⣾" "⣽" "⣻" "⢿" "⡿" "⣟" "⣯" "⣷")
     local i=0
     while true; do
-      printf "\r    ${PURPLE_SOFT}${frames[$i]}${NC} ${DIM}%s${NC}" "$msg"
+      printf "\r    ${GRAPHITE_SOFT}${frames[$i]}${NC} ${DIM}%s${NC}" "$msg"
       i=$(( (i + 1) % ${#frames[@]} ))
       sleep 0.07
     done
@@ -69,20 +69,20 @@ SECONDS=0
 
 # ─── Header ─────────────────────────────────────────────
 echo
-echo -e "  ${PURPLE_SOFT}${BOLD}██╗   ██╗ ██████╗  ██████╗ ██████╗ ${NC}"
-echo -e "  ${PURPLE_SOFT}${BOLD}██║   ██║██╔═══██╗██╔════╝██╔═══██╗${NC}"
-echo -e "  ${PURPLE_SOFT}${BOLD}██║   ██║██║   ██║██║     ██║   ██║${NC}"
-echo -e "  ${PURPLE_SOFT}${BOLD}╚██╗ ██╔╝██║   ██║██║     ██║   ██║${NC}"
-echo -e "  ${PURPLE}${BOLD} ╚████╔╝ ╚██████╔╝╚██████╗╚██████╔╝${NC}"
-echo -e "  ${PURPLE}${BOLD}  ╚═══╝   ╚═════╝  ╚═════╝ ╚═════╝ ${NC}"
+echo -e "  ${GRAPHITE_SOFT}${BOLD}██╗   ██╗ ██████╗  ██████╗ ██████╗ ${NC}"
+echo -e "  ${GRAPHITE_SOFT}${BOLD}██║   ██║██╔═══██╗██╔════╝██╔═══██╗${NC}"
+echo -e "  ${GRAPHITE_SOFT}${BOLD}██║   ██║██║   ██║██║     ██║   ██║${NC}"
+echo -e "  ${GRAPHITE_SOFT}${BOLD}╚██╗ ██╔╝██║   ██║██║     ██║   ██║${NC}"
+echo -e "  ${GRAPHITE}${BOLD} ╚████╔╝ ╚██████╔╝╚██████╗╚██████╔╝${NC}"
+echo -e "  ${GRAPHITE}${BOLD}  ╚═══╝   ╚═════╝  ╚═════╝ ╚═════╝ ${NC}"
 echo
-echo -e "  ${DIM}A voice-native interface layer designed for speed and precision${NC}"
+echo -e "  ${DIM}Voice-native interface layer. Built for Linux.${NC}"
 echo -e "  ${DIM}────────────────────────────────────────────────────────────${NC}"
 echo -e "  ${DIM}v${VERSION}${NC}"
 echo
 
 # ─── Checks ─────────────────────────────────────────────
-echo -e "  ${BOLD}${PURPLE}[1/3]${NC} ${BOLD}Checks${NC}"
+echo -e "  ${BOLD}${GRAPHITE}[1/3]${NC} ${BOLD}Checks${NC}"
 
 if [[ "$(uname)" != "Linux" ]]; then
   err "VOCO only supports Linux. Detected: $(uname)"
@@ -115,7 +115,7 @@ fi
 
 # ─── Download ───────────────────────────────────────────
 echo
-echo -e "  ${BOLD}${PURPLE}[2/3]${NC} ${BOLD}Download${NC}"
+echo -e "  ${BOLD}${GRAPHITE}[2/3]${NC} ${BOLD}Download${NC}"
 
 TMPDIR=$(mktemp -d)
 DEB_FILE="${TMPDIR}/voco_${VERSION}_amd64.deb"
@@ -128,7 +128,7 @@ dim "Package: voco_${VERSION}_amd64.deb (${DEB_SIZE})"
 
 # ─── Install ────────────────────────────────────────────
 echo
-echo -e "  ${BOLD}${PURPLE}[3/3]${NC} ${BOLD}Install${NC}"
+echo -e "  ${BOLD}${GRAPHITE}[3/3]${NC} ${BOLD}Install${NC}"
 
 if sudo dpkg -i "$DEB_FILE" > /dev/null 2>&1; then
   ok "VOCO installed"
@@ -145,7 +145,7 @@ rm -rf "$TMPDIR"
 
 # ─── Onboarding ─────────────────────────────────────────
 echo
-echo -e "  ${BOLD}${PURPLE}Quick Setup${NC}"
+echo -e "  ${BOLD}${GRAPHITE}Quick Setup${NC}"
 echo
 echo -e "  VOCO uses a global hotkey to start and stop listening."
 echo -e "  The default is ${BOLD}Alt+D${NC} — press it anywhere to dictate."
@@ -199,7 +199,7 @@ echo -e "  ${GREEN}${BOLD}  Installed in ${ELAPSED}s!${NC}"
 echo -e "  ${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo
 echo -e "  ${WHITE}${BOLD}▸${NC} Open ${BOLD}VOCO${NC} from your app launcher"
-echo -e "  ${WHITE}${BOLD}▸${NC} Or run: ${PURPLE_SOFT}voco${NC}"
+echo -e "  ${WHITE}${BOLD}▸${NC} Or run: ${GRAPHITE_SOFT}voco${NC}"
 echo
 echo -e "  ${DIM}First launch downloads the speech model (~142 MB, one-time).${NC}"
 echo -e "  ${DIM}Then press ${BOLD}${HOTKEY}${NC}${DIM} to dictate!${NC}"

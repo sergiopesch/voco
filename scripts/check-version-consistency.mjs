@@ -43,8 +43,8 @@ const sources = [
     value: JSON.parse(read("apps/desktop/src-tauri/tauri.conf.json")).version,
   },
   {
-    label: "install script",
-    value: expectMatch("scripts/install.sh", /^VERSION="([^"]+)"/m, "install script version"),
+    label: "install entrypoint",
+    value: expectMatch("install", /^VERSION="([^"]+)"/m, "install script version"),
   },
   {
     label: "AppStream release",

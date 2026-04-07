@@ -8,8 +8,8 @@ set -euo pipefail
 # ─── Colors ─────────────────────────────────────────────
 BOLD='\033[1m'
 DIM='\033[2m'
-PURPLE='\033[38;2;108;76;245m'
-PURPLE_SOFT='\033[38;2;138;114;255m'
+GRAPHITE='\033[38;2;122;128;138m'
+GRAPHITE_SOFT='\033[38;2;199;204;212m'
 GREEN='\033[32m'
 YELLOW='\033[33m'
 RED='\033[31m'
@@ -24,7 +24,7 @@ dim()  { printf "  ${DIM}%s${NC}\n" "$*"; }
 step() {
   STEP_NUM=$((STEP_NUM + 1))
   echo
-  printf "  ${BOLD}${PURPLE}[%d/%d]${NC} ${BOLD}%s${NC}\n" "$STEP_NUM" "$TOTAL_STEPS" "$1"
+  printf "  ${BOLD}${GRAPHITE}[%d/%d]${NC} ${BOLD}%s${NC}\n" "$STEP_NUM" "$TOTAL_STEPS" "$1"
 }
 
 # ─── Spinner ────────────────────────────────────────────
@@ -35,7 +35,7 @@ spinner_start() {
     local frames=("⣾" "⣽" "⣻" "⢿" "⡿" "⣟" "⣯" "⣷")
     local i=0
     while true; do
-      printf "\r    ${PURPLE_SOFT}${frames[$i]}${NC} ${DIM}%s${NC}" "$msg"
+      printf "\r    ${GRAPHITE_SOFT}${frames[$i]}${NC} ${DIM}%s${NC}" "$msg"
       i=$(( (i + 1) % ${#frames[@]} ))
       sleep 0.07
     done
@@ -80,14 +80,14 @@ STEP_NUM=0
 
 # ─── Header ─────────────────────────────────────────────
 echo
-echo -e "  ${PURPLE_SOFT}${BOLD}██╗   ██╗ ██████╗  ██████╗ ██████╗ ${NC}"
-echo -e "  ${PURPLE_SOFT}${BOLD}██║   ██║██╔═══██╗██╔════╝██╔═══██╗${NC}"
-echo -e "  ${PURPLE_SOFT}${BOLD}██║   ██║██║   ██║██║     ██║   ██║${NC}"
-echo -e "  ${PURPLE_SOFT}${BOLD}╚██╗ ██╔╝██║   ██║██║     ██║   ██║${NC}"
-echo -e "  ${PURPLE}${BOLD} ╚████╔╝ ╚██████╔╝╚██████╗╚██████╔╝${NC}"
-echo -e "  ${PURPLE}${BOLD}  ╚═══╝   ╚═════╝  ╚═════╝ ╚═════╝ ${NC}"
+echo -e "  ${GRAPHITE_SOFT}${BOLD}██╗   ██╗ ██████╗  ██████╗ ██████╗ ${NC}"
+echo -e "  ${GRAPHITE_SOFT}${BOLD}██║   ██║██╔═══██╗██╔════╝██╔═══██╗${NC}"
+echo -e "  ${GRAPHITE_SOFT}${BOLD}██║   ██║██║   ██║██║     ██║   ██║${NC}"
+echo -e "  ${GRAPHITE_SOFT}${BOLD}╚██╗ ██╔╝██║   ██║██║     ██║   ██║${NC}"
+echo -e "  ${GRAPHITE}${BOLD} ╚████╔╝ ╚██████╔╝╚██████╗╚██████╔╝${NC}"
+echo -e "  ${GRAPHITE}${BOLD}  ╚═══╝   ╚═════╝  ╚═════╝ ╚═════╝ ${NC}"
 echo
-echo -e "  ${DIM}A voice-native interface layer designed for speed and precision${NC}"
+echo -e "  ${DIM}Voice-native interface layer. Built for Linux.${NC}"
 echo -e "  ${DIM}────────────────────────────────────────────────────────────${NC}"
 echo
 
@@ -202,9 +202,9 @@ TOML
     fi
     ELAPSED=$((SECONDS - BUILD_START))
     if [[ -n "$LAST_CRATE" ]]; then
-      printf "\r    ${PURPLE_SOFT}${FRAMES[$FRAME_I]}${NC} ${DIM}Compiling (%d crates, %ds) · %s${NC}    " "$CRATE_COUNT" "$ELAPSED" "$LAST_CRATE"
+      printf "\r    ${GRAPHITE_SOFT}${FRAMES[$FRAME_I]}${NC} ${DIM}Compiling (%d crates, %ds) · %s${NC}    " "$CRATE_COUNT" "$ELAPSED" "$LAST_CRATE"
     else
-      printf "\r    ${PURPLE_SOFT}${FRAMES[$FRAME_I]}${NC} ${DIM}Starting build...${NC}    "
+      printf "\r    ${GRAPHITE_SOFT}${FRAMES[$FRAME_I]}${NC} ${DIM}Starting build...${NC}    "
     fi
     FRAME_I=$(( (FRAME_I + 1) % ${#FRAMES[@]} ))
     sleep 0.15
@@ -245,7 +245,7 @@ TOML
 
   # ─── Onboarding ───────────────────────────────────────
   echo
-  echo -e "  ${BOLD}${PURPLE}Quick Setup${NC}"
+  echo -e "  ${BOLD}${GRAPHITE}Quick Setup${NC}"
   echo
   echo -e "  VOCO uses a global hotkey to start and stop listening."
   echo -e "  The default is ${BOLD}Alt+D${NC} — press it anywhere to dictate."
@@ -300,7 +300,7 @@ EOF
   echo -e "  ${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
   echo
   echo -e "  ${WHITE}${BOLD}▸${NC} Open ${BOLD}VOCO${NC} from your app launcher"
-  echo -e "  ${WHITE}${BOLD}▸${NC} Or run: ${PURPLE_SOFT}voco${NC}"
+  echo -e "  ${WHITE}${BOLD}▸${NC} Or run: ${GRAPHITE_SOFT}voco${NC}"
   echo
   echo -e "  ${DIM}First launch downloads the speech model (~142 MB, one-time).${NC}"
   echo -e "  ${DIM}Then press ${BOLD}${HOTKEY}${NC}${DIM} to dictate!${NC}"
@@ -317,8 +317,8 @@ else
   echo -e "  ${GREEN}${BOLD}  Ready in ${ELAPSED}s!${NC}"
   echo -e "  ${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
   echo
-  echo -e "  ${WHITE}${BOLD}▸${NC} Development:   ${PURPLE_SOFT}npm run dev${NC}"
-  echo -e "  ${WHITE}${BOLD}▸${NC} Full install:  ${PURPLE_SOFT}./scripts/setup.sh --install${NC}"
+  echo -e "  ${WHITE}${BOLD}▸${NC} Development:   ${GRAPHITE_SOFT}npm run dev${NC}"
+  echo -e "  ${WHITE}${BOLD}▸${NC} Full install:  ${GRAPHITE_SOFT}./scripts/setup.sh --install${NC}"
   echo
   echo -e "  ${DIM}First launch downloads the speech model (~142 MB, one-time).${NC}"
   echo -e "  ${DIM}Then press ${BOLD}Alt+D${NC}${DIM} to dictate!${NC}"

@@ -68,10 +68,10 @@ jobs:
 
           if [[ "$TAG_NAME" == voco.* ]]; then
             VERSION="${TAG_NAME#voco.}"
-            RELEASE_NAME="$TAG_NAME"
+            RELEASE_NAME="VOCO ${VERSION}"
           elif [[ "$TAG_NAME" == v* ]]; then
             VERSION="${TAG_NAME#v}"
-            RELEASE_NAME="VOCO v${VERSION}"
+            RELEASE_NAME="VOCO ${VERSION}"
           else
             VERSION="$TAG_NAME"
             RELEASE_NAME="VOCO ${VERSION}"
@@ -114,7 +114,7 @@ jobs:
           body: |
             ## Summary
 
-            Premium Linux-first dictation, now shipping under the VOCO name.
+            Voice-native interface layer for Linux, shipped as a local-first desktop install.
 
             ## Install
 
