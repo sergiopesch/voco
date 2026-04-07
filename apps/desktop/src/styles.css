@@ -149,7 +149,12 @@ code {
   color: var(--voco-text-muted);
 }
 
-.voco-panel__content,
+.voco-panel__content {
+  min-height: 0;
+  overflow: auto;
+  padding-bottom: 12px;
+}
+
 .voco-settings {
   min-height: 0;
 }
@@ -237,7 +242,7 @@ code {
 .voco-onboarding__step,
 .voco-settings__section {
   max-width: 720px;
-  padding: 26px 30px 32px;
+  padding: 26px 30px 40px;
   display: grid;
   gap: 18px;
 }
