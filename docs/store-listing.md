@@ -57,7 +57,10 @@ Current release priorities:
 
 Planned store path:
 - Flathub first
-- Snap after Flatpak packaging is stable
+- Snap draft now exists for Ubuntu App Center preparation
+
+Current Snap note:
+- use `classic` confinement for the honest v1 draft because VOCO depends on host-level hotkeys and text insertion helpers
 
 ## Release Notes Template
 
@@ -98,5 +101,5 @@ Capture these surfaces on a clean Linux desktop with legible text and restrained
 - use a dark desktop background with minimal visual noise
 - keep VOCO centered and readable
 - avoid unrelated terminal clutter or browser tabs
-- ensure panel shadows and purple accents remain visible
+- ensure panel shadows and graphite highlights remain visible
 - capture at high resolution, then export scaled store assets from those masters

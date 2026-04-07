@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { AppConfig, AudioDeviceOption, UpdateCheckState } from "@/types";
 import { calculateVisualAudioLevelFromSamples } from "@/lib/audioLevel";
+import vocoBrandImage from "@/assets/voco-brand.jpg";
 
 interface ControlPanelProps {
   surface: "onboarding" | "settings" | "popover";
@@ -222,12 +223,11 @@ export function ControlPanel({
         <header className="voco-panel__hero">
           <div className="voco-panel__brand" data-tauri-drag-region>
             <div className="voco-panel__brand-mark" aria-hidden="true">
-              <span className="voco-panel__brand-mic">
-                <span className="voco-panel__brand-mic-body" />
-                <span className="voco-panel__brand-mic-yoke" />
-                <span className="voco-panel__brand-mic-stem" />
-                <span className="voco-panel__brand-mic-base" />
-              </span>
+              <img
+                className="voco-panel__brand-mark-image"
+                src={vocoBrandImage}
+                alt=""
+              />
             </div>
             <div>
               <p className="voco-panel__eyebrow">{panelEyebrow}</p>
@@ -648,7 +648,7 @@ export function ControlPanel({
                 <section className="voco-settings__section">
                   <h2>Appearance</h2>
                   <p>
-                    VOCO currently ships with an opinionated dark, purple-first interface.
+                    VOCO currently ships with an opinionated dark interface based on the new graphite microphone branding.
                   </p>
                   <div className="voco-inline-note">
                     Theme switching is intentionally deferred until the product surfaces

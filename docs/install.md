@@ -1,6 +1,6 @@
 # Install
 
-VOCO currently ships through GitHub Releases first, with additional Linux channels planned after packaging quality is stable.
+VOCO currently ships through GitHub Releases first, with additional Linux channels planned after packaging quality is stable. The visual system now centers on the graphite microphone mark used in the app and release assets.
 
 ## GitHub Release
 
@@ -46,6 +46,21 @@ flatpak-builder --user --install --force-clean build-flatpak packaging/flatpak/c
 
 This path is still packaging work in progress. Treat it as a local validation path before Flathub submission, not a finished public channel.
 
+## Snap Preparation
+
+VOCO now includes an initial Snap draft under `snap/`.
+
+Start from:
+
+```bash
+snapcraft
+```
+
+Current note:
+- the draft uses `classic` confinement intentionally
+- this matches VOCO's current host-integration model for hotkeys, text insertion, notifications, and URL opening
+- treat this as Ubuntu App Center preparation work, not a published Snap channel yet
+
 ## AppImage Fallback Packaging
 
 If Tauri leaves `VOCO.AppDir` in `apps/desktop/src-tauri/target/release/bundle/appimage/` without creating the final `.AppImage`, run:
@@ -76,6 +91,14 @@ If you also want to remove local state:
 
 ```bash
 rm -rf ~/.config/voco ~/.local/share/voco ~/.cache/voco
+```
+
+### Snap draft cleanup
+
+If you built the draft snap locally, remove the installed snap with:
+
+```bash
+sudo snap remove voco
 ```
 
 ### Source install

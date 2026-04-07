@@ -232,13 +232,13 @@ fn apply_tray_state(app: &tauri::AppHandle, tray_state: &TrayState) {
     let (state, color, tooltip) = if tray_state.recording {
         (
             TrayVisualState::Recording,
-            [138, 114, 255, 244],
+            [225, 229, 236, 244],
             "VOCO — Listening",
         )
     } else if tray_state.microphone_ready {
         (
             TrayVisualState::Ready,
-            [108, 76, 245, 240],
+            [170, 176, 186, 240],
             "VOCO — Ready to listen",
         )
     } else {
@@ -309,13 +309,13 @@ fn create_base_mic_icon(size: u32, color: [u8; 4]) -> Vec<u8> {
     let mut pixels = vec![0u8; (size * size * 4) as usize];
     let s = size as f32;
     let orb_fill = match color {
-        [138, 114, 255, _] => [42, 32, 86, 255],
-        [108, 76, 245, _] => [32, 24, 74, 255],
+        [225, 229, 236, _] => [48, 52, 60, 255],
+        [170, 176, 186, _] => [38, 42, 50, 255],
         _ => [28, 28, 36, 245],
     };
     let rim = match color {
-        [138, 114, 255, _] => [183, 167, 255, 235],
-        [108, 76, 245, _] => [140, 122, 255, 220],
+        [225, 229, 236, _] => [236, 239, 244, 235],
+        [170, 176, 186, _] => [200, 206, 214, 220],
         _ => [120, 120, 132, 205],
     };
 
@@ -369,7 +369,7 @@ fn create_base_mic_icon(size: u32, color: [u8; 4]) -> Vec<u8> {
                     size,
                     px as i32,
                     py as i32,
-                    [244, 239, 255, color[3]],
+                    [242, 244, 247, color[3]],
                     alpha.min(1.0),
                 );
 
@@ -383,7 +383,7 @@ fn create_base_mic_icon(size: u32, color: [u8; 4]) -> Vec<u8> {
                             size,
                             px as i32,
                             py as i32,
-                            [90, 62, 224, 96],
+                            [122, 128, 138, 96],
                             groove * alpha.min(1.0),
                         );
                     }

@@ -12,7 +12,7 @@
 <p align="center">
   <a href="#requirements"><img src="https://img.shields.io/badge/platform-Linux-black?style=flat-square&logo=linux&logoColor=white" alt="Linux"></a>
   <a href="https://github.com/sergiopesch/voco/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/sergiopesch/voco/ci.yml?style=flat-square&label=CI" alt="CI"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-6C4CF5?style=flat-square" alt="MIT License"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-5E6570?style=flat-square" alt="MIT License"></a>
 </p>
 
 ---
@@ -35,6 +35,7 @@ GitHub Releases now target:
 Current stable release: `voco.2026.0.3`
 
 An initial Flatpak packaging baseline is also included in `packaging/flatpak/` for local validation and Flathub preparation.
+An initial Snap draft is also included in `snap/` for Ubuntu App Center preparation, currently using classic confinement because VOCO depends on host-level desktop automation.
 For AppImage fallback packaging, the repo also includes `scripts/package-appimage.sh` to finalize an AppDir when Tauri stops before emitting the final `.AppImage` file.
 
 ### Build from source

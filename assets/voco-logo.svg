@@ -1,58 +1,58 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 140" fill="none">
-  <rect width="480" height="140" rx="24" fill="#0A0A0F"/>
-  <rect x="1" y="1" width="478" height="138" rx="23" stroke="#B7A7FF" stroke-opacity="0.14"/>
+  <rect width="480" height="140" rx="24" fill="#090A0D"/>
+  <rect x="1" y="1" width="478" height="138" rx="23" stroke="#C7CCD5" stroke-opacity="0.14"/>
 
   <g transform="translate(28,20)">
-    <circle cx="50" cy="50" r="44" fill="#11111A"/>
-    <circle cx="50" cy="50" r="43.5" stroke="#2A2A38"/>
-    <circle cx="50" cy="50" r="37" fill="url(#orbGlow)"/>
-    <circle cx="50" cy="50" r="36.5" stroke="url(#orbRing)" stroke-opacity="0.8"/>
-    <ellipse cx="38" cy="31" rx="18" ry="11" fill="#FFFFFF" opacity="0.14"/>
+    <rect x="0" y="0" width="100" height="100" rx="24" fill="#111318"/>
+    <rect x="1" y="1" width="98" height="98" rx="23" stroke="#2B3038"/>
+    <circle cx="50" cy="50" r="35" fill="url(#orbGlow)"/>
+    <circle cx="50" cy="50" r="34.5" stroke="url(#orbRing)" stroke-opacity="0.82"/>
+    <ellipse cx="39" cy="30" rx="16" ry="10" fill="#FFFFFF" opacity="0.14"/>
 
     <g filter="url(#softShadow)">
-      <rect x="37" y="20" width="26" height="40" rx="13" fill="url(#micBody)"/>
-      <rect x="47" y="60" width="6" height="16" rx="3" fill="#EAE6FF" fill-opacity="0.92"/>
-      <path d="M30 46C30 58.1503 38.9543 68 50 68C61.0457 68 70 58.1503 70 46" stroke="#EAE6FF" stroke-width="5" stroke-linecap="round" stroke-opacity="0.88"/>
-      <rect x="33" y="76" width="34" height="5" rx="2.5" fill="#EAE6FF" fill-opacity="0.88"/>
-      <rect x="43.5" y="28" width="1.8" height="24" rx="0.9" fill="#4C33B8" fill-opacity="0.35"/>
-      <rect x="49.1" y="28" width="1.8" height="24" rx="0.9" fill="#4C33B8" fill-opacity="0.3"/>
-      <rect x="54.7" y="28" width="1.8" height="24" rx="0.9" fill="#4C33B8" fill-opacity="0.35"/>
+      <rect x="37" y="18" width="26" height="42" rx="13" fill="url(#micBody)"/>
+      <rect x="47" y="60" width="6" height="15" rx="3" fill="#F2F4F7" fill-opacity="0.94"/>
+      <path d="M30 45C30 57.1503 38.9543 67 50 67C61.0457 67 70 57.1503 70 45" stroke="#F2F4F7" stroke-width="5" stroke-linecap="round" stroke-opacity="0.9"/>
+      <rect x="33" y="76" width="34" height="5" rx="2.5" fill="#F2F4F7" fill-opacity="0.9"/>
+      <rect x="43.5" y="25" width="1.8" height="26" rx="0.9" fill="#7A808A" fill-opacity="0.32"/>
+      <rect x="49.1" y="25" width="1.8" height="26" rx="0.9" fill="#7A808A" fill-opacity="0.28"/>
+      <rect x="54.7" y="25" width="1.8" height="26" rx="0.9" fill="#7A808A" fill-opacity="0.32"/>
     </g>
   </g>
 
-  <g transform="translate(126,0)">
-    <text x="0" y="68" font-family="Inter, Helvetica, Arial, sans-serif" font-size="44" font-weight="600" letter-spacing="7" fill="#FFFFFF">
+  <g transform="translate(146,0)">
+    <text x="0" y="66" font-family="Geist, Inter, Helvetica, Arial, sans-serif" font-size="44" font-weight="600" letter-spacing="6" fill="#FFFFFF">
       VOCO
     </text>
-    <text x="1" y="95" font-family="Inter, Helvetica, Arial, sans-serif" font-size="13" font-weight="500" letter-spacing="1.1" fill="#C9C9D6">
+    <text x="1" y="94" font-family="Geist, Inter, Helvetica, Arial, sans-serif" font-size="13" font-weight="500" letter-spacing="1" fill="#C7CCD4">
       A voice-native interface layer designed for speed and precision
     </text>
-    <rect x="1" y="108" width="252" height="2" rx="1" fill="#6C4CF5"/>
+    <rect x="1" y="108" width="252" height="2" rx="1" fill="#7A808A"/>
   </g>
 
   <defs>
-    <radialGradient id="orbGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(39 31) rotate(50) scale(50)">
+    <radialGradient id="orbGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(40 30) rotate(52) scale(48)">
       <stop stop-color="#FFFFFF"/>
-      <stop offset="0.18" stop-color="#D7CCFF"/>
-      <stop offset="0.52" stop-color="#8A72FF"/>
-      <stop offset="1" stop-color="#5A3EE0"/>
+      <stop offset="0.28" stop-color="#E1E5EC"/>
+      <stop offset="0.68" stop-color="#AAB0BA"/>
+      <stop offset="1" stop-color="#5E6570"/>
     </radialGradient>
-    <linearGradient id="orbRing" x1="20" y1="16" x2="79" y2="88" gradientUnits="userSpaceOnUse">
+    <linearGradient id="orbRing" x1="20" y1="18" x2="80" y2="86" gradientUnits="userSpaceOnUse">
       <stop stop-color="#FFFFFF"/>
-      <stop offset="0.22" stop-color="#B7A7FF"/>
-      <stop offset="1" stop-color="#6C4CF5"/>
+      <stop offset="0.4" stop-color="#C7CCD5"/>
+      <stop offset="1" stop-color="#7A808A"/>
     </linearGradient>
-    <linearGradient id="micBody" x1="37" y1="20" x2="63" y2="60" gradientUnits="userSpaceOnUse">
+    <linearGradient id="micBody" x1="37" y1="18" x2="63" y2="60" gradientUnits="userSpaceOnUse">
       <stop stop-color="#FFFFFF"/>
-      <stop offset="0.35" stop-color="#F3EEFF"/>
-      <stop offset="1" stop-color="#D8CBFF"/>
+      <stop offset="0.42" stop-color="#E7EBF1"/>
+      <stop offset="1" stop-color="#B5BBC5"/>
     </linearGradient>
-    <filter id="softShadow" x="24" y="14" width="52" height="72" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+    <filter id="softShadow" x="24" y="12" width="52" height="74" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
       <feFlood flood-opacity="0" result="BackgroundImageFix"/>
       <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
       <feOffset dy="2"/>
       <feGaussianBlur stdDeviation="2"/>
-      <feColorMatrix type="matrix" values="0 0 0 0 0.126 0 0 0 0 0.086 0 0 0 0 0.345 0 0 0 0.45 0"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0.03 0 0 0 0 0.04 0 0 0 0 0.07 0 0 0 0.45 0"/>
       <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_0_1"/>
       <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_0_1" result="shape"/>
     </filter>

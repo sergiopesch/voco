@@ -14,13 +14,18 @@ VOCO's v1 packaging plan is intentionally staged.
 
 - Flathub packaging
 - Flatpak manifest baseline now lives in `packaging/flatpak/`
+- Snap draft baseline now lives in `snap/`
 
 ## Later
 
-- Snap
+- strict-confinement investigation only if VOCO stops depending on host-level desktop automation
 - RPM if Fedora-class support becomes a priority
 
 ## Asset Naming
+
+Branding note:
+- package and listing assets should use VOCO's graphite microphone branding rather than the older purple treatment
+
 
 - `voco_<version>_amd64.deb`
 - `voco_checksums.txt`
@@ -54,6 +59,28 @@ The repo now includes an initial Flatpak packaging baseline:
 - `packaging/flatpak/com.sergiopesch.voco.metainfo.xml`
 
 This is a starting point for Flathub submission work, not a claimed production-ready Flathub package yet. The next packaging pass should validate sandbox permissions, runtime dependencies, and release build behavior inside `flatpak-builder`.
+
+## Snap Baseline
+
+The repo now also includes an initial Snap draft:
+
+- `snap/snapcraft.yaml`
+- `snap/gui/com.sergiopesch.voco.desktop`
+
+This draft currently uses `classic` confinement on purpose.
+
+Why not strict yet:
+
+- VOCO registers global hotkeys
+- on Wayland it can rely on direct `evdev` keyboard access
+- text insertion shells out to `ydotool`, `xdotool`, `wl-copy`, `wl-paste`, and `xclip`
+- it opens external URLs with `xdg-open`
+- it uses `notify-send` for desktop notifications
+- its core user promise is typing into arbitrary host applications, which is exactly where strict confinement becomes unnatural
+
+So the honest first Snap is a buildable classic draft for Ubuntu App Center review, not a pretend-strict package that quietly breaks VOCO's core workflow.
+
+The next packaging pass should validate `snapcraft` builds on Ubuntu 24.04+, confirm Node 20+ availability in the build environment, and decide whether any future product changes could make stricter confinement realistic.
 
 ## AppImage Fallback Packaging
 
