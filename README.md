@@ -1,6 +1,6 @@
 <!-- markdownlint-disable MD031 MD033 MD041 -->
 <h1 align="center">
-  <img src="assets/voco-logo.png" alt="VOCO" width="320">
+  <img src="assets/voco-logo.png" alt="VOCO logo" width="160" valign="middle">&nbsp;&nbsp;<span style="font-family: Geist, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 84px; font-weight: 600; letter-spacing: -0.08em; vertical-align: middle;">voco</span>
 </h1>
 <!-- markdownlint-enable MD041 -->
 
