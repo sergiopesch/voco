@@ -19,7 +19,7 @@ VOCO is a Linux local-first voice interface for fast control and insertion at th
 ### GitHub Release
 
 ```bash
-VERSION="<version>"; wget "https://github.com/sergiopesch/voco/releases/download/voco.${VERSION}/voco_${VERSION}_amd64.deb" && sudo dpkg -i "voco_${VERSION}_amd64.deb"
+wget "$(curl -fsSL https://api.github.com/repos/sergiopesch/voco/releases/latest | grep -o 'https://[^"]*voco_[^"]*_amd64\.deb' | head -1)" && sudo dpkg -i voco_*_amd64.deb
 ```
 
 Primary tested path: Ubuntu and Debian.
