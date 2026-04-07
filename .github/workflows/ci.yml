@@ -33,6 +33,11 @@ jobs:
       - name: Verify version consistency
         run: npm run verify:versions
 
+      - name: Validate install and build scripts
+        run: |
+          bash -n install scripts/install.sh scripts/setup.sh scripts/build-desktop.sh scripts/package-appimage.sh
+          python3 -m py_compile scripts/generate-icons.py
+
       - name: TypeScript check
         run: npm run check
 
