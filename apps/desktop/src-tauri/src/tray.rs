@@ -306,90 +306,16 @@ fn create_mic_icon(size: u32, color: [u8; 4], state: TrayVisualState) -> Vec<u8>
 }
 
 fn create_base_mic_icon(size: u32, color: [u8; 4]) -> Vec<u8> {
-    let mut pixels = vec![0u8; (size * size * 4) as usize];
-    let s = size as f32;
-    let panel_fill = match color {
-        [225, 229, 236, _] => [34, 37, 43, 255],
-        [170, 176, 186, _] => [28, 31, 36, 255],
-        _ => [22, 24, 29, 248],
-    };
-    let panel_rim = match color {
-        [225, 229, 236, _] => [188, 194, 202, 220],
-        [170, 176, 186, _] => [154, 160, 170, 205],
-        _ => [104, 108, 116, 190],
-    };
+    let icon_bytes = include_bytes!("../icons/128x128@2x.png");
+    let decoded = image::load_from_memory_with_format(icon_bytes, image::ImageFormat::Png)
+        .expect("official tray icon should decode")
+        .to_rgba8();
 
-    for py in 0..size {
-        for px in 0..size {
-            let x = px as f32;
-            let y = py as f32;
+    let resized =
+        image::imageops::resize(&decoded, size, size, image::imageops::FilterType::Lanczos3);
 
-            let nx = x / s;
-            let ny = y / s;
-            let idx = ((py * size + px) * 4) as usize;
-
-            let panel_alpha = rounded_rect_alpha(nx, ny, 0.16, 0.09, 0.84, 0.91, 0.15, 0.03);
-            if panel_alpha <= 0.0 {
-                continue;
-            }
-
-            let top_light = ellipse_alpha(nx, ny, 0.5, 0.20, 0.34, 0.18, 0.22) * 0.22;
-            let center_glow = ellipse_alpha(nx, ny, 0.5, 0.48, 0.28, 0.34, 0.2) * 0.12;
-            let rim_outer = rounded_rect_alpha(nx, ny, 0.16, 0.09, 0.84, 0.91, 0.15, 0.03);
-            let rim_inner = rounded_rect_alpha(nx, ny, 0.20, 0.13, 0.80, 0.87, 0.12, 0.03);
-            let rim_strength = (rim_outer - rim_inner).clamp(0.0, 1.0);
-
-            let mut red = panel_fill[0] as f32;
-            let mut green = panel_fill[1] as f32;
-            let mut blue = panel_fill[2] as f32;
-
-            red = red * (1.0 - center_glow * 0.5) + color[0] as f32 * center_glow * 0.18;
-            green = green * (1.0 - center_glow * 0.5) + color[1] as f32 * center_glow * 0.18;
-            blue = blue * (1.0 - center_glow * 0.5) + color[2] as f32 * center_glow * 0.18;
-
-            red = red * (1.0 - top_light) + 255.0 * top_light;
-            green = green * (1.0 - top_light) + 255.0 * top_light;
-            blue = blue * (1.0 - top_light) + 255.0 * top_light;
-
-            red = red * (1.0 - rim_strength * 0.45) + panel_rim[0] as f32 * rim_strength * 0.45;
-            green = green * (1.0 - rim_strength * 0.45) + panel_rim[1] as f32 * rim_strength * 0.45;
-            blue = blue * (1.0 - rim_strength * 0.45) + panel_rim[2] as f32 * rim_strength * 0.45;
-
-            pixels[idx] = red.round().clamp(0.0, 255.0) as u8;
-            pixels[idx + 1] = green.round().clamp(0.0, 255.0) as u8;
-            pixels[idx + 2] = blue.round().clamp(0.0, 255.0) as u8;
-            pixels[idx + 3] = (panel_alpha * 255.0).round().clamp(0.0, 255.0) as u8;
-
-            let alpha = mic_shape(nx, ny);
-            if alpha > 0.0 {
-                blend_pixel(
-                    &mut pixels,
-                    size,
-                    px as i32,
-                    py as i32,
-                    [242, 244, 247, color[3]],
-                    alpha.min(1.0),
-                );
-
-                if (0.405..=0.595).contains(&nx) && (0.25..=0.52).contains(&ny) {
-                    let groove_phase = ((nx - 0.405) / 0.038).fract();
-                    let groove_distance = (groove_phase - 0.5).abs();
-                    if groove_distance < 0.14 {
-                        let groove = 1.0 - groove_distance / 0.14;
-                        blend_pixel(
-                            &mut pixels,
-                            size,
-                            px as i32,
-                            py as i32,
-                            [122, 128, 138, 96],
-                            groove * alpha.min(1.0),
-                        );
-                    }
-                }
-            }
-        }
-    }
-
+    let mut pixels = resized.into_raw();
+    tint_icon(&mut pixels, color);
     pixels
 }
 
@@ -512,118 +438,31 @@ fn blend_pixel(pixels: &mut [u8], size: u32, x: i32, y: i32, color: [u8; 4], alp
     pixels[idx + 3] = (out_a * 255.0).round().clamp(0.0, 255.0) as u8;
 }
 
-fn mic_shape(nx: f32, ny: f32) -> f32 {
-    let body = ellipse_alpha(nx, ny, 0.5, 0.39, 0.16, 0.23, 0.1);
-    let trimmed_body = if ny > 0.56 {
-        body * (1.0 - smoothstep(0.56, 0.62, ny))
-    } else {
-        body
-    };
-    let stem = rect_alpha(nx, ny, 0.472, 0.56, 0.528, 0.72, 0.015);
-    let base = rect_alpha(nx, ny, 0.36, 0.73, 0.64, 0.79, 0.02);
+fn tint_icon(pixels: &mut [u8], color: [u8; 4]) {
+    let target = [color[0] as f32, color[1] as f32, color[2] as f32];
 
-    let yoke_dx = (nx - 0.5) / 0.24;
-    let yoke_dy = (ny - 0.56) / 0.16;
-    let yoke_dist = yoke_dx * yoke_dx + yoke_dy * yoke_dy;
-    let yoke = if (0.7..=1.06).contains(&yoke_dist) && ny <= 0.62 {
-        1.0 - ((yoke_dist - 0.88).abs() / 0.18)
-    } else {
-        0.0
-    };
+    for pixel in pixels.chunks_exact_mut(4) {
+        let alpha = pixel[3] as f32 / 255.0;
+        if alpha <= 0.0 {
+            continue;
+        }
 
-    trimmed_body.max(stem).max(base).max(yoke.clamp(0.0, 1.0))
-}
+        let luminance =
+            (0.2126 * pixel[0] as f32 + 0.7152 * pixel[1] as f32 + 0.0722 * pixel[2] as f32)
+                / 255.0;
+        let mix = 0.18 + luminance * 0.82;
 
-fn smoothstep(edge0: f32, edge1: f32, value: f32) -> f32 {
-    if (edge1 - edge0).abs() <= f32::EPSILON {
-        return if value >= edge1 { 1.0 } else { 0.0 };
+        pixel[0] = (pixel[0] as f32 * 0.55 + target[0] * mix * 0.45)
+            .round()
+            .clamp(0.0, 255.0) as u8;
+        pixel[1] = (pixel[1] as f32 * 0.55 + target[1] * mix * 0.45)
+            .round()
+            .clamp(0.0, 255.0) as u8;
+        pixel[2] = (pixel[2] as f32 * 0.55 + target[2] * mix * 0.45)
+            .round()
+            .clamp(0.0, 255.0) as u8;
+        pixel[3] = (pixel[3] as f32 * (color[3] as f32 / 255.0))
+            .round()
+            .clamp(0.0, 255.0) as u8;
     }
-    let t = ((value - edge0) / (edge1 - edge0)).clamp(0.0, 1.0);
-    t * t * (3.0 - 2.0 * t)
-}
-
-fn ellipse_alpha(nx: f32, ny: f32, cx: f32, cy: f32, rx: f32, ry: f32, feather: f32) -> f32 {
-    let dx = (nx - cx) / rx;
-    let dy = (ny - cy) / ry;
-    let dist = dx * dx + dy * dy;
-    if dist <= 1.0 {
-        return 1.0;
-    }
-    if dist >= 1.0 + feather {
-        return 0.0;
-    }
-    1.0 - smoothstep(1.0, 1.0 + feather, dist)
-}
-
-fn rect_alpha(nx: f32, ny: f32, x0: f32, y0: f32, x1: f32, y1: f32, feather: f32) -> f32 {
-    if (x0..=x1).contains(&nx) && (y0..=y1).contains(&ny) {
-        return 1.0;
-    }
-
-    let dx = if nx < x0 {
-        x0 - nx
-    } else if nx > x1 {
-        nx - x1
-    } else {
-        0.0
-    };
-    let dy = if ny < y0 {
-        y0 - ny
-    } else if ny > y1 {
-        ny - y1
-    } else {
-        0.0
-    };
-    let dist = (dx * dx + dy * dy).sqrt();
-    if dist >= feather {
-        return 0.0;
-    }
-    1.0 - smoothstep(0.0, feather, dist)
-}
-
-fn rounded_rect_alpha(
-    nx: f32,
-    ny: f32,
-    x0: f32,
-    y0: f32,
-    x1: f32,
-    y1: f32,
-    radius: f32,
-    feather: f32,
-) -> f32 {
-    let inner_x0 = x0 + radius;
-    let inner_x1 = x1 - radius;
-    let inner_y0 = y0 + radius;
-    let inner_y1 = y1 - radius;
-
-    if (inner_x0..=inner_x1).contains(&nx) && (y0..=y1).contains(&ny) {
-        return 1.0;
-    }
-    if (x0..=x1).contains(&nx) && (inner_y0..=inner_y1).contains(&ny) {
-        return 1.0;
-    }
-
-    let cx = if nx < inner_x0 {
-        inner_x0
-    } else if nx > inner_x1 {
-        inner_x1
-    } else {
-        nx
-    };
-    let cy = if ny < inner_y0 {
-        inner_y0
-    } else if ny > inner_y1 {
-        inner_y1
-    } else {
-        ny
-    };
-
-    let dist = ((nx - cx).powi(2) + (ny - cy).powi(2)).sqrt();
-    if dist <= radius {
-        return 1.0;
-    }
-    if dist >= radius + feather {
-        return 0.0;
-    }
-    1.0 - smoothstep(radius, radius + feather, dist)
 }

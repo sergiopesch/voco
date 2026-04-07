@@ -2,7 +2,7 @@
 """Generate VOCO app icons from the branded logo source.
 
 Uses ffmpeg (already present in the dev environment) to create the PNG icons
-needed by Tauri plus the frontend favicon from assets/voco-logo.jpg.
+needed by Tauri plus the frontend favicon from assets/voco-logo.png.
 """
 import os
 import shutil
@@ -10,7 +10,7 @@ import subprocess
 import sys
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-SOURCE = os.path.join(ROOT, "assets", "voco-logo.jpg")
+SOURCE = os.path.join(ROOT, "assets", "voco-logo.png")
 ICON_DIR = os.path.join(ROOT, "apps", "desktop", "src-tauri", "icons")
 FAVICON = os.path.join(ROOT, "apps", "desktop", "public", "favicon.png")
 
@@ -32,12 +32,10 @@ def ensure_source() -> None:
 def render_png(ffmpeg: str, target: str, size: int) -> None:
     os.makedirs(os.path.dirname(target), exist_ok=True)
 
-    # Crop vertically to a square with a slight upward bias so the mic stays large
-    # and centered, then scale.
+    # Fit the transparent icon into a square canvas without adding a background.
     vf = (
-        "crop='min(iw,ih)':'min(iw,ih)':"
-        "'(iw-min(iw,ih))/2':'max((ih-min(iw,ih))/2-72,0)',"
-        f"scale={size}:{size}:flags=lanczos,format=rgba"
+        f"scale={size}:{size}:force_original_aspect_ratio=decrease:flags=lanczos,"
+        f"pad={size}:{size}:(ow-iw)/2:(oh-ih)/2:color=black@0,format=rgba"
     )
 
     subprocess.run(
@@ -77,7 +75,7 @@ def main() -> None:
 
     shutil.copy(os.path.join(ICON_DIR, "128x128.png"), os.path.join(ICON_DIR, "icon.ico"))
     shutil.copy(os.path.join(ICON_DIR, "128x128@2x.png"), os.path.join(ICON_DIR, "icon.icns"))
-    print("Generated Tauri icons and favicon from assets/voco-logo.jpg")
+    print("Generated Tauri icons and favicon from assets/voco-logo.png")
 
 
 if __name__ == "__main__":
