@@ -1,5 +1,7 @@
 <!-- markdownlint-disable MD031 MD033 MD041 -->
-<h1 align="center">voco</h1>
+<h1 align="center">
+  <img src="assets/voco-logo.svg" alt="voco logo" width="30" valign="middle"> voco
+</h1>
 <!-- markdownlint-enable MD041 -->
 
 <p align="center">
