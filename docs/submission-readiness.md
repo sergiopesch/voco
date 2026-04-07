@@ -34,7 +34,7 @@ It separates:
 - `desktop-file-validate packaging/flatpak/com.sergiopesch.voco.desktop`
 - `appstreamcli validate packaging/flatpak/com.sergiopesch.voco.metainfo.xml`
 - package inspection confirmed:
-  - version `2026.0.3`
+  - version aligned with the current repo release
   - deduplicated runtime dependencies
   - packaged metainfo file
 
@@ -94,7 +94,7 @@ No-go until the sandbox and host-integration story is proven in a real Flatpak r
 - `desktop-file-validate snap/gui/com.sergiopesch.voco.desktop`
 - `snapcraft --destructive-mode`
 - built artifact:
-  - `snap/voco_2026.0.3_amd64.snap`
+  - `snap/voco_<version>_amd64.snap`
 
 ### Remaining Warnings
 

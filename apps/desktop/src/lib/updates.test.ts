@@ -24,8 +24,8 @@ describe("compareVersions", () => {
   });
 
   it("normalizes voco-prefixed release tags before comparing", () => {
-    expect(compareVersions("voco.2026.0.3", "2026.0.2")).toBeGreaterThan(0);
-    expect(compareVersions("voco.2026.0.3", "2026.0.3")).toBe(0);
+    expect(compareVersions("voco.2026.0.4", "2026.0.3")).toBeGreaterThan(0);
+    expect(compareVersions("voco.2026.0.4", "2026.0.4")).toBe(0);
   });
 });
 
@@ -34,27 +34,27 @@ describe("selectReleaseForChannel", () => {
     {
       draft: false,
       prerelease: true,
-      html_url: "https://github.com/sergiopesch/voco/releases/tag/voco.2026.0.4-beta.1",
-      name: "VOCO 2026.0.4 beta 1",
+      html_url: "https://github.com/sergiopesch/voco/releases/tag/voco.2026.0.5-beta.1",
+      name: "VOCO 2026.0.5 beta 1",
       published_at: "2026-04-02T09:00:00Z",
-      tag_name: "voco.2026.0.4-beta.1",
+      tag_name: "voco.2026.0.5-beta.1",
     },
     {
       draft: false,
       prerelease: false,
-      html_url: "https://github.com/sergiopesch/voco/releases/tag/voco.2026.0.3",
-      name: "VOCO 2026.0.3",
+      html_url: "https://github.com/sergiopesch/voco/releases/tag/voco.2026.0.4",
+      name: "VOCO 2026.0.4",
       published_at: "2026-03-28T09:00:00Z",
-      tag_name: "voco.2026.0.3",
+      tag_name: "voco.2026.0.4",
     },
   ];
 
   it("prefers the newest stable release on the stable channel", () => {
-    expect(selectReleaseForChannel(releases, "stable")?.version).toBe("2026.0.3");
+    expect(selectReleaseForChannel(releases, "stable")?.version).toBe("2026.0.4");
   });
 
   it("allows prerelease builds on the beta channel", () => {
-    expect(selectReleaseForChannel(releases, "beta")?.version).toBe("2026.0.4-beta.1");
+    expect(selectReleaseForChannel(releases, "beta")?.version).toBe("2026.0.5-beta.1");
   });
 });
 
@@ -66,10 +66,10 @@ describe("checkForUpdates", () => {
         {
           draft: false,
           prerelease: false,
-          html_url: "https://github.com/sergiopesch/voco/releases/tag/voco.2026.0.3",
-          name: "VOCO 2026.0.3",
+          html_url: "https://github.com/sergiopesch/voco/releases/tag/voco.2026.0.4",
+          name: "VOCO 2026.0.4",
           published_at: "2026-03-28T09:00:00Z",
-          tag_name: "voco.2026.0.3",
+          tag_name: "voco.2026.0.4",
         },
       ],
     });
@@ -77,12 +77,12 @@ describe("checkForUpdates", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(
-      checkForUpdates({ currentVersion: "2026.0.2", channel: "stable" }),
+      checkForUpdates({ currentVersion: "2026.0.3", channel: "stable" }),
     ).resolves.toMatchObject({
       status: "available",
-      currentVersion: "2026.0.2",
+      currentVersion: "2026.0.3",
       latestRelease: {
-        version: "2026.0.3",
+        version: "2026.0.4",
       },
     });
   });
@@ -92,11 +92,11 @@ describe("update cache helpers", () => {
   it("returns a recent cached state for the matching channel and version", async () => {
     const cacheState = {
       status: "up-to-date" as const,
-      currentVersion: "2026.0.3",
+      currentVersion: "2026.0.4",
       latestRelease: {
-        version: "2026.0.3",
-        name: "VOCO 2026.0.3",
-        url: "https://github.com/sergiopesch/voco/releases/tag/voco.2026.0.3",
+        version: "2026.0.4",
+        name: "VOCO 2026.0.4",
+        url: "https://github.com/sergiopesch/voco/releases/tag/voco.2026.0.4",
         publishedAt: "2026-04-02T09:00:00Z",
         prerelease: false,
       },
@@ -112,7 +112,7 @@ describe("update cache helpers", () => {
 
     await writeCachedUpdateState("stable", cacheState);
 
-    await expect(readCachedUpdateState("stable", "2026.0.3")).resolves.toMatchObject({
+    await expect(readCachedUpdateState("stable", "2026.0.4")).resolves.toMatchObject({
       status: "up-to-date",
     });
   });
