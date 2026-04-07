@@ -27,7 +27,7 @@ GitHub Releases now target:
 - `.AppImage` for portable Linux installs when bundled by the release build
 - checksums for verification
 
-Current stable release: `voco.2026.0.3`
+Stable releases are tagged as `voco.<version>`.
 
 An initial Flatpak packaging baseline is also included in `packaging/flatpak/` for local validation and Flathub preparation.
 A tracked Snap draft is also included in `snap/` for Ubuntu App Center preparation, but it still depends on classic confinement review and desktop-level validation.
@@ -106,6 +106,7 @@ npm run check
 npm run lint
 npm test
 cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml
+npm run rehearse:release
 ```
 
 Optional tray diagnostics:
@@ -120,6 +121,7 @@ VOCO_TRAY_DEBUG=1 npm run dev
 - [docs/linux-packaging.md](docs/linux-packaging.md)
 - [docs/submission-readiness.md](docs/submission-readiness.md)
 - [docs/store-listing.md](docs/store-listing.md)
+- [docs/release-process.md](docs/release-process.md)
 - [docs/troubleshooting.md](docs/troubleshooting.md)
 - [docs/contributing.md](docs/contributing.md)
 - [docs/architecture/README.md](docs/architecture/README.md)

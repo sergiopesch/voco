@@ -35,7 +35,7 @@ jobs:
 
       - name: Validate install and build scripts
         run: |
-          bash -n install scripts/install.sh scripts/setup.sh scripts/build-desktop.sh scripts/package-appimage.sh scripts/render-release-body.sh scripts/lib/install-common.sh
+          bash -n install scripts/install.sh scripts/setup.sh scripts/build-desktop.sh scripts/package-appimage.sh scripts/render-release-body.sh scripts/rehearse-release.sh scripts/lib/install-common.sh
           python3 -m py_compile scripts/generate-icons.py
 
       - name: TypeScript check

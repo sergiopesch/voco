@@ -49,6 +49,7 @@ Current primary validation target:
 
 Store copy, release-note structure, and screenshot requirements live in [docs/store-listing.md](store-listing.md).
 Submission status and release gating live in [docs/submission-readiness.md](submission-readiness.md).
+Release rehearsal steps live in [docs/release-process.md](release-process.md).
 
 ## Flatpak Baseline
 

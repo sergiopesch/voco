@@ -11,14 +11,14 @@ bash <(curl -s https://raw.githubusercontent.com/sergiopesch/voco/master/install
 Manual install:
 
 ```bash
-wget https://github.com/sergiopesch/voco/releases/download/voco.2026.0.3/voco_2026.0.3_amd64.deb
-sudo dpkg -i voco_2026.0.3_amd64.deb
+wget https://github.com/sergiopesch/voco/releases/download/voco.<version>/voco_<version>_amd64.deb
+sudo dpkg -i voco_<version>_amd64.deb
 ```
 
-Current stable release:
-- tag: `voco.2026.0.3`
-- Debian package: `voco_2026.0.3_amd64.deb`
-- AppImage: `VOCO-2026.0.3-x86_64.AppImage`
+Current stable release naming:
+- tag: `voco.<version>`
+- Debian package: `voco_<version>_amd64.deb`
+- AppImage: `VOCO-<version>-x86_64.AppImage`
 
 ## Build From Source
 
@@ -78,6 +78,16 @@ bash ./scripts/package-appimage.sh
 ```
 
 This path is intended for local packaging validation and CI recovery when the AppDir exists but the final AppImage artifact was not written.
+
+## Release Rehearsal
+
+Before cutting a release, run:
+
+```bash
+npm run rehearse:release
+```
+
+This validates version alignment, shell helper syntax, and the generated GitHub release notes against the current repo version and asset naming.
 
 ## Runtime Paths
 

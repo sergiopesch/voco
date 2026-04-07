@@ -11,7 +11,8 @@
     "lint": "npm run lint -w apps/desktop",
     "check": "npm run check --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
-    "verify:versions": "node scripts/check-version-consistency.mjs"
+    "verify:versions": "node scripts/check-version-consistency.mjs",
+    "rehearse:release": "bash ./scripts/rehearse-release.sh"
   },
   "engines": {
     "node": ">=20"
