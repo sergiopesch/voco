@@ -1,6 +1,6 @@
 # Install
 
-VOCO currently ships through GitHub Releases first, with additional Linux channels planned after packaging quality is stable. The visual system now centers on the graphite microphone mark used in the app and release assets.
+VOCO currently ships through GitHub Releases first. `.deb` is the primary release channel today, AppImage remains a secondary manual-install artifact, and the Snap and Flatpak paths are still under validation.
 
 ## GitHub Release
 
@@ -52,7 +52,7 @@ VOCO now includes a tracked Snap draft under `snap/`.
 
 Current note:
 - local packaging work now lives in `snap/snapcraft.yaml`
-- the Ubuntu App Center path still needs store review and real desktop validation
+- the Ubuntu App Center path still needs local install validation, runtime smoke tests, and store review
 - classic confinement is the honest current fit because VOCO depends on host-level hotkeys, text insertion, notifications, and URL opening
 - treat this as packaging work in progress, not an available install path yet
 

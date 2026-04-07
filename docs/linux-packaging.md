@@ -12,9 +12,9 @@ VOCO's v1 packaging plan is intentionally staged.
 
 ## Next
 
-- Flathub packaging
-- Flatpak manifest baseline now lives in `packaging/flatpak/`
-- Ubuntu App Center review path once the tracked Snap draft and confinement story are settled
+- Ubuntu App Center review path after local snap install and runtime validation
+- Flatpak sandbox validation to determine whether Flathub is a real fit
+- release workflow polish for the channels that already build cleanly
 
 ## Later
 
@@ -58,7 +58,7 @@ The repo now includes an initial Flatpak packaging baseline:
 - `packaging/flatpak/com.sergiopesch.voco.desktop`
 - `packaging/flatpak/com.sergiopesch.voco.metainfo.xml`
 
-This is a starting point for Flathub submission work, not a claimed production-ready Flathub package yet. The next packaging pass should validate sandbox permissions, runtime dependencies, and release build behavior inside `flatpak-builder`.
+This is a starting point for Flathub submission work, not a claimed production-ready Flathub package yet. The next packaging pass should validate sandbox permissions, runtime dependencies, and release build behavior inside `flatpak-builder` before Flathub is treated as an active release target.
 
 ## Snap Status
 
@@ -82,7 +82,7 @@ Why not strict yet:
 
 So the honest first Snap is a classic-confinement review candidate, not a pretend-strict package that quietly breaks VOCO's core workflow.
 
-The next packaging pass should validate `snapcraft --destructive-mode` on Ubuntu 24.04+ with root-capable host packaging or an LXD-backed Snapcraft environment, confirm the staged runtime helpers behave correctly in real desktop sessions, and decide whether any future product changes could make stricter confinement realistic.
+The next packaging pass should install the built snap locally, verify tray, microphone, hotkey, and insertion behavior in a real desktop session, and then decide whether any future product changes could make stricter confinement realistic.
 
 ## AppImage Fallback Packaging
 

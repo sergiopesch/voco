@@ -52,11 +52,14 @@ run_step() {
   spinner_start "$msg"
   local log; log=$(mktemp)
   if "$@" > "$log" 2>&1; then
-    spinner_stop; ok "$msg"; rm -f "$log"
+    spinner_stop
+    ok "$msg"
+    rm -f "$log"
   else
-    spinner_stop; err "$msg (see output above)"
+    spinner_stop
     tail -10 "$log" | while IFS= read -r l; do dim "  $l"; done
-    rm -f "$log"; exit 1
+    rm -f "$log"
+    err "$msg failed"
   fi
 }
 
