@@ -57,7 +57,7 @@ Current release priorities:
 
 Planned store path:
 - Flathub first
-- Ubuntu App Center review after the Snap packaging path is validated
+- Ubuntu App Center review after the tracked Snap packaging path is validated
 
 Current Snap note:
 - use `classic` confinement for the honest v1 draft because VOCO depends on host-level hotkeys and text insertion helpers

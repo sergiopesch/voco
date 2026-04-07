@@ -48,12 +48,24 @@ This path is still packaging work in progress. Treat it as a local validation pa
 
 ## Snap / Ubuntu App Center Status
 
-VOCO is not yet claiming a publish-ready Snap channel.
+VOCO now includes a tracked Snap draft under `snap/`.
 
 Current note:
-- the Ubuntu App Center path still needs explicit Snap work and store review
+- local packaging work now lives in `snap/snapcraft.yaml`
+- the Ubuntu App Center path still needs store review and real desktop validation
 - classic confinement is the honest current fit because VOCO depends on host-level hotkeys, text insertion, notifications, and URL opening
 - treat this as packaging work in progress, not an available install path yet
+
+Local build entry point:
+
+```bash
+cd snap
+snapcraft --destructive-mode
+```
+
+This currently assumes either:
+- a root-capable `snapcraft --destructive-mode` environment, or
+- an LXD-backed Snapcraft setup
 
 ## AppImage Fallback Packaging
 

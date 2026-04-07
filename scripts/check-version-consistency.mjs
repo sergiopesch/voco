@@ -54,6 +54,10 @@ const sources = [
       "AppStream release version",
     ),
   },
+  {
+    label: "snapcraft.yaml",
+    value: expectMatch("snap/snapcraft.yaml", /^version:\s+'([^']+)'/m, "Snap version"),
+  },
 ];
 
 const expectedVersion = sources[0].value;

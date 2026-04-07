@@ -43,6 +43,10 @@ npm --workspace @voco/desktop run build:frontend
 desktop-file-validate packaging/flatpak/com.sergiopesch.voco.desktop
 appstreamcli validate packaging/flatpak/com.sergiopesch.voco.metainfo.xml
 cd apps/desktop/src-tauri && cargo check && cargo clippy -- -D warnings && cargo test
+
+# Snap draft validation when changing snap/
+# Requires either root-capable destructive mode or an LXD-backed Snapcraft setup.
+cd snap && snapcraft --destructive-mode
 ```
 
 ## CI

@@ -30,7 +30,7 @@ GitHub Releases now target:
 Current stable release: `voco.2026.0.3`
 
 An initial Flatpak packaging baseline is also included in `packaging/flatpak/` for local validation and Flathub preparation.
-Ubuntu App Center work is still pending because VOCO's current host-level automation model likely requires classic Snap confinement and manual review.
+A tracked Snap draft is also included in `snap/` for Ubuntu App Center preparation, but it still depends on classic confinement review and desktop-level validation.
 For AppImage fallback packaging, the repo includes `scripts/package-appimage.sh`, and local `npm run build` now uses that fallback automatically when Tauri stops at the final `linuxdeploy` step.
 
 ### Build from source

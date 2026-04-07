@@ -1,0 +1,107 @@
+name: voco
+title: VOCO
+base: core24
+version: '2026.0.3'
+summary: Voice-native interface layer for Linux
+license: MIT
+website: https://github.com/sergiopesch/voco
+source-code: https://github.com/sergiopesch/voco
+issues: https://github.com/sergiopesch/voco/issues
+contact: https://github.com/sergiopesch/voco/issues
+icon: apps/desktop/src-tauri/icons/128x128.png
+
+description: |
+  VOCO is a Linux desktop dictation tool built for low friction and high trust.
+  It lives in the tray, listens on demand, keeps audio local, and inserts
+  transcripts into the app you are already using.
+
+  This Snap still uses classic confinement intentionally. VOCO currently
+  relies on desktop automation paths that are not an honest fit for strict
+  confinement: global hotkeys, evdev access on Wayland, external typing helpers
+  such as ydotool and xdotool, clipboard tooling, xdg-open, notify-send, and
+  direct insertion into arbitrary host applications.
+
+grade: stable
+confinement: classic
+platforms:
+  amd64:
+
+apps:
+  voco:
+    command: usr/bin/voco
+    common-id: com.sergiopesch.voco.desktop
+    desktop: usr/share/applications/com.sergiopesch.voco.desktop
+    plugs:
+      - audio-record
+      - desktop
+      - desktop-legacy
+      - home
+      - network
+      - opengl
+      - unity7
+      - wayland
+      - x11
+    environment:
+      PATH: $SNAP/usr/bin:$SNAP/bin:$PATH
+      WEBKIT_DISABLE_COMPOSITING_MODE: '1'
+
+parts:
+  voco:
+    plugin: nil
+    source: ..
+    stage-packages:
+      - libglib2.0-0
+      - libsoup-3.0-0
+      - libjavascriptcoregtk-4.1-0
+      - libwebkit2gtk-4.1-0
+      - libgtk-3-0
+      - libayatana-appindicator3-1
+      - xdg-utils
+      - libnotify-bin
+      - xdotool
+      - xclip
+      - wl-clipboard
+      - ydotool
+    prime:
+      - -usr/bin/bwrap
+      - -usr/bin/debconf*
+      - -usr/bin/fc-*
+      - -usr/bin/gtk-update-icon-cache
+      - -usr/bin/ispell-wrapper
+      - -usr/bin/perl*
+      - -usr/bin/select-default-iwrap
+      - -usr/bin/session-migration
+      - -usr/bin/update-mime-database
+      - -usr/lib/x86_64-linux-gnu/caca/**
+      - -usr/lib/x86_64-linux-gnu/gstreamer-1.0/libgstcacasink.so
+      - -usr/lib/x86_64-linux-gnu/libcaca++.so*
+      - -usr/lib/x86_64-linux-gnu/libcaca.so*
+      - -usr/lib/x86_64-linux-gnu/libgstcheck-1.0.so*
+      - -usr/lib/x86_64-linux-gnu/libgstcontroller-1.0.so*
+      - -usr/lib/x86_64-linux-gnu/libicuio.so*
+      - -usr/lib/x86_64-linux-gnu/libicutest.so*
+      - -usr/lib/x86_64-linux-gnu/libmenu.so*
+      - -usr/lib/x86_64-linux-gnu/liborc-test-0.4.so*
+      - -usr/lib/x86_64-linux-gnu/libpanel.so*
+      - -usr/lib/x86_64-linux-gnu/libunwind-coredump.so*
+      - -usr/lib/x86_64-linux-gnu/libunwind-ptrace.so*
+      - -usr/lib/x86_64-linux-gnu/libunwind-x86_64.so*
+      - -usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/MiniBrowser
+    override-build: |
+      export PATH="$HOME/.cargo/bin:${PATH}"
+      npm ci
+      npm --workspace @voco/desktop run build:frontend
+      cargo build --manifest-path apps/desktop/src-tauri/Cargo.toml --release
+
+      install -Dm755 apps/desktop/src-tauri/target/release/voco \
+        "$CRAFT_PART_INSTALL/usr/bin/voco"
+      install -Dm644 packaging/flatpak/com.sergiopesch.voco.desktop \
+        "$CRAFT_PART_INSTALL/usr/share/applications/com.sergiopesch.voco.desktop"
+      sed -i 's#^Icon=.*#Icon=${SNAP}/meta/gui/icon.png#' \
+        "$CRAFT_PART_INSTALL/usr/share/applications/com.sergiopesch.voco.desktop"
+      install -Dm644 packaging/flatpak/com.sergiopesch.voco.metainfo.xml \
+        "$CRAFT_PART_INSTALL/usr/share/metainfo/com.sergiopesch.voco.metainfo.xml"
+      install -Dm644 apps/desktop/src-tauri/icons/128x128.png \
+        "$CRAFT_PART_INSTALL/usr/share/icons/hicolor/128x128/apps/com.sergiopesch.voco.png"
+      install -Dm644 apps/desktop/src-tauri/icons/128x128.png \
+        "$CRAFT_PART_INSTALL/meta/gui/icon.png"
