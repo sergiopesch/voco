@@ -48,3 +48,6 @@ yarn-debug.log*
 # Package manager
 .npm
 *.tgz
+
+# Snap build artifacts
+snap/*.snap
