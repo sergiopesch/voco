@@ -16,47 +16,21 @@ VOCO is a Linux local-first voice interface for fast control and insertion at th
 
 ## Install
 
-### GitHub Releases
+### GitHub Release
 
 ```bash
-wget https://github.com/sergiopesch/voco/releases/download/voco.<version>/voco_<version>_amd64.deb
-wget https://github.com/sergiopesch/voco/releases/download/voco.<version>/voco_checksums.txt
-grep ' voco_<version>_amd64.deb$' voco_checksums.txt | sha256sum --check
-sudo dpkg -i voco_<version>_amd64.deb
+VERSION="<version>"; wget "https://github.com/sergiopesch/voco/releases/download/voco.${VERSION}/voco_${VERSION}_amd64.deb" && sudo dpkg -i "voco_${VERSION}_amd64.deb"
 ```
 
-Optional helper path:
-
-```bash
-TAG="voco.<version>"
-wget "https://raw.githubusercontent.com/sergiopesch/voco/${TAG}/install" -O voco-install
-chmod +x voco-install
-less ./voco-install
-./voco-install
-```
-
-The helper should be downloaded and inspected locally before you run it. It verifies the published `.deb` checksum before installation.
-
-GitHub Releases now target:
-- `.deb` for Debian / Ubuntu
-- `.AppImage` for portable Linux installs when bundled by the release build
-- checksums for verification
-
-Stable releases are tagged as `voco.<version>`.
-
-An initial Flatpak packaging baseline is also included in `packaging/flatpak/` for local validation and Flathub preparation.
-A tracked Snap draft is also included in `snap/` for Ubuntu App Center preparation, but it still depends on classic confinement review and desktop-level validation.
-For AppImage fallback packaging, the repo includes `scripts/package-appimage.sh`, and local `npm run build` now uses that fallback automatically when Tauri stops at the final `linuxdeploy` step.
+Primary tested path: Ubuntu and Debian.
 
 ### Build from source
 
 ```bash
-git clone https://github.com/sergiopesch/voco.git
-cd voco
-./scripts/setup.sh --install
+git clone https://github.com/sergiopesch/voco.git && cd voco && ./scripts/setup.sh --install
 ```
 
-More install paths and uninstall guidance live in [docs/install.md](docs/install.md).
+Checksums, AppImage notes, packaging status, and uninstall steps live in [docs/install.md](docs/install.md).
 
 ## How It Works
 
@@ -64,71 +38,56 @@ More install paths and uninstall guidance live in [docs/install.md](docs/install
 2. Press `Alt+D` to start listening.
 3. Press `Alt+D` again and VOCO types the transcript at your cursor.
 
-The current build uses a tray icon plus a compact listening HUD so state remains visible without taking over the desktop.
-VOCO also checks GitHub Releases in-app so manual installs can see when a newer stable or beta build is available.
-First launch now guides users through a compact setup flow for microphone access, mic selection, hotkeys, and HUD preferences.
+VOCO stays in the tray, shows a compact listening HUD, and opens with a short first-run setup for microphone access, device selection, hotkeys, and HUD preferences.
 
 ## Features
 
-| Feature | Details |
-| --- | --- |
-| Local-first transcription | `whisper.cpp` runs on your machine |
-| Global hotkey | Default `Alt+D`, changeable at install time or in config |
-| Tray-native workflow | Clear idle, ready, listening, and blocked states |
-| Guided onboarding | First-run setup for microphone, hotkey, and HUD behavior |
-| Smart insertion | Types into the focused app with clipboard fallback |
-| Linux-aware behavior | Works with Wayland and X11 with documented constraints |
+- Local-first transcription with `whisper.cpp`
+- Tray-native workflow with clear ready, listening, and blocked states
+- Default `Alt+D` hotkey with runtime configuration
+- Guided onboarding for microphone, hotkey, and HUD setup
+- Text insertion with documented Wayland and X11 behavior
+- In-app GitHub Release update checks for manual installs
 
 ## Requirements
 
-| What | Why |
-| --- | --- |
-| Ubuntu / Debian | Primary tested distro family |
-| PulseAudio or PipeWire | Microphone input |
-| Wayland: `ydotool`, `wl-clipboard` | Text insertion and clipboard support |
-| X11: `xdotool`, `xclip` | Text insertion and clipboard support |
+- Ubuntu or Debian
+- PulseAudio or PipeWire
+- Wayland: `ydotool` and `wl-clipboard`
+- X11: `xdotool` and `xclip`
 
-Other Linux distributions may work, but the project currently validates Ubuntu-class environments first.
+Other Linux distributions may work, but VOCO is validated on Ubuntu-class environments first.
 
 ## Configuration
 
 VOCO stores configuration at `~/.config/voco/config.json`.
 
 ```json
-{
-  "hotkey": "Alt+D",
-  "insertionStrategy": "auto"
-}
+{ "hotkey": "Alt+D", "insertionStrategy": "auto" }
 ```
 
 Existing `voice` installs are migrated automatically on startup:
 - `~/.config/voice/config.json` -> `~/.config/voco/config.json`
 - `~/.local/share/voice/models/` -> `~/.local/share/voco/models/`
 
-Current product note:
-- the voice-profile step is present in onboarding, but accent-aware recognition remains a future feature and is intentionally disabled in the current release
-
 On Wayland, `Alt+D` and `Alt+Shift+D` remain the most reliable built-in presets because they can use the evdev backend.
+The voice-profile step is present in onboarding, but accent-aware recognition is still intentionally disabled in the current release.
 
 ## Development
 
 ```bash
-git clone https://github.com/sergiopesch/voco.git
-cd voco
-./scripts/setup.sh
-npm run dev
+git clone https://github.com/sergiopesch/voco.git && cd voco && ./scripts/setup.sh && npm run dev
+```
+
+Useful checks:
+
+```bash
 npm run check
 npm run lint
 npm test
 cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml
 npm run rehearse:release
 npm run report:linux-runtime
-```
-
-Optional tray diagnostics:
-
-```bash
-VOCO_TRAY_DEBUG=1 npm run dev
 ```
 
 ## Documentation
