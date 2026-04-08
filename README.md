@@ -19,7 +19,7 @@ VOCO is a Linux local-first voice interface for fast control and insertion at th
 ### Guided VOCO Installer
 
 ```bash
-wget https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.11/install -O voco-install
+wget https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.12/install -O voco-install
 chmod +x voco-install
 less ./voco-install
 ./voco-install
