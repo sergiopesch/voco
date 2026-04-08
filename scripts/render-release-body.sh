@@ -17,8 +17,13 @@ Voice-native interface layer for Linux, shipped as a local-first desktop install
 \`\`\`bash
 wget https://raw.githubusercontent.com/sergiopesch/voco/${TAG_NAME}/install -O voco-install
 chmod +x voco-install
-less ./voco-install
 ./voco-install
+\`\`\`
+
+Optional trust step before running it:
+
+\`\`\`bash
+less ./voco-install
 \`\`\`
 
 ### Manual Debian / Ubuntu fallback

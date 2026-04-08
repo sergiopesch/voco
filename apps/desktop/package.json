@@ -1,6 +1,6 @@
 {
   "name": "@voco/desktop",
-  "version": "2026.0.12",
+  "version": "2026.0.13",
   "private": true,
   "type": "module",
   "scripts": {

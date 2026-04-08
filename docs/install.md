@@ -10,7 +10,6 @@ Primary recommended path:
 TAG="voco.<version>"
 wget "https://raw.githubusercontent.com/sergiopesch/voco/${TAG}/install" -O voco-install
 chmod +x voco-install
-less ./voco-install
 ./voco-install
 ```
 
@@ -21,6 +20,12 @@ The guided installer is the branded install path and should be treated as the de
 - installs the `.deb`
 - guides the first hotkey choice so first launch feels configured instead of raw
 
+Optional trust step before running it:
+
+```bash
+less ./voco-install
+```
+
 Manual `.deb` fallback:
 
 ```bash
@@ -30,7 +35,7 @@ grep ' voco_<version>_amd64.deb$' voco_checksums.txt | sha256sum --check
 sudo dpkg -i voco_<version>_amd64.deb
 ```
 
-Download the helper first, inspect it locally, then run it. Do not execute it directly from `curl`.
+Download the helper first, inspect it locally if you want, then run it. Do not execute it directly from `curl`.
 
 Current stable release naming:
 - tag: `voco.<version>`
