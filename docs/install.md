@@ -4,23 +4,7 @@ VOCO currently ships through GitHub Releases first. `.deb` is the primary releas
 
 ## GitHub Release
 
-```bash
-wget https://github.com/sergiopesch/voco/releases/download/voco.<version>/voco_<version>_amd64.deb
-wget https://github.com/sergiopesch/voco/releases/download/voco.<version>/voco_checksums.txt
-grep ' voco_<version>_amd64.deb$' voco_checksums.txt | sha256sum --check
-sudo dpkg -i voco_<version>_amd64.deb
-```
-
-Manual install:
-
-```bash
-wget https://github.com/sergiopesch/voco/releases/download/voco.<version>/voco_<version>_amd64.deb
-wget https://github.com/sergiopesch/voco/releases/download/voco.<version>/voco_checksums.txt
-grep ' voco_<version>_amd64.deb$' voco_checksums.txt | sha256sum --check
-sudo dpkg -i voco_<version>_amd64.deb
-```
-
-Optional helper path if you prefer the guided installer:
+Primary recommended path:
 
 ```bash
 TAG="voco.<version>"
@@ -28,6 +12,22 @@ wget "https://raw.githubusercontent.com/sergiopesch/voco/${TAG}/install" -O voco
 chmod +x voco-install
 less ./voco-install
 ./voco-install
+```
+
+The guided installer is the branded install path and should be treated as the default VOCO experience on GitHub Releases. It:
+- checks Linux requirements before install
+- downloads the exact release package and checksums
+- verifies the package checksum
+- installs the `.deb`
+- guides the first hotkey choice so first launch feels configured instead of raw
+
+Manual `.deb` fallback:
+
+```bash
+wget -O voco_<version>_amd64.deb https://github.com/sergiopesch/voco/releases/download/voco.<version>/voco_<version>_amd64.deb
+wget https://github.com/sergiopesch/voco/releases/download/voco.<version>/voco_checksums.txt
+grep ' voco_<version>_amd64.deb$' voco_checksums.txt | sha256sum --check
+sudo dpkg -i voco_<version>_amd64.deb
 ```
 
 Download the helper first, inspect it locally, then run it. Do not execute it directly from `curl`.

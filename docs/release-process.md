@@ -14,7 +14,8 @@ This checks:
 - version metadata consistency across shipped manifests
 - shell helper syntax for install and packaging scripts
 - public install docs still require checksum verification and do not recommend `curl | bash`
-- the README keeps a stable `releases/latest/download/voco_latest_amd64.deb` install path
+- the README keeps the guided installer as the primary install path
+- the README keeps a robust manual `.deb` fallback using `wget -O`
 - the release helper comment stays pinned to the exact release tag
 - generated GitHub release notes for the current version
 - expected asset names:
@@ -55,6 +56,7 @@ The GitHub Release path is ready for end-user testing when all of these are true
 - `npm run rehearse:release` passes on the release commit
 - GitHub Actions CI is green on `master`
 - the release tag is cut as `voco.<version>`
+- the README points users at the branded guided installer first
 - the GitHub Release contains:
   - `voco_<version>_amd64.deb`
   - `voco_checksums.txt`

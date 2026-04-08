@@ -32,7 +32,8 @@ echo "  appimage: ${APPIMAGE_NAME}"
   grep -F 'sha256sum --check' docs/install.md > /dev/null
   grep -F 'raw.githubusercontent.com/sergiopesch/voco/${TAG}/install' docs/install.md > /dev/null
   grep -F "raw.githubusercontent.com/sergiopesch/voco/${TAG_NAME}/install" install > /dev/null
-  grep -F 'releases/latest/download/voco_latest_amd64.deb' README.md > /dev/null
+  grep -F "raw.githubusercontent.com/sergiopesch/voco/${TAG_NAME}/install" README.md > /dev/null
+  grep -F 'wget -O voco_latest_amd64.deb https://github.com/sergiopesch/voco/releases/latest/download/voco_latest_amd64.deb' README.md > /dev/null
   bash ./scripts/render-release-body.sh "${VERSION}" "${TAG_NAME}" > "${TMP_DIR}/release-body-no-appimage.md"
   bash ./scripts/render-release-body.sh "${VERSION}" "${TAG_NAME}" "${APPIMAGE_NAME}" > "${TMP_DIR}/release-body-with-appimage.md"
   grep -F 'voco_checksums.txt' "${TMP_DIR}/release-body-no-appimage.md" > /dev/null

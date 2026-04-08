@@ -16,13 +16,30 @@ VOCO is a Linux local-first voice interface for fast control and insertion at th
 
 ## Install
 
-### GitHub Release
+### Guided VOCO Installer
 
 ```bash
-wget https://github.com/sergiopesch/voco/releases/latest/download/voco_latest_amd64.deb && sudo dpkg -i voco_latest_amd64.deb
+wget https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.11/install -O voco-install
+chmod +x voco-install
+less ./voco-install
+./voco-install
 ```
 
+This is the primary install path. It keeps the VOCO-branded setup flow at the center of the experience by:
+- checking Linux runtime requirements up front
+- downloading the exact release package and checksums
+- verifying the package before install
+- guiding the initial hotkey setup before first launch
+
 Primary tested path: Ubuntu and Debian.
+
+### Manual `.deb` Fallback
+
+```bash
+wget -O voco_latest_amd64.deb https://github.com/sergiopesch/voco/releases/latest/download/voco_latest_amd64.deb && sudo dpkg -i voco_latest_amd64.deb
+```
+
+Use this only if you explicitly want the raw package path instead of the guided installer.
 
 ### Build from source
 

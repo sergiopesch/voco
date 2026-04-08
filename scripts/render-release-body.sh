@@ -12,10 +12,19 @@ Voice-native interface layer for Linux, shipped as a local-first desktop install
 
 ## Install
 
-### Debian / Ubuntu
+### Guided installer
 
 \`\`\`bash
-wget https://github.com/sergiopesch/voco/releases/download/${TAG_NAME}/voco_${VERSION}_amd64.deb
+wget https://raw.githubusercontent.com/sergiopesch/voco/${TAG_NAME}/install -O voco-install
+chmod +x voco-install
+less ./voco-install
+./voco-install
+\`\`\`
+
+### Manual Debian / Ubuntu fallback
+
+\`\`\`bash
+wget -O voco_${VERSION}_amd64.deb https://github.com/sergiopesch/voco/releases/download/${TAG_NAME}/voco_${VERSION}_amd64.deb
 wget https://github.com/sergiopesch/voco/releases/download/${TAG_NAME}/voco_checksums.txt
 sha256sum --check voco_checksums.txt
 sudo dpkg -i voco_${VERSION}_amd64.deb
