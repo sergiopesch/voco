@@ -17,7 +17,7 @@ VOCO is a local-first Linux dictation app. Press a hotkey, speak, press it again
 Recommended:
 
 ```bash
-wget https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.14/install -O voco-install
+wget https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.15/install -O voco-install
 chmod +x voco-install
 ./voco-install
 ```

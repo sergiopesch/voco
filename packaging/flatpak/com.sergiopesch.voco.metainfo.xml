@@ -28,7 +28,7 @@
   <url type="vcs-browser">https://github.com/sergiopesch/voco</url>
   <content_rating type="oars-1.1" />
   <releases>
-    <release version="2026.0.14" date="2026-04-09">
+    <release version="2026.0.15" date="2026-04-09">
       <description>
         <p>Hardened insertion behavior, installer trust checks, update handling, and Linux runtime diagnostics ahead of end-user release testing.</p>
       </description>

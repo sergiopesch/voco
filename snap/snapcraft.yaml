@@ -1,7 +1,7 @@
 name: voco
 title: VOCO
 base: core24
-version: '2026.0.14'
+version: '2026.0.15'
 summary: Voice-native interface layer for Linux
 license: MIT
 website: https://github.com/sergiopesch/voco
