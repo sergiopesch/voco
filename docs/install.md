@@ -1,61 +1,92 @@
 # Install
 
-VOCO currently ships through GitHub Releases first. `.deb` is the primary release channel today, AppImage remains a secondary manual-install artifact, and the Snap and Flatpak paths are still under validation.
+VOCO ships through GitHub Releases first. The `.deb` is the main install path. The AppImage is a secondary manual option.
 
-## GitHub Release
+## Recommended: guided installer
 
-Primary recommended path:
+1. Pick the release tag you want:
 
 ```bash
 TAG="voco.<version>"
-wget "https://raw.githubusercontent.com/sergiopesch/voco/${TAG}/install" -O voco-install
-chmod +x voco-install
-./voco-install
 ```
 
-The guided installer is the branded install path and should be treated as the default VOCO experience on GitHub Releases. It:
-- checks Linux requirements before install
-- downloads the exact release package and checksums
-- verifies the package checksum
-- installs the `.deb`
-- guides the first hotkey choice so first launch feels configured instead of raw
+2. Download the installer:
 
-Optional trust step before running it:
+```bash
+wget "https://raw.githubusercontent.com/sergiopesch/voco/${TAG}/install" -O voco-install
+chmod +x voco-install
+```
+
+3. Optional: inspect it first:
 
 ```bash
 less ./voco-install
 ```
 
-Manual `.deb` fallback:
+4. Run it:
+
+```bash
+./voco-install
+```
+
+The installer checks Linux requirements, downloads the exact package, verifies checksums, installs VOCO, and lets you pick the first hotkey.
+
+## Manual `.deb` install
+
+1. Download the package and checksums:
 
 ```bash
 wget -O voco_<version>_amd64.deb https://github.com/sergiopesch/voco/releases/download/voco.<version>/voco_<version>_amd64.deb
 wget https://github.com/sergiopesch/voco/releases/download/voco.<version>/voco_checksums.txt
+```
+
+2. Verify the package:
+
+```bash
 grep ' voco_<version>_amd64.deb$' voco_checksums.txt | sha256sum --check
+```
+
+3. Install it:
+
+```bash
 sudo dpkg -i voco_<version>_amd64.deb
 ```
 
-Download the helper first, inspect it locally if you want, then run it. Do not execute it directly from `curl`.
+## Run from source
 
-Current stable release naming:
-- tag: `voco.<version>`
-- Debian package: `voco_<version>_amd64.deb`
-- AppImage: `VOCO-<version>-x86_64.AppImage`
-
-## Build From Source
+1. Clone the repo:
 
 ```bash
 git clone https://github.com/sergiopesch/voco.git
 cd voco
+```
+
+2. Install dependencies:
+
+```bash
+npm install
 ./scripts/setup.sh --install
 ```
 
-On first launch, VOCO opens its setup flow so you can:
-- confirm microphone access
-- choose an input device
-- confirm the default hotkey
-- pick the Linux insertion path that fits your desktop session
-- understand the tray-first workflow before the window hides
+3. Start the app:
+
+```bash
+npm run dev
+```
+
+4. Test it:
+- allow microphone access
+- finish setup
+- press `Alt+D`
+- speak
+- press `Alt+D` again
+- confirm text is inserted at the cursor
+
+## Release asset names
+
+- tag: `voco.<version>`
+- Debian package: `voco_<version>_amd64.deb`
+- AppImage: `VOCO-<version>-x86_64.AppImage`
 
 ## Flatpak / Flathub Preparation
 
@@ -104,13 +135,13 @@ This path is intended for local packaging validation and CI recovery when the Ap
 
 ## Release Rehearsal
 
-Before cutting a release, run:
+Before cutting a release:
 
 ```bash
 npm run rehearse:release
 ```
 
-This validates version alignment, shell helper syntax, and the generated GitHub release notes against the current repo version and asset naming.
+This checks version alignment, install-script safety, and generated release notes.
 
 ## Runtime Paths
 

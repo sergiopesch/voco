@@ -19,7 +19,7 @@ VOCO is a Linux local-first voice interface for fast control and insertion at th
 ### Guided VOCO Installer
 
 ```bash
-wget https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.13/install -O voco-install
+wget https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.14/install -O voco-install
 chmod +x voco-install
 ./voco-install
 ```
@@ -48,11 +48,27 @@ Use this only if you explicitly want the raw package path instead of the guided 
 
 ### Build from source
 
+1. Clone the repo:
+
 ```bash
-git clone https://github.com/sergiopesch/voco.git && cd voco && ./scripts/setup.sh --install
+git clone https://github.com/sergiopesch/voco.git
+cd voco
 ```
 
-Checksums, AppImage notes, packaging status, and uninstall steps live in [docs/install.md](docs/install.md).
+2. Install dependencies and repo tooling:
+
+```bash
+npm install
+./scripts/setup.sh --install
+```
+
+3. Run the app locally:
+
+```bash
+npm run dev
+```
+
+Checksums, AppImage notes, packaging status, uninstall steps, and manual install paths live in [docs/install.md](docs/install.md).
 
 ## How It Works
 
@@ -60,14 +76,14 @@ Checksums, AppImage notes, packaging status, and uninstall steps live in [docs/i
 2. Press `Alt+D` to start listening.
 3. Press `Alt+D` again and VOCO types the transcript at your cursor.
 
-VOCO stays in the tray, shows a compact listening HUD, and opens with a branded first-run setup for microphone access, hotkeys, Linux insertion strategy, and tray workflow.
+VOCO stays in the tray, shows a compact listening HUD, and opens with a short first-run setup for microphone access, hotkeys, and tray feedback.
 
 ## Features
 
 - Local-first transcription with `whisper.cpp`
 - Tray-native workflow with clear ready, listening, and blocked states
 - Default `Alt+D` hotkey with runtime configuration
-- Branded onboarding for microphone, hotkey, insertion strategy, and tray workflow
+- Minimal onboarding for microphone, hotkey, and tray feedback
 - Text insertion with documented Wayland and X11 behavior
 - In-app GitHub Release update checks for manual installs
 
@@ -93,13 +109,30 @@ Existing `voice` installs are migrated automatically on startup:
 - `~/.local/share/voice/models/` -> `~/.local/share/voco/models/`
 
 On Wayland, `Alt+D` and `Alt+Shift+D` remain the most reliable built-in presets because they can use the evdev backend.
-The first-run flow tailors setup around your Linux desktop session and install channel, while keeping all configuration local on disk.
 
-## Development
+## Local Test
+
+1. Start VOCO from source:
 
 ```bash
-git clone https://github.com/sergiopesch/voco.git && cd voco && ./scripts/setup.sh && npm run dev
+git clone https://github.com/sergiopesch/voco.git
+cd voco
+npm install
+./scripts/setup.sh --install
+npm run dev
 ```
+
+2. In the app:
+- allow microphone access
+- choose your microphone
+- keep `Alt+D` unless you need another hotkey
+- finish setup
+
+3. Test dictation:
+- press `Alt+D`
+- speak a short sentence
+- press `Alt+D` again
+- confirm the text is inserted at your cursor
 
 Useful checks:
 
@@ -111,6 +144,8 @@ cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml
 npm run rehearse:release
 npm run report:linux-runtime
 ```
+
+Release and deployment steps live in [docs/release-process.md](docs/release-process.md).
 
 ## Documentation
 

@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { MouseEvent } from "react";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import type {
   AppConfig,
   AudioDeviceOption,
-  InsertionStrategy,
   RuntimeDiagnostics,
   UpdateCheckState,
 } from "@/types";
@@ -48,57 +49,10 @@ const PANEL_SECTIONS = [
 
 type PanelSection = (typeof PANEL_SECTIONS)[number];
 
-const TRAY_STATE_EXPLAINERS = [
-  {
-    label: "Ready",
-    image: vocoTrayReadyImage,
-    description: "Green means VOCO is armed and waiting for your hotkey.",
-  },
-  {
-    label: "Listening",
-    image: vocoTrayRecordingImage,
-    description: "Red means the microphone is live and VOCO is recording.",
-  },
-  {
-    label: "Transcribing",
-    image: vocoTrayProcessingImage,
-    description: "Yellow means VOCO is turning your speech into text.",
-  },
-  {
-    label: "Needs attention",
-    image: vocoBrandImage,
-    description: "Graphite means the microphone or transcription flow needs attention.",
-  },
-] as const;
-
-const ONBOARDING_STEPS = [
-  "Welcome",
-  "Microphone",
-  "Hotkey",
-  "Insertion",
-  "Ready",
-] as const;
-
-const INSERTION_STRATEGIES: Array<{
-  value: InsertionStrategy;
-  title: string;
-  description: string;
-}> = [
-  {
-    value: "auto",
-    title: "Auto",
-    description: "Prefer direct typing first, then fall back when Linux needs a safer insertion path.",
-  },
-  {
-    value: "clipboard",
-    title: "Clipboard",
-    description: "Use clipboard-driven insertion when you want the most conservative cross-desktop behavior.",
-  },
-  {
-    value: "type-simulation",
-    title: "Type simulation",
-    description: "Type directly into the focused app when your desktop session supports it reliably.",
-  },
+const TRAY_COLOR_LEGEND = [
+  { label: "Ready", image: vocoTrayReadyImage },
+  { label: "Listening", image: vocoTrayRecordingImage },
+  { label: "Transcribing", image: vocoTrayProcessingImage },
 ] as const;
 
 export function ControlPanel({
@@ -124,6 +78,23 @@ export function ControlPanel({
   onRefreshRuntimeDiagnostics,
   onToggleDictation,
 }: ControlPanelProps) {
+  async function handleHeaderPointerDown(event: MouseEvent<HTMLElement>) {
+    if (event.button !== 0) {
+      return;
+    }
+
+    const target = event.target as HTMLElement | null;
+    if (target?.closest("button, input, select, textarea, a, label")) {
+      return;
+    }
+
+    try {
+      await getCurrentWindow().startDragging();
+    } catch (error) {
+      console.warn("Failed to start window drag:", error);
+    }
+  }
+
   const isPopover = surface === "popover";
   const isOnboarding = surface === "onboarding";
   const [activeSection, setActiveSection] = useState<PanelSection>("General");
@@ -191,15 +162,12 @@ export function ControlPanel({
     }
     return new Date(updateState.lastCheckedAt).toLocaleString();
   }, [updateState.lastCheckedAt]);
-  const showUpdateBanner =
-    updateState.status === "available" && !!updateState.latestRelease;
-  const showMainUpdateBanner = showUpdateBanner && !isPopover;
   const panelTitle = isOnboarding
-    ? "Speak naturally. VOCO handles the rest."
+    ? "Voco"
     : isPopover
       ? "VOCO"
       : "VOCO settings";
-  const panelEyebrow = isPopover ? "Command panel" : "VOCO";
+  const panelEyebrow = isOnboarding ? "Setup" : isPopover ? "Command panel" : "VOCO";
   const runtimeSessionLabel = useMemo(() => {
     switch (runtimeDiagnostics?.sessionType) {
       case "wayland":
@@ -226,49 +194,6 @@ export function ControlPanel({
       ? "Ready"
       : `Missing: ${runtimeDiagnostics.clipboard.missingCommands.join(", ")}`;
   }, [runtimeDiagnostics]);
-  const installChannelLabel = useMemo(() => {
-    switch (config.installChannel) {
-      case "appimage":
-        return "Portable AppImage";
-      case "source":
-        return "Source build";
-      case "flatpak":
-        return "Flatpak";
-      case "snap":
-        return "Snap";
-      default:
-        return "GitHub Release .deb";
-    }
-  }, [config.installChannel]);
-  const runtimeFlowCopy = useMemo(() => {
-    if (!runtimeDiagnostics) {
-      return "VOCO will check Linux insertion support after setup so you can pick the safest path for this machine.";
-    }
-
-    if (
-      runtimeDiagnostics.typeSimulation.available &&
-      runtimeDiagnostics.clipboard.available
-    ) {
-      return "This desktop is ready for both direct typing and clipboard fallback, so Auto is the right default.";
-    }
-
-    if (runtimeDiagnostics.typeSimulation.available) {
-      return "Direct typing is available here. Auto or Type simulation should feel native on this desktop.";
-    }
-
-    if (runtimeDiagnostics.clipboard.available) {
-      return "Clipboard insertion is available, but direct typing is not fully ready. Auto will safely lean on clipboard behavior.";
-    }
-
-    return "This desktop is still missing insertion helpers. Finish setup, then install the missing commands shown in Advanced settings.";
-  }, [runtimeDiagnostics]);
-  const insertionStrategyLabel = useMemo(
-    () =>
-      INSERTION_STRATEGIES.find((strategy) => strategy.value === config.insertionStrategy)
-        ?.title ?? config.insertionStrategy,
-    [config.insertionStrategy],
-  );
-
   useEffect(() => {
     if (surface === "onboarding") {
       void onRefreshDevices();
@@ -378,8 +303,12 @@ export function ControlPanel({
   return (
     <main className="voco-panel" data-surface={surface}>
       <section className="voco-panel__shell">
-        <header className="voco-panel__hero">
-          <div className="voco-panel__brand" data-tauri-drag-region>
+        <header
+          className="voco-panel__hero"
+          data-tauri-drag-region
+          onMouseDown={(event) => void handleHeaderPointerDown(event)}
+        >
+          <div className="voco-panel__brand">
             <div className="voco-panel__brand-mark" aria-hidden="true">
               <img
                 className="voco-panel__brand-mark-image"
@@ -393,10 +322,6 @@ export function ControlPanel({
             </div>
           </div>
           <div className="voco-panel__hero-actions">
-            <div className="voco-panel__state">
-              <span className="voco-panel__state-label">Status</span>
-              <strong>{statusLabel}</strong>
-            </div>
             <button
               className="voco-button voco-button--ghost voco-button--compact"
               onClick={() => onSurfaceChange("hidden")}
@@ -409,32 +334,6 @@ export function ControlPanel({
         {errorMessage ? (
           <section className="voco-panel__error" aria-live="polite">
             {errorMessage}
-          </section>
-        ) : null}
-
-        {showMainUpdateBanner ? (
-          <section className="voco-update-banner" aria-live="polite">
-            <div className="voco-update-banner__copy">
-              <span className="voco-update-banner__eyebrow">Update available</span>
-              <strong>VOCO {updateState.latestRelease?.version} is ready.</strong>
-              <p>{upgradePrompt}</p>
-            </div>
-            <div className="voco-update-banner__actions">
-              <button
-                className="voco-button voco-button--secondary"
-                onClick={() => void onCheckForUpdates()}
-              >
-                Refresh check
-              </button>
-              {updateState.latestRelease?.url ? (
-                <button
-                  className="voco-button voco-button--primary"
-                  onClick={() => void onOpenReleasePage(updateState.latestRelease!.url)}
-                >
-                  Open release
-                </button>
-              ) : null}
-            </div>
           </section>
         ) : null}
 
@@ -465,23 +364,14 @@ export function ControlPanel({
             <div className="voco-inline-note">
               Selected input: {selectedDeviceLabel}
             </div>
-            {showUpdateBanner ? (
-              <div className="voco-inline-note">
-                Update available: <code>{updateState.latestRelease?.version}</code>
-              </div>
-            ) : null}
           </section>
         ) : isOnboarding ? (
           <section className="voco-panel__content">
             <div className="voco-onboarding__progress">
-              {ONBOARDING_STEPS.map((label, step) => (
+              {[0, 1, 2].map((step) => (
                 <span
-                  key={label}
-                  className={[
-                    "voco-onboarding__progress-item",
-                    onboardingStep === step ? "voco-onboarding__progress-item--active" : "",
-                    onboardingStep > step ? "voco-onboarding__progress-item--complete" : "",
-                  ].join(" ")}
+                  key={step}
+                  className="voco-onboarding__progress-item"
                 >
                   <span
                     className={[
@@ -490,58 +380,22 @@ export function ControlPanel({
                       onboardingStep > step ? "voco-onboarding__dot--complete" : "",
                     ].join(" ")}
                   />
-                  <span className="voco-onboarding__progress-label">{label}</span>
                 </span>
               ))}
             </div>
 
             {onboardingStep === 0 ? (
               <section className="voco-onboarding__step">
-                <h2>Welcome to VOCO</h2>
+                <h2>Welcome to Voco</h2>
                 <p>
-                  VOCO is a voice-native Linux desktop tool for people who live in
-                  editors, terminals, browsers, and issue trackers. It stays local,
-                  sits in the tray, and keeps the path from thought to typed text short.
+                  Your voice-first Linux command layer.
                 </p>
-                <div className="voco-onboarding__hero-grid">
-                  <article className="voco-onboarding__hero-card voco-onboarding__hero-card--lead">
-                    <span className="voco-onboarding__hero-eyebrow">Built for focus</span>
-                    <strong>Press hotkey. Speak. Keep working.</strong>
-                    <p>
-                      No account, no subscription, no cloud-first detour. VOCO is tuned
-                      for Linux desktop work where speed and control matter.
-                    </p>
-                  </article>
-                  <article className="voco-onboarding__hero-card">
-                    <span className="voco-onboarding__hero-eyebrow">This install</span>
-                    <strong>{installChannelLabel}</strong>
-                    <p>
-                      Updates and release guidance will follow this install channel after
-                      setup.
-                    </p>
-                  </article>
-                  <article className="voco-onboarding__hero-card">
-                    <span className="voco-onboarding__hero-eyebrow">Stored locally</span>
-                    <strong>
-                      <code>~/.config/voco/config.json</code>
-                    </strong>
-                    <p>Settings stay on this machine, alongside local models and caches.</p>
-                  </article>
-                </div>
-                <div className="voco-command-preview" aria-label="VOCO quick flow">
-                  <span className="voco-command-preview__eyebrow">Typical flow</span>
-                  <code>Alt+D -&gt; speak naturally -&gt; Alt+D -&gt; text at cursor</code>
-                </div>
-                <div className="voco-inline-note">
-                  The first-run setup will confirm your microphone, hotkey, Linux insertion
-                  path, and tray workflow so the installed package feels ready immediately.
-                </div>
                 <div className="voco-onboarding__actions">
                   <button
                     className="voco-button voco-button--primary"
                     onClick={() => onOnboardingStepChange(1)}
                   >
-                    Set up VOCO
+                    Start setup
                   </button>
                   <button
                     className="voco-button voco-button--secondary"
@@ -560,21 +414,10 @@ export function ControlPanel({
 
             {onboardingStep === 1 ? (
               <section className="voco-onboarding__step">
-                <h2>Microphone check</h2>
+                <h2>Microphone and hotkey</h2>
                 <p>
-                  Choose the microphone VOCO should use. You can keep the system
-                  default or pin a specific device now.
+                  Pick your mic and confirm the hotkey you want to use.
                 </p>
-                <div className="voco-onboarding__detail-grid">
-                  <div className="voco-inline-card">
-                    <span>Permission</span>
-                    <strong>{microphonePermission}</strong>
-                  </div>
-                  <div className="voco-inline-card">
-                    <span>Selected input</span>
-                    <strong>{selectedDeviceLabel}</strong>
-                  </div>
-                </div>
                 <label className="voco-field">
                   <span>Input device</span>
                   <select
@@ -590,7 +433,8 @@ export function ControlPanel({
                   </select>
                 </label>
                 <div className="voco-inline-note">
-                  VOCO uses this device for startup readiness checks and live dictation.
+                  <strong>Mic:</strong> {selectedDeviceLabel} · <strong>Access:</strong>{" "}
+                  {microphonePermission}
                 </div>
                 <div className="voco-meter">
                   <span className="voco-meter__label">Live level</span>
@@ -601,49 +445,9 @@ export function ControlPanel({
                     />
                   </div>
                   <span className="voco-meter__hint">
-                    The meter should move mostly through the middle during normal speech.
+                    Speak normally. The bar should move.
                   </span>
                 </div>
-                {previewError ? (
-                  <div className="voco-inline-note voco-inline-note--error">
-                    {previewError}
-                  </div>
-                ) : null}
-                <div className="voco-onboarding__actions">
-                  <button
-                    className="voco-button voco-button--ghost"
-                    onClick={() => void onRequestMicrophoneAccess()}
-                  >
-                    Retry microphone access
-                  </button>
-                  <button
-                    className="voco-button voco-button--secondary"
-                    onClick={() => onOnboardingStepChange(0)}
-                  >
-                    Back
-                  </button>
-                  <button
-                    className="voco-button voco-button--primary"
-                    onClick={async () => {
-                      const result = await savePatch({ selectedMic: selectedDeviceId });
-                      if (result.ok) {
-                        onOnboardingStepChange(2);
-                      }
-                    }}
-                  >
-                    Continue
-                  </button>
-                </div>
-              </section>
-            ) : null}
-
-            {onboardingStep === 2 ? (
-              <section className="voco-onboarding__step">
-                <h2>Trigger and feedback</h2>
-                <p>
-                  VOCO listens when you press your hotkey. The current default is{" "}
-                  <code>{config.hotkey}</code>.
-                </p>
                 <label className="voco-field">
                   <span>Hotkey</span>
                   <input
@@ -667,22 +471,58 @@ export function ControlPanel({
                     {hotkeyError}
                   </div>
                 ) : null}
-                <div className="voco-inline-note">
-                  On Wayland, <code>Alt+D</code> and <code>Alt+Shift+D</code> are still the
-                  most reliable built-in presets.
+                {previewError ? (
+                  <div className="voco-inline-note voco-inline-note--error">
+                    {previewError}
+                  </div>
+                ) : null}
+                <div className="voco-onboarding__actions">
+                  <button
+                    className="voco-button voco-button--ghost"
+                    onClick={() => void onRequestMicrophoneAccess()}
+                  >
+                    Retry microphone access
+                  </button>
+                  <button
+                    className="voco-button voco-button--secondary"
+                    onClick={() => onOnboardingStepChange(0)}
+                  >
+                    Back
+                  </button>
+                  <button
+                    className="voco-button voco-button--primary"
+                    onClick={async () => {
+                      const micSaved = await savePatch({ selectedMic: selectedDeviceId });
+                      const hotkeySaved = micSaved.ok ? await saveHotkey() : false;
+                      if (micSaved.ok && hotkeySaved) {
+                        onOnboardingStepChange(2);
+                      }
+                    }}
+                  >
+                    Continue
+                  </button>
                 </div>
-                <div className="voco-tray-state-grid" aria-label="Tray icon states">
-                  {TRAY_STATE_EXPLAINERS.map((state) => (
-                    <article key={state.label} className="voco-tray-state-card">
-                      <div className="voco-tray-state-card__icon" aria-hidden="true">
-                        <img src={state.image} alt="" />
+              </section>
+            ) : null}
+
+            {onboardingStep === 2 ? (
+              <section className="voco-onboarding__step">
+                <h2>Ready to use</h2>
+                <p>
+                  Press <code>{config.hotkey}</code> to start and stop listening.
+                </p>
+                <div className="voco-tray-legend" aria-label="Tray icon colors">
+                  {TRAY_COLOR_LEGEND.map((item) => (
+                    <article key={item.label} className="voco-tray-legend__item">
+                      <div className="voco-tray-legend__icon" aria-hidden="true">
+                        <img src={item.image} alt="" />
                       </div>
-                      <div className="voco-tray-state-card__copy">
-                        <strong>{state.label}</strong>
-                        <span>{state.description}</span>
-                      </div>
+                      <span>{item.label}</span>
                     </article>
                   ))}
+                </div>
+                <div className="voco-inline-note">
+                  You can reopen settings from the tray any time.
                 </div>
                 <div className="voco-onboarding__actions">
                   <button
@@ -694,116 +534,7 @@ export function ControlPanel({
                   <button
                     className="voco-button voco-button--primary"
                     onClick={async () => {
-                      const saved = await saveHotkey();
-                      if (saved) {
-                        onOnboardingStepChange(3);
-                      }
-                    }}
-                  >
-                    Continue
-                  </button>
-                </div>
-              </section>
-            ) : null}
-
-            {onboardingStep === 3 ? (
-              <section className="voco-onboarding__step">
-                <h2>Linux insertion path</h2>
-                <p>
-                  Pick how VOCO should place text into the focused app. This is the
-                  part of the workflow that varies most across Wayland and X11 desktops.
-                </p>
-                <div className="voco-onboarding__detail-grid">
-                  <div className="voco-inline-card">
-                    <span>Session</span>
-                    <strong>{runtimeSessionLabel}</strong>
-                  </div>
-                  <div className="voco-inline-card">
-                    <span>Install path</span>
-                    <strong>{installChannelLabel}</strong>
-                  </div>
-                </div>
-                <div className="voco-inline-note">{runtimeFlowCopy}</div>
-                <div className="voco-profile-grid">
-                  {INSERTION_STRATEGIES.map((strategy) => (
-                    <button
-                      key={strategy.value}
-                      className={[
-                        "voco-profile-card",
-                        config.insertionStrategy === strategy.value
-                          ? "voco-profile-card--active"
-                          : "",
-                      ].join(" ")}
-                      onClick={() => void savePatch({ insertionStrategy: strategy.value })}
-                    >
-                      <strong>{strategy.title}</strong>
-                      <span>{strategy.description}</span>
-                    </button>
-                  ))}
-                </div>
-                <div className="voco-inline-note">
-                  Type simulation: {typeSimulationLabel}
-                </div>
-                <div className="voco-inline-note">
-                  Clipboard insertion: {clipboardLabel}
-                </div>
-                <div className="voco-onboarding__actions">
-                  <button
-                    className="voco-button voco-button--secondary"
-                    onClick={() => onOnboardingStepChange(2)}
-                  >
-                    Back
-                  </button>
-                  <button
-                    className="voco-button voco-button--primary"
-                    onClick={async () => {
-                      const result = await savePatch({
-                        insertionStrategy: config.insertionStrategy,
-                      });
-                      if (result.ok) {
-                        onOnboardingStepChange(4);
-                      }
-                    }}
-                  >
-                    Continue
-                  </button>
-                </div>
-              </section>
-            ) : null}
-
-            {onboardingStep === 4 ? (
-              <section className="voco-onboarding__step">
-                <h2>VOCO is ready</h2>
-                <p>
-                  Press <code>{config.hotkey}</code> any time to begin. Watch the tray
-                  icon as you work so you always know whether VOCO is ready, listening,
-                  transcribing, or needs attention.
-                </p>
-                <div className="voco-onboarding__hero-grid">
-                  <article className="voco-onboarding__hero-card voco-onboarding__hero-card--lead">
-                    <span className="voco-onboarding__hero-eyebrow">Quick start</span>
-                    <strong>1. Trigger VOCO with <code>{config.hotkey}</code></strong>
-                    <p>2. Speak naturally into the selected microphone. 3. Press the hotkey again and VOCO inserts the transcript at the cursor.</p>
-                  </article>
-                  <article className="voco-onboarding__hero-card">
-                    <span className="voco-onboarding__hero-eyebrow">Insertion mode</span>
-                    <strong>{insertionStrategyLabel}</strong>
-                    <p>You can adjust Linux insertion behavior later in Settings -&gt; Advanced.</p>
-                  </article>
-                  <article className="voco-onboarding__hero-card">
-                    <span className="voco-onboarding__hero-eyebrow">Updates</span>
-                    <strong>{installChannelLabel}</strong>
-                    <p>README install instructions and in-app update guidance now follow this channel.</p>
-                  </article>
-                </div>
-                <div className="voco-inline-note">
-                  Settings and the command panel stay available from the tray after setup.
-                </div>
-                <div className="voco-onboarding__actions">
-                  <button
-                    className="voco-button voco-button--primary"
-                    onClick={async () => {
-                      const result = await savePatch({ onboardingCompleted: true });
+                      const result = await savePatch({ onboardingCompleted: true, voiceProfile: "default" });
                       if (result.ok) {
                         onSurfaceChange("hidden");
                       }

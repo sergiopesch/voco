@@ -2,7 +2,47 @@
 
 VOCO releases are cut from git tags in the form `voco.<version>`.
 
-## Rehearsal
+## Quick path
+
+1. Start from current `master`:
+
+```bash
+git checkout master
+git pull origin master
+npm install
+```
+
+2. Run the release checks:
+
+```bash
+npm run verify:versions
+npm run check
+npm test
+npm --workspace @voco/desktop run build:frontend
+npm run rehearse:release
+```
+
+3. Commit and push:
+
+```bash
+git add .
+git commit -m "Cut release <version>"
+git push origin master
+```
+
+4. Create and push the release tag:
+
+```bash
+git tag voco.<version>
+git push origin voco.<version>
+```
+
+5. Wait for the GitHub release workflow to publish the assets, then verify the release page contains:
+- `voco_<version>_amd64.deb`
+- `voco_checksums.txt`
+- `VOCO-<version>-x86_64.AppImage` when AppImage packaging succeeds
+
+## Rehearsal details
 
 Before creating a release tag, run:
 
@@ -41,7 +81,7 @@ The release workflow:
 - generates checksums
 - renders the GitHub release body from `scripts/render-release-body.sh`
 
-## Publish Checklist
+## Publish checklist
 
 - bump the repo version everywhere required by `npm run verify:versions`
 - run `npm run rehearse:release`
@@ -49,17 +89,12 @@ The release workflow:
 - create the tag as `voco.<version>`
 - verify the GitHub Release contains the expected assets and notes
 
-## End-User Test Gate
+## Manual test before tagging
 
-The GitHub Release path is ready for end-user testing when all of these are true:
+- start VOCO locally with `npm run dev`
+- complete onboarding
+- test dictation with `Alt+D`
+- confirm tray launch, settings, and hide-to-tray still work
+- run `npm run report:linux-runtime` if Linux insertion changed
 
-- `npm run rehearse:release` passes on the release commit
-- GitHub Actions CI is green on `master`
-- the release tag is cut as `voco.<version>`
-- the README points users at the branded guided installer first
-- the GitHub Release contains:
-  - `voco_<version>_amd64.deb`
-  - `voco_checksums.txt`
-  - `VOCO-<version>-x86_64.AppImage` if the AppImage build completed
-
-For the first end-user release test, treat the `.deb` as the primary path. Treat the AppImage as a secondary path only when that asset is actually attached to the release. Snap and Flatpak are not part of the current end-user release test gate.
+Treat the `.deb` as the primary release path. Treat the AppImage as secondary when that asset is attached successfully.

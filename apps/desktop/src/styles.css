@@ -123,12 +123,8 @@ code {
 .voco-panel {
   width: 100%;
   height: 100%;
-  padding: 28px;
   box-sizing: border-box;
-  background:
-    radial-gradient(circle at top left, rgba(225, 229, 236, 0.12), transparent 28%),
-    radial-gradient(circle at bottom right, rgba(158, 164, 175, 0.12), transparent 30%),
-    linear-gradient(180deg, rgba(9, 10, 13, 0.98), rgba(17, 19, 24, 0.98));
+  background: transparent;
 }
 
 .voco-panel__shell {
@@ -147,18 +143,24 @@ code {
 
 .voco-panel__hero {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 24px;
   padding: 28px 30px 18px;
   border-bottom: 1px solid rgba(199, 204, 213, 0.08);
+  cursor: grab;
+}
+
+.voco-panel__hero:active {
+  cursor: grabbing;
 }
 
 .voco-panel__hero-actions {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: flex-end;
   gap: 12px;
+  cursor: default;
 }
 
 .voco-panel__brand {
@@ -213,11 +215,6 @@ code {
   font-size: 1.76rem;
 }
 
-.voco-panel[data-surface="onboarding"] .voco-panel__state {
-  min-width: 168px;
-  padding: 12px 15px;
-}
-
 .voco-panel__state {
   min-width: 180px;
   padding: 14px 16px;
@@ -242,6 +239,11 @@ code {
   padding-bottom: 12px;
 }
 
+.voco-panel[data-surface="onboarding"] .voco-panel__content {
+  overflow: hidden;
+  padding-bottom: 0;
+}
+
 .voco-settings {
   min-height: 0;
 }
@@ -254,57 +256,6 @@ code {
   background: rgba(255, 92, 122, 0.08);
   color: #ffc5cf;
   line-height: 1.5;
-}
-
-.voco-update-banner {
-  margin: 0 30px 0;
-  padding: 18px 20px;
-  border-radius: 22px;
-  border: 1px solid rgba(199, 204, 213, 0.18);
-  background:
-    radial-gradient(circle at top left, rgba(225, 229, 236, 0.14), transparent 42%),
-    linear-gradient(180deg, rgba(38, 42, 50, 0.76), rgba(24, 27, 33, 0.88));
-  box-shadow:
-    0 14px 32px rgba(8, 8, 12, 0.28),
-    inset 0 1px 0 rgba(255, 255, 255, 0.04);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-}
-
-.voco-update-banner__copy {
-  display: grid;
-  gap: 6px;
-}
-
-.voco-update-banner__copy strong {
-  font-size: 1rem;
-  letter-spacing: -0.02em;
-}
-
-.voco-update-banner__copy p,
-.voco-update-banner__eyebrow {
-  margin: 0;
-}
-
-.voco-update-banner__eyebrow {
-  font-size: 0.74rem;
-  font-weight: 500;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--voco-accent-highlight);
-}
-
-.voco-update-banner__copy p {
-  color: var(--voco-text-secondary);
-  line-height: 1.45;
-}
-
-.voco-update-banner__actions {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
 }
 
 .voco-onboarding__progress {
@@ -343,18 +294,6 @@ code {
   box-shadow: 0 0 16px rgba(225, 229, 236, 0.24);
 }
 
-.voco-onboarding__progress-label {
-  font-size: 0.74rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--voco-text-muted);
-}
-
-.voco-onboarding__progress-item--active .voco-onboarding__progress-label,
-.voco-onboarding__progress-item--complete .voco-onboarding__progress-label {
-  color: var(--voco-text-secondary);
-}
-
 .voco-onboarding__step,
 .voco-settings__section {
   max-width: 720px;
@@ -364,14 +303,18 @@ code {
 }
 
 .voco-panel[data-surface="onboarding"] .voco-onboarding__progress {
-  padding-top: 22px;
+  padding-top: 18px;
 }
 
 .voco-panel[data-surface="onboarding"] .voco-onboarding__step {
-  padding-top: 20px;
-  padding-bottom: 28px;
-  gap: 14px;
-  max-width: 860px;
+  max-width: 640px;
+  padding-top: 12px;
+  padding-bottom: 20px;
+  gap: 12px;
+}
+
+.voco-panel[data-surface="onboarding"] .voco-onboarding__actions {
+  margin-top: 10px;
 }
 
 .voco-onboarding__step h2,
@@ -420,139 +363,50 @@ code {
   gap: 10px;
 }
 
-.voco-onboarding__hero-grid,
-.voco-onboarding__detail-grid {
+.voco-tray-legend {
   display: grid;
-  gap: 14px;
-}
-
-.voco-onboarding__hero-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
 }
 
-.voco-onboarding__detail-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.voco-onboarding__hero-card,
-.voco-inline-card {
-  border: 1px solid rgba(199, 204, 213, 0.12);
-  border-radius: 20px;
-  background:
-    radial-gradient(circle at top left, rgba(225, 229, 236, 0.08), transparent 45%),
-    rgba(255, 255, 255, 0.03);
-  padding: 18px;
+.voco-tray-legend__item {
+  border: 1px solid rgba(199, 204, 213, 0.1);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 14px 10px 12px;
   display: grid;
+  justify-items: center;
   gap: 10px;
+  text-align: center;
 }
 
-.voco-onboarding__hero-card--lead {
-  background:
-    radial-gradient(circle at top left, rgba(225, 229, 236, 0.14), transparent 48%),
-    linear-gradient(180deg, rgba(31, 35, 43, 0.9), rgba(18, 20, 26, 0.94));
-  box-shadow: 0 18px 40px rgba(4, 5, 9, 0.22);
-}
-
-.voco-onboarding__hero-eyebrow,
-.voco-inline-card span {
-  font-size: 0.74rem;
-  font-weight: 500;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--voco-text-muted);
-}
-
-.voco-onboarding__hero-card strong,
-.voco-inline-card strong {
-  color: var(--voco-text);
-  font-size: 1rem;
-  line-height: 1.35;
-}
-
-.voco-onboarding__hero-card p {
-  margin: 0;
-  color: var(--voco-text-secondary);
-  line-height: 1.55;
-}
-
-.voco-command-preview {
+.voco-tray-legend__icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(199, 204, 213, 0.08);
   display: grid;
-  gap: 8px;
-  padding: 18px 20px;
-  border-radius: 20px;
-  border: 1px solid rgba(199, 204, 213, 0.12);
-  background: rgba(255, 255, 255, 0.025);
+  place-items: center;
 }
 
-.voco-command-preview__eyebrow {
-  font-size: 0.72rem;
-  font-weight: 500;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--voco-text-muted);
+.voco-tray-legend__icon img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  display: block;
 }
 
-.voco-command-preview code {
-  font-size: 0.98rem;
-  line-height: 1.6;
-  white-space: normal;
-  color: var(--voco-accent-highlight);
+.voco-tray-legend__item span {
+  color: var(--voco-text-secondary);
+  font-size: 0.86rem;
+  line-height: 1.3;
 }
 
 .voco-profile-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
-}
-
-.voco-tray-state-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-}
-
-.voco-tray-state-card {
-  border: 1px solid rgba(199, 204, 213, 0.12);
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.03);
-  padding: 16px 18px;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 14px;
-  align-items: center;
-}
-
-.voco-tray-state-card__icon {
-  width: 56px;
-  height: 56px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(199, 204, 213, 0.1);
-  display: grid;
-  place-items: center;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
-}
-
-.voco-tray-state-card__icon img {
-  width: 36px;
-  height: 36px;
-  object-fit: contain;
-  display: block;
-}
-
-.voco-tray-state-card__copy {
-  display: grid;
-  gap: 6px;
-}
-
-.voco-tray-state-card__copy strong {
-  color: var(--voco-text);
-  font-size: 0.98rem;
-}
-
-.voco-tray-state-card__copy span {
-  color: var(--voco-text-secondary);
-  line-height: 1.5;
 }
 
 .voco-profile-card {
@@ -809,13 +663,6 @@ code {
     padding-right: 20px;
   }
 
-  .voco-update-banner {
-    margin-left: 20px;
-    margin-right: 20px;
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
   .voco-settings {
     grid-template-columns: 1fr;
   }
@@ -837,15 +684,6 @@ code {
   }
 
   .voco-profile-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .voco-tray-state-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .voco-onboarding__hero-grid,
-  .voco-onboarding__detail-grid {
     grid-template-columns: 1fr;
   }
 

@@ -1,6 +1,6 @@
 [package]
 name = "voco"
-version = "2026.0.13"
+version = "2026.0.14"
 description = "A voice-native interface layer designed for speed and precision"
 authors = ["VOCO Contributors"]
 edition = "2021"
