@@ -5,18 +5,16 @@
 <!-- markdownlint-enable MD041 -->
 
 <p align="center">
-  <a href="#requirements"><img src="https://img.shields.io/badge/platform-Linux-black?style=flat-square&logo=linux&logoColor=white" alt="Linux"></a>
+  <a href="#install"><img src="https://img.shields.io/badge/platform-Linux-black?style=flat-square&logo=linux&logoColor=white" alt="Linux"></a>
   <a href="https://github.com/sergiopesch/voco/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/sergiopesch/voco/ci.yml?style=flat-square&label=CI" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-5E6570?style=flat-square" alt="MIT License"></a>
 </p>
 
----
-
-VOCO is a Linux local-first voice interface for fast control and insertion at the cursor. It lives in your tray, listens on demand while keeping audio local.
+VOCO is a local-first Linux dictation app. Press a hotkey, speak, press it again, and VOCO types at your cursor.
 
 ## Install
 
-### Guided VOCO Installer
+Recommended:
 
 ```bash
 wget https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.14/install -O voco-install
@@ -24,68 +22,29 @@ chmod +x voco-install
 ./voco-install
 ```
 
-This is the primary install path. It keeps the VOCO-branded setup flow at the center of the experience by:
-- checking Linux runtime requirements up front
-- downloading the exact release package and checksums
-- verifying the package before install
-- guiding the initial hotkey setup before first launch
-
-Optional trust step before running it:
+Optional:
 
 ```bash
 less ./voco-install
 ```
 
+Manual `.deb` fallback:
+
+```bash
+wget -O voco_latest_amd64.deb https://github.com/sergiopesch/voco/releases/latest/download/voco_latest_amd64.deb
+sudo dpkg -i voco_latest_amd64.deb
+```
+
 Primary tested path: Ubuntu and Debian.
 
-### Manual `.deb` Fallback
+## Try It
 
-```bash
-wget -O voco_latest_amd64.deb https://github.com/sergiopesch/voco/releases/latest/download/voco_latest_amd64.deb && sudo dpkg -i voco_latest_amd64.deb
-```
-
-Use this only if you explicitly want the raw package path instead of the guided installer.
-
-### Build from source
-
-1. Clone the repo:
-
-```bash
-git clone https://github.com/sergiopesch/voco.git
-cd voco
-```
-
-2. Install dependencies and repo tooling:
-
-```bash
-npm install
-./scripts/setup.sh --install
-```
-
-3. Run the app locally:
-
-```bash
-npm run dev
-```
-
-Checksums, AppImage notes, packaging status, uninstall steps, and manual install paths live in [docs/install.md](docs/install.md).
-
-## How It Works
-
-1. Launch `VOCO` from your app launcher or run `voco`.
-2. Press `Alt+D` to start listening.
-3. Press `Alt+D` again and VOCO types the transcript at your cursor.
-
-VOCO stays in the tray, shows a compact listening HUD, and opens with a short first-run setup for microphone access, hotkeys, and tray feedback.
-
-## Features
-
-- Local-first transcription with `whisper.cpp`
-- Tray-native workflow with clear ready, listening, and blocked states
-- Default `Alt+D` hotkey with runtime configuration
-- Minimal onboarding for microphone, hotkey, and tray feedback
-- Text insertion with documented Wayland and X11 behavior
-- In-app GitHub Release update checks for manual installs
+1. Launch `VOCO` from your app menu or run `voco`.
+2. Finish the short setup.
+3. Press `Alt+D`.
+4. Speak.
+5. Press `Alt+D` again.
+6. Confirm the text is inserted at your cursor.
 
 ## Requirements
 
@@ -94,25 +53,7 @@ VOCO stays in the tray, shows a compact listening HUD, and opens with a short fi
 - Wayland: `ydotool` and `wl-clipboard`
 - X11: `xdotool` and `xclip`
 
-Other Linux distributions may work, but VOCO is validated on Ubuntu-class environments first.
-
-## Configuration
-
-VOCO stores configuration at `~/.config/voco/config.json`.
-
-```json
-{ "hotkey": "Alt+D", "insertionStrategy": "auto" }
-```
-
-Existing `voice` installs are migrated automatically on startup:
-- `~/.config/voice/config.json` -> `~/.config/voco/config.json`
-- `~/.local/share/voice/models/` -> `~/.local/share/voco/models/`
-
-On Wayland, `Alt+D` and `Alt+Shift+D` remain the most reliable built-in presets because they can use the evdev backend.
-
-## Local Test
-
-1. Start VOCO from source:
+## Run From Source
 
 ```bash
 git clone https://github.com/sergiopesch/voco.git
@@ -122,19 +63,7 @@ npm install
 npm run dev
 ```
 
-2. In the app:
-- allow microphone access
-- choose your microphone
-- keep `Alt+D` unless you need another hotkey
-- finish setup
-
-3. Test dictation:
-- press `Alt+D`
-- speak a short sentence
-- press `Alt+D` again
-- confirm the text is inserted at your cursor
-
-Useful checks:
+## Useful Checks
 
 ```bash
 npm run check
@@ -145,26 +74,18 @@ npm run rehearse:release
 npm run report:linux-runtime
 ```
 
-Release and deployment steps live in [docs/release-process.md](docs/release-process.md).
+## More Help
 
-## Documentation
+- [Install details](docs/install.md)
+- [Testing](docs/testing/README.md)
+- [Troubleshooting](docs/troubleshooting.md)
+- [Release process](docs/release-process.md)
 
-- [docs/install.md](docs/install.md)
-- [docs/linux-packaging.md](docs/linux-packaging.md)
-- [docs/submission-readiness.md](docs/submission-readiness.md)
-- [docs/store-listing.md](docs/store-listing.md)
-- [docs/release-process.md](docs/release-process.md)
-- [docs/testing/README.md](docs/testing/README.md)
-- [docs/troubleshooting.md](docs/troubleshooting.md)
-- [docs/contributing.md](docs/contributing.md)
-- [docs/architecture/README.md](docs/architecture/README.md)
+## Notes
 
-## Known Limitations
-
-- Wayland text insertion still depends on compositor support and `ydotool`.
-- Some Linux shells render tray icons monochrome, reducing the effect of accent colors.
-- First launch downloads the speech model once before VOCO can run fully offline.
-- The onboarding microphone meter is a setup aid, not a calibrated studio meter.
+- First launch downloads the speech model once.
+- Wayland text insertion depends on `ydotool` and compositor support.
+- Config lives at `~/.config/voco/config.json`.
 
 ## License
 
