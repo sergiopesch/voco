@@ -30,6 +30,7 @@ static EVDEV_WATCHED_PATHS: LazyLock<Mutex<std::collections::HashSet<std::path::
 const TOGGLE_DICTATION_EVENT: &str = "voco:toggle-dictation";
 const LEGACY_TOGGLE_DICTATION_EVENT: &str = "voice:toggle-dictation";
 const TOGGLE_DEBOUNCE_MS: i64 = 120;
+const MAX_AUDIO_SECONDS: usize = 60;
 const HIDDEN_WINDOW_POS_X: i32 = -100;
 const HIDDEN_WINDOW_POS_Y: i32 = -100;
 const HIDDEN_WINDOW_SIZE: u32 = 1;
@@ -115,13 +116,8 @@ fn save_cached_update_state(cache: CachedUpdateCheck) -> Result<(), String> {
 
 // --- Transcription ---
 
-fn decode_audio_base64(encoded: &str) -> Result<Vec<f32>, String> {
-    use base64::Engine;
-    let bytes = base64::engine::general_purpose::STANDARD
-        .decode(encoded)
-        .map_err(|e| format!("Invalid audio data: {e}"))?;
-
-    if bytes.len() % 4 != 0 {
+fn decode_audio_bytes(bytes: &[u8]) -> Result<Vec<f32>, String> {
+    if !bytes.len().is_multiple_of(4) {
         return Err("Audio data length is not a multiple of 4 bytes".to_string());
     }
 
@@ -133,16 +129,19 @@ fn decode_audio_base64(encoded: &str) -> Result<Vec<f32>, String> {
 
 #[tauri::command]
 fn transcribe_audio(
-    audio_base64: String,
+    audio_bytes: Vec<u8>,
     state: tauri::State<'_, WhisperMutex>,
 ) -> Result<String, String> {
-    let samples = decode_audio_base64(&audio_base64)?;
+    let samples = decode_audio_bytes(&audio_bytes)?;
 
     if samples.is_empty() {
         return Err("No audio samples provided".to_string());
     }
-    if samples.len() > 16000 * 300 {
-        return Err("Audio too long (max 5 minutes)".to_string());
+    if samples.len() > 16000 * MAX_AUDIO_SECONDS {
+        return Err(format!(
+            "Audio too long (max {} seconds)",
+            MAX_AUDIO_SECONDS
+        ));
     }
 
     let model_path = transcribe::default_model_path()?;
@@ -1137,37 +1136,26 @@ mod tests {
     use super::*;
 
     #[test]
-    fn decode_audio_base64_valid() {
-        use base64::Engine;
+    fn decode_audio_bytes_valid() {
         let mut bytes = Vec::new();
         bytes.extend_from_slice(&0.5f32.to_le_bytes());
         bytes.extend_from_slice(&(-0.5f32).to_le_bytes());
-        let encoded = base64::engine::general_purpose::STANDARD.encode(&bytes);
-        let samples = decode_audio_base64(&encoded).unwrap();
+        let samples = decode_audio_bytes(&bytes).unwrap();
         assert_eq!(samples.len(), 2);
         assert!((samples[0] - 0.5).abs() < f32::EPSILON);
         assert!((samples[1] + 0.5).abs() < f32::EPSILON);
     }
 
     #[test]
-    fn decode_audio_base64_empty() {
-        use base64::Engine;
-        let encoded = base64::engine::general_purpose::STANDARD.encode(b"");
-        assert!(decode_audio_base64(&encoded).unwrap().is_empty());
+    fn decode_audio_bytes_empty() {
+        assert!(decode_audio_bytes(&[]).unwrap().is_empty());
     }
 
     #[test]
-    fn decode_audio_base64_invalid_length() {
-        use base64::Engine;
-        let encoded = base64::engine::general_purpose::STANDARD.encode(b"abc");
-        assert!(decode_audio_base64(&encoded)
+    fn decode_audio_bytes_invalid_length() {
+        assert!(decode_audio_bytes(b"abc")
             .unwrap_err()
             .contains("not a multiple of 4"));
-    }
-
-    #[test]
-    fn decode_audio_base64_invalid_encoding() {
-        assert!(decode_audio_base64("not-valid-base64!!!").is_err());
     }
 
     #[test]

@@ -15,6 +15,7 @@ import { openMicrophoneStream, probeMicrophoneAccess } from "@/lib/audioInput";
 import type { DictationStatus } from "@/types";
 
 const TARGET_SAMPLE_RATE = 16000;
+const MAX_AUDIO_SECONDS = 60;
 const AUDIO_LEVEL_ATTACK = 0.68;
 const AUDIO_LEVEL_RELEASE = 0.24;
 const AUDIO_LEVEL_FLOOR = 0.01;
@@ -335,6 +336,23 @@ export function useDictation() {
     // Skip very short recordings (< 0.3s)
     if (merged.length < TARGET_SAMPLE_RATE * 0.3) {
       finalizeIdleState();
+      return;
+    }
+
+    if (merged.length > TARGET_SAMPLE_RATE * MAX_AUDIO_SECONDS) {
+      phaseRef.current = "error";
+      setStatus("error");
+      setError(
+        `Recording too long. Please keep dictation under ${MAX_AUDIO_SECONDS} seconds.`,
+      );
+      setInterimTranscript("");
+      setDictationStatus("error").catch(() => {});
+
+      const queuedAction = queuedActionRef.current;
+      queuedActionRef.current = null;
+      if (queuedAction === "start") {
+        void startRecording();
+      }
       return;
     }
 

@@ -48,7 +48,7 @@ Document significant technical decisions here using the format below.
 - **Status**: accepted
 - **Context**: Need microphone capture for dictation; could use Web APIs or native Rust audio libs (cpal, etc.)
 - **Decision**: Use WebView getUserMedia + AudioWorklet for audio capture (ScriptProcessorNode fallback)
-- **Consequences**: Off-main-thread audio processing, well-tested browser APIs, automatic device enumeration. Audio data base64-encoded and passed to Rust for whisper-rs (see ADR-008). Trade-off: requires WebKitGTK window to be "shown" (1x1 transparent off-screen) for getUserMedia to work.
+- **Consequences**: Off-main-thread audio processing, well-tested browser APIs, automatic device enumeration. Audio data is packed into byte buffers and passed to Rust for whisper-rs (see ADR-009). Trade-off: requires WebKitGTK window to be "shown" (1x1 transparent off-screen) for getUserMedia to work.
 
 ### ADR-006: Linux-only scope
 - **Date**: 2026-03-25
@@ -66,7 +66,14 @@ Document significant technical decisions here using the format below.
 
 ### ADR-008: Base64 audio IPC over JSON number arrays
 - **Date**: 2026-03-28
-- **Status**: accepted
+- **Status**: superseded
 - **Context**: Audio samples were sent as `Array.from(Float32Array)` through Tauri invoke, resulting in JSON arrays of millions of float numbers. A 5-minute recording produced ~50MB of JSON.
 - **Decision**: Encode Float32Array bytes as base64 on the frontend, decode to `Vec<f32>` in Rust via the `base64` crate.
-- **Consequences**: ~60% smaller IPC payload, far faster serialization/deserialization (single string vs millions of number tokens). Adds `base64` crate dependency (small, widely used). Audio data format is little-endian f32, matching native representation on x86 and ARM Linux.
+- **Consequences**: This removed the worst JSON payload bloat at the time, but it was later replaced by direct byte transport to avoid large base64 string construction and decode overhead.
+
+### ADR-009: Packed byte audio IPC over base64 strings
+- **Date**: 2026-04-14
+- **Status**: accepted
+- **Context**: The base64 audio IPC path still built very large strings on the frontend and forced a full base64 decode in Rust before transcription.
+- **Decision**: Send packed `Uint8Array` audio bytes through Tauri invoke and decode them directly to `Vec<f32>` in Rust.
+- **Consequences**: Lower CPU and memory overhead in the dictation path, no base64 dependency in the app crate, and a simpler bridge while preserving the current full-buffer transcription architecture. The product now also caps a single dictation recording at 60 seconds to keep memory and IPC cost in line with the intended dictation use case.

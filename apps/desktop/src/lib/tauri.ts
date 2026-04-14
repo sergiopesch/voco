@@ -15,12 +15,10 @@ export async function saveConfig(config: AppConfig): Promise<void> {
 }
 
 export async function transcribeAudio(samples: Float32Array): Promise<string> {
-  const bytes = new Uint8Array(samples.buffer, samples.byteOffset, samples.byteLength);
-  let binary = "";
-  for (let i = 0; i < bytes.length; i += 8192) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
-  }
-  return invoke<string>("transcribe_audio", { audioBase64: btoa(binary) });
+  const bytes = new Uint8Array(
+    samples.buffer.slice(samples.byteOffset, samples.byteOffset + samples.byteLength),
+  );
+  return invoke<string>("transcribe_audio", { audioBytes: bytes });
 }
 
 export async function insertText(text: string, strategy: string): Promise<void> {

@@ -14,7 +14,7 @@
     <p>It stays in the tray, listens on demand, keeps visible state compact, and defaults to a local-first workflow for voice capture.</p>
     <ul>
       <li>Tray-first workflow with a compact command panel</li>
-      <li>Onboarding for microphone setup, hotkeys, and voice profile selection</li>
+      <li>Onboarding for microphone setup and hotkeys</li>
       <li>GitHub Release update checks for manual install channels</li>
       <li>Clear Linux-specific install, upgrade, and troubleshooting guidance</li>
     </ul>
@@ -28,9 +28,10 @@
   <url type="vcs-browser">https://github.com/sergiopesch/voco</url>
   <content_rating type="oars-1.1" />
   <releases>
-    <release version="2026.0.15" date="2026-04-09">
+    <release version="2026.0.16" date="2026-04-14">
       <description>
-        <p>Hardened insertion behavior, installer trust checks, update handling, and Linux runtime diagnostics ahead of end-user release testing.</p>
+        <p>Aligned the installer and docs around the most reliable Wayland hotkeys, reduced dictation recordings to a 60-second cap, and removed base64 overhead from the audio IPC path.</p>
+        <p>Current onboarding still focuses on microphone setup and hotkeys while voice profile work remains future-facing.</p>
       </description>
     </release>
   </releases>

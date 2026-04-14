@@ -6,11 +6,11 @@ set -euo pipefail
 #
 # VOCO — release install helper
 # Usage:
-#   wget https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.15/install -O voco-install
+#   wget https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.16/install -O voco-install
 #   chmod +x voco-install
 #   ./voco-install
 
-VERSION="2026.0.15"
+VERSION="2026.0.16"
 RELEASE_TAG="voco.${VERSION}"
 DEB_URL="https://github.com/sergiopesch/voco/releases/download/${RELEASE_TAG}/voco_${VERSION}_amd64.deb"
 CHECKSUMS_URL="https://github.com/sergiopesch/voco/releases/download/${RELEASE_TAG}/voco_checksums.txt"
@@ -105,6 +105,8 @@ voco_run_hotkey_setup() {
   local hotkey="${1:-Alt+D}"
   local config_dir="${HOME}/.config/voco"
   local config_file="${config_dir}/config.json"
+  local session_type="${XDG_SESSION_TYPE:-x11}"
+  local alternate_wayland_hotkey="Alt+Shift+D"
 
   echo
   echo -e "  ${BOLD}${GRAPHITE}Quick Setup${NC}"
@@ -120,14 +122,29 @@ voco_run_hotkey_setup() {
 
     if [[ "$ANSWER" =~ ^[Nn] ]]; then
       echo
-      echo -e "  ${DIM}Examples: Ctrl+Shift+V, Super+D, Alt+Shift+R${NC}"
-      printf "  ${WHITE}${BOLD}▸${NC} Enter your preferred hotkey: "
-      read -r CUSTOM_HOTKEY </dev/tty 2>/dev/null || CUSTOM_HOTKEY=""
-      if [[ -n "$CUSTOM_HOTKEY" ]]; then
-        hotkey="$CUSTOM_HOTKEY"
-        ok "Hotkey set to ${BOLD}${hotkey}${NC}"
+      if [[ "$session_type" == "wayland" ]]; then
+        echo -e "  ${DIM}Wayland note: VOCO is currently most reliable with ${BOLD}Alt+D${NC}${DIM} or ${BOLD}${alternate_wayland_hotkey}${NC}${DIM}.${NC}"
+        printf "  ${WHITE}${BOLD}▸${NC} Use ${BOLD}%s${NC} instead? [y/N] " "${alternate_wayland_hotkey}"
+        read -r WAYLAND_ALTERNATE </dev/tty 2>/dev/null || WAYLAND_ALTERNATE="n"
+        WAYLAND_ALTERNATE="${WAYLAND_ALTERNATE:-n}"
+
+        if [[ "$WAYLAND_ALTERNATE" =~ ^[Yy] ]]; then
+          hotkey="$alternate_wayland_hotkey"
+          ok "Hotkey set to ${BOLD}${hotkey}${NC}"
+        else
+          warn "Keeping ${BOLD}${hotkey}${NC}. Change it later from the tray if needed."
+          dim "Custom hotkeys may be less reliable on Wayland right now."
+        fi
       else
-        ok "Keeping default ${BOLD}Alt+D${NC}"
+        echo -e "  ${DIM}Examples: Ctrl+Shift+V, Super+D, Alt+Shift+R${NC}"
+        printf "  ${WHITE}${BOLD}▸${NC} Enter your preferred hotkey: "
+        read -r CUSTOM_HOTKEY </dev/tty 2>/dev/null || CUSTOM_HOTKEY=""
+        if [[ -n "$CUSTOM_HOTKEY" ]]; then
+          hotkey="$CUSTOM_HOTKEY"
+          ok "Hotkey set to ${BOLD}${hotkey}${NC}"
+        else
+          ok "Keeping default ${BOLD}Alt+D${NC}"
+        fi
       fi
     else
       ok "Hotkey: ${BOLD}${hotkey}${NC}"

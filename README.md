@@ -17,7 +17,7 @@ VOCO is a local-first Linux dictation app. Press a hotkey, speak, press it again
 Recommended:
 
 ```bash
-wget https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.15/install -O voco-install
+wget https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.16/install -O voco-install
 chmod +x voco-install
 ./voco-install
 ```
@@ -50,7 +50,7 @@ Primary tested path: Ubuntu and Debian.
 
 - Ubuntu or Debian
 - PulseAudio or PipeWire
-- Wayland: `ydotool` and `wl-clipboard`
+- Wayland: `ydotool`, `wl-clipboard`, and access to the `input` group for the most reliable hotkey path
 - X11: `xdotool` and `xclip`
 
 ## Run From Source
@@ -84,7 +84,9 @@ npm run report:linux-runtime
 ## Notes
 
 - First launch downloads the speech model once.
-- Wayland text insertion depends on `ydotool` and compositor support.
+- Single dictation recordings are currently capped at 60 seconds.
+- On Wayland, `Alt+D` and `Alt+Shift+D` are the most reliable hotkeys right now.
+- Wayland text insertion depends on `ydotool`, compositor support, and often `input` group access.
 - Config lives at `~/.config/voco/config.json`.
 
 ## License

@@ -31,6 +31,8 @@ less ./voco-install
 
 The installer checks Linux requirements, downloads the exact package, verifies checksums, installs VOCO, and lets you pick the first hotkey.
 
+On Wayland, the installer keeps the first-run choice conservative: `Alt+D` stays the default and `Alt+Shift+D` is the supported alternate because those are currently VOCO's most reliable hotkeys there.
+
 ## Manual `.deb` install
 
 1. Download the package and checksums:
@@ -81,6 +83,13 @@ npm run dev
 - speak
 - press `Alt+D` again
 - confirm text is inserted at the cursor
+- keep single dictation recordings under 60 seconds
+
+## Wayland Hotkey and Permission Notes
+
+- The most reliable Wayland hotkeys right now are `Alt+D` and `Alt+Shift+D`.
+- Custom hotkeys may fall back to a less reliable backend on Wayland.
+- For the evdev hotkey path, many Linux setups also require your user to be in the `input` group.
 
 ## Release asset names
 
