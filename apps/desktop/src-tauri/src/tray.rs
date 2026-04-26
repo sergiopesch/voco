@@ -266,6 +266,7 @@ fn apply_tray_state(app: &tauri::AppHandle, tray_state: &TrayState) {
         if let Err(e) = tray.set_tooltip(Some(&effective_tooltip)) {
             error!("Failed to set tray tooltip: {e}");
         }
+        crate::trace_hotkey_event("tray_status_updated", None);
 
         if debug_enabled {
             info!(

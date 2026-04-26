@@ -6,6 +6,7 @@ import {
   setDictationStatus,
   setMicrophoneReady,
   showNotification,
+  traceHotkeyEvent,
 } from "@/lib/tauri";
 import {
   calculateVisualAudioLevelFromSamples,
@@ -37,19 +38,51 @@ export function useDictation() {
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const silentSinkRef = useRef<GainNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const primedStreamRef = useRef<MediaStream | null>(null);
+  const primedStreamPromiseRef = useRef<Promise<MediaStream> | null>(null);
   const samplesRef = useRef<Float32Array[]>([]);
   const phaseRef = useRef<DictationPhase>("idle");
   const queuedActionRef = useRef<QueuedAction>(null);
+  const workletModuleLoadedRef = useRef(false);
   const smoothedAudioLevelRef = useRef(0);
   const firstHotkeyPressMsRef = useRef<number | null>(null);
   const initialHotkeyPressLoggedRef = useRef(false);
   const initialHotkeyLatencyLoggedRef = useRef(false);
+
+  const ensureAudioContext = useCallback(async () => {
+    if (!audioContextRef.current || audioContextRef.current.state === "closed") {
+      audioContextRef.current = new AudioContext({
+        latencyHint: "interactive",
+      });
+      workletModuleLoadedRef.current = false;
+    }
+
+    if (audioContextRef.current.state === "suspended") {
+      await audioContextRef.current.resume().catch(() => {});
+    }
+
+    return audioContextRef.current;
+  }, []);
+
+  const ensureWorkletModuleLoaded = useCallback(
+    async (audioContext: AudioContext) => {
+      if (workletModuleLoadedRef.current) {
+        return;
+      }
+
+      await audioContext.audioWorklet.addModule("/audio-processor.js");
+      workletModuleLoadedRef.current = true;
+    },
+    [],
+  );
 
   const initializeMicrophone = useCallback(
     async (appStartMs: number) => {
       try {
         const deviceId = useStore.getState().selectedDeviceId;
         await probeMicrophoneAccess(deviceId);
+        const audioContext = await ensureAudioContext();
+        await ensureWorkletModuleLoaded(audioContext).catch(() => {});
 
         setStatus("idle");
         setError(null);
@@ -86,8 +119,40 @@ export function useDictation() {
         }
       }
     },
-    [setError, setInterimTranscript],
+    [ensureAudioContext, ensureWorkletModuleLoaded, setError, setInterimTranscript],
   );
+
+  const prepareAudioEngine = useCallback(async () => {
+    const audioContext = await ensureAudioContext();
+    await ensureWorkletModuleLoaded(audioContext).catch(() => {});
+  }, [ensureAudioContext, ensureWorkletModuleLoaded]);
+
+  const openTracedMicrophoneStream = useCallback(async (deviceId: string | null) => {
+    traceHotkeyEvent("recording_get_user_media_started").catch(() => {});
+    const stream = await openMicrophoneStream(deviceId);
+    traceHotkeyEvent("recording_get_user_media_done").catch(() => {});
+    return stream;
+  }, []);
+
+  const primeRecordingStream = useCallback(async () => {
+    if (streamRef.current || primedStreamRef.current || primedStreamPromiseRef.current) {
+      return;
+    }
+
+    const deviceId = useStore.getState().selectedDeviceId;
+    const promise = openTracedMicrophoneStream(deviceId)
+      .then((stream) => {
+        primedStreamRef.current = stream;
+        setMicrophoneReady(true).catch(() => {});
+        return stream;
+      })
+      .finally(() => {
+        primedStreamPromiseRef.current = null;
+      });
+
+    primedStreamPromiseRef.current = promise;
+    await promise.catch(() => {});
+  }, [openTracedMicrophoneStream]);
 
   const updateAudioLevel = useCallback(
     (rawLevel: number) => {
@@ -125,7 +190,7 @@ export function useDictation() {
     source: MediaStreamAudioSourceNode,
   ): Promise<boolean> => {
     try {
-      await audioContext.audioWorklet.addModule("/audio-processor.js");
+      await ensureWorkletModuleLoaded(audioContext);
       const worklet = new AudioWorkletNode(
         audioContext,
         "audio-capture-processor",
@@ -185,15 +250,6 @@ export function useDictation() {
 
     const sampleRate = audioContextRef.current?.sampleRate ?? TARGET_SAMPLE_RATE;
 
-    if (audioContextRef.current) {
-      try {
-        await audioContextRef.current.close();
-      } catch {
-        // Closing an already-closed context is safe to ignore here.
-      }
-      audioContextRef.current = null;
-    }
-
     return sampleRate;
   }
 
@@ -219,6 +275,7 @@ export function useDictation() {
 
     phaseRef.current = "starting";
     queuedActionRef.current = null;
+    traceHotkeyEvent("recording_state_requested").catch(() => {});
 
     try {
       clearTranscript();
@@ -229,8 +286,16 @@ export function useDictation() {
       setDictationStatus("recording").catch(() => {});
 
       const deviceId = useStore.getState().selectedDeviceId;
-
-      const stream = await openMicrophoneStream(deviceId);
+      let stream = primedStreamRef.current;
+      if (stream) {
+        primedStreamRef.current = null;
+      } else if (primedStreamPromiseRef.current) {
+        stream = await primedStreamPromiseRef.current.catch(() => null);
+        primedStreamRef.current = null;
+      }
+      if (!stream) {
+        stream = await openTracedMicrophoneStream(deviceId);
+      }
 
       streamRef.current = stream;
       setMicrophoneReady(true).catch(() => {});
@@ -247,21 +312,24 @@ export function useDictation() {
         );
       }
 
-      const audioContext = new AudioContext({
-        latencyHint: "interactive",
-      });
-      audioContextRef.current = audioContext;
+      const audioContext = await ensureAudioContext();
+      traceHotkeyEvent("recording_audio_context_ready").catch(() => {});
 
       const source = audioContext.createMediaStreamSource(stream);
       sourceRef.current = source;
+      traceHotkeyEvent("recording_media_source_created").catch(() => {});
 
       // Prefer AudioWorklet (off main thread), fall back to ScriptProcessorNode
       const workletOk = await connectWorklet(audioContext, source);
       if (!workletOk) {
         connectScriptProcessor(audioContext, source);
+        traceHotkeyEvent("recording_script_processor_connected").catch(() => {});
+      } else {
+        traceHotkeyEvent("recording_worklet_connected").catch(() => {});
       }
 
       phaseRef.current = "recording";
+      traceHotkeyEvent("recording_state_active").catch(() => {});
 
       if (queuedActionRef.current === "stop") {
         queuedActionRef.current = null;
@@ -435,6 +503,8 @@ export function useDictation() {
 
   return {
     initializeMicrophone,
+    prepareAudioEngine,
+    primeRecordingStream,
     toggle,
     onHotkeyPressed,
   };

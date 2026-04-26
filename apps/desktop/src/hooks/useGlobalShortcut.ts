@@ -1,11 +1,13 @@
 import { useEffect, useRef } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { traceHotkeyEvent } from "@/lib/tauri";
 
 const TOGGLE_EVENT = "voco:toggle-dictation";
 
 export function useGlobalShortcut(
   toggle: () => void,
   shouldHandleHotkey: () => boolean,
+  canHandleHotkey: boolean,
   appStartMs: number,
   onHotkeyPressed: () => void,
 ) {
@@ -15,6 +17,7 @@ export function useGlobalShortcut(
   shouldHandleHotkeyRef.current = shouldHandleHotkey;
   const onHotkeyPressedRef = useRef(onHotkeyPressed);
   onHotkeyPressedRef.current = onHotkeyPressed;
+  const handlerReadyLoggedRef = useRef(false);
 
   useEffect(() => {
     let unlisten: (() => void) | null = null;
@@ -22,6 +25,7 @@ export function useGlobalShortcut(
 
     void getCurrentWindow()
       .listen(TOGGLE_EVENT, () => {
+        traceHotkeyEvent("frontend_toggle_received").catch(() => {});
         onHotkeyPressedRef.current();
         if (!shouldHandleHotkeyRef.current()) {
           return;
@@ -35,6 +39,7 @@ export function useGlobalShortcut(
         }
 
         unlisten = cleanup;
+        traceHotkeyEvent("frontend_hotkey_listener_registered").catch(() => {});
         const elapsed = Math.round(performance.now() - appStartMs);
         console.info("Hotkey listener attached");
         console.info(
@@ -52,4 +57,13 @@ export function useGlobalShortcut(
       }
     };
   }, [appStartMs]);
+
+  useEffect(() => {
+    if (!canHandleHotkey || handlerReadyLoggedRef.current) {
+      return;
+    }
+
+    handlerReadyLoggedRef.current = true;
+    traceHotkeyEvent("frontend_hotkey_handler_ready").catch(() => {});
+  }, [canHandleHotkey]);
 }

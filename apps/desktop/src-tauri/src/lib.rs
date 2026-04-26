@@ -8,6 +8,7 @@ use log::{debug, error, info, warn};
 use serde::Serialize;
 use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
 use std::sync::{LazyLock, Mutex};
+use std::time::Instant;
 use tauri::{Emitter, Manager};
 use transcribe::{WhisperMutex, WhisperState};
 
@@ -21,6 +22,11 @@ static EVDEV_HOTKEY_MODE: std::sync::atomic::AtomicU8 = std::sync::atomic::Atomi
 static USE_EVDEV_HOTKEY: AtomicBool = AtomicBool::new(false);
 static EVDEV_LISTENER_STARTED: AtomicBool = AtomicBool::new(false);
 static HOTKEY_BINDING_VERSION: AtomicU64 = AtomicU64::new(0);
+static FRONTEND_HOTKEY_HANDLER_READY: AtomicBool = AtomicBool::new(false);
+static PENDING_TOGGLE_BACKEND: LazyLock<Mutex<Option<String>>> = LazyLock::new(|| Mutex::new(None));
+static TRACE_START: LazyLock<Instant> = LazyLock::new(Instant::now);
+static TRACE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
+static TRACE_FILE_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 static REGISTERED_PLUGIN_SHORTCUT: LazyLock<Mutex<Option<String>>> =
     LazyLock::new(|| Mutex::new(None));
 #[cfg(target_os = "linux")]
@@ -52,6 +58,145 @@ fn now_ms() -> i64 {
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis() as i64
+}
+
+fn monotonic_trace_ms() -> u128 {
+    TRACE_START.elapsed().as_micros() / 1000
+}
+
+fn xdg_state_home() -> std::path::PathBuf {
+    std::env::var_os("XDG_STATE_HOME")
+        .map(std::path::PathBuf::from)
+        .or_else(dirs::state_dir)
+        .or_else(|| dirs::home_dir().map(|home| home.join(".local/state")))
+        .unwrap_or_else(std::env::temp_dir)
+}
+
+fn hotkey_trace_path() -> std::path::PathBuf {
+    xdg_state_home().join("voco").join("hotkey-trace.jsonl")
+}
+
+fn session_type_label() -> &'static str {
+    match std::env::var("XDG_SESSION_TYPE") {
+        Ok(value) if value.eq_ignore_ascii_case("wayland") => "Wayland",
+        Ok(value) if value.eq_ignore_ascii_case("x11") => "X11",
+        _ => "unknown",
+    }
+}
+
+fn selected_backend_label() -> &'static str {
+    if USE_EVDEV_HOTKEY.load(Ordering::SeqCst) {
+        "evdev"
+    } else {
+        "global_shortcut"
+    }
+}
+
+pub fn trace_hotkey_event(event: &str, backend_used: Option<&str>) {
+    let path = hotkey_trace_path();
+    let Some(parent) = path.parent() else {
+        return;
+    };
+    if let Err(error) = std::fs::create_dir_all(parent) {
+        warn!(
+            "Failed to create hotkey trace directory {}: {error}",
+            parent.display()
+        );
+        return;
+    }
+
+    let backend = match backend_used {
+        Some(value) => value,
+        None => selected_backend_label(),
+    };
+    let record = serde_json::json!({
+        "seq": TRACE_SEQUENCE.fetch_add(1, Ordering::SeqCst) + 1,
+        "event": event,
+        "t_ms": monotonic_trace_ms(),
+        "backend_used": backend,
+        "session_type": session_type_label(),
+    });
+
+    let line = match serde_json::to_string(&record) {
+        Ok(line) => line,
+        Err(error) => {
+            warn!("Failed to encode hotkey trace event {event}: {error}");
+            return;
+        }
+    };
+
+    use std::io::Write;
+    let _guard = match TRACE_FILE_LOCK.lock() {
+        Ok(guard) => guard,
+        Err(error) => {
+            warn!("Failed to lock hotkey trace writer: {error}");
+            return;
+        }
+    };
+    match std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+    {
+        Ok(mut file) => {
+            if let Err(error) = writeln!(file, "{line}") {
+                warn!(
+                    "Failed to write hotkey trace event to {}: {error}",
+                    path.display()
+                );
+            }
+        }
+        Err(error) => warn!(
+            "Failed to open hotkey trace file {}: {error}",
+            path.display()
+        ),
+    }
+}
+
+#[tauri::command]
+fn trace_frontend_hotkey_event(app: tauri::AppHandle, event: String) -> Result<(), String> {
+    match event.as_str() {
+        "frontend_main_module_loaded"
+        | "frontend_render_requested"
+        | "frontend_app_mounted"
+        | "frontend_init_started"
+        | "frontend_config_load_started"
+        | "frontend_config_loaded"
+        | "frontend_audio_prepare_started"
+        | "frontend_audio_prepare_done"
+        | "frontend_init_complete"
+        | "frontend_hotkey_listener_registered" => {
+            trace_hotkey_event(&event, None);
+            Ok(())
+        }
+        "frontend_hotkey_handler_ready" => {
+            trace_hotkey_event(&event, None);
+            FRONTEND_HOTKEY_HANDLER_READY.store(true, Ordering::SeqCst);
+            replay_pending_toggle(&app);
+            Ok(())
+        }
+        "frontend_toggle_received"
+        | "recording_state_requested"
+        | "recording_get_user_media_started"
+        | "recording_get_user_media_done"
+        | "recording_audio_context_ready"
+        | "recording_media_source_created"
+        | "recording_worklet_connected"
+        | "recording_script_processor_connected"
+        | "recording_state_active" => {
+            trace_hotkey_event(&event, None);
+            Ok(())
+        }
+        _ => Err(format!("Unsupported hotkey trace event: {event}")),
+    }
+}
+
+#[tauri::command]
+fn has_pending_hotkey_toggle() -> bool {
+    PENDING_TOGGLE_BACKEND
+        .lock()
+        .map(|pending_backend| pending_backend.is_some())
+        .unwrap_or(false)
 }
 
 fn hotkey_to_evdev_mode(hotkey: &str) -> u8 {
@@ -466,18 +611,63 @@ fn ensure_model_downloaded(app_handle: &tauri::AppHandle) -> Result<(), String> 
 // --- Toggle dictation via window event ---
 
 pub fn eval_toggle(app_handle: &tauri::AppHandle) {
+    eval_toggle_with_backend(app_handle, "internal");
+}
+
+fn emit_toggle_event(app_handle: &tauri::AppHandle, backend_used: &str) {
+    if let Err(e) = app_handle.emit_to("main", TOGGLE_DICTATION_EVENT, ()) {
+        error!("Failed to emit toggle event: {e}");
+    } else {
+        trace_hotkey_event("toggle_event_emitted", Some(backend_used));
+    }
+    let _ = app_handle.emit_to("main", LEGACY_TOGGLE_DICTATION_EVENT, ());
+}
+
+fn buffer_toggle_until_frontend_ready(backend_used: &str) {
+    let Ok(mut pending_backend) = PENDING_TOGGLE_BACKEND.lock() else {
+        error!("Failed to lock pending toggle state");
+        return;
+    };
+
+    if pending_backend.is_none() {
+        *pending_backend = Some(backend_used.to_string());
+    }
+    trace_hotkey_event("toggle_event_buffered", Some(backend_used));
+}
+
+fn replay_pending_toggle(app_handle: &tauri::AppHandle) {
+    let pending_backend = match PENDING_TOGGLE_BACKEND.lock() {
+        Ok(mut pending_backend) => pending_backend.take(),
+        Err(error) => {
+            error!("Failed to lock pending toggle state: {error}");
+            None
+        }
+    };
+
+    if let Some(backend_used) = pending_backend {
+        trace_hotkey_event("pending_toggle_replayed", Some(&backend_used));
+        emit_toggle_event(app_handle, &backend_used);
+    }
+}
+
+fn eval_toggle_with_backend(app_handle: &tauri::AppHandle, backend_used: &str) {
+    trace_hotkey_event("eval_toggle_entered", Some(backend_used));
+
     // Debounce with SeqCst to guarantee cross-thread visibility.
     let now = now_ms();
     let last = LAST_TOGGLE_MS.swap(now, Ordering::SeqCst);
     if (now - last).abs() < TOGGLE_DEBOUNCE_MS {
         debug!("eval_toggle debounced ({}ms since last)", now - last);
+        trace_hotkey_event("eval_toggle_debounced", Some(backend_used));
         return;
     }
 
-    if let Err(e) = app_handle.emit_to("main", TOGGLE_DICTATION_EVENT, ()) {
-        error!("Failed to emit toggle event: {e}");
+    if !FRONTEND_HOTKEY_HANDLER_READY.load(Ordering::SeqCst) {
+        buffer_toggle_until_frontend_ready(backend_used);
+        return;
     }
-    let _ = app_handle.emit_to("main", LEGACY_TOGGLE_DICTATION_EVENT, ());
+
+    emit_toggle_event(app_handle, backend_used);
 }
 
 // --- Hotkey configuration ---
@@ -519,7 +709,8 @@ fn register_global_shortcut_listener(app: &tauri::AppHandle, hotkey: &str) -> Re
             }
 
             debug!("{label} detected via global shortcut plugin");
-            eval_toggle(&handle);
+            trace_hotkey_event("hotkey_event_received_global_shortcut", Some("global_shortcut"));
+            eval_toggle_with_backend(&handle, "global_shortcut");
         })
         .map_err(|e| format!("Failed to register global shortcut {hotkey}: {e}"))
 }
@@ -559,6 +750,7 @@ fn sync_global_shortcut_binding(
     register_global_shortcut_listener(app, hotkey)?;
     *current = Some(hotkey.to_string());
     info!("Registered global shortcut {hotkey}");
+    trace_hotkey_event("global_shortcut_registered", Some("global_shortcut"));
     Ok(())
 }
 
@@ -752,7 +944,8 @@ fn start_socket_listener(app_handle: tauri::AppHandle) {
                 match stream {
                     Ok(_) => {
                         debug!("Toggle received via socket");
-                        eval_toggle(&handle);
+                        trace_hotkey_event("socket_toggle_received", Some("socket"));
+                        eval_toggle_with_backend(&handle, "socket");
                     }
                     Err(e) => {
                         warn!("Socket accept error (will rebind): {e}");
@@ -857,6 +1050,7 @@ fn spawn_evdev_device_worker(
                 dev.name().unwrap_or("Unnamed device"),
                 path.display()
             );
+            trace_hotkey_event("evdev_device_worker_started", Some("evdev"));
 
             loop {
                 match dev.fetch_events() {
@@ -886,7 +1080,11 @@ fn spawn_evdev_device_worker(
 
                                         if matched {
                                             debug!("Hotkey detected via evdev (mode {})", mode);
-                                            eval_toggle(&app_handle);
+                                            trace_hotkey_event(
+                                                "hotkey_event_received_evdev",
+                                                Some("evdev"),
+                                            );
+                                            eval_toggle_with_backend(&app_handle, "evdev");
                                         }
                                     }
                                     _ => {}
@@ -1016,6 +1214,7 @@ fn start_hotkey_listener(app_handle: tauri::AppHandle) -> bool {
             initial_discovered
         );
     }
+    trace_hotkey_event("evdev_listener_started", Some("evdev"));
 
     spawn_evdev_device_watcher(app_handle, alt_held, shift_held);
 
@@ -1057,6 +1256,8 @@ pub fn run() {
             get_runtime_diagnostics,
             set_dictation_status,
             set_microphone_ready,
+            trace_frontend_hotkey_event,
+            has_pending_hotkey_toggle,
             show_status_overlay,
             hide_status_overlay,
             show_notification,
@@ -1064,12 +1265,25 @@ pub fn run() {
         ])
         .setup(|app| {
             let startup_ms = now_ms();
+            FRONTEND_HOTKEY_HANDLER_READY.store(false, Ordering::SeqCst);
+            if let Ok(mut pending_backend) = PENDING_TOGGLE_BACKEND.lock() {
+                *pending_backend = None;
+            }
+            trace_hotkey_event("app_start", Some("internal"));
             let hotkey = configured_hotkey();
             let app_handle = app.handle().clone();
             EVDEV_HOTKEY_MODE.store(hotkey_to_evdev_mode(&hotkey), Ordering::SeqCst);
             let wayland_session = is_wayland_session();
             let use_evdev_hotkey = prefers_evdev_hotkey(wayland_session, &hotkey);
             USE_EVDEV_HOTKEY.store(use_evdev_hotkey, Ordering::SeqCst);
+            trace_hotkey_event(
+                "hotkey_backend_selected",
+                Some(if use_evdev_hotkey {
+                    "evdev"
+                } else {
+                    "global_shortcut"
+                }),
+            );
 
             #[cfg(target_os = "linux")]
             grant_webview_permissions(app);

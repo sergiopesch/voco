@@ -33,6 +33,14 @@ export async function setMicrophoneReady(ready: boolean): Promise<void> {
   return invoke("set_microphone_ready", { ready });
 }
 
+export async function traceHotkeyEvent(event: string): Promise<void> {
+  return invoke("trace_frontend_hotkey_event", { event });
+}
+
+export async function hasPendingHotkeyToggle(): Promise<boolean> {
+  return invoke<boolean>("has_pending_hotkey_toggle");
+}
+
 export async function showStatusOverlay(width: number, height: number): Promise<void> {
   return invoke("show_status_overlay", { width, height });
 }

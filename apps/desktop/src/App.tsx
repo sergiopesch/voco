@@ -6,6 +6,7 @@ import { useStore } from "@/store/useStore";
 import {
   getConfig,
   getRuntimeDiagnostics,
+  hasPendingHotkeyToggle,
   hideStatusOverlay,
   openExternalUrl,
   saveConfig,
@@ -13,6 +14,7 @@ import {
   setMicrophoneReady,
   showNotification,
   showStatusOverlay,
+  traceHotkeyEvent,
 } from "@/lib/tauri";
 import {
   checkForUpdates,
@@ -104,7 +106,8 @@ export function App() {
   const updateState = useStore((state) => state.updateState);
   const setUpdateState = useStore((state) => state.setUpdateState);
   const {
-    initializeMicrophone,
+    prepareAudioEngine,
+    primeRecordingStream,
     toggle,
     onHotkeyPressed,
   } = useDictation();
@@ -112,28 +115,34 @@ export function App() {
   const [runtimeDiagnostics, setRuntimeDiagnostics] = useState<RuntimeDiagnostics | null>(null);
   const appStartMsRef = useRef(performance.now());
   const initStartedRef = useRef(false);
+  const appMountedLoggedRef = useRef(false);
   const trayPopoverAnchorRef = useRef<TrayPopoverAnchor | null>(null);
   const lastCheckedChannelRef = useRef<AppConfig["updateChannel"] | null>(null);
   const notifiedReleaseVersionRef = useRef<string | null>(null);
   const overlayVisible =
     surface === "hidden" && (status === "recording" || status === "processing");
+  const canHandleHotkey =
+    initComplete &&
+    (surface === "hidden" || status === "recording" || status === "processing");
 
   useGlobalShortcut(
     toggle,
     () => {
-      if (!initComplete) {
-        return false;
-      }
-
-      if (surface === "hidden") {
-        return true;
-      }
-
-      return status === "recording" || status === "processing";
+      return canHandleHotkey;
     },
+    canHandleHotkey,
     appStartMsRef.current,
     onHotkeyPressed,
   );
+
+  useEffect(() => {
+    if (appMountedLoggedRef.current) {
+      return;
+    }
+
+    appMountedLoggedRef.current = true;
+    traceHotkeyEvent("frontend_app_mounted").catch(() => {});
+  }, []);
 
   const refreshDevices = useCallback(async () => {
     try {
@@ -304,8 +313,11 @@ export function App() {
 
     async function init() {
       try {
+        traceHotkeyEvent("frontend_init_started").catch(() => {});
+        traceHotkeyEvent("frontend_config_load_started").catch(() => {});
         const loadedConfig = await getConfig();
         const appVersion = await getVersion();
+        traceHotkeyEvent("frontend_config_loaded").catch(() => {});
         setConfig(loadedConfig);
         setUpdateState({
           status: "idle",
@@ -315,7 +327,17 @@ export function App() {
           error: null,
         });
         setOnboardingStep(0);
-        await initializeMicrophone(appStartMsRef.current);
+        if (
+          loadedConfig.onboardingCompleted &&
+          (await hasPendingHotkeyToggle().catch(() => false))
+        ) {
+          void primeRecordingStream();
+        }
+        traceHotkeyEvent("frontend_audio_prepare_started").catch(() => {});
+        await prepareAudioEngine();
+        traceHotkeyEvent("frontend_audio_prepare_done").catch(() => {});
+        setInitComplete(true);
+        traceHotkeyEvent("frontend_init_complete").catch(() => {});
         await refreshDevices();
         await refreshRuntimeDiagnostics();
         await runUpdateCheck(loadedConfig.updateChannel, appVersion);
@@ -330,7 +352,8 @@ export function App() {
     }
     void init();
   }, [
-    initializeMicrophone,
+    prepareAudioEngine,
+    primeRecordingStream,
     refreshDevices,
     setConfig,
     setError,
