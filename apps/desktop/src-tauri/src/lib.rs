@@ -580,8 +580,7 @@ fn ensure_model_downloaded(app_handle: &tauri::AppHandle) -> Result<(), String> 
         bytes.extend_from_slice(&buf[..n]);
         downloaded += n as u64;
 
-        if total_size > 0 {
-            let pct = (downloaded * 100) / total_size;
+        if let Some(pct) = downloaded.saturating_mul(100).checked_div(total_size) {
             if pct != last_pct {
                 last_pct = pct;
                 set_tray_tooltip(&format!("VOCO — Downloading model {}%", pct));
