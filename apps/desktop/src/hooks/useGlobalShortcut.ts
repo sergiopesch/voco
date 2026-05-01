@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { traceHotkeyEvent } from "@/lib/tauri";
 
@@ -18,6 +18,7 @@ export function useGlobalShortcut(
   const onHotkeyPressedRef = useRef(onHotkeyPressed);
   onHotkeyPressedRef.current = onHotkeyPressed;
   const handlerReadyLoggedRef = useRef(false);
+  const [listenerRegistered, setListenerRegistered] = useState(false);
 
   useEffect(() => {
     let unlisten: (() => void) | null = null;
@@ -39,6 +40,7 @@ export function useGlobalShortcut(
         }
 
         unlisten = cleanup;
+        setListenerRegistered(true);
         traceHotkeyEvent("frontend_hotkey_listener_registered").catch(() => {});
         const elapsed = Math.round(performance.now() - appStartMs);
         console.info("Hotkey listener attached");
@@ -59,11 +61,11 @@ export function useGlobalShortcut(
   }, [appStartMs]);
 
   useEffect(() => {
-    if (!canHandleHotkey || handlerReadyLoggedRef.current) {
+    if (!listenerRegistered || !canHandleHotkey || handlerReadyLoggedRef.current) {
       return;
     }
 
     handlerReadyLoggedRef.current = true;
     traceHotkeyEvent("frontend_hotkey_handler_ready").catch(() => {});
-  }, [canHandleHotkey]);
+  }, [canHandleHotkey, listenerRegistered]);
 }

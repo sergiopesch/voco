@@ -121,12 +121,16 @@ export function App() {
   const notifiedReleaseVersionRef = useRef<string | null>(null);
   const overlayVisible =
     surface === "hidden" && (status === "recording" || status === "processing");
-  const canHandleHotkey =
-    initComplete &&
-    (surface === "hidden" || status === "recording" || status === "processing");
+  const canHandleHotkey = initComplete && config !== null;
+  const handleToggleRequest = useCallback(() => {
+    if (surface !== "hidden") {
+      setSurface("hidden");
+    }
+    toggle();
+  }, [setSurface, surface, toggle]);
 
   useGlobalShortcut(
-    toggle,
+    handleToggleRequest,
     () => {
       return canHandleHotkey;
     },

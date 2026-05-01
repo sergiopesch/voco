@@ -20,6 +20,7 @@ static LAST_TOGGLE_MS: AtomicI64 = AtomicI64::new(0);
 // Evdev hotkey mode: 0 = Alt+D, 1 = Alt+Shift+D, 255 = custom (disabled)
 static EVDEV_HOTKEY_MODE: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
 static USE_EVDEV_HOTKEY: AtomicBool = AtomicBool::new(false);
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 static EVDEV_LISTENER_STARTED: AtomicBool = AtomicBool::new(false);
 static HOTKEY_BINDING_VERSION: AtomicU64 = AtomicU64::new(0);
 static FRONTEND_HOTKEY_HANDLER_READY: AtomicBool = AtomicBool::new(false);
@@ -27,6 +28,7 @@ static PENDING_TOGGLE_BACKEND: LazyLock<Mutex<Option<String>>> = LazyLock::new(|
 static TRACE_START: LazyLock<Instant> = LazyLock::new(Instant::now);
 static TRACE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 static TRACE_FILE_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
+static MODEL_DOWNLOAD_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 static REGISTERED_PLUGIN_SHORTCUT: LazyLock<Mutex<Option<String>>> =
     LazyLock::new(|| Mutex::new(None));
 #[cfg(target_os = "linux")]
@@ -221,6 +223,7 @@ fn should_register_global_shortcut(use_evdev_hotkey: bool) -> bool {
     !use_evdev_hotkey
 }
 
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 fn should_start_evdev_listener(use_evdev_hotkey: bool, listener_started: bool) -> bool {
     use_evdev_hotkey && !listener_started
 }
@@ -274,6 +277,7 @@ fn decode_audio_bytes(bytes: &[u8]) -> Result<Vec<f32>, String> {
 
 #[tauri::command]
 fn transcribe_audio(
+    app: tauri::AppHandle,
     audio_bytes: Vec<u8>,
     state: tauri::State<'_, WhisperMutex>,
 ) -> Result<String, String> {
@@ -289,9 +293,11 @@ fn transcribe_audio(
         ));
     }
 
+    ensure_model_downloaded(&app)?;
+
     let model_path = transcribe::default_model_path()?;
     if !model_path.exists() {
-        return Err("Model not downloaded. Please download the model first.".to_string());
+        return Err("Model is not available after download attempt.".to_string());
     }
 
     let mut whisper = state
@@ -526,6 +532,10 @@ fn grant_webview_permissions(app: &tauri::App) {
 const MODEL_SHA256: &str = "a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002";
 
 fn ensure_model_downloaded(app_handle: &tauri::AppHandle) -> Result<(), String> {
+    let _download_guard = MODEL_DOWNLOAD_LOCK
+        .lock()
+        .map_err(|_| "Model download state lock is poisoned".to_string())?;
+
     let path = transcribe::default_model_path()?;
     if path.exists() {
         return Ok(());
