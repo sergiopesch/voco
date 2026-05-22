@@ -6,6 +6,13 @@ on:
   pull_request:
     branches: [master]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   check:
     name: Frontend Checks
@@ -30,6 +37,9 @@ jobs:
       - name: Install Node dependencies
         run: npm ci
 
+      - name: Audit Node dependencies
+        run: npm audit --audit-level=moderate
+
       - name: Verify version consistency
         run: npm run verify:versions
 
@@ -46,6 +56,9 @@ jobs:
 
       - name: Frontend tests
         run: npm test
+
+      - name: Rehearse release metadata
+        run: npm run rehearse:release
 
       - name: Frontend production build
         run: npm --workspace @voco/desktop run build:frontend
