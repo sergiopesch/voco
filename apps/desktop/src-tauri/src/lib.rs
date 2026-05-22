@@ -347,8 +347,8 @@ fn show_notification(summary: String, body: String) {
 
 #[tauri::command]
 fn open_external_url(url: String) -> Result<(), String> {
-    if !url.starts_with("https://") {
-        return Err("Only https URLs are supported".to_string());
+    if !is_allowed_external_url(&url) {
+        return Err("Only VOCO GitHub release URLs are supported".to_string());
     }
 
     let status = std::process::Command::new("xdg-open")
@@ -529,7 +529,28 @@ fn grant_webview_permissions(app: &tauri::App) {
 
 // --- Auto-download model on first launch ---
 
+const MODEL_URL: &str =
+    "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin";
 const MODEL_SHA256: &str = "a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002";
+const MODEL_MAX_BYTES: u64 = 200 * 1024 * 1024;
+
+fn is_allowed_external_url(url: &str) -> bool {
+    url.strip_prefix("https://github.com/sergiopesch/voco/releases/tag/")
+        .is_some_and(|tag| !tag.is_empty() && !tag.contains(['\r', '\n', '\\']))
+}
+
+fn validate_model_content_length(content_length: Option<u64>) -> Result<(), String> {
+    if let Some(size) = content_length {
+        if size > MODEL_MAX_BYTES {
+            return Err(format!(
+                "Model download is too large ({} bytes, max {} bytes)",
+                size, MODEL_MAX_BYTES
+            ));
+        }
+    }
+
+    Ok(())
+}
 
 fn ensure_model_downloaded(app_handle: &tauri::AppHandle) -> Result<(), String> {
     let _download_guard = MODEL_DOWNLOAD_LOCK
@@ -550,7 +571,6 @@ fn ensure_model_downloaded(app_handle: &tauri::AppHandle) -> Result<(), String> 
 
     set_tray_tooltip("VOCO — Downloading model...");
     info!("Downloading speech model (one-time, ~142 MB)...");
-    let url = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin";
 
     let client = reqwest::blocking::Client::builder()
         .timeout(std::time::Duration::from_secs(300))
@@ -559,7 +579,7 @@ fn ensure_model_downloaded(app_handle: &tauri::AppHandle) -> Result<(), String> 
         .map_err(|e| format!("HTTP client error: {e}"))?;
 
     let response = client
-        .get(url)
+        .get(MODEL_URL)
         .send()
         .map_err(|e| format!("Download failed: {e}"))?;
 
@@ -571,11 +591,18 @@ fn ensure_model_downloaded(app_handle: &tauri::AppHandle) -> Result<(), String> 
         ));
     }
 
-    let total_size = response.content_length().unwrap_or(0);
+    let total_size = response.content_length();
+    validate_model_content_length(total_size)?;
 
-    use std::io::Read;
+    use sha2::{Digest, Sha256};
+    use std::io::{Read, Write};
     let mut reader = response;
-    let mut bytes = Vec::with_capacity(total_size as usize);
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&tmp_path)
+        .map_err(|e| format!("Failed to save model (tmp): {e}"))?;
+    let mut hasher = Sha256::new();
     let mut downloaded: u64 = 0;
     let mut last_pct: u64 = 0;
     let mut buf = [0u8; 65536];
@@ -587,10 +614,23 @@ fn ensure_model_downloaded(app_handle: &tauri::AppHandle) -> Result<(), String> 
         if n == 0 {
             break;
         }
-        bytes.extend_from_slice(&buf[..n]);
         downloaded += n as u64;
+        if downloaded > MODEL_MAX_BYTES {
+            let _ = std::fs::remove_file(&tmp_path);
+            set_tray_tooltip("VOCO — Download too large, retry on next launch");
+            return Err(format!(
+                "Model download exceeded max size of {} bytes",
+                MODEL_MAX_BYTES
+            ));
+        }
 
-        if let Some(pct) = downloaded.saturating_mul(100).checked_div(total_size) {
+        hasher.update(&buf[..n]);
+        file.write_all(&buf[..n])
+            .map_err(|e| format!("Failed to save model (tmp): {e}"))?;
+
+        if let Some(pct) =
+            total_size.and_then(|size| downloaded.saturating_mul(100).checked_div(size))
+        {
             if pct != last_pct {
                 last_pct = pct;
                 set_tray_tooltip(&format!("VOCO — Downloading model {}%", pct));
@@ -598,9 +638,13 @@ fn ensure_model_downloaded(app_handle: &tauri::AppHandle) -> Result<(), String> 
         }
     }
 
-    use sha2::Digest;
-    let hash = format!("{:x}", sha2::Sha256::digest(&bytes));
+    file.sync_all()
+        .map_err(|e| format!("Failed to flush model file (tmp): {e}"))?;
+    drop(file);
+
+    let hash = format!("{:x}", hasher.finalize());
     if hash != MODEL_SHA256 {
+        let _ = std::fs::remove_file(&tmp_path);
         set_tray_tooltip("VOCO — Download corrupt, retry on next launch");
         return Err(format!(
             "Model integrity check failed (expected {}, got {}). Download may be corrupt.",
@@ -609,7 +653,6 @@ fn ensure_model_downloaded(app_handle: &tauri::AppHandle) -> Result<(), String> 
         ));
     }
 
-    std::fs::write(&tmp_path, &bytes).map_err(|e| format!("Failed to save model (tmp): {e}"))?;
     std::fs::rename(&tmp_path, &path).map_err(|e| format!("Failed to finalize model file: {e}"))?;
 
     set_tray_tooltip("VOCO");
@@ -1379,6 +1422,29 @@ mod tests {
         assert!(decode_audio_bytes(b"abc")
             .unwrap_err()
             .contains("not a multiple of 4"));
+    }
+
+    #[test]
+    fn external_url_allowlist_only_accepts_voco_release_tags() {
+        assert!(is_allowed_external_url(
+            "https://github.com/sergiopesch/voco/releases/tag/voco.2026.0.16"
+        ));
+        assert!(!is_allowed_external_url(
+            "https://github.com/sergiopesch/voco"
+        ));
+        assert!(!is_allowed_external_url(
+            "https://example.com/sergiopesch/voco/releases/tag/voco.2026.0.16"
+        ));
+        assert!(!is_allowed_external_url(
+            "http://github.com/sergiopesch/voco/releases/tag/voco.2026.0.16"
+        ));
+    }
+
+    #[test]
+    fn model_content_length_rejects_oversized_downloads() {
+        assert!(validate_model_content_length(Some(MODEL_MAX_BYTES)).is_ok());
+        assert!(validate_model_content_length(None).is_ok());
+        assert!(validate_model_content_length(Some(MODEL_MAX_BYTES + 1)).is_err());
     }
 
     #[test]

@@ -25,7 +25,9 @@ The app runs entirely locally with no authentication and no cloud accounts. Netw
 - **No auth**: No credentials to steal
 - **Tauri CSP**: Restrictive content security policy, no remote scripts
 - **Scoped permissions**: WebView permission grants restricted to UserMedia (microphone) only
-- **Input validation**: Audio length limit (5 min), text size limit (100KB), empty input rejected
+- **Input validation**: Audio length limit (60 seconds), text size limit (100KB), empty input rejected
+- **Bounded downloads**: Model downloads are streamed to disk with a 200 MiB ceiling before use
+- **External link allowlist**: WebView-triggered external opens are limited to VOCO GitHub release pages
 - **Local storage only**: Config in XDG dirs, no cloud sync
 - **Shell safety**: Text passed as arguments (not interpolated), `--` separators used
 - **Clipboard preservation**: Original clipboard contents restored after fallback insertion (only when prior content was text and save succeeded)
