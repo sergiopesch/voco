@@ -25,7 +25,7 @@ echo "  appimage: ${APPIMAGE_NAME}"
   cd "${ROOT_DIR}"
   npm run verify:versions
   bash -n install scripts/install.sh scripts/setup.sh scripts/build-desktop.sh scripts/package-appimage.sh scripts/render-release-body.sh scripts/lib/install-common.sh
-  if rg -n 'raw.githubusercontent.com/.*/master/install|bash <\(curl|curl -s .*install' README.md docs install; then
+  if grep -RInE 'raw.githubusercontent.com/.*/master/install|bash <\(curl|curl -s .*install' README.md docs install; then
     echo "Unsafe installer reference found in docs or helper comments"
     exit 1
   fi

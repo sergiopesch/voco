@@ -37,16 +37,8 @@ jobs:
       - name: Install Node dependencies
         run: npm ci
 
-      - name: Audit Node dependencies
-        run: npm audit --audit-level=moderate
-
-      - name: Verify version consistency
-        run: npm run verify:versions
-
-      - name: Validate install and build scripts
-        run: |
-          bash -n install scripts/install.sh scripts/setup.sh scripts/build-desktop.sh scripts/package-appimage.sh scripts/render-release-body.sh scripts/rehearse-release.sh scripts/lib/install-common.sh
-          python3 -m py_compile scripts/generate-icons.py
+      - name: DevOps preflight
+        run: npm run verify:devops
 
       - name: TypeScript check
         run: npm run check
@@ -56,9 +48,6 @@ jobs:
 
       - name: Frontend tests
         run: npm test
-
-      - name: Rehearse release metadata
-        run: npm run rehearse:release
 
       - name: Frontend production build
         run: npm --workspace @voco/desktop run build:frontend
