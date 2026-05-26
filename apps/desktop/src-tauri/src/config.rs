@@ -15,6 +15,12 @@ pub struct AppConfig {
     pub selected_mic: Option<String>,
     #[serde(default = "default_insertion_strategy")]
     pub insertion_strategy: InsertionStrategy,
+    #[serde(default = "default_transcript_target")]
+    pub transcript_target: TranscriptTarget,
+    #[serde(default = "default_openclaw_agent")]
+    pub openclaw_agent: String,
+    #[serde(default = "default_openclaw_prompt_prefix")]
+    pub openclaw_prompt_prefix: String,
     #[serde(default)]
     pub onboarding_completed: bool,
     #[serde(default = "default_update_channel")]
@@ -60,6 +66,18 @@ fn default_insertion_strategy() -> InsertionStrategy {
     InsertionStrategy::Auto
 }
 
+fn default_transcript_target() -> TranscriptTarget {
+    TranscriptTarget::Cursor
+}
+
+fn default_openclaw_agent() -> String {
+    "main".to_string()
+}
+
+fn default_openclaw_prompt_prefix() -> String {
+    "You are my electronics professor and robotics companion. Explain the answer step by step, call out Raspberry Pi wiring safety risks, and ask before any physical action that could damage hardware.".to_string()
+}
+
 fn default_update_channel() -> UpdateChannel {
     UpdateChannel::Stable
 }
@@ -79,6 +97,14 @@ pub enum InsertionStrategy {
     Auto,
     Clipboard,
     TypeSimulation,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum TranscriptTarget {
+    #[default]
+    Cursor,
+    OpenclawAgent,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -125,6 +151,9 @@ impl Default for AppConfig {
             hotkey: default_hotkey(),
             selected_mic: None,
             insertion_strategy: InsertionStrategy::Auto,
+            transcript_target: default_transcript_target(),
+            openclaw_agent: default_openclaw_agent(),
+            openclaw_prompt_prefix: default_openclaw_prompt_prefix(),
             onboarding_completed: false,
             update_channel: default_update_channel(),
             install_channel: default_install_channel(),
@@ -266,6 +295,11 @@ mod tests {
         assert_eq!(config.hotkey, "Alt+D");
         assert!(config.selected_mic.is_none());
         assert!(matches!(config.insertion_strategy, InsertionStrategy::Auto));
+        assert!(matches!(config.transcript_target, TranscriptTarget::Cursor));
+        assert_eq!(config.openclaw_agent, "main");
+        assert!(config
+            .openclaw_prompt_prefix
+            .contains("electronics professor"));
         assert!(!config.onboarding_completed);
         assert!(matches!(config.update_channel, UpdateChannel::Stable));
         assert!(matches!(
@@ -281,6 +315,9 @@ mod tests {
             hotkey: "Ctrl+Shift+V".to_string(),
             selected_mic: Some("test-mic".to_string()),
             insertion_strategy: InsertionStrategy::Clipboard,
+            transcript_target: TranscriptTarget::OpenclawAgent,
+            openclaw_agent: "bench".to_string(),
+            openclaw_prompt_prefix: "Teach safely.".to_string(),
             onboarding_completed: true,
             update_channel: UpdateChannel::Beta,
             install_channel: InstallChannel::Appimage,
@@ -294,6 +331,12 @@ mod tests {
             parsed.insertion_strategy,
             InsertionStrategy::Clipboard
         ));
+        assert!(matches!(
+            parsed.transcript_target,
+            TranscriptTarget::OpenclawAgent
+        ));
+        assert_eq!(parsed.openclaw_agent, "bench");
+        assert_eq!(parsed.openclaw_prompt_prefix, "Teach safely.");
         assert!(parsed.onboarding_completed);
         assert!(matches!(parsed.update_channel, UpdateChannel::Beta));
         assert!(matches!(parsed.install_channel, InstallChannel::Appimage));
@@ -306,6 +349,11 @@ mod tests {
         let config: AppConfig = serde_json::from_str(json).unwrap();
         assert_eq!(config.hotkey, "Alt+D");
         assert!(matches!(config.insertion_strategy, InsertionStrategy::Auto));
+        assert!(matches!(config.transcript_target, TranscriptTarget::Cursor));
+        assert_eq!(config.openclaw_agent, "main");
+        assert!(config
+            .openclaw_prompt_prefix
+            .contains("electronics professor"));
         assert!(!config.onboarding_completed);
         assert!(matches!(config.update_channel, UpdateChannel::Stable));
         assert!(matches!(
@@ -321,6 +369,8 @@ mod tests {
         let config: AppConfig = serde_json::from_str(json).unwrap();
         assert_eq!(config.hotkey, "Alt+Shift+D");
         assert!(matches!(config.insertion_strategy, InsertionStrategy::Auto));
+        assert!(matches!(config.transcript_target, TranscriptTarget::Cursor));
+        assert_eq!(config.openclaw_agent, "main");
         assert!(!config.onboarding_completed);
         assert!(matches!(config.update_channel, UpdateChannel::Stable));
         assert!(matches!(
@@ -337,6 +387,12 @@ mod tests {
 
         let json = serde_json::to_string(&InsertionStrategy::Auto).unwrap();
         assert_eq!(json, r#""auto""#);
+    }
+
+    #[test]
+    fn transcript_target_serializes_kebab_case() {
+        let json = serde_json::to_string(&TranscriptTarget::OpenclawAgent).unwrap();
+        assert_eq!(json, r#""openclaw-agent""#);
     }
 
     #[test]

@@ -40,7 +40,8 @@ body {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 
@@ -472,7 +473,8 @@ code {
 }
 
 .voco-field input,
-.voco-field select {
+.voco-field select,
+.voco-field textarea {
   appearance: none;
   border: 1px solid rgba(199, 204, 213, 0.16);
   border-radius: 16px;
@@ -482,8 +484,14 @@ code {
   outline: none;
 }
 
+.voco-field textarea {
+  min-height: 128px;
+  resize: vertical;
+}
+
 .voco-field input:focus,
-.voco-field select:focus {
+.voco-field select:focus,
+.voco-field textarea:focus {
   border-color: rgba(225, 229, 236, 0.5);
   box-shadow: 0 0 0 4px rgba(158, 164, 175, 0.14);
 }

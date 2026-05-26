@@ -158,6 +158,8 @@ This checks version alignment, install-script safety, and generated release note
 - Models: `~/.local/share/voco/models/`
 - Socket: `$XDG_RUNTIME_DIR/voco.sock` when `XDG_RUNTIME_DIR` is set, otherwise `${TMPDIR:-/tmp}/voco-$(id -u)/voco.sock`
 
+OpenClaw voice-bridge settings are stored in the same config file. That mode is opt-in and requires the `openclaw` CLI to resolve from the app's runtime `PATH`.
+
 Legacy `voice` config and model paths are migrated automatically on startup when possible.
 
 ## Uninstall

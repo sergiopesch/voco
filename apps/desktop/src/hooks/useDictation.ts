@@ -1,6 +1,7 @@
 import { useCallback, useRef } from "react";
 import { useStore } from "@/store/useStore";
 import {
+  askOpenClawAgent,
   transcribeAudio,
   insertText,
   setDictationStatus,
@@ -437,14 +438,49 @@ export function useDictation() {
       }
 
       setTranscript(transcript);
-      setInterimTranscript("Typing at your cursor...");
+      const config = useStore.getState().config;
+      const strategy = config?.insertionStrategy ?? "auto";
+      let textToInsert = transcript;
+
+      if (config?.transcriptTarget === "openclaw-agent") {
+        setInterimTranscript("Asking OpenClaw...");
+        try {
+          const result = await askOpenClawAgent(
+            transcript,
+            config.openclawAgent,
+            config.openclawPromptPrefix,
+          );
+          textToInsert = result.response;
+          setTranscript(result.response);
+          setInterimTranscript("Typing OpenClaw's answer at your cursor...");
+        } catch (err) {
+          const detail = err instanceof Error ? err.message : String(err);
+          showNotification(
+            "OpenClaw request failed",
+            detail || "VOCO could not send the transcript to OpenClaw.",
+          ).catch(() => {});
+          phaseRef.current = "error";
+          setStatus("error");
+          setError(`OpenClaw request failed: ${detail}`);
+          setInterimTranscript("");
+          setDictationStatus("error").catch(() => {});
+
+          const queuedAction = queuedActionRef.current;
+          queuedActionRef.current = null;
+          if (queuedAction === "start") {
+            void startRecording();
+          }
+          return;
+        }
+      } else {
+        setInterimTranscript("Typing at your cursor...");
+      }
 
       // Small delay to let focus return to the previous app
       await new Promise((r) => setTimeout(r, 250));
 
-      const strategy = useStore.getState().config?.insertionStrategy ?? "auto";
       try {
-        await insertText(transcript, strategy);
+        await insertText(textToInsert, strategy);
       } catch (err) {
         const detail = err instanceof Error ? err.message : String(err);
         showNotification(

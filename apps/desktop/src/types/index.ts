@@ -1,4 +1,5 @@
 export type InsertionStrategy = "auto" | "clipboard" | "type-simulation";
+export type TranscriptTarget = "cursor" | "openclaw-agent";
 export type UpdateChannel = "stable" | "beta";
 export type InstallChannel =
   | "github-release"
@@ -12,6 +13,9 @@ export interface AppConfig {
   hotkey: string;
   selectedMic: string | null;
   insertionStrategy: InsertionStrategy;
+  transcriptTarget: TranscriptTarget;
+  openclawAgent: string;
+  openclawPromptPrefix: string;
   onboardingCompleted: boolean;
   updateChannel: UpdateChannel;
   installChannel: InstallChannel;
@@ -67,4 +71,9 @@ export interface RuntimeDiagnostics {
   sessionType: string;
   typeSimulation: InsertionSupport;
   clipboard: InsertionSupport;
+}
+
+export interface OpenClawAgentResult {
+  agent: string;
+  response: string;
 }

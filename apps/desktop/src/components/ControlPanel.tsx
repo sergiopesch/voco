@@ -41,6 +41,7 @@ interface ControlPanelProps {
 const PANEL_SECTIONS = [
   "General",
   "Audio",
+  "Output",
   "Hotkeys",
   "Appearance",
   "Updates",
@@ -101,6 +102,11 @@ export function ControlPanel({
   const [saving, setSaving] = useState(false);
   const [hotkeyDraft, setHotkeyDraft] = useState(config.hotkey);
   const [hotkeyError, setHotkeyError] = useState<string | null>(null);
+  const [openClawAgentDraft, setOpenClawAgentDraft] = useState(config.openclawAgent);
+  const [openClawPromptDraft, setOpenClawPromptDraft] = useState(
+    config.openclawPromptPrefix,
+  );
+  const [openClawError, setOpenClawError] = useState<string | null>(null);
   const [previewLevel, setPreviewLevel] = useState(0);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const previewFrameRef = useRef<number | null>(null);
@@ -206,6 +212,12 @@ export function ControlPanel({
   }, [config.hotkey]);
 
   useEffect(() => {
+    setOpenClawAgentDraft(config.openclawAgent);
+    setOpenClawPromptDraft(config.openclawPromptPrefix);
+    setOpenClawError(null);
+  }, [config.openclawAgent, config.openclawPromptPrefix]);
+
+  useEffect(() => {
     const shouldPreview =
       (surface === "onboarding" && onboardingStep === 1) ||
       (surface === "settings" && activeSection === "Audio");
@@ -297,6 +309,23 @@ export function ControlPanel({
     }
 
     setHotkeyError(result.message);
+    return false;
+  }
+
+  async function saveOpenClawSettings(): Promise<boolean> {
+    const normalizedAgent = openClawAgentDraft.trim() || "main";
+    setOpenClawAgentDraft(normalizedAgent);
+    setOpenClawError(null);
+
+    const result = await savePatch({
+      openclawAgent: normalizedAgent,
+      openclawPromptPrefix: openClawPromptDraft,
+    });
+    if (result.ok) {
+      return true;
+    }
+
+    setOpenClawError(result.message);
     return false;
   }
 
@@ -634,6 +663,79 @@ export function ControlPanel({
                       {previewError}
                     </div>
                   ) : null}
+                </section>
+              ) : null}
+
+              {activeSection === "Output" ? (
+                <section className="voco-settings__section">
+                  <h2>Output</h2>
+                  <label className="voco-field">
+                    <span>After transcription</span>
+                    <select
+                      value={config.transcriptTarget}
+                      onChange={(event) =>
+                        void savePatch({
+                          transcriptTarget: event.target.value as AppConfig["transcriptTarget"],
+                        })
+                      }
+                    >
+                      <option value="cursor">Type transcript at cursor</option>
+                      <option value="openclaw-agent">Ask OpenClaw and type answer</option>
+                    </select>
+                  </label>
+                  <div className="voco-inline-note">
+                    OpenClaw mode sends the local transcript to your configured OpenClaw CLI agent.
+                  </div>
+                  <label className="voco-field">
+                    <span>OpenClaw agent</span>
+                    <input
+                      value={openClawAgentDraft}
+                      onChange={(event) => setOpenClawAgentDraft(event.target.value)}
+                      onBlur={() => {
+                        if (openClawAgentDraft !== config.openclawAgent) {
+                          void saveOpenClawSettings();
+                        }
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          void saveOpenClawSettings();
+                        }
+                      }}
+                      disabled={config.transcriptTarget !== "openclaw-agent"}
+                    />
+                  </label>
+                  <label className="voco-field">
+                    <span>OpenClaw professor prompt</span>
+                    <textarea
+                      value={openClawPromptDraft}
+                      rows={5}
+                      onChange={(event) => setOpenClawPromptDraft(event.target.value)}
+                      onBlur={() => {
+                        if (openClawPromptDraft !== config.openclawPromptPrefix) {
+                          void saveOpenClawSettings();
+                        }
+                      }}
+                      disabled={config.transcriptTarget !== "openclaw-agent"}
+                    />
+                  </label>
+                  {openClawError ? (
+                    <div className="voco-inline-note voco-inline-note--error">
+                      {openClawError}
+                    </div>
+                  ) : null}
+                  <div className="voco-inline-note">
+                    The prompt is prepended to your spoken text before VOCO calls OpenClaw.
+                  </div>
+                  <div className="voco-settings__actions">
+                    <button
+                      className="voco-button voco-button--primary"
+                      onClick={() => void saveOpenClawSettings()}
+                      disabled={config.transcriptTarget !== "openclaw-agent"}
+                    >
+                      Save OpenClaw settings
+                    </button>
+                  </div>
                 </section>
               ) : null}
 

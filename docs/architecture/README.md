@@ -6,6 +6,7 @@ VOCO is a voice-first, local-first desktop dictation app for Linux, built with T
 
 ```
 User speaks -> Audio Capture -> Local ASR -> Text Insertion
+User speaks -> Audio Capture -> Local ASR -> OpenClaw Agent -> Text Insertion
 ```
 
 ## Module Layout
@@ -33,8 +34,9 @@ apps/desktop/           Tauri application
 2. **Resampling**: If mic sample rate != 16kHz, resample via OfflineAudioContext
 3. **ASR**: Float32Array bytes packed into a `Uint8Array`, sent to Rust via Tauri invoke, decoded to `Vec<f32>` -> whisper-rs -> transcript string
 4. **Status Feedback**: Transparent overlay window is moved near the cursor while recording and processing so the user can see that VOCO is listening or processing
-5. **Insertion**: Transcript -> ydotool/xdotool type simulation or clipboard paste
-6. **Fallback**: In `auto` mode, if direct typing fails, text is placed on clipboard and Ctrl+V is simulated. Strict `type-simulation` mode reports the failure instead of modifying the clipboard.
+5. **Output target**: Default target inserts the transcript directly. Optional OpenClaw target sends the transcript to `openclaw agent --agent <id> --message <text>` and uses the agent response as the insertion text.
+6. **Insertion**: Final text -> ydotool/xdotool type simulation or clipboard paste
+7. **Fallback**: In `auto` mode, if direct typing fails, text is placed on clipboard and Ctrl+V is simulated. Strict `type-simulation` mode reports the failure instead of modifying the clipboard.
 
 ## Tauri IPC Commands
 
@@ -44,6 +46,7 @@ apps/desktop/           Tauri application
 | `save_config` | Frontend -> Rust | Persist settings |
 | `transcribe_audio` | Frontend -> Rust | Send packed audio bytes, get transcript |
 | `insert_text` | Frontend -> Rust | Insert transcript into active app |
+| `ask_openclaw_agent` | Frontend -> Rust | Send a transcript to the configured OpenClaw CLI agent |
 | `set_dictation_status` | Frontend -> Rust | Update tray icon state |
 | `set_microphone_ready` | Frontend -> Rust | Update tray readiness state |
 | `show_notification` | Frontend -> Rust | Desktop notification via notify-send |

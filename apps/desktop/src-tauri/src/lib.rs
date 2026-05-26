@@ -374,6 +374,153 @@ fn insert_text(text: String, strategy: String) -> Result<insertion::InsertionRes
     insertion::insert_text(&text, &strategy)
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct OpenClawAgentResult {
+    agent: String,
+    response: String,
+}
+
+fn build_openclaw_message(transcript: &str, prompt_prefix: &str) -> String {
+    let transcript = transcript.trim();
+    let prompt_prefix = prompt_prefix.trim();
+
+    if prompt_prefix.is_empty() {
+        transcript.to_string()
+    } else {
+        format!("{prompt_prefix}\n\nUser said:\n{transcript}")
+    }
+}
+
+fn validate_openclaw_agent(agent: &str) -> Result<(), String> {
+    if agent.trim().is_empty() {
+        return Err("OpenClaw agent is required".to_string());
+    }
+    if agent.len() > 80 {
+        return Err("OpenClaw agent is too long (max 80 characters)".to_string());
+    }
+    if !agent
+        .chars()
+        .all(|character| character.is_ascii_alphanumeric() || matches!(character, '-' | '_' | '.'))
+    {
+        return Err(
+            "OpenClaw agent may only contain letters, numbers, dots, dashes, and underscores"
+                .to_string(),
+        );
+    }
+
+    Ok(())
+}
+
+fn clip_command_output(output: &str, max_chars: usize) -> String {
+    let trimmed = output.trim();
+    if trimmed.chars().count() <= max_chars {
+        return trimmed.to_string();
+    }
+
+    let mut clipped = trimmed.chars().take(max_chars).collect::<String>();
+    clipped.push_str("...");
+    clipped
+}
+
+fn wait_for_openclaw_agent(
+    mut child: std::process::Child,
+    timeout: std::time::Duration,
+) -> Result<std::process::Output, String> {
+    let start = Instant::now();
+
+    loop {
+        match child.try_wait() {
+            Ok(Some(_status)) => {
+                return child
+                    .wait_with_output()
+                    .map_err(|error| format!("Failed to read OpenClaw output: {error}"));
+            }
+            Ok(None) => {
+                if start.elapsed() >= timeout {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return Err(format!(
+                        "OpenClaw did not respond within {} seconds",
+                        timeout.as_secs()
+                    ));
+                }
+                std::thread::sleep(std::time::Duration::from_millis(100));
+            }
+            Err(error) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(format!("Failed while waiting for OpenClaw: {error}"));
+            }
+        }
+    }
+}
+
+#[tauri::command]
+fn ask_openclaw_agent(
+    transcript: String,
+    agent: String,
+    prompt_prefix: String,
+) -> Result<OpenClawAgentResult, String> {
+    let transcript = transcript.trim();
+    let agent = agent.trim();
+
+    if transcript.is_empty() {
+        return Err("No transcript to send to OpenClaw".to_string());
+    }
+    if transcript.len() > 100_000 {
+        return Err("Transcript too long for OpenClaw (max 100KB)".to_string());
+    }
+    if prompt_prefix.len() > 4_000 {
+        return Err("OpenClaw prompt prefix is too long (max 4KB)".to_string());
+    }
+    validate_openclaw_agent(agent)?;
+
+    let message = build_openclaw_message(transcript, &prompt_prefix);
+    let child = std::process::Command::new("openclaw")
+        .arg("agent")
+        .arg("--agent")
+        .arg(agent)
+        .arg("--message")
+        .arg(&message)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .map_err(|error| {
+            if error.kind() == std::io::ErrorKind::NotFound {
+                "OpenClaw CLI was not found in PATH".to_string()
+            } else {
+                format!("Failed to start OpenClaw: {error}")
+            }
+        })?;
+
+    let output = wait_for_openclaw_agent(child, std::time::Duration::from_secs(120))?;
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    if !output.status.success() {
+        let detail = if stderr.trim().is_empty() {
+            clip_command_output(&stdout, 800)
+        } else {
+            clip_command_output(&stderr, 800)
+        };
+        return Err(format!(
+            "OpenClaw exited with status {}: {detail}",
+            output.status
+        ));
+    }
+
+    let response = stdout.trim();
+    if response.is_empty() {
+        return Err("OpenClaw returned an empty response".to_string());
+    }
+
+    Ok(OpenClawAgentResult {
+        agent: agent.to_string(),
+        response: response.to_string(),
+    })
+}
+
 #[tauri::command]
 fn get_runtime_diagnostics() -> insertion::RuntimeDiagnostics {
     insertion::runtime_diagnostics()
@@ -1305,6 +1452,7 @@ pub fn run() {
             save_cached_update_state,
             transcribe_audio,
             insert_text,
+            ask_openclaw_agent,
             get_runtime_diagnostics,
             set_dictation_status,
             set_microphone_ready,
@@ -1445,6 +1593,29 @@ mod tests {
         assert!(validate_model_content_length(Some(MODEL_MAX_BYTES)).is_ok());
         assert!(validate_model_content_length(None).is_ok());
         assert!(validate_model_content_length(Some(MODEL_MAX_BYTES + 1)).is_err());
+    }
+
+    #[test]
+    fn openclaw_message_uses_prompt_prefix_when_present() {
+        assert_eq!(
+            build_openclaw_message("check gpio 17", "Teach safely."),
+            "Teach safely.\n\nUser said:\ncheck gpio 17"
+        );
+    }
+
+    #[test]
+    fn openclaw_message_allows_empty_prompt_prefix() {
+        assert_eq!(
+            build_openclaw_message("  check gpio 17  ", "  "),
+            "check gpio 17"
+        );
+    }
+
+    #[test]
+    fn openclaw_agent_validation_rejects_shell_metacharacters() {
+        assert!(validate_openclaw_agent("main").is_ok());
+        assert!(validate_openclaw_agent("robotics.professor-1").is_ok());
+        assert!(validate_openclaw_agent("main; rm -rf /").is_err());
     }
 
     #[test]

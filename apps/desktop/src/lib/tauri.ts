@@ -3,6 +3,7 @@ import type {
   AppConfig,
   CachedUpdateCheck,
   DictationStatus,
+  OpenClawAgentResult,
   RuntimeDiagnostics,
 } from "@/types";
 
@@ -23,6 +24,18 @@ export async function transcribeAudio(samples: Float32Array): Promise<string> {
 
 export async function insertText(text: string, strategy: string): Promise<void> {
   await invoke("insert_text", { text, strategy });
+}
+
+export async function askOpenClawAgent(
+  transcript: string,
+  agent: string,
+  promptPrefix: string,
+): Promise<OpenClawAgentResult> {
+  return invoke<OpenClawAgentResult>("ask_openclaw_agent", {
+    transcript,
+    agent,
+    promptPrefix,
+  });
 }
 
 export async function setDictationStatus(status: DictationStatus): Promise<void> {

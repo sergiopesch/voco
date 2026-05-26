@@ -12,6 +12,8 @@
 
 VOCO is a local-first Linux dictation app. Press a hotkey, speak, press it again, and VOCO types at your cursor.
 
+VOCO can also run as an optional voice bridge for OpenClaw: speak locally, let VOCO transcribe on-device, then send the transcript to a configured OpenClaw CLI agent and type the agent's answer at your cursor.
+
 ## Install
 
 Recommended:
@@ -45,6 +47,8 @@ Primary tested path: Ubuntu and Debian.
 4. Speak.
 5. Press `Alt+D` again.
 6. Confirm the text is inserted at your cursor.
+
+To use OpenClaw mode, open Settings -> Output, choose `Ask OpenClaw and type answer`, and keep the OpenClaw gateway/agent available from your shell environment.
 
 ## Requirements
 
@@ -87,6 +91,7 @@ npm run report:linux-runtime
 - Single dictation recordings are currently capped at 60 seconds.
 - On Wayland, `Alt+D` and `Alt+Shift+D` are the most reliable hotkeys right now.
 - Wayland text insertion depends on `ydotool`, compositor support, and often `input` group access.
+- OpenClaw mode is opt-in and requires the `openclaw` CLI to be available in `PATH`.
 - Config lives at `~/.config/voco/config.json`.
 
 ## License
