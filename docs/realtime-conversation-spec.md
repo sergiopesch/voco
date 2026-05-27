@@ -415,6 +415,7 @@ When `OPENAI_API_KEY` is configured locally, run:
 
 ```bash
 npm run smoke:realtime
+npm run smoke:realtime -- --interrupt
 ```
 
 This test records a short local text-to-speech sample into a temporary Pulse/PipeWire null
@@ -422,13 +423,22 @@ sink, streams the generated PCM16 audio to OpenAI Realtime with the same session
 VOCO, and reports only non-content event counts. It must never print the API key, transcript,
 assistant text, raw audio, or base64 audio payload.
 
+The interrupt mode cancels the first assistant response after output audio starts, streams a
+second generated utterance into the same session, and requires a second audible assistant
+response. This is the protocol-level acceptance test for realtime interruption before live
+desktop microphone testing.
+
 Acceptance criteria:
 
 - The summary has `"ok": true`.
 - `responseCreated` is greater than zero.
 - `outputAudioDelta` is greater than zero.
+- `outputBytes` is greater than zero.
+- `outputRms` is greater than `0.0005`.
 - `responseDone` is greater than zero.
 - Either server VAD commits the input or the fallback commit path is used.
+- In interrupt mode, `cancelSent`, `secondResponseCreated`, `secondOutputAudioDelta`, and
+  `secondResponseDone` are all greater than zero.
 
 Manual fallback:
 

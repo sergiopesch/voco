@@ -10,6 +10,8 @@ const CHANNELS = 1;
 const CHUNK_MS = 80;
 const CHUNK_BYTES = Math.round((SAMPLE_RATE * CHUNK_MS) / 1000) * 2;
 const SPEECH_TEXT = "give me one very short test reply";
+const INTERRUPT_SPEECH_TEXT = "now answer this latest request in one short sentence";
+const INTERRUPT_MODE = process.argv.includes("--interrupt");
 
 const REQUIRED_COMMANDS = ["pactl", "parec", "sox", "spd-say"];
 
@@ -89,6 +91,22 @@ function pcmRms(buffer) {
   return Math.sqrt(sum / samples);
 }
 
+function appendPcmStats(stats, buffer) {
+  for (let offset = 0; offset + 1 < buffer.length; offset += 2) {
+    const sample = buffer.readInt16LE(offset) / 32768;
+    stats.squaredSum += sample * sample;
+    stats.samples += 1;
+  }
+  stats.bytes += buffer.length;
+}
+
+function pcmStatsRms(stats) {
+  if (stats.samples === 0) {
+    return 0;
+  }
+  return Math.sqrt(stats.squaredSum / stats.samples);
+}
+
 function trimPcmSilence(buffer) {
   const frameBytes = Math.round(SAMPLE_RATE * 0.02) * 2;
   const threshold = 0.004;
@@ -116,7 +134,7 @@ function trimPcmSilence(buffer) {
   return buffer.subarray(start, end);
 }
 
-async function recordSpeechPcm() {
+async function recordSpeechPcm(text = SPEECH_TEXT) {
   REQUIRED_COMMANDS.forEach(assertCommand);
 
   const originalSink = run("pactl", ["get-default-sink"]);
@@ -144,7 +162,7 @@ async function recordSpeechPcm() {
     recorder.stderr.on("data", () => {});
 
     await sleep(300);
-    run("spd-say", ["-w", SPEECH_TEXT]);
+    run("spd-say", ["-w", text]);
     await sleep(700);
     recorder.kill("SIGINT");
     await new Promise((resolve) => recorder.once("close", resolve));
@@ -272,23 +290,79 @@ async function streamAudio(socket, payload) {
   }
 }
 
-async function runRealtimeSmoke(clientSecret, payload) {
+async function runRealtimeSmoke(clientSecret, payload, interruptPayload = null) {
   const events = [];
   const counts = {
     speechStarted: 0,
     speechStopped: 0,
     committed: 0,
     responseCreated: 0,
+    firstResponseCreated: 0,
+    secondResponseCreated: 0,
     outputAudioDelta: 0,
+    firstOutputAudioDelta: 0,
+    secondOutputAudioDelta: 0,
+    outputAudioBytes: 0,
     responseDone: 0,
+    firstResponseDone: 0,
+    secondResponseDone: 0,
+    cancelSent: 0,
     fallbackCommitSent: 0,
     fallbackResponseCreateSent: 0,
   };
+  const outputStats = {
+    bytes: 0,
+    squaredSum: 0,
+    samples: 0,
+  };
+  const interruptMode = Boolean(interruptPayload);
+  let secondStreamStarted = false;
+  let secondStreamFinished = false;
+  let secondSpeechStartedBaseline = 0;
+  let secondResponseCreatedBaseline = 0;
+  let sendingSecondStream = false;
+  const firstResponseIds = new Set();
+  const secondResponseIds = new Set();
   let socketError = null;
   let doneResolve;
   const done = new Promise((resolve) => {
     doneResolve = resolve;
   });
+
+  const completeIfReady = () => {
+    if (!interruptMode && counts.responseDone > 0) {
+      doneResolve();
+      return;
+    }
+    if (
+      interruptMode &&
+      counts.cancelSent > 0 &&
+      counts.secondResponseCreated > 0 &&
+      counts.secondOutputAudioDelta > 0 &&
+      counts.secondResponseDone > 0
+    ) {
+      doneResolve();
+    }
+  };
+
+  const startSecondStream = () => {
+    if (!interruptMode || secondStreamStarted || sendingSecondStream) {
+      return;
+    }
+    secondStreamStarted = true;
+    sendingSecondStream = true;
+    secondSpeechStartedBaseline = counts.speechStarted;
+    secondResponseCreatedBaseline = counts.responseCreated;
+    void (async () => {
+      await sleep(250);
+      await streamAudio(socket, interruptPayload);
+      secondStreamFinished = true;
+      sendingSecondStream = false;
+    })().catch((error) => {
+      socketError = error instanceof Error ? error.message : String(error);
+      doneResolve();
+    });
+  };
 
   const socket = new WebSocket(
     `wss://api.openai.com/v1/realtime?model=${REALTIME_MODEL}`,
@@ -317,13 +391,58 @@ async function runRealtimeSmoke(clientSecret, payload) {
         break;
       case "response.created":
         counts.responseCreated += 1;
+        if (secondStreamStarted && message.response?.id) {
+          secondResponseIds.add(message.response.id);
+          counts.secondResponseCreated += 1;
+        } else if (secondStreamStarted) {
+          counts.secondResponseCreated += 1;
+        } else if (message.response?.id) {
+          firstResponseIds.add(message.response.id);
+          counts.firstResponseCreated += 1;
+        } else {
+          counts.firstResponseCreated += 1;
+        }
         break;
       case "response.output_audio.delta":
         counts.outputAudioDelta += 1;
+        if (typeof message.delta === "string") {
+          const audio = Buffer.from(message.delta, "base64");
+          counts.outputAudioBytes += audio.length;
+          appendPcmStats(outputStats, audio);
+        }
+        if (message.response_id && secondResponseIds.has(message.response_id)) {
+          counts.secondOutputAudioDelta += 1;
+        } else if (message.response_id && firstResponseIds.has(message.response_id)) {
+          counts.firstOutputAudioDelta += 1;
+          if (interruptMode && counts.cancelSent === 0) {
+            socket.send(JSON.stringify({ type: "response.cancel" }));
+            counts.cancelSent += 1;
+            startSecondStream();
+          }
+        } else if (secondStreamStarted) {
+          counts.secondOutputAudioDelta += 1;
+        } else {
+          counts.firstOutputAudioDelta += 1;
+          if (interruptMode && counts.cancelSent === 0) {
+            socket.send(JSON.stringify({ type: "response.cancel" }));
+            counts.cancelSent += 1;
+            startSecondStream();
+          }
+        }
+        completeIfReady();
         break;
       case "response.done":
         counts.responseDone += 1;
-        doneResolve();
+        if (message.response?.id && secondResponseIds.has(message.response.id)) {
+          counts.secondResponseDone += 1;
+        } else if (message.response?.id && firstResponseIds.has(message.response.id)) {
+          counts.firstResponseDone += 1;
+        } else if (secondStreamStarted && counts.secondResponseCreated > 0) {
+          counts.secondResponseDone += 1;
+        } else {
+          counts.firstResponseDone += 1;
+        }
+        completeIfReady();
         break;
       case "error":
         socketError = message.error?.message ?? "Realtime server error";
@@ -357,26 +476,65 @@ async function runRealtimeSmoke(clientSecret, payload) {
     counts.fallbackResponseCreateSent += 1;
   }
 
+  if (interruptMode) {
+    await sleep(4_000);
+    if (secondStreamFinished && counts.speechStarted === secondSpeechStartedBaseline) {
+      socket.send(JSON.stringify({ type: "input_audio_buffer.commit" }));
+      counts.fallbackCommitSent += 1;
+    }
+    await sleep(1_200);
+    if (secondStreamFinished && counts.responseCreated === secondResponseCreatedBaseline) {
+      socket.send(JSON.stringify({
+        type: "response.create",
+        response: { output_modalities: ["audio"] },
+      }));
+      counts.fallbackResponseCreateSent += 1;
+    }
+  }
+
   await Promise.race([done, sleep(20_000)]);
   socket.close();
 
-  return { events, counts, socketError };
+  return { events, counts, outputRms: pcmStatsRms(outputStats), socketError };
 }
 
 async function main() {
   const apiKey = loadApiKey();
   const { payload, rms } = await recordSpeechPcm();
+  const interruptRecording = INTERRUPT_MODE
+    ? await recordSpeechPcm(INTERRUPT_SPEECH_TEXT)
+    : null;
   const clientSecret = await createClientSecret(apiKey);
-  const result = await runRealtimeSmoke(clientSecret, payload);
+  const result = await runRealtimeSmoke(
+    clientSecret,
+    payload,
+    interruptRecording?.payload ?? null,
+  );
   const summary = {
     ok:
       !result.socketError &&
       result.counts.responseCreated > 0 &&
       result.counts.outputAudioDelta > 0 &&
-      result.counts.responseDone > 0,
+      result.counts.outputAudioBytes > 0 &&
+      result.outputRms > 0.0005 &&
+      result.counts.responseDone > 0 &&
+      (
+        !INTERRUPT_MODE ||
+        (
+          result.counts.cancelSent > 0 &&
+          result.counts.secondResponseCreated > 0 &&
+          result.counts.secondOutputAudioDelta > 0 &&
+          result.counts.secondResponseDone > 0
+        )
+      ),
+    mode: INTERRUPT_MODE ? "interrupt" : "single-turn",
     audio: {
       inputBytes: payload.length,
       rms: Number(rms.toFixed(6)),
+      interruptInputBytes: interruptRecording?.payload.length ?? 0,
+      interruptRms: interruptRecording ? Number(interruptRecording.rms.toFixed(6)) : 0,
+      outputBytes: result.counts.outputAudioBytes,
+      outputRms: Number(result.outputRms.toFixed(6)),
     },
     counts: result.counts,
     observedEvents: [...new Set(result.events)],
