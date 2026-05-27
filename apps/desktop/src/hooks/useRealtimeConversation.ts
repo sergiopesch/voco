@@ -66,9 +66,11 @@ const INPUT_CHUNK_TRACE_INTERVAL = 100;
 const NO_SPEECH_TIMEOUT_MS = 8_000;
 const RESPONSE_CREATE_FALLBACK_MS = 1_200;
 const NO_RESPONSE_TIMEOUT_MS = 8_000;
-const LOCAL_SPEECH_LEVEL_THRESHOLD = 0.08;
-const LOCAL_SPEECH_MIN_DURATION_MS = 240;
+const LOCAL_SPEECH_LEVEL_THRESHOLD = 0.02;
+const LOCAL_SPEECH_MIN_DURATION_MS = 120;
 const LOCAL_SPEECH_SILENCE_MS = 850;
+const LOCAL_SPEECH_CANDIDATE_GAP_MS = 900;
+const LOCAL_SPEECH_MIN_VOICE_FRAMES = 2;
 const LOCAL_COMMIT_FALLBACK_MS = 700;
 
 type LocalSpeechDetectorEvent = "started" | "stopped" | null;
@@ -77,24 +79,30 @@ export interface LocalSpeechDetectorState {
   active: boolean;
   candidateStartedAt: number | null;
   lastVoiceAt: number | null;
+  voiceFrameCount: number;
 }
 
 export interface LocalSpeechDetectorConfig {
   levelThreshold: number;
   minDurationMs: number;
   silenceMs: number;
+  candidateGapMs: number;
+  minVoiceFrames: number;
 }
 
 const INITIAL_LOCAL_SPEECH_DETECTOR_STATE: LocalSpeechDetectorState = {
   active: false,
   candidateStartedAt: null,
   lastVoiceAt: null,
+  voiceFrameCount: 0,
 };
 
 const LOCAL_SPEECH_DETECTOR_CONFIG: LocalSpeechDetectorConfig = {
   levelThreshold: LOCAL_SPEECH_LEVEL_THRESHOLD,
   minDurationMs: LOCAL_SPEECH_MIN_DURATION_MS,
   silenceMs: LOCAL_SPEECH_SILENCE_MS,
+  candidateGapMs: LOCAL_SPEECH_CANDIDATE_GAP_MS,
+  minVoiceFrames: LOCAL_SPEECH_MIN_VOICE_FRAMES,
 };
 
 export function audioLevelBucket(level: number): NonNullable<
@@ -127,12 +135,17 @@ export function updateLocalSpeechDetectorState(
     }
 
     const candidateStartedAt = state.candidateStartedAt ?? nowMs;
-    if (nowMs - candidateStartedAt >= config.minDurationMs) {
+    const voiceFrameCount = state.voiceFrameCount + 1;
+    if (
+      nowMs - candidateStartedAt >= config.minDurationMs &&
+      voiceFrameCount >= config.minVoiceFrames
+    ) {
       return {
         state: {
           active: true,
           candidateStartedAt: null,
           lastVoiceAt: nowMs,
+          voiceFrameCount,
         },
         event: "started",
       };
@@ -143,6 +156,7 @@ export function updateLocalSpeechDetectorState(
         active: false,
         candidateStartedAt,
         lastVoiceAt: nowMs,
+        voiceFrameCount,
       },
       event: null,
     };
@@ -157,6 +171,15 @@ export function updateLocalSpeechDetectorState(
       state: INITIAL_LOCAL_SPEECH_DETECTOR_STATE,
       event: "stopped",
     };
+  }
+
+  if (
+    !state.active &&
+    state.candidateStartedAt !== null &&
+    state.lastVoiceAt !== null &&
+    nowMs - state.lastVoiceAt < config.candidateGapMs
+  ) {
+    return { state, event: null };
   }
 
   if (!state.active) {

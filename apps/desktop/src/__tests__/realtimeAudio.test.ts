@@ -61,11 +61,18 @@ describe("realtime audio helpers", () => {
   });
 
   it("detects local speech only after sustained input and silence", () => {
-    const config = { levelThreshold: 0.5, minDurationMs: 200, silenceMs: 300 };
+    const config = {
+      levelThreshold: 0.5,
+      minDurationMs: 200,
+      silenceMs: 300,
+      candidateGapMs: 160,
+      minVoiceFrames: 2,
+    };
     let detector: LocalSpeechDetectorState = {
       active: false,
       candidateStartedAt: null,
       lastVoiceAt: null,
+      voiceFrameCount: 0,
     };
 
     let update = updateLocalSpeechDetectorState(detector, 0.8, 1_000, config);
@@ -90,11 +97,18 @@ describe("realtime audio helpers", () => {
   });
 
   it("drops short local audio spikes instead of treating them as speech", () => {
-    const config = { levelThreshold: 0.5, minDurationMs: 200, silenceMs: 300 };
+    const config = {
+      levelThreshold: 0.5,
+      minDurationMs: 200,
+      silenceMs: 300,
+      candidateGapMs: 120,
+      minVoiceFrames: 2,
+    };
     let detector: LocalSpeechDetectorState = {
       active: false,
       candidateStartedAt: null,
       lastVoiceAt: null,
+      voiceFrameCount: 0,
     };
 
     let update = updateLocalSpeechDetectorState(detector, 0.8, 1_000, config);
@@ -103,8 +117,68 @@ describe("realtime audio helpers", () => {
 
     update = updateLocalSpeechDetectorState(detector, 0.1, 1_100, config);
     expect(update.event).toBeNull();
+    detector = update.state;
+
+    update = updateLocalSpeechDetectorState(detector, 0.1, 1_130, config);
+    expect(update.event).toBeNull();
     expect(update.state.active).toBe(false);
     expect(update.state.candidateStartedAt).toBeNull();
+  });
+
+  it("keeps a local speech candidate across short dips", () => {
+    const config = {
+      levelThreshold: 0.5,
+      minDurationMs: 200,
+      silenceMs: 300,
+      candidateGapMs: 160,
+      minVoiceFrames: 2,
+    };
+    let detector: LocalSpeechDetectorState = {
+      active: false,
+      candidateStartedAt: null,
+      lastVoiceAt: null,
+      voiceFrameCount: 0,
+    };
+
+    let update = updateLocalSpeechDetectorState(detector, 0.8, 1_000, config);
+    expect(update.event).toBeNull();
+    detector = update.state;
+
+    update = updateLocalSpeechDetectorState(detector, 0.1, 1_090, config);
+    expect(update.event).toBeNull();
+    expect(update.state.candidateStartedAt).toBe(1_000);
+    expect(update.state.voiceFrameCount).toBe(1);
+    detector = update.state;
+
+    update = updateLocalSpeechDetectorState(detector, 0.8, 1_220, config);
+    expect(update.event).toBe("started");
+    expect(update.state.active).toBe(true);
+  });
+
+  it("requires multiple local speech frames before starting", () => {
+    const config = {
+      levelThreshold: 0.02,
+      minDurationMs: 100,
+      silenceMs: 300,
+      candidateGapMs: 900,
+      minVoiceFrames: 2,
+    };
+    let detector: LocalSpeechDetectorState = {
+      active: false,
+      candidateStartedAt: null,
+      lastVoiceAt: null,
+      voiceFrameCount: 0,
+    };
+
+    let update = updateLocalSpeechDetectorState(detector, 0.5, 1_000, config);
+    expect(update.event).toBeNull();
+    expect(update.state.voiceFrameCount).toBe(1);
+    detector = update.state;
+
+    update = updateLocalSpeechDetectorState(detector, 0, 1_900, config);
+    expect(update.event).toBeNull();
+    expect(update.state.active).toBe(false);
+    expect(update.state.voiceFrameCount).toBe(0);
   });
 
   it("decides to cancel active assistant playback when server speech starts", () => {
