@@ -84,9 +84,13 @@ int main(int argc, char **argv) {
   usleep((useconds_t)delay_ms * 1000);
   set_key(fd, KEY_LEFTALT, 1);
   usleep(80000);
+  set_key(fd, KEY_LEFTSHIFT, 1);
+  usleep(80000);
   set_key(fd, KEY_R, 1);
   usleep(80000);
   set_key(fd, KEY_R, 0);
+  usleep(80000);
+  set_key(fd, KEY_LEFTSHIFT, 0);
   usleep(80000);
   set_key(fd, KEY_LEFTALT, 0);
   usleep(250000);

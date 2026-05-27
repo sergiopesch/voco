@@ -44,7 +44,7 @@ static EVDEV_WATCHED_PATHS: LazyLock<Mutex<std::collections::HashSet<std::path::
 const TOGGLE_DICTATION_EVENT: &str = "voco:toggle-dictation";
 const TOGGLE_REALTIME_EVENT: &str = "voco:toggle-realtime";
 const LEGACY_TOGGLE_DICTATION_EVENT: &str = "voice:toggle-dictation";
-const REALTIME_HOTKEY: &str = "Alt+R";
+const REALTIME_HOTKEY: &str = "Alt+Shift+R";
 const TOGGLE_DEBOUNCE_MS: i64 = 120;
 const MAX_AUDIO_SECONDS: usize = 60;
 const HIDDEN_WINDOW_POS_X: i32 = -100;
@@ -1845,7 +1845,7 @@ fn spawn_evdev_device_worker(
                                         let alt_down = alt_held.load(Ordering::SeqCst);
                                         let shift_down = shift_held.load(Ordering::SeqCst);
 
-                                        if alt_down && !shift_down {
+                                        if alt_down && shift_down {
                                             debug!("Realtime hotkey detected via evdev");
                                             trace_hotkey_event(
                                                 "realtime_hotkey_event_received_evdev",
@@ -2375,7 +2375,8 @@ mod tests {
     #[test]
     fn realtime_hotkey_is_reserved_for_realtime() {
         assert!(validate_dictation_hotkey("Alt+D").is_ok());
-        assert!(validate_dictation_hotkey("Alt+R")
+        assert!(validate_dictation_hotkey("Alt+R").is_ok());
+        assert!(validate_dictation_hotkey("Alt+Shift+R")
             .unwrap_err()
             .contains("reserved for realtime"));
     }

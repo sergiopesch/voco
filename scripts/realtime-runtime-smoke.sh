@@ -242,7 +242,7 @@ if [ "$INTERRUPT" -eq 1 ]; then
 
   "$HELPER" 2500
   wait_for_trace "realtime_stop_requested" 80 || {
-    echo "Realtime did not stop from the second Alt+R." >&2
+    echo "Realtime did not stop from the second Alt+Shift+R." >&2
     tail -n 280 "$TRACE" 2>/dev/null || true
     exit 5
   }
@@ -276,7 +276,7 @@ done
 
 "$HELPER" 2500
 wait_for_trace "realtime_stop_requested" 80 || {
-  echo "Realtime did not stop from the second Alt+R." >&2
+  echo "Realtime did not stop from the second Alt+Shift+R." >&2
   tail -n 240 "$TRACE" 2>/dev/null || true
   exit 5
 }

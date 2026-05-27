@@ -1,7 +1,7 @@
 # Realtime Conversation Specification
 
 This document defines the expected behavior for VOCO realtime voice conversation mode.
-It is the implementation and QA reference for making `Alt+R` work on the first try,
+It is the implementation and QA reference for making `Alt+Shift+R` work on the first try,
 keeping the session conversational, and proving that the animated VOCO mic reflects
 both user speech and assistant speech.
 
@@ -10,22 +10,22 @@ both user speech and assistant speech.
 Realtime conversation is separate from normal dictation.
 
 - Normal dictation uses `Alt+D`.
-- Realtime conversation uses `Alt+R`.
+- Realtime conversation uses `Alt+Shift+R`.
 - Normal dictation records locally, transcribes locally, and inserts or forwards text.
 - Realtime conversation streams microphone audio to OpenAI Realtime over WebSocket and
   plays assistant audio locally.
 
 The critical product promise is:
 
-> Press `Alt+R`, speak naturally, hear a concise response, interrupt if needed, and press
-> `Alt+R` again to stop. The VOCO mic visual must move with the user's voice and with the
+> Press `Alt+Shift+R`, speak naturally, hear a concise response, interrupt if needed, and press
+> `Alt+Shift+R` again to stop. The VOCO mic visual must move with the user's voice and with the
 > assistant's spoken response.
 
 ## User-Facing Requirements
 
 ### First Toggle
 
-`Alt+R` must work on the first press after app launch.
+`Alt+Shift+R` must work on the first press after app launch.
 
 Acceptance criteria:
 
@@ -34,7 +34,7 @@ Acceptance criteria:
 - Duplicate keyboard backend events within the debounce window do not start and immediately stop realtime.
 - Realtime does not reuse the dictation toggle path.
 - `Alt+D` remains normal dictation.
-- `Alt+R` is reserved and cannot be configured as the dictation hotkey.
+- `Alt+Shift+R` is reserved and cannot be configured as the dictation hotkey.
 
 Expected trace sequence on a successful first start:
 
@@ -63,7 +63,7 @@ pending_realtime_toggle_replayed
 
 ### Stop Toggle
 
-Pressing `Alt+R` while realtime is connecting, listening, thinking, or speaking must stop
+Pressing `Alt+Shift+R` while realtime is connecting, listening, thinking, or speaking must stop
 the session.
 
 Acceptance criteria:
@@ -100,7 +100,7 @@ Acceptance criteria:
 - Assistant audio is played from `response.output_audio.delta`.
 - User interruption cancels queued or active assistant playback and sends `response.cancel`
   when a response is active.
-- The app stays in realtime until the user presses `Alt+R` again or an unrecoverable error occurs.
+- The app stays in realtime until the user presses `Alt+Shift+R` again or an unrecoverable error occurs.
 
 ### No Waffle
 
@@ -270,7 +270,7 @@ Acceptance criteria:
 
 ## Overlay Requirements
 
-When realtime is started from `Alt+R`, VOCO usually hides the main panel. The hidden overlay
+When realtime is started from `Alt+Shift+R`, VOCO usually hides the main panel. The hidden overlay
 must therefore show realtime status.
 
 Acceptance criteria:
@@ -383,7 +383,7 @@ Required:
 
 - Realtime mic visual clamps level values.
 - Realtime mic visual writes level-driven CSS variables.
-- Dictation hotkey validation rejects `Alt+R`.
+- Dictation hotkey validation rejects `Alt+Shift+R`.
 - Realtime client secret parsing rejects missing `value`.
 - Realtime API key loading supports env and `~/.openclaw/realtime.env`.
 - PCM16 encode/decode helpers preserve sample shape within expected precision.
@@ -393,7 +393,7 @@ Required:
 
 Required:
 
-- `Alt+R` event from backend emits `voco:toggle-realtime`.
+- `Alt+Shift+R` event from backend emits `voco:toggle-realtime`.
 - Early realtime toggle buffers until frontend handler ready.
 - Duplicate realtime toggle inside debounce window is ignored.
 - Realtime start creates client secret, opens WebSocket, then connects mic graph.
@@ -485,7 +485,7 @@ Acceptance criteria:
 Manual fallback:
 
 1. Start VOCO from the installed binary.
-2. Press `Alt+R`.
+2. Press `Alt+Shift+R`.
 3. Confirm realtime overlay appears.
 4. Speak: “give me a short test reply”.
 5. Confirm the VOCO mic visual moves while speaking.
@@ -493,7 +493,7 @@ Manual fallback:
 7. Confirm the VOCO mic visual moves during assistant playback.
 8. Interrupt the assistant with a new sentence.
 9. Confirm the assistant stops the old answer and follows the new sentence.
-10. Press `Alt+R`.
+10. Press `Alt+Shift+R`.
 11. Confirm realtime stops and overlay disappears.
 
 ### Required Validation Commands
@@ -516,7 +516,7 @@ Before considering realtime conversation complete:
 - [ ] Local git status is clean.
 - [ ] GitHub default branch contains the final commit.
 - [ ] Installed binary was rebuilt from the final commit.
-- [ ] `Alt+R` first press starts realtime from a fresh app launch.
+- [ ] `Alt+Shift+R` first press starts realtime from a fresh app launch.
 - [ ] Realtime startup trace reaches `realtime_audio_graph_connected`.
 - [ ] Speaking into the mic produces visible mic animation; automated runtime trace includes the input-level event that drives it.
 - [ ] Speaking into the mic produces server speech-start/speech-stop evidence.
@@ -524,7 +524,7 @@ Before considering realtime conversation complete:
 - [ ] Assistant response is audible.
 - [ ] Assistant playback drives the same mic animation; automated runtime trace includes the output-level event that drives it.
 - [ ] User interruption cancels active assistant playback.
-- [ ] Second `Alt+R` stops realtime cleanly.
+- [ ] Second `Alt+Shift+R` stops realtime cleanly.
 - [ ] Missing API key path shows actionable error.
 - [ ] Wrong mic or silent mic can be diagnosed from non-content trace events.
 

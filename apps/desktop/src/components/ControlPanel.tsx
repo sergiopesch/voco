@@ -391,7 +391,7 @@ export function ControlPanel({
                   <span className="voco-panel__state-label">Current state</span>
                   <strong>{statusLabel}</strong>
                   <p>Dictation: <code>{config.hotkey}</code></p>
-                  <p>Realtime: <code>Alt+R</code></p>
+                  <p>Realtime: <code>Alt+Shift+R</code></p>
                 </div>
                 <RealtimeMicVisual
                   active={isRealtimeActive}
@@ -822,7 +822,7 @@ export function ControlPanel({
                     <code>Alt+Shift+D</code> on Wayland.
                   </div>
                   <div className="voco-inline-note">
-                    Realtime conversation uses <code>Alt+R</code>.
+                    Realtime conversation uses <code>Alt+Shift+R</code>.
                   </div>
                 </section>
               ) : null}
