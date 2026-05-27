@@ -409,6 +409,27 @@ realtime_audio_graph_connected
 realtime_stop_requested
 ```
 
+### Realtime Protocol Smoke Test
+
+When `OPENAI_API_KEY` is configured locally, run:
+
+```bash
+npm run smoke:realtime
+```
+
+This test records a short local text-to-speech sample into a temporary Pulse/PipeWire null
+sink, streams the generated PCM16 audio to OpenAI Realtime with the same session config as
+VOCO, and reports only non-content event counts. It must never print the API key, transcript,
+assistant text, raw audio, or base64 audio payload.
+
+Acceptance criteria:
+
+- The summary has `"ok": true`.
+- `responseCreated` is greater than zero.
+- `outputAudioDelta` is greater than zero.
+- `responseDone` is greater than zero.
+- Either server VAD commits the input or the fallback commit path is used.
+
 Manual fallback:
 
 1. Start VOCO from the installed binary.
