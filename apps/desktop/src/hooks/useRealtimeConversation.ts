@@ -631,6 +631,37 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
       const stream = await openMicrophoneStream(selectedDeviceId);
       traceHotkeyEvent("realtime_get_user_media_done").catch(() => {});
       streamRef.current = stream;
+      traceHotkeyEvent("realtime_microphone_track_started").catch(() => {});
+      const trackSettings = stream.getAudioTracks()[0]?.getSettings();
+      const trackTraceFields: HotkeyTraceFields = {
+        selectedDeviceConfigured: selectedDeviceId !== null,
+      };
+      if (
+        typeof trackSettings?.sampleRate === "number" &&
+        Number.isInteger(trackSettings.sampleRate) &&
+        trackSettings.sampleRate >= 8_000 &&
+        trackSettings.sampleRate <= 384_000
+      ) {
+        trackTraceFields.trackSampleRate = trackSettings.sampleRate;
+      }
+      if (
+        typeof trackSettings?.channelCount === "number" &&
+        Number.isInteger(trackSettings.channelCount) &&
+        trackSettings.channelCount >= 1 &&
+        trackSettings.channelCount <= 16
+      ) {
+        trackTraceFields.trackChannelCount = trackSettings.channelCount;
+      }
+      if (typeof trackSettings?.echoCancellation === "boolean") {
+        trackTraceFields.echoCancellation = trackSettings.echoCancellation;
+      }
+      if (typeof trackSettings?.noiseSuppression === "boolean") {
+        trackTraceFields.noiseSuppression = trackSettings.noiseSuppression;
+      }
+      if (typeof trackSettings?.autoGainControl === "boolean") {
+        trackTraceFields.autoGainControl = trackSettings.autoGainControl;
+      }
+      traceHotkeyEvent("realtime_microphone_track_settings", trackTraceFields).catch(() => {});
 
       const source = audioContext.createMediaStreamSource(stream);
       const processor = audioContext.createScriptProcessor(4096, 1, 1);

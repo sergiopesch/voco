@@ -60,6 +60,12 @@ export interface HotkeyTraceFields {
   audioLevelBucket?: "silent" | "low" | "medium" | "high";
   chunkCount?: number;
   responseDeltaCount?: number;
+  selectedDeviceConfigured?: boolean;
+  trackSampleRate?: number;
+  trackChannelCount?: number;
+  echoCancellation?: boolean;
+  noiseSuppression?: boolean;
+  autoGainControl?: boolean;
 }
 
 export async function traceHotkeyEvent(

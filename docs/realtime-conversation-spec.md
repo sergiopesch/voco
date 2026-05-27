@@ -49,6 +49,8 @@ realtime_websocket_connecting
 realtime_websocket_open
 realtime_get_user_media_started
 realtime_get_user_media_done
+realtime_microphone_track_started
+realtime_microphone_track_settings
 realtime_audio_graph_connected
 ```
 
@@ -180,6 +182,12 @@ Recommended fields:
 | `audio_level_bucket` | `silent`, `low`, `medium`, `high` | Allowed |
 | `chunk_count` | Confirms streaming | Allowed |
 | `response_delta_count` | Confirms playback | Allowed |
+| `selected_device_configured` | Confirms whether a saved mic device was requested | Allowed |
+| `track_sample_rate` | Browser-reported microphone track sample rate | Allowed |
+| `track_channel_count` | Browser-reported microphone channel count | Allowed |
+| `echo_cancellation` | Browser-reported capture processing flag | Allowed |
+| `noise_suppression` | Browser-reported capture processing flag | Allowed |
+| `auto_gain_control` | Browser-reported capture processing flag | Allowed |
 
 Forbidden fields:
 
@@ -409,6 +417,8 @@ realtime_start_requested
 realtime_client_secret_created
 realtime_websocket_open
 realtime_get_user_media_done
+realtime_microphone_track_started
+realtime_microphone_track_settings
 realtime_audio_graph_connected
 realtime_stop_requested
 ```

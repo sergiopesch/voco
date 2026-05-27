@@ -113,6 +113,16 @@ wait_for_trace "realtime_audio_graph_connected" 100 || {
   tail -n 160 "$TRACE" 2>/dev/null || true
   exit 3
 }
+wait_for_trace "realtime_microphone_track_started" 20 || {
+  echo "Realtime did not trace microphone track startup." >&2
+  tail -n 160 "$TRACE" 2>/dev/null || true
+  exit 3
+}
+wait_for_trace "realtime_microphone_track_settings" 20 || {
+  echo "Realtime did not trace microphone track settings." >&2
+  tail -n 160 "$TRACE" 2>/dev/null || true
+  exit 3
+}
 
 paplay --device="$SINK_NAME" --raw --format=s16le --rate=24000 --channels=1 "$SPEECH_RAW"
 

@@ -145,6 +145,25 @@ fn trace_hotkey_event_with_fields(
         if let Some(response_delta_count) = fields.response_delta_count {
             record["response_delta_count"] = serde_json::Value::Number(response_delta_count.into());
         }
+        if let Some(selected_device_configured) = fields.selected_device_configured {
+            record["selected_device_configured"] =
+                serde_json::Value::Bool(selected_device_configured);
+        }
+        if let Some(track_sample_rate) = fields.track_sample_rate {
+            record["track_sample_rate"] = serde_json::Value::Number(track_sample_rate.into());
+        }
+        if let Some(track_channel_count) = fields.track_channel_count {
+            record["track_channel_count"] = serde_json::Value::Number(track_channel_count.into());
+        }
+        if let Some(echo_cancellation) = fields.echo_cancellation {
+            record["echo_cancellation"] = serde_json::Value::Bool(echo_cancellation);
+        }
+        if let Some(noise_suppression) = fields.noise_suppression {
+            record["noise_suppression"] = serde_json::Value::Bool(noise_suppression);
+        }
+        if let Some(auto_gain_control) = fields.auto_gain_control {
+            record["auto_gain_control"] = serde_json::Value::Bool(auto_gain_control);
+        }
     }
 
     let line = match serde_json::to_string(&record) {
@@ -237,6 +256,8 @@ fn trace_frontend_hotkey_event(
         | "realtime_websocket_error"
         | "realtime_get_user_media_started"
         | "realtime_get_user_media_done"
+        | "realtime_microphone_track_started"
+        | "realtime_microphone_track_settings"
         | "realtime_audio_graph_connected"
         | "realtime_session_created"
         | "realtime_session_updated"
@@ -271,6 +292,12 @@ struct FrontendTraceFields {
     audio_level_bucket: Option<String>,
     chunk_count: Option<u64>,
     response_delta_count: Option<u64>,
+    selected_device_configured: Option<bool>,
+    track_sample_rate: Option<u64>,
+    track_channel_count: Option<u64>,
+    echo_cancellation: Option<bool>,
+    noise_suppression: Option<bool>,
+    auto_gain_control: Option<bool>,
 }
 
 impl FrontendTraceFields {
@@ -279,6 +306,16 @@ impl FrontendTraceFields {
             match bucket {
                 "silent" | "low" | "medium" | "high" => {}
                 _ => return Err(format!("Unsupported audio level bucket: {bucket}")),
+            }
+        }
+        if let Some(sample_rate) = self.track_sample_rate {
+            if !(8_000..=384_000).contains(&sample_rate) {
+                return Err(format!("Unsupported track sample rate: {sample_rate}"));
+            }
+        }
+        if let Some(channel_count) = self.track_channel_count {
+            if !(1..=16).contains(&channel_count) {
+                return Err(format!("Unsupported track channel count: {channel_count}"));
             }
         }
         Ok(())
@@ -2240,6 +2277,12 @@ mod tests {
             audio_level_bucket: Some("medium".to_string()),
             chunk_count: Some(12),
             response_delta_count: Some(3),
+            selected_device_configured: Some(true),
+            track_sample_rate: Some(48000),
+            track_channel_count: Some(1),
+            echo_cancellation: Some(false),
+            noise_suppression: Some(false),
+            auto_gain_control: Some(false),
         }
         .validate()
         .is_ok());
@@ -2248,10 +2291,31 @@ mod tests {
             audio_level_bucket: Some("raw audio here".to_string()),
             chunk_count: None,
             response_delta_count: None,
+            selected_device_configured: None,
+            track_sample_rate: None,
+            track_channel_count: None,
+            echo_cancellation: None,
+            noise_suppression: None,
+            auto_gain_control: None,
         }
         .validate()
         .unwrap_err()
         .contains("Unsupported audio level bucket"));
+
+        assert!(FrontendTraceFields {
+            audio_level_bucket: None,
+            chunk_count: None,
+            response_delta_count: None,
+            selected_device_configured: None,
+            track_sample_rate: Some(1),
+            track_channel_count: Some(1),
+            echo_cancellation: None,
+            noise_suppression: None,
+            auto_gain_control: None,
+        }
+        .validate()
+        .unwrap_err()
+        .contains("Unsupported track sample rate"));
     }
 
     #[test]
