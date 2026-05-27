@@ -659,7 +659,6 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
           inputLevel >= INPUT_LEVEL_TRACE_THRESHOLD &&
           now - lastInputLevelTraceMsRef.current >= INPUT_LEVEL_TRACE_INTERVAL_MS
         ) {
-          clearNoSpeechTimeout();
           lastInputLevelTraceMsRef.current = now;
           traceHotkeyEvent("realtime_input_audio_level_detected", {
             audioLevelBucket: audioLevelBucket(inputLevel),

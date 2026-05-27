@@ -395,6 +395,10 @@ Required:
 On Wayland, the preferred automated test is a temporary uinput keyboard that emits real evdev
 events. The expected trace must include:
 
+```bash
+./scripts/realtime-runtime-smoke.sh
+```
+
 ```text
 evdev_device_worker_started
 realtime_hotkey_event_received_evdev
@@ -407,6 +411,15 @@ realtime_websocket_open
 realtime_get_user_media_done
 realtime_audio_graph_connected
 realtime_stop_requested
+```
+
+The default runtime smoke accepts either assistant output or `realtime_no_speech_timeout` after
+startup. This keeps the test useful on machines where WebView microphone selection ignores the
+temporary virtual source. On a machine where the injected speech reaches the selected microphone,
+run the stricter response gate:
+
+```bash
+./scripts/realtime-runtime-smoke.sh --require-response
 ```
 
 ### Realtime Protocol Smoke Test
