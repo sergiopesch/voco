@@ -15,11 +15,41 @@ interface RealtimeState {
   error: string | null;
 }
 
-type RealtimeServerEvent = {
+export type RealtimeServerEvent = {
   type?: string;
   delta?: string;
   error?: { message?: string };
 };
+
+export interface RealtimeRuntimeSnapshot {
+  responseActive: boolean;
+  waitingForResponse: boolean;
+  inputChunkCount: number;
+  responseDeltaCount: number;
+}
+
+export interface RealtimeTraceEvent {
+  event: string;
+  fields?: HotkeyTraceFields;
+}
+
+export interface RealtimeServerDecision {
+  traceEvents: RealtimeTraceEvent[];
+  clearNoSpeechTimeout?: boolean;
+  clearLocalCommitFallbackTimeout?: boolean;
+  clearResponseTimeouts?: boolean;
+  stopOutputPlayback?: boolean;
+  cancelResponse?: boolean;
+  scheduleResponseFallback?: boolean;
+  playOutputAudio?: string;
+  cleanup?: boolean;
+  resetLocalSpeechDetector?: boolean;
+  status?: RealtimeState;
+  responseActive?: boolean;
+  waitingForResponse?: boolean;
+  responseDeltaCount?: number;
+  serverDetectedCurrentTurn?: boolean;
+}
 
 const INITIAL_STATE: RealtimeState = {
   status: "idle",
@@ -137,6 +167,103 @@ export function updateLocalSpeechDetectorState(
   }
 
   return { state, event: null };
+}
+
+export function decideRealtimeServerEvent(
+  message: RealtimeServerEvent,
+  snapshot: RealtimeRuntimeSnapshot,
+): RealtimeServerDecision {
+  switch (message.type) {
+    case "session.created":
+      return { traceEvents: [{ event: "realtime_session_created" }] };
+    case "session.updated":
+      return { traceEvents: [{ event: "realtime_session_updated" }] };
+    case "input_audio_buffer.speech_started":
+      return {
+        traceEvents: [{ event: "realtime_server_speech_started" }],
+        clearNoSpeechTimeout: true,
+        clearLocalCommitFallbackTimeout: true,
+        clearResponseTimeouts: true,
+        stopOutputPlayback: true,
+        cancelResponse: snapshot.responseActive,
+        status: { status: "listening", detail: "Listening...", error: null },
+        waitingForResponse: false,
+        serverDetectedCurrentTurn: true,
+      };
+    case "input_audio_buffer.speech_stopped":
+      return {
+        traceEvents: [{ event: "realtime_server_speech_stopped" }],
+        status: {
+          status: "listening",
+          detail: "Heard you. Waiting for the response...",
+          error: null,
+        },
+      };
+    case "input_audio_buffer.committed":
+      return {
+        traceEvents: [{ event: "realtime_server_input_committed" }],
+        clearLocalCommitFallbackTimeout: true,
+        scheduleResponseFallback: true,
+        resetLocalSpeechDetector: true,
+        serverDetectedCurrentTurn: false,
+      };
+    case "response.created":
+      return {
+        traceEvents: [
+          {
+            event: "realtime_server_response_created",
+            fields: { chunkCount: snapshot.inputChunkCount },
+          },
+        ],
+        clearResponseTimeouts: true,
+        status: { status: "speaking", detail: "Speaking... talk to interrupt.", error: null },
+        waitingForResponse: false,
+        responseActive: true,
+      };
+    case "response.output_audio.delta": {
+      const nextResponseDeltaCount = message.delta
+        ? snapshot.responseDeltaCount + 1
+        : snapshot.responseDeltaCount;
+      return {
+        traceEvents: message.delta
+          ? [
+              {
+                event: "realtime_output_audio_delta",
+                fields: { responseDeltaCount: nextResponseDeltaCount },
+              },
+            ]
+          : [],
+        status: { status: "speaking", detail: "Speaking... talk to interrupt.", error: null },
+        playOutputAudio: message.delta,
+        responseDeltaCount: nextResponseDeltaCount,
+      };
+    }
+    case "response.done":
+      return {
+        traceEvents: [
+          {
+            event: "realtime_server_response_done",
+            fields: { responseDeltaCount: snapshot.responseDeltaCount },
+          },
+        ],
+        clearResponseTimeouts: true,
+        status: { status: "listening", detail: "Listening...", error: null },
+        waitingForResponse: false,
+        responseActive: false,
+      };
+    case "error":
+      return {
+        traceEvents: [{ event: "realtime_server_error" }],
+        status: {
+          status: "error",
+          detail: "Realtime error.",
+          error: message.error?.message ?? "Unknown Realtime error",
+        },
+        cleanup: true,
+      };
+    default:
+      return { traceEvents: [] };
+  }
 }
 
 export function samplesToPcm16Base64(samples: Float32Array): string {
@@ -656,88 +783,59 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
       socket.onmessage = (event) => {
         try {
           const message = JSON.parse(String(event.data)) as RealtimeServerEvent;
-          switch (message.type) {
-            case "session.created":
-              traceHotkeyEvent("realtime_session_created").catch(() => {});
-              break;
-            case "session.updated":
-              traceHotkeyEvent("realtime_session_updated").catch(() => {});
-              break;
-            case "input_audio_buffer.speech_started":
-              clearNoSpeechTimeout();
-              clearLocalCommitFallbackTimeout();
-              clearResponseTimeouts();
-              serverDetectedCurrentTurnRef.current = true;
-              waitingForResponseRef.current = false;
-              traceHotkeyEvent("realtime_server_speech_started").catch(() => {});
-              stopOutputPlayback();
-              if (responseActiveRef.current) {
-                if (sendRealtimeEvent(socket, { type: "response.cancel" })) {
-                  traceHotkeyEvent("realtime_response_cancel_sent").catch(() => {});
-                }
-              }
-              setRealtimeState({ status: "listening", detail: "Listening...", error: null });
-              break;
-            case "input_audio_buffer.speech_stopped":
-              traceHotkeyEvent("realtime_server_speech_stopped").catch(() => {});
-              setRealtimeState({
-                status: "listening",
-                detail: "Heard you. Waiting for the response...",
-                error: null,
-              });
-              break;
-            case "input_audio_buffer.committed":
-              clearLocalCommitFallbackTimeout();
-              serverDetectedCurrentTurnRef.current = false;
-              localSpeechDetectorRef.current = INITIAL_LOCAL_SPEECH_DETECTOR_STATE;
-              traceHotkeyEvent("realtime_server_input_committed").catch(() => {});
-              scheduleResponseFallback(socket);
-              break;
-            case "response.created":
-              waitingForResponseRef.current = false;
-              clearResponseTimeouts();
-              responseActiveRef.current = true;
-              traceHotkeyEvent("realtime_server_response_created", {
-                chunkCount: inputChunkCountRef.current,
-              }).catch(() => {});
-              setRealtimeState({
-                status: "speaking",
-                detail: "Speaking... talk to interrupt.",
-                error: null,
-              });
-              break;
-            case "response.output_audio.delta":
-              if (message.delta) {
-                responseDeltaCountRef.current += 1;
-                traceHotkeyEvent("realtime_output_audio_delta", {
-                  responseDeltaCount: responseDeltaCountRef.current,
-                }).catch(() => {});
-                void playOutputAudio(message.delta);
-              }
-              setRealtimeState({
-                status: "speaking",
-                detail: "Speaking... talk to interrupt.",
-                error: null,
-              });
-              break;
-            case "response.done":
-              waitingForResponseRef.current = false;
-              clearResponseTimeouts();
-              responseActiveRef.current = false;
-              traceHotkeyEvent("realtime_server_response_done", {
-                responseDeltaCount: responseDeltaCountRef.current,
-              }).catch(() => {});
-              setRealtimeState({ status: "listening", detail: "Listening...", error: null });
-              break;
-            case "error":
-              traceHotkeyEvent("realtime_server_error").catch(() => {});
-              setRealtimeState({
-                status: "error",
-                detail: "Realtime error.",
-                error: message.error?.message ?? "Unknown Realtime error",
-              });
-              cleanup();
-              break;
+          const decision = decideRealtimeServerEvent(message, {
+            responseActive: responseActiveRef.current,
+            waitingForResponse: waitingForResponseRef.current,
+            inputChunkCount: inputChunkCountRef.current,
+            responseDeltaCount: responseDeltaCountRef.current,
+          });
+
+          if (decision.clearNoSpeechTimeout) {
+            clearNoSpeechTimeout();
+          }
+          if (decision.clearLocalCommitFallbackTimeout) {
+            clearLocalCommitFallbackTimeout();
+          }
+          if (decision.clearResponseTimeouts) {
+            clearResponseTimeouts();
+          }
+          if (decision.serverDetectedCurrentTurn !== undefined) {
+            serverDetectedCurrentTurnRef.current = decision.serverDetectedCurrentTurn;
+          }
+          if (decision.resetLocalSpeechDetector) {
+            localSpeechDetectorRef.current = INITIAL_LOCAL_SPEECH_DETECTOR_STATE;
+          }
+          if (decision.waitingForResponse !== undefined) {
+            waitingForResponseRef.current = decision.waitingForResponse;
+          }
+          if (decision.responseActive !== undefined) {
+            responseActiveRef.current = decision.responseActive;
+          }
+          if (decision.responseDeltaCount !== undefined) {
+            responseDeltaCountRef.current = decision.responseDeltaCount;
+          }
+          for (const traceEvent of decision.traceEvents) {
+            traceHotkeyEvent(traceEvent.event, traceEvent.fields ?? null).catch(() => {});
+          }
+          if (decision.stopOutputPlayback) {
+            stopOutputPlayback();
+          }
+          if (decision.cancelResponse) {
+            if (sendRealtimeEvent(socket, { type: "response.cancel" })) {
+              traceHotkeyEvent("realtime_response_cancel_sent").catch(() => {});
+            }
+          }
+          if (decision.status) {
+            setRealtimeState(decision.status);
+          }
+          if (decision.playOutputAudio) {
+            void playOutputAudio(decision.playOutputAudio);
+          }
+          if (decision.scheduleResponseFallback) {
+            scheduleResponseFallback(socket);
+          }
+          if (decision.cleanup) {
+            cleanup();
           }
         } catch {
           // Ignore non-JSON diagnostics from the Realtime socket.

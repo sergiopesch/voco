@@ -1,12 +1,23 @@
 import { describe, expect, it } from "vitest";
 import {
   audioLevelBucket,
+  decideRealtimeServerEvent,
   pcm16Base64ToSamples,
   resampleLinear,
   samplesToPcm16Base64,
   updateLocalSpeechDetectorState,
 } from "@/hooks/useRealtimeConversation";
-import type { LocalSpeechDetectorState } from "@/hooks/useRealtimeConversation";
+import type {
+  LocalSpeechDetectorState,
+  RealtimeRuntimeSnapshot,
+} from "@/hooks/useRealtimeConversation";
+
+const BASE_RUNTIME_SNAPSHOT: RealtimeRuntimeSnapshot = {
+  responseActive: false,
+  waitingForResponse: false,
+  inputChunkCount: 0,
+  responseDeltaCount: 0,
+};
 
 describe("realtime audio helpers", () => {
   it("buckets audio levels for privacy-safe diagnostics", () => {
@@ -94,5 +105,80 @@ describe("realtime audio helpers", () => {
     expect(update.event).toBeNull();
     expect(update.state.active).toBe(false);
     expect(update.state.candidateStartedAt).toBeNull();
+  });
+
+  it("decides to cancel active assistant playback when server speech starts", () => {
+    const decision = decideRealtimeServerEvent(
+      { type: "input_audio_buffer.speech_started" },
+      { ...BASE_RUNTIME_SNAPSHOT, responseActive: true, waitingForResponse: true },
+    );
+
+    expect(decision.traceEvents).toContainEqual({
+      event: "realtime_server_speech_started",
+    });
+    expect(decision.cancelResponse).toBe(true);
+    expect(decision.stopOutputPlayback).toBe(true);
+    expect(decision.clearResponseTimeouts).toBe(true);
+    expect(decision.waitingForResponse).toBe(false);
+    expect(decision.serverDetectedCurrentTurn).toBe(true);
+    expect(decision.status?.status).toBe("listening");
+  });
+
+  it("schedules a response fallback when server commits input", () => {
+    const decision = decideRealtimeServerEvent(
+      { type: "input_audio_buffer.committed" },
+      BASE_RUNTIME_SNAPSHOT,
+    );
+
+    expect(decision.traceEvents).toContainEqual({
+      event: "realtime_server_input_committed",
+    });
+    expect(decision.scheduleResponseFallback).toBe(true);
+    expect(decision.resetLocalSpeechDetector).toBe(true);
+    expect(decision.serverDetectedCurrentTurn).toBe(false);
+  });
+
+  it("tracks assistant audio deltas and returns to listening on response done", () => {
+    const deltaDecision = decideRealtimeServerEvent(
+      { type: "response.output_audio.delta", delta: "abc" },
+      { ...BASE_RUNTIME_SNAPSHOT, responseDeltaCount: 2 },
+    );
+
+    expect(deltaDecision.responseDeltaCount).toBe(3);
+    expect(deltaDecision.playOutputAudio).toBe("abc");
+    expect(deltaDecision.traceEvents).toContainEqual({
+      event: "realtime_output_audio_delta",
+      fields: { responseDeltaCount: 3 },
+    });
+    expect(deltaDecision.status?.status).toBe("speaking");
+
+    const doneDecision = decideRealtimeServerEvent(
+      { type: "response.done" },
+      { ...BASE_RUNTIME_SNAPSHOT, responseActive: true, responseDeltaCount: 3 },
+    );
+
+    expect(doneDecision.responseActive).toBe(false);
+    expect(doneDecision.waitingForResponse).toBe(false);
+    expect(doneDecision.clearResponseTimeouts).toBe(true);
+    expect(doneDecision.status?.status).toBe("listening");
+    expect(doneDecision.traceEvents).toContainEqual({
+      event: "realtime_server_response_done",
+      fields: { responseDeltaCount: 3 },
+    });
+  });
+
+  it("marks realtime server errors for cleanup with an actionable state", () => {
+    const decision = decideRealtimeServerEvent(
+      { type: "error", error: { message: "bad session" } },
+      BASE_RUNTIME_SNAPSHOT,
+    );
+
+    expect(decision.cleanup).toBe(true);
+    expect(decision.status).toEqual({
+      status: "error",
+      detail: "Realtime error.",
+      error: "bad session",
+    });
+    expect(decision.traceEvents).toContainEqual({ event: "realtime_server_error" });
   });
 });
