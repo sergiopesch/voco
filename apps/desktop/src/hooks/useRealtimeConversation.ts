@@ -6,6 +6,7 @@ import {
   showNotification,
   traceHotkeyEvent,
 } from "@/lib/tauri";
+import type { HotkeyTraceFields } from "@/lib/tauri";
 import type { RealtimeStatus } from "@/types";
 
 interface RealtimeState {
@@ -65,6 +66,21 @@ const LOCAL_SPEECH_DETECTOR_CONFIG: LocalSpeechDetectorConfig = {
   minDurationMs: LOCAL_SPEECH_MIN_DURATION_MS,
   silenceMs: LOCAL_SPEECH_SILENCE_MS,
 };
+
+export function audioLevelBucket(level: number): NonNullable<
+  HotkeyTraceFields["audioLevelBucket"]
+> {
+  if (level < 0.02) {
+    return "silent";
+  }
+  if (level < 0.08) {
+    return "low";
+  }
+  if (level < 0.35) {
+    return "medium";
+  }
+  return "high";
+}
 
 export function updateLocalSpeechDetectorState(
   state: LocalSpeechDetectorState,
@@ -274,7 +290,9 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
   const scheduleNoSpeechTimeout = useCallback(() => {
     clearNoSpeechTimeout();
     noSpeechTimeoutRef.current = window.setTimeout(() => {
-      traceHotkeyEvent("realtime_no_speech_timeout").catch(() => {});
+      traceHotkeyEvent("realtime_no_speech_timeout", {
+        chunkCount: inputChunkCountRef.current,
+      }).catch(() => {});
       if (statusRef.current === "listening") {
         setRealtimeState({
           status: "listening",
@@ -310,7 +328,10 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
           return;
         }
         if (sendResponseCreate(socket)) {
-          traceHotkeyEvent("realtime_response_create_fallback_sent").catch(() => {});
+          traceHotkeyEvent("realtime_response_create_fallback_sent", {
+            chunkCount: inputChunkCountRef.current,
+            responseDeltaCount: responseDeltaCountRef.current,
+          }).catch(() => {});
         }
       }, RESPONSE_CREATE_FALLBACK_MS);
 
@@ -319,7 +340,10 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
         if (!waitingForResponseRef.current || responseActiveRef.current) {
           return;
         }
-        traceHotkeyEvent("realtime_no_response_timeout").catch(() => {});
+        traceHotkeyEvent("realtime_no_response_timeout", {
+          chunkCount: inputChunkCountRef.current,
+          responseDeltaCount: responseDeltaCountRef.current,
+        }).catch(() => {});
         if (statusRef.current === "listening") {
           setRealtimeState({
             status: "listening",
@@ -345,7 +369,9 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
           return;
         }
         if (sendInputCommit(socket)) {
-          traceHotkeyEvent("realtime_input_audio_commit_fallback_sent").catch(() => {});
+          traceHotkeyEvent("realtime_input_audio_commit_fallback_sent", {
+            chunkCount: inputChunkCountRef.current,
+          }).catch(() => {});
           scheduleResponseFallback(socket);
         }
       }, LOCAL_COMMIT_FALLBACK_MS);
@@ -395,7 +421,10 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
       socketRef.current.onmessage = null;
       socketRef.current.onerror = null;
       socketRef.current.onclose = null;
-      if (socketRef.current.readyState === WebSocket.OPEN) {
+      if (
+        socketRef.current.readyState === WebSocket.CONNECTING ||
+        socketRef.current.readyState === WebSocket.OPEN
+      ) {
         socketRef.current.close();
       }
       socketRef.current = null;
@@ -446,7 +475,10 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
         now - lastOutputLevelTraceMsRef.current >= OUTPUT_LEVEL_TRACE_INTERVAL_MS
       ) {
         lastOutputLevelTraceMsRef.current = now;
-        traceHotkeyEvent("realtime_output_audio_level_detected").catch(() => {});
+        traceHotkeyEvent("realtime_output_audio_level_detected", {
+          audioLevelBucket: audioLevelBucket(outputLevel),
+          responseDeltaCount: responseDeltaCountRef.current,
+        }).catch(() => {});
       }
       const buffer = audioContext.createBuffer(1, samples.length, REALTIME_SAMPLE_RATE);
       buffer.copyToChannel(samples as Float32Array<ArrayBuffer>, 0);
@@ -490,7 +522,10 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
           inputChunkCountRef.current === 1 ||
           inputChunkCountRef.current % INPUT_CHUNK_TRACE_INTERVAL === 0
         ) {
-          traceHotkeyEvent("realtime_input_audio_chunk_sent").catch(() => {});
+          traceHotkeyEvent("realtime_input_audio_chunk_sent", {
+            audioLevelBucket: audioLevelBucket(inputLevel),
+            chunkCount: inputChunkCountRef.current,
+          }).catch(() => {});
         }
         const now = performance.now();
         if (
@@ -499,7 +534,10 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
         ) {
           clearNoSpeechTimeout();
           lastInputLevelTraceMsRef.current = now;
-          traceHotkeyEvent("realtime_input_audio_level_detected").catch(() => {});
+          traceHotkeyEvent("realtime_input_audio_level_detected", {
+            audioLevelBucket: audioLevelBucket(inputLevel),
+            chunkCount: inputChunkCountRef.current,
+          }).catch(() => {});
         }
         const localSpeechUpdate = updateLocalSpeechDetectorState(
           localSpeechDetectorRef.current,
@@ -511,7 +549,10 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
           clearNoSpeechTimeout();
           clearLocalCommitFallbackTimeout();
           if (!serverDetectedCurrentTurnRef.current) {
-            traceHotkeyEvent("realtime_local_speech_started").catch(() => {});
+            traceHotkeyEvent("realtime_local_speech_started", {
+              audioLevelBucket: audioLevelBucket(inputLevel),
+              chunkCount: inputChunkCountRef.current,
+            }).catch(() => {});
           }
           stopOutputPlayback();
           if (responseActiveRef.current) {
@@ -522,7 +563,10 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
           setRealtimeState({ status: "listening", detail: "Listening...", error: null });
         } else if (localSpeechUpdate.event === "stopped") {
           if (!serverDetectedCurrentTurnRef.current) {
-            traceHotkeyEvent("realtime_local_speech_stopped").catch(() => {});
+            traceHotkeyEvent("realtime_local_speech_stopped", {
+              audioLevelBucket: audioLevelBucket(inputLevel),
+              chunkCount: inputChunkCountRef.current,
+            }).catch(() => {});
             scheduleLocalCommitFallback(socket);
           }
         }
@@ -653,7 +697,9 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
               waitingForResponseRef.current = false;
               clearResponseTimeouts();
               responseActiveRef.current = true;
-              traceHotkeyEvent("realtime_server_response_created").catch(() => {});
+              traceHotkeyEvent("realtime_server_response_created", {
+                chunkCount: inputChunkCountRef.current,
+              }).catch(() => {});
               setRealtimeState({
                 status: "speaking",
                 detail: "Speaking... talk to interrupt.",
@@ -663,7 +709,9 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
             case "response.output_audio.delta":
               if (message.delta) {
                 responseDeltaCountRef.current += 1;
-                traceHotkeyEvent("realtime_output_audio_delta").catch(() => {});
+                traceHotkeyEvent("realtime_output_audio_delta", {
+                  responseDeltaCount: responseDeltaCountRef.current,
+                }).catch(() => {});
                 void playOutputAudio(message.delta);
               }
               setRealtimeState({
@@ -676,7 +724,9 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
               waitingForResponseRef.current = false;
               clearResponseTimeouts();
               responseActiveRef.current = false;
-              traceHotkeyEvent("realtime_server_response_done").catch(() => {});
+              traceHotkeyEvent("realtime_server_response_done", {
+                responseDeltaCount: responseDeltaCountRef.current,
+              }).catch(() => {});
               setRealtimeState({ status: "listening", detail: "Listening...", error: null });
               break;
             case "error":
@@ -686,6 +736,7 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
                 detail: "Realtime error.",
                 error: message.error?.message ?? "Unknown Realtime error",
               });
+              cleanup();
               break;
           }
         } catch {
@@ -700,6 +751,7 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
           detail: "Realtime socket failed.",
           error: "WebSocket error",
         });
+        cleanup();
       };
 
       socket.onclose = () => {
@@ -710,6 +762,7 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
             detail: "Realtime socket closed.",
             error: "WebSocket closed",
           });
+          cleanup();
         }
       };
     } catch (error) {

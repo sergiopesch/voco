@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  audioLevelBucket,
   pcm16Base64ToSamples,
   resampleLinear,
   samplesToPcm16Base64,
@@ -8,6 +9,13 @@ import {
 import type { LocalSpeechDetectorState } from "@/hooks/useRealtimeConversation";
 
 describe("realtime audio helpers", () => {
+  it("buckets audio levels for privacy-safe diagnostics", () => {
+    expect(audioLevelBucket(0)).toBe("silent");
+    expect(audioLevelBucket(0.03)).toBe("low");
+    expect(audioLevelBucket(0.12)).toBe("medium");
+    expect(audioLevelBucket(0.8)).toBe("high");
+  });
+
   it("round-trips PCM16 base64 samples within expected quantization", () => {
     const samples = new Float32Array([-1, -0.5, 0, 0.5, 1]);
 

@@ -5,7 +5,7 @@ mod tray;
 
 use config::{load_cached_update_check, save_cached_update_check, AppConfig, CachedUpdateCheck};
 use log::{debug, error, info, warn};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
 use std::sync::{LazyLock, Mutex};
 use std::time::Instant;
@@ -103,6 +103,14 @@ fn selected_backend_label() -> &'static str {
 }
 
 pub fn trace_hotkey_event(event: &str, backend_used: Option<&str>) {
+    trace_hotkey_event_with_fields(event, backend_used, None);
+}
+
+fn trace_hotkey_event_with_fields(
+    event: &str,
+    backend_used: Option<&str>,
+    frontend_fields: Option<&FrontendTraceFields>,
+) {
     let path = hotkey_trace_path();
     let Some(parent) = path.parent() else {
         return;
@@ -119,13 +127,25 @@ pub fn trace_hotkey_event(event: &str, backend_used: Option<&str>) {
         Some(value) => value,
         None => selected_backend_label(),
     };
-    let record = serde_json::json!({
+    let mut record = serde_json::json!({
         "seq": TRACE_SEQUENCE.fetch_add(1, Ordering::SeqCst) + 1,
         "event": event,
         "t_ms": monotonic_trace_ms(),
         "backend_used": backend,
         "session_type": session_type_label(),
     });
+    if let Some(fields) = frontend_fields {
+        if let Some(audio_level_bucket) = fields.audio_level_bucket.as_deref() {
+            record["audio_level_bucket"] =
+                serde_json::Value::String(audio_level_bucket.to_string());
+        }
+        if let Some(chunk_count) = fields.chunk_count {
+            record["chunk_count"] = serde_json::Value::Number(chunk_count.into());
+        }
+        if let Some(response_delta_count) = fields.response_delta_count {
+            record["response_delta_count"] = serde_json::Value::Number(response_delta_count.into());
+        }
+    }
 
     let line = match serde_json::to_string(&record) {
         Ok(line) => line,
@@ -164,7 +184,15 @@ pub fn trace_hotkey_event(event: &str, backend_used: Option<&str>) {
 }
 
 #[tauri::command]
-fn trace_frontend_hotkey_event(app: tauri::AppHandle, event: String) -> Result<(), String> {
+fn trace_frontend_hotkey_event(
+    app: tauri::AppHandle,
+    event: String,
+    fields: Option<FrontendTraceFields>,
+) -> Result<(), String> {
+    if let Some(fields) = fields.as_ref() {
+        fields.validate()?;
+    }
+
     match event.as_str() {
         "frontend_main_module_loaded"
         | "frontend_render_requested"
@@ -176,7 +204,7 @@ fn trace_frontend_hotkey_event(app: tauri::AppHandle, event: String) -> Result<(
         | "frontend_audio_prepare_done"
         | "frontend_init_complete"
         | "frontend_hotkey_listener_registered" => {
-            trace_hotkey_event(&event, None);
+            trace_hotkey_event_with_fields(&event, None, fields.as_ref());
             Ok(())
         }
         "frontend_hotkey_handler_ready" => {
@@ -229,10 +257,30 @@ fn trace_frontend_hotkey_event(app: tauri::AppHandle, event: String) -> Result<(
         | "realtime_no_response_timeout"
         | "realtime_server_error"
         | "realtime_start_failed" => {
-            trace_hotkey_event(&event, None);
+            trace_hotkey_event_with_fields(&event, None, fields.as_ref());
             Ok(())
         }
         _ => Err(format!("Unsupported hotkey trace event: {event}")),
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FrontendTraceFields {
+    audio_level_bucket: Option<String>,
+    chunk_count: Option<u64>,
+    response_delta_count: Option<u64>,
+}
+
+impl FrontendTraceFields {
+    fn validate(&self) -> Result<(), String> {
+        if let Some(bucket) = self.audio_level_bucket.as_deref() {
+            match bucket {
+                "silent" | "low" | "medium" | "high" => {}
+                _ => return Err(format!("Unsupported audio level bucket: {bucket}")),
+            }
+        }
+        Ok(())
     }
 }
 
@@ -2183,6 +2231,26 @@ mod tests {
             config["audio"]["input"]["turn_detection"]["interrupt_response"],
             true
         );
+    }
+
+    #[test]
+    fn frontend_trace_fields_accept_only_non_content_audio_buckets() {
+        assert!(FrontendTraceFields {
+            audio_level_bucket: Some("medium".to_string()),
+            chunk_count: Some(12),
+            response_delta_count: Some(3),
+        }
+        .validate()
+        .is_ok());
+
+        assert!(FrontendTraceFields {
+            audio_level_bucket: Some("raw audio here".to_string()),
+            chunk_count: None,
+            response_delta_count: None,
+        }
+        .validate()
+        .unwrap_err()
+        .contains("Unsupported audio level bucket"));
     }
 
     #[test]

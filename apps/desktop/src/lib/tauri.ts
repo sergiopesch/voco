@@ -56,8 +56,17 @@ export async function setMicrophoneReady(ready: boolean): Promise<void> {
   return invoke("set_microphone_ready", { ready });
 }
 
-export async function traceHotkeyEvent(event: string): Promise<void> {
-  return invoke("trace_frontend_hotkey_event", { event });
+export interface HotkeyTraceFields {
+  audioLevelBucket?: "silent" | "low" | "medium" | "high";
+  chunkCount?: number;
+  responseDeltaCount?: number;
+}
+
+export async function traceHotkeyEvent(
+  event: string,
+  fields: HotkeyTraceFields | null = null,
+): Promise<void> {
+  return invoke("trace_frontend_hotkey_event", { event, fields });
 }
 
 export async function hasPendingHotkeyToggle(): Promise<boolean> {
