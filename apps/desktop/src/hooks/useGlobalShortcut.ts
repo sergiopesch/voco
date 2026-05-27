@@ -5,6 +5,20 @@ import { traceHotkeyEvent } from "@/lib/tauri";
 const TOGGLE_EVENT = "voco:toggle-dictation";
 const TOGGLE_REALTIME_EVENT = "voco:toggle-realtime";
 
+export function shouldMarkHotkeyHandlerReady(
+  dictationListenerRegistered: boolean,
+  realtimeListenerRegistered: boolean,
+  canHandleHotkey: boolean,
+  alreadyLogged: boolean,
+) {
+  return (
+    dictationListenerRegistered &&
+    realtimeListenerRegistered &&
+    canHandleHotkey &&
+    !alreadyLogged
+  );
+}
+
 export function useGlobalShortcut(
   toggle: () => void,
   toggleRealtime: () => void,
@@ -22,7 +36,8 @@ export function useGlobalShortcut(
   const onHotkeyPressedRef = useRef(onHotkeyPressed);
   onHotkeyPressedRef.current = onHotkeyPressed;
   const handlerReadyLoggedRef = useRef(false);
-  const [listenerRegistered, setListenerRegistered] = useState(false);
+  const [dictationListenerRegistered, setDictationListenerRegistered] = useState(false);
+  const [realtimeListenerRegistered, setRealtimeListenerRegistered] = useState(false);
 
   useEffect(() => {
     const cleanupFns: Array<() => void> = [];
@@ -44,7 +59,7 @@ export function useGlobalShortcut(
         }
 
         cleanupFns.push(cleanup);
-        setListenerRegistered(true);
+        setDictationListenerRegistered(true);
         traceHotkeyEvent("frontend_hotkey_listener_registered").catch(() => {});
         const elapsed = Math.round(performance.now() - appStartMs);
         console.info("Hotkey listener attached");
@@ -70,6 +85,8 @@ export function useGlobalShortcut(
         }
 
         cleanupFns.push(cleanup);
+        setRealtimeListenerRegistered(true);
+        traceHotkeyEvent("frontend_realtime_hotkey_listener_registered").catch(() => {});
       })
       .catch((error) => {
         console.warn("Failed to register realtime toggle listener:", error);
@@ -82,11 +99,18 @@ export function useGlobalShortcut(
   }, [appStartMs]);
 
   useEffect(() => {
-    if (!listenerRegistered || !canHandleHotkey || handlerReadyLoggedRef.current) {
+    if (
+      !shouldMarkHotkeyHandlerReady(
+        dictationListenerRegistered,
+        realtimeListenerRegistered,
+        canHandleHotkey,
+        handlerReadyLoggedRef.current,
+      )
+    ) {
       return;
     }
 
     handlerReadyLoggedRef.current = true;
     traceHotkeyEvent("frontend_hotkey_handler_ready").catch(() => {});
-  }, [canHandleHotkey, listenerRegistered]);
+  }, [canHandleHotkey, dictationListenerRegistered, realtimeListenerRegistered]);
 }

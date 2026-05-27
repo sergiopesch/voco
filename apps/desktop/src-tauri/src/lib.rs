@@ -203,7 +203,8 @@ fn trace_frontend_hotkey_event(
         | "frontend_audio_prepare_started"
         | "frontend_audio_prepare_done"
         | "frontend_init_complete"
-        | "frontend_hotkey_listener_registered" => {
+        | "frontend_hotkey_listener_registered"
+        | "frontend_realtime_hotkey_listener_registered" => {
             trace_hotkey_event_with_fields(&event, None, fields.as_ref());
             Ok(())
         }
