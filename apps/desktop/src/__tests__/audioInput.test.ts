@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chooseAudioInputDeviceId } from "@/lib/audioInput";
+import { buildAudioConstraints, chooseAudioInputDeviceId } from "@/lib/audioInput";
 
 const DEVICES = [
   { deviceId: "speaker-monitor", kind: "audiooutput" as const, label: "Speaker" },
@@ -24,5 +24,29 @@ describe("audio input device selection", () => {
 
   it("keeps the system default when no preferred device is configured", () => {
     expect(chooseAudioInputDeviceId(null, DEVICES)).toBeNull();
+  });
+
+  it("keeps raw capture processing disabled unless requested", () => {
+    expect(buildAudioConstraints("mic-1")).toMatchObject({
+      deviceId: { exact: "mic-1" },
+      echoCancellation: false,
+      noiseSuppression: false,
+      autoGainControl: false,
+    });
+  });
+
+  it("allows realtime capture to request echo control", () => {
+    expect(
+      buildAudioConstraints("mic-1", {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      }),
+    ).toMatchObject({
+      deviceId: { exact: "mic-1" },
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+    });
   });
 });

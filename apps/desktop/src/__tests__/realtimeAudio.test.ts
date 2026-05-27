@@ -242,6 +242,19 @@ describe("realtime audio helpers", () => {
     });
   });
 
+  it("ignores late assistant audio deltas after sending response cancel", () => {
+    const decision = decideRealtimeServerEvent(
+      { type: "response.output_audio.delta", delta: "abc" },
+      { ...BASE_RUNTIME_SNAPSHOT, cancelResponseInFlight: true },
+    );
+
+    expect(decision.playOutputAudio).toBeUndefined();
+    expect(decision.responseDeltaCount).toBeUndefined();
+    expect(decision.traceEvents).toContainEqual({
+      event: "realtime_output_audio_delta_ignored_after_cancel",
+    });
+  });
+
   it("marks realtime server errors for cleanup with an actionable state", () => {
     const decision = decideRealtimeServerEvent(
       { type: "error", error: { message: "bad session" } },

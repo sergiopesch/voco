@@ -1,5 +1,11 @@
 const LABEL_PREFIX = "label:";
 
+export interface AudioInputProcessingOptions {
+  echoCancellation?: boolean;
+  noiseSuppression?: boolean;
+  autoGainControl?: boolean;
+}
+
 interface AudioInputDeviceCandidate {
   deviceId: string;
   kind: MediaDeviceKind;
@@ -72,20 +78,26 @@ async function resolvePreferredAudioInputDeviceId(
   return resolvedDeviceId;
 }
 
-export function buildAudioConstraints(deviceId: string | null): MediaTrackConstraints {
+export function buildAudioConstraints(
+  deviceId: string | null,
+  processing: AudioInputProcessingOptions = {},
+): MediaTrackConstraints {
   return {
     deviceId: deviceId ? { exact: deviceId } : undefined,
     channelCount: 1,
-    echoCancellation: false,
-    noiseSuppression: false,
-    autoGainControl: false,
+    echoCancellation: processing.echoCancellation ?? false,
+    noiseSuppression: processing.noiseSuppression ?? false,
+    autoGainControl: processing.autoGainControl ?? false,
   };
 }
 
-export async function openMicrophoneStream(deviceId: string | null): Promise<MediaStream> {
+export async function openMicrophoneStream(
+  deviceId: string | null,
+  processing?: AudioInputProcessingOptions,
+): Promise<MediaStream> {
   const resolvedDeviceId = await resolvePreferredAudioInputDeviceId(deviceId);
   return navigator.mediaDevices.getUserMedia({
-    audio: buildAudioConstraints(resolvedDeviceId),
+    audio: buildAudioConstraints(resolvedDeviceId, processing),
   });
 }
 

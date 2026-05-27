@@ -166,11 +166,13 @@ realtime_server_input_committed
 realtime_response_create_fallback_sent
 realtime_server_response_created
 realtime_output_audio_delta
+realtime_output_audio_delta_ignored_after_cancel
 realtime_server_response_done
 realtime_output_audio_level_detected
 realtime_no_speech_timeout
 realtime_no_response_timeout
 realtime_response_cancel_ignored_error
+realtime_local_speech_commit_skipped_during_output
 ```
 
 Recommended fields:
@@ -209,6 +211,7 @@ Input audio must satisfy:
 - Capture API: WebView `getUserMedia`
 - Processing node: `ScriptProcessorNode` in the current implementation
 - Input channel: mono channel 0
+- Realtime capture should request browser echo cancellation, noise suppression, and automatic gain control to reduce assistant speaker echo being treated as user interruption.
 - Resample target: 24 kHz
 - Transport format: PCM16 little-endian
 - WebSocket event type: `input_audio_buffer.append`
@@ -233,6 +236,7 @@ Failure behavior:
 
 - If audio context is suspended, resume it before playback.
 - If the user starts speaking while assistant playback is active, stop queued playback.
+- Late assistant audio deltas that arrive after a client-side `response.cancel` must not be played.
 - If the server reports an error, show realtime error and stop or allow restart.
 
 ## Animation Requirements

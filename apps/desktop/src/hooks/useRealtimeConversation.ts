@@ -74,6 +74,18 @@ const LOCAL_SPEECH_SILENCE_MS = 850;
 const LOCAL_SPEECH_CANDIDATE_GAP_MS = 900;
 const LOCAL_SPEECH_MIN_VOICE_FRAMES = 2;
 const LOCAL_COMMIT_FALLBACK_MS = 700;
+const ASSISTANT_OUTPUT_LOCAL_SPEECH_DETECTOR_CONFIG: LocalSpeechDetectorConfig = {
+  levelThreshold: 0.12,
+  minDurationMs: 220,
+  silenceMs: LOCAL_SPEECH_SILENCE_MS,
+  candidateGapMs: 500,
+  minVoiceFrames: 3,
+};
+const REALTIME_MICROPHONE_PROCESSING = {
+  echoCancellation: true,
+  noiseSuppression: true,
+  autoGainControl: true,
+};
 
 type LocalSpeechDetectorEvent = "started" | "stopped" | null;
 
@@ -251,11 +263,19 @@ export function decideRealtimeServerEvent(
           },
         ],
         clearResponseTimeouts: true,
+        clearCancelResponseInFlight: true,
         status: { status: "speaking", detail: "Speaking... talk to interrupt.", error: null },
         waitingForResponse: false,
         responseActive: true,
       };
     case "response.output_audio.delta": {
+      if (snapshot.cancelResponseInFlight) {
+        return {
+          traceEvents: message.delta
+            ? [{ event: "realtime_output_audio_delta_ignored_after_cancel" }]
+            : [],
+        };
+      }
       const nextResponseDeltaCount = message.delta
         ? snapshot.responseDeltaCount + 1
         : snapshot.responseDeltaCount;
@@ -400,6 +420,7 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
   const waitingForResponseRef = useRef(false);
   const cancelResponseInFlightRef = useRef(false);
   const serverDetectedCurrentTurnRef = useRef(false);
+  const localSpeechStartedDuringAssistantOutputRef = useRef(false);
   const localSpeechDetectorRef = useRef<LocalSpeechDetectorState>(
     INITIAL_LOCAL_SPEECH_DETECTOR_STATE,
   );
@@ -596,6 +617,7 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
     waitingForResponseRef.current = false;
     clearCancelResponseInFlight();
     serverDetectedCurrentTurnRef.current = false;
+    localSpeechStartedDuringAssistantOutputRef.current = false;
     localSpeechDetectorRef.current = INITIAL_LOCAL_SPEECH_DETECTOR_STATE;
     inputChunkCountRef.current = 0;
     responseDeltaCountRef.current = 0;
@@ -693,7 +715,10 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
   const connectMicrophone = useCallback(
     async (socket: WebSocket, audioContext: AudioContext) => {
       traceHotkeyEvent("realtime_get_user_media_started").catch(() => {});
-      const stream = await openMicrophoneStream(selectedDeviceId);
+      const stream = await openMicrophoneStream(
+        selectedDeviceId,
+        REALTIME_MICROPHONE_PROCESSING,
+      );
       traceHotkeyEvent("realtime_get_user_media_done").catch(() => {});
       streamRef.current = stream;
       traceHotkeyEvent("realtime_microphone_track_started").catch(() => {});
@@ -761,15 +786,21 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
             chunkCount: inputChunkCountRef.current,
           }).catch(() => {});
         }
+        const assistantOutputActive =
+          responseActiveRef.current || outputSourcesRef.current.length > 0;
         const localSpeechUpdate = updateLocalSpeechDetectorState(
           localSpeechDetectorRef.current,
           inputLevel,
           now,
+          assistantOutputActive
+            ? ASSISTANT_OUTPUT_LOCAL_SPEECH_DETECTOR_CONFIG
+            : LOCAL_SPEECH_DETECTOR_CONFIG,
         );
         localSpeechDetectorRef.current = localSpeechUpdate.state;
         if (localSpeechUpdate.event === "started") {
           clearNoSpeechTimeout();
           clearLocalCommitFallbackTimeout();
+          localSpeechStartedDuringAssistantOutputRef.current = assistantOutputActive;
           if (!serverDetectedCurrentTurnRef.current) {
             traceHotkeyEvent("realtime_local_speech_started", {
               audioLevelBucket: audioLevelBucket(inputLevel),
@@ -785,12 +816,21 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
           }
           setRealtimeState({ status: "listening", detail: "Listening...", error: null });
         } else if (localSpeechUpdate.event === "stopped") {
+          const startedDuringAssistantOutput =
+            localSpeechStartedDuringAssistantOutputRef.current;
+          localSpeechStartedDuringAssistantOutputRef.current = false;
           if (!serverDetectedCurrentTurnRef.current) {
             traceHotkeyEvent("realtime_local_speech_stopped", {
               audioLevelBucket: audioLevelBucket(inputLevel),
               chunkCount: inputChunkCountRef.current,
             }).catch(() => {});
-            scheduleLocalCommitFallback(socket);
+            if (startedDuringAssistantOutput) {
+              traceHotkeyEvent("realtime_local_speech_commit_skipped_during_output", {
+                chunkCount: inputChunkCountRef.current,
+              }).catch(() => {});
+            } else {
+              scheduleLocalCommitFallback(socket);
+            }
           }
         }
         const audio = samplesToPcm16Base64(
@@ -902,9 +942,13 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
           }
           if (decision.serverDetectedCurrentTurn !== undefined) {
             serverDetectedCurrentTurnRef.current = decision.serverDetectedCurrentTurn;
+            if (decision.serverDetectedCurrentTurn) {
+              localSpeechStartedDuringAssistantOutputRef.current = false;
+            }
           }
           if (decision.resetLocalSpeechDetector) {
             localSpeechDetectorRef.current = INITIAL_LOCAL_SPEECH_DETECTOR_STATE;
+            localSpeechStartedDuringAssistantOutputRef.current = false;
           }
           if (decision.waitingForResponse !== undefined) {
             waitingForResponseRef.current = decision.waitingForResponse;
