@@ -15,6 +15,7 @@ import type {
 const BASE_RUNTIME_SNAPSHOT: RealtimeRuntimeSnapshot = {
   responseActive: false,
   waitingForResponse: false,
+  cancelResponseInFlight: false,
   inputChunkCount: 0,
   responseDeltaCount: 0,
 };
@@ -254,5 +255,22 @@ describe("realtime audio helpers", () => {
       error: "bad session",
     });
     expect(decision.traceEvents).toContainEqual({ event: "realtime_server_error" });
+  });
+
+  it("keeps realtime alive for benign response cancel race errors", () => {
+    const decision = decideRealtimeServerEvent(
+      {
+        type: "error",
+        error: { message: "Cannot cancel response because there is no active response" },
+      },
+      { ...BASE_RUNTIME_SNAPSHOT, cancelResponseInFlight: true },
+    );
+
+    expect(decision.cleanup).toBeUndefined();
+    expect(decision.status).toBeUndefined();
+    expect(decision.clearCancelResponseInFlight).toBe(true);
+    expect(decision.traceEvents).toContainEqual({
+      event: "realtime_response_cancel_ignored_error",
+    });
   });
 });

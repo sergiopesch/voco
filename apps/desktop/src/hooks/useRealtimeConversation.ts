@@ -18,12 +18,13 @@ interface RealtimeState {
 export type RealtimeServerEvent = {
   type?: string;
   delta?: string;
-  error?: { message?: string };
+  error?: { code?: string; message?: string; type?: string };
 };
 
 export interface RealtimeRuntimeSnapshot {
   responseActive: boolean;
   waitingForResponse: boolean;
+  cancelResponseInFlight: boolean;
   inputChunkCount: number;
   responseDeltaCount: number;
 }
@@ -44,6 +45,7 @@ export interface RealtimeServerDecision {
   playOutputAudio?: string;
   cleanup?: boolean;
   resetLocalSpeechDetector?: boolean;
+  clearCancelResponseInFlight?: boolean;
   status?: RealtimeState;
   responseActive?: boolean;
   waitingForResponse?: boolean;
@@ -192,6 +194,16 @@ export function updateLocalSpeechDetectorState(
   return { state, event: null };
 }
 
+function isBenignCancelRaceError(error: RealtimeServerEvent["error"]): boolean {
+  const detail = `${error?.code ?? ""} ${error?.type ?? ""} ${error?.message ?? ""}`
+    .toLocaleLowerCase();
+  return (
+    detail.includes("cancel") ||
+    detail.includes("active response") ||
+    detail.includes("no response")
+  );
+}
+
 export function decideRealtimeServerEvent(
   message: RealtimeServerEvent,
   snapshot: RealtimeRuntimeSnapshot,
@@ -275,6 +287,15 @@ export function decideRealtimeServerEvent(
         responseActive: false,
       };
     case "error":
+      if (
+        snapshot.cancelResponseInFlight &&
+        isBenignCancelRaceError(message.error)
+      ) {
+        return {
+          traceEvents: [{ event: "realtime_response_cancel_ignored_error" }],
+          clearCancelResponseInFlight: true,
+        };
+      }
       return {
         traceEvents: [{ event: "realtime_server_error" }],
         status: {
@@ -371,11 +392,13 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
   const localCommitFallbackTimeoutRef = useRef<number | null>(null);
   const responseCreateFallbackTimeoutRef = useRef<number | null>(null);
   const noResponseTimeoutRef = useRef<number | null>(null);
+  const cancelResponseInFlightTimeoutRef = useRef<number | null>(null);
   const inputChunkCountRef = useRef(0);
   const responseDeltaCountRef = useRef(0);
   const lastInputLevelTraceMsRef = useRef(0);
   const lastOutputLevelTraceMsRef = useRef(0);
   const waitingForResponseRef = useRef(false);
+  const cancelResponseInFlightRef = useRef(false);
   const serverDetectedCurrentTurnRef = useRef(false);
   const localSpeechDetectorRef = useRef<LocalSpeechDetectorState>(
     INITIAL_LOCAL_SPEECH_DETECTOR_STATE,
@@ -429,6 +452,23 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
       noResponseTimeoutRef.current = null;
     }
   }, []);
+
+  const clearCancelResponseInFlight = useCallback(() => {
+    cancelResponseInFlightRef.current = false;
+    if (cancelResponseInFlightTimeoutRef.current !== null) {
+      window.clearTimeout(cancelResponseInFlightTimeoutRef.current);
+      cancelResponseInFlightTimeoutRef.current = null;
+    }
+  }, []);
+
+  const markCancelResponseInFlight = useCallback(() => {
+    clearCancelResponseInFlight();
+    cancelResponseInFlightRef.current = true;
+    cancelResponseInFlightTimeoutRef.current = window.setTimeout(() => {
+      cancelResponseInFlightRef.current = false;
+      cancelResponseInFlightTimeoutRef.current = null;
+    }, 3_000);
+  }, [clearCancelResponseInFlight]);
 
   const clearLocalCommitFallbackTimeout = useCallback(() => {
     if (localCommitFallbackTimeoutRef.current !== null) {
@@ -554,6 +594,7 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
   const cleanup = useCallback(() => {
     responseActiveRef.current = false;
     waitingForResponseRef.current = false;
+    clearCancelResponseInFlight();
     serverDetectedCurrentTurnRef.current = false;
     localSpeechDetectorRef.current = INITIAL_LOCAL_SPEECH_DETECTOR_STATE;
     inputChunkCountRef.current = 0;
@@ -604,6 +645,7 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
     clearResponseTimeouts,
     resetRealtimeLevel,
     stopOutputPlayback,
+    clearCancelResponseInFlight,
   ]);
 
   const playOutputAudio = useCallback(
@@ -737,6 +779,7 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
           stopOutputPlayback();
           if (responseActiveRef.current) {
             if (sendRealtimeEvent(socket, { type: "response.cancel" })) {
+              markCancelResponseInFlight();
               traceHotkeyEvent("realtime_response_cancel_sent").catch(() => {});
             }
           }
@@ -778,6 +821,7 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
       selectedDeviceId,
       setRealtimeState,
       stopOutputPlayback,
+      markCancelResponseInFlight,
     ],
   );
 
@@ -839,6 +883,7 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
           const decision = decideRealtimeServerEvent(message, {
             responseActive: responseActiveRef.current,
             waitingForResponse: waitingForResponseRef.current,
+            cancelResponseInFlight: cancelResponseInFlightRef.current,
             inputChunkCount: inputChunkCountRef.current,
             responseDeltaCount: responseDeltaCountRef.current,
           });
@@ -851,6 +896,9 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
           }
           if (decision.clearResponseTimeouts) {
             clearResponseTimeouts();
+          }
+          if (decision.clearCancelResponseInFlight) {
+            clearCancelResponseInFlight();
           }
           if (decision.serverDetectedCurrentTurn !== undefined) {
             serverDetectedCurrentTurnRef.current = decision.serverDetectedCurrentTurn;
@@ -875,6 +923,7 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
           }
           if (decision.cancelResponse) {
             if (sendRealtimeEvent(socket, { type: "response.cancel" })) {
+              markCancelResponseInFlight();
               traceHotkeyEvent("realtime_response_cancel_sent").catch(() => {});
             }
           }
@@ -929,9 +978,11 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
     clearNoSpeechTimeout,
     clearLocalCommitFallbackTimeout,
     clearResponseTimeouts,
+    clearCancelResponseInFlight,
     playOutputAudio,
     scheduleResponseFallback,
     setRealtimeState,
+    markCancelResponseInFlight,
     stopOutputPlayback,
   ]);
 

@@ -274,6 +274,7 @@ fn trace_frontend_hotkey_event(
         | "realtime_output_audio_level_detected"
         | "realtime_server_response_done"
         | "realtime_response_cancel_sent"
+        | "realtime_response_cancel_ignored_error"
         | "realtime_response_create_fallback_sent"
         | "realtime_no_speech_timeout"
         | "realtime_no_response_timeout"

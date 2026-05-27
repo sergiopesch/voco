@@ -170,6 +170,7 @@ realtime_server_response_done
 realtime_output_audio_level_detected
 realtime_no_speech_timeout
 realtime_no_response_timeout
+realtime_response_cancel_ignored_error
 ```
 
 Recommended fields:
@@ -355,6 +356,7 @@ Acceptance criteria:
 
 - If server reports user speech started while assistant response is active, stop local playback.
 - If a response is active, send `response.cancel`.
+- A cancellation race where the server has already ended the response must not tear down realtime.
 - The UI returns to listening or hearing-user state.
 - The next assistant response addresses the latest user speech.
 
@@ -423,13 +425,30 @@ realtime_audio_graph_connected
 realtime_stop_requested
 ```
 
-The default runtime smoke accepts either assistant output or `realtime_no_speech_timeout` after
-startup. This keeps the test useful on machines where WebView microphone selection ignores the
-temporary virtual source. On a machine where the injected speech reaches the selected microphone,
-run the stricter response gate:
+The runtime smoke launches VOCO with an isolated temporary config and selects a temporary
+Pulse/PipeWire remapped monitor source by label. The default mode accepts either assistant
+output or `realtime_no_speech_timeout` after startup so it can still diagnose machines where
+virtual capture devices are unavailable. When assistant output is required, the smoke also
+captures VOCO's default output sink and requires non-silent rendered audio. The release gate
+is the stricter response mode:
 
 ```bash
 ./scripts/realtime-runtime-smoke.sh --require-response
+```
+
+For desktop interruption proof, run:
+
+```bash
+./scripts/realtime-runtime-smoke.sh --interrupt
+```
+
+Interrupt mode injects a longer first utterance, waits for assistant output audio, injects a
+second utterance while the assistant is responding, and requires:
+
+```text
+realtime_response_cancel_sent
+at least two realtime_server_response_created events
+at least two realtime_server_response_done events
 ```
 
 ### Realtime Protocol Smoke Test
@@ -499,11 +518,11 @@ Before considering realtime conversation complete:
 - [ ] Installed binary was rebuilt from the final commit.
 - [ ] `Alt+R` first press starts realtime from a fresh app launch.
 - [ ] Realtime startup trace reaches `realtime_audio_graph_connected`.
-- [ ] Speaking into the mic produces visible mic animation.
+- [ ] Speaking into the mic produces visible mic animation; automated runtime trace includes the input-level event that drives it.
 - [ ] Speaking into the mic produces server speech-start/speech-stop evidence.
 - [ ] Assistant response produces `response.output_audio.delta`.
 - [ ] Assistant response is audible.
-- [ ] Assistant playback drives the same mic animation.
+- [ ] Assistant playback drives the same mic animation; automated runtime trace includes the output-level event that drives it.
 - [ ] User interruption cancels active assistant playback.
 - [ ] Second `Alt+R` stops realtime cleanly.
 - [ ] Missing API key path shows actionable error.
@@ -526,7 +545,7 @@ Implemented hardening now covers the main stuck-listening branches:
 - after server commit, the frontend sends a delayed `response.create` fallback if no response starts.
 - after local sustained speech stops with no server commit, the frontend sends `input_audio_buffer.commit` and then the same delayed `response.create` fallback.
 
-Remaining proof still requires a live microphone test where the trace includes:
+Automated runtime proof should include:
 
 ```text
 realtime_server_speech_started OR realtime_local_speech_started
@@ -535,4 +554,5 @@ realtime_server_input_committed OR realtime_input_audio_commit_fallback_sent
 realtime_server_response_created
 realtime_output_audio_delta
 realtime_server_response_done
+realtime_response_cancel_sent in interrupt mode
 ```
