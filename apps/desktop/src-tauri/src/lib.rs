@@ -209,7 +209,24 @@ fn trace_frontend_hotkey_event(app: tauri::AppHandle, event: String) -> Result<(
         | "realtime_get_user_media_started"
         | "realtime_get_user_media_done"
         | "realtime_audio_graph_connected"
+        | "realtime_session_created"
+        | "realtime_session_updated"
+        | "realtime_input_audio_chunk_sent"
+        | "realtime_input_audio_level_detected"
+        | "realtime_local_speech_started"
+        | "realtime_local_speech_stopped"
+        | "realtime_server_speech_started"
+        | "realtime_server_speech_stopped"
+        | "realtime_input_audio_commit_fallback_sent"
+        | "realtime_server_input_committed"
+        | "realtime_server_response_created"
         | "realtime_output_audio_delta"
+        | "realtime_output_audio_level_detected"
+        | "realtime_server_response_done"
+        | "realtime_response_cancel_sent"
+        | "realtime_response_create_fallback_sent"
+        | "realtime_no_speech_timeout"
+        | "realtime_no_response_timeout"
         | "realtime_server_error"
         | "realtime_start_failed" => {
             trace_hotkey_event(&event, None);
@@ -707,6 +724,14 @@ fn load_realtime_api_key() -> Result<String, String> {
     let contents = std::fs::read_to_string(&path)
         .map_err(|error| format!("Failed to read {}: {error}", path.display()))?;
 
+    if let Some(value) = parse_realtime_api_key_from_env_file(&contents) {
+        return Ok(value);
+    }
+
+    Err(format!("OPENAI_API_KEY is missing from {}", path.display()))
+}
+
+fn parse_realtime_api_key_from_env_file(contents: &str) -> Option<String> {
     for line in contents.lines() {
         let line = line.trim();
         if line.is_empty() || line.starts_with('#') {
@@ -722,29 +747,40 @@ fn load_realtime_api_key() -> Result<String, String> {
                 .trim_matches('\'')
                 .to_string();
             if !value.is_empty() {
-                return Ok(value);
+                return Some(value);
             }
         }
     }
 
-    Err(format!("OPENAI_API_KEY is missing from {}", path.display()))
+    None
 }
 
 fn realtime_session_config() -> serde_json::Value {
     serde_json::json!({
         "type": "realtime",
         "model": "gpt-realtime-2",
+        "output_modalities": ["audio"],
         "instructions": "You are Sergio's concise realtime OpenClaw voice companion. Answer in 1-2 short sentences. No preamble, no markdown, no waffle. If the user interrupts, stop and respond to the latest thing they said.",
         "reasoning": {
             "effort": "low"
         },
         "audio": {
             "input": {
+                "format": {
+                    "type": "audio/pcm",
+                    "rate": 24000
+                },
                 "turn_detection": {
-                    "type": "server_vad"
+                    "type": "server_vad",
+                    "create_response": true,
+                    "interrupt_response": true
                 }
             },
             "output": {
+                "format": {
+                    "type": "audio/pcm",
+                    "rate": 24000
+                },
                 "voice": "marin"
             }
         }
@@ -762,6 +798,22 @@ fn realtime_error_detail(response_body: &str) -> String {
                 .map(|message| message.to_string())
         })
         .unwrap_or_else(|| clip_command_output(response_body, 800))
+}
+
+fn parse_realtime_client_secret_response(
+    response_body: &str,
+) -> Result<RealtimeClientSecretResult, String> {
+    let parsed: serde_json::Value = serde_json::from_str(response_body)
+        .map_err(|error| format!("Failed to parse Realtime session response: {error}"))?;
+    let value = parsed
+        .get("value")
+        .and_then(|value| value.as_str())
+        .filter(|value| !value.trim().is_empty())
+        .ok_or_else(|| "Realtime session response did not include a client secret".to_string())?
+        .to_string();
+    let expires_at = parsed.get("expires_at").and_then(|value| value.as_i64());
+
+    Ok(RealtimeClientSecretResult { value, expires_at })
 }
 
 #[tauri::command]
@@ -792,17 +844,7 @@ fn create_realtime_client_secret() -> Result<RealtimeClientSecretResult, String>
         ));
     }
 
-    let parsed: serde_json::Value = serde_json::from_str(&response_body)
-        .map_err(|error| format!("Failed to parse Realtime session response: {error}"))?;
-    let value = parsed
-        .get("value")
-        .and_then(|value| value.as_str())
-        .filter(|value| !value.trim().is_empty())
-        .ok_or_else(|| "Realtime session response did not include a client secret".to_string())?
-        .to_string();
-    let expires_at = parsed.get("expires_at").and_then(|value| value.as_i64());
-
-    Ok(RealtimeClientSecretResult { value, expires_at })
+    parse_realtime_client_secret_response(&response_body)
 }
 
 #[tauri::command]
@@ -2087,6 +2129,60 @@ mod tests {
         assert!(parse_openclaw_tts_output(r#"{"provider":"microsoft"}"#)
             .unwrap_err()
             .contains("audio path"));
+    }
+
+    #[test]
+    fn realtime_api_key_parses_env_file_exports_and_quotes() {
+        assert_eq!(
+            parse_realtime_api_key_from_env_file(
+                "\n# comment\nexport OPENAI_API_KEY='sk-test-value'\n"
+            )
+            .as_deref(),
+            Some("sk-test-value")
+        );
+        assert_eq!(
+            parse_realtime_api_key_from_env_file("OPENAI_API_KEY=\"sk-other\"").as_deref(),
+            Some("sk-other")
+        );
+        assert!(parse_realtime_api_key_from_env_file("OTHER=value").is_none());
+    }
+
+    #[test]
+    fn realtime_client_secret_response_requires_value() {
+        let parsed =
+            parse_realtime_client_secret_response(r#"{"value":"ek_test","expires_at":1756310470}"#)
+                .unwrap();
+        assert_eq!(parsed.value, "ek_test");
+        assert_eq!(parsed.expires_at, Some(1756310470));
+
+        assert!(
+            parse_realtime_client_secret_response(r#"{"expires_at":1756310470}"#)
+                .unwrap_err()
+                .contains("client secret")
+        );
+    }
+
+    #[test]
+    fn realtime_session_config_requests_audio_and_vad_responses() {
+        let config = realtime_session_config();
+
+        assert_eq!(config["output_modalities"][0], "audio");
+        assert_eq!(config["audio"]["input"]["format"]["type"], "audio/pcm");
+        assert_eq!(config["audio"]["input"]["format"]["rate"], 24000);
+        assert_eq!(config["audio"]["output"]["format"]["type"], "audio/pcm");
+        assert_eq!(config["audio"]["output"]["format"]["rate"], 24000);
+        assert_eq!(
+            config["audio"]["input"]["turn_detection"]["type"],
+            "server_vad"
+        );
+        assert_eq!(
+            config["audio"]["input"]["turn_detection"]["create_response"],
+            true
+        );
+        assert_eq!(
+            config["audio"]["input"]["turn_detection"]["interrupt_response"],
+            true
+        );
     }
 
     #[test]

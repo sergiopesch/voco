@@ -27,8 +27,103 @@ const INITIAL_STATE: RealtimeState = {
 };
 
 const REALTIME_SAMPLE_RATE = 24_000;
+const INPUT_LEVEL_TRACE_THRESHOLD = 0.08;
+const INPUT_LEVEL_TRACE_INTERVAL_MS = 1_500;
+const OUTPUT_LEVEL_TRACE_THRESHOLD = 0.04;
+const OUTPUT_LEVEL_TRACE_INTERVAL_MS = 1_500;
+const INPUT_CHUNK_TRACE_INTERVAL = 100;
+const NO_SPEECH_TIMEOUT_MS = 8_000;
+const RESPONSE_CREATE_FALLBACK_MS = 1_200;
+const NO_RESPONSE_TIMEOUT_MS = 8_000;
+const LOCAL_SPEECH_LEVEL_THRESHOLD = 0.08;
+const LOCAL_SPEECH_MIN_DURATION_MS = 240;
+const LOCAL_SPEECH_SILENCE_MS = 850;
+const LOCAL_COMMIT_FALLBACK_MS = 700;
 
-function samplesToPcm16Base64(samples: Float32Array): string {
+type LocalSpeechDetectorEvent = "started" | "stopped" | null;
+
+export interface LocalSpeechDetectorState {
+  active: boolean;
+  candidateStartedAt: number | null;
+  lastVoiceAt: number | null;
+}
+
+export interface LocalSpeechDetectorConfig {
+  levelThreshold: number;
+  minDurationMs: number;
+  silenceMs: number;
+}
+
+const INITIAL_LOCAL_SPEECH_DETECTOR_STATE: LocalSpeechDetectorState = {
+  active: false,
+  candidateStartedAt: null,
+  lastVoiceAt: null,
+};
+
+const LOCAL_SPEECH_DETECTOR_CONFIG: LocalSpeechDetectorConfig = {
+  levelThreshold: LOCAL_SPEECH_LEVEL_THRESHOLD,
+  minDurationMs: LOCAL_SPEECH_MIN_DURATION_MS,
+  silenceMs: LOCAL_SPEECH_SILENCE_MS,
+};
+
+export function updateLocalSpeechDetectorState(
+  state: LocalSpeechDetectorState,
+  level: number,
+  nowMs: number,
+  config: LocalSpeechDetectorConfig = LOCAL_SPEECH_DETECTOR_CONFIG,
+): { state: LocalSpeechDetectorState; event: LocalSpeechDetectorEvent } {
+  if (level >= config.levelThreshold) {
+    if (state.active) {
+      return {
+        state: { ...state, lastVoiceAt: nowMs },
+        event: null,
+      };
+    }
+
+    const candidateStartedAt = state.candidateStartedAt ?? nowMs;
+    if (nowMs - candidateStartedAt >= config.minDurationMs) {
+      return {
+        state: {
+          active: true,
+          candidateStartedAt: null,
+          lastVoiceAt: nowMs,
+        },
+        event: "started",
+      };
+    }
+
+    return {
+      state: {
+        active: false,
+        candidateStartedAt,
+        lastVoiceAt: nowMs,
+      },
+      event: null,
+    };
+  }
+
+  if (
+    state.active &&
+    state.lastVoiceAt !== null &&
+    nowMs - state.lastVoiceAt >= config.silenceMs
+  ) {
+    return {
+      state: INITIAL_LOCAL_SPEECH_DETECTOR_STATE,
+      event: "stopped",
+    };
+  }
+
+  if (!state.active) {
+    return {
+      state: INITIAL_LOCAL_SPEECH_DETECTOR_STATE,
+      event: null,
+    };
+  }
+
+  return { state, event: null };
+}
+
+export function samplesToPcm16Base64(samples: Float32Array): string {
   const bytes = new Uint8Array(samples.length * 2);
   const view = new DataView(bytes.buffer);
 
@@ -45,7 +140,7 @@ function samplesToPcm16Base64(samples: Float32Array): string {
   return btoa(binary);
 }
 
-function pcm16Base64ToSamples(audio: string): Float32Array {
+export function pcm16Base64ToSamples(audio: string): Float32Array {
   const binary = atob(audio);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i += 1) {
@@ -60,7 +155,7 @@ function pcm16Base64ToSamples(audio: string): Float32Array {
   return samples;
 }
 
-function resampleLinear(
+export function resampleLinear(
   samples: Float32Array,
   fromRate: number,
   toRate: number,
@@ -84,11 +179,12 @@ function resampleLinear(
   return output;
 }
 
-function sendRealtimeEvent(socket: WebSocket | null, event: unknown): void {
+function sendRealtimeEvent(socket: WebSocket | null, event: unknown): boolean {
   if (!socket || socket.readyState !== WebSocket.OPEN) {
-    return;
+    return false;
   }
   socket.send(JSON.stringify(event));
+  return true;
 }
 
 export function useRealtimeConversation(selectedDeviceId: string | null) {
@@ -105,6 +201,19 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
   const responseActiveRef = useRef(false);
   const realtimeLevelRef = useRef(0);
   const levelDecayTimeoutRef = useRef<number | null>(null);
+  const noSpeechTimeoutRef = useRef<number | null>(null);
+  const localCommitFallbackTimeoutRef = useRef<number | null>(null);
+  const responseCreateFallbackTimeoutRef = useRef<number | null>(null);
+  const noResponseTimeoutRef = useRef<number | null>(null);
+  const inputChunkCountRef = useRef(0);
+  const responseDeltaCountRef = useRef(0);
+  const lastInputLevelTraceMsRef = useRef(0);
+  const lastOutputLevelTraceMsRef = useRef(0);
+  const waitingForResponseRef = useRef(false);
+  const serverDetectedCurrentTurnRef = useRef(false);
+  const localSpeechDetectorRef = useRef<LocalSpeechDetectorState>(
+    INITIAL_LOCAL_SPEECH_DETECTOR_STATE,
+  );
   const [realtimeLevel, setRealtimeLevel] = useState(0);
 
   const setRealtimeState = useCallback((nextState: RealtimeState) => {
@@ -137,6 +246,113 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
     setRealtimeLevel(0);
   }, [clearLevelDecay]);
 
+  const clearNoSpeechTimeout = useCallback(() => {
+    if (noSpeechTimeoutRef.current !== null) {
+      window.clearTimeout(noSpeechTimeoutRef.current);
+      noSpeechTimeoutRef.current = null;
+    }
+  }, []);
+
+  const clearResponseTimeouts = useCallback(() => {
+    if (responseCreateFallbackTimeoutRef.current !== null) {
+      window.clearTimeout(responseCreateFallbackTimeoutRef.current);
+      responseCreateFallbackTimeoutRef.current = null;
+    }
+    if (noResponseTimeoutRef.current !== null) {
+      window.clearTimeout(noResponseTimeoutRef.current);
+      noResponseTimeoutRef.current = null;
+    }
+  }, []);
+
+  const clearLocalCommitFallbackTimeout = useCallback(() => {
+    if (localCommitFallbackTimeoutRef.current !== null) {
+      window.clearTimeout(localCommitFallbackTimeoutRef.current);
+      localCommitFallbackTimeoutRef.current = null;
+    }
+  }, []);
+
+  const scheduleNoSpeechTimeout = useCallback(() => {
+    clearNoSpeechTimeout();
+    noSpeechTimeoutRef.current = window.setTimeout(() => {
+      traceHotkeyEvent("realtime_no_speech_timeout").catch(() => {});
+      if (statusRef.current === "listening") {
+        setRealtimeState({
+          status: "listening",
+          detail: "Listening... no mic speech detected yet.",
+          error: null,
+        });
+      }
+      noSpeechTimeoutRef.current = null;
+    }, NO_SPEECH_TIMEOUT_MS);
+  }, [clearNoSpeechTimeout, setRealtimeState]);
+
+  const sendResponseCreate = useCallback((socket: WebSocket | null): boolean => {
+    return sendRealtimeEvent(socket, {
+      type: "response.create",
+      response: {
+        output_modalities: ["audio"],
+      },
+    });
+  }, []);
+
+  const sendInputCommit = useCallback((socket: WebSocket | null): boolean => {
+    return sendRealtimeEvent(socket, { type: "input_audio_buffer.commit" });
+  }, []);
+
+  const scheduleResponseFallback = useCallback(
+    (socket: WebSocket) => {
+      clearResponseTimeouts();
+      waitingForResponseRef.current = true;
+
+      responseCreateFallbackTimeoutRef.current = window.setTimeout(() => {
+        responseCreateFallbackTimeoutRef.current = null;
+        if (!waitingForResponseRef.current || responseActiveRef.current) {
+          return;
+        }
+        if (sendResponseCreate(socket)) {
+          traceHotkeyEvent("realtime_response_create_fallback_sent").catch(() => {});
+        }
+      }, RESPONSE_CREATE_FALLBACK_MS);
+
+      noResponseTimeoutRef.current = window.setTimeout(() => {
+        noResponseTimeoutRef.current = null;
+        if (!waitingForResponseRef.current || responseActiveRef.current) {
+          return;
+        }
+        traceHotkeyEvent("realtime_no_response_timeout").catch(() => {});
+        if (statusRef.current === "listening") {
+          setRealtimeState({
+            status: "listening",
+            detail: "Listening... speech was detected, waiting for a response.",
+            error: null,
+          });
+        }
+      }, NO_RESPONSE_TIMEOUT_MS);
+    },
+    [clearResponseTimeouts, sendResponseCreate, setRealtimeState],
+  );
+
+  const scheduleLocalCommitFallback = useCallback(
+    (socket: WebSocket) => {
+      clearLocalCommitFallbackTimeout();
+      localCommitFallbackTimeoutRef.current = window.setTimeout(() => {
+        localCommitFallbackTimeoutRef.current = null;
+        if (
+          serverDetectedCurrentTurnRef.current ||
+          waitingForResponseRef.current ||
+          responseActiveRef.current
+        ) {
+          return;
+        }
+        if (sendInputCommit(socket)) {
+          traceHotkeyEvent("realtime_input_audio_commit_fallback_sent").catch(() => {});
+          scheduleResponseFallback(socket);
+        }
+      }, LOCAL_COMMIT_FALLBACK_MS);
+    },
+    [clearLocalCommitFallbackTimeout, scheduleResponseFallback, sendInputCommit],
+  );
+
   const pushRealtimeLevel = useCallback(
     (rawLevel: number) => {
       const normalized = Math.max(0, Math.min(1, rawLevel));
@@ -161,6 +377,16 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
 
   const cleanup = useCallback(() => {
     responseActiveRef.current = false;
+    waitingForResponseRef.current = false;
+    serverDetectedCurrentTurnRef.current = false;
+    localSpeechDetectorRef.current = INITIAL_LOCAL_SPEECH_DETECTOR_STATE;
+    inputChunkCountRef.current = 0;
+    responseDeltaCountRef.current = 0;
+    lastInputLevelTraceMsRef.current = 0;
+    lastOutputLevelTraceMsRef.current = 0;
+    clearNoSpeechTimeout();
+    clearLocalCommitFallbackTimeout();
+    clearResponseTimeouts();
     stopOutputPlayback();
     resetRealtimeLevel();
 
@@ -193,7 +419,13 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
 
     audioContextRef.current?.close().catch(() => {});
     audioContextRef.current = null;
-  }, [resetRealtimeLevel, stopOutputPlayback]);
+  }, [
+    clearNoSpeechTimeout,
+    clearLocalCommitFallbackTimeout,
+    clearResponseTimeouts,
+    resetRealtimeLevel,
+    stopOutputPlayback,
+  ]);
 
   const playOutputAudio = useCallback(
     async (audio: string) => {
@@ -206,7 +438,16 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
       }
 
       const samples = pcm16Base64ToSamples(audio);
-      pushRealtimeLevel(calculateVisualAudioLevelFromSamples(samples));
+      const outputLevel = calculateVisualAudioLevelFromSamples(samples);
+      pushRealtimeLevel(outputLevel);
+      const now = performance.now();
+      if (
+        outputLevel >= OUTPUT_LEVEL_TRACE_THRESHOLD &&
+        now - lastOutputLevelTraceMsRef.current >= OUTPUT_LEVEL_TRACE_INTERVAL_MS
+      ) {
+        lastOutputLevelTraceMsRef.current = now;
+        traceHotkeyEvent("realtime_output_audio_level_detected").catch(() => {});
+      }
       const buffer = audioContext.createBuffer(1, samples.length, REALTIME_SAMPLE_RATE);
       buffer.copyToChannel(samples as Float32Array<ArrayBuffer>, 0);
 
@@ -242,7 +483,49 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
           return;
         }
         const input = event.inputBuffer.getChannelData(0);
-        pushRealtimeLevel(calculateVisualAudioLevelFromSamples(input));
+        const inputLevel = calculateVisualAudioLevelFromSamples(input);
+        pushRealtimeLevel(inputLevel);
+        inputChunkCountRef.current += 1;
+        if (
+          inputChunkCountRef.current === 1 ||
+          inputChunkCountRef.current % INPUT_CHUNK_TRACE_INTERVAL === 0
+        ) {
+          traceHotkeyEvent("realtime_input_audio_chunk_sent").catch(() => {});
+        }
+        const now = performance.now();
+        if (
+          inputLevel >= INPUT_LEVEL_TRACE_THRESHOLD &&
+          now - lastInputLevelTraceMsRef.current >= INPUT_LEVEL_TRACE_INTERVAL_MS
+        ) {
+          clearNoSpeechTimeout();
+          lastInputLevelTraceMsRef.current = now;
+          traceHotkeyEvent("realtime_input_audio_level_detected").catch(() => {});
+        }
+        const localSpeechUpdate = updateLocalSpeechDetectorState(
+          localSpeechDetectorRef.current,
+          inputLevel,
+          now,
+        );
+        localSpeechDetectorRef.current = localSpeechUpdate.state;
+        if (localSpeechUpdate.event === "started") {
+          clearNoSpeechTimeout();
+          clearLocalCommitFallbackTimeout();
+          if (!serverDetectedCurrentTurnRef.current) {
+            traceHotkeyEvent("realtime_local_speech_started").catch(() => {});
+          }
+          stopOutputPlayback();
+          if (responseActiveRef.current) {
+            if (sendRealtimeEvent(socket, { type: "response.cancel" })) {
+              traceHotkeyEvent("realtime_response_cancel_sent").catch(() => {});
+            }
+          }
+          setRealtimeState({ status: "listening", detail: "Listening...", error: null });
+        } else if (localSpeechUpdate.event === "stopped") {
+          if (!serverDetectedCurrentTurnRef.current) {
+            traceHotkeyEvent("realtime_local_speech_stopped").catch(() => {});
+            scheduleLocalCommitFallback(socket);
+          }
+        }
         const audio = samplesToPcm16Base64(
           resampleLinear(input, audioContext.sampleRate, REALTIME_SAMPLE_RATE),
         );
@@ -260,8 +543,18 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
       processorRef.current = processor;
       silentSinkRef.current = silentSink;
       traceHotkeyEvent("realtime_audio_graph_connected").catch(() => {});
+      scheduleNoSpeechTimeout();
     },
-    [pushRealtimeLevel, selectedDeviceId],
+    [
+      clearNoSpeechTimeout,
+      clearLocalCommitFallbackTimeout,
+      pushRealtimeLevel,
+      scheduleLocalCommitFallback,
+      scheduleNoSpeechTimeout,
+      selectedDeviceId,
+      setRealtimeState,
+      stopOutputPlayback,
+    ],
   );
 
   const stop = useCallback(() => {
@@ -320,15 +613,47 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
         try {
           const message = JSON.parse(String(event.data)) as RealtimeServerEvent;
           switch (message.type) {
+            case "session.created":
+              traceHotkeyEvent("realtime_session_created").catch(() => {});
+              break;
+            case "session.updated":
+              traceHotkeyEvent("realtime_session_updated").catch(() => {});
+              break;
             case "input_audio_buffer.speech_started":
+              clearNoSpeechTimeout();
+              clearLocalCommitFallbackTimeout();
+              clearResponseTimeouts();
+              serverDetectedCurrentTurnRef.current = true;
+              waitingForResponseRef.current = false;
+              traceHotkeyEvent("realtime_server_speech_started").catch(() => {});
               stopOutputPlayback();
               if (responseActiveRef.current) {
-                sendRealtimeEvent(socket, { type: "response.cancel" });
+                if (sendRealtimeEvent(socket, { type: "response.cancel" })) {
+                  traceHotkeyEvent("realtime_response_cancel_sent").catch(() => {});
+                }
               }
               setRealtimeState({ status: "listening", detail: "Listening...", error: null });
               break;
+            case "input_audio_buffer.speech_stopped":
+              traceHotkeyEvent("realtime_server_speech_stopped").catch(() => {});
+              setRealtimeState({
+                status: "listening",
+                detail: "Heard you. Waiting for the response...",
+                error: null,
+              });
+              break;
+            case "input_audio_buffer.committed":
+              clearLocalCommitFallbackTimeout();
+              serverDetectedCurrentTurnRef.current = false;
+              localSpeechDetectorRef.current = INITIAL_LOCAL_SPEECH_DETECTOR_STATE;
+              traceHotkeyEvent("realtime_server_input_committed").catch(() => {});
+              scheduleResponseFallback(socket);
+              break;
             case "response.created":
+              waitingForResponseRef.current = false;
+              clearResponseTimeouts();
               responseActiveRef.current = true;
+              traceHotkeyEvent("realtime_server_response_created").catch(() => {});
               setRealtimeState({
                 status: "speaking",
                 detail: "Speaking... talk to interrupt.",
@@ -337,6 +662,7 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
               break;
             case "response.output_audio.delta":
               if (message.delta) {
+                responseDeltaCountRef.current += 1;
                 traceHotkeyEvent("realtime_output_audio_delta").catch(() => {});
                 void playOutputAudio(message.delta);
               }
@@ -347,7 +673,10 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
               });
               break;
             case "response.done":
+              waitingForResponseRef.current = false;
+              clearResponseTimeouts();
               responseActiveRef.current = false;
+              traceHotkeyEvent("realtime_server_response_done").catch(() => {});
               setRealtimeState({ status: "listening", detail: "Listening...", error: null });
               break;
             case "error":
@@ -393,7 +722,11 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
   }, [
     cleanup,
     connectMicrophone,
+    clearNoSpeechTimeout,
+    clearLocalCommitFallbackTimeout,
+    clearResponseTimeouts,
     playOutputAudio,
+    scheduleResponseFallback,
     setRealtimeState,
     stopOutputPlayback,
   ]);

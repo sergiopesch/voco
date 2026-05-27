@@ -147,17 +147,23 @@ is wrong.
 
 ## “Stuck On Listening” Required Diagnostics
 
-To debug this class reliably, a future hardening pass should add non-content trace events.
+To debug this class reliably, VOCO must emit non-content trace events.
 These events must never include transcripts, microphone samples, response text, or API keys.
 
-Recommended trace events:
+Required trace events:
 
 ```text
 realtime_input_audio_chunk_sent
 realtime_input_audio_level_detected
+realtime_local_speech_started
+realtime_local_speech_stopped
 realtime_server_speech_started
 realtime_server_speech_stopped
+realtime_input_audio_commit_fallback_sent
+realtime_server_input_committed
+realtime_response_create_fallback_sent
 realtime_server_response_created
+realtime_output_audio_delta
 realtime_server_response_done
 realtime_output_audio_level_detected
 realtime_no_speech_timeout
@@ -300,7 +306,8 @@ The backend creates the Realtime session with:
 Required hardening for stuck-listening issues:
 
 - The server VAD config should explicitly request automatic response creation if the API supports it.
-- If automatic response creation is disabled or unavailable, the frontend must commit the input buffer and request a response after server speech-stop.
+- If server VAD detects and commits a turn but automatic response creation is disabled or unavailable, the frontend must request a response after the commit.
+- If local microphone levels show a sustained speech start and stop but server VAD never commits the turn, the frontend must commit the input buffer and request a response as a fallback.
 - The implementation must not depend on undocumented default VAD behavior.
 
 ## WebSocket Requirements
@@ -380,6 +387,7 @@ Required:
 - Early realtime toggle buffers until frontend handler ready.
 - Duplicate realtime toggle inside debounce window is ignored.
 - Realtime start creates client secret, opens WebSocket, then connects mic graph.
+- Local speech-stop without server VAD commit sends `input_audio_buffer.commit` and then `response.create`.
 - Realtime stop closes socket, stops tracks, disconnects graph, and resets visual level.
 
 ### Linux Runtime Smoke Test
@@ -453,11 +461,24 @@ If VOCO starts realtime and remains on `Listening`, the highest-probability caus
 
 - Microphone capture is connected but the selected input is silent or wrong.
 - Audio chunks are being sent but server VAD is not detecting speech.
-- Server VAD detects speech but automatic response creation is not enabled or not behaving as expected.
+- Server VAD detects speech but automatic response creation is not behaving as expected.
 - The server is responding with events the frontend is not tracing yet.
 - Assistant response is created but output audio deltas are not arriving or not decoded.
 
-The next implementation hardening should add the non-content diagnostic events listed in
-“Stuck On Listening Required Diagnostics” and make response creation explicit rather than
-depending on Realtime API defaults.
+Implemented hardening now covers the main stuck-listening branches:
 
+- session creation explicitly requests audio output, PCM 24 kHz input/output, server VAD, automatic responses, and interruption.
+- frontend tracing records audio chunk flow, local speech detection, server VAD events, server commits, response creation, audio deltas, output level, and timeout hints.
+- after server commit, the frontend sends a delayed `response.create` fallback if no response starts.
+- after local sustained speech stops with no server commit, the frontend sends `input_audio_buffer.commit` and then the same delayed `response.create` fallback.
+
+Remaining proof still requires a live microphone test where the trace includes:
+
+```text
+realtime_server_speech_started OR realtime_local_speech_started
+realtime_server_speech_stopped OR realtime_local_speech_stopped
+realtime_server_input_committed OR realtime_input_audio_commit_fallback_sent
+realtime_server_response_created
+realtime_output_audio_delta
+realtime_server_response_done
+```
