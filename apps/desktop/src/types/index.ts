@@ -1,5 +1,5 @@
 export type InsertionStrategy = "auto" | "clipboard" | "type-simulation";
-export type TranscriptTarget = "cursor" | "openclaw-agent";
+export type TranscriptTarget = "cursor" | "openclaw-agent" | "openclaw-speech";
 export type UpdateChannel = "stable" | "beta";
 export type InstallChannel =
   | "github-release"
@@ -77,3 +77,16 @@ export interface OpenClawAgentResult {
   agent: string;
   response: string;
 }
+
+export interface OpenClawSpeechResult {
+  audioPath: string;
+  provider: string | null;
+  outputFormat: string | null;
+}
+
+export interface RealtimeClientSecretResult {
+  value: string;
+  expiresAt: number | null;
+}
+
+export type RealtimeStatus = "idle" | "connecting" | "listening" | "speaking" | "error";

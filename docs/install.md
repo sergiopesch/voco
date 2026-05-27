@@ -158,7 +158,9 @@ This checks version alignment, install-script safety, and generated release note
 - Models: `~/.local/share/voco/models/`
 - Socket: `$XDG_RUNTIME_DIR/voco.sock` when `XDG_RUNTIME_DIR` is set, otherwise `${TMPDIR:-/tmp}/voco-$(id -u)/voco.sock`
 
-OpenClaw voice-bridge settings are stored in the same config file. That mode is opt-in and requires the `openclaw` CLI to resolve from the app's runtime `PATH`.
+OpenClaw voice-bridge settings are stored in the same config file. That mode is opt-in and requires the `openclaw` CLI to resolve from the app's runtime `PATH`. The spoken-answer OpenClaw mode also requires OpenClaw TTS to be configured and `ffplay` from FFmpeg to resolve from `PATH`.
+
+Realtime conversation is separate from the OpenClaw text/TTS bridge and is toggled with `Alt+R` or the popover's `Start realtime` button. It requires `OPENAI_API_KEY` in the app environment or in `~/.openclaw/realtime.env`; VOCO reads that key only in the Tauri backend, mints a short-lived Realtime token, and streams audio over `wss://api.openai.com`. While realtime is active, the VOCO mic visual appears in the hidden overlay or popover and follows both microphone input and assistant playback levels.
 
 Legacy `voice` config and model paths are migrated automatically on startup when possible.
 

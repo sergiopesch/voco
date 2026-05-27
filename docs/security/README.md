@@ -1,7 +1,7 @@
 # Security
 
 ## Design Principle: Local-First, Zero-Auth
-The app runs locally with no authentication and no cloud accounts. Network access is limited to first-run model download, optional GitHub Release checks for update awareness, and optional user-enabled OpenClaw CLI agent calls.
+The app runs locally with no authentication by default. Network access is limited to first-run model download, optional GitHub Release checks for update awareness, optional user-enabled OpenClaw CLI agent calls, and optional user-enabled OpenAI Realtime voice sessions.
 
 ## Threat Model
 
@@ -16,6 +16,7 @@ The app runs locally with no authentication and no cloud accounts. Network acces
 - Audio capture (WebView getUserMedia)
 - Text insertion via shell commands (ydotool, xdotool, xclip, wl-copy)
 - Optional OpenClaw CLI execution when the transcript target is set to OpenClaw
+- Optional OpenAI Realtime HTTPS/WebSocket connection when realtime conversation is started
 - ASR model loading (local files)
 - First-run model download (HTTPS from Hugging Face)
 - Optional GitHub Release checks (HTTPS to api.github.com)
@@ -32,6 +33,7 @@ The app runs locally with no authentication and no cloud accounts. Network acces
 - **Local storage only**: Config in XDG dirs, no cloud sync
 - **Shell safety**: Text passed as arguments (not interpolated), `--` separators used
 - **OpenClaw bridge safety**: The OpenClaw agent id is validated, transcript and prompt sizes are bounded, the CLI is launched without shell interpolation, and the request is timed out
+- **Realtime key handling**: The standard OpenAI API key is read only by the Tauri backend from the process environment or `~/.openclaw/realtime.env`; the frontend never receives the standard API key
 - **Clipboard preservation**: Original clipboard contents restored after fallback insertion (only when prior content was text and save succeeded)
 - **Socket security**: Unix socket restricted to owner (0600 permissions) with a private per-user fallback dir when `XDG_RUNTIME_DIR` is unavailable
 - **Concurrency safety**: Transcription uses try_lock to fail fast if already in progress
@@ -43,10 +45,12 @@ The app runs locally with no authentication and no cloud accounts. Network acces
 |------|----------|
 | Config | `~/.config/voco/config.json` |
 | Models | `~/.local/share/voco/models/` |
+| Optional realtime API key | `~/.openclaw/realtime.env` |
 
 ## Privacy
 - Audio is processed locally and never sent to external services
 - In OpenClaw mode, the transcript text is sent to the configured local OpenClaw CLI agent; what happens after that depends on the user's OpenClaw provider and agent configuration
+- In realtime conversation mode, microphone audio is streamed to OpenAI Realtime over WebSocket until the session is stopped
 - No telemetry, analytics, or crash reporting
 - Transcripts are not persisted (in-memory only)
 - Config contains only user preferences, no PII

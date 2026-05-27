@@ -23,12 +23,15 @@ import {
 } from "@/lib/updates";
 import { useGlobalShortcut } from "@/hooks/useGlobalShortcut";
 import { useDictation } from "@/hooks/useDictation";
+import { useRealtimeConversation } from "@/hooks/useRealtimeConversation";
 import { ControlPanel } from "@/components/ControlPanel";
+import { RealtimeMicVisual } from "@/components/RealtimeMicVisual";
 import { probeMicrophoneAccess } from "@/lib/audioInput";
 import type {
   AppConfig,
   AudioDeviceOption,
   DictationStatus,
+  RealtimeStatus,
   RuntimeDiagnostics,
 } from "@/types";
 
@@ -83,6 +86,42 @@ function StatusOverlay({
   );
 }
 
+function RealtimeOverlay({
+  status,
+  detail,
+  level,
+}: {
+  status: RealtimeStatus;
+  detail: string;
+  level: number;
+}) {
+  return (
+    <main
+      className="voco-overlay voco-realtime-overlay"
+      data-state={status}
+      aria-live="polite"
+    >
+      <RealtimeMicVisual
+        active={status !== "idle" && status !== "error"}
+        level={level}
+        status={status}
+        size="overlay"
+      />
+      <div className="voco-realtime-overlay__copy">
+        <span className="voco-overlay__eyebrow">Realtime Voice</span>
+        <strong className="voco-overlay__headline">
+          {status === "speaking"
+            ? "Speaking"
+            : status === "connecting"
+              ? "Connecting"
+              : "Listening"}
+        </strong>
+        <p className="voco-overlay__copy">{detail}</p>
+      </div>
+    </main>
+  );
+}
+
 export function App() {
   const status = useStore((state) => state.status);
   const error = useStore((state) => state.error);
@@ -111,6 +150,14 @@ export function App() {
     toggle,
     onHotkeyPressed,
   } = useDictation();
+  const {
+    realtimeStatus,
+    realtimeDetail,
+    realtimeError,
+    realtimeLevel,
+    isRealtimeActive,
+    toggleRealtime,
+  } = useRealtimeConversation(selectedDeviceId);
   const [initComplete, setInitComplete] = useState(false);
   const [runtimeDiagnostics, setRuntimeDiagnostics] = useState<RuntimeDiagnostics | null>(null);
   const appStartMsRef = useRef(performance.now());
@@ -119,8 +166,10 @@ export function App() {
   const trayPopoverAnchorRef = useRef<TrayPopoverAnchor | null>(null);
   const lastCheckedChannelRef = useRef<AppConfig["updateChannel"] | null>(null);
   const notifiedReleaseVersionRef = useRef<string | null>(null);
-  const overlayVisible =
+  const dictationOverlayVisible =
     surface === "hidden" && (status === "recording" || status === "processing");
+  const realtimeOverlayVisible = surface === "hidden" && isRealtimeActive;
+  const overlayVisible = dictationOverlayVisible || realtimeOverlayVisible;
   const canHandleHotkey = initComplete && config !== null;
   const handleToggleRequest = useCallback(() => {
     if (surface !== "hidden") {
@@ -128,9 +177,16 @@ export function App() {
     }
     toggle();
   }, [setSurface, surface, toggle]);
+  const handleRealtimeToggleRequest = useCallback(() => {
+    if (surface !== "hidden") {
+      setSurface("hidden");
+    }
+    toggleRealtime();
+  }, [setSurface, surface, toggleRealtime]);
 
   useGlobalShortcut(
     handleToggleRequest,
+    handleRealtimeToggleRequest,
     () => {
       return canHandleHotkey;
     },
@@ -533,12 +589,22 @@ export function App() {
   }
 
   if (surface === "hidden") {
-    return overlayVisible ? (
-      <StatusOverlay
-        status={status}
-        interimTranscript={interimTranscript}
-        transcript={transcript}
-        audioLevel={audioLevel}
+    if (dictationOverlayVisible) {
+      return (
+        <StatusOverlay
+          status={status}
+          interimTranscript={interimTranscript}
+          transcript={transcript}
+          audioLevel={audioLevel}
+        />
+      );
+    }
+
+    return realtimeOverlayVisible ? (
+      <RealtimeOverlay
+        status={realtimeStatus}
+        detail={realtimeDetail}
+        level={realtimeLevel}
       />
     ) : null;
   }
@@ -553,6 +619,11 @@ export function App() {
       updateState={updateState}
       runtimeDiagnostics={runtimeDiagnostics}
       isDictationActive={status === "recording" || status === "processing"}
+      isRealtimeActive={isRealtimeActive}
+      realtimeStatus={realtimeStatus}
+      realtimeDetail={realtimeDetail}
+      realtimeError={realtimeError}
+      realtimeLevel={realtimeLevel}
       selectedDeviceId={selectedDeviceId}
       availableDevices={availableDevices}
       microphonePermission={microphonePermission}
@@ -566,6 +637,7 @@ export function App() {
       onOpenReleasePage={(url) => openExternalUrl(url)}
       onRefreshRuntimeDiagnostics={refreshRuntimeDiagnostics}
       onToggleDictation={toggle}
+      onToggleRealtime={toggleRealtime}
     />
   );
 }

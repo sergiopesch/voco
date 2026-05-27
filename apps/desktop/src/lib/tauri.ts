@@ -4,6 +4,8 @@ import type {
   CachedUpdateCheck,
   DictationStatus,
   OpenClawAgentResult,
+  OpenClawSpeechResult,
+  RealtimeClientSecretResult,
   RuntimeDiagnostics,
 } from "@/types";
 
@@ -36,6 +38,14 @@ export async function askOpenClawAgent(
     agent,
     promptPrefix,
   });
+}
+
+export async function speakOpenClawResponse(text: string): Promise<OpenClawSpeechResult> {
+  return invoke<OpenClawSpeechResult>("speak_openclaw_response", { text });
+}
+
+export async function createRealtimeClientSecret(): Promise<RealtimeClientSecretResult> {
+  return invoke<RealtimeClientSecretResult>("create_realtime_client_secret");
 }
 
 export async function setDictationStatus(status: DictationStatus): Promise<void> {

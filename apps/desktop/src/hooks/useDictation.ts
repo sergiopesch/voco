@@ -7,6 +7,7 @@ import {
   setDictationStatus,
   setMicrophoneReady,
   showNotification,
+  speakOpenClawResponse,
   traceHotkeyEvent,
 } from "@/lib/tauri";
 import {
@@ -442,7 +443,10 @@ export function useDictation() {
       const strategy = config?.insertionStrategy ?? "auto";
       let textToInsert = transcript;
 
-      if (config?.transcriptTarget === "openclaw-agent") {
+      if (
+        config?.transcriptTarget === "openclaw-agent" ||
+        config?.transcriptTarget === "openclaw-speech"
+      ) {
         setInterimTranscript("Asking OpenClaw...");
         try {
           const result = await askOpenClawAgent(
@@ -452,16 +456,28 @@ export function useDictation() {
           );
           textToInsert = result.response;
           setTranscript(result.response);
+          if (config.transcriptTarget === "openclaw-speech") {
+            setInterimTranscript("Speaking OpenClaw's answer...");
+            await speakOpenClawResponse(result.response);
+            finalizeIdleState();
+            return;
+          }
           setInterimTranscript("Typing OpenClaw's answer at your cursor...");
         } catch (err) {
           const detail = err instanceof Error ? err.message : String(err);
           showNotification(
-            "OpenClaw request failed",
-            detail || "VOCO could not send the transcript to OpenClaw.",
+            config?.transcriptTarget === "openclaw-speech"
+              ? "OpenClaw speech failed"
+              : "OpenClaw request failed",
+            detail || "VOCO could not complete the OpenClaw request.",
           ).catch(() => {});
           phaseRef.current = "error";
           setStatus("error");
-          setError(`OpenClaw request failed: ${detail}`);
+          setError(
+            config?.transcriptTarget === "openclaw-speech"
+              ? `OpenClaw speech failed: ${detail}`
+              : `OpenClaw request failed: ${detail}`,
+          );
           setInterimTranscript("");
           setDictationStatus("error").catch(() => {});
 

@@ -16,6 +16,7 @@ use transcribe::{WhisperMutex, WhisperState};
 // This collapses duplicate keyboard backends and duplicate evdev devices
 // without eating legitimate quick user toggles.
 static LAST_TOGGLE_MS: AtomicI64 = AtomicI64::new(0);
+static LAST_REALTIME_TOGGLE_MS: AtomicI64 = AtomicI64::new(0);
 
 // Evdev hotkey mode: 0 = Alt+D, 1 = Alt+Shift+D, 255 = custom (disabled)
 static EVDEV_HOTKEY_MODE: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
@@ -23,20 +24,27 @@ static USE_EVDEV_HOTKEY: AtomicBool = AtomicBool::new(false);
 #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 static EVDEV_LISTENER_STARTED: AtomicBool = AtomicBool::new(false);
 static HOTKEY_BINDING_VERSION: AtomicU64 = AtomicU64::new(0);
+static REALTIME_HOTKEY_BINDING_VERSION: AtomicU64 = AtomicU64::new(0);
 static FRONTEND_HOTKEY_HANDLER_READY: AtomicBool = AtomicBool::new(false);
 static PENDING_TOGGLE_BACKEND: LazyLock<Mutex<Option<String>>> = LazyLock::new(|| Mutex::new(None));
+static PENDING_REALTIME_TOGGLE_BACKEND: LazyLock<Mutex<Option<String>>> =
+    LazyLock::new(|| Mutex::new(None));
 static TRACE_START: LazyLock<Instant> = LazyLock::new(Instant::now);
 static TRACE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 static TRACE_FILE_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 static MODEL_DOWNLOAD_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 static REGISTERED_PLUGIN_SHORTCUT: LazyLock<Mutex<Option<String>>> =
     LazyLock::new(|| Mutex::new(None));
+static REGISTERED_REALTIME_PLUGIN_SHORTCUT: LazyLock<Mutex<Option<String>>> =
+    LazyLock::new(|| Mutex::new(None));
 #[cfg(target_os = "linux")]
 static EVDEV_WATCHED_PATHS: LazyLock<Mutex<std::collections::HashSet<std::path::PathBuf>>> =
     LazyLock::new(|| Mutex::new(std::collections::HashSet::new()));
 
 const TOGGLE_DICTATION_EVENT: &str = "voco:toggle-dictation";
+const TOGGLE_REALTIME_EVENT: &str = "voco:toggle-realtime";
 const LEGACY_TOGGLE_DICTATION_EVENT: &str = "voice:toggle-dictation";
+const REALTIME_HOTKEY: &str = "Alt+R";
 const TOGGLE_DEBOUNCE_MS: i64 = 120;
 const MAX_AUDIO_SECONDS: usize = 60;
 const HIDDEN_WINDOW_POS_X: i32 = -100;
@@ -175,9 +183,11 @@ fn trace_frontend_hotkey_event(app: tauri::AppHandle, event: String) -> Result<(
             trace_hotkey_event(&event, None);
             FRONTEND_HOTKEY_HANDLER_READY.store(true, Ordering::SeqCst);
             replay_pending_toggle(&app);
+            replay_pending_realtime_toggle(&app);
             Ok(())
         }
         "frontend_toggle_received"
+        | "frontend_realtime_toggle_received"
         | "recording_state_requested"
         | "recording_get_user_media_started"
         | "recording_get_user_media_done"
@@ -185,7 +195,23 @@ fn trace_frontend_hotkey_event(app: tauri::AppHandle, event: String) -> Result<(
         | "recording_media_source_created"
         | "recording_worklet_connected"
         | "recording_script_processor_connected"
-        | "recording_state_active" => {
+        | "recording_state_active"
+        | "realtime_start_requested"
+        | "realtime_stop_requested"
+        | "realtime_toggle_event_buffered"
+        | "pending_realtime_toggle_replayed"
+        | "eval_realtime_toggle_debounced"
+        | "realtime_client_secret_created"
+        | "realtime_websocket_connecting"
+        | "realtime_websocket_open"
+        | "realtime_websocket_closed"
+        | "realtime_websocket_error"
+        | "realtime_get_user_media_started"
+        | "realtime_get_user_media_done"
+        | "realtime_audio_graph_connected"
+        | "realtime_output_audio_delta"
+        | "realtime_server_error"
+        | "realtime_start_failed" => {
             trace_hotkey_event(&event, None);
             Ok(())
         }
@@ -228,6 +254,16 @@ fn should_start_evdev_listener(use_evdev_hotkey: bool, listener_started: bool) -
     use_evdev_hotkey && !listener_started
 }
 
+fn validate_dictation_hotkey(hotkey: &str) -> Result<(), String> {
+    if hotkey == REALTIME_HOTKEY {
+        return Err(format!(
+            "{REALTIME_HOTKEY} is reserved for realtime conversation"
+        ));
+    }
+
+    Ok(())
+}
+
 #[tauri::command]
 fn get_config() -> Result<AppConfig, String> {
     AppConfig::load().map_err(|e| e.to_string())
@@ -239,6 +275,7 @@ fn save_config(app: tauri::AppHandle, config: AppConfig) -> Result<(), String> {
     let hotkey_changed = previous.hotkey != config.hotkey;
 
     if hotkey_changed {
+        validate_dictation_hotkey(&config.hotkey)?;
         apply_hotkey_runtime_state(&app, &config.hotkey, false)?;
     }
 
@@ -381,6 +418,21 @@ struct OpenClawAgentResult {
     response: String,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct OpenClawSpeechResult {
+    audio_path: String,
+    provider: Option<String>,
+    output_format: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RealtimeClientSecretResult {
+    value: String,
+    expires_at: Option<i64>,
+}
+
 fn build_openclaw_message(transcript: &str, prompt_prefix: &str) -> String {
     let transcript = transcript.trim();
     let prompt_prefix = prompt_prefix.trim();
@@ -481,6 +533,8 @@ fn ask_openclaw_agent(
         .arg("agent")
         .arg("--agent")
         .arg(agent)
+        .arg("--thinking")
+        .arg("minimal")
         .arg("--message")
         .arg(&message)
         .stdout(std::process::Stdio::piped())
@@ -519,6 +573,236 @@ fn ask_openclaw_agent(
         agent: agent.to_string(),
         response: response.to_string(),
     })
+}
+
+fn parse_openclaw_tts_output(output: &str) -> Result<OpenClawSpeechResult, String> {
+    let parsed: serde_json::Value = serde_json::from_str(output.trim())
+        .map_err(|error| format!("Failed to parse OpenClaw TTS output: {error}"))?;
+    let audio_path = parsed
+        .get("audioPath")
+        .and_then(|value| value.as_str())
+        .filter(|value| !value.trim().is_empty())
+        .ok_or_else(|| "OpenClaw TTS did not return an audio path".to_string())?
+        .to_string();
+    let provider = parsed
+        .get("provider")
+        .and_then(|value| value.as_str())
+        .map(|value| value.to_string());
+    let output_format = parsed
+        .get("outputFormat")
+        .and_then(|value| value.as_str())
+        .map(|value| value.to_string());
+
+    Ok(OpenClawSpeechResult {
+        audio_path,
+        provider,
+        output_format,
+    })
+}
+
+fn openclaw_tts_convert(text: &str) -> Result<OpenClawSpeechResult, String> {
+    let params = serde_json::json!({ "text": text }).to_string();
+    let child = std::process::Command::new("openclaw")
+        .arg("gateway")
+        .arg("call")
+        .arg("tts.convert")
+        .arg("--json")
+        .arg("--timeout")
+        .arg("30000")
+        .arg("--params")
+        .arg(params)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .map_err(|error| {
+            if error.kind() == std::io::ErrorKind::NotFound {
+                "OpenClaw CLI was not found in PATH".to_string()
+            } else {
+                format!("Failed to start OpenClaw TTS: {error}")
+            }
+        })?;
+
+    let output = wait_for_openclaw_agent(child, std::time::Duration::from_secs(45))?;
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    if !output.status.success() {
+        let detail = if stderr.trim().is_empty() {
+            clip_command_output(&stdout, 800)
+        } else {
+            clip_command_output(&stderr, 800)
+        };
+        return Err(format!(
+            "OpenClaw TTS exited with status {}: {detail}",
+            output.status
+        ));
+    }
+
+    parse_openclaw_tts_output(&stdout)
+}
+
+fn play_audio_file(audio_path: &str) -> Result<(), String> {
+    let child = std::process::Command::new("ffplay")
+        .arg("-nodisp")
+        .arg("-autoexit")
+        .arg("-loglevel")
+        .arg("error")
+        .arg(audio_path)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .map_err(|error| {
+            if error.kind() == std::io::ErrorKind::NotFound {
+                "ffplay was not found in PATH; install ffmpeg to play OpenClaw speech".to_string()
+            } else {
+                format!("Failed to start audio playback: {error}")
+            }
+        })?;
+
+    let output = wait_for_openclaw_agent(child, std::time::Duration::from_secs(120))?;
+    if output.status.success() {
+        return Ok(());
+    }
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let detail = if stderr.trim().is_empty() {
+        clip_command_output(&stdout, 800)
+    } else {
+        clip_command_output(&stderr, 800)
+    };
+    Err(format!(
+        "Audio playback exited with status {}: {detail}",
+        output.status
+    ))
+}
+
+#[tauri::command]
+fn speak_openclaw_response(text: String) -> Result<OpenClawSpeechResult, String> {
+    let text = text.trim();
+    if text.is_empty() {
+        return Err("No OpenClaw response to speak".to_string());
+    }
+    if text.len() > 100_000 {
+        return Err("OpenClaw response too long for speech (max 100KB)".to_string());
+    }
+
+    let result = openclaw_tts_convert(text)?;
+    play_audio_file(&result.audio_path)?;
+    Ok(result)
+}
+
+fn load_realtime_api_key() -> Result<String, String> {
+    if let Ok(value) = std::env::var("OPENAI_API_KEY") {
+        let value = value.trim().to_string();
+        if !value.is_empty() {
+            return Ok(value);
+        }
+    }
+
+    let path = dirs::home_dir()
+        .ok_or_else(|| "Cannot find home directory".to_string())?
+        .join(".openclaw")
+        .join("realtime.env");
+    let contents = std::fs::read_to_string(&path)
+        .map_err(|error| format!("Failed to read {}: {error}", path.display()))?;
+
+    for line in contents.lines() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        let Some((key, value)) = line.split_once('=') else {
+            continue;
+        };
+        if key.trim().trim_start_matches("export ").trim() == "OPENAI_API_KEY" {
+            let value = value
+                .trim()
+                .trim_matches('"')
+                .trim_matches('\'')
+                .to_string();
+            if !value.is_empty() {
+                return Ok(value);
+            }
+        }
+    }
+
+    Err(format!("OPENAI_API_KEY is missing from {}", path.display()))
+}
+
+fn realtime_session_config() -> serde_json::Value {
+    serde_json::json!({
+        "type": "realtime",
+        "model": "gpt-realtime-2",
+        "instructions": "You are Sergio's concise realtime OpenClaw voice companion. Answer in 1-2 short sentences. No preamble, no markdown, no waffle. If the user interrupts, stop and respond to the latest thing they said.",
+        "reasoning": {
+            "effort": "low"
+        },
+        "audio": {
+            "input": {
+                "turn_detection": {
+                    "type": "server_vad"
+                }
+            },
+            "output": {
+                "voice": "marin"
+            }
+        }
+    })
+}
+
+fn realtime_error_detail(response_body: &str) -> String {
+    serde_json::from_str::<serde_json::Value>(response_body)
+        .ok()
+        .and_then(|value| {
+            value
+                .get("error")
+                .and_then(|error| error.get("message"))
+                .and_then(|message| message.as_str())
+                .map(|message| message.to_string())
+        })
+        .unwrap_or_else(|| clip_command_output(response_body, 800))
+}
+
+#[tauri::command]
+fn create_realtime_client_secret() -> Result<RealtimeClientSecretResult, String> {
+    let api_key = load_realtime_api_key()?;
+    let body = serde_json::json!({
+        "session": realtime_session_config()
+    });
+
+    let client = reqwest::blocking::Client::new();
+    let response = client
+        .post("https://api.openai.com/v1/realtime/client_secrets")
+        .bearer_auth(api_key)
+        .header("Content-Type", "application/json")
+        .header("OpenAI-Safety-Identifier", "sergio-local-voco")
+        .body(body.to_string())
+        .send()
+        .map_err(|error| format!("Failed to create Realtime session secret: {error}"))?;
+
+    let status = response.status();
+    let response_body = response
+        .text()
+        .map_err(|error| format!("Failed to read Realtime session response: {error}"))?;
+    if !status.is_success() {
+        let detail = realtime_error_detail(&response_body);
+        return Err(format!(
+            "OpenAI Realtime client secret request failed ({status}): {detail}"
+        ));
+    }
+
+    let parsed: serde_json::Value = serde_json::from_str(&response_body)
+        .map_err(|error| format!("Failed to parse Realtime session response: {error}"))?;
+    let value = parsed
+        .get("value")
+        .and_then(|value| value.as_str())
+        .filter(|value| !value.trim().is_empty())
+        .ok_or_else(|| "Realtime session response did not include a client secret".to_string())?
+        .to_string();
+    let expires_at = parsed.get("expires_at").and_then(|value| value.as_i64());
+
+    Ok(RealtimeClientSecretResult { value, expires_at })
 }
 
 #[tauri::command]
@@ -813,6 +1097,36 @@ pub fn eval_toggle(app_handle: &tauri::AppHandle) {
     eval_toggle_with_backend(app_handle, "internal");
 }
 
+fn eval_realtime_toggle_with_backend(app_handle: &tauri::AppHandle, backend_used: &str) {
+    trace_hotkey_event("eval_realtime_toggle_entered", Some(backend_used));
+
+    let now = now_ms();
+    let last = LAST_REALTIME_TOGGLE_MS.swap(now, Ordering::SeqCst);
+    if (now - last).abs() < TOGGLE_DEBOUNCE_MS {
+        debug!(
+            "eval_realtime_toggle debounced ({}ms since last)",
+            now - last
+        );
+        trace_hotkey_event("eval_realtime_toggle_debounced", Some(backend_used));
+        return;
+    }
+
+    if !FRONTEND_HOTKEY_HANDLER_READY.load(Ordering::SeqCst) {
+        buffer_realtime_toggle_until_frontend_ready(backend_used);
+        return;
+    }
+
+    emit_realtime_toggle_event(app_handle, backend_used);
+}
+
+fn emit_realtime_toggle_event(app_handle: &tauri::AppHandle, backend_used: &str) {
+    if let Err(e) = app_handle.emit_to("main", TOGGLE_REALTIME_EVENT, ()) {
+        error!("Failed to emit realtime toggle event: {e}");
+    } else {
+        trace_hotkey_event("realtime_toggle_event_emitted", Some(backend_used));
+    }
+}
+
 fn emit_toggle_event(app_handle: &tauri::AppHandle, backend_used: &str) {
     if let Err(e) = app_handle.emit_to("main", TOGGLE_DICTATION_EVENT, ()) {
         error!("Failed to emit toggle event: {e}");
@@ -834,6 +1148,18 @@ fn buffer_toggle_until_frontend_ready(backend_used: &str) {
     trace_hotkey_event("toggle_event_buffered", Some(backend_used));
 }
 
+fn buffer_realtime_toggle_until_frontend_ready(backend_used: &str) {
+    let Ok(mut pending_backend) = PENDING_REALTIME_TOGGLE_BACKEND.lock() else {
+        error!("Failed to lock pending realtime toggle state");
+        return;
+    };
+
+    if pending_backend.is_none() {
+        *pending_backend = Some(backend_used.to_string());
+    }
+    trace_hotkey_event("realtime_toggle_event_buffered", Some(backend_used));
+}
+
 fn replay_pending_toggle(app_handle: &tauri::AppHandle) {
     let pending_backend = match PENDING_TOGGLE_BACKEND.lock() {
         Ok(mut pending_backend) => pending_backend.take(),
@@ -846,6 +1172,21 @@ fn replay_pending_toggle(app_handle: &tauri::AppHandle) {
     if let Some(backend_used) = pending_backend {
         trace_hotkey_event("pending_toggle_replayed", Some(&backend_used));
         emit_toggle_event(app_handle, &backend_used);
+    }
+}
+
+fn replay_pending_realtime_toggle(app_handle: &tauri::AppHandle) {
+    let pending_backend = match PENDING_REALTIME_TOGGLE_BACKEND.lock() {
+        Ok(mut pending_backend) => pending_backend.take(),
+        Err(error) => {
+            error!("Failed to lock pending realtime toggle state: {error}");
+            None
+        }
+    };
+
+    if let Some(backend_used) = pending_backend {
+        trace_hotkey_event("pending_realtime_toggle_replayed", Some(&backend_used));
+        emit_realtime_toggle_event(app_handle, &backend_used);
     }
 }
 
@@ -914,6 +1255,88 @@ fn register_global_shortcut_listener(app: &tauri::AppHandle, hotkey: &str) -> Re
         .map_err(|e| format!("Failed to register global shortcut {hotkey}: {e}"))
 }
 
+fn register_realtime_global_shortcut_listener(app: &tauri::AppHandle) -> Result<(), String> {
+    use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
+
+    let shortcut = REALTIME_HOTKEY
+        .parse::<Shortcut>()
+        .map_err(|e| format!("Invalid realtime hotkey '{REALTIME_HOTKEY}': {e}"))?;
+    let handle = app.clone();
+    let binding_version = REALTIME_HOTKEY_BINDING_VERSION.fetch_add(1, Ordering::SeqCst) + 1;
+
+    app.global_shortcut()
+        .on_shortcut(shortcut, move |_app, _shortcut, event| {
+            if event.state != tauri_plugin_global_shortcut::ShortcutState::Pressed {
+                return;
+            }
+
+            let current_version = REALTIME_HOTKEY_BINDING_VERSION.load(Ordering::SeqCst);
+            if current_version != binding_version {
+                debug!(
+                    "Ignoring stale realtime global shortcut callback (binding version {}, latest {})",
+                    binding_version, current_version
+                );
+                return;
+            }
+
+            if USE_EVDEV_HOTKEY.load(Ordering::SeqCst) {
+                debug!("{REALTIME_HOTKEY} detected via global shortcut plugin but evdev is preferred");
+                return;
+            }
+
+            debug!("{REALTIME_HOTKEY} detected via global shortcut plugin");
+            trace_hotkey_event(
+                "realtime_hotkey_event_received_global_shortcut",
+                Some("global_shortcut"),
+            );
+            eval_realtime_toggle_with_backend(&handle, "global_shortcut");
+        })
+        .map_err(|e| format!("Failed to register realtime global shortcut {REALTIME_HOTKEY}: {e}"))
+}
+
+fn sync_realtime_global_shortcut_binding(
+    app: &tauri::AppHandle,
+    enable_plugin_shortcut: bool,
+) -> Result<(), String> {
+    use tauri_plugin_global_shortcut::GlobalShortcutExt;
+
+    let mut current = REGISTERED_REALTIME_PLUGIN_SHORTCUT
+        .lock()
+        .map_err(|_| "Failed to lock realtime shortcut binding state".to_string())?;
+
+    if let Some(existing) = current.clone() {
+        if !enable_plugin_shortcut {
+            if app.global_shortcut().is_registered(existing.as_str()) {
+                app.global_shortcut()
+                    .unregister(existing.as_str())
+                    .map_err(|e| {
+                        format!("Failed to unregister realtime global shortcut {existing}: {e}")
+                    })?;
+            }
+            *current = None;
+            REALTIME_HOTKEY_BINDING_VERSION.fetch_add(1, Ordering::SeqCst);
+            info!("Unregistered realtime global shortcut {existing}");
+        }
+    }
+
+    if !enable_plugin_shortcut {
+        return Ok(());
+    }
+
+    if current.as_deref() == Some(REALTIME_HOTKEY) {
+        return Ok(());
+    }
+
+    register_realtime_global_shortcut_listener(app)?;
+    *current = Some(REALTIME_HOTKEY.to_string());
+    info!("Registered realtime global shortcut {REALTIME_HOTKEY}");
+    trace_hotkey_event(
+        "realtime_global_shortcut_registered",
+        Some("global_shortcut"),
+    );
+    Ok(())
+}
+
 fn sync_global_shortcut_binding(
     app: &tauri::AppHandle,
     hotkey: &str,
@@ -973,6 +1396,7 @@ fn apply_hotkey_runtime_state(
         new_hotkey,
         should_register_global_shortcut(use_evdev_hotkey),
     )?;
+    sync_realtime_global_shortcut_binding(app, should_register_global_shortcut(use_evdev_hotkey))?;
 
     USE_EVDEV_HOTKEY.store(use_evdev_hotkey, Ordering::SeqCst);
     EVDEV_HOTKEY_MODE.store(hotkey_to_evdev_mode(new_hotkey), Ordering::SeqCst);
@@ -1000,6 +1424,7 @@ fn apply_hotkey_runtime_state(
 
 /// Change the hotkey at runtime.
 pub fn change_hotkey_runtime(app: &tauri::AppHandle, new_hotkey: &str) -> Result<(), String> {
+    validate_dictation_hotkey(new_hotkey)?;
     let mut config = AppConfig::load().map_err(|e| e.to_string())?;
     let previous_hotkey = config.hotkey.clone();
     apply_hotkey_runtime_state(app, new_hotkey, true)?;
@@ -1166,7 +1591,8 @@ fn supports_evdev_hotkey(device: &evdev::Device) -> bool {
 
     let has_alt = keys.contains(evdev::Key::KEY_LEFTALT) || keys.contains(evdev::Key::KEY_RIGHTALT);
     let has_d = keys.contains(evdev::Key::KEY_D);
-    has_alt && has_d
+    let has_r = keys.contains(evdev::Key::KEY_R);
+    has_alt && (has_d || has_r)
 }
 
 #[cfg(target_os = "linux")]
@@ -1284,6 +1710,19 @@ fn spawn_evdev_device_worker(
                                                 Some("evdev"),
                                             );
                                             eval_toggle_with_backend(&app_handle, "evdev");
+                                        }
+                                    }
+                                    Key::KEY_R if pressed && !repeat => {
+                                        let alt_down = alt_held.load(Ordering::SeqCst);
+                                        let shift_down = shift_held.load(Ordering::SeqCst);
+
+                                        if alt_down && !shift_down {
+                                            debug!("Realtime hotkey detected via evdev");
+                                            trace_hotkey_event(
+                                                "realtime_hotkey_event_received_evdev",
+                                                Some("evdev"),
+                                            );
+                                            eval_realtime_toggle_with_backend(&app_handle, "evdev");
                                         }
                                     }
                                     _ => {}
@@ -1453,6 +1892,8 @@ pub fn run() {
             transcribe_audio,
             insert_text,
             ask_openclaw_agent,
+            speak_openclaw_response,
+            create_realtime_client_secret,
             get_runtime_diagnostics,
             set_dictation_status,
             set_microphone_ready,
@@ -1467,6 +1908,9 @@ pub fn run() {
             let startup_ms = now_ms();
             FRONTEND_HOTKEY_HANDLER_READY.store(false, Ordering::SeqCst);
             if let Ok(mut pending_backend) = PENDING_TOGGLE_BACKEND.lock() {
+                *pending_backend = None;
+            }
+            if let Ok(mut pending_backend) = PENDING_REALTIME_TOGGLE_BACKEND.lock() {
                 *pending_backend = None;
             }
             trace_hotkey_event("app_start", Some("internal"));
@@ -1499,6 +1943,12 @@ pub fn run() {
             if let Err(e) = sync_global_shortcut_binding(
                 &app_handle,
                 &hotkey,
+                should_register_global_shortcut(use_evdev_hotkey),
+            ) {
+                warn!("{e}");
+            }
+            if let Err(e) = sync_realtime_global_shortcut_binding(
+                &app_handle,
                 should_register_global_shortcut(use_evdev_hotkey),
             ) {
                 warn!("{e}");
@@ -1619,6 +2069,27 @@ mod tests {
     }
 
     #[test]
+    fn openclaw_tts_output_parses_audio_path() {
+        let parsed = parse_openclaw_tts_output(
+            r#"{"audioPath":"/tmp/openclaw/voice.mp3","provider":"microsoft","outputFormat":"audio-24khz-48kbitrate-mono-mp3"}"#,
+        )
+        .unwrap();
+        assert_eq!(parsed.audio_path, "/tmp/openclaw/voice.mp3");
+        assert_eq!(parsed.provider.as_deref(), Some("microsoft"));
+        assert_eq!(
+            parsed.output_format.as_deref(),
+            Some("audio-24khz-48kbitrate-mono-mp3")
+        );
+    }
+
+    #[test]
+    fn openclaw_tts_output_requires_audio_path() {
+        assert!(parse_openclaw_tts_output(r#"{"provider":"microsoft"}"#)
+            .unwrap_err()
+            .contains("audio path"));
+    }
+
+    #[test]
     fn socket_path_uses_xdg_runtime_dir() {
         assert!(socket_path().to_str().unwrap().ends_with("voco.sock"));
     }
@@ -1669,6 +2140,14 @@ mod tests {
         assert_eq!(hotkey_to_evdev_mode("Alt+D"), 0);
         assert_eq!(hotkey_to_evdev_mode("Alt+Shift+D"), 1);
         assert_eq!(hotkey_to_evdev_mode("Ctrl+Shift+V"), 255);
+    }
+
+    #[test]
+    fn realtime_hotkey_is_reserved_for_realtime() {
+        assert!(validate_dictation_hotkey("Alt+D").is_ok());
+        assert!(validate_dictation_hotkey("Alt+R")
+            .unwrap_err()
+            .contains("reserved for realtime"));
     }
 
     #[test]

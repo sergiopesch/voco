@@ -14,6 +14,8 @@ VOCO is a local-first Linux dictation app. Press a hotkey, speak, press it again
 
 VOCO can also run as an optional voice bridge for OpenClaw: speak locally, let VOCO transcribe on-device, then send the transcript to a configured OpenClaw CLI agent and type the agent's answer at your cursor.
 
+For low-latency back-and-forth voice, VOCO also has an opt-in realtime conversation toggle. It keeps the OpenAI API key in the local Tauri backend, mints a short-lived Realtime token, and streams 24 kHz PCM audio over a WebSocket so the Linux WebView does not depend on WebRTC support.
+
 ## Install
 
 Recommended:
@@ -48,7 +50,9 @@ Primary tested path: Ubuntu and Debian.
 5. Press `Alt+D` again.
 6. Confirm the text is inserted at your cursor.
 
-To use OpenClaw mode, open Settings -> Output, choose `Ask OpenClaw and type answer`, and keep the OpenClaw gateway/agent available from your shell environment.
+To use OpenClaw mode, open Settings -> Output, choose `Ask OpenClaw and type answer` or `Ask OpenClaw and speak answer`, and keep the OpenClaw gateway/agent available from your shell environment. Spoken answers also require OpenClaw TTS and `ffplay`.
+
+To use realtime conversation, store `OPENAI_API_KEY=...` in `~/.openclaw/realtime.env`, then press `Alt+R` or open the VOCO popover and press `Start realtime`. Press `Alt+R` again or press `Stop realtime` to end the session. While realtime is active, the VOCO mic visual appears in the popover or hidden overlay and follows both your microphone level and the assistant's spoken response level.
 
 ## Requirements
 
@@ -90,8 +94,11 @@ npm run report:linux-runtime
 - First launch downloads the speech model once.
 - Single dictation recordings are currently capped at 60 seconds.
 - On Wayland, `Alt+D` and `Alt+Shift+D` are the most reliable hotkeys right now.
+- Realtime conversation uses `Alt+R`.
+- The realtime VOCO mic animation is driven by live input and output audio levels.
 - Wayland text insertion depends on `ydotool`, compositor support, and often `input` group access.
 - OpenClaw mode is opt-in and requires the `openclaw` CLI to be available in `PATH`.
+- Realtime conversation is opt-in and requires `OPENAI_API_KEY` in the environment or `~/.openclaw/realtime.env`.
 - Config lives at `~/.config/voco/config.json`.
 
 ## License

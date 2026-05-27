@@ -105,6 +105,7 @@ pub enum TranscriptTarget {
     #[default]
     Cursor,
     OpenclawAgent,
+    OpenclawSpeech,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -393,6 +394,9 @@ mod tests {
     fn transcript_target_serializes_kebab_case() {
         let json = serde_json::to_string(&TranscriptTarget::OpenclawAgent).unwrap();
         assert_eq!(json, r#""openclaw-agent""#);
+
+        let json = serde_json::to_string(&TranscriptTarget::OpenclawSpeech).unwrap();
+        assert_eq!(json, r#""openclaw-speech""#);
     }
 
     #[test]

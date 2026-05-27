@@ -110,6 +110,147 @@ code {
   animation: voco-overlay-pulse 1.2s ease-in-out infinite;
 }
 
+.voco-realtime-overlay {
+  grid-template-columns: 86px minmax(0, 1fr);
+  align-items: center;
+  align-content: center;
+  gap: 14px;
+}
+
+.voco-realtime-overlay__copy {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.voco-realtime-overlay .voco-overlay__copy {
+  min-height: 0;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.voco-realtime-mic {
+  --voco-realtime-image-scale: 1;
+  --voco-realtime-image-lift: 0px;
+  --voco-realtime-inner-scale: 1;
+  --voco-realtime-outer-scale: 1;
+  --voco-realtime-ring-opacity: 0.18;
+  --voco-realtime-inner-opacity: 0.14;
+  --voco-realtime-glow: 10px;
+  position: relative;
+  width: 72px;
+  height: 72px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+
+.voco-realtime-mic[data-size="overlay"] {
+  width: 82px;
+  height: 82px;
+}
+
+.voco-realtime-mic__ring {
+  position: absolute;
+  inset: 7px;
+  border-radius: 24px;
+  border: 1px solid rgba(225, 229, 236, 0.24);
+  opacity: 0.08;
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease;
+}
+
+.voco-realtime-mic__ring--outer {
+  transform: scale(var(--voco-realtime-outer-scale));
+  opacity: var(--voco-realtime-ring-opacity);
+  background: rgba(225, 229, 236, 0.045);
+}
+
+.voco-realtime-mic__ring--inner {
+  inset: 13px;
+  transform: scale(var(--voco-realtime-inner-scale));
+  opacity: var(--voco-realtime-inner-opacity);
+  background: rgba(158, 164, 175, 0.08);
+}
+
+.voco-realtime-mic__image {
+  position: relative;
+  z-index: 2;
+  width: 48px;
+  height: 48px;
+  border-radius: 15px;
+  object-fit: cover;
+  border: 1px solid rgba(199, 204, 213, 0.24);
+  box-shadow:
+    0 10px 24px rgba(3, 4, 7, 0.36),
+    0 0 var(--voco-realtime-glow) rgba(225, 229, 236, 0.2);
+  transform:
+    translateY(var(--voco-realtime-image-lift))
+    scale(var(--voco-realtime-image-scale));
+  transition:
+    box-shadow 140ms ease,
+    transform 140ms ease;
+}
+
+.voco-realtime-mic[data-size="overlay"] .voco-realtime-mic__image {
+  width: 54px;
+  height: 54px;
+}
+
+.voco-realtime-mic__bars {
+  position: absolute;
+  z-index: 3;
+  right: 4px;
+  bottom: 4px;
+  width: 34px;
+  height: 18px;
+  padding: 4px 5px;
+  box-sizing: border-box;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  background: rgba(9, 10, 13, 0.78);
+  border: 1px solid rgba(225, 229, 236, 0.16);
+}
+
+.voco-realtime-mic__bar {
+  width: 3px;
+  height: 10px;
+  border-radius: 999px;
+  transform: scaleY(var(--voco-realtime-bar-scale));
+  transform-origin: center;
+  background: rgba(225, 229, 236, 0.9);
+  opacity: 0.82;
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease;
+}
+
+.voco-realtime-mic[data-active="false"] .voco-realtime-mic__ring {
+  opacity: 0.08;
+  transform: scale(1);
+}
+
+.voco-realtime-mic[data-active="false"] .voco-realtime-mic__bar {
+  opacity: 0.36;
+  transform: scaleY(0.18);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .voco-realtime-mic__ring,
+  .voco-realtime-mic__image,
+  .voco-realtime-mic__bar,
+  .voco-overlay[data-state="processing"] .voco-overlay__meter-fill {
+    animation: none;
+    transition: none;
+  }
+}
+
 @keyframes voco-overlay-pulse {
   0%,
   100% {
@@ -352,6 +493,13 @@ code {
   border: 1px solid rgba(199, 204, 213, 0.1);
   display: grid;
   gap: 8px;
+}
+
+.voco-popover__state-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
 }
 
 .voco-popover__state p {

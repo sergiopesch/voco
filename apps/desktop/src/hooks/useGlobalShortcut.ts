@@ -3,9 +3,11 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { traceHotkeyEvent } from "@/lib/tauri";
 
 const TOGGLE_EVENT = "voco:toggle-dictation";
+const TOGGLE_REALTIME_EVENT = "voco:toggle-realtime";
 
 export function useGlobalShortcut(
   toggle: () => void,
+  toggleRealtime: () => void,
   shouldHandleHotkey: () => boolean,
   canHandleHotkey: boolean,
   appStartMs: number,
@@ -13,6 +15,8 @@ export function useGlobalShortcut(
 ) {
   const toggleRef = useRef(toggle);
   toggleRef.current = toggle;
+  const toggleRealtimeRef = useRef(toggleRealtime);
+  toggleRealtimeRef.current = toggleRealtime;
   const shouldHandleHotkeyRef = useRef(shouldHandleHotkey);
   shouldHandleHotkeyRef.current = shouldHandleHotkey;
   const onHotkeyPressedRef = useRef(onHotkeyPressed);
@@ -21,7 +25,7 @@ export function useGlobalShortcut(
   const [listenerRegistered, setListenerRegistered] = useState(false);
 
   useEffect(() => {
-    let unlisten: (() => void) | null = null;
+    const cleanupFns: Array<() => void> = [];
     let disposed = false;
 
     void getCurrentWindow()
@@ -39,7 +43,7 @@ export function useGlobalShortcut(
           return;
         }
 
-        unlisten = cleanup;
+        cleanupFns.push(cleanup);
         setListenerRegistered(true);
         traceHotkeyEvent("frontend_hotkey_listener_registered").catch(() => {});
         const elapsed = Math.round(performance.now() - appStartMs);
@@ -52,11 +56,28 @@ export function useGlobalShortcut(
         console.warn("Failed to register dictation toggle listener:", error);
       });
 
+    void getCurrentWindow()
+      .listen(TOGGLE_REALTIME_EVENT, () => {
+        if (!shouldHandleHotkeyRef.current()) {
+          return;
+        }
+        toggleRealtimeRef.current();
+      })
+      .then((cleanup) => {
+        if (disposed) {
+          cleanup();
+          return;
+        }
+
+        cleanupFns.push(cleanup);
+      })
+      .catch((error) => {
+        console.warn("Failed to register realtime toggle listener:", error);
+      });
+
     return () => {
       disposed = true;
-      if (unlisten) {
-        unlisten();
-      }
+      cleanupFns.forEach((cleanup) => cleanup());
     };
   }, [appStartMs]);
 

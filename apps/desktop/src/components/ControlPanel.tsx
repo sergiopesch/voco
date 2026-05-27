@@ -5,10 +5,12 @@ import type {
   AppConfig,
   AudioDeviceOption,
   RuntimeDiagnostics,
+  RealtimeStatus,
   UpdateCheckState,
 } from "@/types";
 import { calculateVisualAudioLevelFromSamples } from "@/lib/audioLevel";
 import { openMicrophoneStream } from "@/lib/audioInput";
+import { RealtimeMicVisual } from "@/components/RealtimeMicVisual";
 import vocoBrandImage from "../../../../assets/voco-logo.png";
 import vocoTrayReadyImage from "../../../../assets/voco logo green v1.png";
 import vocoTrayRecordingImage from "../../../../assets/voco logo red v1.png";
@@ -23,6 +25,11 @@ interface ControlPanelProps {
   updateState: UpdateCheckState;
   runtimeDiagnostics: RuntimeDiagnostics | null;
   isDictationActive: boolean;
+  isRealtimeActive: boolean;
+  realtimeStatus: RealtimeStatus;
+  realtimeDetail: string;
+  realtimeError: string | null;
+  realtimeLevel: number;
   selectedDeviceId: string | null;
   availableDevices: AudioDeviceOption[];
   microphonePermission: "unknown" | "granted" | "denied";
@@ -36,6 +43,7 @@ interface ControlPanelProps {
   onOpenReleasePage: (url: string) => Promise<void>;
   onRefreshRuntimeDiagnostics: () => Promise<void>;
   onToggleDictation: () => void;
+  onToggleRealtime: () => void;
 }
 
 const PANEL_SECTIONS = [
@@ -65,6 +73,11 @@ export function ControlPanel({
   updateState,
   runtimeDiagnostics,
   isDictationActive,
+  isRealtimeActive,
+  realtimeStatus,
+  realtimeDetail,
+  realtimeError,
+  realtimeLevel,
   selectedDeviceId,
   availableDevices,
   microphonePermission,
@@ -78,6 +91,7 @@ export function ControlPanel({
   onOpenReleasePage,
   onRefreshRuntimeDiagnostics,
   onToggleDictation,
+  onToggleRealtime,
 }: ControlPanelProps) {
   async function handleHeaderPointerDown(event: MouseEvent<HTMLElement>) {
     if (event.button !== 0) {
@@ -107,6 +121,9 @@ export function ControlPanel({
     config.openclawPromptPrefix,
   );
   const [openClawError, setOpenClawError] = useState<string | null>(null);
+  const isOpenClawTarget =
+    config.transcriptTarget === "openclaw-agent" ||
+    config.transcriptTarget === "openclaw-speech";
   const [previewLevel, setPreviewLevel] = useState(0);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const previewFrameRef = useRef<number | null>(null);
@@ -369,13 +386,29 @@ export function ControlPanel({
         {isPopover ? (
           <section className="voco-popover">
             <div className="voco-popover__state">
-              <span className="voco-panel__state-label">Current state</span>
-              <strong>{statusLabel}</strong>
-              <p>Hotkey: <code>{config.hotkey}</code></p>
+              <div className="voco-popover__state-main">
+                <div>
+                  <span className="voco-panel__state-label">Current state</span>
+                  <strong>{statusLabel}</strong>
+                  <p>Dictation: <code>{config.hotkey}</code></p>
+                  <p>Realtime: <code>Alt+R</code></p>
+                </div>
+                <RealtimeMicVisual
+                  active={isRealtimeActive}
+                  level={realtimeLevel}
+                  status={realtimeStatus}
+                />
+              </div>
             </div>
             <div className="voco-popover__actions">
               <button className="voco-button voco-button--primary" onClick={onToggleDictation}>
                 {isDictationActive ? "Stop listening" : "Start listening"}
+              </button>
+              <button
+                className="voco-button voco-button--secondary"
+                onClick={onToggleRealtime}
+              >
+                {isRealtimeActive ? "Stop realtime" : "Start realtime"}
               </button>
               <button
                 className="voco-button voco-button--secondary"
@@ -392,6 +425,15 @@ export function ControlPanel({
             </div>
             <div className="voco-inline-note">
               Selected input: {selectedDeviceLabel}
+            </div>
+            <div
+              className={[
+                "voco-inline-note",
+                realtimeStatus === "error" ? "voco-inline-note--error" : "",
+              ].join(" ")}
+            >
+              Realtime: {realtimeDetail}
+              {realtimeError ? ` ${realtimeError}` : ""}
             </div>
           </section>
         ) : isOnboarding ? (
@@ -681,10 +723,12 @@ export function ControlPanel({
                     >
                       <option value="cursor">Type transcript at cursor</option>
                       <option value="openclaw-agent">Ask OpenClaw and type answer</option>
+                      <option value="openclaw-speech">Ask OpenClaw and speak answer</option>
                     </select>
                   </label>
                   <div className="voco-inline-note">
                     OpenClaw mode sends the local transcript to your configured OpenClaw CLI agent.
+                    Speech output uses OpenClaw TTS and local audio playback.
                   </div>
                   <label className="voco-field">
                     <span>OpenClaw agent</span>
@@ -702,7 +746,7 @@ export function ControlPanel({
                           void saveOpenClawSettings();
                         }
                       }}
-                      disabled={config.transcriptTarget !== "openclaw-agent"}
+                      disabled={!isOpenClawTarget}
                     />
                   </label>
                   <label className="voco-field">
@@ -716,7 +760,7 @@ export function ControlPanel({
                           void saveOpenClawSettings();
                         }
                       }}
-                      disabled={config.transcriptTarget !== "openclaw-agent"}
+                      disabled={!isOpenClawTarget}
                     />
                   </label>
                   {openClawError ? (
@@ -731,7 +775,7 @@ export function ControlPanel({
                     <button
                       className="voco-button voco-button--primary"
                       onClick={() => void saveOpenClawSettings()}
-                      disabled={config.transcriptTarget !== "openclaw-agent"}
+                      disabled={!isOpenClawTarget}
                     >
                       Save OpenClaw settings
                     </button>
@@ -776,6 +820,9 @@ export function ControlPanel({
                   <div className="voco-inline-note">
                     The current backend is most reliable with <code>Alt+D</code> and{" "}
                     <code>Alt+Shift+D</code> on Wayland.
+                  </div>
+                  <div className="voco-inline-note">
+                    Realtime conversation uses <code>Alt+R</code>.
                   </div>
                 </section>
               ) : null}
