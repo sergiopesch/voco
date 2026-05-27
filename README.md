@@ -54,6 +54,8 @@ To use OpenClaw mode, open Settings -> Output, choose `Ask OpenClaw and type ans
 
 To use realtime conversation, store `OPENAI_API_KEY=...` in `~/.openclaw/realtime.env`, then press `Alt+R` or open the VOCO popover and press `Start realtime`. Press `Alt+R` again or press `Stop realtime` to end the session. While realtime is active, the VOCO mic visual appears in the popover or hidden overlay and follows both your microphone level and the assistant's spoken response level.
 
+Detailed realtime behavior, first-toggle guarantees, diagnostics, and QA criteria are defined in [`docs/realtime-conversation-spec.md`](docs/realtime-conversation-spec.md).
+
 ## Requirements
 
 - Ubuntu or Debian
