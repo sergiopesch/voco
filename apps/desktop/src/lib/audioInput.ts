@@ -6,6 +6,17 @@ export interface AudioInputProcessingOptions {
   autoGainControl?: boolean;
 }
 
+export type AudioInputFallbackStage =
+  | "none"
+  | "minimal-constraints"
+  | "default-device";
+
+export interface OpenMicrophoneStreamResult {
+  fallbackStage: AudioInputFallbackStage;
+  selectedDeviceConfigured: boolean;
+  stream: MediaStream;
+}
+
 interface AudioInputDeviceCandidate {
   deviceId: string;
   kind: MediaDeviceKind;
@@ -84,21 +95,78 @@ export function buildAudioConstraints(
 ): MediaTrackConstraints {
   return {
     deviceId: deviceId ? { exact: deviceId } : undefined,
-    channelCount: 1,
-    echoCancellation: processing.echoCancellation ?? false,
-    noiseSuppression: processing.noiseSuppression ?? false,
-    autoGainControl: processing.autoGainControl ?? false,
+    channelCount: { ideal: 1 },
+    echoCancellation: { ideal: processing.echoCancellation ?? false },
+    noiseSuppression: { ideal: processing.noiseSuppression ?? false },
+    autoGainControl: { ideal: processing.autoGainControl ?? false },
   };
+}
+
+function buildMinimalAudioConstraints(deviceId: string | null): MediaTrackConstraints {
+  return {
+    deviceId: deviceId ? { exact: deviceId } : undefined,
+  };
+}
+
+function isConstraintFailure(error: unknown): boolean {
+  const name =
+    typeof error === "object" && error !== null && "name" in error
+      ? String((error as { name?: unknown }).name)
+      : "";
+  return (
+    name === "OverconstrainedError" ||
+    name === "ConstraintNotSatisfiedError" ||
+    name === "NotFoundError"
+  );
 }
 
 export async function openMicrophoneStream(
   deviceId: string | null,
   processing?: AudioInputProcessingOptions,
 ): Promise<MediaStream> {
+  return openMicrophoneStreamWithDiagnostics(deviceId, processing).then(
+    (result) => result.stream,
+  );
+}
+
+export async function openMicrophoneStreamWithDiagnostics(
+  deviceId: string | null,
+  processing?: AudioInputProcessingOptions,
+): Promise<OpenMicrophoneStreamResult> {
   const resolvedDeviceId = await resolvePreferredAudioInputDeviceId(deviceId);
-  return navigator.mediaDevices.getUserMedia({
-    audio: buildAudioConstraints(resolvedDeviceId, processing),
-  });
+  const selectedDeviceConfigured = Boolean(deviceId);
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: buildAudioConstraints(resolvedDeviceId, processing),
+    });
+    return { fallbackStage: "none", selectedDeviceConfigured, stream };
+  } catch (error) {
+    if (!isConstraintFailure(error)) {
+      throw error;
+    }
+  }
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: buildMinimalAudioConstraints(resolvedDeviceId),
+    });
+    return {
+      fallbackStage: "minimal-constraints",
+      selectedDeviceConfigured,
+      stream,
+    };
+  } catch (error) {
+    if (!isConstraintFailure(error)) {
+      throw error;
+    }
+  }
+
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  return {
+    fallbackStage: "default-device",
+    selectedDeviceConfigured,
+    stream,
+  };
 }
 
 export async function probeMicrophoneAccess(deviceId: string | null): Promise<void> {

@@ -50,11 +50,11 @@ code {
 }
 
 .voco-overlay {
-  width: 280px;
-  height: 132px;
+  width: 460px;
+  height: 196px;
   box-sizing: border-box;
-  padding: 16px 18px;
-  border-radius: 22px;
+  padding: 18px 20px;
+  border-radius: 18px;
   border: 1px solid rgba(199, 204, 213, 0.16);
   background:
     radial-gradient(circle at top left, rgba(225, 229, 236, 0.16), transparent 42%),
@@ -78,16 +78,47 @@ code {
 }
 
 .voco-overlay__headline {
-  font-size: 1.1rem;
-  letter-spacing: -0.03em;
+  font-size: 1.18rem;
+  letter-spacing: 0;
 }
 
 .voco-overlay__copy {
   margin: 0;
-  min-height: 2.8em;
+  min-height: 5.1em;
   color: var(--voco-text-secondary);
-  font-size: 0.92rem;
+  font-size: 0.96rem;
   line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.voco-overlay__transcript {
+  margin: 0;
+  min-height: 5.1em;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(225, 229, 236, 0.18);
+  background: rgba(255, 255, 255, 0.075);
+  color: var(--voco-text-primary);
+  font-size: 1rem;
+  font-weight: 500;
+  line-height: 1.42;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.voco-overlay[data-live-preview="true"] {
+  border-color: rgba(225, 229, 236, 0.34);
+  box-shadow:
+    0 24px 52px rgba(5, 6, 10, 0.6),
+    0 0 0 1px rgba(255, 255, 255, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .voco-overlay__meter {
@@ -120,7 +151,7 @@ code {
 .voco-realtime-overlay__copy {
   min-width: 0;
   display: grid;
-  gap: 6px;
+  gap: 5px;
 }
 
 .voco-realtime-overlay .voco-overlay__copy {
@@ -128,7 +159,37 @@ code {
   display: -webkit-box;
   overflow: hidden;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 1;
+}
+
+.voco-realtime-overlay__actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.voco-realtime-overlay__button {
+  min-width: 76px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid rgba(225, 229, 236, 0.18);
+  background: rgba(225, 229, 236, 0.08);
+  color: var(--voco-text);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.voco-realtime-overlay__button:hover {
+  border-color: rgba(225, 229, 236, 0.34);
+  background: rgba(225, 229, 236, 0.14);
+}
+
+.voco-realtime-overlay__button--danger {
+  border-color: rgba(255, 118, 118, 0.34);
+  background: rgba(255, 118, 118, 0.12);
+  color: #ffd5d5;
 }
 
 .voco-realtime-mic {
@@ -269,6 +330,11 @@ code {
   background: transparent;
 }
 
+.voco-panel[data-surface="settings"],
+.voco-panel[data-surface="onboarding"] {
+  padding: 8px;
+}
+
 .voco-panel__shell {
   width: 100%;
   height: 100%;
@@ -281,6 +347,85 @@ code {
   display: grid;
   grid-template-rows: auto 1fr auto;
   overflow: hidden;
+}
+
+.voco-resize-zones {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 30;
+}
+
+.voco-resize-zone {
+  position: absolute;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  pointer-events: auto;
+}
+
+.voco-resize-zone--north,
+.voco-resize-zone--south {
+  left: 14px;
+  right: 14px;
+  height: 12px;
+  cursor: ns-resize;
+}
+
+.voco-resize-zone--north {
+  top: 0;
+}
+
+.voco-resize-zone--south {
+  bottom: 0;
+}
+
+.voco-resize-zone--west,
+.voco-resize-zone--east {
+  top: 14px;
+  bottom: 14px;
+  width: 12px;
+  cursor: ew-resize;
+}
+
+.voco-resize-zone--west {
+  left: 0;
+}
+
+.voco-resize-zone--east {
+  right: 0;
+}
+
+.voco-resize-zone--northwest,
+.voco-resize-zone--northeast,
+.voco-resize-zone--southwest,
+.voco-resize-zone--southeast {
+  width: 18px;
+  height: 18px;
+}
+
+.voco-resize-zone--northwest {
+  top: 0;
+  left: 0;
+  cursor: nwse-resize;
+}
+
+.voco-resize-zone--northeast {
+  top: 0;
+  right: 0;
+  cursor: nesw-resize;
+}
+
+.voco-resize-zone--southwest {
+  bottom: 0;
+  left: 0;
+  cursor: nesw-resize;
+}
+
+.voco-resize-zone--southeast {
+  right: 0;
+  bottom: 0;
+  cursor: nwse-resize;
 }
 
 .voco-panel__hero {
@@ -477,6 +622,51 @@ code {
 
 .voco-inline-note--error {
   color: #ff9caf;
+}
+
+.voco-settings__jump {
+  width: 100%;
+  margin-top: 8px;
+  padding: 16px 18px;
+  border: 1px solid rgba(199, 204, 213, 0.14);
+  border-radius: 8px;
+  background: rgba(225, 229, 236, 0.055);
+  color: var(--voco-text);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.voco-settings__jump:hover {
+  border-color: rgba(225, 229, 236, 0.24);
+  background: rgba(225, 229, 236, 0.085);
+}
+
+.voco-settings__jump span:first-child {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.voco-settings__jump strong {
+  font-size: 0.96rem;
+  font-weight: 650;
+}
+
+.voco-settings__jump small {
+  color: var(--voco-text-secondary);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.voco-settings__jump span:last-child {
+  flex: 0 0 auto;
+  color: var(--voco-text-muted);
+  font-size: 0.86rem;
+  font-weight: 650;
 }
 
 .voco-popover {
@@ -809,8 +999,9 @@ code {
 }
 
 @media (max-width: 900px) {
-  .voco-panel {
-    padding: 14px;
+  .voco-panel[data-surface="settings"],
+  .voco-panel[data-surface="onboarding"] {
+    padding: 8px;
   }
 
   .voco-panel__hero,

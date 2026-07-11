@@ -1,7 +1,7 @@
 use log::warn;
 use std::io::Write;
 use std::path::Path;
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(rename_all = "kebab-case")]
@@ -102,6 +102,16 @@ fn command_available(command: &str) -> bool {
         .unwrap_or(false)
 }
 
+fn process_running(process_name: &str) -> bool {
+    Command::new("pgrep")
+        .args(["-x", process_name])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map(|status| status.success())
+        .unwrap_or(false)
+}
+
 fn build_support<F>(
     required_commands: &[&str],
     optional_commands: &[&str],
@@ -149,8 +159,15 @@ where
     let type_simulation = match session {
         SessionKind::Wayland => build_support(
             &["ydotool"],
-            &[],
-            |_| "Direct type simulation is ready on Wayland.".to_string(),
+            &["ydotoold"],
+            |optional_missing| {
+                if optional_missing.is_empty() {
+                    "Direct type simulation is ready on Wayland.".to_string()
+                } else {
+                    "Direct type simulation can run on Wayland, but ydotoold is missing or not running; cursor typing may be delayed or unreliable."
+                        .to_string()
+                }
+            },
             |missing| {
                 format!(
                     "Direct type simulation on Wayland requires: {}.",
@@ -176,10 +193,13 @@ where
     let clipboard = match session {
         SessionKind::Wayland => build_support(
             &["wl-copy", "ydotool"],
-            &["wl-paste"],
+            &["wl-paste", "ydotoold"],
             |optional_missing| {
                 if optional_missing.is_empty() {
                     "Clipboard insertion and clipboard restoration are ready on Wayland."
+                        .to_string()
+                } else if optional_missing.iter().any(|command| command == "ydotoold") {
+                    "Clipboard insertion can run on Wayland, but ydotoold is missing or not running; the paste gesture may be delayed or unreliable."
                         .to_string()
                 } else {
                     "Clipboard insertion is ready on Wayland, but clipboard restoration is unavailable until wl-paste is installed."
@@ -216,7 +236,13 @@ where
 }
 
 pub fn runtime_diagnostics() -> RuntimeDiagnostics {
-    runtime_diagnostics_with(session_kind(), command_available)
+    runtime_diagnostics_with(session_kind(), |command| {
+        if command == "ydotoold" {
+            command_available(command) && process_running(command)
+        } else {
+            command_available(command)
+        }
+    })
 }
 
 fn parse_requested_strategy(preferred: &str) -> Result<RequestedStrategy, String> {
@@ -253,11 +279,43 @@ pub fn insert_text(text: &str, preferred: &str) -> Result<InsertionResult, Strin
     }
 }
 
+pub fn replace_live_text(
+    previous_char_count: usize,
+    next_text: &str,
+) -> Result<InsertionResult, String> {
+    if previous_char_count != 0 {
+        return Err("Live cursor streaming cannot delete text".to_string());
+    }
+    if next_text.len() > 20_000 {
+        return Err("Live text is too long for insertion".to_string());
+    }
+
+    let strategy = if is_wayland() {
+        if next_text.is_empty() || try_ydotool(next_text) {
+            ActiveStrategy::Ydotool
+        } else {
+            return Err(type_simulation_error());
+        }
+    } else {
+        if next_text.is_empty() || try_xdotool(next_text) {
+            ActiveStrategy::Xdotool
+        } else {
+            return Err(type_simulation_error());
+        }
+    };
+
+    Ok(InsertionResult { strategy })
+}
+
 fn try_ydotool(text: &str) -> bool {
     Command::new("ydotool")
         .arg("type")
+        .arg("--key-delay")
+        .arg("2")
         .arg("--")
         .arg(text)
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
         .status()
         .map(|s| s.success())
         .unwrap_or(false)
@@ -271,6 +329,8 @@ fn try_xdotool(text: &str) -> bool {
         .arg("12")
         .arg("--")
         .arg(text)
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
         .status()
         .map(|s| s.success())
         .unwrap_or(false)
@@ -332,6 +392,8 @@ fn pipe_to_command(cmd: &str, args: &[&str], data: &[u8]) -> Result<(), String> 
     let mut child = Command::new(cmd)
         .args(args)
         .stdin(std::process::Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
         .spawn()
         .map_err(|e| format!("Failed to run {cmd}: {e}"))?;
 
@@ -381,6 +443,8 @@ fn clipboard_paste(text: &str) -> Result<(), String> {
     if wayland {
         let paste_ok = Command::new("ydotool")
             .args(["key", "29:1", "47:1", "47:0", "29:0"])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
             .status()
             .map(|s| s.success())
             .unwrap_or(false);
@@ -393,6 +457,8 @@ fn clipboard_paste(text: &str) -> Result<(), String> {
     } else {
         let paste_ok = Command::new("xdotool")
             .args(["key", "--clearmodifiers", "ctrl+v"])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
             .status()
             .map(|s| s.success())
             .unwrap_or(false);
@@ -486,8 +552,28 @@ mod tests {
         assert!(diagnostics.clipboard.available);
         assert_eq!(
             diagnostics.clipboard.optional_missing_commands,
-            vec!["wl-paste".to_string()]
+            vec!["wl-paste".to_string(), "ydotoold".to_string()]
         );
+    }
+
+    #[test]
+    fn runtime_diagnostics_marks_wayland_typing_degraded_without_ydotoold() {
+        let diagnostics =
+            runtime_diagnostics_with(SessionKind::Wayland, |command| command == "ydotool");
+        assert!(diagnostics.type_simulation.available);
+        assert_eq!(
+            diagnostics.type_simulation.optional_missing_commands,
+            vec!["ydotoold".to_string()]
+        );
+
+        let diagnostics = runtime_diagnostics_with(SessionKind::Wayland, |command| {
+            matches!(command, "ydotool" | "ydotoold")
+        });
+        assert!(diagnostics.type_simulation.available);
+        assert!(diagnostics
+            .type_simulation
+            .optional_missing_commands
+            .is_empty());
     }
 
     #[test]
@@ -501,5 +587,22 @@ mod tests {
             diagnostics.clipboard.missing_commands,
             vec!["xclip".to_string()]
         );
+    }
+
+    #[test]
+    fn live_cursor_insertion_rejects_deletion_requests() {
+        let result = replace_live_text(1, "replacement");
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err(),
+            "Live cursor streaming cannot delete text"
+        );
+    }
+
+    #[test]
+    fn live_cursor_insertion_rejects_oversized_text() {
+        let result = replace_live_text(0, &"x".repeat(20_001));
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Live text is too long for insertion");
     }
 }

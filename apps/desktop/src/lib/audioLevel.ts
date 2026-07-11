@@ -8,18 +8,16 @@ export function calculateCenteredRms(samples: ArrayLike<number>): number {
   }
 
   let sum = 0;
+  let squaredSum = 0;
   for (let i = 0; i < samples.length; i += 1) {
-    sum += samples[i] ?? 0;
+    const sample = samples[i] ?? 0;
+    sum += sample;
+    squaredSum += sample * sample;
   }
 
   const mean = sum / samples.length;
-  let squaredSum = 0;
-  for (let i = 0; i < samples.length; i += 1) {
-    const centered = (samples[i] ?? 0) - mean;
-    squaredSum += centered * centered;
-  }
-
-  return Math.sqrt(squaredSum / samples.length);
+  const variance = squaredSum / samples.length - mean * mean;
+  return Math.sqrt(Math.max(0, variance));
 }
 
 export function calculateVisualAudioLevel(rms: number): number {
@@ -58,4 +56,26 @@ export function removeDcOffset(samples: Float32Array): Float32Array {
   }
 
   return centered;
+}
+
+export function removeDcOffsetInPlace(samples: Float32Array): Float32Array {
+  if (samples.length === 0) {
+    return samples;
+  }
+
+  let sum = 0;
+  for (let i = 0; i < samples.length; i += 1) {
+    sum += samples[i] ?? 0;
+  }
+
+  const mean = sum / samples.length;
+  if (Math.abs(mean) < 1e-6) {
+    return samples;
+  }
+
+  for (let i = 0; i < samples.length; i += 1) {
+    samples[i] = (samples[i] ?? 0) - mean;
+  }
+
+  return samples;
 }

@@ -28,10 +28,10 @@
   <url type="vcs-browser">https://github.com/sergiopesch/voco</url>
   <content_rating type="oars-1.1" />
   <releases>
-    <release version="2026.0.16" date="2026-04-14">
+    <release version="2026.0.17" date="2026-07-11">
       <description>
-        <p>Aligned the installer and docs around the most reliable Wayland hotkeys, reduced dictation recordings to a 60-second cap, and removed base64 overhead from the audio IPC path.</p>
-        <p>Current onboarding still focuses on microphone setup and hotkeys while voice profile work remains future-facing.</p>
+        <p>Adds bounded 10-minute dictation, chunked local transcription, append-only live cursor previews, and safer final transcript reconciliation.</p>
+        <p>Improves audio capture throughput and memory use, adds optional local model and realtime assistant paths, and hardens Linux packaging and release verification.</p>
       </description>
     </release>
   </releases>

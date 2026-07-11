@@ -3,6 +3,7 @@ import {
   calculateCenteredRms,
   calculateVisualAudioLevelFromSamples,
   removeDcOffset,
+  removeDcOffsetInPlace,
 } from "@/lib/audioLevel";
 
 describe("audioLevel", () => {
@@ -39,5 +40,19 @@ describe("audioLevel", () => {
         expect.closeTo(-0.1, 6),
       ]),
     );
+  });
+
+  it("centers owned recording buffers without allocating a replacement", () => {
+    const samples = new Float32Array([0.35, 0.15, 0.35, 0.15]);
+
+    const centered = removeDcOffsetInPlace(samples);
+
+    expect(centered).toBe(samples);
+    expect(Array.from(samples)).toEqual([
+      expect.closeTo(0.1, 6),
+      expect.closeTo(-0.1, 6),
+      expect.closeTo(0.1, 6),
+      expect.closeTo(-0.1, 6),
+    ]);
   });
 });

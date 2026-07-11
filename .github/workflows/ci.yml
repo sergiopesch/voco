@@ -18,9 +18,9 @@ jobs:
     name: Frontend Checks
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 20
           cache: npm
@@ -32,7 +32,7 @@ jobs:
             pkg-config libglib2.0-dev libsoup-3.0-dev \
             libjavascriptcoregtk-4.1-dev libwebkit2gtk-4.1-dev \
             libayatana-appindicator3-dev \
-            desktop-file-utils appstream
+            desktop-file-utils appstream cmake
 
       - name: Install Node dependencies
         run: npm ci
@@ -62,7 +62,7 @@ jobs:
     name: Rust Check & Test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install system dependencies
         run: |
@@ -70,7 +70,7 @@ jobs:
           sudo apt-get install -y \
             pkg-config libglib2.0-dev libsoup-3.0-dev \
             libjavascriptcoregtk-4.1-dev libwebkit2gtk-4.1-dev \
-            libayatana-appindicator3-dev
+            libayatana-appindicator3-dev cmake
 
       - uses: dtolnay/rust-toolchain@stable
         with:

@@ -17,10 +17,18 @@ pub struct AppConfig {
     pub insertion_strategy: InsertionStrategy,
     #[serde(default = "default_transcript_target")]
     pub transcript_target: TranscriptTarget,
+    #[serde(default = "default_live_cursor_mode")]
+    pub live_cursor_mode: LiveCursorMode,
     #[serde(default = "default_openclaw_agent")]
     pub openclaw_agent: String,
     #[serde(default = "default_openclaw_prompt_prefix")]
     pub openclaw_prompt_prefix: String,
+    #[serde(default = "default_transcript_enhancement")]
+    pub transcript_enhancement: TranscriptEnhancement,
+    #[serde(default = "default_local_llm_endpoint")]
+    pub local_llm_endpoint: String,
+    #[serde(default)]
+    pub local_llm_model: Option<String>,
     #[serde(default)]
     pub onboarding_completed: bool,
     #[serde(default = "default_update_channel")]
@@ -70,12 +78,24 @@ fn default_transcript_target() -> TranscriptTarget {
     TranscriptTarget::Cursor
 }
 
+fn default_live_cursor_mode() -> LiveCursorMode {
+    LiveCursorMode::StableCursorStreaming
+}
+
 fn default_openclaw_agent() -> String {
     "main".to_string()
 }
 
 fn default_openclaw_prompt_prefix() -> String {
     "You are my electronics professor and robotics companion. Explain the answer step by step, call out Raspberry Pi wiring safety risks, and ask before any physical action that could damage hardware.".to_string()
+}
+
+fn default_transcript_enhancement() -> TranscriptEnhancement {
+    TranscriptEnhancement::Off
+}
+
+fn default_local_llm_endpoint() -> String {
+    "http://127.0.0.1:8080/v1/chat/completions".to_string()
 }
 
 fn default_update_channel() -> UpdateChannel {
@@ -104,8 +124,27 @@ pub enum InsertionStrategy {
 pub enum TranscriptTarget {
     #[default]
     Cursor,
+    LocalAgent,
     OpenclawAgent,
     OpenclawSpeech,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum LiveCursorMode {
+    #[default]
+    StableCursorStreaming,
+    PreviewOverlayOnly,
+    FinalTextOnly,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum TranscriptEnhancement {
+    #[default]
+    Off,
+    Conservative,
+    CommandsOnly,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -153,8 +192,12 @@ impl Default for AppConfig {
             selected_mic: None,
             insertion_strategy: InsertionStrategy::Auto,
             transcript_target: default_transcript_target(),
+            live_cursor_mode: default_live_cursor_mode(),
             openclaw_agent: default_openclaw_agent(),
             openclaw_prompt_prefix: default_openclaw_prompt_prefix(),
+            transcript_enhancement: default_transcript_enhancement(),
+            local_llm_endpoint: default_local_llm_endpoint(),
+            local_llm_model: None,
             onboarding_completed: false,
             update_channel: default_update_channel(),
             install_channel: default_install_channel(),
@@ -297,10 +340,23 @@ mod tests {
         assert!(config.selected_mic.is_none());
         assert!(matches!(config.insertion_strategy, InsertionStrategy::Auto));
         assert!(matches!(config.transcript_target, TranscriptTarget::Cursor));
+        assert!(matches!(
+            config.live_cursor_mode,
+            LiveCursorMode::StableCursorStreaming
+        ));
         assert_eq!(config.openclaw_agent, "main");
         assert!(config
             .openclaw_prompt_prefix
             .contains("electronics professor"));
+        assert!(matches!(
+            config.transcript_enhancement,
+            TranscriptEnhancement::Off
+        ));
+        assert_eq!(
+            config.local_llm_endpoint,
+            "http://127.0.0.1:8080/v1/chat/completions"
+        );
+        assert!(config.local_llm_model.is_none());
         assert!(!config.onboarding_completed);
         assert!(matches!(config.update_channel, UpdateChannel::Stable));
         assert!(matches!(
@@ -317,8 +373,12 @@ mod tests {
             selected_mic: Some("test-mic".to_string()),
             insertion_strategy: InsertionStrategy::Clipboard,
             transcript_target: TranscriptTarget::OpenclawAgent,
+            live_cursor_mode: LiveCursorMode::FinalTextOnly,
             openclaw_agent: "bench".to_string(),
             openclaw_prompt_prefix: "Teach safely.".to_string(),
+            transcript_enhancement: TranscriptEnhancement::Conservative,
+            local_llm_endpoint: "http://localhost:9090/v1/chat/completions".to_string(),
+            local_llm_model: Some("gemma-4-12b-it-qat".to_string()),
             onboarding_completed: true,
             update_channel: UpdateChannel::Beta,
             install_channel: InstallChannel::Appimage,
@@ -336,8 +396,24 @@ mod tests {
             parsed.transcript_target,
             TranscriptTarget::OpenclawAgent
         ));
+        assert!(matches!(
+            parsed.live_cursor_mode,
+            LiveCursorMode::FinalTextOnly
+        ));
         assert_eq!(parsed.openclaw_agent, "bench");
         assert_eq!(parsed.openclaw_prompt_prefix, "Teach safely.");
+        assert!(matches!(
+            parsed.transcript_enhancement,
+            TranscriptEnhancement::Conservative
+        ));
+        assert_eq!(
+            parsed.local_llm_endpoint,
+            "http://localhost:9090/v1/chat/completions"
+        );
+        assert_eq!(
+            parsed.local_llm_model.as_deref(),
+            Some("gemma-4-12b-it-qat")
+        );
         assert!(parsed.onboarding_completed);
         assert!(matches!(parsed.update_channel, UpdateChannel::Beta));
         assert!(matches!(parsed.install_channel, InstallChannel::Appimage));
@@ -351,10 +427,23 @@ mod tests {
         assert_eq!(config.hotkey, "Alt+D");
         assert!(matches!(config.insertion_strategy, InsertionStrategy::Auto));
         assert!(matches!(config.transcript_target, TranscriptTarget::Cursor));
+        assert!(matches!(
+            config.live_cursor_mode,
+            LiveCursorMode::StableCursorStreaming
+        ));
         assert_eq!(config.openclaw_agent, "main");
         assert!(config
             .openclaw_prompt_prefix
             .contains("electronics professor"));
+        assert!(matches!(
+            config.transcript_enhancement,
+            TranscriptEnhancement::Off
+        ));
+        assert_eq!(
+            config.local_llm_endpoint,
+            "http://127.0.0.1:8080/v1/chat/completions"
+        );
+        assert!(config.local_llm_model.is_none());
         assert!(!config.onboarding_completed);
         assert!(matches!(config.update_channel, UpdateChannel::Stable));
         assert!(matches!(
@@ -371,7 +460,19 @@ mod tests {
         assert_eq!(config.hotkey, "Alt+Shift+D");
         assert!(matches!(config.insertion_strategy, InsertionStrategy::Auto));
         assert!(matches!(config.transcript_target, TranscriptTarget::Cursor));
+        assert!(matches!(
+            config.live_cursor_mode,
+            LiveCursorMode::StableCursorStreaming
+        ));
         assert_eq!(config.openclaw_agent, "main");
+        assert!(matches!(
+            config.transcript_enhancement,
+            TranscriptEnhancement::Off
+        ));
+        assert_eq!(
+            config.local_llm_endpoint,
+            "http://127.0.0.1:8080/v1/chat/completions"
+        );
         assert!(!config.onboarding_completed);
         assert!(matches!(config.update_channel, UpdateChannel::Stable));
         assert!(matches!(
@@ -392,11 +493,35 @@ mod tests {
 
     #[test]
     fn transcript_target_serializes_kebab_case() {
+        let json = serde_json::to_string(&TranscriptTarget::LocalAgent).unwrap();
+        assert_eq!(json, r#""local-agent""#);
+
         let json = serde_json::to_string(&TranscriptTarget::OpenclawAgent).unwrap();
         assert_eq!(json, r#""openclaw-agent""#);
 
         let json = serde_json::to_string(&TranscriptTarget::OpenclawSpeech).unwrap();
         assert_eq!(json, r#""openclaw-speech""#);
+    }
+
+    #[test]
+    fn live_cursor_mode_serializes_kebab_case() {
+        let json = serde_json::to_string(&LiveCursorMode::StableCursorStreaming).unwrap();
+        assert_eq!(json, r#""stable-cursor-streaming""#);
+
+        let json = serde_json::to_string(&LiveCursorMode::PreviewOverlayOnly).unwrap();
+        assert_eq!(json, r#""preview-overlay-only""#);
+
+        let json = serde_json::to_string(&LiveCursorMode::FinalTextOnly).unwrap();
+        assert_eq!(json, r#""final-text-only""#);
+    }
+
+    #[test]
+    fn transcript_enhancement_serializes_kebab_case() {
+        let json = serde_json::to_string(&TranscriptEnhancement::CommandsOnly).unwrap();
+        assert_eq!(json, r#""commands-only""#);
+
+        let json = serde_json::to_string(&TranscriptEnhancement::Conservative).unwrap();
+        assert_eq!(json, r#""conservative""#);
     }
 
     #[test]

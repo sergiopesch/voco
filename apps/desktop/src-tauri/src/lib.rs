@@ -3,9 +3,13 @@ mod insertion;
 mod transcribe;
 mod tray;
 
-use config::{load_cached_update_check, save_cached_update_check, AppConfig, CachedUpdateCheck};
+use config::{
+    load_cached_update_check, save_cached_update_check, AppConfig, CachedUpdateCheck,
+    TranscriptEnhancement,
+};
 use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
+use std::io::Read;
 use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
 use std::sync::{LazyLock, Mutex};
 use std::time::Instant;
@@ -46,13 +50,14 @@ const TOGGLE_REALTIME_EVENT: &str = "voco:toggle-realtime";
 const LEGACY_TOGGLE_DICTATION_EVENT: &str = "voice:toggle-dictation";
 const REALTIME_HOTKEY: &str = "Alt+Shift+R";
 const TOGGLE_DEBOUNCE_MS: i64 = 120;
-const MAX_AUDIO_SECONDS: usize = 60;
+const MAX_AUDIO_SECONDS: usize = 600;
 const HIDDEN_WINDOW_POS_X: i32 = -100;
 const HIDDEN_WINDOW_POS_Y: i32 = -100;
 const HIDDEN_WINDOW_SIZE: u32 = 1;
 const OVERLAY_CURSOR_OFFSET_X: i32 = 20;
 const OVERLAY_CURSOR_OFFSET_Y: i32 = 24;
 const OVERLAY_MARGIN: i32 = 16;
+const MAX_MODEL_RESPONSE_BYTES: usize = 2 * 1024 * 1024;
 
 #[derive(Debug, Clone, Copy, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -164,6 +169,15 @@ fn trace_hotkey_event_with_fields(
         if let Some(auto_gain_control) = fields.auto_gain_control {
             record["auto_gain_control"] = serde_json::Value::Bool(auto_gain_control);
         }
+        if let Some(browser_action) = fields.browser_action.as_deref() {
+            record["browser_action"] = serde_json::Value::String(browser_action.to_string());
+        }
+        if let Some(duration_ms) = fields.duration_ms {
+            record["duration_ms"] = serde_json::Value::Number(duration_ms.into());
+        }
+        if let Some(dictation_session_id) = fields.dictation_session_id {
+            record["dictation_session_id"] = serde_json::Value::Number(dictation_session_id.into());
+        }
     }
 
     let line = match serde_json::to_string(&record) {
@@ -234,16 +248,12 @@ fn trace_frontend_hotkey_event(
             replay_pending_realtime_toggle(&app);
             Ok(())
         }
+        event if is_supported_dictation_trace_event(event) => {
+            trace_hotkey_event_with_fields(event, None, fields.as_ref());
+            Ok(())
+        }
         "frontend_toggle_received"
         | "frontend_realtime_toggle_received"
-        | "recording_state_requested"
-        | "recording_get_user_media_started"
-        | "recording_get_user_media_done"
-        | "recording_audio_context_ready"
-        | "recording_media_source_created"
-        | "recording_worklet_connected"
-        | "recording_script_processor_connected"
-        | "recording_state_active"
         | "realtime_start_requested"
         | "realtime_stop_requested"
         | "realtime_toggle_event_buffered"
@@ -277,6 +287,14 @@ fn trace_frontend_hotkey_event(
         | "realtime_response_cancel_sent"
         | "realtime_response_cancel_ignored_error"
         | "realtime_local_speech_commit_skipped_during_output"
+        | "realtime_microphone_muted"
+        | "realtime_microphone_unmuted"
+        | "realtime_browser_function_call_received"
+        | "realtime_browser_action_started"
+        | "realtime_browser_action_completed"
+        | "realtime_browser_action_failed"
+        | "realtime_browser_function_output_sent"
+        | "realtime_browser_response_create_sent"
         | "realtime_response_create_fallback_sent"
         | "realtime_no_speech_timeout"
         | "realtime_no_response_timeout"
@@ -287,6 +305,44 @@ fn trace_frontend_hotkey_event(
         }
         _ => Err(format!("Unsupported hotkey trace event: {event}")),
     }
+}
+
+fn is_supported_dictation_trace_event(event: &str) -> bool {
+    matches!(
+        event,
+        "recording_state_requested"
+            | "recording_get_user_media_started"
+            | "recording_get_user_media_constraints_fallback"
+            | "recording_get_user_media_default_fallback"
+            | "recording_get_user_media_done"
+            | "recording_audio_context_ready"
+            | "recording_media_source_created"
+            | "recording_worklet_connected"
+            | "recording_script_processor_connected"
+            | "recording_state_active"
+            | "dictation_live_preview_completed"
+            | "dictation_live_preview_skipped_short_audio"
+            | "dictation_live_preview_empty"
+            | "dictation_live_preview_updated"
+            | "dictation_live_preview_failed"
+            | "dictation_live_cursor_insert_updated"
+            | "dictation_live_cursor_insert_cleared"
+            | "dictation_live_cursor_insert_finalized"
+            | "dictation_live_cursor_insert_failed"
+            | "dictation_live_cursor_overlay_fallback"
+            | "dictation_live_cursor_unsafe_rewrite_blocked"
+            | "dictation_live_cursor_final_unreconciled"
+            | "dictation_live_cursor_commit_waiting"
+            | "dictation_first_live_text_visible"
+            | "dictation_stop_to_final_transcript"
+            | "dictation_stop_to_idle"
+            | "dictation_recording_duration"
+            | "dictation_transcription_completed"
+            | "dictation_enhancement_completed"
+            | "dictation_local_assistant_completed"
+            | "dictation_final_output_completed"
+            | "dictation_final_insertion_failed"
+    )
 }
 
 #[derive(Debug, Deserialize)]
@@ -301,6 +357,9 @@ struct FrontendTraceFields {
     echo_cancellation: Option<bool>,
     noise_suppression: Option<bool>,
     auto_gain_control: Option<bool>,
+    browser_action: Option<String>,
+    duration_ms: Option<u64>,
+    dictation_session_id: Option<u64>,
 }
 
 impl FrontendTraceFields {
@@ -319,6 +378,27 @@ impl FrontendTraceFields {
         if let Some(channel_count) = self.track_channel_count {
             if !(1..=16).contains(&channel_count) {
                 return Err(format!("Unsupported track channel count: {channel_count}"));
+            }
+        }
+        if let Some(browser_action) = self.browser_action.as_deref() {
+            if browser_action.len() > 40
+                || !browser_action
+                    .chars()
+                    .all(|ch| ch.is_ascii_alphanumeric() || ch == '_' || ch == '-')
+            {
+                return Err(format!("Unsupported browser action: {browser_action}"));
+            }
+        }
+        if let Some(duration_ms) = self.duration_ms {
+            if duration_ms > 3_600_000 {
+                return Err(format!("Unsupported duration: {duration_ms}"));
+            }
+        }
+        if let Some(dictation_session_id) = self.dictation_session_id {
+            if !(1..=1_000_000).contains(&dictation_session_id) {
+                return Err(format!(
+                    "Unsupported dictation session id: {dictation_session_id}"
+                ));
             }
         }
         Ok(())
@@ -418,7 +498,7 @@ fn decode_audio_bytes(bytes: &[u8]) -> Result<Vec<f32>, String> {
         .collect())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn transcribe_audio(
     app: tauri::AppHandle,
     audio_bytes: Vec<u8>,
@@ -444,11 +524,47 @@ fn transcribe_audio(
     }
 
     let mut whisper = state
-        .try_lock()
-        .map_err(|_| "Transcription already in progress".to_string())?;
+        .lock()
+        .map_err(|_| "Transcription state is unavailable".to_string())?;
 
     whisper.load_model(&model_path)?;
     whisper.transcribe(&samples)
+}
+
+#[tauri::command(async)]
+fn preview_transcribe_audio(
+    app: tauri::AppHandle,
+    audio_bytes: Vec<u8>,
+    state: tauri::State<'_, WhisperMutex>,
+) -> Result<Option<String>, String> {
+    let samples = decode_audio_bytes(&audio_bytes)?;
+
+    if samples.len() < 16000 {
+        return Ok(None);
+    }
+    if samples.len() > 16000 * 20 {
+        return Err("Preview audio too long (max 20 seconds)".to_string());
+    }
+
+    ensure_model_downloaded(&app)?;
+
+    let model_path = transcribe::default_model_path()?;
+    if !model_path.exists() {
+        return Err("Model is not available after download attempt.".to_string());
+    }
+
+    let Ok(mut whisper) = state.try_lock() else {
+        return Ok(None);
+    };
+
+    whisper.load_model(&model_path)?;
+    let text = whisper.transcribe(&samples)?;
+    let text = text.trim();
+    if text.is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(text.to_string()))
+    }
 }
 
 // --- Text insertion & notifications ---
@@ -506,7 +622,7 @@ fn open_external_url(url: String) -> Result<(), String> {
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn insert_text(text: String, strategy: String) -> Result<insertion::InsertionResult, String> {
     if text.is_empty() {
         return Err("No text to insert".to_string());
@@ -515,6 +631,14 @@ fn insert_text(text: String, strategy: String) -> Result<insertion::InsertionRes
         return Err("Text too long for insertion (max 100KB)".to_string());
     }
     insertion::insert_text(&text, &strategy)
+}
+
+#[tauri::command(async)]
+fn replace_live_text(
+    previous_char_count: usize,
+    next_text: String,
+) -> Result<insertion::InsertionResult, String> {
+    insertion::replace_live_text(previous_char_count, &next_text)
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -537,6 +661,27 @@ struct OpenClawSpeechResult {
 struct RealtimeClientSecretResult {
     value: String,
     expires_at: Option<i64>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct TranscriptEnhancementResult {
+    text: String,
+    used_enhancement: bool,
+    warning: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LocalLlmTestResult {
+    ok: bool,
+    detail: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LocalLlmAgentResult {
+    response: String,
 }
 
 fn build_openclaw_message(transcript: &str, prompt_prefix: &str) -> String {
@@ -614,7 +759,7 @@ fn wait_for_openclaw_agent(
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn ask_openclaw_agent(
     transcript: String,
     agent: String,
@@ -783,7 +928,7 @@ fn play_audio_file(audio_path: &str) -> Result<(), String> {
     ))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn speak_openclaw_response(text: String) -> Result<OpenClawSpeechResult, String> {
     let text = text.trim();
     if text.is_empty() {
@@ -796,6 +941,840 @@ fn speak_openclaw_response(text: String) -> Result<OpenClawSpeechResult, String>
     let result = openclaw_tts_convert(text)?;
     play_audio_file(&result.audio_path)?;
     Ok(result)
+}
+
+fn validate_local_llm_endpoint(raw: &str) -> Result<String, String> {
+    let value = raw.trim().trim_end_matches('/').to_string();
+    if value.is_empty() {
+        return Err("Local model endpoint is required".to_string());
+    }
+    if value.len() > 2048
+        || value
+            .chars()
+            .any(|ch| ch.is_control() || ch == '\\' || ch.is_whitespace())
+    {
+        return Err("Local model endpoint is invalid".to_string());
+    }
+    let parsed =
+        reqwest::Url::parse(&value).map_err(|_| "Local model endpoint is invalid".to_string())?;
+    if parsed.scheme() != "http" || !url_has_loopback_host(&parsed) || parsed.port().is_none() {
+        return Err(
+            "Local model endpoint must use http://localhost, http://127.0.0.1, or http://[::1]"
+                .to_string(),
+        );
+    }
+    if !parsed.username().is_empty() || parsed.password().is_some() || parsed.fragment().is_some() {
+        return Err("Local model endpoint must not include credentials or fragments".to_string());
+    }
+    Ok(value)
+}
+
+fn url_has_loopback_host(url: &reqwest::Url) -> bool {
+    let Some(host) = url.host_str() else {
+        return false;
+    };
+    let host = host
+        .strip_prefix('[')
+        .and_then(|host| host.strip_suffix(']'))
+        .unwrap_or(host);
+
+    host.eq_ignore_ascii_case("localhost")
+        || host
+            .parse::<std::net::IpAddr>()
+            .map(|address| address.is_loopback())
+            .unwrap_or(false)
+}
+
+fn build_loopback_http_client(
+    timeout: std::time::Duration,
+    connect_timeout: std::time::Duration,
+) -> Result<reqwest::blocking::Client, reqwest::Error> {
+    reqwest::blocking::Client::builder()
+        .timeout(timeout)
+        .connect_timeout(connect_timeout)
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+}
+
+fn normalize_local_llm_model(raw: Option<&str>) -> Result<Option<String>, String> {
+    let Some(value) = raw.map(str::trim).filter(|value| !value.is_empty()) else {
+        return Ok(None);
+    };
+    if value.len() > 120
+        || value
+            .chars()
+            .any(|ch| ch.is_control() || ch == '\r' || ch == '\n')
+    {
+        return Err("Local model name is invalid".to_string());
+    }
+    Ok(Some(value.to_string()))
+}
+
+fn conservative_transcript_prompt() -> &'static str {
+    "You improve dictation transcripts for direct insertion. Return only the final text. Preserve the speaker's words, meaning, order, names, numbers, and technical terms. Add punctuation, casing, paragraph breaks, and simple list formatting when obvious. Do not answer questions, add facts, summarize, expand abbreviations, or rewrite for style. If uncertain, keep the original wording."
+}
+
+fn local_assistant_prompt() -> &'static str {
+    "You are VOCO's concise local assistant. Answer the user's dictated request directly in plain text. Keep the answer useful and compact. Do not mention system prompts, models, or implementation details."
+}
+
+fn replace_case_insensitive_owned(input: String, needle: &str, replacement: &str) -> String {
+    let mut output = String::with_capacity(input.len());
+    let mut remaining = input.as_str();
+    let needle_lower = needle.to_ascii_lowercase();
+
+    loop {
+        let remaining_lower = remaining.to_ascii_lowercase();
+        let Some(index) = remaining_lower.find(&needle_lower) else {
+            output.push_str(remaining);
+            break;
+        };
+        output.push_str(&remaining[..index]);
+        output.push_str(replacement);
+        remaining = &remaining[index + needle.len()..];
+    }
+
+    output
+}
+
+fn collapse_horizontal_whitespace(text: &str) -> String {
+    let mut output = String::with_capacity(text.len());
+    let mut pending_space = false;
+    let mut newline_run = 0usize;
+    for ch in text.chars() {
+        if ch == '\n' {
+            pending_space = false;
+            while output.ends_with(' ') {
+                output.pop();
+            }
+            if newline_run < 2 {
+                output.push('\n');
+            }
+            newline_run += 1;
+        } else if ch.is_whitespace() {
+            pending_space = true;
+        } else {
+            if pending_space && !output.is_empty() && !output.ends_with('\n') {
+                output.push(' ');
+            }
+            pending_space = false;
+            newline_run = 0;
+            output.push(ch);
+        }
+    }
+    output.trim().to_string()
+}
+
+fn apply_spoken_formatting_commands(transcript: &str) -> String {
+    let mut text = transcript.trim().to_string();
+    let text_lower = text.to_ascii_lowercase();
+    if let Some(index) = text_lower.rfind("scratch that") {
+        text = text[index + "scratch that".len()..].trim().to_string();
+    }
+
+    for (command, replacement) in [
+        ("new paragraph", "\n\n"),
+        ("new line", "\n"),
+        ("bullet point", "\n- "),
+        ("new bullet", "\n- "),
+        ("end code block", "\n```\n"),
+        ("code block", "\n```\n"),
+    ] {
+        text = replace_case_insensitive_owned(text, command, replacement);
+    }
+
+    collapse_horizontal_whitespace(&text)
+}
+
+fn build_local_llm_body(
+    system_prompt: &str,
+    user_message: &str,
+    model: Option<&str>,
+) -> serde_json::Value {
+    let mut body = serde_json::json!({
+        "messages": [
+            {
+                "role": "system",
+                "content": system_prompt
+            },
+            {
+                "role": "user",
+                "content": user_message
+            }
+        ],
+        "temperature": 0,
+        "max_tokens": 2048,
+        "stream": false
+    });
+
+    if let Some(model) = model {
+        body["model"] = serde_json::Value::String(model.to_string());
+    }
+
+    body
+}
+
+fn parse_local_llm_chat_response(body: &str) -> Result<String, String> {
+    let parsed: serde_json::Value = serde_json::from_str(body)
+        .map_err(|error| format!("Failed to parse local model response: {error}"))?;
+    let content = parsed
+        .pointer("/choices/0/message/content")
+        .and_then(|content| content.as_str())
+        .or_else(|| {
+            parsed
+                .pointer("/choices/0/text")
+                .and_then(|text| text.as_str())
+        })
+        .map(str::trim)
+        .filter(|content| !content.is_empty())
+        .ok_or_else(|| "Local model returned no text".to_string())?;
+
+    Ok(content.to_string())
+}
+
+fn read_bounded_response_body(
+    mut reader: impl Read,
+    max_bytes: usize,
+    context: &str,
+) -> Result<String, String> {
+    let mut body = Vec::with_capacity(max_bytes.min(64 * 1024));
+    reader
+        .by_ref()
+        .take(max_bytes.saturating_add(1) as u64)
+        .read_to_end(&mut body)
+        .map_err(|error| format!("Failed to read {context}: {error}"))?;
+    if body.len() > max_bytes {
+        return Err(format!("{context} exceeded the {max_bytes}-byte limit"));
+    }
+    String::from_utf8(body).map_err(|error| format!("{context} was not valid UTF-8: {error}"))
+}
+
+fn call_local_llm_chat(
+    endpoint: &str,
+    system_prompt: &str,
+    user_message: &str,
+    model: Option<&str>,
+    timeout: std::time::Duration,
+) -> Result<String, String> {
+    let endpoint = validate_local_llm_endpoint(endpoint)?;
+    let model = normalize_local_llm_model(model)?;
+    let client = build_loopback_http_client(timeout, std::time::Duration::from_millis(900))
+        .map_err(|error| format!("Failed to build local model client: {error}"))?;
+    let response = client
+        .post(endpoint)
+        .header("Content-Type", "application/json")
+        .body(build_local_llm_body(system_prompt, user_message, model.as_deref()).to_string())
+        .send()
+        .map_err(|error| format!("Local model request failed: {error}"))?;
+    let status = response.status();
+    let response_body =
+        read_bounded_response_body(response, MAX_MODEL_RESPONSE_BYTES, "local model response")?;
+    if !status.is_success() {
+        return Err(format!(
+            "Local model request failed ({status}): {}",
+            clip_command_output(&response_body, 600)
+        ));
+    }
+
+    parse_local_llm_chat_response(&response_body)
+}
+
+#[tauri::command(async)]
+fn enhance_transcript(
+    transcript: String,
+    mode: TranscriptEnhancement,
+    endpoint: String,
+    model: Option<String>,
+) -> TranscriptEnhancementResult {
+    let transcript = transcript.trim();
+    if transcript.is_empty() {
+        return TranscriptEnhancementResult {
+            text: String::new(),
+            used_enhancement: false,
+            warning: None,
+        };
+    }
+    if transcript.len() > 100_000 {
+        return TranscriptEnhancementResult {
+            text: transcript.to_string(),
+            used_enhancement: false,
+            warning: Some("Transcript too long for local enhancement".to_string()),
+        };
+    }
+
+    let formatted = apply_spoken_formatting_commands(transcript);
+    match mode {
+        TranscriptEnhancement::Off => TranscriptEnhancementResult {
+            text: transcript.to_string(),
+            used_enhancement: false,
+            warning: None,
+        },
+        TranscriptEnhancement::CommandsOnly => TranscriptEnhancementResult {
+            used_enhancement: formatted != transcript,
+            text: formatted,
+            warning: None,
+        },
+        TranscriptEnhancement::Conservative => match call_local_llm_chat(
+            &endpoint,
+            conservative_transcript_prompt(),
+            &formatted,
+            model.as_deref(),
+            std::time::Duration::from_secs(12),
+        ) {
+            Ok(text) => TranscriptEnhancementResult {
+                text,
+                used_enhancement: true,
+                warning: None,
+            },
+            Err(error) => TranscriptEnhancementResult {
+                text: formatted,
+                used_enhancement: false,
+                warning: Some(error),
+            },
+        },
+    }
+}
+
+#[tauri::command(async)]
+fn test_local_llm(endpoint: String, model: Option<String>) -> LocalLlmTestResult {
+    match call_local_llm_chat(
+        &endpoint,
+        conservative_transcript_prompt(),
+        "test",
+        model.as_deref(),
+        std::time::Duration::from_secs(4),
+    ) {
+        Ok(_) => LocalLlmTestResult {
+            ok: true,
+            detail: "Local model endpoint responded.".to_string(),
+        },
+        Err(error) => LocalLlmTestResult {
+            ok: false,
+            detail: error,
+        },
+    }
+}
+
+#[tauri::command(async)]
+fn ask_local_llm_agent(
+    transcript: String,
+    endpoint: String,
+    model: Option<String>,
+) -> Result<LocalLlmAgentResult, String> {
+    let transcript = transcript.trim();
+    if transcript.is_empty() {
+        return Err("No transcript to send to local model".to_string());
+    }
+    if transcript.len() > 100_000 {
+        return Err("Transcript too long for local model (max 100KB)".to_string());
+    }
+
+    let response = call_local_llm_chat(
+        &endpoint,
+        local_assistant_prompt(),
+        transcript,
+        model.as_deref(),
+        std::time::Duration::from_secs(60),
+    )?;
+    Ok(LocalLlmAgentResult { response })
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct OpenClawBrowserActionInput {
+    action: String,
+    url: Option<String>,
+    target_id: Option<String>,
+    element_ref: Option<String>,
+    text: Option<String>,
+    key: Option<String>,
+    submit: Option<bool>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct OpenClawBrowserActionResult {
+    ok: bool,
+    action: String,
+    summary: String,
+    profile: String,
+    url: Option<String>,
+    target_id: Option<String>,
+    snapshot: Option<String>,
+    next_actions: Vec<String>,
+}
+
+fn openclaw_gateway_base_url() -> Result<String, String> {
+    if let Ok(value) = std::env::var("OPENCLAW_GATEWAY_URL") {
+        return validate_openclaw_gateway_base_url(&value);
+    }
+
+    let port = openclaw_config_value()
+        .and_then(|config| {
+            config
+                .pointer("/gateway/port")
+                .and_then(|port| port.as_u64())
+        })
+        .filter(|port| *port >= 1 && *port <= 65_535)
+        .unwrap_or(18_789);
+    Ok(format!("http://127.0.0.1:{port}"))
+}
+
+fn validate_openclaw_gateway_base_url(raw: &str) -> Result<String, String> {
+    let value = raw.trim().trim_end_matches('/').to_string();
+    if value.is_empty()
+        || value.len() > 2048
+        || value
+            .chars()
+            .any(|ch| ch.is_control() || ch == '\\' || ch.is_whitespace())
+    {
+        return Err("OPENCLAW_GATEWAY_URL is invalid".to_string());
+    }
+
+    let parsed =
+        reqwest::Url::parse(&value).map_err(|_| "OPENCLAW_GATEWAY_URL is invalid".to_string())?;
+    if !matches!(parsed.scheme(), "http" | "https")
+        || !url_has_loopback_host(&parsed)
+        || parsed.port().is_none()
+    {
+        return Err("OPENCLAW_GATEWAY_URL must point to localhost".to_string());
+    }
+    if !parsed.username().is_empty()
+        || parsed.password().is_some()
+        || parsed.fragment().is_some()
+        || parsed.query().is_some()
+    {
+        return Err(
+            "OPENCLAW_GATEWAY_URL must not include credentials, a query, or a fragment".to_string(),
+        );
+    }
+
+    Ok(value)
+}
+
+fn openclaw_config_value() -> Option<serde_json::Value> {
+    let path = dirs::home_dir()?.join(".openclaw").join("openclaw.json");
+    let contents = std::fs::read_to_string(path).ok()?;
+    serde_json::from_str(&contents).ok()
+}
+
+fn openclaw_gateway_bearer() -> Option<String> {
+    for env_name in ["OPENCLAW_GATEWAY_TOKEN", "OPENCLAW_GATEWAY_PASSWORD"] {
+        if let Ok(value) = std::env::var(env_name) {
+            let value = value.trim().to_string();
+            if !value.is_empty() {
+                return Some(value);
+            }
+        }
+    }
+
+    for relative_path in [
+        [".openclaw", ".env"].as_slice(),
+        [".openclaw", "gateway.systemd.env"].as_slice(),
+    ] {
+        let mut path = dirs::home_dir()?;
+        for part in relative_path {
+            path = path.join(part);
+        }
+        if let Ok(contents) = std::fs::read_to_string(path) {
+            for key in ["OPENCLAW_GATEWAY_TOKEN", "OPENCLAW_GATEWAY_PASSWORD"] {
+                if let Some(value) = parse_env_file_value(&contents, key) {
+                    return Some(value);
+                }
+            }
+        }
+    }
+
+    if let Some(value) = openclaw_json_file_value(
+        &dirs::home_dir()?
+            .join(".openclaw")
+            .join("node-gateway-auth.json"),
+        &["/gateway/auth/token", "/gateway/auth/password"],
+    ) {
+        return Some(value);
+    }
+
+    let config = openclaw_config_value()?;
+    for pointer in ["/gateway/auth/token", "/gateway/auth/password"] {
+        if let Some(value) = config
+            .pointer(pointer)
+            .and_then(|value| value.as_str())
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        {
+            return Some(value.to_string());
+        }
+    }
+    None
+}
+
+fn parse_env_file_value(contents: &str, wanted_key: &str) -> Option<String> {
+    for line in contents.lines() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        let Some((key, value)) = line.split_once('=') else {
+            continue;
+        };
+        if key.trim().trim_start_matches("export ").trim() == wanted_key {
+            let value = value
+                .trim()
+                .trim_matches('"')
+                .trim_matches('\'')
+                .to_string();
+            if !value.is_empty() {
+                return Some(value);
+            }
+        }
+    }
+    None
+}
+
+fn openclaw_json_file_value(path: &std::path::Path, pointers: &[&str]) -> Option<String> {
+    let contents = std::fs::read_to_string(path).ok()?;
+    let parsed: serde_json::Value = serde_json::from_str(&contents).ok()?;
+    for pointer in pointers {
+        if let Some(value) = parsed
+            .pointer(pointer)
+            .and_then(|value| value.as_str())
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        {
+            return Some(value.to_string());
+        }
+    }
+    None
+}
+
+fn normalize_browser_url(raw: &str) -> Result<String, String> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return Err("Browser URL is required".to_string());
+    }
+    if trimmed.len() > 2048 || trimmed.contains(['\r', '\n', '\\']) {
+        return Err("Browser URL is invalid".to_string());
+    }
+    if trimmed.contains("://")
+        && !(trimmed.starts_with("http://") || trimmed.starts_with("https://"))
+    {
+        return Err("Only http(s) browser URLs are supported".to_string());
+    }
+
+    let with_scheme = if trimmed.starts_with("http://")
+        || trimmed.starts_with("https://")
+        || trimmed == "about:blank"
+    {
+        trimmed.to_string()
+    } else if trimmed.contains('.') && !trimmed.contains(' ') {
+        format!("https://{trimmed}")
+    } else {
+        format!(
+            "https://www.google.com/search?q={}",
+            url_query_escape(trimmed)
+        )
+    };
+
+    if with_scheme == "about:blank"
+        || with_scheme.starts_with("https://")
+        || with_scheme.starts_with("http://")
+    {
+        Ok(with_scheme)
+    } else {
+        Err("Only http(s) browser URLs are supported".to_string())
+    }
+}
+
+fn url_query_escape(value: &str) -> String {
+    value
+        .bytes()
+        .flat_map(|byte| match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                vec![byte as char]
+            }
+            b' ' => vec!['+'],
+            _ => format!("%{byte:02X}").chars().collect(),
+        })
+        .collect()
+}
+
+fn validate_browser_ref(raw: Option<&str>) -> Result<String, String> {
+    let value = raw.unwrap_or("").trim();
+    if value.is_empty() {
+        return Err("Browser element ref is required".to_string());
+    }
+    if value.len() > 80
+        || !value
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || ch == '-' || ch == '_')
+    {
+        return Err("Browser element ref is invalid".to_string());
+    }
+    Ok(value.to_string())
+}
+
+fn validate_optional_target_id(raw: Option<&str>) -> Result<Option<String>, String> {
+    let Some(value) = raw.map(str::trim).filter(|value| !value.is_empty()) else {
+        return Ok(None);
+    };
+    if value.len() > 160
+        || value
+            .chars()
+            .any(|ch| ch.is_control() || ch == '\r' || ch == '\n')
+    {
+        return Err("Browser target id is invalid".to_string());
+    }
+    Ok(Some(value.to_string()))
+}
+
+fn call_openclaw_browser_tool(
+    action: &str,
+    args: serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    let base_url = openclaw_gateway_base_url()?;
+    let mut request = build_loopback_http_client(
+        std::time::Duration::from_secs(20),
+        std::time::Duration::from_millis(900),
+    )
+    .map_err(|error| format!("Failed to build OpenClaw Gateway client: {error}"))?
+    .post(format!("{base_url}/tools/invoke"))
+    .header("Content-Type", "application/json");
+
+    if let Some(token) = openclaw_gateway_bearer() {
+        request = request.bearer_auth(token);
+    }
+
+    let body = serde_json::json!({
+        "tool": "browser",
+        "action": action,
+        "args": args,
+        "sessionKey": "main"
+    });
+    let response = request
+        .body(body.to_string())
+        .send()
+        .map_err(|error| format!("Failed to call OpenClaw Gateway: {error}"))?;
+    let status = response.status();
+    let body = read_bounded_response_body(
+        response,
+        MAX_MODEL_RESPONSE_BYTES,
+        "OpenClaw Gateway response",
+    )?;
+    if !status.is_success() {
+        return Err(format!(
+            "OpenClaw Gateway browser call failed ({status}): {}",
+            clip_command_output(&body, 600)
+        ));
+    }
+
+    let parsed: serde_json::Value = serde_json::from_str(&body)
+        .map_err(|error| format!("Failed to parse OpenClaw Gateway response: {error}"))?;
+    if parsed.get("ok").and_then(|ok| ok.as_bool()) == Some(false) {
+        let message = parsed
+            .pointer("/error/message")
+            .and_then(|message| message.as_str())
+            .unwrap_or("OpenClaw Gateway returned an error");
+        return Err(message.to_string());
+    }
+    Ok(parsed.get("result").cloned().unwrap_or(parsed))
+}
+
+fn browser_result_url(value: &serde_json::Value) -> Option<String> {
+    value
+        .get("url")
+        .or_else(|| value.pointer("/details/url"))
+        .and_then(|url| url.as_str())
+        .map(|url| url.to_string())
+}
+
+fn browser_result_target_id(value: &serde_json::Value) -> Option<String> {
+    value
+        .get("targetId")
+        .or_else(|| value.pointer("/details/targetId"))
+        .and_then(|id| id.as_str())
+        .map(|id| id.to_string())
+}
+
+fn browser_result_snapshot(value: &serde_json::Value) -> Option<String> {
+    value
+        .get("content")
+        .and_then(|content| content.as_array())
+        .and_then(|content| content.first())
+        .and_then(|item| item.get("text"))
+        .and_then(|text| text.as_str())
+        .or_else(|| value.get("snapshot").and_then(|snapshot| snapshot.as_str()))
+        .map(|snapshot| clip_command_output(snapshot, 6_000))
+}
+
+fn browser_snapshot(target_id: Option<&str>) -> Result<serde_json::Value, String> {
+    let mut args = serde_json::json!({
+        "action": "snapshot",
+        "profile": "openclaw",
+        "snapshotFormat": "ai",
+        "mode": "efficient",
+        "interactive": true,
+        "refs": "role",
+        "maxChars": 6000
+    });
+    if let Some(target_id) = target_id {
+        args["targetId"] = serde_json::Value::String(target_id.to_string());
+    }
+    call_openclaw_browser_tool("snapshot", args)
+}
+
+fn summarize_browser_action(action: &str, url: Option<&str>, snapshot: Option<&str>) -> String {
+    if action == "list_tabs" {
+        return "OpenClaw browser tabs are available for review.".to_string();
+    }
+
+    let page = url.unwrap_or("the current page");
+    if snapshot.is_some() {
+        format!("OpenClaw browser is on {page}. I captured the visible page structure and refs for the next action.")
+    } else {
+        format!("OpenClaw browser action completed on {page}.")
+    }
+    .replace("  ", " ")
+}
+
+#[tauri::command(async)]
+fn invoke_openclaw_browser_action(
+    request: OpenClawBrowserActionInput,
+) -> Result<OpenClawBrowserActionResult, String> {
+    let profile = "openclaw".to_string();
+    let target_id = validate_optional_target_id(request.target_id.as_deref())?;
+    let action = request.action.as_str();
+    let mut url = None;
+    let mut result = match action {
+        "open_url" | "navigate" => {
+            let target_url = normalize_browser_url(request.url.as_deref().unwrap_or(""))?;
+            let mut args = serde_json::json!({
+                "action": if action == "open_url" { "open" } else { "navigate" },
+                "profile": profile,
+                "targetUrl": target_url,
+            });
+            if let Some(target_id) = target_id.as_deref() {
+                args["targetId"] = serde_json::Value::String(target_id.to_string());
+            }
+            let tool_action = if action == "open_url" {
+                "open"
+            } else {
+                "navigate"
+            };
+            let result = call_openclaw_browser_tool(tool_action, args)?;
+            url = browser_result_url(&result).or(Some(target_url));
+            result
+        }
+        "inspect_page" => {
+            let result = browser_snapshot(target_id.as_deref())?;
+            url = browser_result_url(&result);
+            result
+        }
+        "list_tabs" => call_openclaw_browser_tool(
+            "tabs",
+            serde_json::json!({
+                "action": "tabs",
+                "profile": profile
+            }),
+        )?,
+        "click_ref" => {
+            let element_ref = validate_browser_ref(request.element_ref.as_deref())?;
+            let mut act_request = serde_json::json!({
+                "kind": "click",
+                "ref": element_ref,
+            });
+            if let Some(target_id) = target_id.as_deref() {
+                act_request["targetId"] = serde_json::Value::String(target_id.to_string());
+            }
+            call_openclaw_browser_tool(
+                "act",
+                serde_json::json!({
+                    "action": "act",
+                    "profile": profile,
+                    "request": act_request
+                }),
+            )?
+        }
+        "type_ref" => {
+            let element_ref = validate_browser_ref(request.element_ref.as_deref())?;
+            let text = request.text.unwrap_or_default();
+            if text.trim().is_empty() || text.len() > 1_000 {
+                return Err(
+                    "Text to type is required and must be 1000 characters or fewer".to_string(),
+                );
+            }
+            let mut act_request = serde_json::json!({
+                "kind": "type",
+                "ref": element_ref,
+                "text": text,
+                "submit": request.submit.unwrap_or(false),
+            });
+            if let Some(target_id) = target_id.as_deref() {
+                act_request["targetId"] = serde_json::Value::String(target_id.to_string());
+            }
+            call_openclaw_browser_tool(
+                "act",
+                serde_json::json!({
+                    "action": "act",
+                    "profile": profile,
+                    "request": act_request
+                }),
+            )?
+        }
+        "press_key" => {
+            let key = request.key.unwrap_or_default();
+            if key.trim().is_empty() || key.len() > 80 || key.chars().any(|ch| ch.is_control()) {
+                return Err("Browser key is invalid".to_string());
+            }
+            let mut act_request = serde_json::json!({
+                "kind": "press",
+                "key": key,
+            });
+            if let Some(target_id) = target_id.as_deref() {
+                act_request["targetId"] = serde_json::Value::String(target_id.to_string());
+            }
+            call_openclaw_browser_tool(
+                "act",
+                serde_json::json!({
+                    "action": "act",
+                    "profile": profile,
+                    "request": act_request
+                }),
+            )?
+        }
+        _ => return Err(format!("Unsupported OpenClaw browser action: {action}")),
+    };
+
+    if matches!(
+        action,
+        "open_url" | "navigate" | "click_ref" | "type_ref" | "press_key"
+    ) {
+        let snapshot_target_id = browser_result_target_id(&result).or(target_id);
+        if let Ok(snapshot) = browser_snapshot(snapshot_target_id.as_deref()) {
+            result = snapshot;
+        }
+    }
+
+    let target_id = browser_result_target_id(&result);
+    if url.is_none() {
+        url = browser_result_url(&result);
+    }
+    let snapshot = browser_result_snapshot(&result);
+    let summary = summarize_browser_action(action, url.as_deref(), snapshot.as_deref());
+
+    Ok(OpenClawBrowserActionResult {
+        ok: true,
+        action: action.to_string(),
+        summary,
+        profile,
+        url,
+        target_id,
+        snapshot,
+        next_actions: vec![
+            "Ask me to inspect the page.".to_string(),
+            "Ask me to click a visible ref.".to_string(),
+            "Ask me to open another page.".to_string(),
+        ],
+    })
 }
 
 fn load_realtime_api_key() -> Result<String, String> {
@@ -849,10 +1828,61 @@ fn realtime_session_config() -> serde_json::Value {
         "type": "realtime",
         "model": "gpt-realtime-2",
         "output_modalities": ["audio"],
-        "instructions": "You are Sergio's concise realtime OpenClaw voice companion. Answer in 1-2 short sentences. No preamble, no markdown, no waffle. If the user interrupts, stop and respond to the latest thing they said.",
+        "instructions": "You are Sergio's concise realtime OpenClaw voice companion. Answer in 1-2 short sentences. No preamble, no markdown, no waffle. If the user asks to open, navigate, inspect, or control a web page, use the openclaw_browser tool. After each browser tool result, say what page is open, the most important thing visible, and one direct next action Sergio can ask for. Do not click submit, buy, delete, log in, or send messages unless Sergio explicitly confirms that exact action.",
         "reasoning": {
             "effort": "low"
         },
+        "tools": [
+            {
+                "type": "function",
+                "name": "openclaw_browser",
+                "description": "Control OpenClaw's isolated browser profile for voice-driven browsing. Use open_url or navigate for public pages, inspect_page to summarize the current page and available refs, list_tabs to orient the user, click_ref only after Sergio explicitly asks to click a visible ref, type_ref only after Sergio explicitly asks to type into a visible ref, and press_key only for simple navigation keys. Never perform purchases, destructive actions, credential entry, form submission, messaging, or account changes without exact user confirmation.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "action": {
+                            "type": "string",
+                            "enum": [
+                                "open_url",
+                                "navigate",
+                                "inspect_page",
+                                "list_tabs",
+                                "click_ref",
+                                "type_ref",
+                                "press_key"
+                            ]
+                        },
+                        "url": {
+                            "type": "string",
+                            "description": "Absolute http(s) URL, or a host/query that VOCO can normalize for open_url and navigate."
+                        },
+                        "targetId": {
+                            "type": "string",
+                            "description": "Browser tab targetId from a previous result, when continuing in the same tab."
+                        },
+                        "elementRef": {
+                            "type": "string",
+                            "description": "Visible element ref from inspect_page/snapshot, such as e12 or 12."
+                        },
+                        "text": {
+                            "type": "string",
+                            "description": "Text to type for type_ref."
+                        },
+                        "key": {
+                            "type": "string",
+                            "description": "Keyboard key for press_key, such as Enter, Escape, Tab, ArrowDown."
+                        },
+                        "submit": {
+                            "type": "boolean",
+                            "description": "Whether type_ref should submit. Only use after exact user confirmation."
+                        }
+                    },
+                    "required": ["action"],
+                    "additionalProperties": false
+                }
+            }
+        ],
+        "tool_choice": "auto",
         "audio": {
             "input": {
                 "format": {
@@ -905,14 +1935,18 @@ fn parse_realtime_client_secret_response(
     Ok(RealtimeClientSecretResult { value, expires_at })
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn create_realtime_client_secret() -> Result<RealtimeClientSecretResult, String> {
     let api_key = load_realtime_api_key()?;
     let body = serde_json::json!({
         "session": realtime_session_config()
     });
 
-    let client = reqwest::blocking::Client::new();
+    let client = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(20))
+        .connect_timeout(std::time::Duration::from_secs(5))
+        .build()
+        .map_err(|error| format!("Failed to build Realtime session client: {error}"))?;
     let response = client
         .post("https://api.openai.com/v1/realtime/client_secrets")
         .bearer_auth(api_key)
@@ -923,9 +1957,11 @@ fn create_realtime_client_secret() -> Result<RealtimeClientSecretResult, String>
         .map_err(|error| format!("Failed to create Realtime session secret: {error}"))?;
 
     let status = response.status();
-    let response_body = response
-        .text()
-        .map_err(|error| format!("Failed to read Realtime session response: {error}"))?;
+    let response_body = read_bounded_response_body(
+        response,
+        MAX_MODEL_RESPONSE_BYTES,
+        "Realtime session response",
+    )?;
     if !status.is_success() {
         let detail = realtime_error_detail(&response_body);
         return Err(format!(
@@ -936,7 +1972,7 @@ fn create_realtime_client_secret() -> Result<RealtimeClientSecretResult, String>
     parse_realtime_client_secret_response(&response_body)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn get_runtime_diagnostics() -> insertion::RuntimeDiagnostics {
     insertion::runtime_diagnostics()
 }
@@ -992,6 +2028,10 @@ fn show_overlay_window(
     width: u32,
     height: u32,
 ) -> Result<(), String> {
+    window
+        .set_always_on_top(true)
+        .map_err(|e| format!("Failed to keep overlay on top: {e}"))?;
+
     let cursor = window
         .cursor_position()
         .map_err(|e| format!("Failed to read cursor position: {e}"))?;
@@ -1031,6 +2071,10 @@ fn show_overlay_window(
             x, y,
         )))
         .map_err(|e| format!("Failed to position overlay window: {e}"))?;
+
+    window
+        .show()
+        .map_err(|e| format!("Failed to show overlay window: {e}"))?;
 
     Ok(())
 }
@@ -1715,7 +2759,21 @@ fn start_socket_listener(app_handle: tauri::AppHandle) {
 // --- evdev hotkey listener (primary mechanism on Wayland) ---
 
 #[cfg(target_os = "linux")]
+fn is_ignored_evdev_device_name(name: &str) -> bool {
+    let normalized = name.to_ascii_lowercase();
+    normalized.contains("ydotoold virtual device")
+}
+
+#[cfg(target_os = "linux")]
 fn supports_evdev_hotkey(device: &evdev::Device) -> bool {
+    if device
+        .name()
+        .map(is_ignored_evdev_device_name)
+        .unwrap_or(false)
+    {
+        return false;
+    }
+
     let Some(keys) = device.supported_keys() else {
         return false;
     };
@@ -2021,9 +3079,15 @@ pub fn run() {
             load_cached_update_state,
             save_cached_update_state,
             transcribe_audio,
+            preview_transcribe_audio,
             insert_text,
+            replace_live_text,
             ask_openclaw_agent,
             speak_openclaw_response,
+            enhance_transcript,
+            test_local_llm,
+            ask_local_llm_agent,
+            invoke_openclaw_browser_action,
             create_realtime_client_secret,
             get_runtime_diagnostics,
             set_dictation_status,
@@ -2131,6 +3195,28 @@ mod tests {
     use super::*;
 
     #[test]
+    fn bounded_response_reader_accepts_body_at_limit() {
+        let body = b"12345678";
+        assert_eq!(
+            read_bounded_response_body(body.as_slice(), body.len(), "test response").unwrap(),
+            "12345678"
+        );
+    }
+
+    #[test]
+    fn bounded_response_reader_rejects_oversized_body() {
+        let error =
+            read_bounded_response_body(b"123456789".as_slice(), 8, "test response").unwrap_err();
+        assert!(error.contains("exceeded the 8-byte limit"));
+    }
+
+    #[test]
+    fn bounded_response_reader_rejects_invalid_utf8() {
+        let error = read_bounded_response_body([0xff].as_slice(), 8, "test response").unwrap_err();
+        assert!(error.contains("was not valid UTF-8"));
+    }
+
+    #[test]
     fn decode_audio_bytes_valid() {
         let mut bytes = Vec::new();
         bytes.extend_from_slice(&0.5f32.to_le_bytes());
@@ -2221,6 +3307,204 @@ mod tests {
     }
 
     #[test]
+    fn local_llm_endpoint_validation_allows_only_loopback_http() {
+        assert!(validate_local_llm_endpoint("http://127.0.0.1:8080/v1/chat/completions").is_ok());
+        assert!(validate_local_llm_endpoint("http://localhost:8080/v1/chat/completions").is_ok());
+        assert!(validate_local_llm_endpoint("http://[::1]:8080/v1/chat/completions").is_ok());
+        assert!(validate_local_llm_endpoint("https://example.com/v1/chat/completions").is_err());
+        assert!(
+            validate_local_llm_endpoint("http://192.168.1.10:8080/v1/chat/completions").is_err()
+        );
+        assert!(
+            validate_local_llm_endpoint("http://user@localhost:8080/v1/chat/completions").is_err()
+        );
+    }
+
+    #[test]
+    fn openclaw_gateway_rejects_userinfo_that_hides_a_remote_host() {
+        assert!(
+            validate_openclaw_gateway_base_url("http://localhost:18789@remote.example").is_err()
+        );
+        assert!(
+            validate_openclaw_gateway_base_url("https://127.0.0.1:443@remote.example").is_err()
+        );
+    }
+
+    #[test]
+    fn openclaw_gateway_accepts_explicit_loopback_endpoints() {
+        assert_eq!(
+            validate_openclaw_gateway_base_url("http://localhost:18789").as_deref(),
+            Ok("http://localhost:18789")
+        );
+        assert_eq!(
+            validate_openclaw_gateway_base_url("https://[::1]:18789/api").as_deref(),
+            Ok("https://[::1]:18789/api")
+        );
+    }
+
+    #[test]
+    fn loopback_http_client_does_not_follow_redirects() {
+        use std::io::{Read, Write};
+        use std::net::TcpListener;
+
+        let redirect_target = TcpListener::bind("127.0.0.1:0").unwrap();
+        redirect_target.set_nonblocking(true).unwrap();
+        let redirect_target_url = format!(
+            "http://127.0.0.1:{}",
+            redirect_target.local_addr().unwrap().port()
+        );
+
+        let redirect_source = TcpListener::bind("127.0.0.1:0").unwrap();
+        let redirect_source_url = format!(
+            "http://127.0.0.1:{}",
+            redirect_source.local_addr().unwrap().port()
+        );
+        let server = std::thread::spawn(move || {
+            let (mut stream, _) = redirect_source.accept().unwrap();
+            let mut request = [0_u8; 1024];
+            let _ = stream.read(&mut request).unwrap();
+            let response = format!(
+                "HTTP/1.1 307 Temporary Redirect\r\nLocation: {redirect_target_url}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+            );
+            stream.write_all(response.as_bytes()).unwrap();
+        });
+
+        let client = build_loopback_http_client(
+            std::time::Duration::from_secs(2),
+            std::time::Duration::from_secs(1),
+        )
+        .unwrap();
+        let response = client
+            .post(redirect_source_url)
+            .body("private transcript")
+            .send()
+            .unwrap();
+        server.join().unwrap();
+
+        assert_eq!(response.status(), reqwest::StatusCode::TEMPORARY_REDIRECT);
+        assert_eq!(
+            redirect_target.accept().unwrap_err().kind(),
+            std::io::ErrorKind::WouldBlock
+        );
+    }
+
+    #[test]
+    fn spoken_formatting_commands_are_deterministic() {
+        assert_eq!(
+            apply_spoken_formatting_commands(
+                "first line new paragraph bullet point check gpio seventeen new bullet stop"
+            ),
+            "first line\n\n- check gpio seventeen\n- stop"
+        );
+        assert_eq!(
+            apply_spoken_formatting_commands(
+                "write the old sentence scratch that write the new one"
+            ),
+            "write the new one"
+        );
+        assert_eq!(
+            apply_spoken_formatting_commands("code block let x equals one end code block"),
+            "```\nlet x equals one\n```"
+        );
+    }
+
+    #[test]
+    fn local_llm_body_uses_conservative_prompt_and_optional_model() {
+        let body = build_local_llm_body(
+            conservative_transcript_prompt(),
+            "hello world",
+            Some("gemma-local"),
+        );
+        assert_eq!(body["model"], "gemma-local");
+        assert_eq!(body["temperature"], 0);
+        assert_eq!(body["messages"][1]["content"], "hello world");
+        assert!(body["messages"][0]["content"]
+            .as_str()
+            .unwrap()
+            .contains("Preserve the speaker's words"));
+
+        let body = build_local_llm_body(local_assistant_prompt(), "hello world", None);
+        assert!(body.get("model").is_none());
+        assert!(body["messages"][0]["content"]
+            .as_str()
+            .unwrap()
+            .contains("concise local assistant"));
+    }
+
+    #[test]
+    fn local_llm_response_parser_reads_chat_completion_content() {
+        let parsed = parse_local_llm_chat_response(
+            r#"{"choices":[{"message":{"content":"Hello, world."}}]}"#,
+        )
+        .unwrap();
+        assert_eq!(parsed, "Hello, world.");
+
+        assert!(
+            parse_local_llm_chat_response(r#"{"choices":[{"message":{"content":""}}]}"#)
+                .unwrap_err()
+                .contains("no text")
+        );
+    }
+
+    #[test]
+    fn local_llm_chat_posts_to_loopback_without_auth_header() {
+        use std::io::{Read, Write};
+        use std::net::TcpListener;
+        use std::sync::mpsc;
+
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let endpoint = format!(
+            "http://127.0.0.1:{}/v1/chat/completions",
+            listener.local_addr().unwrap().port()
+        );
+        let (sender, receiver) = mpsc::channel();
+
+        std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut request = Vec::new();
+            let mut buffer = [0u8; 1024];
+            loop {
+                let read = stream.read(&mut buffer).unwrap();
+                if read == 0 {
+                    break;
+                }
+                request.extend_from_slice(&buffer[..read]);
+                if request.windows(4).any(|window| window == b"\r\n\r\n")
+                    && String::from_utf8_lossy(&request).contains("hello local")
+                {
+                    break;
+                }
+            }
+            let request_text = String::from_utf8_lossy(&request).to_string();
+            sender.send(request_text).unwrap();
+
+            let body = r#"{"choices":[{"message":{"content":"Hello, local."}}]}"#;
+            let response = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                body.len(),
+                body
+            );
+            stream.write_all(response.as_bytes()).unwrap();
+        });
+
+        let response = call_local_llm_chat(
+            &endpoint,
+            conservative_transcript_prompt(),
+            "hello local",
+            Some("gemma-local"),
+            std::time::Duration::from_secs(2),
+        )
+        .unwrap();
+
+        let request = receiver.recv().unwrap();
+        assert_eq!(response, "Hello, local.");
+        assert!(request.starts_with("POST /v1/chat/completions HTTP/1.1"));
+        assert!(request.contains("\"model\":\"gemma-local\""));
+        assert!(request.contains("\"content\":\"hello local\""));
+        assert!(!request.to_ascii_lowercase().contains("authorization:"));
+    }
+
+    #[test]
     fn realtime_api_key_parses_env_file_exports_and_quotes() {
         assert_eq!(
             parse_realtime_api_key_from_env_file(
@@ -2272,6 +3556,22 @@ mod tests {
             config["audio"]["input"]["turn_detection"]["interrupt_response"],
             true
         );
+        assert_eq!(config["tools"][0]["type"], "function");
+        assert_eq!(config["tools"][0]["name"], "openclaw_browser");
+        assert_eq!(config["tool_choice"], "auto");
+    }
+
+    #[test]
+    fn browser_url_normalizes_hosts_and_searches_plain_queries() {
+        assert_eq!(
+            normalize_browser_url("example.com").unwrap(),
+            "https://example.com"
+        );
+        assert_eq!(
+            normalize_browser_url("weather tomorrow").unwrap(),
+            "https://www.google.com/search?q=weather+tomorrow"
+        );
+        assert!(normalize_browser_url("ftp://example.com").is_err());
     }
 
     #[test]
@@ -2286,6 +3586,9 @@ mod tests {
             echo_cancellation: Some(false),
             noise_suppression: Some(false),
             auto_gain_control: Some(false),
+            browser_action: Some("inspect_page".to_string()),
+            duration_ms: Some(42),
+            dictation_session_id: Some(1),
         }
         .validate()
         .is_ok());
@@ -2300,6 +3603,9 @@ mod tests {
             echo_cancellation: None,
             noise_suppression: None,
             auto_gain_control: None,
+            browser_action: None,
+            duration_ms: None,
+            dictation_session_id: None,
         }
         .validate()
         .unwrap_err()
@@ -2315,10 +3621,97 @@ mod tests {
             echo_cancellation: None,
             noise_suppression: None,
             auto_gain_control: None,
+            browser_action: None,
+            duration_ms: None,
+            dictation_session_id: None,
         }
         .validate()
         .unwrap_err()
         .contains("Unsupported track sample rate"));
+
+        assert!(FrontendTraceFields {
+            audio_level_bucket: None,
+            chunk_count: None,
+            response_delta_count: None,
+            selected_device_configured: None,
+            track_sample_rate: None,
+            track_channel_count: None,
+            echo_cancellation: None,
+            noise_suppression: None,
+            auto_gain_control: None,
+            browser_action: None,
+            duration_ms: Some(3_600_001),
+            dictation_session_id: None,
+        }
+        .validate()
+        .unwrap_err()
+        .contains("Unsupported duration"));
+
+        assert!(FrontendTraceFields {
+            audio_level_bucket: None,
+            chunk_count: None,
+            response_delta_count: None,
+            selected_device_configured: None,
+            track_sample_rate: None,
+            track_channel_count: None,
+            echo_cancellation: None,
+            noise_suppression: None,
+            auto_gain_control: None,
+            browser_action: None,
+            duration_ms: None,
+            dictation_session_id: Some(0),
+        }
+        .validate()
+        .unwrap_err()
+        .contains("Unsupported dictation session id"));
+    }
+
+    #[test]
+    fn dictation_trace_event_allowlist_covers_frontend_emissions() {
+        let emitted_events = [
+            "recording_state_requested",
+            "recording_get_user_media_started",
+            "recording_get_user_media_constraints_fallback",
+            "recording_get_user_media_default_fallback",
+            "recording_get_user_media_done",
+            "recording_audio_context_ready",
+            "recording_media_source_created",
+            "recording_script_processor_connected",
+            "recording_worklet_connected",
+            "recording_state_active",
+            "dictation_live_preview_skipped_short_audio",
+            "dictation_live_preview_completed",
+            "dictation_live_preview_empty",
+            "dictation_live_preview_updated",
+            "dictation_live_preview_failed",
+            "dictation_live_cursor_unsafe_rewrite_blocked",
+            "dictation_live_cursor_commit_waiting",
+            "dictation_first_live_text_visible",
+            "dictation_live_cursor_insert_updated",
+            "dictation_live_cursor_insert_failed",
+            "dictation_live_cursor_overlay_fallback",
+            "dictation_live_cursor_insert_cleared",
+            "dictation_live_cursor_final_unreconciled",
+            "dictation_live_cursor_insert_finalized",
+            "dictation_stop_to_idle",
+            "dictation_recording_duration",
+            "dictation_transcription_completed",
+            "dictation_stop_to_final_transcript",
+            "dictation_enhancement_completed",
+            "dictation_local_assistant_completed",
+            "dictation_final_output_completed",
+            "dictation_final_insertion_failed",
+        ];
+
+        for event in emitted_events {
+            assert!(
+                is_supported_dictation_trace_event(event),
+                "{event} should be accepted by the frontend trace allowlist"
+            );
+        }
+        assert!(!is_supported_dictation_trace_event(
+            "dictation_transcript_text"
+        ));
     }
 
     #[test]
@@ -2402,6 +3795,16 @@ mod tests {
         assert!(should_start_evdev_listener(true, false));
         assert!(!should_start_evdev_listener(true, true));
         assert!(!should_start_evdev_listener(false, false));
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn evdev_hotkey_ignores_ydotool_virtual_device() {
+        assert!(is_ignored_evdev_device_name("ydotoold virtual device"));
+        assert!(is_ignored_evdev_device_name("YDOTOOLD Virtual Device"));
+        assert!(!is_ignored_evdev_device_name(
+            "AT Translated Set 2 keyboard"
+        ));
     }
 
     #[test]

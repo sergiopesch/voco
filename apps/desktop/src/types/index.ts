@@ -1,5 +1,14 @@
 export type InsertionStrategy = "auto" | "clipboard" | "type-simulation";
-export type TranscriptTarget = "cursor" | "openclaw-agent" | "openclaw-speech";
+export type TranscriptTarget =
+  | "cursor"
+  | "local-agent"
+  | "openclaw-agent"
+  | "openclaw-speech";
+export type TranscriptEnhancement = "off" | "conservative" | "commands-only";
+export type LiveCursorMode =
+  | "stable-cursor-streaming"
+  | "preview-overlay-only"
+  | "final-text-only";
 export type UpdateChannel = "stable" | "beta";
 export type InstallChannel =
   | "github-release"
@@ -14,8 +23,12 @@ export interface AppConfig {
   selectedMic: string | null;
   insertionStrategy: InsertionStrategy;
   transcriptTarget: TranscriptTarget;
+  liveCursorMode: LiveCursorMode;
   openclawAgent: string;
   openclawPromptPrefix: string;
+  transcriptEnhancement: TranscriptEnhancement;
+  localLlmEndpoint: string;
+  localLlmModel: string | null;
   onboardingCompleted: boolean;
   updateChannel: UpdateChannel;
   installChannel: InstallChannel;
@@ -67,6 +80,12 @@ export interface InsertionSupport {
   detail: string;
 }
 
+export type ActiveInsertionStrategy = "ydotool" | "xdotool" | "clipboard";
+
+export interface InsertionResult {
+  strategy: ActiveInsertionStrategy;
+}
+
 export interface RuntimeDiagnostics {
   sessionType: string;
   typeSimulation: InsertionSupport;
@@ -82,6 +101,51 @@ export interface OpenClawSpeechResult {
   audioPath: string;
   provider: string | null;
   outputFormat: string | null;
+}
+
+export interface TranscriptEnhancementResult {
+  text: string;
+  usedEnhancement: boolean;
+  warning: string | null;
+}
+
+export interface LocalLlmTestResult {
+  ok: boolean;
+  detail: string;
+}
+
+export interface LocalLlmAgentResult {
+  response: string;
+}
+
+export type OpenClawBrowserAction =
+  | "open_url"
+  | "navigate"
+  | "inspect_page"
+  | "list_tabs"
+  | "click_ref"
+  | "type_ref"
+  | "press_key";
+
+export interface OpenClawBrowserActionInput {
+  action: OpenClawBrowserAction;
+  url?: string;
+  targetId?: string;
+  elementRef?: string;
+  text?: string;
+  key?: string;
+  submit?: boolean;
+}
+
+export interface OpenClawBrowserActionResult {
+  ok: boolean;
+  action: OpenClawBrowserAction;
+  summary: string;
+  profile: string;
+  url: string | null;
+  targetId: string | null;
+  snapshot: string | null;
+  nextActions: string[];
 }
 
 export interface RealtimeClientSecretResult {

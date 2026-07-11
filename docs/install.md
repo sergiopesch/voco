@@ -83,7 +83,7 @@ npm run dev
 - speak
 - press `Alt+D` again
 - confirm text is inserted at the cursor
-- keep single dictation recordings under 60 seconds
+- keep single dictation recordings under 10 minutes
 
 ## Wayland Hotkey and Permission Notes
 
@@ -160,7 +160,10 @@ This checks version alignment, install-script safety, and generated release note
 
 OpenClaw voice-bridge settings are stored in the same config file. That mode is opt-in and requires the `openclaw` CLI to resolve from the app's runtime `PATH`. The spoken-answer OpenClaw mode also requires OpenClaw TTS to be configured and `ffplay` from FFmpeg to resolve from `PATH`.
 
-Realtime conversation is separate from the OpenClaw text/TTS bridge and is toggled with `Alt+R` or the popover's `Start realtime` button. It requires `OPENAI_API_KEY` in the app environment or in `~/.openclaw/realtime.env`; VOCO reads that key only in the Tauri backend, mints a short-lived Realtime token, and streams audio over `wss://api.openai.com`. While realtime is active, the VOCO mic visual appears in the hidden overlay or popover and follows both microphone input and assistant playback levels.
+Local transcript enhancement and the local assistant output target are also opt-in. They require an OpenAI-compatible local model server, such as `llama-server`, listening on a localhost endpoint like `http://127.0.0.1:8080/v1/chat/completions`. VOCO does not bundle or download Gemma/llama models for this path.
+Expected behavior and acceptance criteria are documented in [`local-intelligence-spec.md`](local-intelligence-spec.md).
+
+Realtime conversation is separate from the OpenClaw text/TTS bridge and is toggled with `Alt+Shift+R` or the popover's `Start realtime` button. It requires `OPENAI_API_KEY` in the app environment or in `~/.openclaw/realtime.env`; VOCO reads that key only in the Tauri backend, mints a short-lived Realtime token, and streams audio over `wss://api.openai.com`. While realtime is active, the VOCO mic visual appears in the hidden overlay or popover and follows both microphone input and assistant playback levels.
 
 Detailed realtime behavior, diagnostics, and acceptance criteria are documented in [`realtime-conversation-spec.md`](realtime-conversation-spec.md).
 

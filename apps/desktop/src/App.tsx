@@ -36,12 +36,25 @@ import type {
 } from "@/types";
 
 const PANEL_SIZE = new LogicalSize(1040, 760);
+const PANEL_MIN_SIZE = new LogicalSize(760, 560);
 const POPOVER_SIZE = new LogicalSize(420, 520);
-const STATUS_OVERLAY_WIDTH = 280;
-const STATUS_OVERLAY_HEIGHT = 132;
+const STATUS_OVERLAY_WIDTH = 460;
+const STATUS_OVERLAY_HEIGHT = 196;
+const REALTIME_OVERLAY_WIDTH = 340;
+const REALTIME_OVERLAY_HEIGHT = 156;
 const HIDDEN_SIZE = new LogicalSize(1, 1);
 const HIDDEN_POSITION = new LogicalPosition(-100, -100);
 const POPOVER_MARGIN = 16;
+
+type ResizeDirection =
+  | "East"
+  | "North"
+  | "NorthEast"
+  | "NorthWest"
+  | "South"
+  | "SouthEast"
+  | "SouthWest"
+  | "West";
 
 type TrayPopoverAnchor = {
   rectPositionX: number;
@@ -61,21 +74,37 @@ function StatusOverlay({
   transcript: string;
   audioLevel: number;
 }) {
-  const headline = status === "recording" ? "Listening" : "Transcribing";
+  const trimmedInterim = interimTranscript.trim();
+  const hasLiveText =
+    status === "recording" &&
+    trimmedInterim !== "" &&
+    trimmedInterim !== "Listening...";
+  const headline = status === "recording" ? "Streaming words" : "Transcribing";
   const copy =
-    interimTranscript ||
+    trimmedInterim ||
     (status === "processing" && transcript
       ? transcript
-      : "VOCO is following your voice and keeping the action visible.");
+      : "Speak normally. Live words will appear here before VOCO inserts the final text.");
   const meterLevel = status === "recording" ? Math.max(audioLevel, 0.06) : 1;
 
   return (
-    <main className="voco-overlay" data-state={status} aria-live="polite">
+    <main
+      className="voco-overlay"
+      data-state={status}
+      data-live-preview={hasLiveText ? "true" : "false"}
+      aria-live="polite"
+    >
       <span className="voco-overlay__eyebrow">
-        {status === "recording" ? "Live Dictation" : "Local Processing"}
+        {hasLiveText
+          ? "Live transcript preview"
+          : status === "recording"
+            ? "Listening for speech"
+            : "Local Processing"}
       </span>
       <strong className="voco-overlay__headline">{headline}</strong>
-      <p className="voco-overlay__copy">{copy}</p>
+      <p className={hasLiveText ? "voco-overlay__transcript" : "voco-overlay__copy"}>
+        {copy}
+      </p>
       <div className="voco-overlay__meter" aria-hidden="true">
         <div
           className="voco-overlay__meter-fill"
@@ -90,10 +119,16 @@ function RealtimeOverlay({
   status,
   detail,
   level,
+  muted,
+  onToggleMute,
+  onCancel,
 }: {
   status: RealtimeStatus;
   detail: string;
   level: number;
+  muted: boolean;
+  onToggleMute: () => void;
+  onCancel: () => void;
 }) {
   return (
     <main
@@ -102,23 +137,81 @@ function RealtimeOverlay({
       aria-live="polite"
     >
       <RealtimeMicVisual
-        active={status !== "idle" && status !== "error"}
-        level={level}
+        active={status !== "idle" && status !== "error" && !muted}
+        level={muted ? 0 : level}
         status={status}
         size="overlay"
       />
       <div className="voco-realtime-overlay__copy">
         <span className="voco-overlay__eyebrow">Realtime Voice</span>
         <strong className="voco-overlay__headline">
-          {status === "speaking"
+          {muted
+            ? "Muted"
+            : status === "speaking"
             ? "Speaking"
             : status === "connecting"
               ? "Connecting"
               : "Listening"}
         </strong>
         <p className="voco-overlay__copy">{detail}</p>
+        <div className="voco-realtime-overlay__actions">
+          <button
+            className="voco-realtime-overlay__button"
+            type="button"
+            onClick={onToggleMute}
+            aria-pressed={muted}
+          >
+            {muted ? "Unmute" : "Mute"}
+          </button>
+          <button
+            className="voco-realtime-overlay__button voco-realtime-overlay__button--danger"
+            type="button"
+            onClick={onCancel}
+          >
+            Cancel
+          </button>
+        </div>
       </div>
     </main>
+  );
+}
+
+function ResizeHandles() {
+  const startResize =
+    (direction: ResizeDirection) =>
+    (event: React.PointerEvent<HTMLButtonElement>) => {
+      if (event.button !== 0) {
+        return;
+      }
+
+      event.preventDefault();
+      void getCurrentWindow().startResizeDragging(direction).catch(() => {});
+    };
+
+  const zones: Array<{ direction: ResizeDirection; label: string }> = [
+    { direction: "North", label: "Resize from top edge" },
+    { direction: "South", label: "Resize from bottom edge" },
+    { direction: "West", label: "Resize from left edge" },
+    { direction: "East", label: "Resize from right edge" },
+    { direction: "NorthWest", label: "Resize from top left corner" },
+    { direction: "NorthEast", label: "Resize from top right corner" },
+    { direction: "SouthWest", label: "Resize from bottom left corner" },
+    { direction: "SouthEast", label: "Resize from bottom right corner" },
+  ];
+
+  return (
+    <div className="voco-resize-zones" aria-hidden="true">
+      {zones.map(({ direction, label }) => (
+        <button
+          key={direction}
+          className={`voco-resize-zone voco-resize-zone--${direction.toLowerCase()}`}
+          type="button"
+          tabIndex={-1}
+          aria-label={label}
+          onPointerDown={startResize(direction)}
+        />
+      ))}
+    </div>
   );
 }
 
@@ -155,8 +248,11 @@ export function App() {
     realtimeDetail,
     realtimeError,
     realtimeLevel,
+    isRealtimeMuted,
     isRealtimeActive,
     toggleRealtime,
+    toggleRealtimeMute,
+    stopRealtime,
   } = useRealtimeConversation(selectedDeviceId);
   const [initComplete, setInitComplete] = useState(false);
   const [runtimeDiagnostics, setRuntimeDiagnostics] = useState<RuntimeDiagnostics | null>(null);
@@ -164,10 +260,16 @@ export function App() {
   const initStartedRef = useRef(false);
   const appMountedLoggedRef = useRef(false);
   const trayPopoverAnchorRef = useRef<TrayPopoverAnchor | null>(null);
+  const panelSizeRef = useRef<LogicalSize>(PANEL_SIZE);
   const lastCheckedChannelRef = useRef<AppConfig["updateChannel"] | null>(null);
   const notifiedReleaseVersionRef = useRef<string | null>(null);
+  const cursorStreamingMode =
+    config?.transcriptTarget === "cursor" &&
+    config.liveCursorMode === "stable-cursor-streaming";
   const dictationOverlayVisible =
-    surface === "hidden" && (status === "recording" || status === "processing");
+    surface === "hidden" &&
+    !cursorStreamingMode &&
+    (status === "recording" || status === "processing");
   const realtimeOverlayVisible = surface === "hidden" && isRealtimeActive;
   const overlayVisible = dictationOverlayVisible || realtimeOverlayVisible;
   const canHandleHotkey = initComplete && config !== null;
@@ -444,6 +546,7 @@ export function App() {
         await currentWindow.setDecorations(false).catch(() => {});
         await currentWindow.setSkipTaskbar(true).catch(() => {});
         await currentWindow.setResizable(false).catch(() => {});
+        await currentWindow.setMinSize(null).catch(() => {});
         await currentWindow.setIgnoreCursorEvents(true).catch(() => {});
         await currentWindow.setSize(HIDDEN_SIZE).catch(() => {});
         await currentWindow.setPosition(HIDDEN_POSITION).catch(() => {});
@@ -456,6 +559,7 @@ export function App() {
         await currentWindow.setDecorations(false).catch(() => {});
         await currentWindow.setSkipTaskbar(false).catch(() => {});
         await currentWindow.setResizable(false).catch(() => {});
+        await currentWindow.setMinSize(null).catch(() => {});
         await currentWindow.setSize(POPOVER_SIZE).catch(() => {});
 
         const anchor = trayPopoverAnchorRef.current;
@@ -519,8 +623,9 @@ export function App() {
       await currentWindow.setAlwaysOnTop(false).catch(() => {});
       await currentWindow.setDecorations(false).catch(() => {});
       await currentWindow.setSkipTaskbar(false).catch(() => {});
+      await currentWindow.setMinSize(PANEL_MIN_SIZE).catch(() => {});
       await currentWindow.setResizable(true).catch(() => {});
-      await currentWindow.setSize(PANEL_SIZE).catch(() => {});
+      await currentWindow.setSize(panelSizeRef.current).catch(() => {});
       await currentWindow.center().catch(() => {});
       await currentWindow.show().catch(() => {});
       await currentWindow.setFocus().catch(() => {});
@@ -530,17 +635,70 @@ export function App() {
   }, [surface]);
 
   useEffect(() => {
+    if (surface !== "settings" && surface !== "onboarding") {
+      return;
+    }
+
+    let unlisten: (() => void) | null = null;
+    const currentWindow = getCurrentWindow();
+    void currentWindow
+      .onResized(({ payload }) => {
+        void currentWindow.scaleFactor().then((scaleFactor) => {
+          const logicalSize = payload.toLogical(scaleFactor);
+          if (
+            logicalSize.width >= PANEL_MIN_SIZE.width &&
+            logicalSize.height >= PANEL_MIN_SIZE.height
+          ) {
+            panelSizeRef.current = new LogicalSize(
+              Math.round(logicalSize.width),
+              Math.round(logicalSize.height),
+            );
+          }
+        });
+      })
+      .then((cleanup) => {
+        unlisten = cleanup;
+      });
+
+    return () => {
+      unlisten?.();
+    };
+  }, [surface]);
+
+  useEffect(() => {
     if (surface !== "hidden") {
       return;
     }
 
     if (overlayVisible) {
-      void showStatusOverlay(STATUS_OVERLAY_WIDTH, STATUS_OVERLAY_HEIGHT).catch(() => {});
+      void showStatusOverlay(
+        realtimeOverlayVisible ? REALTIME_OVERLAY_WIDTH : STATUS_OVERLAY_WIDTH,
+        realtimeOverlayVisible ? REALTIME_OVERLAY_HEIGHT : STATUS_OVERLAY_HEIGHT,
+      ).catch(() => {});
+      void getCurrentWindow()
+        .setIgnoreCursorEvents(!realtimeOverlayVisible)
+        .catch(() => {});
       return;
     }
 
     void hideStatusOverlay().catch(() => {});
-  }, [overlayVisible, surface]);
+  }, [overlayVisible, realtimeOverlayVisible, surface]);
+
+  useEffect(() => {
+    let unlisten: (() => void) | null = null;
+    void getCurrentWindow()
+      .onCloseRequested((event) => {
+        event.preventDefault();
+        setSurface("hidden");
+      })
+      .then((cleanup) => {
+        unlisten = cleanup;
+      });
+
+    return () => {
+      unlisten?.();
+    };
+  }, [setSurface]);
 
   useEffect(() => {
     let unlisten: (() => void) | null = null;
@@ -605,39 +763,45 @@ export function App() {
         status={realtimeStatus}
         detail={realtimeDetail}
         level={realtimeLevel}
+        muted={isRealtimeMuted}
+        onToggleMute={toggleRealtimeMute}
+        onCancel={stopRealtime}
       />
     ) : null;
   }
 
   return (
-    <ControlPanel
-      surface={surface}
-      onboardingStep={onboardingStep}
-      config={config}
-      errorMessage={error}
-      statusLabel={statusLabel}
-      updateState={updateState}
-      runtimeDiagnostics={runtimeDiagnostics}
-      isDictationActive={status === "recording" || status === "processing"}
-      isRealtimeActive={isRealtimeActive}
-      realtimeStatus={realtimeStatus}
-      realtimeDetail={realtimeDetail}
-      realtimeError={realtimeError}
-      realtimeLevel={realtimeLevel}
-      selectedDeviceId={selectedDeviceId}
-      availableDevices={availableDevices}
-      microphonePermission={microphonePermission}
-      onSurfaceChange={setSurface}
-      onOnboardingStepChange={setOnboardingStep}
-      onConfigChange={applyConfigPatch}
-      onRefreshDevices={refreshDevices}
-      onSelectedDeviceChange={setSelectedDeviceId}
-      onRequestMicrophoneAccess={requestMicrophoneAccess}
-      onCheckForUpdates={() => runUpdateCheck(config.updateChannel, undefined, true)}
-      onOpenReleasePage={(url) => openExternalUrl(url)}
-      onRefreshRuntimeDiagnostics={refreshRuntimeDiagnostics}
-      onToggleDictation={toggle}
-      onToggleRealtime={toggleRealtime}
-    />
+    <>
+      <ControlPanel
+        surface={surface}
+        onboardingStep={onboardingStep}
+        config={config}
+        errorMessage={error}
+        statusLabel={statusLabel}
+        updateState={updateState}
+        runtimeDiagnostics={runtimeDiagnostics}
+        isDictationActive={status === "recording" || status === "processing"}
+        isRealtimeActive={isRealtimeActive}
+        realtimeStatus={realtimeStatus}
+        realtimeDetail={realtimeDetail}
+        realtimeError={realtimeError}
+        realtimeLevel={realtimeLevel}
+        selectedDeviceId={selectedDeviceId}
+        availableDevices={availableDevices}
+        microphonePermission={microphonePermission}
+        onSurfaceChange={setSurface}
+        onOnboardingStepChange={setOnboardingStep}
+        onConfigChange={applyConfigPatch}
+        onRefreshDevices={refreshDevices}
+        onSelectedDeviceChange={setSelectedDeviceId}
+        onRequestMicrophoneAccess={requestMicrophoneAccess}
+        onCheckForUpdates={() => runUpdateCheck(config.updateChannel, undefined, true)}
+        onOpenReleasePage={(url) => openExternalUrl(url)}
+        onRefreshRuntimeDiagnostics={refreshRuntimeDiagnostics}
+        onToggleDictation={toggle}
+        onToggleRealtime={toggleRealtime}
+      />
+      {surface === "settings" || surface === "onboarding" ? <ResizeHandles /> : null}
+    </>
   );
 }

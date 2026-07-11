@@ -18,9 +18,9 @@ jobs:
     name: Build & Release
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 20
           cache: npm
@@ -31,9 +31,11 @@ jobs:
           sudo apt-get install -y \
             pkg-config libglib2.0-dev libsoup-3.0-dev \
             libjavascriptcoregtk-4.1-dev libwebkit2gtk-4.1-dev \
-            libayatana-appindicator3-dev clang mold
+            libayatana-appindicator3-dev clang mold cmake file wget
 
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy,rustfmt
 
       - uses: Swatinem/rust-cache@v2
         with:
@@ -45,13 +47,20 @@ jobs:
       - name: DevOps preflight
         run: npm run verify:devops
 
+      - name: Frontend quality gate
+        run: npm run check && npm run lint && npm test && npm --workspace @voco/desktop run build:frontend
+
+      - name: Rust quality gate
+        working-directory: apps/desktop/src-tauri
+        run: cargo fmt --check && cargo test && cargo clippy --all-targets --all-features -- -D warnings
+
       - name: Configure mold linker
         run: |
           mkdir -p apps/desktop/src-tauri/.cargo
           printf '[target.x86_64-unknown-linux-gnu]\nlinker = "clang"\nrustflags = ["-C", "link-arg=-fuse-ld=mold"]\n' > apps/desktop/src-tauri/.cargo/config.toml
 
       - name: Install Tauri CLI
-        run: cargo install tauri-cli --version "^2"
+        run: cargo install tauri-cli --version "2.10.1" --locked
 
       - name: Build Debian bundle
         working-directory: apps/desktop

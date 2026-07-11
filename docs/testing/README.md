@@ -45,3 +45,11 @@ cd apps/desktop/src-tauri && cargo check && cargo clippy -- -D warnings && cargo
 - run `npm run report:linux-runtime` on the Linux machine used for release testing
 
 Use [linux-e2e.md](./linux-e2e.md) as the release sign-off checklist for Ubuntu-class Linux environments.
+
+Use [cursor-streaming-manual-qa.md](./cursor-streaming-manual-qa.md) when validating live cursor
+streaming, preview-only fallback, and final-text-only fallback.
+Record the pass/fail evidence in
+[cursor-streaming-qa-results.md](./cursor-streaming-qa-results.md).
+
+Use [local-intelligence-manual-qa.md](./local-intelligence-manual-qa.md) when validating optional
+localhost transcript enhancement or local assistant mode.

@@ -2,11 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   audioLevelBucket,
   decideRealtimeServerEvent,
-  pcm16Base64ToSamples,
+  extractRealtimeFunctionCalls,
   resampleLinear,
-  samplesToPcm16Base64,
   updateLocalSpeechDetectorState,
 } from "@/hooks/useRealtimeConversation";
+import {
+  pcm16Base64ToSamples,
+  samplesToPcm16Base64,
+} from "@/lib/pcm16";
 import type {
   LocalSpeechDetectorState,
   RealtimeRuntimeSnapshot,
@@ -239,6 +242,55 @@ describe("realtime audio helpers", () => {
     expect(doneDecision.traceEvents).toContainEqual({
       event: "realtime_server_response_done",
       fields: { responseDeltaCount: 3 },
+    });
+  });
+
+  it("extracts realtime browser function calls from response.done", () => {
+    const calls = extractRealtimeFunctionCalls({
+      type: "response.done",
+      response: {
+        output: [
+          {
+            type: "function_call",
+            name: "openclaw_browser",
+            call_id: "call_1",
+            arguments: "{\"action\":\"inspect_page\"}",
+          },
+        ],
+      },
+    });
+
+    expect(calls).toEqual([
+      {
+        name: "openclaw_browser",
+        callId: "call_1",
+        argumentsJson: "{\"action\":\"inspect_page\"}",
+      },
+    ]);
+  });
+
+  it("marks browser function responses as tool work instead of normal listening", () => {
+    const decision = decideRealtimeServerEvent(
+      {
+        type: "response.done",
+        response: {
+          output: [
+            {
+              type: "function_call",
+              name: "openclaw_browser",
+              call_id: "call_1",
+              arguments: "{\"action\":\"inspect_page\"}",
+            },
+          ],
+        },
+      },
+      BASE_RUNTIME_SNAPSHOT,
+    );
+
+    expect(decision.functionCalls).toHaveLength(1);
+    expect(decision.status?.detail).toBe("Checking the OpenClaw browser...");
+    expect(decision.traceEvents).toContainEqual({
+      event: "realtime_browser_function_call_received",
     });
   });
 

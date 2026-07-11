@@ -76,4 +76,4 @@ Document significant technical decisions here using the format below.
 - **Status**: accepted
 - **Context**: The base64 audio IPC path still built very large strings on the frontend and forced a full base64 decode in Rust before transcription.
 - **Decision**: Send packed `Uint8Array` audio bytes through Tauri invoke and decode them directly to `Vec<f32>` in Rust.
-- **Consequences**: Lower CPU and memory overhead in the dictation path, no base64 dependency in the app crate, and a simpler bridge while preserving the current full-buffer transcription architecture. The product now also caps a single dictation recording at 60 seconds to keep memory and IPC cost in line with the intended dictation use case.
+- **Consequences**: Lower CPU and memory overhead in the dictation path, no base64 dependency in the app crate, and a simpler bridge while preserving the current full-buffer transcription architecture. At adoption, the product capped recordings at 60 seconds; that limit was later raised to 10 minutes after chunked resampling and transcription bounded the long-recording path.

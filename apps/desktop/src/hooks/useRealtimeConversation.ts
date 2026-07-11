@@ -2,12 +2,21 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { openMicrophoneStream } from "@/lib/audioInput";
 import { calculateVisualAudioLevelFromSamples } from "@/lib/audioLevel";
 import {
+  pcm16Base64ToSamples,
+  samplesToPcm16Base64,
+} from "@/lib/pcm16";
+import {
   createRealtimeClientSecret,
+  invokeOpenClawBrowserAction,
   showNotification,
   traceHotkeyEvent,
 } from "@/lib/tauri";
 import type { HotkeyTraceFields } from "@/lib/tauri";
-import type { RealtimeStatus } from "@/types";
+import type {
+  OpenClawBrowserAction,
+  OpenClawBrowserActionInput,
+  RealtimeStatus,
+} from "@/types";
 
 interface RealtimeState {
   status: RealtimeStatus;
@@ -18,8 +27,22 @@ interface RealtimeState {
 export type RealtimeServerEvent = {
   type?: string;
   delta?: string;
+  response?: {
+    output?: Array<{
+      type?: string;
+      name?: string;
+      call_id?: string;
+      arguments?: string;
+    }>;
+  };
   error?: { code?: string; message?: string; type?: string };
 };
+
+export interface RealtimeFunctionCall {
+  name: string;
+  callId: string;
+  argumentsJson: string;
+}
 
 export interface RealtimeRuntimeSnapshot {
   responseActive: boolean;
@@ -51,6 +74,7 @@ export interface RealtimeServerDecision {
   waitingForResponse?: boolean;
   responseDeltaCount?: number;
   serverDetectedCurrentTurn?: boolean;
+  functionCalls?: RealtimeFunctionCall[];
 }
 
 const INITIAL_STATE: RealtimeState = {
@@ -86,6 +110,8 @@ const REALTIME_MICROPHONE_PROCESSING = {
   noiseSuppression: true,
   autoGainControl: true,
 };
+
+const OPENCLAW_BROWSER_TOOL_NAME = "openclaw_browser";
 
 type LocalSpeechDetectorEvent = "started" | "stopped" | null;
 
@@ -216,6 +242,33 @@ function isBenignCancelRaceError(error: RealtimeServerEvent["error"]): boolean {
   );
 }
 
+export function extractRealtimeFunctionCalls(
+  message: RealtimeServerEvent,
+): RealtimeFunctionCall[] {
+  const output = message.response?.output;
+  if (!Array.isArray(output)) {
+    return [];
+  }
+
+  return output.flatMap((item) => {
+    if (
+      item?.type !== "function_call" ||
+      typeof item.name !== "string" ||
+      typeof item.call_id !== "string"
+    ) {
+      return [];
+    }
+
+    return [
+      {
+        name: item.name,
+        callId: item.call_id,
+        argumentsJson: typeof item.arguments === "string" ? item.arguments : "{}",
+      },
+    ];
+  });
+}
+
 export function decideRealtimeServerEvent(
   message: RealtimeServerEvent,
   snapshot: RealtimeRuntimeSnapshot,
@@ -294,6 +347,29 @@ export function decideRealtimeServerEvent(
       };
     }
     case "response.done":
+      {
+        const functionCalls = extractRealtimeFunctionCalls(message);
+        if (functionCalls.length > 0) {
+          return {
+            traceEvents: [
+              {
+                event: "realtime_server_response_done",
+                fields: { responseDeltaCount: snapshot.responseDeltaCount },
+              },
+              { event: "realtime_browser_function_call_received" },
+            ],
+            clearResponseTimeouts: true,
+            status: {
+              status: "speaking",
+              detail: "Checking the OpenClaw browser...",
+              error: null,
+            },
+            waitingForResponse: false,
+            responseActive: false,
+            functionCalls,
+          };
+        }
+      }
       return {
         traceEvents: [
           {
@@ -330,38 +406,6 @@ export function decideRealtimeServerEvent(
   }
 }
 
-export function samplesToPcm16Base64(samples: Float32Array): string {
-  const bytes = new Uint8Array(samples.length * 2);
-  const view = new DataView(bytes.buffer);
-
-  for (let i = 0; i < samples.length; i += 1) {
-    const sample = Math.max(-1, Math.min(1, samples[i] ?? 0));
-    const value = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
-    view.setInt16(i * 2, value, true);
-  }
-
-  let binary = "";
-  for (let i = 0; i < bytes.length; i += 1) {
-    binary += String.fromCharCode(bytes[i] ?? 0);
-  }
-  return btoa(binary);
-}
-
-export function pcm16Base64ToSamples(audio: string): Float32Array {
-  const binary = atob(audio);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-
-  const view = new DataView(bytes.buffer);
-  const samples = new Float32Array(Math.floor(bytes.length / 2));
-  for (let i = 0; i < samples.length; i += 1) {
-    samples[i] = view.getInt16(i * 2, true) / 0x8000;
-  }
-  return samples;
-}
-
 export function resampleLinear(
   samples: Float32Array,
   fromRate: number,
@@ -394,6 +438,47 @@ function sendRealtimeEvent(socket: WebSocket | null, event: unknown): boolean {
   return true;
 }
 
+function parseBrowserActionInput(argumentsJson: string): OpenClawBrowserActionInput {
+  const parsed = JSON.parse(argumentsJson) as Partial<OpenClawBrowserActionInput>;
+  const allowedActions: OpenClawBrowserAction[] = [
+    "open_url",
+    "navigate",
+    "inspect_page",
+    "list_tabs",
+    "click_ref",
+    "type_ref",
+    "press_key",
+  ];
+  if (!allowedActions.includes(parsed.action as OpenClawBrowserAction)) {
+    throw new Error("Unsupported OpenClaw browser action.");
+  }
+
+  return {
+    action: parsed.action as OpenClawBrowserAction,
+    url: typeof parsed.url === "string" ? parsed.url : undefined,
+    targetId: typeof parsed.targetId === "string" ? parsed.targetId : undefined,
+    elementRef: typeof parsed.elementRef === "string" ? parsed.elementRef : undefined,
+    text: typeof parsed.text === "string" ? parsed.text : undefined,
+    key: typeof parsed.key === "string" ? parsed.key : undefined,
+    submit: typeof parsed.submit === "boolean" ? parsed.submit : undefined,
+  };
+}
+
+function sendFunctionCallOutput(
+  socket: WebSocket | null,
+  callId: string,
+  output: unknown,
+): boolean {
+  return sendRealtimeEvent(socket, {
+    type: "conversation.item.create",
+    item: {
+      type: "function_call_output",
+      call_id: callId,
+      output: JSON.stringify(output),
+    },
+  });
+}
+
 export function useRealtimeConversation(selectedDeviceId: string | null) {
   const [state, setState] = useState<RealtimeState>(INITIAL_STATE);
   const socketRef = useRef<WebSocket | null>(null);
@@ -419,12 +504,15 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
   const lastOutputLevelTraceMsRef = useRef(0);
   const waitingForResponseRef = useRef(false);
   const cancelResponseInFlightRef = useRef(false);
+  const mutedRef = useRef(false);
   const serverDetectedCurrentTurnRef = useRef(false);
   const localSpeechStartedDuringAssistantOutputRef = useRef(false);
+  const handledFunctionCallIdsRef = useRef<Set<string>>(new Set());
   const localSpeechDetectorRef = useRef<LocalSpeechDetectorState>(
     INITIAL_LOCAL_SPEECH_DETECTOR_STATE,
   );
   const [realtimeLevel, setRealtimeLevel] = useState(0);
+  const [isMuted, setIsMuted] = useState(false);
 
   const setRealtimeState = useCallback((nextState: RealtimeState) => {
     statusRef.current = nextState.status;
@@ -500,6 +588,9 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
 
   const scheduleNoSpeechTimeout = useCallback(() => {
     clearNoSpeechTimeout();
+    if (mutedRef.current) {
+      return;
+    }
     noSpeechTimeoutRef.current = window.setTimeout(() => {
       traceHotkeyEvent("realtime_no_speech_timeout", {
         chunkCount: inputChunkCountRef.current,
@@ -514,6 +605,35 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
       noSpeechTimeoutRef.current = null;
     }, NO_SPEECH_TIMEOUT_MS);
   }, [clearNoSpeechTimeout, setRealtimeState]);
+
+  const setMicrophoneMuted = useCallback(
+    (muted: boolean) => {
+      mutedRef.current = muted;
+      setIsMuted(muted);
+      streamRef.current?.getAudioTracks().forEach((track) => {
+        track.enabled = !muted;
+      });
+      traceHotkeyEvent(
+        muted ? "realtime_microphone_muted" : "realtime_microphone_unmuted",
+      ).catch(() => {});
+      if (muted) {
+        resetRealtimeLevel();
+        setRealtimeState({
+          status: "listening",
+          detail: "Muted. Press the mic button to speak again.",
+          error: null,
+        });
+      } else if (statusRef.current !== "idle" && statusRef.current !== "error") {
+        setRealtimeState({
+          status: "listening",
+          detail: "Realtime conversation is live.",
+          error: null,
+        });
+        scheduleNoSpeechTimeout();
+      }
+    },
+    [resetRealtimeLevel, scheduleNoSpeechTimeout, setRealtimeState],
+  );
 
   const sendResponseCreate = useCallback((socket: WebSocket | null): boolean => {
     return sendRealtimeEvent(socket, {
@@ -616,8 +736,11 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
     responseActiveRef.current = false;
     waitingForResponseRef.current = false;
     clearCancelResponseInFlight();
+    mutedRef.current = false;
+    setIsMuted(false);
     serverDetectedCurrentTurnRef.current = false;
     localSpeechStartedDuringAssistantOutputRef.current = false;
+    handledFunctionCallIdsRef.current.clear();
     localSpeechDetectorRef.current = INITIAL_LOCAL_SPEECH_DETECTOR_STATE;
     inputChunkCountRef.current = 0;
     responseDeltaCountRef.current = 0;
@@ -721,6 +844,9 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
       );
       traceHotkeyEvent("realtime_get_user_media_done").catch(() => {});
       streamRef.current = stream;
+      stream.getAudioTracks().forEach((track) => {
+        track.enabled = !mutedRef.current;
+      });
       traceHotkeyEvent("realtime_microphone_track_started").catch(() => {});
       const trackSettings = stream.getAudioTracks()[0]?.getSettings();
       const trackTraceFields: HotkeyTraceFields = {
@@ -764,6 +890,10 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
         }
         const input = event.inputBuffer.getChannelData(0);
         const inputLevel = calculateVisualAudioLevelFromSamples(input);
+        if (mutedRef.current) {
+          resetRealtimeLevel();
+          return;
+        }
         pushRealtimeLevel(inputLevel);
         inputChunkCountRef.current += 1;
         if (
@@ -856,6 +986,7 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
       clearNoSpeechTimeout,
       clearLocalCommitFallbackTimeout,
       pushRealtimeLevel,
+      resetRealtimeLevel,
       scheduleLocalCommitFallback,
       scheduleNoSpeechTimeout,
       selectedDeviceId,
@@ -863,6 +994,55 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
       stopOutputPlayback,
       markCancelResponseInFlight,
     ],
+  );
+
+  const handleRealtimeFunctionCall = useCallback(
+    async (socket: WebSocket, call: RealtimeFunctionCall) => {
+      if (handledFunctionCallIdsRef.current.has(call.callId)) {
+        return;
+      }
+      handledFunctionCallIdsRef.current.add(call.callId);
+
+      let output: unknown;
+      try {
+        if (call.name !== OPENCLAW_BROWSER_TOOL_NAME) {
+          throw new Error(`Unsupported realtime function: ${call.name}`);
+        }
+
+        const request = parseBrowserActionInput(call.argumentsJson);
+        traceHotkeyEvent("realtime_browser_action_started", {
+          browserAction: request.action,
+        }).catch(() => {});
+        setRealtimeState({
+          status: "speaking",
+          detail: "Checking the OpenClaw browser...",
+          error: null,
+        });
+        const result = await invokeOpenClawBrowserAction(request);
+        output = result;
+        traceHotkeyEvent("realtime_browser_action_completed", {
+          browserAction: request.action,
+        }).catch(() => {});
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error);
+        output = {
+          ok: false,
+          summary: detail,
+          nextActions: ["Ask me to open a public web page or inspect the current browser page."],
+        };
+        traceHotkeyEvent("realtime_browser_action_failed").catch(() => {});
+      }
+
+      if (!sendFunctionCallOutput(socket, call.callId, output)) {
+        return;
+      }
+      traceHotkeyEvent("realtime_browser_function_output_sent").catch(() => {});
+      waitingForResponseRef.current = true;
+      if (sendResponseCreate(socket)) {
+        traceHotkeyEvent("realtime_browser_response_create_sent").catch(() => {});
+      }
+    },
+    [sendResponseCreate, setRealtimeState],
   );
 
   const stop = useCallback(() => {
@@ -980,6 +1160,11 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
           if (decision.scheduleResponseFallback) {
             scheduleResponseFallback(socket);
           }
+          if (decision.functionCalls) {
+            for (const call of decision.functionCalls) {
+              void handleRealtimeFunctionCall(socket, call);
+            }
+          }
           if (decision.cleanup) {
             cleanup();
           }
@@ -1024,6 +1209,7 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
     clearResponseTimeouts,
     clearCancelResponseInFlight,
     playOutputAudio,
+    handleRealtimeFunctionCall,
     scheduleResponseFallback,
     setRealtimeState,
     markCancelResponseInFlight,
@@ -1039,6 +1225,13 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
     }
   }, [start, stop]);
 
+  const toggleMute = useCallback(() => {
+    if (statusRef.current === "idle" || statusRef.current === "error") {
+      return;
+    }
+    setMicrophoneMuted(!mutedRef.current);
+  }, [setMicrophoneMuted]);
+
   useEffect(() => stop, [stop]);
 
   return {
@@ -1046,9 +1239,11 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
     realtimeDetail: state.detail,
     realtimeError: state.error,
     realtimeLevel,
+    isRealtimeMuted: isMuted,
     isRealtimeActive: state.status !== "idle" && state.status !== "error",
     startRealtime: start,
     stopRealtime: stop,
     toggleRealtime: toggle,
+    toggleRealtimeMute: toggleMute,
   };
 }

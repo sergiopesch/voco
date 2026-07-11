@@ -13,6 +13,16 @@ sudo usermod -aG input "$USER"
 
 Then log out and back in.
 
+If `ydotool` v1.x reports a missing socket, start `ydotoold` and refresh runtime checks:
+
+```bash
+systemctl --user enable --now ydotoold
+```
+
+Open Settings -> Output & local model -> Live cursor mode to switch between `Stable cursor
+streaming`, `Preview overlay only`, and `Final text only`. Use `Final text only` for target apps
+that behave unpredictably with synthetic typing.
+
 ## VOCO does not type text on X11
 
 Open Settings -> Advanced and press `Refresh runtime checks` first. VOCO should report `X11 or other` and show whether `xdotool` or `xclip` are missing.

@@ -10,6 +10,8 @@ import type {
 } from "@/types";
 import { calculateVisualAudioLevelFromSamples } from "@/lib/audioLevel";
 import { openMicrophoneStream } from "@/lib/audioInput";
+import { testLocalLlm } from "@/lib/tauri";
+import { formatLocalModelTestStatus } from "@/lib/localModelStatus";
 import { RealtimeMicVisual } from "@/components/RealtimeMicVisual";
 import vocoBrandImage from "../../../../assets/voco-logo.png";
 import vocoTrayReadyImage from "../../../../assets/voco logo green v1.png";
@@ -57,6 +59,16 @@ const PANEL_SECTIONS = [
 ] as const;
 
 type PanelSection = (typeof PANEL_SECTIONS)[number];
+
+const PANEL_SECTION_LABELS: Record<PanelSection, string> = {
+  General: "General",
+  Audio: "Audio",
+  Output: "Output & local model",
+  Hotkeys: "Hotkeys",
+  Appearance: "Appearance",
+  Updates: "Updates",
+  Advanced: "Advanced",
+};
 
 const TRAY_COLOR_LEGEND = [
   { label: "Ready", image: vocoTrayReadyImage },
@@ -121,6 +133,16 @@ export function ControlPanel({
     config.openclawPromptPrefix,
   );
   const [openClawError, setOpenClawError] = useState<string | null>(null);
+  const [localLlmEndpointDraft, setLocalLlmEndpointDraft] = useState(
+    config.localLlmEndpoint,
+  );
+  const [localLlmModelDraft, setLocalLlmModelDraft] = useState(
+    config.localLlmModel ?? "",
+  );
+  const [localLlmStatus, setLocalLlmStatus] = useState<{
+    kind: "ok" | "error";
+    detail: string;
+  } | null>(null);
   const isOpenClawTarget =
     config.transcriptTarget === "openclaw-agent" ||
     config.transcriptTarget === "openclaw-speech";
@@ -205,6 +227,12 @@ export function ControlPanel({
     if (!runtimeDiagnostics) {
       return "Runtime checks unavailable.";
     }
+    if (
+      runtimeDiagnostics.typeSimulation.available &&
+      runtimeDiagnostics.typeSimulation.optionalMissingCommands.length > 0
+    ) {
+      return `Degraded: ${runtimeDiagnostics.typeSimulation.optionalMissingCommands.join(", ")}`;
+    }
     return runtimeDiagnostics.typeSimulation.available
       ? "Ready"
       : `Missing: ${runtimeDiagnostics.typeSimulation.missingCommands.join(", ")}`;
@@ -233,6 +261,12 @@ export function ControlPanel({
     setOpenClawPromptDraft(config.openclawPromptPrefix);
     setOpenClawError(null);
   }, [config.openclawAgent, config.openclawPromptPrefix]);
+
+  useEffect(() => {
+    setLocalLlmEndpointDraft(config.localLlmEndpoint);
+    setLocalLlmModelDraft(config.localLlmModel ?? "");
+    setLocalLlmStatus(null);
+  }, [config.localLlmEndpoint, config.localLlmModel]);
 
   useEffect(() => {
     const shouldPreview =
@@ -344,6 +378,48 @@ export function ControlPanel({
 
     setOpenClawError(result.message);
     return false;
+  }
+
+  async function saveLocalLlmSettings(): Promise<boolean> {
+    const normalizedEndpoint =
+      localLlmEndpointDraft.trim() ||
+      "http://127.0.0.1:8080/v1/chat/completions";
+    const normalizedModel = localLlmModelDraft.trim();
+    setLocalLlmEndpointDraft(normalizedEndpoint);
+    setLocalLlmModelDraft(normalizedModel);
+    setLocalLlmStatus(null);
+
+    const result = await savePatch({
+      localLlmEndpoint: normalizedEndpoint,
+      localLlmModel: normalizedModel.length > 0 ? normalizedModel : null,
+    });
+    if (result.ok) {
+      return true;
+    }
+
+    setLocalLlmStatus({ kind: "error", detail: result.message });
+    return false;
+  }
+
+  async function testLocalModelConnection(): Promise<void> {
+    const saved = await saveLocalLlmSettings();
+    if (!saved) {
+      return;
+    }
+
+    const endpoint =
+      localLlmEndpointDraft.trim() ||
+      "http://127.0.0.1:8080/v1/chat/completions";
+    const model =
+      localLlmModelDraft.trim().length > 0 ? localLlmModelDraft.trim() : null;
+    const result = await testLocalLlm(
+      endpoint,
+      model,
+    );
+    setLocalLlmStatus({
+      kind: result.ok ? "ok" : "error",
+      detail: formatLocalModelTestStatus(endpoint, result),
+    });
   }
 
   return (
@@ -629,7 +705,7 @@ export function ControlPanel({
                   ].join(" ")}
                   onClick={() => setActiveSection(section)}
                 >
-                  {section}
+                  {PANEL_SECTION_LABELS[section]}
                 </button>
               ))}
             </nav>
@@ -650,6 +726,20 @@ export function ControlPanel({
                     On Linux, the command panel opens from the tray icon or tray menu, with
                     the tray menu kept as a reliable fallback path.
                   </div>
+                  <button
+                    className="voco-settings__jump"
+                    type="button"
+                    onClick={() => setActiveSection("Output")}
+                  >
+                    <span>
+                      <strong>Output & local model</strong>
+                      <small>
+                        Choose what happens after transcription, configure local polish,
+                        and test the localhost model endpoint.
+                      </small>
+                    </span>
+                    <span aria-hidden="true">Open</span>
+                  </button>
                 </section>
               ) : null}
 
@@ -710,7 +800,7 @@ export function ControlPanel({
 
               {activeSection === "Output" ? (
                 <section className="voco-settings__section">
-                  <h2>Output</h2>
+                  <h2>Output & local model</h2>
                   <label className="voco-field">
                     <span>After transcription</span>
                     <select
@@ -722,13 +812,124 @@ export function ControlPanel({
                       }
                     >
                       <option value="cursor">Type transcript at cursor</option>
+                      <option value="local-agent">Ask local model and type answer</option>
                       <option value="openclaw-agent">Ask OpenClaw and type answer</option>
                       <option value="openclaw-speech">Ask OpenClaw and speak answer</option>
                     </select>
                   </label>
                   <div className="voco-inline-note">
-                    OpenClaw mode sends the local transcript to your configured OpenClaw CLI agent.
-                    Speech output uses OpenClaw TTS and local audio playback.
+                    Cursor mode types the transcript directly. Local model mode sends it to the
+                    localhost endpoint below, while OpenClaw modes use your configured CLI agent.
+                  </div>
+                  {config.transcriptTarget === "cursor" ? (
+                    <>
+                      <label className="voco-field">
+                        <span>Live cursor mode</span>
+                        <select
+                          value={config.liveCursorMode}
+                          onChange={(event) =>
+                            void savePatch({
+                              liveCursorMode: event.target
+                                .value as AppConfig["liveCursorMode"],
+                            })
+                          }
+                        >
+                          <option value="stable-cursor-streaming">
+                            Stable cursor streaming
+                          </option>
+                          <option value="preview-overlay-only">Preview overlay only</option>
+                          <option value="final-text-only">Final text only</option>
+                        </select>
+                      </label>
+                      <div className="voco-inline-note">
+                        Stable cursor streaming only appends confirmed text and never deletes
+                        existing target-app text. Use final text only if a target app behaves
+                        unpredictably.
+                      </div>
+                    </>
+                  ) : null}
+                  <label className="voco-field">
+                    <span>Transcript enhancement</span>
+                    <select
+                      value={config.transcriptEnhancement}
+                      onChange={(event) =>
+                        void savePatch({
+                          transcriptEnhancement: event.target
+                            .value as AppConfig["transcriptEnhancement"],
+                        })
+                      }
+                    >
+                      <option value="off">Off</option>
+                      <option value="commands-only">Voice formatting commands</option>
+                      <option value="conservative">Conservative local polish</option>
+                    </select>
+                  </label>
+                  <div className="voco-inline-note">
+                    Conservative polish calls an OpenAI-compatible model on localhost only. If it
+                    fails, VOCO keeps using the raw local transcript.
+                  </div>
+                  <label className="voco-field">
+                    <span>Local model endpoint</span>
+                    <input
+                      value={localLlmEndpointDraft}
+                      onChange={(event) => setLocalLlmEndpointDraft(event.target.value)}
+                      onBlur={() => {
+                        if (localLlmEndpointDraft !== config.localLlmEndpoint) {
+                          void saveLocalLlmSettings();
+                        }
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          void saveLocalLlmSettings();
+                        }
+                      }}
+                    />
+                  </label>
+                  <label className="voco-field">
+                    <span>Local model name</span>
+                    <input
+                      value={localLlmModelDraft}
+                      placeholder="Optional"
+                      onChange={(event) => setLocalLlmModelDraft(event.target.value)}
+                      onBlur={() => {
+                        if (localLlmModelDraft !== (config.localLlmModel ?? "")) {
+                          void saveLocalLlmSettings();
+                        }
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          void saveLocalLlmSettings();
+                        }
+                      }}
+                    />
+                  </label>
+                  {localLlmStatus ? (
+                    <div
+                      className={[
+                        "voco-inline-note",
+                        localLlmStatus.kind === "error" ? "voco-inline-note--error" : "",
+                      ].join(" ")}
+                    >
+                      {localLlmStatus.detail}
+                    </div>
+                  ) : null}
+                  <div className="voco-settings__actions">
+                    <button
+                      className="voco-button voco-button--secondary"
+                      onClick={() => void testLocalModelConnection()}
+                      disabled={saving}
+                    >
+                      Test local model
+                    </button>
+                    <button
+                      className="voco-button voco-button--primary"
+                      onClick={() => void saveLocalLlmSettings()}
+                      disabled={saving}
+                    >
+                      Save local model settings
+                    </button>
                   </div>
                   <label className="voco-field">
                     <span>OpenClaw agent</span>

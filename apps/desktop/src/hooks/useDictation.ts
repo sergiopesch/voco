@@ -3,28 +3,82 @@ import { useStore } from "@/store/useStore";
 import {
   askOpenClawAgent,
   transcribeAudio,
+  previewTranscribeAudio,
   insertText,
+  appendLiveText,
   setDictationStatus,
   setMicrophoneReady,
   showNotification,
   speakOpenClawResponse,
   traceHotkeyEvent,
 } from "@/lib/tauri";
+import type { HotkeyTraceFields } from "@/lib/tauri";
 import {
   calculateVisualAudioLevelFromSamples,
-  removeDcOffset,
+  removeDcOffsetInPlace,
 } from "@/lib/audioLevel";
-import { openMicrophoneStream, probeMicrophoneAccess } from "@/lib/audioInput";
+import {
+  appendAudioSamples,
+  collectRecentAudioSamples,
+  createAudioCaptureBuffer,
+  drainAudioCaptureBuffer,
+  clearAudioCaptureBuffer,
+} from "@/lib/audioCaptureBuffer";
+import {
+  resampleAudioBuffer,
+  resampleAudioForTranscription,
+} from "@/lib/audioResampling";
+import {
+  openMicrophoneStreamWithDiagnostics,
+  probeMicrophoneAccess,
+} from "@/lib/audioInput";
+import {
+  addCommittedCursorText,
+  clearCommittedCursorText,
+  consumeQueuedStop,
+  createDictationSessionState,
+  createPreviewToken,
+  disableLiveCursorInsertion,
+  disableLivePreview,
+  failSession,
+  finishSessionIdle,
+  isActivePreviewToken,
+  markFinalizing,
+  markProcessing,
+  markRecording,
+  recordPreviewDuration,
+  requestStop as requestSessionStop,
+  requestToggle as requestSessionToggle,
+  startSession,
+} from "@/lib/dictationSession";
+import type { DictationPreviewToken } from "@/lib/dictationSession";
+import {
+  askLocalAssistantForDictation,
+  enhanceTranscriptForDictation,
+} from "@/lib/localIntelligence";
+import { planLiveFinalCursorAction } from "@/lib/dictationFinalizer";
+import {
+  LIVE_PREVIEW_CONFIRMATION_INTERVAL_MS,
+  LIVE_PREVIEW_INITIAL_DELAY_MS,
+  LIVE_PREVIEW_MIN_INTERVAL_MS,
+  clampLivePreviewDelay,
+  liveCursorCommitDecision,
+  nextLiveCursorFallbackDecision,
+  nextLivePreviewDelay,
+  shouldUseFastLivePreviewConfirmation,
+} from "@/lib/liveCommitPolicy";
 import type { DictationStatus } from "@/types";
 
 const TARGET_SAMPLE_RATE = 16000;
-const MAX_AUDIO_SECONDS = 60;
+const MAX_AUDIO_SECONDS = 600;
+const LIVE_PREVIEW_MIN_SECONDS = 1;
+const LIVE_PREVIEW_MAX_SECONDS = 6;
 const AUDIO_LEVEL_ATTACK = 0.68;
 const AUDIO_LEVEL_RELEASE = 0.24;
 const AUDIO_LEVEL_FLOOR = 0.01;
 
-type DictationPhase = DictationStatus | "starting" | "stopping";
-type QueuedAction = "start" | "stop" | null;
+type DictationPhase = DictationStatus | "starting" | "stopping" | "finalizing";
+type LiveFinalizationResult = "none" | "safe" | "unreconciled";
 
 export function useDictation() {
   const setStatus = useStore((state) => state.setStatus);
@@ -37,19 +91,49 @@ export function useDictation() {
   const audioContextRef = useRef<AudioContext | null>(null);
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const workletRef = useRef<AudioWorkletNode | null>(null);
+  const workletFlushResolverRef = useRef<(() => void) | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const silentSinkRef = useRef<GainNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const primedStreamRef = useRef<MediaStream | null>(null);
   const primedStreamPromiseRef = useRef<Promise<MediaStream> | null>(null);
-  const samplesRef = useRef<Float32Array[]>([]);
+  const audioBufferRef = useRef(createAudioCaptureBuffer());
+  const sessionRef = useRef(createDictationSessionState());
   const phaseRef = useRef<DictationPhase>("idle");
-  const queuedActionRef = useRef<QueuedAction>(null);
   const workletModuleLoadedRef = useRef(false);
   const smoothedAudioLevelRef = useRef(0);
   const firstHotkeyPressMsRef = useRef<number | null>(null);
   const initialHotkeyPressLoggedRef = useRef(false);
   const initialHotkeyLatencyLoggedRef = useRef(false);
+  const recordingStartedAtMsRef = useRef<number | null>(null);
+  const stopRequestedAtMsRef = useRef<number | null>(null);
+  const firstLiveTextInsertedRef = useRef(false);
+  const livePreviewTimeoutRef = useRef<number | null>(null);
+  const livePreviewInFlightRef = useRef<Promise<void> | null>(null);
+  const liveCursorInsertionInFlightRef = useRef<Promise<void> | null>(null);
+  const lastLivePreviewTextRef = useRef("");
+  const liveCursorCandidateTextRef = useRef("");
+  const liveCursorTextRef = useRef("");
+  const liveCursorInsertionDisabledRef = useRef(false);
+  const liveCursorBlockedCommitCountRef = useRef(0);
+  const liveCursorFallbackNotifiedRef = useRef(false);
+  const livePreviewFailureNotifiedRef = useRef(false);
+  const livePreviewNextDelayMsRef = useRef(LIVE_PREVIEW_MIN_INTERVAL_MS);
+
+  function traceDictationEvent(
+    event: string,
+    fields: HotkeyTraceFields | null = null,
+  ): Promise<void> {
+    const sessionId = sessionRef.current.sessionId;
+    if (sessionId <= 0) {
+      return traceHotkeyEvent(event, fields);
+    }
+
+    return traceHotkeyEvent(event, {
+      ...(fields ?? {}),
+      dictationSessionId: sessionId,
+    });
+  }
 
   const ensureAudioContext = useCallback(async () => {
     if (!audioContextRef.current || audioContextRef.current.state === "closed") {
@@ -130,10 +214,21 @@ export function useDictation() {
   }, [ensureAudioContext, ensureWorkletModuleLoaded]);
 
   const openTracedMicrophoneStream = useCallback(async (deviceId: string | null) => {
-    traceHotkeyEvent("recording_get_user_media_started").catch(() => {});
-    const stream = await openMicrophoneStream(deviceId);
-    traceHotkeyEvent("recording_get_user_media_done").catch(() => {});
-    return stream;
+    traceDictationEvent("recording_get_user_media_started").catch(() => {});
+    const result = await openMicrophoneStreamWithDiagnostics(deviceId);
+    if (result.fallbackStage === "minimal-constraints") {
+      traceDictationEvent("recording_get_user_media_constraints_fallback", {
+        selectedDeviceConfigured: result.selectedDeviceConfigured,
+      }).catch(() => {});
+    } else if (result.fallbackStage === "default-device") {
+      traceDictationEvent("recording_get_user_media_default_fallback", {
+        selectedDeviceConfigured: result.selectedDeviceConfigured,
+      }).catch(() => {});
+    }
+    traceDictationEvent("recording_get_user_media_done", {
+      selectedDeviceConfigured: result.selectedDeviceConfigured,
+    }).catch(() => {});
+    return result.stream;
   }, []);
 
   const primeRecordingStream = useCallback(async () => {
@@ -176,6 +271,332 @@ export function useDictation() {
     setAudioLevel(0);
   }, [setAudioLevel]);
 
+  function clearLivePreviewTimer() {
+    if (livePreviewTimeoutRef.current !== null) {
+      window.clearTimeout(livePreviewTimeoutRef.current);
+      livePreviewTimeoutRef.current = null;
+    }
+  }
+
+  function scheduleLivePreview(delayMs = livePreviewNextDelayMsRef.current) {
+    clearLivePreviewTimer();
+    const token = createPreviewToken(sessionRef.current);
+    const safeDelayMs = clampLivePreviewDelay(
+      delayMs,
+      shouldUseFastLiveConfirmation(),
+    );
+    livePreviewTimeoutRef.current = window.setTimeout(() => {
+      livePreviewTimeoutRef.current = null;
+      void runLivePreview(token);
+    }, safeDelayMs);
+  }
+
+  function shouldRunLivePreview() {
+    const config = useStore.getState().config;
+    return (
+      config?.transcriptTarget === "cursor" &&
+      config.liveCursorMode !== "final-text-only" &&
+      !sessionRef.current.livePreviewDisabled
+    );
+  }
+
+  function shouldUseFastLiveConfirmation() {
+    const config = useStore.getState().config;
+    return shouldUseFastLivePreviewConfirmation({
+      firstLiveTextInserted: firstLiveTextInsertedRef.current,
+      liveCursorInsertionDisabled:
+        liveCursorInsertionDisabledRef.current ||
+        sessionRef.current.liveCursorInsertionDisabled,
+      liveCursorMode: config?.liveCursorMode,
+      transcriptTarget: config?.transcriptTarget,
+    });
+  }
+
+  function shouldShowLivePreviewOverlay() {
+    const config = useStore.getState().config;
+    return (
+      config?.liveCursorMode === "preview-overlay-only" ||
+      liveCursorInsertionDisabledRef.current ||
+      sessionRef.current.liveCursorInsertionDisabled
+    );
+  }
+
+  async function runLivePreview(token: DictationPreviewToken): Promise<void> {
+    if (
+      !isActivePreviewToken(sessionRef.current, token) ||
+      !shouldRunLivePreview()
+    ) {
+      return;
+    }
+
+    if (livePreviewInFlightRef.current) {
+      scheduleLivePreview(
+        shouldUseFastLiveConfirmation()
+          ? LIVE_PREVIEW_CONFIRMATION_INTERVAL_MS
+          : LIVE_PREVIEW_MIN_INTERVAL_MS,
+      );
+      return;
+    }
+
+    const previewPromise: Promise<void> = (async () => {
+      const sampleRate = audioContextRef.current?.sampleRate ?? TARGET_SAMPLE_RATE;
+      const previewSamples = collectRecentAudioSamples(
+        audioBufferRef.current,
+        Math.round(sampleRate * LIVE_PREVIEW_MAX_SECONDS),
+      );
+      if (previewSamples.length < sampleRate * LIVE_PREVIEW_MIN_SECONDS) {
+        if (shouldUseFastLiveConfirmation()) {
+          livePreviewNextDelayMsRef.current = LIVE_PREVIEW_CONFIRMATION_INTERVAL_MS;
+        }
+        traceDictationEvent("dictation_live_preview_skipped_short_audio").catch(() => {});
+        return;
+      }
+
+      let prepared = removeDcOffsetInPlace(previewSamples);
+      if (Math.abs(sampleRate - TARGET_SAMPLE_RATE) > 1) {
+        prepared = await resampleAudioBuffer(prepared, sampleRate, TARGET_SAMPLE_RATE);
+      }
+
+      const startedAt = performance.now();
+      const preview = await previewTranscribeAudio(prepared);
+      const durationMs = Math.round(performance.now() - startedAt);
+      if (!isActivePreviewToken(sessionRef.current, token)) {
+        return;
+      }
+      sessionRef.current = recordPreviewDuration(
+        sessionRef.current,
+        token,
+        durationMs,
+      );
+      livePreviewNextDelayMsRef.current = nextLivePreviewDelay(
+        durationMs,
+        shouldUseFastLiveConfirmation(),
+      );
+      traceDictationEvent("dictation_live_preview_completed", {
+        durationMs,
+      }).catch(() => {});
+
+      const normalizedPreview = preview?.trim() ?? "";
+      if (normalizedPreview.length === 0) {
+        if (shouldUseFastLiveConfirmation()) {
+          livePreviewNextDelayMsRef.current = LIVE_PREVIEW_CONFIRMATION_INTERVAL_MS;
+        }
+        traceDictationEvent("dictation_live_preview_empty").catch(() => {});
+        return;
+      }
+
+      if (
+        isActivePreviewToken(sessionRef.current, token) &&
+        normalizedPreview !== lastLivePreviewTextRef.current
+      ) {
+        lastLivePreviewTextRef.current = normalizedPreview;
+        if (shouldShowLivePreviewOverlay()) {
+          setInterimTranscript(normalizedPreview);
+        }
+        await updateLiveCursorText(normalizedPreview);
+        traceDictationEvent("dictation_live_preview_updated").catch(() => {});
+      }
+    })()
+      .catch((error) => {
+        console.warn("Live dictation preview failed:", error);
+        if (isActivePreviewToken(sessionRef.current, token)) {
+          sessionRef.current = disableLivePreview(sessionRef.current);
+          liveCursorInsertionDisabledRef.current = true;
+          traceDictationEvent("dictation_live_cursor_overlay_fallback").catch(() => {});
+          if (!livePreviewFailureNotifiedRef.current) {
+            livePreviewFailureNotifiedRef.current = true;
+            setInterimTranscript(
+              "Live preview paused. Final insertion will still run when you stop dictation.",
+            );
+            showNotification(
+              "Live preview paused",
+              "VOCO could not produce a live preview. Final insertion will still run when you stop dictation.",
+            ).catch(() => {});
+          }
+        }
+        traceDictationEvent("dictation_live_preview_failed").catch(() => {});
+      })
+      .finally(() => {
+        if (livePreviewInFlightRef.current === previewPromise) {
+          livePreviewInFlightRef.current = null;
+        }
+        if (
+          isActivePreviewToken(sessionRef.current, token)
+        ) {
+          scheduleLivePreview();
+        }
+      });
+
+    livePreviewInFlightRef.current = previewPromise;
+    await previewPromise;
+  }
+
+  async function updateLiveCursorText(nextText: string) {
+    const config = useStore.getState().config;
+    if (
+      config?.transcriptTarget !== "cursor" ||
+      config.liveCursorMode !== "stable-cursor-streaming" ||
+      sessionRef.current.liveCursorInsertionDisabled ||
+      liveCursorInsertionDisabledRef.current
+    ) {
+      return;
+    }
+
+    const previousCandidate = liveCursorCandidateTextRef.current;
+    liveCursorCandidateTextRef.current = nextText;
+
+    if (previousCandidate.length === 0) {
+      return;
+    }
+
+    const committedText = liveCursorTextRef.current;
+    const decision = liveCursorCommitDecision(
+      committedText,
+      previousCandidate,
+      nextText,
+    );
+    const fallback = nextLiveCursorFallbackDecision(
+      decision.reason,
+      liveCursorBlockedCommitCountRef.current,
+    );
+    liveCursorBlockedCommitCountRef.current = fallback.blockedCommitCount;
+
+    const appendText = decision.appendText;
+    if (appendText.length === 0) {
+      if (fallback.shouldFallback) {
+        pauseLiveCursorStreamingForSession(nextText);
+        return;
+      }
+
+      if (decision.reason === "unsafe-rewrite") {
+        traceDictationEvent("dictation_live_cursor_unsafe_rewrite_blocked").catch(
+          () => {},
+        );
+        return;
+      }
+
+      if (decision.reason === "waiting-for-stable-preview") {
+        traceDictationEvent("dictation_live_cursor_commit_waiting").catch(() => {});
+      }
+      return;
+    }
+
+    await appendLiveCursorText(appendText, nextText);
+  }
+
+  async function appendLiveCursorText(appendText: string, latestPreviewText: string) {
+    const committedText = liveCursorTextRef.current;
+    const insertionPromise = (async () => {
+      await appendLiveText(appendText);
+      liveCursorTextRef.current = committedText + appendText;
+      liveCursorBlockedCommitCountRef.current = 0;
+      sessionRef.current = addCommittedCursorText(sessionRef.current, appendText);
+      if (!firstLiveTextInsertedRef.current && recordingStartedAtMsRef.current !== null) {
+        firstLiveTextInsertedRef.current = true;
+        traceDictationEvent("dictation_first_live_text_visible", {
+          durationMs: Math.round(performance.now() - recordingStartedAtMsRef.current),
+        }).catch(() => {});
+      }
+      traceDictationEvent("dictation_live_cursor_insert_updated").catch(() => {});
+    })();
+
+    liveCursorInsertionInFlightRef.current = insertionPromise;
+
+    try {
+      await insertionPromise;
+    } catch (error) {
+      sessionRef.current = disableLiveCursorInsertion(sessionRef.current);
+      liveCursorInsertionDisabledRef.current = true;
+      liveCursorFallbackNotifiedRef.current = true;
+      setInterimTranscript(latestPreviewText);
+      console.warn("Live cursor text insertion failed:", error);
+      traceDictationEvent("dictation_live_cursor_insert_failed").catch(() => {});
+      traceDictationEvent("dictation_live_cursor_overlay_fallback").catch(() => {});
+      showNotification(
+        "Live cursor streaming paused",
+        "VOCO could not update text at the cursor. Final insertion will still run when you stop dictation.",
+      ).catch(() => {});
+    } finally {
+      if (liveCursorInsertionInFlightRef.current === insertionPromise) {
+        liveCursorInsertionInFlightRef.current = null;
+      }
+    }
+  }
+
+  function pauseLiveCursorStreamingForSession(latestPreviewText: string) {
+    sessionRef.current = disableLiveCursorInsertion(sessionRef.current);
+    liveCursorInsertionDisabledRef.current = true;
+    setInterimTranscript(latestPreviewText);
+    traceDictationEvent("dictation_live_cursor_overlay_fallback").catch(() => {});
+
+    if (!liveCursorFallbackNotifiedRef.current) {
+      liveCursorFallbackNotifiedRef.current = true;
+      showNotification(
+        "Live cursor streaming paused",
+        "VOCO is still listening and showing live preview. Final insertion will run when you stop dictation.",
+      ).catch(() => {});
+    }
+  }
+
+  function stopLivePreview() {
+    clearLivePreviewTimer();
+    lastLivePreviewTextRef.current = "";
+    liveCursorCandidateTextRef.current = "";
+  }
+
+  async function clearLiveCursorText() {
+    await waitForLiveCursorInsertion();
+    const previousText = liveCursorTextRef.current;
+    if (previousText.length === 0) {
+      return;
+    }
+
+    liveCursorTextRef.current = "";
+    sessionRef.current = clearCommittedCursorText(sessionRef.current);
+    traceDictationEvent("dictation_live_cursor_insert_cleared").catch(() => {});
+  }
+
+  async function replaceLiveCursorTextWithFinal(
+    finalText: string,
+  ): Promise<LiveFinalizationResult> {
+    await waitForLiveCursorInsertion();
+    const committedText = liveCursorTextRef.current;
+    if (committedText.length === 0) {
+      return "none";
+    }
+
+    const action = planLiveFinalCursorAction(committedText, finalText);
+    if (action.status === "no-live-text") {
+      return "none";
+    }
+
+    liveCursorTextRef.current = "";
+    sessionRef.current = clearCommittedCursorText(sessionRef.current);
+
+    if (action.status === "keep-live-text") {
+      traceDictationEvent("dictation_live_cursor_final_unreconciled").catch(() => {});
+      showNotification(
+        "Final transcript ready",
+        "VOCO kept the live text at the cursor. The final transcript is available in VOCO without changing existing text.",
+      ).catch(() => {});
+      return "unreconciled";
+    }
+
+    if (action.status === "append-final-suffix") {
+      await appendLiveText(action.appendText);
+    }
+
+    traceDictationEvent("dictation_live_cursor_insert_finalized").catch(() => {});
+    return "safe";
+  }
+
+  async function waitForLiveCursorInsertion() {
+    const inFlight = liveCursorInsertionInFlightRef.current;
+    if (inFlight) {
+      await inFlight.catch(() => {});
+    }
+  }
+
   const connectSilentSink = useCallback(
     (audioContext: AudioContext, sourceNode: AudioNode) => {
       const silentSink = audioContext.createGain();
@@ -199,9 +620,12 @@ export function useDictation() {
       );
       worklet.port.onmessage = (e) => {
         if (e.data.type === "samples") {
-          samplesRef.current.push(e.data.data as Float32Array);
+          appendAudioSamples(audioBufferRef.current, e.data.data as Float32Array);
         } else if (e.data.type === "level") {
           updateAudioLevel(e.data.data as number);
+        } else if (e.data.type === "flushed") {
+          workletFlushResolverRef.current?.();
+          workletFlushResolverRef.current = null;
         }
       };
       source.connect(worklet);
@@ -220,7 +644,7 @@ export function useDictation() {
     const processor = audioContext.createScriptProcessor(4096, 1, 1);
     processor.onaudioprocess = (e) => {
       const input = e.inputBuffer.getChannelData(0);
-      samplesRef.current.push(new Float32Array(input));
+      appendAudioSamples(audioBufferRef.current, new Float32Array(input));
       updateAudioLevel(calculateVisualAudioLevelFromSamples(input));
     };
     source.connect(processor);
@@ -228,7 +652,33 @@ export function useDictation() {
     processorRef.current = processor;
   };
 
+  async function flushWorkletSamples() {
+    const worklet = workletRef.current;
+    if (!worklet) {
+      return;
+    }
+
+    await new Promise<void>((resolve) => {
+      let timeoutId: number | null = null;
+      const finish = () => {
+        if (timeoutId !== null) {
+          window.clearTimeout(timeoutId);
+        }
+        if (workletFlushResolverRef.current === finish) {
+          workletFlushResolverRef.current = null;
+        }
+        resolve();
+      };
+
+      workletFlushResolverRef.current = finish;
+      timeoutId = window.setTimeout(finish, 80);
+      worklet.port.postMessage({ type: "flush" });
+    });
+  }
+
   async function teardownAudioGraph() {
+    await flushWorkletSamples();
+
     if (workletRef.current) {
       workletRef.current.disconnect();
       workletRef.current = null;
@@ -256,17 +706,19 @@ export function useDictation() {
   }
 
   function finalizeIdleState() {
+    const stopRequestedAtMs = stopRequestedAtMsRef.current;
+    if (stopRequestedAtMs !== null) {
+      traceDictationEvent("dictation_stop_to_idle", {
+        durationMs: Math.round(performance.now() - stopRequestedAtMs),
+      }).catch(() => {});
+      stopRequestedAtMsRef.current = null;
+    }
+
     setInterimTranscript("");
+    sessionRef.current = finishSessionIdle(sessionRef.current);
     phaseRef.current = "idle";
     setStatus("idle");
     setDictationStatus("idle").catch(() => {});
-
-    const queuedAction = queuedActionRef.current;
-    queuedActionRef.current = null;
-
-    if (queuedAction === "start") {
-      void startRecording();
-    }
   }
 
   async function startRecording() {
@@ -275,16 +727,27 @@ export function useDictation() {
       return;
     }
 
+    sessionRef.current = startSession(sessionRef.current);
     phaseRef.current = "starting";
-    queuedActionRef.current = null;
-    traceHotkeyEvent("recording_state_requested").catch(() => {});
+    traceDictationEvent("recording_state_requested").catch(() => {});
 
     try {
       clearTranscript();
       setInterimTranscript("Listening...");
       setStatus("recording");
       resetAudioLevel();
-      samplesRef.current = [];
+      clearAudioCaptureBuffer(audioBufferRef.current);
+      lastLivePreviewTextRef.current = "";
+      liveCursorCandidateTextRef.current = "";
+      liveCursorTextRef.current = "";
+      liveCursorInsertionDisabledRef.current = false;
+      liveCursorBlockedCommitCountRef.current = 0;
+      liveCursorFallbackNotifiedRef.current = false;
+      livePreviewFailureNotifiedRef.current = false;
+      recordingStartedAtMsRef.current = null;
+      stopRequestedAtMsRef.current = null;
+      firstLiveTextInsertedRef.current = false;
+      livePreviewNextDelayMsRef.current = LIVE_PREVIEW_MIN_INTERVAL_MS;
       setDictationStatus("recording").catch(() => {});
 
       const deviceId = useStore.getState().selectedDeviceId;
@@ -302,6 +765,7 @@ export function useDictation() {
       streamRef.current = stream;
       setMicrophoneReady(true).catch(() => {});
       console.info("Recording started");
+      recordingStartedAtMsRef.current = performance.now();
       if (
         firstHotkeyPressMsRef.current !== null &&
         !initialHotkeyLatencyLoggedRef.current
@@ -315,26 +779,31 @@ export function useDictation() {
       }
 
       const audioContext = await ensureAudioContext();
-      traceHotkeyEvent("recording_audio_context_ready").catch(() => {});
+      traceDictationEvent("recording_audio_context_ready").catch(() => {});
 
       const source = audioContext.createMediaStreamSource(stream);
       sourceRef.current = source;
-      traceHotkeyEvent("recording_media_source_created").catch(() => {});
+      traceDictationEvent("recording_media_source_created").catch(() => {});
 
       // Prefer AudioWorklet (off main thread), fall back to ScriptProcessorNode
       const workletOk = await connectWorklet(audioContext, source);
       if (!workletOk) {
         connectScriptProcessor(audioContext, source);
-        traceHotkeyEvent("recording_script_processor_connected").catch(() => {});
+        traceDictationEvent("recording_script_processor_connected").catch(() => {});
       } else {
-        traceHotkeyEvent("recording_worklet_connected").catch(() => {});
+        traceDictationEvent("recording_worklet_connected").catch(() => {});
       }
 
+      sessionRef.current = markRecording(sessionRef.current);
       phaseRef.current = "recording";
-      traceHotkeyEvent("recording_state_active").catch(() => {});
+      traceDictationEvent("recording_state_active").catch(() => {});
+      if (shouldRunLivePreview()) {
+        scheduleLivePreview(LIVE_PREVIEW_INITIAL_DELAY_MS);
+      }
 
-      if (queuedActionRef.current === "stop") {
-        queuedActionRef.current = null;
+      const queuedStop = consumeQueuedStop(sessionRef.current);
+      sessionRef.current = queuedStop.state;
+      if (queuedStop.shouldStop) {
         void stopRecording();
       }
     } catch (err) {
@@ -344,7 +813,7 @@ export function useDictation() {
       setDictationStatus("error").catch(() => {});
       setMicrophoneReady(false).catch(() => {});
       setInterimTranscript("");
-      queuedActionRef.current = null;
+      sessionRef.current = failSession(sessionRef.current);
       phaseRef.current = "error";
       showNotification(
         "Microphone initialization failed",
@@ -373,84 +842,181 @@ export function useDictation() {
     }
 
     phaseRef.current = "stopping";
+    stopRequestedAtMsRef.current = performance.now();
+    if (recordingStartedAtMsRef.current !== null) {
+      traceDictationEvent("dictation_recording_duration", {
+        durationMs: Math.round(stopRequestedAtMsRef.current - recordingStartedAtMsRef.current),
+      }).catch(() => {});
+    }
+    sessionRef.current = requestSessionStop(sessionRef.current);
     setStatus("processing");
     setInterimTranscript("Wrapping up...");
     setDictationStatus("processing").catch(() => {});
+    stopLivePreview();
 
-    const sampleRate = await teardownAudioGraph();
-    resetAudioLevel();
+    let sampleRate: number;
+    let merged: Float32Array;
+    try {
+      sampleRate = await teardownAudioGraph();
+      resetAudioLevel();
+      merged = drainAudioCaptureBuffer(audioBufferRef.current);
 
-    const chunks = samplesRef.current;
-    samplesRef.current = [];
+      if (merged.length > 0) {
+        removeDcOffsetInPlace(merged);
 
-    if (chunks.length === 0) {
+        if (Math.abs(sampleRate - TARGET_SAMPLE_RATE) > 1) {
+          merged = await resampleAudioForTranscription(
+            merged,
+            sampleRate,
+            TARGET_SAMPLE_RATE,
+          );
+        }
+      }
+    } catch (err) {
+      resetAudioLevel();
+      clearAudioCaptureBuffer(audioBufferRef.current);
+      await clearLiveCursorText().catch(() => {});
+      const detail = err instanceof Error ? err.message : String(err);
+      phaseRef.current = "error";
+      sessionRef.current = failSession(sessionRef.current);
+      setStatus("error");
+      setError(`Audio processing failed: ${detail}`);
+      setInterimTranscript("");
+      setDictationStatus("error").catch(() => {});
+      return;
+    }
+
+    if (merged.length === 0) {
+      await clearLiveCursorText().catch((error) => {
+        console.warn("Failed to clear live cursor text after empty recording:", error);
+      });
       finalizeIdleState();
       return;
     }
 
-    const totalLength = chunks.reduce((sum, c) => sum + c.length, 0);
-    let merged: Float32Array = new Float32Array(totalLength);
-    let offset = 0;
-    for (const chunk of chunks) {
-      merged.set(chunk, offset);
-      offset += chunk.length;
-    }
-
-    merged = removeDcOffset(merged);
-
-    // Resample to 16kHz if needed using OfflineAudioContext for proper quality
-    if (Math.abs(sampleRate - TARGET_SAMPLE_RATE) > 1) {
-      merged = await resample(merged, sampleRate, TARGET_SAMPLE_RATE);
-    }
-
     // Skip very short recordings (< 0.3s)
     if (merged.length < TARGET_SAMPLE_RATE * 0.3) {
+      await clearLiveCursorText().catch((error) => {
+        console.warn("Failed to clear live cursor text after short recording:", error);
+      });
       finalizeIdleState();
       return;
     }
 
     if (merged.length > TARGET_SAMPLE_RATE * MAX_AUDIO_SECONDS) {
       phaseRef.current = "error";
+      sessionRef.current = failSession(sessionRef.current);
       setStatus("error");
       setError(
         `Recording too long. Please keep dictation under ${MAX_AUDIO_SECONDS} seconds.`,
       );
       setInterimTranscript("");
       setDictationStatus("error").catch(() => {});
-
-      const queuedAction = queuedActionRef.current;
-      queuedActionRef.current = null;
-      if (queuedAction === "start") {
-        void startRecording();
-      }
       return;
     }
 
     phaseRef.current = "processing";
+    sessionRef.current = markProcessing(sessionRef.current);
     setInterimTranscript("Transcribing...");
 
     try {
+      const transcribeStartedAt = performance.now();
       const transcript = await transcribeAudio(merged);
+      const transcriptionDurationMs = Math.round(
+        performance.now() - transcribeStartedAt,
+      );
+      console.info(
+        `[timing] transcription completed: ${transcriptionDurationMs}ms`,
+      );
+      traceDictationEvent("dictation_transcription_completed", {
+        durationMs: transcriptionDurationMs,
+      }).catch(() => {});
+      if (stopRequestedAtMsRef.current !== null) {
+        traceDictationEvent("dictation_stop_to_final_transcript", {
+          durationMs: Math.round(performance.now() - stopRequestedAtMsRef.current),
+        }).catch(() => {});
+      }
 
       if (!transcript || transcript.trim().length === 0) {
+        await clearLiveCursorText().catch((error) => {
+          console.warn("Failed to clear live cursor text after empty transcript:", error);
+        });
         setTranscript("(no speech detected)");
         finalizeIdleState();
         return;
       }
 
-      setTranscript(transcript);
       const config = useStore.getState().config;
-      const strategy = config?.insertionStrategy ?? "auto";
-      let textToInsert = transcript;
+      let transcriptForOutput = transcript;
+      if (config?.transcriptEnhancement && config.transcriptEnhancement !== "off") {
+        setInterimTranscript(
+          config.transcriptEnhancement === "commands-only"
+            ? "Applying voice commands..."
+            : "Polishing transcript locally...",
+        );
+        const enhancementStartedAt = performance.now();
+        const enhancement = await enhanceTranscriptForDictation(transcript, config);
+        transcriptForOutput = enhancement.text;
+        const enhancementDurationMs = Math.round(
+          performance.now() - enhancementStartedAt,
+        );
+        console.info(
+          `[timing] transcript enhancement completed: ${enhancementDurationMs}ms`,
+        );
+        traceDictationEvent("dictation_enhancement_completed", {
+          durationMs: enhancementDurationMs,
+        }).catch(() => {});
+        if (enhancement.warning) {
+          console.warn("Transcript enhancement skipped:", enhancement.warning);
+        }
+      }
 
-      if (
+      setTranscript(transcriptForOutput);
+      const strategy = config?.insertionStrategy ?? "auto";
+      let textToInsert = transcriptForOutput;
+
+      if (config?.transcriptTarget === "local-agent") {
+        setInterimTranscript("Asking local model...");
+        const localAssistantStartedAt = performance.now();
+        try {
+          const response = await askLocalAssistantForDictation(transcriptForOutput, config);
+          const localAssistantDurationMs = Math.round(
+            performance.now() - localAssistantStartedAt,
+          );
+          console.info(
+            `[timing] local assistant completed: ${localAssistantDurationMs}ms`,
+          );
+          traceDictationEvent("dictation_local_assistant_completed", {
+            durationMs: localAssistantDurationMs,
+          }).catch(() => {});
+          textToInsert = response;
+          setTranscript(response);
+          setInterimTranscript("Typing local model answer at your cursor...");
+        } catch (err) {
+          const detail = err instanceof Error ? err.message : String(err);
+          showNotification(
+            "Local model request failed",
+            detail || "VOCO could not complete the local model request.",
+          ).catch(() => {});
+          phaseRef.current = "error";
+          sessionRef.current = failSession(sessionRef.current);
+          setStatus("error");
+          setError(`Local model request failed: ${detail}`);
+          setInterimTranscript("");
+          await clearLiveCursorText().catch((error) => {
+            console.warn("Failed to clear live cursor text after local model error:", error);
+          });
+          setDictationStatus("error").catch(() => {});
+          return;
+        }
+      } else if (
         config?.transcriptTarget === "openclaw-agent" ||
         config?.transcriptTarget === "openclaw-speech"
       ) {
         setInterimTranscript("Asking OpenClaw...");
         try {
           const result = await askOpenClawAgent(
-            transcript,
+            transcriptForOutput,
             config.openclawAgent,
             config.openclawPromptPrefix,
           );
@@ -472,6 +1038,7 @@ export function useDictation() {
             detail || "VOCO could not complete the OpenClaw request.",
           ).catch(() => {});
           phaseRef.current = "error";
+          sessionRef.current = failSession(sessionRef.current);
           setStatus("error");
           setError(
             config?.transcriptTarget === "openclaw-speech"
@@ -479,13 +1046,10 @@ export function useDictation() {
               : `OpenClaw request failed: ${detail}`,
           );
           setInterimTranscript("");
+          await clearLiveCursorText().catch((error) => {
+            console.warn("Failed to clear live cursor text after OpenClaw error:", error);
+          });
           setDictationStatus("error").catch(() => {});
-
-          const queuedAction = queuedActionRef.current;
-          queuedActionRef.current = null;
-          if (queuedAction === "start") {
-            void startRecording();
-          }
           return;
         }
       } else {
@@ -496,50 +1060,66 @@ export function useDictation() {
       await new Promise((r) => setTimeout(r, 250));
 
       try {
-        await insertText(textToInsert, strategy);
+        phaseRef.current = "finalizing";
+        sessionRef.current = markFinalizing(sessionRef.current);
+        const liveFinalization = await replaceLiveCursorTextWithFinal(textToInsert);
+        if (liveFinalization === "safe") {
+          console.info("[timing] live cursor text finalized by safe append");
+          traceDictationEvent("dictation_final_output_completed").catch(() => {});
+        } else if (liveFinalization === "unreconciled") {
+          console.info("[timing] final transcript kept in VOCO after unsafe live reconciliation");
+          traceDictationEvent("dictation_final_output_completed").catch(() => {});
+        } else {
+          const insertion = await insertText(textToInsert, strategy);
+          console.info(`[timing] insertion completed via ${insertion.strategy}`);
+          traceDictationEvent("dictation_final_output_completed").catch(() => {});
+        }
       } catch (err) {
         const detail = err instanceof Error ? err.message : String(err);
+        traceDictationEvent("dictation_final_insertion_failed").catch(() => {});
         showNotification(
           "Text insertion failed",
           detail.includes("clipboard")
             ? detail
             : "VOCO could not insert text automatically. Please try again.",
         ).catch(() => {});
+        phaseRef.current = "error";
+        sessionRef.current = failSession(sessionRef.current);
+        setStatus("error");
+        setError(`Text insertion failed: ${detail}`);
+        setInterimTranscript("");
+        setDictationStatus("error").catch(() => {});
+        return;
       }
 
       finalizeIdleState();
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err);
+      await clearLiveCursorText().catch((error) => {
+        console.warn("Failed to clear live cursor text after transcription failure:", error);
+      });
       phaseRef.current = "error";
+      sessionRef.current = failSession(sessionRef.current);
       setStatus("error");
       setError(`Transcription failed: ${detail} (${merged.length} samples)`);
       setInterimTranscript("");
       setDictationStatus("error").catch(() => {});
-
-      const queuedAction = queuedActionRef.current;
-      queuedActionRef.current = null;
-      if (queuedAction === "start") {
-        void startRecording();
-      }
     }
   }
 
   const toggle = useCallback(() => {
-    switch (phaseRef.current) {
-      case "idle":
-      case "error":
+    const toggleRequest = requestSessionToggle(sessionRef.current);
+    sessionRef.current = toggleRequest.state;
+
+    switch (toggleRequest.action) {
+      case "start":
         void startRecording();
-        break;
-      case "starting":
-        queuedActionRef.current = "stop";
-        break;
-      case "recording":
+        return;
+      case "stop":
         void stopRecording();
-        break;
-      case "stopping":
-      case "processing":
-        queuedActionRef.current = "start";
-        break;
+        return;
+      case "none":
+        return;
     }
   }, []);
 
@@ -560,25 +1140,4 @@ export function useDictation() {
     toggle,
     onHotkeyPressed,
   };
-}
-
-/**
- * Resample audio using OfflineAudioContext for proper anti-aliased,
- * browser-native resampling (replaces naive linear interpolation).
- */
-async function resample(
-  input: Float32Array,
-  fromRate: number,
-  toRate: number,
-): Promise<Float32Array> {
-  const duration = input.length / fromRate;
-  const offlineCtx = new OfflineAudioContext(1, Math.ceil(duration * toRate), toRate);
-  const buffer = offlineCtx.createBuffer(1, input.length, fromRate);
-  buffer.getChannelData(0).set(input);
-  const source = offlineCtx.createBufferSource();
-  source.buffer = buffer;
-  source.connect(offlineCtx.destination);
-  source.start(0);
-  const rendered = await offlineCtx.startRendering();
-  return new Float32Array(rendered.getChannelData(0));
 }
