@@ -37,7 +37,8 @@ git tag voco.<version>
 git push origin voco.<version>
 ```
 
-5. Wait for the GitHub release workflow to publish the assets, then verify the release page contains:
+5. Wait for the GitHub release workflow to create a draft with all verified assets, inspect it, then
+   publish the draft manually only after release sign-off. Verify it contains:
 - `voco_<version>_amd64.deb`
 - `voco_checksums.txt`
 - `VOCO-<version>-x86_64.AppImage` when AppImage packaging succeeds
@@ -68,18 +69,19 @@ This checks:
 
 The GitHub release workflow runs on tags matching:
 - `voco.*`
-- `v*`
 
-The intended stable path is `voco.<version>`.
+The workflow rejects a tag unless it exactly matches `voco.<package.json version>`.
 
 ## Current Output
 
 The release workflow:
 - builds the Debian bundle
 - attempts the AppImage bundle
-- falls back to `scripts/package-appimage.sh` when Tauri stops after producing `VOCO.AppDir`
+- includes the AppImage only when Tauri produces it; the manual AppDir fallback requires explicit
+  `VOCO_APPIMAGETOOL_PATH` and `VOCO_APPIMAGETOOL_SHA256` values
 - generates checksums
 - renders the GitHub release body from `scripts/render-release-body.sh`
+- uploads all available artifacts in one action and leaves the GitHub Release as a draft
 
 ## Publish checklist
 
@@ -91,7 +93,7 @@ The release workflow:
 
 ## Manual test before tagging
 
-- start VOCO locally with `npm run dev`
+- start VOCO only inside the disposable remote desktop described in the testing guide
 - complete onboarding
 - test dictation with `Alt+D`
 - confirm tray launch, settings, and hide-to-tray still work

@@ -84,7 +84,8 @@ pgrep -x ydotoold > /dev/null || ydotoold &
 - Flatpak may require portal permissions for mic access
 - Some Wayland compositors block simulated input
 - First launch requires internet for model download (~142 MB)
-- AppImage bundling still depends on Tauri/linuxdeploy behaviour, though the repo now falls back to `scripts/package-appimage.sh` when `VOCO.AppDir` exists
+- AppImage bundling still depends on Tauri/linuxdeploy behaviour; the optional AppDir fallback runs
+  only with an explicitly supplied, checksum-verified appimagetool
 
 ## Packaging
 
@@ -92,7 +93,7 @@ pgrep -x ydotoold > /dev/null || ydotoold &
 | -------- | -------------- | --------------------------------------------------------------------- |
 | .deb     | Working        | Built via `./scripts/setup.sh --install` or GitHub Releases           |
 | .rpm     | Not configured | Can be added to tauri.conf.json targets                               |
-| AppImage | Working        | Release workflow attempts Tauri bundling and falls back to repo helper |
+| AppImage | Secondary      | Included when Tauri succeeds; manual fallback requires a pinned tool  |
 
 ## Data Locations
 

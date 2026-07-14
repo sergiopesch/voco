@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if [[ "${VOCO_DISPOSABLE_DESKTOP:-}" != "1" ]]; then
+  echo "Refusing to alter input/audio state outside an explicitly disposable desktop." >&2
+  echo "Run this only in a remote VM or microVM with VOCO_DISPOSABLE_DESKTOP=1." >&2
+  exit 1
+fi
+
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TRACE="${XDG_STATE_HOME:-$HOME/.local/state}/voco/hotkey-trace.jsonl"
 LOG="${TMPDIR:-/tmp}/voco-runtime-realtime-smoke.log"

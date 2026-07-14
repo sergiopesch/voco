@@ -15,7 +15,7 @@ trap cleanup EXIT
 cd "${APP_DIR}"
 
 set +e
-cargo tauri build 2>&1 | tee "${LOG_PATH}"
+cargo tauri build --features custom-protocol 2>&1 | tee "${LOG_PATH}"
 BUILD_EXIT=${PIPESTATUS[0]}
 set -e
 
@@ -24,7 +24,7 @@ if [[ ${BUILD_EXIT} -eq 0 ]]; then
 fi
 
 if grep -q "failed to run linuxdeploy" "${LOG_PATH}" && [[ -d "${APPDIR_PATH}" ]]; then
-  echo "linuxdeploy failed; using scripts/package-appimage.sh fallback"
+  echo "linuxdeploy failed; using the checksum-pinned appimagetool fallback"
   bash "${ROOT_DIR}/scripts/package-appimage.sh"
   exit 0
 fi

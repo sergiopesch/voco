@@ -31,7 +31,7 @@ less ./voco-install
 \`\`\`bash
 wget -O voco_${VERSION}_amd64.deb https://github.com/sergiopesch/voco/releases/download/${TAG_NAME}/voco_${VERSION}_amd64.deb
 wget https://github.com/sergiopesch/voco/releases/download/${TAG_NAME}/voco_checksums.txt
-sha256sum --check voco_checksums.txt
+grep " voco_${VERSION}_amd64.deb\$" voco_checksums.txt | sha256sum --check -
 sudo dpkg -i voco_${VERSION}_amd64.deb
 \`\`\`
 EOF
@@ -43,6 +43,8 @@ if [[ -n "${APPIMAGE_NAME}" ]]; then
 
 \`\`\`bash
 wget https://github.com/sergiopesch/voco/releases/download/${TAG_NAME}/${APPIMAGE_NAME}
+wget https://github.com/sergiopesch/voco/releases/download/${TAG_NAME}/voco_checksums.txt
+grep " ${APPIMAGE_NAME}\$" voco_checksums.txt | sha256sum --check -
 chmod +x ${APPIMAGE_NAME}
 ./${APPIMAGE_NAME}
 \`\`\`
@@ -51,7 +53,7 @@ fi
 
 cat <<'EOF'
 
-**Requirements:** Ubuntu/Debian with `libwebkit2gtk-4.1-0`, `libgtk-3-0`, `libayatana-appindicator3-1`
+**Requirements:** Ubuntu/Debian with `libwebkit2gtk-4.1-0`, `libgtk-3-0`, `libayatana-appindicator3-1`, `ibus`, `gir1.2-ibus-1.0`, and `python3-gi`
 
 **Wayland users:** `sudo apt install ydotool wl-clipboard && sudo usermod -aG input $USER`
 

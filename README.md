@@ -23,7 +23,7 @@ For low-latency back-and-forth voice, VOCO also has an opt-in realtime conversat
 Recommended:
 
 ```bash
-wget https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.17/install -O voco-install
+wget https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.18/install -O voco-install
 chmod +x voco-install
 ./voco-install
 ```
@@ -38,6 +38,8 @@ Manual `.deb` fallback:
 
 ```bash
 wget -O voco_latest_amd64.deb https://github.com/sergiopesch/voco/releases/latest/download/voco_latest_amd64.deb
+wget https://github.com/sergiopesch/voco/releases/latest/download/voco_latest_checksums.txt
+sha256sum --check voco_latest_checksums.txt
 sudo dpkg -i voco_latest_amd64.deb
 ```
 
@@ -99,9 +101,19 @@ npm run report:linux-runtime
 - Single dictation recordings are currently capped at 10 minutes.
 - On Wayland, `Alt+D` and `Alt+Shift+D` are the most reliable hotkeys right now.
 - Realtime conversation uses `Alt+Shift+R`.
+- Live words at the cursor is the default: on supported Linux desktops, VOCO keeps only the changing
+  tail in an owned IBus preedit range and progressively commits stable phrases as normal target-app
+  text so the field can wrap and lay them out natively. Generic IBus surrounding text is cached and
+  cannot prove a fresh editor revision, so VOCO never deletes or rewrites progressively committed
+  text. If the authoritative final differs from those normal target-app commits, VOCO preserves the
+  target and keeps the final transcript in VOCO. Timestamped Whisper segments keep the bounded
+  preview window anchored so long dictations cannot skip audio.
+- A live transcript panel and final-text-only mode remain available in Settings as fallbacks.
 - Local model transcript enhancement and local assistant mode are opt-in and require a localhost model server.
 - The realtime VOCO mic animation is driven by live input and output audio levels.
-- Wayland text insertion depends on `ydotool`, compositor support, and often `input` group access.
+- Live cursor revisions require IBus, `python3-gi`, and the IBus GI bindings. If that owned preedit
+  cannot start, stable mode remains preview-only for the session; it does not fall back to global
+  keyboard injection.
 - OpenClaw mode is opt-in and requires the `openclaw` CLI to be available in `PATH`.
 - Realtime conversation is opt-in and requires `OPENAI_API_KEY` in the environment or `~/.openclaw/realtime.env`.
 - Config lives at `~/.config/voco/config.json`.

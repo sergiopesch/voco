@@ -3,6 +3,7 @@ import type {
   AppConfig,
   CachedUpdateCheck,
   DictationStatus,
+  DebugDictationCaptureResult,
   InsertionResult,
   LocalLlmAgentResult,
   LocalLlmTestResult,
@@ -10,6 +11,8 @@ import type {
   OpenClawBrowserActionInput,
   OpenClawBrowserActionResult,
   OpenClawSpeechResult,
+  OwnedPreeditStatus,
+  PreviewTranscription,
   RealtimeClientSecretResult,
   RuntimeDiagnostics,
   TranscriptEnhancement,
@@ -33,24 +36,73 @@ export async function transcribeAudio(samples: Float32Array): Promise<string> {
   return invoke<string>("transcribe_audio", { audioBytes: bytes });
 }
 
-export async function previewTranscribeAudio(samples: Float32Array): Promise<string | null> {
+export async function previewTranscribeAudio(
+  samples: Float32Array,
+): Promise<PreviewTranscription | null> {
   const bytes = new Uint8Array(
     samples.buffer,
     samples.byteOffset,
     samples.byteLength,
   );
-  return invoke<string | null>("preview_transcribe_audio", { audioBytes: bytes });
+  return invoke<PreviewTranscription | null>("preview_transcribe_audio", {
+    audioBytes: bytes,
+  });
+}
+
+export async function debugDictationCaptureEnabled(): Promise<boolean> {
+  return invoke<boolean>("debug_dictation_capture_enabled");
+}
+
+export async function saveDebugDictationCapture(
+  samples: Float32Array,
+  timeline: unknown,
+): Promise<DebugDictationCaptureResult | null> {
+  const bytes = new Uint8Array(
+    samples.buffer,
+    samples.byteOffset,
+    samples.byteLength,
+  );
+  return invoke<DebugDictationCaptureResult | null>(
+    "save_debug_dictation_capture",
+    { audioBytes: bytes, timeline },
+  );
 }
 
 export async function insertText(text: string, strategy: string): Promise<InsertionResult> {
   return invoke<InsertionResult>("insert_text", { text, strategy });
 }
 
-export async function appendLiveText(nextText: string): Promise<InsertionResult> {
-  return invoke<InsertionResult>("replace_live_text", {
-    previousCharCount: 0,
-    nextText,
+export async function getOwnedPreeditStatus(): Promise<OwnedPreeditStatus> {
+  return invoke<OwnedPreeditStatus>("get_owned_preedit_status");
+}
+
+export async function startOwnedPreedit(sessionId: number): Promise<OwnedPreeditStatus> {
+  return invoke<OwnedPreeditStatus>("start_owned_preedit", { sessionId });
+}
+
+export async function updateOwnedPreedit(
+  sessionId: number,
+  confirmedText: string,
+  preeditText: string,
+  provisionalText: string,
+): Promise<OwnedPreeditStatus> {
+  return invoke<OwnedPreeditStatus>("update_owned_preedit", {
+    sessionId,
+    confirmedText,
+    preeditText,
+    provisionalText,
   });
+}
+
+export async function commitOwnedPreedit(
+  sessionId: number,
+  text: string,
+): Promise<OwnedPreeditStatus> {
+  return invoke<OwnedPreeditStatus>("commit_owned_preedit", { sessionId, text });
+}
+
+export async function cancelOwnedPreedit(sessionId: number): Promise<OwnedPreeditStatus> {
+  return invoke<OwnedPreeditStatus>("cancel_owned_preedit", { sessionId });
 }
 
 export async function askOpenClawAgent(

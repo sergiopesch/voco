@@ -1,3 +1,4 @@
+use serde::Serialize;
 use std::path::PathBuf;
 use std::sync::Mutex;
 use std::sync::Once;
@@ -9,6 +10,21 @@ static INIT_LOG: Once = Once::new();
 const LONG_TRANSCRIPTION_CHUNK_SECONDS: usize = 30;
 const LONG_TRANSCRIPTION_CHUNK_SAMPLES: usize = 16_000 * LONG_TRANSCRIPTION_CHUNK_SECONDS;
 const LONG_TRANSCRIPTION_CHUNK_OVERLAP_SAMPLES: usize = 16_000;
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TranscriptionSegment {
+    pub text: String,
+    pub start_ms: u64,
+    pub end_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PreviewTranscription {
+    pub text: String,
+    pub segments: Vec<TranscriptionSegment>,
+}
 
 /// No-op callback to suppress whisper.cpp's verbose C-level logging
 unsafe extern "C" fn whisper_log_noop(
@@ -31,6 +47,12 @@ fn suppress_whisper_logging() {
 pub struct WhisperState {
     ctx: Option<WhisperContext>,
     model_path: Option<PathBuf>,
+}
+
+impl Default for WhisperState {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl WhisperState {
@@ -67,6 +89,10 @@ impl WhisperState {
         self.transcribe_single(samples)
     }
 
+    pub fn transcribe_preview(&self, samples: &[f32]) -> Result<PreviewTranscription, String> {
+        self.transcribe_single_with_segments(samples)
+    }
+
     fn transcribe_chunked(&self, samples: &[f32]) -> Result<String, String> {
         let ranges = transcription_chunk_ranges(
             samples.len(),
@@ -88,25 +114,11 @@ impl WhisperState {
 
     fn transcribe_single(&self, samples: &[f32]) -> Result<String, String> {
         let ctx = self.ctx.as_ref().ok_or("Model not loaded")?;
-
         let mut state = ctx
             .create_state()
             .map_err(|e| format!("Failed to create state: {e}"))?;
-
-        let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
-        params.set_language(Some("en"));
-        params.set_print_progress(false);
-        params.set_print_realtime(false);
-        params.set_print_timestamps(false);
-        params.set_print_special(false);
-        params.set_suppress_blank(true);
-        params.set_suppress_nst(true);
-        params.set_no_speech_thold(0.6);
-        params.set_single_segment(false);
-        params.set_n_threads(num_cpus());
-
         state
-            .full(params, samples)
+            .full(transcription_params(), samples)
             .map_err(|e| format!("Transcription failed: {e}"))?;
 
         let num_segments = state
@@ -114,23 +126,94 @@ impl WhisperState {
             .map_err(|e| format!("Failed to get segments: {e}"))?;
         let mut text = String::new();
         for i in 0..num_segments {
-            if let Ok(segment) = state.full_get_segment_text(i) {
-                text.push_str(&segment);
+            text.push_str(
+                &state
+                    .full_get_segment_text(i)
+                    .map_err(|e| format!("Failed to get segment text: {e}"))?,
+            );
+        }
+        Ok(clean_transcript_text(&text))
+    }
+
+    fn transcribe_single_with_segments(
+        &self,
+        samples: &[f32],
+    ) -> Result<PreviewTranscription, String> {
+        let ctx = self.ctx.as_ref().ok_or("Model not loaded")?;
+
+        let mut state = ctx
+            .create_state()
+            .map_err(|e| format!("Failed to create state: {e}"))?;
+
+        state
+            .full(transcription_params(), samples)
+            .map_err(|e| format!("Transcription failed: {e}"))?;
+
+        let num_segments = state
+            .full_n_segments()
+            .map_err(|e| format!("Failed to get segments: {e}"))?;
+        let mut text = String::new();
+        let mut segments = Vec::with_capacity(num_segments.max(0) as usize);
+        for i in 0..num_segments {
+            let segment_text = state
+                .full_get_segment_text(i)
+                .map_err(|e| format!("Failed to get segment text: {e}"))?;
+            text.push_str(&segment_text);
+
+            let cleaned_segment = clean_transcript_text(&segment_text);
+            if cleaned_segment.is_empty() {
+                continue;
             }
+
+            // whisper.cpp timestamps use 10 ms ticks relative to this audio window.
+            let start_ms = state
+                .full_get_segment_t0(i)
+                .map_err(|e| format!("Failed to get segment start timestamp: {e}"))?
+                .max(0) as u64
+                * 10;
+            let end_ms = state
+                .full_get_segment_t1(i)
+                .map_err(|e| format!("Failed to get segment end timestamp: {e}"))?
+                .max(0) as u64
+                * 10;
+            segments.push(TranscriptionSegment {
+                text: cleaned_segment,
+                start_ms,
+                end_ms: end_ms.max(start_ms),
+            });
         }
 
-        let trimmed = text.trim();
-
-        // Filter out whisper hallucination artifacts on silence/noise
-        let cleaned = trimmed
-            .replace("[BLANK_AUDIO]", "")
-            .replace("[Music]", "")
-            .replace("(music)", "")
-            .replace("[MUSIC]", "");
-        let cleaned = cleaned.trim();
-
-        Ok(cleaned.to_string())
+        Ok(PreviewTranscription {
+            text: clean_transcript_text(&text),
+            segments,
+        })
     }
+}
+
+fn transcription_params() -> FullParams<'static, 'static> {
+    let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
+    params.set_language(Some("en"));
+    params.set_print_progress(false);
+    params.set_print_realtime(false);
+    params.set_print_timestamps(false);
+    params.set_print_special(false);
+    params.set_suppress_blank(true);
+    params.set_suppress_nst(true);
+    params.set_no_speech_thold(0.6);
+    params.set_single_segment(false);
+    params.set_n_threads(num_cpus());
+    params
+}
+
+fn clean_transcript_text(text: &str) -> String {
+    // Filter out whisper hallucination artifacts on silence/noise.
+    text.trim()
+        .replace("[BLANK_AUDIO]", "")
+        .replace("[Music]", "")
+        .replace("(music)", "")
+        .replace("[MUSIC]", "")
+        .trim()
+        .to_string()
 }
 
 fn transcription_chunk_ranges(

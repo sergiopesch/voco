@@ -16,7 +16,7 @@ It separates:
 | --- | --- | --- | --- | --- |
 | `.deb` | Yes | Good | Good | Closest to ready |
 | Flatpak | Baseline only | Good | Not fully validated | Not ready |
-| Snap / Ubuntu App Center | Yes | Coherent draft | Build validated, install not locally verified | Not ready |
+| Snap / Ubuntu App Center | Rebuild required | Coherent draft | Prior artifact predates current release feature gate | Not ready |
 
 ## `.deb`
 
@@ -30,7 +30,7 @@ It separates:
 
 ### Verified
 
-- `cargo tauri build --bundles deb`
+- `cargo tauri build --features custom-protocol --bundles deb`
 - `desktop-file-validate packaging/flatpak/com.sergiopesch.voco.desktop`
 - `appstreamcli validate packaging/flatpak/com.sergiopesch.voco.metainfo.xml`
 - package inspection confirmed:
@@ -84,7 +84,7 @@ No-go until the sandbox and host-integration story is proven in a real Flatpak r
 ### Ready
 
 - tracked snap sources now exist under `snap/`
-- `snapcraft --destructive-mode` builds a real artifact
+- tracked Snap build now enables Tauri's required `custom-protocol` release feature
 - desktop metadata validates
 - version metadata is aligned with the repo release version
 - the draft is honest about `classic` confinement
@@ -92,13 +92,12 @@ No-go until the sandbox and host-integration story is proven in a real Flatpak r
 ### Verified
 
 - `desktop-file-validate snap/gui/com.sergiopesch.voco.desktop`
-- `snapcraft --destructive-mode`
-- built artifact:
-  - `snap/voco_<version>_amd64.snap`
+- the earlier `snapcraft --destructive-mode` artifact predates the release feature gate and is not a
+  current passing artifact
 
 ### Remaining Warnings
 
-- Snapcraft still emits a classic-confinement warning set around ELF interpreter and rpath expectations for bundled runtime binaries and libraries
+- rerun `snapcraft` in an isolated build environment and inspect its confinement, ELF, and rpath warnings
 - Snapcraft still emits some unused-library warnings
 - metadata still lacks a `donation` field
 

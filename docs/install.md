@@ -137,10 +137,14 @@ Local `npm run build` now falls back to `scripts/package-appimage.sh` automatica
 If you still need to finish AppImage packaging manually from an existing `VOCO.AppDir` in `apps/desktop/src-tauri/target/release/bundle/appimage/`, run:
 
 ```bash
+VOCO_APPIMAGETOOL_PATH=/path/to/pinned/appimagetool \
+VOCO_APPIMAGETOOL_SHA256=<verified-sha256> \
 bash ./scripts/package-appimage.sh
 ```
 
-This path is intended for local packaging validation and CI recovery when the AppDir exists but the final AppImage artifact was not written.
+This path is intended for packaging validation when the AppDir exists but the final AppImage
+artifact was not written. The helper does not download or execute a mutable tool; provide an
+independently verified binary and digest explicitly.
 
 ## Release Rehearsal
 

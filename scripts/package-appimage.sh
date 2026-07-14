@@ -6,28 +6,30 @@ APPIMAGE_DIR="${ROOT_DIR}/apps/desktop/src-tauri/target/release/bundle/appimage"
 APPDIR_PATH="${APPIMAGE_DIR}/VOCO.AppDir"
 APPIMAGE_VERSION="${VOCO_APPIMAGE_VERSION:-$(node -p "require('${ROOT_DIR}/apps/desktop/package.json').version")}"
 OUTPUT_PATH="${APPIMAGE_DIR}/VOCO-${APPIMAGE_VERSION}-x86_64.AppImage"
-APPIMAGETOOL_PATH="${ROOT_DIR}/.tmp/appimagetool-x86_64.AppImage"
+APPIMAGETOOL_PATH="${VOCO_APPIMAGETOOL_PATH:-}"
+APPIMAGETOOL_SHA256="${VOCO_APPIMAGETOOL_SHA256:-}"
 
 if [[ ! -d "${APPDIR_PATH}" ]]; then
   echo "VOCO AppDir not found at ${APPDIR_PATH}" >&2
   exit 1
 fi
 
-mkdir -p "${ROOT_DIR}/.tmp"
-
+if [[ -z "${APPIMAGETOOL_PATH}" || -z "${APPIMAGETOOL_SHA256}" ]]; then
+  echo "Set VOCO_APPIMAGETOOL_PATH and VOCO_APPIMAGETOOL_SHA256 to a pinned appimagetool binary." >&2
+  exit 1
+fi
 if [[ ! -x "${APPIMAGETOOL_PATH}" ]]; then
-  APPIMAGETOOL_URL="https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage"
-  if command -v curl >/dev/null 2>&1; then
-    curl --fail --location --silent --show-error \
-      "${APPIMAGETOOL_URL}" \
-      --output "${APPIMAGETOOL_PATH}"
-  elif command -v wget >/dev/null 2>&1; then
-    wget -q "${APPIMAGETOOL_URL}" -O "${APPIMAGETOOL_PATH}"
-  else
-    echo "curl or wget is required to download appimagetool" >&2
-    exit 1
-  fi
-  chmod +x "${APPIMAGETOOL_PATH}"
+  echo "Pinned appimagetool is not executable: ${APPIMAGETOOL_PATH}" >&2
+  exit 1
+fi
+if [[ ! "${APPIMAGETOOL_SHA256}" =~ ^[0-9a-fA-F]{64}$ ]]; then
+  echo "VOCO_APPIMAGETOOL_SHA256 must be a 64-character SHA-256 digest." >&2
+  exit 1
+fi
+ACTUAL_APPIMAGETOOL_SHA256="$(sha256sum "${APPIMAGETOOL_PATH}" | awk '{print $1}')"
+if [[ "${ACTUAL_APPIMAGETOOL_SHA256,,}" != "${APPIMAGETOOL_SHA256,,}" ]]; then
+  echo "Pinned appimagetool checksum mismatch." >&2
+  exit 1
 fi
 
 # appimagetool resolves the icon from the desktop file's Icon= entry, which Tauri

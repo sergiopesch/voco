@@ -45,6 +45,11 @@ Current primary validation target:
 - x86_64 / amd64
 - Wayland and X11, with documented insertion caveats
 
+Automatic live cursor revisions use the desktop IBus service through the system Python GI
+bindings. Debian packages recommend `ibus`, `gir1.2-ibus-1.0`, and `python3-gi`; source setup
+installs them on apt-based systems. VOCO falls back to compatibility insertion when the active
+desktop or target field does not expose an IBus input context.
+
 ## Listing Assets
 
 Store copy, release-note structure, and screenshot requirements live in [docs/store-listing.md](store-listing.md).
@@ -96,9 +101,18 @@ The repo now includes:
 This helper:
 
 - normalizes the expected lowercase icon name inside `VOCO.AppDir`
-- downloads `appimagetool` if needed
+- requires `VOCO_APPIMAGETOOL_PATH` and `VOCO_APPIMAGETOOL_SHA256` for a pre-fetched immutable
+  `appimagetool` binary, and verifies it before execution
 - runs `appimagetool` in extract-and-run mode so it does not require host FUSE 2
 
-Local `npm run build` now falls back to this helper automatically when Tauri stops at the final `linuxdeploy` step.
+Local `npm run build` can use this helper when Tauri stops at the final `linuxdeploy` step, but only
+when both pinned-tool environment variables are set.
 
-Use it manually after `cargo tauri build` if no final `.AppImage` file was emitted automatically.
+Use it manually after `cargo tauri build --features custom-protocol` if no final `.AppImage` file
+was emitted automatically.
+
+```bash
+VOCO_APPIMAGETOOL_PATH=/path/to/pinned/appimagetool \
+VOCO_APPIMAGETOOL_SHA256=<verified-sha256> \
+bash ./scripts/package-appimage.sh
+```

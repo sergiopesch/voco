@@ -437,7 +437,7 @@ On Wayland, the preferred automated test is a temporary uinput keyboard that emi
 events. The expected trace must include:
 
 ```bash
-./scripts/realtime-runtime-smoke.sh
+VOCO_DISPOSABLE_DESKTOP=1 ./scripts/realtime-runtime-smoke.sh
 ```
 
 ```text
@@ -464,13 +464,13 @@ captures VOCO's default output sink and requires non-silent rendered audio. The 
 is the stricter response mode:
 
 ```bash
-./scripts/realtime-runtime-smoke.sh --require-response
+VOCO_DISPOSABLE_DESKTOP=1 ./scripts/realtime-runtime-smoke.sh --require-response
 ```
 
 For desktop interruption proof, run:
 
 ```bash
-./scripts/realtime-runtime-smoke.sh --interrupt
+VOCO_DISPOSABLE_DESKTOP=1 ./scripts/realtime-runtime-smoke.sh --interrupt
 ```
 
 Interrupt mode injects a longer first utterance, waits for assistant output audio, injects a

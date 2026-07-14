@@ -1,6 +1,6 @@
 {
   "name": "voco",
-  "version": "2026.0.17",
+  "version": "2026.0.18",
   "private": true,
   "workspaces": [
     "apps/*"
@@ -10,9 +10,12 @@
     "build": "npm run build -w apps/desktop",
     "lint": "npm run lint -w apps/desktop",
     "check": "npm run check --workspaces --if-present",
-    "test": "node scripts/report-cursor-streaming-trace.test.mjs && node scripts/report-dictation-baseline-config.test.mjs && node scripts/reset-cursor-streaming-trace.test.mjs && npm run test --workspaces --if-present",
+    "test": "npm run test:owned-preedit && node scripts/report-cursor-streaming-trace.test.mjs && node scripts/report-dictation-baseline-config.test.mjs && node scripts/reset-cursor-streaming-trace.test.mjs && npm run test --workspaces --if-present",
+    "test:owned-preedit": "PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 apps/desktop/src-tauri/resources/voco_ibus_ownership_test.py",
+    "test:captured-dictation": "npm run test:captured-dictation -w apps/desktop",
     "verify:versions": "node scripts/check-version-consistency.mjs",
     "verify:devops": "bash ./scripts/check-devops.sh",
+    "verify:security": "npm audit --audit-level=moderate",
     "smoke:realtime": "node scripts/realtime-protocol-smoke.mjs",
     "rehearse:release": "bash ./scripts/rehearse-release.sh",
     "report:linux-runtime": "bash ./scripts/report-linux-runtime.sh",

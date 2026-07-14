@@ -1,7 +1,20 @@
 <!-- markdownlint-disable MD032 MD060 -->
 # Testing
 
-## Quick local test
+Run the headless IBus ownership/no-deletion command matrix before any isolated desktop cursor test:
+
+```bash
+npm run test:owned-preedit
+```
+
+This does not attach to the live input session. Real IBus/target-app testing belongs in a disposable
+remote VM or microVM; see the cursor-streaming checklist for the evidence requirements.
+
+## Disposable desktop test
+
+Do not run VOCO input-method, injection, or virtual-audio experiments on an active workstation.
+Perform the steps below only inside the disposable remote VM or microVM described in the cursor
+streaming checklist, and preserve the remote run ID and evidence.
 
 1. Install dependencies:
 
@@ -21,8 +34,20 @@ npm run dev
 - finish onboarding
 - press `Alt+D`
 - speak a short sentence
+- confirm live words appear directly in the focused text field
 - press `Alt+D` again
 - confirm text is inserted at the cursor
+
+For a production-mode headless build without packaging, run:
+
+```bash
+cd apps/desktop
+cargo tauri build --features custom-protocol --no-bundle
+```
+
+Do not use plain `cargo build --release` for a runnable desktop build. The app's
+`custom-protocol` feature enables Tauri's production frontend protocol; the Rust build now rejects
+release binaries that omit it.
 
 ## Automated checks
 

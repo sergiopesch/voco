@@ -48,18 +48,23 @@ These failures have already occurred and must be designed out:
 
 ## Core Design Principle
 
-Arbitrary Linux applications do not provide VOCO with an owned editable range.
+Arbitrary Linux applications do not provide VOCO with an owned document range, but IBus can provide
+an app-owned composition (preedit) range at the active input context. VOCO must use that range for
+provisional dictation instead of simulating destructive edits.
 
 Therefore, VOCO cannot reliably "replace" provisional text in the target application using
 Backspace/Delete unless it owns the target editor integration. Generic cursor streaming must use one
 of these safe models:
 
-1. **Append-only stable text**: type only text that is sufficiently stable and never delete it.
-2. **Owned composition surface**: show provisional text in VOCO-controlled UI, then insert final text.
+1. **Bounded input-method preedit**: progressively commit sealed phrases for native target layout,
+   while owning and revising only the changing tail at the cursor.
+2. **Owned composition surface**: show provisional text in VOCO-controlled UI, then expose final text
+   without mutating an unproven target.
 3. **Editor-aware adapters**: for specific editors/apps, use their APIs to manage a known range.
 
-The near-term product should use model 1 for cursor streaming and keep model 2 as a fallback.
-Model 3 is out of scope until specific app integrations are planned.
+The product uses model 1 for cursor streaming and model 2 when an owned preedit is unavailable or
+invalidated. Generic synthetic append/delete compatibility is not part of stable mode. Model 3
+remains out of scope until specific app integrations are planned.
 
 ## Recommended Architecture
 
@@ -100,23 +105,28 @@ Acceptance criteria:
   - steady preview target: 800-1400 ms depending on model latency
   - never overlap preview calls
 - Preview input is bounded by a rolling audio window.
+- Stable cursor preview input is anchored to the oldest uncommitted audio and advances only through
+  committed timestamped Whisper segments; overlay-only preview may use a recent rolling window.
 - Preview reconciliation supports rolling windows that no longer contain the full committed
   transcript prefix.
 - Preview failures disable live cursor streaming for that session but do not break final dictation.
 - Preview traces include durations and status only, never transcript content.
 
-### 3. Stable Text Commit Policy
+### 3. Owned Preedit Revision Policy
 
-Do not type every preview. Type only stable text.
+Display every usable preview in the owned preedit range. Use stable, timestamped segments to advance
+the bounded audio window, while keeping the remaining words provisional and automatically revisable.
 
 Recommended policy:
 
-- Compare consecutive ASR previews.
-- Compute their common prefix.
-- Commit only complete words or punctuation-terminated phrases from that common prefix.
-- Never commit text that would require changing already committed cursor text.
-- Do not commit a one-word phrase until the next preview extends it or punctuation confirms it.
-- Keep final text quality through final ASR and enhancement, not live-preview rewriting.
+- Show the first non-empty preview immediately.
+- Compare consecutive ASR previews and seal only whole timestamped segments for audio-window
+  advancement.
+- Progressively commit the sealed prefix as normal target text so the target editor controls wrapping
+  and paragraph layout.
+- Keep only the unsealed candidate and its leading separator in the VOCO-owned preedit range.
+- On unsupported clients, keep preview/final text in VOCO rather than using global cursor injection.
+- Keep final text quality through a full-session final ASR pass and optional enhancement.
 
 Acceptance criteria:
 
@@ -127,21 +137,27 @@ Acceptance criteria:
   - ASR repeats words
   - ASR shortens the preview
   - no common stable prefix
-  - final text extends committed text with punctuation/case differences
-- Live cursor streaming never calls a native insertion command with a deletion count.
-- If final text does not safely extend committed text, VOCO does not attempt destructive correction.
+- Live cursor streaming never synthesizes Backspace/Delete or asks the user to repair text.
+- Generic IBus finalization never calls `DeleteSurroundingText`. Its cached surrounding-text API has
+  no request nonce or editor revision and therefore cannot authorize destructive editing.
+- Focus loss clears the provisional tail and preserves any already committed text rather than
+  inserting a duplicate transcript into a different field.
 
-### 4. Cursor Insertion Backend
+### 4. Cursor Input Backend
 
-Live cursor streaming must be append-only for generic Linux apps.
+Preferred live cursor streaming uses a private IBus engine owned by the VOCO process.
 
 Acceptance criteria:
 
-- Native live insertion command rejects nonzero deletion/replacement requests.
-- Wayland uses `ydotoold` when available.
-- `ydotoold` virtual keyboard is ignored by VOCO's hotkey listener.
-- Subprocess stdout/stderr from `ydotool`, `xdotool`, `pgrep`, and helper commands is silenced.
-- Insertion backend tests prove live cursor insertion cannot send Backspace/Delete.
+- The sidecar is child-process scoped, accepts only structured stdin commands, and never logs or
+  returns transcript text.
+- The sidecar does not request, retain, return, log, or persist surrounding target text.
+- Start captures the previous global engine; commit, cancel, failure, and app exit restore it.
+- Service-issued session generations reject renderer reloads and stale preview/finalization commands.
+- Headless command-level tests assert that mismatch, prefix-only match, cursor/context reset,
+  focus/context changes, session races, cancellation, target closure, and the long synthetic case
+  emit no target command. The command model cannot represent deletion.
+- Stable cursor mode has no ydotool/xdotool insertion command or destructive compatibility route.
 - Settings diagnostics clearly show `ydotoold` status.
 
 ### 5. Finalization
@@ -151,8 +167,14 @@ Stopping dictation must be fast and predictable.
 Acceptance criteria:
 
 - Stop-to-final-visible target for ordinary dictation is measured and reported.
-- Finalization does not delete target-app text.
-- Finalization appends only a safe suffix when final text clearly extends live committed text.
+- Finalization never uses synthetic deletion or deletes an unverified target-app range.
+- Preferred-path finalization always runs full-session local Whisper and clears only the bounded
+  preedit tail. If no normal text was progressively committed, VOCO may commit the still-owned final
+  preedit. If the final exactly equals progressively committed text, no target command is needed.
+- Any final that would revise or extend normal target-app text is preserved in VOCO; generic IBus
+  finalization does not delete, replace, or append to that text.
+- Cancel, teardown, and error recovery clear only VOCO's provisional preedit; progressively committed
+  target text is preserved.
 - If final text cannot be safely reconciled with committed live text:
   - do not corrupt the field
   - preserve the committed live text
@@ -168,7 +190,8 @@ gracefully.
 Acceptance criteria:
 
 - If live cursor insertion fails once in a session, disable live cursor insertion for that session.
-- Final dictation insertion still runs using the configured insertion strategy.
+- Stable mode does not run generic final insertion after its owned target lease fails. The final
+  transcript remains available in VOCO without risking another field.
 - The user sees a concise notification only once per session.
 - Settings can offer a mode choice:
   - `Stable cursor streaming`
@@ -186,19 +209,24 @@ Acceptance criteria:
   - preview ASR duration p50/p95
   - stop-to-final-transcript
   - stop-to-idle
+- The trace report fails stable cursor streaming when first live text exceeds 1500 ms or cursor
+  update gap p95 exceeds 2000 ms.
 - Live cursor updates should not block audio capture.
 - No more than one live ASR request may run at a time.
 - Live ASR requests must remain bounded by a small recent-audio window, independent of total
   dictation length.
 - Final ASR must chunk long recordings so 10-minute dictation does not depend on one unbounded
   Whisper call.
+- Recording must stop automatically at the 10-minute limit instead of accepting additional audio
+  and failing after the user stops.
+- Collecting a late anchored preview range must not scan every earlier audio chunk.
 - No long synchronous loops on the UI thread.
 - No per-character subprocess spawning.
 - Preview cadence must back off when model latency exceeds the interval.
 
 ## Manual QA Matrix
 
-Run every case on Ubuntu Wayland with `ydotoold` active:
+Run every case in a disposable Ubuntu Wayland VM with IBus and the VOCO-owned preedit active:
 
 - Empty text field, short sentence.
 - Empty text field, 20-30 second paragraph.
@@ -230,9 +258,9 @@ Pass criteria:
 Acceptance criteria:
 
 - Unit tests for stable prefix policy.
-- Unit tests for append-only final suffix reconciliation.
+- Unit tests proving a final suffix is preserved rather than injected after progressive commits.
 - Unit tests for state machine transition gating.
-- Rust tests proving live insertion rejects deletion.
+- Rust/static tests proving stable mode exposes no deletion or global live-insertion command.
 - Rust tests proving `ydotoold virtual device` is ignored.
 - Frontend tests covering:
   - preview after stop ignored

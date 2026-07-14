@@ -1,6 +1,6 @@
 {
   "name": "@voco/desktop",
-  "version": "2026.0.17",
+  "version": "2026.0.18",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,7 +10,8 @@
     "build:frontend": "tsc -b && vite build",
     "lint": "eslint src/",
     "check": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:captured-dictation": "vitest run src/lib/capturedDictationReplay.test.ts"
   },
   "dependencies": {
     "@fontsource/geist": "^5.2.8",

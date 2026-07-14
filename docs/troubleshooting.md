@@ -2,7 +2,22 @@
 
 ## VOCO does not type text on Wayland
 
-Open Settings -> Advanced and press `Refresh runtime checks` first. VOCO should report a Wayland session and show whether `ydotool` or `wl-copy` are missing.
+Open Settings -> Advanced and press `Refresh runtime checks` first. VOCO should report a Wayland
+session and show whether Automatic live cursor is ready. Its preferred path requires IBus and the
+system Python GI bindings:
+
+```bash
+sudo apt install ibus gir1.2-ibus-1.0 python3-gi
+ibus engine
+```
+
+If `ibus engine` cannot report an engine, sign out and back in after installing IBus. VOCO starts a
+private, app-owned dictation engine only while a live dictation is active, restores the previous
+engine on stop or cancellation, and never asks the user to edit provisional words.
+
+One-shot insertion in `Final text only` mode can use `ydotool` or `wl-copy`. Stable cursor mode does
+not fall back to these global insertion tools when IBus or preedit support is unavailable; it keeps
+the final transcript in VOCO instead.
 
 Check that `ydotool` and `wl-clipboard` are installed and that your user is in the `input` group.
 
@@ -19,9 +34,31 @@ If `ydotool` v1.x reports a missing socket, start `ydotoold` and refresh runtime
 systemctl --user enable --now ydotoold
 ```
 
-Open Settings -> Output & local model -> Live cursor mode to switch between `Stable cursor
-streaming`, `Preview overlay only`, and `Final text only`. Use `Final text only` for target apps
-that behave unpredictably with synthetic typing.
+Open Settings -> Output & local model -> Live cursor mode to switch between `Live words at cursor
+(recommended)`, `Live transcript panel`, and `Final text only`. Cursor mode progressively commits
+stable phrases as normal target text so the target field wraps them, while keeping the changing tail
+in an app-owned preedit range. VOCO never reads or deletes surrounding target text: IBus exposes a
+cache without a target-bound revision, which is not sufficient proof for destructive replacement.
+At stop, VOCO can commit a wholly owned preedit or acknowledge an exact final that needs no target
+mutation. If progressively committed text would need revision or a final suffix, or if the session,
+focus, cursor context, or ownership changes, VOCO preserves the target and keeps the full-session
+final transcript in its UI. Use the transcript panel if a target app does not support input-method
+preedit, or final-text-only mode to disable preview transcription.
+
+If words appear initially and then stop, reset the trace, reproduce one dictation, and run:
+
+```bash
+npm run reset:cursor-streaming-trace
+npm run report:cursor-streaming
+```
+
+`cursor-streaming-stalled` means previews continued without safe cursor commits.
+`final-cursor-output-unreconciled` means the complete final transcript was preserved in VOCO, but
+the normal target-app commits could not be reconciled without rewriting them. Neither status is a
+passing cursor run.
+A healthy preferred-path trace contains `dictation_owned_preedit_started`, one or more
+`dictation_owned_preedit_updated` events, and `dictation_owned_preedit_committed` when final ASR
+exactly agrees with the progressively committed text.
 
 ## VOCO does not type text on X11
 

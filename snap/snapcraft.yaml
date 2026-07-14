@@ -1,7 +1,7 @@
 name: voco
 title: VOCO
 base: core24
-version: '2026.0.17'
+version: '2026.0.18'
 summary: Voice-native interface layer for Linux
 license: MIT
 website: https://github.com/sergiopesch/voco
@@ -91,7 +91,7 @@ parts:
       export PATH="$HOME/.cargo/bin:${PATH}"
       npm ci
       npm --workspace @voco/desktop run build:frontend
-      cargo build --manifest-path apps/desktop/src-tauri/Cargo.toml --release
+      cargo build --manifest-path apps/desktop/src-tauri/Cargo.toml --release --features custom-protocol
 
       install -Dm755 apps/desktop/src-tauri/target/release/voco \
         "$CRAFT_PART_INSTALL/usr/bin/voco"

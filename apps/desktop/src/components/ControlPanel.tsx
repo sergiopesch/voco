@@ -245,6 +245,14 @@ export function ControlPanel({
       ? "Ready"
       : `Missing: ${runtimeDiagnostics.clipboard.missingCommands.join(", ")}`;
   }, [runtimeDiagnostics]);
+  const ownedPreeditLabel = useMemo(() => {
+    if (!runtimeDiagnostics) {
+      return "Runtime checks unavailable.";
+    }
+    return runtimeDiagnostics.ownedPreedit.available
+      ? "Ready"
+      : "Unavailable (preview-only fallback)";
+  }, [runtimeDiagnostics]);
   useEffect(() => {
     if (surface === "onboarding") {
       void onRefreshDevices();
@@ -835,16 +843,17 @@ export function ControlPanel({
                           }
                         >
                           <option value="stable-cursor-streaming">
-                            Stable cursor streaming
+                            Live words at cursor (recommended)
                           </option>
-                          <option value="preview-overlay-only">Preview overlay only</option>
+                          <option value="preview-overlay-only">Live transcript panel</option>
                           <option value="final-text-only">Final text only</option>
                         </select>
                       </label>
                       <div className="voco-inline-note">
-                        Stable cursor streaming only appends confirmed text and never deletes
-                        existing target-app text. Use final text only if a target app behaves
-                        unpredictably.
+                        Live words at cursor keeps provisional text attached to the focused field,
+                        revises it automatically as recognition improves, and commits the complete
+                        final transcript when you stop. The transcript panel keeps previews inside
+                        VOCO and inserts only the final result.
                       </div>
                     </>
                   ) : null}
@@ -1150,6 +1159,14 @@ export function ControlPanel({
                   <div className="voco-inline-note">
                     <strong>Session:</strong> {runtimeSessionLabel}
                   </div>
+                  <div className="voco-inline-note">
+                    <strong>Automatic live cursor:</strong> {ownedPreeditLabel}
+                  </div>
+                  {runtimeDiagnostics?.ownedPreedit.error ? (
+                    <div className="voco-inline-note">
+                      {runtimeDiagnostics.ownedPreedit.error}
+                    </div>
+                  ) : null}
                   <div className="voco-inline-note">
                     <strong>Type simulation:</strong> {typeSimulationLabel}
                   </div>

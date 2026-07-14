@@ -3,6 +3,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
+const DEFAULT_MAX_FIRST_LIVE_TEXT_MS = 1_500;
+const DEFAULT_MAX_CURSOR_GAP_P95_MS = 2_000;
 const options = parseArgs(process.argv.slice(2));
 const tracePath =
   options.tracePath ??
@@ -16,6 +18,8 @@ const eventsToSummarize = [
   "dictation_recording_duration",
   "dictation_first_live_text_visible",
   "dictation_live_preview_completed",
+  "dictation_live_preview_window_advanced",
+  "dictation_live_cursor_update_gap",
   "dictation_stop_to_final_transcript",
   "dictation_stop_to_idle",
 ];
@@ -23,15 +27,30 @@ const eventsToSummarize = [
 const notableEvents = [
   "recording_get_user_media_constraints_fallback",
   "recording_get_user_media_default_fallback",
+  "dictation_owned_preedit_started",
+  "dictation_owned_preedit_unavailable",
+  "dictation_owned_preedit_updated",
+  "dictation_owned_preedit_failed",
+  "dictation_owned_preedit_cancelled",
+  "dictation_owned_preedit_committed",
+  "dictation_owned_preedit_commit_failed",
   "dictation_live_cursor_insert_updated",
   "dictation_live_cursor_insert_failed",
   "dictation_live_cursor_unsafe_rewrite_blocked",
   "dictation_live_cursor_overlay_fallback",
   "dictation_live_cursor_final_unreconciled",
   "dictation_final_output_completed",
+  "dictation_final_output_unreconciled",
   "dictation_final_insertion_failed",
   "dictation_live_preview_failed",
   "dictation_live_cursor_commit_waiting",
+  "dictation_live_preview_confirmed",
+  "dictation_live_preview_window_advanced",
+  "dictation_live_cursor_tail_transcribed",
+  "dictation_live_cursor_tail_flushed",
+  "dictation_live_cursor_tail_already_covered",
+  "dictation_live_cursor_tail_flush_failed",
+  "dictation_recording_limit_reached",
 ];
 
 function percentile(values, quantile) {
@@ -66,6 +85,7 @@ for (const [index, line] of lines.entries()) {
     event: entry.event,
     index,
     durationMs: Number.isFinite(entry.duration_ms) ? entry.duration_ms : null,
+    tMs: Number.isFinite(entry.t_ms) ? entry.t_ms : null,
     dictationSessionId: Number.isInteger(entry.dictation_session_id)
       ? entry.dictation_session_id
       : null,
@@ -122,6 +142,9 @@ if (options.minDurationMs !== null) {
 }
 if (options.expectFinalOnly) {
   console.log("Expected mode: final-text-only");
+} else {
+  console.log(`Maximum first live text: ${options.maxFirstLiveTextMs}ms`);
+  console.log(`Maximum cursor update gap p95: ${options.maxCursorGapP95Ms}ms`);
 }
 if (latestCompletedSessionId !== null) {
   console.log(`Latest completed dictation session: ${latestCompletedSessionId}`);
@@ -183,6 +206,20 @@ function summarizeEntries(entries) {
     }
   }
 
+  const cursorUpdateTimes = entries
+    .filter(
+      (entry) =>
+        (entry.event === "dictation_live_cursor_insert_updated" ||
+          entry.event === "dictation_owned_preedit_updated") &&
+        entry.tMs !== null,
+    )
+    .map((entry) => entry.tMs);
+  const cursorUpdateGaps = cursorUpdateTimes
+    .slice(1)
+    .map((time, index) => time - cursorUpdateTimes[index])
+    .filter((duration) => Number.isFinite(duration) && duration >= 0);
+  rows.set("dictation_live_cursor_update_gap", cursorUpdateGaps);
+
   const completedDictationCount = rows.get("dictation_stop_to_idle")?.length ?? 0;
   const recordingDurations = rows.get("dictation_recording_duration") ?? [];
   const recordingDurationCount = recordingDurations.length;
@@ -191,17 +228,20 @@ function summarizeEntries(entries) {
   const previewCount = rows.get("dictation_live_preview_completed")?.length ?? 0;
   const firstLiveTextCount = rows.get("dictation_first_live_text_visible")?.length ?? 0;
   const finalOutputCount = notableCounts.get("dictation_final_output_completed") ?? 0;
-  const finalUnreconciledCount =
-    notableCounts.get("dictation_live_cursor_final_unreconciled") ?? 0;
+  const finalUnreconciledCount = Math.max(
+    notableCounts.get("dictation_final_output_unreconciled") ?? 0,
+    notableCounts.get("dictation_live_cursor_final_unreconciled") ?? 0,
+  );
   const previewFailureCount = notableCounts.get("dictation_live_preview_failed") ?? 0;
   const liveCursorInsertUpdatedCount =
-    notableCounts.get("dictation_live_cursor_insert_updated") ?? 0;
+    (notableCounts.get("dictation_live_cursor_insert_updated") ?? 0) +
+    (notableCounts.get("dictation_owned_preedit_updated") ?? 0);
   const blockedLiveCursorCommitCount =
     (notableCounts.get("dictation_live_cursor_unsafe_rewrite_blocked") ?? 0) +
     (notableCounts.get("dictation_live_cursor_commit_waiting") ?? 0);
-  const lastLiveCursorUpdateIndex = findLastEventIndex(
-    entries,
-    "dictation_live_cursor_insert_updated",
+  const lastLiveCursorUpdateIndex = Math.max(
+    findLastEventIndex(entries, "dictation_live_cursor_insert_updated"),
+    findLastEventIndex(entries, "dictation_owned_preedit_updated"),
   );
   const previewsAfterLastLiveCursorUpdate =
     lastLiveCursorUpdateIndex === -1
@@ -226,6 +266,8 @@ function summarizeEntries(entries) {
         );
   const failureCount = [
     "dictation_live_cursor_insert_failed",
+    "dictation_owned_preedit_failed",
+    "dictation_owned_preedit_commit_failed",
     "dictation_final_insertion_failed",
   ].reduce((sum, event) => sum + (notableCounts.get(event) ?? 0), 0);
   const fallbackCount = notableCounts.get("dictation_live_cursor_overlay_fallback") ?? 0;
@@ -242,11 +284,16 @@ function summarizeEntries(entries) {
     blockedLiveCursorCommitCount,
     completedDictationCount,
     cursorStreamingStalled,
+    cursorUpdateGapP95Ms: percentile(cursorUpdateGaps, 95),
     failureCount,
     fallbackCount,
     finalOutputCount,
     finalUnreconciledCount,
     firstLiveTextCount,
+    firstLiveTextP95Ms: percentile(
+      rows.get("dictation_first_live_text_visible") ?? [],
+      95,
+    ),
     liveCursorInsertUpdatedCount,
     maxRecordingDurationMs,
     notableCounts,
@@ -275,6 +322,14 @@ function classifySummary(summary, options) {
     };
   }
 
+  if (summary.finalUnreconciledCount > 0) {
+    return {
+      priority: 2,
+      status: "final-cursor-output-unreconciled",
+      detail: `${summary.finalUnreconciledCount} session(s) preserved a final transcript in VOCO but could not safely finish it at the cursor`,
+    };
+  }
+
   if (summary.finalOutputCount === 0) {
     return {
       priority: 3,
@@ -289,6 +344,33 @@ function classifySummary(summary, options) {
       status: "cursor-streaming-stalled",
       detail: `${summary.previewCount} live preview event(s), ${summary.liveCursorInsertUpdatedCount} live cursor update event(s), ${summary.blockedLiveCursorCommitCount} blocked commit event(s), ${summary.previewsAfterLastLiveCursorUpdate} preview event(s) after the last cursor update, ${summary.blockedCommitsAfterLastLiveCursorUpdate} blocked commit event(s) after the last cursor update, and no overlay fallback`,
     };
+  }
+
+  if (!options.expectFinalOnly) {
+    const firstLiveTextTooSlow =
+      summary.firstLiveTextP95Ms !== null &&
+      summary.firstLiveTextP95Ms > options.maxFirstLiveTextMs;
+    const cursorUpdatesTooBursty =
+      summary.cursorUpdateGapP95Ms !== null &&
+      summary.cursorUpdateGapP95Ms > options.maxCursorGapP95Ms;
+    if (firstLiveTextTooSlow || cursorUpdatesTooBursty) {
+      const issues = [];
+      if (firstLiveTextTooSlow) {
+        issues.push(
+          `first live text ${summary.firstLiveTextP95Ms}ms exceeds ${options.maxFirstLiveTextMs}ms`,
+        );
+      }
+      if (cursorUpdatesTooBursty) {
+        issues.push(
+          `cursor update gap p95 ${summary.cursorUpdateGapP95Ms}ms exceeds ${options.maxCursorGapP95Ms}ms`,
+        );
+      }
+      return {
+        priority: 2,
+        status: "cursor-streaming-latency-above-target",
+        detail: issues.join("; "),
+      };
+    }
   }
 
   if (summary.recordingDurationCount === 0) {
@@ -360,6 +442,8 @@ function findHighestPriorityIssue(reports) {
 
 function parseArgs(args) {
   let expectFinalOnly = false;
+  let maxCursorGapP95Ms = DEFAULT_MAX_CURSOR_GAP_P95_MS;
+  let maxFirstLiveTextMs = DEFAULT_MAX_FIRST_LIVE_TEXT_MS;
   let minDurationMs = null;
   let tracePath = null;
 
@@ -370,10 +454,32 @@ function parseArgs(args) {
       minDurationMs = parsePositiveInteger(args[index], "--min-duration-ms");
     } else if (arg === "--expect-final-only") {
       expectFinalOnly = true;
+    } else if (arg === "--max-first-live-text-ms") {
+      index += 1;
+      maxFirstLiveTextMs = parsePositiveInteger(
+        args[index],
+        "--max-first-live-text-ms",
+      );
+    } else if (arg === "--max-cursor-gap-p95-ms") {
+      index += 1;
+      maxCursorGapP95Ms = parsePositiveInteger(
+        args[index],
+        "--max-cursor-gap-p95-ms",
+      );
     } else if (arg.startsWith("--min-duration-ms=")) {
       minDurationMs = parsePositiveInteger(
         arg.slice("--min-duration-ms=".length),
         "--min-duration-ms",
+      );
+    } else if (arg.startsWith("--max-first-live-text-ms=")) {
+      maxFirstLiveTextMs = parsePositiveInteger(
+        arg.slice("--max-first-live-text-ms=".length),
+        "--max-first-live-text-ms",
+      );
+    } else if (arg.startsWith("--max-cursor-gap-p95-ms=")) {
+      maxCursorGapP95Ms = parsePositiveInteger(
+        arg.slice("--max-cursor-gap-p95-ms=".length),
+        "--max-cursor-gap-p95-ms",
       );
     } else if (arg.startsWith("--")) {
       console.error(`Unsupported option: ${arg}`);
@@ -386,7 +492,13 @@ function parseArgs(args) {
     }
   }
 
-  return { expectFinalOnly, minDurationMs, tracePath };
+  return {
+    expectFinalOnly,
+    maxCursorGapP95Ms,
+    maxFirstLiveTextMs,
+    minDurationMs,
+    tracePath,
+  };
 }
 
 function parsePositiveInteger(value, optionName) {

@@ -86,10 +86,48 @@ export interface InsertionResult {
   strategy: ActiveInsertionStrategy;
 }
 
+export interface TranscriptionSegment {
+  text: string;
+  startMs: number;
+  endMs: number;
+}
+
+export interface PreviewTranscription {
+  text: string;
+  segments: TranscriptionSegment[];
+}
+
+export interface DebugDictationCaptureResult {
+  audioPath: string;
+  timelinePath: string;
+}
+
 export interface RuntimeDiagnostics {
   sessionType: string;
   typeSimulation: InsertionSupport;
   clipboard: InsertionSupport;
+  ownedPreedit: OwnedPreeditStatus;
+}
+
+export interface OwnedPreeditStatus {
+  available: boolean;
+  ready: boolean;
+  sessionId: number | null;
+  engineActive: boolean;
+  focusLost: boolean;
+  switching: boolean;
+  progressiveCommitActive: boolean;
+  committedCharacterCount: number;
+  ownershipIntact: boolean;
+  finalizationOutcome:
+    | "none"
+    | "committed"
+    | "discarded"
+    | "preserved"
+    | null;
+  currentEngine: string;
+  defaultEngine: string;
+  error: string | null;
 }
 
 export interface OpenClawAgentResult {

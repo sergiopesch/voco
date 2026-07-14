@@ -27,6 +27,7 @@ import { useRealtimeConversation } from "@/hooks/useRealtimeConversation";
 import { ControlPanel } from "@/components/ControlPanel";
 import { RealtimeMicVisual } from "@/components/RealtimeMicVisual";
 import { probeMicrophoneAccess } from "@/lib/audioInput";
+import { shouldShowDictationOverlay } from "@/lib/dictationPresentation";
 import type {
   AppConfig,
   AudioDeviceOption,
@@ -263,13 +264,12 @@ export function App() {
   const panelSizeRef = useRef<LogicalSize>(PANEL_SIZE);
   const lastCheckedChannelRef = useRef<AppConfig["updateChannel"] | null>(null);
   const notifiedReleaseVersionRef = useRef<string | null>(null);
-  const cursorStreamingMode =
-    config?.transcriptTarget === "cursor" &&
-    config.liveCursorMode === "stable-cursor-streaming";
-  const dictationOverlayVisible =
-    surface === "hidden" &&
-    !cursorStreamingMode &&
-    (status === "recording" || status === "processing");
+  const dictationOverlayVisible = shouldShowDictationOverlay(
+    surface,
+    status,
+    config?.transcriptTarget,
+    config?.liveCursorMode,
+  );
   const realtimeOverlayVisible = surface === "hidden" && isRealtimeActive;
   const overlayVisible = dictationOverlayVisible || realtimeOverlayVisible;
   const canHandleHotkey = initComplete && config !== null;

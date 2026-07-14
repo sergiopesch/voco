@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   appendableFinalCursorText,
   appendableLiveCursorText,
+  anchoredLiveCursorCommitDecision,
   clampLivePreviewDelay,
   liveCursorCommitDecision,
   nextLiveCursorFallbackDecision,
@@ -10,6 +11,7 @@ import {
   shouldUseFastLivePreviewConfirmation,
   stableLivePreviewPrefix,
   stableLivePreviewText,
+  withCursorAppendSeparator,
 } from "@/lib/liveCommitPolicy";
 
 describe("live cursor streaming", () => {
@@ -139,6 +141,31 @@ describe("live cursor streaming", () => {
     ).toEqual({ appendText: "", reason: "unsafe-rewrite" });
   });
 
+  it("never skips ahead when an anchored preview changes earlier words", () => {
+    expect(
+      anchoredLiveCursorCommitDecision(
+        "This paragraph was already typed",
+        "Now we continue with another stable",
+        "Now we continue with another stable phrase",
+      ),
+    ).toEqual({ appendText: "", reason: "unsafe-rewrite" });
+
+    expect(
+      anchoredLiveCursorCommitDecision(
+        "Hello world",
+        "Hello world and this",
+        "Hello world and this continues",
+      ),
+    ).toEqual({ appendText: " and this", reason: "append" });
+  });
+
+  it("adds spacing when a new anchored audio window starts", () => {
+    expect(withCursorAppendSeparator("Hello world", "Next phrase")).toBe(
+      " Next phrase",
+    );
+    expect(withCursorAppendSeparator("Hello world", ".")).toBe(".");
+  });
+
   it("finalizes only by safe append", () => {
     expect(appendableFinalCursorText("Okay, let's give", "Okay, let's give it a try.")).toBe(
       " it a try.",
@@ -188,11 +215,12 @@ describe("live cursor streaming", () => {
   });
 
   it("uses fast confirmation cadence only before first live text appears", () => {
-    expect(clampLivePreviewDelay(50, true)).toBe(250);
-    expect(clampLivePreviewDelay(50, false)).toBe(800);
-    expect(nextLivePreviewDelay(725, true)).toBe(250);
-    expect(nextLivePreviewDelay(725, false)).toBe(875);
-    expect(nextLivePreviewDelay(1800, false)).toBe(1400);
+    expect(clampLivePreviewDelay(50, true)).toBe(100);
+    expect(clampLivePreviewDelay(50, false)).toBe(100);
+    expect(nextLivePreviewDelay(725, true)).toBe(100);
+    expect(nextLivePreviewDelay(725, false)).toBe(375);
+    expect(nextLivePreviewDelay(950, false)).toBe(150);
+    expect(nextLivePreviewDelay(1800, false)).toBe(100);
     expect(
       shouldUseFastLivePreviewConfirmation({
         firstLiveTextInserted: false,
@@ -238,28 +266,24 @@ describe("live cursor streaming", () => {
     ).toBe(false);
   });
 
-  it("falls back after repeated blocked live cursor commits", () => {
+  it("falls back only after repeated unsafe live cursor rewrites", () => {
     let blockedCount = 0;
 
-    for (let index = 0; index < 3; index += 1) {
+    for (let index = 0; index < 4; index += 1) {
       const decision = nextLiveCursorFallbackDecision(
         "unsafe-rewrite",
         blockedCount,
       );
       blockedCount = decision.blockedCommitCount;
-      expect(decision.shouldFallback).toBe(false);
+      expect(decision.shouldFallback).toBe(index === 3);
     }
 
-    const fallback = nextLiveCursorFallbackDecision(
-      "waiting-for-stable-preview",
-      blockedCount,
-    );
-    expect(fallback).toEqual({
-      blockedCommitCount: 4,
-      shouldFallback: true,
+    expect(nextLiveCursorFallbackDecision("waiting-for-stable-preview", 3)).toEqual({
+      blockedCommitCount: 0,
+      shouldFallback: false,
     });
 
-    expect(nextLiveCursorFallbackDecision("append", fallback.blockedCommitCount)).toEqual({
+    expect(nextLiveCursorFallbackDecision("append", blockedCount)).toEqual({
       blockedCommitCount: 0,
       shouldFallback: false,
     });

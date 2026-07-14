@@ -16,11 +16,11 @@ concurrency:
 jobs:
   check:
     name: Frontend Checks
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version: 20
           cache: npm
@@ -39,6 +39,9 @@ jobs:
 
       - name: DevOps preflight
         run: npm run verify:devops
+
+      - name: Dependency security audit
+        run: npm run verify:security
 
       - name: TypeScript check
         run: npm run check
@@ -60,9 +63,9 @@ jobs:
 
   rust:
     name: Rust Check & Test
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Install system dependencies
         run: |
@@ -72,21 +75,26 @@ jobs:
             libjavascriptcoregtk-4.1-dev libwebkit2gtk-4.1-dev \
             libayatana-appindicator3-dev cmake
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@fa04a1451ff1842e2626ccb99004d0195b455a88
         with:
-          components: clippy
+          toolchain: 1.94.0
+          components: clippy,rustfmt
 
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
           workspaces: apps/desktop/src-tauri
 
       - name: Cargo check
         working-directory: apps/desktop/src-tauri
-        run: cargo check
+        run: cargo check --all-targets --all-features
+
+      - name: Cargo fmt
+        working-directory: apps/desktop/src-tauri
+        run: cargo fmt --check
 
       - name: Cargo clippy
         working-directory: apps/desktop/src-tauri
-        run: cargo clippy -- -D warnings
+        run: cargo clippy --all-targets --all-features -- -D warnings
 
       - name: Cargo test
         working-directory: apps/desktop/src-tauri

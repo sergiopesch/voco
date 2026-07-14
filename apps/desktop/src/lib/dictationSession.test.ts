@@ -89,6 +89,27 @@ describe("dictation session state machine", () => {
     expect(requestToggle(state).action).toBe("start");
   });
 
+  it("completes repeated start-stop-finalize toggle cycles without stale state", () => {
+    let state = createDictationSessionState();
+
+    for (let session = 1; session <= 20; session += 1) {
+      const start = requestToggle(state);
+      expect(start.action).toBe("start");
+      state = markRecording(startSession(start.state));
+
+      const stop = requestToggle(state);
+      expect(stop.action).toBe("stop");
+      state = markFinalizing(markProcessing(requestStop(stop.state)));
+      expect(requestToggle(state).action).toBe("none");
+
+      state = finishSessionIdle(state);
+      expect(state.phase).toBe("idle");
+      expect(state.sessionId).toBe(session);
+      expect(state.queuedAction).toBeNull();
+      expect(state.committedCursorTextLength).toBe(0);
+    }
+  });
+
   it("tracks live cursor insertion failure for the active session", () => {
     let state = markRecording(startSession(createDictationSessionState()));
     state = addCommittedCursorText(state, "hello");

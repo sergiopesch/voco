@@ -1,6 +1,12 @@
+#[cfg(all(not(debug_assertions), not(feature = "custom-protocol")))]
+compile_error!(
+    "VOCO production builds require the app's custom-protocol feature; use `cargo tauri build --features custom-protocol` instead of `cargo build --release`"
+);
+
 mod config;
 mod insertion;
-mod transcribe;
+mod owned_preedit;
+pub mod transcribe;
 mod tray;
 
 use config::{
@@ -37,6 +43,7 @@ static TRACE_START: LazyLock<Instant> = LazyLock::new(Instant::now);
 static TRACE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 static TRACE_FILE_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 static MODEL_DOWNLOAD_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
+static DEBUG_CAPTURE_WRITTEN: AtomicBool = AtomicBool::new(false);
 static REGISTERED_PLUGIN_SHORTCUT: LazyLock<Mutex<Option<String>>> =
     LazyLock::new(|| Mutex::new(None));
 static REGISTERED_REALTIME_PLUGIN_SHORTCUT: LazyLock<Mutex<Option<String>>> =
@@ -89,6 +96,10 @@ fn xdg_state_home() -> std::path::PathBuf {
 
 fn hotkey_trace_path() -> std::path::PathBuf {
     xdg_state_home().join("voco").join("hotkey-trace.jsonl")
+}
+
+fn debug_capture_dir() -> std::path::PathBuf {
+    xdg_state_home().join("voco").join("debug-captures")
 }
 
 fn session_type_label() -> &'static str {
@@ -324,6 +335,8 @@ fn is_supported_dictation_trace_event(event: &str) -> bool {
             | "dictation_live_preview_skipped_short_audio"
             | "dictation_live_preview_empty"
             | "dictation_live_preview_updated"
+            | "dictation_live_preview_confirmed"
+            | "dictation_live_preview_window_advanced"
             | "dictation_live_preview_failed"
             | "dictation_live_cursor_insert_updated"
             | "dictation_live_cursor_insert_cleared"
@@ -333,6 +346,18 @@ fn is_supported_dictation_trace_event(event: &str) -> bool {
             | "dictation_live_cursor_unsafe_rewrite_blocked"
             | "dictation_live_cursor_final_unreconciled"
             | "dictation_live_cursor_commit_waiting"
+            | "dictation_live_cursor_tail_transcribed"
+            | "dictation_live_cursor_tail_flushed"
+            | "dictation_live_cursor_tail_flush_failed"
+            | "dictation_owned_preedit_started"
+            | "dictation_owned_preedit_unavailable"
+            | "dictation_owned_preedit_updated"
+            | "dictation_owned_preedit_failed"
+            | "dictation_owned_preedit_cancelled"
+            | "dictation_owned_preedit_committed"
+            | "dictation_owned_preedit_commit_failed"
+            | "dictation_owned_preedit_final_preserved"
+            | "dictation_owned_preedit_progressive_commit"
             | "dictation_first_live_text_visible"
             | "dictation_stop_to_final_transcript"
             | "dictation_stop_to_idle"
@@ -341,6 +366,7 @@ fn is_supported_dictation_trace_event(event: &str) -> bool {
             | "dictation_enhancement_completed"
             | "dictation_local_assistant_completed"
             | "dictation_final_output_completed"
+            | "dictation_final_output_unreconciled"
             | "dictation_final_insertion_failed"
     )
 }
@@ -536,7 +562,7 @@ fn preview_transcribe_audio(
     app: tauri::AppHandle,
     audio_bytes: Vec<u8>,
     state: tauri::State<'_, WhisperMutex>,
-) -> Result<Option<String>, String> {
+) -> Result<Option<transcribe::PreviewTranscription>, String> {
     let samples = decode_audio_bytes(&audio_bytes)?;
 
     if samples.len() < 16000 {
@@ -558,13 +584,138 @@ fn preview_transcribe_audio(
     };
 
     whisper.load_model(&model_path)?;
-    let text = whisper.transcribe(&samples)?;
-    let text = text.trim();
-    if text.is_empty() {
+    let preview = whisper.transcribe_preview(&samples)?;
+    if preview.text.is_empty() {
         Ok(None)
     } else {
-        Ok(Some(text.to_string()))
+        Ok(Some(preview))
     }
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DebugDictationCaptureResult {
+    audio_path: String,
+    timeline_path: String,
+}
+
+#[tauri::command]
+fn debug_dictation_capture_enabled() -> bool {
+    std::env::var("VOCO_DEBUG_CAPTURE_AUDIO").as_deref() == Ok("1")
+        && !DEBUG_CAPTURE_WRITTEN.load(Ordering::SeqCst)
+}
+
+#[tauri::command(async)]
+fn save_debug_dictation_capture(
+    audio_bytes: Vec<u8>,
+    timeline: serde_json::Value,
+) -> Result<Option<DebugDictationCaptureResult>, String> {
+    if std::env::var("VOCO_DEBUG_CAPTURE_AUDIO").as_deref() != Ok("1") {
+        return Ok(None);
+    }
+    if DEBUG_CAPTURE_WRITTEN
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        return Ok(None);
+    }
+
+    let result = write_debug_dictation_capture(&audio_bytes, &timeline);
+    if result.is_err() {
+        DEBUG_CAPTURE_WRITTEN.store(false, Ordering::SeqCst);
+    }
+    result.map(Some)
+}
+
+fn write_debug_dictation_capture(
+    audio_bytes: &[u8],
+    timeline: &serde_json::Value,
+) -> Result<DebugDictationCaptureResult, String> {
+    let samples = decode_audio_bytes(audio_bytes)?;
+    if samples.is_empty() {
+        return Err("Debug capture has no audio samples".to_string());
+    }
+    if samples.len() > 16_000 * MAX_AUDIO_SECONDS {
+        return Err(format!(
+            "Debug capture is too long (max {MAX_AUDIO_SECONDS} seconds)"
+        ));
+    }
+
+    let timeline_bytes = serde_json::to_vec_pretty(timeline)
+        .map_err(|error| format!("Failed to encode debug capture timeline: {error}"))?;
+    if timeline_bytes.len() > 16 * 1024 * 1024 {
+        return Err("Debug capture timeline is too large (max 16MB)".to_string());
+    }
+
+    let directory = debug_capture_dir();
+    std::fs::create_dir_all(&directory).map_err(|error| {
+        format!(
+            "Failed to create debug capture directory {}: {error}",
+            directory.display()
+        )
+    })?;
+    secure_private_path(&directory, 0o700)?;
+
+    let capture_id = format!("dictation-{}", now_ms());
+    let audio_path = directory.join(format!("{capture_id}.wav"));
+    let timeline_path = directory.join(format!("{capture_id}.json"));
+    std::fs::write(&audio_path, encode_pcm16_wav(&samples, 16_000)).map_err(|error| {
+        format!(
+            "Failed to write debug audio capture {}: {error}",
+            audio_path.display()
+        )
+    })?;
+    std::fs::write(&timeline_path, timeline_bytes).map_err(|error| {
+        format!(
+            "Failed to write debug capture timeline {}: {error}",
+            timeline_path.display()
+        )
+    })?;
+    secure_private_path(&audio_path, 0o600)?;
+    secure_private_path(&timeline_path, 0o600)?;
+
+    Ok(DebugDictationCaptureResult {
+        audio_path: audio_path.to_string_lossy().into_owned(),
+        timeline_path: timeline_path.to_string_lossy().into_owned(),
+    })
+}
+
+fn encode_pcm16_wav(samples: &[f32], sample_rate: u32) -> Vec<u8> {
+    let data_size = samples.len().saturating_mul(2).min(u32::MAX as usize) as u32;
+    let mut wav = Vec::with_capacity(44 + data_size as usize);
+    wav.extend_from_slice(b"RIFF");
+    wav.extend_from_slice(&(36u32.saturating_add(data_size)).to_le_bytes());
+    wav.extend_from_slice(b"WAVEfmt ");
+    wav.extend_from_slice(&16u32.to_le_bytes());
+    wav.extend_from_slice(&1u16.to_le_bytes());
+    wav.extend_from_slice(&1u16.to_le_bytes());
+    wav.extend_from_slice(&sample_rate.to_le_bytes());
+    wav.extend_from_slice(&sample_rate.saturating_mul(2).to_le_bytes());
+    wav.extend_from_slice(&2u16.to_le_bytes());
+    wav.extend_from_slice(&16u16.to_le_bytes());
+    wav.extend_from_slice(b"data");
+    wav.extend_from_slice(&data_size.to_le_bytes());
+    for sample in samples.iter().take((data_size / 2) as usize) {
+        let pcm = (sample.clamp(-1.0, 1.0) * i16::MAX as f32).round() as i16;
+        wav.extend_from_slice(&pcm.to_le_bytes());
+    }
+    wav
+}
+
+fn secure_private_path(path: &std::path::Path, mode: u32) -> Result<(), String> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(mode)).map_err(|error| {
+            format!(
+                "Failed to secure debug capture path {}: {error}",
+                path.display()
+            )
+        })?;
+    }
+    #[cfg(not(unix))]
+    let _ = mode;
+    Ok(())
 }
 
 // --- Text insertion & notifications ---
@@ -631,14 +782,6 @@ fn insert_text(text: String, strategy: String) -> Result<insertion::InsertionRes
         return Err("Text too long for insertion (max 100KB)".to_string());
     }
     insertion::insert_text(&text, &strategy)
-}
-
-#[tauri::command(async)]
-fn replace_live_text(
-    previous_char_count: usize,
-    next_text: String,
-) -> Result<insertion::InsertionResult, String> {
-    insertion::replace_live_text(previous_char_count, &next_text)
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -1972,9 +2115,65 @@ fn create_realtime_client_secret() -> Result<RealtimeClientSecretResult, String>
     parse_realtime_client_secret_response(&response_body)
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RuntimeDiagnostics {
+    #[serde(flatten)]
+    insertion: insertion::RuntimeDiagnostics,
+    owned_preedit: owned_preedit::OwnedPreeditStatus,
+}
+
 #[tauri::command(async)]
-fn get_runtime_diagnostics() -> insertion::RuntimeDiagnostics {
-    insertion::runtime_diagnostics()
+fn get_runtime_diagnostics(
+    state: tauri::State<'_, owned_preedit::OwnedPreeditService>,
+) -> RuntimeDiagnostics {
+    RuntimeDiagnostics {
+        insertion: insertion::runtime_diagnostics(),
+        owned_preedit: state.status(),
+    }
+}
+
+#[tauri::command(async)]
+fn get_owned_preedit_status(
+    state: tauri::State<'_, owned_preedit::OwnedPreeditService>,
+) -> owned_preedit::OwnedPreeditStatus {
+    state.status()
+}
+
+#[tauri::command(async)]
+fn start_owned_preedit(
+    state: tauri::State<'_, owned_preedit::OwnedPreeditService>,
+    session_id: u64,
+) -> Result<owned_preedit::OwnedPreeditStatus, String> {
+    state.start(session_id)
+}
+
+#[tauri::command(async)]
+fn update_owned_preedit(
+    state: tauri::State<'_, owned_preedit::OwnedPreeditService>,
+    session_id: u64,
+    confirmed_text: String,
+    preedit_text: String,
+    provisional_text: String,
+) -> Result<owned_preedit::OwnedPreeditStatus, String> {
+    state.update(session_id, confirmed_text, preedit_text, provisional_text)
+}
+
+#[tauri::command(async)]
+fn commit_owned_preedit(
+    state: tauri::State<'_, owned_preedit::OwnedPreeditService>,
+    session_id: u64,
+    text: String,
+) -> Result<owned_preedit::OwnedPreeditStatus, String> {
+    state.commit(session_id, text)
+}
+
+#[tauri::command(async)]
+fn cancel_owned_preedit(
+    state: tauri::State<'_, owned_preedit::OwnedPreeditService>,
+    session_id: u64,
+) -> Result<owned_preedit::OwnedPreeditStatus, String> {
+    state.cancel(session_id)
 }
 
 fn main_window(app: &tauri::AppHandle) -> Result<tauri::WebviewWindow<tauri::Wry>, String> {
@@ -3073,6 +3272,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .manage(Mutex::new(WhisperState::new()) as WhisperMutex)
+        .manage(owned_preedit::OwnedPreeditService::default())
         .invoke_handler(tauri::generate_handler![
             get_config,
             save_config,
@@ -3080,8 +3280,9 @@ pub fn run() {
             save_cached_update_state,
             transcribe_audio,
             preview_transcribe_audio,
+            debug_dictation_capture_enabled,
+            save_debug_dictation_capture,
             insert_text,
-            replace_live_text,
             ask_openclaw_agent,
             speak_openclaw_response,
             enhance_transcript,
@@ -3090,6 +3291,11 @@ pub fn run() {
             invoke_openclaw_browser_action,
             create_realtime_client_secret,
             get_runtime_diagnostics,
+            get_owned_preedit_status,
+            start_owned_preedit,
+            update_owned_preedit,
+            commit_owned_preedit,
+            cancel_owned_preedit,
             set_dictation_status,
             set_microphone_ready,
             trace_frontend_hotkey_event,
@@ -3183,8 +3389,9 @@ pub fn run() {
         })
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
-        .run(|_app, event| {
+        .run(|app, event| {
             if let tauri::RunEvent::Exit = event {
+                app.state::<owned_preedit::OwnedPreeditService>().shutdown();
                 cleanup_socket_files();
             }
         });
@@ -3237,6 +3444,24 @@ mod tests {
         assert!(decode_audio_bytes(b"abc")
             .unwrap_err()
             .contains("not a multiple of 4"));
+    }
+
+    #[test]
+    fn debug_capture_wav_is_valid_mono_pcm16() {
+        let wav = encode_pcm16_wav(&[-1.0, 0.0, 1.0], 16_000);
+
+        assert_eq!(&wav[0..4], b"RIFF");
+        assert_eq!(&wav[8..12], b"WAVE");
+        assert_eq!(u16::from_le_bytes([wav[20], wav[21]]), 1);
+        assert_eq!(u16::from_le_bytes([wav[22], wav[23]]), 1);
+        assert_eq!(
+            u32::from_le_bytes([wav[24], wav[25], wav[26], wav[27]]),
+            16_000
+        );
+        assert_eq!(u16::from_le_bytes([wav[34], wav[35]]), 16);
+        assert_eq!(&wav[36..40], b"data");
+        assert_eq!(u32::from_le_bytes([wav[40], wav[41], wav[42], wav[43]]), 6);
+        assert_eq!(wav.len(), 50);
     }
 
     #[test]
@@ -3683,9 +3908,23 @@ mod tests {
             "dictation_live_preview_completed",
             "dictation_live_preview_empty",
             "dictation_live_preview_updated",
+            "dictation_live_preview_confirmed",
+            "dictation_live_preview_window_advanced",
             "dictation_live_preview_failed",
             "dictation_live_cursor_unsafe_rewrite_blocked",
             "dictation_live_cursor_commit_waiting",
+            "dictation_live_cursor_tail_transcribed",
+            "dictation_live_cursor_tail_flushed",
+            "dictation_live_cursor_tail_flush_failed",
+            "dictation_owned_preedit_started",
+            "dictation_owned_preedit_unavailable",
+            "dictation_owned_preedit_updated",
+            "dictation_owned_preedit_failed",
+            "dictation_owned_preedit_cancelled",
+            "dictation_owned_preedit_committed",
+            "dictation_owned_preedit_commit_failed",
+            "dictation_owned_preedit_final_preserved",
+            "dictation_owned_preedit_progressive_commit",
             "dictation_first_live_text_visible",
             "dictation_live_cursor_insert_updated",
             "dictation_live_cursor_insert_failed",
@@ -3700,6 +3939,7 @@ mod tests {
             "dictation_enhancement_completed",
             "dictation_local_assistant_completed",
             "dictation_final_output_completed",
+            "dictation_final_output_unreconciled",
             "dictation_final_insertion_failed",
         ];
 

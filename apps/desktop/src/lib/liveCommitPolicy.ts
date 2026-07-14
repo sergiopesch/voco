@@ -1,7 +1,8 @@
-export const LIVE_PREVIEW_MIN_INTERVAL_MS = 800;
-export const LIVE_PREVIEW_CONFIRMATION_INTERVAL_MS = 250;
-export const LIVE_PREVIEW_MAX_INTERVAL_MS = 1400;
-export const LIVE_PREVIEW_INITIAL_DELAY_MS = 550;
+export const LIVE_PREVIEW_MIN_INTERVAL_MS = 100;
+export const LIVE_PREVIEW_CONFIRMATION_INTERVAL_MS = 100;
+export const LIVE_PREVIEW_MAX_INTERVAL_MS = 450;
+export const LIVE_PREVIEW_INITIAL_DELAY_MS = 600;
+export const LIVE_PREVIEW_TARGET_COMPLETION_INTERVAL_MS = 1100;
 export const LIVE_CURSOR_BLOCKED_COMMIT_FALLBACK_THRESHOLD = 4;
 
 export type LiveCursorCommitDecision =
@@ -51,7 +52,10 @@ export function nextLivePreviewDelay(
     return LIVE_PREVIEW_CONFIRMATION_INTERVAL_MS;
   }
 
-  return clampLivePreviewDelay(previewDurationMs + 150, false);
+  return clampLivePreviewDelay(
+    LIVE_PREVIEW_TARGET_COMPLETION_INTERVAL_MS - previewDurationMs,
+    false,
+  );
 }
 
 export function shouldUseFastLivePreviewConfirmation(
@@ -81,7 +85,7 @@ export function nextLiveCursorFallbackDecision(
   reason: LiveCursorCommitDecision["reason"],
   previousBlockedCommitCount: number,
 ): LiveCursorFallbackDecision {
-  if (reason === "append" || reason === "already-committed") {
+  if (reason !== "unsafe-rewrite") {
     return { blockedCommitCount: 0, shouldFallback: false };
   }
 
@@ -110,6 +114,37 @@ export function liveCursorCommitDecision(
 
   const appendText = withCursorAppendSeparator(
     committedText,
+    stablePreview.slice(suffixStart),
+  );
+  return {
+    appendText,
+    reason: appendText.length > 0 ? "append" : "already-committed",
+  };
+}
+
+export function anchoredLiveCursorCommitDecision(
+  committedWindowText: string,
+  previousPreviewText: string,
+  nextPreviewText: string,
+): LiveCursorCommitDecision {
+  const stablePreview = stableLivePreviewPrefix(
+    previousPreviewText,
+    nextPreviewText,
+  );
+  if (stablePreview.length === 0) {
+    return { appendText: "", reason: "waiting-for-stable-preview" };
+  }
+
+  const suffixStart = findNormalizedPrefixEnd(
+    stablePreview,
+    committedWindowText,
+  );
+  if (suffixStart === null) {
+    return { appendText: "", reason: "unsafe-rewrite" };
+  }
+
+  const appendText = withCursorAppendSeparator(
+    committedWindowText,
     stablePreview.slice(suffixStart),
   );
   return {
@@ -355,7 +390,7 @@ function findWordSuffixPrefixOverlapEnd(
   return null;
 }
 
-function withCursorAppendSeparator(
+export function withCursorAppendSeparator(
   committedText: string,
   appendText: string,
 ): string {

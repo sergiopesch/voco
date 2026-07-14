@@ -279,34 +279,6 @@ pub fn insert_text(text: &str, preferred: &str) -> Result<InsertionResult, Strin
     }
 }
 
-pub fn replace_live_text(
-    previous_char_count: usize,
-    next_text: &str,
-) -> Result<InsertionResult, String> {
-    if previous_char_count != 0 {
-        return Err("Live cursor streaming cannot delete text".to_string());
-    }
-    if next_text.len() > 20_000 {
-        return Err("Live text is too long for insertion".to_string());
-    }
-
-    let strategy = if is_wayland() {
-        if next_text.is_empty() || try_ydotool(next_text) {
-            ActiveStrategy::Ydotool
-        } else {
-            return Err(type_simulation_error());
-        }
-    } else {
-        if next_text.is_empty() || try_xdotool(next_text) {
-            ActiveStrategy::Xdotool
-        } else {
-            return Err(type_simulation_error());
-        }
-    };
-
-    Ok(InsertionResult { strategy })
-}
-
 fn try_ydotool(text: &str) -> bool {
     Command::new("ydotool")
         .arg("type")
@@ -587,22 +559,5 @@ mod tests {
             diagnostics.clipboard.missing_commands,
             vec!["xclip".to_string()]
         );
-    }
-
-    #[test]
-    fn live_cursor_insertion_rejects_deletion_requests() {
-        let result = replace_live_text(1, "replacement");
-        assert!(result.is_err());
-        assert_eq!(
-            result.unwrap_err(),
-            "Live cursor streaming cannot delete text"
-        );
-    }
-
-    #[test]
-    fn live_cursor_insertion_rejects_oversized_text() {
-        let result = replace_live_text(0, &"x".repeat(20_001));
-        assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "Live text is too long for insertion");
     }
 }

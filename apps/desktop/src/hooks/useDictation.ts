@@ -2,15 +2,20 @@ import { useCallback, useRef } from "react";
 import { useStore } from "@/store/useStore";
 import {
   askOpenClawAgent,
+  debugDictationCaptureEnabled,
   transcribeAudio,
   previewTranscribeAudio,
   insertText,
-  appendLiveText,
+  cancelOwnedPreedit,
+  commitOwnedPreedit,
   setDictationStatus,
   setMicrophoneReady,
   showNotification,
+  saveDebugDictationCapture,
   speakOpenClawResponse,
+  startOwnedPreedit,
   traceHotkeyEvent,
+  updateOwnedPreedit,
 } from "@/lib/tauri";
 import type { HotkeyTraceFields } from "@/lib/tauri";
 import {
@@ -18,7 +23,8 @@ import {
   removeDcOffsetInPlace,
 } from "@/lib/audioLevel";
 import {
-  appendAudioSamples,
+  appendAudioSamplesUpTo,
+  collectAudioSamplesRange,
   collectRecentAudioSamples,
   createAudioCaptureBuffer,
   drainAudioCaptureBuffer,
@@ -33,7 +39,6 @@ import {
   probeMicrophoneAccess,
 } from "@/lib/audioInput";
 import {
-  addCommittedCursorText,
   clearCommittedCursorText,
   consumeQueuedStop,
   createDictationSessionState,
@@ -56,29 +61,63 @@ import {
   askLocalAssistantForDictation,
   enhanceTranscriptForDictation,
 } from "@/lib/localIntelligence";
-import { planLiveFinalCursorAction } from "@/lib/dictationFinalizer";
+import { planStableCursorFallback } from "@/lib/dictationFinalizer";
 import {
   LIVE_PREVIEW_CONFIRMATION_INTERVAL_MS,
   LIVE_PREVIEW_INITIAL_DELAY_MS,
   LIVE_PREVIEW_MIN_INTERVAL_MS,
   clampLivePreviewDelay,
-  liveCursorCommitDecision,
-  nextLiveCursorFallbackDecision,
   nextLivePreviewDelay,
   shouldUseFastLivePreviewConfirmation,
 } from "@/lib/liveCommitPolicy";
-import type { DictationStatus } from "@/types";
+import {
+  reviseOwnedPreedit,
+} from "@/lib/livePreviewWindow";
+import type {
+  AppConfig,
+  DictationStatus,
+  OwnedPreeditStatus,
+  PreviewTranscription,
+} from "@/types";
 
 const TARGET_SAMPLE_RATE = 16000;
 const MAX_AUDIO_SECONDS = 600;
-const LIVE_PREVIEW_MIN_SECONDS = 1;
+// Owned preedit can safely revise an early hypothesis, so the first preview
+// does not need to wait for a full second of audio.
+const LIVE_PREVIEW_MIN_SECONDS = 0.7;
 const LIVE_PREVIEW_MAX_SECONDS = 6;
+const ANCHORED_LIVE_PREVIEW_MAX_SECONDS = 20;
 const AUDIO_LEVEL_ATTACK = 0.68;
 const AUDIO_LEVEL_RELEASE = 0.24;
 const AUDIO_LEVEL_FLOOR = 0.01;
 
 type DictationPhase = DictationStatus | "starting" | "stopping" | "finalizing";
 type LiveFinalizationResult = "none" | "safe" | "unreconciled";
+interface DebugPreviewFrame {
+  sequence: number;
+  sourceSampleRate: number;
+  capturedSampleCount: number;
+  previewStartSample: number;
+  preview: PreviewTranscription;
+  stateAfter: {
+    candidateText: string;
+    committedWindowText: string;
+    committedCursorText: string;
+    nextPreviewStartSample: number;
+    blockedCommitCount: number;
+    cursorInsertionDisabled: boolean;
+  };
+}
+
+interface PendingDebugCapture {
+  audio: Float32Array;
+  completedTranscript: string;
+  committedCursorText: string;
+  cursorInsertionDisabled: boolean;
+  needsFullAudioReference: boolean;
+  previewFrames: DebugPreviewFrame[];
+  sessionId: number;
+}
 
 export function useDictation() {
   const setStatus = useStore((state) => state.setStatus);
@@ -99,6 +138,7 @@ export function useDictation() {
   const primedStreamPromiseRef = useRef<Promise<MediaStream> | null>(null);
   const audioBufferRef = useRef(createAudioCaptureBuffer());
   const sessionRef = useRef(createDictationSessionState());
+  const sessionConfigRef = useRef<AppConfig | null>(null);
   const phaseRef = useRef<DictationPhase>("idle");
   const workletModuleLoadedRef = useRef(false);
   const smoothedAudioLevelRef = useRef(0);
@@ -111,14 +151,21 @@ export function useDictation() {
   const livePreviewTimeoutRef = useRef<number | null>(null);
   const livePreviewInFlightRef = useRef<Promise<void> | null>(null);
   const liveCursorInsertionInFlightRef = useRef<Promise<void> | null>(null);
+  const ownedPreeditStartPromiseRef = useRef<Promise<boolean> | null>(null);
+  const ownedPreeditActiveRef = useRef(false);
+  const ownedPreeditSessionIdRef = useRef<number | null>(null);
+  const ownedPreeditProgressiveRef = useRef(false);
+  const ownedPreeditCommittedTextRef = useRef("");
   const lastLivePreviewTextRef = useRef("");
   const liveCursorCandidateTextRef = useRef("");
   const liveCursorTextRef = useRef("");
+  const livePreviewAudioStartSampleRef = useRef(0);
   const liveCursorInsertionDisabledRef = useRef(false);
-  const liveCursorBlockedCommitCountRef = useRef(0);
   const liveCursorFallbackNotifiedRef = useRef(false);
   const livePreviewFailureNotifiedRef = useRef(false);
   const livePreviewNextDelayMsRef = useRef(LIVE_PREVIEW_MIN_INTERVAL_MS);
+  const debugCaptureEnabledRef = useRef(false);
+  const debugPreviewFramesRef = useRef<DebugPreviewFrame[]>([]);
 
   function traceDictationEvent(
     event: string,
@@ -292,7 +339,7 @@ export function useDictation() {
   }
 
   function shouldRunLivePreview() {
-    const config = useStore.getState().config;
+    const config = sessionConfigRef.current;
     return (
       config?.transcriptTarget === "cursor" &&
       config.liveCursorMode !== "final-text-only" &&
@@ -300,8 +347,87 @@ export function useDictation() {
     );
   }
 
+  function shouldUseOwnedPreedit() {
+    const config = sessionConfigRef.current;
+    return (
+      config?.transcriptTarget === "cursor" &&
+      config.liveCursorMode === "stable-cursor-streaming"
+    );
+  }
+
+  function beginOwnedPreedit(sessionId: number): Promise<boolean> | null {
+    if (!shouldUseOwnedPreedit()) {
+      return null;
+    }
+
+    ownedPreeditProgressiveRef.current = false;
+    ownedPreeditCommittedTextRef.current = "";
+    const startPromise = (async () => {
+      try {
+        const status = await startOwnedPreedit(sessionId);
+        const sidecarSessionId = status.sessionId;
+        if (sidecarSessionId === null || sidecarSessionId <= 0) {
+          throw new Error("VOCO input method did not issue a session lease.");
+        }
+        if (
+          sessionRef.current.sessionId !== sessionId ||
+          phaseRef.current === "idle" ||
+          phaseRef.current === "error"
+        ) {
+          await cancelOwnedPreedit(sidecarSessionId).catch(() => {});
+          return false;
+        }
+        if (!status.engineActive || status.focusLost) {
+          await cancelOwnedPreedit(sidecarSessionId).catch(() => {});
+          return false;
+        }
+
+        ownedPreeditSessionIdRef.current = sidecarSessionId;
+        ownedPreeditActiveRef.current = true;
+        traceDictationEvent("dictation_owned_preedit_started").catch(() => {});
+        return true;
+      } catch {
+        console.info("Owned cursor streaming unavailable; using VOCO preview only.");
+        traceDictationEvent("dictation_owned_preedit_unavailable").catch(() => {});
+        return false;
+      }
+    })();
+    ownedPreeditStartPromiseRef.current = startPromise;
+    return startPromise;
+  }
+
+  async function waitForOwnedPreeditStart(): Promise<boolean> {
+    const startPromise = ownedPreeditStartPromiseRef.current;
+    if (startPromise) {
+      return startPromise.catch(() => false);
+    }
+    return ownedPreeditActiveRef.current;
+  }
+
+  function resetOwnedPreeditState() {
+    ownedPreeditStartPromiseRef.current = null;
+    ownedPreeditActiveRef.current = false;
+    ownedPreeditSessionIdRef.current = null;
+    ownedPreeditProgressiveRef.current = false;
+    ownedPreeditCommittedTextRef.current = "";
+  }
+
+  async function cancelOwnedPreeditSession(): Promise<OwnedPreeditStatus | null> {
+    await waitForOwnedPreeditStart();
+    const sessionId = ownedPreeditSessionIdRef.current;
+    const wasActive = ownedPreeditActiveRef.current;
+    resetOwnedPreeditState();
+    if (sessionId === null || !wasActive) {
+      return null;
+    }
+
+    const status = await cancelOwnedPreedit(sessionId);
+    traceDictationEvent("dictation_owned_preedit_cancelled").catch(() => {});
+    return status;
+  }
+
   function shouldUseFastLiveConfirmation() {
-    const config = useStore.getState().config;
+    const config = sessionConfigRef.current;
     return shouldUseFastLivePreviewConfirmation({
       firstLiveTextInserted: firstLiveTextInsertedRef.current,
       liveCursorInsertionDisabled:
@@ -310,15 +436,6 @@ export function useDictation() {
       liveCursorMode: config?.liveCursorMode,
       transcriptTarget: config?.transcriptTarget,
     });
-  }
-
-  function shouldShowLivePreviewOverlay() {
-    const config = useStore.getState().config;
-    return (
-      config?.liveCursorMode === "preview-overlay-only" ||
-      liveCursorInsertionDisabledRef.current ||
-      sessionRef.current.liveCursorInsertionDisabled
-    );
   }
 
   async function runLivePreview(token: DictationPreviewToken): Promise<void> {
@@ -340,10 +457,30 @@ export function useDictation() {
 
     const previewPromise: Promise<void> = (async () => {
       const sampleRate = audioContextRef.current?.sampleRate ?? TARGET_SAMPLE_RATE;
-      const previewSamples = collectRecentAudioSamples(
-        audioBufferRef.current,
-        Math.round(sampleRate * LIVE_PREVIEW_MAX_SECONDS),
-      );
+      const config = sessionConfigRef.current;
+      const usesAnchoredCursorWindow =
+        config?.transcriptTarget === "cursor" &&
+        config.liveCursorMode === "stable-cursor-streaming";
+      const previewStartSample = usesAnchoredCursorWindow
+        ? Math.min(
+            livePreviewAudioStartSampleRef.current,
+            audioBufferRef.current.sampleCount,
+          )
+        : Math.max(
+            0,
+            audioBufferRef.current.sampleCount -
+              Math.round(sampleRate * LIVE_PREVIEW_MAX_SECONDS),
+          );
+      const previewSamples = usesAnchoredCursorWindow
+        ? collectAudioSamplesRange(
+            audioBufferRef.current,
+            previewStartSample,
+            Math.round(sampleRate * ANCHORED_LIVE_PREVIEW_MAX_SECONDS),
+          )
+        : collectRecentAudioSamples(
+            audioBufferRef.current,
+            Math.round(sampleRate * LIVE_PREVIEW_MAX_SECONDS),
+          );
       if (previewSamples.length < sampleRate * LIVE_PREVIEW_MIN_SECONDS) {
         if (shouldUseFastLiveConfirmation()) {
           livePreviewNextDelayMsRef.current = LIVE_PREVIEW_CONFIRMATION_INTERVAL_MS;
@@ -376,7 +513,7 @@ export function useDictation() {
         durationMs,
       }).catch(() => {});
 
-      const normalizedPreview = preview?.trim() ?? "";
+      const normalizedPreview = preview?.text.trim() ?? "";
       if (normalizedPreview.length === 0) {
         if (shouldUseFastLiveConfirmation()) {
           livePreviewNextDelayMsRef.current = LIVE_PREVIEW_CONFIRMATION_INTERVAL_MS;
@@ -385,16 +522,44 @@ export function useDictation() {
         return;
       }
 
-      if (
-        isActivePreviewToken(sessionRef.current, token) &&
-        normalizedPreview !== lastLivePreviewTextRef.current
-      ) {
+      if (isActivePreviewToken(sessionRef.current, token) && preview) {
+        const previewChanged = normalizedPreview !== lastLivePreviewTextRef.current;
         lastLivePreviewTextRef.current = normalizedPreview;
-        if (shouldShowLivePreviewOverlay()) {
+        if (previewChanged) {
           setInterimTranscript(normalizedPreview);
         }
-        await updateLiveCursorText(normalizedPreview);
-        traceDictationEvent("dictation_live_preview_updated").catch(() => {});
+        await updateLiveCursorText(
+          normalizedPreview,
+          preview,
+          sampleRate,
+          previewStartSample,
+        );
+        if (debugCaptureEnabledRef.current) {
+          debugPreviewFramesRef.current.push({
+            sequence: debugPreviewFramesRef.current.length + 1,
+            sourceSampleRate: sampleRate,
+            capturedSampleCount: audioBufferRef.current.sampleCount,
+            previewStartSample,
+            preview,
+            stateAfter: {
+              candidateText: liveCursorCandidateTextRef.current,
+              committedWindowText: "",
+              committedCursorText: ownedPreeditProgressiveRef.current
+                ? ownedPreeditCommittedTextRef.current
+                : liveCursorTextRef.current,
+              nextPreviewStartSample: livePreviewAudioStartSampleRef.current,
+              blockedCommitCount: 0,
+              cursorInsertionDisabled:
+                liveCursorInsertionDisabledRef.current ||
+                sessionRef.current.liveCursorInsertionDisabled,
+            },
+          });
+        }
+        traceDictationEvent(
+          previewChanged
+            ? "dictation_live_preview_updated"
+            : "dictation_live_preview_confirmed",
+        ).catch(() => {});
       }
     })()
       .catch((error) => {
@@ -431,8 +596,13 @@ export function useDictation() {
     await previewPromise;
   }
 
-  async function updateLiveCursorText(nextText: string) {
-    const config = useStore.getState().config;
+  async function updateLiveCursorText(
+    nextText: string,
+    preview: PreviewTranscription,
+    sampleRate: number,
+    previewStartSample: number,
+  ) {
+    const config = sessionConfigRef.current;
     if (
       config?.transcriptTarget !== "cursor" ||
       config.liveCursorMode !== "stable-cursor-streaming" ||
@@ -445,96 +615,138 @@ export function useDictation() {
     const previousCandidate = liveCursorCandidateTextRef.current;
     liveCursorCandidateTextRef.current = nextText;
 
-    if (previousCandidate.length === 0) {
+    const ownedPreeditActive = await waitForOwnedPreeditStart();
+    if (phaseRef.current !== "recording") {
       return;
     }
-
-    const committedText = liveCursorTextRef.current;
-    const decision = liveCursorCommitDecision(
-      committedText,
-      previousCandidate,
-      nextText,
-    );
-    const fallback = nextLiveCursorFallbackDecision(
-      decision.reason,
-      liveCursorBlockedCommitCountRef.current,
-    );
-    liveCursorBlockedCommitCountRef.current = fallback.blockedCommitCount;
-
-    const appendText = decision.appendText;
-    if (appendText.length === 0) {
-      if (fallback.shouldFallback) {
-        pauseLiveCursorStreamingForSession(nextText);
-        return;
-      }
-
-      if (decision.reason === "unsafe-rewrite") {
-        traceDictationEvent("dictation_live_cursor_unsafe_rewrite_blocked").catch(
-          () => {},
+    if (
+      ownedPreeditActive &&
+      ownedPreeditActiveRef.current
+    ) {
+      const revision = reviseOwnedPreedit(
+        liveCursorTextRef.current,
+        previousCandidate,
+        nextText,
+        preview,
+      );
+      liveCursorTextRef.current = revision.confirmedText;
+      liveCursorCandidateTextRef.current = revision.candidateText;
+      if (revision.advanceDurationMs > 0) {
+        livePreviewAudioStartSampleRef.current = Math.min(
+          previewStartSample +
+            Math.max(
+              1,
+              Math.round((revision.advanceDurationMs / 1000) * sampleRate),
+            ),
+          audioBufferRef.current.sampleCount,
         );
-        return;
+        traceDictationEvent("dictation_live_preview_window_advanced", {
+          chunkCount: revision.advancedSegmentCount,
+          durationMs: revision.advanceDurationMs,
+        }).catch(() => {});
       }
 
-      if (decision.reason === "waiting-for-stable-preview") {
-        traceDictationEvent("dictation_live_cursor_commit_waiting").catch(() => {});
-      }
+      await publishOwnedPreedit(
+        revision.confirmedText,
+        revision.preeditText,
+        revision.provisionalText,
+        nextText,
+      );
       return;
     }
 
-    await appendLiveCursorText(appendText, nextText);
+    sessionRef.current = disableLiveCursorInsertion(sessionRef.current);
+    liveCursorInsertionDisabledRef.current = true;
+    setInterimTranscript(nextText);
+    traceDictationEvent("dictation_live_cursor_overlay_fallback").catch(() => {});
+    if (!liveCursorFallbackNotifiedRef.current) {
+      liveCursorFallbackNotifiedRef.current = true;
+      showNotification(
+        "Live cursor streaming unavailable",
+        "VOCO cannot prove ownership of this target, so it will keep the final transcript in VOCO without typing into another field.",
+      ).catch(() => {});
+    }
   }
 
-  async function appendLiveCursorText(appendText: string, latestPreviewText: string) {
-    const committedText = liveCursorTextRef.current;
+  async function publishOwnedPreedit(
+    confirmedText: string,
+    preeditText: string,
+    provisionalText: string,
+    latestPreviewText: string,
+  ): Promise<boolean> {
+    const sessionId = ownedPreeditSessionIdRef.current;
+    if (sessionId === null || !ownedPreeditActiveRef.current) {
+      return false;
+    }
+
     const insertionPromise = (async () => {
-      await appendLiveText(appendText);
-      liveCursorTextRef.current = committedText + appendText;
-      liveCursorBlockedCommitCountRef.current = 0;
-      sessionRef.current = addCommittedCursorText(sessionRef.current, appendText);
+      const previouslyCommittedText = ownedPreeditCommittedTextRef.current;
+      const status = await updateOwnedPreedit(
+        sessionId,
+        confirmedText,
+        preeditText,
+        provisionalText,
+      );
+      if (!status.engineActive || status.focusLost) {
+        throw new Error("The dictation target lost focus.");
+      }
+      ownedPreeditProgressiveRef.current = status.progressiveCommitActive;
+      if (status.progressiveCommitActive) {
+        const confirmedCharacters = Array.from(confirmedText);
+        if (status.committedCharacterCount > confirmedCharacters.length) {
+          throw new Error("VOCO input method reported an invalid committed range.");
+        }
+        ownedPreeditCommittedTextRef.current = confirmedCharacters
+          .slice(0, status.committedCharacterCount)
+          .join("");
+        if (ownedPreeditCommittedTextRef.current !== previouslyCommittedText) {
+          traceDictationEvent(
+            "dictation_owned_preedit_progressive_commit",
+          ).catch(() => {});
+        }
+      }
       if (!firstLiveTextInsertedRef.current && recordingStartedAtMsRef.current !== null) {
         firstLiveTextInsertedRef.current = true;
         traceDictationEvent("dictation_first_live_text_visible", {
           durationMs: Math.round(performance.now() - recordingStartedAtMsRef.current),
         }).catch(() => {});
       }
-      traceDictationEvent("dictation_live_cursor_insert_updated").catch(() => {});
+      traceDictationEvent("dictation_owned_preedit_updated").catch(() => {});
     })();
-
     liveCursorInsertionInFlightRef.current = insertionPromise;
 
     try {
       await insertionPromise;
+      return true;
     } catch (error) {
+      const progressivelyCommittedText = ownedPreeditCommittedTextRef.current;
+      let cancellationOutcome: OwnedPreeditStatus["finalizationOutcome"] = null;
+      const isCurrentRecording =
+        phaseRef.current === "recording" &&
+        ownedPreeditSessionIdRef.current === sessionId;
+      const cancellation = await cancelOwnedPreedit(sessionId).catch(() => null);
+      cancellationOutcome = cancellation?.finalizationOutcome ?? null;
+      resetOwnedPreeditState();
+      liveCursorTextRef.current =
+        cancellationOutcome === "preserved" ? progressivelyCommittedText : "";
+      liveCursorCandidateTextRef.current = "";
       sessionRef.current = disableLiveCursorInsertion(sessionRef.current);
       liveCursorInsertionDisabledRef.current = true;
-      liveCursorFallbackNotifiedRef.current = true;
-      setInterimTranscript(latestPreviewText);
-      console.warn("Live cursor text insertion failed:", error);
-      traceDictationEvent("dictation_live_cursor_insert_failed").catch(() => {});
-      traceDictationEvent("dictation_live_cursor_overlay_fallback").catch(() => {});
-      showNotification(
-        "Live cursor streaming paused",
-        "VOCO could not update text at the cursor. Final insertion will still run when you stop dictation.",
-      ).catch(() => {});
+      if (isCurrentRecording) {
+        setInterimTranscript(latestPreviewText);
+        console.warn("Owned cursor streaming stopped:", error);
+        traceDictationEvent("dictation_owned_preedit_failed").catch(() => {});
+        traceDictationEvent("dictation_live_cursor_overlay_fallback").catch(() => {});
+        showNotification(
+          "Live cursor streaming paused",
+          "The target field stopped accepting live updates. VOCO will leave target text unchanged and keep the final transcript available when you stop.",
+        ).catch(() => {});
+      }
+      return false;
     } finally {
       if (liveCursorInsertionInFlightRef.current === insertionPromise) {
         liveCursorInsertionInFlightRef.current = null;
       }
-    }
-  }
-
-  function pauseLiveCursorStreamingForSession(latestPreviewText: string) {
-    sessionRef.current = disableLiveCursorInsertion(sessionRef.current);
-    liveCursorInsertionDisabledRef.current = true;
-    setInterimTranscript(latestPreviewText);
-    traceDictationEvent("dictation_live_cursor_overlay_fallback").catch(() => {});
-
-    if (!liveCursorFallbackNotifiedRef.current) {
-      liveCursorFallbackNotifiedRef.current = true;
-      showNotification(
-        "Live cursor streaming paused",
-        "VOCO is still listening and showing live preview. Final insertion will run when you stop dictation.",
-      ).catch(() => {});
     }
   }
 
@@ -546,6 +758,11 @@ export function useDictation() {
 
   async function clearLiveCursorText() {
     await waitForLiveCursorInsertion();
+    if (ownedPreeditActiveRef.current || ownedPreeditStartPromiseRef.current) {
+      await cancelOwnedPreeditSession().catch((error) => {
+        console.warn("Failed to cancel owned cursor text:", error);
+      });
+    }
     const previousText = liveCursorTextRef.current;
     if (previousText.length === 0) {
       return;
@@ -560,20 +777,67 @@ export function useDictation() {
     finalText: string,
   ): Promise<LiveFinalizationResult> {
     await waitForLiveCursorInsertion();
-    const committedText = liveCursorTextRef.current;
-    if (committedText.length === 0) {
-      return "none";
+    await waitForOwnedPreeditStart();
+    if (ownedPreeditActiveRef.current) {
+      const sessionId = ownedPreeditSessionIdRef.current;
+      if (sessionId !== null) {
+        try {
+          const status = await commitOwnedPreedit(sessionId, finalText);
+          const finalizationOutcome = status.finalizationOutcome;
+          resetOwnedPreeditState();
+          liveCursorTextRef.current = "";
+          liveCursorCandidateTextRef.current = "";
+          sessionRef.current = clearCommittedCursorText(sessionRef.current);
+          if (
+            finalizationOutcome !== "committed"
+          ) {
+            traceDictationEvent("dictation_owned_preedit_final_preserved").catch(
+              () => {},
+            );
+            showNotification(
+              "Final transcript ready",
+              "VOCO kept the wrapped live text because the target field could not prove a safe automatic replacement. The final transcript remains available in VOCO.",
+            ).catch(() => {});
+            return "unreconciled";
+          }
+          traceDictationEvent("dictation_owned_preedit_committed").catch(() => {});
+          return "safe";
+        } catch (error) {
+          const progressivelyCommittedText = ownedPreeditCommittedTextRef.current;
+          const hadProgressiveCommit = ownedPreeditProgressiveRef.current;
+          const cancellation = await cancelOwnedPreedit(sessionId).catch(() => null);
+          const liveTextWasPreserved =
+            cancellation?.finalizationOutcome === "preserved" ||
+            (cancellation === null && hadProgressiveCommit);
+          resetOwnedPreeditState();
+          liveCursorTextRef.current = liveTextWasPreserved
+            ? progressivelyCommittedText
+            : "";
+          liveCursorCandidateTextRef.current = "";
+          sessionRef.current = clearCommittedCursorText(sessionRef.current);
+          console.warn("Owned cursor final commit failed:", error);
+          traceDictationEvent("dictation_owned_preedit_commit_failed").catch(() => {});
+          showNotification(
+            "Final transcript ready",
+            "VOCO could not re-prove the original target field, so it left target text unchanged. The final transcript remains available in VOCO.",
+          ).catch(() => {});
+          return "unreconciled";
+        }
+      }
     }
-
-    const action = planLiveFinalCursorAction(committedText, finalText);
-    if (action.status === "no-live-text") {
-      return "none";
-    }
-
+    const hadCommittedTargetText = liveCursorTextRef.current.length > 0;
+    const cursorTargetValid = !(
+      liveCursorInsertionDisabledRef.current ||
+      sessionRef.current.liveCursorInsertionDisabled
+    );
     liveCursorTextRef.current = "";
     sessionRef.current = clearCommittedCursorText(sessionRef.current);
 
-    if (action.status === "keep-live-text") {
+    const fallback = planStableCursorFallback(
+      hadCommittedTargetText,
+      cursorTargetValid,
+    );
+    if (fallback.status === "preserve-target") {
       traceDictationEvent("dictation_live_cursor_final_unreconciled").catch(() => {});
       showNotification(
         "Final transcript ready",
@@ -581,19 +845,74 @@ export function useDictation() {
       ).catch(() => {});
       return "unreconciled";
     }
-
-    if (action.status === "append-final-suffix") {
-      await appendLiveText(action.appendText);
-    }
-
-    traceDictationEvent("dictation_live_cursor_insert_finalized").catch(() => {});
-    return "safe";
+    return "none";
   }
 
   async function waitForLiveCursorInsertion() {
     const inFlight = liveCursorInsertionInFlightRef.current;
     if (inFlight) {
       await inFlight.catch(() => {});
+    }
+  }
+
+  async function persistDebugCapture(
+    pending: PendingDebugCapture,
+  ): Promise<void> {
+    let referenceTranscript = pending.completedTranscript;
+    if (pending.needsFullAudioReference) {
+      const referenceStartedAt = performance.now();
+      referenceTranscript = await transcribeAudio(pending.audio).catch((error) => {
+        console.warn(
+          "Failed to create full-audio debug reference transcript:",
+          error,
+        );
+        return pending.completedTranscript;
+      });
+      traceHotkeyEvent("dictation_debug_reference_completed", {
+        dictationSessionId: pending.sessionId,
+        durationMs: Math.round(performance.now() - referenceStartedAt),
+      }).catch(() => {});
+    }
+
+    const capture = await saveDebugDictationCapture(pending.audio, {
+      schemaVersion: 1,
+      targetSampleRate: TARGET_SAMPLE_RATE,
+      finalTranscript: referenceTranscript,
+      committedCursorText: pending.committedCursorText,
+      cursorInsertionDisabled: pending.cursorInsertionDisabled,
+      previewFrames: pending.previewFrames,
+    }).catch((error) => {
+      console.warn("Failed to save local debug dictation capture:", error);
+      return null;
+    });
+    if (!capture) {
+      return;
+    }
+
+    console.info(`Debug dictation capture saved: ${capture.timelinePath}`);
+    showNotification(
+      "Debug dictation captured",
+      `Saved locally for replay: ${capture.timelinePath}`,
+    ).catch(() => {});
+  }
+
+  function appendRecordingSamples(samples: Float32Array): void {
+    const sampleRate = audioContextRef.current?.sampleRate ?? TARGET_SAMPLE_RATE;
+    const maxSamples = Math.round(sampleRate * MAX_AUDIO_SECONDS);
+    const appendResult = appendAudioSamplesUpTo(
+      audioBufferRef.current,
+      samples,
+      maxSamples,
+    );
+
+    if (
+      phaseRef.current === "recording" &&
+      appendResult.reachedLimit
+    ) {
+      traceDictationEvent("dictation_recording_limit_reached", {
+        durationMs: MAX_AUDIO_SECONDS * 1000,
+      }).catch(() => {});
+      void stopRecording();
     }
   }
 
@@ -620,7 +939,7 @@ export function useDictation() {
       );
       worklet.port.onmessage = (e) => {
         if (e.data.type === "samples") {
-          appendAudioSamples(audioBufferRef.current, e.data.data as Float32Array);
+          appendRecordingSamples(e.data.data as Float32Array);
         } else if (e.data.type === "level") {
           updateAudioLevel(e.data.data as number);
         } else if (e.data.type === "flushed") {
@@ -644,7 +963,7 @@ export function useDictation() {
     const processor = audioContext.createScriptProcessor(4096, 1, 1);
     processor.onaudioprocess = (e) => {
       const input = e.inputBuffer.getChannelData(0);
-      appendAudioSamples(audioBufferRef.current, new Float32Array(input));
+      appendRecordingSamples(new Float32Array(input));
       updateAudioLevel(calculateVisualAudioLevelFromSamples(input));
     };
     source.connect(processor);
@@ -728,6 +1047,7 @@ export function useDictation() {
     }
 
     sessionRef.current = startSession(sessionRef.current);
+    sessionConfigRef.current = useStore.getState().config;
     phaseRef.current = "starting";
     traceDictationEvent("recording_state_requested").catch(() => {});
 
@@ -740,14 +1060,20 @@ export function useDictation() {
       lastLivePreviewTextRef.current = "";
       liveCursorCandidateTextRef.current = "";
       liveCursorTextRef.current = "";
+      livePreviewAudioStartSampleRef.current = 0;
       liveCursorInsertionDisabledRef.current = false;
-      liveCursorBlockedCommitCountRef.current = 0;
       liveCursorFallbackNotifiedRef.current = false;
       livePreviewFailureNotifiedRef.current = false;
       recordingStartedAtMsRef.current = null;
       stopRequestedAtMsRef.current = null;
       firstLiveTextInsertedRef.current = false;
       livePreviewNextDelayMsRef.current = LIVE_PREVIEW_MIN_INTERVAL_MS;
+      debugPreviewFramesRef.current = [];
+      resetOwnedPreeditState();
+      beginOwnedPreedit(sessionRef.current.sessionId);
+      debugCaptureEnabledRef.current = await debugDictationCaptureEnabled().catch(
+        () => false,
+      );
       setDictationStatus("recording").catch(() => {});
 
       const deviceId = useStore.getState().selectedDeviceId;
@@ -808,6 +1134,7 @@ export function useDictation() {
       }
     } catch (err) {
       await teardownAudioGraph();
+      await clearLiveCursorText().catch(() => {});
       resetAudioLevel();
       setStatus("error");
       setDictationStatus("error").catch(() => {});
@@ -904,6 +1231,7 @@ export function useDictation() {
     }
 
     if (merged.length > TARGET_SAMPLE_RATE * MAX_AUDIO_SECONDS) {
+      await clearLiveCursorText().catch(() => {});
       phaseRef.current = "error";
       sessionRef.current = failSession(sessionRef.current);
       setStatus("error");
@@ -918,9 +1246,11 @@ export function useDictation() {
     phaseRef.current = "processing";
     sessionRef.current = markProcessing(sessionRef.current);
     setInterimTranscript("Transcribing...");
+    const transcribeStartedAt = performance.now();
 
     try {
-      const transcribeStartedAt = performance.now();
+      // Preview hypotheses are never authoritative. Always run the complete
+      // recording through the final transcription path.
       const transcript = await transcribeAudio(merged);
       const transcriptionDurationMs = Math.round(
         performance.now() - transcribeStartedAt,
@@ -937,6 +1267,29 @@ export function useDictation() {
         }).catch(() => {});
       }
 
+      if (debugCaptureEnabledRef.current) {
+        const pendingCapture: PendingDebugCapture = {
+          audio: merged,
+          completedTranscript: transcript,
+          committedCursorText: ownedPreeditProgressiveRef.current
+            ? ownedPreeditCommittedTextRef.current
+            : ownedPreeditActiveRef.current
+              ? ""
+              : liveCursorTextRef.current,
+          cursorInsertionDisabled:
+            liveCursorInsertionDisabledRef.current ||
+            sessionRef.current.liveCursorInsertionDisabled,
+          needsFullAudioReference: false,
+          previewFrames: [...debugPreviewFramesRef.current],
+          sessionId: sessionRef.current.sessionId,
+        };
+        debugCaptureEnabledRef.current = false;
+        // A full-session reference pass is intentionally diagnostic-only. Do not
+        // hold the toggle or final cursor insertion behind several seconds of
+        // extra ASR work when one-shot capture is enabled.
+        void persistDebugCapture(pendingCapture);
+      }
+
       if (!transcript || transcript.trim().length === 0) {
         await clearLiveCursorText().catch((error) => {
           console.warn("Failed to clear live cursor text after empty transcript:", error);
@@ -946,7 +1299,7 @@ export function useDictation() {
         return;
       }
 
-      const config = useStore.getState().config;
+      const config = sessionConfigRef.current;
       let transcriptForOutput = transcript;
       if (config?.transcriptEnhancement && config.transcriptEnhancement !== "off") {
         setInterimTranscript(
@@ -1056,19 +1409,22 @@ export function useDictation() {
         setInterimTranscript("Typing at your cursor...");
       }
 
-      // Small delay to let focus return to the previous app
-      await new Promise((r) => setTimeout(r, 250));
+      // One-shot final insertion may need a brief focus handoff. An active
+      // owned preedit stays attached to the original field and commits now.
+      if (!ownedPreeditActiveRef.current) {
+        await new Promise((r) => setTimeout(r, 250));
+      }
 
       try {
         phaseRef.current = "finalizing";
         sessionRef.current = markFinalizing(sessionRef.current);
         const liveFinalization = await replaceLiveCursorTextWithFinal(textToInsert);
         if (liveFinalization === "safe") {
-          console.info("[timing] live cursor text finalized by safe append");
+          console.info("[timing] owned cursor text finalized safely");
           traceDictationEvent("dictation_final_output_completed").catch(() => {});
         } else if (liveFinalization === "unreconciled") {
           console.info("[timing] final transcript kept in VOCO after unsafe live reconciliation");
-          traceDictationEvent("dictation_final_output_completed").catch(() => {});
+          traceDictationEvent("dictation_final_output_unreconciled").catch(() => {});
         } else {
           const insertion = await insertText(textToInsert, strategy);
           console.info(`[timing] insertion completed via ${insertion.strategy}`);

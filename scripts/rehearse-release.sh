@@ -34,10 +34,19 @@ echo "  appimage: ${APPIMAGE_NAME}"
   grep -F "raw.githubusercontent.com/sergiopesch/voco/${TAG_NAME}/install" install > /dev/null
   grep -F "raw.githubusercontent.com/sergiopesch/voco/${TAG_NAME}/install" README.md > /dev/null
   grep -F 'wget -O voco_latest_amd64.deb https://github.com/sergiopesch/voco/releases/latest/download/voco_latest_amd64.deb' README.md > /dev/null
+  grep -F 'wget https://github.com/sergiopesch/voco/releases/latest/download/voco_latest_checksums.txt' README.md > /dev/null
+  grep -F 'sha256sum --check voco_latest_checksums.txt' README.md > /dev/null
+  grep -F -- '- "voco.*"' .github/workflows/release.yml > /dev/null
+  if grep -F -- '- "v*"' .github/workflows/release.yml > /dev/null; then
+    echo "Release workflow still accepts non-canonical v* tags"
+    exit 1
+  fi
+  grep -F 'draft: true' .github/workflows/release.yml > /dev/null
   bash ./scripts/render-release-body.sh "${VERSION}" "${TAG_NAME}" > "${TMP_DIR}/release-body-no-appimage.md"
   bash ./scripts/render-release-body.sh "${VERSION}" "${TAG_NAME}" "${APPIMAGE_NAME}" > "${TMP_DIR}/release-body-with-appimage.md"
   grep -F 'voco_checksums.txt' "${TMP_DIR}/release-body-no-appimage.md" > /dev/null
-  grep -F 'sha256sum --check voco_checksums.txt' "${TMP_DIR}/release-body-no-appimage.md" > /dev/null
+  grep -F "grep \" voco_${VERSION}_amd64.deb\$\" voco_checksums.txt | sha256sum --check -" "${TMP_DIR}/release-body-no-appimage.md" > /dev/null
+  grep -F "grep \" ${APPIMAGE_NAME}\$\" voco_checksums.txt | sha256sum --check -" "${TMP_DIR}/release-body-with-appimage.md" > /dev/null
 )
 
 echo
