@@ -45,10 +45,16 @@ Current primary validation target:
 - x86_64 / amd64
 - Wayland and X11, with documented insertion caveats
 
-Automatic live cursor revisions use the desktop IBus service through the system Python GI
-bindings. Debian packages recommend `ibus`, `gir1.2-ibus-1.0`, and `python3-gi`; source setup
-installs them on apt-based systems. VOCO falls back to compatibility insertion when the active
-desktop or target field does not expose an IBus input context.
+Automatic live cursor revisions use a persistent, package-owned IBus component at
+`/usr/share/ibus/component/voco.xml`, launched through `/usr/libexec/voco-ibus-engine`. Debian
+packages depend on `ibus`, `python3`, `gir1.2-ibus-1.0`, and `python3-gi`. Installation only makes
+the source available: the user must add and select `VOCO Dictation`, and no maintainer script may
+modify GNOME settings or restart IBus. The app talks to the engine through an owner-only socket at
+`$XDG_RUNTIME_DIR/voco/ibus-engine.sock`; disconnects fail closed to preview-only behavior.
+
+The AppImage cannot install the host component and therefore does not claim live cursor support by
+itself. Stable cursor mode does not fall back to compatibility keyboard injection when the input
+source or target preedit context is unavailable.
 
 ## Listing Assets
 

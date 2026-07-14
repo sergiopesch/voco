@@ -51,8 +51,27 @@ grep ' voco_<version>_amd64.deb$' voco_checksums.txt | sha256sum --check
 3. Install it:
 
 ```bash
-sudo dpkg -i voco_<version>_amd64.deb
+sudo apt install ./voco_<version>_amd64.deb
 ```
+
+## Enable live words at the cursor
+
+The Debian package installs the persistent `VOCO Dictation` IBus component, but deliberately does
+not enable or select it for you.
+
+1. Sign out and back in if the input source is not visible immediately after installation.
+2. Open the desktop Keyboard or Region & Language settings.
+3. Under Input Sources, add `VOCO Dictation` (normally listed under English).
+4. Select `VOCO Dictation`, focus the target text field, and then press `Alt+D`.
+
+VOCO passes ordinary keyboard input through while idle. It never edits GNOME settings, changes the
+global IBus engine, or restarts desktop services. Settings -> Advanced -> Automatic live cursor
+shows whether the private engine connection is ready. If it is not ready, stable cursor mode stays
+preview-only.
+
+The AppImage does not install a host IBus component. Use the Debian package for live cursor words;
+an AppImage or uninstalled source build remains preview-only unless the matching Debian component is
+already installed.
 
 ## Run from source
 
@@ -79,6 +98,7 @@ npm run dev
 4. Test it:
 - allow microphone access
 - finish setup
+- install the generated Debian package and manually select `VOCO Dictation` for live cursor words
 - press `Alt+D`
 - speak
 - press `Alt+D` again
@@ -161,6 +181,7 @@ This checks version alignment, install-script safety, and generated release note
 - Config: `~/.config/voco/config.json`
 - Models: `~/.local/share/voco/models/`
 - Socket: `$XDG_RUNTIME_DIR/voco.sock` when `XDG_RUNTIME_DIR` is set, otherwise `${TMPDIR:-/tmp}/voco-$(id -u)/voco.sock`
+- Persistent IBus control socket: `$XDG_RUNTIME_DIR/voco/ibus-engine.sock` (owner-only; no `/tmp` fallback)
 
 OpenClaw voice-bridge settings are stored in the same config file. That mode is opt-in and requires the `openclaw` CLI to resolve from the app's runtime `PATH`. The spoken-answer OpenClaw mode also requires OpenClaw TTS to be configured and `ffplay` from FFmpeg to resolve from `PATH`.
 
@@ -176,6 +197,9 @@ Legacy `voice` config and model paths are migrated automatically on startup when
 ## Uninstall
 
 ### `.deb`
+
+Disable or switch away from `VOCO Dictation` in Input Sources first, then remove the package. VOCO
+does not alter per-user input-source settings during uninstall.
 
 ```bash
 sudo apt remove voco

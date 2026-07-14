@@ -1,15 +1,15 @@
 #!/usr/bin/python3
-"""VOCO-owned IBus preedit engine.
+"""Persistent VOCO IBus preedit engine.
 
-The parent VOCO process owns this sidecar over stdin/stdout. Only structured
-status is returned; transcript text is never written to logs or responses.
+IBus owns this process after the user explicitly enables the packaged VOCO
+input source.  The VOCO app connects over a private same-user socket.  The
+engine never changes the desktop's active input source, reads surrounding
+text, or requests deletion from a target application.
 """
 
 from __future__ import annotations
 
-import json
 import signal
-import sys
 from typing import Any, Optional
 
 import gi
@@ -21,6 +21,11 @@ from voco_ibus_ownership import (  # noqa: E402
     FinalizationAction,
     FinalizationPlan,
     OwnedPreeditLease,
+)
+from voco_ibus_protocol import (  # noqa: E402
+    PROTOCOL_VERSION,
+    PrivateSocketServer,
+    ProtocolError,
 )
 
 
@@ -38,114 +43,109 @@ SESSION_CONTROL_KEYVALS = {
     IBus.keyval_from_name("Super_L"),
     IBus.keyval_from_name("Super_R"),
 }
-
-
-def write_response(payload: dict[str, Any]) -> None:
-    sys.stdout.write(json.dumps(payload, separators=(",", ":")) + "\n")
-    sys.stdout.flush()
-
-
-def current_engine_name(bus: IBus.Bus) -> str:
-    engine = bus.get_global_engine()
-    return engine.get_name() if engine is not None else ""
+SENSITIVE_INPUT_HINT_MASK = int(IBus.InputHints.PRIVATE) | int(
+    getattr(IBus.InputHints, "HIDDEN_TEXT", 0)
+)
+KNOWN_INPUT_HINT_MASK = SENSITIVE_INPUT_HINT_MASK
+for _input_hint_name in (
+    "SPELLCHECK",
+    "NO_SPELLCHECK",
+    "WORD_COMPLETION",
+    "LOWERCASE",
+    "UPPERCASE_CHARS",
+    "UPPERCASE_WORDS",
+    "UPPERCASE_SENTENCES",
+    "INHIBIT_OSK",
+    "VERTICAL_WRITING",
+    "EMOJI",
+    "NO_EMOJI",
+):
+    KNOWN_INPUT_HINT_MASK |= int(getattr(IBus.InputHints, _input_hint_name, 0))
 
 
 class VocoCoordinator:
-    def __init__(
-        self,
-        bus: IBus.Bus,
-        loop: GLib.MainLoop,
-        default_engine: str,
-    ) -> None:
-        self.bus = bus
-        self.loop = loop
-        self.default_engine = default_engine
+    """Serializes one app connection, dictation lease, and input context."""
+
+    def __init__(self) -> None:
         self.session_id: Optional[int] = None
-        self.previous_engine = ""
+        self.focused_engine: Optional[VocoEngine] = None
         self.target_engine: Optional[VocoEngine] = None
-        self.confirmed_text = ""
         self.committed_text = ""
         self.provisional_text = ""
         self.finalization_pending = False
         self.ownership_intact = True
         self.focus_lost = False
-        self.switching = False
-        self.switch_error = ""
-        self.restore_attempts = 0
-        self.shutdown_requested = False
-        self.lifecycle_generation = 0
 
     def activate_engine(self, engine: "VocoEngine") -> None:
-        if self.session_id is None:
-            return
-        if self.target_engine is None:
-            self.target_engine = engine
-            self.focus_lost = False
-            engine.bind_session(self.session_id)
-            if self.provisional_text:
-                engine.set_preedit(self.provisional_text)
-        elif self.target_engine is not engine:
-            self.focus_lost = True
+        if self.focused_engine is not None and self.focused_engine is not engine:
+            self._invalidate_target(self.focused_engine)
+        self.focused_engine = engine
+        if self.session_id is not None and self.target_engine is not engine:
+            self._invalidate_target(self.target_engine)
 
     def deactivate_engine(self, engine: "VocoEngine") -> None:
+        if self.focused_engine is engine:
+            self.focused_engine = None
         if self.target_engine is engine and self.session_id is not None:
-            self.focus_lost = True
+            self._invalidate_target(engine)
+
+    def disable_engine(self, engine: "VocoEngine") -> None:
+        self.deactivate_engine(engine)
 
     def register_key_event(self, keyval: int, state: int) -> None:
         if self.session_id is None or is_session_control_key(keyval, state):
             return
-        # User input is allowed to pass through, but it ends VOCO's exclusive
-        # ownership lease. Finalization then preserves normal target text.
+        # Normal input always passes through. It also ends VOCO's exclusive
+        # lease before any later cursor update or finalization can mutate the
+        # target. Only VOCO's preedit is cleared; committed text is preserved.
         self.ownership_intact = False
         if self.target_engine is not None:
             self.target_engine.invalidate_context()
+            try:
+                self.target_engine.clear_preedit()
+            except Exception:
+                pass
+        self.provisional_text = ""
 
     def register_context_reset(self, engine: "VocoEngine") -> None:
         if self.session_id is None or self.target_engine is not engine:
             return
-        # IBus reset is the only portable signal for cursor/selection changes
-        # inside one focused client. Once observed, stop all target mutation.
         self.ownership_intact = False
         engine.invalidate_context()
+        self.provisional_text = ""
 
     def validate_session(self, raw_session_id: Any) -> int:
-        if not isinstance(raw_session_id, int) or raw_session_id <= 0:
+        if not is_positive_integer(raw_session_id):
             raise ValueError("sessionId must be a positive integer")
         if self.session_id != raw_session_id:
             raise ValueError("stale or inactive session")
         return raw_session_id
 
-    def start(self, session_id: Any) -> dict[str, Any]:
-        if not isinstance(session_id, int) or session_id <= 0:
-            raise ValueError("sessionId must be a positive integer")
+    def start(self, client_session_id: Any) -> dict[str, Any]:
+        if not is_positive_integer(client_session_id):
+            raise ValueError("clientSessionId must be a positive integer")
         if self.session_id is not None:
-            self.cancel(self.session_id)
+            raise RuntimeError("active dictation session must be canceled first")
 
-        current = current_engine_name(self.bus)
-        if current and current != ENGINE_NAME:
-            self.default_engine = current
-        self.previous_engine = (
-            current if current and current != ENGINE_NAME else self.default_engine
-        )
+        engine = self.focused_engine
+        if engine is None or not engine.focus_active:
+            raise RuntimeError(
+                "Enable the VOCO Dictation input source and focus a text field first"
+            )
+        if not engine.can_accept_preedit:
+            raise RuntimeError(
+                "The focused field does not expose a safe non-sensitive preedit context"
+            )
+
+        session_id = client_session_id
         self.session_id = session_id
-        self.lifecycle_generation += 1
-        self.target_engine = None
-        self.confirmed_text = ""
+        self.target_engine = engine
         self.committed_text = ""
         self.provisional_text = ""
         self.finalization_pending = False
         self.ownership_intact = True
         self.focus_lost = False
-        self.switching = True
-        self.switch_error = ""
-        self.bus.set_global_engine_async(
-            ENGINE_NAME,
-            1_000,
-            None,
-            self._finish_engine_switch,
-            self.lifecycle_generation,
-        )
-
+        engine.bind_session(session_id)
         return self.status()
 
     def update(
@@ -161,32 +161,26 @@ class VocoCoordinator:
         confirmed_text = validate_text(confirmed_text)
         preedit_text = validate_text(preedit_text)
         provisional_text = validate_text(provisional_text)
-        if self.focus_lost or self.target_engine is None:
-            raise RuntimeError("target text field is not connected to VOCO")
-        if not self.ownership_intact:
-            raise RuntimeError("target cursor context changed during dictation")
+        engine = self._require_owned_target()
         if provisional_text != confirmed_text + preedit_text:
             raise ValueError("provisional text does not match its owned ranges")
-        if not confirmed_text.startswith(self.confirmed_text):
+        if not confirmed_text.startswith(self.committed_text):
             raise ValueError("confirmed text cannot revise an already sealed segment")
 
-        engine = self.target_engine
-        if not confirmed_text.startswith(self.committed_text):
-            raise ValueError("confirmed text does not extend committed target text")
         append_text = confirmed_text[len(self.committed_text) :]
+        if append_text and not self.provisional_text.startswith(append_text):
+            raise ValueError(
+                "confirmed text was not an exact prefix of the previously owned preedit"
+            )
         engine.advance_preedit(append_text, preedit_text)
         self.committed_text = confirmed_text
         self.provisional_text = preedit_text
-        self.confirmed_text = confirmed_text
         return self.status()
 
     def commit(self, session_id: Any, text: Any) -> dict[str, Any]:
         self.validate_session(session_id)
         text = validate_text(text)
-        if self.focus_lost or self.target_engine is None:
-            raise RuntimeError("target text field lost focus before final commit")
-
-        engine = self.target_engine
+        engine = self._require_current_target()
         plan = engine.plan_finalization(
             session_id,
             self.committed_text,
@@ -205,135 +199,102 @@ class VocoCoordinator:
         }[plan.action]
         result = self.status()
         result["finalizationOutcome"] = outcome
-        previous_engine = self.previous_engine
-        restore_generation = self.lifecycle_generation
         self._clear_session()
-        GLib.timeout_add(
-            50,
-            self._restore_engine_once,
-            previous_engine,
-            restore_generation,
-        )
         return result
 
     def cancel(self, session_id: Any) -> dict[str, Any]:
         self.validate_session(session_id)
-        outcome = "none"
-        if self.target_engine is not None:
-            had_provisional_text = bool(self.provisional_text)
-            self.target_engine.clear_preedit()
-            if self.committed_text:
-                # Progressive commits are already normal target text. Cancel,
-                # teardown, and error recovery never delete them.
-                outcome = "preserved"
-            elif had_provisional_text:
-                outcome = "discarded"
-        result = self.status()
-        result["finalizationOutcome"] = outcome
-        previous_engine = self.previous_engine
-        restore_generation = self.lifecycle_generation
-        self._clear_session()
-        GLib.timeout_add(
-            0,
-            self._restore_engine_once,
-            previous_engine,
-            restore_generation,
-        )
-        return result
+        return self._cancel_active()
+
+    def disconnect_client(self) -> None:
+        if self.session_id is not None:
+            try:
+                self._cancel_active()
+            except Exception:
+                self._clear_session()
 
     def status(self) -> dict[str, Any]:
+        engine_active = (
+            self.target_engine is not None
+            and self.target_engine is self.focused_engine
+            and self.target_engine.focus_active
+            and not self.focus_lost
+        )
         return {
             "ready": True,
+            "setupState": "ready",
             "sessionId": self.session_id,
-            "engineActive": self.target_engine is not None and not self.focus_lost,
+            "engineActive": engine_active,
             "focusLost": self.focus_lost,
-            "switching": self.switching,
             "progressiveCommitActive": bool(self.committed_text),
             "committedCharacterCount": len(self.committed_text),
             "ownershipIntact": self.ownership_intact,
             "finalizationOutcome": None,
-            "error": self.switch_error,
-            "currentEngine": current_engine_name(self.bus),
-            "defaultEngine": self.default_engine,
+            "error": "",
         }
 
-    def shutdown(self) -> dict[str, Any]:
-        self.shutdown_requested = True
-        if self.session_id is not None:
+    def _require_current_target(self) -> "VocoEngine":
+        engine = self.target_engine
+        if (
+            self.focus_lost
+            or engine is None
+            or engine is not self.focused_engine
+            or not engine.focus_active
+            or engine.bound_session_id != self.session_id
+            or not engine.can_accept_preedit
+        ):
+            raise RuntimeError("target text field lost focus")
+        return engine
+
+    def _require_owned_target(self) -> "VocoEngine":
+        engine = self._require_current_target()
+        if not self.ownership_intact:
+            raise RuntimeError("target cursor context changed during dictation")
+        return engine
+
+    def _invalidate_target(self, engine: Optional["VocoEngine"]) -> None:
+        if engine is None:
+            return
+        had_owned_preedit = bool(self.provisional_text)
+        self.focus_lost = True
+        self.ownership_intact = False
+        self.provisional_text = ""
+        engine.invalidate_context()
+        if had_owned_preedit:
             try:
-                self.cancel(self.session_id)
+                engine.clear_preedit()
             except Exception:
-                self._clear_session()
-        else:
-            GLib.timeout_add(
-                0,
-                self._restore_engine_once,
-                self.default_engine,
-                self.lifecycle_generation,
-            )
-        # The callback normally quits immediately after restoration. This is a
-        # bounded fallback for a disconnected or unresponsive IBus daemon.
-        GLib.timeout_add(500, self._quit_once)
-        return {"ready": False}
+                pass
+
+    def _cancel_active(self) -> dict[str, Any]:
+        outcome = "none"
+        engine = self.target_engine
+        had_provisional_text = bool(self.provisional_text)
+        try:
+            if engine is not None:
+                # Preedit is VOCO-owned and may be cleared non-destructively.
+                # The engine never deletes or rewrites committed target text.
+                engine.clear_preedit()
+                if self.committed_text:
+                    outcome = "preserved"
+                elif had_provisional_text:
+                    outcome = "discarded"
+            result = self.status()
+            result["finalizationOutcome"] = outcome
+            return result
+        finally:
+            self._clear_session()
 
     def _clear_session(self) -> None:
         if self.target_engine is not None:
             self.target_engine.unbind_session()
         self.session_id = None
-        self.previous_engine = ""
         self.target_engine = None
-        self.confirmed_text = ""
         self.committed_text = ""
         self.provisional_text = ""
         self.finalization_pending = False
         self.ownership_intact = True
         self.focus_lost = False
-        self.switching = False
-        self.switch_error = ""
-
-    def _finish_engine_switch(
-        self,
-        bus: IBus.Bus,
-        result: Any,
-        generation: Any,
-    ) -> None:
-        switch_error = ""
-        try:
-            switched = bool(bus.set_global_engine_async_finish(result))
-            if not switched:
-                raise RuntimeError("IBus refused the VOCO engine")
-        except Exception as error:
-            switch_error = str(error)
-        if generation != self.lifecycle_generation:
-            return
-        self.switch_error = switch_error
-        self.switching = False
-
-    def _restore_engine_once(self, engine_name: str, generation: int) -> bool:
-        if not self.shutdown_requested and generation != self.lifecycle_generation:
-            return GLib.SOURCE_REMOVE
-        current_engine = current_engine_name(self.bus)
-        if engine_name and (current_engine == ENGINE_NAME or not current_engine):
-            try:
-                restored = bool(self.bus.set_global_engine(engine_name))
-            except Exception:
-                restored = False
-            if not restored and self.shutdown_requested and self.restore_attempts < 4:
-                self.restore_attempts += 1
-                GLib.timeout_add(
-                    50,
-                    self._restore_engine_once,
-                    engine_name,
-                    generation,
-                )
-                return GLib.SOURCE_REMOVE
-        if self.shutdown_requested:
-            self.loop.quit()
-        return GLib.SOURCE_REMOVE
-
-    def _quit_once(self) -> bool:
-        self.loop.quit()
-        return GLib.SOURCE_REMOVE
 
 
 class VocoEngine(IBus.Engine):
@@ -356,6 +317,15 @@ class VocoEngine(IBus.Engine):
         self.focus_active = False
         self.focus_identity: Optional[tuple[str, ...]] = None
         self.bound_session_id: Optional[int] = None
+        self._voco_client_capabilities = 0
+        # IBus suppresses same-valued SetContentType callbacks. Keep the
+        # daemon's cached candidate, but never treat it as proof for a new
+        # focus until the revision-bound low-priority barrier has run.
+        self._voco_input_purpose = IBus.InputPurpose.FREE_FORM
+        self._voco_input_hints = int(IBus.InputHints.NONE)
+        self._voco_content_type_known = True
+        self._voco_content_type_revision: Optional[int] = None
+        self._voco_destroyed = False
 
     def do_process_key_event(self, keyval: int, _keycode: int, state: int) -> bool:
         self.coordinator.register_key_event(keyval, state)
@@ -370,18 +340,33 @@ class VocoEngine(IBus.Engine):
         self.coordinator.activate_engine(self)
 
     def do_focus_out(self) -> None:
-        self._leave_focus()
-        self.coordinator.deactivate_engine(self)
+        try:
+            self._clear_owned_preedit_before_focus_loss()
+        finally:
+            self._leave_focus()
+            self.coordinator.deactivate_engine(self)
 
     def do_focus_out_id(self, _object_path: str) -> None:
-        self._leave_focus()
-        self.coordinator.deactivate_engine(self)
+        try:
+            self._clear_owned_preedit_before_focus_loss()
+        finally:
+            self._leave_focus()
+            self.coordinator.deactivate_engine(self)
 
     def _enter_focus(self, identity: tuple[str, ...]) -> None:
         if not self.focus_active:
             self.context_revision += 1
             self.focus_active = True
             self.focus_identity = identity
+            self._reset_content_type_proof()
+            self._schedule_content_type_promotion()
+            return
+        if self.bound_session_id is not None:
+            # Once text is owned, a legacy callback cannot prove it still
+            # names the same target. Only an exact repeated ID is harmless.
+            if identity[0] == "id" and identity == self.focus_identity:
+                return
+            self._replace_focus_identity(identity)
             return
         if self.focus_identity == ("legacy",) and identity[0] == "id":
             # Some clients deliver the legacy callback immediately before the
@@ -391,20 +376,35 @@ class VocoEngine(IBus.Engine):
         if identity == ("legacy",) or identity == self.focus_identity:
             return
 
-        # An ID-bearing target changed without a matching focus-out. Preserve
-        # target text and invalidate the active session rather than carrying
-        # an ownership lease into the new input context.
-        self.context_revision += 1
-        self.focus_identity = identity
-        self.ownership_lease.invalidate()
-        self.coordinator.deactivate_engine(self)
+        self._replace_focus_identity(identity)
+
+    def _replace_focus_identity(self, identity: tuple[str, ...]) -> None:
+        # A target changed without a matching focus-out. Invalidate before
+        # accepting another app command for the new context. Clearing preedit
+        # is non-destructive; committed application text is untouched.
+        try:
+            self._clear_owned_preedit_before_focus_loss()
+        except Exception:
+            pass
+        finally:
+            self.context_revision += 1
+            self.focus_identity = identity
+            self._reset_content_type_proof()
+            self._schedule_content_type_promotion()
+            self.ownership_lease.invalidate()
+            self.coordinator.deactivate_engine(self)
 
     def _leave_focus(self) -> None:
         if self.focus_active:
             self.context_revision += 1
         self.focus_active = False
         self.focus_identity = None
+        self._reset_content_type_proof()
         self.ownership_lease.invalidate()
+
+    def _clear_owned_preedit_before_focus_loss(self) -> None:
+        if self.bound_session_id is not None:
+            self.clear_preedit()
 
     def bind_session(self, session_id: int) -> None:
         self.bound_session_id = session_id
@@ -423,6 +423,92 @@ class VocoEngine(IBus.Engine):
 
     def do_enable(self) -> None:
         pass
+
+    def do_disable(self) -> None:
+        try:
+            self._clear_owned_preedit_before_focus_loss()
+        finally:
+            self._leave_focus()
+            self.coordinator.disable_engine(self)
+
+    def do_destroy(self) -> None:
+        if self._voco_destroyed:
+            return
+        self._voco_destroyed = True
+        try:
+            try:
+                self._clear_owned_preedit_before_focus_loss()
+            except Exception:
+                pass
+            finally:
+                self._leave_focus()
+                self.coordinator.deactivate_engine(self)
+        finally:
+            super().destroy()
+
+    @property
+    def can_accept_preedit(self) -> bool:
+        preedit_supported = bool(
+            self._voco_client_capabilities & int(IBus.Capabilite.PREEDIT_TEXT)
+        )
+        sensitive = self._voco_input_purpose in {
+            IBus.InputPurpose.PASSWORD,
+            IBus.InputPurpose.PIN,
+        }
+        sensitive_hint = bool(int(self._voco_input_hints) & SENSITIVE_INPUT_HINT_MASK)
+        content_type_is_current = (
+            self._voco_content_type_revision == self.context_revision
+        )
+        return (
+            preedit_supported
+            and content_type_is_current
+            and self._voco_content_type_known
+            and not sensitive
+            and not sensitive_hint
+        )
+
+    def do_set_capabilities(self, capabilities: int) -> None:
+        self._voco_client_capabilities = int(capabilities)
+        if self.bound_session_id is not None and not self.can_accept_preedit:
+            try:
+                self.clear_preedit()
+            finally:
+                self.coordinator.deactivate_engine(self)
+
+    def do_set_content_type(self, purpose: int, hints: int) -> None:
+        raw_hints = int(hints)
+        try:
+            self._voco_input_purpose = IBus.InputPurpose(int(purpose))
+            self._voco_content_type_known = not bool(
+                raw_hints & ~KNOWN_INPUT_HINT_MASK
+            )
+        except (TypeError, ValueError, OverflowError):
+            self._voco_input_purpose = None
+            self._voco_content_type_known = False
+        self._voco_input_hints = raw_hints
+        self._voco_content_type_revision = (
+            self.context_revision if self.focus_active else None
+        )
+        if self.bound_session_id is not None and not self.can_accept_preedit:
+            try:
+                self.clear_preedit()
+            finally:
+                self.coordinator.deactivate_engine(self)
+
+    def _reset_content_type_proof(self) -> None:
+        self._voco_content_type_revision = None
+
+    def _schedule_content_type_promotion(self) -> None:
+        GLib.idle_add(
+            self._promote_content_type_after_focus,
+            self.context_revision,
+            priority=GLib.PRIORITY_LOW,
+        )
+
+    def _promote_content_type_after_focus(self, revision: int) -> bool:
+        if self.focus_active and self.context_revision == revision:
+            self._voco_content_type_revision = revision
+        return GLib.SOURCE_REMOVE
 
     def set_preedit(self, text: str) -> None:
         value = IBus.Text.new_from_string(text)
@@ -497,7 +583,13 @@ def validate_text(value: Any) -> str:
     return value
 
 
+def is_positive_integer(value: Any) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value > 0
+
+
 def is_session_control_key(keyval: int, state: int) -> bool:
+    if int(state) & int(IBus.ModifierType.RELEASE_MASK):
+        return True
     if keyval in SESSION_CONTROL_KEYVALS:
         return True
     alt_pressed = bool(int(state) & int(IBus.ModifierType.MOD1_MASK))
@@ -507,38 +599,13 @@ def is_session_control_key(keyval: int, state: int) -> bool:
     }
 
 
-def register_component(bus: IBus.Bus) -> None:
-    component = IBus.Component(
-        name=ENGINE_BUS_NAME,
-        description="VOCO owned dictation preedit",
-        version="1",
-        license="MIT",
-        author="VOCO Contributors",
-        homepage="https://github.com/sergiopesch/voco",
-        textdomain="voco",
-    )
-    component.add_engine(
-        IBus.EngineDesc(
-            name=ENGINE_NAME,
-            longname="VOCO Dictation",
-            description="Automatic local dictation at the cursor",
-            language="en",
-            license="MIT",
-            author="VOCO Contributors",
-            icon="",
-            layout="default",
-            symbol="VO",
-            rank=0,
-        )
-    )
-    bus.register_component(component)
-    bus.request_name(ENGINE_BUS_NAME, 0)
-
-
-def dispatch_command(coordinator: VocoCoordinator, command: dict[str, Any]) -> dict[str, Any]:
+def dispatch_command(
+    coordinator: VocoCoordinator,
+    command: dict[str, Any],
+) -> dict[str, Any]:
     operation = command.get("operation")
     if operation == "start":
-        return coordinator.start(command.get("sessionId"))
+        return coordinator.start(command.get("clientSessionId"))
     if operation == "update":
         return coordinator.update(
             command.get("sessionId"),
@@ -550,10 +617,8 @@ def dispatch_command(coordinator: VocoCoordinator, command: dict[str, Any]) -> d
         return coordinator.commit(command.get("sessionId"), command.get("text"))
     if operation == "cancel":
         return coordinator.cancel(command.get("sessionId"))
-    if operation == "status":
+    if operation in {"hello", "status"}:
         return coordinator.status()
-    if operation == "shutdown":
-        return coordinator.shutdown()
     raise ValueError("unsupported operation")
 
 
@@ -562,68 +627,119 @@ def main() -> int:
     loop = GLib.MainLoop()
     bus = IBus.Bus()
     if not bus.is_connected():
-        write_response({"event": "startup", "ok": False, "error": "IBus is unavailable"})
         return 1
 
-    # Dynamic component registration can temporarily clear the global engine.
-    # Capture the user's engine first so every exit path can restore it.
-    default_engine = current_engine_name(bus)
-    if not default_engine:
-        write_response(
-            {
-                "event": "startup",
-                "ok": False,
-                "error": "IBus has no active desktop input engine",
-            }
-        )
+    coordinator = VocoCoordinator()
+    _factory = VocoFactory(bus, coordinator)
+    name_reply = IBus.BusRequestNameReply(bus.request_name(ENGINE_BUS_NAME, 0))
+    if name_reply not in {
+        IBus.BusRequestNameReply.PRIMARY_OWNER,
+        IBus.BusRequestNameReply.ALREADY_OWNER,
+    }:
         return 1
-    coordinator = VocoCoordinator(bus, loop, default_engine)
-    factory = VocoFactory(bus, coordinator)
-    register_component(bus)
-    if default_engine and not current_engine_name(bus):
-        if not bus.set_global_engine(default_engine):
-            write_response(
-                {
-                    "event": "startup",
-                    "ok": False,
-                    "error": "IBus did not restore the desktop input engine",
-                }
-            )
-            return 1
 
-    def handle_stdin(_source: Any, condition: GLib.IOCondition) -> bool:
+    server = PrivateSocketServer()
+    try:
+        listener = server.start()
+    except (OSError, ProtocolError):
+        return 1
+
+    def disconnect_client() -> None:
+        coordinator.disconnect_client()
+        server.disconnect()
+
+    def handle_client(_source: Any, condition: GLib.IOCondition) -> bool:
         if condition & (GLib.IOCondition.HUP | GLib.IOCondition.ERR):
-            coordinator.shutdown()
+            disconnect_client()
             return GLib.SOURCE_REMOVE
-        line = sys.stdin.readline()
-        if not line:
-            coordinator.shutdown()
-            return GLib.SOURCE_REMOVE
-        request_id: Any = None
         try:
-            command = json.loads(line)
-            if not isinstance(command, dict):
-                raise ValueError("command must be a JSON object")
+            commands = server.receive()
+        except BlockingIOError:
+            return GLib.SOURCE_CONTINUE
+        except (EOFError, OSError, ProtocolError):
+            disconnect_client()
+            return GLib.SOURCE_REMOVE
+
+        for command in commands:
             request_id = command.get("id")
-            result = dispatch_command(coordinator, command)
-            write_response({"id": request_id, "ok": True, "result": result})
-        except Exception as error:
-            write_response({"id": request_id, "ok": False, "error": str(error)})
+            close_after_response = False
+            try:
+                if not is_positive_integer(request_id):
+                    close_after_response = True
+                    raise ProtocolError("request id must be a positive integer")
+                if (
+                    not isinstance(command.get("version"), int)
+                    or isinstance(command.get("version"), bool)
+                    or command.get("version") != PROTOCOL_VERSION
+                ):
+                    close_after_response = True
+                    raise ProtocolError("unsupported VOCO input method protocol version")
+                if not server.negotiated:
+                    if command.get("operation") != "hello":
+                        close_after_response = True
+                        raise ProtocolError("protocol hello must be the first request")
+                    server.negotiated = True
+                result = dispatch_command(coordinator, command)
+                server.send(
+                    {
+                        "version": PROTOCOL_VERSION,
+                        "id": request_id,
+                        "ok": True,
+                        "result": result,
+                    }
+                )
+            except Exception as error:
+                try:
+                    server.send(
+                        {
+                            "version": PROTOCOL_VERSION,
+                            "id": request_id,
+                            "ok": False,
+                            "error": str(error),
+                        }
+                    )
+                except (OSError, ProtocolError):
+                    close_after_response = True
+            if close_after_response:
+                disconnect_client()
+                return GLib.SOURCE_REMOVE
         return GLib.SOURCE_CONTINUE
 
-    stdin_channel = GLib.IOChannel.unix_new(sys.stdin.fileno())
-    stdin_channel.set_encoding("utf-8")
-    GLib.io_add_watch(
-        stdin_channel,
-        GLib.IOCondition.IN | GLib.IOCondition.HUP | GLib.IOCondition.ERR,
-        handle_stdin,
-    )
+    def handle_listener(_source: Any, condition: GLib.IOCondition) -> bool:
+        if condition & (GLib.IOCondition.HUP | GLib.IOCondition.ERR):
+            loop.quit()
+            return GLib.SOURCE_REMOVE
+        try:
+            client = server.accept()
+        except BlockingIOError:
+            return GLib.SOURCE_CONTINUE
+        except (OSError, ProtocolError):
+            return GLib.SOURCE_CONTINUE
+        if client is not None:
+            GLib.io_add_watch(
+                client.fileno(),
+                GLib.IOCondition.IN | GLib.IOCondition.HUP | GLib.IOCondition.ERR,
+                handle_client,
+            )
+        return GLib.SOURCE_CONTINUE
 
-    signal.signal(signal.SIGTERM, lambda *_args: coordinator.shutdown())
-    signal.signal(signal.SIGINT, lambda *_args: coordinator.shutdown())
-    write_response({"event": "startup", "ok": True, "engine": ENGINE_NAME})
+    def stop() -> None:
+        try:
+            coordinator.disconnect_client()
+        finally:
+            server.close()
+            loop.quit()
+
+    GLib.io_add_watch(
+        listener.fileno(),
+        GLib.IOCondition.IN | GLib.IOCondition.HUP | GLib.IOCondition.ERR,
+        handle_listener,
+    )
+    bus.connect("disconnected", lambda *_args: stop())
+    signal.signal(signal.SIGTERM, lambda *_args: stop())
+    signal.signal(signal.SIGINT, lambda *_args: stop())
     loop.run()
-    _ = factory
+    server.close()
     return 0
 
 

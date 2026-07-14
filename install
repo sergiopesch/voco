@@ -6,11 +6,11 @@ set -euo pipefail
 #
 # VOCO — release install helper
 # Usage:
-#   wget https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.18/install -O voco-install
+#   wget https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.19/install -O voco-install
 #   chmod +x voco-install
 #   ./voco-install
 
-VERSION="2026.0.18"
+VERSION="2026.0.19"
 RELEASE_TAG="voco.${VERSION}"
 DEB_URL="https://github.com/sergiopesch/voco/releases/download/${RELEASE_TAG}/voco_${VERSION}_amd64.deb"
 CHECKSUMS_URL="https://github.com/sergiopesch/voco/releases/download/${RELEASE_TAG}/voco_checksums.txt"
@@ -320,9 +320,10 @@ echo -e "  ${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━
 echo
 echo -e "  ${WHITE}${BOLD}▸${NC} Open ${BOLD}VOCO${NC} from your app launcher"
 echo -e "  ${WHITE}${BOLD}▸${NC} Or run: ${GRAPHITE_SOFT}voco${NC}"
+echo -e "  ${WHITE}${BOLD}▸${NC} Add and select ${BOLD}VOCO Dictation${NC} in Input Sources for live cursor words"
 echo
 echo -e "  ${DIM}First launch downloads the speech model (~142 MB, one-time).${NC}"
-echo -e "  ${DIM}Then press ${BOLD}${HOTKEY}${NC}${DIM} to dictate!${NC}"
+echo -e "  ${DIM}Focus a text field, then press ${BOLD}${HOTKEY}${NC}${DIM} to dictate!${NC}"
 echo
 echo -e "  ${DIM}You can change the hotkey anytime from the system tray icon${NC}"
 echo -e "  ${DIM}or edit ${CONFIG_FILE}${NC}"

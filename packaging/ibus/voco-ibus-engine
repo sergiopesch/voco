@@ -1,0 +1,2 @@
+#!/bin/sh
+exec /usr/bin/python3 -u /usr/lib/voco/ibus/voco_ibus_engine.py --ibus "$@"

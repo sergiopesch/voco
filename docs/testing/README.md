@@ -30,6 +30,8 @@ npm run dev
 ```
 
 3. Test the product:
+- install the Debian package in the disposable VM so the persistent component exists
+- manually add and select `VOCO Dictation` in Input Sources
 - allow microphone access
 - finish onboarding
 - press `Alt+D`
@@ -37,6 +39,9 @@ npm run dev
 - confirm live words appear directly in the focused text field
 - press `Alt+D` again
 - confirm text is inserted at the cursor
+
+An AppImage or uninstalled source process does not install the host IBus component and is not a
+valid live-cursor E2E configuration by itself.
 
 For a production-mode headless build without packaging, run:
 
@@ -54,6 +59,7 @@ release binaries that omit it.
 ```bash
 npm run verify:versions
 npm run test:owned-preedit
+npm run test:private-ibus
 npm run check
 npm run lint
 CARGO_BUILD_JOBS=2 cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml

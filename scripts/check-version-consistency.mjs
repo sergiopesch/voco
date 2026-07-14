@@ -72,6 +72,14 @@ const sources = [
     ),
   },
   {
+    label: "IBus component",
+    value: expectMatch(
+      "packaging/ibus/voco.xml",
+      /<version>([^<]+)<\/version>/,
+      "IBus component version",
+    ),
+  },
+  {
     label: "snapcraft.yaml",
     value: expectMatch("snap/snapcraft.yaml", /^version:\s+'([^']+)'/m, "Snap version"),
   },

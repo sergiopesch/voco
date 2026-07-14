@@ -249,9 +249,22 @@ export function ControlPanel({
     if (!runtimeDiagnostics) {
       return "Runtime checks unavailable.";
     }
-    return runtimeDiagnostics.ownedPreedit.available
-      ? "Ready"
-      : "Unavailable (preview-only fallback)";
+    switch (runtimeDiagnostics.ownedPreedit.setupState) {
+      case "ready":
+        return "Ready";
+      case "not-enabled":
+        return "Input source not enabled";
+      case "not-installed":
+        return "Input source not installed";
+      case "incompatible":
+        return "Package refresh required";
+      case "runtime-unavailable":
+        return "Desktop session unavailable";
+      default:
+        return runtimeDiagnostics.ownedPreedit.available
+          ? "Ready"
+          : "Unavailable (preview-only fallback)";
+    }
   }, [runtimeDiagnostics]);
   useEffect(() => {
     if (surface === "onboarding") {
@@ -662,9 +675,22 @@ export function ControlPanel({
 
             {onboardingStep === 2 ? (
               <section className="voco-onboarding__step">
-                <h2>Ready to use</h2>
+                <h2>Enable live dictation</h2>
                 <p>
-                  Press <code>{config.hotkey}</code> to start and stop listening.
+                  In your desktop <strong>Keyboard</strong> or <strong>Region &amp; Language</strong>
+                  settings, add and select <strong>VOCO Dictation</strong> as an input source.
+                  VOCO never enables or switches it automatically.
+                </p>
+                <div className="voco-inline-note">
+                  <strong>Live cursor status:</strong> {ownedPreeditLabel}
+                  <br />
+                  {runtimeDiagnostics?.ownedPreedit.detail ??
+                    "Refresh after selecting VOCO Dictation. Without it, recordings stay safely preview-only."}
+                </div>
+                <p>
+                  Then focus a normal text field and press <code>{config.hotkey}</code> to start
+                  and stop listening. Password, PIN, private, unsupported, or changed targets are
+                  intentionally preview-only.
                 </p>
                 <div className="voco-tray-legend" aria-label="Tray icon colors">
                   {TRAY_COLOR_LEGEND.map((item) => (
@@ -680,6 +706,12 @@ export function ControlPanel({
                   You can reopen settings from the tray any time.
                 </div>
                 <div className="voco-onboarding__actions">
+                  <button
+                    className="voco-button voco-button--ghost"
+                    onClick={() => void onRefreshRuntimeDiagnostics()}
+                  >
+                    Refresh input-source status
+                  </button>
                   <button
                     className="voco-button voco-button--secondary"
                     onClick={() => onOnboardingStepChange(1)}
@@ -850,10 +882,11 @@ export function ControlPanel({
                         </select>
                       </label>
                       <div className="voco-inline-note">
-                        Live words at cursor keeps provisional text attached to the focused field,
-                        revises it automatically as recognition improves, and commits the complete
-                        final transcript when you stop. The transcript panel keeps previews inside
-                        VOCO and inserts only the final result.
+                        Live words at cursor uses the persistent VOCO Dictation input source. Add
+                        it once in your desktop Input Sources settings, select it, then focus the
+                        target field before pressing Alt+D. VOCO revises only its provisional
+                        preedit and never switches your input source automatically. The transcript
+                        panel keeps previews inside VOCO and inserts only the final result.
                       </div>
                     </>
                   ) : null}
@@ -1164,7 +1197,7 @@ export function ControlPanel({
                   </div>
                   {runtimeDiagnostics?.ownedPreedit.error ? (
                     <div className="voco-inline-note">
-                      {runtimeDiagnostics.ownedPreedit.error}
+                      {runtimeDiagnostics.ownedPreedit.detail}
                     </div>
                   ) : null}
                   <div className="voco-inline-note">

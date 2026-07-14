@@ -1,49 +1,52 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::fs::{self, OpenOptions};
-use std::io::{BufRead, BufReader, Write};
+use std::fs;
+use std::io::{BufRead, BufReader, Read, Write};
+use std::os::fd::AsRawFd;
+use std::os::unix::fs::{FileTypeExt, MetadataExt, PermissionsExt};
+use std::os::unix::net::UnixStream;
 use std::path::{Path, PathBuf};
-use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 use std::sync::{
     atomic::{AtomicU64, Ordering},
     Mutex,
 };
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
-const PYTHON_PATH: &str = "/usr/bin/python3";
-const IBUS_PATH: &str = "/usr/bin/ibus";
-const ENGINE_SCRIPT: &str = include_str!("../resources/voco_ibus_engine.py");
-const OWNERSHIP_SCRIPT: &str = include_str!("../resources/voco_ibus_ownership.py");
-const ENGINE_START_TIMEOUT: Duration = Duration::from_millis(1_250);
-const ENGINE_POLL_INTERVAL: Duration = Duration::from_millis(20);
+const PROTOCOL_VERSION: u32 = 1;
+const COMPONENT_PATH: &str = "/usr/share/ibus/component/voco.xml";
+const SOCKET_DIRECTORY_NAME: &str = "voco";
+const SOCKET_FILE_NAME: &str = "ibus-engine.sock";
+const IPC_TIMEOUT: Duration = Duration::from_millis(1_000);
 const MAX_TEXT_BYTES: usize = 1_000_000;
+const MAX_REQUEST_BYTES: usize = 4_000_000;
+const MAX_RESPONSE_BYTES: usize = 64_000;
 
 #[derive(Debug, Clone, Default, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct OwnedPreeditStatus {
     pub available: bool,
     pub ready: bool,
+    pub setup_state: String,
+    pub detail: String,
     pub session_id: Option<u64>,
     pub engine_active: bool,
     pub focus_lost: bool,
-    pub switching: bool,
     pub progressive_commit_active: bool,
     pub committed_character_count: usize,
     pub ownership_intact: bool,
     pub finalization_outcome: Option<String>,
-    pub current_engine: String,
-    pub default_engine: String,
     pub error: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct SidecarStatus {
+struct EngineStatus {
     ready: bool,
+    #[serde(default = "ready_setup_state")]
+    setup_state: String,
     session_id: Option<u64>,
     engine_active: bool,
     focus_lost: bool,
-    switching: bool,
     #[serde(default)]
     progressive_commit_active: bool,
     #[serde(default)]
@@ -53,43 +56,36 @@ struct SidecarStatus {
     #[serde(default)]
     finalization_outcome: Option<String>,
     #[serde(default)]
-    current_engine: String,
-    #[serde(default)]
-    default_engine: String,
-    #[serde(default)]
     error: String,
 }
 
-impl From<SidecarStatus> for OwnedPreeditStatus {
-    fn from(status: SidecarStatus) -> Self {
+fn ready_setup_state() -> String {
+    "ready".to_string()
+}
+
+impl From<EngineStatus> for OwnedPreeditStatus {
+    fn from(status: EngineStatus) -> Self {
         Self {
             available: true,
             ready: status.ready,
+            setup_state: status.setup_state,
+            detail: "VOCO Dictation is enabled and its private input channel is ready.".to_string(),
             session_id: status.session_id,
             engine_active: status.engine_active,
             focus_lost: status.focus_lost,
-            switching: status.switching,
             progressive_commit_active: status.progressive_commit_active,
             committed_character_count: status.committed_character_count,
             ownership_intact: status.ownership_intact,
             finalization_outcome: status.finalization_outcome,
-            current_engine: status.current_engine,
-            default_engine: status.default_engine,
             error: (!status.error.is_empty()).then_some(status.error),
         }
     }
 }
 
 #[derive(Debug, Deserialize)]
-struct StartupResponse {
-    ok: bool,
-    #[serde(default)]
-    error: String,
-}
-
-#[derive(Debug, Deserialize)]
 struct ProtocolResponse {
-    id: u64,
+    version: u32,
+    id: Option<u64>,
     ok: bool,
     #[serde(default)]
     result: Option<Value>,
@@ -97,175 +93,163 @@ struct ProtocolResponse {
     error: String,
 }
 
-struct SidecarBridge {
-    child: Child,
-    stdin: ChildStdin,
-    stdout: BufReader<ChildStdout>,
-    next_id: u64,
-    restore_engine: String,
+#[derive(Debug)]
+enum BridgeCommandError {
+    Rejected(String),
+    Uncertain(String),
 }
 
-impl SidecarBridge {
-    fn spawn() -> Result<Self, String> {
-        if !is_executable(Path::new(PYTHON_PATH)) {
-            return Err(format!(
-                "Owned cursor streaming requires the system Python runtime at {PYTHON_PATH}."
-            ));
+impl BridgeCommandError {
+    fn message(self) -> String {
+        match self {
+            Self::Rejected(message) | Self::Uncertain(message) => message,
         }
+    }
+}
 
-        let script_path = materialize_engine_script()?;
-        let mut child = Command::new(PYTHON_PATH)
-            .args(["-u", script_path.to_string_lossy().as_ref()])
-            .env("PYTHONDONTWRITEBYTECODE", "1")
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::null())
-            .spawn()
-            .map_err(|error| format!("Failed to start the VOCO input method: {error}"))?;
+struct SocketBridge {
+    writer: UnixStream,
+    reader: BufReader<UnixStream>,
+    next_id: u64,
+}
 
-        let stdin = child
-            .stdin
-            .take()
-            .ok_or_else(|| "VOCO input method stdin is unavailable.".to_string())?;
-        let stdout = child
-            .stdout
-            .take()
-            .ok_or_else(|| "VOCO input method stdout is unavailable.".to_string())?;
-        let mut stdout = BufReader::new(stdout);
-        let mut startup_line = String::new();
-        if let Err(error) = stdout.read_line(&mut startup_line) {
-            let _ = child.kill();
-            let _ = child.wait();
-            return Err(format!("Failed to read VOCO input method startup: {error}"));
-        }
-        if startup_line.is_empty() {
-            let _ = child.kill();
-            return Err("The VOCO input method exited before it reported readiness.".to_string());
-        }
-
-        let startup: StartupResponse = match serde_json::from_str(startup_line.trim_end()) {
-            Ok(startup) => startup,
-            Err(error) => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return Err(format!(
-                    "Invalid VOCO input method startup response: {error}"
-                ));
-            }
-        };
-        if !startup.ok {
-            let _ = child.kill();
-            return Err(if startup.error.is_empty() {
-                "IBus is unavailable in this desktop session.".to_string()
-            } else {
-                startup.error
-            });
-        }
-
-        Ok(Self {
-            child,
-            stdin,
-            stdout,
-            next_id: 1,
-            restore_engine: String::new(),
-        })
+impl SocketBridge {
+    fn connect() -> Result<Self, String> {
+        let socket_path = runtime_socket_path()?;
+        Self::connect_to(&socket_path)
     }
 
-    fn send_status(&mut self, mut command: Value) -> Result<OwnedPreeditStatus, String> {
+    fn connect_to(socket_path: &Path) -> Result<Self, String> {
+        validate_socket_path(socket_path)?;
+        let writer = UnixStream::connect(socket_path).map_err(|error| {
+            format!(
+                "VOCO Dictation is not active at {}: {error}",
+                socket_path.display()
+            )
+        })?;
+        validate_peer(&writer)?;
+        writer
+            .set_read_timeout(Some(IPC_TIMEOUT))
+            .and_then(|_| writer.set_write_timeout(Some(IPC_TIMEOUT)))
+            .map_err(|error| format!("Failed to bound VOCO input method IPC: {error}"))?;
+        let reader = BufReader::new(
+            writer
+                .try_clone()
+                .map_err(|error| format!("Failed to open VOCO input method IPC: {error}"))?,
+        );
+        let mut bridge = Self {
+            writer,
+            reader,
+            next_id: 1,
+        };
+        bridge
+            .send_status(json!({ "operation": "hello" }))
+            .map_err(BridgeCommandError::message)?;
+        Ok(bridge)
+    }
+
+    fn send_status(
+        &mut self,
+        mut command: Value,
+    ) -> Result<OwnedPreeditStatus, BridgeCommandError> {
         let result = self.send(&mut command)?;
-        let status = serde_json::from_value::<SidecarStatus>(result)
-            .map_err(|error| format!("Invalid VOCO input method status: {error}"))?;
-        if !status.default_engine.is_empty() && status.default_engine != "voco" {
-            self.restore_engine.clone_from(&status.default_engine);
-        }
+        let status = serde_json::from_value::<EngineStatus>(result).map_err(|error| {
+            BridgeCommandError::Uncertain(format!("Invalid VOCO input method status: {error}"))
+        })?;
         Ok(OwnedPreeditStatus::from(status))
     }
 
-    fn send(&mut self, command: &mut Value) -> Result<Value, String> {
+    fn send(&mut self, command: &mut Value) -> Result<Value, BridgeCommandError> {
         let id = self.next_id;
-        self.next_id = self.next_id.saturating_add(1).max(1);
+        self.next_id = self.next_id.checked_add(1).ok_or_else(|| {
+            BridgeCommandError::Uncertain(
+                "VOCO input method request counter was exhausted.".to_string(),
+            )
+        })?;
+        command["version"] = Value::from(PROTOCOL_VERSION);
         command["id"] = Value::from(id);
 
-        serde_json::to_writer(&mut self.stdin, command)
-            .map_err(|error| format!("Failed to encode VOCO input method command: {error}"))?;
-        self.stdin
-            .write_all(b"\n")
-            .and_then(|_| self.stdin.flush())
-            .map_err(|error| format!("Failed to send VOCO input method command: {error}"))?;
-
-        let mut response_line = String::new();
-        self.stdout
-            .read_line(&mut response_line)
-            .map_err(|error| format!("Failed to read VOCO input method response: {error}"))?;
-        if response_line.is_empty() {
-            return Err("The VOCO input method stopped unexpectedly.".to_string());
+        let mut encoded = serde_json::to_vec(command).map_err(|error| {
+            BridgeCommandError::Uncertain(format!(
+                "Failed to encode VOCO input method command: {error}"
+            ))
+        })?;
+        encoded.push(b'\n');
+        if encoded.len() > MAX_REQUEST_BYTES {
+            return Err(BridgeCommandError::Uncertain(
+                "VOCO input method command exceeds the safety limit.".to_string(),
+            ));
         }
+        self.writer
+            .write_all(&encoded)
+            .and_then(|_| self.writer.flush())
+            .map_err(|error| {
+                BridgeCommandError::Uncertain(format!(
+                    "Failed to send VOCO input method command: {error}"
+                ))
+            })?;
 
-        let response: ProtocolResponse = serde_json::from_str(response_line.trim_end())
-            .map_err(|error| format!("Invalid VOCO input method response: {error}"))?;
-        if response.id != id {
-            return Err("VOCO input method response order was invalid.".to_string());
+        let mut response_line = Vec::new();
+        let bytes_read = (&mut self.reader)
+            .take((MAX_RESPONSE_BYTES + 1) as u64)
+            .read_until(b'\n', &mut response_line)
+            .map_err(|error| {
+                BridgeCommandError::Uncertain(format!(
+                    "Failed to read VOCO input method response: {error}"
+                ))
+            })?;
+        if bytes_read == 0 {
+            return Err(BridgeCommandError::Uncertain(
+                "The VOCO input method disconnected unexpectedly.".to_string(),
+            ));
+        }
+        if response_line.len() > MAX_RESPONSE_BYTES || !response_line.ends_with(b"\n") {
+            return Err(BridgeCommandError::Uncertain(
+                "VOCO input method response exceeds the safety limit.".to_string(),
+            ));
+        }
+        response_line.pop();
+
+        let response: ProtocolResponse =
+            serde_json::from_slice(&response_line).map_err(|error| {
+                BridgeCommandError::Uncertain(format!(
+                    "Invalid VOCO input method response: {error}"
+                ))
+            })?;
+        if response.version != PROTOCOL_VERSION {
+            return Err(BridgeCommandError::Uncertain(format!(
+                "VOCO input method protocol version {} is incompatible with app version {}.",
+                response.version, PROTOCOL_VERSION
+            )));
+        }
+        if !response.ok && response.id.is_none() {
+            return Err(BridgeCommandError::Uncertain(
+                if response.error.is_empty() {
+                    "The VOCO input method rejected the connection.".to_string()
+                } else {
+                    response.error
+                },
+            ));
+        }
+        if response.id != Some(id) {
+            return Err(BridgeCommandError::Uncertain(
+                "VOCO input method response order was invalid.".to_string(),
+            ));
         }
         if !response.ok {
-            return Err(if response.error.is_empty() {
+            return Err(BridgeCommandError::Rejected(if response.error.is_empty() {
                 "The VOCO input method rejected the command.".to_string()
             } else {
                 response.error
-            });
+            }));
         }
 
         Ok(response.result.unwrap_or(Value::Null))
     }
-
-    fn shutdown(mut self) {
-        let _ = self.send(&mut json!({ "operation": "shutdown" }));
-        let deadline = Instant::now() + Duration::from_millis(750);
-        let mut exited = false;
-        while Instant::now() < deadline {
-            match self.child.try_wait() {
-                Ok(Some(_)) => {
-                    exited = true;
-                    break;
-                }
-                Ok(None) => std::thread::sleep(Duration::from_millis(10)),
-                Err(_) => break,
-            }
-        }
-        if !exited {
-            let _ = self.child.kill();
-            let _ = self.child.wait();
-        }
-        self.restore_desktop_engine();
-    }
-
-    fn restore_desktop_engine(&mut self) {
-        if self.restore_engine.is_empty() || self.restore_engine == "voco" {
-            return;
-        }
-        let engine = std::mem::take(&mut self.restore_engine);
-        if is_executable(Path::new(IBUS_PATH)) {
-            let _ = Command::new(IBUS_PATH)
-                .args(["engine", &engine])
-                .stdin(Stdio::null())
-                .stdout(Stdio::null())
-                .stderr(Stdio::null())
-                .status();
-        }
-    }
-}
-
-impl Drop for SidecarBridge {
-    fn drop(&mut self) {
-        if self.child.try_wait().ok().flatten().is_none() {
-            let _ = self.child.kill();
-            let _ = self.child.wait();
-        }
-        self.restore_desktop_engine();
-    }
 }
 
 pub struct OwnedPreeditService {
-    bridge: Mutex<Option<SidecarBridge>>,
+    bridge: Mutex<Option<SocketBridge>>,
     next_session_id: AtomicU64,
 }
 
@@ -288,48 +272,27 @@ impl OwnedPreeditService {
 
     pub fn start(&self, client_session_id: u64) -> Result<OwnedPreeditStatus, String> {
         validate_session_id(client_session_id)?;
-        // The renderer's counter can restart after a reload. A service-issued
-        // generation prevents a delayed command from acting on a later session
-        // that happens to reuse the same renderer ID.
+        // Renderer counters can restart after a reload. A backend generation
+        // prevents delayed renderer commands from acting on a later session.
         let session_id = self.allocate_session_id()?;
-        let initial = self.with_bridge(|bridge| {
+        let status = self.with_bridge(|bridge| {
             bridge.send_status(json!({
                 "operation": "start",
-                "sessionId": session_id,
+                "clientSessionId": session_id,
             }))
         })?;
-        if status_matches_session(&initial, session_id) && initial.engine_active {
-            return Ok(initial);
+        if !status_matches_session(&status, session_id) {
+            self.cancel_best_effort(status.session_id);
+            return Err("VOCO input method returned an invalid session lease.".to_string());
         }
-
-        let deadline = Instant::now() + ENGINE_START_TIMEOUT;
-        while Instant::now() < deadline {
-            std::thread::sleep(ENGINE_POLL_INTERVAL);
-            let status =
-                self.with_bridge(|bridge| bridge.send_status(json!({ "operation": "status" })))?;
-            if !status_matches_session(&status, session_id) {
-                return Err(
-                    "VOCO input method startup was superseded by a newer session.".to_string(),
-                );
-            }
-            if status.engine_active {
-                return Ok(status);
-            }
-            if status.focus_lost {
-                self.cancel_best_effort(session_id);
-                return Err(
-                    "The focused field stopped accepting VOCO input before dictation began."
-                        .to_string(),
-                );
-            }
-            if let Some(error) = status.error {
-                self.cancel_best_effort(session_id);
-                return Err(format!("VOCO could not activate its input method: {error}"));
-            }
+        if !status.engine_active || status.focus_lost {
+            self.cancel_best_effort(status.session_id);
+            return Err(
+                "Enable VOCO Dictation as the active input source and focus a text field first."
+                    .to_string(),
+            );
         }
-
-        self.cancel_best_effort(session_id);
-        Err("The focused field did not connect to the VOCO input method in time.".to_string())
+        Ok(status)
     }
 
     pub fn update(
@@ -357,8 +320,6 @@ impl OwnedPreeditService {
     pub fn commit(&self, session_id: u64, text: String) -> Result<OwnedPreeditStatus, String> {
         validate_session_id(session_id)?;
         validate_text(&text)?;
-        // Finalization is one serialized sidecar transaction. It never releases
-        // the bridge lock between a proof phase and a target mutation.
         self.with_bridge(|bridge| {
             bridge.send_status(json!({
                 "operation": "commit",
@@ -379,14 +340,15 @@ impl OwnedPreeditService {
     }
 
     pub fn shutdown(&self) {
-        let bridge = self.bridge.lock().ok().and_then(|mut guard| guard.take());
-        if let Some(bridge) = bridge {
-            bridge.shutdown();
+        if let Ok(mut guard) = self.bridge.lock() {
+            guard.take();
         }
     }
 
-    fn cancel_best_effort(&self, session_id: u64) {
-        let _ = self.cancel(session_id);
+    fn cancel_best_effort(&self, session_id: Option<u64>) {
+        if let Some(session_id) = session_id {
+            let _ = self.cancel(session_id);
+        }
     }
 
     fn allocate_session_id(&self) -> Result<u64, String> {
@@ -399,25 +361,107 @@ impl OwnedPreeditService {
 
     fn with_bridge<T>(
         &self,
-        operation: impl FnOnce(&mut SidecarBridge) -> Result<T, String>,
+        operation: impl FnOnce(&mut SocketBridge) -> Result<T, BridgeCommandError>,
     ) -> Result<T, String> {
         let mut guard = self
             .bridge
             .lock()
             .map_err(|_| "VOCO input method state is unavailable.".to_string())?;
         if guard.is_none() {
-            *guard = Some(SidecarBridge::spawn()?);
+            *guard = Some(SocketBridge::connect()?);
         }
-        let result = operation(guard.as_mut().expect("bridge initialized above"));
-        let sidecar_exited = guard
-            .as_mut()
-            .and_then(|bridge| bridge.child.try_wait().ok().flatten())
-            .is_some();
-        if result.is_err() && sidecar_exited {
-            guard.take();
+        match operation(guard.as_mut().expect("bridge initialized above")) {
+            Ok(result) => Ok(result),
+            Err(BridgeCommandError::Rejected(error)) => Err(error),
+            Err(BridgeCommandError::Uncertain(error)) => {
+                // Never retry a mutation across an uncertain connection.
+                // Closing the socket makes the engine discard only VOCO's
+                // active preedit. An ordered engine rejection is safe to keep.
+                guard.take();
+                Err(error)
+            }
         }
-        result
     }
+}
+
+fn runtime_socket_path() -> Result<PathBuf, String> {
+    let runtime_dir = std::env::var_os("XDG_RUNTIME_DIR")
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
+        .ok_or_else(|| "XDG_RUNTIME_DIR is unavailable in this desktop session.".to_string())?;
+    if !runtime_dir.is_absolute() {
+        return Err("XDG_RUNTIME_DIR must be an absolute path.".to_string());
+    }
+    validate_private_directory(&runtime_dir, "XDG_RUNTIME_DIR")?;
+    Ok(runtime_dir
+        .join(SOCKET_DIRECTORY_NAME)
+        .join(SOCKET_FILE_NAME))
+}
+
+fn validate_socket_path(socket_path: &Path) -> Result<(), String> {
+    let parent = socket_path
+        .parent()
+        .ok_or_else(|| "VOCO input method socket has no parent directory.".to_string())?;
+    validate_private_directory(parent, "VOCO runtime socket directory")?;
+    let metadata = fs::symlink_metadata(socket_path)
+        .map_err(|error| format!("VOCO Dictation input source is not active: {error}"))?;
+    if !metadata.file_type().is_socket() {
+        return Err("VOCO input method path is not a Unix socket.".to_string());
+    }
+    if metadata.uid() != current_euid() {
+        return Err("VOCO input method socket is owned by another user.".to_string());
+    }
+    if metadata.permissions().mode() & 0o077 != 0 {
+        return Err("VOCO input method socket permissions are not private.".to_string());
+    }
+    Ok(())
+}
+
+fn validate_private_directory(path: &Path, label: &str) -> Result<(), String> {
+    let metadata =
+        fs::symlink_metadata(path).map_err(|error| format!("{label} is unavailable: {error}"))?;
+    if !metadata.file_type().is_dir() {
+        return Err(format!("{label} is not a directory."));
+    }
+    if metadata.uid() != current_euid() {
+        return Err(format!("{label} is owned by another user."));
+    }
+    if metadata.permissions().mode() & 0o077 != 0 {
+        return Err(format!("{label} permissions are not private."));
+    }
+    Ok(())
+}
+
+fn validate_peer(stream: &UnixStream) -> Result<(), String> {
+    let mut credentials = libc::ucred {
+        pid: 0,
+        uid: 0,
+        gid: 0,
+    };
+    let mut length = std::mem::size_of::<libc::ucred>() as libc::socklen_t;
+    // SAFETY: `credentials` and `length` are valid writable buffers for the
+    // kernel's fixed-size SO_PEERCRED result, and the stream fd stays open.
+    let result = unsafe {
+        libc::getsockopt(
+            stream.as_raw_fd(),
+            libc::SOL_SOCKET,
+            libc::SO_PEERCRED,
+            (&mut credentials as *mut libc::ucred).cast(),
+            &mut length,
+        )
+    };
+    if result != 0 || length as usize != std::mem::size_of::<libc::ucred>() {
+        return Err("Could not verify the VOCO input method peer.".to_string());
+    }
+    if credentials.uid != current_euid() {
+        return Err("VOCO input method peer is owned by another user.".to_string());
+    }
+    Ok(())
+}
+
+fn current_euid() -> u32 {
+    // SAFETY: geteuid has no preconditions or failure mode.
+    unsafe { libc::geteuid() }
 }
 
 fn validate_session_id(session_id: u64) -> Result<(), String> {
@@ -441,82 +485,70 @@ fn validate_text(text: &str) -> Result<(), String> {
 }
 
 fn unavailable_status(error: String) -> OwnedPreeditStatus {
+    let component_installed = Path::new(COMPONENT_PATH).is_file();
+    let (setup_state, detail) = classify_unavailable_status(&error, component_installed);
     OwnedPreeditStatus {
+        setup_state: setup_state.to_string(),
+        detail: detail.to_string(),
         error: Some(error),
         ..OwnedPreeditStatus::default()
     }
 }
 
-fn materialize_engine_script() -> Result<PathBuf, String> {
-    let root = dirs::cache_dir()
-        .unwrap_or_else(std::env::temp_dir)
-        .join("voco")
-        .join("runtime");
-    fs::create_dir_all(&root)
-        .map_err(|error| format!("Failed to prepare VOCO input method runtime: {error}"))?;
-
-    #[cfg(unix)]
+fn classify_unavailable_status(
+    error: &str,
+    component_installed: bool,
+) -> (&'static str, &'static str) {
+    if error.contains("protocol version") {
+        (
+            "incompatible",
+            "The app and VOCO input source have different protocol versions. Reinstall the current package, then switch the input source away and back.",
+        )
+    } else if error.contains("XDG_RUNTIME_DIR is unavailable")
+        || error.contains("XDG_RUNTIME_DIR must be an absolute path")
     {
-        use std::os::unix::fs::PermissionsExt;
-        fs::set_permissions(&root, fs::Permissions::from_mode(0o700)).map_err(|error| {
-            format!("Failed to secure VOCO input method runtime directory: {error}")
-        })?;
-    }
-
-    let ownership_path = root.join("voco_ibus_ownership.py");
-    materialize_runtime_file(&ownership_path, OWNERSHIP_SCRIPT)?;
-    let script_path = root.join("voco_ibus_engine.py");
-    materialize_runtime_file(&script_path, ENGINE_SCRIPT)?;
-
-    Ok(script_path)
-}
-
-fn materialize_runtime_file(path: &Path, contents: &str) -> Result<(), String> {
-    let current = fs::read_to_string(path).ok();
-    if current.as_deref() != Some(contents) {
-        let mut options = OpenOptions::new();
-        options.write(true).create(true).truncate(true);
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::OpenOptionsExt;
-            options.mode(0o600);
-        }
-        let mut file = options
-            .open(path)
-            .map_err(|error| format!("Failed to install VOCO input method runtime: {error}"))?;
-        file.write_all(contents.as_bytes())
-            .and_then(|_| file.sync_all())
-            .map_err(|error| format!("Failed to update VOCO input method runtime: {error}"))?;
-    }
-
-    #[cfg(unix)]
+        (
+            "runtime-unavailable",
+            "The desktop runtime directory is unavailable. Sign out and back in before retrying.",
+        )
+    } else if error.contains("already connected") {
+        (
+            "error",
+            "Another VOCO app process already controls the input source. Close the older process before retrying.",
+        )
+    } else if component_installed
+        && (error.contains("not active")
+            || error.contains("No such file")
+            || error.contains("Connection refused"))
     {
-        use std::os::unix::fs::PermissionsExt;
-        fs::set_permissions(path, fs::Permissions::from_mode(0o600))
-            .map_err(|error| format!("Failed to secure VOCO input method runtime: {error}"))?;
-    }
-
-    Ok(())
-}
-
-fn is_executable(path: &Path) -> bool {
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        fs::metadata(path)
-            .map(|metadata| metadata.is_file() && metadata.permissions().mode() & 0o111 != 0)
-            .unwrap_or(false)
-    }
-
-    #[cfg(not(unix))]
-    {
-        path.is_file()
+        (
+            "not-enabled",
+            "Add VOCO Dictation in the desktop Input Sources settings, select it, and focus the target text field.",
+        )
+    } else if !component_installed {
+        (
+            "not-installed",
+            "Install the VOCO Debian package to add the VOCO Dictation input source. Source and AppImage builds remain preview-only.",
+        )
+    } else {
+        (
+            "error",
+            "The VOCO input source failed a private IPC safety check. Keep stable cursor mode preview-only and reinstall the current package before retrying.",
+        )
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::os::unix::net::UnixListener;
+    use std::thread;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    const ENGINE_SCRIPT: &str = include_str!("../resources/voco_ibus_engine.py");
+    const PROTOCOL_SCRIPT: &str = include_str!("../resources/voco_ibus_protocol.py");
+    const OWNERSHIP_SCRIPT: &str = include_str!("../resources/voco_ibus_ownership.py");
+    const COMPONENT_XML: &str = include_str!("../../../../packaging/ibus/voco.xml");
 
     #[test]
     fn rejects_invalid_sessions_and_oversized_text() {
@@ -546,99 +578,310 @@ mod tests {
     }
 
     #[test]
-    fn converts_sidecar_status_without_exposing_empty_errors() {
-        let status = OwnedPreeditStatus::from(SidecarStatus {
+    fn converts_engine_status_without_exposing_empty_errors() {
+        let status = OwnedPreeditStatus::from(EngineStatus {
             ready: true,
+            setup_state: "ready".to_string(),
             session_id: Some(7),
             engine_active: true,
             focus_lost: false,
-            switching: false,
             progressive_commit_active: true,
             committed_character_count: 18,
             ownership_intact: true,
             finalization_outcome: None,
-            current_engine: "voco".to_string(),
-            default_engine: "xkb:us::eng".to_string(),
             error: String::new(),
         });
 
         assert!(status.available);
         assert!(status.ready);
+        assert_eq!(status.setup_state, "ready");
         assert_eq!(status.session_id, Some(7));
         assert!(status.engine_active);
         assert!(status.progressive_commit_active);
         assert_eq!(status.committed_character_count, 18);
         assert!(status.ownership_intact);
-        assert_eq!(status.current_engine, "voco");
-        assert_eq!(status.default_engine, "xkb:us::eng");
         assert_eq!(status.error, None);
     }
 
     #[test]
-    fn embedded_engine_uses_owned_preedit_and_commit_apis() {
+    fn classifies_only_absent_or_refused_installed_sockets_as_not_enabled() {
+        for error in [
+            "VOCO Dictation is not active at /run/user/1/voco/ibus-engine.sock",
+            "VOCO Dictation input source is not active: No such file or directory",
+            "VOCO Dictation is not active: Connection refused",
+        ] {
+            assert_eq!(classify_unavailable_status(error, true).0, "not-enabled");
+        }
+        for error in [
+            "VOCO input method socket permissions are not private",
+            "Could not verify the VOCO input method peer",
+            "Invalid VOCO input method response",
+            "Failed to read VOCO input method response: timed out",
+            "VOCO input method response order was invalid",
+            "XDG_RUNTIME_DIR permissions are not private",
+        ] {
+            assert_eq!(classify_unavailable_status(error, true).0, "error");
+        }
+    }
+
+    #[test]
+    fn classifies_setup_and_protocol_failures_actionably() {
+        assert_eq!(
+            classify_unavailable_status("protocol version mismatch", true).0,
+            "incompatible"
+        );
+        assert_eq!(
+            classify_unavailable_status("XDG_RUNTIME_DIR is unavailable", true).0,
+            "runtime-unavailable"
+        );
+        assert_eq!(
+            classify_unavailable_status("input method is already connected", true).0,
+            "error"
+        );
+        assert_eq!(
+            classify_unavailable_status("No such file or directory", false).0,
+            "not-installed"
+        );
+    }
+
+    #[test]
+    fn production_engine_has_no_global_switch_or_destructive_api() {
+        for forbidden in [
+            "set_global_engine",
+            "register_component",
+            "delete_surrounding_text",
+            "get_surrounding_text",
+        ] {
+            assert!(!ENGINE_SCRIPT.contains(forbidden), "found {forbidden}");
+        }
         assert!(ENGINE_SCRIPT.contains("update_preedit_text_with_mode"));
         assert!(ENGINE_SCRIPT.contains("commit_text"));
-        assert!(ENGINE_SCRIPT.contains("ownership_intact"));
-        assert!(ENGINE_SCRIPT.contains("plan.commands()"));
+        assert!(ENGINE_SCRIPT.contains("return False"));
+        assert!(ENGINE_SCRIPT.contains("clientSessionId"));
+        assert!(PROTOCOL_SCRIPT.contains("SO_PEERCRED"));
         assert!(OWNERSHIP_SCRIPT.contains("cannot authorize destructive editing"));
-        assert!(!ENGINE_SCRIPT.contains("delete_surrounding_text"));
-        assert!(!OWNERSHIP_SCRIPT.contains("delete-surrounding-text"));
-        assert!(!ENGINE_SCRIPT.contains("get_surrounding_text"));
-        assert!(ENGINE_SCRIPT.contains("bus.set_global_engine(default_engine)"));
-        assert!(ENGINE_SCRIPT.contains("IBus has no active desktop input engine"));
-        assert!(ENGINE_SCRIPT.contains("register_context_reset"));
         assert!(!ENGINE_SCRIPT.contains("print(text"));
     }
 
-    #[cfg(target_os = "linux")]
     #[test]
-    #[ignore = "requires a live IBus desktop session and focused input context"]
-    fn desktop_sidecar_restores_the_previous_engine_on_shutdown() {
-        let before = Command::new(IBUS_PATH)
-            .arg("engine")
-            .output()
-            .expect("query the current IBus engine");
-        assert!(before.status.success());
-        let before = String::from_utf8(before.stdout)
-            .expect("IBus engine name is UTF-8")
-            .trim()
-            .to_string();
-        assert!(!before.is_empty());
+    fn packaged_component_is_explicit_and_not_preferred() {
+        assert!(COMPONENT_XML.contains("<name>org.freedesktop.IBus.Voco</name>"));
+        assert!(COMPONENT_XML.contains("<exec>/usr/libexec/voco-ibus-engine</exec>"));
+        assert!(COMPONENT_XML.contains("<name>voco</name>"));
+        assert!(COMPONENT_XML.contains("<rank>0</rank>"));
+    }
 
-        let service = OwnedPreeditService::default();
-        let status = service.start(99_001).expect("activate the VOCO engine");
-        assert!(status.engine_active);
-        let session_id = status.session_id.expect("service-issued session ID");
-        let status = service
-            .update(
-                session_id,
-                String::new(),
-                "VOCO provisional text".to_string(),
-                "VOCO provisional text".to_string(),
-            )
-            .expect("publish provisional text");
-        assert!(status.engine_active);
-        let status = service
-            .update(
-                session_id,
-                String::new(),
-                "VOCO revised provisional text".to_string(),
-                "VOCO revised provisional text".to_string(),
-            )
-            .expect("revise provisional text");
-        assert!(status.engine_active);
-        service.cancel(session_id).expect("cancel provisional text");
+    fn temporary_socket_path(label: &str) -> PathBuf {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock after epoch")
+            .as_nanos();
+        let directory = std::env::temp_dir().join(format!(
+            "voco-owned-preedit-{label}-{}-{nonce}",
+            std::process::id()
+        ));
+        fs::create_dir(&directory).expect("create private test directory");
+        fs::set_permissions(&directory, fs::Permissions::from_mode(0o700))
+            .expect("secure test directory");
+        directory.join("ibus-engine.sock")
+    }
+
+    fn ready_response(id: u64, protocol_version: u32) -> Value {
+        json!({
+            "version": protocol_version,
+            "id": id,
+            "ok": true,
+            "result": {
+                "ready": true,
+                "setupState": "ready",
+                "sessionId": null,
+                "engineActive": false,
+                "focusLost": false,
+                "progressiveCommitActive": false,
+                "committedCharacterCount": 0,
+                "ownershipIntact": true,
+                "finalizationOutcome": null,
+                "error": ""
+            }
+        })
+    }
+
+    fn write_response(stream: &mut UnixStream, value: &Value) {
+        serde_json::to_writer(&mut *stream, value).expect("encode fake response");
+        stream.write_all(b"\n").expect("terminate fake response");
+        stream.flush().expect("flush fake response");
+    }
+
+    #[test]
+    fn private_socket_client_negotiates_and_preserves_request_order() {
+        let socket_path = temporary_socket_path("round-trip");
+        let listener = UnixListener::bind(&socket_path).expect("bind fake engine");
+        fs::set_permissions(&socket_path, fs::Permissions::from_mode(0o600))
+            .expect("secure fake engine socket");
+        let server = thread::spawn(move || {
+            let (stream, _) = listener.accept().expect("accept app client");
+            let mut reader = BufReader::new(stream.try_clone().expect("clone fake stream"));
+            let mut writer = stream;
+            for expected_operation in ["hello", "status"] {
+                let mut line = String::new();
+                reader.read_line(&mut line).expect("read request");
+                let request: Value = serde_json::from_str(&line).expect("decode request");
+                assert_eq!(request["version"], PROTOCOL_VERSION);
+                assert_eq!(request["operation"], expected_operation);
+                let id = request["id"].as_u64().expect("request id");
+                write_response(&mut writer, &ready_response(id, PROTOCOL_VERSION));
+            }
+        });
+
+        let mut bridge = SocketBridge::connect_to(&socket_path).expect("connect fake engine");
+        let status = bridge
+            .send_status(json!({ "operation": "status" }))
+            .expect("read fake status");
+        assert!(status.available);
+        assert_eq!(status.setup_state, "ready");
+        drop(bridge);
+        server.join().expect("fake server completed");
+        fs::remove_file(&socket_path).expect("remove fake socket");
+        fs::remove_dir(socket_path.parent().expect("socket parent"))
+            .expect("remove fake directory");
+    }
+
+    #[test]
+    fn private_socket_client_rejects_protocol_version_mismatch() {
+        let socket_path = temporary_socket_path("version");
+        let listener = UnixListener::bind(&socket_path).expect("bind fake engine");
+        fs::set_permissions(&socket_path, fs::Permissions::from_mode(0o600))
+            .expect("secure fake engine socket");
+        let server = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().expect("accept app client");
+            let mut line = String::new();
+            BufReader::new(stream.try_clone().expect("clone fake stream"))
+                .read_line(&mut line)
+                .expect("read hello");
+            let request: Value = serde_json::from_str(&line).expect("decode hello");
+            let id = request["id"].as_u64().expect("request id");
+            write_response(&mut stream, &ready_response(id, PROTOCOL_VERSION + 1));
+        });
+
+        let error = match SocketBridge::connect_to(&socket_path) {
+            Ok(_) => panic!("protocol mismatch should fail"),
+            Err(error) => error,
+        };
+        assert!(error.contains("protocol version"));
+        server.join().expect("fake server completed");
+        fs::remove_file(&socket_path).expect("remove fake socket");
+        fs::remove_dir(socket_path.parent().expect("socket parent"))
+            .expect("remove fake directory");
+    }
+
+    #[test]
+    fn private_socket_client_rejects_permissive_socket_mode() {
+        let socket_path = temporary_socket_path("mode");
+        let listener = UnixListener::bind(&socket_path).expect("bind fake engine");
+        fs::set_permissions(&socket_path, fs::Permissions::from_mode(0o666))
+            .expect("make fake socket unsafe");
+        let error = validate_socket_path(&socket_path).expect_err("unsafe mode rejected");
+        assert!(error.contains("permissions are not private"));
+        drop(listener);
+        fs::remove_file(&socket_path).expect("remove fake socket");
+        fs::remove_dir(socket_path.parent().expect("socket parent"))
+            .expect("remove fake directory");
+    }
+
+    #[test]
+    fn shutdown_drops_the_renderer_connection() {
+        let socket_path = temporary_socket_path("renderer-reload");
+        let listener = UnixListener::bind(&socket_path).expect("bind fake engine");
+        fs::set_permissions(&socket_path, fs::Permissions::from_mode(0o600))
+            .expect("secure fake engine socket");
+        let server = thread::spawn(move || {
+            let (stream, _) = listener.accept().expect("accept app client");
+            let mut reader = BufReader::new(stream.try_clone().expect("clone fake stream"));
+            let mut writer = stream;
+            let mut line = String::new();
+            reader.read_line(&mut line).expect("read hello");
+            let request: Value = serde_json::from_str(&line).expect("decode hello");
+            let id = request["id"].as_u64().expect("request id");
+            write_response(&mut writer, &ready_response(id, PROTOCOL_VERSION));
+            let mut byte = [0_u8; 1];
+            assert_eq!(reader.read(&mut byte).expect("read client close"), 0);
+        });
+
+        let bridge = SocketBridge::connect_to(&socket_path).expect("connect fake engine");
+        let service = OwnedPreeditService {
+            bridge: Mutex::new(Some(bridge)),
+            next_session_id: AtomicU64::new(1),
+        };
         service.shutdown();
 
-        let after = Command::new(IBUS_PATH)
-            .arg("engine")
-            .output()
-            .expect("query the restored IBus engine");
-        assert!(after.status.success());
-        let after = String::from_utf8(after.stdout)
-            .expect("IBus engine name is UTF-8")
-            .trim()
-            .to_string();
-        assert_eq!(after, before);
+        server.join().expect("fake server completed");
+        fs::remove_file(&socket_path).expect("remove fake socket");
+        fs::remove_dir(socket_path.parent().expect("socket parent"))
+            .expect("remove fake directory");
+    }
+
+    #[test]
+    fn ordered_stale_rejection_keeps_the_current_connection() {
+        let socket_path = temporary_socket_path("stale-rejection");
+        let listener = UnixListener::bind(&socket_path).expect("bind fake engine");
+        fs::set_permissions(&socket_path, fs::Permissions::from_mode(0o600))
+            .expect("secure fake engine socket");
+        let server = thread::spawn(move || {
+            let (stream, _) = listener.accept().expect("accept app client");
+            let mut reader = BufReader::new(stream.try_clone().expect("clone fake stream"));
+            let mut writer = stream;
+
+            let mut hello_line = String::new();
+            reader.read_line(&mut hello_line).expect("read hello");
+            let hello: Value = serde_json::from_str(&hello_line).expect("decode hello");
+            write_response(
+                &mut writer,
+                &ready_response(hello["id"].as_u64().expect("hello id"), PROTOCOL_VERSION),
+            );
+
+            let mut stale_line = String::new();
+            reader
+                .read_line(&mut stale_line)
+                .expect("read stale update");
+            let stale: Value = serde_json::from_str(&stale_line).expect("decode stale update");
+            assert_eq!(stale["operation"], "update");
+            write_response(
+                &mut writer,
+                &json!({
+                    "version": PROTOCOL_VERSION,
+                    "id": stale["id"],
+                    "ok": false,
+                    "error": "stale or inactive session"
+                }),
+            );
+
+            let mut status_line = String::new();
+            reader
+                .read_line(&mut status_line)
+                .expect("read status after rejection");
+            let status: Value = serde_json::from_str(&status_line).expect("decode status");
+            assert_eq!(status["operation"], "status");
+            write_response(
+                &mut writer,
+                &ready_response(status["id"].as_u64().expect("status id"), PROTOCOL_VERSION),
+            );
+        });
+
+        let bridge = SocketBridge::connect_to(&socket_path).expect("connect fake engine");
+        let service = OwnedPreeditService {
+            bridge: Mutex::new(Some(bridge)),
+            next_session_id: AtomicU64::new(1),
+        };
+        let error = service
+            .update(99, String::new(), "tail".to_string(), "tail".to_string())
+            .expect_err("stale update rejected");
+        assert_eq!(error, "stale or inactive session");
+        assert!(service.status().available);
+
+        service.shutdown();
+        server.join().expect("fake server completed");
+        fs::remove_file(&socket_path).expect("remove fake socket");
+        fs::remove_dir(socket_path.parent().expect("socket parent"))
+            .expect("remove fake directory");
     }
 }

@@ -28,10 +28,10 @@
   <url type="vcs-browser">https://github.com/sergiopesch/voco</url>
   <content_rating type="oars-1.1" />
   <releases>
-    <release version="2026.0.18" date="2026-07-13">
+    <release version="2026.0.19" date="2026-07-14">
       <description>
-        <p>Adds bounded IBus-owned cursor streaming with progressive native text, authoritative full-session transcription, and fail-closed finalization that never deletes surrounding target text.</p>
-        <p>Hardens stale-session and cursor-context races, captured-audio regression coverage, long-dictation performance, Linux packaging, checksums, and release verification.</p>
+        <p>Replaces dynamic desktop-engine switching with a persistent, explicitly user-enabled VOCO Dictation input source and owner-authenticated private IPC.</p>
+        <p>Hardens focus, cursor, session, password-field, disconnect, and finalization races while preserving the no-surrounding-text-deletion contract.</p>
       </description>
     </release>
   </releases>

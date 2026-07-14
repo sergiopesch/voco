@@ -3273,6 +3273,16 @@ pub fn run() {
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .manage(Mutex::new(WhisperState::new()) as WhisperMutex)
         .manage(owned_preedit::OwnedPreeditService::default())
+        .on_page_load(|webview, payload| {
+            if matches!(payload.event(), tauri::webview::PageLoadEvent::Started) {
+                // A renderer reload discards its session ids. Close the
+                // private channel first so the engine clears only its owned
+                // preedit before the replacement renderer can start.
+                webview
+                    .state::<owned_preedit::OwnedPreeditService>()
+                    .shutdown();
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             get_config,
             save_config,

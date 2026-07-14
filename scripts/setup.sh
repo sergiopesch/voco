@@ -271,9 +271,10 @@ TOML
   echo
   echo -e "  ${WHITE}${BOLD}▸${NC} Open ${BOLD}VOCO${NC} from your app launcher"
   echo -e "  ${WHITE}${BOLD}▸${NC} Or run: ${GRAPHITE_SOFT}voco${NC}"
+  echo -e "  ${WHITE}${BOLD}▸${NC} Add and select ${BOLD}VOCO Dictation${NC} in Input Sources for live cursor words"
   echo
   echo -e "  ${DIM}First launch downloads the speech model (~142 MB, one-time).${NC}"
-  echo -e "  ${DIM}Then press ${BOLD}${HOTKEY}${NC}${DIM} to dictate!${NC}"
+  echo -e "  ${DIM}Focus a text field, then press ${BOLD}${HOTKEY}${NC}${DIM} to dictate!${NC}"
   echo
   echo -e "  ${DIM}You can change the hotkey anytime from the system tray icon${NC}"
   echo -e "  ${DIM}or edit ${CONFIG_FILE}${NC}"
@@ -291,6 +292,7 @@ else
   echo -e "  ${WHITE}${BOLD}▸${NC} Full install:  ${GRAPHITE_SOFT}./scripts/setup.sh --install${NC}"
   echo
   echo -e "  ${DIM}First launch downloads the speech model (~142 MB, one-time).${NC}"
-  echo -e "  ${DIM}Then press ${BOLD}Alt+D${NC}${DIM} to dictate!${NC}"
+  echo -e "  ${DIM}Live cursor words require the installed Debian component; dev-only runs use the preview fallback.${NC}"
+  echo -e "  ${DIM}Then press ${BOLD}Alt+D${NC}${DIM} to dictate.${NC}"
   echo
 fi

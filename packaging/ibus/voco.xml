@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component>
+  <name>org.freedesktop.IBus.Voco</name>
+  <description>VOCO Dictation Input Source</description>
+  <exec>/usr/libexec/voco-ibus-engine</exec>
+  <version>2026.0.19</version>
+  <author>VOCO Contributors</author>
+  <license>MIT</license>
+  <homepage>https://github.com/sergiopesch/voco</homepage>
+  <textdomain>voco</textdomain>
+  <engines>
+    <engine>
+      <name>voco</name>
+      <longname>VOCO Dictation</longname>
+      <description>Local dictation input source</description>
+      <language>en</language>
+      <license>MIT</license>
+      <author>VOCO Contributors</author>
+      <icon>voco</icon>
+      <layout>default</layout>
+      <symbol>VO</symbol>
+      <rank>0</rank>
+    </engine>
+  </engines>
+</component>

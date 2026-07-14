@@ -112,10 +112,18 @@ export interface RuntimeDiagnostics {
 export interface OwnedPreeditStatus {
   available: boolean;
   ready: boolean;
+  setupState:
+    | "ready"
+    | "not-enabled"
+    | "not-installed"
+    | "runtime-unavailable"
+    | "incompatible"
+    | "error"
+    | "";
+  detail: string;
   sessionId: number | null;
   engineActive: boolean;
   focusLost: boolean;
-  switching: boolean;
   progressiveCommitActive: boolean;
   committedCharacterCount: number;
   ownershipIntact: boolean;
@@ -125,8 +133,6 @@ export interface OwnedPreeditStatus {
     | "discarded"
     | "preserved"
     | null;
-  currentEngine: string;
-  defaultEngine: string;
   error: string | null;
 }
 

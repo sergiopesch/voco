@@ -145,20 +145,31 @@ Acceptance criteria:
 
 ### 4. Cursor Input Backend
 
-Preferred live cursor streaming uses a private IBus engine owned by the VOCO process.
+Preferred live cursor streaming uses the persistent `VOCO Dictation` IBus input source. The Debian
+package advertises it, IBus owns its process, and the user explicitly enables/selects it. VOCO never
+changes the global engine or input-source settings.
 
 Acceptance criteria:
 
-- The sidecar is child-process scoped, accepts only structured stdin commands, and never logs or
-  returns transcript text.
-- The sidecar does not request, retain, return, log, or persist surrounding target text.
-- Start captures the previous global engine; commit, cancel, failure, and app exit restore it.
-- Service-issued session generations reject renderer reloads and stale preview/finalization commands.
+- The engine accepts one same-user app connection over a private, versioned, bounded Unix-socket
+  protocol and never logs or returns transcript text.
+- The runtime directory is 0700, the socket is 0600, both peers verify `SO_PEERCRED`, and an absent
+  or unsafe `XDG_RUNTIME_DIR` fails closed.
+- The engine does not request, retain, return, log, or persist surrounding target text.
+- The app never spawns, stops, registers, selects, switches, or restores an IBus engine.
+- Service-issued session generations reject stale preview/finalization commands, and a renderer page
+  reload closes the backend socket so the engine clears only its preedit before accepting a new one.
+- App disconnect, focus/source/context changes, normal key input, missing preedit capability, and
+  password/PIN purpose or private/hidden content hints clear only preedit and invalidate the active
+  generation. A revision-bound post-focus barrier lets queued sensitive metadata win before a
+  repeated non-sensitive content type can be reused.
 - Headless command-level tests assert that mismatch, prefix-only match, cursor/context reset,
-  focus/context changes, session races, cancellation, target closure, and the long synthetic case
-  emit no target command. The command model cannot represent deletion.
+  focus/context changes, session races, cancellation, input-source replacement, target closure, and
+  the long synthetic case emit no target command. A progressive commit must exactly consume a prefix
+  of the previously owned preedit. The command model cannot represent deletion.
 - Stable cursor mode has no ydotool/xdotool insertion command or destructive compatibility route.
-- Settings diagnostics clearly show `ydotoold` status.
+- Settings diagnostics distinguish missing, not-enabled, ready, runtime-unavailable, and
+  version-incompatible input-source states.
 
 ### 5. Finalization
 

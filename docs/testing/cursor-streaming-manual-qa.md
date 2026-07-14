@@ -5,6 +5,8 @@ Use this checklist when validating direct live words at the cursor.
 ## Setup
 
 - Ubuntu Wayland with IBus, `python3-gi`, and `gir1.2-ibus-1.0` installed.
+- The current VOCO Debian package installed in the disposable VM.
+- `VOCO Dictation` manually added and selected in the VM's Input Sources settings.
 - Settings -> Advanced -> Automatic live cursor reports `Ready`.
 - Settings -> Output & local model -> After transcription is `Type transcript at cursor`.
 - Settings -> Output & local model -> Live cursor mode is `Live words at cursor (recommended)`.
@@ -34,8 +36,9 @@ npm run report:cursor-streaming
 ## Desktop Safety Boundary
 
 Run automated VOCO + IBus + target-application tests only in a disposable remote VM or microVM. Do
-not exercise input injection, virtual audio routing, or engine switching on an active workstation
-desktop. The no-deletion ownership and command-emission matrix is safe to run headlessly:
+not exercise input injection, virtual audio routing, or automated input-source changes on an active
+workstation desktop. The no-deletion ownership and command-emission matrix is safe to run
+headlessly:
 
 ```bash
 npm run test:owned-preedit
@@ -62,6 +65,12 @@ screenshots, and recordings separately.
 - Dictate punctuation-heavy text.
 - Dictate phrases that commonly get revised by Whisper.
 - Repeat the same phrase twice.
+- Switch away from `VOCO Dictation` during a provisional update; only preedit clears.
+- Move focus, move the cursor, change selection, and close the target during dictation.
+- Type a normal key while provisional text is visible; the key passes through and the lease ends.
+- Attempt password, PIN, private, and hidden-text fields; stable cursor streaming remains unavailable.
+- Kill/restart only the disposable VM's VOCO app and IBus engine in separate cases.
+- Reinstall a newer package while the old engine is running; protocol mismatch stays preview-only.
 
 ## Target Apps
 
@@ -87,6 +96,8 @@ screenshots, and recordings separately.
   text and the trace report marks the run as failed rather than calling it complete.
 - Cancellation after progressive commits preserves those normal target-app commits and clears only
   VOCO's still-provisional preedit tail.
+- Ordinary GB-layout typing, compose/dead keys, GTK, Qt, Electron, and terminal input continue to
+  behave normally while the persistent source is selected and dictation is idle.
 
 ## Timing Evidence
 

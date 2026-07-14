@@ -32,7 +32,8 @@ jobs:
             pkg-config libglib2.0-dev libsoup-3.0-dev \
             libjavascriptcoregtk-4.1-dev libwebkit2gtk-4.1-dev \
             libayatana-appindicator3-dev \
-            desktop-file-utils appstream cmake
+            desktop-file-utils appstream cmake \
+            ibus python3 python3-gi gir1.2-ibus-1.0 bubblewrap
 
       - name: Install Node dependencies
         run: npm ci
@@ -51,6 +52,9 @@ jobs:
 
       - name: Frontend tests
         run: npm test
+
+      - name: Private headless IBus lifecycle
+        run: npm run test:private-ibus
 
       - name: Frontend production build
         run: npm --workspace @voco/desktop run build:frontend

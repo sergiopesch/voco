@@ -6,6 +6,7 @@ VOCO is a voice-first, local-first desktop dictation app for Linux, built with T
 
 ```
 User speaks -> Audio Capture -> Local ASR -> Text Insertion
+User speaks -> Audio Capture -> Preview ASR -> Persistent IBus owned preedit -> Target field
 User speaks -> Audio Capture -> Local ASR -> Optional Local Transcript Enhancement -> Text Insertion
 User speaks -> Audio Capture -> Local ASR -> Optional Local Model Assistant -> Text Insertion
 User speaks -> Audio Capture -> Local ASR -> OpenClaw Agent -> Text Insertion
@@ -30,6 +31,8 @@ apps/desktop/           Tauri application
     src/transcribe.rs   whisper.cpp integration via whisper-rs
     src/insertion.rs    Text insertion (ydotool/xdotool/clipboard)
     src/config.rs       Settings persistence (XDG config dir)
+    src/owned_preedit.rs Private client for the persistent IBus engine
+    resources/voco_ibus_* Persistent engine, protocol, and pure ownership model
 ```
 
 ## Data Flow
@@ -40,8 +43,15 @@ apps/desktop/           Tauri application
 4. **Optional transcript enhancement**: When enabled, deterministic voice formatting commands are applied after ASR. Conservative polish can also call an OpenAI-compatible local model endpoint on `localhost` only; failures fall back to the raw transcript.
 5. **Status Feedback**: Transparent overlay window is moved near the cursor while recording and processing so the user can see that VOCO is listening or processing
 6. **Output target**: Default target inserts the transcript directly. The local model target sends the transcript to the configured localhost model endpoint and inserts the answer. Optional OpenClaw targets send the transcript to `openclaw agent --agent <id> --message <text>` and either insert the agent response or convert it through `openclaw gateway call tts.convert` for local playback.
-7. **Insertion**: Final text -> ydotool/xdotool type simulation or clipboard paste
-8. **Fallback**: In `auto` mode, if direct typing fails, text is placed on clipboard and Ctrl+V is simulated. Strict `type-simulation` mode reports the failure instead of modifying the clipboard.
+7. **Stable live cursor**: The Debian package advertises a persistent `VOCO Dictation` IBus input
+   source. After the user selects it, Rust connects through a private same-user runtime socket.
+   Stable preview phrases become normal target text; only the bounded changing tail remains preedit.
+   The engine never reads or deletes surrounding target text.
+8. **Final/other insertion**: Final-text-only and non-cursor outputs use ydotool/xdotool type
+   simulation or clipboard paste according to the selected strategy.
+9. **Fallback**: If the owned input source, focus, preedit capability, or session lease is not
+   provable, stable cursor mode keeps the transcript inside VOCO. It does not switch engines or use
+   global keyboard injection as a hidden fallback.
 
 Realtime conversation bypasses the local ASR/output target path. The backend reads `OPENAI_API_KEY` and mints a short-lived Realtime client token. The frontend uses that token to open a WebSocket, streams 24 kHz PCM16 microphone chunks with `input_audio_buffer.append`, and plays PCM16 `response.output_audio.delta` chunks through Web Audio. The same audio samples drive the realtime VOCO mic visual, so the hidden overlay and popover reflect both user speech and assistant playback.
 
@@ -81,6 +91,19 @@ Realtime conversation uses a separate fixed hotkey, `Alt+Shift+R`, and emits `vo
 | X11 | xdotool type | xclip + xdotool Ctrl+V |
 
 Clipboard contents are saved (if text) and restored after fallback insertion (300ms delay).
+
+## Persistent IBus Input Source
+
+The Debian package installs immutable component, launcher, and Python engine files. IBus owns the
+engine process; the VOCO app never spawns or kills it and never calls `SetGlobalEngine`. Outside an
+active lease every key is passed through. The app/engine protocol uses
+`$XDG_RUNTIME_DIR/voco/ibus-engine.sock`, checks owner-only filesystem permissions and Linux peer
+credentials, accepts one controller, and carries no transcript text in status or error responses.
+App disconnect invalidates the session and clears only VOCO-owned preedit.
+
+IBus surrounding text is cached and lacks a target-bound freshness revision. Consequently the
+engine has no deletion API, and any authoritative final that would revise progressively committed
+normal text is preserved in VOCO instead of rewriting the target.
 
 ## Logging
 

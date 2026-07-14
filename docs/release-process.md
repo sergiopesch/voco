@@ -18,6 +18,7 @@ npm ci
 npm run verify:versions
 npm run check
 npm test
+npm run test:private-ibus
 npm --workspace @voco/desktop run build:frontend
 npm run rehearse:release
 ```
@@ -42,6 +43,11 @@ git push origin voco.<version>
 - `voco_<version>_amd64.deb`
 - `voco_checksums.txt`
 - `VOCO-<version>-x86_64.AppImage` when AppImage packaging succeeds
+- the Debian package contains `/usr/share/ibus/component/voco.xml`, the executable
+  `/usr/libexec/voco-ibus-engine`, and the three root-owned modules under `/usr/lib/voco/ibus/`
+- `scripts/verify-deb-package.sh <package.deb> <version>` confirms the package dependencies,
+  paths, ownership, modes, exact engine payload, and absence of Python test/cache artifacts
+- package installation does not alter the test user's enabled input sources
 
 ## Rehearsal details
 
@@ -76,6 +82,8 @@ The workflow rejects a tag unless it exactly matches `voco.<package.json version
 
 The release workflow:
 - builds the Debian bundle
+- runs the private headless IBus lifecycle in an isolated namespace
+- verifies the built Debian bundle before collecting release assets
 - attempts the AppImage bundle
 - includes the AppImage only when Tauri produces it; the manual AppDir fallback requires explicit
   `VOCO_APPIMAGETOOL_PATH` and `VOCO_APPIMAGETOOL_SHA256` values
@@ -96,6 +104,8 @@ The release workflow:
 - start VOCO only inside the disposable remote desktop described in the testing guide
 - complete onboarding
 - test dictation with `Alt+D`
+- manually add/select `VOCO Dictation`; verify normal GB-layout typing while idle
+- verify source switch, focus loss, app exit, target close, and package-version mismatch fail closed
 - confirm tray launch, settings, and hide-to-tray still work
 - run `npm run report:linux-runtime` if Linux insertion changed
 

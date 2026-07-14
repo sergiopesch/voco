@@ -23,7 +23,7 @@ For low-latency back-and-forth voice, VOCO also has an opt-in realtime conversat
 Recommended:
 
 ```bash
-wget https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.18/install -O voco-install
+wget https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.19/install -O voco-install
 chmod +x voco-install
 ./voco-install
 ```
@@ -40,7 +40,7 @@ Manual `.deb` fallback:
 wget -O voco_latest_amd64.deb https://github.com/sergiopesch/voco/releases/latest/download/voco_latest_amd64.deb
 wget https://github.com/sergiopesch/voco/releases/latest/download/voco_latest_checksums.txt
 sha256sum --check voco_latest_checksums.txt
-sudo dpkg -i voco_latest_amd64.deb
+sudo apt install ./voco_latest_amd64.deb
 ```
 
 Primary tested path: Ubuntu and Debian.
@@ -49,10 +49,11 @@ Primary tested path: Ubuntu and Debian.
 
 1. Launch `VOCO` from your app menu or run `voco`.
 2. Finish the short setup.
-3. Press `Alt+D`.
-4. Speak.
-5. Press `Alt+D` again.
-6. Confirm the text is inserted at your cursor.
+3. In your desktop Input Sources settings, add and select `VOCO Dictation`.
+4. Focus the target text field and press `Alt+D`.
+5. Speak.
+6. Press `Alt+D` again.
+7. Confirm the text is inserted at your cursor.
 
 To use OpenClaw mode, open Settings -> Output, choose `Ask OpenClaw and type answer` or `Ask OpenClaw and speak answer`, and keep the OpenClaw gateway/agent available from your shell environment. Spoken answers also require OpenClaw TTS and `ffplay`.
 
@@ -64,6 +65,7 @@ Detailed realtime behavior, first-toggle guarantees, diagnostics, and QA criteri
 
 - Ubuntu or Debian
 - PulseAudio or PipeWire
+- IBus, `python3-gi`, and `gir1.2-ibus-1.0` for live words at the cursor
 - Wayland: `ydotool`, `wl-clipboard`, and access to the `input` group for the most reliable hotkey path
 - X11: `xdotool` and `xclip`
 
@@ -101,7 +103,8 @@ npm run report:linux-runtime
 - Single dictation recordings are currently capped at 10 minutes.
 - On Wayland, `Alt+D` and `Alt+Shift+D` are the most reliable hotkeys right now.
 - Realtime conversation uses `Alt+Shift+R`.
-- Live words at the cursor is the default: on supported Linux desktops, VOCO keeps only the changing
+- Live words at the cursor is the default for the Debian package: after the user explicitly enables
+  and selects the persistent `VOCO Dictation` input source, VOCO keeps only the changing
   tail in an owned IBus preedit range and progressively commits stable phrases as normal target-app
   text so the field can wrap and lay them out natively. Generic IBus surrounding text is cached and
   cannot prove a fresh editor revision, so VOCO never deletes or rewrites progressively committed
@@ -111,9 +114,11 @@ npm run report:linux-runtime
 - A live transcript panel and final-text-only mode remain available in Settings as fallbacks.
 - Local model transcript enhancement and local assistant mode are opt-in and require a localhost model server.
 - The realtime VOCO mic animation is driven by live input and output audio levels.
-- Live cursor revisions require IBus, `python3-gi`, and the IBus GI bindings. If that owned preedit
-  cannot start, stable mode remains preview-only for the session; it does not fall back to global
-  keyboard injection.
+- VOCO never enables, selects, switches, or restores a desktop input source. The packaged engine is
+  passive outside an active dictation and communicates with the app over a private same-user runtime
+  socket. If the component is absent, not selected, incompatible, or disconnected, stable mode
+  remains preview-only for the session and does not fall back to global keyboard injection. AppImage
+  and uninstalled source builds do not provide the system IBus component.
 - OpenClaw mode is opt-in and requires the `openclaw` CLI to be available in `PATH`.
 - Realtime conversation is opt-in and requires `OPENAI_API_KEY` in the environment or `~/.openclaw/realtime.env`.
 - Config lives at `~/.config/voco/config.json`.

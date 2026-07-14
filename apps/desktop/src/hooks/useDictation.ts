@@ -386,9 +386,28 @@ export function useDictation() {
         ownedPreeditActiveRef.current = true;
         traceDictationEvent("dictation_owned_preedit_started").catch(() => {});
         return true;
-      } catch {
+      } catch (error) {
         console.info("Owned cursor streaming unavailable; using VOCO preview only.");
         traceDictationEvent("dictation_owned_preedit_unavailable").catch(() => {});
+        const detail = error instanceof Error ? error.message : String(error);
+        const sensitiveOrUnsupportedField = detail.includes(
+          "safe non-sensitive preedit context",
+        );
+        const inputSourceUnavailable =
+          detail.includes("VOCO Dictation") || detail.includes("not active");
+        liveCursorFallbackNotifiedRef.current = true;
+        showNotification(
+          sensitiveOrUnsupportedField
+            ? "Live cursor unavailable for this field"
+            : inputSourceUnavailable
+              ? "VOCO Dictation input source required"
+              : "Live cursor safety fallback",
+          sensitiveOrUnsupportedField
+            ? "VOCO keeps sensitive or unsupported fields preview-only. This recording will remain inside VOCO."
+            : inputSourceUnavailable
+              ? "Add and select VOCO Dictation in your desktop Input Sources, then focus the target field. This recording will remain preview-only."
+              : "VOCO could not establish a verified private input session, so this recording will remain preview-only.",
+        ).catch(() => {});
         return false;
       }
     })();
