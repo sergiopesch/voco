@@ -83,8 +83,15 @@ describe("captured dictation replay", () => {
       timeline.cursorInsertionDisabled === true ||
       finalFrame?.stateAfter.cursorInsertionDisabled === true;
     if (captureDisabled) {
+      const hasCommittedCursorText =
+        (timeline.committedCursorText?.length ?? 0) > 0 ||
+        (finalFrame?.stateAfter.committedCursorText.length ?? 0) > 0;
       expect(
         orphaningFrames.length > 0 ||
+          // Owned preedit can fail closed before VOCO commits anything to the
+          // target. The final may still be appendable in isolation, but there
+          // is deliberately no target-owned text to reconcile.
+          !hasCommittedCursorText ||
           reconcileFinalCursorText(
             finalFrame?.stateAfter.committedCursorText ?? "",
             timeline.finalTranscript,
