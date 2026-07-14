@@ -19,7 +19,7 @@ streaming checklist, and preserve the remote run ID and evidence.
 1. Install dependencies:
 
 ```bash
-npm install
+npm ci
 ./scripts/setup.sh --install
 ```
 
@@ -53,12 +53,18 @@ release binaries that omit it.
 
 ```bash
 npm run verify:versions
+npm run test:owned-preedit
 npm run check
 npm run lint
-npm test
+CARGO_BUILD_JOBS=2 cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml
+cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml -- --check
 npm --workspace @voco/desktop run build:frontend
-cd apps/desktop/src-tauri && cargo check && cargo clippy -- -D warnings && cargo test
+CARGO_BUILD_JOBS=2 cargo clippy --locked --manifest-path apps/desktop/src-tauri/Cargo.toml --all-targets --all-features -- -D warnings
+npm test
 ```
+
+Build the frontend before the all-features Clippy gate on a clean checkout. Tauri's production
+`custom-protocol` context validates `apps/desktop/dist` at compile time.
 
 ## Manual checks before release
 

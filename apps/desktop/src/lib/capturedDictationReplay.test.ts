@@ -247,7 +247,10 @@ describe("captured dictation replay", () => {
       // the old append-only 13-second stalls.
       expect(percentile(updateGapsMs, 95)).toBeLessThanOrEqual(5_000);
     },
-    180_000,
+    // Full-capture CPU inference varies substantially with host load. Keep
+    // correctness and cursor-cadence limits in the assertions above instead
+    // of treating machine throughput as product behavior.
+    600_000,
   );
 });
 

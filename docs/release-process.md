@@ -9,7 +9,7 @@ VOCO releases are cut from git tags in the form `voco.<version>`.
 ```bash
 git checkout master
 git pull origin master
-npm install
+npm ci
 ```
 
 2. Run the release checks:
