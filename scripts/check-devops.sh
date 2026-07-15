@@ -5,6 +5,13 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 cd "${ROOT_DIR}"
 
+for command in node npm python3 rg; do
+  if ! command -v "${command}" >/dev/null 2>&1; then
+    echo "Required DevOps preflight command is unavailable: ${command}" >&2
+    exit 1
+  fi
+done
+
 npm run verify:versions
 
 bash -n \
