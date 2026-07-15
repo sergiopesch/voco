@@ -16,9 +16,6 @@ jobs:
   build:
     name: Build & Verify
     runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-      checks: write
     outputs:
       version: ${{ steps.version.outputs.version }}
       tag_name: ${{ steps.version.outputs.tag_name }}
@@ -83,10 +80,10 @@ jobs:
         run: npm run verify:security
 
       - name: Rust dependency security audit
-        uses: rustsec/audit-check@69366f33c96575abad1ee0dba8212993eecbe998 # v2.0.0
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          working-directory: apps/desktop/src-tauri
+        working-directory: apps/desktop/src-tauri
+        run: |
+          cargo install cargo-audit --version "0.22.2" --locked
+          cargo audit
 
       - name: Frontend quality gate
         run: npm run check && npm run lint && npm test && npm --workspace @voco/desktop run build:frontend

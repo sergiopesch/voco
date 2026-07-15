@@ -89,6 +89,8 @@ The workflow rejects a tag unless it exactly matches `voco.<package.json version
 
 The release workflow:
 - builds the Debian bundle
+- installs lockfile-pinned `cargo-audit 0.22.2` under the repository's pinned Rust toolchain before
+  scanning the exact application lockfile
 - runs the private headless IBus lifecycle in an isolated namespace
 - verifies the built Debian bundle before collecting release assets
 - omits AppImage while Tauri's Linux packaging helpers are not all immutable and checksum-pinned

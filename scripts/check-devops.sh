@@ -218,6 +218,7 @@ if not re.search(r"actions/download-artifact@[0-9a-f]{40}", release_workflow):
     raise SystemExit("Verified release payload download action must be commit-pinned")
 
 hosted_ibus_command = "run: bash scripts/test-private-ibus-engine-hosted.sh"
+locked_rust_audit_install = 'cargo install cargo-audit --version "0.22.2" --locked'
 for workflow_path, workflow in (
     (Path(".github/workflows/ci.yml"), Path(".github/workflows/ci.yml").read_text()),
     (Path(".github/workflows/release.yml"), release_workflow),
@@ -228,6 +229,16 @@ for workflow_path, workflow in (
         )
     if "run: npm run test:private-ibus" in workflow:
         raise SystemExit(f"{workflow_path} bypasses the hosted IBus namespace wrapper")
+    if "rustsec/audit-check@" in workflow:
+        raise SystemExit(f"{workflow_path} uses the non-reproducible Node audit action")
+    if workflow.count(locked_rust_audit_install) != 1:
+        raise SystemExit(
+            f"{workflow_path} must install one lockfile-pinned cargo-audit tool"
+        )
+    if workflow.count("\n          cargo audit\n") != 1:
+        raise SystemExit(f"{workflow_path} must run one Rust dependency audit")
+    if "checks: write" in workflow:
+        raise SystemExit(f"{workflow_path} grants unnecessary checks write permission")
 print("Release workflow privilege and artifact boundaries are valid.")
 PY
 
