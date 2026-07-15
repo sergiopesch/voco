@@ -69,6 +69,12 @@ CARGO_BUILD_JOBS=2 cargo clippy --locked --manifest-path apps/desktop/src-tauri/
 npm test
 ```
 
+Run `npm run test:private-ibus` directly on development machines. CI and release jobs use
+`scripts/test-private-ibus-engine-hosted.sh` instead. That wrapper refuses to run outside GitHub
+Actions and, on affected Ubuntu 24.04 hosted runners, temporarily permits Bubblewrap's private user
+namespace only for the test before restoring the original AppArmor policy. The private network,
+mount, IPC, PID, and UTS namespaces remain enabled.
+
 Build the frontend before the all-features Clippy gate on a clean checkout. Tauri's production
 `custom-protocol` context validates `apps/desktop/dist` at compile time.
 

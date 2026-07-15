@@ -92,7 +92,7 @@ jobs:
         run: npm run check && npm run lint && npm test && npm --workspace @voco/desktop run build:frontend
 
       - name: Private headless IBus lifecycle
-        run: npm run test:private-ibus
+        run: bash scripts/test-private-ibus-engine-hosted.sh
 
       - name: Rust quality gate
         working-directory: apps/desktop/src-tauri

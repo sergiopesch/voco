@@ -71,7 +71,7 @@ jobs:
         run: npm test
 
       - name: Private headless IBus lifecycle
-        run: npm run test:private-ibus
+        run: bash scripts/test-private-ibus-engine-hosted.sh
 
       - name: Frontend production build
         run: npm --workspace @voco/desktop run build:frontend

@@ -24,6 +24,7 @@ bash -n \
   scripts/rehearse-release.sh \
   scripts/test-install-common.sh \
   scripts/test-private-ibus-engine.sh \
+  scripts/test-private-ibus-engine-hosted.sh \
   scripts/verify-deb-package.sh \
   scripts/lib/install-common.sh
 
@@ -201,20 +202,32 @@ PYTHONDONTWRITEBYTECODE=1 python3 - <<'PY'
 import re
 from pathlib import Path
 
-workflow = Path(".github/workflows/release.yml").read_text()
-if "--bundles appimage" in workflow or "linuxdeploy" in workflow:
+release_workflow = Path(".github/workflows/release.yml").read_text()
+if "--bundles appimage" in release_workflow or "linuxdeploy" in release_workflow:
     raise SystemExit("Release workflow must not execute the unpinned AppImage toolchain")
-if workflow.count("actions/checkout@") != 1 or workflow.count("persist-credentials: false") != 1:
+if release_workflow.count("actions/checkout@") != 1 or release_workflow.count("persist-credentials: false") != 1:
     raise SystemExit("Release build must use one checkout with credential persistence disabled")
-if "\n  create-draft:\n" not in workflow:
+if "\n  create-draft:\n" not in release_workflow:
     raise SystemExit("Release workflow is missing the isolated draft-release job")
-draft_job = workflow.split("\n  create-draft:\n", 1)[1]
+draft_job = release_workflow.split("\n  create-draft:\n", 1)[1]
 if "actions/checkout@" in draft_job:
     raise SystemExit("Release-write job must not checkout or execute repository code")
-if not re.search(r"actions/upload-artifact@[0-9a-f]{40}", workflow):
+if not re.search(r"actions/upload-artifact@[0-9a-f]{40}", release_workflow):
     raise SystemExit("Verified release payload upload action must be commit-pinned")
-if not re.search(r"actions/download-artifact@[0-9a-f]{40}", workflow):
+if not re.search(r"actions/download-artifact@[0-9a-f]{40}", release_workflow):
     raise SystemExit("Verified release payload download action must be commit-pinned")
+
+hosted_ibus_command = "run: bash scripts/test-private-ibus-engine-hosted.sh"
+for workflow_path, workflow in (
+    (Path(".github/workflows/ci.yml"), Path(".github/workflows/ci.yml").read_text()),
+    (Path(".github/workflows/release.yml"), release_workflow),
+):
+    if workflow.count(hosted_ibus_command) != 1:
+        raise SystemExit(
+            f"{workflow_path} must run the isolated hosted IBus wrapper exactly once"
+        )
+    if "run: npm run test:private-ibus" in workflow:
+        raise SystemExit(f"{workflow_path} bypasses the hosted IBus namespace wrapper")
 print("Release workflow privilege and artifact boundaries are valid.")
 PY
 
