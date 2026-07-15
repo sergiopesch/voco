@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any, Mapping, Optional
 
 
-PROTOCOL_VERSION = 1
+PROTOCOL_VERSION = 3
 SOCKET_DIRECTORY_NAME = "voco"
 SOCKET_FILE_NAME = "ibus-engine.sock"
 MAX_REQUEST_BYTES = 4_000_000

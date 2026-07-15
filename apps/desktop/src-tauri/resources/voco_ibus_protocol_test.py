@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import socket
 import stat
 import tempfile
@@ -23,6 +24,19 @@ from voco_ibus_protocol import (
 
 
 class ProtocolTests(unittest.TestCase):
+    def test_protocol_version_matches_every_private_engine_peer(self) -> None:
+        repository_root = Path(__file__).resolve().parents[4]
+        rust_client = (repository_root / "apps/desktop/src-tauri/src/owned_preedit.rs").read_text()
+        smoke_client = (repository_root / "scripts/test-private-ibus-engine.py").read_text()
+
+        rust_match = re.search(r"const PROTOCOL_VERSION: u32 = (\d+);", rust_client)
+        smoke_match = re.search(r"^PROTOCOL_VERSION = (\d+)$", smoke_client, re.MULTILINE)
+        self.assertIsNotNone(rust_match)
+        self.assertIsNotNone(smoke_match)
+        self.assertEqual(PROTOCOL_VERSION, 3)
+        self.assertEqual(int(rust_match.group(1)), PROTOCOL_VERSION)
+        self.assertEqual(int(smoke_match.group(1)), PROTOCOL_VERSION)
+
     def test_runtime_path_requires_an_absolute_xdg_runtime_directory(self) -> None:
         with self.assertRaises(ProtocolError):
             runtime_socket_path({})
@@ -57,7 +71,10 @@ class ProtocolTests(unittest.TestCase):
             {"version": PROTOCOL_VERSION, "id": 1, "text": "café 👩\u200d💻"},
             1_000,
         )
-        self.assertEqual(json.loads(encoded), {"version": 1, "id": 1, "text": "café 👩\u200d💻"})
+        self.assertEqual(
+            json.loads(encoded),
+            {"version": PROTOCOL_VERSION, "id": 1, "text": "café 👩\u200d💻"},
+        )
 
     def test_socket_is_private_and_accepts_only_same_user_peer(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

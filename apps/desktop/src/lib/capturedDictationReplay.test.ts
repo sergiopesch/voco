@@ -4,7 +4,8 @@ import {
   reviseOwnedPreedit,
 } from "@/lib/livePreviewWindow";
 import { reconcileFinalCursorText } from "@/lib/liveCommitPolicy";
-import type { PreviewTranscription } from "@/types";
+import { canonicalTranscriptionRanges } from "@/lib/canonicalCursorSession";
+import type { CanonicalTranscription, PreviewTranscription } from "@/types";
 
 interface CapturedPreviewFrame {
   sequence: number;
@@ -26,6 +27,16 @@ interface CapturedDictationTimeline {
   committedCursorText?: string;
   cursorInsertionDisabled?: boolean;
   previewFrames: CapturedPreviewFrame[];
+  canonicalChunks?: Array<{
+    sequence: number;
+    range: {
+      chunkIndex: number;
+      startSample: number;
+      endSample: number;
+      complete: boolean;
+    };
+    result: CanonicalTranscription;
+  }>;
 }
 
 const capturePath = (
@@ -56,7 +67,7 @@ describe("captured dictation replay", () => {
     ) as CapturedDictationTimeline;
     const audioPath = (capturePath as string).replace(/\.json$/u, ".wav");
 
-    expect(timeline.schemaVersion).toBe(1);
+    expect([1, 2]).toContain(timeline.schemaVersion);
     expect(existsSync(audioPath)).toBe(true);
     expect(timeline.previewFrames.length).toBeGreaterThan(1);
     expect(timeline.finalTranscript.trim().length).toBeGreaterThan(0);
@@ -109,7 +120,7 @@ describe("captured dictation replay", () => {
   });
 
   capturedIt(
-    "replays preview cadence and authoritative full-session ASR from the WAV",
+    "replays preview cadence and exact canonical target text from the WAV",
     async () => {
       const timeline = await readCapturedTimeline(capturePath as string);
       const audioPath = (capturePath as string).replace(/\.json$/u, ".wav");
@@ -117,14 +128,15 @@ describe("captured dictation replay", () => {
 
       let previewStartSample = 0;
       let candidateText = "";
-      let confirmedText = "";
-      let committedTargetText = "";
+      let confirmedDraftText = "";
       let provisionalText = "";
-      let progressiveCommitCount = 0;
       let maxPreeditCharacterCount = 0;
-      let maxProvisionalCharacterCount = 0;
       const cursorUpdateTimesMs: number[] = [];
-      let finalCursorText = "";
+      let canonicalText = "";
+      let acknowledgedTargetText = "";
+      let canonicalCheckpointCount = 0;
+      const replayCanonicalTexts: string[] = [];
+      const replayCanonicalRanges: Array<[number, number]> = [];
 
       try {
         for (const frame of timeline.previewFrames) {
@@ -139,7 +151,7 @@ describe("captured dictation replay", () => {
             continue;
           }
 
-          const preview = await worker.request({
+          const preview = await worker.requestPreview({
             startSample: previewStartSample,
             endSample: previewEndSample,
           });
@@ -149,25 +161,17 @@ describe("captured dictation replay", () => {
           }
 
           const revision = reviseOwnedPreedit(
-            confirmedText,
+            confirmedDraftText,
             candidateText,
             nextPreviewText,
             preview,
           );
-          confirmedText = revision.confirmedText;
+          confirmedDraftText = revision.confirmedText;
           candidateText = revision.candidateText;
-          if (revision.confirmedAppendText.length > 0) {
-            committedTargetText = revision.confirmedText;
-            progressiveCommitCount += 1;
-          }
           provisionalText = revision.provisionalText;
           maxPreeditCharacterCount = Math.max(
             maxPreeditCharacterCount,
             revision.preeditText.length,
-          );
-          maxProvisionalCharacterCount = Math.max(
-            maxProvisionalCharacterCount,
-            revision.provisionalText.length,
           );
           cursorUpdateTimesMs.push(
             Math.round(
@@ -183,25 +187,34 @@ describe("captured dictation replay", () => {
           }
         }
 
-        const finalTranscription = await worker.request({
-          startSample: 0,
-          endSample: Number.MAX_SAFE_INTEGER,
-          fullSession: true,
-        });
-        finalCursorText = finalTranscription.text.trim();
+        const sampleCount = await readCaptureSampleCount(audioPath);
+        for (const range of canonicalTranscriptionRanges(sampleCount)) {
+          replayCanonicalRanges.push([range.startSample, range.endSample]);
+          const result = await worker.requestCanonical({
+            startSample: range.startSample,
+            endSample: range.endSample,
+            canonical: true,
+            previousCanonicalText: canonicalText,
+          });
+          expect(result.canonicalText).toBe(canonicalText + result.appendText);
+          canonicalText = result.canonicalText;
+          replayCanonicalTexts.push(canonicalText);
+          if (range.complete) {
+            acknowledgedTargetText = canonicalText;
+            canonicalCheckpointCount += 1;
+          }
+        }
+        // Stop-time finish-canonical appends the one exact remaining suffix.
+        expect(canonicalText.startsWith(acknowledgedTargetText)).toBe(true);
+        acknowledgedTargetText = canonicalText;
       } finally {
         worker.close();
       }
 
-      const finalReferenceText = timeline.finalTranscript.trim();
-      const finalWords = normalizedWords(finalReferenceText);
+      const finalReferenceText = timeline.finalTranscript;
       const provisionalWordErrorRate = normalizedWordErrorRate(
         finalReferenceText,
         provisionalText,
-      );
-      const finalWordErrorRate = normalizedWordErrorRate(
-        finalReferenceText,
-        finalCursorText,
       );
       const updateGapsMs = cursorUpdateTimesMs
         .slice(1)
@@ -213,15 +226,13 @@ describe("captured dictation replay", () => {
           cursorUpdateGapP50Ms: percentile(updateGapsMs, 50),
           cursorUpdateGapP95Ms: percentile(updateGapsMs, 95),
           cursorUpdateGapMaxMs: Math.max(0, ...updateGapsMs),
-          progressiveCommitCount,
-          committedTargetCharacterCount: committedTargetText.length,
+          canonicalCheckpointCount,
+          committedTargetCharacterCount: acknowledgedTargetText.length,
           maxPreeditCharacterCount,
-          maxProvisionalCharacterCount,
           provisionalWordCount: normalizedWords(provisionalText).length,
-          finalCursorWordCount: normalizedWords(finalCursorText).length,
-          referenceWordCount: finalWords.length,
+          finalCursorWordCount: normalizedWords(canonicalText).length,
+          referenceWordCount: normalizedWords(finalReferenceText).length,
           provisionalWordErrorRate,
-          finalWordErrorRate,
         }),
       );
       if (captureReplayVerbose) {
@@ -230,29 +241,42 @@ describe("captured dictation replay", () => {
           JSON.stringify({
             finalReferenceText,
             provisionalText,
-            finalCursorText,
+            canonicalText,
           }),
         );
       }
-      const finalCursorWords = normalizedWords(finalCursorText);
       expect(cursorUpdateTimesMs.length).toBeGreaterThan(2);
       expect(provisionalText.trim().length).toBeGreaterThan(0);
-      expect(progressiveCommitCount).toBeGreaterThan(0);
-      expect(committedTargetText.length).toBeGreaterThan(0);
-      expect(maxPreeditCharacterCount).toBeLessThan(
-        maxProvisionalCharacterCount,
-      );
-      expect(finalCursorWords.length).toBeGreaterThanOrEqual(
-        Math.floor(finalWords.length * 0.9),
-      );
-      expect(finalCursorWords.length).toBeLessThanOrEqual(
-        Math.ceil(finalWords.length * 1.1),
-      );
-      expect(finalWordErrorRate).toBeLessThanOrEqual(0.02);
-      // Every usable preview updates the bounded owned tail while sealed
-      // phrases become native target text, so wrapping does not reintroduce
-      // the old append-only 13-second stalls.
+      expect(canonicalCheckpointCount).toBeGreaterThan(0);
+      expect(acknowledgedTargetText).toBe(finalReferenceText);
+      expect(canonicalText).toBe(finalReferenceText);
       expect(percentile(updateGapsMs, 95)).toBeLessThanOrEqual(5_000);
+      if (
+        replayCanonicalRanges[replayCanonicalRanges.length - 1]?.[1] ===
+        1_064_543
+      ) {
+        expect(canonicalCheckpointCount).toBe(2);
+        expect(replayCanonicalRanges).toEqual([
+          [0, 480_000],
+          [464_000, 944_000],
+          [928_000, 1_064_543],
+        ]);
+        expect(replayCanonicalTexts.map((text) => text.length)).toEqual([
+          222, 486, 555,
+        ]);
+        expect(
+          await Promise.all(replayCanonicalTexts.map(sha256Text)),
+        ).toEqual([
+          "38231922e9852c4c9989bc8b09861f58d526df1f52bb5266ec901636c9380931",
+          "70295ea3f276939163a362da3871926931aa334e77950a068250c9c87f1c6284",
+          "d659f33d6eee60874d0ac67d196957985d8cf0855d078ab78b8d4d5ca63bd0d7",
+        ]);
+      }
+      if (timeline.canonicalChunks) {
+        expect(
+          timeline.canonicalChunks.map((chunk) => chunk.result.canonicalText),
+        ).toEqual(replayCanonicalTexts);
+      }
     },
     // Full-capture CPU inference varies substantially with host load. Keep
     // correctness and cursor-cadence limits in the assertions above instead
@@ -273,10 +297,37 @@ async function readCapturedTimeline(
   ) as CapturedDictationTimeline;
 }
 
+async function readCaptureSampleCount(audioPath: string): Promise<number> {
+  const moduleName = "node:fs";
+  const { readFileSync } = (await import(/* @vite-ignore */ moduleName)) as {
+    readFileSync(path: string): Uint8Array;
+  };
+  const wav = readFileSync(audioPath);
+  if (wav.length < 44) {
+    throw new Error("Captured WAV is incomplete");
+  }
+  const dataByteLength =
+    (wav[40] ?? 0) |
+    ((wav[41] ?? 0) << 8) |
+    ((wav[42] ?? 0) << 16) |
+    ((wav[43] ?? 0) << 24);
+  return Math.max(0, dataByteLength >>> 0) / 2;
+}
+
 function normalizedWords(text: string): string[] {
   return Array.from(text.toLocaleLowerCase().matchAll(/[a-z0-9]+/gu)).map(
     (match) => match[0],
   );
+}
+
+async function sha256Text(text: string): Promise<string> {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(text),
+  );
+  return Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  ).join("");
 }
 
 function normalizedWordErrorRate(reference: string, hypothesis: string): number {
@@ -324,11 +375,16 @@ function percentile(values: number[], quantile: number): number {
 }
 
 interface ReplayWorker {
-  request(input: {
+  requestPreview(input: {
     startSample: number;
     endSample: number;
-    fullSession?: boolean;
   }): Promise<PreviewTranscription>;
+  requestCanonical(input: {
+    startSample: number;
+    endSample: number;
+    canonical: true;
+    previousCanonicalText: string;
+  }): Promise<CanonicalTranscription>;
   close(): void;
 }
 
@@ -376,7 +432,7 @@ async function startPreviewReplayWorker(audioPath: string): Promise<ReplayWorker
   let stderrBuffer = "";
   let terminalError: Error | null = null;
   const pending: Array<{
-    resolve(value: PreviewTranscription): void;
+    resolve(value: PreviewTranscription | CanonicalTranscription): void;
     reject(error: Error): void;
   }> = [];
 
@@ -422,12 +478,27 @@ async function startPreviewReplayWorker(audioPath: string): Promise<ReplayWorker
   });
 
   return {
-    request(input) {
+    requestPreview(input) {
       if (terminalError) {
         return Promise.reject(terminalError);
       }
       return new Promise<PreviewTranscription>((resolve, reject) => {
-        pending.push({ resolve, reject });
+        pending.push({
+          resolve: (value) => resolve(value as PreviewTranscription),
+          reject,
+        });
+        child.stdin.write(`${JSON.stringify(input)}\n`);
+      });
+    },
+    requestCanonical(input) {
+      if (terminalError) {
+        return Promise.reject(terminalError);
+      }
+      return new Promise<CanonicalTranscription>((resolve, reject) => {
+        pending.push({
+          resolve: (value) => resolve(value as CanonicalTranscription),
+          reject,
+        });
         child.stdin.write(`${JSON.stringify(input)}\n`);
       });
     },

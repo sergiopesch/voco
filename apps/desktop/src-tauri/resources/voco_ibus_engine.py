@@ -9,7 +9,10 @@ text, or requests deletion from a target application.
 
 from __future__ import annotations
 
+import json
+import os
 import signal
+from pathlib import Path
 from typing import Any, Optional
 
 import gi
@@ -33,6 +36,8 @@ ENGINE_NAME = "voco"
 ENGINE_BUS_NAME = "org.freedesktop.IBus.Voco"
 ENGINE_PATH_PREFIX = "/org/freedesktop/IBus/Voco/Engine/"
 MAX_TEXT_BYTES = 1_000_000
+DEFAULT_DICTATION_HOTKEY = "Alt+D"
+REALTIME_HOTKEY = "Alt+Shift+R"
 SESSION_CONTROL_KEYVALS = {
     IBus.keyval_from_name("Alt_L"),
     IBus.keyval_from_name("Alt_R"),
@@ -43,8 +48,123 @@ SESSION_CONTROL_KEYVALS = {
     IBus.keyval_from_name("Super_L"),
     IBus.keyval_from_name("Super_R"),
 }
+SHORTCUT_MODIFIER_NAMES = {
+    "ALT": "alt",
+    "OPTION": "alt",
+    "CONTROL": "control",
+    "CTRL": "control",
+    "COMMAND": "super",
+    "CMD": "super",
+    "SUPER": "super",
+    "COMMANDORCONTROL": "control",
+    "COMMANDORCTRL": "control",
+    "CMDORCTRL": "control",
+    "CMDORCONTROL": "control",
+    "SHIFT": "shift",
+}
+SHORTCUT_KEY_NAMES = {
+    "BACKQUOTE": "grave",
+    "`": "grave",
+    "BACKSLASH": "backslash",
+    "\\": "backslash",
+    "BRACKETLEFT": "bracketleft",
+    "[": "bracketleft",
+    "BRACKETRIGHT": "bracketright",
+    "]": "bracketright",
+    "PAUSE": "Pause",
+    "PAUSEBREAK": "Pause",
+    "COMMA": "comma",
+    ",": "comma",
+    "EQUAL": "equal",
+    "=": "equal",
+    "MINUS": "minus",
+    "-": "minus",
+    "PERIOD": "period",
+    ".": "period",
+    "QUOTE": "apostrophe",
+    "'": "apostrophe",
+    "SEMICOLON": "semicolon",
+    ";": "semicolon",
+    "SLASH": "slash",
+    "/": "slash",
+    "BACKSPACE": "BackSpace",
+    "CAPSLOCK": "Caps_Lock",
+    "ENTER": "Return",
+    "SPACE": "space",
+    "TAB": "Tab",
+    "DELETE": "Delete",
+    "END": "End",
+    "HOME": "Home",
+    "INSERT": "Insert",
+    "PAGEDOWN": "Page_Down",
+    "PAGEUP": "Page_Up",
+    "PRINTSCREEN": "Print",
+    "SCROLLLOCK": "Scroll_Lock",
+    "ARROWDOWN": "Down",
+    "DOWN": "Down",
+    "ARROWLEFT": "Left",
+    "LEFT": "Left",
+    "ARROWRIGHT": "Right",
+    "RIGHT": "Right",
+    "ARROWUP": "Up",
+    "UP": "Up",
+    "NUMLOCK": "Num_Lock",
+    "ESCAPE": "Escape",
+    "ESC": "Escape",
+}
+MEDIA_SHORTCUT_KEYVALS = {
+    "AUDIOVOLUMEDOWN": getattr(IBus, "KEY_AudioLowerVolume", 0),
+    "VOLUMEDOWN": getattr(IBus, "KEY_AudioLowerVolume", 0),
+    "AUDIOVOLUMEUP": getattr(IBus, "KEY_AudioRaiseVolume", 0),
+    "VOLUMEUP": getattr(IBus, "KEY_AudioRaiseVolume", 0),
+    "AUDIOVOLUMEMUTE": getattr(IBus, "KEY_AudioMute", 0),
+    "VOLUMEMUTE": getattr(IBus, "KEY_AudioMute", 0),
+    "MEDIAPLAY": getattr(IBus, "KEY_AudioPlay", 0),
+    "MEDIAPAUSE": getattr(IBus, "KEY_AudioPause", 0),
+    "MEDIAPLAYPAUSE": getattr(IBus, "KEY_AudioPlay", 0),
+    "MEDIASTOP": getattr(IBus, "KEY_AudioStop", 0),
+    "MEDIATRACKNEXT": getattr(IBus, "KEY_AudioNext", 0),
+    "MEDIATRACKPREV": getattr(IBus, "KEY_AudioPrev", 0),
+    "MEDIATRACKPREVIOUS": getattr(IBus, "KEY_AudioPrev", 0),
+}
+SHIFTED_KEYVAL_NAMES = {
+    "exclam": "1",
+    "at": "2",
+    "numbersign": "3",
+    "dollar": "4",
+    "percent": "5",
+    "asciicircum": "6",
+    "ampersand": "7",
+    "asterisk": "8",
+    "parenleft": "9",
+    "parenright": "0",
+    "underscore": "minus",
+    "plus": "equal",
+    "braceleft": "bracketleft",
+    "braceright": "bracketright",
+    "bar": "backslash",
+    "colon": "semicolon",
+    "quotedbl": "apostrophe",
+    "less": "comma",
+    "greater": "period",
+    "question": "slash",
+    "asciitilde": "grave",
+}
 SENSITIVE_INPUT_HINT_MASK = int(IBus.InputHints.PRIVATE) | int(
     getattr(IBus.InputHints, "HIDDEN_TEXT", 0)
+)
+# Older GI bindings may not expose the symbolic TERMINAL member even though
+# the stable IBus enum value is 10. Comparing raw values keeps import working
+# there while preserving fail-closed terminal handling.
+_TERMINAL_INPUT_PURPOSE_VALUE = int(
+    getattr(IBus.InputPurpose, "TERMINAL", 10)
+)
+DISALLOWED_PREEDIT_PURPOSE_VALUES = frozenset(
+    {
+        int(IBus.InputPurpose.PASSWORD),
+        int(IBus.InputPurpose.PIN),
+        _TERMINAL_INPUT_PURPOSE_VALUE,
+    }
 )
 KNOWN_INPUT_HINT_MASK = SENSITIVE_INPUT_HINT_MASK
 for _input_hint_name in (
@@ -93,7 +213,14 @@ class VocoCoordinator:
         self.deactivate_engine(engine)
 
     def register_key_event(self, keyval: int, state: int) -> None:
-        if self.session_id is None or is_session_control_key(keyval, state):
+        if self.session_id is None:
+            return
+        session_hotkeys = getattr(
+            self.target_engine,
+            "_voco_session_control_hotkeys",
+            (),
+        )
+        if is_session_control_key(keyval, state, session_hotkeys):
             return
         # Normal input always passes through. It also ends VOCO's exclusive
         # lease before any later cursor update or finalization can mutate the
@@ -184,6 +311,7 @@ class VocoCoordinator:
         plan = engine.plan_finalization(
             session_id,
             self.committed_text,
+            self.provisional_text,
             text,
             self.ownership_intact,
         )
@@ -201,6 +329,32 @@ class VocoCoordinator:
         result["finalizationOutcome"] = outcome
         self._clear_session()
         return result
+
+    def checkpoint(
+        self,
+        session_id: Any,
+        expected_committed_text: Any,
+        append_text: Any,
+    ) -> dict[str, Any]:
+        return self._apply_canonical_append(
+            session_id,
+            expected_committed_text,
+            append_text,
+            finish=False,
+        )
+
+    def finish_canonical(
+        self,
+        session_id: Any,
+        expected_committed_text: Any,
+        append_text: Any,
+    ) -> dict[str, Any]:
+        return self._apply_canonical_append(
+            session_id,
+            expected_committed_text,
+            append_text,
+            finish=True,
+        )
 
     def cancel(self, session_id: Any) -> dict[str, Any]:
         self.validate_session(session_id)
@@ -285,6 +439,35 @@ class VocoCoordinator:
         finally:
             self._clear_session()
 
+    def _apply_canonical_append(
+        self,
+        session_id: Any,
+        expected_committed_text: Any,
+        append_text: Any,
+        *,
+        finish: bool,
+    ) -> dict[str, Any]:
+        self.validate_session(session_id)
+        if self.finalization_pending:
+            raise RuntimeError("final cursor commit is already being prepared")
+        expected_committed_text = validate_text(expected_committed_text)
+        append_text = validate_text(append_text)
+        if expected_committed_text != self.committed_text:
+            raise ValueError("expected committed text does not match the active session")
+        engine = self._require_owned_target()
+
+        if finish:
+            self.finalization_pending = True
+        engine.commit_canonical_append(append_text)
+        self.committed_text = expected_committed_text + append_text
+        self.provisional_text = ""
+
+        result = self.status()
+        if finish:
+            result["finalizationOutcome"] = "committed"
+            self._clear_session()
+        return result
+
     def _clear_session(self) -> None:
         if self.target_engine is not None:
             self.target_engine.unbind_session()
@@ -317,14 +500,25 @@ class VocoEngine(IBus.Engine):
         self.focus_active = False
         self.focus_identity: Optional[tuple[str, ...]] = None
         self.bound_session_id: Optional[int] = None
-        self._voco_client_capabilities = 0
-        # IBus suppresses same-valued SetContentType callbacks. Keep the
-        # daemon's cached candidate, but never treat it as proof for a new
-        # focus until the revision-bound low-priority barrier has run.
+        self._voco_target_identity: Optional[tuple[str, ...]] = None
+        self._voco_target_capabilities = 0
+        # With a global IBus engine, one engine instance is reused across real
+        # input contexts and IBus's internal client="fake" proxy. Content type
+        # and capability proof therefore belongs to one exact real focus epoch,
+        # not to this Python object or to the proxy. IBus also synthesizes the
+        # default FREE_FORM/NONE tuple for an untyped context, which is
+        # indistinguishable from an explicit default at this callback. Every
+        # focus epoch must first provide fresh non-default, known, safe metadata;
+        # an ambiguous default always revokes proof, even within that epoch.
         self._voco_input_purpose = IBus.InputPurpose.FREE_FORM
         self._voco_input_hints = int(IBus.InputHints.NONE)
-        self._voco_content_type_known = True
+        self._voco_content_type_observed = False
+        self._voco_content_type_known = False
+        self._voco_content_type_established = False
         self._voco_content_type_revision: Optional[int] = None
+        self._voco_session_control_hotkeys: tuple[
+            tuple[frozenset[str], int], ...
+        ] = ()
         self._voco_destroyed = False
 
     def do_process_key_event(self, keyval: int, _keycode: int, state: int) -> bool:
@@ -355,11 +549,11 @@ class VocoEngine(IBus.Engine):
 
     def _enter_focus(self, identity: tuple[str, ...]) -> None:
         if not self.focus_active:
+            self._adopt_focus_target(identity)
             self.context_revision += 1
             self.focus_active = True
             self.focus_identity = identity
-            self._reset_content_type_proof()
-            self._schedule_content_type_promotion()
+            self._clear_content_type_observation()
             return
         if self.bound_session_id is not None:
             # Once text is owned, a legacy callback cannot prove it still
@@ -371,6 +565,7 @@ class VocoEngine(IBus.Engine):
         if self.focus_identity == ("legacy",) and identity[0] == "id":
             # Some clients deliver the legacy callback immediately before the
             # ID-bearing callback for the same focus transition.
+            self._adopt_focus_target(identity)
             self.focus_identity = identity
             return
         if identity == ("legacy",) or identity == self.focus_identity:
@@ -389,17 +584,44 @@ class VocoEngine(IBus.Engine):
         finally:
             self.context_revision += 1
             self.focus_identity = identity
-            self._reset_content_type_proof()
-            self._schedule_content_type_promotion()
+            self._adopt_focus_target(identity)
+            self._clear_content_type_observation()
             self.ownership_lease.invalidate()
             self.coordinator.deactivate_engine(self)
+
+    def _adopt_focus_target(self, identity: tuple[str, ...]) -> None:
+        if self._is_fake_focus(identity):
+            return
+        if identity != self._voco_target_identity:
+            self._voco_target_identity = identity
+            self._voco_target_capabilities = 0
+            self._clear_content_type_observation()
+
+    @staticmethod
+    def _is_fake_focus(identity: Optional[tuple[str, ...]]) -> bool:
+        return bool(
+            identity is not None
+            and len(identity) >= 3
+            and identity[0] == "id"
+            and identity[2] == "fake"
+        )
+
+    def _focus_routes_to_target(self) -> bool:
+        # IBus's internal client="fake" context represents background or
+        # desktop focus, not an alias for the last real editor. Retain the real
+        # target identity and capability cache across that transition, but
+        # require new content proof before routing preedit after focus returns.
+        return (
+            self._voco_target_identity is not None
+            and self.focus_identity == self._voco_target_identity
+        )
 
     def _leave_focus(self) -> None:
         if self.focus_active:
             self.context_revision += 1
         self.focus_active = False
         self.focus_identity = None
-        self._reset_content_type_proof()
+        self._clear_content_type_observation()
         self.ownership_lease.invalidate()
 
     def _clear_owned_preedit_before_focus_loss(self) -> None:
@@ -408,10 +630,15 @@ class VocoEngine(IBus.Engine):
 
     def bind_session(self, session_id: int) -> None:
         self.bound_session_id = session_id
+        # Bind the exact controls with the ownership lease. Reading/parsing
+        # configuration on every IBus key event would add filesystem latency
+        # to the input path and could change the meaning of an active lease.
+        self._voco_session_control_hotkeys = session_control_hotkey_specs()
         self.ownership_lease.bind_session(session_id, self.context_revision)
 
     def unbind_session(self) -> None:
         self.bound_session_id = None
+        self._voco_session_control_hotkeys = ()
         self.ownership_lease.unbind_session()
 
     def invalidate_context(self) -> None:
@@ -449,26 +676,34 @@ class VocoEngine(IBus.Engine):
     @property
     def can_accept_preedit(self) -> bool:
         preedit_supported = bool(
-            self._voco_client_capabilities & int(IBus.Capabilite.PREEDIT_TEXT)
+            self._voco_target_capabilities & int(IBus.Capabilite.PREEDIT_TEXT)
         )
-        sensitive = self._voco_input_purpose in {
-            IBus.InputPurpose.PASSWORD,
-            IBus.InputPurpose.PIN,
-        }
+        purpose_is_disallowed = (
+            self._voco_input_purpose is not None
+            and int(self._voco_input_purpose)
+            in DISALLOWED_PREEDIT_PURPOSE_VALUES
+        )
         sensitive_hint = bool(int(self._voco_input_hints) & SENSITIVE_INPUT_HINT_MASK)
         content_type_is_current = (
             self._voco_content_type_revision == self.context_revision
         )
         return (
-            preedit_supported
+            self._focus_routes_to_target()
+            and preedit_supported
             and content_type_is_current
+            and self._voco_content_type_observed
             and self._voco_content_type_known
-            and not sensitive
+            and self._voco_content_type_established
+            and not purpose_is_disallowed
             and not sensitive_hint
         )
 
     def do_set_capabilities(self, capabilities: int) -> None:
-        self._voco_client_capabilities = int(capabilities)
+        if (
+            self.focus_active
+            and self.focus_identity == self._voco_target_identity
+        ):
+            self._voco_target_capabilities = int(capabilities)
         if self.bound_session_id is not None and not self.can_accept_preedit:
             try:
                 self.clear_preedit()
@@ -477,8 +712,10 @@ class VocoEngine(IBus.Engine):
 
     def do_set_content_type(self, purpose: int, hints: int) -> None:
         raw_hints = int(hints)
+        self._voco_content_type_observed = True
+        raw_purpose = int(purpose)
         try:
-            self._voco_input_purpose = IBus.InputPurpose(int(purpose))
+            self._voco_input_purpose = IBus.InputPurpose(raw_purpose)
             self._voco_content_type_known = not bool(
                 raw_hints & ~KNOWN_INPUT_HINT_MASK
             )
@@ -486,8 +723,42 @@ class VocoEngine(IBus.Engine):
             self._voco_input_purpose = None
             self._voco_content_type_known = False
         self._voco_input_hints = raw_hints
+        callback_has_target_provenance = (
+            self.focus_active
+            and self.focus_identity == self._voco_target_identity
+        )
+        is_synthesized_default = (
+            raw_purpose == int(IBus.InputPurpose.FREE_FORM)
+            and raw_hints == int(IBus.InputHints.NONE)
+        )
+        metadata_is_safe = (
+            self._voco_content_type_known
+            and self._voco_input_purpose is not None
+            and int(self._voco_input_purpose)
+            not in DISALLOWED_PREEDIT_PURPOSE_VALUES
+            and not raw_hints & SENSITIVE_INPUT_HINT_MASK
+        )
+        if (
+            not metadata_is_safe
+            or not callback_has_target_provenance
+            or is_synthesized_default
+        ):
+            # Metadata delivered outside the real target context cannot renew
+            # that target's proof. In particular, the internal fake proxy must
+            # never turn its own defaults into authority for an editor. Unsafe
+            # or ambiguous metadata also revokes establishment so a later
+            # default cannot launder an unverified or sensitive context.
+            self._voco_content_type_established = False
+        else:
+            self._voco_content_type_established = True
         self._voco_content_type_revision = (
-            self.context_revision if self.focus_active else None
+            self.context_revision
+            if (
+                self.focus_active
+                and self._voco_content_type_established
+                and metadata_is_safe
+            )
+            else None
         )
         if self.bound_session_id is not None and not self.can_accept_preedit:
             try:
@@ -495,20 +766,11 @@ class VocoEngine(IBus.Engine):
             finally:
                 self.coordinator.deactivate_engine(self)
 
-    def _reset_content_type_proof(self) -> None:
+    def _clear_content_type_observation(self) -> None:
+        self._voco_content_type_observed = False
+        self._voco_content_type_known = False
+        self._voco_content_type_established = False
         self._voco_content_type_revision = None
-
-    def _schedule_content_type_promotion(self) -> None:
-        GLib.idle_add(
-            self._promote_content_type_after_focus,
-            self.context_revision,
-            priority=GLib.PRIORITY_LOW,
-        )
-
-    def _promote_content_type_after_focus(self, revision: int) -> bool:
-        if self.focus_active and self.context_revision == revision:
-            self._voco_content_type_revision = revision
-        return GLib.SOURCE_REMOVE
 
     def set_preedit(self, text: str) -> None:
         value = IBus.Text.new_from_string(text)
@@ -537,10 +799,18 @@ class VocoEngine(IBus.Engine):
             self.commit_value(append_text)
         self.set_preedit(preedit_text)
 
+    def commit_canonical_append(self, append_text: str) -> None:
+        # This pair runs in one private-protocol callback. Only VOCO's current
+        # preedit is cleared; normal application text is never deleted or
+        # rewritten. An empty append is a safe draft-clear checkpoint.
+        self.clear_preedit()
+        self.commit_value(append_text)
+
     def plan_finalization(
         self,
         session_id: int,
         owned_text: str,
+        owned_preedit_text: str,
         final_text: str,
         ownership_intact: bool,
     ) -> FinalizationPlan:
@@ -549,6 +819,7 @@ class VocoEngine(IBus.Engine):
             self.context_revision,
             ownership_intact,
             owned_text,
+            owned_preedit_text,
             final_text,
         )
 
@@ -587,16 +858,170 @@ def is_positive_integer(value: Any) -> bool:
     return isinstance(value, int) and not isinstance(value, bool) and value > 0
 
 
-def is_session_control_key(keyval: int, state: int) -> bool:
+def configured_dictation_hotkey() -> str:
+    config_home = os.environ.get("XDG_CONFIG_HOME", "")
+    base = Path(config_home).expanduser() if config_home else Path.home() / ".config"
+    if not base.is_absolute():
+        base = Path.home() / ".config"
+    path = base / "voco" / "config.json"
+    try:
+        with path.open("rb") as config_file:
+            raw_config = config_file.read(MAX_TEXT_BYTES + 1)
+        if len(raw_config) > MAX_TEXT_BYTES:
+            return DEFAULT_DICTATION_HOTKEY
+        config = json.loads(raw_config.decode("utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return DEFAULT_DICTATION_HOTKEY
+    hotkey = config.get("hotkey") if isinstance(config, dict) else None
+    if isinstance(hotkey, str) and hotkey.strip():
+        return hotkey.strip()
+    return DEFAULT_DICTATION_HOTKEY
+
+
+def _shortcut_keyval(raw_name: str) -> Optional[int]:
+    name = raw_name.strip().upper()
+    if len(name) == 1 and (name.isalpha() or name.isdigit()):
+        keyval = IBus.keyval_from_name(name.lower())
+    elif name.startswith("KEY") and len(name) == 4 and name[-1].isalpha():
+        keyval = IBus.keyval_from_name(name[-1].lower())
+    elif name.startswith("DIGIT") and len(name) == 6 and name[-1].isdigit():
+        keyval = IBus.keyval_from_name(name[-1])
+    elif name.startswith("F") and name[1:].isdigit() and 1 <= int(name[1:]) <= 24:
+        keyval = IBus.keyval_from_name(name)
+    elif name in MEDIA_SHORTCUT_KEYVALS:
+        keyval = MEDIA_SHORTCUT_KEYVALS[name]
+    else:
+        numpad_names = {
+            **{f"NUMPAD{digit}": f"KP_{digit}" for digit in range(10)},
+            **{f"NUM{digit}": f"KP_{digit}" for digit in range(10)},
+            "NUMPADADD": "KP_Add",
+            "NUMADD": "KP_Add",
+            "NUMPADPLUS": "KP_Add",
+            "NUMPLUS": "KP_Add",
+            "NUMPADDECIMAL": "KP_Decimal",
+            "NUMDECIMAL": "KP_Decimal",
+            "NUMPADDIVIDE": "KP_Divide",
+            "NUMDIVIDE": "KP_Divide",
+            "NUMPADENTER": "KP_Enter",
+            "NUMENTER": "KP_Enter",
+            "NUMPADEQUAL": "KP_Equal",
+            "NUMEQUAL": "KP_Equal",
+            "NUMPADMULTIPLY": "KP_Multiply",
+            "NUMMULTIPLY": "KP_Multiply",
+            "NUMPADSUBTRACT": "KP_Subtract",
+            "NUMSUBTRACT": "KP_Subtract",
+        }
+        keysym_name = numpad_names.get(name, SHORTCUT_KEY_NAMES.get(name))
+        if keysym_name is None:
+            return None
+        keyval = IBus.keyval_from_name(keysym_name)
+    if not keyval or keyval == int(getattr(IBus, "KEY_VoidSymbol", 0xFFFFFF)):
+        return None
+    return int(IBus.keyval_to_lower(keyval))
+
+
+def _parse_session_hotkey(value: str) -> Optional[tuple[frozenset[str], int]]:
+    parts = [part.strip() for part in value.split("+")]
+    if not parts or any(not part for part in parts):
+        return None
+    modifiers: set[str] = set()
+    for part in parts[:-1]:
+        modifier = SHORTCUT_MODIFIER_NAMES.get(part.upper())
+        if modifier is None:
+            return None
+        modifiers.add(modifier)
+    if modifiers.isdisjoint({"alt", "control", "super"}):
+        return None
+    if parts[-1].upper() in SHORTCUT_MODIFIER_NAMES:
+        return None
+    keyval = _shortcut_keyval(parts[-1])
+    if keyval is None:
+        return None
+    return frozenset(modifiers), keyval
+
+
+def _event_shortcut_modifiers(state: int) -> Optional[frozenset[str]]:
+    state = int(state)
+    # MOD3/MOD5 commonly carry layout-specific modifiers (for example
+    # AltGr). They are not accepted by VOCO's shortcut parser and must not
+    # make a normal text key look like a control shortcut.
+    unsupported_mask = int(IBus.ModifierType.MOD3_MASK) | int(
+        IBus.ModifierType.MOD5_MASK
+    )
+    if state & unsupported_mask:
+        return None
+    modifiers: set[str] = set()
+    if state & int(IBus.ModifierType.SHIFT_MASK):
+        modifiers.add("shift")
+    if state & int(IBus.ModifierType.CONTROL_MASK):
+        modifiers.add("control")
+    if state & int(IBus.ModifierType.MOD1_MASK):
+        modifiers.add("alt")
+    super_mask = (
+        int(IBus.ModifierType.MOD4_MASK)
+        | int(getattr(IBus.ModifierType, "SUPER_MASK", 0))
+        | int(getattr(IBus.ModifierType, "HYPER_MASK", 0))
+        | int(getattr(IBus.ModifierType, "META_MASK", 0))
+    )
+    if state & super_mask:
+        modifiers.add("super")
+    return frozenset(modifiers)
+
+
+def _event_shortcut_keyval(keyval: int) -> int:
+    keysym_name = IBus.keyval_name(keyval)
+    base_name = SHIFTED_KEYVAL_NAMES.get(keysym_name)
+    if base_name is not None:
+        keyval = IBus.keyval_from_name(base_name)
+    return int(IBus.keyval_to_lower(keyval))
+
+
+def session_control_hotkey_specs(
+    dictation_hotkey: Optional[str] = None,
+) -> tuple[tuple[frozenset[str], int], ...]:
+    controls = (
+        configured_dictation_hotkey()
+        if dictation_hotkey is None
+        else dictation_hotkey,
+        REALTIME_HOTKEY,
+    )
+    return tuple(
+        specification
+        for control in controls
+        if (specification := _parse_session_hotkey(control)) is not None
+    )
+
+
+def _matches_session_hotkey(
+    keyval: int,
+    state: int,
+    expected: tuple[frozenset[str], int],
+) -> bool:
+    actual_modifiers = _event_shortcut_modifiers(state)
+    if actual_modifiers is None:
+        return False
+    expected_modifiers, expected_keyval = expected
+    return (
+        actual_modifiers == expected_modifiers
+        and _event_shortcut_keyval(keyval) == expected_keyval
+    )
+
+
+def is_session_control_key(
+    keyval: int,
+    state: int,
+    session_hotkeys: Optional[tuple[tuple[frozenset[str], int], ...]] = None,
+) -> bool:
     if int(state) & int(IBus.ModifierType.RELEASE_MASK):
         return True
     if keyval in SESSION_CONTROL_KEYVALS:
         return True
-    alt_pressed = bool(int(state) & int(IBus.ModifierType.MOD1_MASK))
-    return alt_pressed and keyval in {
-        IBus.keyval_from_name("d"),
-        IBus.keyval_from_name("D"),
-    }
+    if session_hotkeys is None:
+        session_hotkeys = session_control_hotkey_specs()
+    return any(
+        _matches_session_hotkey(keyval, state, hotkey)
+        for hotkey in session_hotkeys
+    )
 
 
 def dispatch_command(
@@ -615,6 +1040,18 @@ def dispatch_command(
         )
     if operation == "commit":
         return coordinator.commit(command.get("sessionId"), command.get("text"))
+    if operation == "checkpoint":
+        return coordinator.checkpoint(
+            command.get("sessionId"),
+            command.get("expectedCommittedText"),
+            command.get("appendText"),
+        )
+    if operation == "finish-canonical":
+        return coordinator.finish_canonical(
+            command.get("sessionId"),
+            command.get("expectedCommittedText"),
+            command.get("appendText"),
+        )
     if operation == "cancel":
         return coordinator.cancel(command.get("sessionId"))
     if operation in {"hello", "status"}:

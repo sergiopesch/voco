@@ -11,6 +11,17 @@ cat <<EOF
 Local-first Linux dictation with a persistent, explicitly user-enabled VOCO IBus input source and
 fail-closed owned-preedit cursor streaming.
 
+## Highlights
+
+- Keeps rolling local speech previews revisable and commits only authoritative canonical chunks
+- Requires fresh safe input metadata for each focus; terminals, sensitive fields, and ambiguous
+  targets remain preview-only instead of reusing stale cursor authority
+- Unifies tray, settings, microphone permission, muted realtime, and transcript-recovery state
+- Adds safe configuration recovery, single-instance ownership, model-cache integrity checks, and
+  stronger Debian installer/release verification
+- Keeps optional Realtime conversation voice-only; VOCO exposes no browser tool, URL, tab metadata,
+  page content, snapshot, or browser mutation to the model in this release
+
 ## Install
 
 ### Guided installer
@@ -49,16 +60,16 @@ grep " ${APPIMAGE_NAME}\$" voco_checksums.txt | sha256sum --check -
 chmod +x ${APPIMAGE_NAME}
 ./${APPIMAGE_NAME}
 \`\`\`
+
+**AppImage limitation:** The AppImage does not install the host IBus component, so it remains preview-only unless the matching Debian component is already installed.
 EOF
 fi
 
 cat <<'EOF'
 
-**Requirements:** Ubuntu/Debian with `libwebkit2gtk-4.1-0`, `libgtk-3-0`, `libayatana-appindicator3-1`, `ibus`, `python3`, `gir1.2-ibus-1.0`, and `python3-gi`
+**Requirements:** Ubuntu 24.04 is the primary reference environment and requires `libwebkit2gtk-4.1-0`, `libgtk-3-0`, `libayatana-appindicator3-1`, `ibus`, `python3`, `gir1.2-ibus-1.0`, and `python3-gi`. Debian-derived systems are best-effort rather than part of the regular desktop matrix.
 
 **Live cursor setup:** After installing the Debian package, manually add and select `VOCO Dictation` in the desktop Input Sources settings. VOCO never changes the active source automatically.
-
-**AppImage limitation:** The AppImage does not install the host IBus component, so it remains preview-only unless the matching Debian component is already installed.
 
 **Wayland users:** `sudo apt install ydotool wl-clipboard && sudo usermod -aG input $USER`
 
@@ -69,11 +80,16 @@ cat <<'EOF'
 - Existing `voice` config is migrated to `~/.config/voco`
 - Existing local models are reused from the prior install when present
 - Restart VOCO after upgrading if it is already running
-- Switch away from and back to `VOCO Dictation` after an engine protocol upgrade
+- After an engine protocol upgrade, quit VOCO and run `ibus restart` or sign out and back in before reopening it; switching input sources alone does not reload the resident engine
 
 ## Known issues
 
 - First launch still downloads the speech model (~142 MB, one-time)
 - Wayland text insertion depends on `ydotool` and compositor support
-- Live cursor rendering and keyboard pass-through still require isolated desktop QA across target toolkits
+- Live words intentionally use VOCO preview in terminals, sensitive fields, and fields whose current
+  focus does not freshly report safe input metadata
+- IBus global-engine mode suppresses unchanged metadata, so consecutive same-metadata focuses and
+  generic `FREE_FORM`/no-hint fields remain preview-only by design
+- Remote/physical live-cursor rendering and keyboard pass-through QA remains pending across the
+  target toolkit matrix
 EOF

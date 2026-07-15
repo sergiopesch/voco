@@ -9,6 +9,10 @@ struct PreviewRequest {
     end_sample: usize,
     #[serde(default)]
     full_session: bool,
+    #[serde(default)]
+    canonical: bool,
+    #[serde(default)]
+    previous_canonical_text: String,
 }
 
 fn main() -> Result<(), String> {
@@ -55,6 +59,19 @@ fn main() -> Result<(), String> {
         }
         let start = request.start_sample.min(samples.len());
         let end = request.end_sample.min(samples.len()).max(start);
+        if request.canonical {
+            let canonical = whisper.transcribe_canonical_chunk(
+                &samples[start..end],
+                &request.previous_canonical_text,
+            )?;
+            serde_json::to_writer(&mut stdout, &canonical)
+                .map_err(|error| format!("Failed to encode replay response: {error}"))?;
+            stdout
+                .write_all(b"\n")
+                .and_then(|_| stdout.flush())
+                .map_err(|error| format!("Failed to write replay response: {error}"))?;
+            continue;
+        }
         let preview = whisper.transcribe_preview(&samples[start..end])?;
         serde_json::to_writer(&mut stdout, &preview)
             .map_err(|error| format!("Failed to encode replay response: {error}"))?;

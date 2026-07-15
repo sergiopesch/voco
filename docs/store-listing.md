@@ -23,6 +23,7 @@ VOCO lives in the Linux tray, listens on demand, and inserts speech directly int
 VOCO is a desktop dictation tool built for Linux users who want fast voice capture without giving up clarity or control.
 
 It stays out of the way until you trigger it, then moves through a small set of explicit states:
+
 - ready
 - listening
 - processing
@@ -30,6 +31,7 @@ It stays out of the way until you trigger it, then moves through a small set of 
 - blocked
 
 Key product points:
+
 - tray-first workflow with a compact command panel
 - branded first-run setup for microphone, hotkey, insertion strategy, and tray workflow
 - local-first transcription path
@@ -37,6 +39,7 @@ Key product points:
 - settings that remain compact instead of sprawling
 
 VOCO is designed for:
+
 - developers
 - writers
 - creators
@@ -44,21 +47,35 @@ VOCO is designed for:
 
 ## Privacy / Trust Copy
 
-VOCO needs microphone access for voice input features. Audio is used for dictation and related voice workflows. Configuration stays local on the machine. Existing `voice` installs migrate forward to `voco` paths automatically.
+VOCO needs microphone access for voice input. Normal dictation is transcribed on-device and does
+not require an account or cloud transcription service. Optional OpenClaw modes may send transcript
+text according to the user's OpenClaw provider configuration. Microphone audio is sent to OpenAI
+only when the user explicitly starts the optional Realtime conversation mode.
+
+Configuration stays local on the machine. VOCO automatically requests GitHub Releases metadata for
+update awareness, without uploading audio or transcripts. A developer-only environment flag can
+persist one debug WAV and transcript timeline for regression testing; it is off by default and is
+not part of normal dictation. Existing `voice` installs migrate forward to `voco` paths
+automatically.
 
 ## Packaging Notes
 
 Current release priorities:
+
 - GitHub Releases
 - `.deb`
-- `.AppImage`
 - checksums
 
+AppImage publication is paused until the complete Linux packaging toolchain is immutable and
+checksum-verified.
+
 Current store path:
+
 - Ubuntu App Center remains a classic-confinement review candidate after local install and runtime validation
 - Flathub is deferred until the sandbox and host-integration story is proven workable
 
 Current Snap note:
+
 - use `classic` confinement for the honest v1 draft because VOCO depends on host-level hotkeys and text insertion helpers
 
 ## Release Notes Template

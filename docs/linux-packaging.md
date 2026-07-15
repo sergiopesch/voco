@@ -6,9 +6,11 @@ VOCO's v1 packaging plan is intentionally staged.
 
 - GitHub Releases
 - `.deb`
-- `.AppImage`
 - release checksums
 - update checks against GitHub Releases inside the app
+
+AppImage remains a local packaging experiment and is not published until the full linuxdeploy and
+appimagetool chain can be supplied from immutable, checksum-verified sources.
 
 ## Next
 
@@ -41,20 +43,24 @@ Branding note:
 
 Current primary validation target:
 
-- Ubuntu / Debian
+- Ubuntu
 - x86_64 / amd64
 - Wayland and X11, with documented insertion caveats
 
+Debian-derived distributions are best-effort. The `.deb` format and dependency metadata target
+Debian-family package managers, but that compatibility is not a substitute for a recorded desktop
+runtime test.
+
 Automatic live cursor revisions use a persistent, package-owned IBus component at
-`/usr/share/ibus/component/voco.xml`, launched through `/usr/libexec/voco-ibus-engine`. Debian
-packages depend on `ibus`, `python3`, `gir1.2-ibus-1.0`, and `python3-gi`. Installation only makes
+`/usr/share/ibus/component/voco.xml`, launched through `/usr/libexec/voco-ibus-engine`. The `.deb`
+depends on `ibus`, `python3`, `gir1.2-ibus-1.0`, and `python3-gi`. Installation only makes
 the source available: the user must add and select `VOCO Dictation`, and no maintainer script may
 modify GNOME settings or restart IBus. The app talks to the engine through an owner-only socket at
 `$XDG_RUNTIME_DIR/voco/ibus-engine.sock`; disconnects fail closed to preview-only behavior.
 
-The AppImage cannot install the host component and therefore does not claim live cursor support by
-itself. Stable cursor mode does not fall back to compatibility keyboard injection when the input
-source or target preedit context is unavailable.
+A locally built experimental AppImage cannot install the host component and therefore does not
+claim live cursor support by itself. Stable cursor mode does not fall back to compatibility keyboard
+injection when the input source or target preedit context is unavailable.
 
 ## Listing Assets
 
@@ -96,9 +102,11 @@ So the honest first Snap is a classic-confinement review candidate, not a preten
 
 The next packaging pass should install the built snap locally, verify tray, microphone, hotkey, and insertion behavior in a real desktop session, and then decide whether any future product changes could make stricter confinement realistic.
 
-## AppImage Fallback Packaging
+## Experimental AppImage Packaging
 
-Tauri currently generates a complete `VOCO.AppDir` locally on this machine, but it may stop before writing the final `.AppImage` file.
+This path is for local packaging research only. It is not part of the release workflow because the
+upstream Tauri/linuxdeploy stages are not yet fully pinned, even though the final `appimagetool`
+fallback itself is checksum-verified.
 
 The repo now includes:
 
@@ -111,11 +119,12 @@ This helper:
   `appimagetool` binary, and verifies it before execution
 - runs `appimagetool` in extract-and-run mode so it does not require host FUSE 2
 
-Local `npm run build` can use this helper when Tauri stops at the final `linuxdeploy` step, but only
-when both pinned-tool environment variables are set.
+Default `npm run build` builds only the locked Debian bundle. After an explicit experimental
+AppImage attempt, this helper can finish an existing AppDir only when both pinned-tool environment
+variables are set. That does not make the earlier linuxdeploy stages release-safe.
 
-Use it manually after `cargo tauri build --features custom-protocol` if no final `.AppImage` file
-was emitted automatically.
+Use it manually only after an explicit experimental
+`cargo tauri build --features custom-protocol --bundles appimage` run created the AppDir.
 
 ```bash
 VOCO_APPIMAGETOOL_PATH=/path/to/pinned/appimagetool \

@@ -88,7 +88,7 @@ done
 
 /usr/bin/python3 "${ROOT_DIR}/scripts/test-private-ibus-engine.py"
 
-if rg -q 'stable provisional|focus-owned tail|authoritative mismatch|exact authoritative final|delayed final|key-owned tail|reset-owned tail|selection-owned tail|destroy-owned tail|disconnect-owned tail|stale tail' \
+if rg -q 'stable provisional|focus-owned tail|authoritative mismatch|exact authoritative final|delayed final|key-owned tail|reset-owned tail|selection-owned tail|destroy-owned tail|disconnect-owned tail|stale tail|canonical draft|canonical checkpoint|canonical final|wrong canonical prefix|forbidden append|canonical preserved|canonical canceled draft' \
   "${TEST_ROOT}/ibus.log"; then
   echo "Private IBus test log exposed transcript text." >&2
   exit 1

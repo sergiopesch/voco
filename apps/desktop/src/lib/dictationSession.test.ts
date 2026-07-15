@@ -8,6 +8,7 @@ import {
   disableLivePreview,
   failSession,
   finishSessionIdle,
+  invalidateLivePreview,
   isActivePreviewToken,
   markFinalizing,
   markProcessing,
@@ -63,6 +64,17 @@ describe("dictation session state machine", () => {
     state = requestStop(state);
     expect(isActivePreviewToken(state, token)).toBe(false);
     expect(recordPreviewDuration(state, token, 900).lastPreviewDurationMs).toBeNull();
+  });
+
+  it("invalidates an in-flight preview without disabling the next preview", () => {
+    let state = markRecording(startSession(createDictationSessionState()));
+    const staleToken = createPreviewToken(state);
+
+    state = invalidateLivePreview(state);
+
+    expect(isActivePreviewToken(state, staleToken)).toBe(false);
+    expect(state.livePreviewDisabled).toBe(false);
+    expect(isActivePreviewToken(state, createPreviewToken(state))).toBe(true);
   });
 
   it("separates old preview tokens from new sessions", () => {

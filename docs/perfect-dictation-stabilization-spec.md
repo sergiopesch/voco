@@ -1,4 +1,13 @@
-# Perfect Dictation Stabilization Spec
+# Historical Perfect Dictation Stabilization Spec
+
+> Historical pre-canonical-v3 plan. Wrapper paths, progressive live-commit events, and AppImage-led
+> build/install steps below are superseded and retained for decision history only. The active design
+> and gates are [Cursor Streaming Dictation Hardening](cursor-streaming-dictation-hardening-spec.md),
+> [Release Process](release-process.md), and
+> [Cursor Streaming QA Results](testing/cursor-streaming-qa-results.md).
+>
+> **Do not execute the commands or follow the paths and phase gates below for a current build.**
+> Every section after this notice describes the archived pre-v3 plan.
 
 ## Goal
 

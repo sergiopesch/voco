@@ -1,4 +1,14 @@
-# VOCO Stabilization Risk Register
+# Historical VOCO Stabilization Risk Register
+
+> Historical pre-canonical-v3 register. The P0 live-commit events, local wrapper paths, and
+> machine-specific settings below describe the superseded progressive-commit implementation. They
+> are not current release requirements. See
+> [Live Dictation Architecture Audit](./live-dictation-architecture-audit.md),
+> [Cursor Streaming Hardening](../cursor-streaming-dictation-hardening-spec.md), and
+> [current QA results](../testing/cursor-streaming-qa-results.md).
+>
+> **Do not use the paths, event names, or exit criteria below as current operational guidance.**
+> Every risk entry after this notice belongs to the archived pre-v3 snapshot.
 
 ## Severity Key
 

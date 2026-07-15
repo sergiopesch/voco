@@ -64,11 +64,19 @@ const sources = [
     value: expectMatch("install", /^VERSION="([^"]+)"/m, "install script version"),
   },
   {
-    label: "AppStream release",
+    label: "Flatpak/Snap AppStream release",
     value: expectMatch(
       "packaging/flatpak/com.sergiopesch.voco.metainfo.xml",
       /<release version="([^"]+)"/,
       "AppStream release version",
+    ),
+  },
+  {
+    label: "Tauri Debian/AppImage AppStream release",
+    value: expectMatch(
+      "packaging/tauri/com.sergiopesch.voco.metainfo.xml",
+      /<release version="([^"]+)"/,
+      "Tauri AppStream release version",
     ),
   },
   {

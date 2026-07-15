@@ -1,9 +1,18 @@
-# Cursor Streaming Completion Audit
+# Historical Cursor Streaming Completion Audit
 
-This audit tracks the current evidence for
+> Historical pre-canonical-v3 audit. Its live-commit policy, local launcher, and trace-event notes
+> describe the superseded append-only preview architecture and are retained only for provenance.
+> Use [Cursor Streaming QA Results](./cursor-streaming-qa-results.md) for current evidence and
+> [Cursor Streaming Dictation Hardening](../cursor-streaming-dictation-hardening-spec.md) for the
+> active protocol-v3 design.
+>
+> **Do not use the procedures, paths, event names, or completion gate below for a current build.**
+> Every section after this notice describes the archived pre-v3 snapshot.
+
+This audit tracked the evidence available at that time for
 [`cursor-streaming-dictation-hardening-spec.md`](../cursor-streaming-dictation-hardening-spec.md).
 
-## Proven By Current Evidence
+## Proven By Historical Evidence
 
 - Stable cursor commit policy has unit coverage in
   `apps/desktop/src/__tests__/liveCursorStreaming.test.ts`.

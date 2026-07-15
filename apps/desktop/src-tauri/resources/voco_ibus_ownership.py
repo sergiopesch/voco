@@ -30,7 +30,12 @@ class FinalizationPlan:
     commit_text: str = ""
 
     def commands(self) -> tuple[FinalizationCommand, ...]:
-        if self.action == FinalizationAction.COMMIT and self.commit_text:
+        # A preserved final may still commit the exact text that remains in
+        # VOCO's owned preedit. That converts already-visible live text into
+        # normal target text without reading, deleting, or revising any target
+        # range. The action continues to report PRESERVE because the
+        # authoritative final itself was not reconciled.
+        if self.commit_text:
             return (FinalizationCommand("commit-text", text=self.commit_text),)
         return ()
 
@@ -62,6 +67,7 @@ class OwnedPreeditLease:
         context_revision: int,
         ownership_intact: bool,
         committed_text: str,
+        owned_preedit_text: str,
         final_text: str,
     ) -> FinalizationPlan:
         preserve = FinalizationPlan(FinalizationAction.PRESERVE)
@@ -75,13 +81,25 @@ class OwnedPreeditLease:
 
         # Progressively committed text is already ordinary application text.
         # Without a fresh, atomic editor lease IBus cannot prove that it remains
-        # next to the cursor, so VOCO never rewrites or appends to that range.
-        # An exact final needs no target mutation and is safe to acknowledge.
+        # next to the cursor, so VOCO never rewrites or extends that range with
+        # text that was not already owned. The current preedit is different: it
+        # is an exact, revisable VOCO-owned range and can be committed verbatim.
         if committed_text:
             if final_text == committed_text:
                 self._ownership_intact = False
                 return FinalizationPlan(FinalizationAction.COMMIT)
-            return preserve
+
+            self._ownership_intact = False
+            if final_text == committed_text + owned_preedit_text:
+                return FinalizationPlan(
+                    FinalizationAction.COMMIT,
+                    commit_text=owned_preedit_text,
+                )
+
+            return FinalizationPlan(
+                FinalizationAction.PRESERVE,
+                commit_text=owned_preedit_text,
+            )
 
         # With no normal target text to reconcile, the full final replaces only
         # VOCO's currently owned preedit. The engine clears that preedit before

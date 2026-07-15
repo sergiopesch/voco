@@ -1,158 +1,75 @@
-# Submission Readiness
+# Distribution Readiness
 
-Status snapshot: April 7, 2026.
+Status reviewed: July 15, 2026.
 
-This document is the publish gate for VOCO's Linux distribution channels.
+This document is a gate checklist, not proof that the current workspace or next release candidate
+passed it. Record candidate-specific command output and desktop evidence in the testing results and
+release artifacts; do not infer readiness from packaging files merely existing in the repository.
 
-It separates:
-- artifact buildability
-- metadata quality
-- install and runtime validation
-- channel-specific review risk
+## Current Channel Boundary
 
-## Current Verdict
+| Channel | Current role | Host integration | Publication status |
+| --- | --- | --- | --- |
+| GitHub Release `.deb` | Primary Ubuntu package | Installs the persistent IBus component | Published channel; validate every candidate |
+| AppImage | Local packaging experiment | Does not install the IBus component | Not published until every helper is pinned |
+| Flatpak / Flathub | Packaging experiment | Host input and hotkey model unresolved | Not published; no submission claim |
+| Snap / Ubuntu App Center | Tracked draft | Requires classic confinement and store review | Not published; no submission claim |
 
-| Channel | Artifact Builds | Metadata Shape | Local Install Validation | Store Submission Verdict |
-| --- | --- | --- | --- | --- |
-| `.deb` | Yes | Good | Good | Closest to ready |
-| Flatpak | Baseline only | Good | Not fully validated | Not ready |
-| Snap / Ubuntu App Center | Rebuild required | Coherent draft | Prior artifact predates current release feature gate | Not ready |
+Ubuntu is the primary reference and release-test environment. Debian-derived distributions are
+best-effort and are not part of the regular desktop matrix. A `.deb` payload being structurally
+compatible with Debian does not prove desktop behavior there.
 
-## `.deb`
+## GitHub Release `.deb`
 
-### Ready
+For each release candidate, retain evidence for all applicable gates:
 
-- Tauri `.deb` bundling works.
-- Debian metadata is version-aligned with the repo release metadata.
-- AppStream metadata is bundled into the package.
-- Desktop metadata validates.
-- The release workflow already publishes `.deb` artifacts.
+- version consistency and source-tree validation
+- frontend build, type checks, lint, unit tests, Rust tests, formatting, and Clippy
+- Debian bundle build and exact payload verification
+- `desktop-file-validate` and `appstreamcli validate`
+- clean Ubuntu install and launch from the packaged desktop entry
+- tray, onboarding, microphone, update-check, hotkey, and insertion smoke tests
+- persistent `VOCO Dictation` setup and owned-cursor behavior in normal and failure cases
+- upgrade over the prior published package, including resident IBus protocol refresh instructions
+- uninstall and reinstall, including confirmation that per-user input-source settings and XDG data
+  are not silently removed
 
-### Verified
+Headless ownership/protocol tests and deterministic audio replay are necessary but do not prove
+visible IBus preedit, focus transitions, target-app layout, or a complete desktop matrix. The live
+cursor candidate status and any pending manual cases belong in
+[Cursor Streaming QA Results](testing/cursor-streaming-qa-results.md).
 
-- `cargo tauri build --features custom-protocol --bundles deb`
-- `desktop-file-validate packaging/flatpak/com.sergiopesch.voco.desktop`
-- `appstreamcli validate packaging/flatpak/com.sergiopesch.voco.metainfo.xml`
-- package inspection confirmed:
-  - version aligned with the current repo release
-  - deduplicated runtime dependencies
-  - packaged metainfo file
+## AppImage
 
-### Remaining Before Calling It Done
-
-- smoke-test install and launch on a clean Ubuntu machine
-- verify launcher presence and tray behaviour from the installed package
-- verify upgrade-over-install and uninstall paths on a clean system
-
-### Go / No-Go
-
-Go once the clean-machine install, launch, tray, and upgrade checks pass.
+Publication is paused while the Tauri/linuxdeploy path relies on mutable helper downloads. Before
+restoring it, pin and verify every packaging tool, then validate launch, tray, microphone capture,
+local transcription, one-shot insertion, update instructions, and clean shutdown on Ubuntu. The
+AppImage does not install the host IBus component; without a matching component already installed,
+automatic live-cursor mode must report its preview-only limitation rather than being recorded as a
+passing owned-cursor run.
 
 ## Flatpak / Flathub
 
-### Ready
-
-- tracked manifest exists in `packaging/flatpak/`
-- desktop file validates
-- AppStream metadata validates
-
-### Verified
-
-- `desktop-file-validate packaging/flatpak/com.sergiopesch.voco.desktop`
-- `appstreamcli validate packaging/flatpak/com.sergiopesch.voco.metainfo.xml`
-
-### Blocking Issues
-
-- the product model is still a poor sandbox fit:
-  - global hotkeys
-  - host-level text insertion
-  - Wayland `ydotool` / input-device assumptions
-  - typing into arbitrary host applications
-- `flatpak-builder` end-to-end validation is not yet part of the repo validation story
-- runtime permission behaviour has not been verified in a real Flatpak sandbox
-
-### Submission Verdict
-
-Do not submit to Flathub yet. The metadata is acceptable, but the runtime/product fit is still unresolved.
-
-### Go / No-Go
-
-No-go until the sandbox and host-integration story is proven in a real Flatpak runtime.
+The tracked manifest and metadata are preparation material only. Before any Flathub submission,
+the project must demonstrate in a real Flatpak runtime that microphone access, global hotkeys,
+arbitrary host-application insertion, external links, updates, and the IBus architecture have an
+acceptable sandboxed design. Until then, do not describe Flatpak as an install or release channel.
 
 ## Snap / Ubuntu App Center
 
-### Ready
+The tracked Snap configuration is a draft. Classic confinement is currently the honest fit for
+VOCO's host-level hotkeys, input simulation, notifications, and arbitrary target applications, and
+it requires store review. Before submission, build in an isolated environment, inspect confinement
+and ELF/rpath warnings, install the exact artifact with the intended confinement, run end-to-end
+desktop tests, and prepare a precise classic-confinement justification. Until those steps are
+recorded, do not describe the Snap or Ubuntu App Center path as ready.
 
-- tracked snap sources now exist under `snap/`
-- tracked Snap build now enables Tauri's required `custom-protocol` release feature
-- desktop metadata validates
-- version metadata is aligned with the repo release version
-- the draft is honest about `classic` confinement
+## Evidence Rules
 
-### Verified
-
-- `desktop-file-validate snap/gui/com.sergiopesch.voco.desktop`
-- the earlier `snapcraft --destructive-mode` artifact predates the release feature gate and is not a
-  current passing artifact
-
-### Remaining Warnings
-
-- rerun `snapcraft` in an isolated build environment and inspect its confinement, ELF, and rpath warnings
-- Snapcraft still emits some unused-library warnings
-- metadata still lacks a `donation` field
-
-### Blocking Issues
-
-- local install and runtime verification still require privileged install:
-  - `snap install --dangerous --classic ...`
-- this machine did not complete that install step because `sudo` required a password
-- Ubuntu App Center publication still depends on manual review because VOCO uses `classic` confinement
-
-### Submission Verdict
-
-Closer than before, but still not ready for submission. The packaging path is now real, but store review risk and runtime validation are still open.
-
-### Go / No-Go
-
-No-go until the snap is installed locally, smoke-tested end to end, and the classic-confinement review case is written clearly enough for submission.
-
-## Final Checklist
-
-Use this before any store submission attempt.
-
-### For `.deb`
-
-- [ ] install on clean Ubuntu
-- [ ] launch from app launcher
-- [ ] verify tray icon and onboarding
-- [ ] verify Wayland insertion path
-- [ ] verify X11 insertion path
-- [ ] verify uninstall and reinstall
-
-### For Flatpak
-
-- [ ] build with `flatpak-builder`
-- [ ] verify microphone access in sandbox
-- [ ] verify update and external URL behaviour in sandbox
-- [ ] verify whether hotkeys and host insertion are acceptable or fundamentally blocked
-- [ ] decide whether Flathub is a real target or should be deferred
-
-### For Snap
-
-- [ ] install locally with `snap install --dangerous --classic`
-- [ ] launch from App Center-style desktop entry path
-- [ ] verify tray, mic access, hotkey registration, and insertion helpers
-- [ ] review the remaining Snapcraft classic/library warnings and decide which are acceptable
-- [ ] prepare the classic-confinement review justification for store submission
-
-## Recommendation
-
-Near-term release priority:
-1. `.deb`
-2. GitHub-only Snap artifact for manual testing
-3. Flatpak only after resolving the sandbox/product fit
-
-Near-term store priority:
-1. finish local Snap install/runtime validation
-2. prepare classic-confinement review notes
-3. postpone Flathub submission until the host-integration model is either redesigned or explicitly proven workable
+- Name the exact version, commit SHA, artifact digest, operating system, desktop, display protocol,
+  and test date.
+- Distinguish automated, headless, disposable-desktop, and active-workstation evidence.
+- Keep historical failures as history; do not relabel them as current candidate results.
+- Leave an unperformed case as pending. Do not promote a channel based on expected compatibility.
+- Do not publish Flatpak, Flathub, Snap, or Ubuntu App Center availability until the matching
+  artifact and runtime path have actually been verified and published.

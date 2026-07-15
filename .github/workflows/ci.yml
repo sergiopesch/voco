@@ -14,11 +14,28 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  rust-security:
+    name: RustSec Audit
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      checks: write
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - uses: rustsec/audit-check@69366f33c96575abad1ee0dba8212993eecbe998 # v2.0.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          working-directory: apps/desktop/src-tauri
+
   check:
     name: Frontend Checks
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
@@ -60,16 +77,22 @@ jobs:
         run: npm --workspace @voco/desktop run build:frontend
 
       - name: Validate desktop metadata
-        run: desktop-file-validate packaging/flatpak/com.sergiopesch.voco.desktop
+        run: |
+          desktop-file-validate packaging/flatpak/com.sergiopesch.voco.desktop
+          desktop-file-validate packaging/tauri/VOCO.desktop
 
       - name: Validate AppStream metadata
-        run: appstreamcli validate packaging/flatpak/com.sergiopesch.voco.metainfo.xml
+        run: |
+          appstreamcli validate packaging/flatpak/com.sergiopesch.voco.metainfo.xml
+          appstreamcli validate packaging/tauri/com.sergiopesch.voco.metainfo.xml
 
   rust:
     name: Rust Check & Test
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:

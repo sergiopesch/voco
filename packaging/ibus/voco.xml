@@ -3,7 +3,7 @@
   <name>org.freedesktop.IBus.Voco</name>
   <description>VOCO Dictation Input Source</description>
   <exec>/usr/libexec/voco-ibus-engine</exec>
-  <version>2026.0.19</version>
+  <version>2026.0.21</version>
   <author>VOCO Contributors</author>
   <license>MIT</license>
   <homepage>https://github.com/sergiopesch/voco</homepage>

@@ -3,14 +3,14 @@
 
 ## Supported Platforms
 
-| Platform         | Status      | Notes                                            |
-| ---------------- | ----------- | ------------------------------------------------ |
-| Ubuntu (X11)     | Tested      | xdotool for text insertion                       |
-| Ubuntu (Wayland) | Tested      | ydotool for text insertion, clipboard fallback   |
-| Debian-derived   | Best-effort | Likely to work, not regularly tested             |
-| Other Linux      | Experimental | May work, not supported                          |
-| macOS            | Not targeted | Not in scope                                     |
-| Windows          | Not targeted | Not in scope                                     |
+| Platform         | Status            | Notes                                        |
+| ---------------- | ----------------- | -------------------------------------------- |
+| Ubuntu (X11)     | Reference target  | Candidate-specific desktop evidence required |
+| Ubuntu (Wayland) | Primary reference | Candidate-specific desktop evidence required |
+| Debian-derived   | Best-effort       | Likely to work, not regularly tested         |
+| Other Linux      | Experimental      | May work, not supported                      |
+| macOS            | Not targeted      | Not in scope                                 |
+| Windows          | Not targeted      | Not in scope                                 |
 
 ## Requirements
 
@@ -84,8 +84,8 @@ pgrep -x ydotoold > /dev/null || ydotoold &
 - Flatpak may require portal permissions for mic access
 - Some Wayland compositors block simulated input
 - First launch requires internet for model download (~142 MB)
-- AppImage bundling still depends on Tauri/linuxdeploy behaviour; the optional AppDir fallback runs
-  only with an explicitly supplied, checksum-verified appimagetool
+- AppImage publication is paused because Tauri/linuxdeploy still uses mutable helper downloads;
+  local experiments require an explicitly supplied, checksum-verified final appimagetool
 
 ## Packaging
 
@@ -93,12 +93,13 @@ pgrep -x ydotoold > /dev/null || ydotoold &
 | -------- | -------------- | --------------------------------------------------------------------- |
 | .deb     | Working        | Built via `./scripts/setup.sh --install` or GitHub Releases           |
 | .rpm     | Not configured | Can be added to tauri.conf.json targets                               |
-| AppImage | Secondary      | Included when Tauri succeeds; manual fallback requires a pinned tool  |
+| AppImage | Local experiment | Not published until the complete packaging toolchain is pinned      |
 
 ## Data Locations
 
-| Data   | Path                             |
-| ------ | -------------------------------- |
-| Config | `~/.config/voco/config.json`     |
-| Models | `~/.local/share/voco/models/`    |
-| Socket | `$XDG_RUNTIME_DIR/voco.sock` or `${TMPDIR:-/tmp}/voco-$(id -u)/voco.sock` |
+| Data   | Path                                                                           |
+| ------ | ------------------------------------------------------------------------------ |
+| Config | `~/.config/voco/config.json`                                                   |
+| Models | `~/.local/share/voco/models/`                                                  |
+| State  | `${XDG_STATE_HOME:-$HOME/.local/state}/voco/`                                  |
+| Socket | `$XDG_RUNTIME_DIR/voco.sock` or `${TMPDIR:-/tmp}/voco-$(id -u)/voco.sock`       |

@@ -2,9 +2,9 @@
 
 ## Core Finding
 
-The current live cursor streaming design is built on repeated local Whisper preview transcriptions
-over a rolling audio window. That can produce useful preview text, but the output is not a stable
-streaming transcript. Whisper may:
+The pre-v3 live cursor design was built on repeated local Whisper preview transcriptions over a
+rolling audio window. That produced useful provisional text, but not a stable transcript. Whisper
+may:
 
 - Change earlier words.
 - Add or remove punctuation.
@@ -14,7 +14,8 @@ streaming transcript. Whisper may:
 - Produce disjoint previews that do not share a reliable prefix or suffix.
 
 The earlier cursor commit policy tried to infer globally appendable text from those previews. That
-fragile compatibility path has been removed from stable mode.
+fragile compatibility path has been removed from stable mode. In v3, previews remain revisable IBus
+preedit and only authoritative canonical chunks can become normal target text.
 
 ## Current Data Flow
 
@@ -22,16 +23,20 @@ fragile compatibility path has been removed from stable mode.
 2. WebView opens a microphone stream.
 3. AudioWorklet posts batched samples to the frontend.
 4. Frontend stores full-session samples in memory.
-5. A timer collects the recent audio tail for preview ASR.
-6. Frontend calls native `preview_transcribe_audio`.
-7. Native Whisper transcribes the preview window.
-8. Frontend seals timestamped segments and revises only the IBus-owned preedit tail.
-9. The private IBus engine progressively commits sealed phrases as normal target text.
-10. On stop, the complete audio recording always runs through authoritative final transcription.
-11. If no normal text was committed, finalization may commit the still-owned preedit. If the final
-    exactly matches normal commits, no target command is needed.
-12. Every mismatch or invalid session/context preserves the target and keeps the final in VOCO. No
-    global append or deletion command is available to stable mode.
+5. A timer transcribes a bounded recent window and displays the result as revisable IBus preedit.
+6. In parallel, the frontend preprocesses stable, non-overlapping source blocks ending at 30, 59,
+   88 seconds, and subsequent 29-second strides.
+7. Native Whisper transcribes authoritative 30-second ranges with one second of overlap: `0-30`,
+   `29-59`, `58-88`, and so on.
+8. Each result must preserve the cached canonical prefix and identify its exact append.
+9. Protocol v3 atomically verifies the target's acknowledged canonical prefix and commits only that
+   exact append. A preview hypothesis is never committed merely because it appears stable.
+10. On stop, VOCO waits for in-flight work, finishes every complete canonical range, then transcribes
+    the remaining partial range once.
+11. Previously cached exact chunks are reused as final truth; there is no separate enhancement-off
+    full-session pass that can disagree with earlier checkpoints.
+12. The engine commits the exact remaining canonical suffix and closes the lease. If a mutating IPC
+    outcome is uncertain, VOCO never retries it or falls back to global keyboard insertion.
 
 ## Design Constraints
 
@@ -41,26 +46,30 @@ delete, rewrite, or append to normal target text during finalization.
 
 The only safe generic cursor models are:
 
-- Bounded owned preedit plus progressive normal commits.
-- Owned overlay preview plus final-preserved output.
+- Bounded owned preedit plus immutable, prefix-checked canonical commits.
+- Owned overlay preview plus one-shot final output.
 - Editor-specific adapters that can manage a known text range.
 
-Current stable mode uses bounded preedit and fails closed to VOCO-owned output.
+Enhancement-off stable mode uses the first model. Enhancement modes use the second so an enhanced
+one-shot final is never mixed with unenhanced canonical checkpoints.
 
-## Why Words Stop Appearing
+## Why Words Stopped Appearing In V2
 
-Recent trace evidence shows repeated preview completion with no insertion. This means:
+Historical trace evidence showed repeated preview completion with no insertion. This meant:
 
 - Audio capture is active.
 - Preview ASR is active.
 - Native insertion has not failed.
 - The commit policy is refusing to append.
 
-Root cause:
+The root cause was:
 
-The commit policy is trying to avoid corruption by rejecting anything it cannot reconcile with
+The commit policy was trying to avoid corruption by rejecting anything it could not reconcile with
 already committed text. With real rolling Whisper previews, normal continuation can look like an
 unsafe rewrite. Once that happens, visible cursor text stalls even though previews continue.
+
+V3 removes this preview-consensus gate from normal-text commits. Preview updates may continue to
+revise, while canonical checkpoint cadence is determined only by exact audio boundaries.
 
 ## Complexity Hotspots
 
@@ -76,9 +85,9 @@ Candidate extraction boundaries:
 - `dictationFinalizer.ts` - final ASR, enhancement, final insertion/reconciliation.
 - `dictationTrace.ts` - privacy-safe event helpers.
 
-### Commit Policy
+### Retired Preview Commit Policy
 
-The current policy mixes:
+The retired policy mixed:
 
 - Stable prefix logic.
 - Rolling suffix-prefix overlap.
@@ -87,61 +96,38 @@ The current policy mixes:
 - Disjoint rolling append fallback.
 - Unsafe rewrite detection.
 
-This should be isolated into a pure module with a fixture suite built from real anonymized trace
-shapes. Tests should not need React or `useDictation`.
+These heuristics are no longer an authority for direct-cursor commits. Preview reconciliation stays
+pure and provisional; canonical session and delivery state are separately testable.
 
 ### Native Boundary
 
 The native boundary correctly rejects deletion for live cursor streaming. That invariant should stay.
 
-The current issue is not native insertion failure. It is frontend commit refusal.
+The v2 issue was not native insertion failure. It was frontend preview-commit refusal.
 
-## Recommended Architecture
+## Canonical Architecture Implemented
 
-### Near-Term Stabilization
+The direct-cursor v3 path has two explicitly separate streams:
 
-Default to reliability:
+- Preview ASR supplies low-latency, revisable text inside VOCO's leased IBus preedit.
+- Canonical ASR owns transcript truth. Stable source blocks are resampled once, canonical ranges are
+  at most 30 seconds with one second of overlap, and every result extends an immutable cached prefix.
 
-- Keep final dictation as source of truth.
-- Keep live cursor streaming append-only.
-- Add a product-grade fallback when append confidence is low:
-  - Continue showing live preview in VOCO overlay.
-  - Stop trying to type uncertain live text at the cursor.
-  - Final insertion still runs.
+At a complete boundary, the target receives an atomic `(expected prefix, exact append)` checkpoint.
+At stop, the same coordinator catches up any deferred complete work and processes only the final
+partial range. This makes the text already checkpointed at the cursor byte-for-byte identical to the
+corresponding canonical cache; a later global reconciliation pass is neither needed nor allowed.
 
-But if the user chooses `Stable cursor streaming`, the app should avoid silent stalls. It should
-either append measured stable segments or explicitly switch to overlay-only for that session with a
-single notification.
-
-### Segmented Design Implemented
-
-The direct-cursor path now uses the segmented model:
-
-- Native Whisper previews return text plus segment start/end timestamps.
-- Preview audio is anchored to the oldest uncommitted session sample and bounded to 20 seconds.
-- Consecutive previews confirm whole timestamped Whisper segments; partial segments are never typed.
-- The audio anchor advances only through confirmed segments that have already been typed.
-- The direct-cursor policy cannot use disjoint rolling-window heuristics to jump over missing words.
-- On stop, VOCO transcribes and appends the complete unsealed audio tail, so every source-audio range
-  is covered without deleting target text. If tail insertion fails, full-session final transcription
-  remains the non-destructive fallback.
-
-This gives the app explicit audio-backed units of work instead of relying on string diff guesses
-across arbitrary rolling windows. Overlay-only mode keeps its short rolling preview because it does
-not mutate cursor text.
+When transcript enhancement is enabled, VOCO does not start canonical IBus delivery. Preview stays
+in the VOCO overlay and the enhanced transcript is inserted once after stop.
 
 ## Hard Product Decision
 
-If generic append-only cursor streaming cannot pass the manual QA matrix, VOCO should not pretend it
-is production-ready. The product should default to:
+The v3 design has automated state, protocol, ownership, and pinned-replay evidence. It is not
+product-ready until a newly built Debian package passes the installed Ubuntu/Wayland manual matrix.
+The older installed results below do not validate v3.
 
-- `Preview overlay only` for long dictation confidence.
-- `Final text only` for maximum reliability.
-- `Stable cursor streaming` as an experimental mode until proven.
-
-The product can still be excellent if the core final insertion path is fast, reliable, and local.
-
-## July 2026 Captured-Session Evidence
+## Pre-v3 July 2026 Captured-Session Evidence
 
 A 152.475-second local capture completed with 133 preview transcriptions, 23 sealed window
 advances, no insertion failure, no unsafe rewrite, no overlay fallback, and a successful tail flush.
@@ -199,17 +185,19 @@ Targeted A/B experiments were rejected:
 These results rule out a scheduler-only fix, a larger Whisper model, and the tested drop-in online
 models for direct append-only cursor output.
 
-### Architecture Consequence
+### V3 Architecture Consequence
 
-VOCO now owns only the changing cursor tail through an IBus preedit range. Sealed phrases
-progressively become normal target text so the editor performs native wrapping; repeated stateless
-Whisper windows can still revise the current candidate without synthetic deletion. Full-session
-Whisper remains the final source of truth. Because IBus surrounding text is cached and has no
-target-bound revision, the private engine never deletes, rewrites, or appends to progressively
-committed text. A mismatch preserves target text and exposes the final transcript in VOCO.
+VOCO owns the changing preview through an IBus preedit range, but preview-confirmed phrases no longer
+become normal text. Only exact canonical checkpoints do. Cached canonical text is therefore final
+truth for enhancement-off stable cursor mode, and each successful target acknowledgement proves the
+same prefix exists on both sides of the private protocol-v3 boundary.
 
-Unsupported or invalidated fields use VOCO preview/final-preserved behavior. The former global
-append-only ydotool/xdotool compatibility streamer is no longer part of stable cursor mode.
-Long-session safeguards now include an exact 10-minute automatic cutoff, bounded 20-second preview
-windows, indexed access to late-session audio chunks, 30-second overlapping final-ASR chunks, and a
-captured-WAV replay that measures coverage, word error, and update gaps.
+Unsupported or invalidated fields remain overlay-only and report canonical delivery as unreconciled.
+The former global ydotool/xdotool compatibility streamer is not part of stable cursor mode. A
+rejected IPC command may be handled as a known failure; an uncertain mutating outcome closes the
+socket and is never retried.
+
+Long-session safeguards include an exact 10-minute automatic cutoff, bounded 20-second preview
+windows, indexed access to late-session audio chunks, authoritative 30-second ranges with one second
+of overlap, cached exact chunk results, and a pinned WAV replay that proves the 30/59/final boundary
+sequence. Installed-package manual QA for v3 remains pending.

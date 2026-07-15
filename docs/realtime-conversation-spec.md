@@ -21,9 +21,8 @@ The critical product promise is:
 > `Alt+Shift+R` again to stop. The VOCO mic visual must move with the user's voice and with the
 > assistant's spoken response.
 
-When the user asks to open, navigate, or inspect a web page, realtime mode may call OpenClaw's
-isolated browser tool and then speak a compact summary of what is visible and what action can be
-taken next.
+VOCO 2026.0.21 realtime mode is voice-only. It does not open, navigate, inspect, list, or mutate
+browser pages, and it does not send browser URLs, tab metadata, or page snapshots to OpenAI.
 
 ## User-Facing Requirements
 
@@ -119,25 +118,29 @@ Acceptance criteria:
 - The response style is 1-2 short sentences unless the user asks for detail.
 - The assistant should respond to the latest user interruption, not continue the old answer.
 
-### Browser Collaboration
+### Browser Collaboration (Disabled in 2026.0.21)
 
-Realtime browser collaboration is implemented as a Realtime function tool named `openclaw_browser`.
-VOCO executes that tool locally by calling OpenClaw Gateway's `browser` tool through
-`/tools/invoke`.
+The Realtime session schema advertises no browser function tool. The frontend rejects any
+unexpected function call without invoking Tauri or OpenClaw, and the retained backend compatibility
+command rejects every browser action without making a network or browser call. Realtime is
+voice-only for this release.
 
-Acceptance criteria:
+This fail-closed policy is required because validating only a model-requested URL is not a complete
+SSRF boundary. VOCO cannot currently enforce which address OpenClaw resolves, re-check every
+redirect destination, or prove the final loaded URL before content becomes accessible. OpenClaw can
+also be configured to allow private-network navigation, and its isolated profile may contain logged-in
+sessions. Therefore page inspection, tab listing, navigation, snapshots, clicking, typing, and key
+presses are all unavailable.
 
-- Browser control uses OpenClaw's isolated `openclaw` browser profile by default.
-- Supported voice actions are `open_url`, `navigate`, `inspect_page`, `list_tabs`, `click_ref`,
-  `type_ref`, and `press_key`.
-- Open and navigate actions accept public `http` or `https` URLs; plain hostnames are normalized to
-  `https://`, and plain search phrases become a web search URL.
-- Browser snapshots are compact and ref-oriented so the assistant can say what is visible and which
-  direct next action the user can request.
-- The assistant must not buy, delete, log in, submit forms, send messages, or make account changes
-  unless the user explicitly confirms the exact action.
-- OpenClaw Gateway credentials are read from `OPENCLAW_GATEWAY_TOKEN`,
-  `OPENCLAW_GATEWAY_PASSWORD`, or `~/.openclaw/openclaw.json`; secrets are never included in traces.
+The dormant backend URL parser remains defense in depth: it structurally parses normalized URLs,
+allows only public `http` or `https` destinations, rejects credentials, invalid or single-label
+hosts, private/special-use DNS suffixes, and non-public IPv4/IPv6 literals including mapped and
+non-canonical encodings. Passing that parser never authorizes a browser call.
+
+Re-enabling browser collaboration requires an enforceable browser-network policy that checks every
+DNS result and redirect at the component performing the request, a verified public final URL before
+any page data is returned, an unauthenticated deterministic browsing scope, and a user-visible
+one-time authorization gate for mutations. Prompt wording alone is not authorization.
 
 ## Realtime State Machine
 
@@ -332,6 +335,10 @@ Requirements:
 - The backend mints a short-lived Realtime client secret.
 - The frontend receives only the short-lived client secret.
 - Logs and traces never include either key.
+- On Unix, `~/.openclaw/realtime.env` must be a current-user-owned regular file with no group or
+  world access; symlinks and files larger than 64 KiB are rejected.
+- The file is outside VOCO's XDG state and may be shared with OpenClaw or other tools. VOCO must not
+  create, modify, or remove it during package installation or uninstall.
 
 ### Realtime Session
 
@@ -416,7 +423,12 @@ Required:
 - Realtime mic visual writes level-driven CSS variables.
 - Dictation hotkey validation rejects `Alt+Shift+R`.
 - Realtime client secret parsing rejects missing `value`.
-- Realtime API key loading supports env and `~/.openclaw/realtime.env`.
+- Realtime API key loading supports env and a private `~/.openclaw/realtime.env`, and rejects unsafe
+  file ownership, modes, type, size, and symlinks.
+- Realtime session config contains no function tools or browser instructions.
+- The dormant browser URL parser rejects credentials, private/special-use hostnames, non-public IP
+  literals, mapped IPv4-in-IPv6, and non-canonical numeric IPv4 forms.
+- The backend browser compatibility command rejects every action without contacting OpenClaw.
 - PCM16 encode/decode helpers preserve sample shape within expected precision.
 - Resampler returns expected sample count.
 
@@ -429,6 +441,8 @@ Required:
 - Duplicate realtime toggle inside debounce window is ignored.
 - Realtime start creates client secret, opens WebSocket, then connects mic graph.
 - Local speech-stop without server VAD commit sends `input_audio_buffer.commit` and then `response.create`.
+- An unexpected server function call receives a fixed unavailable result and cannot invoke Tauri or
+  OpenClaw.
 - Realtime stop closes socket, stops tracks, disconnects graph, and resets visual level.
 
 ### Linux Runtime Smoke Test
@@ -495,6 +509,9 @@ This test records a short local text-to-speech sample into a temporary Pulse/Pip
 sink, streams the generated PCM16 audio to OpenAI Realtime with the same session config as
 VOCO, and reports only non-content event counts. It must never print the API key, transcript,
 assistant text, raw audio, or base64 audio payload.
+
+Before requesting a client secret, the protocol smoke asserts that its session schema is voice-only
+and contains neither `tools` nor `tool_choice`.
 
 The interrupt mode cancels the first assistant response after output audio starts, streams a
 second generated utterance into the same session, and requires a second audible assistant

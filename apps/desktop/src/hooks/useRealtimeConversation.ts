@@ -7,16 +7,11 @@ import {
 } from "@/lib/pcm16";
 import {
   createRealtimeClientSecret,
-  invokeOpenClawBrowserAction,
   showNotification,
   traceHotkeyEvent,
 } from "@/lib/tauri";
 import type { HotkeyTraceFields } from "@/lib/tauri";
-import type {
-  OpenClawBrowserAction,
-  OpenClawBrowserActionInput,
-  RealtimeStatus,
-} from "@/types";
+import type { RealtimeStatus } from "@/types";
 
 interface RealtimeState {
   status: RealtimeStatus;
@@ -77,6 +72,25 @@ export interface RealtimeServerDecision {
   functionCalls?: RealtimeFunctionCall[];
 }
 
+export function isCurrentRealtimeLifecycle(
+  expectedLifecycleId: number,
+  currentLifecycleId: number,
+): boolean {
+  return expectedLifecycleId === currentLifecycleId;
+}
+
+export function isCurrentRealtimeResource<T extends object>(
+  expectedLifecycleId: number,
+  currentLifecycleId: number,
+  expectedResource: T,
+  currentResource: T | null,
+): boolean {
+  return (
+    isCurrentRealtimeLifecycle(expectedLifecycleId, currentLifecycleId) &&
+    expectedResource === currentResource
+  );
+}
+
 const INITIAL_STATE: RealtimeState = {
   status: "idle",
   detail: "Realtime conversation is off.",
@@ -110,8 +124,6 @@ const REALTIME_MICROPHONE_PROCESSING = {
   noiseSuppression: true,
   autoGainControl: true,
 };
-
-const OPENCLAW_BROWSER_TOOL_NAME = "openclaw_browser";
 
 type LocalSpeechDetectorEvent = "started" | "stopped" | null;
 
@@ -356,12 +368,11 @@ export function decideRealtimeServerEvent(
                 event: "realtime_server_response_done",
                 fields: { responseDeltaCount: snapshot.responseDeltaCount },
               },
-              { event: "realtime_browser_function_call_received" },
             ],
             clearResponseTimeouts: true,
             status: {
               status: "speaking",
-              detail: "Checking the OpenClaw browser...",
+              detail: "Browser access is unavailable in this release.",
               error: null,
             },
             waitingForResponse: false,
@@ -438,32 +449,6 @@ function sendRealtimeEvent(socket: WebSocket | null, event: unknown): boolean {
   return true;
 }
 
-function parseBrowserActionInput(argumentsJson: string): OpenClawBrowserActionInput {
-  const parsed = JSON.parse(argumentsJson) as Partial<OpenClawBrowserActionInput>;
-  const allowedActions: OpenClawBrowserAction[] = [
-    "open_url",
-    "navigate",
-    "inspect_page",
-    "list_tabs",
-    "click_ref",
-    "type_ref",
-    "press_key",
-  ];
-  if (!allowedActions.includes(parsed.action as OpenClawBrowserAction)) {
-    throw new Error("Unsupported OpenClaw browser action.");
-  }
-
-  return {
-    action: parsed.action as OpenClawBrowserAction,
-    url: typeof parsed.url === "string" ? parsed.url : undefined,
-    targetId: typeof parsed.targetId === "string" ? parsed.targetId : undefined,
-    elementRef: typeof parsed.elementRef === "string" ? parsed.elementRef : undefined,
-    text: typeof parsed.text === "string" ? parsed.text : undefined,
-    key: typeof parsed.key === "string" ? parsed.key : undefined,
-    submit: typeof parsed.submit === "boolean" ? parsed.submit : undefined,
-  };
-}
-
 function sendFunctionCallOutput(
   socket: WebSocket | null,
   callId: string,
@@ -481,6 +466,7 @@ function sendFunctionCallOutput(
 
 export function useRealtimeConversation(selectedDeviceId: string | null) {
   const [state, setState] = useState<RealtimeState>(INITIAL_STATE);
+  const lifecycleIdRef = useRef(0);
   const socketRef = useRef<WebSocket | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -573,7 +559,11 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
   const markCancelResponseInFlight = useCallback(() => {
     clearCancelResponseInFlight();
     cancelResponseInFlightRef.current = true;
+    const lifecycleId = lifecycleIdRef.current;
     cancelResponseInFlightTimeoutRef.current = window.setTimeout(() => {
+      if (!isCurrentRealtimeLifecycle(lifecycleId, lifecycleIdRef.current)) {
+        return;
+      }
       cancelResponseInFlightRef.current = false;
       cancelResponseInFlightTimeoutRef.current = null;
     }, 3_000);
@@ -591,7 +581,11 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
     if (mutedRef.current) {
       return;
     }
+    const lifecycleId = lifecycleIdRef.current;
     noSpeechTimeoutRef.current = window.setTimeout(() => {
+      if (!isCurrentRealtimeLifecycle(lifecycleId, lifecycleIdRef.current)) {
+        return;
+      }
       traceHotkeyEvent("realtime_no_speech_timeout", {
         chunkCount: inputChunkCountRef.current,
       }).catch(() => {});
@@ -652,8 +646,19 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
     (socket: WebSocket) => {
       clearResponseTimeouts();
       waitingForResponseRef.current = true;
+      const lifecycleId = lifecycleIdRef.current;
 
       responseCreateFallbackTimeoutRef.current = window.setTimeout(() => {
+        if (
+          !isCurrentRealtimeResource(
+            lifecycleId,
+            lifecycleIdRef.current,
+            socket,
+            socketRef.current,
+          )
+        ) {
+          return;
+        }
         responseCreateFallbackTimeoutRef.current = null;
         if (!waitingForResponseRef.current || responseActiveRef.current) {
           return;
@@ -667,6 +672,16 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
       }, RESPONSE_CREATE_FALLBACK_MS);
 
       noResponseTimeoutRef.current = window.setTimeout(() => {
+        if (
+          !isCurrentRealtimeResource(
+            lifecycleId,
+            lifecycleIdRef.current,
+            socket,
+            socketRef.current,
+          )
+        ) {
+          return;
+        }
         noResponseTimeoutRef.current = null;
         if (!waitingForResponseRef.current || responseActiveRef.current) {
           return;
@@ -690,7 +705,18 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
   const scheduleLocalCommitFallback = useCallback(
     (socket: WebSocket) => {
       clearLocalCommitFallbackTimeout();
+      const lifecycleId = lifecycleIdRef.current;
       localCommitFallbackTimeoutRef.current = window.setTimeout(() => {
+        if (
+          !isCurrentRealtimeResource(
+            lifecycleId,
+            lifecycleIdRef.current,
+            socket,
+            socketRef.current,
+          )
+        ) {
+          return;
+        }
         localCommitFallbackTimeoutRef.current = null;
         if (
           serverDetectedCurrentTurnRef.current ||
@@ -712,6 +738,7 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
 
   const pushRealtimeLevel = useCallback(
     (rawLevel: number) => {
+      const lifecycleId = lifecycleIdRef.current;
       const normalized = Math.max(0, Math.min(1, rawLevel));
       const current = realtimeLevelRef.current;
       const next =
@@ -724,6 +751,9 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
 
       clearLevelDecay();
       levelDecayTimeoutRef.current = window.setTimeout(() => {
+        if (!isCurrentRealtimeLifecycle(lifecycleId, lifecycleIdRef.current)) {
+          return;
+        }
         realtimeLevelRef.current = 0;
         setRealtimeLevel(0);
         levelDecayTimeoutRef.current = null;
@@ -793,14 +823,40 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
     clearCancelResponseInFlight,
   ]);
 
+  const retireRealtimeLifecycle = useCallback((): number => {
+    lifecycleIdRef.current += 1;
+    cleanup();
+    return lifecycleIdRef.current;
+  }, [cleanup]);
+
   const playOutputAudio = useCallback(
-    async (audio: string) => {
-      const audioContext = audioContextRef.current;
-      if (!audioContext) {
+    async (
+      audio: string,
+      lifecycleId: number,
+      audioContext: AudioContext,
+    ) => {
+      if (
+        !isCurrentRealtimeResource(
+          lifecycleId,
+          lifecycleIdRef.current,
+          audioContext,
+          audioContextRef.current,
+        )
+      ) {
         return;
       }
       if (audioContext.state === "suspended") {
         await audioContext.resume().catch(() => {});
+      }
+      if (
+        !isCurrentRealtimeResource(
+          lifecycleId,
+          lifecycleIdRef.current,
+          audioContext,
+          audioContextRef.current,
+        )
+      ) {
+        return;
       }
 
       const samples = pcm16Base64ToSamples(audio);
@@ -836,12 +892,37 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
   );
 
   const connectMicrophone = useCallback(
-    async (socket: WebSocket, audioContext: AudioContext) => {
+    async (
+      socket: WebSocket,
+      audioContext: AudioContext,
+      lifecycleId: number,
+    ): Promise<boolean> => {
+      const resourcesAreCurrent = () =>
+        isCurrentRealtimeResource(
+          lifecycleId,
+          lifecycleIdRef.current,
+          socket,
+          socketRef.current,
+        ) &&
+        isCurrentRealtimeResource(
+          lifecycleId,
+          lifecycleIdRef.current,
+          audioContext,
+          audioContextRef.current,
+        );
+
+      if (!resourcesAreCurrent()) {
+        return false;
+      }
       traceHotkeyEvent("realtime_get_user_media_started").catch(() => {});
       const stream = await openMicrophoneStream(
         selectedDeviceId,
         REALTIME_MICROPHONE_PROCESSING,
       );
+      if (!resourcesAreCurrent() || socket.readyState !== WebSocket.OPEN) {
+        stream.getTracks().forEach((track) => track.stop());
+        return false;
+      }
       traceHotkeyEvent("realtime_get_user_media_done").catch(() => {});
       streamRef.current = stream;
       stream.getAudioTracks().forEach((track) => {
@@ -885,7 +966,12 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
       silentSink.gain.value = 0;
 
       processor.onaudioprocess = (event) => {
-        if (socket.readyState !== WebSocket.OPEN) {
+        if (
+          !resourcesAreCurrent() ||
+          streamRef.current !== stream ||
+          processorRef.current !== processor ||
+          socket.readyState !== WebSocket.OPEN
+        ) {
           return;
         }
         const input = event.inputBuffer.getChannelData(0);
@@ -981,6 +1067,7 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
       silentSinkRef.current = silentSink;
       traceHotkeyEvent("realtime_audio_graph_connected").catch(() => {});
       scheduleNoSpeechTimeout();
+      return true;
     },
     [
       clearNoSpeechTimeout,
@@ -997,67 +1084,66 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
   );
 
   const handleRealtimeFunctionCall = useCallback(
-    async (socket: WebSocket, call: RealtimeFunctionCall) => {
+    async (
+      socket: WebSocket,
+      call: RealtimeFunctionCall,
+      lifecycleId: number,
+    ) => {
+      const socketIsCurrent = () =>
+        isCurrentRealtimeResource(
+          lifecycleId,
+          lifecycleIdRef.current,
+          socket,
+          socketRef.current,
+        );
+      if (!socketIsCurrent()) {
+        return;
+      }
       if (handledFunctionCallIdsRef.current.has(call.callId)) {
         return;
       }
       handledFunctionCallIdsRef.current.add(call.callId);
 
-      let output: unknown;
-      try {
-        if (call.name !== OPENCLAW_BROWSER_TOOL_NAME) {
-          throw new Error(`Unsupported realtime function: ${call.name}`);
-        }
+      const output = {
+        ok: false,
+        summary:
+          "Realtime browser access is disabled in this release because VOCO cannot enforce public-only DNS resolution and redirects in OpenClaw.",
+        nextActions: ["Continue the voice conversation without browser access."],
+      };
+      setRealtimeState({
+        status: "speaking",
+        detail: "Browser access is unavailable in this release.",
+        error: null,
+      });
 
-        const request = parseBrowserActionInput(call.argumentsJson);
-        traceHotkeyEvent("realtime_browser_action_started", {
-          browserAction: request.action,
-        }).catch(() => {});
-        setRealtimeState({
-          status: "speaking",
-          detail: "Checking the OpenClaw browser...",
-          error: null,
-        });
-        const result = await invokeOpenClawBrowserAction(request);
-        output = result;
-        traceHotkeyEvent("realtime_browser_action_completed", {
-          browserAction: request.action,
-        }).catch(() => {});
-      } catch (error) {
-        const detail = error instanceof Error ? error.message : String(error);
-        output = {
-          ok: false,
-          summary: detail,
-          nextActions: ["Ask me to open a public web page or inspect the current browser page."],
-        };
-        traceHotkeyEvent("realtime_browser_action_failed").catch(() => {});
+      if (!socketIsCurrent()) {
+        return;
       }
-
       if (!sendFunctionCallOutput(socket, call.callId, output)) {
         return;
       }
-      traceHotkeyEvent("realtime_browser_function_output_sent").catch(() => {});
       waitingForResponseRef.current = true;
-      if (sendResponseCreate(socket)) {
-        traceHotkeyEvent("realtime_browser_response_create_sent").catch(() => {});
-      }
+      sendResponseCreate(socket);
     },
     [sendResponseCreate, setRealtimeState],
   );
 
   const stop = useCallback(() => {
     traceHotkeyEvent("realtime_stop_requested").catch(() => {});
-    cleanup();
+    retireRealtimeLifecycle();
     setRealtimeState(INITIAL_STATE);
-  }, [cleanup, setRealtimeState]);
+  }, [retireRealtimeLifecycle, setRealtimeState]);
 
   const start = useCallback(async () => {
-    cleanup();
+    const lifecycleId = retireRealtimeLifecycle();
     traceHotkeyEvent("realtime_start_requested").catch(() => {});
     setRealtimeState({ status: "connecting", detail: "Starting realtime voice...", error: null });
 
     try {
       const secret = await createRealtimeClientSecret();
+      if (!isCurrentRealtimeLifecycle(lifecycleId, lifecycleIdRef.current)) {
+        return;
+      }
       traceHotkeyEvent("realtime_client_secret_created").catch(() => {});
 
       const audioContext = new AudioContext({ sampleRate: REALTIME_SAMPLE_RATE });
@@ -1065,6 +1151,17 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
       nextOutputTimeRef.current = audioContext.currentTime;
       if (audioContext.state === "suspended") {
         await audioContext.resume().catch(() => {});
+      }
+      if (
+        !isCurrentRealtimeResource(
+          lifecycleId,
+          lifecycleIdRef.current,
+          audioContext,
+          audioContextRef.current,
+        )
+      ) {
+        audioContext.close().catch(() => {});
+        return;
       }
 
       traceHotkeyEvent("realtime_websocket_connecting").catch(() => {});
@@ -1075,9 +1172,36 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
       socketRef.current = socket;
 
       socket.onopen = () => {
+        if (
+          !isCurrentRealtimeResource(
+            lifecycleId,
+            lifecycleIdRef.current,
+            socket,
+            socketRef.current,
+          ) ||
+          !isCurrentRealtimeResource(
+            lifecycleId,
+            lifecycleIdRef.current,
+            audioContext,
+            audioContextRef.current,
+          )
+        ) {
+          return;
+        }
         traceHotkeyEvent("realtime_websocket_open").catch(() => {});
-        void connectMicrophone(socket, audioContext)
-          .then(() => {
+        void connectMicrophone(socket, audioContext, lifecycleId)
+          .then((connected) => {
+            if (
+              !connected ||
+              !isCurrentRealtimeResource(
+                lifecycleId,
+                lifecycleIdRef.current,
+                socket,
+                socketRef.current,
+              )
+            ) {
+              return;
+            }
             setRealtimeState({
               status: "listening",
               detail: "Realtime conversation is live.",
@@ -1085,19 +1209,39 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
             });
           })
           .catch((error) => {
+            if (
+              !isCurrentRealtimeResource(
+                lifecycleId,
+                lifecycleIdRef.current,
+                socket,
+                socketRef.current,
+              )
+            ) {
+              return;
+            }
             const detail = error instanceof Error ? error.message : String(error);
             traceHotkeyEvent("realtime_start_failed").catch(() => {});
+            retireRealtimeLifecycle();
             setRealtimeState({
               status: "error",
               detail: "Realtime microphone failed.",
               error: detail,
             });
             showNotification("Realtime failed", detail).catch(() => {});
-            cleanup();
           });
       };
 
       socket.onmessage = (event) => {
+        if (
+          !isCurrentRealtimeResource(
+            lifecycleId,
+            lifecycleIdRef.current,
+            socket,
+            socketRef.current,
+          )
+        ) {
+          return;
+        }
         try {
           const message = JSON.parse(String(event.data)) as RealtimeServerEvent;
           const decision = decideRealtimeServerEvent(message, {
@@ -1155,18 +1299,18 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
             setRealtimeState(decision.status);
           }
           if (decision.playOutputAudio) {
-            void playOutputAudio(decision.playOutputAudio);
+            void playOutputAudio(decision.playOutputAudio, lifecycleId, audioContext);
           }
           if (decision.scheduleResponseFallback) {
             scheduleResponseFallback(socket);
           }
           if (decision.functionCalls) {
             for (const call of decision.functionCalls) {
-              void handleRealtimeFunctionCall(socket, call);
+              void handleRealtimeFunctionCall(socket, call, lifecycleId);
             }
           }
           if (decision.cleanup) {
-            cleanup();
+            retireRealtimeLifecycle();
           }
         } catch {
           // Ignore non-JSON diagnostics from the Realtime socket.
@@ -1174,35 +1318,58 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
       };
 
       socket.onerror = () => {
+        if (
+          !isCurrentRealtimeResource(
+            lifecycleId,
+            lifecycleIdRef.current,
+            socket,
+            socketRef.current,
+          )
+        ) {
+          return;
+        }
         traceHotkeyEvent("realtime_websocket_error").catch(() => {});
+        retireRealtimeLifecycle();
         setRealtimeState({
           status: "error",
           detail: "Realtime socket failed.",
           error: "WebSocket error",
         });
-        cleanup();
       };
 
       socket.onclose = () => {
+        if (
+          !isCurrentRealtimeResource(
+            lifecycleId,
+            lifecycleIdRef.current,
+            socket,
+            socketRef.current,
+          )
+        ) {
+          return;
+        }
         traceHotkeyEvent("realtime_websocket_closed").catch(() => {});
         if (statusRef.current !== "idle" && statusRef.current !== "error") {
+          retireRealtimeLifecycle();
           setRealtimeState({
             status: "error",
             detail: "Realtime socket closed.",
             error: "WebSocket closed",
           });
-          cleanup();
         }
       };
     } catch (error) {
-      cleanup();
+      if (!isCurrentRealtimeLifecycle(lifecycleId, lifecycleIdRef.current)) {
+        return;
+      }
       const detail = error instanceof Error ? error.message : String(error);
       traceHotkeyEvent("realtime_start_failed").catch(() => {});
+      retireRealtimeLifecycle();
       setRealtimeState({ status: "error", detail: "Realtime failed to start.", error: detail });
       showNotification("Realtime failed", detail).catch(() => {});
     }
   }, [
-    cleanup,
+    retireRealtimeLifecycle,
     connectMicrophone,
     clearNoSpeechTimeout,
     clearLocalCommitFallbackTimeout,
@@ -1232,7 +1399,12 @@ export function useRealtimeConversation(selectedDeviceId: string | null) {
     setMicrophoneMuted(!mutedRef.current);
   }, [setMicrophoneMuted]);
 
-  useEffect(() => stop, [stop]);
+  useEffect(
+    () => () => {
+      retireRealtimeLifecycle();
+    },
+    [retireRealtimeLifecycle],
+  );
 
   return {
     realtimeStatus: state.status,

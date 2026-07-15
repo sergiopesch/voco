@@ -1,6 +1,9 @@
 # Linux End-To-End Matrix
 
-Use this document as the manual release sign-off path for VOCO. The goal is to validate the real Linux runtime around microphone access, tray state, global hotkeys, insertion helpers, and update UX where unit tests cannot fully exercise the system.
+Use this document to record manual desktop coverage for VOCO. It defines the full desired matrix;
+the checklist alone is not evidence that a candidate ran or passed it. The goal is to validate the
+real Linux runtime around microphone access, tray state, global hotkeys, insertion helpers, and
+update UX where unit tests cannot fully exercise the system.
 
 ## Target Environments
 
@@ -71,4 +74,8 @@ Attach the following to the release note, issue, or PR:
 
 ## Exit Criteria
 
-VOCO is ready for release only when all required environments are green, strict `type-simulation` never overwrites the clipboard, runtime diagnostics match the real host environment, and there is no reproducible hotkey, tray, socket, or update-state regression across restart.
+A full-matrix report is complete only when all required environments are green, strict
+`type-simulation` never overwrites the clipboard, runtime diagnostics match the real host
+environment, and there is no reproducible hotkey, tray, socket, or update-state regression across
+restart. If a release proceeds without the full matrix, record each untested environment as pending
+in the candidate QA results and do not describe the release as having complete desktop coverage.

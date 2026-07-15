@@ -4,12 +4,16 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import type {
   AppConfig,
   AudioDeviceOption,
+  CursorDeliveryState,
+  DictationStatus,
+  MicrophonePermission,
   RuntimeDiagnostics,
   RealtimeStatus,
   UpdateCheckState,
 } from "@/types";
 import { calculateVisualAudioLevelFromSamples } from "@/lib/audioLevel";
 import { openMicrophoneStream } from "@/lib/audioInput";
+import { createAnimationFrameLease } from "@/lib/animationFrameLease";
 import { testLocalLlm } from "@/lib/tauri";
 import { formatLocalModelTestStatus } from "@/lib/localModelStatus";
 import { RealtimeMicVisual } from "@/components/RealtimeMicVisual";
@@ -26,25 +30,30 @@ interface ControlPanelProps {
   statusLabel: string;
   updateState: UpdateCheckState;
   runtimeDiagnostics: RuntimeDiagnostics | null;
-  isDictationActive: boolean;
+  dictationStatus: DictationStatus;
+  cursorDeliveryState: CursorDeliveryState;
+  transcript: string;
+  requestedSection: PanelSection;
+  requestedSectionRequestId: number;
   isRealtimeActive: boolean;
+  isRealtimeMuted: boolean;
+  realtimeActivationAllowed: boolean;
   realtimeStatus: RealtimeStatus;
   realtimeDetail: string;
   realtimeError: string | null;
   realtimeLevel: number;
   selectedDeviceId: string | null;
   availableDevices: AudioDeviceOption[];
-  microphonePermission: "unknown" | "granted" | "denied";
+  microphonePermission: MicrophonePermission;
   onSurfaceChange: (surface: "hidden" | "onboarding" | "settings" | "popover") => void;
   onOnboardingStepChange: (step: number) => void;
   onConfigChange: (patch: Partial<AppConfig>) => Promise<void>;
   onRefreshDevices: () => Promise<void>;
-  onSelectedDeviceChange: (deviceId: string | null) => void;
   onRequestMicrophoneAccess: () => Promise<void>;
   onCheckForUpdates: () => Promise<void>;
   onOpenReleasePage: (url: string) => Promise<void>;
   onRefreshRuntimeDiagnostics: () => Promise<void>;
-  onToggleDictation: () => void;
+  onOpenSettings: () => Promise<void>;
   onToggleRealtime: () => void;
 }
 
@@ -53,19 +62,32 @@ const PANEL_SECTIONS = [
   "Audio",
   "Output",
   "Hotkeys",
-  "Appearance",
   "Updates",
   "Advanced",
 ] as const;
 
 type PanelSection = (typeof PANEL_SECTIONS)[number];
 
+export function shouldOpenMicrophonePreview(
+  surface: ControlPanelProps["surface"],
+  onboardingStep: number,
+  activeSection: PanelSection,
+  isRealtimeActive: boolean,
+): boolean {
+  if (isRealtimeActive) {
+    return false;
+  }
+  return (
+    (surface === "onboarding" && onboardingStep === 1) ||
+    (surface === "settings" && activeSection === "Audio")
+  );
+}
+
 const PANEL_SECTION_LABELS: Record<PanelSection, string> = {
   General: "General",
   Audio: "Audio",
   Output: "Output & local model",
   Hotkeys: "Hotkeys",
-  Appearance: "Appearance",
   Updates: "Updates",
   Advanced: "Advanced",
 };
@@ -84,8 +106,14 @@ export function ControlPanel({
   statusLabel,
   updateState,
   runtimeDiagnostics,
-  isDictationActive,
+  dictationStatus,
+  cursorDeliveryState,
+  transcript,
+  requestedSection,
+  requestedSectionRequestId,
   isRealtimeActive,
+  isRealtimeMuted,
+  realtimeActivationAllowed,
   realtimeStatus,
   realtimeDetail,
   realtimeError,
@@ -97,12 +125,11 @@ export function ControlPanel({
   onOnboardingStepChange,
   onConfigChange,
   onRefreshDevices,
-  onSelectedDeviceChange,
   onRequestMicrophoneAccess,
   onCheckForUpdates,
   onOpenReleasePage,
   onRefreshRuntimeDiagnostics,
-  onToggleDictation,
+  onOpenSettings,
   onToggleRealtime,
 }: ControlPanelProps) {
   async function handleHeaderPointerDown(event: MouseEvent<HTMLElement>) {
@@ -124,8 +151,20 @@ export function ControlPanel({
 
   const isPopover = surface === "popover";
   const isOnboarding = surface === "onboarding";
-  const [activeSection, setActiveSection] = useState<PanelSection>("General");
-  const [saving, setSaving] = useState(false);
+  const [activeSection, setActiveSection] = useState<PanelSection>(() =>
+    surface === "settings" ? requestedSection : "General",
+  );
+  const [savingCount, setSavingCount] = useState(0);
+  const saving = savingCount > 0;
+  const [microphoneSaveError, setMicrophoneSaveError] = useState<string | null>(null);
+  const [copyStatus, setCopyStatus] = useState<string | null>(null);
+  const microphoneSaveRequestRef = useRef(0);
+  const copyRequestRef = useRef(0);
+  const latestTranscriptRef = useRef(transcript);
+  latestTranscriptRef.current = transcript;
+  const hasRecoverableTranscript =
+    transcript.trim().length > 0 &&
+    (cursorDeliveryState === "unreconciled" || dictationStatus === "error");
   const [hotkeyDraft, setHotkeyDraft] = useState(config.hotkey);
   const [hotkeyError, setHotkeyError] = useState<string | null>(null);
   const [openClawAgentDraft, setOpenClawAgentDraft] = useState(config.openclawAgent);
@@ -148,7 +187,6 @@ export function ControlPanel({
     config.transcriptTarget === "openclaw-speech";
   const [previewLevel, setPreviewLevel] = useState(0);
   const [previewError, setPreviewError] = useState<string | null>(null);
-  const previewFrameRef = useRef<number | null>(null);
   const selectedDeviceLabel = useMemo(
     () =>
       availableDevices.find((device) => device.deviceId === selectedDeviceId)?.label ??
@@ -158,13 +196,13 @@ export function ControlPanel({
   const updateInstallCopy = useMemo(() => {
     switch (config.installChannel) {
       case "appimage":
-        return "This build is treated as portable. Replace the AppImage manually when a new release lands.";
+        return "AppImage publication is paused while its packaging toolchain is being pinned. Move to the verified GitHub Release .deb or rebuild from source for updates.";
       case "source":
         return "This build is treated as self-managed from source. Pull the repo and rebuild when you want to update.";
       case "flatpak":
-        return "This build is treated as store-managed through Flatpak. Let your software center handle updates.";
+        return "Flatpak distribution is not currently verified. Choose GitHub Release (.deb) or Source for accurate update instructions.";
       case "snap":
-        return "This build is treated as store-managed through Snap. Automatic refreshes should apply in the background.";
+        return "Snap distribution is not currently verified. Choose GitHub Release (.deb) or Source for accurate update instructions.";
       default:
         return "This build is treated as a GitHub Release install. Download and install the next release manually.";
     }
@@ -190,13 +228,13 @@ export function ControlPanel({
 
     switch (config.installChannel) {
       case "appimage":
-        return `Replace your current AppImage with ${updateState.latestRelease.version} from GitHub Releases, then relaunch VOCO.`;
+        return `AppImage publication is paused. Install the verified ${updateState.latestRelease.version} .deb from GitHub Releases or rebuild that tag from source.`;
       case "source":
         return `Pull the repo, checkout ${updateState.latestRelease.version} or newer, and rebuild locally.`;
       case "flatpak":
-        return "This install channel should update through Flatpak once the new build is published there.";
+        return "This legacy Flatpak setting is not a verified update path. Use the GitHub release instead.";
       case "snap":
-        return "This install channel should update through Snap refresh once the new build is published there.";
+        return "This legacy Snap setting is not a verified update path. Use the GitHub release instead.";
       default:
         return `Download the ${updateState.latestRelease.version} release from GitHub and install it over your current build.`;
     }
@@ -266,6 +304,28 @@ export function ControlPanel({
           : "Unavailable (preview-only fallback)";
     }
   }, [runtimeDiagnostics]);
+  const effectiveDeliveryLabel = useMemo(() => {
+    if (config.transcriptTarget !== "cursor") {
+      return "One final response is delivered after the selected local or OpenClaw action.";
+    }
+    if (config.transcriptEnhancement !== "off") {
+      return "Live transcript panel while speaking, then one enhanced insertion when you stop.";
+    }
+    switch (config.liveCursorMode) {
+      case "stable-cursor-streaming":
+        return "Live words in verified non-sensitive fields; VOCO preview everywhere else.";
+      case "preview-overlay-only":
+        return "Live transcript panel, then one final insertion when you stop.";
+      case "final-text-only":
+        return "No live preview; one final insertion when you stop.";
+    }
+  }, [config.liveCursorMode, config.transcriptEnhancement, config.transcriptTarget]);
+  useEffect(() => {
+    if (surface === "settings") {
+      setActiveSection(requestedSection);
+    }
+  }, [requestedSection, requestedSectionRequestId, surface]);
+
   useEffect(() => {
     if (surface === "onboarding") {
       void onRefreshDevices();
@@ -290,9 +350,12 @@ export function ControlPanel({
   }, [config.localLlmEndpoint, config.localLlmModel]);
 
   useEffect(() => {
-    const shouldPreview =
-      (surface === "onboarding" && onboardingStep === 1) ||
-      (surface === "settings" && activeSection === "Audio");
+    const shouldPreview = shouldOpenMicrophonePreview(
+      surface,
+      onboardingStep,
+      activeSection,
+      isRealtimeActive,
+    );
     if (!shouldPreview) {
       setPreviewLevel(0);
       setPreviewError(null);
@@ -305,14 +368,18 @@ export function ControlPanel({
     let analyser: AnalyserNode | null = null;
     let source: MediaStreamAudioSourceNode | null = null;
     let data: Float32Array | null = null;
+    const animationFrame = createAnimationFrameLease(
+      (callback) => window.requestAnimationFrame(callback),
+      (frameId) => window.cancelAnimationFrame(frameId),
+    );
 
     const tick = () => {
-      if (cancelled || !analyser || !data) {
+      if (cancelled || !animationFrame.isActive() || !analyser || !data) {
         return;
       }
       analyser.getFloatTimeDomainData(data as unknown as Float32Array<ArrayBuffer>);
       setPreviewLevel(calculateVisualAudioLevelFromSamples(data));
-      previewFrameRef.current = window.requestAnimationFrame(tick);
+      animationFrame.schedule(tick);
     };
 
     void openMicrophoneStream(selectedDeviceId)
@@ -334,6 +401,18 @@ export function ControlPanel({
         tick();
       })
       .catch((error) => {
+        animationFrame.stop();
+        source?.disconnect();
+        analyser?.disconnect();
+        void audioContext?.close().catch(() => {});
+        stream?.getTracks().forEach((track) => track.stop());
+        source = null;
+        analyser = null;
+        audioContext = null;
+        stream = null;
+        if (cancelled) {
+          return;
+        }
         const detail = error instanceof Error ? error.message : String(error);
         setPreviewError(detail);
         setPreviewLevel(0);
@@ -341,21 +420,33 @@ export function ControlPanel({
 
     return () => {
       cancelled = true;
-      if (previewFrameRef.current !== null) {
-        window.cancelAnimationFrame(previewFrameRef.current);
-        previewFrameRef.current = null;
-      }
+      animationFrame.stop();
       source?.disconnect();
       analyser?.disconnect();
       void audioContext?.close().catch(() => {});
       stream?.getTracks().forEach((track) => track.stop());
     };
-  }, [activeSection, onboardingStep, selectedDeviceId, surface]);
+  }, [activeSection, isRealtimeActive, onboardingStep, selectedDeviceId, surface]);
+
+  useEffect(() => {
+    copyRequestRef.current += 1;
+    setCopyStatus(null);
+  }, [cursorDeliveryState, dictationStatus, transcript]);
+
+  useEffect(() => {
+    if (!isRealtimeActive) {
+      return;
+    }
+    microphoneSaveRequestRef.current += 1;
+    setMicrophoneSaveError(null);
+    setPreviewError(null);
+    setPreviewLevel(0);
+  }, [isRealtimeActive]);
 
   async function savePatch(
     patch: Partial<AppConfig>,
   ): Promise<{ ok: true } | { ok: false; message: string }> {
-    setSaving(true);
+    setSavingCount((count) => count + 1);
     try {
       await onConfigChange(patch);
       return { ok: true };
@@ -366,7 +457,50 @@ export function ControlPanel({
           error instanceof Error ? error.message : "VOCO could not save those settings.",
       };
     } finally {
-      setSaving(false);
+      setSavingCount((count) => Math.max(0, count - 1));
+    }
+  }
+
+  async function selectMicrophone(deviceId: string | null): Promise<void> {
+    if (isRealtimeActive) {
+      setMicrophoneSaveError("Stop realtime to change microphone.");
+      return;
+    }
+    const requestId = microphoneSaveRequestRef.current + 1;
+    microphoneSaveRequestRef.current = requestId;
+    setMicrophoneSaveError(null);
+    const result = await savePatch({ selectedMic: deviceId });
+    if (microphoneSaveRequestRef.current !== requestId) {
+      return;
+    }
+    if (!result.ok) {
+      setMicrophoneSaveError(result.message);
+    }
+  }
+
+  async function copyRecoveredTranscript(): Promise<void> {
+    const copiedTranscript = transcript;
+    const requestId = copyRequestRef.current + 1;
+    copyRequestRef.current = requestId;
+    try {
+      await navigator.clipboard.writeText(copiedTranscript);
+      if (
+        copyRequestRef.current !== requestId ||
+        latestTranscriptRef.current !== copiedTranscript
+      ) {
+        return;
+      }
+      setCopyStatus("Copied to clipboard");
+    } catch (error) {
+      if (
+        copyRequestRef.current !== requestId ||
+        latestTranscriptRef.current !== copiedTranscript
+      ) {
+        return;
+      }
+      setCopyStatus(
+        `Copy failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
@@ -474,11 +608,13 @@ export function ControlPanel({
           </div>
         </header>
 
-        {errorMessage ? (
-          <section className="voco-panel__error" aria-live="polite">
-            {errorMessage}
-          </section>
-        ) : null}
+        <div className="voco-panel__error-slot">
+          {errorMessage ? (
+            <section className="voco-panel__error" aria-live="polite">
+              {errorMessage}
+            </section>
+          ) : null}
+        </div>
 
         {isPopover ? (
           <section className="voco-popover">
@@ -491,37 +627,59 @@ export function ControlPanel({
                   <p>Realtime: <code>Alt+Shift+R</code></p>
                 </div>
                 <RealtimeMicVisual
-                  active={isRealtimeActive}
-                  level={realtimeLevel}
+                  active={isRealtimeActive && !isRealtimeMuted}
+                  level={isRealtimeMuted ? 0 : realtimeLevel}
                   status={realtimeStatus}
                 />
               </div>
             </div>
+            {hasRecoverableTranscript ? (
+              <div className="voco-popover__recovery" role="status">
+                <strong>
+                  {cursorDeliveryState === "unreconciled"
+                    ? "Transcript kept safely in VOCO"
+                    : "Latest transcript available to recover"}
+                </strong>
+                <span>
+                  {cursorDeliveryState === "unreconciled"
+                    ? "Cursor delivery could not be verified. Copy the text before starting another dictation."
+                    : "The selected output did not complete. Confirm this is your latest dictation, then copy it before trying again."}
+                </span>
+                <p>{transcript}</p>
+                <button
+                  className="voco-button voco-button--primary"
+                  type="button"
+                  onClick={() => void copyRecoveredTranscript()}
+                >
+                  Copy transcript
+                </button>
+                {copyStatus ? <span>{copyStatus}</span> : null}
+              </div>
+            ) : null}
+            <div className="voco-inline-note voco-popover__dictation-hint">
+              To preserve your target cursor, focus a text field and press <code>{config.hotkey}</code>.
+            </div>
             <div className="voco-popover__actions">
-              <button className="voco-button voco-button--primary" onClick={onToggleDictation}>
-                {isDictationActive ? "Stop listening" : "Start listening"}
-              </button>
               <button
                 className="voco-button voco-button--secondary"
                 onClick={onToggleRealtime}
+                disabled={
+                  dictationStatus === "recording" ||
+                  dictationStatus === "processing" ||
+                  (!isRealtimeActive && !realtimeActivationAllowed)
+                }
               >
                 {isRealtimeActive ? "Stop realtime" : "Start realtime"}
               </button>
               <button
                 className="voco-button voco-button--secondary"
-                onClick={() => onSurfaceChange("settings")}
+                onClick={() => void onOpenSettings()}
               >
                 Settings
               </button>
-              <button
-                className="voco-button voco-button--ghost"
-                onClick={() => onSurfaceChange("hidden")}
-              >
-                Hide to tray
-              </button>
             </div>
             <div className="voco-inline-note">
-              Selected input: {selectedDeviceLabel}
+              Microphone: {selectedDeviceLabel}
             </div>
             <div
               className={[
@@ -529,7 +687,7 @@ export function ControlPanel({
                 realtimeStatus === "error" ? "voco-inline-note--error" : "",
               ].join(" ")}
             >
-              Realtime: {realtimeDetail}
+              Realtime: {isRealtimeMuted ? "Muted" : realtimeDetail}
               {realtimeError ? ` ${realtimeError}` : ""}
             </div>
           </section>
@@ -590,7 +748,10 @@ export function ControlPanel({
                   <span>Input device</span>
                   <select
                     value={selectedDeviceId ?? ""}
-                    onChange={(event) => onSelectedDeviceChange(event.target.value || null)}
+                    disabled={saving || isRealtimeActive}
+                    onChange={(event) =>
+                      void selectMicrophone(event.target.value || null)
+                    }
                   >
                     <option value="">System default</option>
                     {availableDevices.map((device) => (
@@ -600,6 +761,12 @@ export function ControlPanel({
                     ))}
                   </select>
                 </label>
+                {isRealtimeActive ? (
+                  <div className="voco-inline-note">
+                    Stop realtime to change microphone. Audio preview is paused while
+                    realtime owns the microphone.
+                  </div>
+                ) : null}
                 <div className="voco-inline-note">
                   <strong>Mic:</strong> {selectedDeviceLabel} · <strong>Access:</strong>{" "}
                   {microphonePermission}
@@ -621,11 +788,6 @@ export function ControlPanel({
                   <input
                     value={hotkeyDraft}
                     onChange={(event) => setHotkeyDraft(event.target.value)}
-                    onBlur={() => {
-                      if (hotkeyDraft !== config.hotkey) {
-                        void saveHotkey();
-                      }
-                    }}
                     onKeyDown={(event) => {
                       if (event.key === "Enter") {
                         event.preventDefault();
@@ -644,10 +806,16 @@ export function ControlPanel({
                     {previewError}
                   </div>
                 ) : null}
+                {microphoneSaveError ? (
+                  <div className="voco-inline-note voco-inline-note--error">
+                    {microphoneSaveError}
+                  </div>
+                ) : null}
                 <div className="voco-onboarding__actions">
                   <button
                     className="voco-button voco-button--ghost"
                     onClick={() => void onRequestMicrophoneAccess()}
+                    disabled={isRealtimeActive}
                   >
                     Retry microphone access
                   </button>
@@ -660,12 +828,12 @@ export function ControlPanel({
                   <button
                     className="voco-button voco-button--primary"
                     onClick={async () => {
-                      const micSaved = await savePatch({ selectedMic: selectedDeviceId });
-                      const hotkeySaved = micSaved.ok ? await saveHotkey() : false;
-                      if (micSaved.ok && hotkeySaved) {
+                      const hotkeySaved = await saveHotkey();
+                      if (hotkeySaved) {
                         onOnboardingStepChange(2);
                       }
                     }}
+                    disabled={saving}
                   >
                     Continue
                   </button>
@@ -689,8 +857,9 @@ export function ControlPanel({
                 </div>
                 <p>
                   Then focus a normal text field and press <code>{config.hotkey}</code> to start
-                  and stop listening. Password, PIN, private, unsupported, or changed targets are
-                  intentionally preview-only.
+                  and stop listening. For privacy, live words start only when the current field
+                  freshly confirms that it is normal and non-sensitive. Terminals, password/PIN
+                  fields, and any target VOCO cannot verify are intentionally preview-only.
                 </p>
                 <div className="voco-tray-legend" aria-label="Tray icon colors">
                   {TRAY_COLOR_LEGEND.map((item) => (
@@ -743,6 +912,7 @@ export function ControlPanel({
                     "voco-settings__nav-item",
                     activeSection === section ? "voco-settings__nav-item--active" : "",
                   ].join(" ")}
+                  aria-current={activeSection === section ? "page" : undefined}
                   onClick={() => setActiveSection(section)}
                 >
                   {PANEL_SECTION_LABELS[section]}
@@ -759,8 +929,8 @@ export function ControlPanel({
                   </div>
                   <div className="voco-inline-note">
                     The tray icon reflects runtime state directly: green when ready, red
-                    while listening, yellow while transcribing, and graphite when VOCO
-                    needs attention.
+                    while listening, yellow while transcribing, and graphite when realtime
+                    is muted or VOCO needs attention.
                   </div>
                   <div className="voco-inline-note">
                     On Linux, the command panel opens from the tray icon or tray menu, with
@@ -791,7 +961,10 @@ export function ControlPanel({
                     <span>Input device</span>
                     <select
                       value={selectedDeviceId ?? ""}
-                      onChange={(event) => onSelectedDeviceChange(event.target.value || null)}
+                      disabled={saving || isRealtimeActive}
+                      onChange={(event) =>
+                        void selectMicrophone(event.target.value || null)
+                      }
                     >
                       <option value="">System default</option>
                       {availableDevices.map((device) => (
@@ -801,10 +974,17 @@ export function ControlPanel({
                       ))}
                     </select>
                   </label>
+                  {isRealtimeActive ? (
+                    <div className="voco-inline-note">
+                      Stop realtime to change microphone. Audio preview is paused while
+                      realtime owns the microphone.
+                    </div>
+                  ) : null}
                   <div className="voco-settings__actions">
                     <button
                       className="voco-button voco-button--ghost"
                       onClick={() => void onRequestMicrophoneAccess()}
+                      disabled={isRealtimeActive}
                     >
                       Retry microphone access
                     </button>
@@ -813,12 +993,6 @@ export function ControlPanel({
                       onClick={() => void onRefreshDevices()}
                     >
                       Refresh devices
-                    </button>
-                    <button
-                      className="voco-button voco-button--primary"
-                      onClick={() => void savePatch({ selectedMic: selectedDeviceId })}
-                    >
-                      Save audio settings
                     </button>
                   </div>
                   <div className="voco-meter">
@@ -833,6 +1007,11 @@ export function ControlPanel({
                   {previewError ? (
                     <div className="voco-inline-note voco-inline-note--error">
                       {previewError}
+                    </div>
+                  ) : null}
+                  {microphoneSaveError ? (
+                    <div className="voco-inline-note voco-inline-note--error">
+                      {microphoneSaveError}
                     </div>
                   ) : null}
                 </section>
@@ -875,7 +1054,7 @@ export function ControlPanel({
                           }
                         >
                           <option value="stable-cursor-streaming">
-                            Live words at cursor (recommended)
+                            Live words at cursor (enhancement off)
                           </option>
                           <option value="preview-overlay-only">Live transcript panel</option>
                           <option value="final-text-only">Final text only</option>
@@ -884,9 +1063,19 @@ export function ControlPanel({
                       <div className="voco-inline-note">
                         Live words at cursor uses the persistent VOCO Dictation input source. Add
                         it once in your desktop Input Sources settings, select it, then focus the
-                        target field before pressing Alt+D. VOCO revises only its provisional
-                        preedit and never switches your input source automatically. The transcript
-                        panel keeps previews inside VOCO and inserts only the final result.
+                        target field before pressing Alt+D. With enhancement off, VOCO keeps the
+                        newest preview revisable and appends authoritative local transcript
+                        checkpoints without switching your input source. For privacy, live words
+                        start only when the current field freshly confirms that it is normal and
+                        non-sensitive; terminals and sensitive or unverified fields use the VOCO
+                        preview fallback. The transcript panel keeps previews inside VOCO and
+                        inserts only the final result.
+                      </div>
+                      <div className="voco-inline-note">
+                        <strong>VOCO Dictation:</strong> {ownedPreeditLabel}
+                        {runtimeDiagnostics?.ownedPreedit.detail
+                          ? ` — ${runtimeDiagnostics.ownedPreedit.detail}`
+                          : ""}
                       </div>
                     </>
                   ) : null}
@@ -907,19 +1096,21 @@ export function ControlPanel({
                     </select>
                   </label>
                   <div className="voco-inline-note">
-                    Conservative polish calls an OpenAI-compatible model on localhost only. If it
-                    fails, VOCO keeps using the raw local transcript.
+                    {config.transcriptTarget === "cursor" &&
+                    config.liveCursorMode === "stable-cursor-streaming" &&
+                    config.transcriptEnhancement !== "off"
+                      ? "Enhancement can revise earlier words, so live text stays in VOCO and the enhanced result is inserted once when you stop."
+                      : "Conservative polish calls an OpenAI-compatible model on localhost only. If it fails, VOCO keeps using the raw local transcript."}
+                  </div>
+                  <div className="voco-effective-mode" role="status">
+                    <span>Effective delivery</span>
+                    <strong>{effectiveDeliveryLabel}</strong>
                   </div>
                   <label className="voco-field">
                     <span>Local model endpoint</span>
                     <input
                       value={localLlmEndpointDraft}
                       onChange={(event) => setLocalLlmEndpointDraft(event.target.value)}
-                      onBlur={() => {
-                        if (localLlmEndpointDraft !== config.localLlmEndpoint) {
-                          void saveLocalLlmSettings();
-                        }
-                      }}
                       onKeyDown={(event) => {
                         if (event.key === "Enter") {
                           event.preventDefault();
@@ -934,11 +1125,6 @@ export function ControlPanel({
                       value={localLlmModelDraft}
                       placeholder="Optional"
                       onChange={(event) => setLocalLlmModelDraft(event.target.value)}
-                      onBlur={() => {
-                        if (localLlmModelDraft !== (config.localLlmModel ?? "")) {
-                          void saveLocalLlmSettings();
-                        }
-                      }}
                       onKeyDown={(event) => {
                         if (event.key === "Enter") {
                           event.preventDefault();
@@ -978,11 +1164,6 @@ export function ControlPanel({
                     <input
                       value={openClawAgentDraft}
                       onChange={(event) => setOpenClawAgentDraft(event.target.value)}
-                      onBlur={() => {
-                        if (openClawAgentDraft !== config.openclawAgent) {
-                          void saveOpenClawSettings();
-                        }
-                      }}
                       onKeyDown={(event) => {
                         if (event.key === "Enter") {
                           event.preventDefault();
@@ -993,16 +1174,11 @@ export function ControlPanel({
                     />
                   </label>
                   <label className="voco-field">
-                    <span>OpenClaw professor prompt</span>
+                    <span>OpenClaw instruction prefix</span>
                     <textarea
                       value={openClawPromptDraft}
                       rows={5}
                       onChange={(event) => setOpenClawPromptDraft(event.target.value)}
-                      onBlur={() => {
-                        if (openClawPromptDraft !== config.openclawPromptPrefix) {
-                          void saveOpenClawSettings();
-                        }
-                      }}
                       disabled={!isOpenClawTarget}
                     />
                   </label>
@@ -1018,7 +1194,7 @@ export function ControlPanel({
                     <button
                       className="voco-button voco-button--primary"
                       onClick={() => void saveOpenClawSettings()}
-                      disabled={!isOpenClawTarget}
+                      disabled={!isOpenClawTarget || saving}
                     >
                       Save OpenClaw settings
                     </button>
@@ -1034,11 +1210,6 @@ export function ControlPanel({
                     <input
                       value={hotkeyDraft}
                       onChange={(event) => setHotkeyDraft(event.target.value)}
-                      onBlur={() => {
-                        if (hotkeyDraft !== config.hotkey) {
-                          void saveHotkey();
-                        }
-                      }}
                       onKeyDown={(event) => {
                         if (event.key === "Enter") {
                           event.preventDefault();
@@ -1056,6 +1227,7 @@ export function ControlPanel({
                     <button
                       className="voco-button voco-button--primary"
                       onClick={() => void saveHotkey()}
+                      disabled={saving}
                     >
                       Save hotkey
                     </button>
@@ -1070,24 +1242,11 @@ export function ControlPanel({
                 </section>
               ) : null}
 
-              {activeSection === "Appearance" ? (
-                <section className="voco-settings__section">
-                  <h2>Appearance</h2>
-                  <p>
-                    VOCO currently ships with an opinionated dark interface based on the new graphite microphone branding.
-                  </p>
-                  <div className="voco-inline-note">
-                    Theme switching is intentionally deferred until the product surfaces
-                    stabilize.
-                  </div>
-                </section>
-              ) : null}
-
               {activeSection === "Updates" ? (
                 <section className="voco-settings__section">
                   <h2>Updates</h2>
                   <label className="voco-field">
-                    <span>Install channel</span>
+                    <span>Installation method for update instructions</span>
                     <select
                       value={config.installChannel}
                       onChange={(event) =>
@@ -1096,13 +1255,29 @@ export function ControlPanel({
                         })
                       }
                     >
-                      <option value="github-release">GitHub Release</option>
-                      <option value="appimage">AppImage</option>
+                      <option value="github-release">GitHub Release (.deb)</option>
+                      {config.installChannel === "appimage" ? (
+                        <option value="appimage" disabled>
+                          AppImage (legacy, publication paused)
+                        </option>
+                      ) : null}
                       <option value="source">Source build</option>
-                      <option value="flatpak">Flatpak</option>
-                      <option value="snap">Snap</option>
+                      {config.installChannel === "flatpak" ? (
+                        <option value="flatpak" disabled>
+                          Flatpak (legacy, unverified)
+                        </option>
+                      ) : null}
+                      {config.installChannel === "snap" ? (
+                        <option value="snap" disabled>
+                          Snap (legacy, unverified)
+                        </option>
+                      ) : null}
                     </select>
                   </label>
+                  <div className="voco-inline-note">
+                    VOCO currently publishes and verifies the GitHub Release .deb. AppImage,
+                    Flatpak, and Snap are not current published release channels.
+                  </div>
                   <label className="voco-field">
                     <span>Update channel</span>
                     <select
@@ -1224,30 +1399,9 @@ export function ControlPanel({
                       Refresh runtime checks
                     </button>
                   </div>
-                  <label className="voco-field">
-                    <span>Voice profile</span>
-                    <select
-                      value="default"
-                      disabled
-                    >
-                      <option value="default">Default</option>
-                    </select>
-                  </label>
-                  <div className="voco-inline-note">
-                    Accent-aware recognition is planned for a future release and is not
-                    configurable yet.
-                  </div>
                 </section>
               ) : null}
 
-              <div className="voco-settings__footer-actions">
-                <button
-                  className="voco-button voco-button--secondary"
-                  onClick={() => onSurfaceChange("hidden")}
-                >
-                  Close panel
-                </button>
-              </div>
             </div>
           </section>
         )}

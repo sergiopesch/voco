@@ -10,6 +10,7 @@ static INIT_LOG: Once = Once::new();
 const LONG_TRANSCRIPTION_CHUNK_SECONDS: usize = 30;
 const LONG_TRANSCRIPTION_CHUNK_SAMPLES: usize = 16_000 * LONG_TRANSCRIPTION_CHUNK_SECONDS;
 const LONG_TRANSCRIPTION_CHUNK_OVERLAP_SAMPLES: usize = 16_000;
+pub const CANONICAL_CHUNK_MAX_SAMPLES: usize = LONG_TRANSCRIPTION_CHUNK_SAMPLES;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -24,6 +25,14 @@ pub struct TranscriptionSegment {
 pub struct PreviewTranscription {
     pub text: String,
     pub segments: Vec<TranscriptionSegment>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct CanonicalTranscription {
+    pub canonical_text: String,
+    pub append_text: String,
+    pub chunk_text: String,
 }
 
 /// No-op callback to suppress whisper.cpp's verbose C-level logging
@@ -91,6 +100,16 @@ impl WhisperState {
 
     pub fn transcribe_preview(&self, samples: &[f32]) -> Result<PreviewTranscription, String> {
         self.transcribe_single_with_segments(samples)
+    }
+
+    pub fn transcribe_canonical_chunk(
+        &self,
+        samples: &[f32],
+        previous_canonical_text: &str,
+    ) -> Result<CanonicalTranscription, String> {
+        validate_canonical_chunk_sample_count(samples.len())?;
+        let chunk_text = self.transcribe_single(samples)?;
+        canonical_transcription_from_chunk(previous_canonical_text, &chunk_text)
     }
 
     fn transcribe_chunked(&self, samples: &[f32]) -> Result<String, String> {
@@ -190,6 +209,38 @@ impl WhisperState {
     }
 }
 
+fn validate_canonical_chunk_sample_count(sample_count: usize) -> Result<(), String> {
+    if sample_count == 0 {
+        return Err("No canonical chunk audio samples provided".to_string());
+    }
+    if sample_count > CANONICAL_CHUNK_MAX_SAMPLES {
+        return Err("Canonical chunk audio too long (max 30 seconds)".to_string());
+    }
+    Ok(())
+}
+
+fn canonical_transcription_from_chunk(
+    previous_canonical_text: &str,
+    chunk_text: &str,
+) -> Result<CanonicalTranscription, String> {
+    let chunk_text = chunk_text.trim().to_string();
+    let mut canonical_text = previous_canonical_text.to_string();
+    if !chunk_text.is_empty() {
+        append_transcript_segment(&mut canonical_text, &chunk_text);
+    }
+
+    let append_text = canonical_text
+        .strip_prefix(previous_canonical_text)
+        .ok_or_else(|| "Canonical transcription did not preserve its prior prefix.".to_string())?
+        .to_string();
+
+    Ok(CanonicalTranscription {
+        canonical_text,
+        append_text,
+        chunk_text,
+    })
+}
+
 fn transcription_params() -> FullParams<'static, 'static> {
     let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
     params.set_language(Some("en"));
@@ -259,18 +310,138 @@ fn join_transcript_segments(segments: &[String]) -> String {
 }
 
 fn append_transcript_segment(output: &mut String, segment: &str) {
-    let append_start = find_word_overlap_append_start(output, segment).unwrap_or(0);
-    let append_text = segment[append_start..].trim_start();
+    let overlap_append_start = find_word_overlap_append_start(output, segment);
+    let (append_text, removed_boundary) = match overlap_append_start {
+        Some(append_start) => trim_redundant_overlap_boundary(output, &segment[append_start..]),
+        None => (segment.trim_start(), false),
+    };
     if append_text.is_empty() {
         return;
     }
 
+    let (append_text, continues_boundary_token) = if overlap_append_start.is_some() {
+        trim_duplicate_attached_boundary_mark(output, append_text)
+    } else {
+        (append_text, false)
+    };
+    if append_text.is_empty() {
+        return;
+    }
+
+    let capitalized_append;
+    let append_text = if removed_boundary && output_ends_with_terminal_punctuation(output) {
+        capitalized_append = capitalize_first_alphabetic(append_text);
+        capitalized_append.as_str()
+    } else {
+        append_text
+    };
+
     let previous = output.chars().last().unwrap_or(' ');
     let next = append_text.chars().next().unwrap_or(' ');
-    if !previous.is_whitespace() && !matches!(next, '.' | ',' | '!' | '?' | ';' | ':' | ')') {
+    if !continues_boundary_token
+        && !previous.is_whitespace()
+        && !matches!(next, '.' | ',' | '!' | '?' | ';' | ':' | ')')
+    {
         output.push(' ');
     }
     output.push_str(append_text);
+}
+
+fn trim_duplicate_attached_boundary_mark<'a>(
+    output: &str,
+    append_text: &'a str,
+) -> (&'a str, bool) {
+    let Some(mark) = append_text.chars().next() else {
+        return (append_text, false);
+    };
+    if !matches!(mark, '.' | ',') || !output.ends_with(mark) {
+        return (append_text, false);
+    }
+
+    let remainder = &append_text[mark.len_utf8()..];
+    if remainder.chars().next().is_some_and(char::is_alphanumeric) {
+        return (remainder, true);
+    }
+
+    (append_text, false)
+}
+
+fn trim_redundant_overlap_boundary<'a>(output: &str, overlap_suffix: &'a str) -> (&'a str, bool) {
+    let trimmed = overlap_suffix.trim_start();
+    if !output_ends_with_boundary_punctuation(output) {
+        return (trimmed, false);
+    }
+
+    let mut punctuation_end = 0;
+    for (index, char) in trimmed.char_indices() {
+        if is_boundary_mark(char) || is_closing_delimiter(char) {
+            punctuation_end = index + char.len_utf8();
+        } else {
+            break;
+        }
+    }
+
+    if punctuation_end == 0 {
+        return (trimmed, false);
+    }
+
+    let remainder = &trimmed[punctuation_end..];
+    let punctuation_is_separate = remainder.chars().next().is_none_or(char::is_whitespace);
+    if !punctuation_is_separate {
+        return (trimmed, false);
+    }
+
+    (remainder.trim_start(), true)
+}
+
+fn output_ends_with_boundary_punctuation(output: &str) -> bool {
+    for char in output.trim_end().chars().rev() {
+        if is_boundary_mark(char) {
+            return true;
+        }
+        if !is_closing_delimiter(char) {
+            return false;
+        }
+    }
+    false
+}
+
+fn output_ends_with_terminal_punctuation(output: &str) -> bool {
+    for char in output.trim_end().chars().rev() {
+        if matches!(char, '.' | '!' | '?' | '…') {
+            return true;
+        }
+        if !is_closing_delimiter(char) {
+            return false;
+        }
+    }
+    false
+}
+
+fn capitalize_first_alphabetic(text: &str) -> String {
+    for (index, char) in text.char_indices() {
+        if !char.is_alphabetic() {
+            continue;
+        }
+        if !char.is_lowercase() {
+            return text.to_string();
+        }
+
+        let mut capitalized = String::with_capacity(text.len());
+        capitalized.push_str(&text[..index]);
+        capitalized.extend(char.to_uppercase());
+        capitalized.push_str(&text[index + char.len_utf8()..]);
+        return capitalized;
+    }
+    text.to_string()
+}
+
+fn is_boundary_mark(char: char) -> bool {
+    matches!(char, '.' | ',' | '!' | '?' | ';' | ':' | '…')
+}
+
+fn is_closing_delimiter(char: char) -> bool {
+    matches!(char, '\'' | '"' | '’' | '”' | ')' | ']' | '}')
 }
 
 fn find_word_overlap_append_start(output: &str, segment: &str) -> Option<usize> {
@@ -402,7 +573,10 @@ pub type WhisperMutex = Mutex<WhisperState>;
 
 #[cfg(test)]
 mod tests {
-    use super::{join_transcript_segments, transcription_chunk_ranges};
+    use super::{
+        canonical_transcription_from_chunk, join_transcript_segments, transcription_chunk_ranges,
+        validate_canonical_chunk_sample_count, CANONICAL_CHUNK_MAX_SAMPLES,
+    };
 
     #[test]
     fn transcription_chunk_ranges_bound_long_recordings() {
@@ -454,5 +628,197 @@ mod tests {
             ]),
             "The first thought ends here here is a different sentence",
         );
+    }
+
+    #[test]
+    fn canonical_chunk_drops_conflicting_punctuation_after_an_overlap() {
+        let previous = "Prior context ends with the first sentence.";
+        let result = canonical_transcription_from_chunk(
+            previous,
+            "First sentence, and the next thought continues.",
+        )
+        .expect("canonical transcription");
+
+        assert_eq!(
+            result.canonical_text,
+            "Prior context ends with the first sentence. And the next thought continues."
+        );
+        assert_eq!(result.append_text, " And the next thought continues.");
+        assert!(!result.canonical_text.contains("sentence.,"));
+        assert!(result.canonical_text.starts_with(previous));
+    }
+
+    #[test]
+    fn canonical_chunk_drops_spaced_conflicting_punctuation_after_an_overlap() {
+        let previous = "Prior context ends with the first sentence.";
+        let result = canonical_transcription_from_chunk(
+            previous,
+            "First sentence , and the next thought continues.",
+        )
+        .expect("canonical transcription");
+
+        assert_eq!(
+            result.canonical_text,
+            "Prior context ends with the first sentence. And the next thought continues."
+        );
+        assert_eq!(result.append_text, " And the next thought continues.");
+        assert!(!result.canonical_text.contains("sentence.,"));
+        assert!(result.canonical_text.starts_with(previous));
+    }
+
+    #[test]
+    fn overlap_boundary_preserves_decimal_continuation_punctuation() {
+        assert_eq!(
+            super::trim_redundant_overlap_boundary(
+                "The measured value was 3.",
+                ".14 after calibration.",
+            ),
+            (".14 after calibration.", false),
+        );
+    }
+
+    #[test]
+    fn overlap_boundary_preserves_thousands_continuation_punctuation() {
+        assert_eq!(
+            super::trim_redundant_overlap_boundary(
+                "The processed count reached 1,",
+                ",000 records.",
+            ),
+            (",000 records.", false),
+        );
+    }
+
+    #[test]
+    fn canonical_chunk_reuses_boundary_period_for_decimal_continuation() {
+        let previous = "The measured value was 3.";
+        let result = canonical_transcription_from_chunk(
+            previous,
+            "Measured value was 3.14 after calibration.",
+        )
+        .expect("canonical transcription");
+
+        assert_eq!(
+            result.canonical_text,
+            "The measured value was 3.14 after calibration."
+        );
+        assert_eq!(result.append_text, "14 after calibration.");
+        assert!(result.canonical_text.starts_with(previous));
+    }
+
+    #[test]
+    fn canonical_chunk_reuses_boundary_comma_for_thousands_continuation() {
+        let previous = "The processed count reached 1,";
+        let result =
+            canonical_transcription_from_chunk(previous, "Processed count reached 1,000 records.")
+                .expect("canonical transcription");
+
+        assert_eq!(
+            result.canonical_text,
+            "The processed count reached 1,000 records."
+        );
+        assert_eq!(result.append_text, "000 records.");
+        assert!(result.canonical_text.starts_with(previous));
+    }
+
+    #[test]
+    fn overlap_boundary_still_drops_standalone_punctuation_and_closers() {
+        assert_eq!(
+            super::trim_redundant_overlap_boundary(
+                "She called it \"the final answer.\"",
+                ",\" and moved on.",
+            ),
+            ("and moved on.", true),
+        );
+    }
+
+    #[test]
+    fn transcript_segments_join_drops_quoted_overlap_punctuation() {
+        assert_eq!(
+            join_transcript_segments(&[
+                "She called it \"the final answer.\"".to_string(),
+                "\"The final answer,\" and moved on.".to_string(),
+            ]),
+            "She called it \"the final answer.\" And moved on.",
+        );
+    }
+
+    #[test]
+    fn overlap_boundary_capitalization_respects_non_terminal_punctuation() {
+        assert_eq!(
+            join_transcript_segments(&[
+                "The list contains apples, bananas,".to_string(),
+                "apples, bananas; and pears.".to_string(),
+            ]),
+            "The list contains apples, bananas, and pears.",
+        );
+    }
+
+    #[test]
+    fn overlap_boundary_capitalization_supports_unicode() {
+        assert_eq!(
+            join_transcript_segments(&[
+                "The repeated boundary ends here.".to_string(),
+                "Boundary ends here, élan follows.".to_string(),
+            ]),
+            "The repeated boundary ends here. Élan follows.",
+        );
+    }
+
+    #[test]
+    fn canonical_chunk_keeps_a_single_repeated_word_with_its_punctuation() {
+        let result = canonical_transcription_from_chunk(
+            "The first thought ends here.",
+            "Here, a new thought begins.",
+        )
+        .expect("canonical transcription");
+
+        assert_eq!(
+            result.canonical_text,
+            "The first thought ends here. Here, a new thought begins."
+        );
+        assert_eq!(result.append_text, " Here, a new thought begins.");
+    }
+
+    #[test]
+    fn canonical_chunk_preserves_prior_text_and_returns_exact_suffix() {
+        let previous = "This is a long dictation with overlapping chunk text";
+        let result = canonical_transcription_from_chunk(
+            previous,
+            " overlapping chunk text continuing after the boundary ",
+        )
+        .expect("canonical transcription");
+
+        assert_eq!(
+            result.chunk_text,
+            "overlapping chunk text continuing after the boundary"
+        );
+        assert_eq!(
+            result.canonical_text,
+            "This is a long dictation with overlapping chunk text continuing after the boundary"
+        );
+        assert_eq!(result.append_text, " continuing after the boundary");
+        assert!(result.canonical_text.starts_with(previous));
+        assert_eq!(
+            result.canonical_text.strip_prefix(previous),
+            Some(result.append_text.as_str())
+        );
+    }
+
+    #[test]
+    fn empty_canonical_chunk_keeps_the_prior_text_unchanged() {
+        let result = canonical_transcription_from_chunk("Already committed.", "   ")
+            .expect("empty canonical transcription");
+
+        assert_eq!(result.canonical_text, "Already committed.");
+        assert_eq!(result.append_text, "");
+        assert_eq!(result.chunk_text, "");
+    }
+
+    #[test]
+    fn canonical_chunk_audio_is_nonempty_and_bounded_to_thirty_seconds() {
+        assert!(validate_canonical_chunk_sample_count(0).is_err());
+        assert!(validate_canonical_chunk_sample_count(1).is_ok());
+        assert!(validate_canonical_chunk_sample_count(CANONICAL_CHUNK_MAX_SAMPLES).is_ok());
+        assert!(validate_canonical_chunk_sample_count(CANONICAL_CHUNK_MAX_SAMPLES + 1).is_err());
     }
 }

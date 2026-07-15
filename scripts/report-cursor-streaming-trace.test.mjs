@@ -31,7 +31,6 @@ function runReport(entries, args = []) {
 
 {
   const output = runReport([
-    { event: "dictation_final_output_completed" },
     { event: "dictation_recording_duration", duration_ms: 10000 },
     { event: "dictation_first_live_text_visible", duration_ms: 1000 },
     { event: "dictation_live_cursor_insert_updated" },
@@ -39,6 +38,8 @@ function runReport(entries, args = []) {
     { event: "dictation_live_preview_completed", duration_ms: 700 },
     { event: "dictation_live_preview_completed", duration_ms: 900 },
     { event: "dictation_live_cursor_overlay_fallback" },
+    { event: "dictation_canonical_final_completed" },
+    { event: "dictation_final_output_completed" },
     { event: "dictation_stop_to_idle", duration_ms: 1200 },
   ]);
   assert.match(output, /status: dictation-session-observed/);
@@ -61,6 +62,7 @@ function runReport(entries, args = []) {
     { event: "dictation_live_preview_completed", duration_ms: 620 },
     { event: "dictation_owned_preedit_updated", t_ms: 1800 },
     { event: "dictation_owned_preedit_committed" },
+    { event: "dictation_canonical_final_completed" },
     { event: "dictation_final_output_completed" },
     { event: "dictation_stop_to_idle", duration_ms: 1100 },
   ]);
@@ -96,10 +98,11 @@ function runReport(entries, args = []) {
 {
   const output = runReport(
     [
-      { event: "dictation_final_output_completed" },
       { event: "dictation_recording_duration", duration_ms: 10000 },
       { event: "dictation_first_live_text_visible", duration_ms: 1000 },
       { event: "dictation_live_cursor_insert_updated" },
+      { event: "dictation_canonical_final_completed" },
+      { event: "dictation_final_output_completed" },
       { event: "dictation_stop_to_idle", duration_ms: 1200 },
     ],
     ["--min-duration-ms", "10000"],
@@ -140,10 +143,11 @@ function runReport(entries, args = []) {
 {
   const output = runReport(
     [
-      { event: "dictation_final_output_completed" },
       { event: "dictation_recording_duration", duration_ms: 9500 },
       { event: "dictation_first_live_text_visible", duration_ms: 1000 },
       { event: "dictation_live_cursor_insert_updated" },
+      { event: "dictation_canonical_final_completed" },
+      { event: "dictation_final_output_completed" },
       { event: "dictation_stop_to_idle", duration_ms: 1200 },
     ],
     ["--min-duration-ms=10000"],
@@ -180,16 +184,17 @@ function runReport(entries, args = []) {
   assert.match(output, /dictation_live_cursor_final_unreconciled: 1/);
   assert.match(
     output,
-    /1 session\(s\) preserved a final transcript in VOCO but could not safely finish it at the cursor/,
+    /1 session\(s\) preserved live target text because the authoritative final could not be applied safely at the cursor/,
   );
 }
 
 {
   const output = runReport([
-    { event: "dictation_final_output_completed" },
     { event: "dictation_recording_duration", duration_ms: 10000 },
     { event: "dictation_live_preview_failed" },
     { event: "dictation_live_cursor_overlay_fallback" },
+    { event: "dictation_canonical_final_completed" },
+    { event: "dictation_final_output_completed" },
     { event: "dictation_stop_to_idle", duration_ms: 1200 },
   ]);
   assert.match(output, /status: dictation-session-observed/);
@@ -199,6 +204,7 @@ function runReport(entries, args = []) {
 
 {
   const output = runReport([
+    { event: "dictation_canonical_final_completed", dictation_session_id: 1 },
     { event: "dictation_final_output_completed", dictation_session_id: 1 },
     { event: "dictation_recording_duration", duration_ms: 10000, dictation_session_id: 1 },
     { event: "dictation_first_live_text_visible", duration_ms: 900, dictation_session_id: 1 },
@@ -238,13 +244,65 @@ function runReport(entries, args = []) {
 
 {
   const output = runReport([
-    { event: "dictation_final_output_completed" },
+    { event: "app_start" },
+    { event: "dictation_live_cursor_insert_failed", dictation_session_id: 1 },
+    { event: "dictation_stop_to_idle", duration_ms: 1400, dictation_session_id: 1 },
+    { event: "app_start" },
+    { event: "dictation_canonical_final_completed", dictation_session_id: 1 },
+    { event: "dictation_final_output_completed", dictation_session_id: 1 },
+    { event: "dictation_recording_duration", duration_ms: 10000, dictation_session_id: 1 },
+    { event: "dictation_first_live_text_visible", duration_ms: 800, dictation_session_id: 1 },
+    { event: "dictation_owned_preedit_updated", t_ms: 1000, dictation_session_id: 1 },
+    { event: "dictation_stop_to_idle", duration_ms: 1100, dictation_session_id: 1 },
+  ]);
+  assert.match(output, /Entries read: 10/);
+  assert.match(output, /Entries in latest frontend run: 7/);
+  assert.match(output, /status: dictation-session-observed/);
+  assert.match(output, /dictation_live_cursor_insert_failed: 0/);
+  assert.doesNotMatch(output, /status: failures-observed/);
+}
+
+{
+  const output = runReport([
+    { event: "app_start" },
+    { event: "dictation_final_output_completed", dictation_session_id: 1 },
+    { event: "dictation_stop_to_idle", duration_ms: 1100, dictation_session_id: 1 },
+    { event: "app_start" },
+    { event: "recording_state_requested", dictation_session_id: 1 },
+  ]);
+  assert.match(output, /Entries in latest frontend run: 2/);
+  assert.match(output, /status: no-dictation-session/);
+}
+
+{
+  const output = runReport([
+    { event: "app_start" },
+    { event: "frontend_app_mounted" },
+    { event: "dictation_live_cursor_insert_failed", dictation_session_id: 1 },
+    { event: "dictation_stop_to_idle", duration_ms: 1400, dictation_session_id: 1 },
+    { event: "frontend_app_mounted" },
+    { event: "dictation_canonical_final_completed", dictation_session_id: 1 },
+    { event: "dictation_final_output_completed", dictation_session_id: 1 },
+    { event: "dictation_recording_duration", duration_ms: 10000, dictation_session_id: 1 },
+    { event: "dictation_first_live_text_visible", duration_ms: 800, dictation_session_id: 1 },
+    { event: "dictation_owned_preedit_updated", t_ms: 1000, dictation_session_id: 1 },
+    { event: "dictation_stop_to_idle", duration_ms: 1100, dictation_session_id: 1 },
+  ]);
+  assert.match(output, /Entries in latest frontend run: 7/);
+  assert.match(output, /status: dictation-session-observed/);
+  assert.match(output, /dictation_live_cursor_insert_failed: 0/);
+}
+
+{
+  const output = runReport([
     { event: "dictation_recording_duration", duration_ms: 10000 },
     { event: "dictation_first_live_text_visible", duration_ms: 1600 },
     { event: "dictation_live_cursor_insert_updated", t_ms: 1000 },
     { event: "dictation_live_cursor_insert_updated", t_ms: 2000 },
     { event: "dictation_live_cursor_insert_updated", t_ms: 4500 },
     { event: "dictation_live_preview_window_advanced", duration_ms: 2400 },
+    { event: "dictation_canonical_final_completed" },
+    { event: "dictation_final_output_completed" },
     { event: "dictation_stop_to_idle", duration_ms: 1200 },
   ]);
   assert.match(output, /status: cursor-streaming-latency-above-target/);
@@ -263,11 +321,12 @@ function runReport(entries, args = []) {
 {
   const output = runReport(
     [
-      { event: "dictation_final_output_completed" },
       { event: "dictation_recording_duration", duration_ms: 10000 },
       { event: "dictation_first_live_text_visible", duration_ms: 1600 },
       { event: "dictation_live_cursor_insert_updated", t_ms: 1000 },
       { event: "dictation_live_cursor_insert_updated", t_ms: 3500 },
+      { event: "dictation_canonical_final_completed" },
+      { event: "dictation_final_output_completed" },
       { event: "dictation_stop_to_idle", duration_ms: 1200 },
     ],
     ["--max-first-live-text-ms=2000", "--max-cursor-gap-p95-ms", "3000"],
@@ -279,9 +338,10 @@ function runReport(entries, args = []) {
 
 {
   const output = runReport([
-    { event: "dictation_final_output_completed" },
     { event: "dictation_recording_duration", duration_ms: 10000 },
     { event: "dictation_live_preview_completed", duration_ms: 700 },
+    { event: "dictation_canonical_final_completed" },
+    { event: "dictation_final_output_completed" },
     { event: "dictation_stop_to_idle", duration_ms: 1200 },
   ]);
   assert.match(output, /status: cursor-streaming-unproven/);
@@ -293,9 +353,10 @@ function runReport(entries, args = []) {
 
 {
   const output = runReport([
-    { event: "dictation_final_output_completed" },
     { event: "dictation_first_live_text_visible", duration_ms: 900 },
     { event: "dictation_live_cursor_insert_updated" },
+    { event: "dictation_canonical_final_completed" },
+    { event: "dictation_final_output_completed" },
     { event: "dictation_stop_to_idle", duration_ms: 1200 },
   ]);
   assert.match(output, /status: recording-duration-unproven/);
@@ -307,7 +368,6 @@ function runReport(entries, args = []) {
 
 {
   const output = runReport([
-    { event: "dictation_final_output_completed" },
     { event: "dictation_recording_duration", duration_ms: 10000 },
     { event: "dictation_first_live_text_visible", duration_ms: 900 },
     { event: "dictation_live_cursor_insert_updated" },
@@ -319,6 +379,8 @@ function runReport(entries, args = []) {
     { event: "dictation_live_cursor_commit_waiting" },
     { event: "dictation_live_cursor_unsafe_rewrite_blocked" },
     { event: "dictation_live_cursor_unsafe_rewrite_blocked" },
+    { event: "dictation_canonical_final_completed" },
+    { event: "dictation_final_output_completed" },
     { event: "dictation_stop_to_idle", duration_ms: 1200 },
   ]);
   assert.match(output, /status: cursor-streaming-stalled/);
@@ -330,7 +392,6 @@ function runReport(entries, args = []) {
 
 {
   const output = runReport([
-    { event: "dictation_final_output_completed" },
     { event: "dictation_recording_duration", duration_ms: 10000 },
     { event: "dictation_first_live_text_visible", duration_ms: 900 },
     { event: "dictation_live_cursor_insert_updated" },
@@ -345,6 +406,8 @@ function runReport(entries, args = []) {
     { event: "dictation_live_cursor_commit_waiting" },
     { event: "dictation_live_cursor_commit_waiting" },
     { event: "dictation_live_cursor_unsafe_rewrite_blocked" },
+    { event: "dictation_canonical_final_completed" },
+    { event: "dictation_final_output_completed" },
     { event: "dictation_stop_to_idle", duration_ms: 1200 },
   ]);
   assert.match(output, /status: cursor-streaming-stalled/);
@@ -370,6 +433,150 @@ function runReport(entries, args = []) {
   ]);
   assert.match(output, /status: no-dictation-session/);
   assert.match(output, /detail: no completed dictation session is present in this trace window/);
+}
+
+{
+  const output = runReport([
+    { event: "dictation_recording_duration", duration_ms: 12000 },
+    { event: "dictation_first_live_text_visible", duration_ms: 800 },
+    { event: "dictation_owned_preedit_updated", t_ms: 1000 },
+    { event: "dictation_owned_preedit_committed" },
+    { event: "dictation_final_output_completed" },
+    { event: "dictation_stop_to_idle", duration_ms: 900 },
+  ]);
+  assert.match(output, /status: canonical-final-unproven/);
+  assert.match(output, /generic final output evidence is insufficient/);
+  assert.doesNotMatch(output, /status: dictation-session-observed/);
+}
+
+{
+  const output = runReport([
+    { event: "dictation_recording_duration", duration_ms: 12000 },
+    { event: "dictation_first_live_text_visible", duration_ms: 800 },
+    { event: "dictation_owned_preedit_updated", t_ms: 1000 },
+    { event: "dictation_canonical_final_completed" },
+    { event: "dictation_final_output_completed" },
+    { event: "dictation_stop_to_idle", duration_ms: 900 },
+  ]);
+  assert.match(output, /status: dictation-session-observed/);
+  assert.match(output, /dictation_canonical_checkpoint_completed: 0/);
+  assert.match(output, /dictation_canonical_final_completed: 1/);
+}
+
+{
+  const output = runReport([
+    { event: "dictation_recording_duration", duration_ms: 30000 },
+    { event: "dictation_first_live_text_visible", duration_ms: 800 },
+    { event: "dictation_owned_preedit_updated", t_ms: 1000 },
+    { event: "dictation_canonical_final_completed" },
+    { event: "dictation_final_output_completed" },
+    { event: "dictation_stop_to_idle", duration_ms: 900 },
+  ]);
+  assert.match(output, /status: canonical-checkpoint-cadence-unproven/);
+  assert.match(output, /requires 1 completed canonical checkpoint event\(s\)/);
+  assert.match(output, /0 were observed/);
+}
+
+{
+  const output = runReport([
+    { event: "dictation_recording_duration", duration_ms: 30000 },
+    { event: "dictation_first_live_text_visible", duration_ms: 800 },
+    { event: "dictation_owned_preedit_updated", t_ms: 1000 },
+    { event: "dictation_canonical_checkpoint_completed", duration_ms: 1800 },
+    { event: "dictation_canonical_checkpoint_committed" },
+    { event: "dictation_canonical_final_completed" },
+    { event: "dictation_final_output_completed" },
+    { event: "dictation_stop_to_idle", duration_ms: 900 },
+  ]);
+  assert.match(output, /status: dictation-session-observed/);
+  assert.match(output, /dictation_canonical_checkpoint_completed: 1/);
+  assert.match(output, /dictation_canonical_checkpoint_committed: 1/);
+}
+
+{
+  const output = runReport([
+    { event: "dictation_recording_duration", duration_ms: 59000 },
+    { event: "dictation_first_live_text_visible", duration_ms: 800 },
+    { event: "dictation_owned_preedit_updated", t_ms: 1000 },
+    { event: "dictation_canonical_checkpoint_completed", duration_ms: 1800 },
+    { event: "dictation_canonical_checkpoint_committed" },
+    { event: "dictation_canonical_checkpoint_completed", duration_ms: 1700 },
+    { event: "dictation_canonical_final_completed" },
+    { event: "dictation_final_output_completed" },
+    { event: "dictation_stop_to_idle", duration_ms: 900 },
+  ]);
+  assert.match(output, /status: dictation-session-observed/);
+  assert.match(output, /dictation_canonical_checkpoint_completed: 2/);
+  assert.match(output, /dictation_canonical_checkpoint_committed: 1/);
+}
+
+{
+  const output = runReport([
+    { event: "dictation_recording_duration", duration_ms: 59000 },
+    { event: "dictation_first_live_text_visible", duration_ms: 800 },
+    { event: "dictation_owned_preedit_updated", t_ms: 1000 },
+    { event: "dictation_canonical_checkpoint_completed", duration_ms: 1800 },
+    { event: "dictation_canonical_checkpoint_committed" },
+    { event: "dictation_canonical_final_completed" },
+    { event: "dictation_final_output_completed" },
+    { event: "dictation_stop_to_idle", duration_ms: 900 },
+  ]);
+  assert.match(output, /status: canonical-checkpoint-cadence-unproven/);
+  assert.match(output, /requires 2 completed canonical checkpoint event\(s\)/);
+  assert.match(output, /1 were observed/);
+}
+
+{
+  const output = runReport([
+    { event: "dictation_recording_duration", duration_ms: 30000 },
+    { event: "dictation_first_live_text_visible", duration_ms: 800 },
+    { event: "dictation_owned_preedit_updated", t_ms: 1000 },
+    { event: "dictation_canonical_checkpoint_completed", duration_ms: 1800 },
+    { event: "dictation_canonical_final_completed" },
+    { event: "dictation_final_output_completed" },
+    { event: "dictation_stop_to_idle", duration_ms: 900 },
+  ]);
+  assert.match(output, /status: canonical-checkpoint-delivery-unproven/);
+  assert.match(output, /no dictation_canonical_checkpoint_committed event/);
+}
+
+{
+  const output = runReport([
+    { event: "dictation_recording_duration", duration_ms: 30000 },
+    { event: "dictation_first_live_text_visible", duration_ms: 800 },
+    { event: "dictation_owned_preedit_updated", t_ms: 1000 },
+    { event: "dictation_canonical_checkpoint_completed", duration_ms: 1800 },
+    { event: "dictation_canonical_final_completed" },
+    { event: "dictation_canonical_checkpoint_committed" },
+    { event: "dictation_final_output_completed" },
+    { event: "dictation_stop_to_idle", duration_ms: 900 },
+  ]);
+  assert.match(output, /status: canonical-checkpoint-delivery-unproven/);
+  assert.match(output, /before the canonical final/);
+}
+
+{
+  const output = runReport([
+    { event: "dictation_recording_duration", duration_ms: 12000 },
+    { event: "dictation_first_live_text_visible", duration_ms: 800 },
+    { event: "dictation_owned_preedit_updated", t_ms: 1000 },
+    { event: "dictation_canonical_checkpoint_committed" },
+    { event: "dictation_canonical_final_completed" },
+    { event: "dictation_final_output_completed" },
+    { event: "dictation_stop_to_idle", duration_ms: 900 },
+  ]);
+  assert.match(output, /status: canonical-checkpoint-evidence-invalid/);
+  assert.match(output, /deliveries cannot exceed completed checkpoints/);
+}
+
+{
+  const output = runReport([
+    { event: "dictation_recording_duration", duration_ms: 30000 },
+    { event: "dictation_canonical_checkpoint_failed" },
+    { event: "dictation_stop_to_idle", duration_ms: 900 },
+  ]);
+  assert.match(output, /status: failures-observed/);
+  assert.match(output, /dictation_canonical_checkpoint_failed: 1/);
 }
 
 console.log("report-cursor-streaming-trace tests passed");

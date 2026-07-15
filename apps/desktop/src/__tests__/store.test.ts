@@ -15,6 +15,8 @@ describe("useStore", () => {
       onboardingStep: 0,
       availableDevices: [],
       microphonePermission: "unknown",
+      microphoneReady: false,
+      ownedPreeditSetupState: "",
       updateState: {
         status: "idle",
         currentVersion: null,
@@ -73,6 +75,14 @@ describe("useStore", () => {
   it("setAudioLevel updates level", () => {
     useStore.getState().setAudioLevel(0.75);
     expect(useStore.getState().audioLevel).toBe(0.75);
+  });
+
+  it("tracks the current owned-preedit setup state independently of panel diagnostics", () => {
+    useStore.getState().setOwnedPreeditSetupState("not-enabled");
+    expect(useStore.getState().ownedPreeditSetupState).toBe("not-enabled");
+
+    useStore.getState().setOwnedPreeditSetupState("ready");
+    expect(useStore.getState().ownedPreeditSetupState).toBe("ready");
   });
 
   it("setConfig stores config", () => {

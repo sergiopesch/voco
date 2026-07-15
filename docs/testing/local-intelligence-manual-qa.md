@@ -55,6 +55,6 @@ llama-server --host 127.0.0.1 --port 8080 --model /path/to/model.gguf
 Local intelligence is ready for daily dictation only when:
 
 - all required automated checks pass
-- LI-01 through LI-08 pass on at least one Ubuntu/Debian desktop session
+- LI-01 through LI-08 pass on at least one Ubuntu desktop session
 - LI-09 and LI-10 show no regression in existing optional flows
 - failure cases never lose raw dictation text for enhancement and never insert stale local assistant output

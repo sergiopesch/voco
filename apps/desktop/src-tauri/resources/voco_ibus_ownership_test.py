@@ -30,6 +30,7 @@ class OwnedPreeditLeaseTests(unittest.TestCase):
         committed_text: str,
         final_text: str,
         *,
+        owned_preedit_text: str = "",
         session_id: int = SESSION_ID,
         context_revision: int = CONTEXT_REVISION,
         ownership_intact: bool = True,
@@ -39,6 +40,7 @@ class OwnedPreeditLeaseTests(unittest.TestCase):
             context_revision,
             ownership_intact,
             committed_text,
+            owned_preedit_text,
             final_text,
         )
 
@@ -67,6 +69,32 @@ class OwnedPreeditLeaseTests(unittest.TestCase):
             self.plan("committed live words", "authoritative final words")
         )
 
+    def test_changed_final_commits_only_the_owned_live_tail(self) -> None:
+        plan = self.plan(
+            "committed live words",
+            "different authoritative final",
+            owned_preedit_text=" provisional tail",
+        )
+
+        self.assertEqual(plan.action, FinalizationAction.PRESERVE)
+        self.assertEqual(len(plan.commands()), 1)
+        self.assertEqual(plan.commands()[0].operation, "commit-text")
+        self.assertEqual(plan.commands()[0].text, " provisional tail")
+        self.assertEqual(deletion_commands(plan), [])
+
+    def test_exact_final_commits_the_owned_live_tail(self) -> None:
+        plan = self.plan(
+            "committed live words",
+            "committed live words provisional tail",
+            owned_preedit_text=" provisional tail",
+        )
+
+        self.assertEqual(plan.action, FinalizationAction.COMMIT)
+        self.assertEqual(len(plan.commands()), 1)
+        self.assertEqual(plan.commands()[0].operation, "commit-text")
+        self.assertEqual(plan.commands()[0].text, " provisional tail")
+        self.assertEqual(deletion_commands(plan), [])
+
     def test_final_suffix_is_not_injected_after_progressive_commits(self) -> None:
         self.assert_preserved_without_commands(
             self.plan("committed prefix", "committed prefix final suffix")
@@ -88,7 +116,12 @@ class OwnedPreeditLeaseTests(unittest.TestCase):
 
     def test_external_key_activity_is_rejected(self) -> None:
         self.assert_preserved_without_commands(
-            self.plan("", "final", ownership_intact=False)
+            self.plan(
+                "committed",
+                "final",
+                owned_preedit_text=" owned tail",
+                ownership_intact=False,
+            )
         )
 
     def test_target_close_or_cancellation_unbinds_the_lease(self) -> None:

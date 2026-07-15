@@ -35,7 +35,18 @@ export interface AppConfig {
   voiceProfile: VoiceProfile;
 }
 
+export interface ConfigSnapshot {
+  revision: number;
+  config: AppConfig;
+}
+
 export type DictationStatus = "idle" | "recording" | "processing" | "error";
+export type CursorDeliveryState =
+  | "inactive"
+  | "pending"
+  | "owned"
+  | "preview-only"
+  | "unreconciled";
 
 export type AppSurface = "hidden" | "onboarding" | "settings" | "popover";
 
@@ -95,6 +106,12 @@ export interface TranscriptionSegment {
 export interface PreviewTranscription {
   text: string;
   segments: TranscriptionSegment[];
+}
+
+export interface CanonicalTranscription {
+  canonicalText: string;
+  appendText: string;
+  chunkText: string;
 }
 
 export interface DebugDictationCaptureResult {
@@ -162,39 +179,25 @@ export interface LocalLlmAgentResult {
   response: string;
 }
 
-export type OpenClawBrowserAction =
-  | "open_url"
-  | "navigate"
-  | "inspect_page"
-  | "list_tabs"
-  | "click_ref"
-  | "type_ref"
-  | "press_key";
-
-export interface OpenClawBrowserActionInput {
-  action: OpenClawBrowserAction;
-  url?: string;
-  targetId?: string;
-  elementRef?: string;
-  text?: string;
-  key?: string;
-  submit?: boolean;
-}
-
-export interface OpenClawBrowserActionResult {
-  ok: boolean;
-  action: OpenClawBrowserAction;
-  summary: string;
-  profile: string;
-  url: string | null;
-  targetId: string | null;
-  snapshot: string | null;
-  nextActions: string[];
-}
-
 export interface RealtimeClientSecretResult {
   value: string;
   expiresAt: number | null;
 }
 
 export type RealtimeStatus = "idle" | "connecting" | "listening" | "speaking" | "error";
+export type MicrophonePermission = "unknown" | "granted" | "denied";
+
+export interface RuntimeStatusSnapshot {
+  epoch: number;
+  revision: number;
+  runtimeInitialized: boolean;
+  configurationError: boolean;
+  microphoneReady: boolean;
+  microphonePermission: MicrophonePermission;
+  dictationStatus: DictationStatus;
+  cursorDelivery: CursorDeliveryState;
+  cursorRequired: boolean;
+  cursorSetupState: OwnedPreeditStatus["setupState"];
+  realtimeStatus: RealtimeStatus;
+  realtimeMuted: boolean;
+}

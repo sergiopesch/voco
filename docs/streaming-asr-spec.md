@@ -21,7 +21,7 @@ Streaming ASR feel is not a new assistant mode.
 The product promise is:
 
 > VOCO should feel like it starts, stops, and types faster, from 10-second notes through 10-minute
-> dictation, while preserving current reliability on Ubuntu/Debian, Wayland, and X11.
+> dictation, while preserving measured reliability on the primary Ubuntu Wayland and X11 paths.
 
 ## User-Facing Requirements
 

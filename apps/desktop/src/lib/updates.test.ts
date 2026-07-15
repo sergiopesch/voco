@@ -167,4 +167,21 @@ describe("update cache helpers", () => {
 
     await expect(readCachedUpdateState("stable", "2026.0.6")).resolves.toBeNull();
   });
+
+  it("ignores a cache timestamp from the future", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-15T12:00:00Z"));
+    vi.spyOn(tauriLib, "loadCachedUpdateState").mockResolvedValue({
+      channel: "stable",
+      state: {
+        status: "up-to-date",
+        currentVersion: "2026.0.21",
+        latestRelease: null,
+        lastCheckedAt: "2026-07-15T12:00:01Z",
+        error: null,
+      },
+    });
+
+    await expect(readCachedUpdateState("stable", "2026.0.21")).resolves.toBeNull();
+  });
 });

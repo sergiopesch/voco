@@ -231,3 +231,16 @@ export function disableLivePreview(
     previewGeneration: state.previewGeneration + 1,
   };
 }
+
+export function invalidateLivePreview(
+  state: DictationSessionState,
+): DictationSessionState {
+  if (state.phase !== "recording") {
+    return state;
+  }
+
+  return {
+    ...state,
+    previewGeneration: state.previewGeneration + 1,
+  };
+}

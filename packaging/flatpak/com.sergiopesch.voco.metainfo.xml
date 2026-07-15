@@ -10,8 +10,8 @@
   </developer>
   <launchable type="desktop-id">com.sergiopesch.voco.desktop</launchable>
   <description>
-    <p>VOCO is a Linux desktop dictation tool for people who want fast voice capture without handing speech data to a cloud service.</p>
-    <p>It stays in the tray, listens on demand, keeps visible state compact, and defaults to a local-first workflow for voice capture.</p>
+    <p>VOCO is a Linux desktop dictation tool for people who want fast, private voice capture with local transcription by default.</p>
+    <p>It stays in the tray, listens on demand, and keeps visible state compact. Its optional realtime conversation mode sends microphone audio to OpenAI only after the user explicitly starts that mode.</p>
     <ul>
       <li>Tray-first workflow with a compact command panel</li>
       <li>Onboarding for microphone setup and hotkeys</li>
@@ -28,10 +28,16 @@
   <url type="vcs-browser">https://github.com/sergiopesch/voco</url>
   <content_rating type="oars-1.1" />
   <releases>
-    <release version="2026.0.19" date="2026-07-14">
+    <release version="2026.0.21" date="2026-07-15">
       <description>
-        <p>Replaces dynamic desktop-engine switching with a persistent, explicitly user-enabled VOCO Dictation input source and owner-authenticated private IPC.</p>
-        <p>Hardens focus, cursor, session, password-field, disconnect, and finalization races while preserving the no-surrounding-text-deletion contract.</p>
+        <p>Adds persistent VOCO Dictation input-source support with revisable live preedit, authoritative local checkpoints, exact-prefix delivery, and recoverable fail-closed final transcripts.</p>
+        <p>Unifies tray and settings state, adds safe configuration recovery and single-instance ownership, and hardens model-cache integrity, installers, private IPC, and release verification.</p>
+      </description>
+    </release>
+    <release version="2026.0.17" date="2026-07-11">
+      <description>
+        <p>Adds bounded 10-minute dictation, chunked local transcription, append-only live cursor previews, and safer final transcript reconciliation.</p>
+        <p>Improves audio capture throughput and memory use, adds optional local model and realtime assistant paths, and hardens Linux packaging and release verification.</p>
       </description>
     </release>
   </releases>

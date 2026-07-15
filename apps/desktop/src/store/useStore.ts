@@ -4,6 +4,8 @@ import type {
   AppSurface,
   AudioDeviceOption,
   DictationStatus,
+  MicrophonePermission,
+  OwnedPreeditStatus,
   UpdateCheckState,
 } from "@/types";
 
@@ -38,7 +40,9 @@ interface AppState {
   surface: AppSurface;
   onboardingStep: number;
   availableDevices: AudioDeviceOption[];
-  microphonePermission: "unknown" | "granted" | "denied";
+  microphonePermission: MicrophonePermission;
+  microphoneReady: boolean;
+  ownedPreeditSetupState: OwnedPreeditStatus["setupState"];
   updateState: UpdateCheckState;
 
   setStatus: (status: DictationStatus) => void;
@@ -51,7 +55,11 @@ interface AppState {
   setOnboardingStep: (step: number) => void;
   setAvailableDevices: (devices: AudioDeviceOption[]) => void;
   setSelectedDeviceId: (deviceId: string | null) => void;
-  setMicrophonePermission: (state: "unknown" | "granted" | "denied") => void;
+  setMicrophonePermission: (state: MicrophonePermission) => void;
+  setMicrophoneReady: (ready: boolean) => void;
+  setOwnedPreeditSetupState: (
+    setupState: OwnedPreeditStatus["setupState"],
+  ) => void;
   setUpdateState: (updateState: UpdateCheckState) => void;
   clearTranscript: () => void;
 }
@@ -68,6 +76,8 @@ export const useStore = create<AppState>((set) => ({
   onboardingStep: 0,
   availableDevices: [],
   microphonePermission: "unknown",
+  microphoneReady: false,
+  ownedPreeditSetupState: "",
   updateState: {
     status: "idle",
     currentVersion: null,
@@ -92,6 +102,9 @@ export const useStore = create<AppState>((set) => ({
   setAvailableDevices: (devices) => set({ availableDevices: devices }),
   setSelectedDeviceId: (selectedDeviceId) => set({ selectedDeviceId }),
   setMicrophonePermission: (microphonePermission) => set({ microphonePermission }),
+  setMicrophoneReady: (microphoneReady) => set({ microphoneReady }),
+  setOwnedPreeditSetupState: (ownedPreeditSetupState) =>
+    set({ ownedPreeditSetupState }),
   setUpdateState: (updateState) => set({ updateState }),
   clearTranscript: () => set({ transcript: "", interimTranscript: "" }),
 }));

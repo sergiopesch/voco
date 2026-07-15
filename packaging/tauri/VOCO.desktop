@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=VOCO
+Comment=A voice-native interface layer designed for speed and precision
+Exec=voco
+Icon=voco
+Terminal=false
+Categories=AudioVideo;Audio;
+StartupNotify=true
+StartupWMClass=voco

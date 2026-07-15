@@ -3,6 +3,8 @@ import {
   audioLevelBucket,
   decideRealtimeServerEvent,
   extractRealtimeFunctionCalls,
+  isCurrentRealtimeLifecycle,
+  isCurrentRealtimeResource,
   resampleLinear,
   updateLocalSpeechDetectorState,
 } from "@/hooks/useRealtimeConversation";
@@ -24,6 +26,21 @@ const BASE_RUNTIME_SNAPSHOT: RealtimeRuntimeSnapshot = {
 };
 
 describe("realtime audio helpers", () => {
+  it("invalidates continuations from an older realtime lifecycle", () => {
+    expect(isCurrentRealtimeLifecycle(4, 4)).toBe(true);
+    expect(isCurrentRealtimeLifecycle(4, 5)).toBe(false);
+  });
+
+  it("requires both lifecycle and resource identity for async callbacks", () => {
+    const socket = {};
+    const replacementSocket = {};
+
+    expect(isCurrentRealtimeResource(7, 7, socket, socket)).toBe(true);
+    expect(isCurrentRealtimeResource(7, 8, socket, socket)).toBe(false);
+    expect(isCurrentRealtimeResource(7, 7, socket, replacementSocket)).toBe(false);
+    expect(isCurrentRealtimeResource(7, 7, socket, null)).toBe(false);
+  });
+
   it("buckets audio levels for privacy-safe diagnostics", () => {
     expect(audioLevelBucket(0)).toBe("silent");
     expect(audioLevelBucket(0.03)).toBe("low");
@@ -245,16 +262,16 @@ describe("realtime audio helpers", () => {
     });
   });
 
-  it("extracts realtime browser function calls from response.done", () => {
+  it("extracts unexpected realtime function calls so they can be rejected", () => {
     const calls = extractRealtimeFunctionCalls({
       type: "response.done",
       response: {
         output: [
           {
             type: "function_call",
-            name: "openclaw_browser",
+            name: "unexpected_tool",
             call_id: "call_1",
-            arguments: "{\"action\":\"inspect_page\"}",
+            arguments: "{}",
           },
         ],
       },
@@ -262,14 +279,14 @@ describe("realtime audio helpers", () => {
 
     expect(calls).toEqual([
       {
-        name: "openclaw_browser",
+        name: "unexpected_tool",
         callId: "call_1",
-        argumentsJson: "{\"action\":\"inspect_page\"}",
+        argumentsJson: "{}",
       },
     ]);
   });
 
-  it("marks browser function responses as tool work instead of normal listening", () => {
+  it("fails closed when a server emits a function call despite the tool-free schema", () => {
     const decision = decideRealtimeServerEvent(
       {
         type: "response.done",
@@ -277,9 +294,9 @@ describe("realtime audio helpers", () => {
           output: [
             {
               type: "function_call",
-              name: "openclaw_browser",
+              name: "unexpected_tool",
               call_id: "call_1",
-              arguments: "{\"action\":\"inspect_page\"}",
+              arguments: "{}",
             },
           ],
         },
@@ -288,10 +305,13 @@ describe("realtime audio helpers", () => {
     );
 
     expect(decision.functionCalls).toHaveLength(1);
-    expect(decision.status?.detail).toBe("Checking the OpenClaw browser...");
-    expect(decision.traceEvents).toContainEqual({
-      event: "realtime_browser_function_call_received",
-    });
+    expect(decision.status?.detail).toBe("Browser access is unavailable in this release.");
+    expect(decision.traceEvents).toEqual([
+      {
+        event: "realtime_server_response_done",
+        fields: { responseDeltaCount: 0 },
+      },
+    ]);
   });
 
   it("ignores late assistant audio deltas after sending response cancel", () => {

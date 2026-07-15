@@ -243,10 +243,15 @@ TOML
   if [[ -n "$DEB" ]]; then
     DEB_SIZE=$(du -h "$DEB" | cut -f1)
     printf "    ${DIM}Package: %s (%s)${NC}\n" "$(basename "$DEB")" "$DEB_SIZE"
-    if sudo dpkg -i "$DEB" > /dev/null 2>&1; then
-      ok "VOCO installed"
+    EXPECTED_VERSION="$(node -p "require('${ROOT_DIR}/package.json').version")"
+    if voco_install_deb_package "$DEB" "$EXPECTED_VERSION" "amd64"; then
+      if [[ "${VOCO_INSTALL_USED_APT_FIX}" == true ]]; then
+        ok "VOCO installed (dependencies resolved)"
+      else
+        ok "VOCO installed"
+      fi
     else
-      err "dpkg install failed"
+      err "Installation failed: ${VOCO_INSTALL_ERROR}"
       exit 1
     fi
   else

@@ -6,16 +6,17 @@ compile_error!(
 mod config;
 mod insertion;
 mod owned_preedit;
+mod single_instance;
 pub mod transcribe;
 mod tray;
 
 use config::{
-    load_cached_update_check, save_cached_update_check, AppConfig, CachedUpdateCheck,
-    TranscriptEnhancement,
+    load_cached_update_check, save_cached_update_check, AppConfig, AppConfigPatch,
+    CachedUpdateCheck, TranscriptEnhancement,
 };
 use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
-use std::io::Read;
+use std::io::{Read, Write};
 use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
 use std::sync::{LazyLock, Mutex};
 use std::time::Instant;
@@ -43,7 +44,12 @@ static TRACE_START: LazyLock<Instant> = LazyLock::new(Instant::now);
 static TRACE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 static TRACE_FILE_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 static MODEL_DOWNLOAD_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
+static MODEL_VERIFIED_IDENTITY: LazyLock<Mutex<Option<CachedModelIdentity>>> =
+    LazyLock::new(|| Mutex::new(None));
+static CONFIG_WRITE_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
+static CONFIG_REVISION: AtomicU64 = AtomicU64::new(0);
 static DEBUG_CAPTURE_WRITTEN: AtomicBool = AtomicBool::new(false);
+static DEBUG_CAPTURE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 static REGISTERED_PLUGIN_SHORTCUT: LazyLock<Mutex<Option<String>>> =
     LazyLock::new(|| Mutex::new(None));
 static REGISTERED_REALTIME_PLUGIN_SHORTCUT: LazyLock<Mutex<Option<String>>> =
@@ -54,10 +60,14 @@ static EVDEV_WATCHED_PATHS: LazyLock<Mutex<std::collections::HashSet<std::path::
 
 const TOGGLE_DICTATION_EVENT: &str = "voco:toggle-dictation";
 const TOGGLE_REALTIME_EVENT: &str = "voco:toggle-realtime";
+const CONFIG_CHANGED_EVENT: &str = "voco:config-changed";
 const LEGACY_TOGGLE_DICTATION_EVENT: &str = "voice:toggle-dictation";
 const REALTIME_HOTKEY: &str = "Alt+Shift+R";
 const TOGGLE_DEBOUNCE_MS: i64 = 120;
 const MAX_AUDIO_SECONDS: usize = 600;
+const PREVIEW_SAMPLE_RATE: usize = 16_000;
+const MIN_PREVIEW_SAMPLES: usize = PREVIEW_SAMPLE_RATE * 7 / 10;
+const MAX_PREVIEW_SAMPLES: usize = PREVIEW_SAMPLE_RATE * 20;
 const HIDDEN_WINDOW_POS_X: i32 = -100;
 const HIDDEN_WINDOW_POS_Y: i32 = -100;
 const HIDDEN_WINDOW_SIZE: u32 = 1;
@@ -73,6 +83,13 @@ pub struct TrayPopoverAnchor {
     pub rect_position_y: i32,
     pub rect_width: u32,
     pub rect_height: u32,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ConfigSnapshot {
+    revision: u64,
+    config: AppConfig,
 }
 
 fn now_ms() -> i64 {
@@ -179,9 +196,6 @@ fn trace_hotkey_event_with_fields(
         }
         if let Some(auto_gain_control) = fields.auto_gain_control {
             record["auto_gain_control"] = serde_json::Value::Bool(auto_gain_control);
-        }
-        if let Some(browser_action) = fields.browser_action.as_deref() {
-            record["browser_action"] = serde_json::Value::String(browser_action.to_string());
         }
         if let Some(duration_ms) = fields.duration_ms {
             record["duration_ms"] = serde_json::Value::Number(duration_ms.into());
@@ -300,12 +314,6 @@ fn trace_frontend_hotkey_event(
         | "realtime_local_speech_commit_skipped_during_output"
         | "realtime_microphone_muted"
         | "realtime_microphone_unmuted"
-        | "realtime_browser_function_call_received"
-        | "realtime_browser_action_started"
-        | "realtime_browser_action_completed"
-        | "realtime_browser_action_failed"
-        | "realtime_browser_function_output_sent"
-        | "realtime_browser_response_create_sent"
         | "realtime_response_create_fallback_sent"
         | "realtime_no_speech_timeout"
         | "realtime_no_response_timeout"
@@ -358,6 +366,10 @@ fn is_supported_dictation_trace_event(event: &str) -> bool {
             | "dictation_owned_preedit_commit_failed"
             | "dictation_owned_preedit_final_preserved"
             | "dictation_owned_preedit_progressive_commit"
+            | "dictation_canonical_checkpoint_completed"
+            | "dictation_canonical_checkpoint_committed"
+            | "dictation_canonical_checkpoint_failed"
+            | "dictation_canonical_final_completed"
             | "dictation_first_live_text_visible"
             | "dictation_stop_to_final_transcript"
             | "dictation_stop_to_idle"
@@ -383,7 +395,6 @@ struct FrontendTraceFields {
     echo_cancellation: Option<bool>,
     noise_suppression: Option<bool>,
     auto_gain_control: Option<bool>,
-    browser_action: Option<String>,
     duration_ms: Option<u64>,
     dictation_session_id: Option<u64>,
 }
@@ -404,15 +415,6 @@ impl FrontendTraceFields {
         if let Some(channel_count) = self.track_channel_count {
             if !(1..=16).contains(&channel_count) {
                 return Err(format!("Unsupported track channel count: {channel_count}"));
-            }
-        }
-        if let Some(browser_action) = self.browser_action.as_deref() {
-            if browser_action.len() > 40
-                || !browser_action
-                    .chars()
-                    .all(|ch| ch.is_ascii_alphanumeric() || ch == '_' || ch == '-')
-            {
-                return Err(format!("Unsupported browser action: {browser_action}"));
             }
         }
         if let Some(duration_ms) = self.duration_ms {
@@ -440,10 +442,21 @@ fn has_pending_hotkey_toggle() -> bool {
 }
 
 fn hotkey_to_evdev_mode(hotkey: &str) -> u8 {
-    match hotkey {
-        "Alt+D" => 0,
-        "Alt+Shift+D" => 1,
-        _ => 255,
+    let Ok(shortcut) = hotkey.parse::<tauri_plugin_global_shortcut::Shortcut>() else {
+        return 255;
+    };
+    if "Alt+D"
+        .parse::<tauri_plugin_global_shortcut::Shortcut>()
+        .is_ok_and(|candidate| candidate == shortcut)
+    {
+        0
+    } else if "Alt+Shift+D"
+        .parse::<tauri_plugin_global_shortcut::Shortcut>()
+        .is_ok_and(|candidate| candidate == shortcut)
+    {
+        1
+    } else {
+        255
     }
 }
 
@@ -467,38 +480,190 @@ fn should_start_evdev_listener(use_evdev_hotkey: bool, listener_started: bool) -
 }
 
 fn validate_dictation_hotkey(hotkey: &str) -> Result<(), String> {
-    if hotkey == REALTIME_HOTKEY {
+    let shortcut = hotkey
+        .parse::<tauri_plugin_global_shortcut::Shortcut>()
+        .map_err(|error| format!("Invalid hotkey '{hotkey}': {error}"))?;
+    let realtime_shortcut = REALTIME_HOTKEY
+        .parse::<tauri_plugin_global_shortcut::Shortcut>()
+        .map_err(|error| format!("Invalid built-in realtime hotkey: {error}"))?;
+    if shortcut == realtime_shortcut {
         return Err(format!(
             "{REALTIME_HOTKEY} is reserved for realtime conversation"
         ));
     }
+    let required_modifiers = tauri_plugin_global_shortcut::Modifiers::ALT
+        | tauri_plugin_global_shortcut::Modifiers::CONTROL
+        | tauri_plugin_global_shortcut::Modifiers::SUPER
+        | tauri_plugin_global_shortcut::Modifiers::META;
+    if !shortcut.mods.intersects(required_modifiers) {
+        return Err(
+            "Dictation hotkey must include Alt, Control, or Super in addition to the main key"
+                .to_string(),
+        );
+    }
 
     Ok(())
 }
 
-#[tauri::command]
-fn get_config() -> Result<AppConfig, String> {
-    AppConfig::load().map_err(|e| e.to_string())
+fn validate_loaded_config(config: &AppConfig) -> Result<(), String> {
+    validate_dictation_hotkey(&config.hotkey)
 }
 
 #[tauri::command]
-fn save_config(app: tauri::AppHandle, config: AppConfig) -> Result<(), String> {
-    let previous = AppConfig::load().unwrap_or_default();
+fn get_config() -> Result<ConfigSnapshot, String> {
+    let _guard = CONFIG_WRITE_LOCK
+        .lock()
+        .map_err(|_| "VOCO configuration writer is unavailable".to_string())?;
+    let config = AppConfig::load().map_err(|error| error.to_string())?;
+    validate_loaded_config(&config)?;
+    Ok(ConfigSnapshot {
+        revision: CONFIG_REVISION.load(Ordering::SeqCst),
+        config,
+    })
+}
+
+#[tauri::command]
+fn reload_config_from_disk(app: tauri::AppHandle) -> Result<ConfigSnapshot, String> {
+    let _guard = CONFIG_WRITE_LOCK
+        .lock()
+        .map_err(|_| "VOCO configuration writer is unavailable".to_string())?;
+    let previous_hotkey = tray::current_hotkey(&app)?;
+    let config = AppConfig::load().map_err(|error| error.to_string())?;
+    validate_loaded_config(&config)?;
+    if let Err(error) = apply_hotkey_runtime_state(&app, &config.hotkey, false) {
+        let rollback = apply_hotkey_runtime_state(&app, &previous_hotkey, false);
+        return match rollback {
+            Ok(()) => Err(format!(
+                "Could not apply the repaired hotkey {}: {error}",
+                config.hotkey
+            )),
+            Err(rollback_error) => Err(format!(
+                "Could not apply the repaired hotkey {}: {error}; restoring {previous_hotkey} also failed: {rollback_error}",
+                config.hotkey
+            )),
+        };
+    }
+
+    let snapshot = ConfigSnapshot {
+        revision: CONFIG_REVISION.fetch_add(1, Ordering::SeqCst) + 1,
+        config,
+    };
+    if let Err(error) = app.emit_to("main", CONFIG_CHANGED_EVENT, snapshot.clone()) {
+        warn!("Failed to emit reloaded configuration update: {error}");
+    }
+    Ok(snapshot)
+}
+
+#[tauri::command]
+fn reset_config_to_defaults(app: tauri::AppHandle) -> Result<ConfigSnapshot, String> {
+    let _guard = CONFIG_WRITE_LOCK
+        .lock()
+        .map_err(|_| "VOCO configuration writer is unavailable".to_string())?;
+    let previous_hotkey = tray::current_hotkey(&app)?;
+    let default_hotkey = AppConfig::default().hotkey;
+    if let Err(error) = apply_hotkey_runtime_state(&app, &default_hotkey, false) {
+        let rollback = apply_hotkey_runtime_state(&app, &previous_hotkey, false);
+        return match rollback {
+            Ok(()) => Err(format!(
+                "Could not bind the default hotkey before resetting settings: {error}"
+            )),
+            Err(rollback_error) => Err(format!(
+                "Could not bind the default hotkey before resetting settings: {error}; restoring {previous_hotkey} also failed: {rollback_error}"
+            )),
+        };
+    }
+    let config = match AppConfig::reset_to_defaults() {
+        Ok(config) => config,
+        Err(error) => {
+            let rollback = apply_hotkey_runtime_state(&app, &previous_hotkey, false);
+            return match rollback {
+                Ok(()) => Err(error.to_string()),
+                Err(rollback_error) => Err(format!(
+                    "{error}; restoring the previous hotkey also failed: {rollback_error}"
+                )),
+            };
+        }
+    };
+    let snapshot = ConfigSnapshot {
+        revision: CONFIG_REVISION.fetch_add(1, Ordering::SeqCst) + 1,
+        config,
+    };
+    if let Err(error) = app.emit_to("main", CONFIG_CHANGED_EVENT, snapshot.clone()) {
+        warn!("Failed to emit recovered configuration update: {error}");
+    }
+    Ok(snapshot)
+}
+
+#[tauri::command]
+fn open_config_directory() -> Result<(), String> {
+    let directory = AppConfig::config_dir_for_recovery().map_err(|error| error.to_string())?;
+    std::process::Command::new("xdg-open")
+        .arg(&directory)
+        .spawn()
+        .map_err(|error| format!("Failed to open {}: {error}", directory.display()))?;
+    Ok(())
+}
+
+fn persist_config_patch(
+    app: &tauri::AppHandle,
+    patch: AppConfigPatch,
+    notify_hotkey_change: bool,
+) -> Result<ConfigSnapshot, String> {
+    let _guard = CONFIG_WRITE_LOCK
+        .lock()
+        .map_err(|_| "VOCO configuration writer is unavailable".to_string())?;
+    let previous = AppConfig::load().map_err(|error| error.to_string())?;
+    let mut config = previous.clone();
+    patch.apply_to(&mut config);
     let hotkey_changed = previous.hotkey != config.hotkey;
 
     if hotkey_changed {
         validate_dictation_hotkey(&config.hotkey)?;
-        apply_hotkey_runtime_state(&app, &config.hotkey, false)?;
+        if let Err(error) = apply_hotkey_runtime_state(app, &config.hotkey, false) {
+            let rollback = apply_hotkey_runtime_state(app, &previous.hotkey, false);
+            return match rollback {
+                Ok(()) => Err(error),
+                Err(rollback_error) => Err(format!(
+                    "{error}; restoring the previous hotkey also failed: {rollback_error}"
+                )),
+            };
+        }
     }
 
     if let Err(error) = config.save() {
         if hotkey_changed {
-            let _ = apply_hotkey_runtime_state(&app, &previous.hotkey, false);
+            if let Err(rollback_error) = apply_hotkey_runtime_state(app, &previous.hotkey, false) {
+                return Err(format!(
+                    "{error}; restoring the previous hotkey also failed: {rollback_error}"
+                ));
+            }
         }
         return Err(error.to_string());
     }
 
-    Ok(())
+    let snapshot = ConfigSnapshot {
+        revision: CONFIG_REVISION.fetch_add(1, Ordering::SeqCst) + 1,
+        config,
+    };
+    if let Err(error) = app.emit_to("main", CONFIG_CHANGED_EVENT, snapshot.clone()) {
+        warn!("Failed to emit authoritative configuration update: {error}");
+    }
+    if hotkey_changed && notify_hotkey_change {
+        send_notification(
+            "Hotkey changed",
+            &format!("VOCO will now respond to {}", snapshot.config.hotkey),
+        );
+    }
+
+    Ok(snapshot)
+}
+
+#[tauri::command]
+fn save_config_patch(
+    app: tauri::AppHandle,
+    patch: AppConfigPatch,
+) -> Result<ConfigSnapshot, String> {
+    persist_config_patch(&app, patch, false)
 }
 
 #[tauri::command]
@@ -558,6 +723,41 @@ fn transcribe_audio(
 }
 
 #[tauri::command(async)]
+fn transcribe_canonical_chunk(
+    app: tauri::AppHandle,
+    audio_bytes: Vec<u8>,
+    previous_canonical_text: String,
+    state: tauri::State<'_, WhisperMutex>,
+) -> Result<transcribe::CanonicalTranscription, String> {
+    let samples = decode_audio_bytes(&audio_bytes)?;
+    validate_canonical_sample_count(samples.len())?;
+
+    ensure_model_downloaded(&app)?;
+
+    let model_path = transcribe::default_model_path()?;
+    if !model_path.exists() {
+        return Err("Model is not available after download attempt.".to_string());
+    }
+
+    let mut whisper = state
+        .lock()
+        .map_err(|_| "Transcription state is unavailable".to_string())?;
+
+    whisper.load_model(&model_path)?;
+    whisper.transcribe_canonical_chunk(&samples, &previous_canonical_text)
+}
+
+fn validate_canonical_sample_count(sample_count: usize) -> Result<(), String> {
+    if sample_count == 0 {
+        return Err("No canonical chunk audio samples provided".to_string());
+    }
+    if sample_count > transcribe::CANONICAL_CHUNK_MAX_SAMPLES {
+        return Err("Canonical chunk audio too long (max 30 seconds)".to_string());
+    }
+    Ok(())
+}
+
+#[tauri::command(async)]
 fn preview_transcribe_audio(
     app: tauri::AppHandle,
     audio_bytes: Vec<u8>,
@@ -565,11 +765,8 @@ fn preview_transcribe_audio(
 ) -> Result<Option<transcribe::PreviewTranscription>, String> {
     let samples = decode_audio_bytes(&audio_bytes)?;
 
-    if samples.len() < 16000 {
+    if !validate_preview_sample_count(samples.len())? {
         return Ok(None);
-    }
-    if samples.len() > 16000 * 20 {
-        return Err("Preview audio too long (max 20 seconds)".to_string());
     }
 
     ensure_model_downloaded(&app)?;
@@ -590,6 +787,16 @@ fn preview_transcribe_audio(
     } else {
         Ok(Some(preview))
     }
+}
+
+fn validate_preview_sample_count(sample_count: usize) -> Result<bool, String> {
+    if sample_count < MIN_PREVIEW_SAMPLES {
+        return Ok(false);
+    }
+    if sample_count > MAX_PREVIEW_SAMPLES {
+        return Err("Preview audio too long (max 20 seconds)".to_string());
+    }
+    Ok(true)
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -648,31 +855,20 @@ fn write_debug_dictation_capture(
     }
 
     let directory = debug_capture_dir();
-    std::fs::create_dir_all(&directory).map_err(|error| {
-        format!(
-            "Failed to create debug capture directory {}: {error}",
-            directory.display()
-        )
-    })?;
-    secure_private_path(&directory, 0o700)?;
+    prepare_private_debug_capture_directory(&directory)?;
 
-    let capture_id = format!("dictation-{}", now_ms());
-    let audio_path = directory.join(format!("{capture_id}.wav"));
-    let timeline_path = directory.join(format!("{capture_id}.json"));
-    std::fs::write(&audio_path, encode_pcm16_wav(&samples, 16_000)).map_err(|error| {
-        format!(
-            "Failed to write debug audio capture {}: {error}",
-            audio_path.display()
-        )
-    })?;
-    std::fs::write(&timeline_path, timeline_bytes).map_err(|error| {
-        format!(
-            "Failed to write debug capture timeline {}: {error}",
-            timeline_path.display()
-        )
-    })?;
-    secure_private_path(&audio_path, 0o600)?;
-    secure_private_path(&timeline_path, 0o600)?;
+    let capture_id = format!(
+        "dictation-{}-{}-{}",
+        now_ms(),
+        std::process::id(),
+        DEBUG_CAPTURE_SEQUENCE.fetch_add(1, Ordering::SeqCst) + 1
+    );
+    let (audio_path, timeline_path) = write_private_debug_capture_pair(
+        &directory,
+        &capture_id,
+        &encode_pcm16_wav(&samples, 16_000),
+        &timeline_bytes,
+    )?;
 
     Ok(DebugDictationCaptureResult {
         audio_path: audio_path.to_string_lossy().into_owned(),
@@ -702,41 +898,198 @@ fn encode_pcm16_wav(samples: &[f32], sample_rate: u32) -> Vec<u8> {
     wav
 }
 
-fn secure_private_path(path: &std::path::Path, mode: u32) -> Result<(), String> {
+fn prepare_private_debug_capture_directory(path: &std::path::Path) -> Result<(), String> {
+    std::fs::create_dir_all(path).map_err(|error| {
+        format!(
+            "Failed to create debug capture directory {}: {error}",
+            path.display()
+        )
+    })?;
+
     #[cfg(unix)]
     {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(path, std::fs::Permissions::from_mode(mode)).map_err(|error| {
+        use std::os::unix::fs::{MetadataExt, PermissionsExt};
+
+        let metadata = std::fs::symlink_metadata(path).map_err(|error| {
             format!(
-                "Failed to secure debug capture path {}: {error}",
+                "Failed to inspect debug capture directory {}: {error}",
                 path.display()
             )
         })?;
+        if metadata.file_type().is_symlink() || !metadata.is_dir() {
+            return Err(format!(
+                "Debug capture path {} must be a real directory",
+                path.display()
+            ));
+        }
+        if metadata.uid() != unsafe { libc::geteuid() } {
+            return Err(format!(
+                "Debug capture directory {} is not owned by the current user",
+                path.display()
+            ));
+        }
+
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o700)).map_err(
+            |error| {
+                format!(
+                    "Failed to secure debug capture directory {}: {error}",
+                    path.display()
+                )
+            },
+        )?;
+        let secured = std::fs::symlink_metadata(path).map_err(|error| {
+            format!(
+                "Failed to verify debug capture directory {}: {error}",
+                path.display()
+            )
+        })?;
+        if secured.mode() & 0o777 != 0o700 || secured.uid() != unsafe { libc::geteuid() } {
+            return Err(format!(
+                "Debug capture directory {} could not be secured to mode 0700",
+                path.display()
+            ));
+        }
     }
-    #[cfg(not(unix))]
-    let _ = mode;
     Ok(())
+}
+
+fn create_private_debug_capture_file(path: &std::path::Path) -> Result<std::fs::File, String> {
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    options.open(path).map_err(|error| {
+        format!(
+            "Failed to create private debug capture file {}: {error}",
+            path.display()
+        )
+    })
+}
+
+fn verify_private_debug_capture_file(
+    file: &std::fs::File,
+    path: &std::path::Path,
+) -> Result<(), String> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        let metadata = file.metadata().map_err(|error| {
+            format!(
+                "Failed to inspect debug capture file {}: {error}",
+                path.display()
+            )
+        })?;
+        if !metadata.is_file()
+            || metadata.uid() != unsafe { libc::geteuid() }
+            || metadata.mode() & 0o777 != 0o600
+        {
+            return Err(format!(
+                "Debug capture file {} is not a user-owned 0600 regular file",
+                path.display()
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn write_private_debug_capture_pair(
+    directory: &std::path::Path,
+    capture_id: &str,
+    audio_bytes: &[u8],
+    timeline_bytes: &[u8],
+) -> Result<(std::path::PathBuf, std::path::PathBuf), String> {
+    let audio_path = directory.join(format!("{capture_id}.wav"));
+    let timeline_path = directory.join(format!("{capture_id}.json"));
+    let mut audio_file = create_private_debug_capture_file(&audio_path)?;
+    let mut timeline_file = match create_private_debug_capture_file(&timeline_path) {
+        Ok(file) => file,
+        Err(error) => {
+            let cleanup = std::fs::remove_file(&audio_path).map_err(|cleanup_error| {
+                format!(
+                    "{error}; failed to remove partial debug audio {}: {cleanup_error}",
+                    audio_path.display()
+                )
+            });
+            return cleanup.and(Err(error));
+        }
+    };
+
+    let write_result = (|| {
+        audio_file.write_all(audio_bytes).map_err(|error| {
+            format!(
+                "Failed to write debug audio capture {}: {error}",
+                audio_path.display()
+            )
+        })?;
+        timeline_file.write_all(timeline_bytes).map_err(|error| {
+            format!(
+                "Failed to write debug capture timeline {}: {error}",
+                timeline_path.display()
+            )
+        })?;
+        audio_file.sync_all().map_err(|error| {
+            format!(
+                "Failed to sync debug audio capture {}: {error}",
+                audio_path.display()
+            )
+        })?;
+        timeline_file.sync_all().map_err(|error| {
+            format!(
+                "Failed to sync debug capture timeline {}: {error}",
+                timeline_path.display()
+            )
+        })?;
+        verify_private_debug_capture_file(&audio_file, &audio_path)?;
+        verify_private_debug_capture_file(&timeline_file, &timeline_path)?;
+        if let Ok(directory_file) = std::fs::File::open(directory) {
+            directory_file.sync_all().map_err(|error| {
+                format!(
+                    "Failed to sync debug capture directory {}: {error}",
+                    directory.display()
+                )
+            })?;
+        }
+        Ok::<(), String>(())
+    })();
+
+    drop(audio_file);
+    drop(timeline_file);
+
+    if let Err(error) = write_result {
+        let mut cleanup_errors = Vec::new();
+        for path in [&audio_path, &timeline_path] {
+            if let Err(cleanup_error) = std::fs::remove_file(path) {
+                cleanup_errors.push(format!("{}: {cleanup_error}", path.display()));
+            }
+        }
+        if cleanup_errors.is_empty() {
+            return Err(error);
+        }
+        return Err(format!(
+            "{error}; failed to remove partial debug capture files: {}",
+            cleanup_errors.join(", ")
+        ));
+    }
+
+    Ok((audio_path, timeline_path))
 }
 
 // --- Text insertion & notifications ---
 
 #[tauri::command]
-fn set_dictation_status(app: tauri::AppHandle, status: String) -> Result<(), String> {
-    let status = match status.as_str() {
-        "idle" => tray::DictationStatus::Idle,
-        "recording" => tray::DictationStatus::Recording,
-        "processing" => tray::DictationStatus::Processing,
-        "error" => tray::DictationStatus::Error,
-        _ => return Err(format!("Unknown dictation status: {status}")),
-    };
-
-    tray::set_dictation_status(&app, status);
-    Ok(())
+fn begin_runtime_status_session(app: tauri::AppHandle) -> Result<u64, String> {
+    tray::begin_runtime_status_session(&app)
 }
 
 #[tauri::command]
-fn set_microphone_ready(app: tauri::AppHandle, ready: bool) -> Result<(), String> {
-    tray::update_microphone_ready(&app, ready);
+fn sync_runtime_status(
+    app: tauri::AppHandle,
+    snapshot: tray::RuntimeStatusSnapshot,
+) -> Result<(), String> {
+    tray::update_runtime_status(&app, snapshot);
     Ok(())
 }
 
@@ -1423,209 +1776,185 @@ fn ask_local_llm_agent(
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct OpenClawBrowserActionInput {
     action: String,
     url: Option<String>,
-    target_id: Option<String>,
-    element_ref: Option<String>,
-    text: Option<String>,
-    key: Option<String>,
-    submit: Option<bool>,
 }
 
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct OpenClawBrowserActionResult {
-    ok: bool,
-    action: String,
-    summary: String,
-    profile: String,
-    url: Option<String>,
-    target_id: Option<String>,
-    snapshot: Option<String>,
-    next_actions: Vec<String>,
-}
-
-fn openclaw_gateway_base_url() -> Result<String, String> {
-    if let Ok(value) = std::env::var("OPENCLAW_GATEWAY_URL") {
-        return validate_openclaw_gateway_base_url(&value);
-    }
-
-    let port = openclaw_config_value()
-        .and_then(|config| {
-            config
-                .pointer("/gateway/port")
-                .and_then(|port| port.as_u64())
-        })
-        .filter(|port| *port >= 1 && *port <= 65_535)
-        .unwrap_or(18_789);
-    Ok(format!("http://127.0.0.1:{port}"))
-}
-
-fn validate_openclaw_gateway_base_url(raw: &str) -> Result<String, String> {
-    let value = raw.trim().trim_end_matches('/').to_string();
-    if value.is_empty()
-        || value.len() > 2048
-        || value
-            .chars()
-            .any(|ch| ch.is_control() || ch == '\\' || ch.is_whitespace())
-    {
-        return Err("OPENCLAW_GATEWAY_URL is invalid".to_string());
-    }
-
-    let parsed =
-        reqwest::Url::parse(&value).map_err(|_| "OPENCLAW_GATEWAY_URL is invalid".to_string())?;
-    if !matches!(parsed.scheme(), "http" | "https")
-        || !url_has_loopback_host(&parsed)
-        || parsed.port().is_none()
-    {
-        return Err("OPENCLAW_GATEWAY_URL must point to localhost".to_string());
-    }
-    if !parsed.username().is_empty()
-        || parsed.password().is_some()
-        || parsed.fragment().is_some()
-        || parsed.query().is_some()
-    {
-        return Err(
-            "OPENCLAW_GATEWAY_URL must not include credentials, a query, or a fragment".to_string(),
-        );
-    }
-
-    Ok(value)
-}
-
-fn openclaw_config_value() -> Option<serde_json::Value> {
-    let path = dirs::home_dir()?.join(".openclaw").join("openclaw.json");
-    let contents = std::fs::read_to_string(path).ok()?;
-    serde_json::from_str(&contents).ok()
-}
-
-fn openclaw_gateway_bearer() -> Option<String> {
-    for env_name in ["OPENCLAW_GATEWAY_TOKEN", "OPENCLAW_GATEWAY_PASSWORD"] {
-        if let Ok(value) = std::env::var(env_name) {
-            let value = value.trim().to_string();
-            if !value.is_empty() {
-                return Some(value);
-            }
-        }
-    }
-
-    for relative_path in [
-        [".openclaw", ".env"].as_slice(),
-        [".openclaw", "gateway.systemd.env"].as_slice(),
-    ] {
-        let mut path = dirs::home_dir()?;
-        for part in relative_path {
-            path = path.join(part);
-        }
-        if let Ok(contents) = std::fs::read_to_string(path) {
-            for key in ["OPENCLAW_GATEWAY_TOKEN", "OPENCLAW_GATEWAY_PASSWORD"] {
-                if let Some(value) = parse_env_file_value(&contents, key) {
-                    return Some(value);
-                }
-            }
-        }
-    }
-
-    if let Some(value) = openclaw_json_file_value(
-        &dirs::home_dir()?
-            .join(".openclaw")
-            .join("node-gateway-auth.json"),
-        &["/gateway/auth/token", "/gateway/auth/password"],
-    ) {
-        return Some(value);
-    }
-
-    let config = openclaw_config_value()?;
-    for pointer in ["/gateway/auth/token", "/gateway/auth/password"] {
-        if let Some(value) = config
-            .pointer(pointer)
-            .and_then(|value| value.as_str())
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-        {
-            return Some(value.to_string());
-        }
-    }
-    None
-}
-
-fn parse_env_file_value(contents: &str, wanted_key: &str) -> Option<String> {
-    for line in contents.lines() {
-        let line = line.trim();
-        if line.is_empty() || line.starts_with('#') {
-            continue;
-        }
-        let Some((key, value)) = line.split_once('=') else {
-            continue;
-        };
-        if key.trim().trim_start_matches("export ").trim() == wanted_key {
-            let value = value
-                .trim()
-                .trim_matches('"')
-                .trim_matches('\'')
-                .to_string();
-            if !value.is_empty() {
-                return Some(value);
-            }
-        }
-    }
-    None
-}
-
-fn openclaw_json_file_value(path: &std::path::Path, pointers: &[&str]) -> Option<String> {
-    let contents = std::fs::read_to_string(path).ok()?;
-    let parsed: serde_json::Value = serde_json::from_str(&contents).ok()?;
-    for pointer in pointers {
-        if let Some(value) = parsed
-            .pointer(pointer)
-            .and_then(|value| value.as_str())
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-        {
-            return Some(value.to_string());
-        }
-    }
-    None
-}
-
-fn normalize_browser_url(raw: &str) -> Result<String, String> {
+fn normalize_public_browser_url(raw: &str) -> Result<String, String> {
     let trimmed = raw.trim();
     if trimmed.is_empty() {
         return Err("Browser URL is required".to_string());
     }
-    if trimmed.len() > 2048 || trimmed.contains(['\r', '\n', '\\']) {
+    if trimmed.len() > 2048 || trimmed.chars().any(|ch| ch.is_control() || ch == '\\') {
         return Err("Browser URL is invalid".to_string());
     }
-    if trimmed.contains("://")
-        && !(trimmed.starts_with("http://") || trimmed.starts_with("https://"))
-    {
-        return Err("Only http(s) browser URLs are supported".to_string());
-    }
 
-    let with_scheme = if trimmed.starts_with("http://")
-        || trimmed.starts_with("https://")
-        || trimmed == "about:blank"
-    {
+    let with_scheme = if has_explicit_url_scheme(trimmed) {
         trimmed.to_string()
-    } else if trimmed.contains('.') && !trimmed.contains(' ') {
-        format!("https://{trimmed}")
-    } else {
+    } else if trimmed.chars().any(char::is_whitespace) {
         format!(
             "https://www.google.com/search?q={}",
             url_query_escape(trimmed)
         )
+    } else {
+        format!("https://{trimmed}")
     };
 
-    if with_scheme == "about:blank"
-        || with_scheme.starts_with("https://")
-        || with_scheme.starts_with("http://")
-    {
-        Ok(with_scheme)
-    } else {
-        Err("Only http(s) browser URLs are supported".to_string())
+    let mut parsed =
+        reqwest::Url::parse(&with_scheme).map_err(|_| "Browser URL is invalid".to_string())?;
+    if !matches!(parsed.scheme(), "http" | "https") {
+        return Err("Only public http(s) browser URLs are supported".to_string());
     }
+    if !parsed.username().is_empty() || parsed.password().is_some() {
+        return Err("Browser URLs must not include credentials".to_string());
+    }
+
+    let raw_host = parsed
+        .host_str()
+        .ok_or_else(|| "Browser URL must include a public host".to_string())?;
+    let host = raw_host
+        .strip_prefix('[')
+        .and_then(|host| host.strip_suffix(']'))
+        .unwrap_or(raw_host)
+        .trim_end_matches('.')
+        .to_ascii_lowercase();
+    if host.is_empty() {
+        return Err("Browser URL must include a public host".to_string());
+    }
+
+    if let Ok(address) = host.parse::<std::net::IpAddr>() {
+        if let std::net::IpAddr::V4(address) = address {
+            let input_host = raw_url_authority_host(&with_scheme)
+                .ok_or_else(|| "Browser URL host is invalid".to_string())?;
+            if input_host != address.to_string() {
+                return Err("Browser URL must use canonical IPv4 notation".to_string());
+            }
+        }
+        if !is_public_browser_ip(address) {
+            return Err("Browser URL must not target a private or special-use address".to_string());
+        }
+    } else {
+        validate_public_browser_hostname(&host)?;
+    }
+
+    // Drop a trailing DNS root dot so the validated host and serialized destination are identical.
+    parsed
+        .set_host(Some(&host))
+        .map_err(|_| "Browser URL host is invalid".to_string())?;
+    Ok(parsed.to_string())
+}
+
+fn raw_url_authority_host(value: &str) -> Option<&str> {
+    let (_, remainder) = value.split_once("://")?;
+    let authority = remainder.split(['/', '?', '#']).next()?;
+    let host_and_port = authority
+        .rsplit_once('@')
+        .map_or(authority, |(_, host)| host);
+    if let Some(bracketed) = host_and_port.strip_prefix('[') {
+        return bracketed.split_once(']').map(|(host, _)| host);
+    }
+    if let Some((host, port)) = host_and_port.rsplit_once(':') {
+        if !host.contains(':') && port.bytes().all(|byte| byte.is_ascii_digit()) {
+            return Some(host);
+        }
+    }
+    Some(host_and_port)
+}
+
+fn has_explicit_url_scheme(value: &str) -> bool {
+    let Some((scheme, _)) = value.split_once("://") else {
+        return false;
+    };
+    !scheme.is_empty()
+        && scheme.chars().enumerate().all(|(index, ch)| {
+            ch.is_ascii_alphabetic() || (index > 0 && matches!(ch, '0'..='9' | '+' | '-' | '.'))
+        })
+}
+
+fn validate_public_browser_hostname(host: &str) -> Result<(), String> {
+    if host.len() > 253 || !host.contains('.') {
+        return Err("Browser URL must use a public DNS name".to_string());
+    }
+
+    for label in host.split('.') {
+        if label.is_empty()
+            || label.len() > 63
+            || label.starts_with('-')
+            || label.ends_with('-')
+            || !label
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
+        {
+            return Err("Browser URL host is invalid".to_string());
+        }
+    }
+
+    const PRIVATE_OR_SPECIAL_SUFFIXES: &[&str] = &[
+        "localhost",
+        "local",
+        "localdomain",
+        "internal",
+        "intranet",
+        "lan",
+        "home",
+        "home.arpa",
+        "corp",
+        "private",
+        "onion",
+        "alt",
+        "test",
+        "invalid",
+        "example",
+    ];
+    if PRIVATE_OR_SPECIAL_SUFFIXES
+        .iter()
+        .any(|suffix| host == *suffix || host.ends_with(&format!(".{suffix}")))
+        || host.ends_with(".arpa")
+    {
+        return Err("Browser URL must not use a private or special-use hostname".to_string());
+    }
+
+    Ok(())
+}
+
+fn is_public_browser_ip(address: std::net::IpAddr) -> bool {
+    match address {
+        std::net::IpAddr::V4(address) => is_public_browser_ipv4(address),
+        std::net::IpAddr::V6(address) => {
+            if address.to_ipv4().is_some() {
+                return false;
+            }
+
+            let segments = address.segments();
+            let is_global_unicast = segments[0] & 0xe000 == 0x2000;
+            let is_ietf_special = segments[0] == 0x2001 && segments[1] <= 0x01ff;
+            let is_documentation = (segments[0] == 0x2001 && segments[1] == 0x0db8)
+                || (segments[0] == 0x3fff && segments[1] & 0xf000 == 0);
+            let is_six_to_four = segments[0] == 0x2002;
+
+            is_global_unicast && !is_ietf_special && !is_documentation && !is_six_to_four
+        }
+    }
+}
+
+fn is_public_browser_ipv4(address: std::net::Ipv4Addr) -> bool {
+    let [first, second, third, _] = address.octets();
+    !(first == 0
+        || first == 10
+        || first == 127
+        || first >= 224
+        || (first == 100 && (64..=127).contains(&second))
+        || (first == 169 && second == 254)
+        || (first == 172 && (16..=31).contains(&second))
+        || (first == 192 && second == 0 && third == 0)
+        || (first == 192 && second == 0 && third == 2)
+        || (first == 192 && second == 88 && third == 99)
+        || (first == 192 && second == 168)
+        || (first == 198 && matches!(second, 18 | 19))
+        || (first == 198 && second == 51 && third == 100)
+        || (first == 203 && second == 0 && third == 113))
 }
 
 fn url_query_escape(value: &str) -> String {
@@ -1641,283 +1970,18 @@ fn url_query_escape(value: &str) -> String {
         .collect()
 }
 
-fn validate_browser_ref(raw: Option<&str>) -> Result<String, String> {
-    let value = raw.unwrap_or("").trim();
-    if value.is_empty() {
-        return Err("Browser element ref is required".to_string());
-    }
-    if value.len() > 80
-        || !value
-            .chars()
-            .all(|ch| ch.is_ascii_alphanumeric() || ch == '-' || ch == '_')
-    {
-        return Err("Browser element ref is invalid".to_string());
-    }
-    Ok(value.to_string())
-}
-
-fn validate_optional_target_id(raw: Option<&str>) -> Result<Option<String>, String> {
-    let Some(value) = raw.map(str::trim).filter(|value| !value.is_empty()) else {
-        return Ok(None);
-    };
-    if value.len() > 160
-        || value
-            .chars()
-            .any(|ch| ch.is_control() || ch == '\r' || ch == '\n')
-    {
-        return Err("Browser target id is invalid".to_string());
-    }
-    Ok(Some(value.to_string()))
-}
-
-fn call_openclaw_browser_tool(
-    action: &str,
-    args: serde_json::Value,
-) -> Result<serde_json::Value, String> {
-    let base_url = openclaw_gateway_base_url()?;
-    let mut request = build_loopback_http_client(
-        std::time::Duration::from_secs(20),
-        std::time::Duration::from_millis(900),
-    )
-    .map_err(|error| format!("Failed to build OpenClaw Gateway client: {error}"))?
-    .post(format!("{base_url}/tools/invoke"))
-    .header("Content-Type", "application/json");
-
-    if let Some(token) = openclaw_gateway_bearer() {
-        request = request.bearer_auth(token);
-    }
-
-    let body = serde_json::json!({
-        "tool": "browser",
-        "action": action,
-        "args": args,
-        "sessionKey": "main"
-    });
-    let response = request
-        .body(body.to_string())
-        .send()
-        .map_err(|error| format!("Failed to call OpenClaw Gateway: {error}"))?;
-    let status = response.status();
-    let body = read_bounded_response_body(
-        response,
-        MAX_MODEL_RESPONSE_BYTES,
-        "OpenClaw Gateway response",
-    )?;
-    if !status.is_success() {
-        return Err(format!(
-            "OpenClaw Gateway browser call failed ({status}): {}",
-            clip_command_output(&body, 600)
-        ));
-    }
-
-    let parsed: serde_json::Value = serde_json::from_str(&body)
-        .map_err(|error| format!("Failed to parse OpenClaw Gateway response: {error}"))?;
-    if parsed.get("ok").and_then(|ok| ok.as_bool()) == Some(false) {
-        let message = parsed
-            .pointer("/error/message")
-            .and_then(|message| message.as_str())
-            .unwrap_or("OpenClaw Gateway returned an error");
-        return Err(message.to_string());
-    }
-    Ok(parsed.get("result").cloned().unwrap_or(parsed))
-}
-
-fn browser_result_url(value: &serde_json::Value) -> Option<String> {
-    value
-        .get("url")
-        .or_else(|| value.pointer("/details/url"))
-        .and_then(|url| url.as_str())
-        .map(|url| url.to_string())
-}
-
-fn browser_result_target_id(value: &serde_json::Value) -> Option<String> {
-    value
-        .get("targetId")
-        .or_else(|| value.pointer("/details/targetId"))
-        .and_then(|id| id.as_str())
-        .map(|id| id.to_string())
-}
-
-fn browser_result_snapshot(value: &serde_json::Value) -> Option<String> {
-    value
-        .get("content")
-        .and_then(|content| content.as_array())
-        .and_then(|content| content.first())
-        .and_then(|item| item.get("text"))
-        .and_then(|text| text.as_str())
-        .or_else(|| value.get("snapshot").and_then(|snapshot| snapshot.as_str()))
-        .map(|snapshot| clip_command_output(snapshot, 6_000))
-}
-
-fn browser_snapshot(target_id: Option<&str>) -> Result<serde_json::Value, String> {
-    let mut args = serde_json::json!({
-        "action": "snapshot",
-        "profile": "openclaw",
-        "snapshotFormat": "ai",
-        "mode": "efficient",
-        "interactive": true,
-        "refs": "role",
-        "maxChars": 6000
-    });
-    if let Some(target_id) = target_id {
-        args["targetId"] = serde_json::Value::String(target_id.to_string());
-    }
-    call_openclaw_browser_tool("snapshot", args)
-}
-
-fn summarize_browser_action(action: &str, url: Option<&str>, snapshot: Option<&str>) -> String {
-    if action == "list_tabs" {
-        return "OpenClaw browser tabs are available for review.".to_string();
-    }
-
-    let page = url.unwrap_or("the current page");
-    if snapshot.is_some() {
-        format!("OpenClaw browser is on {page}. I captured the visible page structure and refs for the next action.")
-    } else {
-        format!("OpenClaw browser action completed on {page}.")
-    }
-    .replace("  ", " ")
-}
-
 #[tauri::command(async)]
-fn invoke_openclaw_browser_action(
-    request: OpenClawBrowserActionInput,
-) -> Result<OpenClawBrowserActionResult, String> {
-    let profile = "openclaw".to_string();
-    let target_id = validate_optional_target_id(request.target_id.as_deref())?;
+fn invoke_openclaw_browser_action(request: OpenClawBrowserActionInput) -> Result<(), String> {
     let action = request.action.as_str();
-    let mut url = None;
-    let mut result = match action {
+    match action {
         "open_url" | "navigate" => {
-            let target_url = normalize_browser_url(request.url.as_deref().unwrap_or(""))?;
-            let mut args = serde_json::json!({
-                "action": if action == "open_url" { "open" } else { "navigate" },
-                "profile": profile,
-                "targetUrl": target_url,
-            });
-            if let Some(target_id) = target_id.as_deref() {
-                args["targetId"] = serde_json::Value::String(target_id.to_string());
-            }
-            let tool_action = if action == "open_url" {
-                "open"
-            } else {
-                "navigate"
-            };
-            let result = call_openclaw_browser_tool(tool_action, args)?;
-            url = browser_result_url(&result).or(Some(target_url));
-            result
-        }
-        "inspect_page" => {
-            let result = browser_snapshot(target_id.as_deref())?;
-            url = browser_result_url(&result);
-            result
-        }
-        "list_tabs" => call_openclaw_browser_tool(
-            "tabs",
-            serde_json::json!({
-                "action": "tabs",
-                "profile": profile
-            }),
-        )?,
-        "click_ref" => {
-            let element_ref = validate_browser_ref(request.element_ref.as_deref())?;
-            let mut act_request = serde_json::json!({
-                "kind": "click",
-                "ref": element_ref,
-            });
-            if let Some(target_id) = target_id.as_deref() {
-                act_request["targetId"] = serde_json::Value::String(target_id.to_string());
-            }
-            call_openclaw_browser_tool(
-                "act",
-                serde_json::json!({
-                    "action": "act",
-                    "profile": profile,
-                    "request": act_request
-                }),
-            )?
-        }
-        "type_ref" => {
-            let element_ref = validate_browser_ref(request.element_ref.as_deref())?;
-            let text = request.text.unwrap_or_default();
-            if text.trim().is_empty() || text.len() > 1_000 {
-                return Err(
-                    "Text to type is required and must be 1000 characters or fewer".to_string(),
-                );
-            }
-            let mut act_request = serde_json::json!({
-                "kind": "type",
-                "ref": element_ref,
-                "text": text,
-                "submit": request.submit.unwrap_or(false),
-            });
-            if let Some(target_id) = target_id.as_deref() {
-                act_request["targetId"] = serde_json::Value::String(target_id.to_string());
-            }
-            call_openclaw_browser_tool(
-                "act",
-                serde_json::json!({
-                    "action": "act",
-                    "profile": profile,
-                    "request": act_request
-                }),
-            )?
-        }
-        "press_key" => {
-            let key = request.key.unwrap_or_default();
-            if key.trim().is_empty() || key.len() > 80 || key.chars().any(|ch| ch.is_control()) {
-                return Err("Browser key is invalid".to_string());
-            }
-            let mut act_request = serde_json::json!({
-                "kind": "press",
-                "key": key,
-            });
-            if let Some(target_id) = target_id.as_deref() {
-                act_request["targetId"] = serde_json::Value::String(target_id.to_string());
-            }
-            call_openclaw_browser_tool(
-                "act",
-                serde_json::json!({
-                    "action": "act",
-                    "profile": profile,
-                    "request": act_request
-                }),
-            )?
+            normalize_public_browser_url(request.url.as_deref().unwrap_or(""))?;
         }
         _ => return Err(format!("Unsupported OpenClaw browser action: {action}")),
-    };
-
-    if matches!(
-        action,
-        "open_url" | "navigate" | "click_ref" | "type_ref" | "press_key"
-    ) {
-        let snapshot_target_id = browser_result_target_id(&result).or(target_id);
-        if let Ok(snapshot) = browser_snapshot(snapshot_target_id.as_deref()) {
-            result = snapshot;
-        }
     }
 
-    let target_id = browser_result_target_id(&result);
-    if url.is_none() {
-        url = browser_result_url(&result);
-    }
-    let snapshot = browser_result_snapshot(&result);
-    let summary = summarize_browser_action(action, url.as_deref(), snapshot.as_deref());
-
-    Ok(OpenClawBrowserActionResult {
-        ok: true,
-        action: action.to_string(),
-        summary,
-        profile,
-        url,
-        target_id,
-        snapshot,
-        next_actions: vec![
-            "Ask me to inspect the page.".to_string(),
-            "Ask me to click a visible ref.".to_string(),
-            "Ask me to open another page.".to_string(),
-        ],
-    })
+    Err("Realtime browser control is disabled: VOCO cannot yet enforce public-only DNS resolution and redirects in OpenClaw"
+        .to_string())
 }
 
 fn load_realtime_api_key() -> Result<String, String> {
@@ -1932,14 +1996,69 @@ fn load_realtime_api_key() -> Result<String, String> {
         .ok_or_else(|| "Cannot find home directory".to_string())?
         .join(".openclaw")
         .join("realtime.env");
-    let contents = std::fs::read_to_string(&path)
-        .map_err(|error| format!("Failed to read {}: {error}", path.display()))?;
+    let contents = read_private_realtime_env_file(&path)?;
 
     if let Some(value) = parse_realtime_api_key_from_env_file(&contents) {
         return Ok(value);
     }
 
     Err(format!("OPENAI_API_KEY is missing from {}", path.display()))
+}
+
+fn read_private_realtime_env_file(path: &std::path::Path) -> Result<String, String> {
+    const MAX_REALTIME_ENV_BYTES: u64 = 64 * 1024;
+
+    let mut options = std::fs::OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options
+            .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC | libc::O_NONBLOCK | libc::O_NOCTTY);
+    }
+    let file = options.open(path).map_err(|error| {
+        format!(
+            "Failed to open private key file {}: {error}",
+            path.display()
+        )
+    })?;
+    let metadata = file
+        .metadata()
+        .map_err(|error| format!("Failed to inspect key file {}: {error}", path.display()))?;
+    if !metadata.is_file() {
+        return Err(format!(
+            "Realtime key path {} must be a regular file",
+            path.display()
+        ));
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        if metadata.uid() != unsafe { libc::geteuid() } {
+            return Err(format!(
+                "Realtime key file {} is not owned by the current user",
+                path.display()
+            ));
+        }
+        if metadata.mode() & 0o077 != 0 {
+            return Err(format!(
+                "Realtime key file {} is accessible to other users; run chmod 600 on it",
+                path.display()
+            ));
+        }
+    }
+    if metadata.len() > MAX_REALTIME_ENV_BYTES {
+        return Err(format!("Realtime key file {} is too large", path.display()));
+    }
+
+    let mut contents = String::new();
+    file.take(MAX_REALTIME_ENV_BYTES + 1)
+        .read_to_string(&mut contents)
+        .map_err(|error| format!("Failed to read key file {}: {error}", path.display()))?;
+    if contents.len() as u64 > MAX_REALTIME_ENV_BYTES {
+        return Err(format!("Realtime key file {} is too large", path.display()));
+    }
+    Ok(contents)
 }
 
 fn parse_realtime_api_key_from_env_file(contents: &str) -> Option<String> {
@@ -1971,61 +2090,10 @@ fn realtime_session_config() -> serde_json::Value {
         "type": "realtime",
         "model": "gpt-realtime-2",
         "output_modalities": ["audio"],
-        "instructions": "You are Sergio's concise realtime OpenClaw voice companion. Answer in 1-2 short sentences. No preamble, no markdown, no waffle. If the user asks to open, navigate, inspect, or control a web page, use the openclaw_browser tool. After each browser tool result, say what page is open, the most important thing visible, and one direct next action Sergio can ask for. Do not click submit, buy, delete, log in, or send messages unless Sergio explicitly confirms that exact action.",
+        "instructions": "You are the user's concise realtime voice companion. Answer in 1-2 short sentences. No preamble, no markdown, no waffle. Browser access and browser control are unavailable in this release. If the user asks you to browse, say briefly that you cannot access web pages and continue without claiming you opened, inspected, or changed anything.",
         "reasoning": {
             "effort": "low"
         },
-        "tools": [
-            {
-                "type": "function",
-                "name": "openclaw_browser",
-                "description": "Control OpenClaw's isolated browser profile for voice-driven browsing. Use open_url or navigate for public pages, inspect_page to summarize the current page and available refs, list_tabs to orient the user, click_ref only after Sergio explicitly asks to click a visible ref, type_ref only after Sergio explicitly asks to type into a visible ref, and press_key only for simple navigation keys. Never perform purchases, destructive actions, credential entry, form submission, messaging, or account changes without exact user confirmation.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "action": {
-                            "type": "string",
-                            "enum": [
-                                "open_url",
-                                "navigate",
-                                "inspect_page",
-                                "list_tabs",
-                                "click_ref",
-                                "type_ref",
-                                "press_key"
-                            ]
-                        },
-                        "url": {
-                            "type": "string",
-                            "description": "Absolute http(s) URL, or a host/query that VOCO can normalize for open_url and navigate."
-                        },
-                        "targetId": {
-                            "type": "string",
-                            "description": "Browser tab targetId from a previous result, when continuing in the same tab."
-                        },
-                        "elementRef": {
-                            "type": "string",
-                            "description": "Visible element ref from inspect_page/snapshot, such as e12 or 12."
-                        },
-                        "text": {
-                            "type": "string",
-                            "description": "Text to type for type_ref."
-                        },
-                        "key": {
-                            "type": "string",
-                            "description": "Keyboard key for press_key, such as Enter, Escape, Tab, ArrowDown."
-                        },
-                        "submit": {
-                            "type": "boolean",
-                            "description": "Whether type_ref should submit. Only use after exact user confirmation."
-                        }
-                    },
-                    "required": ["action"],
-                    "additionalProperties": false
-                }
-            }
-        ],
-        "tool_choice": "auto",
         "audio": {
             "input": {
                 "format": {
@@ -2094,7 +2162,6 @@ fn create_realtime_client_secret() -> Result<RealtimeClientSecretResult, String>
         .post("https://api.openai.com/v1/realtime/client_secrets")
         .bearer_auth(api_key)
         .header("Content-Type", "application/json")
-        .header("OpenAI-Safety-Identifier", "sergio-local-voco")
         .body(body.to_string())
         .send()
         .map_err(|error| format!("Failed to create Realtime session secret: {error}"))?;
@@ -2166,6 +2233,26 @@ fn commit_owned_preedit(
     text: String,
 ) -> Result<owned_preedit::OwnedPreeditStatus, String> {
     state.commit(session_id, text)
+}
+
+#[tauri::command(async)]
+fn checkpoint_owned_preedit(
+    state: tauri::State<'_, owned_preedit::OwnedPreeditService>,
+    session_id: u64,
+    expected_committed_text: String,
+    append_text: String,
+) -> Result<owned_preedit::OwnedPreeditStatus, String> {
+    state.checkpoint(session_id, expected_committed_text, append_text)
+}
+
+#[tauri::command(async)]
+fn finish_canonical_owned_preedit(
+    state: tauri::State<'_, owned_preedit::OwnedPreeditService>,
+    session_id: u64,
+    expected_committed_text: String,
+    append_text: String,
+) -> Result<owned_preedit::OwnedPreeditStatus, String> {
+    state.finish_canonical(session_id, expected_committed_text, append_text)
 }
 
 #[tauri::command(async)]
@@ -2339,6 +2426,336 @@ const MODEL_URL: &str =
 const MODEL_SHA256: &str = "a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002";
 const MODEL_MAX_BYTES: u64 = 200 * 1024 * 1024;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct CachedModelIdentity {
+    length: u64,
+    #[cfg(target_os = "linux")]
+    device: u64,
+    #[cfg(target_os = "linux")]
+    inode: u64,
+    #[cfg(target_os = "linux")]
+    owner: u32,
+    #[cfg(target_os = "linux")]
+    modified_seconds: i64,
+    #[cfg(target_os = "linux")]
+    modified_nanoseconds: i64,
+    #[cfg(target_os = "linux")]
+    status_changed_seconds: i64,
+    #[cfg(target_os = "linux")]
+    status_changed_nanoseconds: i64,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum CachedModelVerification {
+    Missing,
+    Ready {
+        identity: CachedModelIdentity,
+    },
+    OwnedCorrupt {
+        reason: String,
+        identity: CachedModelIdentity,
+    },
+}
+
+fn cached_model_identity(metadata: &std::fs::Metadata) -> CachedModelIdentity {
+    #[cfg(target_os = "linux")]
+    use std::os::unix::fs::MetadataExt;
+
+    CachedModelIdentity {
+        length: metadata.len(),
+        #[cfg(target_os = "linux")]
+        device: metadata.dev(),
+        #[cfg(target_os = "linux")]
+        inode: metadata.ino(),
+        #[cfg(target_os = "linux")]
+        owner: metadata.uid(),
+        #[cfg(target_os = "linux")]
+        modified_seconds: metadata.mtime(),
+        #[cfg(target_os = "linux")]
+        modified_nanoseconds: metadata.mtime_nsec(),
+        #[cfg(target_os = "linux")]
+        status_changed_seconds: metadata.ctime(),
+        #[cfg(target_os = "linux")]
+        status_changed_nanoseconds: metadata.ctime_nsec(),
+    }
+}
+
+fn cached_model_path_matches_identity(
+    path: &std::path::Path,
+    expected_identity: CachedModelIdentity,
+) -> Result<bool, String> {
+    let metadata = match std::fs::symlink_metadata(path) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+        Err(error) => {
+            return Err(format!(
+                "Failed to re-inspect verified cached model {}: {error}",
+                path.display()
+            ));
+        }
+    };
+    Ok(!metadata.file_type().is_symlink()
+        && metadata.is_file()
+        && cached_model_is_owned_by_current_user(&metadata)
+        && cached_model_identity(&metadata) == expected_identity)
+}
+
+fn replace_verified_model_identity(identity: Option<CachedModelIdentity>) -> Result<(), String> {
+    *MODEL_VERIFIED_IDENTITY
+        .lock()
+        .map_err(|_| "Verified model identity lock is poisoned".to_string())? = identity;
+    Ok(())
+}
+
+fn cached_model_is_owned_by_current_user(metadata: &std::fs::Metadata) -> bool {
+    #[cfg(target_os = "linux")]
+    {
+        use std::os::unix::fs::MetadataExt;
+        metadata.uid() == current_effective_uid()
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = metadata;
+        true
+    }
+}
+
+fn owned_corrupt_cached_model(
+    path: &std::path::Path,
+    metadata: &std::fs::Metadata,
+    reason: String,
+) -> Result<CachedModelVerification, String> {
+    if !cached_model_is_owned_by_current_user(metadata) {
+        return Err(format!(
+            "Cached model {} is corrupt but is not owned by the current user; it was preserved. Remove or replace it manually.",
+            path.display()
+        ));
+    }
+
+    Ok(CachedModelVerification::OwnedCorrupt {
+        reason,
+        identity: cached_model_identity(metadata),
+    })
+}
+
+fn validate_model_cache_directory(model_path: &std::path::Path) -> Result<(), String> {
+    let directory = model_path.parent().ok_or_else(|| {
+        format!(
+            "Model path {} has no parent directory",
+            model_path.display()
+        )
+    })?;
+    let metadata = std::fs::symlink_metadata(directory).map_err(|error| {
+        format!(
+            "Failed to inspect model directory {}: {error}",
+            directory.display()
+        )
+    })?;
+    if metadata.file_type().is_symlink() || !metadata.is_dir() {
+        return Err(format!(
+            "Model directory {} must be a real directory; refusing to follow or replace it",
+            directory.display()
+        ));
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        use std::os::unix::fs::MetadataExt;
+
+        if metadata.uid() != current_effective_uid() {
+            return Err(format!(
+                "Model directory {} is not owned by the current user",
+                directory.display()
+            ));
+        }
+        if metadata.mode() & 0o022 != 0 {
+            return Err(format!(
+                "Model directory {} is writable by another user; secure it before VOCO uses cached models",
+                directory.display()
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+fn verify_existing_model_file(
+    path: &std::path::Path,
+    expected_sha256: &str,
+    max_bytes: u64,
+) -> Result<CachedModelVerification, String> {
+    if expected_sha256.len() != 64 || !expected_sha256.as_bytes().iter().all(u8::is_ascii_hexdigit)
+    {
+        return Err("Pinned model SHA-256 is invalid".to_string());
+    }
+
+    let initial_metadata = match std::fs::symlink_metadata(path) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return Ok(CachedModelVerification::Missing);
+        }
+        Err(error) => {
+            return Err(format!(
+                "Failed to inspect cached model {}: {error}",
+                path.display()
+            ));
+        }
+    };
+
+    if initial_metadata.file_type().is_symlink() || !initial_metadata.is_file() {
+        return Err(format!(
+            "Cached model {} must be a regular file; refusing to follow or replace it",
+            path.display()
+        ));
+    }
+
+    if initial_metadata.len() > max_bytes {
+        return owned_corrupt_cached_model(
+            path,
+            &initial_metadata,
+            format!(
+                "cached model is too large ({} bytes, max {} bytes)",
+                initial_metadata.len(),
+                max_bytes
+            ),
+        );
+    }
+
+    let initial_identity = cached_model_identity(&initial_metadata);
+    let mut options = std::fs::OpenOptions::new();
+    options.read(true);
+    #[cfg(target_os = "linux")]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options
+            .custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW | libc::O_NONBLOCK | libc::O_NOCTTY);
+    }
+    let mut file = options
+        .open(path)
+        .map_err(|error| format!("Failed to open cached model {}: {error}", path.display()))?;
+    let opened_metadata = file.metadata().map_err(|error| {
+        format!(
+            "Failed to inspect opened cached model {}: {error}",
+            path.display()
+        )
+    })?;
+    if !opened_metadata.is_file() || cached_model_identity(&opened_metadata) != initial_identity {
+        return Err(format!(
+            "Cached model {} changed while it was being opened; it was preserved",
+            path.display()
+        ));
+    }
+
+    use sha2::{Digest, Sha256};
+    let mut hasher = Sha256::new();
+    let mut read_bytes = 0u64;
+    let mut buffer = [0u8; 64 * 1024];
+    loop {
+        let count = file
+            .read(&mut buffer)
+            .map_err(|error| format!("Failed to read cached model {}: {error}", path.display()))?;
+        if count == 0 {
+            break;
+        }
+        read_bytes = read_bytes.saturating_add(count as u64);
+        if read_bytes > max_bytes {
+            return owned_corrupt_cached_model(
+                path,
+                &opened_metadata,
+                format!("cached model grew beyond the {max_bytes}-byte size limit"),
+            );
+        }
+        hasher.update(&buffer[..count]);
+    }
+
+    let final_metadata = file.metadata().map_err(|error| {
+        format!(
+            "Failed to re-inspect cached model {}: {error}",
+            path.display()
+        )
+    })?;
+    if cached_model_identity(&final_metadata) != initial_identity
+        || read_bytes != initial_metadata.len()
+    {
+        return Err(format!(
+            "Cached model {} changed while its integrity was being verified; it was preserved",
+            path.display()
+        ));
+    }
+
+    let actual_sha256 = format!("{:x}", hasher.finalize());
+    if !actual_sha256.eq_ignore_ascii_case(expected_sha256) {
+        return owned_corrupt_cached_model(
+            path,
+            &opened_metadata,
+            format!(
+                "SHA-256 mismatch (expected {}, got {})",
+                &expected_sha256[..16],
+                &actual_sha256[..16]
+            ),
+        );
+    }
+
+    Ok(CachedModelVerification::Ready {
+        identity: initial_identity,
+    })
+}
+
+fn remove_owned_corrupt_cached_model(
+    path: &std::path::Path,
+    expected_identity: CachedModelIdentity,
+) -> Result<(), String> {
+    validate_model_cache_directory(path)?;
+    let metadata = std::fs::symlink_metadata(path).map_err(|error| {
+        format!(
+            "Failed to re-inspect corrupt cached model {}: {error}",
+            path.display()
+        )
+    })?;
+    if metadata.file_type().is_symlink()
+        || !metadata.is_file()
+        || !cached_model_is_owned_by_current_user(&metadata)
+        || cached_model_identity(&metadata) != expected_identity
+    {
+        return Err(format!(
+            "Cached model {} changed after verification; it was preserved",
+            path.display()
+        ));
+    }
+
+    std::fs::remove_file(path).map_err(|error| {
+        format!(
+            "Failed to remove corrupt cached model {}: {error}",
+            path.display()
+        )
+    })
+}
+
+fn remove_stale_model_temp_file(path: &std::path::Path) -> Result<(), String> {
+    let metadata = match std::fs::symlink_metadata(path) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => {
+            return Err(format!(
+                "Failed to inspect temporary model {}: {error}",
+                path.display()
+            ));
+        }
+    };
+    if metadata.file_type().is_symlink()
+        || !metadata.is_file()
+        || !cached_model_is_owned_by_current_user(&metadata)
+    {
+        return Err(format!(
+            "Temporary model path {} is not a user-owned regular file; refusing to replace it",
+            path.display()
+        ));
+    }
+    std::fs::remove_file(path)
+        .map_err(|error| format!("Failed to remove stale temporary model: {error}"))
+}
+
 fn is_allowed_external_url(url: &str) -> bool {
     url.strip_prefix("https://github.com/sergiopesch/voco/releases/tag/")
         .is_some_and(|tag| !tag.is_empty() && !tag.contains(['\r', '\n', '\\']))
@@ -2358,23 +2775,54 @@ fn validate_model_content_length(content_length: Option<u64>) -> Result<(), Stri
 }
 
 fn ensure_model_downloaded(app_handle: &tauri::AppHandle) -> Result<(), String> {
+    let result = ensure_model_downloaded_inner(app_handle);
+    if result.is_err() {
+        if let Ok(mut identity) = MODEL_VERIFIED_IDENTITY.lock() {
+            *identity = None;
+        }
+        tray::update_model_download_status(app_handle, tray::ModelDownloadStatus::Failed);
+    }
+    result
+}
+
+fn ensure_model_downloaded_inner(app_handle: &tauri::AppHandle) -> Result<(), String> {
     let _download_guard = MODEL_DOWNLOAD_LOCK
         .lock()
         .map_err(|_| "Model download state lock is poisoned".to_string())?;
 
     let path = transcribe::default_model_path()?;
-    if path.exists() {
-        return Ok(());
+    validate_model_cache_directory(&path)?;
+    let verified_identity = *MODEL_VERIFIED_IDENTITY
+        .lock()
+        .map_err(|_| "Verified model identity lock is poisoned".to_string())?;
+    if let Some(identity) = verified_identity {
+        if cached_model_path_matches_identity(&path, identity)? {
+            return Ok(());
+        }
+        replace_verified_model_identity(None)?;
+        info!("Previously verified speech model changed or was removed; checking the cache again");
+    }
+
+    match verify_existing_model_file(&path, MODEL_SHA256, MODEL_MAX_BYTES)? {
+        CachedModelVerification::Ready { identity } => {
+            replace_verified_model_identity(Some(identity))?;
+            tray::update_model_download_status(app_handle, tray::ModelDownloadStatus::Ready);
+            info!("Cached speech model verified: {}", path.display());
+            return Ok(());
+        }
+        CachedModelVerification::OwnedCorrupt { reason, identity } => {
+            warn!(
+                "Cached speech model failed integrity verification ({reason}); removing the user-owned cache entry and downloading a verified copy"
+            );
+            remove_owned_corrupt_cached_model(&path, identity)?;
+        }
+        CachedModelVerification::Missing => {}
     }
 
     let tmp_path = path.with_extension("bin.tmp");
-    let _ = std::fs::remove_file(&tmp_path);
+    remove_stale_model_temp_file(&tmp_path)?;
 
-    let set_tray_tooltip = |msg: &str| {
-        tray::update_tray_tooltip(app_handle, msg);
-    };
-
-    set_tray_tooltip("VOCO — Downloading model...");
+    tray::update_model_download_status(app_handle, tray::ModelDownloadStatus::Downloading(None));
     info!("Downloading speech model (one-time, ~142 MB)...");
 
     let client = reqwest::blocking::Client::builder()
@@ -2389,7 +2837,6 @@ fn ensure_model_downloaded(app_handle: &tauri::AppHandle) -> Result<(), String> 
         .map_err(|e| format!("Download failed: {e}"))?;
 
     if !response.status().is_success() {
-        set_tray_tooltip("VOCO — Download failed");
         return Err(format!(
             "Download failed with status: {}",
             response.status()
@@ -2402,9 +2849,14 @@ fn ensure_model_downloaded(app_handle: &tauri::AppHandle) -> Result<(), String> 
     use sha2::{Digest, Sha256};
     use std::io::{Read, Write};
     let mut reader = response;
-    let mut file = std::fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
+    let mut temp_options = std::fs::OpenOptions::new();
+    temp_options.write(true).create_new(true);
+    #[cfg(target_os = "linux")]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        temp_options.mode(0o600).custom_flags(libc::O_CLOEXEC);
+    }
+    let mut file = temp_options
         .open(&tmp_path)
         .map_err(|e| format!("Failed to save model (tmp): {e}"))?;
     let mut hasher = Sha256::new();
@@ -2422,7 +2874,6 @@ fn ensure_model_downloaded(app_handle: &tauri::AppHandle) -> Result<(), String> 
         downloaded += n as u64;
         if downloaded > MODEL_MAX_BYTES {
             let _ = std::fs::remove_file(&tmp_path);
-            set_tray_tooltip("VOCO — Download too large, retry on next launch");
             return Err(format!(
                 "Model download exceeded max size of {} bytes",
                 MODEL_MAX_BYTES
@@ -2438,7 +2889,10 @@ fn ensure_model_downloaded(app_handle: &tauri::AppHandle) -> Result<(), String> 
         {
             if pct != last_pct {
                 last_pct = pct;
-                set_tray_tooltip(&format!("VOCO — Downloading model {}%", pct));
+                tray::update_model_download_status(
+                    app_handle,
+                    tray::ModelDownloadStatus::Downloading(Some(pct.min(100) as u8)),
+                );
             }
         }
     }
@@ -2450,7 +2904,6 @@ fn ensure_model_downloaded(app_handle: &tauri::AppHandle) -> Result<(), String> 
     let hash = format!("{:x}", hasher.finalize());
     if hash != MODEL_SHA256 {
         let _ = std::fs::remove_file(&tmp_path);
-        set_tray_tooltip("VOCO — Download corrupt, retry on next launch");
         return Err(format!(
             "Model integrity check failed (expected {}, got {}). Download may be corrupt.",
             &MODEL_SHA256[..16],
@@ -2460,7 +2913,16 @@ fn ensure_model_downloaded(app_handle: &tauri::AppHandle) -> Result<(), String> 
 
     std::fs::rename(&tmp_path, &path).map_err(|e| format!("Failed to finalize model file: {e}"))?;
 
-    set_tray_tooltip("VOCO");
+    let downloaded_metadata = std::fs::symlink_metadata(&path)
+        .map_err(|e| format!("Failed to inspect finalized model file: {e}"))?;
+    if downloaded_metadata.file_type().is_symlink()
+        || !downloaded_metadata.is_file()
+        || !cached_model_is_owned_by_current_user(&downloaded_metadata)
+    {
+        return Err("Finalized model path is not a user-owned regular file".to_string());
+    }
+    replace_verified_model_identity(Some(cached_model_identity(&downloaded_metadata)))?;
+    tray::update_model_download_status(app_handle, tray::ModelDownloadStatus::Ready);
     info!("Model downloaded and verified: {}", path.display());
     Ok(())
 }
@@ -2469,6 +2931,10 @@ fn ensure_model_downloaded(app_handle: &tauri::AppHandle) -> Result<(), String> 
 
 pub fn eval_toggle(app_handle: &tauri::AppHandle) {
     eval_toggle_with_backend(app_handle, "internal");
+}
+
+pub fn eval_realtime_toggle(app_handle: &tauri::AppHandle) {
+    eval_realtime_toggle_with_backend(app_handle, "internal");
 }
 
 fn eval_realtime_toggle_with_backend(app_handle: &tauri::AppHandle, backend_used: &str) {
@@ -2586,10 +3052,41 @@ fn eval_toggle_with_backend(app_handle: &tauri::AppHandle, backend_used: &str) {
 
 // --- Hotkey configuration ---
 
-fn configured_hotkey() -> String {
-    AppConfig::load()
-        .map(|c| c.hotkey)
-        .unwrap_or_else(|_| "Alt+D".to_string())
+#[derive(Debug)]
+struct ConfiguredHotkey {
+    hotkey: String,
+    repair_notice: Option<String>,
+}
+
+fn repair_invalid_configured_hotkey(config: &mut AppConfig) -> Option<String> {
+    let error = validate_dictation_hotkey(&config.hotkey).err()?;
+    let invalid_hotkey = std::mem::replace(&mut config.hotkey, "Alt+D".to_string());
+    Some(format!(
+        "Configured hotkey '{invalid_hotkey}' was reset: {error}"
+    ))
+}
+
+fn configured_hotkey() -> ConfiguredHotkey {
+    let Ok(mut config) = AppConfig::load() else {
+        return ConfiguredHotkey {
+            hotkey: "Alt+D".to_string(),
+            repair_notice: Some(
+                "VOCO could not load the configured hotkey and is using Alt+D.".to_string(),
+            ),
+        };
+    };
+    let repair_notice = repair_invalid_configured_hotkey(&mut config).map(|notice| {
+        if let Err(error) = config.save() {
+            return format!(
+                "{notice} VOCO could not persist the repair ({error}); update the hotkey in Settings."
+            );
+        }
+        notice
+    });
+    ConfiguredHotkey {
+        hotkey: config.hotkey,
+        repair_notice,
+    }
 }
 
 fn register_global_shortcut_listener(app: &tauri::AppHandle, hotkey: &str) -> Result<(), String> {
@@ -2798,16 +3295,11 @@ fn apply_hotkey_runtime_state(
 
 /// Change the hotkey at runtime.
 pub fn change_hotkey_runtime(app: &tauri::AppHandle, new_hotkey: &str) -> Result<(), String> {
-    validate_dictation_hotkey(new_hotkey)?;
-    let mut config = AppConfig::load().map_err(|e| e.to_string())?;
-    let previous_hotkey = config.hotkey.clone();
-    apply_hotkey_runtime_state(app, new_hotkey, true)?;
-    config.hotkey = new_hotkey.to_string();
-    if let Err(error) = config.save() {
-        let _ = apply_hotkey_runtime_state(app, &previous_hotkey, false);
-        return Err(error.to_string());
-    }
-
+    persist_config_patch(
+        app,
+        AppConfigPatch::with_hotkey(new_hotkey.to_string()),
+        true,
+    )?;
     Ok(())
 }
 
@@ -3261,7 +3753,9 @@ fn ensure_evdev_hotkey_listener(app_handle: &tauri::AppHandle) {
     }
 }
 
-pub fn run() {
+pub fn run() -> Result<(), String> {
+    let single_instance_guard = single_instance::acquire().map_err(|error| error.to_string())?;
+
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
         .format_timestamp_millis()
         .init();
@@ -3271,6 +3765,7 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .manage(single_instance_guard)
         .manage(Mutex::new(WhisperState::new()) as WhisperMutex)
         .manage(owned_preedit::OwnedPreeditService::default())
         .on_page_load(|webview, payload| {
@@ -3285,10 +3780,13 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             get_config,
-            save_config,
+            reload_config_from_disk,
+            reset_config_to_defaults,
+            save_config_patch,
             load_cached_update_state,
             save_cached_update_state,
             transcribe_audio,
+            transcribe_canonical_chunk,
             preview_transcribe_audio,
             debug_dictation_capture_enabled,
             save_debug_dictation_capture,
@@ -3305,15 +3803,18 @@ pub fn run() {
             start_owned_preedit,
             update_owned_preedit,
             commit_owned_preedit,
+            checkpoint_owned_preedit,
+            finish_canonical_owned_preedit,
             cancel_owned_preedit,
-            set_dictation_status,
-            set_microphone_ready,
+            begin_runtime_status_session,
+            sync_runtime_status,
             trace_frontend_hotkey_event,
             has_pending_hotkey_toggle,
             show_status_overlay,
             hide_status_overlay,
             show_notification,
             open_external_url,
+            open_config_directory,
         ])
         .setup(|app| {
             let startup_ms = now_ms();
@@ -3325,7 +3826,8 @@ pub fn run() {
                 *pending_backend = None;
             }
             trace_hotkey_event("app_start", Some("internal"));
-            let hotkey = configured_hotkey();
+            let configured_hotkey = configured_hotkey();
+            let hotkey = configured_hotkey.hotkey;
             let app_handle = app.handle().clone();
             EVDEV_HOTKEY_MODE.store(hotkey_to_evdev_mode(&hotkey), Ordering::SeqCst);
             let wayland_session = is_wayland_session();
@@ -3387,6 +3889,10 @@ pub fn run() {
             if let Err(e) = tray::setup_tray(app, &hotkey) {
                 error!("Failed to setup tray: {e}");
             }
+            if let Some(notice) = configured_hotkey.repair_notice {
+                warn!("{notice}");
+                send_notification("Hotkey repaired", &notice);
+            }
 
             let download_handle = app.handle().clone();
             std::thread::spawn(move || {
@@ -3405,11 +3911,31 @@ pub fn run() {
                 cleanup_socket_files();
             }
         });
+
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn model_test_directory(label: &str) -> std::path::PathBuf {
+        let directory = std::env::temp_dir().join(format!(
+            "voco-model-{label}-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&directory, std::fs::Permissions::from_mode(0o700)).unwrap();
+        }
+        directory
+    }
 
     #[test]
     fn bounded_response_reader_accepts_body_at_limit() {
@@ -3457,6 +3983,24 @@ mod tests {
     }
 
     #[test]
+    fn preview_audio_accepts_the_frontend_point_seven_second_boundary() {
+        assert!(!validate_preview_sample_count(MIN_PREVIEW_SAMPLES - 1).unwrap());
+        assert!(validate_preview_sample_count(MIN_PREVIEW_SAMPLES).unwrap());
+        assert!(validate_preview_sample_count(MAX_PREVIEW_SAMPLES).unwrap());
+        assert!(validate_preview_sample_count(MAX_PREVIEW_SAMPLES + 1).is_err());
+    }
+
+    #[test]
+    fn canonical_audio_accepts_only_nonempty_thirty_second_chunks() {
+        assert!(validate_canonical_sample_count(0).is_err());
+        assert!(validate_canonical_sample_count(1).is_ok());
+        assert!(validate_canonical_sample_count(transcribe::CANONICAL_CHUNK_MAX_SAMPLES).is_ok());
+        assert!(
+            validate_canonical_sample_count(transcribe::CANONICAL_CHUNK_MAX_SAMPLES + 1).is_err()
+        );
+    }
+
+    #[test]
     fn debug_capture_wav_is_valid_mono_pcm16() {
         let wav = encode_pcm16_wav(&[-1.0, 0.0, 1.0], 16_000);
 
@@ -3472,6 +4016,54 @@ mod tests {
         assert_eq!(&wav[36..40], b"data");
         assert_eq!(u32::from_le_bytes([wav[40], wav[41], wav[42], wav[43]]), 6);
         assert_eq!(wav.len(), 50);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn debug_capture_pair_is_private_and_cleans_up_without_overwriting_collisions() {
+        use std::os::unix::fs::{MetadataExt, PermissionsExt};
+
+        let unique = format!(
+            "voco-debug-capture-test-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        );
+        let directory = std::env::temp_dir().join(unique);
+        prepare_private_debug_capture_directory(&directory).unwrap();
+
+        let (audio_path, timeline_path) =
+            write_private_debug_capture_pair(&directory, "success", b"audio", b"timeline").unwrap();
+        assert_eq!(
+            std::fs::metadata(&directory).unwrap().permissions().mode() & 0o777,
+            0o700
+        );
+        for path in [&audio_path, &timeline_path] {
+            let metadata = std::fs::metadata(path).unwrap();
+            assert_eq!(metadata.permissions().mode() & 0o777, 0o600);
+            assert_eq!(metadata.uid(), unsafe { libc::geteuid() });
+        }
+
+        let collision_timeline = directory.join("collision.json");
+        let mut existing = create_private_debug_capture_file(&collision_timeline).unwrap();
+        existing.write_all(b"keep-existing").unwrap();
+        drop(existing);
+        let collision = write_private_debug_capture_pair(
+            &directory,
+            "collision",
+            b"must-be-removed",
+            b"must-not-overwrite",
+        );
+        assert!(collision.is_err());
+        assert!(!directory.join("collision.wav").exists());
+        assert_eq!(
+            std::fs::read(&collision_timeline).unwrap(),
+            b"keep-existing"
+        );
+
+        std::fs::remove_dir_all(directory).unwrap();
     }
 
     #[test]
@@ -3495,6 +4087,128 @@ mod tests {
         assert!(validate_model_content_length(Some(MODEL_MAX_BYTES)).is_ok());
         assert!(validate_model_content_length(None).is_ok());
         assert!(validate_model_content_length(Some(MODEL_MAX_BYTES + 1)).is_err());
+    }
+
+    #[test]
+    fn existing_model_requires_the_pinned_sha256() {
+        const FIXTURE_SHA256: &str =
+            "f707aa7408e39f75df32062808b06429989342eed28fb3c33d3142dbc505fd83";
+        let directory = model_test_directory("digest");
+        let path = directory.join("model.bin");
+        std::fs::write(&path, b"voco-model-fixture").unwrap();
+
+        assert!(matches!(
+            verify_existing_model_file(&path, FIXTURE_SHA256, 1024).unwrap(),
+            CachedModelVerification::Ready { .. }
+        ));
+        let mismatch = verify_existing_model_file(&path, MODEL_SHA256, 1024).unwrap();
+        assert!(matches!(
+            mismatch,
+            CachedModelVerification::OwnedCorrupt { ref reason, .. }
+                if reason.contains("SHA-256 mismatch")
+        ));
+
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn verified_model_identity_fast_path_detects_removal_and_replacement() {
+        let directory = model_test_directory("verified-identity");
+        let path = directory.join("model.bin");
+        let original = directory.join("original.bin");
+        std::fs::write(&path, b"voco-model-fixture").unwrap();
+        let identity = cached_model_identity(&std::fs::symlink_metadata(&path).unwrap());
+
+        assert!(cached_model_path_matches_identity(&path, identity).unwrap());
+        std::fs::rename(&path, &original).unwrap();
+        assert!(!cached_model_path_matches_identity(&path, identity).unwrap());
+
+        std::fs::write(&path, b"voco-model-fixture").unwrap();
+        assert!(!cached_model_path_matches_identity(&path, identity).unwrap());
+
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn oversized_owned_model_is_removed_only_if_its_identity_is_unchanged() {
+        let directory = model_test_directory("oversized");
+        let path = directory.join("model.bin");
+        std::fs::write(&path, [0u8; 17]).unwrap();
+
+        let verification = verify_existing_model_file(&path, MODEL_SHA256, 16).unwrap();
+        let CachedModelVerification::OwnedCorrupt { reason, identity } = verification else {
+            panic!("oversized model should be replaceable corruption");
+        };
+        assert!(reason.contains("too large"));
+        remove_owned_corrupt_cached_model(&path, identity).unwrap();
+        assert!(!path.exists());
+
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn changed_corrupt_model_is_preserved_instead_of_unlinked() {
+        let directory = model_test_directory("changed");
+        let path = directory.join("model.bin");
+        let original = directory.join("original.bin");
+        std::fs::write(&path, b"corrupt-one").unwrap();
+        let verification = verify_existing_model_file(&path, MODEL_SHA256, 1024).unwrap();
+        let CachedModelVerification::OwnedCorrupt { identity, .. } = verification else {
+            panic!("wrong digest should be replaceable corruption");
+        };
+
+        std::fs::rename(&path, &original).unwrap();
+        std::fs::write(&path, b"replacement").unwrap();
+        let error = remove_owned_corrupt_cached_model(&path, identity).unwrap_err();
+        assert!(error.contains("changed after verification"));
+        assert_eq!(std::fs::read(&path).unwrap(), b"replacement");
+
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn model_verification_rejects_symlinks_and_fifos_without_reading_them() {
+        use std::os::unix::ffi::OsStrExt;
+        use std::os::unix::fs::symlink;
+
+        let directory = model_test_directory("special-files");
+        let target = directory.join("target.bin");
+        let linked = directory.join("linked.bin");
+        std::fs::write(&target, b"voco-model-fixture").unwrap();
+        symlink(&target, &linked).unwrap();
+        assert!(verify_existing_model_file(&linked, MODEL_SHA256, 1024)
+            .unwrap_err()
+            .contains("regular file"));
+
+        let fifo = directory.join("model.fifo");
+        let fifo_bytes = std::ffi::CString::new(fifo.as_os_str().as_bytes()).unwrap();
+        assert_eq!(unsafe { libc::mkfifo(fifo_bytes.as_ptr(), 0o600) }, 0);
+        let started = std::time::Instant::now();
+        assert!(verify_existing_model_file(&fifo, MODEL_SHA256, 1024)
+            .unwrap_err()
+            .contains("regular file"));
+        assert!(started.elapsed() < std::time::Duration::from_secs(1));
+
+        let started = std::time::Instant::now();
+        assert!(
+            verify_existing_model_file(std::path::Path::new("/dev/null"), MODEL_SHA256, 1024)
+                .unwrap_err()
+                .contains("regular file")
+        );
+        assert!(started.elapsed() < std::time::Duration::from_secs(1));
+
+        let storage = directory.join("storage");
+        let linked_directory = directory.join("models");
+        std::fs::create_dir(&storage).unwrap();
+        symlink(&storage, &linked_directory).unwrap();
+        assert!(
+            validate_model_cache_directory(&linked_directory.join("model.bin"))
+                .unwrap_err()
+                .contains("real directory")
+        );
+
+        std::fs::remove_dir_all(directory).unwrap();
     }
 
     #[test]
@@ -3552,28 +4266,6 @@ mod tests {
         );
         assert!(
             validate_local_llm_endpoint("http://user@localhost:8080/v1/chat/completions").is_err()
-        );
-    }
-
-    #[test]
-    fn openclaw_gateway_rejects_userinfo_that_hides_a_remote_host() {
-        assert!(
-            validate_openclaw_gateway_base_url("http://localhost:18789@remote.example").is_err()
-        );
-        assert!(
-            validate_openclaw_gateway_base_url("https://127.0.0.1:443@remote.example").is_err()
-        );
-    }
-
-    #[test]
-    fn openclaw_gateway_accepts_explicit_loopback_endpoints() {
-        assert_eq!(
-            validate_openclaw_gateway_base_url("http://localhost:18789").as_deref(),
-            Ok("http://localhost:18789")
-        );
-        assert_eq!(
-            validate_openclaw_gateway_base_url("https://[::1]:18789/api").as_deref(),
-            Ok("https://[::1]:18789/api")
         );
     }
 
@@ -3755,6 +4447,50 @@ mod tests {
         assert!(parse_realtime_api_key_from_env_file("OTHER=value").is_none());
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn realtime_env_file_must_be_private_regular_and_user_owned() {
+        use std::os::unix::ffi::OsStrExt;
+        use std::os::unix::fs::{symlink, PermissionsExt};
+
+        let directory = std::env::temp_dir().join(format!(
+            "voco-realtime-key-test-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let path = directory.join("realtime.env");
+        std::fs::write(&path, "OPENAI_API_KEY=sk-private").unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+        assert!(read_private_realtime_env_file(&path)
+            .unwrap()
+            .contains("sk-private"));
+
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).unwrap();
+        assert!(read_private_realtime_env_file(&path)
+            .unwrap_err()
+            .contains("accessible to other users"));
+
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+        let symlink_path = directory.join("linked.env");
+        symlink(&path, &symlink_path).unwrap();
+        assert!(read_private_realtime_env_file(&symlink_path).is_err());
+
+        let fifo_path = directory.join("fifo.env");
+        let fifo_path_bytes = std::ffi::CString::new(fifo_path.as_os_str().as_bytes()).unwrap();
+        assert_eq!(unsafe { libc::mkfifo(fifo_path_bytes.as_ptr(), 0o600) }, 0);
+        let started = std::time::Instant::now();
+        assert!(read_private_realtime_env_file(&fifo_path)
+            .unwrap_err()
+            .contains("regular file"));
+        assert!(started.elapsed() < std::time::Duration::from_secs(1));
+
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
     #[test]
     fn realtime_client_secret_response_requires_value() {
         let parsed =
@@ -3791,22 +4527,138 @@ mod tests {
             config["audio"]["input"]["turn_detection"]["interrupt_response"],
             true
         );
-        assert_eq!(config["tools"][0]["type"], "function");
-        assert_eq!(config["tools"][0]["name"], "openclaw_browser");
-        assert_eq!(config["tool_choice"], "auto");
+        assert!(config.get("tools").is_none());
+        assert!(config.get("tool_choice").is_none());
+        let serialized = config.to_string();
+        assert!(!serialized.contains("openclaw_browser"));
+        assert!(!serialized.contains("inspect_page"));
+        assert!(!serialized.contains("list_tabs"));
+        assert!(!serialized.contains("Sergio"));
+        assert!(!serialized.contains("sergio"));
     }
 
     #[test]
-    fn browser_url_normalizes_hosts_and_searches_plain_queries() {
+    fn browser_url_parser_normalizes_only_public_http_destinations() {
         assert_eq!(
-            normalize_browser_url("example.com").unwrap(),
-            "https://example.com"
+            normalize_public_browser_url("example.com").unwrap(),
+            "https://example.com/"
         );
         assert_eq!(
-            normalize_browser_url("weather tomorrow").unwrap(),
+            normalize_public_browser_url("weather tomorrow").unwrap(),
             "https://www.google.com/search?q=weather+tomorrow"
         );
-        assert!(normalize_browser_url("ftp://example.com").is_err());
+        assert_eq!(
+            normalize_public_browser_url("HTTPS://EXAMPLE.COM.:443/path?q=1#heading").unwrap(),
+            "https://example.com/path?q=1#heading"
+        );
+        assert_eq!(
+            normalize_public_browser_url("example.com:8443/path").unwrap(),
+            "https://example.com:8443/path"
+        );
+        assert!(normalize_public_browser_url("https://8.8.8.8/dns-query").is_ok());
+        assert!(normalize_public_browser_url("https://[2606:4700:4700::1111]/").is_ok());
+    }
+
+    #[test]
+    fn browser_url_parser_rejects_credentials_private_names_and_malformed_inputs() {
+        for url in [
+            "ftp://example.com",
+            "https://user@example.com",
+            "https://user:password@example.com",
+            "http:///",
+            "https://localhost",
+            "https://api.localhost",
+            "https://printer.local",
+            "https://service.internal",
+            "https://host.localdomain",
+            "https://intranet",
+            "https://server.lan",
+            "https://router.home.arpa",
+            "https://service.corp",
+            "https://hidden.onion",
+            "https://example.test",
+            "https://example.invalid",
+            "https://example.example",
+            "https://bad_host.example.com",
+            "https://example.com\\private",
+            "https://example.com\nprivate",
+        ] {
+            assert!(
+                normalize_public_browser_url(url).is_err(),
+                "unexpectedly accepted {url}"
+            );
+        }
+    }
+
+    #[test]
+    fn browser_url_parser_rejects_non_public_and_odd_ip_literals() {
+        for url in [
+            "http://0.0.0.0",
+            "http://10.0.0.1",
+            "http://100.64.0.1",
+            "http://127.0.0.1",
+            "http://169.254.169.254/latest/meta-data",
+            "http://172.16.0.1",
+            "http://192.0.0.1",
+            "http://192.0.2.1",
+            "http://192.88.99.1",
+            "http://192.168.1.1",
+            "http://198.18.0.1",
+            "http://198.51.100.1",
+            "http://203.0.113.1",
+            "http://224.0.0.1",
+            "http://255.255.255.255",
+            "http://2130706433",
+            "http://0177.0.0.1",
+            "http://0x7f000001",
+            "http://134744072",
+            "http://0x08080808",
+            "http://010.010.010.010",
+            "http://[::]",
+            "http://[::1]",
+            "http://[::ffff:127.0.0.1]",
+            "http://[::ffff:10.0.0.1]",
+            "http://[::ffff:8.8.8.8]",
+            "http://[fc00::1]",
+            "http://[fd00::1]",
+            "http://[fe80::1]",
+            "http://[ff02::1]",
+            "http://[2001:db8::1]",
+            "http://[2002:7f00:1::]",
+            "http://[3fff::1]",
+        ] {
+            assert!(
+                normalize_public_browser_url(url).is_err(),
+                "unexpectedly accepted {url}"
+            );
+        }
+    }
+
+    #[test]
+    fn realtime_browser_backend_is_fail_closed_for_every_action() {
+        for action in ["open_url", "navigate"] {
+            let error = invoke_openclaw_browser_action(OpenClawBrowserActionInput {
+                action: action.to_string(),
+                url: Some("https://example.com".to_string()),
+            })
+            .unwrap_err();
+            assert!(error.contains("Realtime browser control is disabled"));
+        }
+
+        for action in [
+            "inspect_page",
+            "list_tabs",
+            "click_ref",
+            "type_ref",
+            "press_key",
+        ] {
+            let error = invoke_openclaw_browser_action(OpenClawBrowserActionInput {
+                action: action.to_string(),
+                url: None,
+            })
+            .unwrap_err();
+            assert!(error.contains("Unsupported OpenClaw browser action"));
+        }
     }
 
     #[test]
@@ -3821,7 +4673,6 @@ mod tests {
             echo_cancellation: Some(false),
             noise_suppression: Some(false),
             auto_gain_control: Some(false),
-            browser_action: Some("inspect_page".to_string()),
             duration_ms: Some(42),
             dictation_session_id: Some(1),
         }
@@ -3838,7 +4689,6 @@ mod tests {
             echo_cancellation: None,
             noise_suppression: None,
             auto_gain_control: None,
-            browser_action: None,
             duration_ms: None,
             dictation_session_id: None,
         }
@@ -3856,7 +4706,6 @@ mod tests {
             echo_cancellation: None,
             noise_suppression: None,
             auto_gain_control: None,
-            browser_action: None,
             duration_ms: None,
             dictation_session_id: None,
         }
@@ -3874,7 +4723,6 @@ mod tests {
             echo_cancellation: None,
             noise_suppression: None,
             auto_gain_control: None,
-            browser_action: None,
             duration_ms: Some(3_600_001),
             dictation_session_id: None,
         }
@@ -3892,7 +4740,6 @@ mod tests {
             echo_cancellation: None,
             noise_suppression: None,
             auto_gain_control: None,
-            browser_action: None,
             duration_ms: None,
             dictation_session_id: Some(0),
         }
@@ -3935,6 +4782,10 @@ mod tests {
             "dictation_owned_preedit_commit_failed",
             "dictation_owned_preedit_final_preserved",
             "dictation_owned_preedit_progressive_commit",
+            "dictation_canonical_checkpoint_completed",
+            "dictation_canonical_checkpoint_committed",
+            "dictation_canonical_checkpoint_failed",
+            "dictation_canonical_final_completed",
             "dictation_first_live_text_visible",
             "dictation_live_cursor_insert_updated",
             "dictation_live_cursor_insert_failed",
@@ -4006,14 +4857,11 @@ mod tests {
     }
 
     #[test]
-    fn configured_hotkey_returns_nonempty() {
-        assert!(!configured_hotkey().is_empty());
-    }
-
-    #[test]
     fn hotkey_modes() {
         assert_eq!(hotkey_to_evdev_mode("Alt+D"), 0);
         assert_eq!(hotkey_to_evdev_mode("Alt+Shift+D"), 1);
+        assert_eq!(hotkey_to_evdev_mode("alt + d"), 0);
+        assert_eq!(hotkey_to_evdev_mode("SHIFT+ALT+KEYD"), 1);
         assert_eq!(hotkey_to_evdev_mode("Ctrl+Shift+V"), 255);
     }
 
@@ -4021,9 +4869,77 @@ mod tests {
     fn realtime_hotkey_is_reserved_for_realtime() {
         assert!(validate_dictation_hotkey("Alt+D").is_ok());
         assert!(validate_dictation_hotkey("Alt+R").is_ok());
+        assert!(validate_dictation_hotkey("Ctrl+Shift+V").is_ok());
+        assert!(validate_dictation_hotkey("Command+D").is_ok());
+        assert!(validate_dictation_hotkey("Alt+")
+            .unwrap_err()
+            .contains("Invalid hotkey"));
         assert!(validate_dictation_hotkey("Alt+Shift+R")
             .unwrap_err()
             .contains("reserved for realtime"));
+        assert!(validate_dictation_hotkey("shift + alt + keyr")
+            .unwrap_err()
+            .contains("reserved for realtime"));
+    }
+
+    #[test]
+    fn dictation_hotkey_requires_a_non_shift_modifier() {
+        for hotkey in ["D", "Shift+D", "F8", "Shift+Equal"] {
+            assert!(
+                validate_dictation_hotkey(hotkey)
+                    .unwrap_err()
+                    .contains("must include Alt, Control, or Super"),
+                "unsafe hotkey was not rejected: {hotkey}"
+            );
+        }
+    }
+
+    #[test]
+    fn invalid_or_reserved_persisted_hotkeys_fall_back_without_touching_valid_values() {
+        let mut invalid = AppConfig {
+            hotkey: "Alt+".to_string(),
+            ..AppConfig::default()
+        };
+        assert!(repair_invalid_configured_hotkey(&mut invalid).is_some());
+        assert_eq!(invalid.hotkey, "Alt+D");
+
+        let mut reserved = AppConfig {
+            hotkey: "shift + alt + r".to_string(),
+            ..AppConfig::default()
+        };
+        assert!(repair_invalid_configured_hotkey(&mut reserved).is_some());
+        assert_eq!(reserved.hotkey, "Alt+D");
+
+        let mut modifierless = AppConfig {
+            hotkey: "F8".to_string(),
+            ..AppConfig::default()
+        };
+        assert!(repair_invalid_configured_hotkey(&mut modifierless).is_some());
+        assert_eq!(modifierless.hotkey, "Alt+D");
+
+        let mut valid = AppConfig {
+            hotkey: "Ctrl+Shift+V".to_string(),
+            ..AppConfig::default()
+        };
+        assert!(repair_invalid_configured_hotkey(&mut valid).is_none());
+        assert_eq!(valid.hotkey, "Ctrl+Shift+V");
+    }
+
+    #[test]
+    fn config_snapshot_validation_fails_closed_for_an_unpersisted_hotkey_repair() {
+        let invalid = AppConfig {
+            hotkey: "F8".to_string(),
+            ..AppConfig::default()
+        };
+        assert!(validate_loaded_config(&invalid)
+            .unwrap_err()
+            .contains("must include Alt, Control, or Super"));
+
+        let valid = AppConfig {
+            hotkey: "Alt+D".to_string(),
+            ..AppConfig::default()
+        };
+        assert!(validate_loaded_config(&valid).is_ok());
     }
 
     #[test]

@@ -12,7 +12,7 @@ use std::sync::{
 };
 use std::time::Duration;
 
-const PROTOCOL_VERSION: u32 = 1;
+const PROTOCOL_VERSION: u32 = 3;
 const COMPONENT_PATH: &str = "/usr/share/ibus/component/voco.xml";
 const SOCKET_DIRECTORY_NAME: &str = "voco";
 const SOCKET_FILE_NAME: &str = "ibus-engine.sock";
@@ -329,6 +329,44 @@ impl OwnedPreeditService {
         })
     }
 
+    pub fn checkpoint(
+        &self,
+        session_id: u64,
+        expected_committed_text: String,
+        append_text: String,
+    ) -> Result<OwnedPreeditStatus, String> {
+        validate_session_id(session_id)?;
+        validate_text(&expected_committed_text)?;
+        validate_text(&append_text)?;
+        self.with_bridge(|bridge| {
+            bridge.send_status(json!({
+                "operation": "checkpoint",
+                "sessionId": session_id,
+                "expectedCommittedText": expected_committed_text,
+                "appendText": append_text,
+            }))
+        })
+    }
+
+    pub fn finish_canonical(
+        &self,
+        session_id: u64,
+        expected_committed_text: String,
+        append_text: String,
+    ) -> Result<OwnedPreeditStatus, String> {
+        validate_session_id(session_id)?;
+        validate_text(&expected_committed_text)?;
+        validate_text(&append_text)?;
+        self.with_bridge(|bridge| {
+            bridge.send_status(json!({
+                "operation": "finish-canonical",
+                "sessionId": session_id,
+                "expectedCommittedText": expected_committed_text,
+                "appendText": append_text,
+            }))
+        })
+    }
+
     pub fn cancel(&self, session_id: u64) -> Result<OwnedPreeditStatus, String> {
         validate_session_id(session_id)?;
         self.with_bridge(|bridge| {
@@ -502,7 +540,7 @@ fn classify_unavailable_status(
     if error.contains("protocol version") {
         (
             "incompatible",
-            "The app and VOCO input source have different protocol versions. Reinstall the current package, then switch the input source away and back.",
+            "The app and VOCO input source have different protocol versions. Reinstall the current package, quit VOCO, then run `ibus restart` or sign out and back in before reopening VOCO. Switching input sources is not sufficient.",
         )
     } else if error.contains("XDG_RUNTIME_DIR is unavailable")
         || error.contains("XDG_RUNTIME_DIR must be an absolute path")
@@ -556,6 +594,27 @@ mod tests {
         assert!(validate_session_id(1).is_ok());
         assert!(validate_text("hello").is_ok());
         assert!(validate_text(&"x".repeat(MAX_TEXT_BYTES + 1)).is_err());
+    }
+
+    #[test]
+    fn canonical_mutations_validate_before_opening_the_bridge() {
+        let service = OwnedPreeditService::default();
+        assert!(service
+            .checkpoint(0, String::new(), String::new())
+            .unwrap_err()
+            .contains("positive integer"));
+        assert!(service
+            .finish_canonical(0, String::new(), String::new())
+            .unwrap_err()
+            .contains("positive integer"));
+        assert!(service
+            .checkpoint(1, "x".repeat(MAX_TEXT_BYTES + 1), String::new())
+            .unwrap_err()
+            .contains("safety limit"));
+        assert!(service
+            .finish_canonical(1, String::new(), "x".repeat(MAX_TEXT_BYTES + 1))
+            .unwrap_err()
+            .contains("safety limit"));
     }
 
     #[test]
@@ -629,6 +688,11 @@ mod tests {
         assert_eq!(
             classify_unavailable_status("protocol version mismatch", true).0,
             "incompatible"
+        );
+        assert!(
+            classify_unavailable_status("protocol version mismatch", true)
+                .1
+                .contains("ibus restart")
         );
         assert_eq!(
             classify_unavailable_status("XDG_RUNTIME_DIR is unavailable", true).0,
@@ -740,6 +804,80 @@ mod tests {
         assert!(status.available);
         assert_eq!(status.setup_state, "ready");
         drop(bridge);
+        server.join().expect("fake server completed");
+        fs::remove_file(&socket_path).expect("remove fake socket");
+        fs::remove_dir(socket_path.parent().expect("socket parent"))
+            .expect("remove fake directory");
+    }
+
+    #[test]
+    fn canonical_mutations_send_expected_prefix_and_append_atomically() {
+        let socket_path = temporary_socket_path("canonical-mutations");
+        let listener = UnixListener::bind(&socket_path).expect("bind fake engine");
+        fs::set_permissions(&socket_path, fs::Permissions::from_mode(0o600))
+            .expect("secure fake engine socket");
+        let server = thread::spawn(move || {
+            let (stream, _) = listener.accept().expect("accept app client");
+            let mut reader = BufReader::new(stream.try_clone().expect("clone fake stream"));
+            let mut writer = stream;
+
+            let mut hello_line = String::new();
+            reader.read_line(&mut hello_line).expect("read hello");
+            let hello: Value = serde_json::from_str(&hello_line).expect("decode hello");
+            write_response(
+                &mut writer,
+                &ready_response(hello["id"].as_u64().expect("hello id"), PROTOCOL_VERSION),
+            );
+
+            for (operation, expected, append) in [
+                ("checkpoint", "Canonical prefix", " checkpoint tail"),
+                (
+                    "finish-canonical",
+                    "Canonical prefix checkpoint tail",
+                    " final tail",
+                ),
+            ] {
+                let mut line = String::new();
+                reader
+                    .read_line(&mut line)
+                    .expect("read canonical mutation");
+                let request: Value = serde_json::from_str(&line).expect("decode mutation");
+                assert_eq!(request["version"], PROTOCOL_VERSION);
+                assert_eq!(request["operation"], operation);
+                assert_eq!(request["sessionId"], 41);
+                assert_eq!(request["expectedCommittedText"], expected);
+                assert_eq!(request["appendText"], append);
+                write_response(
+                    &mut writer,
+                    &ready_response(
+                        request["id"].as_u64().expect("canonical mutation id"),
+                        PROTOCOL_VERSION,
+                    ),
+                );
+            }
+        });
+
+        let bridge = SocketBridge::connect_to(&socket_path).expect("connect fake engine");
+        let service = OwnedPreeditService {
+            bridge: Mutex::new(Some(bridge)),
+            next_session_id: AtomicU64::new(1),
+        };
+        service
+            .checkpoint(
+                41,
+                "Canonical prefix".to_string(),
+                " checkpoint tail".to_string(),
+            )
+            .expect("checkpoint accepted");
+        service
+            .finish_canonical(
+                41,
+                "Canonical prefix checkpoint tail".to_string(),
+                " final tail".to_string(),
+            )
+            .expect("canonical finish accepted");
+
+        service.shutdown();
         server.join().expect("fake server completed");
         fs::remove_file(&socket_path).expect("remove fake socket");
         fs::remove_dir(socket_path.parent().expect("socket parent"))

@@ -6,7 +6,7 @@ on:
       - "voco.*"
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: release-${{ github.ref }}
@@ -14,10 +14,19 @@ concurrency:
 
 jobs:
   build:
-    name: Build & Release
+    name: Build & Verify
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      checks: write
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag_name: ${{ steps.version.outputs.tag_name }}
+      release_name: ${{ steps.version.outputs.release_name }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
@@ -45,6 +54,7 @@ jobs:
             pkg-config libglib2.0-dev libsoup-3.0-dev \
             libjavascriptcoregtk-4.1-dev libwebkit2gtk-4.1-dev \
             libayatana-appindicator3-dev clang mold cmake file wget \
+            desktop-file-utils appstream \
             ibus python3 python3-gi gir1.2-ibus-1.0 bubblewrap
 
       - uses: dtolnay/rust-toolchain@fa04a1451ff1842e2626ccb99004d0195b455a88
@@ -62,8 +72,21 @@ jobs:
       - name: DevOps preflight
         run: npm run verify:devops
 
+      - name: Validate Linux desktop metadata
+        run: |
+          desktop-file-validate packaging/flatpak/com.sergiopesch.voco.desktop
+          desktop-file-validate packaging/tauri/VOCO.desktop
+          appstreamcli validate packaging/flatpak/com.sergiopesch.voco.metainfo.xml
+          appstreamcli validate packaging/tauri/com.sergiopesch.voco.metainfo.xml
+
       - name: Dependency security audit
         run: npm run verify:security
+
+      - name: Rust dependency security audit
+        uses: rustsec/audit-check@69366f33c96575abad1ee0dba8212993eecbe998 # v2.0.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          working-directory: apps/desktop/src-tauri
 
       - name: Frontend quality gate
         run: npm run check && npm run lint && npm test && npm --workspace @voco/desktop run build:frontend
@@ -73,7 +96,7 @@ jobs:
 
       - name: Rust quality gate
         working-directory: apps/desktop/src-tauri
-        run: cargo fmt --check && cargo test && cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo fmt --check && cargo test --locked && cargo clippy --locked --all-targets --all-features -- -D warnings
 
       - name: Configure mold linker
         run: |
@@ -87,7 +110,7 @@ jobs:
         working-directory: apps/desktop
         env:
           CMAKE_BUILD_PARALLEL_LEVEL: "4"
-        run: cargo tauri build --features custom-protocol --bundles deb
+        run: cargo tauri build --features custom-protocol --bundles deb -- --locked
 
       - name: Verify Debian bundle
         shell: bash
@@ -99,16 +122,7 @@ jobs:
           fi
           bash scripts/verify-deb-package.sh "$DEB" "${{ steps.version.outputs.version }}"
 
-      - name: Attempt AppImage bundle
-        id: build_appimage
-        continue-on-error: true
-        working-directory: apps/desktop
-        env:
-          CMAKE_BUILD_PARALLEL_LEVEL: "4"
-        run: cargo tauri build --features custom-protocol --bundles appimage
-
       - name: Collect release artifacts
-        id: artifacts
         shell: bash
         run: |
           DEB=$(find apps/desktop/src-tauri/target/release/bundle/deb -name "*${{ steps.version.outputs.version }}*amd64.deb" | sort | tail -1)
@@ -118,33 +132,18 @@ jobs:
           fi
           cp "$DEB" "voco_${{ steps.version.outputs.version }}_amd64.deb"
           cp "$DEB" "voco_latest_amd64.deb"
-          APPIMAGE=$(find apps/desktop/src-tauri/target/release/bundle/appimage -name "*${{ steps.version.outputs.version }}*.AppImage" | sort | tail -1 || true)
-          if [ -n "$APPIMAGE" ]; then
-            APPIMAGE_NAME="VOCO-${{ steps.version.outputs.version }}-x86_64.AppImage"
-            cp "$APPIMAGE" "${APPIMAGE_NAME}"
-            echo "has_appimage=true" >> "$GITHUB_OUTPUT"
-            echo "appimage_name=${APPIMAGE_NAME}" >> "$GITHUB_OUTPUT"
-          else
-            echo "has_appimage=false" >> "$GITHUB_OUTPUT"
-            echo "appimage_name=" >> "$GITHUB_OUTPUT"
-          fi
 
       - name: Render release notes
         shell: bash
         run: |
           bash ./scripts/render-release-body.sh \
             "${{ steps.version.outputs.version }}" \
-            "${{ steps.version.outputs.tag_name }}" \
-            "${{ steps.artifacts.outputs.appimage_name }}" > release-body.md
+            "${{ steps.version.outputs.tag_name }}" > release-body.md
 
       - name: Generate checksums
         shell: bash
         run: |
-          if [ -f "VOCO-${{ steps.version.outputs.version }}-x86_64.AppImage" ]; then
-            sha256sum "voco_${{ steps.version.outputs.version }}_amd64.deb" "VOCO-${{ steps.version.outputs.version }}-x86_64.AppImage" > voco_checksums.txt
-          else
-            sha256sum "voco_${{ steps.version.outputs.version }}_amd64.deb" > voco_checksums.txt
-          fi
+          sha256sum "voco_${{ steps.version.outputs.version }}_amd64.deb" > voco_checksums.txt
           sha256sum voco_latest_amd64.deb > voco_latest_checksums.txt
           mkdir release-assets
           cp \
@@ -152,16 +151,39 @@ jobs:
             voco_latest_amd64.deb \
             voco_checksums.txt \
             voco_latest_checksums.txt \
+            release-body.md \
             release-assets/
-          if [ -f "VOCO-${{ steps.version.outputs.version }}-x86_64.AppImage" ]; then
-            cp "VOCO-${{ steps.version.outputs.version }}-x86_64.AppImage" release-assets/
-          fi
+
+      - name: Upload verified release payload
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: voco-release-${{ steps.version.outputs.version }}
+          path: release-assets/
+          if-no-files-found: error
+          retention-days: 1
+
+  create-draft:
+    name: Create Draft Release
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download verified release payload
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: voco-release-${{ needs.build.outputs.version }}
+          path: release-assets
 
       - name: Create draft GitHub Release with verified assets
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
-          name: ${{ steps.version.outputs.release_name }}
-          body_path: release-body.md
-          files: release-assets/*
+          name: ${{ needs.build.outputs.release_name }}
+          body_path: release-assets/release-body.md
+          files: |
+            release-assets/voco_${{ needs.build.outputs.version }}_amd64.deb
+            release-assets/voco_latest_amd64.deb
+            release-assets/voco_checksums.txt
+            release-assets/voco_latest_checksums.txt
           draft: true
           prerelease: false

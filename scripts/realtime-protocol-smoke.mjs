@@ -223,7 +223,7 @@ function realtimeSessionConfig() {
     model: REALTIME_MODEL,
     output_modalities: ["audio"],
     instructions:
-      "You are Sergio's concise realtime OpenClaw voice companion. Answer in 1-2 short sentences. No preamble, no markdown, no waffle. If the user interrupts, stop and respond to the latest thing they said.",
+      "You are the user's concise realtime OpenClaw voice companion. Answer in 1-2 short sentences. No preamble, no markdown, no waffle. If the user interrupts, stop and respond to the latest thing they said.",
     reasoning: { effort: "low" },
     audio: {
       input: {
@@ -243,13 +243,17 @@ function realtimeSessionConfig() {
 }
 
 async function createClientSecret(apiKey) {
+  const session = realtimeSessionConfig();
+  if ("tools" in session || "tool_choice" in session) {
+    throw new Error("Realtime smoke schema must remain voice-only");
+  }
   const response = await fetch("https://api.openai.com/v1/realtime/client_secrets", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ session: realtimeSessionConfig() }),
+    body: JSON.stringify({ session }),
   });
   const body = await response.text();
   if (!response.ok) {

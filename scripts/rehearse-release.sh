@@ -24,7 +24,17 @@ echo "  appimage: ${APPIMAGE_NAME}"
 (
   cd "${ROOT_DIR}"
   npm run verify:versions
-  bash -n install scripts/install.sh scripts/setup.sh scripts/build-desktop.sh scripts/package-appimage.sh scripts/render-release-body.sh scripts/lib/install-common.sh
+  bash -n install scripts/install.sh scripts/setup.sh scripts/build-desktop.sh scripts/package-appimage.sh scripts/render-release-body.sh scripts/lib/install-common.sh scripts/test-install-common.sh
+  bash scripts/test-install-common.sh
+  if rg -n 'Examples:.*Alt\+Shift\+R|Downloading VOCO.*~5 MB' install scripts/lib/install-common.sh; then
+    echo "Installer still advertises a reserved hotkey or stale package size"
+    exit 1
+  fi
+  for installer in install scripts/lib/install-common.sh; do
+    grep -F 'Examples: Ctrl+Shift+V, Super+D, Alt+Shift+T' "${installer}" > /dev/null
+    grep -F 'Alt+Shift+R is reserved for realtime conversation.' "${installer}" > /dev/null
+    grep -F 'existing config preserved' "${installer}" > /dev/null
+  done
   if grep -RInE 'raw.githubusercontent.com/.*/master/install|bash <\(curl|curl -s .*install' README.md docs install; then
     echo "Unsafe installer reference found in docs or helper comments"
     exit 1
@@ -51,4 +61,4 @@ echo "  appimage: ${APPIMAGE_NAME}"
 
 echo
 echo "Rendered release body preview:"
-sed -n '1,80p' "${TMP_DIR}/release-body-with-appimage.md"
+sed -n '1,80p' "${TMP_DIR}/release-body-no-appimage.md"

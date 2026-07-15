@@ -204,7 +204,7 @@ export async function readCachedUpdateState(
     }
 
     const ageMs = Date.now() - new Date(cache.state.lastCheckedAt).getTime();
-    if (!Number.isFinite(ageMs) || ageMs > UPDATE_CACHE_MAX_AGE_MS) {
+    if (!Number.isFinite(ageMs) || ageMs < 0 || ageMs > UPDATE_CACHE_MAX_AGE_MS) {
       return null;
     }
 

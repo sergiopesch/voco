@@ -2,29 +2,43 @@ import { invoke } from "@tauri-apps/api/core";
 import type {
   AppConfig,
   CachedUpdateCheck,
-  DictationStatus,
+  CanonicalTranscription,
+  ConfigSnapshot,
   DebugDictationCaptureResult,
   InsertionResult,
   LocalLlmAgentResult,
   LocalLlmTestResult,
   OpenClawAgentResult,
-  OpenClawBrowserActionInput,
-  OpenClawBrowserActionResult,
   OpenClawSpeechResult,
   OwnedPreeditStatus,
   PreviewTranscription,
   RealtimeClientSecretResult,
   RuntimeDiagnostics,
+  RuntimeStatusSnapshot,
   TranscriptEnhancement,
   TranscriptEnhancementResult,
 } from "@/types";
 
-export async function getConfig(): Promise<AppConfig> {
-  return invoke<AppConfig>("get_config");
+export async function getConfig(): Promise<ConfigSnapshot> {
+  return invoke<ConfigSnapshot>("get_config");
 }
 
-export async function saveConfig(config: AppConfig): Promise<void> {
-  return invoke("save_config", { config });
+export async function reloadConfigFromDisk(): Promise<ConfigSnapshot> {
+  return invoke<ConfigSnapshot>("reload_config_from_disk");
+}
+
+export async function resetConfigToDefaults(): Promise<ConfigSnapshot> {
+  return invoke<ConfigSnapshot>("reset_config_to_defaults");
+}
+
+export async function openConfigDirectory(): Promise<void> {
+  return invoke("open_config_directory");
+}
+
+export async function saveConfigPatch(
+  patch: Partial<AppConfig>,
+): Promise<ConfigSnapshot> {
+  return invoke<ConfigSnapshot>("save_config_patch", { patch });
 }
 
 export async function transcribeAudio(samples: Float32Array): Promise<string> {
@@ -34,6 +48,21 @@ export async function transcribeAudio(samples: Float32Array): Promise<string> {
     samples.byteLength,
   );
   return invoke<string>("transcribe_audio", { audioBytes: bytes });
+}
+
+export async function transcribeCanonicalChunk(
+  samples: Float32Array,
+  previousCanonicalText: string,
+): Promise<CanonicalTranscription> {
+  const bytes = new Uint8Array(
+    samples.buffer,
+    samples.byteOffset,
+    samples.byteLength,
+  );
+  return invoke<CanonicalTranscription>("transcribe_canonical_chunk", {
+    audioBytes: bytes,
+    previousCanonicalText,
+  });
 }
 
 export async function previewTranscribeAudio(
@@ -101,6 +130,30 @@ export async function commitOwnedPreedit(
   return invoke<OwnedPreeditStatus>("commit_owned_preedit", { sessionId, text });
 }
 
+export async function checkpointOwnedPreedit(
+  sessionId: number,
+  expectedCommittedText: string,
+  appendText: string,
+): Promise<OwnedPreeditStatus> {
+  return invoke<OwnedPreeditStatus>("checkpoint_owned_preedit", {
+    sessionId,
+    expectedCommittedText,
+    appendText,
+  });
+}
+
+export async function finishCanonicalOwnedPreedit(
+  sessionId: number,
+  expectedCommittedText: string,
+  appendText: string,
+): Promise<OwnedPreeditStatus> {
+  return invoke<OwnedPreeditStatus>("finish_canonical_owned_preedit", {
+    sessionId,
+    expectedCommittedText,
+    appendText,
+  });
+}
+
 export async function cancelOwnedPreedit(sessionId: number): Promise<OwnedPreeditStatus> {
   return invoke<OwnedPreeditStatus>("cancel_owned_preedit", { sessionId });
 }
@@ -154,22 +207,16 @@ export async function askLocalLlmAgent(
   });
 }
 
-export async function invokeOpenClawBrowserAction(
-  request: OpenClawBrowserActionInput,
-): Promise<OpenClawBrowserActionResult> {
-  return invoke<OpenClawBrowserActionResult>("invoke_openclaw_browser_action", { request });
-}
-
 export async function createRealtimeClientSecret(): Promise<RealtimeClientSecretResult> {
   return invoke<RealtimeClientSecretResult>("create_realtime_client_secret");
 }
 
-export async function setDictationStatus(status: DictationStatus): Promise<void> {
-  return invoke("set_dictation_status", { status });
+export async function syncRuntimeStatus(snapshot: RuntimeStatusSnapshot): Promise<void> {
+  return invoke("sync_runtime_status", { snapshot });
 }
 
-export async function setMicrophoneReady(ready: boolean): Promise<void> {
-  return invoke("set_microphone_ready", { ready });
+export async function beginRuntimeStatusSession(): Promise<number> {
+  return invoke<number>("begin_runtime_status_session");
 }
 
 export interface HotkeyTraceFields {
@@ -182,7 +229,6 @@ export interface HotkeyTraceFields {
   echoCancellation?: boolean;
   noiseSuppression?: boolean;
   autoGainControl?: boolean;
-  browserAction?: string;
   durationMs?: number;
   dictationSessionId?: number;
 }

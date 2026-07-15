@@ -5,6 +5,8 @@ import path from "node:path";
 
 const DEFAULT_MAX_FIRST_LIVE_TEXT_MS = 1_500;
 const DEFAULT_MAX_CURSOR_GAP_P95_MS = 2_000;
+const CANONICAL_FIRST_CHECKPOINT_MS = 30_000;
+const CANONICAL_CHECKPOINT_STRIDE_MS = 29_000;
 const options = parseArgs(process.argv.slice(2));
 const tracePath =
   options.tracePath ??
@@ -19,6 +21,7 @@ const eventsToSummarize = [
   "dictation_first_live_text_visible",
   "dictation_live_preview_completed",
   "dictation_live_preview_window_advanced",
+  "dictation_canonical_checkpoint_completed",
   "dictation_live_cursor_update_gap",
   "dictation_stop_to_final_transcript",
   "dictation_stop_to_idle",
@@ -34,6 +37,10 @@ const notableEvents = [
   "dictation_owned_preedit_cancelled",
   "dictation_owned_preedit_committed",
   "dictation_owned_preedit_commit_failed",
+  "dictation_canonical_checkpoint_completed",
+  "dictation_canonical_checkpoint_committed",
+  "dictation_canonical_checkpoint_failed",
+  "dictation_canonical_final_completed",
   "dictation_live_cursor_insert_updated",
   "dictation_live_cursor_insert_failed",
   "dictation_live_cursor_unsafe_rewrite_blocked",
@@ -66,13 +73,30 @@ function formatMs(value) {
   return value === null ? "-" : `${value}ms`;
 }
 
+function expectedCanonicalCheckpointCount(recordingDurationMs) {
+  if (
+    recordingDurationMs === null ||
+    recordingDurationMs < CANONICAL_FIRST_CHECKPOINT_MS
+  ) {
+    return 0;
+  }
+
+  return (
+    1 +
+    Math.floor(
+      (recordingDurationMs - CANONICAL_FIRST_CHECKPOINT_MS) /
+        CANONICAL_CHECKPOINT_STRIDE_MS,
+    )
+  );
+}
+
 if (!fs.existsSync(tracePath)) {
   console.error(`Trace file not found: ${tracePath}`);
   process.exit(1);
 }
 
 const lines = fs.readFileSync(tracePath, "utf8").split(/\r?\n/).filter(Boolean);
-const parsedEntries = [];
+const allParsedEntries = [];
 for (const [index, line] of lines.entries()) {
   let entry;
   try {
@@ -81,7 +105,7 @@ for (const [index, line] of lines.entries()) {
     continue;
   }
 
-  parsedEntries.push({
+  allParsedEntries.push({
     event: entry.event,
     index,
     durationMs: Number.isFinite(entry.duration_ms) ? entry.duration_ms : null,
@@ -91,6 +115,19 @@ for (const [index, line] of lines.entries()) {
       : null,
   });
 }
+
+const traceScopeStartEvents = new Set(["app_start", "frontend_app_mounted"]);
+let latestTraceScopeStartPosition = -1;
+for (let index = allParsedEntries.length - 1; index >= 0; index -= 1) {
+  if (traceScopeStartEvents.has(allParsedEntries[index]?.event)) {
+    latestTraceScopeStartPosition = index;
+    break;
+  }
+}
+const parsedEntries =
+  latestTraceScopeStartPosition === -1
+    ? allParsedEntries
+    : allParsedEntries.slice(latestTraceScopeStartPosition);
 
 const completedSessionIds = parsedEntries
   .filter(
@@ -137,6 +174,9 @@ console.log("VOCO cursor streaming trace report");
 console.log("");
 console.log(`Trace file: ${tracePath}`);
 console.log(`Entries read: ${lines.length}`);
+if (latestTraceScopeStartPosition !== -1) {
+  console.log(`Entries in latest frontend run: ${parsedEntries.length}`);
+}
 if (options.minDurationMs !== null) {
   console.log(`Minimum recording duration: ${options.minDurationMs}ms`);
 }
@@ -228,6 +268,32 @@ function summarizeEntries(entries) {
   const previewCount = rows.get("dictation_live_preview_completed")?.length ?? 0;
   const firstLiveTextCount = rows.get("dictation_first_live_text_visible")?.length ?? 0;
   const finalOutputCount = notableCounts.get("dictation_final_output_completed") ?? 0;
+  const canonicalFinalCount =
+    notableCounts.get("dictation_canonical_final_completed") ?? 0;
+  const canonicalFinalIndex = findLastEventIndex(
+    entries,
+    "dictation_canonical_final_completed",
+  );
+  const canonicalCheckpointCompletedCount =
+    notableCounts.get("dictation_canonical_checkpoint_completed") ?? 0;
+  const canonicalCheckpointCommittedCount =
+    notableCounts.get("dictation_canonical_checkpoint_committed") ?? 0;
+  const canonicalCheckpointCompletedBeforeFinalCount =
+    canonicalFinalIndex === -1
+      ? 0
+      : entries.filter(
+          (entry) =>
+            entry.event === "dictation_canonical_checkpoint_completed" &&
+            entry.index < canonicalFinalIndex,
+        ).length;
+  const canonicalCheckpointCommittedBeforeFinalCount =
+    canonicalFinalIndex === -1
+      ? 0
+      : entries.filter(
+          (entry) =>
+            entry.event === "dictation_canonical_checkpoint_committed" &&
+            entry.index < canonicalFinalIndex,
+        ).length;
   const finalUnreconciledCount = Math.max(
     notableCounts.get("dictation_final_output_unreconciled") ?? 0,
     notableCounts.get("dictation_live_cursor_final_unreconciled") ?? 0,
@@ -268,6 +334,7 @@ function summarizeEntries(entries) {
     "dictation_live_cursor_insert_failed",
     "dictation_owned_preedit_failed",
     "dictation_owned_preedit_commit_failed",
+    "dictation_canonical_checkpoint_failed",
     "dictation_final_insertion_failed",
   ].reduce((sum, event) => sum + (notableCounts.get(event) ?? 0), 0);
   const fallbackCount = notableCounts.get("dictation_live_cursor_overlay_fallback") ?? 0;
@@ -282,6 +349,11 @@ function summarizeEntries(entries) {
   return {
     blockedCommitsAfterLastLiveCursorUpdate,
     blockedLiveCursorCommitCount,
+    canonicalCheckpointCommittedBeforeFinalCount,
+    canonicalCheckpointCommittedCount,
+    canonicalCheckpointCompletedBeforeFinalCount,
+    canonicalCheckpointCompletedCount,
+    canonicalFinalCount,
     completedDictationCount,
     cursorStreamingStalled,
     cursorUpdateGapP95Ms: percentile(cursorUpdateGaps, 95),
@@ -296,6 +368,9 @@ function summarizeEntries(entries) {
     ),
     liveCursorInsertUpdatedCount,
     maxRecordingDurationMs,
+    expectedCanonicalCheckpointCount: expectedCanonicalCheckpointCount(
+      maxRecordingDurationMs,
+    ),
     notableCounts,
     previewCount,
     previewFailureCount,
@@ -326,7 +401,7 @@ function classifySummary(summary, options) {
     return {
       priority: 2,
       status: "final-cursor-output-unreconciled",
-      detail: `${summary.finalUnreconciledCount} session(s) preserved a final transcript in VOCO but could not safely finish it at the cursor`,
+      detail: `${summary.finalUnreconciledCount} session(s) preserved live target text because the authoritative final could not be applied safely at the cursor`,
     };
   }
 
@@ -335,6 +410,53 @@ function classifySummary(summary, options) {
       priority: 3,
       status: "final-output-unproven",
       detail: `${summary.completedDictationCount} completed session(s), but no final output completion event was observed`,
+    };
+  }
+
+  if (!options.expectFinalOnly && summary.canonicalFinalCount === 0) {
+    return {
+      priority: 3,
+      status: "canonical-final-unproven",
+      detail:
+        "stable canonical cursor validation requires dictation_canonical_final_completed; generic final output evidence is insufficient",
+    };
+  }
+
+  if (
+    !options.expectFinalOnly &&
+    (summary.canonicalCheckpointCommittedCount >
+      summary.canonicalCheckpointCompletedCount ||
+      summary.canonicalCheckpointCommittedBeforeFinalCount >
+        summary.canonicalCheckpointCompletedBeforeFinalCount)
+  ) {
+    return {
+      priority: 3,
+      status: "canonical-checkpoint-evidence-invalid",
+      detail: `${summary.canonicalCheckpointCompletedCount} canonical checkpoint completion event(s) and ${summary.canonicalCheckpointCommittedCount} delivery event(s) were observed; deliveries cannot exceed completed checkpoints`,
+    };
+  }
+
+  if (
+    !options.expectFinalOnly &&
+    summary.canonicalCheckpointCompletedBeforeFinalCount !==
+      summary.expectedCanonicalCheckpointCount
+  ) {
+    return {
+      priority: 3,
+      status: "canonical-checkpoint-cadence-unproven",
+      detail: `${summary.maxRecordingDurationMs}ms of recording requires ${summary.expectedCanonicalCheckpointCount} completed canonical checkpoint event(s) before the canonical final; ${summary.canonicalCheckpointCompletedBeforeFinalCount} were observed`,
+    };
+  }
+
+  if (
+    !options.expectFinalOnly &&
+    summary.expectedCanonicalCheckpointCount > 0 &&
+    summary.canonicalCheckpointCommittedBeforeFinalCount === 0
+  ) {
+    return {
+      priority: 3,
+      status: "canonical-checkpoint-delivery-unproven",
+      detail: `${summary.maxRecordingDurationMs}ms of recording requires a canonical checkpoint delivery before finalization, but no dictation_canonical_checkpoint_committed event was observed before the canonical final`,
     };
   }
 
