@@ -37,7 +37,11 @@ it("retries exact failed bytes and prefix with a distinct attempt, not a committ
   s=start(s,480000);const attempt=s.active!,first=payload(attempt),pending=s.pending;
   s=failHybridAttempt(s,attempt);expect(s.pending).toBe(pending);
   expect(()=>prepareHybridRequest(s,new Float32Array(480000),true)).toThrow();
-  s=beginHybridAttempt(s);expect(payload(s.active!).audio).toEqual(first.audio);
+  s=beginHybridAttempt(s);
+  // Compare every PCM byte without Vitest enumerating a 1.92 MB typed array.
+  const retriedAudio = payload(s.active!).audio;
+  expect(retriedAudio.length).toBe(first.audio.length);
+  expect(retriedAudio.every((byte, index) => byte === first.audio[index])).toBe(true);
   expect(s.active!.metadata.requestSequence).toBe(3);expect(s.active!.metadata.plannerSequence).toBe(1);
   expect(s.active!.metadata.previousCanonicalText).toBe("First.");
   expect(()=>completeHybridAttempt(s,attempt,result(s,"Second."))).toThrow();
