@@ -57,6 +57,16 @@ dependencies. These warnings remain follow-up work, not evidence of a warning-fr
 or universally secure release. Dated security assessments retain their historical
 counts. Re-run both audits for the eventual release commit.
 
+## Legacy Whisper regression gate
+
+The [14 September repetition-recovery investigation](testing/whisper-repetition-recovery-2026-09-14.md)
+records the reproduced CI failure, rejected experiment and focused 12/12 candidate
+result. All 76 broader unchanged-plan cases, baseline and continuity checks also
+passed locally without worsened case scores; integrated CI remains a merge gate.
+The owner requires the failure to be fixed and the required checks to pass before
+merging; no waiver is authorized. This does not qualify all Whisper accuracy or
+replace laptop acceptance and release-cut approval.
+
 ## Current boundaries
 
 The local default is English NVIDIA Nemotron CPU streaming. Generic desktop paste

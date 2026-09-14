@@ -403,7 +403,8 @@ impl WhisperState {
             || first.native_terminal_failure
             || first.native_repetition_rejection_history
         {
-            let ranges = coalesce_retry_ranges(utterance_ranges(samples));
+            let ranges =
+                decoder_failure_retry_ranges(samples, first.native_repetition_rejection_history);
             if ranges.len() >= 2 && ranges.len() <= CANONICAL_CHUNK_MAX_SAMPLES / 24_000 {
                 (
                     ranges,
@@ -1114,6 +1115,61 @@ fn utterance_ranges(samples: &[f32]) -> Vec<std::ops::Range<usize>> {
     ranges
 }
 
+// A relative-energy dip can lie inside a quiet word. When a rejected decode
+// has multiple unambiguous digital pauses, prefer their centers for recovery.
+// This does not classify nonzero quiet speech as silence or alter capture PCM.
+fn digital_silence_retry_ranges(samples: &[f32]) -> Option<Vec<std::ops::Range<usize>>> {
+    const MIN_PAUSE_SAMPLES: usize = 3_200; // Existing 200 ms pause requirement.
+    const MIN_RANGE_SAMPLES: usize = 24_000;
+    let mut silence_start = None;
+    let mut start = 0;
+    let mut ranges = Vec::new();
+    for (index, sample) in samples
+        .iter()
+        .copied()
+        .chain(std::iter::once(1.0))
+        .enumerate()
+    {
+        if sample == 0.0 {
+            silence_start.get_or_insert(index);
+        } else if let Some(low) = silence_start.take() {
+            // Edge padding is not an interior utterance boundary.
+            if low == 0 || index == samples.len() || index - low < MIN_PAUSE_SAMPLES {
+                continue;
+            }
+            let cut = low + (index - low) / 2;
+            if cut - start >= MIN_RANGE_SAMPLES && samples.len() - cut >= MIN_RANGE_SAMPLES {
+                ranges.push(start..cut);
+                start = cut;
+            }
+        }
+    }
+    // Count usable boundaries after minimum-size filtering, not raw zero runs.
+    if ranges.len() < 2 {
+        return None;
+    }
+    ranges.push(start..samples.len());
+    Some(ranges)
+}
+
+fn decoder_failure_retry_ranges(
+    samples: &[f32],
+    repetition_history: bool,
+) -> Vec<std::ops::Range<usize>> {
+    if repetition_history {
+        if let Some(ranges) = digital_silence_retry_ranges(samples) {
+            // Recombining repeated utterances can reproduce the native repetition
+            // failure. Keep safe pauses separate only within existing work bounds.
+            if ranges.len() <= CANONICAL_CHUNK_MAX_SAMPLES / 24_000
+                && ranges.iter().all(|range| range.len() <= 8 * 16_000)
+            {
+                return ranges;
+            }
+        }
+    }
+    coalesce_retry_ranges(utterance_ranges(samples))
+}
+
 // Bound encoder work by merging adjacent pause partitions up to eight seconds.
 // A pre-existing longer range remains whole; no new acoustic cut is introduced.
 fn coalesce_retry_ranges(ranges: Vec<std::ops::Range<usize>>) -> Vec<std::ops::Range<usize>> {
@@ -1701,6 +1757,228 @@ mod coalesced_retry_tests {
 }
 
 #[cfg(test)]
+mod digital_silence_retry_tests {
+    use super::*;
+
+    fn voiced(count: usize) -> Vec<f32> {
+        (0..count)
+            .map(|i| if i % 2 == 0 { 0.1 } else { -0.1 })
+            .collect()
+    }
+
+    #[test]
+    fn interior_digital_pauses_preserve_exact_pcm_and_avoid_quiet_word_cuts() {
+        let mut samples = voiced(240_123);
+        // These nonzero dips satisfy the old energy threshold, but are not silence.
+        for low in [30_000..34_000, 110_000..114_000, 190_000..194_000] {
+            for sample in &mut samples[low] {
+                *sample *= 0.0001;
+            }
+        }
+        for pause in [70_000..74_000, 150_000..154_000] {
+            for (i, sample) in samples[pause].iter_mut().enumerate() {
+                *sample = if i % 2 == 0 { 0.0 } else { -0.0 };
+            }
+        }
+        let ranges = digital_silence_retry_ranges(&samples).unwrap();
+        assert_eq!(ranges, vec![0..72_000, 72_000..152_000, 152_000..240_123]);
+        assert_eq!(decoder_failure_retry_ranges(&samples, true), ranges);
+        let restored: Vec<u32> = ranges
+            .iter()
+            .flat_map(|range| samples[range.clone()].iter().map(|sample| sample.to_bits()))
+            .collect();
+        assert_eq!(
+            restored,
+            samples
+                .iter()
+                .map(|sample| sample.to_bits())
+                .collect::<Vec<_>>()
+        );
+        assert!(ranges
+            .iter()
+            .all(|range| range.len() >= 24_000 && range.len() <= 128_000));
+    }
+
+    #[test]
+    fn insufficient_or_nonzero_pause_candidates_keep_the_existing_fallback() {
+        let mut cases = vec![vec![], vec![0.0; 160_000], voiced(160_000)];
+        let mut quiet = voiced(160_000);
+        quiet[40_000..44_000].fill(f32::MIN_POSITIVE);
+        quiet[90_000..94_000].fill(-f32::MIN_POSITIVE);
+        cases.push(quiet);
+        let mut short = voiced(160_000);
+        short[40_000..43_199].fill(0.0);
+        short[90_000..93_199].fill(0.0);
+        cases.push(short);
+        let mut edges = voiced(160_000);
+        edges[..32_000].fill(0.0);
+        edges[128_000..].fill(0.0);
+        cases.push(edges);
+        let mut only_one_usable = voiced(100_000);
+        for range in [4_000..8_000, 40_000..44_000, 88_000..92_000] {
+            only_one_usable[range].fill(0.0);
+        }
+        cases.push(only_one_usable);
+        for samples in cases {
+            assert!(digital_silence_retry_ranges(&samples).is_none());
+            assert_eq!(
+                decoder_failure_retry_ranges(&samples, true),
+                coalesce_retry_ranges(utterance_ranges(&samples))
+            );
+        }
+    }
+
+    #[test]
+    fn only_repetition_history_keeps_safe_pauses_separate_within_inclusive_bounds() {
+        let mut samples = voiced(152_000);
+        for range in [22_400..25_600, 62_400..65_600, 126_400..129_600] {
+            samples[range].fill(0.0);
+        }
+        assert_eq!(
+            digital_silence_retry_ranges(&samples).unwrap(),
+            vec![0..24_000, 24_000..64_000, 64_000..128_000, 128_000..152_000]
+        );
+        assert_eq!(
+            decoder_failure_retry_ranges(&samples, true),
+            vec![0..24_000, 24_000..64_000, 64_000..128_000, 128_000..152_000]
+        );
+        assert_eq!(
+            decoder_failure_retry_ranges(&samples, false),
+            vec![0..128_000, 128_000..152_000]
+        );
+    }
+
+    #[test]
+    fn oversized_or_excessive_separate_ranges_preserve_original_recovery() {
+        let mut oversized = voiced(240_000);
+        oversized[22_400..25_600].fill(0.0);
+        oversized[46_400..49_600].fill(0.0);
+        assert!(digital_silence_retry_ranges(&oversized)
+            .unwrap()
+            .iter()
+            .any(|r| r.len() > 128_000));
+        let mut excessive = voiced(528_000);
+        for cut in (24_000..528_000).step_by(24_000) {
+            excessive[cut - 1_600..cut + 1_600].fill(0.0);
+        }
+        assert!(digital_silence_retry_ranges(&excessive).unwrap().len() > 20);
+        for samples in [oversized, excessive] {
+            for history in [false, true] {
+                assert_eq!(
+                    decoder_failure_retry_ranges(&samples, history),
+                    coalesce_retry_ranges(utterance_ranges(&samples))
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn ordinary_terminal_failure_keeps_coalescing_despite_available_digital_pauses() {
+        let mut samples = voiced(152_000);
+        for range in [22_400..25_600, 62_400..65_600, 126_400..129_600] {
+            samples[range].fill(0.0);
+        }
+        for history in [false, true] {
+            let state = WhisperState::new();
+            let mut lengths = Vec::new();
+            state
+                .decode_with_one_retry_using(&samples, |audio, _| {
+                    let first = lengths.is_empty();
+                    lengths.push(audio.len());
+                    Ok(DecodeAttempt {
+                        output: PreviewTranscription {
+                            text: "Recovered".into(),
+                            segments: Vec::new(),
+                        },
+                        native_low_confidence_rejection: false,
+                        native_repetition_rejection_history: history,
+                        native_terminal_failure: first,
+                        near_end_completion_offset_frames: None,
+                    })
+                })
+                .unwrap();
+            assert_eq!(
+                lengths,
+                if history {
+                    vec![152_000, 24_000, 40_000, 64_000, 24_000]
+                } else {
+                    vec![152_000, 128_000, 24_000]
+                }
+            );
+        }
+    }
+
+    #[test]
+    fn safe_boundaries_do_not_enable_recovery_on_healthy_decoding() {
+        let mut samples = voiced(240_000);
+        samples[70_000..74_000].fill(0.0);
+        samples[150_000..154_000].fill(0.0);
+        assert!(digital_silence_retry_ranges(&samples).is_some());
+        let state = WhisperState::new();
+        let mut calls = 0;
+        let output = state
+            .decode_with_one_retry_using(&samples, |_, _| {
+                calls += 1;
+                Ok(DecodeAttempt {
+                    output: PreviewTranscription {
+                        text: "Unchanged healthy output".into(),
+                        segments: Vec::new(),
+                    },
+                    native_low_confidence_rejection: false,
+                    native_repetition_rejection_history: false,
+                    native_terminal_failure: false,
+                    near_end_completion_offset_frames: None,
+                })
+            })
+            .unwrap();
+        assert_eq!(calls, 1);
+        assert_eq!(output.text, "Unchanged healthy output");
+        assert!(!state.decode_decisions()[0].retried);
+    }
+
+    #[test]
+    fn recovery_keeps_context_and_stops_at_the_first_failed_retry() {
+        let mut samples = voiced(240_000);
+        samples[70_000..74_000].fill(0.0);
+        samples[150_000..154_000].fill(0.0);
+        for retry_fails in [false, true] {
+            let state = WhisperState::new();
+            let mut ranges = Vec::new();
+            let output = state.decode_with_one_retry_using(&samples, |audio, context| {
+                let first = ranges.is_empty();
+                ranges.push(audio.len());
+                assert_eq!(
+                    retry_audio_context(audio.len(), context),
+                    if first { 0 } else { 512 }
+                );
+                Ok(DecodeAttempt {
+                    output: PreviewTranscription {
+                        text: "Recovered".into(),
+                        segments: Vec::new(),
+                    },
+                    native_low_confidence_rejection: !first && retry_fails,
+                    // Repetition history on a retry must not start recursive recovery.
+                    native_repetition_rejection_history: true,
+                    native_terminal_failure: false,
+                    near_end_completion_offset_frames: None,
+                })
+            });
+            if retry_fails {
+                assert!(output
+                    .unwrap_err()
+                    .contains("retry still reported incomplete decoding"));
+                assert_eq!(ranges, vec![240_000, 72_000]);
+                assert!(state.decode_decisions()[0].retry_failed);
+            } else {
+                assert_eq!(output.unwrap().text, "Recovered Recovered Recovered");
+                assert_eq!(ranges, vec![240_000, 72_000, 80_000, 88_000]);
+                assert!(!state.decode_decisions()[0].retry_failed);
+            }
+        }
+    }
+}
+
+#[cfg(test)]
 mod single_region_tail_tests {
     use super::*;
     fn tail() -> Vec<f32> {
@@ -1980,8 +2258,17 @@ mod terminal_retry_controller_tests {
     fn healthy_selected_decoder_with_history_uses_one_nonrecursive_recovery_pass() {
         let state = WhisperState::new();
         let samples = audio();
-        let ranges = coalesce_retry_ranges(utterance_ranges(&samples));
-        assert!(ranges.len() >= 2);
+        let ranges = vec![
+            0..48_000,
+            48_000..112_000,
+            112_000..176_000,
+            176_000..240_000,
+            240_000..304_000,
+            304_000..368_000,
+            368_000..432_000,
+            432_000..480_000,
+        ];
+        assert_eq!(decoder_failure_retry_ranges(&samples, true), ranges);
         let mut calls = 0;
         let output = state
             .decode_with_one_retry_using(&samples, |_, context| {
