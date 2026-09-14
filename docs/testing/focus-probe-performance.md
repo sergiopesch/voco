@@ -1,0 +1,5 @@
+# Destination-probe performance
+
+The desktop focus helper invalidates each visited AT-SPI object's cache with `clear_cache_single()` immediately before reading its properties. This API is supplied by the Ubuntu reference libatspi. Unlike recursive `clear_cache()`, it avoids repeatedly traversing unrelated descendants as the search visits parents and children. It does not reuse focus results across requests, change the traversal limits, omit terminal detection, or remove the expected-target token comparison.
+
+Performance logs retain aggregate target-probe, clipboard and keyboard timings. Private public-audio native tests provide visible-field timestamps. These measure different boundaries. Test applications must service accessibility requests promptly: sleeping 5 ms between GTK dispatches can inflate a chain of synchronous queries. The runtime-optimization evidence round records old/new harness controls separately from application comparisons. Native Wayland and physical microphone acceptance remain separate qualification work.

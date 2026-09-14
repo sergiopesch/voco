@@ -1,6 +1,6 @@
-import type { CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import type { RealtimeStatus } from "@/types";
-import vocoBrandImage from "../../../../assets/voco-logo.png";
+import vocoBrandImage from "../../../../assets/voco-symbol-ui.png";
 
 interface RealtimeMicVisualProps {
   active: boolean;
@@ -17,13 +17,36 @@ const WAVE_BARS = [
   { id: "e", weight: 0.5 },
 ] as const;
 
+const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
+
+function reducedMotionRequested(): boolean {
+  return typeof window !== "undefined" && typeof window.matchMedia === "function"
+    ? window.matchMedia(REDUCED_MOTION_QUERY).matches
+    : false;
+}
+
 export function RealtimeMicVisual({
   active,
   level,
   status,
   size = "compact",
 }: RealtimeMicVisualProps) {
-  const visualLevel = Math.max(0, Math.min(1, level));
+  const [reducedMotion, setReducedMotion] = useState(reducedMotionRequested);
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") {
+      return;
+    }
+    const preference = window.matchMedia(REDUCED_MOTION_QUERY);
+    const updatePreference = () => setReducedMotion(preference.matches);
+    preference.addEventListener("change", updatePreference);
+    updatePreference();
+    return () => preference.removeEventListener("change", updatePreference);
+  }, []);
+
+  // Removing CSS transitions alone still lets audio samples move the graphic.
+  // Hold every decorative level-driven property still when motion is reduced.
+  const visualLevel = reducedMotion ? 0 : Math.max(0, Math.min(1, level));
   const style = {
     "--voco-realtime-level": visualLevel.toFixed(3),
     "--voco-realtime-image-scale": (1 + visualLevel * 0.16).toFixed(3),
@@ -41,6 +64,7 @@ export function RealtimeMicVisual({
       data-active={active}
       data-size={size}
       data-status={status}
+      data-reduced-motion={reducedMotion}
       style={style}
       aria-hidden="true"
     >

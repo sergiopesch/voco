@@ -52,7 +52,10 @@ jobs:
             libjavascriptcoregtk-4.1-dev libwebkit2gtk-4.1-dev \
             libayatana-appindicator3-dev clang mold cmake file wget \
             desktop-file-utils appstream ripgrep \
-            ibus python3 python3-gi gir1.2-ibus-1.0 bubblewrap
+            ibus ibus-gtk3 python3 python3-numpy python3-psutil python3-gi gir1.2-ibus-1.0 bubblewrap \
+            xvfb xdotool gir1.2-gtk-3.0 gir1.2-webkit2-4.1 gir1.2-atspi-2.0 at-spi2-core \
+            pulseaudio pulseaudio-utils libpulse-dev gstreamer1.0-plugins-good \
+            weston libweston-13-0 wayland-utils gir1.2-gtk-4.0 gir1.2-webkit-6.0
 
       - uses: dtolnay/rust-toolchain@fa04a1451ff1842e2626ccb99004d0195b455a88
         with:
@@ -88,12 +91,45 @@ jobs:
       - name: Frontend quality gate
         run: npm run check && npm run lint && npm test && npm --workspace @voco/desktop run build:frontend
 
+      - name: Install renderer test browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Dictation renderer lifecycle regression
+        run: npm run test:dictation-renderer
+
+      - name: Microphone refresh and retry regression
+        run: npm run test:microphone-renderer
+        env:
+          VOCO_RENDERER_EVIDENCE_DIR: ${{ runner.temp }}/voco-microphone-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Chromium exact-field adversarial regression
+        run: npm run test:chromium-exact-field
+
       - name: Private headless IBus lifecycle
         run: bash scripts/test-private-ibus-engine-hosted.sh
 
+      - name: Native GTK delivery and WebKit coverage checks
+        timeout-minutes: 5
+        env:
+          VOCO_NATIVE_EVIDENCE_DIR: ${{ runner.temp }}/voco-native-desktop
+        run: bash scripts/test-private-ibus-engine-hosted.sh --native-desktop
+
       - name: Rust quality gate
         working-directory: apps/desktop/src-tauri
-        run: cargo fmt --check && cargo test --locked && cargo clippy --locked --all-targets --all-features -- -D warnings
+        run: cargo fmt --check && cargo test --locked --all-targets && cargo test --locked --lib --features native-capture-dev && cargo clippy --locked --all-targets --all-features -- -D warnings
+
+      - name: Existing-model speech regression baseline
+        env:
+          VOCO_MODEL_PATH: ${{ runner.temp }}/voco-ggml-base.en.bin
+        run: |
+          curl --fail --location --retry 3 --max-time 180 --output "$VOCO_MODEL_PATH" \
+            https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin
+          echo "a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002  $VOCO_MODEL_PATH" | sha256sum --check --strict
+          speech_failed=0
+          npm run test:speech-baseline -- --report "${{ runner.temp }}/voco-speech-baseline.json" || speech_failed=1
+          npm run test:speech-continuity -- --report "${{ runner.temp }}/voco-speech-continuity.json" || speech_failed=1
+          npm run test:speech-adversarial -- --output-dir "${{ runner.temp }}/voco-speech-adversarial" || speech_failed=1
+          exit "$speech_failed"
 
       - name: Configure mold linker
         run: |
@@ -104,10 +140,20 @@ jobs:
         run: cargo install tauri-cli --version "2.10.1" --locked
 
       - name: Build Debian bundle
-        working-directory: apps/desktop
         env:
           CMAKE_BUILD_PARALLEL_LEVEL: "4"
-        run: cargo tauri build --features custom-protocol --bundles deb -- --locked
+        run: bash scripts/build-desktop.sh
+
+      # A base Tauri archive has no NVIDIA worker/model. Never publish it as a
+      # complete dictation app. Pinned portable runtime provisioning is a release gate.
+      - name: Assemble complete local speech payload
+        shell: bash
+        run: |
+          DEB=$(find apps/desktop/src-tauri/target/release/bundle/deb -name "*${{ steps.version.outputs.version }}*amd64.deb" | sort | tail -1)
+          test -n "$DEB"
+          BASE="${RUNNER_TEMP}/voco-tauri-base.deb"
+          mv "$DEB" "$BASE"
+          python3 scripts/package-nvidia.py "$BASE" "$DEB"
 
       - name: Verify Debian bundle
         shell: bash
@@ -118,6 +164,53 @@ jobs:
             exit 1
           fi
           bash scripts/verify-deb-package.sh "$DEB" "${{ steps.version.outputs.version }}"
+          CANDIDATE_DIR="${RUNNER_TEMP}/voco-native-packaged"
+          mkdir -p "$CANDIDATE_DIR"
+          dpkg-deb --extract "$DEB" "$CANDIDATE_DIR"
+          echo "VOCO_NATIVE_APP_BINARY=${CANDIDATE_DIR}/usr/bin/voco" >> "$GITHUB_ENV"
+          echo "VOCO_BROWSER_HOST_BINARY=${CANDIDATE_DIR}/usr/libexec/voco-browser-host" >> "$GITHUB_ENV"
+          echo "VOCO_BROWSER_EXTENSION_DIR=${CANDIDATE_DIR}/usr/share/voco/chromium" >> "$GITHUB_ENV"
+
+      - name: Native application capture and manual Copy
+        timeout-minutes: 5
+        env:
+          VOCO_NATIVE_BUILD_ROLE: packaged-candidate
+          VOCO_NATIVE_MODEL: ${{ runner.temp }}/voco-ggml-base.en.bin
+          VOCO_NATIVE_EVIDENCE_DIR: ${{ runner.temp }}/voco-native-application
+        run: bash scripts/test-private-ibus-engine-hosted.sh --full-application
+
+      - name: Packaged application Wayland lifecycle and model cache readiness
+        timeout-minutes: 3
+        env:
+          VOCO_WAYLAND_DEPS: /usr
+          VOCO_WAYLAND_MODEL: ${{ runner.temp }}/voco-ggml-base.en.bin
+          VOCO_WAYLAND_EVIDENCE_DIR: ${{ runner.temp }}/voco-native-wayland
+        run: VOCO_WAYLAND_APP_BINARY="$VOCO_NATIVE_APP_BINARY" bash scripts/test-private-ibus-engine-hosted.sh --native-wayland
+
+      - name: Packaged application capture to exact Chromium field
+        timeout-minutes: 5
+        env:
+          VOCO_NATIVE_MODEL: ${{ runner.temp }}/voco-ggml-base.en.bin
+          VOCO_BROWSER_EVIDENCE_DIR: ${{ runner.temp }}/voco-browser-application
+        run: bash scripts/test-private-ibus-engine-hosted.sh --browser-application
+
+      - name: Retain native application evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: native-application-evidence
+          path: |
+            ${{ runner.temp }}/voco-native-desktop/
+            ${{ runner.temp }}/voco-native-application/
+            ${{ runner.temp }}/voco-native-wayland/
+            ${{ runner.temp }}/voco-browser-application/
+            ${{ runner.temp }}/voco-speech-*.json
+            ${{ runner.temp }}/voco-speech-adversarial/**/*.json
+            ${{ runner.temp }}/voco-speech-adversarial/**/*.log
+            ${{ runner.temp }}/voco-speech-adversarial/**/*.stderr
+            ${{ runner.temp }}/voco-speech-adversarial/transcribe.rs
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Collect release artifacts
         shell: bash

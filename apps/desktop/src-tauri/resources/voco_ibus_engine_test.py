@@ -82,6 +82,18 @@ class FakeEngine:
             self.commands.append((command.operation, command.text, ""))
 
 
+class DisabledTransportSinkTests(unittest.TestCase):
+    def test_lifecycle_clear_cannot_send_composition_and_mutations_reject(self):
+        class ForbiddenTarget:
+            def __getattr__(self, name):
+                raise AssertionError('target operation attempted: ' + name)
+        target = ForbiddenTarget()
+        VocoEngine.clear_preedit(target)
+        for operation in (VocoEngine.set_preedit, VocoEngine.commit_value):
+            with self.assertRaisesRegex(RuntimeError, 'original text field'):
+                operation(target, 'never insert')
+
+
 class CoordinatorTests(unittest.TestCase):
     def setUp(self) -> None:
         self.coordinator = VocoCoordinator()
@@ -396,6 +408,8 @@ class CoordinatorTests(unittest.TestCase):
         self.coordinator.update(session_id, "live words", " tail", "live words tail")
         status = self.coordinator.commit(session_id, "authoritative final")
         self.assertEqual(status["finalizationOutcome"], "preserved")
+        self.assertEqual(status["committedCharacterCount"], len("live words tail"))
+        self.assertNotEqual(status["committedCharacterCount"], len("authoritative final"))
         operations = [command[0] for command in self.engine.commands]
         self.assertEqual(
             operations,
@@ -415,6 +429,7 @@ class CoordinatorTests(unittest.TestCase):
         self.coordinator.update(session_id, "live words", " tail", "live words tail")
         status = self.coordinator.commit(session_id, "live words tail")
         self.assertEqual(status["finalizationOutcome"], "committed")
+        self.assertEqual(status["committedCharacterCount"], len("live words tail"))
         self.assertEqual(self.engine.commands[-2:], [
             ("clear-preedit",),
             ("commit-text", " tail", ""),
@@ -426,12 +441,35 @@ class CoordinatorTests(unittest.TestCase):
         self.coordinator.update(session_id, "", "draft", "draft")
         status = self.coordinator.commit(session_id, "authoritative final")
         self.assertEqual(status["finalizationOutcome"], "committed")
+        self.assertEqual(status["committedCharacterCount"], len("authoritative final"))
         operations = [command[0] for command in self.engine.commands]
         self.assertEqual(
             operations,
             ["advance-preedit", "clear-preedit", "commit-text"],
         )
         self.assert_no_destructive_command()
+
+    def test_one_shot_without_preview_acknowledges_exact_unicode_count(self) -> None:
+        session_id = self.start()
+        text = "A café 👩‍💻 é"
+        status = self.coordinator.commit(session_id, text)
+        self.assertEqual(status["sessionId"], session_id)
+        self.assertEqual(status["finalizationOutcome"], "committed")
+        self.assertEqual(status["committedCharacterCount"], len(text))
+        self.assertTrue(status["ownershipIntact"])
+        self.assertEqual(self.engine.commands[-1], ("commit-text", text, ""))
+        self.assertIsNone(self.coordinator.session_id)
+
+    def test_failed_final_dispatch_does_not_acknowledge_requested_text(self) -> None:
+        session_id = self.start()
+        with patch.object(self.engine, "execute_finalization", side_effect=RuntimeError("dispatch failed")):
+            with self.assertRaisesRegex(RuntimeError, "dispatch failed"):
+                self.coordinator.commit(session_id, "unconfirmed final")
+        self.assertEqual(self.coordinator.status()["committedCharacterCount"], 0)
+        self.assertIsNone(self.coordinator.status()["finalizationOutcome"])
+        self.assertTrue(self.coordinator.finalization_pending)
+        with self.assertRaisesRegex(RuntimeError, "already being prepared"):
+            self.coordinator.update(session_id, "", "retry", "retry")
 
     def test_disconnect_clears_only_preedit_and_preserves_commits(self) -> None:
         session_id = self.start()
@@ -526,6 +564,37 @@ class FocusEngineDouble:
 
 
 class EngineContextTransitionTests(unittest.TestCase):
+    def test_changed_safe_metadata_revokes_active_context_ownership(self):
+        engine = FocusEngineDouble()
+        VocoEngine.do_set_content_type(engine, int(IBus.InputPurpose.FREE_FORM), int(IBus.InputHints.SPELLCHECK))
+        self.assertTrue(engine.can_accept_preedit)
+        self.assertFalse(engine.coordinator.ownership_intact)
+
+    def test_changed_safe_metadata_revokes_unclaimed_trigger(self):
+        engine = FocusEngineDouble()
+        engine.bound_session_id = None
+        engine.coordinator.session_id = None
+        engine._voco_input_hints = int(IBus.InputHints.SPELLCHECK)
+        engine.coordinator.poll_trigger('Alt+D')
+        self.assertTrue(engine.coordinator.consume_shortcut(engine, ord('d'), int(IBus.ModifierType.MOD1_MASK)))
+        token = engine.coordinator.poll_trigger('Alt+D')['trigger']['triggerId']
+        VocoEngine.do_set_content_type(engine, int(IBus.InputPurpose.FREE_FORM), int(IBus.InputHints.WORD_COMPLETION))
+        with self.assertRaises(RuntimeError):
+            engine.coordinator.claim_trigger(token)
+
+
+    def test_equal_transport_capabilities_survive_context_switch_but_metadata_does_not(self):
+        engine = FocusEngineDouble()
+        engine.bound_session_id = None
+        engine.ownership_lease.unbind_session()
+        VocoEngine._leave_focus(engine)
+        VocoEngine._enter_focus(engine, ("id", "/new-widget", "gtk3"))
+        self.assertFalse(engine.can_accept_preedit)
+        self.assertEqual(engine._voco_target_capabilities, int(IBus.Capabilite.PREEDIT_TEXT))
+        VocoEngine.do_set_content_type(engine, int(IBus.InputPurpose.FREE_FORM), int(IBus.InputHints.SPELLCHECK))
+        self.assertTrue(engine.can_accept_preedit)
+
+
     def test_id_change_without_focus_out_clears_and_invalidates_preedit(self) -> None:
         engine = FocusEngineDouble()
         VocoEngine._enter_focus(engine, ("id", "/new", "client"))
@@ -1089,6 +1158,164 @@ class SessionControlHotkeyTests(unittest.TestCase):
             )
         )
         self.assertTrue(is_session_control_key(IBus.keyval_from_name("Alt_L"), 0))
+
+
+
+class ConsumingShortcutTests(unittest.TestCase):
+    def setUp(self):
+        self.coordinator = VocoCoordinator()
+        self.engine = FakeEngine()
+        self.coordinator.activate_engine(self.engine)
+        self.key = IBus.keyval_from_name('d')
+        self.alt = int(IBus.ModifierType.MOD1_MASK)
+
+    def trigger(self):
+        self.coordinator.poll_trigger('Alt+D')
+        self.assertTrue(self.coordinator.consume_shortcut(self.engine, self.key, self.alt))
+        return self.coordinator.poll_trigger('Alt+D')['trigger']['triggerId']
+
+    def test_absent_or_expired_client_does_not_swallow_shortcut(self):
+        self.assertFalse(self.coordinator.consume_shortcut(self.engine, self.key, self.alt))
+        self.coordinator.poll_trigger('Alt+D')
+        self.coordinator.shortcut_armed_until = 0
+        self.assertFalse(self.coordinator.consume_shortcut(self.engine, self.key, self.alt))
+
+    def test_verified_trigger_is_one_shot_and_poll_delivery_is_once(self):
+        token = self.trigger()
+        self.assertIsNone(self.coordinator.poll_trigger('Alt+D')['trigger'])
+        self.coordinator.claim_trigger(token)
+        self.coordinator.start(100)
+        with self.assertRaises(RuntimeError):
+            self.coordinator.claim_trigger(token)
+
+    def test_negative_poll_disarms_until_next_eligible_poll(self):
+        self.engine.can_accept_preedit = False
+        self.assertFalse(self.coordinator.poll_trigger('Alt+D')['armed'])
+        self.engine.can_accept_preedit = True
+        self.assertFalse(self.coordinator.consume_shortcut(self.engine, self.key, self.alt))
+        self.assertTrue(self.coordinator.poll_trigger('Alt+D')['armed'])
+        self.assertTrue(self.coordinator.consume_shortcut(self.engine, self.key, self.alt))
+
+    def test_sensitive_field_does_not_consume_shortcut(self):
+        self.coordinator.poll_trigger('Alt+D')
+        self.engine.can_accept_preedit = False
+        self.assertFalse(self.coordinator.consume_shortcut(self.engine, self.key, self.alt))
+
+    def test_focus_switch_before_start_cannot_redirect(self):
+        token = self.trigger()
+        self.coordinator.activate_engine(FakeEngine())
+        with self.assertRaises(RuntimeError):
+            self.coordinator.claim_trigger(token)
+        self.assertIsNone(self.coordinator.session_id)
+
+    def test_focus_away_and_back_invalidates_even_same_engine(self):
+        token = self.trigger()
+        self.coordinator.deactivate_engine(self.engine)
+        self.coordinator.activate_engine(self.engine)
+        with self.assertRaises(RuntimeError):
+            self.coordinator.claim_trigger(token)
+
+    def test_context_revision_change_invalidates(self):
+        token = self.trigger()
+        self.engine.context_revision += 1
+        with self.assertRaises(RuntimeError):
+            self.coordinator.claim_trigger(token)
+
+    def test_typing_before_start_invalidates(self):
+        token = self.trigger()
+        self.coordinator.register_key_event(IBus.keyval_from_name('x'), 0)
+        with self.assertRaises(RuntimeError):
+            self.coordinator.claim_trigger(token)
+
+    def test_reset_before_start_invalidates(self):
+        token = self.trigger()
+        self.coordinator.register_context_reset(self.engine)
+        with self.assertRaises(RuntimeError):
+            self.coordinator.claim_trigger(token)
+
+    def test_expired_or_forged_token_fails_closed(self):
+        token = self.trigger()
+        with self.assertRaises(RuntimeError):
+            self.coordinator.claim_trigger('forged')
+        with self.assertRaises(RuntimeError):
+            self.coordinator.claim_trigger(token)
+        self.coordinator.consumed_shortcut_keys.clear()
+        token = self.trigger()
+        with patch('voco_ibus_engine.time.monotonic', return_value=10**20):
+            with self.assertRaises(RuntimeError):
+                self.coordinator.claim_trigger(token)
+
+    def test_repeat_and_release_are_consumed_without_duplicate_trigger(self):
+        self.trigger()
+        self.assertTrue(self.coordinator.consume_shortcut(self.engine, self.key, self.alt))
+        self.assertIsNone(self.coordinator.poll_trigger('Alt+D')['trigger'])
+        self.assertTrue(self.coordinator.consume_shortcut(self.engine, self.key, self.alt | int(IBus.ModifierType.RELEASE_MASK)))
+        self.assertFalse(self.coordinator.consume_shortcut(self.engine, self.key, self.alt | int(IBus.ModifierType.RELEASE_MASK)))
+
+    def test_missing_release_cannot_swallow_ordinary_typing(self):
+        self.trigger()
+        self.assertFalse(self.coordinator.consume_shortcut(self.engine, self.key, 0))
+
+    def test_missing_release_after_focus_change_does_not_block_new_shortcut(self):
+        self.trigger()
+        self.coordinator.deactivate_engine(self.engine)
+        self.coordinator.activate_engine(self.engine)
+        self.assertTrue(self.coordinator.consume_shortcut(self.engine, self.key, self.alt))
+        self.assertIsNotNone(self.coordinator.poll_trigger('Alt+D')['trigger'])
+
+    def test_missing_release_after_client_expiry_does_not_swallow_keys(self):
+        self.trigger()
+        self.coordinator.shortcut_armed_until = 0
+        self.assertFalse(self.coordinator.consume_shortcut(self.engine, self.key, self.alt))
+
+    def test_disconnect_disarms_and_revokes_trigger(self):
+        token = self.trigger()
+        self.coordinator.disconnect_client()
+        with self.assertRaises(RuntimeError):
+            self.coordinator.claim_trigger(token)
+
+    def test_protocol_rejects_passive_start_without_token(self):
+        from voco_ibus_engine import dispatch_command
+        with self.assertRaisesRegex(RuntimeError, 'original text field'):
+            dispatch_command(self.coordinator, {'operation': 'start', 'clientSessionId': 1})
+        self.assertIsNone(self.coordinator.session_id)
+
+    def test_public_mutations_reject_even_with_valid_token_or_existing_policy_session(self):
+        from voco_ibus_engine import dispatch_command
+        token = self.trigger()
+        for active in (False, True):
+            if active:
+                # A policy session is deliberately injected to exercise mutation
+                # guards independently of the public start guard.
+                self.coordinator.start(41)
+            before = list(self.engine.commands)
+            for operation in ('start', 'update', 'commit', 'checkpoint', 'finish-canonical', 'cancel'):
+                with self.subTest(active=active, operation=operation):
+                    with self.assertRaisesRegex(RuntimeError, 'original text field'):
+                        dispatch_command(self.coordinator, dict(operation=operation,
+                            triggerId=token, clientSessionId=41, sessionId=41,
+                            confirmedText='', preeditText='draft', provisionalText='draft',
+                            text='never insert', expectedCommittedText='', appendText='never insert'))
+                    self.assertEqual(self.engine.commands, before)
+        status = dispatch_command(self.coordinator, {'operation': 'status'})
+        self.assertFalse(status['ready'])
+        self.assertFalse(status['ownershipIntact'])
+        self.assertEqual(status['setupState'], 'safety-disabled')
+
+    def test_registration_change_discards_old_trigger_and_uses_new_chord(self):
+        token = self.trigger()
+        self.coordinator.consumed_shortcut_keys.clear()
+        self.coordinator.poll_trigger('Ctrl+Shift+V')
+        with self.assertRaises(RuntimeError):
+            self.coordinator.claim_trigger(token)
+        self.assertFalse(self.coordinator.consume_shortcut(self.engine, self.key, self.alt))
+        self.assertTrue(self.coordinator.consume_shortcut(self.engine, IBus.keyval_from_name('v'), int(IBus.ModifierType.CONTROL_MASK | IBus.ModifierType.SHIFT_MASK)))
+
+    def test_dead_client_does_not_consume_fresh_press_after_consumed_release(self):
+        self.trigger()
+        self.coordinator.disconnect_client()
+        self.assertTrue(self.coordinator.consume_shortcut(self.engine, self.key, self.alt | int(IBus.ModifierType.RELEASE_MASK)))
+        self.assertFalse(self.coordinator.consume_shortcut(self.engine, self.key, self.alt))
 
 
 if __name__ == "__main__":

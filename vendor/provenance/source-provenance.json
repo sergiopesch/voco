@@ -1,0 +1,33 @@
+{
+  "scope": "Frozen combined-native source only; newly assembled source has NOT yet been built or inferred. Separate diagnostic9/reset and lexical-development evidence are not combined-worker acceptance.",
+  "versions": {
+    "whisper-rs": "0.14.4",
+    "whisper-rs-sys": "0.13.1",
+    "whisper.cpp": "1.7.4"
+  },
+  "nativeNearEndValidationProvenanceSha256": "a9455d4950eb4999ab809a06e70c70645687f18a2d18f99822d3a3feb4fb40df",
+  "originalDiagnosticValidationProvenanceSha256": "bf791f02e7e85021357b801df5ed38dca21def74fcf3690dd4a3659be96000bc",
+  "modelSha256": "a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002",
+  "patchOrder": [
+    "diagnostic.patch",
+    "build-refresh.patch",
+    "near-end-diagnostic.patch",
+    "lexical-confidence.patch"
+  ],
+  "sha256": {
+    "whisper-rs-sys/whisper.cpp/src/whisper.cpp": "9e6c650365505b952fbc8a7a091e0ecb534ea7ecf3260618fd5d906bf7910512",
+    "whisper-rs-sys/whisper.cpp/include/whisper.h": "6aaa0a53830e790fc4c47a566fa60eafb1cccf5785655bf13ffecf2812b140c1",
+    "whisper-rs-sys/src/bindings.rs": "e64800d84e907ca516c98cd9d9761f2d1a0aeb58e897f9bbc93e3a3cb0a7d29a",
+    "whisper-rs/src/whisper_state.rs": "80d3baeaae6fc1b8244f9a08588ed69e6480e84ce56163c9c272cc2f49c4db6d",
+    "whisper-rs-sys/build.rs": "1cbd1830c096f30a82251c48af5616c3d4b8708e6ec270963ea4405bbf8fcb50",
+    "combined-pristine.patch": "e2b09a9b8950c4dc24a8f7e4767b67494af4ff729853efc9fb37d64ac4d6f59e",
+    "diagnostic.patch": "f68d8b445f7b38be9193560548ec056b41d7cfce63cfb2daf4bdf2832def5df4",
+    "build-refresh.patch": "4d2510a1af4e677cfd186b14a8f2a3aaa30ff41ad7b53d69a5c4cf4044e8e728",
+    "near-end-diagnostic.patch": "ba18a8ed27e39e7f8dd8a9fb97d522f673411ede76bb25a91f48fd1d8f0e06cb",
+    "lexical-confidence.patch": "b8908821a415c646a03c6e48fb11fe9757d633aa59b90ce07a95f5b111dc43fc",
+    "pristine-whisper-rs-0.14.4.crate": "4d2eac0a371f8ae667a5ee15ae4130553ea3004e7572544d1ce546c81ea8874b",
+    "pristine-whisper-rs-sys-0.13.1.crate": "1c86f1b993f216594b1ad9a9bb00a26014fb7c512e12664a2d401c7897d2ef7d",
+    "whisper-rs/LICENSE": "f0510d3b9d1223c45e8fdd2b49270ec8734fff491c7f7d1b948ee70162e1ceff",
+    "whisper-rs-sys/whisper.cpp/LICENSE": "e562a2ddfaf8280537795ac5ecd34e3012b6582a147ef69ba6a6a5c08c84757d"
+  }
+}

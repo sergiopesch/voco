@@ -1,0 +1,8 @@
+{
+  "source": "https://huggingface.co/nvidia/nemotron-speech-streaming-en-0.6b",
+  "revision": "ebe59e5a817142986528bbbee5dba8db7b38ed50",
+  "model_sha256": "d9a01898d2a611c8764e23a1c2f45e70bbd5a425dc4de93692ac951dd603812d",
+  "architecture": "CPU host-native",
+  "context": 1,
+  "cpu_threads": 4
+}

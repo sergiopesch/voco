@@ -1,0 +1,33 @@
+--- a/whisper-rs-sys/build.rs
++++ b/whisper-rs-sys/build.rs
+@@ -100,20 +100,20 @@
+     }
+ 
+     println!("cargo:rerun-if-changed=wrapper.h");
++    println!("cargo:rerun-if-env-changed=WHISPER_DONT_GENERATE_BINDINGS");
++    println!("cargo:rerun-if-changed=whisper.cpp");
++    println!("cargo:rerun-if-changed=src/bindings.rs");
+ 
+     let out = PathBuf::from(env::var("OUT_DIR").unwrap());
+     let whisper_root = out.join("whisper.cpp/");
+ 
+-    if !whisper_root.exists() {
+-        std::fs::create_dir_all(&whisper_root).unwrap();
+-        fs_extra::dir::copy("./whisper.cpp", &out, &Default::default()).unwrap_or_else(|e| {
+-            panic!(
+-                "Failed to copy whisper sources into {}: {}",
+-                whisper_root.display(),
+-                e
+-            )
+-        });
+-    }
++    // This directory is generated exclusively by this build script. Refresh it
++    // on every rerun so changed and removed vendored files cannot remain stale.
++    if whisper_root.exists() {
++        std::fs::remove_dir_all(&whisper_root).expect("Failed to refresh generated Whisper sources");
++    }
++    fs_extra::dir::copy("./whisper.cpp", &out, &Default::default())
++        .expect("Failed to copy current vendored Whisper sources");
+ 
+     if env::var("WHISPER_DONT_GENERATE_BINDINGS").is_ok() {
+         let _: u64 = std::fs::copy("src/bindings.rs", out.join("bindings.rs"))

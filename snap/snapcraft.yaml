@@ -1,8 +1,8 @@
 name: voco
 title: VOCO
 base: core24
-version: '2026.0.21'
-summary: Voice-native interface layer for Linux
+version: '2026.0.35'
+summary: Local dictation at your cursor. Built for Linux.
 license: MIT
 website: https://github.com/sergiopesch/voco
 source-code: https://github.com/sergiopesch/voco
@@ -10,11 +10,17 @@ issues: https://github.com/sergiopesch/voco/issues
 contact: https://github.com/sergiopesch/voco/issues
 
 description: |
-  VOCO is a Linux desktop dictation tool built for low friction and high trust.
-  It lives in the tray, listens on demand, keeps core dictation transcription
-  local, and inserts transcripts into the app you are already using. The
-  optional Realtime conversation mode sends microphone audio to OpenAI only
-  after the user explicitly starts it.
+  Your voice, typed. Built for Linux.
+
+  VOCO turns speech into text at your cursor. Press a hotkey, speak, and press
+  it again to finish. It stays in the tray and transcribes normal dictation on
+  your device, with no account or subscription required. Text insertion depends
+  on your desktop session and the target field.
+
+  Optional local model modes use your own localhost model server. Optional
+  OpenClaw modes may send transcript text according to your configured provider.
+  Realtime conversation sends microphone audio to OpenAI only after you
+  explicitly start that mode.
 
   This Snap still uses classic confinement intentionally. VOCO currently
   relies on desktop automation paths that are not an honest fit for strict

@@ -104,13 +104,19 @@ for (const [index, line] of lines.entries()) {
   } catch {
     continue;
   }
+  if (entry === null || typeof entry !== "object" || Array.isArray(entry) ||
+    typeof entry.event !== "string" || entry.event.trim().length === 0 ||
+    (entry.dictation_session_id != null &&
+      (!Number.isSafeInteger(entry.dictation_session_id) || entry.dictation_session_id <= 0))) {
+    continue;
+  }
 
   allParsedEntries.push({
     event: entry.event,
     index,
     durationMs: Number.isFinite(entry.duration_ms) ? entry.duration_ms : null,
     tMs: Number.isFinite(entry.t_ms) ? entry.t_ms : null,
-    dictationSessionId: Number.isInteger(entry.dictation_session_id)
+    dictationSessionId: Number.isSafeInteger(entry.dictation_session_id)
       ? entry.dictation_session_id
       : null,
   });
@@ -158,17 +164,31 @@ const latestCompletedSessionReport =
     : sessionReports.find(
         (report) => report.sessionId === latestCompletedSessionId,
       ) ?? null;
+const strictSessionReports = options.strict ? summarizeStrictSessions(parsedEntries) : [];
+const latestObservedReport = strictSessionReports.at(-1) ?? null;
 const selectedReport =
-  issueReport ??
-  latestCompletedSessionReport ??
+  (options.strict
+    ? findHighestPriorityIssue(strictSessionReports) ?? latestObservedReport
+    : issueReport ?? latestCompletedSessionReport) ??
   {
     classification: null,
     sessionId: null,
     summary: summarizeEntries(parsedEntries),
   };
 const { rows, notableCounts } = selectedReport.summary;
-const classification =
+let classification =
   selectedReport.classification ?? classifySummary(selectedReport.summary, options);
+const latestRecordingStart = Math.max(
+  findLastEventIndex(parsedEntries, "recording_state_requested"),
+  findLastEventIndex(parsedEntries, "recording_state_active"),
+);
+if (options.strict && latestRecordingStart > findLastEventIndex(parsedEntries, "dictation_stop_to_idle")) {
+  classification = {
+    priority: 3,
+    status: "latest-dictation-incomplete",
+    detail: "the latest recording started without a subsequent completion; earlier successful sessions cannot satisfy acceptance",
+  };
+}
 
 console.log("VOCO cursor streaming trace report");
 console.log("");
@@ -188,6 +208,9 @@ if (options.expectFinalOnly) {
 }
 if (latestCompletedSessionId !== null) {
   console.log(`Latest completed dictation session: ${latestCompletedSessionId}`);
+}
+if (options.strict && latestObservedReport !== null) {
+  console.log(`Latest observed dictation session: ${latestObservedReport.sessionId ?? "untagged"}`);
 }
 if (selectedReport.sessionId !== null) {
   console.log(`Reported dictation session scope: ${selectedReport.sessionId}`);
@@ -218,6 +241,56 @@ console.log("");
 console.log("Notable events");
 for (const [event, count] of notableCounts) {
   console.log(`${event}: ${count}`);
+}
+
+// Reporting remains useful on incomplete traces; acceptance must fail closed.
+// An overlay/copy fallback is not successful delivery to a supported target.
+if (options.strict) {
+  const passed = classification.priority === 6 &&
+    strictSessionReports.length > 0 &&
+    strictSessionReports.every((report) => report.classification.priority === 6 &&
+      report.summary.fallbackCount === 0 && report.summary.previewFailureCount === 0) &&
+    allParsedEntries.length === lines.length;
+  console.log(`Acceptance gate: ${passed ? "PASS" : "FAIL"}`);
+  process.exitCode = passed ? 0 : 1;
+}
+
+function summarizeStrictSessions(entries) {
+  // Include sessions that never reached idle. A completion-only index silently
+  // hides a later microphone failure, cancellation, crash, or unfinished capture.
+  const tagged = new Map();
+  const untagged = [];
+  let pending = [];
+  const relevantUntaggedEvents = new Set([
+    ...eventsToSummarize, ...notableEvents,
+    "recording_state_requested", "recording_state_active",
+  ]);
+  const flushPending = () => {
+    if (pending.length > 0) untagged.push(pending);
+    pending = [];
+  };
+  for (const entry of entries) {
+    if (entry.dictationSessionId !== null) {
+      if (!tagged.has(entry.dictationSessionId)) tagged.set(entry.dictationSessionId, []);
+      tagged.get(entry.dictationSessionId).push(entry);
+      continue;
+    }
+    if (!relevantUntaggedEvents.has(entry.event)) continue;
+    if (entry.event === "recording_state_requested") flushPending();
+    // Standalone startup mic priming is not a dictation session.
+    if (pending.length === 0 && entry.event.startsWith("recording_get_user_media_")) continue;
+    pending.push(entry);
+    if (entry.event === "dictation_stop_to_idle") flushPending();
+  }
+  flushPending();
+  return [
+    ...[...tagged].map(([sessionId, sessionEntries]) => ({ sessionId, sessionEntries })),
+    ...untagged.map((sessionEntries) => ({ sessionId: null, sessionEntries })),
+  ].map(({ sessionId, sessionEntries }) => {
+    const summary = summarizeEntries(sessionEntries);
+    return { sessionId, firstIndex: sessionEntries[0].index, summary,
+      classification: classifySummary(summary, options) };
+  }).sort((left, right) => left.firstIndex - right.firstIndex);
 }
 
 function findLastEventIndex(entries, event) {
@@ -563,6 +636,7 @@ function findHighestPriorityIssue(reports) {
 }
 
 function parseArgs(args) {
+  let strict = false;
   let expectFinalOnly = false;
   let maxCursorGapP95Ms = DEFAULT_MAX_CURSOR_GAP_P95_MS;
   let maxFirstLiveTextMs = DEFAULT_MAX_FIRST_LIVE_TEXT_MS;
@@ -571,7 +645,9 @@ function parseArgs(args) {
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
-    if (arg === "--min-duration-ms") {
+    if (arg === "--strict") {
+      strict = true;
+    } else if (arg === "--min-duration-ms") {
       index += 1;
       minDurationMs = parsePositiveInteger(args[index], "--min-duration-ms");
     } else if (arg === "--expect-final-only") {
@@ -615,6 +691,7 @@ function parseArgs(args) {
   }
 
   return {
+    strict,
     expectFinalOnly,
     maxCursorGapP95Ms,
     maxFirstLiveTextMs,

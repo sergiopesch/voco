@@ -1,5 +1,9 @@
 # Cursor Streaming Manual QA
 
+> Historical IBus insertion procedure. It does not apply to the foundations candidate,
+> which requires zero IBus target mutations. Use [native isolation](native-isolated.md)
+> and the [current adapter acceptance](foundations-iteration-3-2026-09-05.md) instead.
+
 Use this checklist when validating direct live words at the cursor.
 
 This file defines the procedure; it does not claim that an installed desktop run was performed.

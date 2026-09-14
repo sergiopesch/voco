@@ -9,7 +9,7 @@ METAINFO_PATH="/usr/share/metainfo/com.sergiopesch.voco.metainfo.xml"
 TAURI_DESKTOP_SOURCE="${ROOT_DIR}/packaging/tauri/VOCO.desktop"
 TAURI_METAINFO_SOURCE="${ROOT_DIR}/packaging/tauri/com.sergiopesch.voco.metainfo.xml"
 
-for command in dpkg-deb desktop-file-validate appstreamcli python3 rg; do
+for command in dpkg-deb desktop-file-validate appstreamcli python3 rg readelf; do
   if ! command -v "${command}" >/dev/null 2>&1; then
     echo "Required package verification command is unavailable: ${command}" >&2
     exit 1
@@ -39,7 +39,7 @@ PACKAGE_DEPENDS="$(dpkg-deb -f "${DEB_PATH}" Depends)"
   exit 1
 }
 
-for dependency in ibus python3 python3-gi gir1.2-ibus-1.0; do
+for dependency in ibus python3 python3-gi gir1.2-ibus-1.0 python3-numpy python3-psutil libsentencepiece0 xclip gir1.2-atspi-2.0; do
   if ! grep -Eq "(^|, )${dependency}( \\([^)]*\\))?(,|$)" <<<"${PACKAGE_DEPENDS}"; then
     echo "Debian package is missing dependency: ${dependency}" >&2
     exit 1
@@ -53,7 +53,7 @@ assert_entry() {
   local archive_path="${path#/}"
   local -a matches=()
   mapfile -t matches < <(
-    awk -v expected="${archive_path}" '$NF == expected { print $1, $2 }' \
+    awk -v expected="${archive_path}" '{ path = $NF; sub(/^\.\//, "", path); if (path == expected) print $1, $2 }' \
       <<<"${PACKAGE_LISTING}"
   )
   if [[ "${#matches[@]}" -ne 1 ]]; then
@@ -72,6 +72,13 @@ assert_entry /usr/lib/voco/ibus/voco_ibus_engine.py -rw-r--r--
 assert_entry /usr/lib/voco/ibus/voco_ibus_ownership.py -rw-r--r--
 assert_entry /usr/lib/voco/ibus/voco_ibus_protocol.py -rw-r--r--
 assert_entry /usr/bin/voco -rwxr-xr-x
+assert_entry /usr/share/doc/voco/THIRD-PARTY-NOTICES.txt -rw-r--r--
+assert_entry /usr/libexec/voco-browser-host -rwxr-xr-x
+assert_entry /etc/opt/chrome/native-messaging-hosts/com.voco.exact_field.json -rw-r--r--
+assert_entry /etc/chromium/native-messaging-hosts/com.voco.exact_field.json -rw-r--r--
+for file in manifest.json background.js content.js; do
+  assert_entry "/usr/share/voco/chromium/${file}" -rw-r--r--
+done
 assert_entry "${DESKTOP_PATH}" -rw-r--r--
 assert_entry "${METAINFO_PATH}" -rw-r--r--
 assert_entry /usr/share/icons/hicolor/32x32/apps/voco.png -rw-r--r--
@@ -95,6 +102,18 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 dpkg-deb -x "${DEB_PATH}" "${EXTRACT_ROOT}"
+# A development binary may link Pulse directly; never rely on a desktop's
+# incidental transitive installation to satisfy that runtime dependency.
+for executable in /usr/bin/voco /usr/libexec/voco-browser-host; do
+  dynamic_dependencies="$(readelf -d "${EXTRACT_ROOT}${executable}")"
+  if rg -q 'NEEDED.*\[libpulse\.so\.0\]' <<<"${dynamic_dependencies}" \
+    && ! rg -q '(^|, )libpulse0( \([^)]*\))?(,|$)' <<<"${PACKAGE_DEPENDS}"; then
+    echo "Debian package links libpulse.so.0 but does not declare libpulse0." >&2
+    exit 1
+  fi
+done
+
+cmp "${ROOT_DIR}/vendor/THIRD-PARTY-NOTICES.txt" "${EXTRACT_ROOT}/usr/share/doc/voco/THIRD-PARTY-NOTICES.txt"
 
 mapfile -t packaged_desktop_files < <(
   find "${EXTRACT_ROOT}/usr/share/applications" -maxdepth 1 -type f -name '*.desktop' -print
@@ -125,6 +144,28 @@ for module in voco_ibus_engine.py voco_ibus_ownership.py voco_ibus_protocol.py; 
   cmp "${ROOT_DIR}/apps/desktop/src-tauri/resources/${module}" \
     "${EXTRACT_ROOT}/usr/lib/voco/ibus/${module}"
 done
+for browser in opt/chrome chromium; do
+  cmp "${ROOT_DIR}/packaging/chromium/com.voco.exact_field.json" \
+    "${EXTRACT_ROOT}/etc/${browser}/native-messaging-hosts/com.voco.exact_field.json"
+done
+for file in manifest.json background.js content.js; do
+  cmp "${ROOT_DIR}/integrations/chromium/${file}" "${EXTRACT_ROOT}/usr/share/voco/chromium/${file}"
+done
+python3 - "${EXTRACT_ROOT}" <<'BROWSER'
+import base64, hashlib, json, pathlib, subprocess, sys
+root = pathlib.Path(sys.argv[1])
+manifest = json.loads((root / 'usr/share/voco/chromium/manifest.json').read_text())
+key_hash = hashlib.sha256(base64.b64decode(manifest['key'], validate=True)).hexdigest()[:32]
+extension_id = ''.join(chr(ord('a') + int(char, 16)) for char in key_hash)
+host = json.loads((root / 'etc/chromium/native-messaging-hosts/com.voco.exact_field.json').read_text())
+assert host['name'] == 'com.voco.exact_field' and host['type'] == 'stdio'
+assert host['path'] == '/usr/libexec/voco-browser-host'
+assert host['allowed_origins'] == ['chrome-extension://' + extension_id + '/']
+assert extension_id == 'dohnphckdenppjhdafmhefhomomodgcc'
+# An unregistered origin must fail before opening any session transport.
+result = subprocess.run([str(root / 'usr/libexec/voco-browser-host'), 'chrome-extension://untrusted/'], capture_output=True, timeout=5)
+assert result.returncode == 1 and result.stdout == b''
+BROWSER
 cmp "${TAURI_DESKTOP_SOURCE}" "${EXTRACT_ROOT}${DESKTOP_PATH}"
 cmp "${TAURI_METAINFO_SOURCE}" "${EXTRACT_ROOT}${METAINFO_PATH}"
 cmp "${ROOT_DIR}/apps/desktop/src-tauri/icons/32x32.png" \
@@ -134,7 +175,7 @@ cmp "${ROOT_DIR}/apps/desktop/src-tauri/icons/128x128.png" \
 cmp "${ROOT_DIR}/apps/desktop/src-tauri/icons/128x128@2x.png" \
   "${EXTRACT_ROOT}/usr/share/icons/hicolor/256x256@2/apps/voco.png"
 
-python3 - "${EXTRACT_ROOT}${METAINFO_PATH}" "${EXPECTED_VERSION}" <<'PY'
+python3 - "${EXTRACT_ROOT}${METAINFO_PATH}" "${EXPECTED_VERSION%%+*}" <<'PY'
 import sys
 import xml.etree.ElementTree as ET
 
@@ -156,6 +197,8 @@ if release is None or release.attrib.get("version") != expected_version:
         f"Packaged AppStream release version {actual!r} does not match {expected_version!r}"
     )
 PY
+
+python3 "${ROOT_DIR}/scripts/verify-speech-payload.py" "${EXTRACT_ROOT}" "${EXPECTED_VERSION}"
 
 desktop-file-validate "${EXTRACT_ROOT}${DESKTOP_PATH}"
 appstreamcli validate "${EXTRACT_ROOT}${METAINFO_PATH}"
@@ -180,4 +223,4 @@ for path in \
   [[ "$(stat -c '%a' "${path}")" == "${expected_mode}" ]]
 done
 
-echo "Verified VOCO ${PACKAGE_VERSION} Debian package, desktop/AppStream identity, icons, and persistent IBus payload."
+echo "Verified VOCO ${PACKAGE_VERSION} Debian package, desktop/AppStream identity, icons, persistent IBus payload, and exact-field browser integration."

@@ -1,128 +1,102 @@
 # Troubleshooting
 
-## VOCO does not type text on Wayland
+## VOCO records but does not type into the active application
 
-Open Settings -> Advanced and press `Refresh runtime checks` first. VOCO should report a Wayland
-session and show whether Automatic live cursor is ready. Its preferred path requires the Debian
-package's persistent IBus component and the system Python GI bindings:
+The current candidate normally streams NVIDIA recognition through desktop paste.
+First verify the complete package and worker identity: a base Tauri package lacks the
+NVIDIA payload. Inspect old launcher overrides, especially `VOCO_STREAM_WORKER`,
+`VOCO_DESKTOP_PASTE=0` and `VOCO_DESKTOP_STREAM=0`. Keep the intended editable field
+focused, check helper availability, and review local app/worker diagnostics.
 
-```bash
-sudo apt install ibus gir1.2-ibus-1.0 python3-gi
-dpkg-query -W voco
-```
+A successful recognizer response or key dispatch does not prove that the target accepted
+text. Open VOCO recovery and inspect the destination before copying: some words may
+already have arrived. Do not repeatedly replay an uncertain insertion. The optional
+Chromium exact-field adapter uses a separate contract; IBus remains shortcut-only.
 
-Open the desktop Keyboard or Region & Language settings, add `VOCO Dictation` under Input Sources,
-and select it before focusing the target text field. Sign out and back in if the source is not
-listed immediately after package installation. VOCO never changes the active source itself. Its
-persistent engine passes normal keys through while idle and accepts dictation only through an
-owner-only runtime socket from the VOCO app.
+## The tray says Review Transcript instead of Start Dictation
 
-`Input source not installed` means the system component is absent (including an AppImage-only or
-uninstalled source run). `Input source not enabled` means the package is present but the engine is
-not selected/running. `Package refresh required` means the app and still-running engine use
-different private protocol versions. Canonical checkpoints require protocol v3 on both sides. To
-load the upgraded engine:
+A manual transcript is still pending. Choose `Review Transcript` to open it, then use
+`Copy transcript` and paste your text where you need it. Copying keeps the transcript in VOCO;
+choose `Clear transcript` when you are ready for another recording. A failed clipboard write
+leaves the transcript available and displays the error. Clearing VOCO's transcript does not
+clear the clipboard.
 
-1. Quit VOCO.
-2. Run `ibus restart` and reopen VOCO, or sign out and back in and then reopen VOCO.
-3. Select `VOCO Dictation`, focus a normal text field, and try again.
+If a cancelled or failed recording has recovery available, the tray instead offers
+`Review Recording`. Open it to retry transcription or explicitly discard that recovery.
 
-Switching away from and back to the input source alone is insufficient because it does not reliably
-replace the resident IBus engine process.
+The review action opens the panel without starting or stopping capture. It remains available
+if microphone access becomes unavailable or settings need repair. Switching to another app
+hides the popover but retains the text; `Review Transcript` opens it again. A pending focus
+query from an older event cannot dismiss a panel after a newer focus observation.
 
-One-shot insertion in `Final text only` mode can use `ydotool` or `wl-copy`. Stable cursor mode does
-not fall back to these global insertion tools when IBus or preedit support is unavailable. Instead,
-the current session becomes a visible preview in VOCO's overlay. On stop, VOCO leaves unverified
-target text unchanged, retains the final transcript, marks the tray as needing attention, and offers
-`Copy transcript` in the popover.
+## Set up exact-field Chromium dictation
 
-Check that `ydotool` and `wl-clipboard` are installed and that your user is in the `input` group.
+The development Debian candidate includes a native host and unpacked extension files. Follow
+[installation](install.md) for explicit browser setup; building the package does not activate an
+extension in the current profile. Once enabled, click the extension action to authorize the tab,
+focus an eligible plain-text input or textarea, and use `Alt+Shift+V` to start and stop. The ordinary
+VOCO hotkey remains the manual-copy route.
 
-```bash
-sudo apt install ydotool wl-clipboard
-sudo usermod -aG input "$USER"
-```
+The extension requires a collapsed selection and a supported editable control. Password/recognized-sensitive
+controls, rich editors, unsupported frames, disabled/read-only inputs and fields marked private
+are unavailable. Switching fields, leaving and returning, navigation, element replacement, user
+edits or selection changes revoke the current authorization. Enable/start a new session deliberately;
+the old token cannot authorize a different field.
 
-Then log out and back in.
+If the extension cannot connect, check that the native host is present and the packaged manifest
+matches the installed extension identity. Chrome and Chromium use different native-host manifest
+locations. A missing private `XDG_RUNTIME_DIR`, wrong ownership or public socket permissions causes
+the broker to reject the connection. Do not weaken permissions to bypass this check. See
+[broker acceptance](testing/browser-broker.md) for paths and protocol details.
 
-If `ydotool` v1.x reports a missing socket, start `ydotoold` and refresh runtime checks:
+A cold or blocked browser/app can outlast the two-second trigger or request deadline. The result
+then stays in VOCO. Requests have a short recipient-side expiry checked after page hooks, so delayed
+work is rejected under the shared host clock assumption; arbitrary wall-clock rollback is not
+covered. No automatic retry is performed after an uncertain result. Review any text already in the
+field before copying a retained transcript, because uncertainty does not prove that nothing landed.
 
-```bash
-systemctl --user enable --now ydotoold
-```
+The adapter uses direct mutation of the captured element. Browser native undo may not include these
+writes; do not assume undo support or rich-editor compatibility from a successful plain-text test.
 
-Open Settings -> Output & local model -> Live cursor mode to switch between `Live words at cursor
-(enhancement off)`, `Live transcript panel`, and `Final text only`. With transcript enhancement off,
-cursor mode keeps rolling preview wording inside an engine-owned, revisable preedit. Preview phrases
-do not become normal target text merely because repeated previews agree. Separate authoritative
-30-second chunks overlap by one second and checkpoint exact canonical suffixes at 30, 59, 88
-seconds, and so on. At stop, cached exact chunks remain final truth and VOCO transcribes only
-deferred complete work plus the remaining canonical range.
+## Live preview appears only in VOCO
 
-VOCO never reads or deletes surrounding target text. Each protocol-v3 checkpoint verifies the exact
-previously acknowledged canonical prefix before appending. If the session, focus, cursor context, or
-ownership changed, the command is rejected. If a mutating IPC result is uncertain, VOCO closes the
-channel and never retries or switches to global insertion because it cannot know whether the first
-command landed.
+Check whether the active session has desktop streaming enabled and transcript enhancement
+off. Stop-only delivery may reflect configuration or an unavailable streaming worker.
+Use `report-speech-performance.py` for recognition/startup timing and worker failure
+stages. A `first_hypothesis` event is not a visible-field receipt. Whole-message
+post-Stop rewrite is not implemented by the generic desktop route.
 
-When transcript enhancement is enabled, live preview stays in VOCO's overlay and the enhanced final
-is inserted once after stop. This avoids mixing an enhanced final with unenhanced canonical
-checkpoints. Use `Live transcript panel` when a target app does not support input-method preedit, or
-`Final text only` to disable preview transcription.
+For exact-field Chromium sessions, invalidated ownership retains recovery without
+retargeting or automatic fallback. Do not confuse those recipient receipts with native
+paste-dispatch success.
 
-If words appear initially and then stop, reset the trace, reproduce one dictation, and run:
+For a controlled development reproduction, use:
 
 ```bash
 npm run reset:cursor-streaming-trace
 npm run report:cursor-streaming
 ```
 
-`cursor-streaming-stalled` means previews continued without canonical target checkpoints.
-`final-cursor-output-unreconciled` means VOCO could not prove exact canonical delivery to the owned
-target. Neither status is a passing cursor run.
-A healthy preferred-path trace contains `dictation_owned_preedit_started`, one or more
-`dictation_owned_preedit_updated` events, `dictation_canonical_checkpoint_completed` and
-`dictation_canonical_checkpoint_committed` for every complete boundary reached, and
-`dictation_canonical_final_completed` after the stop-time remainder.
+A trace without a validated recipient receipt is not proof of exact-field delivery. Short final
+fixtures do not establish sustained rolling checkpoint coverage. Keep audio/transcript diagnostics
+private and distinguish synthetic isolated tests from physical microphone acceptance.
 
-Terminals, password/PIN fields, private or hidden-text fields, clients without preedit support, and
-targets with missing or ambiguous content metadata are never eligible for live cursor streaming.
-Source changes, focus changes, cursor context resets, ordinary key input, stale sessions, renderer
-reloads, target closure, and app/engine disconnects also invalidate live cursor ownership. VOCO then
-clears only its preedit, preserves acknowledged canonical target text, and reports the canonical
-final as unreconciled. It does not retry the failed checkpoint in another field. Open VOCO from the
-tray and use `Copy transcript` to recover the retained final safely.
+## IBus shortcut source is missing or outdated
 
-Each real focus entry must freshly establish safe, non-sensitive content metadata for that exact
-input context. Focus loss clears the proof even if the same app or context identity returns, and a
-synthetic global-engine proxy cannot establish or renew it. Some toolkits report only ambiguous
-`FREE_FORM`/no-purpose metadata or do not send a fresh content-type callback after focus; those
-contexts deliberately remain preview-only. This is a fail-closed limitation rather than a hidden
-mode change.
+The optional `VOCO Dictation` source can supply consuming recording shortcuts. It is not an
+insertion prerequisite. Native/engine protocol v5 rejects all legacy composition and text mutation
+operations. An older resident engine cannot be made safe merely by changing output mode; use the
+matching updated application and engine package.
 
-IBus 1.5 global-engine mode suppresses a repeated content tuple. As a result, two consecutive
-focuses with the same purpose and hints do not provide fresh proof to VOCO, even if both are normal
-fields; the later focus is preview-only until it reports a changed, explicit safe tuple. A generic
-`FREE_FORM`/no-hint field is ambiguous from its first report and remains preview-only. Use the
-visible VOCO preview, then `Copy transcript`, or choose `Live transcript panel`/`Final text only`
-before the next dictation when that application does not expose usable metadata.
+If you explicitly use the source and have installed a protocol upgrade, quit VOCO and restart IBus
+or sign out and back in before reopening. Switching sources alone does not reliably reload the
+resident engine. VOCO itself never changes or restarts the active source. No desktop service restart
+is needed just to copy a transcript or refresh VOCO's panel.
 
-## Live words are configured but only the VOCO overlay appears
-
-This is the intentional runtime-owned fallback, not a silent mode change. The saved setting still
-describes the preferred mode, while the overlay describes what this session can safely deliver. It
-appears when VOCO cannot establish or keep a verified lease on the focused target, including when:
-
-- `VOCO Dictation` is missing, inactive, or running an incompatible protocol version
-- the exact current focus has not freshly established a safe, non-sensitive input-method preedit
-- the target is a terminal, sensitive field, or reports missing/ambiguous content metadata
-- focus, selection, cursor context, or ordinary key input invalidates the lease
-- the app and engine disconnect or a mutating response becomes uncertain
-
-Continue speaking if you want the transcript. After stop, the tray reports `Transcript needs
-attention`; open the popover and choose `Copy transcript`. VOCO does not redirect the result to the
-currently focused app because that could be a different field. For intentional one-shot insertion,
-choose `Live transcript panel` or `Final text only` before starting the next dictation.
+Legacy ydotool/xdotool/clipboard helper setup is documented separately in
+[platform support](platform/README.md). The native desktop route uses these helpers; the separate explicit Copy path does
+not require input injection. Do not change input-group membership without understanding
+the broader keyboard-device access it grants.
 
 ## Tray, popover, dictation, and realtime controls disagree
 
@@ -131,6 +105,10 @@ readiness and permission, dictation phase, live-cursor delivery/setup, realtime 
 state. Expected behavior includes:
 
 - `Transcribing…` is disabled while a final is processing.
+- `Review Transcript` replaces `Start Dictation` while an idle manual transcript is pending.
+  Reviewing text does not require microphone permission and never starts a recording.
+- `Review Recording` opens retained recovery after cancellation or failure, including recordings
+  that have no completed transcript yet.
 - Realtime cannot start during recording or processing, and dictation cannot start while realtime
   is connecting, listening, or speaking.
 - A muted realtime session uses the neutral graphite icon and an explicit `Realtime voice muted`
@@ -139,7 +117,8 @@ state. Expected behavior includes:
   stay disabled until microphone access is retried from Settings.
 - During initialization or a blocking configuration error, the command popover cannot open or
   start a new realtime session. An already-active realtime session can still open the popover to
-  stop safely. Settings remains available after initialization so configuration can be repaired.
+  stop safely, and retained transcripts or recordings remain available for review after initialization.
+  Settings remains available after initialization so configuration can be repaired.
 - `Open VOCO` shows the popover; clicking the tray icon again may hide it.
 - The popover deliberately has no dictation start button. Opening a focusable panel would move focus
   away from the target, so focus the text field and use the configured hotkey.
@@ -185,15 +164,11 @@ Do not replace the VOCO config directory with a symlink. If the directory itself
 check, repair `${XDG_CONFIG_HOME:-$HOME/.config}/voco` as a real directory owned by your user with
 mode `0700`, then retry. Config files are normalized to mode `0600`.
 
-## VOCO does not type text on X11
+## Missing X11 insertion helpers
 
-Open Settings -> Advanced and press `Refresh runtime checks` first. VOCO should report `X11 or other` and show whether `xdotool` or `xclip` are missing.
-
-Install the X11 helpers:
-
-```bash
-sudo apt install xdotool xclip
-```
+Missing `xdotool` or `xclip` can block the native X11 desktop route before capture.
+Check the selected helper and runtime report. Explicit Copy and exact-field browser
+delivery are separate paths; installing a helper does not prove target consumption.
 
 ## VOCO says the microphone is not ready
 
@@ -207,6 +182,21 @@ sudo apt install xdotool xclip
 - test at silence first, then while speaking at a normal distance from the microphone
 - if the bar stays high at rest, reopen the setup flow after confirming the correct input device is selected
 - if the bar barely moves while speaking, check system input gain in your desktop sound settings before retesting
+
+## VOCO says complete audio capture cannot be confirmed
+
+VOCO keeps the audio it received and stops automatic output. Choose **Retry
+transcription** to review that audio locally, then copy the result explicitly, or
+choose **Discard recovery**. Retrying cannot reconstruct missing audio; check the
+ending and any interrupted words before using the transcript. The notice remains
+after Retry so that a readable result is not mistaken for confirmed capture.
+
+This can occur when the audio engine does not acknowledge its final samples or
+when AudioWorklet initialization fails and the compatibility capture path is
+used. The latter always requires manual review because its callback API cannot
+confirm a complete recording. Discarding recovery and starting again resets the
+session; a healthy AudioWorklet session resumes normal operation. Neither action
+changes your selected microphone or input settings.
 
 ## Old Voice install settings did not appear
 
@@ -234,5 +224,6 @@ npm run report:linux-runtime
 
 The published binary artifact is the GitHub Release `.deb`. Ubuntu is the primary reference
 environment; Debian-derived distributions are best-effort. AppImage publication is paused until its
-complete packaging toolchain is pinned; local experimental AppImages do not install the host IBus
-component. Flatpak, Flathub, Snap, and Ubuntu App Center are not published VOCO release channels.
+complete packaging toolchain is pinned; local experimental AppImages do not install desktop/browser
+registration files. The current NVIDIA 2026.0.35 work is a local candidate;
+this documentation does not imply it has been installed or published. Flatpak, Flathub, Snap, and Ubuntu App Center are not published VOCO release channels.

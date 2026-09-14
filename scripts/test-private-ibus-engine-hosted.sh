@@ -4,6 +4,30 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 USERNS_POLICY="/proc/sys/kernel/apparmor_restrict_unprivileged_userns"
 ORIGINAL_USERNS_POLICY=""
+case "${1:-}" in
+  "") TEST_SCRIPT="test-private-ibus-engine.sh" ;;
+  --native-desktop) TEST_SCRIPT="test-native-desktop.sh" ;;
+  --native-wayland)
+    : "${VOCO_WAYLAND_DEPS:?Set the installed or extracted Weston root/usr}"
+    : "${VOCO_WAYLAND_EVIDENCE_DIR:?Set a directory for Wayland evidence}"
+    TEST_SCRIPT="test-native-wayland.sh"
+    ;;
+  --browser-application)
+    : "${VOCO_BROWSER_HOST_BINARY:?Set the packaged native host executable}"
+    : "${VOCO_BROWSER_EXTENSION_DIR:?Set the packaged Chromium extension directory}"
+    : "${VOCO_NATIVE_APP_BINARY:?Set the built candidate executable}"
+    : "${VOCO_NATIVE_MODEL:?Set the pinned existing model}"
+    : "${VOCO_BROWSER_EVIDENCE_DIR:?Set a directory for browser application evidence}"
+    TEST_SCRIPT="test-browser-full-app.sh"
+    ;;
+  --full-application)
+    : "${VOCO_NATIVE_APP_BINARY:?Set the built candidate executable}"
+    : "${VOCO_NATIVE_MODEL:?Set the pinned existing model}"
+    : "${VOCO_NATIVE_EVIDENCE_DIR:?Set a directory for native application evidence}"
+    TEST_SCRIPT="test-native-desktop.sh"
+    ;;
+  *) echo "Unknown hosted IBus test selection: $1" >&2; exit 1 ;;
+esac
 
 if [[ "${GITHUB_ACTIONS:-}" != "true" ]]; then
   echo "The hosted IBus wrapper may run only on an ephemeral GitHub Actions runner." >&2
@@ -35,4 +59,24 @@ if [[ -r "${USERNS_POLICY}" ]]; then
   fi
 fi
 
-PYTHONDONTWRITEBYTECODE=1 bash "${ROOT_DIR}/scripts/test-private-ibus-engine.sh"
+if [[ "${1:-}" == --browser-application ]]; then
+  browser_evidence="${VOCO_BROWSER_EVIDENCE_DIR}"
+  VOCO_NATIVE_OUTPUT_MODE=final-text-only VOCO_BROWSER_LONG_CAPTURE=0 \
+    VOCO_BROWSER_EVIDENCE_DIR="${browser_evidence}/final-text-only" \
+    bash "${ROOT_DIR}/scripts/${TEST_SCRIPT}"
+  VOCO_NATIVE_OUTPUT_MODE=stable-cursor-streaming VOCO_BROWSER_LONG_CAPTURE=1 VOCO_BROWSER_DEBUG_CAPTURE=1 \
+    VOCO_BROWSER_EVIDENCE_DIR="${browser_evidence}/canonical-checkpoint" \
+    bash "${ROOT_DIR}/scripts/${TEST_SCRIPT}"
+elif [[ "${1:-}" == --full-application ]]; then
+  application_evidence="${VOCO_NATIVE_EVIDENCE_DIR}"
+  for output_mode in final-text-only stable-cursor-streaming; do
+    VOCO_NATIVE_APP_CASE=delivery VOCO_NATIVE_OUTPUT_MODE="${output_mode}" \
+      VOCO_NATIVE_EVIDENCE_DIR="${application_evidence}/${output_mode}" \
+      PYTHONDONTWRITEBYTECODE=1 bash "${ROOT_DIR}/scripts/${TEST_SCRIPT}"
+  done
+  VOCO_NATIVE_APP_CASE=focus-switch VOCO_NATIVE_OUTPUT_MODE=final-text-only \
+    VOCO_NATIVE_EVIDENCE_DIR="${application_evidence}/focus-manual-copy" \
+    PYTHONDONTWRITEBYTECODE=1 bash "${ROOT_DIR}/scripts/${TEST_SCRIPT}"
+else
+  PYTHONDONTWRITEBYTECODE=1 bash "${ROOT_DIR}/scripts/${TEST_SCRIPT}"
+fi

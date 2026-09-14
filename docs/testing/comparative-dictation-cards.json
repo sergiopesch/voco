@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "status": "text-only; audio and performance unmeasured",
+  "license": "CC0-1.0",
+  "selection": "Eight prospectively authored task categories; no recognizer outputs consulted",
+  "cards": [
+    {
+      "id": "message",
+      "prompt": "Please move our planning meeting to Thursday and send the revised agenda to the whole team."
+    },
+    {
+      "id": "numbers",
+      "prompt": "Send forty two folders, not twenty four, and keep the remaining seven copies."
+    },
+    {
+      "id": "date-money",
+      "prompt": "The fictional invoice is dated the fifth of September and totals one hundred twenty pounds and fifty pence."
+    },
+    {
+      "id": "names",
+      "prompt": "Ask Ada Lovelace and Grace Hopper to review the notes for the fictional Kirkhaven project."
+    },
+    {
+      "id": "technical",
+      "prompt": "Open the README file, run npm test, and keep the C plus plus example beside the Python version."
+    },
+    {
+      "id": "instructions",
+      "prompt": "First save the draft. Second check the figures. Third send the draft only after I confirm."
+    },
+    {
+      "id": "repetition",
+      "prompt": "Keep this line. Keep this line. Keep this line."
+    },
+    {
+      "id": "closing",
+      "prompt": "The earlier estimate is provisional. Please keep the final sentence: no delivery before Monday."
+    }
+  ]
+}

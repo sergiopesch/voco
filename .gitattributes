@@ -1,0 +1,3 @@
+# Preserve pinned third-party source and notices byte-for-byte.
+vendor/** -whitespace linguist-vendored
+runtime/notices/** -whitespace

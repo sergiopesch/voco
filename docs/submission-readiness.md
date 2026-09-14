@@ -1,6 +1,9 @@
+> **Historical distribution readiness checklist.** Versioned findings below are retained for provenance; use [current candidate gates](release-candidate.md) for 2026.0.35 status and release authorization.
+
 # Distribution Readiness
 
-Status reviewed: July 15, 2026.
+Channel checklist originally reviewed July 15, 2026. Foundations update: September 5, 2026.
+The current candidate is uninstalled and unpublished; see [iteration 3 acceptance](testing/foundations-iteration-3-2026-09-05.md).
 
 This document is a gate checklist, not proof that the current workspace or next release candidate
 passed it. Record candidate-specific command output and desktop evidence in the testing results and
@@ -10,7 +13,7 @@ release artifacts; do not infer readiness from packaging files merely existing i
 
 | Channel | Current role | Host integration | Publication status |
 | --- | --- | --- | --- |
-| GitHub Release `.deb` | Primary Ubuntu package | Installs the persistent IBus component | Published channel; validate every candidate |
+| GitHub Release `.deb` | Primary Ubuntu package | Installs consuming-shortcut IBus component and opt-in Chromium native host | Published channel; validate every candidate |
 | AppImage | Local packaging experiment | Does not install the IBus component | Not published until every helper is pinned |
 | Flatpak / Flathub | Packaging experiment | Host input and hotkey model unresolved | Not published; no submission claim |
 | Snap / Ubuntu App Center | Tracked draft | Requires classic confinement and store review | Not published; no submission claim |
@@ -43,10 +46,11 @@ cursor candidate status and any pending manual cases belong in
 
 Publication is paused while the Tauri/linuxdeploy path relies on mutable helper downloads. Before
 restoring it, pin and verify every packaging tool, then validate launch, tray, microphone capture,
-local transcription, one-shot insertion, update instructions, and clean shutdown on Ubuntu. The
+local transcription, manual-copy recovery, verified automatic delivery when the host engine is
+present, update instructions, and clean shutdown on Ubuntu. The
 AppImage does not install the host IBus component; without a matching component already installed,
-automatic live-cursor mode must report its preview-only limitation rather than being recorded as a
-passing owned-cursor run.
+every automatic text mode must report its manual-copy limitation rather than being recorded as a
+passing automatic-delivery run. Selecting final-text-only mode does not bypass this requirement.
 
 ## Flatpak / Flathub
 

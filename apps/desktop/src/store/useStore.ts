@@ -1,9 +1,13 @@
 import { create } from "zustand";
+import type { DictationRecovery } from "@/lib/dictationRecovery";
+import type { CaptureBackendMode, NativeCaptureSource } from "@/lib/nativeCaptureSettings";
 import type {
   AppConfig,
   AppSurface,
   AudioDeviceOption,
   DictationStatus,
+  DictationResult,
+  RecoverableTranscript,
   MicrophonePermission,
   OwnedPreeditStatus,
   UpdateCheckState,
@@ -30,10 +34,19 @@ export function deriveSurfaceForConfig(
 }
 
 interface AppState {
+  captureBackendMode: CaptureBackendMode;
+  nativeCaptureSource: NativeCaptureSource | null;
+  setCaptureBackendMode: (mode: CaptureBackendMode) => void;
+  setNativeCaptureSource: (source: NativeCaptureSource | null) => void;
   status: DictationStatus;
   transcript: string;
+  rawTranscript: string;
+  recoverableTranscripts: RecoverableTranscript[];
+  lastDictationResult: DictationResult | null;
   interimTranscript: string;
   error: string | null;
+  recovery: DictationRecovery | null;
+  captureNotice: string | null;
   selectedDeviceId: string | null;
   audioLevel: number;
   config: AppConfig | null;
@@ -45,8 +58,14 @@ interface AppState {
   ownedPreeditSetupState: OwnedPreeditStatus["setupState"];
   updateState: UpdateCheckState;
 
+  setRecovery: (recovery: DictationRecovery | null) => void;
+  setCaptureNotice: (notice: string | null) => void;
   setStatus: (status: DictationStatus) => void;
   setTranscript: (transcript: string) => void;
+  setRawTranscript: (transcript: string) => void;
+  retainRecoverableTranscript: (entry: Omit<RecoverableTranscript, "createdAt">) => void;
+  dismissRecoverableTranscript: (id: string) => void;
+  setLastDictationResult: (result: DictationResult | null) => void;
   setInterimTranscript: (interim: string) => void;
   setError: (error: string | null) => void;
   setAudioLevel: (level: number) => void;
@@ -65,10 +84,26 @@ interface AppState {
 }
 
 export const useStore = create<AppState>((set) => ({
+  captureBackendMode: "pending",
+  nativeCaptureSource: null,
+  setCaptureBackendMode: (captureBackendMode) => set((state) => ({
+    captureBackendMode,
+    microphoneReady: captureBackendMode === "native" ? Boolean(state.nativeCaptureSource)
+      : captureBackendMode === "pending" ? false : state.microphoneReady,
+  })),
+  setNativeCaptureSource: (nativeCaptureSource) => set((state) => ({
+    nativeCaptureSource,
+    microphoneReady: state.captureBackendMode === "native" ? Boolean(nativeCaptureSource) : state.microphoneReady,
+  })),
   status: "idle",
   transcript: "",
+  rawTranscript: "",
+  recoverableTranscripts: [],
+  lastDictationResult: null,
   interimTranscript: "",
   error: null,
+  recovery: null,
+  captureNotice: null,
   selectedDeviceId: null,
   audioLevel: 0,
   config: null,
@@ -86,8 +121,26 @@ export const useStore = create<AppState>((set) => ({
     error: null,
   },
 
+  setRecovery: (recovery) => set({ recovery }),
+  setCaptureNotice: (captureNotice) => set({ captureNotice }),
   setStatus: (status) => set({ status, error: null }),
   setTranscript: (transcript) => set({ transcript }),
+  setRawTranscript: (rawTranscript) => set({ rawTranscript }),
+  // Recovery is intentionally session-only and separate from the current capture.
+  retainRecoverableTranscript: (entry) => set((state) => {
+    if (!entry.text.trim()) return state;
+    const existing = state.recoverableTranscripts.find((item) => item.id === entry.id);
+    const retained = { ...entry, createdAt: existing?.createdAt ?? Date.now() };
+    return {
+      recoverableTranscripts: existing
+        ? state.recoverableTranscripts.map((item) => item.id === entry.id ? retained : item)
+        : [...state.recoverableTranscripts, retained],
+    };
+  }),
+  dismissRecoverableTranscript: (id) => set((state) => ({
+    recoverableTranscripts: state.recoverableTranscripts.filter((entry) => entry.id !== id),
+  })),
+  setLastDictationResult: (lastDictationResult) => set({ lastDictationResult }),
   setInterimTranscript: (interim) => set({ interimTranscript: interim }),
   setError: (error) => set({ error }),
   setAudioLevel: (level) => set({ audioLevel: level }),
@@ -106,5 +159,5 @@ export const useStore = create<AppState>((set) => ({
   setOwnedPreeditSetupState: (ownedPreeditSetupState) =>
     set({ ownedPreeditSetupState }),
   setUpdateState: (updateState) => set({ updateState }),
-  clearTranscript: () => set({ transcript: "", interimTranscript: "" }),
+  clearTranscript: () => set({ transcript: "", rawTranscript: "", interimTranscript: "" }),
 }));

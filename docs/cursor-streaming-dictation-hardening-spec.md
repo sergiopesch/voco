@@ -1,5 +1,10 @@
 # Cursor Streaming Dictation Hardening Spec
 
+> Historical protocol-v3 design. The foundations candidate now suspends all automatic
+> IBus mutation and uses an explicit Chromium exact-field adapter. See the
+> [approved delivery decision](testing/targeted-delivery-decision.md) and
+> [current acceptance record](testing/foundations-iteration-3-2026-09-05.md).
+
 ## Purpose
 
 Make VOCO's cursor-visible live dictation feel fast, stable, and trustworthy on Linux without
@@ -132,15 +137,19 @@ Recommended policy:
 - Keep preview text inside the VOCO-owned preedit; repeated preview agreement is never commit proof.
 - Preprocess stable, non-overlapping source blocks ending at 30, 59, 88 seconds, and subsequent
   29-second strides.
-- Transcribe authoritative 30-second canonical ranges with one second of overlap: `0-30`, `29-59`,
-  `58-88`, and so on.
+- Offer at most 30 seconds of cached canonical PCM to the shared native hybrid planner.
+  Supported numerical plateaus create disjoint boundaries. A fallback uses one second of
+  overlap and retains that cadence for the rest of the session. Decode progress comes from
+  the validated receipt, separately from the unchanged 30/29-second source-block cache.
+  See [hybrid recognition](architecture/hybrid-recognition.md) for the implemented contract.
 - Append each result to an immutable canonical prefix and checkpoint only its exact new suffix.
 - After a checkpoint, retain only the newer provisional candidate in preedit while the acknowledged
   canonical prefix is ordinary target text.
 - On unsupported clients, leave the target unchanged and report the final as unreconciled rather
   than using global cursor injection.
-- At stop, reuse cached exact chunks as final truth and transcribe only unprocessed complete ranges
-  plus the remaining partial range.
+- At stop, reuse completed recognition and retained request bytes; continue from actual decoded
+  coverage through the remaining audio. An exact 30-second fallback completion needs no extra
+  overlap-only request. Retries change attempt identity without changing the pending PCM or prefix.
 - Keep enhancement separate: enhancement modes use overlay preview and one-shot final insertion.
 
 Acceptance criteria:

@@ -40,7 +40,20 @@ export interface ConfigSnapshot {
   config: AppConfig;
 }
 
-export type DictationStatus = "idle" | "recording" | "processing" | "error";
+export type DictationStatus = "idle" | "starting" | "recording" | "processing" | "error";
+
+export interface RecoverableTranscript {
+  id: string;
+  text: string;
+  createdAt: number;
+  reason: "delivery-unconfirmed" | "output-failed";
+  isPartial: boolean;
+}
+
+export interface DictationResult {
+  completedAt: number;
+  outcome: "delivered" | "needs-recovery";
+}
 export type CursorDeliveryState =
   | "inactive"
   | "pending"
@@ -119,7 +132,16 @@ export interface DebugDictationCaptureResult {
   timelinePath: string;
 }
 
+export interface ShortcutDiagnostics {
+  hotkey: string;
+  route: "ibus" | "global-shortcut" | "evdev" | null;
+  state: "available" | "focus-required" | "unavailable" | "unknown";
+  detail: string;
+}
+
 export interface RuntimeDiagnostics {
+  desktopPaste?: { enabled: boolean; available: boolean; detail: string };
+  shortcut: ShortcutDiagnostics;
   sessionType: string;
   typeSimulation: InsertionSupport;
   clipboard: InsertionSupport;
@@ -131,6 +153,7 @@ export interface OwnedPreeditStatus {
   ready: boolean;
   setupState:
     | "ready"
+    | "safety-disabled"
     | "not-enabled"
     | "not-installed"
     | "runtime-unavailable"
@@ -149,6 +172,7 @@ export interface OwnedPreeditStatus {
     | "committed"
     | "discarded"
     | "preserved"
+    | "uncertain"
     | null;
   error: string | null;
 }
@@ -191,13 +215,17 @@ export interface RuntimeStatusSnapshot {
   epoch: number;
   revision: number;
   runtimeInitialized: boolean;
+  hasRecoverableTranscript: boolean;
   configurationError: boolean;
   microphoneReady: boolean;
   microphonePermission: MicrophonePermission;
+  nativeMicrophoneReady?: boolean | null;
   dictationStatus: DictationStatus;
   cursorDelivery: CursorDeliveryState;
   cursorRequired: boolean;
   cursorSetupState: OwnedPreeditStatus["setupState"];
+  manualTranscriptReady: boolean;
+  recoveryAvailable: boolean;
   realtimeStatus: RealtimeStatus;
   realtimeMuted: boolean;
 }

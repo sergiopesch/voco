@@ -3286,9 +3286,9 @@ dependencies = [
 
 [[package]]
 name = "rustls"
-version = "0.23.37"
+version = "0.23.45"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "758025cb5fccfd3bc2fd74708fd4682be41d99e5dff73c377c0646c6012c73a4"
+checksum = "0d41d731c7d2f962d1ccc364cec258de3c0e93b38c2fb3ba97ac74513048d634"
 dependencies = [
  "once_cell",
  "ring",
@@ -3310,9 +3310,9 @@ dependencies = [
 
 [[package]]
 name = "rustls-webpki"
-version = "0.103.13"
+version = "0.103.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "61c429a8649f110dddef65e2a5ad240f747e85f7758a6bccc7e5777bd33f756e"
+checksum = "f3c3cf1d8b1e7d4927e2d154c3fcb02979afb9939629c62cd9048d4f07b60ac2"
 dependencies = [
  "ring",
  "rustls-pki-types",
@@ -4665,8 +4665,9 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "voco"
-version = "2026.0.21"
+version = "2026.0.35"
 dependencies = [
+ "cc",
  "dirs",
  "env_logger",
  "evdev",
@@ -4675,6 +4676,7 @@ dependencies = [
  "inotify",
  "libc",
  "log",
+ "pkg-config",
  "reqwest 0.12.28",
  "serde",
  "serde_json",
@@ -4986,8 +4988,6 @@ dependencies = [
 [[package]]
 name = "whisper-rs"
 version = "0.14.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4d2eac0a371f8ae667a5ee15ae4130553ea3004e7572544d1ce546c81ea8874b"
 dependencies = [
  "whisper-rs-sys",
 ]
@@ -4995,8 +4995,6 @@ dependencies = [
 [[package]]
 name = "whisper-rs-sys"
 version = "0.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1c86f1b993f216594b1ad9a9bb00a26014fb7c512e12664a2d401c7897d2ef7d"
 dependencies = [
  "bindgen",
  "cfg-if",

@@ -99,8 +99,39 @@ describe("local dictation intelligence", () => {
     expect(result.warning).toBe("Local model returned no text");
     expect(tauri.showNotification).toHaveBeenCalledWith(
       "Local enhancement skipped",
-      "VOCO used the raw transcript because the local model was unavailable.",
+      "VOCO used the raw transcript because local enhancement did not complete.",
     );
+  });
+
+  it("preserves a deliberate empty result from spoken scratch that", async () => {
+    vi.mocked(tauri.enhanceTranscript).mockResolvedValue({
+      text: "",
+      usedEnhancement: true,
+      warning: null,
+    });
+
+    const result = await enhanceTranscriptForDictation("old text command scratch that", {
+      ...BASE_CONFIG,
+      transcriptEnhancement: "commands-only",
+    });
+
+    expect(result.text).toBe("");
+    expect(result.usedEnhancement).toBe(true);
+    expect(tauri.showNotification).not.toHaveBeenCalled();
+  });
+
+  it("preserves raw recognition when an incomplete result includes partial formatting", async () => {
+    vi.mocked(tauri.enhanceTranscript).mockResolvedValue({
+      text: "First half only.",
+      usedEnhancement: true,
+      warning: "Local model response was truncated",
+    });
+
+    const result = await enhanceTranscriptForDictation("First half and the important tail.", BASE_CONFIG);
+
+    expect(result.text).toBe("First half and the important tail.");
+    expect(result.usedEnhancement).toBe(false);
+    expect(result.warning).toBe("Local model response was truncated");
   });
 
   it("returns the local assistant answer from the same localhost provider settings", async () => {

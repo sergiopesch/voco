@@ -1,3 +1,8 @@
+> Historical Whisper-era specification. The measured NVIDIA candidate now uses a separate
+> streaming worker. This document retains proposed requirements, not current implementation
+> or passed acceptance. See [current architecture](architecture/README.md) and
+> [candidate gates](release-candidate.md).
+
 # Streaming ASR Feel Specification
 
 This document defines the next latency improvement for normal dictation. It focuses on perceived
@@ -69,7 +74,7 @@ The existing WebView audio capture remains the source of truth.
 
 Acceptance criteria:
 
-- AudioWorklet remains preferred, ScriptProcessor remains fallback.
+- AudioWorklet remains preferred. ScriptProcessor remains a received-audio recovery fallback: it cannot confirm complete capture, so live output is disabled and Stop requires explicit manual Retry or Discard.
 - Samples continue to be resampled to 16 kHz before Whisper.
 - Live previews use a small rolling audio window and must not scale with total session duration.
 - Final ASR work is chunked so each native transcription operation remains bounded.

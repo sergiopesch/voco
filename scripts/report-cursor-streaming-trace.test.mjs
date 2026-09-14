@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -577,6 +577,67 @@ function runReport(entries, args = []) {
   ]);
   assert.match(output, /status: failures-observed/);
   assert.match(output, /dictation_canonical_checkpoint_failed: 1/);
+}
+
+{
+  const good = [
+    { event: "dictation_recording_duration", duration_ms: 10000 },
+    { event: "dictation_first_live_text_visible", duration_ms: 800 },
+    { event: "dictation_owned_preedit_updated", t_ms: 1000 },
+    { event: "dictation_canonical_final_completed" },
+    { event: "dictation_final_output_completed" },
+    { event: "dictation_stop_to_idle", duration_ms: 900 },
+  ];
+  for (const [entries, expected] of [
+    [good, 0],
+    [[{ event: "app_start" }], 1],
+    [[...good, { event: "dictation_final_output_unreconciled" }], 1],
+    [[...good, { event: "dictation_live_cursor_overlay_fallback" }], 1],
+    [[...good, { event: "dictation_final_insertion_failed" }], 1],
+  ]) {
+    const result = spawnSync(process.execPath, [scriptPath, "--strict", writeTrace(entries)], { encoding: "utf8" });
+    assert.equal(result.status, expected, result.stdout);
+    assert.match(result.stdout, /Acceptance gate: (PASS|FAIL)/);
+  }
+  const malformedPath = writeTrace(good);
+  fs.appendFileSync(malformedPath, "\ntruncated json");
+  assert.equal(spawnSync(process.execPath, [scriptPath, "--strict", malformedPath]).status, 1);
+  for (const malformed of [null, [], {}, { event: "recording_state_requested", dictation_session_id: "2" }]) {
+    const malformedRecordPath = writeTrace([...good, malformed]);
+    const result = spawnSync(process.execPath, [scriptPath, "--strict", malformedRecordPath], { encoding: "utf8" });
+    assert.equal(result.status, 1, result.stdout);
+  }
+
+  const firstSession = good.map((entry) => ({ ...entry, dictation_session_id: 1 }));
+  const secondSession = good.map((entry) => ({ ...entry, dictation_session_id: 2 }));
+  for (const [tail, expected, classification] of [
+    [[{ event: "recording_state_requested", dictation_session_id: 2 }], 1, "latest-dictation-incomplete"],
+    [[{ event: "recording_state_active", dictation_session_id: 2 }], 1, "latest-dictation-incomplete"],
+    [[{ event: "dictation_final_insertion_failed", dictation_session_id: 2 }], 1, "failures-observed"],
+    [[{ event: "dictation_live_preview_completed", dictation_session_id: 2 }], 1, "no-dictation-session"],
+    [[{ event: "recording_state_requested", dictation_session_id: 1 }], 1, "latest-dictation-incomplete"],
+    [[{ event: "recording_state_requested" }], 1, "latest-dictation-incomplete"],
+    [[{ event: "dictation_final_insertion_failed" }], 1, "failures-observed"],
+    [secondSession, 0, "dictation-session-observed"],
+  ]) {
+    const result = spawnSync(process.execPath, [scriptPath, "--strict", writeTrace([...firstSession, ...tail])], { encoding: "utf8" });
+    assert.equal(result.status, expected, result.stdout);
+    assert.match(result.stdout, new RegExp(`status: ${classification}`));
+  }
+  // Historical untagged traces must also fail when a later capture never finishes.
+  const untaggedIncomplete = spawnSync(process.execPath, [scriptPath, "--strict", writeTrace([
+    ...good, { event: "recording_state_requested" }, { event: "recording_state_active" },
+  ])], { encoding: "utf8" });
+  assert.equal(untaggedIncomplete.status, 1, untaggedIncomplete.stdout);
+  assert.match(untaggedIncomplete.stdout, /status: latest-dictation-incomplete/);
+  // Late events from an old session cannot make a newer incomplete session disappear.
+  const lateOldEvent = spawnSync(process.execPath, [scriptPath, "--strict", writeTrace([
+    ...firstSession,
+    { event: "dictation_live_preview_completed", dictation_session_id: 2 },
+    { event: "dictation_stop_to_idle", dictation_session_id: 1 },
+  ])], { encoding: "utf8" });
+  assert.equal(lateOldEvent.status, 1, lateOldEvent.stdout);
+  assert.match(lateOldEvent.stdout, /Latest observed dictation session: 2/);
 }
 
 console.log("report-cursor-streaming-trace tests passed");

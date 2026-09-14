@@ -1,6 +1,21 @@
+> **Current gate:** `2026.0.35` is a local candidate, not an authorized release.
+> Complete candidate checks and owner laptop testing first. The owner must approve
+> a release cut, followed by further installed/artifact testing before public sharing.
+> See [candidate status](release-candidate.md). Commands below describe a later
+> authorized release workflow; do not run tagging/publishing steps during preparation.
+
 # Release Process
 
 VOCO releases are cut from git tags in the form `voco.<version>`.
+
+## NVIDIA packaging gate
+
+The public workflow now invokes `scripts/package-nvidia.py` and requires complete
+runtime verification. Before a release, finish portable, pinned provisioning of
+model/native artifacts and retain the required notices. Verify the **complete** assembled package and downloaded
+draft asset, including `/usr/lib/voco/speech`, model digest and runtime dependencies.
+Base-bundle verification alone cannot qualify NVIDIA dictation. A local `2026.0.35` testing package
+and its GitHub review branch must not be confused with a `voco.<version>` release tag.
 
 ## Quick path
 
@@ -122,7 +137,9 @@ The release workflow:
 - confirm tray launch, settings, and hide-to-tray still work
 - run `npm run report:linux-runtime` if Linux insertion changed
 
-Never substitute an active workstation for the disposable desktop. If the remote provider is
+Do not substitute uncontrolled active-workstation injection for the disposable desktop.
+The owner separately requested manual laptop acceptance of this candidate; record that
+physical evidence without treating it as a replacement for package/isolation checks. If the remote provider is
 unavailable, publishing requires explicit owner acceptance of a documented release exception after
 the final package passes the source, saved-audio, package-verifier, private-IBus, and installed
 local-container gates. Record the local-container `cbx_...` ID and keep the remote/physical matrix

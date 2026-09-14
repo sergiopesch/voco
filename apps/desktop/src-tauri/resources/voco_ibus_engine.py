@@ -12,6 +12,8 @@ from __future__ import annotations
 import json
 import os
 import signal
+import secrets
+import time
 from pathlib import Path
 from typing import Any, Optional
 
@@ -195,16 +197,85 @@ class VocoCoordinator:
         self.finalization_pending = False
         self.ownership_intact = True
         self.focus_lost = False
+        self.shortcut_armed_until = 0.0
+        self.shortcut_specs = ()
+        self.shortcut_config = None
+        self.pending_trigger = None
+        self.trigger_to_deliver = None
+        self.consumed_shortcut_keys: set[int] = set()
+
+    def poll_trigger(self, hotkey: Any) -> dict[str, Any]:
+        if not isinstance(hotkey, str) or _parse_session_hotkey(hotkey) is None:
+            raise ValueError("a valid modified dictation hotkey is required")
+        if hotkey != self.shortcut_config:
+            self.shortcut_specs = session_control_hotkey_specs(hotkey)
+            self.shortcut_config = hotkey
+            self.pending_trigger = None
+            self.trigger_to_deliver = None
+        engine = self.focused_engine
+        armed = bool(engine and engine.focus_active and engine.can_accept_preedit)
+        # A negative poll is an explicit disarm acknowledgment to native. Do
+        # not silently become consuming on later focus changes before renewal.
+        self.shortcut_armed_until = time.monotonic() + 1.0 if armed else 0.0
+        trigger = self.trigger_to_deliver
+        self.trigger_to_deliver = None
+        return {"armed": armed, "trigger": trigger}
+
+    def consume_shortcut(self, engine: "VocoEngine", keyval: int, state: int) -> bool:
+        key = int(IBus.keyval_to_lower(keyval))
+        if int(state) & int(IBus.ModifierType.RELEASE_MASK):
+            if key in self.consumed_shortcut_keys:
+                self.consumed_shortcut_keys.discard(key)
+                return True
+            return False
+        available = (time.monotonic() < self.shortcut_armed_until
+                     and engine is self.focused_engine and engine.focus_active
+                     and engine.can_accept_preedit)
+        if key in self.consumed_shortcut_keys:
+            if available and any(_matches_session_hotkey(keyval, state, hotkey)
+                                 for hotkey in self.shortcut_specs):
+                return True  # A held matching chord must not create another toggle.
+            # A lost release must never capture later ordinary typing, a changed
+            # chord, or input after the client heartbeat has expired.
+            self.consumed_shortcut_keys.discard(key)
+        if not available:
+            return False
+        for index, hotkey in enumerate(self.shortcut_specs):
+            if _matches_session_hotkey(keyval, state, hotkey):
+                token = secrets.token_hex(24)
+                self.pending_trigger = (token, engine, engine.context_revision,
+                                        time.monotonic() + 2.0)
+                self.trigger_to_deliver = {"triggerId": token,
+                                           "mode": "dictation" if index == 0 else "realtime"}
+                self.consumed_shortcut_keys.add(key)
+                return True
+        return False
+
+    def claim_trigger(self, trigger_id: Any) -> None:
+        pending = self.pending_trigger
+        self.pending_trigger = None
+        self.trigger_to_deliver = None
+        if (not isinstance(trigger_id, str) or pending is None
+                or not secrets.compare_digest(trigger_id, pending[0])
+                or time.monotonic() >= pending[3]
+                or self.focused_engine is not pending[1]
+                or not pending[1].focus_active
+                or pending[1].context_revision != pending[2]
+                or not pending[1].can_accept_preedit):
+            raise RuntimeError("The shortcut's original input context could not be verified. Review and copy the transcript in VOCO.")
 
     def activate_engine(self, engine: "VocoEngine") -> None:
         if self.focused_engine is not None and self.focused_engine is not engine:
+            self.consumed_shortcut_keys.clear()
             self._invalidate_target(self.focused_engine)
         self.focused_engine = engine
         if self.session_id is not None and self.target_engine is not engine:
             self._invalidate_target(self.target_engine)
 
     def deactivate_engine(self, engine: "VocoEngine") -> None:
+        self.pending_trigger = None
         if self.focused_engine is engine:
+            self.consumed_shortcut_keys.clear()
             self.focused_engine = None
         if self.target_engine is engine and self.session_id is not None:
             self._invalidate_target(engine)
@@ -213,6 +284,8 @@ class VocoCoordinator:
         self.deactivate_engine(engine)
 
     def register_key_event(self, keyval: int, state: int) -> None:
+        if not is_session_control_key(keyval, state, ()):
+            self.pending_trigger = None
         if self.session_id is None:
             return
         session_hotkeys = getattr(
@@ -235,6 +308,7 @@ class VocoCoordinator:
         self.provisional_text = ""
 
     def register_context_reset(self, engine: "VocoEngine") -> None:
+        self.pending_trigger = None
         if self.session_id is None or self.target_engine is not engine:
             return
         self.ownership_intact = False
@@ -321,6 +395,11 @@ class VocoCoordinator:
         self.provisional_text = ""
         engine.clear_preedit()
         engine.execute_finalization(plan)
+        # A final acknowledgement counts exactly the text sent by this lease,
+        # including an owned tail preserved when the requested final differs.
+        # Update only after the engine command succeeds; an exception cannot
+        # masquerade as confirmation of the requested full result.
+        self.committed_text += plan.commit_text
         outcome = {
             FinalizationAction.COMMIT: "committed",
             FinalizationAction.PRESERVE: "preserved",
@@ -361,6 +440,9 @@ class VocoCoordinator:
         return self._cancel_active()
 
     def disconnect_client(self) -> None:
+        self.shortcut_armed_until = 0.0
+        self.pending_trigger = None
+        self.trigger_to_deliver = None
         if self.session_id is not None:
             try:
                 self._cancel_active()
@@ -522,6 +604,8 @@ class VocoEngine(IBus.Engine):
         self._voco_destroyed = False
 
     def do_process_key_event(self, keyval: int, _keycode: int, state: int) -> bool:
+        if self.coordinator.consume_shortcut(self, keyval, state):
+            return True
         self.coordinator.register_key_event(keyval, state)
         return False
 
@@ -594,7 +678,9 @@ class VocoEngine(IBus.Engine):
             return
         if identity != self._voco_target_identity:
             self._voco_target_identity = identity
-            self._voco_target_capabilities = 0
+            # Capabilities are engine transport state. IBus deduplicates equal
+            # SetCapabilities values across contexts; fresh content metadata,
+            # identity and revision independently establish target eligibility.
             self._clear_content_type_observation()
 
     @staticmethod
@@ -699,10 +785,9 @@ class VocoEngine(IBus.Engine):
         )
 
     def do_set_capabilities(self, capabilities: int) -> None:
-        if (
-            self.focus_active
-            and self.focus_identity == self._voco_target_identity
-        ):
+        if int(capabilities) != self._voco_target_capabilities:
+            self.coordinator.pending_trigger = None
+        if not self._is_fake_focus(self.focus_identity):
             self._voco_target_capabilities = int(capabilities)
         if self.bound_session_id is not None and not self.can_accept_preedit:
             try:
@@ -711,6 +796,11 @@ class VocoEngine(IBus.Engine):
                 self.coordinator.deactivate_engine(self)
 
     def do_set_content_type(self, purpose: int, hints: int) -> None:
+        if (self._voco_content_type_observed and
+                (self._voco_input_purpose != purpose or self._voco_input_hints != int(hints))):
+            # A changed metadata tuple may be the only observable field change
+            # inside a toolkit input context. Never renew an existing proof.
+            self.coordinator.register_context_reset(self)
         raw_hints = int(hints)
         self._voco_content_type_observed = True
         raw_purpose = int(purpose)
@@ -773,25 +863,16 @@ class VocoEngine(IBus.Engine):
         self._voco_content_type_revision = None
 
     def set_preedit(self, text: str) -> None:
-        value = IBus.Text.new_from_string(text)
-        self.update_preedit_text_with_mode(
-            value,
-            len(text),
-            bool(text),
-            IBus.PreeditFocusMode.CLEAR,
-        )
+        raise RuntimeError(EXACT_FIELD_REQUIRED)
 
     def clear_preedit(self) -> None:
-        self.update_preedit_text_with_mode(
-            IBus.Text.new_from_string(""),
-            0,
-            False,
-            IBus.PreeditFocusMode.CLEAR,
-        )
+        # No public session can own preedit on this context-only transport.
+        # Reset/focus/disconnect callbacks must not send even an empty
+        # composition update into whichever DOM field is currently selected.
+        return None
 
     def commit_value(self, text: str) -> None:
-        if text:
-            self.commit_text(IBus.Text.new_from_string(text))
+        raise RuntimeError(EXACT_FIELD_REQUIRED)
 
     def advance_preedit(self, append_text: str, preedit_text: str) -> None:
         if append_text:
@@ -1024,12 +1105,26 @@ def is_session_control_key(
     )
 
 
+EXACT_FIELD_REQUIRED = (
+    "Automatic IBus delivery is disabled because the original text field cannot be verified. "
+    "Recording remains available; review and copy the transcript in VOCO."
+)
+
+
 def dispatch_command(
     coordinator: VocoCoordinator,
     command: dict[str, Any],
 ) -> dict[str, Any]:
     operation = command.get("operation")
+    # IBus authenticates an input context, which can span multiple editable
+    # elements. No public mutation may infer element ownership from that context.
+    # Keep the coordinator's pure policy separate from this transport boundary.
+    if operation in {"start", "update", "commit", "checkpoint", "finish-canonical", "cancel"}:
+        raise RuntimeError(EXACT_FIELD_REQUIRED)
+    if operation == "poll-trigger":
+        return coordinator.poll_trigger(command.get("hotkey"))
     if operation == "start":
+        coordinator.claim_trigger(command.get("triggerId"))
         return coordinator.start(command.get("clientSessionId"))
     if operation == "update":
         return coordinator.update(
@@ -1055,7 +1150,10 @@ def dispatch_command(
     if operation == "cancel":
         return coordinator.cancel(command.get("sessionId"))
     if operation in {"hello", "status"}:
-        return coordinator.status()
+        status = coordinator.status()
+        status.update(ready=False, setupState="safety-disabled", ownershipIntact=False,
+                      error=EXACT_FIELD_REQUIRED)
+        return status
     raise ValueError("unsupported operation")
 
 

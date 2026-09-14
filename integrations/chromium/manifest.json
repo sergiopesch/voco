@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "VOCO Exact Field",
+  "version": "0.1.0",
+  "description": "Explicitly enable local dictation into the focused plain text field of this tab.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAyRn+CQ5yOAo6eps4WtCg3qQm1FW/6IC+MpG8goqUKeu6tfBx+WttRySHWqB8FOKs/cmap9zPfCLaACzaYipeisWHBGGYNaCgTUTPMzQppQfsVJFg+0c5OOfEw674NItmoqaJH2fn3cI4lkc8/+TuDGb/b0zhEnmy+SE0tVNSTSRwrHk+0hgQCLxRA+4QqQr95jq4NLZq67/c6/n+JdD/YbMTVubVsiXdooNvEEpno12Q7UWGlS1srqqVjkRm5e8/PQqNVzsO+kqlXOotemiBbVuREKTIEKAP2oaPB/Un4AeIOK58PQ2WeiFmjtYYNoxKO5+kBOxT5h9idl0Vh5kTxQIDAQAB",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "nativeMessaging"
+  ],
+  "action": {
+    "default_title": "Enable VOCO in this tab"
+  },
+  "background": {
+    "service_worker": "background.js"
+  }
+}

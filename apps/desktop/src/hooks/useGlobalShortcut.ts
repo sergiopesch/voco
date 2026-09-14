@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { traceHotkeyEvent } from "@/lib/tauri";
+import { refreshShortcutHeartbeat, releaseBrowserRecording, traceHotkeyEvent } from "@/lib/tauri";
+import type { DictationTriggerAction } from "@/lib/dictationTrigger";
 
 const TOGGLE_EVENT = "voco:toggle-dictation";
 const TOGGLE_REALTIME_EVENT = "voco:toggle-realtime";
@@ -20,8 +21,8 @@ export function shouldMarkHotkeyHandlerReady(
 }
 
 export function useGlobalShortcut(
-  toggle: () => void,
-  toggleRealtime: () => void,
+  toggle: (triggerId?: string, action?: DictationTriggerAction) => void,
+  toggleRealtime: (triggerId?: string) => void,
   shouldHandleHotkey: () => boolean,
   canHandleHotkey: boolean,
   appStartMs: number,
@@ -44,13 +45,16 @@ export function useGlobalShortcut(
     let disposed = false;
 
     void getCurrentWindow()
-      .listen(TOGGLE_EVENT, () => {
+      .listen<{ triggerId?: string; action?: DictationTriggerAction } | null>(TOGGLE_EVENT, (event) => {
         traceHotkeyEvent("frontend_toggle_received").catch(() => {});
         onHotkeyPressedRef.current();
         if (!shouldHandleHotkeyRef.current()) {
+          if (event.payload?.action === "start" && event.payload.triggerId?.startsWith("browser:")) {
+            void releaseBrowserRecording(event.payload.triggerId).catch(() => {});
+          }
           return;
         }
-        toggleRef.current();
+        toggleRef.current(event.payload?.triggerId, event.payload?.action);
       })
       .then((cleanup) => {
         if (disposed) {
@@ -62,9 +66,9 @@ export function useGlobalShortcut(
         setDictationListenerRegistered(true);
         traceHotkeyEvent("frontend_hotkey_listener_registered").catch(() => {});
         const elapsed = Math.round(performance.now() - appStartMs);
-        console.info("Hotkey listener attached");
+        console.info("Frontend dictation event subscription registered");
         console.info(
-          `[timing] app start -> hotkey listener attachment: ${elapsed}ms`,
+          `[timing] app start -> frontend dictation event subscription: ${elapsed}ms`,
         );
       })
       .catch((error) => {
@@ -72,11 +76,11 @@ export function useGlobalShortcut(
       });
 
     void getCurrentWindow()
-      .listen(TOGGLE_REALTIME_EVENT, () => {
+      .listen<{ triggerId?: string } | null>(TOGGLE_REALTIME_EVENT, (event) => {
         if (!shouldHandleHotkeyRef.current()) {
           return;
         }
-        toggleRealtimeRef.current();
+        toggleRealtimeRef.current(event.payload?.triggerId);
       })
       .then((cleanup) => {
         if (disposed) {
@@ -97,6 +101,17 @@ export function useGlobalShortcut(
       cleanupFns.forEach((cleanup) => cleanup());
     };
   }, [appStartMs]);
+
+  useEffect(() => {
+    if (!dictationListenerRegistered || !realtimeListenerRegistered || !canHandleHotkey) return;
+    const refresh = () => { void refreshShortcutHeartbeat(true).catch(() => {}); };
+    refresh();
+    const timer = window.setInterval(refresh, 1_000);
+    return () => {
+      window.clearInterval(timer);
+      void refreshShortcutHeartbeat(false).catch(() => {});
+    };
+  }, [canHandleHotkey, dictationListenerRegistered, realtimeListenerRegistered]);
 
   useEffect(() => {
     if (

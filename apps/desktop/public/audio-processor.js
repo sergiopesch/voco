@@ -1,6 +1,9 @@
 class AudioCaptureProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
+    this._inputSeen = false;
+    this._sealed = false;
+    this._interrupted = false;
     this._sampleBuffer = new Float32Array(2048);
     this._sampleBufferOffset = 0;
     this._levelSum = 0;
@@ -8,8 +11,9 @@ class AudioCaptureProcessor extends AudioWorkletProcessor {
     this._levelSamples = 0;
     this.port.onmessage = (event) => {
       if (event.data?.type === "flush") {
+        this._sealed = true;
         this._flushSamples();
-        this.port.postMessage({ type: "flushed" });
+        this.port.postMessage({ type: "flushed", complete: !this._interrupted });
       }
     };
   }
@@ -55,9 +59,20 @@ class AudioCaptureProcessor extends AudioWorkletProcessor {
   }
 
   process(inputs) {
+    if (this._sealed) return true;
     const input = inputs[0];
-    if (!input || !input[0]) return true;
+    if (!input || !input[0] || input[0].length === 0) {
+      if (this._inputSeen) {
+        this._sealed = true;
+        this._interrupted = true;
+        // Invalidate output before delivering the final received prefix.
+        this.port.postMessage({ type: "capture-interrupted" });
+        this._flushSamples();
+      }
+      return true;
+    }
 
+    this._inputSeen = true;
     const samples = input[0];
     this._appendSamples(samples);
 
