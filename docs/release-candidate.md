@@ -46,6 +46,17 @@ Do not copy personal audio/transcripts into public documentation or alter those
 receipts to match a newer candidate. [This summary](testing/model-comparison-2026-09-14.md)
 provides shareable aggregate measurements with their limits.
 
+## Dependency checks for 2026.0.35
+
+The 14 September 2026 audit identified and patched the Vitest development-tool
+advisory GHSA-82fw-gwwq-j7x9 (Vitest and related packages now 4.1.11) and
+RUSTSEC-2026-0285 (rustls now 0.23.45; rustls-webpki 0.103.15). No audit exemptions
+were added. The fresh npm and Rust audits report zero vulnerabilities; the Rust
+audit still reports seven unmaintained and two unsoundness warnings in upstream
+dependencies. These warnings remain follow-up work, not evidence of a warning-free
+or universally secure release. Dated security assessments retain their historical
+counts. Re-run both audits for the eventual release commit.
+
 ## Current boundaries
 
 The local default is English NVIDIA Nemotron CPU streaming. Generic desktop paste
