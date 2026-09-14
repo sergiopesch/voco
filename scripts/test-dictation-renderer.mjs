@@ -137,6 +137,39 @@ await page.addInitScript(() => {
  window.lease = false;
  window.nativeCalls = [];
  window.tracks = [];
+ // Exercise the real append-only queue against an explicit native IPC double.
+ // Legacy transcribeAudio/preview callbacks are not the current stream transport.
+ window.benchmarkRequests = [];
+ window.benchmarkAudioSamples = 0;
+ window.__TAURI_INTERNALS__ = {invoke: async (command, {request}) => {
+   if(command !== 'benchmark_stream') throw new Error('Unexpected native command: ' + command);
+   window.benchmarkRequests.push(request);
+   if(request.op === 'warmup' || request.op === 'diagnostic') return {};
+   if(request.op === 'start') {
+     if(request.seq !== 0 || typeof request.session !== 'string') throw new Error('Invalid stream start');
+     window.benchmarkSession = request.session;
+     window.benchmarkSequence = 0;
+     window.benchmarkAudioSamples = 0;
+   } else if(request.session !== window.benchmarkSession || request.seq <= window.benchmarkSequence) {
+     throw new Error('Stream request identity or sequence changed');
+   }
+   window.benchmarkSequence = request.seq;
+   let text = null;
+   if(request.op === 'push') {
+     if(request.rate !== 16000 || !Array.isArray(request.audio) || !request.audio.length ||
+       request.audio.length > 320 || !request.audio.every(Number.isFinite)) throw new Error('Invalid stream PCM packet');
+     if(window.deferInference) {
+       await new Promise(resolve => window.resolveInference = resolve);
+       window.deferInference = false;
+     }
+     window.benchmarkAudioSamples += request.audio.length;
+     const plan = window.streamTextAt ?? [{samples:16000,text:'Recovered words'}];
+     text = plan.filter(item => item.samples <= window.benchmarkAudioSamples).at(-1)?.text ?? null;
+   } else if(request.op === 'finish') {
+     text = window.streamFinalText ?? 'Recovered words for manual review.';
+   } else if(!['start','cancel'].includes(request.op)) throw new Error('Unexpected stream operation');
+   return {session:request.session,seq:request.seq,mode:'append-only',text};
+ }};
  class Track extends EventTarget { readyState='live'; muted=false; stop(){this.readyState='ended';this.stopCount=(this.stopCount||0)+1;} }
  const getUserMedia = async (constraints) => { window.requestedMicrophones ??= []; window.requestedMicrophones.push(constraints.audio); if(window.deferMicrophone) await new Promise(resolve=>window.resolveMicrophone=resolve); if(window.failSelectedDevice && constraints.audio !== true) throw new DOMException('Unplugged selected device','NotFoundError'); const track = new Track(); window.tracks.push(track); return {getTracks:()=>[track],getAudioTracks:()=>[track]}; };
  Object.defineProperty(navigator,'mediaDevices',{configurable:true,value:{getUserMedia,enumerateDevices:async()=>[],addEventListener(){},removeEventListener(){}}});
@@ -919,6 +952,7 @@ await page.waitForFunction(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktop
 assert.equal(await page.evaluate(()=>window.store.getState().status),'recording');
 await page.evaluate(()=>window.samples(1));await stop();await page.waitForFunction(()=>window.store.getState().status==='idle');
 assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length),2);
+assert.equal(await page.evaluate(()=>window.benchmarkRequests.filter(r=>['start','push','finish'].includes(r.op)).every((r,index)=>r.seq===index)),true);
 assert.equal(await page.evaluate(()=>window.traceEvents.filter(c=>c[0]==='dictation_desktop_first_phrase_dispatched').length),1);
 assert.equal(await page.evaluate(()=>window.traceEvents.filter(c=>c[0]==='dictation_desktop_terminal_route_dispatched').length),2);
 assert.equal(await page.evaluate(()=>window.traceEvents.find(c=>c[0]==='dictation_desktop_keyboard_dispatch_completed')[1].durationMs),350);
@@ -927,9 +961,9 @@ await load();await page.evaluate(()=>{window.desktopPaste=true;window.desktopStr
 await start();await page.evaluate(()=>window.captureWorklet.port.onmessage({data:{type:'samples',data:new Float32Array(16000)}}));
 await page.waitForFunction(()=>Boolean(window.resolveInference));
 await page.evaluate(()=>{void window.hook.cancelRecording();});await page.evaluate(()=>window.resolveInference());
-await page.waitForTimeout(80);
+await page.waitForFunction(()=>window.benchmarkRequests.some(r=>r.op==='cancel'));
 assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length),0);
-results.push('Cancellation while a progressive phrase is decoding suppresses its late paste.');
+results.push('Cancellation while a progressive worker request is in flight drains the cancel command and suppresses its late paste.');
 await load();await page.evaluate(()=>{window.desktopPaste=true;window.desktopStream=true;window.failPaste=true;});
 await start();await page.evaluate(()=>window.captureWorklet.port.onmessage({data:{type:'samples',data:new Float32Array(16000)}}));
 await page.waitForFunction(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length===1);
@@ -938,49 +972,68 @@ assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteD
 assert.equal(await page.evaluate(()=>window.store.getState().recovery.targetMayContainText),true);
 results.push('Uncertain progressive paste retains text/audio and never sends queued phrases or a final duplicate.');
 
-await load(); await page.evaluate(()=>{window.desktopPaste=true;window.desktopStream=true;});
-await start();
+await load(); await page.evaluate(()=>{window.desktopPaste=true;window.desktopStream=true;window.streamTextAt=[];window.streamFinalText='Exact captured samples.';});
+await start(0);
 await page.evaluate(()=>{
- const batch = new Float32Array(80000);
- for (let i=16000;i<32000;i++) batch[i]=Math.sin(i/20)*0.2;
- for (let i=48000;i<64000;i++) batch[i]=Math.sin(i/20)*0.2;
- window.captureWorklet.port.onmessage({data:{type:'samples',data:batch}});
+ const batch = new Float32Array(32321);
+ for (let i=1600;i<12000;i++) batch[i]=Math.sin(i/20)*0.2;
+ for (let i=18000;i<31000;i++) batch[i]=Math.sin(i/20)*0.2;
+ window.expectedStreamAudio = Array.from(batch);
+ for(const [from,to] of [[0,111],[111,9876],[9876,batch.length]]) {
+   window.captureWorklet.port.onmessage({data:{type:'samples',data:batch.slice(from,to)}});
+ }
 });
-await page.waitForFunction(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length===3);
-assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='transcribeAudio').map(c=>c[1])),[23360,32000,32000]);
+await page.waitForFunction(()=>window.benchmarkAudioSamples===32320);
+assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length),0);
 await stop(); await page.waitForFunction(()=>window.store.getState().status==='idle');
-results.push('Multiple quiet boundaries within one capture batch send disjoint exact audio ranges without overlap.');
+assert.deepEqual(await page.evaluate(()=>window.benchmarkRequests.filter(r=>r.op==='push').flatMap(r=>r.audio)),await page.evaluate(()=>window.expectedStreamAudio));
+assert.deepEqual(await page.evaluate(()=>window.benchmarkRequests.filter(r=>r.op==='push').map(r=>r.audio.length)),[...Array(101).fill(320),1]);
+assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').map(c=>c[1])),['Exact captured samples.']);
+assert.equal(await page.evaluate(()=>window.benchmarkRequests.filter(r=>r.op==='finish').length),1);
+results.push('Irregular callbacks retain every speech and silence sample in 20 ms packets, flush the one-sample tail exactly once, and deliver only the final recognized text.');
 
-await load(); await page.evaluate(()=>{window.desktopPaste=true;window.desktopStream=true;window.inferenceTexts=['Words appear during speech','Words appear during speech before stopping','Words appear during speech before stopping now.'];});
+await load(); await page.evaluate(()=>{
+ window.desktopPaste=true;window.desktopStream=true;
+ window.streamTextAt=[{samples:16000,text:'Words appe'},{samples:20800,text:'Words appear during speech'}];
+ window.streamFinalText='Words appear during speech before stopping now.';
+});
 await start(0);
 await page.evaluate(()=>window.samples(0.8));
-assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='previewTranscribeAudio').length),0);
-await page.evaluate(()=>window.samples(0.2));
-await page.waitForFunction(()=>window.nativeCalls.filter(c=>c[0]==='previewTranscribeAudio').length===1);
-await page.waitForFunction(()=>window.traceEvents.some(c=>c[0]==='dictation_desktop_snapshot_recognized'));
+await page.waitForFunction(()=>window.benchmarkAudioSamples===12800);
 assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length),0);
-await page.evaluate(()=>window.samples(0.3));
+await page.evaluate(()=>window.samples(0.2));
 await page.waitForFunction(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length===1);
 assert.equal(await page.evaluate(()=>window.store.getState().status),'recording');
-assert.equal(await page.evaluate(()=>window.nativeCalls.find(c=>c[0]==='pasteDesktopText')[1]),'Words appear during speech');
+assert.equal(await page.evaluate(()=>window.nativeCalls.find(c=>c[0]==='pasteDesktopText')[1]),'Words appe');
+await page.evaluate(()=>window.samples(0.3));
+await page.waitForFunction(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length===2);
+assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').map(c=>c[1])),['Words appe','ar during speech']);
 await page.evaluate(()=>window.samples(0.25));
-assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='previewTranscribeAudio').length),2);
+await page.waitForFunction(()=>window.benchmarkAudioSamples===24640);
+assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length),2);
 await stop(); await page.waitForFunction(()=>window.store.getState().status==='idle');
-assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').map(c=>c[1]).join('')),'Words appear during speech before stopping now.');
-assert.equal(await page.evaluate(()=>window.traceEvents.filter(c=>c[0]==='dictation_desktop_live_prefix_dispatched').length),1);
-assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='transcribeAudio').length),1);
-assert.equal(await page.evaluate(()=>window.traceEvents.filter(c=>c[0]==='dictation_desktop_snapshot_waiting_agreement').length),1);
+assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').map(c=>c[1])),['Words appe','ar during speech',' before stopping now.']);
+assert.equal(await page.evaluate(()=>window.traceEvents.filter(c=>c[0]==='dictation_desktop_live_prefix_dispatched').length),3);
+assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>['previewTranscribeAudio','transcribeAudio'].includes(c[0])).length),0);
+assert.equal(await page.evaluate(()=>window.benchmarkRequests.filter(r=>r.op==='finish').length),1);
 await screenshot('continuous-speech-finished.png');
-results.push('Uninterrupted input waits for usable audio, inserts agreed words while recording, retires extra startup checks after delivery, and Stop appends only the remaining suffix.');
+results.push('Uninterrupted input appends partial words exactly as the worker responds, suppresses repeated hypotheses, and Stop adds only the remaining suffix without legacy re-decoding.');
 
-await load(); await page.evaluate(()=>{window.desktopPaste=true;window.desktopStream=true;});
-await start(0); await page.evaluate(()=>window.samples(21));
-await page.waitForFunction(()=>window.nativeCalls.some(c=>c[0]==='previewTranscribeAudio'));
-assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>c[0]==='transcribeAudio')),false);
-assert.equal(await page.evaluate(()=>window.nativeCalls.find(c=>c[0]==='previewTranscribeAudio')[1]),21*16000);
+await load(); await page.evaluate(()=>{window.desktopPaste=true;window.desktopStream=true;window.streamTextAt=[];window.streamFinalText='Long stream completed.';});
+await start(0);
+// Yield between capture callbacks so this models an ongoing stream, not a
+// 21-second backlog intentionally rejected by the three-second queue bound.
+for(let second=1;second<=21;second++) {
+ await page.evaluate(()=>window.samples(1));
+ await page.waitForFunction(samples=>window.benchmarkAudioSamples===samples,second*16000);
+}
+assert.equal(await page.evaluate(()=>window.benchmarkRequests.filter(r=>r.op==='push').length),1050);
+assert.equal(await page.evaluate(()=>window.benchmarkRequests.some(r=>r.op==='diagnostic')),false);
+assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>['previewTranscribeAudio','transcribeAudio'].includes(c[0]))),false);
 await stop(); await page.waitForFunction(()=>window.store.getState().status==='idle');
-assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='transcribeAudio').length),1);
-results.push('Desktop snapshots beyond 20 seconds still use preview recognition; full decoding is reserved for the final phrase.');
+assert.equal(await page.evaluate(()=>window.benchmarkRequests.filter(r=>r.op==='finish').length),1);
+assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').map(c=>c[1])),['Long stream completed.']);
+results.push('A stream exceeding 20 seconds maintains sequenced 20 ms IPC packets, avoids whole-history decoding and finishes once after all captured audio.');
 
 if (evidence) await writeFile(path.join(evidence,'diagnostics.json'),JSON.stringify({results,errors,consoleMessages},null,2));
 assert.equal(consoleMessages.filter(message=>message.startsWith('Canonical cursor checkpoint deferred until stop: Error: no canonical transcription is in flight')).length,0, 'Output cancellation must not invalidate an otherwise valid local recognition receipt');
