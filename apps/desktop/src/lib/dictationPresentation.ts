@@ -1,23 +1,23 @@
 import type {
-  AppSurface,
   CursorDeliveryState,
   DictationStatus,
-  LiveCursorMode,
   MicrophonePermission,
   OwnedPreeditStatus,
   RealtimeStatus,
-  TranscriptEnhancement,
-  TranscriptTarget,
 } from "@/types";
 
 interface StatusLabelInput {
   configurationError: boolean;
+  hasRecovery?: boolean;
+  manualTranscriptReady?: boolean;
+  hasRecoverableTranscript?: boolean;
   cursorDeliveryState: CursorDeliveryState;
   cursorRequired: boolean;
   cursorSetupState: OwnedPreeditStatus["setupState"];
   dictationStatus: DictationStatus;
   isRealtimeActive: boolean;
   microphonePermission: MicrophonePermission;
+  nativeMicrophoneReady?: boolean | null;
   microphoneReady: boolean;
   realtimeMuted: boolean;
   realtimeStatus: RealtimeStatus;
@@ -25,19 +25,26 @@ interface StatusLabelInput {
 
 export function deriveStatusLabel({
   configurationError,
+  hasRecovery = false,
+  manualTranscriptReady = false,
+  hasRecoverableTranscript = false,
   cursorDeliveryState,
   cursorRequired,
   cursorSetupState,
   dictationStatus,
   isRealtimeActive,
   microphonePermission,
+  nativeMicrophoneReady,
   microphoneReady,
   realtimeMuted,
   realtimeStatus,
 }: StatusLabelInput): string {
+  if (dictationStatus === "starting") {
+    return "Starting microphone";
+  }
   if (dictationStatus === "recording") {
     if (cursorDeliveryState === "pending") {
-      return "Listening — preparing live cursor";
+      return "Listening — verifying original field";
     }
     return cursorDeliveryState === "preview-only"
       ? "Listening — preview only"
@@ -57,11 +64,17 @@ export function deriveStatusLabel({
       ? "Realtime voice is speaking"
       : "Realtime voice is listening";
   }
+  if (hasRecovery) {
+    return manualTranscriptReady ? "Transcript ready to copy" : "Recording needs recovery";
+  }
   if (cursorDeliveryState === "unreconciled") {
     return "Transcript needs attention";
   }
   if (configurationError) {
     return "Settings need attention";
+  }
+  if (hasRecoverableTranscript) {
+    return "Transcript needs attention";
   }
   if (dictationStatus === "error") {
     return "Needs attention";
@@ -69,37 +82,16 @@ export function deriveStatusLabel({
   if (realtimeStatus === "error") {
     return "Realtime voice needs attention";
   }
-  if (microphonePermission === "denied") {
+  if (nativeMicrophoneReady === false) return "Microphone setup required";
+  if (nativeMicrophoneReady == null && microphonePermission === "denied") {
     return "Microphone needs permission";
   }
   if (cursorRequired && cursorSetupState !== "ready") {
-    return "Live cursor needs setup — preview fallback available";
+    if (cursorSetupState === "safety-disabled") return "Ready — manual copy";
+    return "Text delivery needs setup — manual copy available";
   }
   if (!microphoneReady) {
     return "Ready — microphone checks on first use";
   }
   return "Ready to listen";
-}
-
-export function shouldShowDictationOverlay(
-  surface: AppSurface,
-  status: DictationStatus,
-  transcriptTarget: TranscriptTarget | null | undefined,
-  liveCursorMode: LiveCursorMode | null | undefined,
-  transcriptEnhancement: TranscriptEnhancement | null | undefined,
-  cursorDeliveryState?: CursorDeliveryState,
-): boolean {
-  const streamsAtCursor =
-    transcriptTarget === "cursor" &&
-    liveCursorMode === "stable-cursor-streaming" &&
-    transcriptEnhancement === "off" &&
-    (cursorDeliveryState === undefined ||
-      cursorDeliveryState === "pending" ||
-      cursorDeliveryState === "owned");
-
-  return (
-    surface === "hidden" &&
-    !streamsAtCursor &&
-    (status === "recording" || status === "processing")
-  );
 }

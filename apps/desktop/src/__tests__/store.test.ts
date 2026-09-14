@@ -6,6 +6,8 @@ describe("useStore", () => {
     useStore.setState({
       status: "idle",
       transcript: "",
+      recoverableTranscripts: [],
+      lastDictationResult: null,
       interimTranscript: "",
       error: null,
       selectedDeviceId: null,
@@ -70,6 +72,38 @@ describe("useStore", () => {
     useStore.getState().clearTranscript();
     expect(useStore.getState().transcript).toBe("");
     expect(useStore.getState().interimTranscript).toBe("");
+  });
+
+  it("keeps distinct recovery entries across subsequent failed and successful captures", () => {
+    const store = useStore.getState();
+    store.retainRecoverableTranscript({ id: "first", text: "First result", reason: "delivery-unconfirmed", isPartial: false });
+    store.clearTranscript();
+    store.setStatus("starting");
+    store.setTranscript("Second result");
+    store.retainRecoverableTranscript({ id: "second", text: "Second result", reason: "output-failed", isPartial: false });
+    store.clearTranscript();
+    store.setTranscript("Successfully delivered third result");
+    store.setStatus("idle");
+    expect(useStore.getState().recoverableTranscripts.map((entry) => entry.text)).toEqual(["First result", "Second result"]);
+    store.dismissRecoverableTranscript("first");
+    expect(useStore.getState().recoverableTranscripts.map((entry) => entry.id)).toEqual(["second"]);
+    store.dismissRecoverableTranscript("second");
+    expect(useStore.getState().recoverableTranscripts).toEqual([]);
+  });
+
+  it("updates one failed session without duplicating it or replacing another session", () => {
+    const store = useStore.getState();
+    store.retainRecoverableTranscript({ id: "one", text: "Partial", reason: "output-failed", isPartial: true });
+    const retained = useStore.getState().recoverableTranscripts[0];
+    if (!retained) throw new Error("Expected the first recovery entry");
+    const timestamp = retained.createdAt;
+    store.retainRecoverableTranscript({ id: "two", text: "Other result", reason: "delivery-unconfirmed", isPartial: false });
+    store.retainRecoverableTranscript({ id: "one", text: "Completed result", reason: "delivery-unconfirmed", isPartial: false });
+    store.retainRecoverableTranscript({ id: "empty", text: "  ", reason: "output-failed", isPartial: false });
+    expect(useStore.getState().recoverableTranscripts).toEqual([
+      { id: "one", text: "Completed result", reason: "delivery-unconfirmed", isPartial: false, createdAt: timestamp },
+      expect.objectContaining({ id: "two", text: "Other result" }),
+    ]);
   });
 
   it("setAudioLevel updates level", () => {

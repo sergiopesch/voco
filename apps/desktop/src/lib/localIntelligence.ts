@@ -45,19 +45,27 @@ export async function enhanceTranscriptForDictation(
       config.localLlmEndpoint,
       config.localLlmModel,
     );
-    const text = enhancement.text.trim().length > 0 ? enhancement.text : transcript;
+    // A successful deterministic "scratch that" can intentionally clear the text.
+    // Any failed enhancement must recover the original recognition, even if a
+    // partial transformation was returned by an older backend.
+    const intentionalEmpty = enhancement.usedEnhancement && !enhancement.warning;
+    const text = enhancement.warning
+      ? transcript
+      : enhancement.text.trim().length > 0 || intentionalEmpty
+        ? enhancement.text
+        : transcript;
     if (enhancement.warning) {
       await deps
         .showNotification(
           "Local enhancement skipped",
-          "VOCO used the raw transcript because the local model was unavailable.",
+          "VOCO used the raw transcript because local enhancement did not complete.",
         )
         .catch(() => {});
     }
 
     return {
       text,
-      usedEnhancement: enhancement.usedEnhancement,
+      usedEnhancement: enhancement.warning ? false : enhancement.usedEnhancement,
       warning: enhancement.warning,
     };
   } catch (error) {

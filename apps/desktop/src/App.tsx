@@ -5,7 +5,7 @@ import {
   PhysicalPosition,
   PhysicalSize,
 } from "@tauri-apps/api/dpi";
-import { availableMonitors, getCurrentWindow } from "@tauri-apps/api/window";
+import { availableMonitors, currentMonitor, getCurrentWindow } from "@tauri-apps/api/window";
 import { useStore } from "@/store/useStore";
 import {
   getConfig,
@@ -21,6 +21,7 @@ import {
   showNotification,
   showStatusOverlay,
   syncRuntimeStatus,
+  releaseBrowserRecording,
   traceHotkeyEvent,
 } from "@/lib/tauri";
 import {
@@ -28,45 +29,55 @@ import {
   readCachedUpdateState,
   writeCachedUpdateState,
 } from "@/lib/updates";
+import { DiagnosticsRequestGate, unknownShortcut } from "@/lib/shortcutPresentation";
 import { UpdateCheckCoordinator } from "@/lib/updateCheckCoordinator";
 import { useGlobalShortcut } from "@/hooks/useGlobalShortcut";
 import { useDictation } from "@/hooks/useDictation";
+import { useNativeCaptureSettings } from "@/hooks/useNativeCaptureSettings";
 import { useRealtimeConversation } from "@/hooks/useRealtimeConversation";
 import { ControlPanel } from "@/components/ControlPanel";
 import { ConfigRecoveryPanel } from "@/components/ConfigRecoveryPanel";
 import { RealtimeMicVisual } from "@/components/RealtimeMicVisual";
+import { requiresVerifiedTextTarget } from "@/lib/dictationOutputPlan";
 import { probeMicrophoneAccess } from "@/lib/audioInput";
+import { MicrophoneRefresh, queryMicrophonePermission, microphoneAccessFailure } from "@/lib/microphoneRefresh";
 import {
   deriveStatusLabel,
-  shouldShowDictationOverlay,
 } from "@/lib/dictationPresentation";
+import type { DictationTriggerAction } from "@/lib/dictationTrigger";
 import {
   shouldApplyConfigSnapshot,
   shouldBlockRuntimeForConfigErrors,
 } from "@/lib/configSnapshot";
 import { placeTrayPopover } from "@/lib/popoverPlacement";
+import { showInteractiveWindow, WindowRemapFocusGuard, isWaylandSession } from "@/lib/windowRemap";
 import {
   canActivateMode,
   canToggleDictationWithPermission,
   deriveActivityMode,
+  isDictationActive,
   type ActivityMode,
 } from "@/lib/activityMode";
 import type {
   AppConfig,
   AudioDeviceOption,
   ConfigSnapshot,
-  CursorDeliveryState,
-  DictationStatus,
   RealtimeStatus,
   RuntimeDiagnostics,
 } from "@/types";
 
 const PANEL_SIZE = new LogicalSize(1040, 760);
+
+function getCaptureSelection() {
+  const state = useStore.getState();
+  if (state.captureBackendMode === "pending") throw new Error("Capture backend has not been verified. Retry capture setup in Audio settings.");
+  return state.captureBackendMode === "native"
+    ? { backend: "native" as const, selectionToken: state.nativeCaptureSource?.selectionToken ?? null }
+    : { backend: "webkit" as const };
+}
 const PANEL_MIN_SIZE = new LogicalSize(760, 560);
-const POPOVER_SIZE = new LogicalSize(420, 520);
+const POPOVER_SIZE = new LogicalSize(420, 380);
 const POPOVER_RECOVERY_SIZE = new LogicalSize(420, 660);
-const STATUS_OVERLAY_WIDTH = 460;
-const STATUS_OVERLAY_HEIGHT = 196;
 const REALTIME_OVERLAY_WIDTH = 340;
 const REALTIME_OVERLAY_HEIGHT = 156;
 
@@ -112,71 +123,6 @@ function cleanupDeferredListener(
   };
 }
 
-function StatusOverlay({
-  status,
-  interimTranscript,
-  transcript,
-  audioLevel,
-  cursorDeliveryState,
-}: {
-  status: DictationStatus;
-  interimTranscript: string;
-  transcript: string;
-  audioLevel: number;
-  cursorDeliveryState: CursorDeliveryState;
-}) {
-  const trimmedInterim = interimTranscript.trim();
-  const hasLiveText =
-    status === "recording" &&
-    trimmedInterim !== "" &&
-    trimmedInterim !== "Listening...";
-  const previewOnly =
-    cursorDeliveryState === "preview-only" ||
-    cursorDeliveryState === "unreconciled";
-  const headline = previewOnly
-    ? "Preview only"
-    : status === "recording"
-      ? "Streaming words"
-      : "Transcribing";
-  const copy =
-    trimmedInterim ||
-    (status === "processing" && transcript
-      ? transcript
-      : previewOnly
-        ? "Cursor delivery is unavailable. Your transcript will remain in VOCO so you can copy it safely."
-        : "Speak normally. Live words will appear here before VOCO inserts the final text.");
-  const meterLevel = status === "recording" ? Math.max(audioLevel, 0.06) : 1;
-
-  return (
-    <main
-      className="voco-overlay"
-      data-state={status}
-      data-live-preview={hasLiveText ? "true" : "false"}
-      data-cursor-delivery={cursorDeliveryState}
-      aria-live="polite"
-    >
-      <span className="voco-overlay__eyebrow">
-        {previewOnly
-          ? "Cursor unavailable — safe preview"
-          : hasLiveText
-          ? "Live transcript preview"
-          : status === "recording"
-            ? "Listening for speech"
-            : "Local Processing"}
-      </span>
-      <strong className="voco-overlay__headline">{headline}</strong>
-      <p className={hasLiveText ? "voco-overlay__transcript" : "voco-overlay__copy"}>
-        {copy}
-      </p>
-      <div className="voco-overlay__meter" aria-hidden="true">
-        <div
-          className="voco-overlay__meter-fill"
-          style={{ transform: `scaleX(${meterLevel})` }}
-        />
-      </div>
-    </main>
-  );
-}
 
 function RealtimeOverlay({
   status,
@@ -279,17 +225,25 @@ function ResizeHandles() {
 }
 
 export function App() {
+  const nativeMicrophone = useNativeCaptureSettings();
   const status = useStore((state) => state.status);
   const error = useStore((state) => state.error);
+  const recovery = useStore((state) => state.recovery);
+  const captureNotice = useStore((state) => state.captureNotice);
   const transcript = useStore((state) => state.transcript);
-  const interimTranscript = useStore((state) => state.interimTranscript);
-  const audioLevel = useStore((state) => state.audioLevel);
+  const rawTranscript = useStore((state) => state.rawTranscript);
+  const recoverableTranscripts = useStore((state) => state.recoverableTranscripts);
+  const dismissRecoverableTranscript = useStore((state) => state.dismissRecoverableTranscript);
+  const lastDictationResult = useStore((state) => state.lastDictationResult);
+  const hasRecoverableTranscript = recoverableTranscripts.length > 0;
   const surface = useStore((state) => state.surface);
   const onboardingStep = useStore((state) => state.onboardingStep);
   const selectedDeviceId = useStore((state) => state.selectedDeviceId);
   const availableDevices = useStore((state) => state.availableDevices);
   const microphonePermission = useStore((state) => state.microphonePermission);
   const microphoneReady = useStore((state) => state.microphoneReady);
+  const nativeMicrophoneReady = nativeMicrophone.mode === "webkit" ? null
+    : nativeMicrophone.mode === "native" && Boolean(nativeMicrophone.selected) && microphoneReady;
   const ownedPreeditSetupState = useStore(
     (state) => state.ownedPreeditSetupState,
   );
@@ -324,9 +278,14 @@ export function App() {
     prepareAudioEngine,
     primeRecordingStream,
     cursorDeliveryState,
+    canCancel,
+    cancellationPending,
+    cancelRecording,
+    retryRecovery,
+    discardRecovery,
     toggle,
     onHotkeyPressed,
-  } = useDictation();
+  } = useDictation({ getCaptureSelection });
   const {
     realtimeStatus,
     realtimeDetail,
@@ -344,9 +303,21 @@ export function App() {
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [startupConfigError, setStartupConfigError] = useState<string | null>(null);
   const [settingsRequest, setSettingsRequest] = useState<{
-    section: "General" | "Hotkeys";
+    section: "General" | "Audio" | "Hotkeys" | "Integrations";
     id: number;
   }>({ section: "General", id: 0 });
+  const [closeRequestId, setCloseRequestId] = useState(0);
+  const draftsDirtyRef = useRef(false);
+  const shortcutCaptureRef = useRef(false);
+  const shortcutCaptureReleasedAtRef = useRef(Number.NEGATIVE_INFINITY);
+  const handleDraftStateChange = useCallback((dirty: boolean) => {
+    draftsDirtyRef.current = dirty;
+  }, []);
+  const handleShortcutCaptureChange = useCallback((active: boolean) => {
+    const wasCapturing = shortcutCaptureRef.current;
+    shortcutCaptureRef.current = active;
+    if (wasCapturing && !active) shortcutCaptureReleasedAtRef.current = performance.now();
+  }, []);
   const appStartMsRef = useRef(performance.now());
   const initStartedRef = useRef(false);
   const appMountedLoggedRef = useRef(false);
@@ -357,10 +328,16 @@ export function App() {
   const configSaveRequestVersionRef = useRef(0);
   const surfaceSyncQueueRef = useRef<Promise<void>>(Promise.resolve());
   const surfaceSyncVersionRef = useRef(0);
+  const runtimeSessionTypeRef = useRef<string | null>(null);
+  const remapFocusGuardRef = useRef(new WindowRemapFocusGuard());
   const panelRequestVersionRef = useRef(0);
   const lastConfigRevisionRef = useRef(-1);
+  const diagnosticsGateRef = useRef(new DiagnosticsRequestGate());
+  const diagnosticsInFlightRef = useRef(false);
+  const diagnosticsExpiryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const runtimeStatusRevisionRef = useRef(0);
   const activityModeRef = useRef<ActivityMode>("idle");
+  const microphoneRefreshRef = useRef(new MicrophoneRefresh());
   const dictationStatusRef = useRef(status);
   const realtimeStatusRef = useRef(realtimeStatus);
   const realtimeActivationAllowedRef = useRef(false);
@@ -382,9 +359,17 @@ export function App() {
     },
     [setConfig],
   );
-  const dismissInteractiveSurface = useCallback(() => {
+  const dismissInteractiveSurface = useCallback((): boolean => {
+    const currentSurface = useStore.getState().surface;
+    if (draftsDirtyRef.current && (currentSurface === "settings" || currentSurface === "onboarding")) {
+      setCloseRequestId((request) => request + 1);
+      return false;
+    }
     panelRequestVersionRef.current += 1;
+    surfaceSyncVersionRef.current += 1;
+    remapFocusGuardRef.current.invalidate();
     setSurface("hidden");
+    return true;
   }, [setSurface]);
   const handleSurfaceChange = useCallback(
     (nextSurface: "hidden" | "onboarding" | "settings" | "popover") => {
@@ -396,26 +381,18 @@ export function App() {
     },
     [dismissInteractiveSurface, setSurface],
   );
-  const dictationOverlayVisible = shouldShowDictationOverlay(
-    surface,
-    status,
-    config?.transcriptTarget,
-    config?.liveCursorMode,
-    config?.transcriptEnhancement,
-    cursorDeliveryState,
-  );
-  const realtimeOverlayVisible =
-    surface === "hidden" && isRealtimeActive && !dictationOverlayVisible;
-  const overlayVisible = dictationOverlayVisible || realtimeOverlayVisible;
+  // Dictation stays in the tray; it must not map a transcript window over the
+  // destination. Realtime conversation keeps its separate explicit surface.
+  const realtimeOverlayVisible = surface === "hidden" && isRealtimeActive;
+  const overlayVisible = realtimeOverlayVisible;
+  const recoveryAvailable = Boolean(recovery);
   const popoverSize =
-    transcript.trim().length > 0 &&
-    (cursorDeliveryState === "unreconciled" || status === "error")
+    recovery || hasRecoverableTranscript || (transcript.trim().length > 0 &&
+    (cursorDeliveryState === "unreconciled" || status === "error"))
       ? POPOVER_RECOVERY_SIZE
       : POPOVER_SIZE;
-  const cursorRequired =
-    config?.transcriptTarget === "cursor" &&
-    config.liveCursorMode === "stable-cursor-streaming" &&
-    config.transcriptEnhancement === "off";
+  const cursorRequired = requiresVerifiedTextTarget(config) &&
+    !(config?.transcriptTarget === "cursor" && runtimeDiagnostics?.desktopPaste?.enabled && runtimeDiagnostics.desktopPaste.available);
   const cursorSetupState =
     ownedPreeditSetupState ||
     runtimeDiagnostics?.ownedPreedit.setupState ||
@@ -432,10 +409,17 @@ export function App() {
   realtimeActivationAllowedRef.current = realtimeActivationAllowed;
   const canHandleHotkey =
     initComplete && config !== null && !runtimeConfigurationError;
-  const handleToggleRequest = useCallback(async () => {
+  const handleToggleRequest = useCallback(async (triggerId?: string, action?: DictationTriggerAction) => {
+    const rejectBrowserStart = () => {
+      if (action === "start" && triggerId?.startsWith("browser:")) {
+        void releaseBrowserRecording(triggerId).catch(() => {});
+      }
+    };
+    if (shortcutCaptureRef.current || performance.now() - shortcutCaptureReleasedAtRef.current < 350) { rejectBrowserStart(); return; }
     const currentSurface = useStore.getState().surface;
-    if (currentSurface !== "hidden") {
-      dismissInteractiveSurface();
+    if (currentSurface !== "hidden" && action !== "stop") {
+      rejectBrowserStart();
+      if (!dismissInteractiveSurface()) return;
       await hideStatusOverlay().catch(() => {});
       await showNotification(
         "Panel hidden",
@@ -451,6 +435,7 @@ export function App() {
       realtimeActive ||
       !canActivateMode(activityModeRef.current, "dictation")
     ) {
+      rejectBrowserStart();
       await showNotification(
         "Realtime voice is active",
         "Stop realtime voice before starting dictation.",
@@ -458,30 +443,52 @@ export function App() {
       return;
     }
 
-    const dictationActive = ["recording", "processing"].includes(
-      dictationStatusRef.current,
-    );
+    const dictationActive = isDictationActive(dictationStatusRef.current);
+    const captureState = useStore.getState();
+    if (!dictationActive && (captureState.captureBackendMode === "pending" ||
+        (captureState.captureBackendMode === "native" && !captureState.nativeCaptureSource))) {
+      rejectBrowserStart();
+      await showNotification("Microphone setup required", "Choose and allow a native microphone in Audio settings, or retry capture setup if the backend is unavailable.").catch(() => {});
+      return;
+    }
     if (
+      captureState.captureBackendMode === "webkit" &&
       !canToggleDictationWithPermission(
         dictationStatusRef.current,
         useStore.getState().microphonePermission,
       )
     ) {
+      rejectBrowserStart();
       await showNotification(
         "Microphone access is blocked",
         "Grant microphone access in VOCO settings before starting dictation.",
       ).catch(() => {});
       return;
     }
-    if (!dictationActive) {
+    const admitted = toggle(triggerId, action);
+    if (admitted && !dictationActive) {
       activityModeRef.current = "dictation";
     }
-    toggle();
   }, [dismissInteractiveSurface, toggle]);
+  const handlePrepareDictation = useCallback(async () => {
+    if (isDictationActive(useStore.getState().status)) return;
+    if (!["idle", "error"].includes(realtimeStatusRef.current) ||
+        !canActivateMode(activityModeRef.current, "dictation")) {
+      await showNotification("Realtime voice is active", "Stop realtime voice before preparing dictation.").catch(() => {});
+      return;
+    }
+    if (!dismissInteractiveSurface()) return;
+    await hideStatusOverlay().catch(() => {});
+    await showNotification(
+      "Ready to try dictation",
+      `Focus a text field, then press ${useStore.getState().config?.hotkey ?? "Alt+D"}. Wait for Listening before speaking.`,
+    ).catch(() => {});
+  }, [dismissInteractiveSurface]);
+
   const handleRealtimeToggleRequest = useCallback(async () => {
-    const dictationActive = ["recording", "processing"].includes(
-      dictationStatusRef.current,
-    );
+    // Native shortcut delivery can follow the DOM event that finished capture.
+    if (shortcutCaptureRef.current || performance.now() - shortcutCaptureReleasedAtRef.current < 350) return;
+    const dictationActive = isDictationActive(dictationStatusRef.current);
     if (
       dictationActive ||
       !canActivateMode(activityModeRef.current, "realtime")
@@ -514,11 +521,11 @@ export function App() {
     }
 
     if (useStore.getState().surface !== "hidden") {
-      dismissInteractiveSurface();
+      if (!dismissInteractiveSurface()) return;
       await hideStatusOverlay().catch(() => {});
     }
     if (
-      ["recording", "processing"].includes(dictationStatusRef.current) ||
+      isDictationActive(dictationStatusRef.current) ||
       !canActivateMode(activityModeRef.current, "realtime")
     ) {
       return;
@@ -527,6 +534,7 @@ export function App() {
     if (!realtimeActive) {
       activityModeRef.current = "realtime";
     }
+    microphoneRefreshRef.current.invalidateRetry();
     toggleRealtime();
   }, [dismissInteractiveSurface, toggleRealtime]);
 
@@ -563,66 +571,154 @@ export function App() {
     );
   }, [applyAuthoritativeConfig]);
 
-  const refreshDevices = useCallback(async () => {
-    try {
-      const permission = await navigator.permissions
-        .query({ name: "microphone" as PermissionName })
-        .catch(() => null);
-      if (permission?.state === "granted") {
-        setMicrophonePermission("granted");
-      } else if (permission?.state === "denied") {
-        setMicrophonePermission("denied");
-      } else {
-        setMicrophonePermission("unknown");
-      }
 
+  useEffect(() => {
+    const controller = microphoneRefreshRef.current;
+    controller.activate();
+    const unsubscribe = useStore.subscribe((state, previous) => {
+      if (state.selectedDeviceId !== previous.selectedDeviceId || state.status !== previous.status) {
+        controller.invalidateRetry();
+      }
+    });
+    return () => { unsubscribe(); controller.dispose(); };
+  }, []);
+  useEffect(() => { microphoneRefreshRef.current.invalidateRetry(); }, [realtimeStatus]);
+
+  const refreshDevices = useCallback(async () => {
+    if (useStore.getState().captureBackendMode !== "webkit") {
+      await nativeMicrophone.refresh();
+      return;
+    }
+    const current = microphoneRefreshRef.current.beginRefresh();
+    // Permission support is advisory: panel refresh waits only for enumeration.
+    void queryMicrophonePermission().then((permission) => {
+      if (!current()) return;
+      if (permission === "granted" || permission === "denied") setMicrophonePermission(permission);
+      else if (permission === "prompt") setMicrophonePermission("unknown");
+    });
+    try {
       const devices = await navigator.mediaDevices.enumerateDevices();
+      if (!current()) return;
       const options: AudioDeviceOption[] = devices
         .filter((device) => device.kind === "audioinput")
-        .map((device, index) => ({
-          deviceId: device.deviceId,
-          label: device.label || `Microphone ${index + 1}`,
-        }));
+        .map((device, index) => ({ deviceId: device.deviceId, label: device.label || `Microphone ${index + 1}` }));
       setAvailableDevices(options);
     } catch (error) {
-      console.warn("Failed to enumerate audio devices:", error);
+      if (current()) console.warn("Failed to enumerate audio devices:", error);
     }
-  }, [setAvailableDevices, setMicrophonePermission]);
+  }, [setAvailableDevices, setMicrophonePermission, nativeMicrophone.refresh]);
 
-  const requestMicrophoneAccess = useCallback(async () => {
+  useEffect(() => {
+    const mediaDevices = navigator.mediaDevices;
+    if (!mediaDevices?.addEventListener) return;
+    const refresh = () => { void refreshDevices().catch(() => {}); };
+    mediaDevices.addEventListener("devicechange", refresh);
+    return () => mediaDevices.removeEventListener("devicechange", refresh);
+  }, [refreshDevices]);
+
+  const requestMicrophoneAccess = useCallback(async (): Promise<boolean> => {
+    if (useStore.getState().captureBackendMode !== "webkit") return false;
+    const controller = microphoneRefreshRef.current;
+    const current = controller.beginRetry();
+    const deviceId = useStore.getState().selectedDeviceId;
+    const initialRealtime = realtimeStatusRef.current;
+    const inactive = () => {
+      const state = useStore.getState();
+      return current() && activityModeRef.current === "idle" && state.selectedDeviceId === deviceId &&
+        state.status !== "recording" && state.status !== "processing" &&
+        realtimeStatusRef.current === initialRealtime && (initialRealtime === "idle" || initialRealtime === "error");
+    };
+    if (!inactive()) return false;
     try {
-      await probeMicrophoneAccess(selectedDeviceId);
-      setStatus("idle");
+      await probeMicrophoneAccess(deviceId);
+      if (!inactive()) return false;
       setError(null);
       setMicrophonePermission("granted");
       setMicrophoneReadyState(true);
-      await refreshDevices();
+      setStatus("idle");
+      void refreshDevices();
+      return true;
     } catch (error) {
-      setStatus("error");
-      setMicrophonePermission("denied");
+      if (!inactive()) return false;
+      const failure = microphoneAccessFailure(error);
+      if (failure.denied) setMicrophonePermission("denied");
       setMicrophoneReadyState(false);
-      setError(
-        `Microphone access is blocked. ${error instanceof Error ? error.message : String(error)}`,
-      );
+      setStatus("error");
+      setError(failure.message);
+      return false;
     }
-  }, [
-    refreshDevices,
-    selectedDeviceId,
-    setError,
-    setMicrophonePermission,
-    setMicrophoneReadyState,
-    setStatus,
-  ]);
+  }, [refreshDevices, setError, setMicrophonePermission, setMicrophoneReadyState, setStatus]);
+
+  const invalidateShortcutDiagnostics = useCallback(() => {
+    diagnosticsGateRef.current.invalidate();
+    if (diagnosticsExpiryRef.current !== null) clearTimeout(diagnosticsExpiryRef.current);
+    setRuntimeDiagnostics((current) => current ? {
+      ...current,
+      shortcut: unknownShortcut(useStore.getState().config?.hotkey ?? ""),
+    } : null);
+  }, []);
 
   const refreshRuntimeDiagnostics = useCallback(async () => {
+    if (diagnosticsInFlightRef.current || configSavePendingCountRef.current > 0) return;
+    const isCurrent = diagnosticsGateRef.current.begin();
+    const hotkey = useStore.getState().config?.hotkey;
+    const revision = lastConfigRevisionRef.current;
+    const saveVersion = configSaveRequestVersionRef.current;
+    diagnosticsInFlightRef.current = true;
+    let timeout: ReturnType<typeof setTimeout> | undefined;
     try {
-      const diagnostics = await getRuntimeDiagnostics();
+      // A stalled observer must neither block opening Settings nor accumulate requests.
+      const request = Promise.resolve().then(getRuntimeDiagnostics).finally(() => {
+        diagnosticsInFlightRef.current = false;
+      });
+      const diagnostics = await Promise.race([
+        request,
+        new Promise<null>((resolve) => { timeout = setTimeout(() => resolve(null), 2000); }),
+      ]);
+      if (!isCurrent()) return;
+      if (!diagnostics || revision !== lastConfigRevisionRef.current ||
+          saveVersion !== configSaveRequestVersionRef.current ||
+          configSavePendingCountRef.current > 0 || hotkey !== useStore.getState().config?.hotkey) {
+        invalidateShortcutDiagnostics();
+        return;
+      }
+      runtimeSessionTypeRef.current = diagnostics.sessionType;
       setRuntimeDiagnostics(diagnostics);
       setOwnedPreeditSetupState(diagnostics.ownedPreedit.setupState);
+      if (diagnosticsExpiryRef.current !== null) clearTimeout(diagnosticsExpiryRef.current);
+      diagnosticsExpiryRef.current = setTimeout(invalidateShortcutDiagnostics, 2000);
     } catch (error) {
+      if (isCurrent()) invalidateShortcutDiagnostics();
       console.warn("Failed to load runtime diagnostics:", error);
+    } finally {
+      if (timeout !== undefined) clearTimeout(timeout);
     }
-  }, [setOwnedPreeditSetupState]);
+  }, [invalidateShortcutDiagnostics, setOwnedPreeditSetupState]);
+
+  useEffect(() => {
+    diagnosticsGateRef.current.activate();
+    return () => {
+      diagnosticsGateRef.current.dispose();
+      if (diagnosticsExpiryRef.current !== null) clearTimeout(diagnosticsExpiryRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    invalidateShortcutDiagnostics();
+    if (surface === "hidden" || !config) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const poll = async () => {
+      await refreshRuntimeDiagnostics();
+      if (!cancelled) timer = setTimeout(() => { void poll(); }, 1000);
+    };
+    void poll();
+    return () => {
+      cancelled = true;
+      if (timer !== undefined) clearTimeout(timer);
+      invalidateShortcutDiagnostics();
+    };
+  }, [surface, config, invalidateShortcutDiagnostics, refreshRuntimeDiagnostics]);
 
   const refreshAuthoritativeConfig = useCallback(async () => {
     const snapshot = await getConfig();
@@ -643,19 +739,18 @@ export function App() {
     }
   }, [refreshAuthoritativeConfig, refreshDevices, refreshRuntimeDiagnostics]);
 
-  const openSettings = useCallback(async (section: "General" | "Hotkeys" = "General") => {
+  const openSettings = useCallback(async (section: "General" | "Audio" | "Hotkeys" | "Integrations" = "General") => {
     const requestVersion = panelRequestVersionRef.current + 1;
     panelRequestVersionRef.current = requestVersion;
     const currentStatus = useStore.getState().status;
-    if (currentStatus === "recording" || currentStatus === "processing") {
+    if (isDictationActive(currentStatus)) {
       return;
     }
     await refreshPanelState();
     const latestStatus = useStore.getState().status;
     if (
       panelRequestVersionRef.current !== requestVersion ||
-      latestStatus === "recording" ||
-      latestStatus === "processing"
+      isDictationActive(latestStatus)
     ) {
       return;
     }
@@ -671,7 +766,11 @@ export function App() {
       const requestVersion = panelRequestVersionRef.current + 1;
       panelRequestVersionRef.current = requestVersion;
       const state = useStore.getState();
-      if (state.status === "recording" || state.status === "processing") {
+      if (draftsDirtyRef.current && (state.surface === "settings" || state.surface === "onboarding")) {
+        setCloseRequestId((request) => request + 1);
+        return;
+      }
+      if (isDictationActive(state.status)) {
         return;
       }
       trayPopoverAnchorRef.current = anchor;
@@ -683,8 +782,7 @@ export function App() {
       const latestState = useStore.getState();
       if (
         panelRequestVersionRef.current !== requestVersion ||
-        latestState.status === "recording" ||
-        latestState.status === "processing"
+        isDictationActive(latestState.status)
       ) {
         return;
       }
@@ -697,6 +795,7 @@ export function App() {
     (patch: Partial<AppConfig>): Promise<void> => {
       const requestVersion = configSaveRequestVersionRef.current + 1;
       configSaveRequestVersionRef.current = requestVersion;
+      invalidateShortcutDiagnostics();
       configSavePendingCountRef.current += 1;
       const operation = configSaveQueueRef.current.then(async () => {
         try {
@@ -722,7 +821,7 @@ export function App() {
       configSaveQueueRef.current = operation.catch(() => {});
       return operation;
     },
-    [applyAuthoritativeConfig],
+    [applyAuthoritativeConfig, invalidateShortcutDiagnostics],
   );
 
   const retryConfigLoad = useCallback(async () => {
@@ -762,6 +861,38 @@ export function App() {
     [updateCheckCoordinator],
   );
 
+  const retryCaptureSetup = useCallback(async () => {
+    const loadedConfig = useStore.getState().config;
+    if (!loadedConfig) throw new Error("Load the application configuration before capture setup.");
+    try {
+      await nativeMicrophone.initialize();
+      const appVersion = await getVersion();
+      setUpdateState({ status: "idle", currentVersion: appVersion, latestRelease: null, lastCheckedAt: null, error: null });
+      if (loadedConfig.onboardingCompleted && (await hasPendingHotkeyToggle().catch(() => false))) {
+        void primeRecordingStream();
+      }
+      traceHotkeyEvent("frontend_audio_prepare_started").catch(() => {});
+      await prepareAudioEngine();
+      traceHotkeyEvent("frontend_audio_prepare_done").catch(() => {});
+      const state = useStore.getState();
+      if (state.status === "error" && state.error?.startsWith("Failed to initialize:")) {
+        state.setError(null);
+        state.setStatus("idle");
+      }
+      setInitComplete(true);
+      traceHotkeyEvent("frontend_init_complete").catch(() => {});
+      await refreshDevices();
+      await refreshRuntimeDiagnostics();
+      await runUpdateCheck(loadedConfig.updateChannel, appVersion);
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : String(cause);
+      setStatus("error");
+      setError(`Failed to initialize: ${message}`);
+      throw cause;
+    }
+  }, [nativeMicrophone.initialize, prepareAudioEngine, primeRecordingStream, refreshDevices,
+    refreshRuntimeDiagnostics, runUpdateCheck, setError, setStatus, setUpdateState]);
+
   useEffect(() => {
     if (initStartedRef.current) {
       return;
@@ -780,29 +911,8 @@ export function App() {
           ? loadedSnapshot.config
           : useStore.getState().config ?? loadedSnapshot.config;
         setStartupConfigError(null);
-        const appVersion = await getVersion();
-        setUpdateState({
-          status: "idle",
-          currentVersion: appVersion,
-          latestRelease: null,
-          lastCheckedAt: null,
-          error: null,
-        });
         setOnboardingStep(0);
-        if (
-          loadedConfig.onboardingCompleted &&
-          (await hasPendingHotkeyToggle().catch(() => false))
-        ) {
-          void primeRecordingStream();
-        }
-        traceHotkeyEvent("frontend_audio_prepare_started").catch(() => {});
-        await prepareAudioEngine();
-        traceHotkeyEvent("frontend_audio_prepare_done").catch(() => {});
-        setInitComplete(true);
-        traceHotkeyEvent("frontend_init_complete").catch(() => {});
-        await refreshDevices();
-        await refreshRuntimeDiagnostics();
-        await runUpdateCheck(loadedConfig.updateChannel, appVersion);
+        await retryCaptureSetup();
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         if (loadedConfig === null) {
@@ -816,19 +926,7 @@ export function App() {
       }
     }
     void init();
-  }, [
-    prepareAudioEngine,
-    primeRecordingStream,
-    applyAuthoritativeConfig,
-    refreshDevices,
-    setError,
-    setOnboardingStep,
-    setStatus,
-    setSurface,
-    setUpdateState,
-    refreshRuntimeDiagnostics,
-    runUpdateCheck,
-  ]);
+  }, [applyAuthoritativeConfig, retryCaptureSetup, setError, setOnboardingStep, setStatus, setSurface]);
 
   useEffect(() => {
     if (!initComplete || !config?.updateChannel) {
@@ -850,13 +948,17 @@ export function App() {
       epoch: runtimeStatusEpoch,
       revision: runtimeStatusRevisionRef.current,
       runtimeInitialized: initComplete,
+      hasRecoverableTranscript,
       configurationError: runtimeConfigurationError,
       microphoneReady,
       microphonePermission,
+      nativeMicrophoneReady,
       dictationStatus: status,
       cursorDelivery: cursorDeliveryState,
       cursorRequired,
       cursorSetupState,
+      manualTranscriptReady: recovery?.kind === "manual-copy",
+      recoveryAvailable,
       realtimeStatus,
       realtimeMuted: isRealtimeMuted,
     }).catch((error) => {
@@ -866,13 +968,17 @@ export function App() {
     cursorRequired,
     cursorDeliveryState,
     cursorSetupState,
+    hasRecoverableTranscript,
     initComplete,
     isRealtimeMuted,
     microphonePermission,
     microphoneReady,
+    nativeMicrophoneReady,
     realtimeStatus,
     runtimeConfigurationError,
     runtimeStatusEpoch,
+    recoveryAvailable,
+    recovery?.kind,
     status,
   ]);
 
@@ -880,10 +986,12 @@ export function App() {
     const currentWindow = getCurrentWindow();
     const syncVersion = surfaceSyncVersionRef.current + 1;
     surfaceSyncVersionRef.current = syncVersion;
+    remapFocusGuardRef.current.invalidate();
 
     async function syncWindowSurface() {
       const isCurrentRequest = () =>
-        surfaceSyncVersionRef.current === syncVersion;
+        surfaceSyncVersionRef.current === syncVersion &&
+        useStore.getState().surface === surface;
       if (!isCurrentRequest()) {
         return;
       }
@@ -894,15 +1002,15 @@ export function App() {
         await currentWindow.setResizable(false).catch(() => {});
         await currentWindow.setMinSize(null).catch(() => {});
         await currentWindow
-          .setIgnoreCursorEvents(!realtimeOverlayVisible)
+          .setIgnoreCursorEvents(!overlayVisible)
           .catch(() => {});
         if (!isCurrentRequest()) {
           return;
         }
         if (overlayVisible) {
           await showStatusOverlay(
-            realtimeOverlayVisible ? REALTIME_OVERLAY_WIDTH : STATUS_OVERLAY_WIDTH,
-            realtimeOverlayVisible ? REALTIME_OVERLAY_HEIGHT : STATUS_OVERLAY_HEIGHT,
+            REALTIME_OVERLAY_WIDTH,
+            REALTIME_OVERLAY_HEIGHT,
           ).catch(() => {});
         } else {
           await hideStatusOverlay().catch(() => {});
@@ -921,80 +1029,45 @@ export function App() {
           return;
         }
         const anchor = trayPopoverAnchorRef.current;
-        if (anchor && (anchor.rectWidth > 0 || anchor.rectHeight > 0)) {
-          const monitors = await availableMonitors().catch(() => []);
-          const targetMonitor =
-            monitors.find((monitor) => {
-              const x = anchor.rectPositionX;
-              const y = anchor.rectPositionY;
-              return (
-                x >= monitor.position.x &&
-                x <= monitor.position.x + monitor.size.width &&
-                y >= monitor.position.y &&
-                y <= monitor.position.y + monitor.size.height
-              );
-            }) ?? monitors[0];
-
-          const scaleFactor =
-            targetMonitor?.scaleFactor ??
-            (await currentWindow
-              .scaleFactor()
-              .catch(() => window.devicePixelRatio || 1));
-          const placement = placeTrayPopover(
-            {
-              x: anchor.rectPositionX,
-              y: anchor.rectPositionY,
-              width: anchor.rectWidth,
-              height: anchor.rectHeight,
-            },
-            {
-              x: targetMonitor?.position.x ?? 0,
-              y: targetMonitor?.position.y ?? 0,
-              width:
-                targetMonitor?.size.width ?? window.screen.width * scaleFactor,
-              height:
-                targetMonitor?.size.height ?? window.screen.height * scaleFactor,
-              scaleFactor,
-            },
-            { width: popoverSize.width, height: popoverSize.height },
-          );
-
-          if (!isCurrentRequest()) {
-            return;
-          }
-
-          await currentWindow
-            .setSize(
-              new PhysicalSize(
-                placement.width,
-                placement.height,
-              ),
-            )
-            .catch(() => {});
-          if (!isCurrentRequest()) {
-            return;
-          }
-          await currentWindow
-            .setPosition(new PhysicalPosition(placement.x, placement.y))
-            .catch(() => {});
-        } else {
-          if (!isCurrentRequest()) {
-            return;
-          }
-          await currentWindow.setSize(popoverSize).catch(() => {});
-          if (!isCurrentRequest()) {
-            return;
-          }
-          await currentWindow.center().catch(() => {});
-        }
-        if (!isCurrentRequest()) {
-          return;
-        }
-        await currentWindow.show().catch(() => {});
-        if (!isCurrentRequest()) {
-          return;
-        }
-        await currentWindow.setFocus().catch(() => {});
+        const hasAnchor = anchor && (anchor.rectWidth > 0 || anchor.rectHeight > 0);
+        const monitors = await availableMonitors().catch(() => []);
+        const targetMonitor = (hasAnchor
+          ? monitors.find((monitor) =>
+            anchor.rectPositionX >= monitor.position.x &&
+            anchor.rectPositionX < monitor.position.x + monitor.size.width &&
+            anchor.rectPositionY >= monitor.position.y &&
+            anchor.rectPositionY < monitor.position.y + monitor.size.height)
+          : await currentMonitor().catch(() => null)) ?? monitors[0];
+        const scaleFactor = targetMonitor?.scaleFactor ??
+          await currentWindow.scaleFactor().catch(() => window.devicePixelRatio || 1);
+        const workArea = targetMonitor?.workArea;
+        const placement = placeTrayPopover(
+          hasAnchor ? {
+            x: anchor.rectPositionX, y: anchor.rectPositionY,
+            width: anchor.rectWidth, height: anchor.rectHeight,
+          } : null,
+          {
+            x: workArea?.position.x ?? targetMonitor?.position.x ?? 0,
+            y: workArea?.position.y ?? targetMonitor?.position.y ?? 0,
+            width: workArea?.size.width ?? targetMonitor?.size.width ?? window.screen.availWidth * scaleFactor,
+            height: workArea?.size.height ?? targetMonitor?.size.height ?? window.screen.availHeight * scaleFactor,
+            scaleFactor,
+          },
+          { width: popoverSize.width, height: popoverSize.height },
+        );
+        if (!isCurrentRequest()) return;
+        await showInteractiveWindow({
+          request: syncVersion,
+          wayland: isWaylandSession(runtimeSessionTypeRef.current),
+          guard: remapFocusGuardRef.current,
+          isCurrent: isCurrentRequest,
+          hide: () => currentWindow.hide(),
+          resize: () => currentWindow.setSize(new PhysicalSize(placement.width, placement.height)),
+          position: () => currentWindow.setPosition(new PhysicalPosition(placement.x, placement.y)).catch(() => {}),
+          show: () => currentWindow.show(),
+          focus: () => currentWindow.setFocus(),
+          isFocused: () => currentWindow.isFocused(),
+        });
         return;
       }
 
@@ -1007,19 +1080,18 @@ export function App() {
       if (!isCurrentRequest()) {
         return;
       }
-      await currentWindow.setSize(panelSizeRef.current).catch(() => {});
-      if (!isCurrentRequest()) {
-        return;
-      }
-      await currentWindow.center().catch(() => {});
-      if (!isCurrentRequest()) {
-        return;
-      }
-      await currentWindow.show().catch(() => {});
-      if (!isCurrentRequest()) {
-        return;
-      }
-      await currentWindow.setFocus().catch(() => {});
+      await showInteractiveWindow({
+        request: syncVersion,
+        wayland: isWaylandSession(runtimeSessionTypeRef.current),
+        guard: remapFocusGuardRef.current,
+        isCurrent: isCurrentRequest,
+        hide: () => currentWindow.hide(),
+        resize: () => currentWindow.setSize(panelSizeRef.current),
+        position: () => currentWindow.center().catch(() => {}),
+        show: () => currentWindow.show(),
+        focus: () => currentWindow.setFocus(),
+        isFocused: () => currentWindow.isFocused(),
+      });
     }
 
     const operation = surfaceSyncQueueRef.current.then(syncWindowSurface);
@@ -1034,7 +1106,9 @@ export function App() {
     const currentWindow = getCurrentWindow();
     return cleanupDeferredListener(
       currentWindow.onResized(({ payload }) => {
+        const version = surfaceSyncVersionRef.current;
         void currentWindow.scaleFactor().then((scaleFactor) => {
+          if (version !== surfaceSyncVersionRef.current || useStore.getState().surface !== surface) return;
           const logicalSize = payload.toLogical(scaleFactor);
           if (
             logicalSize.width >= PANEL_MIN_SIZE.width &&
@@ -1117,9 +1191,14 @@ export function App() {
     window.addEventListener("keydown", onKeyDown);
     const cleanupFocusListener = cleanupDeferredListener(
       currentWindow.onFocusChanged(({ payload: focused }) => {
-        if (!focused) {
-          dismissInteractiveSurface();
+        if (!isWaylandSession(runtimeSessionTypeRef.current)) {
+          if (!focused) dismissInteractiveSurface();
+          return;
         }
+        const version = surfaceSyncVersionRef.current;
+        void remapFocusGuardRef.current.shouldDismiss(() => currentWindow.isFocused()).then((dismiss) => {
+          if (dismiss && version === surfaceSyncVersionRef.current && useStore.getState().surface === "popover") dismissInteractiveSurface();
+        });
       }),
       "popover focus listener",
     );
@@ -1131,6 +1210,9 @@ export function App() {
   }, [dismissInteractiveSurface, surface]);
 
   const statusLabel = deriveStatusLabel({
+    hasRecovery: Boolean(recovery),
+    manualTranscriptReady: recovery?.kind === "manual-copy",
+    hasRecoverableTranscript,
     configurationError: runtimeConfigurationError,
     cursorDeliveryState,
     cursorRequired,
@@ -1139,6 +1221,7 @@ export function App() {
     isRealtimeActive,
     microphonePermission,
     microphoneReady,
+    nativeMicrophoneReady,
     realtimeMuted: isRealtimeMuted,
     realtimeStatus,
   });
@@ -1161,18 +1244,6 @@ export function App() {
   }
 
   if (surface === "hidden") {
-    if (dictationOverlayVisible) {
-      return (
-        <StatusOverlay
-          status={status}
-          interimTranscript={interimTranscript}
-          transcript={transcript}
-          audioLevel={audioLevel}
-          cursorDeliveryState={cursorDeliveryState}
-        />
-      );
-    }
-
     return realtimeOverlayVisible ? (
       <RealtimeOverlay
         status={realtimeStatus}
@@ -1188,6 +1259,7 @@ export function App() {
   return (
     <>
       <ControlPanel
+        nativeMicrophone={{ ...nativeMicrophone, initialize: retryCaptureSetup }}
         surface={surface}
         onboardingStep={onboardingStep}
         config={config}
@@ -1198,6 +1270,21 @@ export function App() {
         dictationStatus={status}
         cursorDeliveryState={cursorDeliveryState}
         transcript={transcript}
+        rawTranscript={rawTranscript}
+        recovery={recovery}
+        captureNotice={captureNotice}
+        canCancelDictation={canCancel}
+        cancellationPending={cancellationPending}
+        onCancelDictation={() => void cancelRecording()}
+        onRetryRecovery={() => void retryRecovery()}
+        onDiscardRecovery={discardRecovery}
+        recoverableTranscripts={recoverableTranscripts}
+        onDismissRecoverableTranscript={dismissRecoverableTranscript}
+        lastDictationResult={lastDictationResult}
+        onPrepareDictation={() => void handlePrepareDictation()}
+        onDraftStateChange={handleDraftStateChange}
+        onShortcutCaptureChange={handleShortcutCaptureChange}
+        closeRequestId={closeRequestId}
         requestedSection={settingsRequest.section}
         requestedSectionRequestId={settingsRequest.id}
         isRealtimeActive={isRealtimeActive}

@@ -2,7 +2,7 @@
 <component type="desktop-application">
   <id>com.sergiopesch.voco</id>
   <name>VOCO</name>
-  <summary>A voice-native interface layer designed for speed and precision</summary>
+  <summary>Turn speech into text at your cursor with local dictation</summary>
   <metadata_license>MIT</metadata_license>
   <project_license>MIT</project_license>
   <developer id="com.sergiopesch">
@@ -10,14 +10,16 @@
   </developer>
   <launchable type="desktop-id">com.sergiopesch.voco.desktop</launchable>
   <description>
-    <p>VOCO is a Linux desktop dictation tool for people who want fast, private voice capture with local transcription by default.</p>
-    <p>It stays in the tray, listens on demand, and keeps visible state compact. Its optional realtime conversation mode sends microphone audio to OpenAI only after the user explicitly starts that mode.</p>
+    <p>Your voice, typed. Built for Linux. VOCO turns speech into text at your cursor. Press a hotkey, speak, and press it again to finish. Normal dictation is transcribed on your device and needs no account or subscription.</p>
+    <p>VOCO stays in the tray, with a compact panel for microphone feedback and dictation status. Text insertion depends on your desktop session and the target field.</p>
     <ul>
-      <li>Tray-first workflow with a compact command panel</li>
-      <li>Onboarding for microphone setup and hotkeys</li>
+      <li>Local speech transcription with Whisper</li>
+      <li>Setup for your microphone, hotkey, and Linux text insertion options</li>
+      <li>Transcript preview and final-text-only options</li>
       <li>GitHub Release update checks for manual install channels</li>
-      <li>Clear Linux-specific install, upgrade, and troubleshooting guidance</li>
+      <li>Linux-specific install, upgrade, and troubleshooting guidance</li>
     </ul>
+    <p>Optional local model modes can enhance transcripts or answer questions through your own localhost model server. Optional OpenClaw modes may send transcript text according to your configured provider. Realtime conversation sends microphone audio to OpenAI only after you explicitly start that mode.</p>
   </description>
   <categories>
     <category>Utility</category>
@@ -28,7 +30,7 @@
   <url type="vcs-browser">https://github.com/sergiopesch/voco</url>
   <content_rating type="oars-1.1" />
   <releases>
-    <release version="2026.0.21" date="2026-07-15">
+    <release version="2026.0.35" date="2026-07-15">
       <description>
         <p>Adds persistent VOCO Dictation input-source support with revisable live preedit, authoritative local checkpoints, exact-prefix delivery, and recoverable fail-closed final transcripts.</p>
         <p>Unifies tray and settings state, adds safe configuration recovery and single-instance ownership, and hardens model-cache integrity, installers, private IPC, and release verification.</p>

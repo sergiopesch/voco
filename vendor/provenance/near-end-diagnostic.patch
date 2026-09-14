@@ -1,0 +1,119 @@
+--- a/whisper-rs-sys/whisper.cpp/src/whisper.cpp
++++ b/whisper-rs-sys/whisper.cpp/src/whisper.cpp
+@@ -773,6 +773,7 @@
+     bool failed;    // has the current segment failed to decode?
+     bool completed; // has the decoder completed the current segment?
+     bool has_ts;    // have we already sampled a non-beg timestamp token for the current segment?
++    int near_end_completion_offset = -1;
+ 
+     // new token probs, logits and logprobs after the last whisper_decode (1-dimensional array: [n_vocab])
+     std::vector<float> probs;
+@@ -794,6 +795,7 @@
+ 
+ struct whisper_state {
+     bool had_low_confidence_decoder_rejection = false;
++    int earliest_near_end_completion_offset = -1;
+     int64_t t_sample_us = 0;
+     int64_t t_encode_us = 0;
+     int64_t t_decode_us = 0;
+@@ -5341,6 +5343,7 @@
+                    const float * samples,
+                            int   n_samples) {
+     state->had_low_confidence_decoder_rejection = false;
++    state->earliest_near_end_completion_offset = -1;
+     // clear old results
+     auto & result_all = state->result_all;
+ 
+@@ -5602,6 +5605,7 @@
+                 decoder.failed    = false;
+                 decoder.completed = false;
+                 decoder.has_ts    = false;
++                decoder.near_end_completion_offset = -1;
+ 
+                 if (params.grammar_rules != nullptr) {
+                     decoder.grammar = whisper_grammar_init(params.grammar_rules, params.n_grammar_rules, params.i_start_rule);
+@@ -5883,6 +5887,15 @@
+                            (params.max_tokens > 0 && i >= params.max_tokens) || // max tokens per segment reached
+                            (has_ts && seek + seek_delta + 100 >= seek_end)      // end of audio reached
+                            ) {
++                            // Diagnostic only: this branch stopped solely on the original
++                            // one-second timestamp margin, before the actual frame end.
++                            // Keep decoder ownership through temperature selection.
++                            if (token.id != whisper_token_eot(ctx) &&
++                                !(params.max_tokens > 0 && i >= params.max_tokens) &&
++                                has_ts && seek_delta > 0 && seek + seek_delta < seek_end &&
++                                seek + seek_delta + 100 >= seek_end) {
++                                decoder.near_end_completion_offset = seek + seek_delta;
++                            }
+                             if (result_len == 0 && !params.no_timestamps) {
+                                 if (seek + seek_delta + 100 >= seek_end) {
+                                     result_len = i + 1;
+@@ -6092,6 +6105,16 @@
+             const auto & best_decoder = state->decoders[best_decoder_id];
+             state->had_low_confidence_decoder_rejection |= seek_had_decoder_rejection &&
+                 best_decoder.sequence.avg_logprobs < params.logprob_thold;
++
++            // Publish only the final selected decoder, before single-timestamp
++            // ending can replace its original seek delta. Offsets are absolute
++            // 10 ms frames in this full call; -1 means no such selected ending.
++            const int near_end_offset = best_decoder.near_end_completion_offset;
++            if (near_end_offset >= 0 &&
++                (state->earliest_near_end_completion_offset < 0 ||
++                 near_end_offset < state->earliest_near_end_completion_offset)) {
++                state->earliest_near_end_completion_offset = near_end_offset;
++            }
+ 
+             auto seek_delta = best_decoder.seek_delta;
+             const auto result_len = best_decoder.sequence.result_len;
+@@ -7407,3 +7430,7 @@
+ extern "C" bool whisper_full_had_low_confidence_decoder_rejection_from_state(const struct whisper_state * state) {
+     return state->had_low_confidence_decoder_rejection;
+ }
++
++extern "C" int whisper_full_earliest_near_end_completion_offset_from_state(const struct whisper_state * state) {
++    return state->earliest_near_end_completion_offset;
++}
+--- a/whisper-rs-sys/whisper.cpp/include/whisper.h
++++ b/whisper-rs-sys/whisper.cpp/include/whisper.h
+@@ -613,6 +613,11 @@
+     // Reset at each whisper_full_with_state entry; does not change decoding decisions.
+     WHISPER_API bool whisper_full_had_low_confidence_decoder_rejection_from_state(const struct whisper_state * state);
+ 
++    // Local read-only diagnostic: earliest absolute 10 ms frame offset where a
++    // final selected decoder stopped solely on the original near-end margin.
++    // Resets per full call; -1 means absent. This is not lexical coverage proof.
++    WHISPER_API int whisper_full_earliest_near_end_completion_offset_from_state(const struct whisper_state * state);
++
+     WHISPER_API int whisper_full_n_segments_from_state(struct whisper_state * state);
+ 
+     // Language id associated with the context's default state
+--- a/whisper-rs-sys/src/bindings.rs
++++ b/whisper-rs-sys/src/bindings.rs
+@@ -5545,3 +5545,7 @@
+     /// Local diagnostic: observes prior loop/entropy rejection plus final low log probability.
+     pub fn whisper_full_had_low_confidence_decoder_rejection_from_state(state: *const whisper_state) -> bool;
+ }
++
++extern "C" {
++    pub fn whisper_full_earliest_near_end_completion_offset_from_state(state: *const whisper_state) -> ::std::os::raw::c_int;
++}
+--- a/whisper-rs/src/whisper_state.rs
++++ b/whisper-rs/src/whisper_state.rs
+@@ -23,6 +23,17 @@
+ }
+ 
+ impl WhisperState {
++    /// Earliest absolute 10 ms frame offset of a selected near-end-margin
++    /// completion in the most recent full call. None means no such completion.
++    /// A decoder timestamp is not proof that lexical speech was omitted.
++    pub fn earliest_near_end_completion_offset_frames(&self) -> Option<usize> {
++        // SAFETY: self owns this valid native state for the duration of the call.
++        let offset = unsafe {
++            whisper_rs_sys::whisper_full_earliest_near_end_completion_offset_from_state(self.ptr)
++        };
++        usize::try_from(offset).ok()
++    }
++
+     /// Whether a seek rejected a loop/low-entropy attempt and its final sequence
+     /// remained below the configured log-probability threshold. Reset by full().
+     pub fn had_low_confidence_decoder_rejection(&self) -> bool {

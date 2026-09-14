@@ -6,6 +6,10 @@ import type {
 
 export type ActivityMode = "idle" | "dictation" | "realtime";
 
+export function isDictationActive(status: DictationStatus): boolean {
+  return status === "starting" || status === "recording" || status === "processing";
+}
+
 export function canActivateMode(
   current: ActivityMode,
   requested: Exclude<ActivityMode, "idle">,
@@ -17,7 +21,7 @@ export function canToggleDictationWithPermission(
   status: DictationStatus,
   permission: MicrophonePermission,
 ): boolean {
-  const dictationActive = status === "recording" || status === "processing";
+  const dictationActive = isDictationActive(status);
   return dictationActive || permission !== "denied";
 }
 
@@ -25,7 +29,7 @@ export function deriveActivityMode(
   dictationStatus: DictationStatus,
   realtimeStatus: RealtimeStatus,
 ): ActivityMode {
-  if (dictationStatus === "recording" || dictationStatus === "processing") {
+  if (isDictationActive(dictationStatus)) {
     return "dictation";
   }
   if (realtimeStatus !== "idle" && realtimeStatus !== "error") {

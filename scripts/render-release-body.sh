@@ -8,19 +8,20 @@ APPIMAGE_NAME="${3:-}"
 cat <<EOF
 ## Summary
 
-Local-first Linux dictation with a persistent, explicitly user-enabled VOCO IBus input source and
-fail-closed owned-preedit cursor streaming.
+Local Linux dictation with CPU-local NVIDIA Nemotron English streaming and the Crystal Sidebar interface.
+
+Rendering this document does not publish a release or establish installation/test status.
+Use these download commands only after the exact tag and complete verified assets exist.
 
 ## Highlights
 
-- Keeps rolling local speech previews revisable and commits only authoritative canonical chunks
-- Requires fresh safe input metadata for each focus; terminals, sensitive fields, and ambiguous
-  targets remain preview-only instead of reusing stale cursor authority
-- Unifies tray, settings, microphone permission, muted realtime, and transcript-recovery state
-- Adds safe configuration recovery, single-instance ownership, model-cache integrity checks, and
-  stronger Debian installer/release verification
-- Keeps optional Realtime conversation voice-only; VOCO exposes no browser tool, URL, tab metadata,
-  page content, snapshot, or browser mutation to the model in this release
+- Bundles the pinned NVIDIA Nemotron English Q8 model and native CPU runtime in the complete Debian package
+- Appends live words through desktop clipboard paste; Stop flushes the tail without an automatic preview window
+- Uses terminal paste chords without changing target application keybindings; never sends Enter
+- Preserves recovery after capture, recognition or uncertain delivery failures instead of blindly replaying text
+- Retains a separate explicitly enabled Chromium exact-field adapter and shortcut-only IBus integration
+- Adds bounded local app/worker diagnostics with fixed error stages and numeric timing/resource metadata
+- Keeps optional localhost processing, OpenClaw and voice-only OpenAI Realtime separate from local dictation
 
 ## Install
 
@@ -61,35 +62,40 @@ chmod +x ${APPIMAGE_NAME}
 ./${APPIMAGE_NAME}
 \`\`\`
 
-**AppImage limitation:** The AppImage does not install the host IBus component, so it remains preview-only unless the matching Debian component is already installed.
+**AppImage limitation:** This experimental artifact is not a qualified NVIDIA package. It does not install desktop/browser registrations or establish bundled model/runtime readiness; the verified complete Debian package is the candidate path.
 EOF
 fi
 
 cat <<'EOF'
 
-**Requirements:** Ubuntu 24.04 is the primary reference environment and requires `libwebkit2gtk-4.1-0`, `libgtk-3-0`, `libayatana-appindicator3-1`, `ibus`, `python3`, `gir1.2-ibus-1.0`, and `python3-gi`. Debian-derived systems are best-effort rather than part of the regular desktop matrix.
+**Requirements:** Ubuntu 24.04 is the primary reference environment and requires `libwebkit2gtk-4.1-0`, `libgtk-3-0`, `libayatana-appindicator3-1`, `ibus`, `python3`, `gir1.2-ibus-1.0`, `python3-gi`, `python3-numpy`, `python3-psutil`, `gir1.2-atspi-2.0`, `libsentencepiece0`, and `xclip`. Debian-derived systems are best-effort rather than part of the regular desktop matrix.
 
-**Live cursor setup:** After installing the Debian package, manually add and select `VOCO Dictation` in the desktop Input Sources settings. VOCO never changes the active source automatically.
+**Optional Chromium delivery:** Load the packaged `/usr/share/voco/chromium` extension as unpacked, enable the current tab from its toolbar button, focus a supported plain text field and use `Alt+Shift+V`. The ordinary native hotkey uses the configured native desktop route. Browser access is never enabled by the package installer.
 
-**Wayland users:** `sudo apt install ydotool wl-clipboard && sudo usermod -aG input $USER`
+**Wayland hotkeys:** The evdev fallback needs keyboard-device access, commonly membership in the `input` group. The installer documents the required access; it is separate from IBus text delivery.
 
-**X11 users:** `sudo apt install xdotool xclip`
+**Desktop delivery:** X11 uses `xdotool`/`xclip`. Wayland needs working `ydotool`; GNOME can use the XWayland `xclip` bridge, while other environments use `wl-copy`. The route performs best-effort focus checks, replaces clipboard text and cannot prove target consumption. Helper availability is not universal application qualification.
 
 ## Upgrade notes
 
 - Existing `voice` config is migrated to `~/.config/voco`
-- Existing local models are reused from the prior install when present
+- The complete Debian package supplies the pinned NVIDIA model; existing legacy Whisper caches remain separate
 - Restart VOCO after upgrading if it is already running
-- After an engine protocol upgrade, quit VOCO and run `ibus restart` or sign out and back in before reopening it; switching input sources alone does not reload the resident engine
+- After an input-engine upgrade, quit VOCO and run `ibus restart` or sign out and back in before reopening it; switching input sources alone does not reload the resident engine
+- IBus protocol 5 supports consuming shortcuts but rejects text mutation; native desktop paste and exact-field Chromium delivery are separate contracts
+- Voice commands must be standalone sentences or use an explicit inline prefix, such as `command new paragraph`. Use quotes or `literal new paragraph` to dictate command words literally
+- Copy completed text, then clear it before another recording. Failed recordings have explicit retry/discard recovery; audio stays in memory only and is not restored after VOCO closes
+- Desktop delivery leaves dictated text in the clipboard; no delayed restoration can overwrite a newer copy
 
 ## Known issues
 
-- First launch still downloads the speech model (~142 MB, one-time)
-- Wayland text insertion depends on `ydotool` and compositor support
-- Live words intentionally use VOCO preview in terminals, sensitive fields, and fields whose current
-  focus does not freshly report safe input metadata
-- IBus global-engine mode suppresses unchanged metadata, so consecutive same-metadata focuses and
-  generic `FREE_FORM`/no-hint fields remain preview-only by design
-- Remote/physical live-cursor rendering and keyboard pass-through QA remains pending across the
-  target toolkit matrix
+- Generic desktop paste cannot safely rewrite the entire delivered message after Stop or guarantee exact-widget ownership
+- The Chromium development integration supports top-frame textarea and text/search/url/tel input
+  fields with a collapsed caret. Rich editors, iframes, passwords and browser-native undo history
+  are not supported; confined browser packages are not verified
+- A page can read text deliberately inserted into its own field; the extension does not classify
+  every private use case. Enable only a tab where you intend to dictate
+- Exact-field browser ownership is revoked by focus changes, edits, timeouts or disconnection; generic desktop focus guards provide a weaker guarantee
+- Physical-device and installed-session GNOME/KDE/browser qualification and broader application QA remain pending
+
 EOF

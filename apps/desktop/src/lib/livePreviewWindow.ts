@@ -30,14 +30,58 @@ export interface OwnedPreeditRevision {
   advancedSegmentCount: number;
 }
 
+export interface PreviewAudioSnapshot {
+  preparedSampleCount: number;
+  sourceSampleCount: number;
+  sourceSampleRate: number;
+}
+
+export function previewGeometryWithinSnapshot(
+  preview: PreviewTranscription,
+  snapshot: PreviewAudioSnapshot,
+): boolean {
+  const { preparedSampleCount, sourceSampleCount, sourceSampleRate } = snapshot;
+  if (
+    !Number.isSafeInteger(preparedSampleCount) ||
+    preparedSampleCount <= 0 ||
+    !Number.isSafeInteger(sourceSampleCount) ||
+    sourceSampleCount <= 0 ||
+    !Number.isFinite(sourceSampleRate) ||
+    sourceSampleRate <= 0
+  ) {
+    return false;
+  }
+  const maximumDurationMs = Math.min(
+    (preparedSampleCount / 16_000) * 1000,
+    (sourceSampleCount / sourceSampleRate) * 1000,
+  );
+  let previousEndMs = 0;
+  for (const segment of preview.segments) {
+    if (
+      !Number.isFinite(segment.startMs) ||
+      !Number.isFinite(segment.endMs) ||
+      segment.startMs < previousEndMs ||
+      segment.endMs < segment.startMs ||
+      segment.endMs > maximumDurationMs ||
+      Math.round((Math.round(segment.endMs) / 1000) * sourceSampleRate) >
+        sourceSampleCount
+    ) {
+      return false;
+    }
+    previousEndMs = segment.endMs;
+  }
+  return true;
+}
+
 export function reviseOwnedPreedit(
   confirmedText: string,
   previousCandidateText: string,
   nextCandidateText: string,
   preview: PreviewTranscription,
+  allowSealing = true,
 ): OwnedPreeditRevision {
   const commit =
-    previousCandidateText.length > 0
+    allowSealing && previousCandidateText.length > 0
       ? sealedAnchoredPreviewCommit(previousCandidateText, preview)
       : null;
   const confirmedAppend = commit?.appendText

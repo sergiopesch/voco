@@ -90,7 +90,7 @@ echo -e "  ${GRAPHITE_SOFT}${BOLD}╚██╗ ██╔╝██║   ██║
 echo -e "  ${GRAPHITE}${BOLD} ╚████╔╝ ╚██████╔╝╚██████╗╚██████╔╝${NC}"
 echo -e "  ${GRAPHITE}${BOLD}  ╚═══╝   ╚═════╝  ╚═════╝ ╚═════╝ ${NC}"
 echo
-echo -e "  ${DIM}Voice-native interface layer. Built for Linux.${NC}"
+echo -e "  ${DIM}Your voice, typed. Built for Linux.${NC}"
 echo -e "  ${DIM}────────────────────────────────────────────────────────────${NC}"
 echo
 
@@ -141,23 +141,23 @@ if command -v apt &>/dev/null; then
 else
   warn "Not using apt — install manually: pkg-config libglib2.0-dev libsoup-3.0-dev"
   warn "libjavascriptcoregtk-4.1-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev"
-  warn "For automatic live cursor revisions, install IBus, its GI bindings, and system Python 3"
+  warn "For automatic text delivery, install IBus, its GI bindings, and system Python 3"
 fi
 
 if [[ -x /usr/bin/python3 ]] && /usr/bin/python3 -c 'import gi; gi.require_version("IBus", "1.0"); from gi.repository import IBus' 2>/dev/null; then
-  ok "IBus automatic live cursor runtime"
+  ok "IBus automatic text delivery runtime"
 else
-  warn "Automatic live cursor revisions unavailable — install ibus gir1.2-ibus-1.0 python3-gi"
+  warn "Automatic text delivery unavailable — install ibus gir1.2-ibus-1.0 python3-gi"
 fi
 
 SESSION="${XDG_SESSION_TYPE:-x11}"
 if [[ "$SESSION" == "wayland" ]]; then
-  command -v ydotool &>/dev/null && ok "ydotool" || warn "Missing: sudo apt install ydotool"
-  command -v wl-copy &>/dev/null && ok "wl-clipboard" || warn "Missing: sudo apt install wl-clipboard"
+  command -v ydotool &>/dev/null && ok "ydotool" || dim "Optional compatibility helper missing: ydotool (automatic dictation uses IBus)"
+  command -v wl-copy &>/dev/null && ok "wl-clipboard" || dim "Optional compatibility helper missing: wl-clipboard (automatic dictation uses IBus)"
   groups | grep -q '\binput\b' && ok "input group" || warn "Run: sudo usermod -aG input \$USER"
 else
-  command -v xdotool &>/dev/null && ok "xdotool" || warn "Missing: sudo apt install xdotool"
-  command -v xclip &>/dev/null && ok "xclip" || warn "Missing: sudo apt install xclip"
+  command -v xdotool &>/dev/null && ok "xdotool" || dim "Optional compatibility helper missing: xdotool (automatic dictation uses IBus)"
+  command -v xclip &>/dev/null && ok "xclip" || dim "Optional compatibility helper missing: xclip (automatic dictation uses IBus)"
 fi
 
 # ─── Step 3: npm Dependencies ───────────────────────────
@@ -276,7 +276,7 @@ TOML
   echo
   echo -e "  ${WHITE}${BOLD}▸${NC} Open ${BOLD}VOCO${NC} from your app launcher"
   echo -e "  ${WHITE}${BOLD}▸${NC} Or run: ${GRAPHITE_SOFT}voco${NC}"
-  echo -e "  ${WHITE}${BOLD}▸${NC} Add and select ${BOLD}VOCO Dictation${NC} in Input Sources for live cursor words"
+  echo -e "  ${WHITE}${BOLD}▸${NC} Add and select ${BOLD}VOCO Dictation${NC} in Input Sources for automatic text delivery"
   echo
   echo -e "  ${DIM}First launch downloads the speech model (~142 MB, one-time).${NC}"
   echo -e "  ${DIM}Focus a text field, then press ${BOLD}${HOTKEY}${NC}${DIM} to dictate!${NC}"

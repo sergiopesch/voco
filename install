@@ -6,11 +6,11 @@ set -euo pipefail
 #
 # VOCO — release install helper
 # Usage:
-#   wget https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.21/install -O voco-install
+#   wget https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.35/install -O voco-install
 #   chmod +x voco-install
 #   ./voco-install
 
-VERSION="2026.0.21"
+VERSION="2026.0.35"
 RELEASE_TAG="voco.${VERSION}"
 DEB_URL="https://github.com/sergiopesch/voco/releases/download/${RELEASE_TAG}/voco_${VERSION}_amd64.deb"
 CHECKSUMS_URL="https://github.com/sergiopesch/voco/releases/download/${RELEASE_TAG}/voco_checksums.txt"
@@ -632,7 +632,7 @@ echo -e "  ${GRAPHITE_SOFT}${BOLD}╚██╗ ██╔╝██║   ██║
 echo -e "  ${GRAPHITE}${BOLD} ╚████╔╝ ╚██████╔╝╚██████╗╚██████╔╝${NC}"
 echo -e "  ${GRAPHITE}${BOLD}  ╚═══╝   ╚═════╝  ╚═════╝ ╚═════╝ ${NC}"
 echo
-echo -e "  ${DIM}Voice-native interface layer. Built for Linux.${NC}"
+echo -e "  ${DIM}Your voice, typed. Built for Linux.${NC}"
 echo -e "  ${DIM}────────────────────────────────────────────────────────────${NC}"
 echo -e "  ${DIM}v${VERSION}${NC}"
 echo
@@ -661,12 +661,12 @@ fi
 
 SESSION="${XDG_SESSION_TYPE:-x11}"
 if [[ "$SESSION" == "wayland" ]]; then
-  command -v ydotool &>/dev/null && ok "ydotool" || warn "Missing: sudo apt install ydotool"
-  command -v wl-copy &>/dev/null && ok "wl-clipboard" || warn "Missing: sudo apt install wl-clipboard"
+  command -v ydotool &>/dev/null && ok "ydotool" || dim "Optional compatibility helper missing: ydotool (automatic dictation uses IBus)"
+  command -v wl-copy &>/dev/null && ok "wl-clipboard" || dim "Optional compatibility helper missing: wl-clipboard (automatic dictation uses IBus)"
   groups | grep -q '\binput\b' && ok "input group" || warn "Run: sudo usermod -aG input \$USER"
 else
-  command -v xdotool &>/dev/null && ok "xdotool" || warn "Missing: sudo apt install xdotool"
-  command -v xclip &>/dev/null && ok "xclip" || warn "Missing: sudo apt install xclip"
+  command -v xdotool &>/dev/null && ok "xdotool" || dim "Optional compatibility helper missing: xdotool (automatic dictation uses IBus)"
+  command -v xclip &>/dev/null && ok "xclip" || dim "Optional compatibility helper missing: xclip (automatic dictation uses IBus)"
 fi
 
 # ─── Download ───────────────────────────────────────────
@@ -729,7 +729,7 @@ echo -e "  ${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━
 echo
 echo -e "  ${WHITE}${BOLD}▸${NC} Open ${BOLD}VOCO${NC} from your app launcher"
 echo -e "  ${WHITE}${BOLD}▸${NC} Or run: ${GRAPHITE_SOFT}voco${NC}"
-echo -e "  ${WHITE}${BOLD}▸${NC} Add and select ${BOLD}VOCO Dictation${NC} in Input Sources for live cursor words"
+echo -e "  ${WHITE}${BOLD}▸${NC} Add and select ${BOLD}VOCO Dictation${NC} in Input Sources for automatic text delivery"
 echo
 echo -e "  ${DIM}First launch downloads the speech model (~142 MB, one-time).${NC}"
 echo -e "  ${DIM}Focus a text field, then press ${BOLD}${HOTKEY}${NC}${DIM} to dictate!${NC}"

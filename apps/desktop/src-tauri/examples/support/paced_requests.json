@@ -1,0 +1,172 @@
+{
+  "requests": [
+    {
+      "startSample": 0,
+      "endSample": 209920,
+      "canonical": true,
+      "previousCanonicalText": ""
+    },
+    {
+      "startSample": 209920,
+      "endSample": 442720,
+      "canonical": true,
+      "previousCanonicalText": ""
+    },
+    {
+      "startSample": 442720,
+      "endSample": 922720,
+      "canonical": true,
+      "previousCanonicalText": ""
+    },
+    {
+      "startSample": 922720,
+      "endSample": 966560,
+      "canonical": true,
+      "previousCanonicalText": ""
+    },
+    {
+      "startSample": 966560,
+      "endSample": 1054720,
+      "canonical": true,
+      "previousCanonicalText": ""
+    },
+    {
+      "startSample": 1054720,
+      "endSample": 1142880,
+      "canonical": true,
+      "previousCanonicalText": ""
+    },
+    {
+      "startSample": 1142880,
+      "endSample": 1211520,
+      "canonical": true,
+      "previousCanonicalText": ""
+    },
+    {
+      "startSample": 1211520,
+      "endSample": 1280160,
+      "canonical": true,
+      "previousCanonicalText": ""
+    },
+    {
+      "startSample": 1280160,
+      "endSample": 1419840,
+      "canonical": true,
+      "previousCanonicalText": ""
+    },
+    {
+      "startSample": 1419840,
+      "endSample": 1559520,
+      "canonical": true,
+      "previousCanonicalText": ""
+    },
+    {
+      "startSample": 1559520,
+      "endSample": 1599840,
+      "canonical": true,
+      "previousCanonicalText": ""
+    },
+    {
+      "startSample": 1599840,
+      "endSample": 1640160,
+      "canonical": true,
+      "previousCanonicalText": ""
+    },
+    {
+      "startSample": 1640160,
+      "endSample": 1973280,
+      "canonical": true,
+      "previousCanonicalText": ""
+    },
+    {
+      "startSample": 1973280,
+      "endSample": 2306400,
+      "canonical": true,
+      "previousCanonicalText": ""
+    },
+    {
+      "startSample": 2306400,
+      "endSample": 2370800,
+      "canonical": true,
+      "previousCanonicalText": ""
+    },
+    {
+      "startSample": 2370800,
+      "endSample": 2435200,
+      "canonical": true,
+      "previousCanonicalText": ""
+    },
+    {
+      "startSample": 2435200,
+      "endSample": 2554560,
+      "canonical": true,
+      "previousCanonicalText": ""
+    },
+    {
+      "startSample": 2554560,
+      "endSample": 2673920,
+      "canonical": true,
+      "previousCanonicalText": ""
+    },
+    {
+      "startSample": 2673920,
+      "endSample": 2725200,
+      "canonical": true,
+      "previousCanonicalText": ""
+    },
+    {
+      "startSample": 2725200,
+      "endSample": 2776480,
+      "canonical": true,
+      "previousCanonicalText": ""
+    },
+    {
+      "startSample": 2776480,
+      "endSample": 2940880,
+      "canonical": true,
+      "previousCanonicalText": ""
+    },
+    {
+      "startSample": 2940880,
+      "endSample": 3105280,
+      "canonical": true,
+      "previousCanonicalText": ""
+    },
+    {
+      "startSample": 3105280,
+      "endSample": 3150480,
+      "canonical": true,
+      "previousCanonicalText": ""
+    },
+    {
+      "startSample": 3150480,
+      "endSample": 3195680,
+      "canonical": true,
+      "previousCanonicalText": ""
+    },
+    {
+      "startSample": 3195680,
+      "endSample": 3419680,
+      "canonical": true,
+      "previousCanonicalText": ""
+    },
+    {
+      "startSample": 3419680,
+      "endSample": 3643680,
+      "canonical": true,
+      "previousCanonicalText": ""
+    },
+    {
+      "startSample": 3643680,
+      "endSample": 3683280,
+      "canonical": true,
+      "previousCanonicalText": ""
+    },
+    {
+      "startSample": 3683280,
+      "endSample": 3722880,
+      "canonical": true,
+      "previousCanonicalText": ""
+    }
+  ]
+}

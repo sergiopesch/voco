@@ -16,7 +16,7 @@ VOCO is a voice-first Linux desktop tool for dictation, interaction, and fast sy
 
 ## Short Description
 
-VOCO lives in the Linux tray, listens on demand, and inserts speech directly into the app you are already using. It keeps the visible experience compact, keeps state clear, and defaults to a local-first workflow.
+VOCO lives in the Linux tray and listens on demand. It transcribes locally and delivers text through the selected VOCO Dictation input source when the target field can be verified; otherwise the transcript remains available for manual copying.
 
 ## Full Description
 
@@ -33,7 +33,7 @@ It stays out of the way until you trigger it, then moves through a small set of 
 Key product points:
 
 - tray-first workflow with a compact command panel
-- branded first-run setup for microphone, hotkey, insertion strategy, and tray workflow
+- first-run setup for microphone, hotkey, the VOCO Dictation input source, and tray workflow
 - local-first transcription path
 - explicit Linux install and upgrade guidance
 - settings that remain compact instead of sprawling

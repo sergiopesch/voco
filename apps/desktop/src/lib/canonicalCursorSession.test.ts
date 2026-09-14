@@ -4,22 +4,61 @@ import {
   CANONICAL_STRIDE_SAMPLES,
   acknowledgeCanonicalDelivery,
   activateCanonicalDelivery,
-  beginCanonicalTranscription,
+  beginCanonicalTranscription as beginActual,
   canonicalTranscriptionRanges,
-  completeCanonicalTranscription,
+  completeCanonicalTranscription as completeActual,
+  completeCanonicalTranscriptionWithResponse,
   createCanonicalCursorSession,
   createCanonicalPreviewToken,
-  failCanonicalTranscription,
+  failCanonicalTranscription as failActual,
   finishCanonicalSession,
   isCanonicalPreviewTokenActive,
   markCanonicalDeliveryUncertain,
-  planFinalCanonicalRange,
   planFinalSourceBlock,
-  planNextCompleteCanonicalRange,
   planNextCompleteSourceBlock,
-  recordCanonicalSourceBlock,
+  recordCanonicalSourceBlock as recordActual,
+  captureCanonicalPreparation,
+  planCanonicalWork,
+  invalidateCanonicalCache,
+  canonicalPreviewSourceAnchor,
+  type CanonicalCursorSession,
+  type CanonicalSourceBlock,
+  type CanonicalTranscriptionRange,
   requestCanonicalStop,
 } from "@/lib/canonicalCursorSession";
+
+
+// These legacy-overlap receipt fixtures preserve the old replay tests explicitly.
+// Hybrid cut behavior is exercised separately below with actual numeric receipts.
+function recordCanonicalSourceBlock(state: CanonicalCursorSession, block: CanonicalSourceBlock, n: number) {
+  return recordActual(state, block, n, captureCanonicalPreparation(state, block));
+}
+function range(state: CanonicalCursorSession, finalizing: boolean): CanonicalTranscriptionRange | null {
+  const work = planCanonicalWork(state, finalizing);
+  if (!work) return null;
+  if (work.kind === "retry") {
+    const m = work.pending.metadata;
+    return {chunkIndex: m.plannerSequence, startSample: m.nextInputStart,
+      endSample: m.nextInputStart + m.payloadSamples, complete: m.payloadSamples === 480000};
+  }
+  return {...work.range, chunkIndex: state.recognition.progress.plannerSequence,
+    complete: work.range.endSample - work.range.startSample === 480000};
+}
+const planNextCompleteCanonicalRange = (s: CanonicalCursorSession) => range(s, false);
+const planFinalCanonicalRange = (s: CanonicalCursorSession) => range(s, true);
+function beginCanonicalTranscription(state: CanonicalCursorSession, r: CanonicalTranscriptionRange) {
+  return beginActual(state, state.recognition.pending ? undefined : new Float32Array(r.endSample-r.startSample), !r.complete);
+}
+function completeCanonicalTranscription(state: CanonicalCursorSession, text: {canonicalText:string;appendText:string;chunkText:string}) {
+  const attempt=state.recognition.active!, m=attempt.metadata;
+  const end=m.nextInputStart+m.payloadSamples;
+  return completeActual(state,attempt,{protocolVersion:2,sessionId:m.sessionId,generation:m.generation,
+    requestSequence:m.requestSequence,...text,receipt:{sequence:m.plannerSequence,inputStart:m.nextInputStart,
+    inputEnd:end,previousDecodedEnd:m.previousDecodedEnd,leftJoinMode:m.plannerSequence===0?"initial":m.previousDecodedEnd===m.nextInputStart?"disjoint":"legacyOverlap",
+    rightBoundaryMode:m.payloadSamples===480000?"legacyStride":"final",plateauStart:null,plateauEnd:null,
+    nextInputStart:m.payloadSamples===480000?end-16000:end}});
+}
+const failCanonicalTranscription=(s:CanonicalCursorSession)=>failActual(s,s.recognition.active!);
 
 describe("canonical cursor session", () => {
   it("plans stable source blocks at an arbitrary capture rate", () => {
@@ -61,7 +100,7 @@ describe("canonical cursor session", () => {
     );
   });
 
-  it("matches the native 10-minute range count and tail", () => {
+  it("retains the legacy replay 10-minute range count and tail", () => {
     const ranges = canonicalTranscriptionRanges(600 * 16_000);
     expect(ranges).toHaveLength(21);
     expect(ranges[0]).toMatchObject({ startSample: 0, endSample: 480_000 });
@@ -205,9 +244,9 @@ describe("canonical cursor session", () => {
         appendText: " tail",
         chunkText: "tail",
       }),
-    ).toThrow(/revised its prior prefix/u);
+    ).toThrow(/recognized prefix/u);
     const retry = failCanonicalTranscription(state);
-    expect(retry.inFlightRange).toBeNull();
+    expect(retry.recognition.active).toBeNull();
     expect(planNextCompleteCanonicalRange(retry)).toEqual(expectedRange);
   });
 
@@ -229,7 +268,7 @@ describe("canonical cursor session", () => {
     expect(state.acknowledgedTargetText).toBe("");
 
     state = acknowledgeCanonicalDelivery(state, "", "canonical");
-    expect(state.acknowledgedTargetText).toBe(state.canonicalText);
+    expect(state.acknowledgedTargetText).toBe(state.recognition.canonicalText);
     expect(() => acknowledgeCanonicalDelivery(state, "", "canonical")).toThrow(
       /out of sequence/u,
     );
@@ -248,7 +287,7 @@ describe("canonical cursor session", () => {
 
     state = failCanonicalTranscription(state);
     const postCheckpointToken = createCanonicalPreviewToken(state);
-    expect(isCanonicalPreviewTokenActive(state, postCheckpointToken)).toBe(true);
+    expect(isCanonicalPreviewTokenActive(state, postCheckpointToken)).toBe(false);
     state = requestCanonicalStop(state);
     expect(isCanonicalPreviewTokenActive(state, postCheckpointToken)).toBe(false);
     expect(markCanonicalDeliveryUncertain(state).delivery).toBe("uncertain");
@@ -277,7 +316,7 @@ describe("canonical cursor session", () => {
       );
       const range = planNextCompleteCanonicalRange(state)!;
       canonicalRanges.push([range.startSample, range.endSample]);
-      const previous = state.canonicalText;
+      const previous = state.recognition.canonicalText;
       state = beginCanonicalTranscription(state, range);
       state = completeCanonicalTranscription(state, {
         canonicalText: nextText,
@@ -287,7 +326,7 @@ describe("canonical cursor session", () => {
       state = acknowledgeCanonicalDelivery(
         state,
         state.acknowledgedTargetText,
-        state.canonicalText.slice(state.acknowledgedTargetText.length),
+        state.recognition.canonicalText.slice(state.acknowledgedTargetText.length),
       );
     }
 
@@ -325,7 +364,7 @@ describe("canonical cursor session", () => {
       [928_000, 1_064_543],
     ]);
     expect(state.phase).toBe("complete");
-    expect(state.acknowledgedTargetText).toBe(state.canonicalText);
+    expect(state.acknowledgedTargetText).toBe(state.recognition.canonicalText);
   });
 
   it("executes the complete ten-minute source/range sequence statefully", () => {
@@ -351,7 +390,7 @@ describe("canonical cursor session", () => {
       const range = planNextCompleteCanonicalRange(state)!;
       state = beginCanonicalTranscription(state, range);
       state = completeCanonicalTranscription(state, {
-        canonicalText: state.canonicalText + "x",
+        canonicalText: state.recognition.canonicalText + "x",
         appendText: "x",
         chunkText: "x",
       });
@@ -379,12 +418,12 @@ describe("canonical cursor session", () => {
     });
     state = beginCanonicalTranscription(state, finalRange);
     state = completeCanonicalTranscription(state, {
-      canonicalText: state.canonicalText + "z",
+      canonicalText: state.recognition.canonicalText + "z",
       appendText: "z",
       chunkText: "z",
     });
     state = finishCanonicalSession(state, capturedSourceSamples);
-    expect(state.completedChunkCount).toBe(21);
+    expect(state.recognition.progress.plannerSequence).toBe(21);
     expect(state.phase).toBe("complete");
   });
 
@@ -401,10 +440,71 @@ describe("canonical cursor session", () => {
         },
         CANONICAL_CHUNK_SAMPLES,
       ),
-    ).toThrow(/planned boundary/u);
+    ).toThrow(/source block sequence/u);
     expect(() => finishCanonicalSession(recording, 0)).toThrow(/stopping/u);
 
     const stopping = requestCanonicalStop(recording);
     expect(() => finishCanonicalSession(stopping, 1)).toThrow(/source prefix/u);
+  });
+});
+
+
+describe("hybrid ownership and source preview", () => {
+  it("keeps the undecoded tail previewable after a seven-second silence core", () => {
+    let state = createCanonicalCursorSession(71, 48_000);
+    const block = planNextCompleteSourceBlock(state, 1_440_000)!;
+    state = recordCanonicalSourceBlock(state, block, 480_000);
+    state = beginActual(state, new Float32Array(480_000), true);
+    const attempt = state.recognition.active!;
+    const raw = {
+      protocolVersion: 2, sessionId: 71, generation: 0, requestSequence: 1,
+      chunkText: "", canonicalText: "", appendText: "",
+      receipt: {sequence: 0, inputStart: 0, inputEnd: 112_000,
+        previousDecodedEnd: 0, leftJoinMode: "initial", rightBoundaryMode: "numericalPlateau",
+        plateauStart: 0, plateauEnd: 224_000, nextInputStart: 112_000},
+    };
+    const completed = completeCanonicalTranscriptionWithResponse(state, attempt, raw);
+    state = completed.session;
+    raw.receipt.inputEnd = 480_000;
+    raw.canonicalText = "mutated";
+    expect(completed.response.receipt.inputEnd).toBe(112_000);
+    expect(Object.isFrozen(completed.response)).toBe(true);
+    expect(Object.isFrozen(completed.response.receipt)).toBe(true);
+    expect(canonicalPreviewSourceAnchor(state)).toBe(336_000);
+    expect(state.processedSourceEndSample).toBe(1_440_000);
+    expect(state.checkpointSequence).toBe(1);
+    expect(planCanonicalWork(state, true)).toEqual({kind: "range", finalizing: true,
+      range: {startSample: 112_000, endSample: 480_000}});
+    state = beginActual(state, new Float32Array(368_000), true);
+    const m = state.recognition.active!.metadata;
+    state = completeActual(state, state.recognition.active!, {
+      protocolVersion: 2, sessionId: m.sessionId, generation: m.generation,
+      requestSequence: m.requestSequence, chunkText: "Retained tail", canonicalText: "Retained tail", appendText: "Retained tail",
+      receipt: {sequence: 1, inputStart: 112_000, inputEnd: 480_000,
+        previousDecodedEnd: 112_000, leftJoinMode: "disjoint", rightBoundaryMode: "final",
+        plateauStart: null, plateauEnd: null, nextInputStart: 480_000},
+    });
+    expect(canonicalPreviewSourceAnchor(state)).toBe(1_440_000);
+    expect(state.recognition.progress.plannerSequence).toBe(2);
+    expect(state.processedSourceBlockCount).toBe(1);
+  });
+
+  it("fences an asynchronous source ticket and active result when the cache is cleared", () => {
+    let state = createCanonicalCursorSession(72, 16_000);
+    const first = planNextCompleteSourceBlock(state, 480_000)!;
+    state = recordCanonicalSourceBlock(state, first, 480_000);
+    const second = planNextCompleteSourceBlock(state, 944_000)!;
+    const ticket = captureCanonicalPreparation(state, second);
+    state = beginActual(state, new Float32Array(480_000));
+    const attempt = state.recognition.active!;
+    const released = invalidateCanonicalCache(state, 1);
+    expect(released.ledger).toBeNull();
+    expect(released.processedSourceEndSample).toBe(0);
+    expect(released.canonicalAudioEndSample).toBe(0);
+    expect(released.recognition.active).toBeNull();
+    expect(released.recognition.pending).toBeNull();
+    expect(() => recordActual(released, second, 464_000, ticket)).toThrow(/released/);
+    expect(() => completeActual(released, attempt, {})).toThrow(/released/);
+    expect(() => planCanonicalWork(released, true)).toThrow(/released/);
   });
 });

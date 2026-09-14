@@ -12,7 +12,12 @@ use std::sync::{
 };
 use std::time::Duration;
 
-const PROTOCOL_VERSION: u32 = 3;
+const PROTOCOL_VERSION: u32 = 5;
+const EXACT_FIELD_REQUIRED: &str = "Automatic IBus delivery is disabled because the original text field cannot be verified. Recording remains available; review and copy the transcript in VOCO.";
+
+fn require_exact_field_delivery() -> Result<(), String> {
+    Err(EXACT_FIELD_REQUIRED.to_string())
+}
 const COMPONENT_PATH: &str = "/usr/share/ibus/component/voco.xml";
 const SOCKET_DIRECTORY_NAME: &str = "voco";
 const SOCKET_FILE_NAME: &str = "ibus-engine.sock";
@@ -65,21 +70,40 @@ fn ready_setup_state() -> String {
 
 impl From<EngineStatus> for OwnedPreeditStatus {
     fn from(status: EngineStatus) -> Self {
+        let _ = (&status.ready, &status.setup_state, &status.ownership_intact);
         Self {
             available: true,
-            ready: status.ready,
-            setup_state: status.setup_state,
-            detail: "VOCO Dictation is enabled and its private input channel is ready.".to_string(),
+            ready: false,
+            setup_state: "safety-disabled".to_string(),
+            detail: EXACT_FIELD_REQUIRED.to_string(),
             session_id: status.session_id,
             engine_active: status.engine_active,
             focus_lost: status.focus_lost,
             progressive_commit_active: status.progressive_commit_active,
             committed_character_count: status.committed_character_count,
-            ownership_intact: status.ownership_intact,
+            ownership_intact: false,
             finalization_outcome: status.finalization_outcome,
             error: (!status.error.is_empty()).then_some(status.error),
         }
     }
+}
+
+#[derive(Debug)]
+pub(crate) struct ShortcutPollFailure {
+    pub may_have_armed: bool,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct ShortcutPoll {
+    pub armed: bool,
+    pub trigger: Option<ShortcutTrigger>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct ShortcutTrigger {
+    pub trigger_id: String,
+    pub mode: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -270,7 +294,29 @@ impl OwnedPreeditService {
         }
     }
 
-    pub fn start(&self, client_session_id: u64) -> Result<OwnedPreeditStatus, String> {
+    pub fn poll_trigger(&self, hotkey: &str) -> Result<ShortcutPoll, ShortcutPollFailure> {
+        let mut may_have_armed = false;
+        self.with_bridge(|bridge| {
+            may_have_armed = true;
+            let result = bridge.send(&mut json!({"operation": "poll-trigger", "hotkey": hotkey}));
+            if matches!(result, Err(BridgeCommandError::Rejected(_))) {
+                may_have_armed = false;
+            }
+            serde_json::from_value(result?).map_err(|error| {
+                BridgeCommandError::Uncertain(format!("Invalid shortcut proof: {error}"))
+            })
+        })
+        .map_err(|_| ShortcutPollFailure { may_have_armed })
+    }
+
+    pub fn start(
+        &self,
+        client_session_id: u64,
+        trigger_id: Option<&str>,
+    ) -> Result<OwnedPreeditStatus, String> {
+        require_exact_field_delivery()?;
+        let trigger_id = trigger_id.filter(|token| token.len() == 48 && token.bytes().all(|byte| byte.is_ascii_hexdigit()))
+            .ok_or_else(|| "The shortcut's original input context could not be verified. Review and copy the transcript in VOCO.".to_string())?;
         validate_session_id(client_session_id)?;
         // Renderer counters can restart after a reload. A backend generation
         // prevents delayed renderer commands from acting on a later session.
@@ -279,6 +325,7 @@ impl OwnedPreeditService {
             bridge.send_status(json!({
                 "operation": "start",
                 "clientSessionId": session_id,
+                "triggerId": trigger_id,
             }))
         })?;
         if !status_matches_session(&status, session_id) {
@@ -306,6 +353,7 @@ impl OwnedPreeditService {
         validate_text(&confirmed_text)?;
         validate_text(&preedit_text)?;
         validate_text(&provisional_text)?;
+        require_exact_field_delivery()?;
         self.with_bridge(|bridge| {
             bridge.send_status(json!({
                 "operation": "update",
@@ -320,6 +368,7 @@ impl OwnedPreeditService {
     pub fn commit(&self, session_id: u64, text: String) -> Result<OwnedPreeditStatus, String> {
         validate_session_id(session_id)?;
         validate_text(&text)?;
+        require_exact_field_delivery()?;
         self.with_bridge(|bridge| {
             bridge.send_status(json!({
                 "operation": "commit",
@@ -338,6 +387,7 @@ impl OwnedPreeditService {
         validate_session_id(session_id)?;
         validate_text(&expected_committed_text)?;
         validate_text(&append_text)?;
+        require_exact_field_delivery()?;
         self.with_bridge(|bridge| {
             bridge.send_status(json!({
                 "operation": "checkpoint",
@@ -357,6 +407,7 @@ impl OwnedPreeditService {
         validate_session_id(session_id)?;
         validate_text(&expected_committed_text)?;
         validate_text(&append_text)?;
+        require_exact_field_delivery()?;
         self.with_bridge(|bridge| {
             bridge.send_status(json!({
                 "operation": "finish-canonical",
@@ -369,6 +420,7 @@ impl OwnedPreeditService {
 
     pub fn cancel(&self, session_id: u64) -> Result<OwnedPreeditStatus, String> {
         validate_session_id(session_id)?;
+        require_exact_field_delivery()?;
         self.with_bridge(|bridge| {
             bridge.send_status(json!({
                 "operation": "cancel",
@@ -578,6 +630,23 @@ fn classify_unavailable_status(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn missing_or_malformed_trigger_cannot_contact_the_input_engine() {
+        let service = super::OwnedPreeditService::default();
+        for trigger in [
+            None,
+            Some(""),
+            Some("forged"),
+            Some("not-a-hex-token-of-valid-length!!!!!!!!!!!!!!!!!!"),
+        ] {
+            assert!(service
+                .start(1, trigger)
+                .unwrap_err()
+                .contains("original text field"));
+            assert!(service.bridge.lock().unwrap().is_none());
+        }
+    }
+
     use super::*;
     use std::os::unix::net::UnixListener;
     use std::thread;
@@ -652,13 +721,13 @@ mod tests {
         });
 
         assert!(status.available);
-        assert!(status.ready);
-        assert_eq!(status.setup_state, "ready");
+        assert!(!status.ready);
+        assert_eq!(status.setup_state, "safety-disabled");
         assert_eq!(status.session_id, Some(7));
         assert!(status.engine_active);
         assert!(status.progressive_commit_active);
         assert_eq!(status.committed_character_count, 18);
-        assert!(status.ownership_intact);
+        assert!(!status.ownership_intact);
         assert_eq!(status.error, None);
     }
 
@@ -718,7 +787,8 @@ mod tests {
         ] {
             assert!(!ENGINE_SCRIPT.contains(forbidden), "found {forbidden}");
         }
-        assert!(ENGINE_SCRIPT.contains("update_preedit_text_with_mode"));
+        assert!(!ENGINE_SCRIPT.contains("self.update_preedit_text"));
+        assert!(!ENGINE_SCRIPT.contains("self.commit_text("));
         assert!(ENGINE_SCRIPT.contains("commit_text"));
         assert!(ENGINE_SCRIPT.contains("return False"));
         assert!(ENGINE_SCRIPT.contains("clientSessionId"));
@@ -802,7 +872,7 @@ mod tests {
             .send_status(json!({ "operation": "status" }))
             .expect("read fake status");
         assert!(status.available);
-        assert_eq!(status.setup_state, "ready");
+        assert_eq!(status.setup_state, "safety-disabled");
         drop(bridge);
         server.join().expect("fake server completed");
         fs::remove_file(&socket_path).expect("remove fake socket");
@@ -811,77 +881,53 @@ mod tests {
     }
 
     #[test]
-    fn canonical_mutations_send_expected_prefix_and_append_atomically() {
-        let socket_path = temporary_socket_path("canonical-mutations");
+    fn all_public_mutations_reject_without_writing_to_a_connected_engine() {
+        let socket_path = temporary_socket_path("disabled-mutations");
         let listener = UnixListener::bind(&socket_path).expect("bind fake engine");
-        fs::set_permissions(&socket_path, fs::Permissions::from_mode(0o600))
-            .expect("secure fake engine socket");
+        fs::set_permissions(&socket_path, fs::Permissions::from_mode(0o600)).unwrap();
         let server = thread::spawn(move || {
-            let (stream, _) = listener.accept().expect("accept app client");
-            let mut reader = BufReader::new(stream.try_clone().expect("clone fake stream"));
+            let (stream, _) = listener.accept().unwrap();
+            let mut reader = BufReader::new(stream.try_clone().unwrap());
             let mut writer = stream;
-
-            let mut hello_line = String::new();
-            reader.read_line(&mut hello_line).expect("read hello");
-            let hello: Value = serde_json::from_str(&hello_line).expect("decode hello");
-            write_response(
-                &mut writer,
-                &ready_response(hello["id"].as_u64().expect("hello id"), PROTOCOL_VERSION),
-            );
-
-            for (operation, expected, append) in [
-                ("checkpoint", "Canonical prefix", " checkpoint tail"),
-                (
-                    "finish-canonical",
-                    "Canonical prefix checkpoint tail",
-                    " final tail",
-                ),
-            ] {
+            // Any mutation reaching the socket would precede status and fail.
+            for expected in ["hello", "status"] {
                 let mut line = String::new();
-                reader
-                    .read_line(&mut line)
-                    .expect("read canonical mutation");
-                let request: Value = serde_json::from_str(&line).expect("decode mutation");
-                assert_eq!(request["version"], PROTOCOL_VERSION);
-                assert_eq!(request["operation"], operation);
-                assert_eq!(request["sessionId"], 41);
-                assert_eq!(request["expectedCommittedText"], expected);
-                assert_eq!(request["appendText"], append);
+                reader.read_line(&mut line).unwrap();
+                let request: Value = serde_json::from_str(&line).unwrap();
+                assert_eq!(request["operation"], expected);
                 write_response(
                     &mut writer,
-                    &ready_response(
-                        request["id"].as_u64().expect("canonical mutation id"),
-                        PROTOCOL_VERSION,
-                    ),
+                    &ready_response(request["id"].as_u64().unwrap(), PROTOCOL_VERSION),
                 );
             }
+            let mut byte = [0_u8; 1];
+            assert_eq!(reader.read(&mut byte).unwrap(), 0);
         });
-
-        let bridge = SocketBridge::connect_to(&socket_path).expect("connect fake engine");
+        let bridge = SocketBridge::connect_to(&socket_path).unwrap();
         let service = OwnedPreeditService {
             bridge: Mutex::new(Some(bridge)),
             next_session_id: AtomicU64::new(1),
         };
-        service
-            .checkpoint(
-                41,
-                "Canonical prefix".to_string(),
-                " checkpoint tail".to_string(),
-            )
-            .expect("checkpoint accepted");
-        service
-            .finish_canonical(
-                41,
-                "Canonical prefix checkpoint tail".to_string(),
-                " final tail".to_string(),
-            )
-            .expect("canonical finish accepted");
-
+        let token = "a".repeat(48);
+        for result in [
+            service.start(41, Some(&token)),
+            service.update(41, String::new(), "draft".into(), "draft".into()),
+            service.commit(41, "never insert".into()),
+            service.checkpoint(41, String::new(), "never insert".into()),
+            service.finish_canonical(41, String::new(), "never insert".into()),
+            service.cancel(41),
+        ] {
+            assert_eq!(result.unwrap_err(), EXACT_FIELD_REQUIRED);
+        }
+        let status = service.status();
+        assert!(status.available);
+        assert!(!status.ready);
+        assert_eq!(status.setup_state, "safety-disabled");
+        assert!(status.detail.contains("original text field"));
         service.shutdown();
-        server.join().expect("fake server completed");
-        fs::remove_file(&socket_path).expect("remove fake socket");
-        fs::remove_dir(socket_path.parent().expect("socket parent"))
-            .expect("remove fake directory");
+        server.join().unwrap();
+        fs::remove_file(&socket_path).unwrap();
+        fs::remove_dir(socket_path.parent().unwrap()).unwrap();
     }
 
     #[test]
@@ -1010,8 +1056,14 @@ mod tests {
             bridge: Mutex::new(Some(bridge)),
             next_session_id: AtomicU64::new(1),
         };
+        // Exercise bridge ordering directly; public mutation APIs are disabled.
         let error = service
-            .update(99, String::new(), "tail".to_string(), "tail".to_string())
+            .with_bridge(|bridge| {
+                bridge.send_status(json!({
+                    "operation": "update", "sessionId": 99,
+                    "confirmedText": "", "preeditText": "tail", "provisionalText": "tail"
+                }))
+            })
             .expect_err("stale update rejected");
         assert_eq!(error, "stale or inactive session");
         assert!(service.status().available);

@@ -1,0 +1,6 @@
+Licensed by NVIDIA Corporation under the NVIDIA Open Model License
+
+Source model: https://huggingface.co/nvidia/nemotron-speech-streaming-en-0.6b
+Pinned revision: ebe59e5a817142986528bbbee5dba8db7b38ed50
+GGUF SHA-256: d9a01898d2a611c8764e23a1c2f45e70bbd5a425dc4de93692ac951dd603812d
+Model weights unchanged. VOCO modifies runtime scheduling and transport.

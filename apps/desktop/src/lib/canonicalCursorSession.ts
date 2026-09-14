@@ -1,4 +1,12 @@
-import type { CanonicalTranscription } from "@/types";
+import {
+  beginHybridAttempt, completeHybridAttempt, createHybridSession, failHybridAttempt,
+  invalidateHybridGeneration, nextHybridRange, prepareHybridRequest,
+  type HybridAttempt, type HybridResponse, type HybridSession, type PendingHybridRequest,
+} from "@/lib/hybridSession";
+import {
+  beginPreparation, completePreparation, createLedger, rawPreviewAnchor,
+  type Ledger, type PreparationTicket,
+} from "@/lib/preprocessingLedger";
 
 export const CANONICAL_SAMPLE_RATE = 16_000;
 export const CANONICAL_CHUNK_SECONDS = 30;
@@ -43,17 +51,16 @@ export interface CanonicalCursorSession {
   sessionId: number;
   sourceSampleRate: number;
   phase: CanonicalSessionPhase;
-  canonicalText: string;
+  recognition: HybridSession;
+  ledger: Ledger | null;
+  cacheReleased: boolean;
   acknowledgedTargetText: string;
   delivery: CanonicalDeliveryState;
   processedSourceBlockCount: number;
   processedSourceEndSample: number;
   canonicalAudioEndSample: number;
-  completedChunkCount: number;
-  completedCanonicalEndSample: number;
   previewGeneration: number;
   checkpointSequence: number;
-  inFlightRange: CanonicalTranscriptionRange | null;
 }
 
 export interface CanonicalPreviewToken {
@@ -64,6 +71,7 @@ export interface CanonicalPreviewToken {
 export function createCanonicalCursorSession(
   sessionId: number,
   sourceSampleRate: number,
+  generation = 0,
 ): CanonicalCursorSession {
   assertPositiveInteger(sessionId, "sessionId");
   assertSampleRate(sourceSampleRate);
@@ -71,17 +79,16 @@ export function createCanonicalCursorSession(
     sessionId,
     sourceSampleRate,
     phase: "recording",
-    canonicalText: "",
+    recognition: createHybridSession(sessionId, generation),
+    ledger: createLedger({sessionId, generation}, sourceSampleRate),
+    cacheReleased: false,
     acknowledgedTargetText: "",
     delivery: "pending",
     processedSourceBlockCount: 0,
     processedSourceEndSample: 0,
     canonicalAudioEndSample: 0,
-    completedChunkCount: 0,
-    completedCanonicalEndSample: 0,
     previewGeneration: 0,
     checkpointSequence: 0,
-    inFlightRange: null,
   };
 }
 
@@ -89,6 +96,7 @@ export function planNextCompleteSourceBlock(
   state: CanonicalCursorSession,
   capturedSourceSampleCount: number,
 ): CanonicalSourceBlock | null {
+  requireCanonicalCache(state);
   const block = completeSourceBlock(
     state.processedSourceBlockCount,
     state.sourceSampleRate,
@@ -102,6 +110,7 @@ export function planFinalSourceBlock(
   state: CanonicalCursorSession,
   capturedSourceSampleCount: number,
 ): CanonicalSourceBlock | null {
+  requireCanonicalCache(state);
   const capturedEnd = normalizeSampleCount(capturedSourceSampleCount);
   if (capturedEnd <= state.processedSourceEndSample) {
     return null;
@@ -121,7 +130,11 @@ export function recordCanonicalSourceBlock(
   state: CanonicalCursorSession,
   block: CanonicalSourceBlock,
   canonicalSampleCount: number,
+  ticket: PreparationTicket,
 ): CanonicalCursorSession {
+  requireCanonicalCache(state);
+  if (ticket.sourceStart !== block.startSample || ticket.sourceEnd !== block.endSample ||
+      ticket.final !== !block.complete) throw new Error("Preparation ticket does not match source block");
   if (block.blockIndex !== state.processedSourceBlockCount) {
     throw new Error("canonical source blocks must be appended sequentially");
   }
@@ -160,96 +173,92 @@ export function recordCanonicalSourceBlock(
 
   return {
     ...state,
+    ledger: completePreparation(state.ledger!, ticket, appendedSamples),
     processedSourceBlockCount: state.processedSourceBlockCount + 1,
     processedSourceEndSample: block.endSample,
     canonicalAudioEndSample: state.canonicalAudioEndSample + appendedSamples,
   };
 }
 
-export function planNextCompleteCanonicalRange(
-  state: CanonicalCursorSession,
-): CanonicalTranscriptionRange | null {
-  const startSample = state.completedChunkCount * CANONICAL_STRIDE_SAMPLES;
-  const endSample = startSample + CANONICAL_CHUNK_SAMPLES;
-  if (endSample > state.canonicalAudioEndSample) {
-    return null;
-  }
-  return {
-    chunkIndex: state.completedChunkCount,
-    startSample,
-    endSample,
-    complete: true,
-  };
+function requireCanonicalCache(state: CanonicalCursorSession): asserts state is CanonicalCursorSession & {ledger: Ledger} {
+  if (state.cacheReleased || !state.ledger) throw new Error("Canonical audio cache has been released");
+  if (state.ledger.identity.sessionId !== state.recognition.sessionId ||
+      state.ledger.identity.generation !== state.recognition.generation)
+    throw new Error("Canonical cache generation does not match recognition");
 }
 
-export function planFinalCanonicalRange(
-  state: CanonicalCursorSession,
-): CanonicalTranscriptionRange | null {
-  if (planNextCompleteCanonicalRange(state)) {
-    throw new Error("complete canonical transcription ranges must be processed first");
-  }
-  if (state.canonicalAudioEndSample <= state.completedCanonicalEndSample) {
-    return null;
-  }
-  const startSample = state.completedChunkCount * CANONICAL_STRIDE_SAMPLES;
-  if (state.canonicalAudioEndSample <= startSample) {
-    return null;
-  }
-  return {
-    chunkIndex: state.completedChunkCount,
-    startSample,
-    endSample: state.canonicalAudioEndSample,
-    complete: false,
-  };
+export function captureCanonicalPreparation(state: CanonicalCursorSession,
+  block: CanonicalSourceBlock): PreparationTicket {
+  requireCanonicalCache(state);
+  if (state.phase !== "recording" && state.phase !== "stopping")
+    throw new Error("Canonical session cannot prepare source audio");
+  if (block.blockIndex !== state.processedSourceBlockCount)
+    throw new Error("Source block is out of sequence");
+  return beginPreparation(state.ledger, block.startSample, block.endSample, !block.complete);
 }
 
-export function beginCanonicalTranscription(
-  state: CanonicalCursorSession,
-  range: CanonicalTranscriptionRange,
-): CanonicalCursorSession {
-  if (state.inFlightRange) {
-    throw new Error("a canonical transcription is already in flight");
-  }
-  validateNextRange(state, range);
-  return {
-    ...state,
-    previewGeneration: state.previewGeneration + 1,
-    checkpointSequence: state.checkpointSequence + 1,
-    inFlightRange: range,
-  };
+export type CanonicalWork =
+  | {kind: "retry"; pending: PendingHybridRequest}
+  | {kind: "range"; range: CanonicalSampleRange; finalizing: boolean};
+
+/** An active attempt must settle. A retry uses owned bytes, never the source cache. */
+export function planCanonicalWork(state: CanonicalCursorSession, finalizing: boolean): CanonicalWork | null {
+  requireCanonicalCache(state);
+  if (state.phase !== "recording" && state.phase !== "stopping")
+    throw new Error("Canonical session is not accepting recognition work");
+  if (typeof finalizing !== "boolean") throw new Error("Invalid finalizing flag");
+  if (state.recognition.active) return null;
+  if (state.recognition.pending) return {kind: "retry", pending: state.recognition.pending};
+  const range = nextHybridRange(state.recognition, state.canonicalAudioEndSample, finalizing);
+  return range ? {kind: "range", range, finalizing} : null;
 }
 
-export function completeCanonicalTranscription(
-  state: CanonicalCursorSession,
-  result: CanonicalTranscription,
-): CanonicalCursorSession {
-  const range = state.inFlightRange;
-  if (!range) {
-    throw new Error("no canonical transcription is in flight");
+export function beginCanonicalTranscription(state: CanonicalCursorSession,
+  samples?: Float32Array, finalizing = false): CanonicalCursorSession {
+  const work = planCanonicalWork(state, finalizing);
+  if (!work) throw new Error("No canonical recognition work is ready");
+  let recognition = state.recognition;
+  if (work.kind === "retry") {
+    if (samples !== undefined) throw new Error("Retry must reuse its owned audio");
+  } else {
+    if (!samples || samples.length !== work.range.endSample - work.range.startSample)
+      throw new Error("Canonical audio does not match its offered range");
+    recognition = prepareHybridRequest(recognition, samples, finalizing);
   }
-  if (!result.canonicalText.startsWith(state.canonicalText)) {
-    throw new Error("canonical transcription revised its prior prefix");
-  }
-  if (result.canonicalText !== state.canonicalText + result.appendText) {
-    throw new Error("canonical transcription append is not its exact suffix");
-  }
-
-  return {
-    ...state,
-    canonicalText: result.canonicalText,
-    completedChunkCount: state.completedChunkCount + 1,
-    completedCanonicalEndSample: range.endSample,
-    inFlightRange: null,
-  };
+  return {...state, recognition: beginHybridAttempt(recognition),
+    previewGeneration: state.previewGeneration + 1};
 }
 
-export function failCanonicalTranscription(
-  state: CanonicalCursorSession,
-): CanonicalCursorSession {
-  if (!state.inFlightRange) {
-    return state;
-  }
-  return { ...state, inFlightRange: null };
+export function completeCanonicalTranscription(state: CanonicalCursorSession,
+  attempt: HybridAttempt, result: unknown): CanonicalCursorSession {
+  return completeCanonicalTranscriptionWithResponse(state, attempt, result).session;
+}
+
+export function completeCanonicalTranscriptionWithResponse(state: CanonicalCursorSession,
+  attempt: HybridAttempt, result: unknown): {session: CanonicalCursorSession; response: HybridResponse} {
+  requireCanonicalCache(state);
+  const {session: recognition, response} = completeHybridAttempt(state.recognition, attempt, result);
+  return {session: {...state, recognition, checkpointSequence: state.checkpointSequence + 1}, response};
+}
+
+export function failCanonicalTranscription(state: CanonicalCursorSession,
+  attempt: HybridAttempt): CanonicalCursorSession {
+  return {...state, recognition: failHybridAttempt(state.recognition, attempt)};
+}
+
+/** Pair synchronously with every actual clear/drain; preserve text for final delivery. */
+export function invalidateCanonicalCache(state: CanonicalCursorSession,
+  generation: number): CanonicalCursorSession {
+  return {...state, recognition: invalidateHybridGeneration(state.recognition, generation),
+    ledger: null, cacheReleased: true, processedSourceBlockCount: 0,
+    processedSourceEndSample: 0, canonicalAudioEndSample: 0,
+    previewGeneration: state.previewGeneration + 1};
+}
+
+export function canonicalPreviewSourceAnchor(state: CanonicalCursorSession): number {
+  requireCanonicalCache(state);
+  const p = state.recognition.progress;
+  return rawPreviewAnchor(state.ledger, state.recognition, p.previousDecodedEnd, p.nextInputStart);
 }
 
 export function activateCanonicalDelivery(
@@ -287,7 +296,7 @@ export function acknowledgeCanonicalDelivery(
     throw new Error("canonical target acknowledgement is out of sequence");
   }
   const acknowledgedTargetText = expectedCommittedText + appendText;
-  if (acknowledgedTargetText !== state.canonicalText) {
+  if (acknowledgedTargetText !== state.recognition.canonicalText) {
     throw new Error("canonical target acknowledgement is not exact");
   }
   return { ...state, acknowledgedTargetText };
@@ -313,8 +322,9 @@ export function finishCanonicalSession(
   if (state.phase !== "stopping") {
     throw new Error("canonical session must be stopping before completion");
   }
-  if (state.inFlightRange) {
-    throw new Error("cannot finish while canonical transcription is in flight");
+  requireCanonicalCache(state);
+  if (state.recognition.active || state.recognition.pending) {
+    throw new Error("cannot finish with active or pending canonical recognition");
   }
   if (
     state.processedSourceEndSample !==
@@ -323,8 +333,7 @@ export function finishCanonicalSession(
     throw new Error("canonical source prefix is incomplete");
   }
   if (
-    planNextCompleteCanonicalRange(state) ||
-    state.canonicalAudioEndSample !== state.completedCanonicalEndSample
+    state.canonicalAudioEndSample !== state.recognition.progress.previousDecodedEnd
   ) {
     throw new Error("canonical audio has not been fully transcribed");
   }
@@ -336,9 +345,8 @@ export function failCanonicalSession(
 ): CanonicalCursorSession {
   return {
     ...state,
-    phase: "failed",
+    phase: state.phase === "complete" ? "complete" : "failed",
     previewGeneration: state.previewGeneration + 1,
-    inFlightRange: null,
   };
 }
 
@@ -356,10 +364,11 @@ export function isCanonicalPreviewTokenActive(
     state.phase === "recording" &&
     state.sessionId === token.sessionId &&
     state.previewGeneration === token.generation &&
-    state.inFlightRange === null
+    state.recognition.active === null && state.recognition.pending === null
   );
 }
 
+/** Legacy fixed-stride replay utility. Live hybrid ranges require PCM-dependent receipts. */
 export function canonicalTranscriptionRanges(
   sampleCount: number,
 ): CanonicalTranscriptionRange[] {
@@ -402,28 +411,9 @@ function completeSourceBlock(
   };
 }
 
-function validateNextRange(
-  state: CanonicalCursorSession,
-  range: CanonicalTranscriptionRange,
-): void {
-  if (range.chunkIndex !== state.completedChunkCount) {
-    throw new Error("canonical transcription ranges must be processed sequentially");
-  }
-  const expectedStart = state.completedChunkCount * CANONICAL_STRIDE_SAMPLES;
-  if (
-    range.startSample !== expectedStart ||
-    range.endSample <= range.startSample ||
-    range.endSample > state.canonicalAudioEndSample ||
-    range.endSample - range.startSample > CANONICAL_CHUNK_SAMPLES
-  ) {
-    throw new Error("canonical transcription range is invalid");
-  }
-}
-
 function normalizeSampleCount(sampleCount: number): number {
-  if (!Number.isSafeInteger(sampleCount) || sampleCount < 0) {
+  if (!Number.isSafeInteger(sampleCount) || sampleCount < 0)
     throw new Error("sample count must be a non-negative safe integer");
-  }
   return sampleCount;
 }
 

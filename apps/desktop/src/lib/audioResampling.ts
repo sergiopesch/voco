@@ -1,3 +1,5 @@
+import { resampledSampleCount } from './sampleGeometry';
+
 export const TRANSCRIPTION_RESAMPLE_CHUNK_SECONDS = 30;
 
 export type AudioResampler = (
@@ -11,8 +13,7 @@ export async function resampleAudioBuffer(
   fromRate: number,
   toRate: number,
 ): Promise<Float32Array> {
-  const duration = input.length / fromRate;
-  const offlineCtx = new OfflineAudioContext(1, Math.ceil(duration * toRate), toRate);
+  const offlineCtx = new OfflineAudioContext(1, resampledSampleCount(input.length, fromRate, toRate), toRate);
   const buffer = offlineCtx.createBuffer(1, input.length, fromRate);
   buffer.getChannelData(0).set(input);
   const source = offlineCtx.createBufferSource();
@@ -36,7 +37,7 @@ export async function resampleAudioForTranscription(
     return resampler(input, fromRate, toRate);
   }
 
-  const outputLength = Math.ceil((input.length / fromRate) * toRate);
+  const outputLength = resampledSampleCount(input.length, fromRate, toRate);
   const merged = new Float32Array(outputLength);
   let targetOffset = 0;
   for (let offset = 0; offset < input.length; offset += maxInputChunkLength) {

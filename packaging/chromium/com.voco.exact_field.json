@@ -1,0 +1,9 @@
+{
+  "name": "com.voco.exact_field",
+  "description": "VOCO local exact-field dictation bridge",
+  "path": "/usr/libexec/voco-browser-host",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://dohnphckdenppjhdafmhefhomomodgcc/"
+  ]
+}

@@ -1,0 +1,2919 @@
+{
+  "schemaVersion": 1,
+  "roots": [
+    "whisper-rs",
+    "whisper-rs-sys"
+  ],
+  "files": [
+    {
+      "path": "whisper-rs-sys/.cargo_vcs_info.json",
+      "sha256": "25733c4bc985974bdebe487ebb2f1af26baf0094b9a37260f855077b20692995",
+      "bytes": 97,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/Cargo.lock",
+      "sha256": "7ee962da9509cb9b1fe65715740094f3c7306393f8e566ed35d490f447abd10b",
+      "bytes": 8434,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/Cargo.toml",
+      "sha256": "ef6b6ceddfed2f1e2522e02274a49f8c34e013a39727fb29f6c4a3d13a04cec3",
+      "bytes": 1678,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/Cargo.toml.orig",
+      "sha256": "6241adc5bba65fc1dac91cea331977d36d98c3a364ff5c25657141656309b707",
+      "bytes": 1034,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/build.rs",
+      "sha256": "1cbd1830c096f30a82251c48af5616c3d4b8708e6ec270963ea4405bbf8fcb50",
+      "bytes": 13626,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/src/bindings.rs",
+      "sha256": "1d2bee686ea7f2b35414b74b59c2cac1aae379c978885a8c95039572e632c083",
+      "bytes": 191544,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/src/lib.rs",
+      "sha256": "1f0c51a1d8af588a150ad38fd44b70b6214058747b52b0dd1c8317ea9ce19d32",
+      "bytes": 145,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/CMakeLists.txt",
+      "sha256": "80499e32238b5e1f2bb3d6f47fafe29885b81da826c3125106a3336d6f8415eb",
+      "bytes": 6626,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/LICENSE",
+      "sha256": "e562a2ddfaf8280537795ac5ecd34e3012b6582a147ef69ba6a6a5c08c84757d",
+      "bytes": 1078,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/bindings/CMakeLists.txt",
+      "sha256": "e2fe599748a5e917cbf181f7495613f111294655a285f9691957a4bbef1d5b57",
+      "bytes": 656,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/bindings/javascript/package-tmpl.json",
+      "sha256": "d5a7f32773da17845d4a2db3ff0c80d3365feae3efe378256cd044ab86991acc",
+      "bytes": 612,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/cmake/DefaultTargetOptions.cmake",
+      "sha256": "46a0fea1d8cac20e3017d31551f316a2846343d929b7833ce2e7ed6f39c800b9",
+      "bytes": 385,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/cmake/FindFFmpeg.cmake",
+      "sha256": "bedd2e8a2bcf9349827794d261ec63ab0fabf9ba6d6a71d7e8788e88f82ae944",
+      "bytes": 6231,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/cmake/build-info.cmake",
+      "sha256": "7f002672200e9cb52268979daa627b3715a35ffada043002e60930a3c445c1bc",
+      "bytes": 1603,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/cmake/git-vars.cmake",
+      "sha256": "411507be4e991f2afc0007905a95bbf848176a282189d0e27d7df1d48974290d",
+      "bytes": 717,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/cmake/whisper-config.cmake.in",
+      "sha256": "57e785ec14a67dc292d554c26d3a606ef278c4671f453457ba8c6de2aba2dfb7",
+      "bytes": 1910,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/cmake/whisper.pc.in",
+      "sha256": "41478e236699a8989513565502e3da04242edf934d43dedf28d27c47d7bd84c6",
+      "bytes": 274,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/CMakeLists.txt",
+      "sha256": "8049b93c09c418fcdb841b6fb06a2e21cd47abc5349c0898cc275fc82f1e40c1",
+      "bytes": 10698,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/include/ggml-alloc.h",
+      "sha256": "67d215acf3d2bbaff24762c61293484d2739d19df6fec025fd9d30c9e567c9c7",
+      "bytes": 3011,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/include/ggml-backend.h",
+      "sha256": "3df5bfa6d32caab5318709bec7b6ebff245653a90ae384a9fbc38bd6a45235a0",
+      "bytes": 19829,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/include/ggml-blas.h",
+      "sha256": "e76cb8594dc9866d99e7d63191b9fff6ab8b50244b4a28ce3af0f962964a6b5b",
+      "bytes": 586,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/include/ggml-cann.h",
+      "sha256": "6f8af52ea9326cead78e5dc59401106fcc8b029d2b9ed24df6cf7a64805405d1",
+      "bytes": 4553,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/include/ggml-cpp.h",
+      "sha256": "4cb370f8cf074d2b7c9a05dbae787991c77b70d365f151f80e32b71046bb87f2",
+      "bytes": 1636,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/include/ggml-cpu.h",
+      "sha256": "75fee5620d38b6cdfa04cb8a0c1f25cafadf168805ccceb5337db41b94843786",
+      "bytes": 6738,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/include/ggml-cuda.h",
+      "sha256": "8f22e8e43e460db426bb94e14e10dc91e64789e8d216c5ae62a0d02a2eb07d7f",
+      "bytes": 1585,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/include/ggml-kompute.h",
+      "sha256": "da286c0ac5b4c00e5bb8e5e572f442c23f292ea0dd40ca1d08c2a66672d41bc5",
+      "bytes": 1159,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/include/ggml-metal.h",
+      "sha256": "08fd1b8de3e63d214063ad93b8b3195f51025a406a90de21e92e88dd19fed33c",
+      "bytes": 2439,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/include/ggml-opencl.h",
+      "sha256": "8e443e1aa9c8bc6e0cf116c4cc3f42f4858938fa15e65b06bc07b26686e1233a",
+      "bytes": 581,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/include/ggml-opt.h",
+      "sha256": "ae9edde17ad3118063831af14df4a7ffa7c30de7002a976aac00eb347cf09a83",
+      "bytes": 12065,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/include/ggml-rpc.h",
+      "sha256": "cbde174381ae33462c52b9412440f7938e7b87ba85faae1b0ea6e63d17e564da",
+      "bytes": 830,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/include/ggml-sycl.h",
+      "sha256": "d59d5275423a7ce173c8e6f69933a501e53a635410de3f8d61bf23a59dac81fd",
+      "bytes": 1763,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/include/ggml-vulkan.h",
+      "sha256": "0bbb7d005f82c822c27d692c7067f2a5bb5a85c810adaea0a5ce2378d5e3f54e",
+      "bytes": 1004,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/include/ggml.h",
+      "sha256": "db24c36d2ad7d80ac87b563b0b154ce0bc1845cb347c2db1f7c319d661a1091a",
+      "bytes": 88785,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/CMakeLists.txt",
+      "sha256": "9c85fab6c775ee9062a41f962aabb29ba373729a2ed4bea737f85cf8c0cda0cb",
+      "bytes": 11053,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-alloc.c",
+      "sha256": "ff715f1848865e40486e04a7c22ef03dd1771b0f1bfe30eafa8e9e1e14939516",
+      "bytes": 38290,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-amx/CMakeLists.txt",
+      "sha256": "ef8563d42fdd59787cac977828bc3b2b98c742691ba76c29833e8d55e0f0574d",
+      "bytes": 4239,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-amx/common.h",
+      "sha256": "484073766de6d13096b9966bd614dba6421c51e59cdef01b8c8e8002219c2116",
+      "bytes": 2167,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-amx/ggml-amx.cpp",
+      "sha256": "a27ab96fbea799601dfbfb90e7c9dce0f68a066ce6d80b5c3daabb4dc0fa2fb1",
+      "bytes": 14373,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-amx/mmq.cpp",
+      "sha256": "beb5723729cbb1206985ef48724cf20593a162eef985dc25c3baf0a3678eb7b2",
+      "bytes": 106976,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-amx/mmq.h",
+      "sha256": "4efa0bc1e16e1cb5d0ae09d505a6e881b289e496d133595069f36d0cfb1c2d16",
+      "bytes": 403,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-backend-impl.h",
+      "sha256": "8326fca21ca854458ae689a32e5ad113b9d22e0fed06803fd8b5acca58a57800",
+      "bytes": 12033,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-backend-reg.cpp",
+      "sha256": "1929eab73d154e50bc260e8d56cbd739ef6c34ba8b8f00658a5f772109cc2166",
+      "bytes": 16971,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-backend.cpp",
+      "sha256": "ee4b17154a7ad1e71d36261dd710f22fb65a9a3f0beb88b9a24cc3a4df8df8ee",
+      "bytes": 77464,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-blas/CMakeLists.txt",
+      "sha256": "2c6680e880440a1ec4e2a32ad4b4264b5949db67f4c76fa001d84d8b6a6bab44",
+      "bytes": 3675,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-blas/ggml-blas.cpp",
+      "sha256": "9b3cee32dd0d517ad9ab361e79b4d75ea41199c713a42c112cd3639914b5a8e8",
+      "bytes": 16953,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cann/CMakeLists.txt",
+      "sha256": "b208dd2bc8175af3db6070d622abd90229d41a3afcc6a0ccb776ee3c1a619b7a",
+      "bytes": 2884,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cann/Doxyfile",
+      "sha256": "ccced0cd28d6a01db68d05df344a55dc8a30528d45f1ec384d3f557dc7213c86",
+      "bytes": 112616,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cann/acl_tensor.cpp",
+      "sha256": "8302966a0567f69ccb2cc4ac5d2f94b7a19b20386de20f088765c3c05a687528",
+      "bytes": 7081,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cann/acl_tensor.h",
+      "sha256": "5bb1479fe5faa3c19748578219b9f27ebfbbcac5659a04166c111895fe343ec9",
+      "bytes": 12467,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cann/aclnn_ops.cpp",
+      "sha256": "e0c7d4984ef685c367fa34f5fad7c23cd1df8132e75725d9ddec3b203b1b3746",
+      "bytes": 140042,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cann/aclnn_ops.h",
+      "sha256": "0233ad379a1c6d08fedf61686b25233441278d0efac551c8ff6fbe7407deb4bb",
+      "bytes": 25858,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cann/common.h",
+      "sha256": "fb75b64c5469da99c8ad4f157353e04d075fd1017f2f3d7224806774550bd420",
+      "bytes": 9651,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cann/ggml-cann.cpp",
+      "sha256": "a17d16d10f53735ffd1b8cb4fd2941f6c1535b0858f12885dc9bee6a7e81e0eb",
+      "bytes": 77604,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cann/kernels/CMakeLists.txt",
+      "sha256": "de1df7229edaa71118d413171933ec44742197330ac62a00632ac880423f5f86",
+      "bytes": 1182,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cann/kernels/ascendc_kernels.h",
+      "sha256": "977b8db50d8a3f52167084e2c561a322ece14962b7a9bbf23f7fe5883f91940c",
+      "bytes": 693,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cann/kernels/dup.cpp",
+      "sha256": "b7e8daba5801b864d3777b6b52c8a934fe0260afd259983c63140c6302574776",
+      "bytes": 8873,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cann/kernels/get_row_f16.cpp",
+      "sha256": "1085560dc0bc8c7ea205e9ca4d42f1729de015b5361a2c8d40cf337de49cb717",
+      "bytes": 7246,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cann/kernels/get_row_f32.cpp",
+      "sha256": "ac86a65ade9a387f133277ffe612a27c4da786538f183b0bd5378ad35eb67b70",
+      "bytes": 6944,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cann/kernels/get_row_q4_0.cpp",
+      "sha256": "8a75616f79b7e7036ac334e0e586bc5bb41243cde9699c7db3f7a1ec5b0330e5",
+      "bytes": 7755,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cann/kernels/get_row_q8_0.cpp",
+      "sha256": "c17208f87ddffcc3aacfddacfc16c04a9aa7a08d9fd8ac0c01b6bbdba9024791",
+      "bytes": 7122,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cann/kernels/quantize_f16_q8_0.cpp",
+      "sha256": "399435ec3f9bd04fd909faf9678384fe3da14c00dd44bace734f6b912439ccae",
+      "bytes": 8008,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cann/kernels/quantize_f32_q8_0.cpp",
+      "sha256": "5f3c1ee16187024e70a20115f48022d3b49a12c0afd1d5b4d3969836f0f7cf1d",
+      "bytes": 7989,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cann/kernels/quantize_float_to_q4_0.cpp",
+      "sha256": "a809d4fd71234000b53068070b2c9c06cb82d00c0c057512aa38c01441232b64",
+      "bytes": 11849,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-common.h",
+      "sha256": "9d8113f0a8970a583cc64b08117c3055d45962ed157103d519e0df3c07f37b59",
+      "bytes": 133231,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cpu/CMakeLists.txt",
+      "sha256": "318cc380c2862b1c0b6dacd9347160edf1cc729f99ea190eaee55cc1640d373c",
+      "bytes": 15086,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cpu/amx/amx.cpp",
+      "sha256": "ca7dc0d470594d1b1d99c41c511e7a97f2a211fa0d5cc897a50d676d6ad6c519",
+      "bytes": 7870,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cpu/amx/amx.h",
+      "sha256": "9d098ceee6a8114d4a660ff269064a27aa25b8a4f205d1e6984d17bec5104f0d",
+      "bytes": 202,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cpu/amx/common.h",
+      "sha256": "256a7bd39e8c130c8f2b7ee441d89ad6ca0149d25b24a472255987e8f924155f",
+      "bytes": 2101,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cpu/amx/mmq.cpp",
+      "sha256": "2c98f9d23355cfa109f6d47653708fea2b26969f00bd32cb2d6ff5c83c5307ca",
+      "bytes": 107139,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cpu/amx/mmq.h",
+      "sha256": "bd33d0713b12daf9eedea1619dd715619baaa36b98c44ec754d532909d80933a",
+      "bytes": 397,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cpu/cmake/FindSIMD.cmake",
+      "sha256": "c36807121bb1452dfb1ab39a7b366bd49f454c49b43b1df4b7c54f038c824d49",
+      "bytes": 2651,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cpu/cpu-feats-x86.cpp",
+      "sha256": "f8d280a3f5549027b74445d1a876e2145f5b79bfbc7b9acfc7f5575423ef8b9b",
+      "bytes": 10650,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cpu/ggml-cpu-aarch64.cpp",
+      "sha256": "ce76793952b509940f5a9764bd30b827a1870a335affa57ff177837b51c273bb",
+      "bytes": 245021,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cpu/ggml-cpu-aarch64.h",
+      "sha256": "e36f7683d7ac55645faf9d9b7e0dc4e0adf8d137785b6fa9f51fa050348205ef",
+      "bytes": 158,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cpu/ggml-cpu-hbm.cpp",
+      "sha256": "4eaf638b3acb3e590a3a9ed9a63dfb35b595ac95b26a375703c99cecb19176f7",
+      "bytes": 2012,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cpu/ggml-cpu-hbm.h",
+      "sha256": "340c84ac6a1c83d2218a15d6d71c1efb6ba1a5517162c2fde4baa0a9204af26b",
+      "bytes": 155,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cpu/ggml-cpu-impl.h",
+      "sha256": "1b16d0eeeda9c2e1bc297fa0830cc25a9bd9c90c71549c28adeb67f42a9f67fd",
+      "bytes": 8742,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cpu/ggml-cpu-quants.c",
+      "sha256": "64c2fbc40fca4ec06a403f68ffaad6d02ee4d87371c9ece71662084ec69df2f2",
+      "bytes": 489642,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cpu/ggml-cpu-quants.h",
+      "sha256": "bf8f9f70da623f141a6f1fbda67d28771e4e01fbbcdbe8fd70fef620631bb517",
+      "bytes": 5164,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cpu/ggml-cpu-traits.cpp",
+      "sha256": "68ad8a0b1501ceb69a3d0feb6201325de8485b927f368ef2f7497b2c533624d5",
+      "bytes": 1240,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cpu/ggml-cpu-traits.h",
+      "sha256": "279658f3cbc456da1c338cbc811f2cd464167f375cbce5dc3bc9eeb60affabb2",
+      "bytes": 1157,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cpu/ggml-cpu.c",
+      "sha256": "d8770286926f6bf1364ad0c3005fcc4425611a36b52993a38b7fa891e25307b6",
+      "bytes": 482374,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cpu/ggml-cpu.cpp",
+      "sha256": "9ed412bf34949345efd59e259289302d5e3e82cda9ce2cd2d05d4c11e891c211",
+      "bytes": 21413,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cpu/llamafile/sgemm.cpp",
+      "sha256": "25d3e0d5fbee9d41d59ae47f31421e2976a50500afcb4bb2b1eb17d2a3d11be3",
+      "bytes": 70334,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cpu/llamafile/sgemm.h",
+      "sha256": "ef50040ba474e97971e7e9a28171c5a49adedca95fc5eaefa373731a98ce37b9",
+      "bytes": 335,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/CMakeLists.txt",
+      "sha256": "7097953e0f5f8c097a0856d5a287a8f2f33a9f0b8c02da8c50f190763e1c96fc",
+      "bytes": 5299,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/acc.cu",
+      "sha256": "cad0b1fe4b230d959ed0794216a1674ff625a4a47f94f76b8ccab4b4f35427ec",
+      "bytes": 1974,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/acc.cuh",
+      "sha256": "4d5ff42aa0767d1b2d1f38ebd7aafef34989c329ba10ff075309feb8dcf0524a",
+      "bytes": 131,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/arange.cu",
+      "sha256": "e9bef1d5940009034d8bc8ca4185dd204191c20d1a0682a9bdccf4f953c57a5e",
+      "bytes": 1215,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/arange.cuh",
+      "sha256": "f5bd2851bc3a5c0191aa3e5ef6dbd4e1aa6a3baef6f7b01ff018220b803cc4a6",
+      "bytes": 137,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/argmax.cu",
+      "sha256": "02b7d8d7b55d9a27b744a92b5e7cf44507b13ee1712596ec8db23c9b4f4994d3",
+      "bytes": 2836,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/argmax.cuh",
+      "sha256": "ef21bf4859104c16037220a70a0c64de0b64a2469d6c1a65b49cf3ce6dc45b84",
+      "bytes": 98,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/argsort.cu",
+      "sha256": "086ef523f03bdc46cfa9e4e6b5bcbd646c9815d9043b43ca268aff21253f1ecb",
+      "bytes": 3433,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/argsort.cuh",
+      "sha256": "3f42aa142fa4b504546cded8606de70d9bad6a104f90f7a0061dde649f6c4161",
+      "bytes": 102,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/binbcast.cu",
+      "sha256": "6d3d208b2f72339a64bd2ba64ad1be860eb02c68e8c67f71157d7bb19773c852",
+      "bytes": 13152,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/binbcast.cuh",
+      "sha256": "416d2209ba2f6cadfa6987938396cdafd2b1ab9f62ce1a28fd49ad64681830d2",
+      "bytes": 485,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/clamp.cu",
+      "sha256": "4790ca218a581c3e268d19209150821593611f1e4e15a6f8c58cddba8cd013a4",
+      "bytes": 1164,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/clamp.cuh",
+      "sha256": "53713bdce3d2cd614719a00e3e282c7ec2555cad1d35baa65e930cb5bda54b27",
+      "bytes": 135,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/common.cuh",
+      "sha256": "4f42165750443fbbc4343a7435e2833303e9042db0d3a03d41543992a07fc71c",
+      "bytes": 23036,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/concat.cu",
+      "sha256": "7c5b593f0ab7f546e40c27dc4e9d5e310814933ac05ea5286456fe54325bccb2",
+      "bytes": 7529,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/concat.cuh",
+      "sha256": "d367604a4ae4ab673580082fb397d04062bd541706d9eefb6989f9a905e61a12",
+      "bytes": 137,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/conv-transpose-1d.cu",
+      "sha256": "d4a69799f4cb2a1ce51fb2def72e923d35fb69485efa099142a1e180b8688676",
+      "bytes": 3329,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/conv-transpose-1d.cuh",
+      "sha256": "7b0e3ae90967a5d20331a045786adbf6c9c32df3fece85ad5489a3b5309920a3",
+      "bytes": 158,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/convert.cu",
+      "sha256": "ccf3d4ffe532402c08f18d21fd77bdc2c638b0adf2e2470d009367347ddbb45f",
+      "bytes": 25659,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/convert.cuh",
+      "sha256": "a2ff41e851e3c7834b2e6f9cae679043d8da72798683c9a52714687e3a32e280",
+      "bytes": 391,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/count-equal.cu",
+      "sha256": "77a92c2ce713ab41427cae44857e3e1b7f5c25fd2fd9ae0d2d79398fae5c0e51",
+      "bytes": 2061,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/count-equal.cuh",
+      "sha256": "8eca686572d160baa9c16de9d5851124626421f1760526c00aab641d36cadd1c",
+      "bytes": 144,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/cpy.cu",
+      "sha256": "c30aafc5965963e9ab3fda974d70c1969e9f3fdbb4df25bb7bd442ce53e986ae",
+      "bytes": 23140,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/cpy.cuh",
+      "sha256": "0e979e9eb864bae40e7dfa075518584323933de518a5f50e2da602127e2bd1d0",
+      "bytes": 298,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/cross-entropy-loss.cu",
+      "sha256": "55633f537b8762ee50bc2dade41999205bdc956a66eadd20f3a7dd2178ec5096",
+      "bytes": 5693,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/cross-entropy-loss.cuh",
+      "sha256": "0f75c1b9f02243ca08a6972f5c8758781033106a38e9f64b5e2f37bade7a1130",
+      "bytes": 251,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/dequantize.cuh",
+      "sha256": "d4fb541fda5a603395438ca43f66196ee35d8126b543969ffa3da7e7aa4e2c22",
+      "bytes": 2650,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/diagmask.cu",
+      "sha256": "dbd7dcd55bbe033bb34d8ead3733c37a7e4e2eecb905a9199315d98cc3e04f7a",
+      "bytes": 1760,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/diagmask.cuh",
+      "sha256": "6017d90f19b13f525806151ff115d94ff38154764334c143b966c5e0efb66bc1",
+      "bytes": 150,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/fattn-common.cuh",
+      "sha256": "fb1ed2bfe212a913d7d54491b78719b8140328fb983391cb2baa1935ae8af749",
+      "bytes": 24477,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/fattn-tile-f16.cu",
+      "sha256": "bce0d01403b3e957a17989e31384384829dc5cc2decb0004a4b9c00a86e2c9ac",
+      "bytes": 12925,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/fattn-tile-f16.cuh",
+      "sha256": "d724dcf6eb9beffea7a328b5b64874cc263d50a94e5e3f3c59613125e7f4b2b7",
+      "bytes": 115,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/fattn-tile-f32.cu",
+      "sha256": "b7fdc01ac3a123241dec731c0643c79dc86760d12e18a8c2ceb945663753f92e",
+      "bytes": 12872,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/fattn-tile-f32.cuh",
+      "sha256": "b844a715b7eceeb5a7a96655df8192e9737166238326cb4192f9106f7575b995",
+      "bytes": 115,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/fattn-vec-f16.cuh",
+      "sha256": "d106cb695441120df479bd010bbba501615306e91a95436ffe9b17b6aff739f8",
+      "bytes": 17090,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/fattn-vec-f32.cuh",
+      "sha256": "453e8b470bbe1db7b4fe5f09120225d12b0d89a4a468262f7f53f2dddcd654a2",
+      "bytes": 16137,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/fattn-wmma-f16.cuh",
+      "sha256": "fa4dfd9e099474d81711738f231898d0f0d67a7f5b5a30aec9ab0e266b7e9c8a",
+      "bytes": 22882,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/fattn.cu",
+      "sha256": "7d97f5a5a399e798c1985ecbf4634fac983e8483f688c461c70c23dead9d1559",
+      "bytes": 14224,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/fattn.cuh",
+      "sha256": "69fa53aa9573a6734a931f80f4ca6946cd847dce87cccdc0c7aa7b10a8d9066b",
+      "bytes": 106,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/getrows.cu",
+      "sha256": "7b6681cb14185df96faaa589ea9b30b962ccc698e7f8eefd78c897952fbaaae6",
+      "bytes": 6995,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/getrows.cuh",
+      "sha256": "9b1154b305b98767abe4f5f57030be1739c1a38e63ba2c10918cb2aade1cba7e",
+      "bytes": 141,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/ggml-cuda.cu",
+      "sha256": "503bea15d0ac6113b0862138af13bb879641c4a6b2f9f7d63c742859d65a7bb5",
+      "bytes": 130460,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/im2col.cu",
+      "sha256": "3dc7c4229e9f7a75b575558406baaa215709122ecb7874caa07aff219b587b95",
+      "bytes": 4541,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/im2col.cuh",
+      "sha256": "cf9650b3f19e3345c81e2d56a359d42ed4c1438ae2c841a0fea7bc790ffb5de4",
+      "bytes": 137,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/mma.cuh",
+      "sha256": "322e12784878de6896e562b145f4116f90531e23bf0afaf87778253108c637a1",
+      "bytes": 7624,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/mmq.cu",
+      "sha256": "27280255b35cdb886c00c87501a981ff8bd94ba7d3671928f31c174069bce091",
+      "bytes": 5184,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/mmq.cuh",
+      "sha256": "423d50bbb1ce52226e4acdb4c8c544b6dc6fde621f0e77249d47d0381e8647a1",
+      "bytes": 113297,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/mmv.cu",
+      "sha256": "5269cbc95df2c82340f72931d76bfc7b0017cd95e91e8aabcdfbc081984d558b",
+      "bytes": 9034,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/mmv.cuh",
+      "sha256": "dee3b5b3254b75fd094e320ebe89ce61787c6e09ce9f92e1fb86b95def57c476",
+      "bytes": 665,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/mmvq.cu",
+      "sha256": "104c60362a89bd1e36ece008249c9bc1a262cb046f7ef4b1ae9dc5f30274d501",
+      "bytes": 19294,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/mmvq.cuh",
+      "sha256": "9d89a4fa76703552a1f8ef9d8e3149aa956639ed83e18c0ba6bd15c5a1eee9df",
+      "bytes": 481,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/norm.cu",
+      "sha256": "42589a25bea7365aeb6d2375ae4e3bb1deede07d1b76c703ae66442b3aa76d5e",
+      "bytes": 7199,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/norm.cuh",
+      "sha256": "0fd32064b828494f31a779a1c62ffb9d6de49d523e6e91073cdffee240fbe25c",
+      "bytes": 263,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/opt-step-adamw.cu",
+      "sha256": "41b4f129b149af3bb86257c41521329448b08f6e41743a8ab2edb98a1f6165a2",
+      "bytes": 2994,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/opt-step-adamw.cuh",
+      "sha256": "250c6fda21e8ed98e34518599c9fe1db2ac50596c8f41fafe03b752d6f0355a4",
+      "bytes": 150,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/out-prod.cu",
+      "sha256": "fef3f72381d396d33d2483c5ebf6413acb01b8089dc032a8dfbaf1e28d0e17f8",
+      "bytes": 1692,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/out-prod.cuh",
+      "sha256": "98e053024e8111bc908c904fc2734a3069d219fefb4699a5588623a5237411da",
+      "bytes": 100,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/pad.cu",
+      "sha256": "33ba5d07711b5fde8cfa0584f09c08442785f9f856cb457a1f5a668c97cd0d4f",
+      "bytes": 1788,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/pad.cuh",
+      "sha256": "2ac173fd9d89eb83c146962f741ca8e1ec49c0d2312df07b16e77a1a3407a275",
+      "bytes": 131,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/pool2d.cu",
+      "sha256": "71d204b8bff51226abe25f3eecf6ca8325fd9399ff89d4eb0c41b1b00f8ad1bb",
+      "bytes": 3306,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/pool2d.cuh",
+      "sha256": "3417872508e299a2b480df788fb96bdeae09cfd48e089238d9eedca779d80a30",
+      "bytes": 137,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/quantize.cu",
+      "sha256": "10211113c01a5533cab3694fd161739b0fe9ec07f567c695bffc934333919edd",
+      "bytes": 5483,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/quantize.cuh",
+      "sha256": "5725dfc09fb984828d398f25cd7e75b757910f2ec347a796ac85a779051dc48f",
+      "bytes": 979,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/rope.cu",
+      "sha256": "84ae60da3f8b090f5206ce05c27066a931dc2ea23afc98a28abd799d6061ab7c",
+      "bytes": 20292,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/rope.cuh",
+      "sha256": "1c0aa19fe0a3b2ca59489217b1004b35a46e74f01560dc523182ecfd8061d679",
+      "bytes": 133,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/scale.cu",
+      "sha256": "1c77d1780b3e0e1c425d013896074f166ec5a26d35a5f9a49ea7ce5237d1168b",
+      "bytes": 1021,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/scale.cuh",
+      "sha256": "7b7c8e4eaeba76d297739b3757f775b9f011568cf40f4f2cc242e8aeb6f4ff5c",
+      "bytes": 135,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/softmax.cu",
+      "sha256": "ad14c70a5b6253a0ca0e01be415b7d52edd87b6dab71d693a73e04252fc66493",
+      "bytes": 7719,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/softmax.cuh",
+      "sha256": "8a970c7ac16c8b36971a12e27a5f9bade0572ffd5c653d50828e36a81fe40dd7",
+      "bytes": 142,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/sum.cu",
+      "sha256": "5b709d11f7fc8dd4d55f837eb7e611662daa3371402e48c3f86be8e7ed3f3254",
+      "bytes": 1496,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/sum.cuh",
+      "sha256": "a5164e2c10a2bd6c83ae481bb6a99a0eab739c2e3d67d55baa38461d2f5b5619",
+      "bytes": 210,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/sumrows.cu",
+      "sha256": "174933f7712dcf13ddefe7382216bb1865f0932c451e7df9c3413d6fdb9dac26",
+      "bytes": 1192,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/sumrows.cuh",
+      "sha256": "4b6075fc9623bd89bc860a6b4398843c286ef1112763b4615743e31169cb4694",
+      "bytes": 213,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f16-instance-hs128-f16-f16.cu",
+      "sha256": "fa4863b663d6c6698197a1a0cfdf8e14a58d83a175117c5067cada321a23e325",
+      "bytes": 177,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f16-instance-hs128-f16-q4_0.cu",
+      "sha256": "f61ed4401c60b150673fb788d679411873b54ee47de6e0d3df3a819f6536facf",
+      "bytes": 178,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f16-instance-hs128-f16-q4_1.cu",
+      "sha256": "8feb4ba0d0a7f48f4260c61d389c9420dd4d74da833717593f2f567924c6459b",
+      "bytes": 178,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f16-instance-hs128-f16-q5_0.cu",
+      "sha256": "8430ab920e7094185cfdbfb4ced8866dfac980fa9c6061d1cf5543b219c8c818",
+      "bytes": 178,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f16-instance-hs128-f16-q5_1.cu",
+      "sha256": "cec5f88818b19c68a1eeae9745a155f4a0bcaffb519915db804fa97948989c4b",
+      "bytes": 178,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f16-instance-hs128-f16-q8_0.cu",
+      "sha256": "5a48c537d8015d881aa7173c34f5484c4c1fef8153e09fe3425ef4ce251f519b",
+      "bytes": 178,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f16-instance-hs128-q4_0-f16.cu",
+      "sha256": "c9b2fba31fb78f315f7e457f38cd9e569efb2ded6ce3b88e9681326a86e90d84",
+      "bytes": 178,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f16-instance-hs128-q4_0-q4_0.cu",
+      "sha256": "af8d1968b168f52b692a6c260253f777e5e6b8a4a2ad9d576e9c4188c49f62b7",
+      "bytes": 179,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f16-instance-hs128-q4_0-q4_1.cu",
+      "sha256": "af4d5adb077e34b3bcea279b1a732fe58885b6fab6a302437f1d28f97c26c6f2",
+      "bytes": 179,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f16-instance-hs128-q4_0-q5_0.cu",
+      "sha256": "3c463dae6aa7712aaaa7591d4463a940a486a0b601eef71c52bb6f448a8e3be5",
+      "bytes": 179,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f16-instance-hs128-q4_0-q5_1.cu",
+      "sha256": "ab6f391dc2897858ca9ef02bbbbbee437b752d71ff37fd3ea3a1a8d0f75a5b88",
+      "bytes": 179,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f16-instance-hs128-q4_0-q8_0.cu",
+      "sha256": "b6c342505744776dcc893204b3abfbef61c16cb543d77f39d0176d1940ba0a0f",
+      "bytes": 179,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f16-instance-hs128-q4_1-f16.cu",
+      "sha256": "a8cc0db6c6d0a8836e46f44a56f0223a934dc75dc891d04cd2cee13e9de40931",
+      "bytes": 178,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f16-instance-hs128-q4_1-q4_0.cu",
+      "sha256": "a9f5184ae6a9cfb79770502fe9896d7c82a4708921fadd8cc18594d56d89dc09",
+      "bytes": 179,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f16-instance-hs128-q4_1-q4_1.cu",
+      "sha256": "ec75125b350593eccea0d3e7bb6df11dd4c78183a20eafcb1021cdb001f90e66",
+      "bytes": 179,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f16-instance-hs128-q4_1-q5_0.cu",
+      "sha256": "94804a3d0b58786bc2954151f18e37ee0bf71e1c25d5ed0d55d091d20bf739d1",
+      "bytes": 179,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f16-instance-hs128-q4_1-q5_1.cu",
+      "sha256": "437cdd8814b911f8e0696182c6aa4073331b5b6b5733e15f81dcfe5ab6cc38ed",
+      "bytes": 179,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f16-instance-hs128-q4_1-q8_0.cu",
+      "sha256": "7742fe9df04fcffda18befc9e41852c96361e94e3497ea3d43e01857835dbe21",
+      "bytes": 179,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f16-instance-hs128-q5_0-f16.cu",
+      "sha256": "e1049321490f05ec8b8ee811bfa4d6792b8713c40e2939e9f8d63147c6d488a7",
+      "bytes": 178,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f16-instance-hs128-q5_0-q4_0.cu",
+      "sha256": "ea2ff14ab8340f7abc40a17b49ed44568345d123e31c9b71e6091623333b1bf4",
+      "bytes": 179,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f16-instance-hs128-q5_0-q4_1.cu",
+      "sha256": "9833ce1db260fd6e41084e21638a3f6611b79bffa81e6f4fb8ee95246b26e431",
+      "bytes": 179,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f16-instance-hs128-q5_0-q5_0.cu",
+      "sha256": "b70bccacc2652dddb800ce3b4addcdc5835686e761f9a328bd2c0a935f51b5e2",
+      "bytes": 179,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f16-instance-hs128-q5_0-q5_1.cu",
+      "sha256": "4da95053de2f08d29b182455841e08eae44cf805c8f00f16182050fed0419e14",
+      "bytes": 179,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f16-instance-hs128-q5_0-q8_0.cu",
+      "sha256": "eb83dfabd3cc982c8cdb78e009c2726a973f2ccd8cbeb362cbb31ab49964693b",
+      "bytes": 179,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f16-instance-hs128-q5_1-f16.cu",
+      "sha256": "ca4b312ae728dc25ffc1a0a82d5764591bebfe3367eb6338fce160a251350301",
+      "bytes": 178,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f16-instance-hs128-q5_1-q4_0.cu",
+      "sha256": "153430ef03835b944db5ad9ab9097b3764216e8ee12d96ce21bdfcfe06ed8adc",
+      "bytes": 179,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f16-instance-hs128-q5_1-q4_1.cu",
+      "sha256": "bbc26788cd8817b4fb649ac39612dd7db40fcbdc9f9c9d98429d4adc5de53129",
+      "bytes": 179,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f16-instance-hs128-q5_1-q5_0.cu",
+      "sha256": "b64ae9631566781a89af4e960e965abf28f727156310df86ea173ad137019ec3",
+      "bytes": 179,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f16-instance-hs128-q5_1-q5_1.cu",
+      "sha256": "28922e21c22228bc725bb011d5816de7b7d80cbdfeca7c63a914fa4268082ca7",
+      "bytes": 179,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f16-instance-hs128-q5_1-q8_0.cu",
+      "sha256": "f4f183f58ab012da7e5ea272d105ae93b258306f83faaa8e5ddadc6ed02e29d2",
+      "bytes": 179,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f16-instance-hs128-q8_0-f16.cu",
+      "sha256": "aa84dfa0da9f58519df93ab0e83e5bd5425f9314fdddc2d4426d60b24217771c",
+      "bytes": 178,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f16-instance-hs128-q8_0-q4_0.cu",
+      "sha256": "2eda4aab8596a3cf9f4ae2506dd965b2153042e11eb1a3550da4679c0a5cd9c5",
+      "bytes": 179,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f16-instance-hs128-q8_0-q4_1.cu",
+      "sha256": "ba6c944a49a97a81e3c346b727e4dc40d63912dae720d9a900da7f34b234a762",
+      "bytes": 179,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f16-instance-hs128-q8_0-q5_0.cu",
+      "sha256": "303d44cd5d74d0e5e9afaca2d04e2fe440b2a1be631303df228afe8f404005a6",
+      "bytes": 179,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f16-instance-hs128-q8_0-q5_1.cu",
+      "sha256": "d1ff80a98bf7f1bf52148b5cc727b490581ffc8181f4e943be376b9f3e997055",
+      "bytes": 179,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f16-instance-hs128-q8_0-q8_0.cu",
+      "sha256": "eb0c1af9702bada1b0ea07b7fd0ca20ff3c015a9c09cdda2efb28dfcebd02667",
+      "bytes": 179,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f16-instance-hs256-f16-f16.cu",
+      "sha256": "eb6a75b1921025b361a85d8bc66d0373610e7c4b58037ea00d12eda1cfab49cd",
+      "bytes": 177,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f16-instance-hs64-f16-f16.cu",
+      "sha256": "87a6081ec27d93be8a775320fe251bdc7c6bed8b2ad61bacc0afda05b33f6659",
+      "bytes": 176,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f16-instance-hs64-f16-q4_0.cu",
+      "sha256": "0fecd5b0931c4c441c6b89e10322db10373ebf93766c95c39df7b7f68b97a1b7",
+      "bytes": 177,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f16-instance-hs64-f16-q4_1.cu",
+      "sha256": "4c1b8eda6584b43a673ffae69de402e0bfed109db61e108a123d73be8db375de",
+      "bytes": 177,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f16-instance-hs64-f16-q5_0.cu",
+      "sha256": "4280c07fab4281ea8f89dd041f0c5239dd8283cb1a3a7e7a7c9060af2b0ae2b0",
+      "bytes": 177,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f16-instance-hs64-f16-q5_1.cu",
+      "sha256": "e33acd639339973757ba74dba279b229ea6218a4ece40268995f5f801ba08d82",
+      "bytes": 177,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f16-instance-hs64-f16-q8_0.cu",
+      "sha256": "c8cca92d02260d0d9908f6f862da3f4eaf5b4c519af3195b66a9e6c6e8f53442",
+      "bytes": 177,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f32-instance-hs128-f16-f16.cu",
+      "sha256": "37cc3beeb6c464fa0528a0be32b2fa73171392e293f2c17a81af71e508b87d34",
+      "bytes": 177,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f32-instance-hs128-f16-q4_0.cu",
+      "sha256": "f005469c261fb64b3ce28cfb634300df44d74b7fd1151d32696558157e964b7e",
+      "bytes": 178,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f32-instance-hs128-f16-q4_1.cu",
+      "sha256": "11c4e3ce73dfbd77bdee9ebbaf29587076e187f7d2f1f27a3c15748d275dfd57",
+      "bytes": 178,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f32-instance-hs128-f16-q5_0.cu",
+      "sha256": "78267689b82126d2786228cc63a1ae170f712c0f547bc7540831ad1a2e5b2ed8",
+      "bytes": 178,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f32-instance-hs128-f16-q5_1.cu",
+      "sha256": "a097ff3296fdc7e402521c96d731a8d448e60d9810fc69b36a60f94e7be90aa5",
+      "bytes": 178,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f32-instance-hs128-f16-q8_0.cu",
+      "sha256": "871dcef77724eadb1518b089e699701117597c2bef3b53b2eb1837289d705d14",
+      "bytes": 178,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f32-instance-hs128-q4_0-f16.cu",
+      "sha256": "3721ae5afb58612dcba30fabb63c9d965960555a93b4eb5dfe27e524247f5739",
+      "bytes": 178,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f32-instance-hs128-q4_0-q4_0.cu",
+      "sha256": "330e78e787c22e6cf37f6cb1782d7073f0a3e2c4cf8b961966f7805777657218",
+      "bytes": 179,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f32-instance-hs128-q4_0-q4_1.cu",
+      "sha256": "56907fef3e18aa2aed70ff42838ad37a3fdc602ff5812006a4e9d931fdc98653",
+      "bytes": 179,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f32-instance-hs128-q4_0-q5_0.cu",
+      "sha256": "160deacd911fa779b8c947e2f8a87171d5d8aefbe3d449e80df92fa2fa46256f",
+      "bytes": 179,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f32-instance-hs128-q4_0-q5_1.cu",
+      "sha256": "bd235429f04fde1cbd33a4fa07504c98cbb5967f755e528ff2527f3d80763618",
+      "bytes": 179,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f32-instance-hs128-q4_0-q8_0.cu",
+      "sha256": "63c672b4f60586fe26349b76778d909d77abd2ed21598eaaaf23f04ecd629cfc",
+      "bytes": 179,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f32-instance-hs128-q4_1-f16.cu",
+      "sha256": "ccf8df1dac98ed796e0b4b65059fb6d6ea2a2de8721a8839df00242bf6b22357",
+      "bytes": 178,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f32-instance-hs128-q4_1-q4_0.cu",
+      "sha256": "146e31288710ed31781ce63e568b81e9503622d0a85e003852741271ec008c35",
+      "bytes": 179,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f32-instance-hs128-q4_1-q4_1.cu",
+      "sha256": "17dfd4953d9cdcad2252e011dc1ce2969667e2993574c25af0475149ff1deec1",
+      "bytes": 179,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f32-instance-hs128-q4_1-q5_0.cu",
+      "sha256": "1ed18e2e8d58eea2548bdafc84ef1620ec03e512a49cda95d121ec81d1aac627",
+      "bytes": 179,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f32-instance-hs128-q4_1-q5_1.cu",
+      "sha256": "55c18a4066099f996e6a00d0303336639dbdd65eb9e0becff86654e5be76306b",
+      "bytes": 179,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f32-instance-hs128-q4_1-q8_0.cu",
+      "sha256": "65b223abcc8ee05c2cc20ba0771e4407dd382d63155ef73c4be7a504c0f52a1a",
+      "bytes": 179,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f32-instance-hs128-q5_0-f16.cu",
+      "sha256": "aab94255a0a7945391aa0c14bff5e21774c0de83ba5ec3e5619d2960964002ca",
+      "bytes": 178,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f32-instance-hs128-q5_0-q4_0.cu",
+      "sha256": "c12cf8c7c9dca60b47eb979838f44fa362252fbbc0d50c1bba87aa3f193bb897",
+      "bytes": 179,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f32-instance-hs128-q5_0-q4_1.cu",
+      "sha256": "7980ed49a0f13d72a723cf4382a42798b8470940cb883fdd6a8506d538bb37a5",
+      "bytes": 179,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f32-instance-hs128-q5_0-q5_0.cu",
+      "sha256": "9a833848c9c0992acdfd5104524e0020e3c02e53f95e9046af70919afb6c3238",
+      "bytes": 179,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f32-instance-hs128-q5_0-q5_1.cu",
+      "sha256": "79567ff041269eba3eeffcca92b01143fcfff0b7878e0e151ec14f8e088971d1",
+      "bytes": 179,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f32-instance-hs128-q5_0-q8_0.cu",
+      "sha256": "4daef0c75a20d7d3b40ca05e8b9bdad4725ce725d5050174c857c512ac9881d1",
+      "bytes": 179,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f32-instance-hs128-q5_1-f16.cu",
+      "sha256": "754a67caf0d33dfbf34e663fddbb055dde045d5b2cde2cca9f2a858a8b06476b",
+      "bytes": 178,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f32-instance-hs128-q5_1-q4_0.cu",
+      "sha256": "f7561b6886f67e6ac767d89622656887ac8f2582ce2042fe66dbcd59aedd7a96",
+      "bytes": 179,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f32-instance-hs128-q5_1-q4_1.cu",
+      "sha256": "067b4f5877f4c1f7f4b79f8d56b09842ea3303f8a3c013ee7ad64e2c3b31f377",
+      "bytes": 179,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f32-instance-hs128-q5_1-q5_0.cu",
+      "sha256": "194bbe8202d95219ec354a3bb68d3ac8367371daf30aa8a57bf18bb43cbc3cde",
+      "bytes": 179,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f32-instance-hs128-q5_1-q5_1.cu",
+      "sha256": "c3d30d03b2554090b1393fac65c1e96f7ffdcdecb55538d46c7b5b9f6994de9c",
+      "bytes": 179,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f32-instance-hs128-q5_1-q8_0.cu",
+      "sha256": "4b6e781f4d85ad7a4cf25ed6da04f810ed28b67bc3567a7eaeadc36427c38f30",
+      "bytes": 179,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f32-instance-hs128-q8_0-f16.cu",
+      "sha256": "ab59910a3db1d0d2e62433f03e5fad46d0f290e58a966a9e1fa095ae70db52c0",
+      "bytes": 178,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f32-instance-hs128-q8_0-q4_0.cu",
+      "sha256": "6a3981409335c625dcdad04fc06968fb4cdfd19776cc185d8e657adc81f32cc6",
+      "bytes": 179,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f32-instance-hs128-q8_0-q4_1.cu",
+      "sha256": "03b474cb6aa9c1ab4f4dbdfcea5c9120b07f33529f63a265825677e1785cd30a",
+      "bytes": 179,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f32-instance-hs128-q8_0-q5_0.cu",
+      "sha256": "3687f181ce9286afc1a9ac9320cf328ccb1103068c001e422329e750b6ad53bb",
+      "bytes": 179,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f32-instance-hs128-q8_0-q5_1.cu",
+      "sha256": "a33f5136f4fb3ad37f9c272788751494c49362de9b064c1a19e5c3665313011a",
+      "bytes": 179,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f32-instance-hs128-q8_0-q8_0.cu",
+      "sha256": "2c83dc5ab144d84419ca30d644fd121ee62c960d46a9cc28ee13eda81f5be89e",
+      "bytes": 179,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f32-instance-hs256-f16-f16.cu",
+      "sha256": "24d2c8e6541774cb5573b3fbafd4d93765debc4bb06ca9f28ddeeab75ea60941",
+      "bytes": 177,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f32-instance-hs64-f16-f16.cu",
+      "sha256": "3df6568c274b74f24688f6252b40c2c7eb6325325e38ef479cbd6d1763fce680",
+      "bytes": 176,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f32-instance-hs64-f16-q4_0.cu",
+      "sha256": "8c0ac9e17fde573ab0327f2641ff2339b056992f660d952e4e17b546b213ff46",
+      "bytes": 177,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f32-instance-hs64-f16-q4_1.cu",
+      "sha256": "007bc60411e09079d7c0efd755e0dbe0fda965089bb76c8a56fc4913a4222301",
+      "bytes": 177,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f32-instance-hs64-f16-q5_0.cu",
+      "sha256": "86ebedfa6462050a699f66ec09b33f445cabd4a47e746b842cfdc28eb7261ffb",
+      "bytes": 177,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f32-instance-hs64-f16-q5_1.cu",
+      "sha256": "f4f1f226dd5fe4c32604a9f4f5c8ff00bfd97b5ee20fd750adaf6baae702e93c",
+      "bytes": 177,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-vec-f32-instance-hs64-f16-q8_0.cu",
+      "sha256": "8dc1c8f9cc8696476c21263397b97bb04c1d06778a429d1bee1fad915f045c7f",
+      "bytes": 177,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-wmma-f16-instance-kqfloat-cpb16.cu",
+      "sha256": "caa30ad3e38760771cdf16a42b223f928ad874ed8e03497a13deae534b83456a",
+      "bytes": 367,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-wmma-f16-instance-kqfloat-cpb32.cu",
+      "sha256": "627f5a2d81d00882441719c7bb27e5f7fa2c66a33f2ea0ea6db9d17d8ccd94c2",
+      "bytes": 325,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-wmma-f16-instance-kqhalf-cpb16.cu",
+      "sha256": "b4ae017c90b74a7b961bfbcf74c334a493b9a437b47509bc9830b2f5afc0d4c6",
+      "bytes": 361,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-wmma-f16-instance-kqhalf-cpb32.cu",
+      "sha256": "3faaf54e9cc789ea6eb7e15f565baf7b4b8bbcb30590307ce845e5dfeba301ef",
+      "bytes": 361,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/fattn-wmma-f16-instance-kqhalf-cpb8.cu",
+      "sha256": "85e6e33770a1c8d77a639bd15842964d9d00adf75647f84bb59aac63fb54bdea",
+      "bytes": 276,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/generate_cu_files.py",
+      "sha256": "bce0a8beb8bf01591dce168792cc565d920dc1963bd50d70f604eae3cd140702",
+      "bytes": 2824,
+      "executable": true
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/mmq-instance-iq1_s.cu",
+      "sha256": "3e54437db9b0cdda4ddb629982f1f083458de06771a04e5d25ab3e65dbca9e95",
+      "bytes": 139,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/mmq-instance-iq2_s.cu",
+      "sha256": "8a841418b1b818a13f739759ea0d36ed778e1b6343aee85fdc58d341b169bd55",
+      "bytes": 139,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/mmq-instance-iq2_xs.cu",
+      "sha256": "549d0c56b4b7ffccf262a611e28d257ce8e7ee94ce7ac814259c427eaeb10fe8",
+      "bytes": 140,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/mmq-instance-iq2_xxs.cu",
+      "sha256": "7fa1a4a0aaec59e2e27eb40a13078be685952e446c5c9fb0840a47d0e28a17bf",
+      "bytes": 141,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/mmq-instance-iq3_s.cu",
+      "sha256": "8167508364494a8f51f736186c5294585a26302cb034e051b8b80acf1db18850",
+      "bytes": 139,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/mmq-instance-iq3_xxs.cu",
+      "sha256": "13af5ff17c13dbbe712a6f400b83b69da77792969162c6f345491392d36c1d51",
+      "bytes": 141,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/mmq-instance-iq4_nl.cu",
+      "sha256": "a03418c7c0607a3ce3707129dd7e0fcd18d36f241c55289a274fac66f1548f93",
+      "bytes": 140,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/mmq-instance-iq4_xs.cu",
+      "sha256": "c4f568105a3ff273287b04c58879ea455efd5fa05aa72da9ef0efeb7ab9de520",
+      "bytes": 140,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/mmq-instance-q2_k.cu",
+      "sha256": "e378922ee4aaabe395e7e3f620a38ae26e36e27b46036b8b7fea71292bf8cc2b",
+      "bytes": 138,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/mmq-instance-q3_k.cu",
+      "sha256": "3847ca2cefb02dd316033e05db5451b24440cf6ab4cb2d23b4f54a388b492edc",
+      "bytes": 138,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/mmq-instance-q4_0.cu",
+      "sha256": "b0f6646afd4a8cc45aaf390a004700057baeae6d87d672dcd67c21a0a81eb74f",
+      "bytes": 138,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/mmq-instance-q4_1.cu",
+      "sha256": "8a8c0da33c1c44fcbe516c6c7bd7bf1a6f3b934b63eaf99333e3fba42bfebbea",
+      "bytes": 138,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/mmq-instance-q4_k.cu",
+      "sha256": "2ab47361d40a9ece25406c20693424a466c93bcb5cdb5c06cee8f9d03a806beb",
+      "bytes": 138,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/mmq-instance-q5_0.cu",
+      "sha256": "34a443ed0e68b1ad614eb251758d0f43f003ce8d10e7833f9f58a46677d336db",
+      "bytes": 138,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/mmq-instance-q5_1.cu",
+      "sha256": "a1312dd1316cd75b4a18e2c4a4c34d54ddfcd92b7fc1e45d4daee101e8d69f00",
+      "bytes": 138,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/mmq-instance-q5_k.cu",
+      "sha256": "c98bbe1dd91e03362f4136357c6f4e4e2c5328902fdc6fd857d0f608386ffb2e",
+      "bytes": 138,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/mmq-instance-q6_k.cu",
+      "sha256": "989943d6501a74927d079eacca793e94a1233863196c94dd20e459017ed76fc2",
+      "bytes": 138,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/template-instances/mmq-instance-q8_0.cu",
+      "sha256": "b38f4de9a3563debaf4796d6772e1ed72ce6944c2b8b03f9c26bf19191addee7",
+      "bytes": 138,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/tsembd.cu",
+      "sha256": "d5b908a5bf52816f39030e281791fd9f3912b2fc5ae06eb6c0cc0b0e3bb241a8",
+      "bytes": 1803,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/tsembd.cuh",
+      "sha256": "7dd4784baed53b3f8cf3c2919fb294e5341398f91297776e4b8af775279e6dc1",
+      "bytes": 161,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/unary.cu",
+      "sha256": "bd7a6f4b06fc3e05c8eac69fd477b113fc0de8cff5f2f0ab0426538ba2f0b851",
+      "bytes": 15355,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/unary.cuh",
+      "sha256": "d915e7c74c91f57298e4f5a87dc8df3ba87a1dceca98d7e3a46a6133b6378bf2",
+      "bytes": 1749,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/upscale.cu",
+      "sha256": "d42b6eaada890c7830156f72f990bfcc2b270a8786a1ee0106c76c70481d5950",
+      "bytes": 2120,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/upscale.cuh",
+      "sha256": "2557d6d800986a0aa9153adbfdbba746945c179323661030b5c45b4aae869687",
+      "bytes": 139,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/vecdotq.cuh",
+      "sha256": "f97d85bc94917df3816fcbc934f5f3c667b7ff88ee4c1a7aeac8f81bc4772dd9",
+      "bytes": 39115,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/vendors/cuda.h",
+      "sha256": "f5c86b6cf1a95c550f5683d0556f7b04d101ce04790b1d08d0f021b1f9fa84a6",
+      "bytes": 462,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/vendors/hip.h",
+      "sha256": "7f963e688dd533242343a27b0f1a09e95c380537e29373d457d55e589793b613",
+      "bytes": 7494,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/vendors/musa.h",
+      "sha256": "a670c456e9847ddfb24e29e5e821b9ee045136a3cec7484db237e0f60c38a04b",
+      "bytes": 6101,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/wkv6.cu",
+      "sha256": "ed04dad88c5916f9d3fe3e15e0b7d27202619cf186297c5cf3050c242f89b0b8",
+      "bytes": 3146,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cuda/wkv6.cuh",
+      "sha256": "46bef498d2a343d39b77559ffd5016e7f1d23a1e7bef8cb3144203749e3ab463",
+      "bytes": 136,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-hip/CMakeLists.txt",
+      "sha256": "2e48e128feee710019aff8c8c31593fbf1ea691428b1c57ae3c256c5b25a8995",
+      "bytes": 3264,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-impl.h",
+      "sha256": "f11d29c839bb8578e36839a64fccbac71ec8f3ae0c3ee2868860d6ee125bfe1f",
+      "bytes": 18446,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-kompute/CMakeLists.txt",
+      "sha256": "8110e1a12b5b35f87772e50f97e8ead47b08c3ba27093fed80793b9480c8a2e0",
+      "bytes": 7431,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-kompute/ggml-kompute.cpp",
+      "sha256": "923c04b22254d87e76dc8cab4fa8993c63a5dffa41593549bb1a769f11f30b7d",
+      "bytes": 90489,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-kompute/kompute-shaders/common.comp",
+      "sha256": "a65bae3f91589b17f8091cd9e57b295a7b7107c7c2e0e600567c3287b2369c99",
+      "bytes": 3857,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-kompute/kompute-shaders/op_add.comp",
+      "sha256": "6988d12ee8104debab7cddd2ce299f8a9f67a7abbd7f0e7d9778917061ef8656",
+      "bytes": 1649,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-kompute/kompute-shaders/op_addrow.comp",
+      "sha256": "329d0d7af18aa2aced0ad019a9e52075be59aa7c20fb653ccafe337c877e7a85",
+      "bytes": 640,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-kompute/kompute-shaders/op_cpy_f16_f16.comp",
+      "sha256": "1954d438e80eefe62637293ec72f5f6caa2a2f5d0603366ebdaea4fcb5fb70d3",
+      "bytes": 1533,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-kompute/kompute-shaders/op_cpy_f16_f32.comp",
+      "sha256": "c8102e2542560357f4b564c47c89f15aeb566a99e8f7bc6e15b1e4e053f6a258",
+      "bytes": 1529,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-kompute/kompute-shaders/op_cpy_f32_f16.comp",
+      "sha256": "7e7f3d8df8ab72d7362916c5843b2c0e683a8c08e31af53a5a37a8b3f987fd7d",
+      "bytes": 1529,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-kompute/kompute-shaders/op_cpy_f32_f32.comp",
+      "sha256": "709f205fa2866a4aaa0110195d97b0545f3792398c00583177be88ddf1ee3852",
+      "bytes": 1525,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-kompute/kompute-shaders/op_diagmask.comp",
+      "sha256": "ebfcec465b682bcdff6bc66e0e45829f64c48c6c6425857ada10fbf4ec5c0811",
+      "bytes": 726,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-kompute/kompute-shaders/op_gelu.comp",
+      "sha256": "2f386796bd2394227346759e09b6034ebd548f3eac0ddbfe9354453112d01bb5",
+      "bytes": 604,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-kompute/kompute-shaders/op_getrows.comp",
+      "sha256": "ab253c5ebdbfa6f24336ca29f68dfd78cca1930307269d18feff392612e1fed2",
+      "bytes": 609,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-kompute/kompute-shaders/op_getrows_f16.comp",
+      "sha256": "6ba5a03ac39cff2f3c5bd46362fe2c10936a0512bfdc793e1b934c7f5b07f18a",
+      "bytes": 787,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-kompute/kompute-shaders/op_getrows_f32.comp",
+      "sha256": "f77c55f0099f9b46ea3ac650f2ef1c0380c9f8e64a2ba70c119f07126cd0d951",
+      "bytes": 762,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-kompute/kompute-shaders/op_getrows_q4_0.comp",
+      "sha256": "80608d45cce4b928bfecc76b476f6a6abbfbcc860666d36a6cebbb85804c3912",
+      "bytes": 919,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-kompute/kompute-shaders/op_getrows_q4_1.comp",
+      "sha256": "f77bf95029656731b9ec45c978125dd02cf3dee1dad6f1ee31c5708cf917d5ad",
+      "bytes": 962,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-kompute/kompute-shaders/op_getrows_q6_k.comp",
+      "sha256": "01938c91827baf596589090d35bd266db6abaeec3fd46998176d5988f9e7c26c",
+      "bytes": 1191,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-kompute/kompute-shaders/op_mul.comp",
+      "sha256": "9664243f4cffea6ceb84654058b56a1acff9518118ef701d554ffc92b3cf9245",
+      "bytes": 1361,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-kompute/kompute-shaders/op_mul_mat_f16.comp",
+      "sha256": "770da49f46ffeddd40d3b83499e365945584286d80a55d47c5301c0b03a59ce7",
+      "bytes": 1644,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-kompute/kompute-shaders/op_mul_mat_mat_f32.comp",
+      "sha256": "672c6d793092fdebd79e2686ab865e82ddd5fe650dc0a13a23c1b08cf6b81205",
+      "bytes": 1298,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-kompute/kompute-shaders/op_mul_mat_q4_0.comp",
+      "sha256": "91af6885132b86eb89222c4582f231e63357c1436d326017218d473a74fe1530",
+      "bytes": 1018,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-kompute/kompute-shaders/op_mul_mat_q4_1.comp",
+      "sha256": "97d78f59c6fa33d6a43c3e2efd6b015a2d466d5641dbbc4fe2ecfa6d5b1006a4",
+      "bytes": 1067,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-kompute/kompute-shaders/op_mul_mat_q4_k.comp",
+      "sha256": "803bd7c947db9d7c2fc8cad412f0a0ace8e1efd1bd75277d20943d73eb820390",
+      "bytes": 4996,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-kompute/kompute-shaders/op_mul_mat_q6_k.comp",
+      "sha256": "14d09fcb84a2936e0a379d4ad573f4bc54efd6b643cca6e49fb7c1dc3f89cece",
+      "bytes": 3822,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-kompute/kompute-shaders/op_mul_mat_q8_0.comp",
+      "sha256": "20d5cdcbc58b8c4fdd06a5f13810722876897ac8713c380d0cf0b07540cab32b",
+      "bytes": 2243,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-kompute/kompute-shaders/op_mul_mv_q_n.comp",
+      "sha256": "7925c260807426c21bb953e3f838f266ffa4d227c4e929e2e18a39f319931e1e",
+      "bytes": 1865,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-kompute/kompute-shaders/op_mul_mv_q_n_pre.comp",
+      "sha256": "0f189dfbe825307223cf8a783de40cc8e093d2549e7d3a4458c4331fb66b5afb",
+      "bytes": 611,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-kompute/kompute-shaders/op_norm.comp",
+      "sha256": "67368e4674c47f9e23b1820e3de120dd96344d045424575f6592903081393b6f",
+      "bytes": 2307,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-kompute/kompute-shaders/op_relu.comp",
+      "sha256": "c049b654239b9d94502d4a9165bb4a755dedb8aaec7efda8c9940d76526971f8",
+      "bytes": 508,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-kompute/kompute-shaders/op_rmsnorm.comp",
+      "sha256": "ab11ae7d1a00cde1d851c7b1091cfcfdcc24e0f9cd5d2df059eea95da5f149af",
+      "bytes": 1415,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-kompute/kompute-shaders/op_rope_neox_f16.comp",
+      "sha256": "0bbc40ffd25341c19eb3d9e4554c7137cfb6bd0abda92b1338e0ead259c701e8",
+      "bytes": 2186,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-kompute/kompute-shaders/op_rope_neox_f32.comp",
+      "sha256": "f6abd4807f6ebe963573e11816ac3bedc725525f1ef510b71d317ea3492ad7a6",
+      "bytes": 2138,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-kompute/kompute-shaders/op_rope_norm_f16.comp",
+      "sha256": "812d10a674897c232e0731e0ee72eaf7b5d39cf040d1012f2cb0997f86712f50",
+      "bytes": 2153,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-kompute/kompute-shaders/op_rope_norm_f32.comp",
+      "sha256": "87b357fe363efa9332d531021e2a77129b25fe271908cbc462d5636e2e7c3e4d",
+      "bytes": 2101,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-kompute/kompute-shaders/op_scale.comp",
+      "sha256": "f0e25002199e60ff9356a991c014e2355a312747dce51c2c445afeeb6140c15e",
+      "bytes": 432,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-kompute/kompute-shaders/op_scale_8.comp",
+      "sha256": "0531df5a25424fb31dbc16069468f71b93575467798af896cb260e8d9454ba09",
+      "bytes": 528,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-kompute/kompute-shaders/op_silu.comp",
+      "sha256": "f7188c5f34ef07a551768fd755dbd8fcaf1f9bdcbc705743d99e626fccb65052",
+      "bytes": 543,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-kompute/kompute-shaders/op_softmax.comp",
+      "sha256": "9f45c38305bcdac2b4141dc06b46a7616cd5217ea3f9896954da64f4a4b0c449",
+      "bytes": 2159,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-kompute/kompute-shaders/rope_common.comp",
+      "sha256": "010ebb4be93a2653536eb8c17a660866f52bc715402e9c17e01664b33d834c4b",
+      "bytes": 2374,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-metal/CMakeLists.txt",
+      "sha256": "e1f3b60f50a17d69be972146ca920036e366dde38551ff78d299ea8913ba61d0",
+      "bytes": 5565,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-metal/ggml-metal-impl.h",
+      "sha256": "018eaa6fce68ab5c8297b6fd3e859140f53041d00297e25d91e66a821c4269f9",
+      "bytes": 5466,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-metal/ggml-metal.m",
+      "sha256": "20d17bbdb5de7b6777df37f9109fb743783533ede066c164b9eb4f8e60388847",
+      "bytes": 262890,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-metal/ggml-metal.metal",
+      "sha256": "13718a9ef20b0b4c7cd71628783bc188bff463cfc8b76e23260030f8578ec6f7",
+      "bytes": 263028,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-musa/CMakeLists.txt",
+      "sha256": "a7971a55e83517e06c2db35aa7c55c4ede5c2e7c73f4fc8aecbeeb4b5082479b",
+      "bytes": 3574,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-opt.cpp",
+      "sha256": "09d84ba2f05a15b92080a9b4c3c551fe6944aa50cabdd37a2ad308ce73d1ca89",
+      "bytes": 31718,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-quants.c",
+      "sha256": "923b7c8d7e6abf241686cb9e239f2d1505f4a61f72309e44ddea0c7010e5a11d",
+      "bytes": 213632,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-quants.h",
+      "sha256": "05f5cc9c65ec6f266a10d89c53dcfb56cec8a794f2a798d28c1a1a7b465f131f",
+      "bytes": 8338,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-rpc/CMakeLists.txt",
+      "sha256": "7da9f3e3563706c4cb78956b71cb388a62547bb6e327ba30998ad4f874c3a659",
+      "bytes": 206,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-rpc/ggml-rpc.cpp",
+      "sha256": "fb1bb0b05dcddc5eb6e0e89b0a0c7a4673c415f4f818a881a4a9f8c8c59999e1",
+      "bytes": 50529,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-sycl/CMakeLists.txt",
+      "sha256": "db3eb0afbd2cf6099808e99ed624c6652349bcba43267c7acb69b831e7709a22",
+      "bytes": 3264,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-sycl/backend.hpp",
+      "sha256": "beda7c65c89b4d29564c046eef734bed4a8ff9d5ccbe50ecd374ddbb97cb6451",
+      "bytes": 746,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-sycl/common.cpp",
+      "sha256": "f656547a1ba440b757a4e7915b5cacc08922e64e6677883cf4f03af47bee4cf8",
+      "bytes": 3424,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-sycl/common.hpp",
+      "sha256": "31b25610297f008f1a1156d041fd60818121f2b4e185af2021d031d67f5acd99",
+      "bytes": 23054,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-sycl/concat.cpp",
+      "sha256": "5bbdffe054413bc619a138837c729144430e4a7898050ae65c2c9aba614dad53",
+      "bytes": 7639,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-sycl/concat.hpp",
+      "sha256": "c74a7747f6f87779e507ad482ac6ba406b29c939edd8482ff6ce00fc6a87c8ed",
+      "bytes": 575,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-sycl/conv.cpp",
+      "sha256": "5c9ded2966727e7a3978ac3d7096bed2a960a3bb795ddf946e21be9511d8076f",
+      "bytes": 3233,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-sycl/conv.hpp",
+      "sha256": "e530f3192ad77bc42a7b5cecf573a3ca6307b3142abb132770c4398aa167eb13",
+      "bytes": 550,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-sycl/convert.cpp",
+      "sha256": "ed86a76188fb73f62d37cc0f047d74383b811aa8f13b2b194989fd8b90a5f118",
+      "bytes": 22316,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-sycl/convert.hpp",
+      "sha256": "06b0d423a18c1849f1a3732b0f875996894644c8d30c1140abeaf66edd2a4581",
+      "bytes": 782,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-sycl/dequantize.hpp",
+      "sha256": "dd078eb7b5d4c9c0efb398b0a9b6d0a0c81313bdc9ab63a67da89b0c41c7427e",
+      "bytes": 23989,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-sycl/dmmv.cpp",
+      "sha256": "286483cbcf33be5b0c51a04eb1cb5f3af39660c0d94f8307b4629a6b35b26657",
+      "bytes": 41714,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-sycl/dmmv.hpp",
+      "sha256": "4ecfa6dc1aa0b76c491c76ef5a9fe4bd6c9124bb1947d92774885bc73ea89463",
+      "bytes": 808,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-sycl/dpct/helper.hpp",
+      "sha256": "e95c610eb1afdb17a31b7c1cd2bbc12f1b31f9fe1ae711264f8b195c67ebaef2",
+      "bytes": 124033,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-sycl/element_wise.cpp",
+      "sha256": "b9c57c17e3dea9bd875fb5631738a54482102f14d3c83f0c7645ed1ad9b7b9ba",
+      "bytes": 41104,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-sycl/element_wise.hpp",
+      "sha256": "f54b445a9c7357d6547c6125f3a37c783a076ca341d837d863a5e55acc4f39ba",
+      "bytes": 3635,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-sycl/gemm.hpp",
+      "sha256": "75b8a55044759c4f95a640bfecc5897405cccbfc9c6502a2ce8263c581b8d8ff",
+      "bytes": 3788,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-sycl/ggml-sycl.cpp",
+      "sha256": "90dcac8e2edd15bcb27fa1b4e031a9e1020e71af76e659ef3abebbabf7d5ce33",
+      "bytes": 187710,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-sycl/im2col.cpp",
+      "sha256": "9c8dc4d7572f19ab13326fb29c33ef3c492bead1db0516723c7c60ac4bd95dd8",
+      "bytes": 5267,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-sycl/im2col.hpp",
+      "sha256": "9ecb36404cdf0df50f752e36f8196c4ee5366bb7356a43c8dea981689102d643",
+      "bytes": 657,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-sycl/mmq.cpp",
+      "sha256": "7898a5853fe9a51b547d10060d0c93edd321bfecd465b950d3301353ca7c2f03",
+      "bytes": 119607,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-sycl/mmq.hpp",
+      "sha256": "da88e98e058c55878652f52a68584990d76b2971adb13ddc27b95d7bdef06f0f",
+      "bytes": 819,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-sycl/mmvq.cpp",
+      "sha256": "d1ff7da9e26fcfe1a7db13a4893de8f5237f50e936315ba4d4c889f0d907ae18",
+      "bytes": 39772,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-sycl/mmvq.hpp",
+      "sha256": "fc909cfbab6908817084e82baf5bf06933eb8fe8f55b944016a839ca9234d049",
+      "bytes": 799,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-sycl/norm.cpp",
+      "sha256": "40931bd1b510805baec03d07680b26c3c90a61eb3967d7affe35985c554c20a6",
+      "bytes": 13663,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-sycl/norm.hpp",
+      "sha256": "69dd42040b6765bf28d1c3f7afbcc5046600ec8d6f1642978b1234d39b320ec6",
+      "bytes": 1105,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-sycl/outprod.cpp",
+      "sha256": "74c3bc382ef710d462faa88dd7cc02e466d82ce446489289c3149e4c051c1826",
+      "bytes": 2046,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-sycl/outprod.hpp",
+      "sha256": "9afde5d15375803efcf4e973a8463d1a4c18108a16f0e5f6fd2570c653a976cb",
+      "bytes": 251,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-sycl/presets.hpp",
+      "sha256": "f613a575b2063ed4a9bd3d75464ab6d61da09a373681ee8b4f6cd18dac370117",
+      "bytes": 2222,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-sycl/rope.cpp",
+      "sha256": "9c35c040bdb7f41054b5c7a41dba49ee0c9300b0b75268977dc665e8a16bbd14",
+      "bytes": 10692,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-sycl/rope.hpp",
+      "sha256": "dda5d346b38fd77156b8517f235fb27b6f16aba4702de348aaa191ec09bb2bf0",
+      "bytes": 633,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-sycl/softmax.cpp",
+      "sha256": "4fc167ffb7b9c1e13c5566152b5b5cd67843c0b0cbca3ee28ff86f586542ac12",
+      "bytes": 11156,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-sycl/softmax.hpp",
+      "sha256": "9d1398d932250febe7f537613457e4157b2f24f999d22e5bc2a0ab3e641d758d",
+      "bytes": 652,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-sycl/tsembd.cpp",
+      "sha256": "6a156eec6392da7a3fdfea1fb708ecda956192c74362414c663a02b408e4b038",
+      "bytes": 2618,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-sycl/tsembd.hpp",
+      "sha256": "403e5f2146109c3312ce33e680d971039ecfaa67693262bec3e6241b0869fa31",
+      "bytes": 560,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-sycl/vecdotq.hpp",
+      "sha256": "837d7e9daf7322f6fe33747704242e05784dd1ede298606581b6e9050da7b6b6",
+      "bytes": 39771,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-sycl/wkv6.cpp",
+      "sha256": "78bda39384d2be8f2c58a85ebe54ba7d974c39cccd955c73a4ced51869a79932",
+      "bytes": 4761,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-sycl/wkv6.hpp",
+      "sha256": "0cff32d40d791130a45bd5ce765de96001d41062eb2fd19d78fd372f2f480169",
+      "bytes": 244,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-threading.cpp",
+      "sha256": "13a18d885393722b7c9f42d4cf8575a4d41699926d656f78a867fa4fac9dad20",
+      "bytes": 250,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-threading.h",
+      "sha256": "9652729043ed91482392c1aa08af5d813190d0ace2e7982d2539d28240ab8d8b",
+      "bytes": 198,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/CMakeLists.txt",
+      "sha256": "0e480ad5455fa19c492a666e8b015117be11af084585a4d8cce282b1c41cbf9c",
+      "bytes": 3430,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/ggml-vulkan.cpp",
+      "sha256": "8969faf24a93c984de56e848db5fa0656f3adcece9f0872ccce2deaebad2ebaa",
+      "bytes": 431662,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/CMakeLists.txt",
+      "sha256": "7966726a199f323c698bef439b4fe2fc7bf0cc87180f92854ecc4f05f2e4411e",
+      "bytes": 380,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/acc.comp",
+      "sha256": "42a28a45e16445468592780948d460b790873d63e98f1a04ce8230ef2fde8abd",
+      "bytes": 946,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/add.comp",
+      "sha256": "625366e3be721cbdd27d7e99b9ac701e1b88e2d7b51af7f2977f5c7555358bff",
+      "bytes": 826,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/argsort.comp",
+      "sha256": "4eb24227981e015a602625e0a3d073befcf232a29527dee8b3dbb894b95e2c02",
+      "bytes": 2011,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/clamp.comp",
+      "sha256": "14ab80d11efcb3854aef742231bda53f43e11399421ab831e7596c05feaa0297",
+      "bytes": 427,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/concat.comp",
+      "sha256": "82a7e23e9be18babdb9ef50b028f5b5e6db9cdf1edc00274b1f0f797fa2ef89c",
+      "bytes": 1496,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/contig_copy.comp",
+      "sha256": "cc43ec016a79def72960156abecde6629562002e78993c5c1c31fe94a784e7c9",
+      "bytes": 1198,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/copy.comp",
+      "sha256": "632a01ec1f850c928ec8942ef6f26717ec50405586c93a3cbacd9f26106645fc",
+      "bytes": 458,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/cos.comp",
+      "sha256": "62b5b704c9404f39309bd51b1341eb4757928f7d35049402859d0bd405c0de0e",
+      "bytes": 374,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/dequant_f32.comp",
+      "sha256": "a146bdf2466f8102b5dceb21b7e8cec3f9ac217d557092ef8209f8ddb87d999b",
+      "bytes": 442,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs.comp",
+      "sha256": "259f6d1641dbcc9311e7938f0acd8aa0168608bc9a5a75250b1c5838b9ae3601",
+      "bytes": 4684,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs_cm2.comp",
+      "sha256": "61d06edfe4647d5bc0bdd175530387133570a204d37f082240946496847a9e0c",
+      "bytes": 10866,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/dequant_head.comp",
+      "sha256": "a2609ec748941f6c2aff143309baee1803f65a69558d8cd223c85d18277a4d8b",
+      "bytes": 249,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq4_nl.comp",
+      "sha256": "d04b31ba2c54088350e6db29f0bbdbcf46f01a2839e7ef4163f9105312cd7825",
+      "bytes": 896,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q2_k.comp",
+      "sha256": "fcb5a93cdf0788744c393285b80f74c10fc52a999db757c38cb42326f2ae30ac",
+      "bytes": 1477,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q3_k.comp",
+      "sha256": "e7a89dc3e5381a70dabb380b4e02cfea7e4983d7b252ed0388af60a1a8999896",
+      "bytes": 1717,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q4_0.comp",
+      "sha256": "d2080ed402315ca5c2a202aab92d4e080e50aeaef3f948fe6b677d05982db1b1",
+      "bytes": 861,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q4_1.comp",
+      "sha256": "6d00c08cc461b0a4926b01eb4aa2f1663dc6cdfcf170169c08d5f06be34d2f29",
+      "bytes": 892,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q4_k.comp",
+      "sha256": "f880be51efbaedeebbfbc96adc5ad00b0338a45d467ef1fae60c6792eb0057e1",
+      "bytes": 2677,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q5_0.comp",
+      "sha256": "f76c4697aa9821bfdc6d2c1a45e113b9aaebb01f55d0f6284abfb286d2202217",
+      "bytes": 1041,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q5_1.comp",
+      "sha256": "784e6a98c22dc65d9437b2a57cc9c97a86599f8aaa5234c5f4c4952a1c75c245",
+      "bytes": 1040,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q5_k.comp",
+      "sha256": "a03085bbc8e6ee9c3c66efc215b0c65864574a82d9fe6dc50dd6ec6826e75ef0",
+      "bytes": 3133,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q6_k.comp",
+      "sha256": "14e0f3fa8d2b5101de5813940374735f9573df99e3a2c018ff50b40a322a45fb",
+      "bytes": 1425,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q8_0.comp",
+      "sha256": "cbe139c4419b4a24036cafb8d6cee7ee19744f291047987cec092428f62d4a5c",
+      "bytes": 839,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/diag_mask_inf.comp",
+      "sha256": "ce12b515f200dbaa5a47ff6db89864feaf366a1e87502321ca61c3345f8b9054",
+      "bytes": 799,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/div.comp",
+      "sha256": "85210c9741da0a090faae99be08a6720bc86896e8e23a33fa8cd8052ddb5ae51",
+      "bytes": 776,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp",
+      "sha256": "839580ccc4c378f12664a9497612770888c778949b0cef78d3e09209143ccffb",
+      "bytes": 10233,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/gelu.comp",
+      "sha256": "88ae2bb95fba066242562c7495078777036c398afbf4e8d5bc9a0b9d28b59104",
+      "bytes": 767,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/gelu_quick.comp",
+      "sha256": "ff288ba11a1c45ddd690bb6886f4e2b6b164fc7bab679bd867e74c0c7e906f81",
+      "bytes": 631,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/generic_binary_head.comp",
+      "sha256": "9d83eaa859f50a9860ca13b7753b5e769dd6bb61b5cdd1f08022730f58ca196e",
+      "bytes": 2352,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/generic_head.comp",
+      "sha256": "296e60abf1c7743ff5be5fb312a3e478f3b740eef16466abb33bb49fecdf57da",
+      "bytes": 160,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/generic_unary_head.comp",
+      "sha256": "4c7d617894b28332fba5a518c77d5eaab5ce445f7b0594abb5142267fd5661b7",
+      "bytes": 2115,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/get_rows.comp",
+      "sha256": "fe77003b43a17495fba161f1114e0b1c977ead4abd47244f64d2adad13ef223e",
+      "bytes": 818,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/get_rows_quant.comp",
+      "sha256": "ab39e126cc3feede779347236e023fd4c523b897df39b069f86a02d507befb76",
+      "bytes": 1157,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/group_norm.comp",
+      "sha256": "8f3262ffb88280047487975863360a34e8ef22b3a1ac03a3eb287d0f7f4efb4f",
+      "bytes": 1736,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/im2col.comp",
+      "sha256": "a38b7f9c00c1c65a4045ece192d04d30c7d42fdc55ced9dbc98cf62e1fcdcf6b",
+      "bytes": 2265,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/leaky_relu.comp",
+      "sha256": "9f3edd729bbdde265a79eb51839220fd3721bb8989bbe2db53095ca036a8f89f",
+      "bytes": 586,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/mul.comp",
+      "sha256": "b51f1b07fa19de8e17e2dc72aa9044ff37097ba265a1024eff166cc3d867bcdf",
+      "bytes": 776,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_split_k_reduce.comp",
+      "sha256": "bb6cbc04d3e19a8a61629ba940a7787241a354bcf02d3eff9588c931f99b5531",
+      "bytes": 1296,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec.comp",
+      "sha256": "4326faaa8f396a5fe025e6f6d194c533ce03e2b1a51827c31f1ee8312381300f",
+      "bytes": 5013,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_base.comp",
+      "sha256": "ae7eb3fb259a71a7d5c4b477fdb92cef7bba3e9c1710a020038e1fde5bb3a2b6",
+      "bytes": 3185,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_nc.comp",
+      "sha256": "a7a328462a2fc876519c2da8509f6176d90a119a30d0058e06adbed7f71137b0",
+      "bytes": 1813,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_p021.comp",
+      "sha256": "057cb10e8d6ce7300ca9353663bcb16d93ac4d1a907e4a16fdc51386f1086bb4",
+      "bytes": 1917,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_q2_k.comp",
+      "sha256": "1c85daa31d40b5974b87e9ac0b82baeb307f70dd7cdbd08fcf18d3fb203fcbaa",
+      "bytes": 5575,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_q3_k.comp",
+      "sha256": "ee111257edb0e04412cc18671eba05da30e18e85d43d0bb339113d02d04a39a2",
+      "bytes": 5950,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_q4_k.comp",
+      "sha256": "5f4b7376199994ccd6d6d4986407414c3c4ade9b8bb3950b5846faaf38f87573",
+      "bytes": 6470,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_q5_k.comp",
+      "sha256": "3ce21212da19654054e94a9ba279db7694bafa92452b683e23f1b9a3d8c60206",
+      "bytes": 7891,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_q6_k.comp",
+      "sha256": "dcb8d78cdacff88acc376da8d77b129681367d3da23bede34d37dbec6f459b20",
+      "bytes": 4837,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm.comp",
+      "sha256": "b68cee758a14680a2297b504d3560a6887fde72bc3b41cdccb3911c6418e184d",
+      "bytes": 27610,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_cm2.comp",
+      "sha256": "90079e777eebdd0143fed7054cb0e5a25521b8542f147a42666c237996179775",
+      "bytes": 12831,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/norm.comp",
+      "sha256": "91050c93b39fe4fd8f3dabac95c334af3200e3de30bcde08060f7647b0d45b92",
+      "bytes": 1281,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/pad.comp",
+      "sha256": "c69230c817aa5931dccfaae7f2f9c0d030896c8704a71ffc878b39d4b4116e77",
+      "bytes": 971,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/pool2d.comp",
+      "sha256": "f2addd4ac1d6b68db19f0f06ac117fbce188d524d316684edd084c1e22950ab7",
+      "bytes": 1785,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/relu.comp",
+      "sha256": "2984cea34bbfcd6c424dc65d32203de6b01f9908eed650d293c06cfbbc31f2e7",
+      "bytes": 520,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/repeat.comp",
+      "sha256": "25122b1e7c91519b8e7de6afef51ad1f85c635988563fda5a78d3048316f9b81",
+      "bytes": 809,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/rms_norm.comp",
+      "sha256": "b21920d263cd8724d870d0faa5007b1be89ad14568991766868f8dac363b6a72",
+      "bytes": 1275,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/rope_head.comp",
+      "sha256": "bf25dbe159913fe1424060c6d5bf4cca1ec7baea424fa52f9b0e623662221f00",
+      "bytes": 1645,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/rope_neox.comp",
+      "sha256": "61b0fc3e93c1f21023209d134b64d903bb326447bc4ecbdb2af0524de85c4c39",
+      "bytes": 929,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/rope_norm.comp",
+      "sha256": "d32e64966c6ef28b90c0cbdd07ce264cb6a629c4e7672fee151de0ef26a65a18",
+      "bytes": 901,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/scale.comp",
+      "sha256": "852eba738c431bfe7167385a74f50082b4f0904a4f7e42d084578fa931b01dcb",
+      "bytes": 602,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/silu.comp",
+      "sha256": "6039f4c0be827be7b544696b5ada2d7c5ff4c16e0106a086db84fdcc2c014dbf",
+      "bytes": 565,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/sin.comp",
+      "sha256": "3dda846f488eb1020efa839828d5745515ac4fdda398cf66440086a995a65100",
+      "bytes": 374,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/soft_max.comp",
+      "sha256": "f4a5c9b51120f4d4adf8f1d6c5407f418f98f65679ad81f66a322a8df22e71ef",
+      "bytes": 4791,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/square.comp",
+      "sha256": "228963b7cdc37da78e6a1d8e54d5d3c3bba7bf8556d8e15138d01dcd1a2b308d",
+      "bytes": 375,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/sum_rows.comp",
+      "sha256": "c08523517c2cfed7e88942de6a2ca415c4d565eae80ae6329057dca1c6007fcb",
+      "bytes": 940,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/tanh.comp",
+      "sha256": "2c1a4352af884ecae45571d3e5f5520d5f44e12f654ec225ae1f165e2f0fadec",
+      "bytes": 537,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/test_coopmat2_support.comp",
+      "sha256": "ca5500437f3baa48d9095102a604907080279a7481d08637286aad82b7088a19",
+      "bytes": 78,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/timestep_embedding.comp",
+      "sha256": "c8885bce92fd08ecbe7273584ce9d01ca1bda20198c456a0311e4c3c8ec2fa4a",
+      "bytes": 1029,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/types.comp",
+      "sha256": "2c73d5b4cb640292f9d5321f90ed7403dae907cb4487f855aeb034bd02f45035",
+      "bytes": 5866,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/upscale.comp",
+      "sha256": "68d68b494b2fd998c21aa65df542ae12ecadc8d6f8008a39cfc75ba96ac52b5d",
+      "bytes": 1122,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/vulkan-shaders-gen.cpp",
+      "sha256": "24f43d69dd71bf63f9192f984d41e4122f4390b1d59f93a2386447b169f9543c",
+      "bytes": 25321,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml-vulkan/vulkan-shaders/wkv6.comp",
+      "sha256": "980576d781008cdcf6bcb5d3a3824e2ea0d73bc133b1d9a8baf93813d941cfe6",
+      "bytes": 2720,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/ggml/src/ggml.c",
+      "sha256": "45137ab2b055ecf7383bb3b01d9e16caadb51c0f55c7ec882793a73946bdd0ac",
+      "bytes": 251349,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/include/whisper.h",
+      "sha256": "0e8aeb7984631cf150c8be787a15b4af30eed8d5d3b0ed409bee722df81a1a72",
+      "bytes": 34455,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/src/CMakeLists.txt",
+      "sha256": "74d7a9ce3f73290ec70ff30b0220d288e6a16ca4857c8a6c041fc6e5a51b6c65",
+      "bytes": 2932,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/src/coreml/whisper-decoder-impl.h",
+      "sha256": "0b905779c45610645e0fb98a4f3865c40e98d72d57f19f2fd18e2529749b0c17",
+      "bytes": 7458,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/src/coreml/whisper-decoder-impl.m",
+      "sha256": "6dff6af3f9c232454ef14c446d324d9a36f0f8881aafbd1058c4a19c141a4755",
+      "bytes": 8817,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/src/coreml/whisper-encoder-impl.h",
+      "sha256": "b8195cefbbe70b9e86849a06a98c7ded76da54e3936e1698878234321079fef7",
+      "bytes": 7193,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/src/coreml/whisper-encoder-impl.m",
+      "sha256": "690a2b9c1cfc22b86d51d2b16f11e183eac992bae906cc989f24f50c8a593058",
+      "bytes": 8522,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/src/coreml/whisper-encoder.h",
+      "sha256": "5f5404265f34e2529fbdd6a8a0bade03e2a3d56be448540505a1b41713aaa242",
+      "bytes": 675,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/src/coreml/whisper-encoder.mm",
+      "sha256": "e20bb1eb2128802b3f8d0e4e7f498fd7e3ad175bfed67665edd5e513f03c2347",
+      "bytes": 2224,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/src/openvino/whisper-openvino-encoder.cpp",
+      "sha256": "b35faa2d9d1baa762feda901605b194e14c8222d7e4a7f5d01c9a883114cc5af",
+      "bytes": 3988,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/src/openvino/whisper-openvino-encoder.h",
+      "sha256": "30debb67a2ba5972d0bfecc5ab35827d67c4e38b5485dbb6bb00af9f64e4404c",
+      "bytes": 876,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/whisper.cpp/src/whisper.cpp",
+      "sha256": "83ac2157802b37f4d430521799517df1ac109e790a1ee9cd63bcdb242f9e69da",
+      "bytes": 273516,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs-sys/wrapper.h",
+      "sha256": "1ecb03ef40c3227b026cf19bb41b0ca199f05f7e2893f3061864c1c2a5201087",
+      "bytes": 116,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs/.cargo_vcs_info.json",
+      "sha256": "179fc4fffe784ef6a6d68c2226fcdbc5111c6ce1dc90a10e08395cd12d0473fa",
+      "bytes": 94,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs/.github/PULL_REQUEST_TEMPLATE.md",
+      "sha256": "699f86b133b2987934428d17980dc63262f34a172dd7f4bc5dd6bc4c046c32bc",
+      "bytes": 610,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs/.gitignore",
+      "sha256": "0ad93445e58e0f32c0d86c2dc4169d51e4eb92cde7060dbd654e6f6b3408fba1",
+      "bytes": 51,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs/.gitmodules",
+      "sha256": "eb15c000e5c253a41393cff5ab4b97349b99b474f123aaad205796d3c3085915",
+      "bytes": 102,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs/BUILDING.md",
+      "sha256": "03024769fe41cf9e4dc2b87bf117e5b9ecf70bd7bff100d014e06fa6e93cb813",
+      "bytes": 2315,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs/CHANGELOG.md",
+      "sha256": "3d095a3c48008c65487e0551fd08441438263d81cb5d14293062965c05b04c8d",
+      "bytes": 2468,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs/Cargo.lock",
+      "sha256": "69800a9dfcbdfcf3c391f7ecdeeabdebaeb6010f31e238dea72cb1ae037a1d44",
+      "bytes": 12145,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs/Cargo.toml",
+      "sha256": "d2369b710df78074b7aa3b4ddf0da01061c411eb8f1e6276bb5086a308478b49",
+      "bytes": 1856,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs/Cargo.toml.orig",
+      "sha256": "1a46f8a1a8fab4b85cfeab512f1b23c83c4843e85f6c81fcc86bb9e00c136b34",
+      "bytes": 1504,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs/LICENSE",
+      "sha256": "f0510d3b9d1223c45e8fdd2b49270ec8734fff491c7f7d1b948ee70162e1ceff",
+      "bytes": 1210,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs/README.md",
+      "sha256": "f7923a1f30f5598350f880a94ba7077ab1f9ba0b4ac69611c830bb3c91857084",
+      "bytes": 4017,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs/build.rs",
+      "sha256": "5a6e58ddfbc08fa07f46c71b6ac04b4b2e4b4331b3c6900f655242de720870c6",
+      "bytes": 540,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs/examples/audio_transcription.rs",
+      "sha256": "10a4d346282781130b4b269f29901e5a220a8c9395c6d96fd36d97686af9e456",
+      "bytes": 5320,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs/examples/basic_use.rs",
+      "sha256": "811256a3c60577b4bfbed7bb019f572176fb6c78f75bac7c87850c54570dec1e",
+      "bytes": 2812,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs/src/common_logging.rs",
+      "sha256": "d78b89a322c7598613867ec1fd501527dc40c191128966d05f36a4d7e3477b09",
+      "bytes": 2715,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs/src/error.rs",
+      "sha256": "bf710f1668cf5407b1a8efc8ac1ff69089f0e4f0b1e503b0f44099357632a924",
+      "bytes": 5171,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs/src/ggml_logging_hook.rs",
+      "sha256": "9c161aa05e3b577844ff7d49245cfff15254da64fb4c0f13a9386be349107cc5",
+      "bytes": 2469,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs/src/lib.rs",
+      "sha256": "2cad85f262aca9bcb61b7a9a916be5792632b53d751262835de843d24321d3fd",
+      "bytes": 3047,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs/src/standalone.rs",
+      "sha256": "83483035895e3520392bf6df57336fa41a3c9691f4e5cd9054b43239909f6c22",
+      "bytes": 3529,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs/src/utilities.rs",
+      "sha256": "1b3a7686994d2eccd3cae1ff1312c710bbf0b3598b59b186815bfbab98562fd4",
+      "bytes": 3174,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs/src/vulkan.rs",
+      "sha256": "5ece17257a429c046fd322dbfc6bf675828cba72cb45701c9c79137b8fdd19c1",
+      "bytes": 2210,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs/src/whisper_ctx.rs",
+      "sha256": "c0f34d941dcb447f14b0bb79cc911c156a2c4fba12e1c066e3d530ecb7f0ac43",
+      "bytes": 21629,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs/src/whisper_ctx_wrapper.rs",
+      "sha256": "f0b471235f6f3a2013e43b4f9092203e1f0e5be1f356eafb8cdd1df69b5e220c",
+      "bytes": 11658,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs/src/whisper_grammar.rs",
+      "sha256": "d81edc2bb9863c0e9cd30e079cb190a09d0f2eaca851f53da9bce399d3fa637f",
+      "bytes": 3270,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs/src/whisper_logging_hook.rs",
+      "sha256": "906f45e5896c24cbd0ed049de2509f6ea57869fd11be29daf6af2a6305a17b6a",
+      "bytes": 2503,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs/src/whisper_params.rs",
+      "sha256": "e5a103bf845f5a4c951d2a5f5787431ae078f881f365e157cb8b5a30717fa1e4",
+      "bytes": 31278,
+      "executable": false
+    },
+    {
+      "path": "whisper-rs/src/whisper_state.rs",
+      "sha256": "b46b129186296b61d82ee5a3e50e819d0ae8e70349221e89f8497fefc02055f5",
+      "bytes": 25122,
+      "executable": false
+    }
+  ]
+}

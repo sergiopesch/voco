@@ -2,7 +2,62 @@
 
 VOCO's v1 packaging plan is intentionally staged.
 
-## Current
+## Complete NVIDIA candidate
+
+The package and application version are both `2026.0.35`. This testing candidate
+is not published. Tauri builds a **base** Debian bundle;
+it must be assembled with the pinned NVIDIA runtime/model before installation:
+
+```bash
+python3 scripts/package-nvidia.py /path/to/tauri-base.deb /path/to/voco_2026.0.35_amd64.deb --debian-version 2026.0.35
+```
+
+The assembler validates the base version and runtime payload, verifies the pinned
+model digest, includes native libraries and notices, and produces a payload manifest
+and package receipt. Inspect its actual successful output and run package/runtime
+checks before delivery; the command alone is not a pass. Keep base and complete
+artifacts distinct. Record the complete package SHA-256 and installed version.
+
+The model/runtime files under `runtime/speech` are separate from the MIT application:
+retain `runtime/notices` and model provenance, including the NVIDIA model terms.
+The complete package needs Python, NumPy, psutil and the declared native dependencies.
+A source snapshot with absent model/native artifacts cannot build this complete
+package merely by running npm install. Verify artifacts rather than silently fetching
+an unpinned replacement. Never package personal benchmark recordings or test logs.
+
+See [candidate gates](release-candidate.md) for owner acceptance and release sequencing.
+The GitHub release workflow now explicitly assembles the NVIDIA payload, and the
+package verifier requires the complete runtime. Portable, pinned provisioning of
+the model/native artifacts remains unresolved before public release: host-native
+binaries and this laptop's successful package check do not establish a reproducible
+portable build. Do not upload a base bundle as this candidate.
+
+## Runtime provisioning
+
+GitHub source intentionally excludes model weights and compiled native runtime
+artifacts. The local candidate workspace contains the tested payload, but `git clone`
+and `npm ci` alone do not provide it. Before running NVIDIA protocol tests or
+assembling the complete Debian package, provision these paths separately:
+
+- `runtime/speech/models/nemotron-speech-streaming-en-0.6b.q8_0.gguf`
+- `runtime/speech/libbench_nemo_pool.so`
+- `runtime/speech/lib/`, including its relative native-library links
+
+Use the verified candidate payload and its SHA-256 inventory. Preserve relative
+links, required notices, and `runtime/speech/MODEL-IDENTITY.json`; the assembler
+checks the model against that identity and rejects escaping or broken payload links.
+Retain the complete package manifest and build receipt so the native-library hashes
+remain traceable. The NVIDIA model is pinned to revision
+`ebe59e5a817142986528bbbee5dba8db7b38ed50`; the converted GGUF digest is
+`d9a01898d2a611c8764e23a1c2f45e70bbd5a425dc4de93692ac951dd603812d`.
+Downloading a similarly named upstream model is not equivalent to this converted
+artifact or to the modified native runtime.
+
+An independently reproducible, portable native build and immutable artifact
+provisioning remain release gates. Do not silently fetch mutable replacements or
+commit binaries, model weights, private recordings or benchmark transcripts to Git.
+
+## Published-channel structure
 
 - GitHub Releases
 - `.deb`
@@ -51,16 +106,21 @@ Debian-derived distributions are best-effort. The `.deb` format and dependency m
 Debian-family package managers, but that compatibility is not a substitute for a recorded desktop
 runtime test.
 
-Automatic live cursor revisions use a persistent, package-owned IBus component at
-`/usr/share/ibus/component/voco.xml`, launched through `/usr/libexec/voco-ibus-engine`. The `.deb`
-depends on `ibus`, `python3`, `gir1.2-ibus-1.0`, and `python3-gi`. Installation only makes
-the source available: the user must add and select `VOCO Dictation`, and no maintainer script may
-modify GNOME settings or restart IBus. The app talks to the engine through an owner-only socket at
-`$XDG_RUNTIME_DIR/voco/ibus-engine.sock`; disconnects fail closed to preview-only behavior.
+The optional consuming-shortcut IBus component remains package-owned at
+`/usr/share/ibus/component/voco.xml` and `/usr/libexec/voco-ibus-engine`. Protocol 5
+rejects text mutation. The package does not select an input source or restart IBus.
 
-A locally built experimental AppImage cannot install the host component and therefore does not
-claim live cursor support by itself. Stable cursor mode does not fall back to compatibility keyboard
-injection when the input source or target preedit context is unavailable.
+The Chromium integration packages `/usr/libexec/voco-browser-host`, native host
+manifests in `/etc/opt/chrome/native-messaging-hosts` and
+`/etc/chromium/native-messaging-hosts`, and `/usr/share/voco/chromium`.
+Its fixed extension origin is the only allowed origin. The build script obtains
+the host executable from Cargo's machine-readable output before bundling, including
+custom target directories. Package verification checks the executable, manifests,
+extension public-key identity, permissions and origin rejection.
+
+The extension is activated by the user; package installation does not modify a
+browser profile. The host connects only to the same user's private Unix socket.
+Experimental AppImage/Flatpak/Snap packaging has not validated this host boundary.
 
 ## Listing Assets
 
@@ -131,3 +191,53 @@ VOCO_APPIMAGETOOL_PATH=/path/to/pinned/appimagetool \
 VOCO_APPIMAGETOOL_SHA256=<verified-sha256> \
 bash ./scripts/package-appimage.sh
 ```
+
+## GNOME desktop clipboard dependency
+
+The 2026.0.28 Debian candidate depends on `xclip`. On GNOME Wayland with `DISPLAY`,
+native desktop paste uses its XWayland clipboard bridge, then `ydotool` for the
+Wayland keyboard gesture. This avoids the locally reproduced `wl-copy` temporary
+focus-surface timeout. Other Wayland desktops retain `wl-copy`. No fallback is
+attempted after a clipboard mutation or uncertain dispatch. See
+[desktop paste verification](testing/desktop-paste.md).
+
+
+The .29 package also depends on `gir1.2-atspi-2.0`. The bounded Python focus probe
+is embedded in the Rust executable and uses the packaged Python/GI runtime. It
+returns only an opaque focus token and a paste-gesture class; it does not read
+application text or change accessibility settings. Inaccessible targets fall back
+to the existing ordinary paste gesture, without a universal acceptance claim.
+
+## NVIDIA local testing candidate (2026.0.35)
+
+The local candidate bundles Nemotron Speech Streaming English 0.6B Q8_0, its
+modified CPU runtime, Python worker and model notices under `/usr/lib/voco/speech`
+and `/usr/share/doc/voco/nvidia`. Ubuntu supplies `python3`, `python3-numpy`,
+`python3-psutil` and `libsentencepiece0`. No Homebrew, virtual environment, network
+access or checkout path is needed at runtime. This is a host-native CPU build for
+the tested laptop, not a portability-qualified public release.
+
+Run the normal Tauri Debian build, then `python3 scripts/package-nvidia.py BASE_DEB
+OUTPUT_DEB` to assemble the complete package with zstd compression. The script
+verifies the fixed model hash, adds a runtime SHA-256 manifest and regenerates the
+Debian file inventory. Install the resulting complete package with apt so declared
+dependencies are resolved. A base Tauri package alone is incomplete for NVIDIA.
+
+Desktop paste and streaming are enabled by default for this authorized candidate;
+`VOCO_DESKTOP_PASTE=0` or `VOCO_DESKTOP_STREAM=0` can disable the corresponding
+path. Existing target checks, enhancement behavior and Whisper recovery remain.
+The English NVIDIA model is used for normal enhancement-off desktop streaming.
+
+`VOCO_PERFORMANCE_LOG=1` enables private, rotating local metrics. Worker records
+include model/runtime identity, monotonic and wall clocks, hashed stream identity,
+recording/request numbers, queue age, recognition time, CPU/RSS, first hypothesis,
+startup/protocol failures and dropped-event counts. Audio, transcript contents,
+app names and window titles are excluded. The app records matching IPC boundaries,
+slow calls and bounded failure reasons. A bounded background writer isolates disk
+stalls/failures from recognition; loss of coverage produces a content-free warning.
+
+Run `python3 /usr/share/doc/voco/report-speech-performance.py
+~/.local/state/voco` for recognizer/IPC diagnostics, and the adjacent
+`report-performance.py` against `~/.local/state/voco/performance` for capture,
+paste and stop stages. Neither report proves that text appeared in a target field;
+that needs independent field readback. Missing recordings remain unavailable.

@@ -1,5 +1,29 @@
 # Install
 
+The current source is an unpublished `2026.0.35` local candidate. Published-channel
+commands below do not install it. Read [candidate gates](release-candidate.md) first.
+
+## Local candidate
+
+Verify the complete local package against its supplied SHA-256 receipt, inspect
+`dpkg-deb -f /path/to/candidate.deb Version`, then install the verified file with
+`sudo apt install /path/to/candidate.deb`. Use an absolute real artifact path; no
+release tag exists merely because a candidate version is documented. Quit VOCO
+normally first; in-memory recovery is lost on exit, so copy needed text beforehand.
+An upgrade preserves user configuration and avoids a destructive purge. Reopen VOCO
+and verify executable/package identity and worker readiness before testing.
+
+The complete package bundles the NVIDIA Nemotron English Q8 model and its CPU
+runtime under `/usr/lib/voco/speech`; no NVIDIA GPU or cloud account is required.
+A base Tauri `.deb` alone omits that payload. The assembler and verification steps
+are in [Linux packaging](linux-packaging.md#complete-nvidia-candidate).
+
+Desktop paste and streaming default on (launcher overrides `VOCO_DESKTOP_PASTE=0`
+and `VOCO_DESKTOP_STREAM=0` disable their respective paths). Inspect old per-user
+launchers when diagnosing mismatched runtime or logging behavior. Installation does
+not qualify each destination, change application keybindings, or authorize release.
+
+
 VOCO ships through GitHub Releases first. Ubuntu is the primary reference and release-test
 environment; Debian-derived distributions are best-effort. The published binary artifact is the
 `.deb`. AppImage publication is paused until every packaging helper is supplied from an immutable,
@@ -42,7 +66,7 @@ On Wayland, the installer keeps the first-run choice conservative: `Alt+D` stays
 1. Download the package and checksums:
 
 ```bash
-VERSION="2026.0.21"
+VERSION="<published-version>"
 TAG="voco.${VERSION}"
 wget -O "voco_${VERSION}_amd64.deb" \
   "https://github.com/sergiopesch/voco/releases/download/${TAG}/voco_${VERSION}_amd64.deb"
@@ -61,29 +85,45 @@ grep " voco_${VERSION}_amd64.deb$" voco_checksums.txt | sha256sum --check -
 sudo apt install "./voco_${VERSION}_amd64.deb"
 ```
 
-## Enable live words at the cursor
+## Recording and optional direct browser delivery
 
-The `.deb` package installs the persistent `VOCO Dictation` IBus component, but deliberately does
-not enable or select it for you.
+The foundations build transcribes locally and remains in the tray during recording
+and processing, without an automatic transcript preview. Without native paste enabled,
+use the explicitly opened transcript/recovery controls for Copy. Installing this build
+does not change your selected input source, browser profile, or desktop services.
 
-1. Sign out and back in if the input source is not visible immediately after installation.
-2. Open the desktop Keyboard or Region & Language settings.
-3. Under Input Sources, add `VOCO Dictation` (normally listed under English).
-4. Select `VOCO Dictation`, focus the target text field, and then press `Alt+D`.
+For the current default native streaming route, recognized words replace the clipboard
+and are pasted progressively into the currently focused field. Stop flushes the tail.
+Set `VOCO_DESKTOP_STREAM=0` for the separate final-only path.
+Keep that field focused until completion. It sends no Enter key and makes no uncertain
+retry. See [desktop paste](testing/desktop-paste.md) for compatibility and policy details.
+GNOME Wayland uses the XWayland clipboard bridge (`xclip`, packaged dependency) and
+`ydotool` with its running daemon. Other Wayland desktops use `wl-copy`; X11 needs
+`xclip` and `xdotool`. Helper availability does not prove editor acceptance.
 
-VOCO passes ordinary keyboard input through while idle. It never edits GNOME settings, changes the
-global IBus engine, or restarts desktop services. Settings -> Advanced -> Automatic live cursor
-shows whether the private engine connection is ready. If it is not ready, stable cursor mode stays
-visibly preview-only for that session. VOCO retains an unreconciled final in its popover for copying
-instead of redirecting it through global keyboard insertion.
+The package includes the optional `VOCO Dictation` IBus component. Selecting it in
+Input Sources can consume the native recording shortcut before the application sees
+it. IBus protocol 5 deliberately rejects all text mutation: its context cannot prove
+which application widget would receive an edit. Without the separately enabled desktop-paste route, native shortcuts produce
+manual-copy transcripts. Restart IBus or sign out after an engine upgrade to load
+its new protocol; the installer does not do that for you.
 
-After installing an upgrade that changes the private engine protocol, quit VOCO and run
-`ibus restart`, or sign out and back in, before reopening VOCO. Switching input sources alone does
-not reload the resident IBus engine.
+For direct delivery in Chromium, follow the [extension setup](../integrations/chromium/README.md).
+The `.deb` provides `/usr/libexec/voco-browser-host`, the fixed native messaging
+registrations for Chrome/Chromium, and `/usr/share/voco/chromium`. Load that
+extension directory through the browser's developer-mode **Load unpacked** control.
+This is a development integration; no browser-store listing has been published.
+Click its toolbar button to enable the current tab, then focus a supported plain
+text field and press `Alt+Shift+V` to start/stop. The ordinary `Alt+D` shortcut uses the configured native route; it is separate
+from browser exact-field delivery and can conflict with application shortcuts. Browser packaging that cannot access the host binary (for
+example a confined browser) is not verified by this integration.
 
-The AppImage does not install a host IBus component. Use the `.deb` for live cursor words; an
-AppImage or uninstalled source build remains preview-only unless the matching `.deb` component is
-already installed.
+Only top-frame textareas and text/search/url/tel inputs with a collapsed caret are
+supported. Passwords, rich editors, iframes and private-marked fields are rejected.
+Focus loss, field replacement, editing, expired tokens and uncertain receipts stop
+automatic delivery. Copy recovery retains the transcript and warns if the original
+field may already contain part. Native browser undo history is not guaranteed by
+this exact-element edit API. See the contract before enabling it on a page.
 
 ## Run from source
 
@@ -101,21 +141,26 @@ npm install
 ./scripts/setup.sh --install
 ```
 
-3. Start the app:
+3. For NVIDIA streaming, separately provision the pinned model and native runtime
+   described in [runtime provisioning](linux-packaging.md#runtime-provisioning).
+   GitHub source excludes these large/compiled artifacts; the tested local candidate
+   already includes them. Missing assets are not a working NVIDIA installation.
+
+4. Start the app:
 
 ```bash
 npm run dev
 ```
 
-4. Test it:
+5. Test it:
 
 - allow microphone access
 - finish setup
-- install the generated `.deb` and manually select `VOCO Dictation` for live cursor words
+- build the `.deb` with `bash scripts/build-desktop.sh`
 - press `Alt+D`
 - speak
 - press `Alt+D` again
-- confirm text is inserted at the cursor
+- verify progressive delivery, final tail and recovery in a disposable test field
 - keep single dictation recordings under 10 minutes
 
 ## Wayland Hotkey and Permission Notes
@@ -294,3 +339,11 @@ rm -rf -- \
 ```
 
 The same `~/.openclaw` ownership warning above applies to source installs.
+
+
+For the progressive .29 candidate, add `VOCO_DESKTOP_STREAM=1` to the launcher.
+Enhancement-off native sessions append recognized phrases during recording and
+flush the remaining tail at Stop. The package includes `gir1.2-atspi-2.0` for
+content-free focus metadata and automatic terminal paste selection. No target-app
+settings need changing. Review [the progressive delivery contract](testing/desktop-paste.md)
+and its continuous-speech/focus limits before evaluating broader compatibility.

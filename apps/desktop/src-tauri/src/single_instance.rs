@@ -12,12 +12,27 @@ mod linux {
     const INSTANCE_LOCK_FILENAME: &str = "instance.lock";
     const FALLBACK_RUNTIME_ROOT: &str = "/tmp";
 
-    /// Owns VOCO's process lock. The file must stay open for the full process
-    /// lifetime because `flock(2)` releases the lock when this open file
-    /// description is closed.
+    /// Owns VOCO's process lock for the guard lifetime. Explicit unlock also
+    /// releases transient descriptors inherited by a concurrently forked helper
+    /// before its exec closes CLOEXEC files.
     #[derive(Debug)]
     pub struct SingleInstanceGuard {
         _lock_file: File,
+    }
+
+    impl Drop for SingleInstanceGuard {
+        fn drop(&mut self) {
+            loop {
+                // SAFETY: the guard still owns this live descriptor. LOCK_UN
+                // releases only the lock on its own open file description.
+                if unsafe { libc::flock(self._lock_file.as_raw_fd(), libc::LOCK_UN) } == 0 {
+                    break;
+                }
+                if io::Error::last_os_error().kind() != io::ErrorKind::Interrupted {
+                    break;
+                }
+            }
+        }
     }
 
     #[derive(Debug)]
@@ -305,8 +320,12 @@ mod linux {
                 .to_string()
                 .contains("another VOCO instance is already running"));
 
+            // A helper fork can retain this same open-file description until
+            // exec. Closing the parent's descriptor alone would retain flock.
+            let inherited_descriptor = first._lock_file.try_clone().unwrap();
             drop(first);
             acquire_at(lock_path, effective_uid).unwrap();
+            drop(inherited_descriptor);
         }
 
         #[test]

@@ -1,0 +1,13 @@
+{
+  "archives": {
+    "pristine-whisper-rs-0.14.4.crate": "4d2eac0a371f8ae667a5ee15ae4130553ea3004e7572544d1ce546c81ea8874b",
+    "pristine-whisper-rs-sys-0.13.1.crate": "1c86f1b993f216594b1ad9a9bb00a26014fb7c512e12664a2d401c7897d2ef7d"
+  },
+  "sources": {
+    "pristine-whisper-rs-0.14.4.crate": "https://static.crates.io/crates/whisper-rs/whisper-rs-0.14.4.crate",
+    "pristine-whisper-rs-sys-0.13.1.crate": "https://static.crates.io/crates/whisper-rs-sys/whisper-rs-sys-0.13.1.crate"
+  },
+  "wrapperLicense": "Unlicense",
+  "sysMetadataLicense": "Unlicense",
+  "bundledNativeLicense": "MIT; Copyright (c) 2023-2024 The ggml authors"
+}

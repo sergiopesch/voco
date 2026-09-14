@@ -15,6 +15,7 @@ describe("activity mode arbitration", () => {
 
   it("gives an existing dictation priority if states ever overlap", () => {
     expect(deriveActivityMode("recording", "listening")).toBe("dictation");
+    expect(deriveActivityMode("starting", "listening")).toBe("dictation");
     expect(deriveActivityMode("idle", "connecting")).toBe("realtime");
     expect(deriveActivityMode("error", "error")).toBe("idle");
   });
@@ -23,6 +24,7 @@ describe("activity mode arbitration", () => {
     expect(canToggleDictationWithPermission("idle", "denied")).toBe(false);
     expect(canToggleDictationWithPermission("error", "denied")).toBe(false);
     expect(canToggleDictationWithPermission("recording", "denied")).toBe(true);
+    expect(canToggleDictationWithPermission("starting", "denied")).toBe(true);
     expect(canToggleDictationWithPermission("processing", "denied")).toBe(true);
     expect(canToggleDictationWithPermission("idle", "unknown")).toBe(true);
     expect(canToggleDictationWithPermission("idle", "granted")).toBe(true);

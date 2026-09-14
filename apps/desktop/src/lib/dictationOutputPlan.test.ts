@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   cursorDeliveryPlan,
+  requiresVerifiedTextTarget,
   keepsLivePreviewInVoco,
   usesCanonicalCursorStreaming,
 } from "@/lib/dictationOutputPlan";
@@ -24,6 +25,15 @@ const baseline: AppConfig = {
 };
 
 describe("dictation output plan", () => {
+  it("requires a verified original field for every automatic text output", () => {
+    for (const transcriptTarget of ["cursor", "local-agent", "openclaw-agent"] as const) {
+      for (const liveCursorMode of ["final-text-only", "preview-overlay-only", "stable-cursor-streaming"] as const) {
+        expect(requiresVerifiedTextTarget({ ...baseline, transcriptTarget, liveCursorMode } as AppConfig)).toBe(true);
+      }
+    }
+    expect(requiresVerifiedTextTarget({ transcriptTarget: "openclaw-speech" })).toBe(false);
+    expect(requiresVerifiedTextTarget(null)).toBe(false);
+  });
   it("allows canonical cursor delivery only for enhancement-off stable mode", () => {
     expect(usesCanonicalCursorStreaming(baseline)).toBe(true);
     for (const transcriptEnhancement of ["commands-only", "conservative"] as const) {

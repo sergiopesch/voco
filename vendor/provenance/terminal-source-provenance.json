@@ -1,0 +1,30 @@
+{
+  "scope": "Frozen new owned combined-native copy after terminal diagnostic fallbackbuild and onecase/reset validation. No recognition policy changes.",
+  "sha256": {
+    "whisper-rs-sys/whisper.cpp/src/whisper.cpp": "9896e8592ebc68e067f8788ce5300b1dbb138bf0ff7eccc4442fb5d169071fa2",
+    "whisper-rs-sys/whisper.cpp/include/whisper.h": "e569f58913055e03a0c2cec355e863902caaa4b9872dac610bb5564246ae36ed",
+    "whisper-rs-sys/src/bindings.rs": "0fc0603dd718f7be7c5c8da1a322507384c88aa7a1ff5670242768ece7afc7d7",
+    "whisper-rs/src/whisper_state.rs": "62f03be88625dd73c29283441441f61043ff486a49249d29cf69628212503bdf",
+    "terminal-diagnostic.patch": "dc919c8113ca7922143fc6a0a78d40a9ad06245253a020634f1ae3069c6c1061",
+    "parent-source-provenance.json": "5e73e98fbb07c7d1e69a834b2c4d3c37e2ce34079ab2c686980e875079ef5251",
+    "Cargo.toml": "98925d6fcde91fb99524c689a66274e5f922876339994f6f0ffcdd34f1cd06ee",
+    "Cargo.lock": "7f0a89c231f27be3298f7dc8b1ea2314cdb90573f38b0653d33f790c194546c5",
+    "state_reset.rs": "c0414ef3ee5e28a4efe9c327c446eba753575c34c1b3dac7622e145791d768f7",
+    "state-check": "a1d4cdc292a7939fd65d682f039f8057665fdffba375488cb364e466d25925c2",
+    "validation-plan.json": "802276e27d60a99981c3d54f12049486a89426efbad42c7a1e0c2a58c5df650d",
+    "validation-result.json": "0a7609b853b70dfa0d1842dca19c792353caa03a99a32891ee372f2000a483c5",
+    "validation-summary.json": "b9035f3be912d760b5b37bc0f030c640939d6c61f0fc84b1dec3eb477652a6a7",
+    "build-fallback.log": "ac6f12ba5dc315f9960a8d0626afaf38814da24ecfe3dee42950616ccb9ac04a"
+  },
+  "validation": {
+    "passed": true,
+    "terminalFailureFlags": [
+      true,
+      false
+    ],
+    "combinedParentCanonicalTextUnchanged": true,
+    "allDiagnosticsResetOnSubsecondInput": true,
+    "staticBindingsBuildPassed": true,
+    "scope": "One full777175 decode followed by same-state subsecondzero control. Diagnostic only; no retry policy."
+  }
+}

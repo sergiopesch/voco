@@ -13,6 +13,8 @@ for command in node npm python3 rg; do
 done
 
 npm run verify:versions
+python3 vendor/verify.py
+python3 vendor/verify.test.py
 
 bash -n \
   install \
@@ -25,6 +27,13 @@ bash -n \
   scripts/test-install-common.sh \
   scripts/test-private-ibus-engine.sh \
   scripts/test-private-ibus-engine-hosted.sh \
+  scripts/test-native-desktop.sh \
+  scripts/test-native-wayland.sh \
+  scripts/test-native-gnome.sh \
+  scripts/test-native-kde.sh \
+  scripts/test-speech-foundations.sh \
+  scripts/test-browser-full-app.sh \
+  scripts/test-browser-toolbar-app.sh \
   scripts/verify-deb-package.sh \
   scripts/lib/install-common.sh
 
@@ -65,6 +74,11 @@ PY
 
 bash scripts/test-install-common.sh
 
+node --check scripts/comparative-dictation.mjs
+node --check scripts/comparative-dictation.test.mjs
+node --test scripts/comparative-dictation.test.mjs
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-physical-speech-session.py
+
 PYTHONDONTWRITEBYTECODE=1 python3 - <<'PY'
 import ast
 from pathlib import Path
@@ -72,6 +86,30 @@ from pathlib import Path
 for path in (
     Path("scripts/generate-icons.py"),
     Path("scripts/test-private-ibus-engine.py"),
+    Path("scripts/test-native-desktop.py"),
+    Path("scripts/test-native-wayland.py"),
+    Path("scripts/test-native-gnome.py"),
+    Path("scripts/test-native-kde.py"),
+    Path("scripts/test_native_wayland_capture.py"),
+    Path("scripts/test-speech-preview-parity.py"),
+    Path("scripts/test-speech-combined-preview.py"),
+    Path("scripts/test-speech-adversarial.py"),
+    Path("scripts/speech-evaluation.test.py"),
+    Path("scripts/prepare-physical-speech-session.py"),
+    Path("scripts/test-physical-speech-session.py"),
+    Path("scripts/speech_worker.py"),
+    Path("scripts/prepare-speech-repetition-generalization.py"),
+    Path("scripts/test-repeated-speech-phase.py"),
+    Path("scripts/prepare-speech-boundaries.py"),
+    Path("scripts/prepare-speech-qualification.py"),
+    Path("scripts/prepare-speech-qualification-next.py"),
+    Path("scripts/prepare-speech-mixed-levels.py"),
+    Path("scripts/compare-speech-adversarial.py"),
+    Path("scripts/test-native-atspi.py"),
+    Path("scripts/test-native-full-app.py"),
+    Path("scripts/test-native-recovery-controls.py"),
+    Path("scripts/test-browser-clear-recovery.py"),
+    Path("scripts/test-browser-toolbar-action.py"),
 ):
     ast.parse(path.read_text())
 print("Repository Python helper syntax is valid.")
@@ -218,15 +256,35 @@ if not re.search(r"actions/download-artifact@[0-9a-f]{40}", release_workflow):
     raise SystemExit("Verified release payload download action must be commit-pinned")
 
 hosted_ibus_command = "run: bash scripts/test-private-ibus-engine-hosted.sh"
+native_ibus_command = hosted_ibus_command + " --native-desktop"
+full_application_command = hosted_ibus_command + " --full-application"
+browser_application_command = hosted_ibus_command + " --browser-application"
+release_commands = [line.strip() for line in release_workflow.splitlines()]
+for required_export in ("VOCO_NATIVE_APP_BINARY=${CANDIDATE_DIR}/usr/bin/voco", "VOCO_BROWSER_HOST_BINARY=${CANDIDATE_DIR}/usr/libexec/voco-browser-host", "VOCO_BROWSER_EXTENSION_DIR=${CANDIDATE_DIR}/usr/share/voco/chromium"):
+    if required_export not in release_workflow:
+        raise SystemExit(f"Release must export extracted candidate identity: {required_export}")
+if release_commands.count(browser_application_command) != 1:
+    raise SystemExit("Release must verify the packaged browser application path exactly once")
+if "run: bash scripts/build-desktop.sh" not in release_commands:
+    raise SystemExit("Release must build the native browser host before packaging")
+if release_workflow.index(browser_application_command) < release_workflow.index("- name: Verify Debian bundle"):
+    raise SystemExit("Browser full application gate must use the extracted package")
+if release_commands.count(full_application_command) != 1:
+    raise SystemExit("Release must test the built application capture-to-delivery path exactly once")
+if release_workflow.index(full_application_command) < release_workflow.index("- name: Build Debian bundle"):
+    raise SystemExit("Full application verification must use the newly built candidate")
 locked_rust_audit_install = 'cargo install cargo-audit --version "0.22.2" --locked'
 for workflow_path, workflow in (
     (Path(".github/workflows/ci.yml"), Path(".github/workflows/ci.yml").read_text()),
     (Path(".github/workflows/release.yml"), release_workflow),
 ):
-    if workflow.count(hosted_ibus_command) != 1:
+    commands = [line.strip() for line in workflow.splitlines()]
+    if commands.count(hosted_ibus_command) != 1 or commands.count(native_ibus_command) != 1:
         raise SystemExit(
-            f"{workflow_path} must run the isolated hosted IBus wrapper exactly once"
+            f"{workflow_path} must run each isolated headless and native IBus gate exactly once"
         )
+    if commands.count("run: npm run test:chromium-exact-field") != 1:
+        raise SystemExit(f"{workflow_path} must run the Chromium recipient and background lifecycle gates")
     if "run: npm run test:private-ibus" in workflow:
         raise SystemExit(f"{workflow_path} bypasses the hosted IBus namespace wrapper")
     if "rustsec/audit-check@" in workflow:

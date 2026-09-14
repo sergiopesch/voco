@@ -1,5 +1,5 @@
 import { useState } from "react";
-import vocoBrandImage from "../../../../assets/voco-logo.png";
+import vocoBrandImage from "../../../../assets/voco-symbol-ui.png";
 
 interface ConfigRecoveryPanelProps {
   error: string;

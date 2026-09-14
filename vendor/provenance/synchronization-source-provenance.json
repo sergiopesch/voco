@@ -1,0 +1,18 @@
+{
+  "scope": "Bounded Linux CPU barrier waiting and graph-boundary cancellation with final graph completion; model, decoder parameters and admission policy unchanged",
+  "versions": {
+    "whisper-rs": "0.14.4",
+    "whisper-rs-sys": "0.13.1",
+    "whisper.cpp": "1.7.4"
+  },
+  "archivesManifestSha256": "49d4c4e9db2ac077ec99c4a3916818db3c7c73a5715ed75d3c81dcba40bf72b2",
+  "previousInventorySha256": "2960fcd863733d0024aa13727d760f7e93c7739535b82f2ef57d96f92083817a",
+  "inventorySha256": "098d1547ec4b5c6251bad1777360b66db7e07f58940ba5e9680dca2af7c9034c",
+  "changedSources": {
+    "whisper-rs-sys/whisper.cpp/ggml/src/ggml-cpu/ggml-cpu.c": "d8770286926f6bf1364ad0c3005fcc4425611a36b52993a38b7fa891e25307b6"
+  },
+  "incrementalPatchSha256": "26cdebc17e4d9ffeddbcac7f676be327c4c46c5c04ea613dff3fba2aaea67f9d",
+  "aggregatePatchSha256": "6de7310610ae062f30e0e4634204bd8ad1cf5d29c5b8173386dd8f6dacb68286",
+  "aggregateReconstructionFiles": 485,
+  "historicalRepetitionManifestSha256": "622176464f9ada39f983973ff892289ffb0e25226908e38c48769d69607f0189"
+}

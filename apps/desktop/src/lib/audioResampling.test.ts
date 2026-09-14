@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   resampleAudioForTranscription,
   TRANSCRIPTION_RESAMPLE_CHUNK_SECONDS,
@@ -10,6 +10,21 @@ function values(samples: Float32Array): number[] {
 }
 
 describe("audio resampling", () => {
+  it("allocates the exact tail extent before asking WebKit to render", async () => {
+    const stop = new Error("Allocation observed before rendering");
+    const constructor = vi.fn(function (_channels: number, frames: number) {
+      expect(frames).toBe(2007);
+      throw stop;
+    });
+    vi.stubGlobal("OfflineAudioContext", constructor);
+    try {
+      await expect(resampleAudioForTranscription(new Float32Array(6021), 48000, 16000)).rejects.toBe(stop);
+      expect(constructor).toHaveBeenCalledExactlyOnceWith(1, 2007, 16000);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("uses one resampling call for short audio", async () => {
     const calls: number[] = [];
     const resampler: AudioResampler = async (input) => {

@@ -3,19 +3,42 @@ compile_error!(
     "VOCO production builds require the app's custom-protocol feature; use `cargo tauri build --features custom-protocol` instead of `cargo build --release`"
 );
 
+mod audio_transport;
+mod benchmark_stream;
+mod browser_broker;
+mod browser_protocol;
+mod browser_socket;
 mod config;
+mod focus_probe;
+#[cfg(target_os = "linux")]
+mod hotkey_state;
 mod insertion;
+mod local_intelligence;
+#[cfg(all(target_os = "linux", feature = "native-capture-dev"))]
+mod native_capture;
+mod native_capture_commands;
 mod owned_preedit;
+mod performance;
+mod process_runner;
+mod shortcut_arbitration;
+mod shortcut_readiness;
 mod single_instance;
+mod spoken_commands;
 pub mod transcribe;
+pub use transcribe::{hybrid, numerical_planner, vca2};
 mod tray;
 
 use config::{
     load_cached_update_check, save_cached_update_check, AppConfig, AppConfigPatch,
     CachedUpdateCheck, TranscriptEnhancement,
 };
+use local_intelligence::{
+    call_local_llm_chat, conservative_transcript_prompt, local_assistant_prompt,
+    validate_conservative_transcript,
+};
 use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
+use spoken_commands::apply_spoken_formatting_commands;
 use std::io::{Read, Write};
 use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
 use std::sync::{LazyLock, Mutex};
@@ -26,12 +49,17 @@ use transcribe::{WhisperMutex, WhisperState};
 // Debounce: ignore duplicate toggle events that arrive almost immediately.
 // This collapses duplicate keyboard backends and duplicate evdev devices
 // without eating legitimate quick user toggles.
-static LAST_TOGGLE_MS: AtomicI64 = AtomicI64::new(0);
-static LAST_REALTIME_TOGGLE_MS: AtomicI64 = AtomicI64::new(0);
+static LAST_TOGGLE_MS: AtomicI64 = AtomicI64::new(-1);
+static LAST_REALTIME_TOGGLE_MS: AtomicI64 = AtomicI64::new(-1);
 
 // Evdev hotkey mode: 0 = Alt+D, 1 = Alt+Shift+D, 255 = custom (disabled)
 static EVDEV_HOTKEY_MODE: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
 static USE_EVDEV_HOTKEY: AtomicBool = AtomicBool::new(false);
+static SHORTCUT_OBSERVATIONS: LazyLock<shortcut_readiness::Observations> =
+    LazyLock::new(shortcut_readiness::Observations::default);
+static IBUS_SHORTCUT_LEASE: shortcut_arbitration::ConsumingLease =
+    shortcut_arbitration::ConsumingLease::new();
+static SHORTCUT_RENDERER_HEARTBEAT_MS: AtomicI64 = AtomicI64::new(-1);
 #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 static EVDEV_LISTENER_STARTED: AtomicBool = AtomicBool::new(false);
 static HOTKEY_BINDING_VERSION: AtomicU64 = AtomicU64::new(0);
@@ -68,6 +96,7 @@ const MAX_AUDIO_SECONDS: usize = 600;
 const PREVIEW_SAMPLE_RATE: usize = 16_000;
 const MIN_PREVIEW_SAMPLES: usize = PREVIEW_SAMPLE_RATE * 7 / 10;
 const MAX_PREVIEW_SAMPLES: usize = PREVIEW_SAMPLE_RATE * 20;
+const MAX_DESKTOP_PREVIEW_SAMPLES: usize = PREVIEW_SAMPLE_RATE * 30;
 const HIDDEN_WINDOW_POS_X: i32 = -100;
 const HIDDEN_WINDOW_POS_Y: i32 = -100;
 const HIDDEN_WINDOW_SIZE: u32 = 1;
@@ -205,6 +234,8 @@ fn trace_hotkey_event_with_fields(
         }
     }
 
+    performance::lifecycle(&record);
+
     let line = match serde_json::to_string(&record) {
         Ok(line) => line,
         Err(error) => {
@@ -329,7 +360,43 @@ fn trace_frontend_hotkey_event(
 fn is_supported_dictation_trace_event(event: &str) -> bool {
     matches!(
         event,
-        "recording_state_requested"
+        "dictation_trigger_start_rejected"
+            | "dictation_trigger_stop_rejected"
+            | "dictation_trigger_start_admitted"
+            | "dictation_trigger_stop_admitted"
+            | "dictation_trigger_toggle_admitted"
+            | "dictation_desktop_target_probe_completed"
+            | "dictation_desktop_paste_preflight_completed"
+            | "dictation_desktop_clipboard_write_completed"
+            | "dictation_desktop_keyboard_dispatch_completed"
+            | "dictation_desktop_terminal_route_dispatched"
+            | "dictation_desktop_standard_route_dispatched"
+            | "dictation_desktop_stream_started"
+            | "dictation_desktop_phrase_queued"
+            | "dictation_desktop_snapshot_requested"
+            | "dictation_desktop_snapshot_limit_reached"
+            | "dictation_desktop_snapshot_recognized"
+            | "dictation_desktop_snapshot_failed"
+            | "dictation_desktop_preview_transcribed"
+            | "dictation_desktop_snapshot_coalesced"
+            | "dictation_desktop_snapshot_superseded"
+            | "dictation_desktop_snapshot_waiting_agreement"
+            | "dictation_desktop_snapshot_unchanged"
+            | "dictation_desktop_snapshot_revised"
+            | "dictation_desktop_snapshot_empty"
+            | "dictation_desktop_snapshot_preview_wait"
+            | "dictation_desktop_snapshot_final_wait"
+            | "dictation_desktop_live_prefix_dispatched"
+            | "dictation_desktop_phrase_transcribed"
+            | "dictation_desktop_first_phrase_dispatched"
+            | "dictation_desktop_stream_flush_completed"
+            | "dictation_desktop_stream_failed"
+            | "dictation_desktop_paste_session_started"
+            | "dictation_desktop_paste_unavailable"
+            | "dictation_desktop_paste_requested"
+            | "dictation_desktop_paste_dispatched"
+            | "dictation_desktop_paste_failed"
+            | "recording_state_requested"
             | "recording_get_user_media_started"
             | "recording_get_user_media_constraints_fallback"
             | "recording_get_user_media_default_fallback"
@@ -339,7 +406,13 @@ fn is_supported_dictation_trace_event(event: &str) -> bool {
             | "recording_worklet_connected"
             | "recording_script_processor_connected"
             | "recording_state_active"
+            | "dictation_capture_input_gap"
+            | "dictation_capture_health_interrupted"
             | "dictation_live_preview_completed"
+            | "dictation_live_preview_reused"
+            | "dictation_stop_checkpoint_wait_completed"
+            | "dictation_stop_preview_wait_completed"
+            | "dictation_stop_insertion_wait_completed"
             | "dictation_live_preview_skipped_short_audio"
             | "dictation_live_preview_empty"
             | "dictation_live_preview_updated"
@@ -375,6 +448,13 @@ fn is_supported_dictation_trace_event(event: &str) -> bool {
             | "dictation_stop_to_idle"
             | "dictation_recording_duration"
             | "dictation_transcription_completed"
+            | "dictation_recording_stopped"
+            | "dictation_audio_teardown_completed"
+            | "dictation_audio_prepared"
+            | "dictation_transcription_started"
+            | "dictation_recovery_retained"
+            | "dictation_manual_transcript_ready"
+            | "dictation_recording_limit_reached"
             | "dictation_enhancement_completed"
             | "dictation_local_assistant_completed"
             | "dictation_final_output_completed"
@@ -597,9 +677,7 @@ fn reset_config_to_defaults(app: tauri::AppHandle) -> Result<ConfigSnapshot, Str
 #[tauri::command]
 fn open_config_directory() -> Result<(), String> {
     let directory = AppConfig::config_dir_for_recovery().map_err(|error| error.to_string())?;
-    std::process::Command::new("xdg-open")
-        .arg(&directory)
-        .spawn()
+    process_runner::spawn_desktop_launcher(process_runner::command("xdg-open").arg(&directory))
         .map_err(|error| format!("Failed to open {}: {error}", directory.display()))?;
     Ok(())
 }
@@ -650,8 +728,8 @@ fn persist_config_patch(
     }
     if hotkey_changed && notify_hotkey_change {
         send_notification(
-            "Hotkey changed",
-            &format!("VOCO will now respond to {}", snapshot.config.hotkey),
+            "Shortcut preference saved",
+            &format!("Preferred shortcut: {}", snapshot.config.hotkey),
         );
     }
 
@@ -679,23 +757,18 @@ fn save_cached_update_state(cache: CachedUpdateCheck) -> Result<(), String> {
 // --- Transcription ---
 
 fn decode_audio_bytes(bytes: &[u8]) -> Result<Vec<f32>, String> {
-    if !bytes.len().is_multiple_of(4) {
-        return Err("Audio data length is not a multiple of 4 bytes".to_string());
-    }
-
-    Ok(bytes
-        .chunks_exact(4)
-        .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]]))
-        .collect())
+    audio_transport::decode_samples(bytes)
 }
 
 #[tauri::command(async)]
 fn transcribe_audio(
     app: tauri::AppHandle,
-    audio_bytes: Vec<u8>,
+    request: tauri::ipc::Request<'_>,
     state: tauri::State<'_, WhisperMutex>,
 ) -> Result<String, String> {
-    let samples = decode_audio_bytes(&audio_bytes)?;
+    let mut performance = performance::RequestTrace::new("final");
+    let audio = audio_transport::decode_request(request.body(), 16_000 * MAX_AUDIO_SECONDS)?;
+    let samples = audio.samples;
 
     if samples.is_empty() {
         return Err("No audio samples provided".to_string());
@@ -707,6 +780,8 @@ fn transcribe_audio(
         ));
     }
 
+    performance.audio(samples.len(), None);
+    performance.stage("model_available");
     ensure_model_downloaded(&app)?;
 
     let model_path = transcribe::default_model_path()?;
@@ -714,24 +789,33 @@ fn transcribe_audio(
         return Err("Model is not available after download attempt.".to_string());
     }
 
+    performance.stage("decoder_lock_wait");
     let mut whisper = state
         .lock()
         .map_err(|_| "Transcription state is unavailable".to_string())?;
 
+    performance.stage("model_load_or_cached");
     whisper.load_model(&model_path)?;
-    whisper.transcribe(&samples)
+    performance.stage("recognition");
+    let result = whisper.transcribe_hybrid_full(&samples).into_result();
+    performance.outcome(if result.is_ok() { "ok" } else { "error" });
+    result
 }
 
 #[tauri::command(async)]
 fn transcribe_canonical_chunk(
     app: tauri::AppHandle,
-    audio_bytes: Vec<u8>,
-    previous_canonical_text: String,
+    request: tauri::ipc::Request<'_>,
     state: tauri::State<'_, WhisperMutex>,
 ) -> Result<transcribe::CanonicalTranscription, String> {
-    let samples = decode_audio_bytes(&audio_bytes)?;
+    let mut performance = performance::RequestTrace::new("canonical");
+    let audio =
+        audio_transport::decode_request(request.body(), transcribe::CANONICAL_CHUNK_MAX_SAMPLES)?;
+    let samples = audio.samples;
     validate_canonical_sample_count(samples.len())?;
 
+    performance.audio(samples.len(), None);
+    performance.stage("model_available");
     ensure_model_downloaded(&app)?;
 
     let model_path = transcribe::default_model_path()?;
@@ -739,12 +823,51 @@ fn transcribe_canonical_chunk(
         return Err("Model is not available after download attempt.".to_string());
     }
 
+    performance.stage("decoder_lock_wait");
     let mut whisper = state
         .lock()
         .map_err(|_| "Transcription state is unavailable".to_string())?;
 
+    performance.stage("model_load_or_cached");
     whisper.load_model(&model_path)?;
-    whisper.transcribe_canonical_chunk(&samples, &previous_canonical_text)
+    performance.stage("recognition");
+    let result = whisper.transcribe_canonical_chunk(&samples, &audio.previous_canonical_text);
+    performance.outcome(if result.is_ok() { "ok" } else { "error" });
+    result
+}
+
+/// VCA2 restores and plans before any model availability or loading work.
+#[tauri::command(async)]
+fn transcribe_hybrid_chunk(
+    app: tauri::AppHandle,
+    request: tauri::ipc::Request<'_>,
+    state: tauri::State<'_, WhisperMutex>,
+) -> Result<vca2::Response, String> {
+    let mut performance = performance::RequestTrace::new("hybrid");
+    let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
+        return Err("Hybrid audio requires the binary VCA2 transport".into());
+    };
+    let audio = vca2::decode_packet(bytes)?;
+    performance.audio(
+        audio.decode_samples().len(),
+        Some(audio.metadata().session_id),
+    );
+    performance.stage("model_available");
+    ensure_model_downloaded(&app)?;
+    let model_path = transcribe::default_model_path()?;
+    if !model_path.exists() {
+        return Err("Model is not available after download attempt.".into());
+    }
+    performance.stage("decoder_lock_wait");
+    let mut whisper = state
+        .lock()
+        .map_err(|_| "Transcription state is unavailable".to_string())?;
+    performance.stage("model_load_or_cached");
+    whisper.load_model(&model_path)?;
+    performance.stage("recognition");
+    let response = whisper.transcribe_hybrid_request(&audio)?.response;
+    performance.outcome("ok");
+    Ok(response)
 }
 
 fn validate_canonical_sample_count(sample_count: usize) -> Result<(), String> {
@@ -760,15 +883,38 @@ fn validate_canonical_sample_count(sample_count: usize) -> Result<(), String> {
 #[tauri::command(async)]
 fn preview_transcribe_audio(
     app: tauri::AppHandle,
-    audio_bytes: Vec<u8>,
+    request: tauri::ipc::Request<'_>,
     state: tauri::State<'_, WhisperMutex>,
 ) -> Result<Option<transcribe::PreviewTranscription>, String> {
-    let samples = decode_audio_bytes(&audio_bytes)?;
+    preview_audio_with_limit(app, request, state, MAX_PREVIEW_SAMPLES)
+}
 
-    if !validate_preview_sample_count(samples.len())? {
+#[tauri::command(async)]
+fn preview_desktop_audio(
+    app: tauri::AppHandle,
+    request: tauri::ipc::Request<'_>,
+    state: tauri::State<'_, WhisperMutex>,
+) -> Result<Option<transcribe::PreviewTranscription>, String> {
+    preview_audio_with_limit(app, request, state, MAX_DESKTOP_PREVIEW_SAMPLES)
+}
+
+fn preview_audio_with_limit(
+    app: tauri::AppHandle,
+    request: tauri::ipc::Request<'_>,
+    state: tauri::State<'_, WhisperMutex>,
+    max_samples: usize,
+) -> Result<Option<transcribe::PreviewTranscription>, String> {
+    let mut performance = performance::RequestTrace::new("preview");
+    let audio = audio_transport::decode_request(request.body(), max_samples)?;
+    let samples = audio.samples;
+
+    if !validate_preview_sample_count(samples.len(), max_samples)? {
+        performance.outcome("skipped_short");
         return Ok(None);
     }
 
+    performance.audio(samples.len(), None);
+    performance.stage("model_available");
     ensure_model_downloaded(&app)?;
 
     let model_path = transcribe::default_model_path()?;
@@ -776,25 +922,43 @@ fn preview_transcribe_audio(
         return Err("Model is not available after download attempt.".to_string());
     }
 
+    performance.stage("decoder_lock_wait");
     let Ok(mut whisper) = state.try_lock() else {
+        performance.outcome("skipped_busy_or_unavailable");
         return Ok(None);
     };
 
+    performance.stage("model_load_or_cached");
     whisper.load_model(&model_path)?;
-    let preview = whisper.transcribe_preview(&samples)?;
+    performance.stage("recognition");
+    let preview = if max_samples == MAX_DESKTOP_PREVIEW_SAMPLES {
+        whisper.transcribe_desktop_preview(&samples)
+    } else {
+        whisper.transcribe_preview(&samples).map(Some)
+    };
+    performance.preview(whisper.preview_diagnostics());
+    let Some(preview) = preview? else {
+        performance.outcome("skipped_budget");
+        return Ok(None);
+    };
     if preview.text.is_empty() {
+        performance.outcome("empty");
         Ok(None)
     } else {
+        performance.outcome("ok");
         Ok(Some(preview))
     }
 }
 
-fn validate_preview_sample_count(sample_count: usize) -> Result<bool, String> {
+fn validate_preview_sample_count(sample_count: usize, max_samples: usize) -> Result<bool, String> {
     if sample_count < MIN_PREVIEW_SAMPLES {
         return Ok(false);
     }
-    if sample_count > MAX_PREVIEW_SAMPLES {
-        return Err("Preview audio too long (max 20 seconds)".to_string());
+    if sample_count > max_samples {
+        return Err(format!(
+            "Preview audio too long (max {} seconds)",
+            max_samples / PREVIEW_SAMPLE_RATE
+        ));
     }
     Ok(true)
 }
@@ -1094,13 +1258,31 @@ fn sync_runtime_status(
 }
 
 fn send_notification(summary: &str, body: &str) {
-    let _ = std::process::Command::new("notify-send")
-        .arg("--app-name=VOCO")
-        .arg("--icon=audio-input-microphone")
-        .arg("--")
-        .arg(summary)
-        .arg(body)
-        .spawn();
+    let summary = summary.to_string();
+    let body = body.to_string();
+    tauri::async_runtime::spawn_blocking(move || {
+        let child = process_runner::command("notify-send")
+            .args([
+                "--app-name=VOCO",
+                "--icon=audio-input-microphone",
+                "--",
+                &summary,
+                &body,
+            ])
+            .spawn();
+        match child {
+            Ok(child) => {
+                if let Err(error) = process_runner::wait_with_output(
+                    child,
+                    std::time::Duration::from_secs(5),
+                    64 * 1024,
+                ) {
+                    warn!("Desktop notification failed: {error}");
+                }
+            }
+            Err(error) => warn!("Could not start desktop notification: {error}"),
+        }
+    });
 }
 
 #[tauri::command]
@@ -1114,27 +1296,38 @@ fn open_external_url(url: String) -> Result<(), String> {
         return Err("Only VOCO GitHub release URLs are supported".to_string());
     }
 
-    let status = std::process::Command::new("xdg-open")
-        .arg(&url)
-        .status()
+    process_runner::spawn_desktop_launcher(process_runner::command("xdg-open").arg(&url))
         .map_err(|error| format!("Failed to open external URL: {error}"))?;
-
-    if status.success() {
-        Ok(())
-    } else {
-        Err(format!("xdg-open exited with status {status}"))
-    }
+    Ok(())
 }
 
 #[tauri::command(async)]
-fn insert_text(text: String, strategy: String) -> Result<insertion::InsertionResult, String> {
+fn insert_text(
+    text: String,
+    strategy: String,
+) -> Result<insertion::InsertionResult, insertion::InsertionError> {
     if text.is_empty() {
-        return Err("No text to insert".to_string());
+        return Err(insertion::InsertionError::rejected("No text to insert"));
     }
     if text.len() > 100_000 {
-        return Err("Text too long for insertion (max 100KB)".to_string());
+        return Err(insertion::InsertionError::rejected(
+            "Text too long for insertion (max 100KB)",
+        ));
     }
     insertion::insert_text(&text, &strategy)
+}
+
+#[tauri::command(async)]
+fn get_desktop_paste_status() -> insertion::DesktopPasteStatus {
+    insertion::desktop_paste_status()
+}
+
+#[tauri::command(async)]
+fn paste_desktop_text(
+    text: String,
+    expected_target_token: Option<String>,
+) -> Result<insertion::InsertionResult, insertion::InsertionError> {
+    insertion::desktop_paste_for_target(&text, expected_target_token.as_deref())
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -1223,36 +1416,11 @@ fn clip_command_output(output: &str, max_chars: usize) -> String {
 }
 
 fn wait_for_openclaw_agent(
-    mut child: std::process::Child,
+    child: std::process::Child,
     timeout: std::time::Duration,
 ) -> Result<std::process::Output, String> {
-    let start = Instant::now();
-
-    loop {
-        match child.try_wait() {
-            Ok(Some(_status)) => {
-                return child
-                    .wait_with_output()
-                    .map_err(|error| format!("Failed to read OpenClaw output: {error}"));
-            }
-            Ok(None) => {
-                if start.elapsed() >= timeout {
-                    let _ = child.kill();
-                    let _ = child.wait();
-                    return Err(format!(
-                        "OpenClaw did not respond within {} seconds",
-                        timeout.as_secs()
-                    ));
-                }
-                std::thread::sleep(std::time::Duration::from_millis(100));
-            }
-            Err(error) => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return Err(format!("Failed while waiting for OpenClaw: {error}"));
-            }
-        }
-    }
+    process_runner::wait_with_output(child, timeout, MAX_MODEL_RESPONSE_BYTES)
+        .map_err(|error| format!("Optional process failed: {error}"))
 }
 
 #[tauri::command(async)]
@@ -1276,7 +1444,7 @@ fn ask_openclaw_agent(
     validate_openclaw_agent(agent)?;
 
     let message = build_openclaw_message(transcript, &prompt_prefix);
-    let child = std::process::Command::new("openclaw")
+    let child = process_runner::command("openclaw")
         .arg("agent")
         .arg("--agent")
         .arg(agent)
@@ -1349,7 +1517,7 @@ fn parse_openclaw_tts_output(output: &str) -> Result<OpenClawSpeechResult, Strin
 
 fn openclaw_tts_convert(text: &str) -> Result<OpenClawSpeechResult, String> {
     let params = serde_json::json!({ "text": text }).to_string();
-    let child = std::process::Command::new("openclaw")
+    let child = process_runner::command("openclaw")
         .arg("gateway")
         .arg("call")
         .arg("tts.convert")
@@ -1389,7 +1557,7 @@ fn openclaw_tts_convert(text: &str) -> Result<OpenClawSpeechResult, String> {
 }
 
 fn play_audio_file(audio_path: &str) -> Result<(), String> {
-    let child = std::process::Command::new("ffplay")
+    let child = process_runner::command("ffplay")
         .arg("-nodisp")
         .arg("-autoexit")
         .arg("-loglevel")
@@ -1439,195 +1607,6 @@ fn speak_openclaw_response(text: String) -> Result<OpenClawSpeechResult, String>
     Ok(result)
 }
 
-fn validate_local_llm_endpoint(raw: &str) -> Result<String, String> {
-    let value = raw.trim().trim_end_matches('/').to_string();
-    if value.is_empty() {
-        return Err("Local model endpoint is required".to_string());
-    }
-    if value.len() > 2048
-        || value
-            .chars()
-            .any(|ch| ch.is_control() || ch == '\\' || ch.is_whitespace())
-    {
-        return Err("Local model endpoint is invalid".to_string());
-    }
-    let parsed =
-        reqwest::Url::parse(&value).map_err(|_| "Local model endpoint is invalid".to_string())?;
-    if parsed.scheme() != "http" || !url_has_loopback_host(&parsed) || parsed.port().is_none() {
-        return Err(
-            "Local model endpoint must use http://localhost, http://127.0.0.1, or http://[::1]"
-                .to_string(),
-        );
-    }
-    if !parsed.username().is_empty() || parsed.password().is_some() || parsed.fragment().is_some() {
-        return Err("Local model endpoint must not include credentials or fragments".to_string());
-    }
-    Ok(value)
-}
-
-fn url_has_loopback_host(url: &reqwest::Url) -> bool {
-    let Some(host) = url.host_str() else {
-        return false;
-    };
-    let host = host
-        .strip_prefix('[')
-        .and_then(|host| host.strip_suffix(']'))
-        .unwrap_or(host);
-
-    host.eq_ignore_ascii_case("localhost")
-        || host
-            .parse::<std::net::IpAddr>()
-            .map(|address| address.is_loopback())
-            .unwrap_or(false)
-}
-
-fn build_loopback_http_client(
-    timeout: std::time::Duration,
-    connect_timeout: std::time::Duration,
-) -> Result<reqwest::blocking::Client, reqwest::Error> {
-    reqwest::blocking::Client::builder()
-        .timeout(timeout)
-        .connect_timeout(connect_timeout)
-        .redirect(reqwest::redirect::Policy::none())
-        .build()
-}
-
-fn normalize_local_llm_model(raw: Option<&str>) -> Result<Option<String>, String> {
-    let Some(value) = raw.map(str::trim).filter(|value| !value.is_empty()) else {
-        return Ok(None);
-    };
-    if value.len() > 120
-        || value
-            .chars()
-            .any(|ch| ch.is_control() || ch == '\r' || ch == '\n')
-    {
-        return Err("Local model name is invalid".to_string());
-    }
-    Ok(Some(value.to_string()))
-}
-
-fn conservative_transcript_prompt() -> &'static str {
-    "You improve dictation transcripts for direct insertion. Return only the final text. Preserve the speaker's words, meaning, order, names, numbers, and technical terms. Add punctuation, casing, paragraph breaks, and simple list formatting when obvious. Do not answer questions, add facts, summarize, expand abbreviations, or rewrite for style. If uncertain, keep the original wording."
-}
-
-fn local_assistant_prompt() -> &'static str {
-    "You are VOCO's concise local assistant. Answer the user's dictated request directly in plain text. Keep the answer useful and compact. Do not mention system prompts, models, or implementation details."
-}
-
-fn replace_case_insensitive_owned(input: String, needle: &str, replacement: &str) -> String {
-    let mut output = String::with_capacity(input.len());
-    let mut remaining = input.as_str();
-    let needle_lower = needle.to_ascii_lowercase();
-
-    loop {
-        let remaining_lower = remaining.to_ascii_lowercase();
-        let Some(index) = remaining_lower.find(&needle_lower) else {
-            output.push_str(remaining);
-            break;
-        };
-        output.push_str(&remaining[..index]);
-        output.push_str(replacement);
-        remaining = &remaining[index + needle.len()..];
-    }
-
-    output
-}
-
-fn collapse_horizontal_whitespace(text: &str) -> String {
-    let mut output = String::with_capacity(text.len());
-    let mut pending_space = false;
-    let mut newline_run = 0usize;
-    for ch in text.chars() {
-        if ch == '\n' {
-            pending_space = false;
-            while output.ends_with(' ') {
-                output.pop();
-            }
-            if newline_run < 2 {
-                output.push('\n');
-            }
-            newline_run += 1;
-        } else if ch.is_whitespace() {
-            pending_space = true;
-        } else {
-            if pending_space && !output.is_empty() && !output.ends_with('\n') {
-                output.push(' ');
-            }
-            pending_space = false;
-            newline_run = 0;
-            output.push(ch);
-        }
-    }
-    output.trim().to_string()
-}
-
-fn apply_spoken_formatting_commands(transcript: &str) -> String {
-    let mut text = transcript.trim().to_string();
-    let text_lower = text.to_ascii_lowercase();
-    if let Some(index) = text_lower.rfind("scratch that") {
-        text = text[index + "scratch that".len()..].trim().to_string();
-    }
-
-    for (command, replacement) in [
-        ("new paragraph", "\n\n"),
-        ("new line", "\n"),
-        ("bullet point", "\n- "),
-        ("new bullet", "\n- "),
-        ("end code block", "\n```\n"),
-        ("code block", "\n```\n"),
-    ] {
-        text = replace_case_insensitive_owned(text, command, replacement);
-    }
-
-    collapse_horizontal_whitespace(&text)
-}
-
-fn build_local_llm_body(
-    system_prompt: &str,
-    user_message: &str,
-    model: Option<&str>,
-) -> serde_json::Value {
-    let mut body = serde_json::json!({
-        "messages": [
-            {
-                "role": "system",
-                "content": system_prompt
-            },
-            {
-                "role": "user",
-                "content": user_message
-            }
-        ],
-        "temperature": 0,
-        "max_tokens": 2048,
-        "stream": false
-    });
-
-    if let Some(model) = model {
-        body["model"] = serde_json::Value::String(model.to_string());
-    }
-
-    body
-}
-
-fn parse_local_llm_chat_response(body: &str) -> Result<String, String> {
-    let parsed: serde_json::Value = serde_json::from_str(body)
-        .map_err(|error| format!("Failed to parse local model response: {error}"))?;
-    let content = parsed
-        .pointer("/choices/0/message/content")
-        .and_then(|content| content.as_str())
-        .or_else(|| {
-            parsed
-                .pointer("/choices/0/text")
-                .and_then(|text| text.as_str())
-        })
-        .map(str::trim)
-        .filter(|content| !content.is_empty())
-        .ok_or_else(|| "Local model returned no text".to_string())?;
-
-    Ok(content.to_string())
-}
-
 fn read_bounded_response_body(
     mut reader: impl Read,
     max_bytes: usize,
@@ -1643,36 +1622,6 @@ fn read_bounded_response_body(
         return Err(format!("{context} exceeded the {max_bytes}-byte limit"));
     }
     String::from_utf8(body).map_err(|error| format!("{context} was not valid UTF-8: {error}"))
-}
-
-fn call_local_llm_chat(
-    endpoint: &str,
-    system_prompt: &str,
-    user_message: &str,
-    model: Option<&str>,
-    timeout: std::time::Duration,
-) -> Result<String, String> {
-    let endpoint = validate_local_llm_endpoint(endpoint)?;
-    let model = normalize_local_llm_model(model)?;
-    let client = build_loopback_http_client(timeout, std::time::Duration::from_millis(900))
-        .map_err(|error| format!("Failed to build local model client: {error}"))?;
-    let response = client
-        .post(endpoint)
-        .header("Content-Type", "application/json")
-        .body(build_local_llm_body(system_prompt, user_message, model.as_deref()).to_string())
-        .send()
-        .map_err(|error| format!("Local model request failed: {error}"))?;
-    let status = response.status();
-    let response_body =
-        read_bounded_response_body(response, MAX_MODEL_RESPONSE_BYTES, "local model response")?;
-    if !status.is_success() {
-        return Err(format!(
-            "Local model request failed ({status}): {}",
-            clip_command_output(&response_body, 600)
-        ));
-    }
-
-    parse_local_llm_chat_response(&response_body)
 }
 
 #[tauri::command(async)]
@@ -1710,20 +1659,29 @@ fn enhance_transcript(
             text: formatted,
             warning: None,
         },
+        TranscriptEnhancement::Conservative if formatted.is_empty() => {
+            TranscriptEnhancementResult {
+                text: formatted,
+                used_enhancement: true,
+                warning: None,
+            }
+        }
         TranscriptEnhancement::Conservative => match call_local_llm_chat(
             &endpoint,
             conservative_transcript_prompt(),
             &formatted,
             model.as_deref(),
             std::time::Duration::from_secs(12),
-        ) {
+        )
+        .and_then(|text| validate_conservative_transcript(&formatted, text))
+        {
             Ok(text) => TranscriptEnhancementResult {
                 text,
                 used_enhancement: true,
                 warning: None,
             },
             Err(error) => TranscriptEnhancementResult {
-                text: formatted,
+                text: transcript.to_string(),
                 used_enhancement: false,
                 warning: Some(error),
             },
@@ -2188,79 +2146,210 @@ struct RuntimeDiagnostics {
     #[serde(flatten)]
     insertion: insertion::RuntimeDiagnostics,
     owned_preedit: owned_preedit::OwnedPreeditStatus,
+    shortcut: shortcut_readiness::Status,
+    desktop_paste: insertion::DesktopPasteStatus,
+}
+
+struct BrowserIntegration(Option<browser_broker::BrowserBroker>);
+
+impl From<browser_broker::BrowserStatus> for owned_preedit::OwnedPreeditStatus {
+    fn from(status: browser_broker::BrowserStatus) -> Self {
+        Self {
+            available: status.available,
+            ready: status.ready,
+            setup_state: status.setup_state,
+            detail: status.detail,
+            session_id: status.session_id,
+            engine_active: status.engine_active,
+            focus_lost: status.focus_lost,
+            progressive_commit_active: status.progressive_commit_active,
+            committed_character_count: status.committed_character_count,
+            ownership_intact: status.ownership_intact,
+            finalization_outcome: status.finalization_outcome,
+            error: status.error,
+        }
+    }
+}
+
+impl BrowserIntegration {
+    fn session(&self, id: u64) -> Option<&browser_broker::BrowserBroker> {
+        self.0
+            .as_ref()
+            .filter(|broker| broker.get_status().session_id == Some(id))
+    }
 }
 
 #[tauri::command(async)]
 fn get_runtime_diagnostics(
     state: tauri::State<'_, owned_preedit::OwnedPreeditService>,
 ) -> RuntimeDiagnostics {
+    let owned_preedit = state.status();
     RuntimeDiagnostics {
         insertion: insertion::runtime_diagnostics(),
-        owned_preedit: state.status(),
+        shortcut: shortcut_runtime_status(owned_preedit.available),
+        owned_preedit,
+        desktop_paste: insertion::desktop_paste_status(),
     }
+}
+
+fn shortcut_runtime_status(bridge_available: bool) -> shortcut_readiness::Status {
+    let unknown = || shortcut_readiness::Status {
+        hotkey: String::new(),
+        route: None,
+        state: "unknown",
+        detail: "Shortcut configuration is unavailable. Start dictation from the tray.",
+    };
+    // Match the writer's lock order and keep config/runtime observations within
+    // one committed generation. This read never registers or arms a shortcut.
+    let Ok(_guard) = CONFIG_WRITE_LOCK.lock() else {
+        return unknown();
+    };
+    let Ok(config) = AppConfig::load() else {
+        return unknown();
+    };
+    if validate_loaded_config(&config).is_err() {
+        return unknown();
+    }
+    let Ok(plugin) = REGISTERED_PLUGIN_SHORTCUT.lock() else {
+        return unknown();
+    };
+    let now = shortcut_monotonic_ms();
+    SHORTCUT_OBSERVATIONS.status(shortcut_readiness::Snapshot {
+        hotkey: &config.hotkey,
+        revision: CONFIG_REVISION.load(Ordering::SeqCst),
+        now,
+        renderer_current: FRONTEND_HOTKEY_HANDLER_READY.load(Ordering::SeqCst)
+            && shortcut_heartbeat_is_current(
+                SHORTCUT_RENDERER_HEARTBEAT_MS.load(Ordering::SeqCst),
+                now,
+            ),
+        consuming_lease: IBUS_SHORTCUT_LEASE.is_current(now),
+        plugin_hotkey: plugin.as_deref(),
+        use_evdev: USE_EVDEV_HOTKEY.load(Ordering::SeqCst),
+        evdev_mode: EVDEV_HOTKEY_MODE.load(Ordering::SeqCst),
+        configured_evdev_mode: hotkey_to_evdev_mode(&config.hotkey),
+        bridge_available,
+    })
 }
 
 #[tauri::command(async)]
 fn get_owned_preedit_status(
     state: tauri::State<'_, owned_preedit::OwnedPreeditService>,
+    browser: tauri::State<'_, BrowserIntegration>,
 ) -> owned_preedit::OwnedPreeditStatus {
+    if let Some(broker) = &browser.0 {
+        let status = broker.get_status();
+        if status.session_id.is_some() {
+            return status.into();
+        }
+    }
     state.status()
 }
 
 #[tauri::command(async)]
 fn start_owned_preedit(
     state: tauri::State<'_, owned_preedit::OwnedPreeditService>,
+    browser: tauri::State<'_, BrowserIntegration>,
     session_id: u64,
+    trigger_id: Option<String>,
 ) -> Result<owned_preedit::OwnedPreeditStatus, String> {
-    state.start(session_id)
+    if let Some(trigger) = trigger_id
+        .as_deref()
+        .filter(|id| id.starts_with("browser:"))
+    {
+        return browser
+            .0
+            .as_ref()
+            .ok_or("The local browser integration is unavailable.")?
+            .start(session_id, trigger)
+            .map(Into::into);
+    }
+    state.start(session_id, trigger_id.as_deref())
 }
 
 #[tauri::command(async)]
 fn update_owned_preedit(
     state: tauri::State<'_, owned_preedit::OwnedPreeditService>,
+    browser: tauri::State<'_, BrowserIntegration>,
     session_id: u64,
     confirmed_text: String,
     preedit_text: String,
     provisional_text: String,
 ) -> Result<owned_preedit::OwnedPreeditStatus, String> {
+    // Browser hypotheses stay in VOCO. Only canonical checkpoints or a final
+    // transcript can request an addressed application mutation.
+    if let Some(broker) = browser.session(session_id) {
+        return broker.session_status(session_id).map(Into::into);
+    }
     state.update(session_id, confirmed_text, preedit_text, provisional_text)
 }
 
 #[tauri::command(async)]
 fn commit_owned_preedit(
     state: tauri::State<'_, owned_preedit::OwnedPreeditService>,
+    browser: tauri::State<'_, BrowserIntegration>,
     session_id: u64,
     text: String,
 ) -> Result<owned_preedit::OwnedPreeditStatus, String> {
+    if let Some(broker) = browser.session(session_id) {
+        return broker.commit(session_id, &text).map(Into::into);
+    }
     state.commit(session_id, text)
 }
 
 #[tauri::command(async)]
 fn checkpoint_owned_preedit(
     state: tauri::State<'_, owned_preedit::OwnedPreeditService>,
+    browser: tauri::State<'_, BrowserIntegration>,
     session_id: u64,
     expected_committed_text: String,
     append_text: String,
 ) -> Result<owned_preedit::OwnedPreeditStatus, String> {
+    if let Some(broker) = browser.session(session_id) {
+        return broker
+            .append(session_id, &expected_committed_text, &append_text, false)
+            .map(Into::into);
+    }
     state.checkpoint(session_id, expected_committed_text, append_text)
 }
 
 #[tauri::command(async)]
 fn finish_canonical_owned_preedit(
     state: tauri::State<'_, owned_preedit::OwnedPreeditService>,
+    browser: tauri::State<'_, BrowserIntegration>,
     session_id: u64,
     expected_committed_text: String,
     append_text: String,
 ) -> Result<owned_preedit::OwnedPreeditStatus, String> {
+    if let Some(broker) = browser.session(session_id) {
+        return broker
+            .append(session_id, &expected_committed_text, &append_text, true)
+            .map(Into::into);
+    }
     state.finish_canonical(session_id, expected_committed_text, append_text)
 }
 
 #[tauri::command(async)]
 fn cancel_owned_preedit(
     state: tauri::State<'_, owned_preedit::OwnedPreeditService>,
+    browser: tauri::State<'_, BrowserIntegration>,
     session_id: u64,
 ) -> Result<owned_preedit::OwnedPreeditStatus, String> {
+    if let Some(broker) = browser.session(session_id) {
+        return broker.cancel(session_id).map(Into::into);
+    }
     state.cancel(session_id)
+}
+
+#[tauri::command(async)]
+fn release_browser_recording(
+    browser: tauri::State<'_, BrowserIntegration>,
+    trigger_id: String,
+) -> Result<(), String> {
+    if let Some(broker) = &browser.0 {
+        broker.release(&trigger_id)?;
+    }
+    Ok(())
 }
 
 fn main_window(app: &tauri::AppHandle) -> Result<tauri::WebviewWindow<tauri::Wry>, String> {
@@ -2927,6 +3016,185 @@ fn ensure_model_downloaded_inner(app_handle: &tauri::AppHandle) -> Result<(), St
     Ok(())
 }
 
+fn shortcut_monotonic_ms() -> i64 {
+    i64::try_from(TRACE_START.elapsed().as_millis()).unwrap_or(i64::MAX)
+}
+
+fn shortcut_heartbeat_is_current(last: i64, now: i64) -> bool {
+    last >= 0 && now >= last && now.saturating_sub(last) < 3000
+}
+
+#[tauri::command]
+fn refresh_shortcut_heartbeat(ready: bool) {
+    SHORTCUT_RENDERER_HEARTBEAT_MS.store(
+        if ready { shortcut_monotonic_ms() } else { -1 },
+        Ordering::SeqCst,
+    );
+    if !ready {
+        SHORTCUT_OBSERVATIONS.clear_poll();
+    }
+}
+
+fn refresh_shortcut_config(
+    cached: &mut Option<ConfigSnapshot>,
+    published_revision: u64,
+    read_committed: impl FnOnce() -> Result<ConfigSnapshot, String>,
+) -> Result<(), String> {
+    if cached
+        .as_ref()
+        .is_none_or(|snapshot| snapshot.revision != published_revision)
+    {
+        // The reader holds CONFIG_WRITE_LOCK: config and revision must come
+        // from the same completed write, never a plugin registration in flight.
+        *cached = Some(read_committed()?);
+    }
+    Ok(())
+}
+
+fn should_register_shortcut_fallback(use_evdev: bool, consuming_context: bool) -> bool {
+    should_register_global_shortcut(use_evdev) && !consuming_context
+}
+
+fn schedule_shortcut_arbitration(app: &tauri::AppHandle, snapshot: &ConfigSnapshot) {
+    let handle = app.clone();
+    let revision = snapshot.revision;
+    let hotkey = snapshot.config.hotkey.clone();
+    let _ = app.run_on_main_thread(move || {
+        // Plugin registration itself marshals synchronously to this thread.
+        // Never wait here for a writer that could be awaiting a plugin callback.
+        let Ok(_guard) = CONFIG_WRITE_LOCK.try_lock() else {
+            return;
+        };
+        if CONFIG_REVISION.load(Ordering::SeqCst) != revision {
+            return;
+        }
+        let enable_plugin = should_register_shortcut_fallback(
+            USE_EVDEV_HOTKEY.load(Ordering::SeqCst),
+            IBUS_SHORTCUT_LEASE.is_current(shortcut_monotonic_ms()),
+        );
+        let result = sync_global_shortcut_binding(&handle, &hotkey, enable_plugin)
+            .and_then(|()| sync_realtime_global_shortcut_binding(&handle, enable_plugin));
+        match result {
+            Ok(()) => {}
+            Err(error) => {
+                warn!("Could not arbitrate consuming shortcut and global fallback: {error}");
+            }
+        }
+    });
+}
+
+fn start_ibus_shortcut_listener(app_handle: tauri::AppHandle) {
+    std::thread::spawn(move || {
+        let mut shortcut_config = None;
+        loop {
+            std::thread::sleep(std::time::Duration::from_millis(50));
+            // Capture the observation epoch before checking renderer readiness,
+            // so a reset during this iteration cannot publish an old reply.
+            let observation_ticket = SHORTCUT_OBSERVATIONS.ticket();
+            if !FRONTEND_HOTKEY_HANDLER_READY.load(Ordering::SeqCst)
+                || !shortcut_heartbeat_is_current(
+                    SHORTCUT_RENDERER_HEARTBEAT_MS.load(Ordering::SeqCst),
+                    shortcut_monotonic_ms(),
+                )
+            {
+                if let Some(snapshot) = shortcut_config.as_ref() {
+                    schedule_shortcut_arbitration(&app_handle, snapshot);
+                }
+                continue;
+            }
+            if refresh_shortcut_config(
+                &mut shortcut_config,
+                CONFIG_REVISION.load(Ordering::SeqCst),
+                get_config,
+            )
+            .is_err()
+            {
+                if let Some(snapshot) = shortcut_config.as_ref() {
+                    schedule_shortcut_arbitration(&app_handle, snapshot);
+                }
+                continue;
+            }
+            let Some(snapshot) = shortcut_config.as_ref() else {
+                continue;
+            };
+            let state = app_handle.state::<owned_preedit::OwnedPreeditService>();
+            let observation_started = shortcut_monotonic_ms();
+            SHORTCUT_OBSERVATIONS.begin_poll(observation_ticket);
+            IBUS_SHORTCUT_LEASE.begin_poll();
+            match state.poll_trigger(&snapshot.config.hotkey) {
+                Ok(poll) => {
+                    SHORTCUT_OBSERVATIONS.poll(
+                        observation_ticket,
+                        snapshot.revision,
+                        &snapshot.config.hotkey,
+                        observation_started,
+                        if poll.armed {
+                            shortcut_readiness::Poll::Armed
+                        } else {
+                            shortcut_readiness::Poll::Disarmed
+                        },
+                    );
+                    IBUS_SHORTCUT_LEASE.finish_poll(
+                        shortcut_monotonic_ms(),
+                        if poll.armed {
+                            shortcut_arbitration::PollOutcome::Armed
+                        } else {
+                            shortcut_arbitration::PollOutcome::Disarmed
+                        },
+                    );
+                    schedule_shortcut_arbitration(&app_handle, snapshot);
+                    if CONFIG_REVISION.load(Ordering::SeqCst) != snapshot.revision {
+                        continue;
+                    }
+                    let Some(trigger) = poll.trigger else {
+                        continue;
+                    };
+                    let (event, last_toggle) = match trigger.mode.as_str() {
+                        "dictation" => (TOGGLE_DICTATION_EVENT, &LAST_TOGGLE_MS),
+                        "realtime" => (TOGGLE_REALTIME_EVENT, &LAST_REALTIME_TOGGLE_MS),
+                        _ => continue,
+                    };
+                    if !shortcut_arbitration::admit_toggle(
+                        last_toggle,
+                        shortcut_monotonic_ms(),
+                        TOGGLE_DEBOUNCE_MS,
+                    ) {
+                        continue;
+                    }
+                    if let Err(error) = app_handle.emit_to("main", event, &trigger) {
+                        error!("Failed to deliver owned IBus shortcut: {error}");
+                    } else {
+                        trace_hotkey_event("owned_shortcut_event_emitted", Some("ibus"));
+                    }
+                }
+                Err(error) => {
+                    SHORTCUT_OBSERVATIONS.poll(
+                        observation_ticket,
+                        snapshot.revision,
+                        &snapshot.config.hotkey,
+                        observation_started,
+                        if error.may_have_armed {
+                            shortcut_readiness::Poll::Uncertain
+                        } else {
+                            shortcut_readiness::Poll::Unavailable
+                        },
+                    );
+                    IBUS_SHORTCUT_LEASE.finish_poll(
+                        shortcut_monotonic_ms(),
+                        if error.may_have_armed {
+                            shortcut_arbitration::PollOutcome::Uncertain
+                        } else {
+                            shortcut_arbitration::PollOutcome::Unavailable
+                        },
+                    );
+                    schedule_shortcut_arbitration(&app_handle, snapshot);
+                    std::thread::sleep(std::time::Duration::from_millis(450));
+                }
+            }
+        }
+    });
+}
+
 // --- Toggle dictation via window event ---
 
 pub fn eval_toggle(app_handle: &tauri::AppHandle) {
@@ -2940,13 +3208,16 @@ pub fn eval_realtime_toggle(app_handle: &tauri::AppHandle) {
 fn eval_realtime_toggle_with_backend(app_handle: &tauri::AppHandle, backend_used: &str) {
     trace_hotkey_event("eval_realtime_toggle_entered", Some(backend_used));
 
-    let now = now_ms();
-    let last = LAST_REALTIME_TOGGLE_MS.swap(now, Ordering::SeqCst);
-    if (now - last).abs() < TOGGLE_DEBOUNCE_MS {
-        debug!(
-            "eval_realtime_toggle debounced ({}ms since last)",
-            now - last
-        );
+    if matches!(backend_used, "evdev" | "global_shortcut")
+        && IBUS_SHORTCUT_LEASE.is_current(shortcut_monotonic_ms())
+    {
+        return;
+    }
+    if !shortcut_arbitration::admit_toggle(
+        &LAST_REALTIME_TOGGLE_MS,
+        shortcut_monotonic_ms(),
+        TOGGLE_DEBOUNCE_MS,
+    ) {
         trace_hotkey_event("eval_realtime_toggle_debounced", Some(backend_used));
         return;
     }
@@ -3033,11 +3304,16 @@ fn replay_pending_realtime_toggle(app_handle: &tauri::AppHandle) {
 fn eval_toggle_with_backend(app_handle: &tauri::AppHandle, backend_used: &str) {
     trace_hotkey_event("eval_toggle_entered", Some(backend_used));
 
-    // Debounce with SeqCst to guarantee cross-thread visibility.
-    let now = now_ms();
-    let last = LAST_TOGGLE_MS.swap(now, Ordering::SeqCst);
-    if (now - last).abs() < TOGGLE_DEBOUNCE_MS {
-        debug!("eval_toggle debounced ({}ms since last)", now - last);
+    if matches!(backend_used, "evdev" | "global_shortcut")
+        && IBUS_SHORTCUT_LEASE.is_current(shortcut_monotonic_ms())
+    {
+        return;
+    }
+    if !shortcut_arbitration::admit_toggle(
+        &LAST_TOGGLE_MS,
+        shortcut_monotonic_ms(),
+        TOGGLE_DEBOUNCE_MS,
+    ) {
         trace_hotkey_event("eval_toggle_debounced", Some(backend_used));
         return;
     }
@@ -3262,12 +3538,12 @@ fn apply_hotkey_runtime_state(
         ensure_evdev_hotkey_listener(app);
     }
 
-    sync_global_shortcut_binding(
-        app,
-        new_hotkey,
-        should_register_global_shortcut(use_evdev_hotkey),
-    )?;
-    sync_realtime_global_shortcut_binding(app, should_register_global_shortcut(use_evdev_hotkey))?;
+    let enable_plugin = should_register_shortcut_fallback(
+        use_evdev_hotkey,
+        IBUS_SHORTCUT_LEASE.is_current(shortcut_monotonic_ms()),
+    );
+    sync_global_shortcut_binding(app, new_hotkey, enable_plugin)?;
+    sync_realtime_global_shortcut_binding(app, enable_plugin)?;
 
     USE_EVDEV_HOTKEY.store(use_evdev_hotkey, Ordering::SeqCst);
     EVDEV_HOTKEY_MODE.store(hotkey_to_evdev_mode(new_hotkey), Ordering::SeqCst);
@@ -3285,8 +3561,8 @@ fn apply_hotkey_runtime_state(
 
     if notify {
         send_notification(
-            "Hotkey changed",
-            &format!("VOCO will now respond to {new_hotkey}"),
+            "Shortcut preference saved",
+            &format!("Preferred shortcut: {new_hotkey}"),
         );
     }
 
@@ -3378,6 +3654,7 @@ fn install_socket_cleanup_signal_handler() {
                 continue;
             }
 
+            native_capture_commands::shutdown();
             cleanup_socket_files();
             std::process::exit(128 + received_signal);
         });
@@ -3457,22 +3734,22 @@ fn is_ignored_evdev_device_name(name: &str) -> bool {
 
 #[cfg(target_os = "linux")]
 fn supports_evdev_hotkey(device: &evdev::Device) -> bool {
-    if device
-        .name()
-        .map(is_ignored_evdev_device_name)
-        .unwrap_or(false)
-    {
+    supports_evdev_hotkey_parts(device.name(), device.supported_keys())
+}
+
+#[cfg(target_os = "linux")]
+fn supports_evdev_hotkey_parts(
+    name: Option<&str>,
+    keys: Option<&evdev::AttributeSetRef<evdev::Key>>,
+) -> bool {
+    if name.map(is_ignored_evdev_device_name).unwrap_or(false) {
         return false;
     }
-
-    let Some(keys) = device.supported_keys() else {
+    let Some(keys) = keys else {
         return false;
     };
-
     let has_alt = keys.contains(evdev::Key::KEY_LEFTALT) || keys.contains(evdev::Key::KEY_RIGHTALT);
-    let has_d = keys.contains(evdev::Key::KEY_D);
-    let has_r = keys.contains(evdev::Key::KEY_R);
-    has_alt && (has_d || has_r)
+    has_alt && (keys.contains(evdev::Key::KEY_D) || keys.contains(evdev::Key::KEY_R))
 }
 
 #[cfg(target_os = "linux")]
@@ -3495,8 +3772,7 @@ fn mark_evdev_path_watched(path: &std::path::Path) -> bool {
 #[cfg(target_os = "linux")]
 fn spawn_supported_evdev_device_workers(
     app_handle: &tauri::AppHandle,
-    alt_held: &std::sync::Arc<std::sync::atomic::AtomicBool>,
-    shift_held: &std::sync::Arc<std::sync::atomic::AtomicBool>,
+    key_state: &std::sync::Arc<Mutex<hotkey_state::HotkeyState>>,
 ) -> usize {
     let mut discovered = 0;
 
@@ -3504,12 +3780,7 @@ fn spawn_supported_evdev_device_workers(
         if mark_evdev_path_watched(&path) {
             discovered += 1;
             info!("Discovered evdev keyboard: {}", path.display());
-            spawn_evdev_device_worker(
-                app_handle.clone(),
-                path,
-                alt_held.clone(),
-                shift_held.clone(),
-            );
+            spawn_evdev_device_worker(app_handle.clone(), path, key_state.clone());
         }
     }
 
@@ -3520,17 +3791,39 @@ fn spawn_supported_evdev_device_workers(
 fn spawn_evdev_device_worker(
     app_handle: tauri::AppHandle,
     path: std::path::PathBuf,
-    alt_held: std::sync::Arc<std::sync::atomic::AtomicBool>,
-    shift_held: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    key_state: std::sync::Arc<Mutex<hotkey_state::HotkeyState>>,
 ) {
-    use evdev::{Device, InputEventKind, Key};
+    use evdev::raw_stream::RawDevice;
 
     std::thread::spawn(move || {
         let mut reopen_logged = false;
 
         loop {
-            let mut dev = match Device::open(&path) {
+            let mut dev = match RawDevice::open(&path) {
                 Ok(device) => {
+                    // event paths are reused after unplug. Recheck capabilities
+                    // and the virtual-device exclusion on every open.
+                    if !supports_evdev_hotkey_parts(device.name(), device.supported_keys()) {
+                        if let Ok(mut state) = key_state.lock() {
+                            state.detach(&path);
+                        }
+                        std::thread::sleep(std::time::Duration::from_secs(2));
+                        continue;
+                    }
+                    let held_keys = match device.get_key_state() {
+                        Ok(keys) => keys,
+                        Err(error) => {
+                            warn!("Cannot synchronize keyboard {}: {error}", path.display());
+                            std::thread::sleep(std::time::Duration::from_secs(2));
+                            continue;
+                        }
+                    };
+                    if let Ok(mut state) = key_state.lock() {
+                        state.attach(&path, held_keys.iter());
+                    } else {
+                        error!("Failed to lock evdev keyboard state");
+                        return;
+                    }
                     if reopen_logged {
                         info!("Reconnected evdev keyboard at {}", path.display());
                         reopen_logged = false;
@@ -3556,61 +3849,88 @@ fn spawn_evdev_device_worker(
                 path.display()
             );
             trace_hotkey_event("evdev_device_worker_started", Some("evdev"));
+            let keys = dev.supported_keys();
+            let mut readiness = SHORTCUT_OBSERVATIONS.device(
+                keys.is_some_and(|keys| keys.contains(evdev::Key::KEY_D)),
+                keys.is_some_and(|keys| {
+                    keys.contains(evdev::Key::KEY_LEFTSHIFT)
+                        || keys.contains(evdev::Key::KEY_RIGHTSHIFT)
+                }),
+            );
 
             loop {
-                match dev.fetch_events() {
+                // RawDevice exposes SYN_DROPPED. The synchronized wrapper can
+                // fabricate key presses when repairing state, which must never
+                // be treated as fresh user activation.
+                let events = match dev.fetch_events() {
+                    Ok(events) => Ok(events.collect::<Vec<_>>()),
+                    Err(error) => Err(error),
+                };
+                match events {
                     Ok(events) => {
-                        for ev in events {
-                            if let InputEventKind::Key(key) = ev.kind() {
-                                let pressed = ev.value() == 1;
-                                let repeat = ev.value() == 2;
-
-                                match key {
-                                    Key::KEY_LEFTALT | Key::KEY_RIGHTALT => {
-                                        alt_held.store(pressed, Ordering::SeqCst);
+                        if events.iter().any(|event| {
+                            event.kind()
+                                == evdev::InputEventKind::Synchronization(
+                                    evdev::Synchronization::SYN_DROPPED,
+                                )
+                        }) {
+                            readiness.unsynchronized();
+                        }
+                        let (actions, synchronize_after_batch) = match key_state.lock() {
+                            Ok(mut state) => state.batch(
+                                &path,
+                                &events,
+                                EVDEV_HOTKEY_MODE.load(Ordering::SeqCst),
+                            ),
+                            Err(_) => {
+                                error!("Failed to lock evdev keyboard state");
+                                return;
+                            }
+                        };
+                        for action in actions {
+                            match action {
+                                hotkey_state::HotkeyAction::Dictation => {
+                                    trace_hotkey_event(
+                                        "hotkey_event_received_evdev",
+                                        Some("evdev"),
+                                    );
+                                    if !IBUS_SHORTCUT_LEASE.is_current(shortcut_monotonic_ms()) {
+                                        eval_toggle_with_backend(&app_handle, "evdev");
                                     }
-                                    Key::KEY_LEFTSHIFT | Key::KEY_RIGHTSHIFT => {
-                                        shift_held.store(pressed, Ordering::SeqCst);
+                                }
+                                hotkey_state::HotkeyAction::Realtime => {
+                                    trace_hotkey_event(
+                                        "realtime_hotkey_event_received_evdev",
+                                        Some("evdev"),
+                                    );
+                                    if !IBUS_SHORTCUT_LEASE.is_current(shortcut_monotonic_ms()) {
+                                        eval_realtime_toggle_with_backend(&app_handle, "evdev");
                                     }
-                                    Key::KEY_D if pressed && !repeat => {
-                                        let mode = EVDEV_HOTKEY_MODE.load(Ordering::SeqCst);
-                                        let alt_down = alt_held.load(Ordering::SeqCst);
-                                        let shift_down = shift_held.load(Ordering::SeqCst);
-
-                                        let matched = match mode {
-                                            0 => alt_down && !shift_down,
-                                            1 => alt_down && shift_down,
-                                            _ => false,
-                                        };
-
-                                        if matched {
-                                            debug!("Hotkey detected via evdev (mode {})", mode);
-                                            trace_hotkey_event(
-                                                "hotkey_event_received_evdev",
-                                                Some("evdev"),
-                                            );
-                                            eval_toggle_with_backend(&app_handle, "evdev");
-                                        }
+                                }
+                            }
+                        }
+                        if synchronize_after_batch {
+                            match dev.get_key_state() {
+                                Ok(keys) => {
+                                    if let Ok(mut state) = key_state.lock() {
+                                        state.attach(&path, keys.iter());
+                                        readiness.synchronized();
                                     }
-                                    Key::KEY_R if pressed && !repeat => {
-                                        let alt_down = alt_held.load(Ordering::SeqCst);
-                                        let shift_down = shift_held.load(Ordering::SeqCst);
-
-                                        if alt_down && shift_down {
-                                            debug!("Realtime hotkey detected via evdev");
-                                            trace_hotkey_event(
-                                                "realtime_hotkey_event_received_evdev",
-                                                Some("evdev"),
-                                            );
-                                            eval_realtime_toggle_with_backend(&app_handle, "evdev");
-                                        }
-                                    }
-                                    _ => {}
+                                }
+                                Err(error) => {
+                                    warn!(
+                                        "Failed to resynchronize keyboard {}: {error}",
+                                        path.display()
+                                    );
+                                    break;
                                 }
                             }
                         }
                     }
                     Err(e) => {
+                        if let Ok(mut state) = key_state.lock() {
+                            state.detach(&path);
+                        }
                         warn!(
                             "Keyboard read error on {}: {e}. Reopening device",
                             path.display()
@@ -3620,6 +3940,7 @@ fn spawn_evdev_device_worker(
                 }
             }
 
+            drop(readiness);
             std::thread::sleep(std::time::Duration::from_millis(500));
         }
     });
@@ -3628,14 +3949,13 @@ fn spawn_evdev_device_worker(
 #[cfg(target_os = "linux")]
 fn spawn_evdev_polling_supervisor(
     app_handle: tauri::AppHandle,
-    alt_held: std::sync::Arc<std::sync::atomic::AtomicBool>,
-    shift_held: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    key_state: std::sync::Arc<Mutex<hotkey_state::HotkeyState>>,
 ) {
     std::thread::spawn(move || loop {
-        let discovered = spawn_supported_evdev_device_workers(&app_handle, &alt_held, &shift_held);
+        let discovered = spawn_supported_evdev_device_workers(&app_handle, &key_state);
         if discovered > 0 {
             info!(
-                "evdev polling fallback attached {} newly discovered keyboard(s)",
+                "evdev polling fallback discovered {} new keyboard path(s)",
                 discovered
             );
         }
@@ -3647,8 +3967,7 @@ fn spawn_evdev_polling_supervisor(
 #[cfg(target_os = "linux")]
 fn spawn_evdev_device_watcher(
     app_handle: tauri::AppHandle,
-    alt_held: std::sync::Arc<std::sync::atomic::AtomicBool>,
-    shift_held: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    key_state: std::sync::Arc<Mutex<hotkey_state::HotkeyState>>,
 ) {
     use inotify::{EventMask, Inotify, WatchMask};
 
@@ -3659,7 +3978,7 @@ fn spawn_evdev_device_watcher(
                 warn!(
                     "Failed to initialize inotify for /dev/input watching: {e}. Falling back to polling."
                 );
-                spawn_evdev_polling_supervisor(app_handle, alt_held, shift_held);
+                spawn_evdev_polling_supervisor(app_handle, key_state);
                 return;
             }
         };
@@ -3673,7 +3992,7 @@ fn spawn_evdev_device_watcher(
                 | WatchMask::MOVE_SELF,
         ) {
             warn!("Failed to watch /dev/input for hotkey devices: {e}. Falling back to polling.");
-            spawn_evdev_polling_supervisor(app_handle, alt_held, shift_held);
+            spawn_evdev_polling_supervisor(app_handle, key_state);
             return;
         }
 
@@ -3685,7 +4004,7 @@ fn spawn_evdev_device_watcher(
                 Ok(events) => events.collect::<Vec<_>>(),
                 Err(e) => {
                     warn!("evdev device watcher failed: {e}. Falling back to polling discovery.");
-                    spawn_evdev_polling_supervisor(app_handle, alt_held, shift_held);
+                    spawn_evdev_polling_supervisor(app_handle, key_state);
                     return;
                 }
             };
@@ -3702,11 +4021,10 @@ fn spawn_evdev_device_watcher(
             });
 
             if should_rescan {
-                let discovered =
-                    spawn_supported_evdev_device_workers(&app_handle, &alt_held, &shift_held);
+                let discovered = spawn_supported_evdev_device_workers(&app_handle, &key_state);
                 if discovered > 0 {
                     info!(
-                        "evdev watcher attached {} newly discovered keyboard(s)",
+                        "evdev watcher discovered {} new keyboard path(s)",
                         discovered
                     );
                 }
@@ -3717,24 +4035,24 @@ fn spawn_evdev_device_watcher(
 
 #[cfg(target_os = "linux")]
 fn start_hotkey_listener(app_handle: tauri::AppHandle) -> bool {
-    let alt_held = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-    let shift_held = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let key_state = std::sync::Arc::new(Mutex::new(hotkey_state::HotkeyState::default()));
 
-    let initial_discovered =
-        spawn_supported_evdev_device_workers(&app_handle, &alt_held, &shift_held);
+    let initial_discovered = spawn_supported_evdev_device_workers(&app_handle, &key_state);
     if initial_discovered == 0 {
         warn!(
             "No keyboard found for evdev at startup. Add user to 'input' group if needed; VOCO will keep watching for devices."
         );
     } else {
         info!(
-            "evdev hotkey listener started on {} keyboard(s)",
+            "evdev startup discovery found {} keyboard path(s)",
             initial_discovered
         );
     }
+    // This retained event marks discovery supervision, not an open keyboard.
+    info!("evdev device discovery supervisor started");
     trace_hotkey_event("evdev_listener_started", Some("evdev"));
 
-    spawn_evdev_device_watcher(app_handle, alt_held, shift_held);
+    spawn_evdev_device_watcher(app_handle, key_state);
 
     true
 }
@@ -3762,6 +4080,8 @@ pub fn run() -> Result<(), String> {
 
     #[cfg(target_os = "linux")]
     install_socket_cleanup_signal_handler();
+    performance::initialize();
+    native_capture_commands::initialize();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
@@ -3770,6 +4090,9 @@ pub fn run() -> Result<(), String> {
         .manage(owned_preedit::OwnedPreeditService::default())
         .on_page_load(|webview, payload| {
             if matches!(payload.event(), tauri::webview::PageLoadEvent::Started) {
+                if webview.label() == "main" {
+                    native_capture_commands::reset_renderer();
+                }
                 // A renderer reload discards its session ids. Close the
                 // private channel first so the engine clears only its owned
                 // preedit before the replacement renderer can start.
@@ -3779,6 +4102,16 @@ pub fn run() -> Result<(), String> {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            benchmark_stream::benchmark_stream,
+            native_capture_commands::native_capture_capabilities,
+            native_capture_commands::native_capture_list_sources,
+            native_capture_commands::native_capture_select_source,
+            native_capture_commands::native_capture_begin,
+            native_capture_commands::native_capture_drain,
+            native_capture_commands::native_capture_stop,
+            native_capture_commands::native_capture_cancel,
+            native_capture_commands::debug_native_capture_enabled,
+            native_capture_commands::save_debug_native_retained_source,
             get_config,
             reload_config_from_disk,
             reset_config_to_defaults,
@@ -3787,10 +4120,14 @@ pub fn run() -> Result<(), String> {
             save_cached_update_state,
             transcribe_audio,
             transcribe_canonical_chunk,
+            transcribe_hybrid_chunk,
             preview_transcribe_audio,
+            preview_desktop_audio,
             debug_dictation_capture_enabled,
             save_debug_dictation_capture,
             insert_text,
+            get_desktop_paste_status,
+            paste_desktop_text,
             ask_openclaw_agent,
             speak_openclaw_response,
             enhance_transcript,
@@ -3801,11 +4138,13 @@ pub fn run() -> Result<(), String> {
             get_runtime_diagnostics,
             get_owned_preedit_status,
             start_owned_preedit,
+            refresh_shortcut_heartbeat,
             update_owned_preedit,
             commit_owned_preedit,
             checkpoint_owned_preedit,
             finish_canonical_owned_preedit,
             cancel_owned_preedit,
+            release_browser_recording,
             begin_runtime_status_session,
             sync_runtime_status,
             trace_frontend_hotkey_event,
@@ -3817,6 +4156,25 @@ pub fn run() -> Result<(), String> {
             open_config_directory,
         ])
         .setup(|app| {
+            let browser_app = app.handle().clone();
+            let browser = browser_broker::BrowserBroker::bind(move |trigger| {
+                if FRONTEND_HOTKEY_HANDLER_READY.load(Ordering::SeqCst)
+                    && shortcut_heartbeat_is_current(
+                        SHORTCUT_RENDERER_HEARTBEAT_MS.load(Ordering::SeqCst),
+                        shortcut_monotonic_ms(),
+                    )
+                {
+                    browser_app
+                        .emit_to("main", TOGGLE_DICTATION_EVENT, trigger)
+                        .is_ok()
+                } else {
+                    false
+                }
+            });
+            if let Err(error) = &browser {
+                warn!("Browser integration unavailable: {error}");
+            }
+            app.manage(BrowserIntegration(browser.ok()));
             let startup_ms = now_ms();
             FRONTEND_HOTKEY_HANDLER_READY.store(false, Ordering::SeqCst);
             if let Ok(mut pending_backend) = PENDING_TOGGLE_BACKEND.lock() {
@@ -3826,6 +4184,7 @@ pub fn run() -> Result<(), String> {
                 *pending_backend = None;
             }
             trace_hotkey_event("app_start", Some("internal"));
+            start_ibus_shortcut_listener(app.handle().clone());
             let configured_hotkey = configured_hotkey();
             let hotkey = configured_hotkey.hotkey;
             let app_handle = app.handle().clone();
@@ -3868,14 +4227,14 @@ pub fn run() -> Result<(), String> {
             }
 
             if use_evdev_hotkey {
-                info!("evdev hotkey backend active for {hotkey}");
+                info!("evdev hotkey backend selected for {hotkey}");
             } else {
-                info!("global shortcut backend active for {hotkey}");
+                info!("global shortcut backend selected for {hotkey}");
             }
 
-            info!("Hotkey listener attached");
+            info!("Hotkey backend setup attempted");
             info!(
-                "[timing] app start -> hotkey backend attachment: {}ms",
+                "[timing] app start -> hotkey backend setup attempt: {}ms",
                 now_ms() - startup_ms
             );
 
@@ -3907,6 +4266,8 @@ pub fn run() -> Result<(), String> {
         .expect("error while building tauri application")
         .run(|app, event| {
             if let tauri::RunEvent::Exit = event {
+                performance::shutdown();
+                native_capture_commands::shutdown();
                 app.state::<owned_preedit::OwnedPreeditService>().shutdown();
                 cleanup_socket_files();
             }
@@ -3918,6 +4279,10 @@ pub fn run() -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::local_intelligence::{
+        build_local_llm_body, build_loopback_http_client, parse_local_llm_chat_response,
+        validate_local_llm_endpoint,
+    };
 
     fn model_test_directory(label: &str) -> std::path::PathBuf {
         let directory = std::env::temp_dir().join(format!(
@@ -3984,10 +4349,38 @@ mod tests {
 
     #[test]
     fn preview_audio_accepts_the_frontend_point_seven_second_boundary() {
-        assert!(!validate_preview_sample_count(MIN_PREVIEW_SAMPLES - 1).unwrap());
-        assert!(validate_preview_sample_count(MIN_PREVIEW_SAMPLES).unwrap());
-        assert!(validate_preview_sample_count(MAX_PREVIEW_SAMPLES).unwrap());
-        assert!(validate_preview_sample_count(MAX_PREVIEW_SAMPLES + 1).is_err());
+        assert!(
+            !validate_preview_sample_count(MIN_PREVIEW_SAMPLES - 1, MAX_PREVIEW_SAMPLES).unwrap()
+        );
+        assert!(validate_preview_sample_count(MIN_PREVIEW_SAMPLES, MAX_PREVIEW_SAMPLES).unwrap());
+        assert!(validate_preview_sample_count(MAX_PREVIEW_SAMPLES, MAX_PREVIEW_SAMPLES).unwrap());
+        assert!(
+            validate_preview_sample_count(MAX_PREVIEW_SAMPLES + 1, MAX_PREVIEW_SAMPLES).is_err()
+        );
+    }
+
+    #[test]
+    fn desktop_preview_has_a_separate_bounded_thirty_second_contract() {
+        assert!(!validate_preview_sample_count(
+            MIN_PREVIEW_SAMPLES - 1,
+            MAX_DESKTOP_PREVIEW_SAMPLES
+        )
+        .unwrap());
+        assert!(validate_preview_sample_count(
+            MAX_PREVIEW_SAMPLES + 1,
+            MAX_DESKTOP_PREVIEW_SAMPLES
+        )
+        .unwrap());
+        assert!(validate_preview_sample_count(
+            MAX_DESKTOP_PREVIEW_SAMPLES,
+            MAX_DESKTOP_PREVIEW_SAMPLES
+        )
+        .unwrap());
+        assert!(validate_preview_sample_count(
+            MAX_DESKTOP_PREVIEW_SAMPLES + 1,
+            MAX_DESKTOP_PREVIEW_SAMPLES
+        )
+        .is_err());
     }
 
     #[test]
@@ -4319,20 +4712,140 @@ mod tests {
     fn spoken_formatting_commands_are_deterministic() {
         assert_eq!(
             apply_spoken_formatting_commands(
-                "first line new paragraph bullet point check gpio seventeen new bullet stop"
+                "first line command new paragraph command bullet point check gpio seventeen command new bullet stop"
             ),
             "first line\n\n- check gpio seventeen\n- stop"
         );
         assert_eq!(
             apply_spoken_formatting_commands(
-                "write the old sentence scratch that write the new one"
+                "write the old sentence command scratch that write the new one"
             ),
             "write the new one"
         );
         assert_eq!(
-            apply_spoken_formatting_commands("code block let x equals one end code block"),
+            apply_spoken_formatting_commands(
+                "command code block let x equals one command end code block"
+            ),
             "```\nlet x equals one\n```"
         );
+    }
+
+    #[test]
+    fn failed_polish_preserves_raw_recognition_before_spoken_commands() {
+        let raw = "Old text command scratch that important tail";
+        let result = enhance_transcript(
+            raw.to_string(),
+            TranscriptEnhancement::Conservative,
+            "https://invalid.example".to_string(),
+            None,
+        );
+        assert_eq!(result.text, raw);
+        assert!(!result.used_enhancement);
+        assert!(result.warning.is_some());
+    }
+
+    #[test]
+    fn consuming_shortcut_tracks_committed_config_without_plugin_reregistration() {
+        let snapshot = |revision, hotkey: &str| ConfigSnapshot {
+            revision,
+            config: AppConfig {
+                hotkey: hotkey.to_string(),
+                ..AppConfig::default()
+            },
+        };
+        let mut cached = None;
+        refresh_shortcut_config(&mut cached, 0, || Ok(snapshot(0, "Alt+D"))).unwrap();
+        // Both chords use evdev on Wayland: no plugin binding revision changes.
+        refresh_shortcut_config(&mut cached, 1, || Ok(snapshot(1, "Alt+Shift+D"))).unwrap();
+        assert_eq!(cached.as_ref().unwrap().config.hotkey, "Alt+Shift+D");
+        // A write completing between the revision check and locked read must
+        // publish the revision corresponding to the actual configuration read.
+        refresh_shortcut_config(&mut cached, 2, || Ok(snapshot(3, "Ctrl+Shift+V"))).unwrap();
+        refresh_shortcut_config(&mut cached, 3, || {
+            panic!("must retain the committed snapshot")
+        })
+        .unwrap();
+        assert_eq!(cached.as_ref().unwrap().config.hotkey, "Ctrl+Shift+V");
+        assert!(
+            refresh_shortcut_config(&mut cached, 4, || Err("write/read unavailable".into()))
+                .is_err()
+        );
+        assert_eq!(cached.as_ref().unwrap().revision, 3);
+    }
+
+    #[test]
+    fn consuming_context_releases_global_grab_and_unavailable_context_restores_it() {
+        assert!(should_register_shortcut_fallback(false, false));
+        assert!(!should_register_shortcut_fallback(false, true));
+        assert!(!should_register_shortcut_fallback(true, true));
+        assert!(!should_register_shortcut_fallback(true, false));
+    }
+
+    #[test]
+    fn shortcut_heartbeat_uses_expiring_monotonic_elapsed_time() {
+        assert!(!shortcut_heartbeat_is_current(-1, 0));
+        assert!(shortcut_heartbeat_is_current(0, 0));
+        assert!(shortcut_heartbeat_is_current(1000, 3999));
+        assert!(!shortcut_heartbeat_is_current(1000, 4000));
+        assert!(!shortcut_heartbeat_is_current(1000, 999));
+    }
+
+    #[test]
+    fn completed_but_rewritten_polish_preserves_original_recognition() {
+        use std::net::TcpListener;
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let endpoint = format!(
+            "http://{}/v1/chat/completions",
+            listener.local_addr().unwrap()
+        );
+        let server = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            stream
+                .set_read_timeout(Some(std::time::Duration::from_secs(2)))
+                .unwrap();
+            let mut request = [0_u8; 4096];
+            assert!(stream.read(&mut request).unwrap() > 0);
+            let body = r#"{"choices":[{"finish_reason":"stop","message":{"content":"Send 15 mg to Alice."}}]}"#;
+            write!(
+                stream,
+                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                body.len(),
+                body
+            )
+            .unwrap();
+        });
+        let original = "do not send 1.5 mg to alice";
+        let result = enhance_transcript(
+            original.to_string(),
+            TranscriptEnhancement::Conservative,
+            endpoint,
+            None,
+        );
+        server.join().unwrap();
+        assert_eq!(result.text, original);
+        assert!(!result.used_enhancement);
+        assert_eq!(
+            result.warning.as_deref(),
+            Some("Local polishing changed recognized content; original recognition preserved")
+        );
+    }
+
+    #[test]
+    fn intentional_empty_command_result_does_not_call_local_model() {
+        for mode in [
+            TranscriptEnhancement::CommandsOnly,
+            TranscriptEnhancement::Conservative,
+        ] {
+            let result = enhance_transcript(
+                "Old text command scratch that".to_string(),
+                mode,
+                "https://invalid.example".to_string(),
+                None,
+            );
+            assert_eq!(result.text, "");
+            assert!(result.used_enhancement);
+            assert!(result.warning.is_none());
+        }
     }
 
     #[test]
@@ -4361,16 +4874,16 @@ mod tests {
     #[test]
     fn local_llm_response_parser_reads_chat_completion_content() {
         let parsed = parse_local_llm_chat_response(
-            r#"{"choices":[{"message":{"content":"Hello, world."}}]}"#,
+            r#"{"choices":[{"finish_reason":"stop","message":{"content":"Hello, world."}}]}"#,
         )
         .unwrap();
         assert_eq!(parsed, "Hello, world.");
 
-        assert!(
-            parse_local_llm_chat_response(r#"{"choices":[{"message":{"content":""}}]}"#)
-                .unwrap_err()
-                .contains("no text")
-        );
+        assert!(parse_local_llm_chat_response(
+            r#"{"choices":[{"finish_reason":"stop","message":{"content":""}}]}"#
+        )
+        .unwrap_err()
+        .contains("no text"));
     }
 
     #[test]
@@ -4405,7 +4918,8 @@ mod tests {
             let request_text = String::from_utf8_lossy(&request).to_string();
             sender.send(request_text).unwrap();
 
-            let body = r#"{"choices":[{"message":{"content":"Hello, local."}}]}"#;
+            let body =
+                r#"{"choices":[{"finish_reason":"stop","message":{"content":"Hello, local."}}]}"#;
             let response = format!(
                 "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
                 body.len(),
@@ -4750,60 +5264,17 @@ mod tests {
 
     #[test]
     fn dictation_trace_event_allowlist_covers_frontend_emissions() {
-        let emitted_events = [
-            "recording_state_requested",
-            "recording_get_user_media_started",
-            "recording_get_user_media_constraints_fallback",
-            "recording_get_user_media_default_fallback",
-            "recording_get_user_media_done",
-            "recording_audio_context_ready",
-            "recording_media_source_created",
-            "recording_script_processor_connected",
-            "recording_worklet_connected",
-            "recording_state_active",
-            "dictation_live_preview_skipped_short_audio",
-            "dictation_live_preview_completed",
-            "dictation_live_preview_empty",
-            "dictation_live_preview_updated",
-            "dictation_live_preview_confirmed",
-            "dictation_live_preview_window_advanced",
-            "dictation_live_preview_failed",
-            "dictation_live_cursor_unsafe_rewrite_blocked",
-            "dictation_live_cursor_commit_waiting",
-            "dictation_live_cursor_tail_transcribed",
-            "dictation_live_cursor_tail_flushed",
-            "dictation_live_cursor_tail_flush_failed",
-            "dictation_owned_preedit_started",
-            "dictation_owned_preedit_unavailable",
-            "dictation_owned_preedit_updated",
-            "dictation_owned_preedit_failed",
-            "dictation_owned_preedit_cancelled",
-            "dictation_owned_preedit_committed",
-            "dictation_owned_preedit_commit_failed",
-            "dictation_owned_preedit_final_preserved",
-            "dictation_owned_preedit_progressive_commit",
-            "dictation_canonical_checkpoint_completed",
-            "dictation_canonical_checkpoint_committed",
-            "dictation_canonical_checkpoint_failed",
-            "dictation_canonical_final_completed",
-            "dictation_first_live_text_visible",
-            "dictation_live_cursor_insert_updated",
-            "dictation_live_cursor_insert_failed",
-            "dictation_live_cursor_overlay_fallback",
-            "dictation_live_cursor_insert_cleared",
-            "dictation_live_cursor_final_unreconciled",
-            "dictation_live_cursor_insert_finalized",
-            "dictation_stop_to_idle",
-            "dictation_recording_duration",
-            "dictation_transcription_completed",
-            "dictation_stop_to_final_transcript",
-            "dictation_enhancement_completed",
-            "dictation_local_assistant_completed",
-            "dictation_final_output_completed",
-            "dictation_final_output_unreconciled",
-            "dictation_final_insertion_failed",
-        ];
-
+        let hook = include_str!("../../src/hooks/useDictation.ts");
+        let emitted_events: Vec<_> = hook
+            .split("traceDictationEvent(")
+            .skip(1)
+            .filter_map(|call| call.trim_start().strip_prefix('"'))
+            .filter_map(|literal| literal.split_once('"').map(|(event, _)| event))
+            .collect();
+        assert!(
+            emitted_events.len() > 30,
+            "frontend event extraction must cover real calls"
+        );
         for event in emitted_events {
             assert!(
                 is_supported_dictation_trace_event(event),

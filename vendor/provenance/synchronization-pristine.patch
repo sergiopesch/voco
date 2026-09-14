@@ -1,0 +1,671 @@
+--- a/whisper-rs-sys/build.rs
++++ b/whisper-rs-sys/build.rs
+@@ -100,20 +100,20 @@
+     }
+ 
+     println!("cargo:rerun-if-changed=wrapper.h");
++    println!("cargo:rerun-if-env-changed=WHISPER_DONT_GENERATE_BINDINGS");
++    println!("cargo:rerun-if-changed=whisper.cpp");
++    println!("cargo:rerun-if-changed=src/bindings.rs");
+ 
+     let out = PathBuf::from(env::var("OUT_DIR").unwrap());
+     let whisper_root = out.join("whisper.cpp/");
+ 
+-    if !whisper_root.exists() {
+-        std::fs::create_dir_all(&whisper_root).unwrap();
+-        fs_extra::dir::copy("./whisper.cpp", &out, &Default::default()).unwrap_or_else(|e| {
+-            panic!(
+-                "Failed to copy whisper sources into {}: {}",
+-                whisper_root.display(),
+-                e
+-            )
+-        });
+-    }
++    // This directory is generated exclusively by this build script. Refresh it
++    // on every rerun so changed and removed vendored files cannot remain stale.
++    if whisper_root.exists() {
++        std::fs::remove_dir_all(&whisper_root).expect("Failed to refresh generated Whisper sources");
++    }
++    fs_extra::dir::copy("./whisper.cpp", &out, &Default::default())
++        .expect("Failed to copy current vendored Whisper sources");
+ 
+     if env::var("WHISPER_DONT_GENERATE_BINDINGS").is_ok() {
+         let _: u64 = std::fs::copy("src/bindings.rs", out.join("bindings.rs"))
+--- a/whisper-rs-sys/src/bindings.rs
++++ b/whisper-rs-sys/src/bindings.rs
+@@ -5540,3 +5540,50 @@
+ pub struct ggml_backend_buffer {
+     pub _address: u8,
+ }
++
++extern "C" {
++    /// Local diagnostic: observes prior loop/entropy rejection plus final low log probability.
++    pub fn whisper_full_had_low_confidence_decoder_rejection_from_state(
++        state: *const whisper_state,
++    ) -> bool;
++    pub fn whisper_full_had_repetition_rejection_history_from_state(
++        state: *const whisper_state,
++    ) -> bool;
++}
++
++extern "C" {
++    pub fn whisper_full_earliest_near_end_completion_offset_from_state(
++        state: *const whisper_state,
++    ) -> ::std::os::raw::c_int;
++}
++
++extern "C" {
++    pub fn whisper_full_had_terminal_decoder_failure_from_state(
++        state: *const whisper_state,
++    ) -> bool;
++}
++
++#[repr(C)]
++#[derive(Debug, Copy, Clone)]
++pub struct whisper_selected_window_evidence {
++    pub seek: i64,
++    pub structural: u32,
++    pub actual_eot: bool,
++    pub entropy_rejected: bool,
++    pub native_failed: bool,
++    pub completed: bool,
++    pub avg_logprob: f64,
++    pub original_no_speech: bool,
++    pub lexical_no_speech: bool,
++    pub text_tokens: i32,
++}
++extern "C" {
++    pub fn whisper_full_selected_window_evidence_count_from_state(
++        state: *const whisper_state,
++    ) -> ::std::os::raw::c_int;
++    pub fn whisper_full_selected_window_evidence_from_state(
++        state: *const whisper_state,
++        index: ::std::os::raw::c_int,
++        out: *mut whisper_selected_window_evidence,
++    ) -> bool;
++}
+--- a/whisper-rs-sys/whisper.cpp/ggml/src/ggml-cpu/ggml-cpu.c
++++ b/whisper-rs-sys/whisper.cpp/ggml/src/ggml-cpu/ggml-cpu.c
+@@ -1290,6 +1290,13 @@
+     ggml_mutex_t mutex;       // mutex for cond.var
+     ggml_cond_t  cond;        // cond.var for waiting for new work
+ 
++#if defined(__linux__) && !defined(GGML_USE_OPENMP)
++    pthread_mutex_t barrier_mutex;
++    pthread_cond_t  barrier_cond;
++    atomic_int     barrier_waiters;
++    bool           barrier_wait_enabled;
++#endif
++
+     struct ggml_cgraph * cgraph;
+     struct ggml_cplan  * cplan;
+ 
+@@ -1302,7 +1309,7 @@
+     // these are atomic as an annotation for thread-sanitizer
+     atomic_bool stop;         // Used for stopping the threadpool altogether
+     atomic_bool pause;        // Used for pausing the threadpool or individual threads
+-    atomic_bool abort;        // Used for aborting processing of a graph
++    atomic_int abort_node;    // First node to skip, or -1 when not aborting
+ 
+     struct ggml_compute_state * workers;   // per thread state
+     int          n_threads_max; // number of threads in the pool
+@@ -2232,6 +2239,29 @@
+ 
+ static struct ggml_state g_state = {0};
+ 
++#if defined(__linux__) && !defined(GGML_USE_OPENMP)
++static void ggml_barrier_wait_init(struct ggml_threadpool * tp) {
++    atomic_init(&tp->barrier_waiters, 0);
++    tp->barrier_wait_enabled = false;
++    if (pthread_mutex_init(&tp->barrier_mutex, NULL) != 0) {
++        return;
++    }
++    if (pthread_cond_init(&tp->barrier_cond, NULL) != 0) {
++        pthread_mutex_destroy(&tp->barrier_mutex);
++        return;
++    }
++    tp->barrier_wait_enabled = true;
++}
++
++static void ggml_barrier_wait_destroy(struct ggml_threadpool * tp) {
++    if (tp->barrier_wait_enabled) {
++        GGML_ASSERT(atomic_load_explicit(&tp->barrier_waiters, memory_order_relaxed) == 0);
++        pthread_cond_destroy(&tp->barrier_cond);
++        pthread_mutex_destroy(&tp->barrier_mutex);
++    }
++}
++#endif
++
+ void ggml_barrier(struct ggml_threadpool * tp) {
+     int n_threads = atomic_load_explicit(&tp->n_threads_cur, memory_order_relaxed);
+     if (n_threads == 1) {
+@@ -2252,12 +2282,42 @@
+ 
+         // exit barrier (fill seq-cst fence)
+         atomic_fetch_add_explicit(&tp->n_barrier_passed, 1, memory_order_seq_cst);
++#if defined(__linux__)
++        if (tp->barrier_wait_enabled && atomic_load_explicit(&tp->barrier_waiters, memory_order_seq_cst) > 0) {
++            pthread_mutex_lock(&tp->barrier_mutex);
++            pthread_cond_broadcast(&tp->barrier_cond);
++            pthread_mutex_unlock(&tp->barrier_mutex);
++        }
++#endif
+         return;
+     }
+ 
+     // wait for other threads
+-    while (atomic_load_explicit(&tp->n_barrier_passed, memory_order_relaxed) == n_passed) {
+-        ggml_thread_cpu_relax();
++#if defined(__linux__)
++    if (tp->barrier_wait_enabled) {
++        for (int spin = 0; spin < 1024; ++spin) {
++            if (atomic_load_explicit(&tp->n_barrier_passed, memory_order_relaxed) != n_passed) {
++                break;
++            }
++            ggml_thread_cpu_relax();
++        }
++        if (atomic_load_explicit(&tp->n_barrier_passed, memory_order_relaxed) == n_passed) {
++            pthread_mutex_lock(&tp->barrier_mutex);
++            // Register before rechecking the generation. If the last arrival missed
++            // this registration, this seq-cst check must observe its new generation.
++            atomic_fetch_add_explicit(&tp->barrier_waiters, 1, memory_order_seq_cst);
++            while (atomic_load_explicit(&tp->n_barrier_passed, memory_order_seq_cst) == n_passed) {
++                pthread_cond_wait(&tp->barrier_cond, &tp->barrier_mutex);
++            }
++            atomic_fetch_add_explicit(&tp->barrier_waiters, -1, memory_order_seq_cst);
++            pthread_mutex_unlock(&tp->barrier_mutex);
++        }
++    } else
++#endif
++    {
++        while (atomic_load_explicit(&tp->n_barrier_passed, memory_order_relaxed) == n_passed) {
++            ggml_thread_cpu_relax();
++        }
+     }
+ 
+     // exit barrier (full seq-cst fence)
+@@ -13337,6 +13397,9 @@
+ 
+     ggml_mutex_destroy(&threadpool->mutex);
+     ggml_cond_destroy(&threadpool->cond);
++#if defined(__linux__)
++    ggml_barrier_wait_destroy(threadpool);
++#endif
+ #endif // GGML_USE_OPENMP
+ 
+     const size_t workers_size = sizeof(struct ggml_compute_state) * n_threads;
+@@ -13582,19 +13645,25 @@
+         /*.threadpool=*/ tp,
+     };
+ 
+-    for (int node_n = 0; node_n < cgraph->n_nodes && !tp->abort; node_n++) {
++    for (int node_n = 0; node_n < cgraph->n_nodes && node_n != tp->abort_node; node_n++) {
+         struct ggml_tensor * node = cgraph->nodes[node_n];
+ 
+         ggml_compute_forward(&params, node);
+ 
+         if (state->ith == 0 && cplan->abort_callback &&
+                 cplan->abort_callback(cplan->abort_callback_data)) {
+-            tp->abort = true;
++            // A worker may still be leaving the previous node's barrier.
++            // It must finish this node before observing the stop point.
++            tp->abort_node = node_n + 1;
+             tp->ec    = GGML_STATUS_ABORTED;
+         }
+ 
+         ggml_barrier(state->threadpool);
+     }
++
++    // All workers must finish the exit decision before the caller resets the
++    // graph, its stop point or its participant count for another computation.
++    ggml_barrier(state->threadpool);
+ 
+     return 0;
+ }
+@@ -13762,7 +13831,7 @@
+         threadpool->current_chunk    = 0;
+         threadpool->stop             = false;
+         threadpool->pause            = tpp->paused;
+-        threadpool->abort            = false;
++        threadpool->abort_node       = -1;
+         threadpool->workers          = NULL;
+         threadpool->n_threads_max    = tpp->n_threads;
+         threadpool->n_threads_cur    = tpp->n_threads;
+@@ -13772,6 +13841,9 @@
+     }
+ 
+     // Allocate and init workers state
++#if defined(__linux__) && !defined(GGML_USE_OPENMP)
++    ggml_barrier_wait_init(threadpool);
++#endif
+     const size_t workers_size = sizeof(struct ggml_compute_state) * tpp->n_threads;
+     struct ggml_compute_state * workers = ggml_aligned_malloc(workers_size);
+ 
+@@ -13841,7 +13913,7 @@
+         threadpool->cgraph           = cgraph;
+         threadpool->cplan            = cplan;
+         threadpool->current_chunk    = 0;
+-        threadpool->abort            = false;
++        threadpool->abort_node       = -1;
+         threadpool->ec               = GGML_STATUS_SUCCESS;
+     }
+ 
+--- a/whisper-rs-sys/whisper.cpp/include/whisper.h
++++ b/whisper-rs-sys/whisper.cpp/include/whisper.h
+@@ -609,6 +609,49 @@
+     // Number of generated text segments
+     // A segment can be a few words, a sentence, or even a paragraph.
+     WHISPER_API int whisper_full_n_segments           (struct whisper_context * ctx);
++    // Local read-only diagnostic: OR across seeks of rejection history plus final low log probability.
++    // Reset at each whisper_full_with_state entry; does not change decoding decisions.
++    WHISPER_API bool whisper_full_had_low_confidence_decoder_rejection_from_state(const struct whisper_state * state);
++
++    // OR of the existing per-seek entropy/repetition-loop rejection history,
++    // independent of final selected confidence. Not a speech/no-speech classifier.
++    // Reset at full-call entry; null returns false. Does not change native decoding.
++    WHISPER_API bool whisper_full_had_repetition_rejection_history_from_state(const struct whisper_state * state);
++
++    // Local numeric observer of each final selected seek; no transcript/token storage.
++    // seek is an absolute 10 ms frame offset. structural bits: 1 backward timestamp,
++    // 2 empty result, 4 repetition loop, 8 incomplete, 16 nonfinite average logprob.
++    struct whisper_selected_window_evidence {
++        int64_t seek;
++        uint32_t structural;
++        bool actual_eot;
++        bool entropy_rejected;
++        bool native_failed;
++        bool completed;
++        double avg_logprob;
++        bool original_no_speech;
++        bool lexical_no_speech;
++        int32_t text_tokens;
++    };
++
++    // Reset before every full call, including early errors. At most 4096 rows.
++    // -1 means null state or unavailable evidence after overflow; otherwise count.
++    // Read only after full returns, with exclusive access to this state.
++    WHISPER_API int whisper_full_selected_window_evidence_count_from_state(const struct whisper_state * state);
++    // Copies an owned row; false for null pointers, unavailable evidence or invalid
++    // index. Failure leaves *out untouched. No pointer to state storage is exposed.
++    WHISPER_API bool whisper_full_selected_window_evidence_from_state(
++        const struct whisper_state * state, int index, struct whisper_selected_window_evidence * out);
++
++    // Local read-only diagnostic: OR of final selected decoders' failed flags
++    // across the most recent full call. Reset even when full returns early.
++    WHISPER_API bool whisper_full_had_terminal_decoder_failure_from_state(const struct whisper_state * state);
++
++    // Local read-only diagnostic: earliest absolute 10 ms frame offset where a
++    // final selected decoder stopped solely on the original near-end margin.
++    // Resets per full call; -1 means absent. This is not lexical coverage proof.
++    WHISPER_API int whisper_full_earliest_near_end_completion_offset_from_state(const struct whisper_state * state);
++
+     WHISPER_API int whisper_full_n_segments_from_state(struct whisper_state * state);
+ 
+     // Language id associated with the context's default state
+--- a/whisper-rs-sys/whisper.cpp/src/whisper.cpp
++++ b/whisper-rs-sys/whisper.cpp/src/whisper.cpp
+@@ -773,6 +773,10 @@
+     bool failed;    // has the current segment failed to decode?
+     bool completed; // has the decoder completed the current segment?
+     bool has_ts;    // have we already sampled a non-beg timestamp token for the current segment?
++    int near_end_completion_offset = -1;
++    unsigned selected_structural = 0;
++    bool selected_eot = false;
++    bool selected_entropy = false;
+ 
+     // new token probs, logits and logprobs after the last whisper_decode (1-dimensional array: [n_vocab])
+     std::vector<float> probs;
+@@ -793,6 +797,12 @@
+ };
+ 
+ struct whisper_state {
++    std::vector<whisper_selected_window_evidence> selected_window_evidence;
++    bool selected_window_evidence_overflow = false;
++    bool had_low_confidence_decoder_rejection = false;
++    bool had_repetition_rejection_history = false;
++    bool had_terminal_decoder_failure = false;
++    int earliest_near_end_completion_offset = -1;
+     int64_t t_sample_us = 0;
+     int64_t t_encode_us = 0;
+     int64_t t_decode_us = 0;
+@@ -5339,6 +5349,12 @@
+     struct whisper_full_params   params,
+                    const float * samples,
+                            int   n_samples) {
++    state->selected_window_evidence.clear();
++    state->selected_window_evidence_overflow = false;
++    state->had_low_confidence_decoder_rejection = false;
++    state->had_repetition_rejection_history = false;
++    state->had_terminal_decoder_failure = false;
++    state->earliest_near_end_completion_offset = -1;
+     // clear old results
+     auto & result_all = state->result_all;
+ 
+@@ -5554,6 +5570,7 @@
+             prompt_past.clear();
+         }
+ 
++        bool seek_had_decoder_rejection = false;
+         int best_decoder_id = 0;
+ 
+         for (int it = 0; it < (int) temperatures.size(); ++it) {
+@@ -5599,6 +5616,10 @@
+                 decoder.failed    = false;
+                 decoder.completed = false;
+                 decoder.has_ts    = false;
++                decoder.near_end_completion_offset = -1;
++                decoder.selected_structural = 0;
++                decoder.selected_eot = false;
++                decoder.selected_entropy = false;
+ 
+                 if (params.grammar_rules != nullptr) {
+                     decoder.grammar = whisper_grammar_init(params.grammar_rules, params.n_grammar_rules, params.i_start_rule);
+@@ -5856,6 +5877,7 @@
+                             // do not allow to go back in time
+                             if (has_ts && seek_delta > seek_delta_new && result_len < i) {
+                                 WHISPER_LOG_DEBUG("%s: decoder %d: failed due to seek_delta (%d > %d)\n", __func__, j, seek_delta, seek_delta_new);
++                                decoder.selected_structural |= 1;
+                                 failed = true; // TODO: maybe this is not a failure ?
+                                 continue;
+                             }
+@@ -5880,11 +5902,22 @@
+                            (params.max_tokens > 0 && i >= params.max_tokens) || // max tokens per segment reached
+                            (has_ts && seek + seek_delta + 100 >= seek_end)      // end of audio reached
+                            ) {
++                            decoder.selected_eot = token.id == whisper_token_eot(ctx);
++                            // Diagnostic only: this branch stopped solely on the original
++                            // one-second timestamp margin, before the actual frame end.
++                            // Keep decoder ownership through temperature selection.
++                            if (token.id != whisper_token_eot(ctx) &&
++                                !(params.max_tokens > 0 && i >= params.max_tokens) &&
++                                has_ts && seek_delta > 0 && seek + seek_delta < seek_end &&
++                                seek + seek_delta + 100 >= seek_end) {
++                                decoder.near_end_completion_offset = seek + seek_delta;
++                            }
+                             if (result_len == 0 && !params.no_timestamps) {
+                                 if (seek + seek_delta + 100 >= seek_end) {
+                                     result_len = i + 1;
+                                 } else {
+                                     WHISPER_LOG_DEBUG("%s: decoder %d failed (result_len = 0)\n", __func__, j);
++                                    decoder.selected_structural |= 2;
+                                     failed = true;
+                                     continue;
+                                 }
+@@ -5911,7 +5944,9 @@
+                     // sometimes, the decoding can get stuck in a repetition loop
+                     // this is an attempt to mitigate such cases - we flag the decoding as failed and use a fallback strategy
+                     if (i == n_max - 1 && (result_len == 0 || seek_delta < 100*WHISPER_CHUNK_SIZE/2)) {
++                        seek_had_decoder_rejection = true;
+                         WHISPER_LOG_DEBUG("%s: decoder %d: failed due to repetition loop\n", __func__, j);
++                        decoder.selected_structural |= 4;
+                         failed = true;
+                         continue;
+                     }
+@@ -6037,9 +6072,11 @@
+                             __func__, j, decoder.sequence.score, decoder.sequence.result_len, decoder.sequence.avg_logprobs, decoder.sequence.entropy);
+ 
+                     if (decoder.sequence.result_len > 32 && decoder.sequence.entropy < params.entropy_thold) {
++                        seek_had_decoder_rejection = true;
+                         WHISPER_LOG_DEBUG("%s: decoder %2d: failed due to entropy %8.5f < %8.5f\n",
+                                 __func__, j, decoder.sequence.entropy, params.entropy_thold);
+ 
++                        decoder.selected_entropy = true;
+                         decoder.failed = true;
+                         state->n_fail_h++;
+ 
+@@ -6085,6 +6122,23 @@
+         // output results through a user-provided callback
+         {
+             const auto & best_decoder = state->decoders[best_decoder_id];
++            state->had_repetition_rejection_history |= seek_had_decoder_rejection;
++            state->had_low_confidence_decoder_rejection |= seek_had_decoder_rejection &&
++                best_decoder.sequence.avg_logprobs < params.logprob_thold;
++
++            // Publish only the final selected decoder, before single-timestamp
++            // ending can replace its original seek delta. Offsets are absolute
++            // 10 ms frames in this full call; -1 means no such selected ending.
++            const int near_end_offset = best_decoder.near_end_completion_offset;
++            if (near_end_offset >= 0 &&
++                (state->earliest_near_end_completion_offset < 0 ||
++                 near_end_offset < state->earliest_near_end_completion_offset)) {
++                state->earliest_near_end_completion_offset = near_end_offset;
++            }
++
++            // Observe the terminal selected native failure independently of
++            // confidence thresholds and the final lexical suppression policy.
++            state->had_terminal_decoder_failure |= best_decoder.failed;
+ 
+             auto seek_delta = best_decoder.seek_delta;
+             const auto result_len = best_decoder.sequence.result_len;
+@@ -6094,8 +6148,36 @@
+             // [EXPERIMENTAL] Token-level timestamps with DTW
+             const auto n_segments_before = state->result_all.size();
+ 
+-            const bool is_no_speech = (state->no_speech_prob > params.no_speech_thold &&
++            const bool original_is_no_speech = (state->no_speech_prob > params.no_speech_thold &&
+                 best_decoder.sequence.avg_logprobs < params.logprob_thold);
++
++            // Structural tokens must not override weak lexical evidence on likely nonspeech.
++            double text_logprobs = 0.0;
++            int text_token_count = 0;
++            for (int i = 0; i < std::min(result_len, (int) tokens_cur.size()); ++i) {
++                if (tokens_cur[i].id < whisper_token_eot(ctx)) {
++                    text_logprobs += tokens_cur[i].plog;
++                    ++text_token_count;
++                }
++            }
++            const bool weak_text_on_likely_nonspeech = text_token_count > 0 &&
++                state->no_speech_prob > params.no_speech_thold &&
++                text_logprobs / text_token_count < params.logprob_thold;
++            const bool is_no_speech = original_is_no_speech || weak_text_on_likely_nonspeech;
++            // Owned diagnostic observer only: no recognition branch is changed.
++            unsigned structural = best_decoder.selected_structural;
++            if (!best_decoder.completed) structural |= 8;
++            if (result_len <= 0) structural |= 2;
++            if (!std::isfinite(best_decoder.sequence.avg_logprobs)) structural |= 16;
++            if (state->selected_window_evidence.size() < 4096) {
++                state->selected_window_evidence.push_back({
++                    seek, structural, best_decoder.selected_eot, best_decoder.selected_entropy,
++                    best_decoder.failed, best_decoder.completed, best_decoder.sequence.avg_logprobs,
++                    original_is_no_speech, weak_text_on_likely_nonspeech, text_token_count});
++            } else {
++                state->selected_window_evidence_overflow = true;
++            }
++
+ 
+             //WHISPER_LOG_DEBUG("prompt_init.size() = %d, prompt.size() = %d, result_len = %d, seek_delta = %d\n", prompt_init.size(), prompt.size(), result_len, seek_delta);
+ 
+@@ -7396,3 +7478,36 @@
+     fputs(text, stderr);
+     fflush(stderr);
+ }
++
++extern "C" bool whisper_full_had_repetition_rejection_history_from_state(const struct whisper_state * state) {
++    return state != nullptr && state->had_repetition_rejection_history;
++}
++
++extern "C" bool whisper_full_had_low_confidence_decoder_rejection_from_state(const struct whisper_state * state) {
++    return state->had_low_confidence_decoder_rejection;
++}
++
++extern "C" int whisper_full_earliest_near_end_completion_offset_from_state(const struct whisper_state * state) {
++    return state->earliest_near_end_completion_offset;
++}
++
++extern "C" bool whisper_full_had_terminal_decoder_failure_from_state(const struct whisper_state * state) {
++    return state->had_terminal_decoder_failure;
++}
++
++extern "C" int whisper_full_selected_window_evidence_count_from_state(const struct whisper_state * state) {
++    if (state == nullptr || state->selected_window_evidence_overflow) {
++        return -1;
++    }
++    return static_cast<int>(state->selected_window_evidence.size());
++}
++
++extern "C" bool whisper_full_selected_window_evidence_from_state(
++        const struct whisper_state * state, int index, struct whisper_selected_window_evidence * out) {
++    if (state == nullptr || out == nullptr || state->selected_window_evidence_overflow ||
++        index < 0 || static_cast<size_t>(index) >= state->selected_window_evidence.size()) {
++        return false;
++    }
++    *out = state->selected_window_evidence[static_cast<size_t>(index)];
++    return true;
++}
+--- a/whisper-rs/src/lib.rs
++++ b/whisper-rs/src/lib.rs
+@@ -30,7 +30,7 @@
+ pub use whisper_params::{FullParams, SamplingStrategy, SegmentCallbackData};
+ #[cfg(feature = "raw-api")]
+ pub use whisper_rs_sys;
+-pub use whisper_state::WhisperState;
++pub use whisper_state::{SelectedWindowEvidence, WhisperState};
+ 
+ pub type WhisperSysContext = whisper_rs_sys::whisper_context;
+ pub type WhisperSysState = whisper_rs_sys::whisper_state;
+--- a/whisper-rs/src/whisper_state.rs
++++ b/whisper-rs/src/whisper_state.rs
+@@ -2,12 +2,28 @@
+ use std::sync::Arc;
+ 
+ use crate::{FullParams, WhisperError, WhisperInnerContext, WhisperToken, WhisperTokenData};
++
++/// Numeric evidence for one selected native seek; completion is distinct from quality.
++#[derive(Debug, Clone, Copy, PartialEq)]
++pub struct SelectedWindowEvidence {
++    pub seek: i64,
++    pub structural: u32,
++    pub actual_eot: bool,
++    pub entropy_rejected: bool,
++    pub native_failed: bool,
++    pub completed: bool,
++    pub avg_logprob: f64,
++    pub original_no_speech: bool,
++    pub lexical_no_speech: bool,
++    pub text_tokens: i32,
++}
+ 
+ /// Rustified pointer to a Whisper state.
+ #[derive(Debug)]
+ pub struct WhisperState {
+     ctx: Arc<WhisperInnerContext>,
+     ptr: *mut whisper_rs_sys::whisper_state,
++    latest_full_invoked_native: bool,
+ }
+ 
+ unsafe impl Send for WhisperState {}
+@@ -23,11 +39,99 @@
+ }
+ 
+ impl WhisperState {
++    /// Copy the latest call's selected-seek evidence. Unavailable evidence is an error.
++    pub fn selected_window_evidence(&self) -> Result<Vec<SelectedWindowEvidence>, WhisperError> {
++        if !self.latest_full_invoked_native {
++            return Err(WhisperError::NoSamples);
++        }
++        // SAFETY: this wrapper owns a live state; the native getter copies numeric fields.
++        let count = unsafe {
++            whisper_rs_sys::whisper_full_selected_window_evidence_count_from_state(self.ptr)
++        };
++        if !(0..=4096).contains(&count) {
++            return Err(WhisperError::GenericError(-1));
++        }
++        let mut result = Vec::with_capacity(count as usize);
++        for index in 0..count {
++            let mut raw =
++                std::mem::MaybeUninit::<whisper_rs_sys::whisper_selected_window_evidence>::uninit();
++            // SAFETY: native initializes the whole output only on success; index is bounded.
++            if !unsafe {
++                whisper_rs_sys::whisper_full_selected_window_evidence_from_state(
++                    self.ptr,
++                    index,
++                    raw.as_mut_ptr(),
++                )
++            } {
++                return Err(WhisperError::GenericError(-1));
++            }
++            // SAFETY: the successful getter initialized every field.
++            let raw = unsafe { raw.assume_init() };
++            result.push(SelectedWindowEvidence {
++                seek: raw.seek,
++                structural: raw.structural,
++                actual_eot: raw.actual_eot,
++                entropy_rejected: raw.entropy_rejected,
++                native_failed: raw.native_failed,
++                completed: raw.completed,
++                avg_logprob: raw.avg_logprob,
++                original_no_speech: raw.original_no_speech,
++                lexical_no_speech: raw.lexical_no_speech,
++                text_tokens: raw.text_tokens,
++            });
++        }
++        Ok(result)
++    }
++
++    /// Whether an existing entropy or repetition-loop rejection occurred in a selected
++    /// seek's temperature history. Independent of final confidence and not a VAD signal.
++    /// Unavailable before a native full call or after a wrapper-level input rejection.
++    pub fn had_repetition_rejection_history(&self) -> Result<bool, WhisperError> {
++        if !self.latest_full_invoked_native {
++            return Err(WhisperError::NoSamples);
++        }
++        // SAFETY: this wrapper owns a live state and the getter only reads numeric state.
++        Ok(unsafe {
++            whisper_rs_sys::whisper_full_had_repetition_rejection_history_from_state(self.ptr)
++        })
++    }
++
++    /// Whether any final selected decoder remained failed in the latest full call.
++    /// This observes native terminal status, not a retry decision or text quality.
++    pub fn had_terminal_decoder_failure(&self) -> bool {
++        // SAFETY: self owns this valid native state for the duration of the call.
++        unsafe { whisper_rs_sys::whisper_full_had_terminal_decoder_failure_from_state(self.ptr) }
++    }
++
++    /// Earliest absolute 10 ms frame offset of a selected near-end-margin
++    /// completion in the most recent full call. None means no such completion.
++    /// A decoder timestamp is not proof that lexical speech was omitted.
++    pub fn earliest_near_end_completion_offset_frames(&self) -> Option<usize> {
++        // SAFETY: self owns this valid native state for the duration of the call.
++        let offset = unsafe {
++            whisper_rs_sys::whisper_full_earliest_near_end_completion_offset_from_state(self.ptr)
++        };
++        usize::try_from(offset).ok()
++    }
++
++    /// Whether a seek rejected a loop/low-entropy attempt and its final sequence
++    /// remained below the configured log-probability threshold. Reset by full().
++    pub fn had_low_confidence_decoder_rejection(&self) -> bool {
++        // SAFETY: this state owns a valid native state for the duration of self.
++        unsafe {
++            whisper_rs_sys::whisper_full_had_low_confidence_decoder_rejection_from_state(self.ptr)
++        }
++    }
++
+     pub(crate) fn new(
+         ctx: Arc<WhisperInnerContext>,
+         ptr: *mut whisper_rs_sys::whisper_state,
+     ) -> Self {
+-        Self { ctx, ptr }
++        Self {
++            ctx,
++            ptr,
++            latest_full_invoked_native: false,
++        }
+     }
+ 
+     /// Convert raw PCM audio (floating point 32 bit) to log mel spectrogram.
+@@ -276,11 +380,13 @@
+     /// # C++ equivalent
+     /// `int whisper_full(struct whisper_context * ctx, struct whisper_full_params params, const float * samples, int n_samples)`
+     pub fn full(&mut self, params: FullParams, data: &[f32]) -> Result<c_int, WhisperError> {
++        self.latest_full_invoked_native = false;
+         if data.is_empty() {
+             // can randomly trigger segmentation faults if we don't check this
+             return Err(WhisperError::NoSamples);
+         }
+ 
++        self.latest_full_invoked_native = true;
+         let ret = unsafe {
+             whisper_rs_sys::whisper_full_with_state(
+                 self.ctx.ctx,

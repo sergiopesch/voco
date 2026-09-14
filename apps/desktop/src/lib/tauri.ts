@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { encodeAudioRequest } from "@/lib/audioTransport";
 import type {
   AppConfig,
   CachedUpdateCheck,
@@ -42,44 +43,38 @@ export async function saveConfigPatch(
 }
 
 export async function transcribeAudio(samples: Float32Array): Promise<string> {
-  const bytes = new Uint8Array(
-    samples.buffer,
-    samples.byteOffset,
-    samples.byteLength,
-  );
-  return invoke<string>("transcribe_audio", { audioBytes: bytes });
+  return invoke<string>("transcribe_audio", encodeAudioRequest(samples));
 }
 
 export async function transcribeCanonicalChunk(
   samples: Float32Array,
   previousCanonicalText: string,
 ): Promise<CanonicalTranscription> {
-  const bytes = new Uint8Array(
-    samples.buffer,
-    samples.byteOffset,
-    samples.byteLength,
-  );
-  return invoke<CanonicalTranscription>("transcribe_canonical_chunk", {
-    audioBytes: bytes,
-    previousCanonicalText,
-  });
+  return invoke<CanonicalTranscription>("transcribe_canonical_chunk", encodeAudioRequest(samples, previousCanonicalText));
+}
+
+/** The session owner validates this untrusted reply before committing recognition. */
+export async function transcribeHybridChunk(packet: Uint8Array): Promise<unknown> {
+  return invoke<unknown>("transcribe_hybrid_chunk", packet);
 }
 
 export async function previewTranscribeAudio(
   samples: Float32Array,
+  desktopStream = false,
 ): Promise<PreviewTranscription | null> {
-  const bytes = new Uint8Array(
-    samples.buffer,
-    samples.byteOffset,
-    samples.byteLength,
-  );
-  return invoke<PreviewTranscription | null>("preview_transcribe_audio", {
-    audioBytes: bytes,
-  });
+  return invoke<PreviewTranscription | null>(desktopStream ? "preview_desktop_audio" : "preview_transcribe_audio", encodeAudioRequest(samples));
 }
 
 export async function debugDictationCaptureEnabled(): Promise<boolean> {
   return invoke<boolean>("debug_dictation_capture_enabled");
+}
+
+export async function debugNativeCaptureEnabled(): Promise<boolean> {
+  return invoke<boolean>("debug_native_capture_enabled");
+}
+
+export async function saveDebugNativeRetainedSource(packet: Uint8Array): Promise<string | null> {
+  return invoke<string | null>("save_debug_native_retained_source", packet);
 }
 
 export async function saveDebugDictationCapture(
@@ -101,12 +96,24 @@ export async function insertText(text: string, strategy: string): Promise<Insert
   return invoke<InsertionResult>("insert_text", { text, strategy });
 }
 
+export async function getDesktopPasteStatus(): Promise<{ enabled: boolean; available: boolean; detail: string; streamingEnabled?: boolean; targetToken?: string | null }> {
+  return invoke("get_desktop_paste_status");
+}
+
+export async function pasteDesktopText(text: string, expectedTargetToken?: string | null): Promise<{ strategy: "clipboard"; outcome: "dispatched"; pasteMetrics?: { terminal: boolean; targetProbeMs: number; preflightMs: number; clipboardMs: number; keyboardMs: number } }> {
+  return invoke("paste_desktop_text", { text, expectedTargetToken: expectedTargetToken ?? null });
+}
+
 export async function getOwnedPreeditStatus(): Promise<OwnedPreeditStatus> {
   return invoke<OwnedPreeditStatus>("get_owned_preedit_status");
 }
 
-export async function startOwnedPreedit(sessionId: number): Promise<OwnedPreeditStatus> {
-  return invoke<OwnedPreeditStatus>("start_owned_preedit", { sessionId });
+export async function refreshShortcutHeartbeat(ready: boolean): Promise<void> {
+  return invoke<void>("refresh_shortcut_heartbeat", { ready });
+}
+
+export async function startOwnedPreedit(sessionId: number, triggerId?: string): Promise<OwnedPreeditStatus> {
+  return invoke<OwnedPreeditStatus>("start_owned_preedit", { sessionId, triggerId });
 }
 
 export async function updateOwnedPreedit(
@@ -156,6 +163,10 @@ export async function finishCanonicalOwnedPreedit(
 
 export async function cancelOwnedPreedit(sessionId: number): Promise<OwnedPreeditStatus> {
   return invoke<OwnedPreeditStatus>("cancel_owned_preedit", { sessionId });
+}
+
+export async function releaseBrowserRecording(triggerId: string): Promise<void> {
+  return invoke("release_browser_recording", { triggerId });
 }
 
 export async function askOpenClawAgent(

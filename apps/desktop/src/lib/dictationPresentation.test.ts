@@ -1,133 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   deriveStatusLabel,
-  shouldShowDictationOverlay,
 } from "@/lib/dictationPresentation";
-
-describe("dictation presentation", () => {
-  it("keeps the overlay hidden while words stream at the cursor", () => {
-    expect(
-      shouldShowDictationOverlay(
-        "hidden",
-        "recording",
-        "cursor",
-        "stable-cursor-streaming",
-        "off",
-        "owned",
-      ),
-    ).toBe(false);
-    expect(
-      shouldShowDictationOverlay(
-        "hidden",
-        "processing",
-        "cursor",
-        "stable-cursor-streaming",
-        "off",
-        "owned",
-      ),
-    ).toBe(false);
-  });
-
-  it("shows the fallback when a configured cursor stream is not actually owned", () => {
-    for (const delivery of ["preview-only", "unreconciled"] as const) {
-      expect(
-        shouldShowDictationOverlay(
-          "hidden",
-          "recording",
-          "cursor",
-          "stable-cursor-streaming",
-          "off",
-          delivery,
-        ),
-      ).toBe(true);
-    }
-  });
-
-  it("does not flash the overlay while cursor ownership is still being established", () => {
-    expect(
-      shouldShowDictationOverlay(
-        "hidden",
-        "recording",
-        "cursor",
-        "stable-cursor-streaming",
-        "off",
-        "pending",
-      ),
-    ).toBe(false);
-  });
-
-  it("shows the non-focusable overlay in preview mode", () => {
-    expect(
-      shouldShowDictationOverlay(
-        "hidden",
-        "recording",
-        "cursor",
-        "preview-overlay-only",
-        "off",
-      ),
-    ).toBe(true);
-    expect(
-      shouldShowDictationOverlay(
-        "hidden",
-        "processing",
-        "cursor",
-        "preview-overlay-only",
-        "off",
-      ),
-    ).toBe(true);
-  });
-
-  it("shows enhanced stable-mode previews in VOCO until one-shot insertion", () => {
-    expect(
-      shouldShowDictationOverlay(
-        "hidden",
-        "recording",
-        "cursor",
-        "stable-cursor-streaming",
-        "conservative",
-      ),
-    ).toBe(true);
-  });
-
-  it("does not cover interactive app surfaces or idle state", () => {
-    expect(
-      shouldShowDictationOverlay(
-        "hidden",
-        "idle",
-        "cursor",
-        "preview-overlay-only",
-        "off",
-      ),
-    ).toBe(false);
-    expect(
-      shouldShowDictationOverlay(
-        "hidden",
-        "error",
-        "cursor",
-        "preview-overlay-only",
-        "off",
-      ),
-    ).toBe(false);
-    expect(
-      shouldShowDictationOverlay(
-        "popover",
-        "recording",
-        "cursor",
-        "preview-overlay-only",
-        "off",
-      ),
-    ).toBe(false);
-    expect(
-      shouldShowDictationOverlay(
-        "settings",
-        "processing",
-        "cursor",
-        "preview-overlay-only",
-        "off",
-      ),
-    ).toBe(false);
-  });
-});
 
 describe("status label presentation", () => {
   const ready = {
@@ -143,11 +17,21 @@ describe("status label presentation", () => {
     realtimeStatus: "idle" as const,
   };
 
+  it("shows startup without claiming the microphone is listening", () => {
+    expect(deriveStatusLabel({ ...ready, dictationStatus: "starting" })).toBe("Starting microphone");
+  });
+
+  it("keeps recovery visible across later successful captures until dismissal", () => {
+    expect(deriveStatusLabel({ ...ready, hasRecoverableTranscript: true })).toBe("Transcript needs attention");
+    expect(deriveStatusLabel({ ...ready, cursorDeliveryState: "inactive", hasRecoverableTranscript: false })).toBe("Ready to listen");
+  });
+
   it("prioritizes transcript recovery over stale activity errors", () => {
     expect(
       deriveStatusLabel({
         ...ready,
         cursorDeliveryState: "unreconciled",
+        hasRecoverableTranscript: true,
         dictationStatus: "error",
         realtimeStatus: "error",
       }),
@@ -184,7 +68,7 @@ describe("status label presentation", () => {
         cursorRequired: true,
         dictationStatus: "recording",
       }),
-    ).toBe("Listening — preparing live cursor");
+    ).toBe("Listening — verifying original field");
     expect(
       deriveStatusLabel({
         ...ready,
@@ -205,7 +89,12 @@ describe("status label presentation", () => {
         cursorRequired: true,
         cursorSetupState: "not-enabled",
       }),
-    ).toBe("Live cursor needs setup — preview fallback available");
+    ).toBe("Text delivery needs setup — manual copy available");
+  });
+
+  it("treats completed manual dictation as a usable result", () => {
+    expect(deriveStatusLabel({ ...ready, hasRecovery: true, manualTranscriptReady: true })).toBe("Transcript ready to copy");
+    expect(deriveStatusLabel({ ...ready, cursorRequired: true, cursorSetupState: "safety-disabled" })).toBe("Ready — manual copy");
   });
 
   it("matches the tray by prioritizing a dictation failure when both modes failed", () => {
@@ -223,12 +112,22 @@ describe("status label presentation", () => {
       deriveStatusLabel({ ...ready, configurationError: true }),
     ).toBe("Settings need attention");
     expect(
+      deriveStatusLabel({ ...ready, configurationError: true, hasRecoverableTranscript: true }),
+    ).toBe("Settings need attention");
+    expect(
       deriveStatusLabel({
         ...ready,
         configurationError: true,
         dictationStatus: "error",
       }),
     ).toBe("Settings need attention");
+  });
+
+  it("keeps native dictation readiness separate from browser permission", () => {
+    expect(deriveStatusLabel({ ...ready, nativeMicrophoneReady: true, microphonePermission: "denied" }))
+      .toBe("Ready to listen");
+    expect(deriveStatusLabel({ ...ready, nativeMicrophoneReady: false, microphonePermission: "granted" }))
+      .toBe("Microphone setup required");
   });
 
   it("prioritizes denied microphone permission over idle cursor setup", () => {

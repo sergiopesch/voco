@@ -4665,8 +4665,9 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "voco"
-version = "2026.0.21"
+version = "2026.0.35"
 dependencies = [
+ "cc",
  "dirs",
  "env_logger",
  "evdev",
@@ -4675,6 +4676,7 @@ dependencies = [
  "inotify",
  "libc",
  "log",
+ "pkg-config",
  "reqwest 0.12.28",
  "serde",
  "serde_json",
@@ -4986,8 +4988,6 @@ dependencies = [
 [[package]]
 name = "whisper-rs"
 version = "0.14.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4d2eac0a371f8ae667a5ee15ae4130553ea3004e7572544d1ce546c81ea8874b"
 dependencies = [
  "whisper-rs-sys",
 ]
@@ -4995,8 +4995,6 @@ dependencies = [
 [[package]]
 name = "whisper-rs-sys"
 version = "0.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1c86f1b993f216594b1ad9a9bb00a26014fb7c512e12664a2d401c7897d2ef7d"
 dependencies = [
  "bindgen",
  "cfg-if",
