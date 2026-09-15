@@ -1,0 +1,1383 @@
+[
+  {
+    "id": "big-picture",
+    "title": "A voice becomes words.",
+    "intro": "Imagine a tiny team on your laptop. One helper listens, one understands, and one puts the words where you are typing.",
+    "story": [
+      "When you press a shortcut, VOCO listens to your microphone, turns the sound into words, and puts those words at your cursor.",
+      "Each part does one job. They pass small messages to each other instead of waiting for one enormous recording.",
+      "In this chapter, follow the whole journey. Later chapters open each box and show the real code inside."
+    ],
+    "steps": [
+      {
+        "label": "Shortcut",
+        "detail": "You press Alt+D. VOCO checks that it is safe to start."
+      },
+      {
+        "label": "Microphone",
+        "detail": "The microphone turns changing air pressure into a stream of numbers."
+      },
+      {
+        "label": "Speech model",
+        "detail": "A local trained model predicts words from those numbers."
+      },
+      {
+        "label": "Delivery",
+        "detail": "VOCO checks the destination and sends the new text."
+      },
+      {
+        "label": "Your cursor",
+        "detail": "The receiving app accepts the paste. VOCO never presses Enter for you."
+      }
+    ],
+    "facts": [
+      {
+        "title": "A team, not one magic function",
+        "text": "React manages the visible app and recording flow. Rust handles operating-system work. A Python worker calls the native speech library. The receiving app is a separate program."
+      },
+      {
+        "title": "The current route",
+        "text": "The selected .39 product uses NVIDIA Nemotron English 0.6B Q8 on the CPU. Names containing benchmark in the streaming code are historical; they do real production work."
+      },
+      {
+        "title": "Keep the boundary clear",
+        "text": "The speech worker can return words even if another application refuses a paste. Recognition success and successful delivery are different things."
+      }
+    ],
+    "files": [
+      {
+        "path": "apps/desktop/src/App.tsx",
+        "why": "Connects the interface, saved preferences and dictation hook."
+      },
+      {
+        "path": "apps/desktop/src/hooks/useDictation.ts",
+        "why": "Coordinates one recording from Start through Stop."
+      },
+      {
+        "path": "runtime/speech/stream_worker.py",
+        "why": "Starts the selected local speech worker."
+      }
+    ],
+    "caution": "This guide describes the pinned 2026.0.39 source. It does not promise every Linux app or compositor accepts delivery.",
+    "quiz": {
+      "question": "Which part owns the text box you are dictating into?",
+      "answers": [
+        "VOCO always owns it",
+        "The receiving application",
+        "The speech model"
+      ],
+      "correct": 1,
+      "why": "The receiving application owns its own text field. VOCO must respect that boundary."
+    },
+    "lab": "journey"
+  },
+  {
+    "id": "languages",
+    "title": "Meet the languages.",
+    "intro": "Different tools do different jobs, like cooks, waiters and a kitchen manager.",
+    "story": [
+      "TypeScript helps us describe what kind of information is allowed. React uses it to build the interface.",
+      "Rust is the careful manager at the door to Linux. Python connects the speech pieces. A compiled native library does the heavy model work.",
+      "A language is not a performance score. Where the time goes matters more than the name of the language."
+    ],
+    "steps": [
+      {
+        "label": "TypeScript",
+        "detail": "Describes data shapes and catches many mistakes before the app runs."
+      },
+      {
+        "label": "React",
+        "detail": "Updates controls and status when application state changes."
+      },
+      {
+        "label": "Rust",
+        "detail": "Owns native commands, processes, files and input checks."
+      },
+      {
+        "label": "Python",
+        "detail": "Validates streaming messages and calls the speech adapter."
+      },
+      {
+        "label": "Native library",
+        "detail": "Runs trained model calculations using CPU threads."
+      }
+    ],
+    "facts": [
+      {
+        "title": "Two kinds of checking",
+        "text": "TypeScript types disappear when compiled. Rust and Python must still validate messages received at runtime. A correctly typed sender is not a security guarantee."
+      },
+      {
+        "title": "What Tauri provides",
+        "text": "Tauri connects a WebKit-rendered interface to native Rust commands. An invoke call crosses that boundary; it is not an ordinary same-language function call."
+      },
+      {
+        "title": "How to read unfamiliar syntax",
+        "text": "An import brings in another tool. A function names a job. A class or struct groups related information. A test checks what happens in a particular situation."
+      }
+    ],
+    "files": [
+      {
+        "path": "apps/desktop/src/lib/tauri.ts",
+        "why": "Typed frontend wrappers for native commands."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/lib.rs",
+        "why": "Registers native commands and initializes the desktop application."
+      },
+      {
+        "path": "runtime/speech/adapters.py",
+        "why": "Connects Python to native C-compatible functions."
+      },
+      {
+        "path": "apps/desktop/src-tauri/Cargo.toml",
+        "why": "Lists Rust dependencies."
+      },
+      {
+        "path": "apps/desktop/package.json",
+        "why": "Lists frontend dependencies and scripts."
+      }
+    ],
+    "caution": "The model weights and compiled speech payload are provisioned separately. They are not all present as readable source in this checkout.",
+    "quiz": {
+      "question": "Does a TypeScript type remove the need to validate a native message?",
+      "answers": [
+        "Yes",
+        "No"
+      ],
+      "correct": 1,
+      "why": "Runtime messages still need validation at each trust boundary."
+    },
+    "lab": "journey"
+  },
+  {
+    "id": "shortcut",
+    "title": "One press, one recording.",
+    "intro": "A shortcut is a doorbell. One ring should produce one response, even when two helpers hear it.",
+    "story": [
+      "Linux can report a key press through different routes. VOCO must avoid treating one press as two separate instructions.",
+      "During a recording, the shortcut belongs to that recording session. An old callback must not stop a newer session.",
+      "If a shortcut has already been consumed, ignoring its callback can lose the user\u2019s only signal. That is why the arbitration rules are careful."
+    ],
+    "steps": [
+      {
+        "label": "Key chord",
+        "detail": "The configured chord is pressed."
+      },
+      {
+        "label": "Arbitration",
+        "detail": "VOCO checks which shortcut route currently has authority."
+      },
+      {
+        "label": "Debounce",
+        "detail": "A repeated observation of the same press is suppressed when appropriate."
+      },
+      {
+        "label": "Session lease",
+        "detail": "One recording gets a specific ownership token."
+      },
+      {
+        "label": "Release",
+        "detail": "Finish, cancellation or expiry releases that ownership."
+      }
+    ],
+    "facts": [
+      {
+        "title": "Root and focused-window grabs",
+        "text": "On X11, a passive grab can be attached to the root window or the exact input-focus window. The selected recording scope avoids the root-grab focus disturbance found in testing."
+      },
+      {
+        "title": "IBus is a shortcut helper",
+        "text": "Protocol 6 does not authorize generic text mutation. It helps deliver the recording trigger; it is not the normal text insertion engine."
+      },
+      {
+        "title": "A lease has an end",
+        "text": "The X11 recording lease has a fixed 650-second expiry. This covers the 600-second capture limit plus finishing allowance; it is not permission to record forever."
+      }
+    ],
+    "files": [
+      {
+        "path": "apps/desktop/src/hooks/useGlobalShortcut.ts",
+        "why": "Receives shortcut events in the interface."
+      },
+      {
+        "path": "apps/desktop/src/lib/desktopShortcutSession.ts",
+        "why": "Owns the UUID and renderer epoch for one recording."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/shortcut_arbitration.rs",
+        "why": "Decides which trigger observations may proceed."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/desktop_shortcut.rs",
+        "why": "Acquires and releases native recording scope."
+      },
+      {
+        "path": "vendor/global-hotkey/src/platform_impl/x11/focus_lease.rs",
+        "why": "Implements the patched X11 focus lease."
+      }
+    ],
+    "caution": "An IBus poll in flight is different from completed IBus ownership. Treating them as identical previously lost valid X11 callbacks.",
+    "quiz": {
+      "question": "An old recording finishes after a new one starts. What should its callback do?",
+      "answers": [
+        "Update the new recording",
+        "Respect its old session identity"
+      ],
+      "correct": 1,
+      "why": "Session tokens prevent old asynchronous work from changing a replacement recording."
+    },
+    "lab": "focus"
+  },
+  {
+    "id": "microphone",
+    "title": "Sound becomes numbers.",
+    "intro": "A microphone makes a very fast flipbook of sound. Each tiny measurement is called a sample.",
+    "story": [
+      "Imagine writing down the height of a wave many times each second. The list of heights is digital audio.",
+      "Sample rate means how many measurements happen in one second. It must travel with the numbers, like units on a ruler.",
+      "An AudioWorklet collects small ordered pieces while the interface does other work. The default path uses WebKit audio capture."
+    ],
+    "steps": [
+      {
+        "label": "Permission",
+        "detail": "Ask the operating system/browser layer for microphone access."
+      },
+      {
+        "label": "Device",
+        "detail": "Use the selected input device, or the current default."
+      },
+      {
+        "label": "Samples",
+        "detail": "Capture ordered blocks of floating-point audio."
+      },
+      {
+        "label": "Descriptor",
+        "detail": "Keep source, rate and sample-count information together."
+      },
+      {
+        "label": "Queue",
+        "detail": "Offer the blocks to the recording\u2019s speech queue."
+      }
+    ],
+    "facts": [
+      {
+        "title": "A sample is not a word",
+        "text": "One number says something about the waveform at one instant. Recognition needs patterns across many samples to infer speech."
+      },
+      {
+        "title": "Never guess the rate",
+        "text": "Calling 44,100 samples \u201cone second at 16 kHz\u201d changes the meaning of the audio. Rate validation and resampling must be deliberate."
+      },
+      {
+        "title": "An optional route is not the default",
+        "text": "The native capture modules form a separately gated development path. Seeing those files does not mean the normal desktop session uses them."
+      }
+    ],
+    "files": [
+      {
+        "path": "apps/desktop/src/lib/audioInput.ts",
+        "why": "Opens and checks browser microphone input."
+      },
+      {
+        "path": "apps/desktop/src/lib/audioCaptureBuffer.ts",
+        "why": "Retains bounded audio for a recording."
+      },
+      {
+        "path": "apps/desktop/src/lib/captureDescriptor.ts",
+        "why": "Keeps audio identity and rate facts together."
+      },
+      {
+        "path": "apps/desktop/src/lib/audioResampling.ts",
+        "why": "Handles explicit sample-rate conversion."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/native_capture_commands.rs",
+        "why": "Commands for the separately gated native capture path."
+      }
+    ],
+    "caution": "The waveform below is a teaching drawing. It never activates your microphone.",
+    "quiz": {
+      "question": "What must accompany a list of audio samples?",
+      "answers": [
+        "The sample rate",
+        "The window wallpaper",
+        "The font size"
+      ],
+      "correct": 0,
+      "why": "The rate tells the receiver how much time those samples represent."
+    },
+    "lab": "wave"
+  },
+  {
+    "id": "queue",
+    "title": "Audio on a conveyor belt.",
+    "intro": "Small boxes arrive in order. The next worker opens them one at a time.",
+    "story": [
+      "A queue is a waiting line for work. It lets microphone capture continue while an earlier request is being processed.",
+      "Each box carries a session and sequence number. Those labels stop a late reply from being mistaken for the next box.",
+      "A bounded queue has a maximum size. If the worker falls too far behind, keeping unlimited audio would make memory and delay grow."
+    ],
+    "steps": [
+      {
+        "label": "Capture",
+        "detail": "A new ordered block of audio arrives."
+      },
+      {
+        "label": "Label",
+        "detail": "Attach session, sequence and sample-range metadata."
+      },
+      {
+        "label": "Wait",
+        "detail": "The block waits behind earlier work."
+      },
+      {
+        "label": "Exchange",
+        "detail": "Rust sends it to the worker and checks the reply."
+      },
+      {
+        "label": "Account",
+        "detail": "Update capture, enqueue and response counters."
+      }
+    ],
+    "facts": [
+      {
+        "title": "The real bound",
+        "text": "The production phrase queue rejects backlog beyond three seconds of queued audio. That is a failure boundary, not a desired steady delay."
+      },
+      {
+        "title": "Words have a queue too",
+        "text": "A newer append-only hypothesis can replace pending output. Text already sent to an external app cannot be blindly replaced or replayed."
+      },
+      {
+        "title": "Counters explain missing work",
+        "text": "Captured, enqueued and responded samples should reconcile at the queue boundary. Those counts do not prove that a physical microphone captured every spoken sound."
+      }
+    ],
+    "files": [
+      {
+        "path": "apps/desktop/src/lib/benchmarkPhraseQueue.ts",
+        "why": "Serializes the production NVIDIA stream and delivery accounting."
+      },
+      {
+        "path": "apps/desktop/src/lib/desktopPhraseStream.ts",
+        "why": "Handles the live phrase-delivery contract."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/benchmark_stream.rs",
+        "why": "Supervises bounded worker requests and replies."
+      }
+    ],
+    "caution": "The boxes in this simulator are illustrative. They are not measured audio or the real app\u2019s queue.",
+    "quiz": {
+      "question": "Why is an unlimited queue a bad idea?",
+      "answers": [
+        "It always improves accuracy",
+        "Memory and waiting time could grow without a bound"
+      ],
+      "correct": 1,
+      "why": "Limits turn overload into an explicit recoverable problem instead of silent unlimited growth."
+    },
+    "lab": "queue"
+  },
+  {
+    "id": "worker",
+    "title": "The speech worker has a rulebook.",
+    "intro": "Two helpers pass numbered notes through a pipe. Both must agree on what each note means.",
+    "story": [
+      "The Rust backend runs one local Python worker. It sends a line of JSON for each request.",
+      "The worker accepts start, push, finish and cancel. It checks the shape and identity of the message before using it.",
+      "Normal protocol output is kept separate from native-library diagnostic output, so a log line cannot masquerade as a reply."
+    ],
+    "steps": [
+      {
+        "label": "Start",
+        "detail": "Open a new recognition stream and remember its session."
+      },
+      {
+        "label": "Push",
+        "detail": "Add a validated audio block in increasing sequence order."
+      },
+      {
+        "label": "Reply",
+        "detail": "Return matching session/sequence fields and any new text."
+      },
+      {
+        "label": "Finish",
+        "detail": "Drain the live stream and return the final hypothesis."
+      },
+      {
+        "label": "Cancel",
+        "detail": "Close the correct stream without replaying old audio."
+      }
+    ],
+    "facts": [
+      {
+        "title": "Small enough to trust",
+        "text": "worker_main.py bounds each input line to 4 MiB and requires a newline. StreamingSession accepts one-dimensional finite audio blocks no longer than one second at the supplied rate."
+      },
+      {
+        "title": "Numbers are checked too",
+        "text": "The accepted sample-rate range is 8,000\u201396,000 Hz, with no rate change inside a session. NaN and infinity are rejected."
+      },
+      {
+        "title": "A stale cancel is special",
+        "text": "A cancel for a different session is acknowledged without cancelling the active recording. Safety sometimes means intentionally doing nothing."
+      }
+    ],
+    "files": [
+      {
+        "path": "runtime/speech/stream_worker.py",
+        "why": "Separates protocol stdout before importing the runtime."
+      },
+      {
+        "path": "runtime/speech/worker_main.py",
+        "why": "Parses, validates and routes protocol messages."
+      },
+      {
+        "path": "runtime/speech/streaming.py",
+        "why": "Validates audio and owns each streaming session."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/benchmark_stream.rs",
+        "why": "Starts the process, bounds I/O and verifies replies."
+      }
+    ],
+    "caution": "A worker that dies during push/finish is not silently restarted with replayed text. Recovery needs a safe session boundary.",
+    "quiz": {
+      "question": "Why do replies repeat the session and sequence?",
+      "answers": [
+        "To make logs colorful",
+        "To prove which request they belong to"
+      ],
+      "correct": 1,
+      "why": "A correct-looking reply for the wrong recording must still be rejected."
+    },
+    "lab": "protocol"
+  },
+  {
+    "id": "model",
+    "title": "How the model guesses words.",
+    "intro": "The model is a practiced pattern-finder, not a little person reading your mind.",
+    "story": [
+      "Training happened before you installed VOCO. It produced many learned numbers called weights.",
+      "During dictation, the model uses those weights and recent audio context to predict text. A runtime is the engine that performs the calculations.",
+      "VOCO\u2019s selected model is English-focused. It does not promise automatic language switching."
+    ],
+    "steps": [
+      {
+        "label": "Weights",
+        "detail": "Load the pinned Q8 model and verify its SHA-256."
+      },
+      {
+        "label": "Recognizer",
+        "detail": "Create one reusable native recognizer."
+      },
+      {
+        "label": "Stream",
+        "detail": "Open a stream for this recording."
+      },
+      {
+        "label": "Context",
+        "detail": "Use incoming audio and recent context to produce hypotheses."
+      },
+      {
+        "label": "Result",
+        "detail": "Read and free each native result handle."
+      }
+    ],
+    "facts": [
+      {
+        "title": "Model versus runtime",
+        "text": "A model is the learned data; the runtime is the software that executes it. The same model may behave differently with different quantization, threading or streaming settings."
+      },
+      {
+        "title": "The selected configuration",
+        "text": "The worker defaults to Nemotron English 0.6B Q8, context 1, four CPU threads and the pool backend. Q8 is quantization: a compact representation of model values, not a statement of 98% accuracy."
+      },
+      {
+        "title": "Python is the bridge",
+        "text": "The Nemotron adapter uses ctypes to call the packaged native library. It defines argument/result types and closes recognizer, stream and result handles to avoid resource leaks."
+      }
+    ],
+    "files": [
+      {
+        "path": "runtime/speech/adapters.py",
+        "why": "Nemotron owns native recognizer and result handles."
+      },
+      {
+        "path": "runtime/speech/streaming.py",
+        "why": "Loads and warms the selected configuration."
+      },
+      {
+        "path": "runtime/speech/worker_main.py",
+        "why": "Reports sanitized runtime identity and readiness."
+      },
+      {
+        "path": "runtime/notices/NOTICE",
+        "why": "Records notices for bundled model and library components."
+      }
+    ],
+    "caution": "The native binary and model weights are separately provisioned artifacts. Research adapters such as Moonshine are not selectable product features.",
+    "quiz": {
+      "question": "What is the difference between model and runtime?",
+      "answers": [
+        "Weights versus the engine that executes them",
+        "They are always the same file"
+      ],
+      "correct": 0,
+      "why": "The runtime executes calculations using the learned model weights."
+    },
+    "lab": "journey"
+  },
+  {
+    "id": "delivery",
+    "title": "Words meet the cursor.",
+    "intro": "Delivering a letter means checking the address, not just finishing the letter.",
+    "story": [
+      "The recognizer\u2019s words travel back to VOCO. Delivery checks whether the intended destination still looks valid.",
+      "The normal desktop route uses clipboard replacement and a paste gesture appropriate to the target category.",
+      "A successful key command is not proof that an application displayed the words. Some fields offer readback; some do not."
+    ],
+    "steps": [
+      {
+        "label": "Hypothesis",
+        "detail": "Accept a new append-only text suffix."
+      },
+      {
+        "label": "Destination",
+        "detail": "Check current focus and available target identity."
+      },
+      {
+        "label": "Clipboard",
+        "detail": "Place the new text on the clipboard."
+      },
+      {
+        "label": "Paste",
+        "detail": "Dispatch the appropriate key gesture without Enter."
+      },
+      {
+        "label": "Observe",
+        "detail": "Use bounded field readback when available."
+      }
+    ],
+    "facts": [
+      {
+        "title": "Why spacing needs care",
+        "text": "Address bars and editors may treat leading spaces specially. The implementation has explicit joining rules and a literal-space path for the legacy helper."
+      },
+      {
+        "title": "Terminals are different",
+        "text": "Known terminal targets use their paste chord. VOCO does not edit the terminal\u2019s shortcut configuration to make that work."
+      },
+      {
+        "title": "Observation has limits",
+        "text": "Accessible-field samples are best-effort local observations, not atomic ownership or compositor paint. A target can still change between checks."
+      }
+    ],
+    "files": [
+      {
+        "path": "apps/desktop/src-tauri/src/insertion.rs",
+        "why": "Owns destination checks, clipboard writes and key dispatch."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/focus_probe.rs",
+        "why": "Collects bounded focus/target identity."
+      },
+      {
+        "path": "apps/desktop/src-tauri/resources/voco_desktop_target.py",
+        "why": "Provides desktop target observations."
+      },
+      {
+        "path": "apps/desktop/src/lib/dictationDelivery.ts",
+        "why": "Coordinates delivery outcomes in the frontend."
+      }
+    ],
+    "caution": "Clipboard paste replaces the current clipboard text. VOCO never automatically sends the message by pressing Enter.",
+    "quiz": {
+      "question": "The model returned words but focus changed. What is safer?",
+      "answers": [
+        "Paste into whatever is focused now",
+        "Retain recovery instead of guessing"
+      ],
+      "correct": 1,
+      "why": "Uncertain delivery must not become a blind paste into a different app."
+    },
+    "lab": "focus"
+  },
+  {
+    "id": "stop",
+    "title": "Stop means finish the work.",
+    "intro": "Closing a shop means serving the people already in line before locking the door.",
+    "story": [
+      "Stopping capture and finishing recognition are two different jobs. Some sound can still be waiting in the last capture block.",
+      "VOCO drains that tail into the same live stream, asks the model to finish, then waits for remaining delivery.",
+      "Only then should the session become idle. Cancellation follows a different path and must not deliver old pending work."
+    ],
+    "steps": [
+      {
+        "label": "Stop capture",
+        "detail": "Stop accepting new microphone input."
+      },
+      {
+        "label": "Drain tail",
+        "detail": "Take the final captured samples that have not been offered yet."
+      },
+      {
+        "label": "Finish stream",
+        "detail": "Finish the existing recognizer stream once."
+      },
+      {
+        "label": "Flush text",
+        "detail": "Deliver the remaining accepted suffix safely."
+      },
+      {
+        "label": "Idle",
+        "detail": "Release session ownership and report completion."
+      }
+    ],
+    "facts": [
+      {
+        "title": "Do not send the whole recording again",
+        "text": "The production Stop path forwards retained samples not yet offered. Replaying the whole recording would waste work and could duplicate delivered words."
+      },
+      {
+        "title": "One recording owns its tail",
+        "text": "Asynchronous guards keep delayed stop/capture callbacks attached to their original recording."
+      },
+      {
+        "title": "Why several timings exist",
+        "text": "Stop-to-final measures recognition completion. Stop-to-idle includes the rest of shutdown and delivery. Neither is the same as the instant the receiving app paints text."
+      }
+    ],
+    "files": [
+      {
+        "path": "apps/desktop/src/hooks/useDictation.ts",
+        "why": "Orders the complete Stop sequence."
+      },
+      {
+        "path": "apps/desktop/src/lib/audioCaptureFlush.ts",
+        "why": "Waits for final capture blocks."
+      },
+      {
+        "path": "apps/desktop/src/lib/dictationFinalizer.ts",
+        "why": "Coordinates finalization outcomes."
+      },
+      {
+        "path": "apps/desktop/src/lib/dictationAsyncGuards.ts",
+        "why": "Prevents stale asynchronous updates."
+      },
+      {
+        "path": "runtime/speech/streaming.py",
+        "why": "Flushes gated samples and finishes the native stream."
+      }
+    ],
+    "caution": "A fast Stop that silently loses the final syllable is a failure, not an optimization.",
+    "quiz": {
+      "question": "What should happen to unoffered tail samples at Stop?",
+      "answers": [
+        "Send them into the existing stream",
+        "Throw them away",
+        "Replay all earlier audio too"
+      ],
+      "correct": 0,
+      "why": "Finish the same stream with only the remaining samples."
+    },
+    "lab": "queue"
+  },
+  {
+    "id": "recovery",
+    "title": "When something goes wrong.",
+    "intro": "A good helper says \u201cI\u2019m not sure\u201d instead of pretending the job is done.",
+    "story": [
+      "A microphone can disappear, a worker can stop, a window can change, or a paste can be uncertain.",
+      "VOCO keeps recovery explicit. It must not blindly retry text that may already have reached another app.",
+      "Retained audio or text belongs to the recording that produced it. An old error must not overwrite a new session\u2019s state."
+    ],
+    "steps": [
+      {
+        "label": "Notice",
+        "detail": "Detect capture, worker or delivery failure."
+      },
+      {
+        "label": "Identify",
+        "detail": "Keep the failed work attached to its session."
+      },
+      {
+        "label": "Retain",
+        "detail": "Preserve available recovery material."
+      },
+      {
+        "label": "Explain",
+        "detail": "Show a useful recovery state instead of false success."
+      },
+      {
+        "label": "Retry safely",
+        "detail": "Start a deliberate recovery or a new session."
+      }
+    ],
+    "facts": [
+      {
+        "title": "Idle worker repair",
+        "text": "A confirmed-dead idle worker may be replaced at a safe boundary. That permission does not extend to automatically replaying an in-flight push or finish."
+      },
+      {
+        "title": "State is a map",
+        "text": "States such as idle, starting, recording and processing make allowed transitions visible. They are more reliable than several unrelated booleans."
+      },
+      {
+        "title": "Retention is bounded",
+        "text": "Recovery support is not a promise to keep every recording forever. Follow the configured limits and explicit recovery workflow."
+      }
+    ],
+    "files": [
+      {
+        "path": "apps/desktop/src/lib/dictationRecovery.ts",
+        "why": "Represents retained recovery work."
+      },
+      {
+        "path": "apps/desktop/src/lib/dictationSession.ts",
+        "why": "Keeps recording identity and lifecycle facts."
+      },
+      {
+        "path": "apps/desktop/src/lib/activityMode.ts",
+        "why": "Defines the activity-state helpers."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/benchmark_stream.rs",
+        "why": "Reaps failed workers and controls restart boundaries."
+      }
+    ],
+    "caution": "This guide\u2019s recovery simulator does not kill or restart the installed app.",
+    "quiz": {
+      "question": "Why avoid an automatic paste retry after an uncertain result?",
+      "answers": [
+        "It may duplicate or misdirect text",
+        "Retries are always slow"
+      ],
+      "correct": 0,
+      "why": "The first paste may already have succeeded. Uncertainty must be handled explicitly."
+    },
+    "lab": "focus"
+  },
+  {
+    "id": "settings",
+    "title": "A small interface, clear ownership.",
+    "intro": "The control panel is the dashboard light, not the engine.",
+    "story": [
+      "The interface shows microphone, shortcut, readiness and recovery. It does not perform neural-network calculations.",
+      "A store keeps visible state and preferences together. Native code still owns operating-system authority.",
+      "VOCO keeps the normal output fixed to live cursor delivery. Removed assistant and appearance controls are not hidden extra modes."
+    ],
+    "steps": [
+      {
+        "label": "Load",
+        "detail": "Read a validated configuration snapshot."
+      },
+      {
+        "label": "Present",
+        "detail": "Derive clear state and helpful labels."
+      },
+      {
+        "label": "Edit",
+        "detail": "Change supported preferences such as microphone or shortcut."
+      },
+      {
+        "label": "Validate",
+        "detail": "Native code validates and saves a supported patch."
+      },
+      {
+        "label": "Refresh",
+        "detail": "Update the interface without losing unrelated state."
+      }
+    ],
+    "facts": [
+      {
+        "title": "A migration is deliberate",
+        "text": "The config loader ignores retired fields and fixes cursor output, stable streaming and enhancement off. It preserves microphone, shortcut and onboarding state."
+      },
+      {
+        "title": "Accessibility is part of the design",
+        "text": "Reduced motion, contrast and transparency follow system preferences. Rounded controls and the silver microphone remain the visual identity."
+      },
+      {
+        "title": "Window movement is native work",
+        "text": "Dragging/resizing a Tauri window uses native APIs. CSS alone cannot move a Linux desktop window."
+      }
+    ],
+    "files": [
+      {
+        "path": "apps/desktop/src/components/ControlPanel.tsx",
+        "why": "Builds the actual panel and settings sections."
+      },
+      {
+        "path": "apps/desktop/src/store/useStore.ts",
+        "why": "Holds frontend state and preferences."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/config.rs",
+        "why": "Validates persisted configuration and supported patches."
+      },
+      {
+        "path": "apps/desktop/src/lib/configSnapshot.ts",
+        "why": "Guards incoming config snapshots."
+      },
+      {
+        "path": "apps/desktop/src/preferences.css",
+        "why": "Applies system accessibility preferences."
+      }
+    ],
+    "caution": "Some old branding documents mention removed features. Read the pinned ControlPanel and config implementation for current behavior.",
+    "quiz": {
+      "question": "Where should Linux input authority live?",
+      "answers": [
+        "Only in a React checkbox",
+        "In the native backend and its guarded integrations"
+      ],
+      "correct": 1,
+      "why": "The UI requests operations; native code enforces their boundaries."
+    },
+    "lab": "journey"
+  },
+  {
+    "id": "linux",
+    "title": "One app, several Linux paths.",
+    "intro": "Linux desktops are neighborhoods with different doorbells and mail slots.",
+    "story": [
+      "X11 and Wayland expose different integration mechanisms. Desktop environments and receiving apps add more variation.",
+      "The normal desktop paste route, optional IBus shortcut helper and explicit Chromium field adapter have different contracts.",
+      "A test inside one distribution\u2019s container does not test its real default desktop or compositor."
+    ],
+    "steps": [
+      {
+        "label": "Desktop route",
+        "detail": "Use current native focus checks and paste helpers."
+      },
+      {
+        "label": "X11 scope",
+        "detail": "Bind the recording shortcut to the intended focus window."
+      },
+      {
+        "label": "IBus",
+        "detail": "Optionally receive owned shortcut events; no text mutation."
+      },
+      {
+        "label": "Chromium",
+        "detail": "Use explicit element/document authorization in that separate route."
+      },
+      {
+        "label": "Qualification",
+        "detail": "Test the actual desktop, application and microphone together."
+      }
+    ],
+    "facts": [
+      {
+        "title": "Stronger browser identity",
+        "text": "The explicit browser adapter can check element/document identity, caret and acknowledged prefix. It rejects unsupported fields, including password inputs."
+      },
+      {
+        "title": "Native messaging is local transport",
+        "text": "The browser host and private socket connect authorized browser work to the desktop. That integration is not a cloud transcription service."
+      },
+      {
+        "title": "A support claim needs the right test",
+        "text": "Ubuntu userspace, package installation, Hyprland behavior and native microphone operation are separate evidence categories."
+      }
+    ],
+    "files": [
+      {
+        "path": "apps/desktop/src-tauri/src/browser_broker.rs",
+        "why": "Coordinates authorized browser sessions."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/browser_protocol.rs",
+        "why": "Defines bounded browser messages."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/bin/voco-browser-host.rs",
+        "why": "Runs the native-messaging bridge."
+      },
+      {
+        "path": "apps/desktop/src-tauri/resources/voco_ibus_engine.py",
+        "why": "Implements the shortcut-only IBus engine."
+      },
+      {
+        "path": "docs/platform/README.md",
+        "why": "Documents platform qualification boundaries."
+      }
+    ],
+    "caution": "Compatibility is not universal. A successful GTK/X11 fixture cannot prove Codex, Brave, Ghostty or every Wayland compositor works.",
+    "quiz": {
+      "question": "Does a successful container test prove the real Hyprland desktop works?",
+      "answers": [
+        "Yes",
+        "No"
+      ],
+      "correct": 1,
+      "why": "A container shares the host kernel and may not run the target compositor or physical devices."
+    },
+    "lab": "journey"
+  },
+  {
+    "id": "privacy",
+    "title": "Draw the trust boundaries.",
+    "intro": "Keep private letters inside the house. Check visitors before opening the door.",
+    "story": [
+      "Normal speech recognition runs locally. It does not require a cloud transcription account.",
+      "Local still needs security: files, sockets, child processes, browser messages and clipboard delivery all cross boundaries.",
+      "Optional timing logs contain counters and identities, not dictated text or recordings. Update checks contact GitHub."
+    ],
+    "steps": [
+      {
+        "label": "Microphone",
+        "detail": "Personal audio enters an authorized recording."
+      },
+      {
+        "label": "Local worker",
+        "detail": "Bounded validated messages stay on the machine."
+      },
+      {
+        "label": "Private state",
+        "detail": "Configuration, sockets and optional logs need safe paths."
+      },
+      {
+        "label": "Other apps",
+        "detail": "Clipboard delivery crosses into a separate process."
+      },
+      {
+        "label": "Updates",
+        "detail": "A separate network operation checks GitHub for releases."
+      }
+    ],
+    "facts": [
+      {
+        "title": "No arbitrary diagnostic strings",
+        "text": "The worker maps failures to safe error codes rather than logging arbitrary exceptions, request data or transcript text."
+      },
+      {
+        "title": "Private paths must stay private",
+        "text": "Permissions, symlink checks and same-user socket rules help prevent another local user from redirecting sensitive output."
+      },
+      {
+        "title": "No silent security shortcuts",
+        "text": "A successful helper command is not proof of safe destination ownership. Content-free logging is not proof that every possible data flow is private."
+      }
+    ],
+    "files": [
+      {
+        "path": "runtime/speech/worker_main.py",
+        "why": "Sanitizes worker error reporting."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/performance.rs",
+        "why": "Writes bounded content-free performance events."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/trigger_socket.rs",
+        "why": "Protects private local control sockets."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/process_runner.rs",
+        "why": "Runs and reaps bounded helper processes."
+      },
+      {
+        "path": "docs/security/README.md",
+        "why": "Explains current security boundaries."
+      }
+    ],
+    "caution": "The study site itself makes no external requests. Its source reader only serves catalogued Git blobs from the pinned commit.",
+    "quiz": {
+      "question": "Which statement is accurate?",
+      "answers": [
+        "Local apps never need security checks",
+        "Local apps still need file, process and input boundaries"
+      ],
+      "correct": 1,
+      "why": "Local execution reduces some exposures but does not remove local trust boundaries."
+    },
+    "lab": "focus"
+  },
+  {
+    "id": "performance",
+    "title": "Measure the right stopwatch.",
+    "intro": "If two runners start their watches at different times, their numbers cannot be compared fairly.",
+    "story": [
+      "First sound, first hypothesis, first paste dispatch and first observed field update are different moments.",
+      "A queue\u2019s waiting time is different from model compute time. Stop-to-idle is different from Stop-to-final.",
+      "A measurement needs its clock origin, units, scope and missing evidence. Good charts keep those labels attached."
+    ],
+    "steps": [
+      {
+        "label": "Playback starts",
+        "detail": "Recorded-audio launch can include leading silence."
+      },
+      {
+        "label": "Worker text",
+        "detail": "The recognizer returns a first nonempty hypothesis."
+      },
+      {
+        "label": "Dispatch",
+        "detail": "The helper completes its delivery command."
+      },
+      {
+        "label": "Field changes",
+        "detail": "An independent observer sees the recipient\u2019s text change."
+      },
+      {
+        "label": "Paint",
+        "detail": "The compositor draws pixels; this needs separate evidence."
+      }
+    ],
+    "facts": [
+      {
+        "title": "Median and p95",
+        "text": "The median is the middle result. The 95th percentile describes the slow tail of a set of observations. Three repeated recordings are not three different speakers."
+      },
+      {
+        "title": "CPU and memory have scope",
+        "text": "Worker RSS covers one process. Summed app-tree RSS can count shared memory more than once. CPU-seconds are work consumed, not battery energy."
+      },
+      {
+        "title": "Logs must not become a bottleneck",
+        "text": "Logging is optional and bounded. Dropped events and missing sequences must be reported because incomplete evidence can make a graph misleading."
+      }
+    ],
+    "files": [
+      {
+        "path": "apps/desktop/src-tauri/src/performance.rs",
+        "why": "Records frontend/native performance events."
+      },
+      {
+        "path": "runtime/speech/streaming.py",
+        "why": "Metrics records worker timings and resource counters."
+      },
+      {
+        "path": "scripts/report-performance.py",
+        "why": "Summarizes application performance logs."
+      },
+      {
+        "path": "scripts/report-speech-performance.py",
+        "why": "Reports speech timing evidence."
+      }
+    ],
+    "caution": "The interactive timeline is an illustration, not benchmark data. Real benchmark assets stay outside this guide repository.",
+    "quiz": {
+      "question": "Can helper dispatch time be labeled \u201cpixels appeared\u201d?",
+      "answers": [
+        "Yes",
+        "No"
+      ],
+      "correct": 1,
+      "why": "The receiver and compositor do additional work. Dispatch is a different observation."
+    },
+    "lab": "latency"
+  },
+  {
+    "id": "tests",
+    "title": "Tests are little promises.",
+    "intro": "A test sets up a situation, performs an action, and checks what should happen.",
+    "story": [
+      "A useful test catches a consequence: a lost final sample, a stale callback, duplicate text or a malformed message.",
+      "Unit tests examine small rules. Integration tests exercise cooperating pieces. Native end-to-end tests use real application boundaries.",
+      "Passing tests gives evidence for the situations tested. It does not prove every future input will work."
+    ],
+    "steps": [
+      {
+        "label": "Arrange",
+        "detail": "Choose a known starting state and input."
+      },
+      {
+        "label": "Act",
+        "detail": "Run the operation under test."
+      },
+      {
+        "label": "Assert",
+        "detail": "Check the expected result and forbidden side effects."
+      },
+      {
+        "label": "Record",
+        "detail": "Keep exact versions, inputs and attempted-run counts."
+      },
+      {
+        "label": "Repeat",
+        "detail": "Fix a real failure and rerun the relevant checks."
+      }
+    ],
+    "facts": [
+      {
+        "title": "Test the failure path",
+        "text": "A dead worker, a missing microphone or a changed target may reveal defects that a happy-path demonstration misses."
+      },
+      {
+        "title": "Do not erase failed attempts",
+        "text": "A fixture failure still belongs in the attempt record. Explain exclusions instead of silently changing the denominator."
+      },
+      {
+        "title": "Different proof levels",
+        "text": "A browser-rendered UI test can mock all native/media boundaries. It proves interface behavior in that harness, not real microphone or desktop insertion."
+      }
+    ],
+    "files": [
+      {
+        "path": "apps/desktop/src/lib/benchmarkPhraseQueue.test.ts",
+        "why": "Checks queue behavior and its invariants."
+      },
+      {
+        "path": "runtime/speech/test_worker_protocol.py",
+        "why": "Checks validation and state transitions at the worker protocol boundary."
+      },
+      {
+        "path": "scripts/test-dictation-renderer.mjs",
+        "why": "Exercises the actual frontend with controlled boundaries."
+      },
+      {
+        "path": "scripts/test-native-desktop.sh",
+        "why": "Runs isolated native desktop checks."
+      },
+      {
+        "path": "docs/testing/README.md",
+        "why": "Indexes test categories and evidence."
+      }
+    ],
+    "caution": "Test files and benchmark research adapters are engineering tools, not extra user-facing app features.",
+    "quiz": {
+      "question": "A mocked browser test passed. What does that establish?",
+      "answers": [
+        "Every physical microphone works",
+        "The tested interface behavior passed in that harness"
+      ],
+      "correct": 1,
+      "why": "The proof must stay within the boundaries actually exercised."
+    },
+    "lab": "journey"
+  },
+  {
+    "id": "shipping",
+    "title": "How source becomes an app.",
+    "intro": "A recipe is not a cake. Building, packaging and checking the result are separate steps.",
+    "story": [
+      "Frontend tools turn TypeScript and CSS into application assets. Rust is compiled into a native executable.",
+      "The package must also contain the pinned speech runtime, model artifacts, helper programs and notices.",
+      "Checksums and exact identities let us verify which bytes were installed and tested. A matching version label alone is not enough."
+    ],
+    "steps": [
+      {
+        "label": "Source",
+        "detail": "Choose a clean commit and locked dependencies."
+      },
+      {
+        "label": "Build",
+        "detail": "Compile the frontend and native application."
+      },
+      {
+        "label": "Assemble",
+        "detail": "Add pinned model/runtime payload and Linux integration."
+      },
+      {
+        "label": "Verify",
+        "detail": "Check package structure, licenses, hashes and execution."
+      },
+      {
+        "label": "Release",
+        "detail": "Publish only after the required tests and acceptance gates."
+      }
+    ],
+    "facts": [
+      {
+        "title": "Lock files are part of the recipe",
+        "text": "package-lock.json and Cargo.lock pin resolved dependency versions. They are not obsolete copies of the package manifests."
+      },
+      {
+        "title": "A base Tauri package can be incomplete",
+        "text": "VOCO\u2019s packaging scripts assemble and validate the speech payload. The raw desktop build alone is not the complete distributable."
+      },
+      {
+        "title": "Frozen evidence stays frozen",
+        "text": "A code change creates new bytes. Tests of an earlier package cannot automatically qualify a newer package, even with the same displayed version."
+      }
+    ],
+    "files": [
+      {
+        "path": "scripts/build-desktop.sh",
+        "why": "Builds the desktop artifacts."
+      },
+      {
+        "path": "scripts/package-nvidia.py",
+        "why": "Assembles the pinned NVIDIA package payload."
+      },
+      {
+        "path": "scripts/verify-deb-package.sh",
+        "why": "Checks Debian package contents."
+      },
+      {
+        "path": "scripts/verify-speech-payload.py",
+        "why": "Verifies speech runtime/model identity."
+      },
+      {
+        "path": "docs/release-process.md",
+        "why": "Documents release and acceptance gates."
+      }
+    ],
+    "caution": "The .39 release remains a candidate until its remaining acceptance/publication gates are met. This learning site does not publish the app.",
+    "quiz": {
+      "question": "Is a version string enough to prove two packages are identical?",
+      "answers": [
+        "Yes",
+        "No; compare exact artifacts and hashes"
+      ],
+      "correct": 1,
+      "why": "Different bytes can accidentally share a version label. Artifact identity is stronger."
+    },
+    "lab": "journey"
+  },
+  {
+    "id": "dependencies",
+    "title": "Borrowed code needs care.",
+    "intro": "You can build a bicycle with borrowed parts, but you still need to know which parts you fitted.",
+    "story": [
+      "A dependency is software that VOCO uses rather than rewriting. Vendored code is a copy kept in the repository.",
+      "The .39 source vendors glib 0.18.5 with a specific upstream iterator-safety fix. Other GTK/WebKit users must resolve to that same patched copy.",
+      "A dependency name on a list is not enough. We need the actual resolved version, patch, license and tests."
+    ],
+    "steps": [
+      {
+        "label": "Manifest",
+        "detail": "Request a dependency and version range or source."
+      },
+      {
+        "label": "Lock",
+        "detail": "Record the resolved dependency graph."
+      },
+      {
+        "label": "Vendor",
+        "detail": "Keep a reviewed patched copy when needed."
+      },
+      {
+        "label": "Verify",
+        "detail": "Compare provenance and run a targeted regression."
+      },
+      {
+        "label": "Notice",
+        "detail": "Include required licenses and acknowledgments."
+      }
+    ],
+    "facts": [
+      {
+        "title": "Why not just add a newer glib?",
+        "text": "Adding a second glib version can leave GTK using the old vulnerable copy. The fix must reach the library actually used by the dependency graph."
+      },
+      {
+        "title": "Upstream code is a different reading layer",
+        "text": "The complete catalog includes vendor files. Their implementations belong to their upstream libraries; start with the local patch notes to see VOCO\u2019s changes."
+      },
+      {
+        "title": "No perfect-security badge",
+        "text": "A fixed issue does not prove that all dependencies have no other risks. Current security documents keep remaining scope separate."
+      }
+    ],
+    "files": [
+      {
+        "path": "vendor/glib/VOCO-PATCH.md",
+        "why": "Explains the exact iterator backport and provenance."
+      },
+      {
+        "path": "scripts/verify-glib-backport.py",
+        "why": "Checks vendored sources and dependency resolution."
+      },
+      {
+        "path": "scripts/test-glib-variant.py",
+        "why": "Runs the optimized iterator regression."
+      },
+      {
+        "path": "apps/desktop/src-tauri/Cargo.lock",
+        "why": "Records Rust dependency resolution when present."
+      }
+    ],
+    "caution": "Do not edit a vendored library casually. A patch needs a reason, provenance, a focused regression and full dependency validation.",
+    "quiz": {
+      "question": "Why can installing a second fixed library version fail to solve an issue?",
+      "answers": [
+        "The application may still use the old copy",
+        "Version numbers cannot be compared"
+      ],
+      "correct": 0,
+      "why": "The resolved consumer dependency must use the patched library."
+    },
+    "lab": "journey"
+  },
+  {
+    "id": "code-reading",
+    "title": "Open any piece of the code.",
+    "intro": "Read code like a map: find the entrance, follow the arrows, then inspect one room at a time.",
+    "story": [
+      "Start with the job of a file, not with its first unfamiliar punctuation mark. Read its imports, named functions and tests.",
+      "Use the file catalog to find every tracked entry at the pinned commit. Open a file to inspect its exact source and jump to a named symbol.",
+      "The chapters explain the central architecture. The catalog supplies complete file coverage; it is not a claim that every upstream line has a hand-written explanation."
+    ],
+    "steps": [
+      {
+        "label": "Find the owner",
+        "detail": "Which module owns the rule you are studying?"
+      },
+      {
+        "label": "Read the boundary",
+        "detail": "What inputs does it accept, and what does it return?"
+      },
+      {
+        "label": "Follow a call",
+        "detail": "Jump to the next helper or native command."
+      },
+      {
+        "label": "Read a test",
+        "detail": "See a concrete input and the expected consequence."
+      },
+      {
+        "label": "Ask why",
+        "detail": "Look for ordering, identity, limits and failure behavior."
+      }
+    ],
+    "facts": [
+      {
+        "title": "Production names can mislead",
+        "text": "benchmarkPhraseQueue.ts and benchmark_stream.rs are live product modules. A historical name is not a reason to delete code."
+      },
+      {
+        "title": "Tests are example stories",
+        "text": "Find the matching .test.ts or test_*.py file. A well-chosen test often explains a tricky rule more clearly than a long comment."
+      },
+      {
+        "title": "Know what the viewer can show",
+        "text": "Text blobs up to 2 MB are readable. Binary assets are indexed with size and Git identity. Native binaries and model weights supplied outside Git are explained as external artifacts."
+      }
+    ],
+    "files": [
+      {
+        "path": "docs/architecture/code-map.md",
+        "why": "The project\u2019s implementation map."
+      },
+      {
+        "path": "AGENTS.md",
+        "why": "Rules for humans and agents working on VOCO."
+      },
+      {
+        "path": "apps/desktop/src/lib/benchmarkPhraseQueue.ts",
+        "why": "A good first detailed queue reading."
+      },
+      {
+        "path": "runtime/speech/worker_main.py",
+        "why": "A compact protocol-validation reading."
+      }
+    ],
+    "caution": "The source reader is read-only and pinned to a commit. It never serves your uncommitted files, credentials or personal recordings.",
+    "quiz": {
+      "question": "What is the best first question when opening a file?",
+      "answers": [
+        "How many lines can I delete?",
+        "What job and invariant does this file own?"
+      ],
+      "correct": 1,
+      "why": "Understanding ownership makes later changes safer and more focused."
+    },
+    "lab": "journey"
+  }
+]
