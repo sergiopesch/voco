@@ -8,6 +8,9 @@ on:
 permissions:
   contents: read
 
+env:
+  WHISPER_NATIVE: "OFF"
+
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
@@ -16,6 +19,10 @@ jobs:
   build:
     name: Build & Verify
     runs-on: ubuntu-24.04
+    env:
+      RUSTFLAGS: "--remap-path-prefix=${{ github.workspace }}=/usr/src/voco --remap-path-prefix=/home/runner=/build/runner"
+      CFLAGS: "-ffile-prefix-map=${{ github.workspace }}=/usr/src/voco -ffile-prefix-map=/home/runner=/build/runner"
+      CXXFLAGS: "-ffile-prefix-map=${{ github.workspace }}=/usr/src/voco -ffile-prefix-map=/home/runner=/build/runner"
     outputs:
       version: ${{ steps.version.outputs.version }}
       tag_name: ${{ steps.version.outputs.tag_name }}
@@ -51,7 +58,7 @@ jobs:
             pkg-config libglib2.0-dev libsoup-3.0-dev \
             libjavascriptcoregtk-4.1-dev libwebkit2gtk-4.1-dev \
             libayatana-appindicator3-dev clang mold cmake file wget \
-            desktop-file-utils appstream ripgrep \
+            desktop-file-utils appstream ripgrep curl libsentencepiece-dev \
             ibus ibus-gtk3 python3 python3-numpy python3-psutil python3-gi gir1.2-ibus-1.0 bubblewrap \
             xvfb xdotool gir1.2-gtk-3.0 gir1.2-webkit2-4.1 gir1.2-atspi-2.0 at-spi2-core \
             pulseaudio pulseaudio-utils libpulse-dev gstreamer1.0-plugins-good \
@@ -144,8 +151,16 @@ jobs:
           CMAKE_BUILD_PARALLEL_LEVEL: "4"
         run: bash scripts/build-desktop.sh
 
-      # A base Tauri archive has no NVIDIA worker/model. Never publish it as a
-      # complete dictation app. Pinned portable runtime provisioning is a release gate.
+      - name: Build pinned portable speech runtime
+        run: |
+          python3 scripts/build-nvidia-runtime.py \
+            --work-dir "$RUNNER_TEMP/voco-native-build" \
+            --output "$RUNNER_TEMP/voco-native-payload"
+          cp -a "$RUNNER_TEMP/voco-native-payload/lib" runtime/speech/
+          cp "$RUNNER_TEMP/voco-native-payload/"{libbench_nemo_pool.so,voco-cpu-check,BUILD-IDENTITY.json} runtime/speech/
+          python3 scripts/provision-nvidia-model.py
+          python3 runtime/speech/test_worker_protocol.py --output-dir "$RUNNER_TEMP/voco-worker-protocol"
+
       - name: Assemble complete local speech payload
         shell: bash
         run: |

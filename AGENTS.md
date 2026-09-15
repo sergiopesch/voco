@@ -98,9 +98,11 @@ isolation, not a remote VM or proof of a distribution's default desktop.
 
 ## Release and evidence
 
-Current development version: **2026.0.39**, glib iterator safety backport. The `.38` and `.37` cuts
-and the accepted `+local7` app are frozen historical evidence. New bytes need fresh
-checks and artifact receipts; do not reuse an older result as current qualification.
+Current development version: **2026.0.40**, public-release preparation. Rebuild
+native libraries from pinned source using the documented fixed CPU baseline and
+neutral paths. Run the baseline CPU check before loading the speech library.
+Package only manifest-listed public files. Keep .39 and earlier evidence frozen;
+new artifact bytes need fresh checks and receipts.
 
 Pass all CI gates, including Whisper accuracy. No waiver is authorized. Keep a
 clean commit, exact package/source hashes, licenses, checksums and release notes.

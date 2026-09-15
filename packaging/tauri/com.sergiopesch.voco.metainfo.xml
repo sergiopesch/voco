@@ -29,7 +29,7 @@
   <url type="vcs-browser">https://github.com/sergiopesch/voco</url>
   <content_rating type="oars-1.1" />
   <releases>
-    <release version="2026.0.39" date="2026-09-15">
+    <release version="2026.0.40" date="2026-09-15">
       <description>
         <p>Adds persistent VOCO Dictation input-source support with revisable live preedit, authoritative local checkpoints, exact-prefix delivery, and recoverable fail-closed final transcripts.</p>
         <p>Unifies tray and settings state, adds safe configuration recovery and single-instance ownership, and hardens model-cache integrity, installers, private IPC, and release verification.</p>

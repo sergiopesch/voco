@@ -3,6 +3,9 @@
 
 # VOCO
 
+[![CI](https://github.com/sergiopesch/voco/actions/workflows/ci.yml/badge.svg)](https://github.com/sergiopesch/voco/actions/workflows/ci.yml)
+[![MIT license](https://img.shields.io/badge/license-MIT-555555)](LICENSE)
+
 Speak. Your words appear at the cursor.
 
 I’m building VOCO to make dictation on Linux fast, simple and private. Speech
@@ -24,10 +27,10 @@ sudo apt install ./voco_latest_amd64.deb
 ```
 
 Run the install command only if checksum verification passes.
-Ubuntu x86_64 is the reference platform. See the [installation guide](docs/install.md)
+Ubuntu 24.04 or newer on x86_64 with AVX2, FMA, F16C, BMI2 and SSE4.2
+is the build baseline. See the [installation guide](docs/install.md)
 for setup, upgrades, source builds and Linux compatibility.
-The newest development candidate may be newer than the latest public download;
-[release status](docs/release-candidate.md) keeps that distinction clear.
+See [release status](docs/release-candidate.md) for qualification and remaining limits.
 
 ## Dictate anywhere you type
 
@@ -43,7 +46,7 @@ transcripts stay available in VOCO for recovery. [Usage and recovery](docs/every
 
 Audio stays on your device. Optional local performance logs contain timings and
 counts, not recordings or dictated text. Update checks contact GitHub.
-[Diagnostics](docs/testing/laptop-performance.md) · [Security](docs/security/README.md).
+[Diagnostics](docs/testing/laptop-performance.md) · [Security](SECURITY.md).
 
 Curious how it works? Explore the [visual code guide](docs/guide/README.md).
 
@@ -51,7 +54,7 @@ Curious how it works? Explore the [visual code guide](docs/guide/README.md).
 
 Start with [development setup](docs/contributing.md), [the code map](docs/architecture/code-map.md)
 and [AGENTS.md](AGENTS.md). Tests and benchmark methods are indexed in
-[testing](docs/testing/README.md).
+[testing](docs/testing/README.md). Please follow our [community conduct](CODE_OF_CONDUCT.md).
 
 ## License
 

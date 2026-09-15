@@ -4,7 +4,7 @@ import argparse
 import hashlib
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import shutil
 import stat
 import subprocess
@@ -15,6 +15,107 @@ VENDORED_NOTICES = {
     "global-hotkey": ("VOCO-PATCH.md", "VOCO-UPSTREAM.json", "LICENSE-APACHE", "LICENSE-MIT", "LICENSE.spdx"),
     "glib": ("VOCO-PATCH.md", "VOCO-UPSTREAM.json", "upstream-fix.patch", "LICENSE", "COPYRIGHT"),
 }
+SPEECH_FILES = (
+    "stream_worker.py", "worker_main.py", "streaming.py", "adapters.py",
+    "MODEL-IDENTITY.json", "BUILD-IDENTITY.json", "voco-cpu-check", "libbench_nemo_pool.so",
+    "models/nemotron-speech-streaming-en-0.6b.q8_0.gguf",
+    "lib/libggml-base.so.0.12.0", "lib/libggml-cpu.so.0.12.0",
+    "lib/libggml.so.0.12.0", "lib/libnemo_speech_asr.so", "lib/libnemo_speech_asr_c.so.1",
+)
+SPEECH_LINKS = {f"lib/lib{name}.so.0": f"lib{name}.so.0.12.0"
+                for name in ("ggml-base", "ggml-cpu", "ggml")}
+SPEECH_LINKS.update({f"lib/lib{name}.so": f"lib{name}.so.0"
+                     for name in ("ggml-base", "ggml-cpu", "ggml")})
+SPEECH_LINKS["lib/libnemo_speech_asr_c.so"] = "libnemo_speech_asr_c.so.1"
+NVIDIA_NOTICES = (
+    "GGML-LICENSE", "LICENSE", "NOTICE", "NVIDIA-MODEL-CARD.md",
+    "NVIDIA-NOTICE.txt", "NVIDIA-OPEN-MODEL-LICENSE.html", "THIRD_PARTY_NOTICES.md",
+)
+
+
+def relative_parts(name):
+    """Manifest entries use canonical relative POSIX paths, never traversal."""
+    if not isinstance(name, str):
+        raise ValueError("Invalid public payload path")
+    path = PurePosixPath(name)
+    if (not path.parts or path.is_absolute() or ".." in path.parts
+            or str(path) != name or "\\" in name):
+        raise ValueError("Invalid public payload path")
+    return path.parts
+
+
+def source_file(source_root, name, link_target=None):
+    parts = relative_parts(name)
+    path = source_root
+    if path.is_symlink() or not path.is_dir():
+        raise ValueError("Public payload source must be a real directory")
+    for index, part in enumerate(parts):
+        path = path / part
+        try:
+            mode = path.lstat().st_mode
+        except OSError as error:
+            raise ValueError(f"Missing public payload source: {name}") from error
+        if index < len(parts) - 1:
+            if not stat.S_ISDIR(mode):
+                raise ValueError(f"Public payload parent must be a real directory: {name}")
+        elif link_target is not None:
+            if not stat.S_ISLNK(mode) or os.readlink(path) != link_target:
+                raise ValueError(f"Unexpected runtime link: {name}")
+        elif not stat.S_ISREG(mode):
+            raise ValueError(f"Public payload source must be a regular file: {name}")
+    return path
+
+
+def copy_public_files(source_root, destination, entries):
+    """Copy only enumerated regular files; validate all sources before writing."""
+    sources = [(source_file(source_root, source), relative_parts(target))
+               for source, target in entries.items()]
+    destination.mkdir(parents=True, exist_ok=True)
+    if destination.is_symlink() or not destination.is_dir():
+        raise ValueError("Public payload destination must be a real directory")
+    for source, parts in sources:
+        parent = destination
+        for part in parts[:-1]:
+            parent = parent / part
+            parent.mkdir(exist_ok=True)
+            if parent.is_symlink() or not parent.is_dir():
+                raise ValueError("Public payload destination parent must be a real directory")
+        target = parent / parts[-1]
+        if target.is_symlink() or (target.exists() and not target.is_file()):
+            raise ValueError("Public payload destination must be a regular file")
+        shutil.copy2(source, target)
+
+
+def copy_public_documents(source_root, doc):
+    manifest = source_file(source_root, "packaging/public-docs.json")
+    names = json.loads(manifest.read_text())
+    if (not isinstance(names, list) or not names
+            or any(not isinstance(name, str) for name in names)
+            or len(names) != len(set(names))):
+        raise ValueError("Invalid public documentation manifest")
+    if any(relative_parts(name)[0] != "docs" for name in names):
+        raise ValueError("Public documentation manifest must name docs files")
+    entries = {name: name for name in names}
+    entries.update({name: name for name in ("README.md", "AGENTS.md", "SECURITY.md")})
+    entries.update({f"scripts/{name}": name for name in
+                    ("report-performance.py", "report-speech-performance.py")})
+    copy_public_files(source_root, doc, entries)
+
+
+def copy_speech_payload(source_root, speech):
+    # Validate the exact loader aliases, then recreate them without following
+    # checkout symlinks. Every terminal library target is copied as a regular file.
+    for name, target in SPEECH_LINKS.items():
+        source_file(source_root, f"runtime/speech/{name}", link_target=target)
+    copy_public_files(source_root, speech,
+                      {f"runtime/speech/{name}": name for name in SPEECH_FILES})
+    for name, target in SPEECH_LINKS.items():
+        (speech / name).symlink_to(target)
+
+
+def copy_nvidia_notices(source_root, doc):
+    copy_public_files(source_root, doc / "nvidia",
+                      {f"runtime/notices/{name}": name for name in NVIDIA_NOTICES})
 
 
 def digest(path, algorithm="sha256"):
@@ -82,14 +183,14 @@ def copy_vendored_notices(source_root, doc):
     """Ship patched dependencies' licenses and provenance, preserving doc links."""
     for crate, names in VENDORED_NOTICES.items():
         for name in names:
-            path = source_root / "vendor" / crate / name
-            if path.is_symlink() or not path.is_file():
-                raise ValueError(f"Missing regular vendored notice: {crate}/{name}")
-    for crate, names in VENDORED_NOTICES.items():
-        destination = doc / "vendor" / crate
-        destination.mkdir(parents=True, exist_ok=True)
-        for name in names:
-            shutil.copy2(source_root / "vendor" / crate / name, destination / name)
+            try:
+                source_file(source_root, f"vendor/{crate}/{name}")
+            except ValueError as error:
+                raise ValueError(f"Missing regular vendored notice: {crate}/{name}") from error
+    copy_public_files(source_root, doc, {
+        f"vendor/{crate}/{name}": f"vendor/{crate}/{name}"
+        for crate, names in VENDORED_NOTICES.items() for name in names
+    })
 
 
 def main():
@@ -116,24 +217,14 @@ def main():
         validate_base_executables(stage)
         subprocess.run(["python3", str(ROOT / "scripts/verify-glib-backport.py")], check=True)
         speech = stage / "usr/lib/voco/speech"
-        speech.mkdir(parents=True)
-        source = ROOT / "runtime/speech"
-        for name in ("stream_worker.py", "worker_main.py", "streaming.py", "adapters.py",
-                     "MODEL-IDENTITY.json", "libbench_nemo_pool.so"):
-            shutil.copy2(source / name, speech / name)
-        for name in ("lib", "models"):
-            shutil.copytree(source / name, speech / name, symlinks=True)
+        copy_speech_payload(ROOT, speech)
         model = speech / "models/nemotron-speech-streaming-en-0.6b.q8_0.gguf"
         expected = json.loads((speech / "MODEL-IDENTITY.json").read_text())["model_sha256"]
         if digest(model) != expected:
             raise ValueError("Packaged model does not match pinned MODEL-IDENTITY.json")
         doc = stage / "usr/share/doc/voco"
-        shutil.copytree(ROOT / "runtime/notices", doc / "nvidia", dirs_exist_ok=True)
-        for name in ("report-performance.py", "report-speech-performance.py"):
-            shutil.copy2(ROOT / "scripts" / name, doc / name)
-        for name in ("README.md", "AGENTS.md"):
-            shutil.copy2(ROOT / name, doc / name)
-        shutil.copytree(ROOT / "docs", doc / "docs", dirs_exist_ok=True)
+        copy_nvidia_notices(ROOT, doc)
+        copy_public_documents(ROOT, doc)
         copy_vendored_notices(ROOT, doc)
         identity = {"version": package_version, "application_version": version,
                     "backend": "CPU native pool", "context": 1, "cpu_threads": 4,

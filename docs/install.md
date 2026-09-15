@@ -1,6 +1,9 @@
 # Install VOCO
 
-Ubuntu x86_64 is the reference platform. Debian-derived systems are best-effort.
+The build baseline is Ubuntu 24.04 or newer on x86_64. The speech runtime needs
+AVX2, FMA, F16C, BMI2 and SSE4.2 with operating-system AVX support. Unsupported
+CPUs fail the readiness check before loading the native engine. Debian-derived
+systems are best-effort; consult the release validation record for tested setups.
 A complete Debian package includes the NVIDIA English model and CPU runtime.
 A plain Tauri bundle is incomplete. See [packaging](linux-packaging.md).
 

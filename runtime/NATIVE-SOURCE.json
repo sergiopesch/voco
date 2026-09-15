@@ -1,0 +1,46 @@
+{
+  "schema": 1,
+  "upstream": {
+    "url": "https://github.com/NVIDIA/NeMo-Speech.cpp.git",
+    "commit": "a5b6953c4a579a2bbd1c0913ad8a85c2a4d99953",
+    "license": "Apache-2.0 with third-party notices"
+  },
+  "ggml": {
+    "url": "https://github.com/ggml-org/ggml.git",
+    "commit": "c03b4e2bcece5134827881af90242086daf75be5",
+    "license": "MIT"
+  },
+  "patches": [
+    {
+      "path": "patches/first-chunk-overlap.patch",
+      "sha256": "617e3d67a0f92296346f154eeee826ec8ca6afdc8c44bfdc061cd510346e0f32"
+    },
+    {
+      "path": "patches/sleeping-cpu-pool.patch",
+      "sha256": "ab84627970075b78a72afdf3d82356d3ab6a8630bf21eb2214a50cfc9fcb9563"
+    }
+  ],
+  "patched_files": {
+    "src/asr/runner.cpp": "6a1cabd8b40aecf48d4e876dc089873e625d6e0efd29bb255653dd7c810b6024",
+    "src/runtime/ggml/backend.cpp": "2b8edf2f638e51636ddb1246a33151eb0afb6f43170f63276c1a66ad7c575564",
+    "src/runtime/ggml/runtime.h": "8e682c0a3a42482583d594bfe6423f1e454259d42b691210931ed8fbec6b22ca",
+    "src/runtime/ggml/session.cpp": "b9fb16b11ba9c54a0aba89f0b5acea56dce3e8228cf6d585202b05a76a5a8b0f"
+  },
+  "cpu_features": [
+    "sse4_2",
+    "avx",
+    "avx2",
+    "fma",
+    "f16c",
+    "bmi2"
+  ],
+  "configuration": {
+    "backend": "CPU single linked backend",
+    "context": 1,
+    "cpu_threads": 4,
+    "pool_poll": 0,
+    "openmp": false,
+    "native_arch": false
+  },
+  "model": "Provision separately using runtime/speech/MODEL-IDENTITY.json; this builder neither downloads nor changes weights."
+}

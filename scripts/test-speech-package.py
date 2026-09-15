@@ -29,17 +29,30 @@ class SpeechPackageTests(unittest.TestCase):
         self.speech = self.root / "usr/lib/voco/speech"
         (self.speech / "models").mkdir(parents=True)
         for name in ("stream_worker.py", "worker_main.py", "streaming.py", "adapters.py",
-                     "libbench_nemo_pool.so", "models/nemotron-speech-streaming-en-0.6b.q8_0.gguf"):
+                     "libbench_nemo_pool.so", "voco-cpu-check",
+                     "models/nemotron-speech-streaming-en-0.6b.q8_0.gguf"):
             (self.speech / name).write_bytes(b"fixture")
+        (self.speech / "voco-cpu-check").chmod(0o755)
         (self.speech / "MODEL-IDENTITY.json").write_text(json.dumps({"model_sha256":
             package.digest(self.speech / "models/nemotron-speech-streaming-en-0.6b.q8_0.gguf")}))
-        (self.speech / "alias.so").symlink_to("libbench_nemo_pool.so")
         (self.speech / "lib").mkdir()
         for name in validator.NATIVE_FILES:
             (self.speech / name).write_bytes(b"native fixture")
         for name, target in validator.NATIVE_LINKS.items():
             (self.speech / name).symlink_to(target)
+        self.build_identity = {
+            "schema": 1,
+            "source": json.loads((validator.SOURCE_ROOT / "runtime/NATIVE-SOURCE.json").read_text()),
+            "bridge_sha256": package.digest(validator.SOURCE_ROOT / "runtime/speech/nemo_bridge.cpp"),
+            "cpu_check_sha256": package.digest(validator.SOURCE_ROOT / "runtime/speech/cpu_check.c"),
+            "files": {name: package.digest(self.speech / name) for name in validator.COMPILED_FILES},
+            "symlinks": validator.NATIVE_LINKS,
+        }
+        self.save_build_identity()
         self.save_manifest()
+
+    def save_build_identity(self):
+        (self.speech / "BUILD-IDENTITY.json").write_text(json.dumps(self.build_identity))
 
     def save_manifest(self):
         (self.speech / "MANIFEST.json").write_text(json.dumps(
@@ -49,7 +62,8 @@ class SpeechPackageTests(unittest.TestCase):
         return validator.verify(self.root, "2026.0.34+rc1")
 
     def test_complete_payload(self):
-        self.assertEqual(self.verify()["symlinks"], 1 + len(validator.NATIVE_LINKS))
+        self.assertEqual(self.verify()["symlinks"], len(validator.NATIVE_LINKS))
+        self.assertEqual(set(package.SPEECH_FILES), validator.REQUIRED_FILES)
 
     def test_missing_native_payload_even_with_new_manifest(self):
         (self.speech / "lib/libnemo_speech_asr.so").unlink()
@@ -79,8 +93,8 @@ class SpeechPackageTests(unittest.TestCase):
             self.verify()
 
     def test_broken_link(self):
-        (self.speech / "alias.so").unlink()
-        (self.speech / "alias.so").symlink_to("absent.so")
+        (self.speech / "lib/libggml.so").unlink()
+        (self.speech / "lib/libggml.so").symlink_to("absent.so")
         with self.assertRaisesRegex(ValueError, "symlink"):
             self.verify()
         with self.assertRaisesRegex(ValueError, "broken"):
@@ -88,8 +102,8 @@ class SpeechPackageTests(unittest.TestCase):
 
     def test_escaped_link(self):
         (self.root / "outside").write_text("outside")
-        (self.speech / "alias.so").unlink()
-        (self.speech / "alias.so").symlink_to(self.root / "outside")
+        (self.speech / "lib/libggml.so").unlink()
+        (self.speech / "lib/libggml.so").symlink_to(self.root / "outside")
         with self.assertRaisesRegex(ValueError, "symlink"):
             self.verify()
         with self.assertRaisesRegex(ValueError, "escapes"):
@@ -103,6 +117,88 @@ class SpeechPackageTests(unittest.TestCase):
         (self.speech / "MODEL-IDENTITY.json").write_text('{"model_sha256":"incorrect"}')
         self.save_manifest()
         with self.assertRaisesRegex(ValueError, "Model identity"):
+            self.verify()
+
+    def test_missing_guard_or_build_identity_even_with_new_manifest(self):
+        for name in ("voco-cpu-check", "BUILD-IDENTITY.json"):
+            with self.subTest(name=name):
+                path = self.speech / name
+                content = path.read_bytes()
+                path.unlink()
+                self.save_manifest()
+                with self.assertRaisesRegex(ValueError, "Incomplete"):
+                    self.verify()
+                path.write_bytes(content)
+                path.chmod(0o755 if name == "voco-cpu-check" else 0o644)
+
+    def test_nonexecutable_guard_is_rejected(self):
+        (self.speech / "voco-cpu-check").chmod(0o644)
+        with self.assertRaisesRegex(ValueError, "guard must be executable"):
+            self.verify()
+
+    def test_guard_and_receipt_symlinks_are_rejected(self):
+        for name in ("voco-cpu-check", "BUILD-IDENTITY.json", "MANIFEST.json"):
+            with self.subTest(name=name):
+                path = self.speech / name
+                saved = self.root / name
+                path.rename(saved)
+                path.symlink_to(saved)
+                with self.assertRaises(ValueError):
+                    self.verify()
+                path.unlink()
+                saved.rename(path)
+
+    def test_extra_file_or_alias_even_with_new_manifest_is_rejected(self):
+        for name in ("private.wav", "alias.so"):
+            with self.subTest(name=name):
+                path = self.speech / name
+                if name.endswith(".so"):
+                    path.symlink_to("libbench_nemo_pool.so")
+                else:
+                    path.write_text("private fixture")
+                self.save_manifest()
+                with self.assertRaisesRegex(ValueError, "unexpected"):
+                    self.verify()
+                path.unlink()
+
+    def test_rehashed_native_bridge_or_guard_requires_matching_build_receipt(self):
+        for name in validator.COMPILED_FILES:
+            with self.subTest(name=name):
+                path = self.speech / name
+                original = path.read_bytes()
+                path.write_bytes(b"changed binary fixture")
+                self.save_manifest()
+                with self.assertRaisesRegex(ValueError, "binary checksums"):
+                    self.verify()
+                path.write_bytes(original)
+
+    def test_build_receipt_source_and_hash_tampering_is_rejected(self):
+        changes = {"schema": 2, "source": {}, "bridge_sha256": "0" * 64,
+                   "cpu_check_sha256": "0" * 64, "files": {}, "symlinks": {}}
+        for key, replacement in changes.items():
+            with self.subTest(key=key):
+                original = self.build_identity[key]
+                self.build_identity[key] = replacement
+                self.save_build_identity()
+                self.save_manifest()
+                with self.assertRaises(ValueError):
+                    self.verify()
+                self.build_identity[key] = original
+
+    def test_build_receipt_notices_need_not_be_packaged_under_speech(self):
+        self.build_identity["files"]["notices/NATIVE-SOURCE.json"] = "a" * 64
+        self.save_build_identity()
+        self.save_manifest()
+        self.verify()
+
+    def test_unexpected_directory_or_special_file_is_rejected(self):
+        extra = self.speech / "private"
+        extra.mkdir()
+        with self.assertRaisesRegex(ValueError, "directory"):
+            self.verify()
+        extra.rmdir()
+        os.mkfifo(extra)
+        with self.assertRaisesRegex(ValueError, "object"):
             self.verify()
 
 
@@ -144,6 +240,130 @@ class VendoredNoticeTests(unittest.TestCase):
                     with self.assertRaisesRegex(ValueError, "regular vendored notice"):
                         package.copy_vendored_notices(root, doc)
                     self.assertFalse(doc.exists())
+
+
+class PublicPayloadTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        self.source = self.root / "source"
+        self.destination = self.root / "out"
+        for name in ("docs/guide/README.md", "README.md", "AGENTS.md", "SECURITY.md",
+                     "scripts/report-performance.py", "scripts/report-speech-performance.py"):
+            path = self.source / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("public fixture")
+        self.manifest = self.source / "packaging/public-docs.json"
+        self.manifest.parent.mkdir()
+        self.manifest.write_text(json.dumps(["docs/guide/README.md"]))
+
+    def test_archive_without_git_excludes_unlisted_private_documents(self):
+        (self.source / "docs/private-recording.txt").write_text("private fixture")
+        (self.source / "docs/guide/local-notes.json").write_text("private fixture")
+        package.copy_public_documents(self.source, self.destination)
+        self.assertEqual((self.destination / "docs/guide/README.md").read_text(), "public fixture")
+        self.assertEqual({str(p.relative_to(self.destination / "docs"))
+                          for p in (self.destination / "docs").rglob("*") if p.is_file()},
+                         {"guide/README.md"})
+        self.assertFalse((self.source / ".git").exists())
+
+    def test_document_and_parent_symlinks_fail_before_any_copy(self):
+        for linked in ("docs/guide/README.md", "docs/guide"):
+            with self.subTest(linked=linked):
+                path = self.source / linked
+                saved = path.with_name(path.name + ".saved")
+                path.rename(saved)
+                path.symlink_to(saved, target_is_directory=saved.is_dir())
+                with self.assertRaisesRegex(ValueError, "real directory|regular file"):
+                    package.copy_public_documents(self.source, self.destination)
+                self.assertFalse(self.destination.exists())
+                path.unlink()
+                saved.rename(path)
+
+    def test_invalid_or_escaping_document_manifest_is_rejected(self):
+        for names in (["../private.txt"], ["/tmp/private.txt"], ["docs/../private.txt"],
+                      ["docs//guide/README.md"], ["docs/guide/README.md"] * 2,
+                      ["runtime/private.txt"], [], {}, [None]):
+            with self.subTest(names=names):
+                self.manifest.write_text(json.dumps(names))
+                with self.assertRaises(ValueError):
+                    package.copy_public_documents(self.source, self.destination)
+                self.assertFalse(self.destination.exists())
+
+    def test_linked_manifest_is_rejected(self):
+        saved = self.manifest.with_suffix(".saved")
+        self.manifest.rename(saved)
+        self.manifest.symlink_to(saved)
+        with self.assertRaisesRegex(ValueError, "regular file"):
+            package.copy_public_documents(self.source, self.destination)
+        self.assertFalse(self.destination.exists())
+
+    def test_destination_symlink_does_not_overwrite_its_target(self):
+        self.destination.mkdir()
+        outside = self.root / "outside"
+        outside.write_text("private fixture")
+        (self.destination / "README.md").symlink_to(outside)
+        with self.assertRaisesRegex(ValueError, "destination must be a regular file"):
+            package.copy_public_documents(self.source, self.destination)
+        self.assertEqual(outside.read_text(), "private fixture")
+
+    def stage_runtime(self):
+        for name in package.SPEECH_FILES:
+            path = self.source / "runtime/speech" / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b"runtime fixture")
+        for name, target in package.SPEECH_LINKS.items():
+            (self.source / "runtime/speech" / name).symlink_to(target)
+
+    def test_runtime_copies_exact_inventory_and_excludes_private_extras(self):
+        self.stage_runtime()
+        for name in ("models/private.wav", "lib/private-notes.txt"):
+            (self.source / "runtime/speech" / name).write_text("private fixture")
+        package.copy_speech_payload(self.source, self.destination)
+        inventory = package.payload_inventory(self.destination)
+        self.assertEqual(set(inventory["files"]), set(package.SPEECH_FILES))
+        self.assertEqual(inventory["symlinks"], package.SPEECH_LINKS)
+        self.assertTrue(validator.NATIVE_FILES.issubset(package.SPEECH_FILES))
+        self.assertEqual(package.SPEECH_LINKS, validator.NATIVE_LINKS)
+
+    def test_runtime_rejects_replaced_model_and_wrong_loader_alias(self):
+        self.stage_runtime()
+        for name in ("models/nemotron-speech-streaming-en-0.6b.q8_0.gguf", "lib/libggml.so"):
+            with self.subTest(name=name):
+                path = self.source / "runtime/speech" / name
+                saved = path.with_name(path.name + ".saved")
+                path.rename(saved)
+                path.symlink_to(saved)
+                with self.assertRaises(ValueError):
+                    package.copy_speech_payload(self.source, self.destination)
+                self.assertFalse(self.destination.exists())
+                path.unlink()
+                saved.rename(path)
+
+    def test_notices_copy_exact_bytes_without_local_extras(self):
+        notices = self.source / "runtime/notices"
+        notices.mkdir(parents=True)
+        for name in package.NVIDIA_NOTICES:
+            (notices / name).write_text("license fixture " + name)
+        (notices / "private.txt").write_text("private fixture")
+        package.copy_nvidia_notices(self.source, self.destination)
+        copied = self.destination / "nvidia"
+        self.assertEqual({path.name for path in copied.iterdir()}, set(package.NVIDIA_NOTICES))
+        for name in package.NVIDIA_NOTICES:
+            self.assertEqual((copied / name).read_bytes(), (notices / name).read_bytes())
+
+    def test_linked_notice_is_rejected_before_any_copy(self):
+        notices = self.source / "runtime/notices"
+        notices.mkdir(parents=True)
+        for name in package.NVIDIA_NOTICES:
+            (notices / name).write_text("license fixture")
+        notice = notices / package.NVIDIA_NOTICES[0]
+        notice.unlink()
+        notice.symlink_to(package.NVIDIA_NOTICES[1])
+        with self.assertRaisesRegex(ValueError, "regular file"):
+            package.copy_nvidia_notices(self.source, self.destination)
+        self.assertFalse(self.destination.exists())
 
 
 class PayloadModeTests(unittest.TestCase):

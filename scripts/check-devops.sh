@@ -15,6 +15,9 @@ done
 npm run verify:versions
 python3 vendor/verify.py
 python3 vendor/verify.test.py
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-build-nvidia-runtime.py
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-provision-nvidia-model.py
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-release-privacy.py
 
 bash -n \
   install \

@@ -108,6 +108,7 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 dpkg-deb -x "${DEB_PATH}" "${EXTRACT_ROOT}"
+python3 "${ROOT_DIR}/scripts/check-release-privacy.py" "${EXTRACT_ROOT}"
 # A development binary may link Pulse directly; never rely on a desktop's
 # incidental transitive installation to satisfy that runtime dependency.
 for executable in /usr/bin/voco /usr/libexec/voco-browser-host; do

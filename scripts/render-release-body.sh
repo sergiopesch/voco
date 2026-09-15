@@ -10,7 +10,8 @@ Local English dictation for Linux. Speak and your words appear at the cursor.
 
 - One direct delivery path with live words and punctuation.
 - Minimal settings and a draggable window header.
-- Assistant, conversation, enhancement and appearance controls removed.
+- Local speech runtime rebuilt from pinned sources with a fixed CPU baseline.
+- Explicit public-file packaging and remapped build paths protect release privacy.
 - Microphone and shortcut preferences preserved on upgrade.
 - Local NVIDIA CPU recognition; no account or cloud transcription.
 
@@ -31,7 +32,8 @@ if diagnostics report an older helper. IBus protocol 6 is dictation-shortcut-onl
 
 ## Scope
 
-Ubuntu x86_64 is the reference platform. Text delivery uses clipboard paste,
+Ubuntu 24.04+ x86_64 is the build baseline. The native engine requires OS-enabled
+AVX2, AVX, FMA, F16C, BMI2 and SSE4.2. Text delivery uses clipboard paste,
 replaces clipboard text and never presses Enter. Protected or custom editors,
 other compositors and physical audio need their own testing. Generic desktop
 paste cannot safely rewrite an entire message after Stop. The bundled model is

@@ -3,9 +3,19 @@ from pathlib import Path
 import ctypes as c
 import os
 import hashlib
+import subprocess
 import time
 import numpy as np
 ROOT=Path(__file__).resolve().parent
+
+def check_cpu():
+    """Check OS-enabled SIMD before the dynamic loader runs native constructors."""
+    result = subprocess.run([str(ROOT / 'voco-cpu-check')],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                            timeout=5, check=False)
+    if result.returncode != 0:
+        raise RuntimeError('Unsupported CPU: VOCO requires AVX2, FMA, F16C, BMI2 and SSE4.2')
+
 class Moonshine:
     def __init__(self,size,interval=.2,fast=False):
         from moonshine_voice import Transcriber, ModelArch
@@ -34,6 +44,7 @@ class Nemotron:
     def __init__(self,context=1):
         backend=os.environ.get('VOCO_NEMO_BACKEND','pool')
         if backend not in ('openmp','pool'):raise ValueError('unsupported backend')
+        check_cpu()
         self.lib=c.CDLL(str(ROOT/f'libbench_nemo_{backend}.so')); lib=self.lib
         def fn(name,args,result):
             f=getattr(lib,name); f.argtypes=args; f.restype=result; return f

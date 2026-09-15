@@ -24,15 +24,14 @@ notes. Download the uploaded assets and verify every byte before marking the cut
 If a signing key is unavailable, say the tag is unsigned; checksums are integrity
 checks, not a substitute for signatures.
 
-The hosted tag workflow still needs portable pinned NVIDIA provisioning from a
-fresh clone. Until that is implemented and verified, keep the tag local and use
-verified isolated build artifacts for the draft. Do not push a tag into a known
-incomplete workflow or substitute mutable downloads. This changes the delivery
-mechanism, not the test gates.
+The hosted tag workflow provisions the pinned model and builds the native runtime
+from exact source commits and verified patches. It creates a draft only. Keep
+build paths neutral, use a fixed CPU baseline, and inspect the actual package for
+personal data before attaching it. A successfully built base Tauri bundle is not
+a complete release.
 
-The [2026.0.37 cut](releases/2026.0.37.md) is historical and immutable. The .38
-dictation-only cut is also frozen. The .39 glib backport changes native
-application bytes and requires fresh qualification despite unchanged speech models.
+Earlier cuts remain immutable. Any native rebuild, packaging change or dependency
+fix needs fresh qualification and a new version, even when the model is unchanged.
 
 ## Publish
 

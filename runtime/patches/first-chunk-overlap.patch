@@ -1,0 +1,14 @@
+--- a/src/asr/runner.cpp
++++ b/src/asr/runner.cpp
+@@ -1012,7 +1012,10 @@
+     // the loop; the next utterance's remaining chunks decode on the next
+     // step() call.
+     last_step_new_tokens_.clear();
+-    while (static_cast<int>((mel_buf_.size() - mel_offset_) / n_mels) >= chunk_size_mel) {
++    // The first chunk supplies its nine overlap frames as zeros below. Wait
++    // only for the real center/right frames, not another 90ms of live audio.
++    while (static_cast<int>((mel_buf_.size() - mel_offset_) / n_mels) >=
++           chunk_size_mel - (stream_zero_padded_ ? 0 : pre_encode_cache_size_)) {
+         if (!stream_zero_padded_) {
+             // First-chunk zero-pad so the encoder's unconditional
+             // cache_drop_extra eats zero-pad, not the leading 160 ms of real audio.

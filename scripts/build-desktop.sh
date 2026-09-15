@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# whisper.cpp otherwise targets the build host, even for distributed packages.
+# Its pinned compatibility option maps to GGML_NATIVE=OFF (fixed SIMD defaults).
+export WHISPER_NATIVE=OFF
+
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_DIR="${ROOT_DIR}/apps/desktop"
 FEATURES="custom-protocol"
