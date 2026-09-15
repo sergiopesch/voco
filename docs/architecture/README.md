@@ -72,8 +72,8 @@ establishes universal desktop or Wayland qualification.
 
 Legacy Whisper preview/final and hybrid recognition remain in `transcribe.rs` and
 the [hybrid planner](hybrid-recognition.md). They are not the streaming NVIDIA
-candidate benchmark path. Optional local-model processing, OpenClaw and Realtime
-retain distinct configuration and network boundaries; see [security](../security/README.md).
+candidate path. Assistant, OpenClaw, conversation and enhancement capabilities have
+been removed; see the current [security boundaries](../security/README.md).
 
 ## State, UI and lifecycle
 
