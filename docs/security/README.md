@@ -254,7 +254,7 @@ attack. Final candidate and distribution receipts remain separate gates.
 
 Fresh isolated npm/Rust audits on 15 September exited 0 with zero vulnerability-class
 findings. RustSec database commit was `e2e640471715167f73e22eaf761f2e547adafeec`.
-Seven maintenance notices and two unsoundness notices remain visible; no exemption
+Seven maintenance notices and one rand unsoundness notice remain visible; no exemption
 was added. Native shared libraries, models and distro packages are outside this
 lockfile-audit scope.
 
@@ -270,7 +270,8 @@ regressions. Source/archive verification and the optimized test are mandatory CI
 gates. See [patch provenance and maintenance](../../vendor/glib/VOCO-PATCH.md).
 
 This is a source backport, not a published glib version upgrade. Version-based
-scanners may retain an alert; an alert disappearing is not the verification.
+scanners may retain an alert. Cargo audit does not report this vendored path copy;
+the source reconstruction and optimized regression establish the fix.
 Application-level exploit reachability was not established. The dependency bug
 is fixed at its shared C out-argument boundary without changing application
 permissions, logging, APIs or GTK object types. The seven maintenance notices
