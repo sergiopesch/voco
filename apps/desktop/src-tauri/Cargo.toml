@@ -1,6 +1,6 @@
 [package]
 name = "voco"
-version = "2026.0.38"
+version = "2026.0.39"
 description = "Turn speech into text at your cursor with local dictation"
 authors = ["VOCO Contributors"]
 edition = "2021"
@@ -56,3 +56,4 @@ libc = "0.2"
 global-hotkey = { path = "../../../vendor/global-hotkey" }
 whisper-rs = { path = "../../../vendor/whisper-rs" }
 whisper-rs-sys = { path = "../../../vendor/whisper-rs-sys" }
+glib = { path = "../../../vendor/glib" }

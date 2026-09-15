@@ -1,22 +1,23 @@
 # Release status
 
-**2026.0.38 is the next private candidate.** It simplifies VOCO to direct cursor
-dictation, removes assistant and conversation capabilities, and adds a usable
-settings-window drag surface. Existing microphone and shortcut preferences survive
-migration. The NVIDIA model and streaming/delivery safeguards are retained.
+**2026.0.39 is the next private candidate.** It backports the upstream glib
+iterator safety fix while retaining VOCO's dictation-only UI, NVIDIA model and
+streaming/delivery behavior. The frozen .38 cut remains the comparison baseline.
 
-The [2026.0.37 cut](releases/2026.0.37.md) is frozen. Its tests do not qualify new
-2026.0.38 bytes. The latest public GitHub download may be older than either candidate.
+## Required before the cut
 
-## Required before the next cut
+- Pinned glib source matches the exact upstream patch; every consumer resolves it.
+- Optimized iterator regression, full CI and unchanged Whisper accuracy gates pass.
+- Isolated renderer/native delivery and package install/remove checks pass.
+- Complete NVIDIA package, licenses, provenance and downloaded checksums match.
+- Performance comparisons identify fixture scope and uncertainty.
 
-- Source, UI, Rust, worker, packaging and unchanged Whisper accuracy gates pass.
-- Isolated rendered settings and native desktop delivery checks pass.
-- Complete NVIDIA package, licenses, source provenance and checksums are verified.
-- Known limitations and untested desktops are recorded in the release notes.
+The [glib backport record](../vendor/glib/VOCO-PATCH.md) explains why a compatible
+source fix is used instead of adding a second glib version. This fixes the named
+iterator defect; it does not establish that all dependency findings are resolved.
 
 ## Public launch
 
-Keep releases as private drafts until final artifact benchmarks, manual acceptance
-and explicit publication approval. No universal Linux compatibility or performance
-superlatives follow from limited userspace tests. See [release process](release-process.md).
+Private cut preparation is authorized. Final artifact benchmarks, manual acceptance
+and explicit publication approval remain separate gates. Hosted tag builds still
+need portable pinned NVIDIA provisioning. See [release process](release-process.md).

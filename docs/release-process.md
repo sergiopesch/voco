@@ -31,8 +31,8 @@ incomplete workflow or substitute mutable downloads. This changes the delivery
 mechanism, not the test gates.
 
 The [2026.0.37 cut](releases/2026.0.37.md) is historical and immutable. The .38
-cleanup has new application/helper bytes and must be built and tested again;
-its package cannot inherit .37 qualification merely because the model is unchanged.
+dictation-only cut is also frozen. The .39 glib backport changes native
+application bytes and requires fresh qualification despite unchanged speech models.
 
 ## Publish
 

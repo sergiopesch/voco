@@ -1,6 +1,6 @@
 # Architecture
 
-VOCO 2026.0.38 provides local, direct-cursor dictation. Read [the code map](code-map.md)
+VOCO 2026.0.39 provides local, direct-cursor dictation. Read [the code map](code-map.md)
 and [release status](../release-candidate.md) for navigation and qualification.
 
 ## Startup and recognizer selection

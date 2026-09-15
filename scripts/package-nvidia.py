@@ -11,9 +11,10 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
-VENDORED_SHORTCUT_NOTICES = (
-    "VOCO-PATCH.md", "VOCO-UPSTREAM.json", "LICENSE-APACHE", "LICENSE-MIT", "LICENSE.spdx",
-)
+VENDORED_NOTICES = {
+    "global-hotkey": ("VOCO-PATCH.md", "VOCO-UPSTREAM.json", "LICENSE-APACHE", "LICENSE-MIT", "LICENSE.spdx"),
+    "glib": ("VOCO-PATCH.md", "VOCO-UPSTREAM.json", "upstream-fix.patch", "LICENSE", "COPYRIGHT"),
+}
 
 
 def digest(path, algorithm="sha256"):
@@ -77,21 +78,18 @@ def validate_base_executables(stage):
                 "run npm run build to bundle the matching application and browser host")
 
 
-def copy_vendored_shortcut_notices(source_root, doc):
-    """Ship the patched dependency's licenses and provenance, not its build tree.
-
-    Preserve the source-relative vendor path used by README/AGENTS/docs links.
-    Missing notices must fail assembly rather than produce an incomplete release.
-    """
-    source = source_root / "vendor/global-hotkey"
-    for name in VENDORED_SHORTCUT_NOTICES:
-        path = source / name
-        if path.is_symlink() or not path.is_file():
-            raise ValueError(f"Missing regular vendored shortcut notice: {name}")
-    destination = doc / "vendor/global-hotkey"
-    destination.mkdir(parents=True, exist_ok=True)
-    for name in VENDORED_SHORTCUT_NOTICES:
-        shutil.copy2(source / name, destination / name)
+def copy_vendored_notices(source_root, doc):
+    """Ship patched dependencies' licenses and provenance, preserving doc links."""
+    for crate, names in VENDORED_NOTICES.items():
+        for name in names:
+            path = source_root / "vendor" / crate / name
+            if path.is_symlink() or not path.is_file():
+                raise ValueError(f"Missing regular vendored notice: {crate}/{name}")
+    for crate, names in VENDORED_NOTICES.items():
+        destination = doc / "vendor" / crate
+        destination.mkdir(parents=True, exist_ok=True)
+        for name in names:
+            shutil.copy2(source_root / "vendor" / crate / name, destination / name)
 
 
 def main():
@@ -116,6 +114,7 @@ def main():
         stage = Path(directory) / "stage"
         subprocess.run(["dpkg-deb", "-R", str(base), str(stage)], check=True)
         validate_base_executables(stage)
+        subprocess.run(["python3", str(ROOT / "scripts/verify-glib-backport.py")], check=True)
         speech = stage / "usr/lib/voco/speech"
         speech.mkdir(parents=True)
         source = ROOT / "runtime/speech"
@@ -135,7 +134,7 @@ def main():
         for name in ("README.md", "AGENTS.md"):
             shutil.copy2(ROOT / name, doc / name)
         shutil.copytree(ROOT / "docs", doc / "docs", dirs_exist_ok=True)
-        copy_vendored_shortcut_notices(ROOT, doc)
+        copy_vendored_notices(ROOT, doc)
         identity = {"version": package_version, "application_version": version,
                     "backend": "CPU native pool", "context": 1, "cpu_threads": 4,
                     **payload_inventory(speech)}

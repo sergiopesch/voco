@@ -254,7 +254,7 @@ attack. Final candidate and distribution receipts remain separate gates.
 
 Fresh isolated npm/Rust audits on 15 September exited 0 with zero vulnerability-class
 findings. RustSec database commit was `e2e640471715167f73e22eaf761f2e547adafeec`.
-Seven maintenance notices and two unsoundness notices remain visible; no exemption
+Seven maintenance notices and one rand unsoundness notice remain visible; no exemption
 was added. Native shared libraries, models and distro packages are outside this
 lockfile-audit scope.
 
@@ -262,10 +262,19 @@ RUSTSEC-2026-0097 affects rand 0.7.3 under conditions including its `log` featur
 a logger re-entering thread RNG. The resolved feature tree does not enable that
 feature; the dependency enters through phf generation/selector build dependencies.
 This assessment must be revisited if the graph or logging changes. For
-RUSTSEC-2024-0429, glib 0.18.5 remains pinned by GTK/WebKit/Tauri. A lexical search
-found no `array_iter_str`/`VariantStrIter` use outside glib in the inspected VOCO and
-cached lockfile sources. That is neither complete reachability proof nor a fix;
-the upstream maintenance/backport work remains. The seven maintenance notices
+RUSTSEC-2024-0429, .39 vendors glib 0.18.5 with the exact upstream mutable
+out-pointer fix. All GTK/WebKit/Tauri consumers resolve the patched copy. The
+pristine dependency crashed with SIGSEGV in optimized forward iteration; the
+patched dependency passes retrieving-method, bounds, Unicode and type-rejection
+regressions. Source/archive verification and the optimized test are mandatory CI
+gates. See [patch provenance and maintenance](../../vendor/glib/VOCO-PATCH.md).
+
+This is a source backport, not a published glib version upgrade. Version-based
+scanners may retain an alert. Cargo audit does not report this vendored path copy;
+the source reconstruction and optimized regression establish the fix.
+Application-level exploit reachability was not established. The dependency bug
+is fixed at its shared C out-argument boundary without changing application
+permissions, logging, APIs or GTK object types. The seven maintenance notices
 cover fxhash, proc-macro-error and five unic crates. See [the current review](../testing/stop-delivery-review-2026-09-15.md)
 for raw receipt locations and application acceptance limits.
 
