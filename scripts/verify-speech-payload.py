@@ -101,6 +101,8 @@ def verify(root, version):
     model = "models/nemotron-speech-streaming-en-0.6b.q8_0.gguf"
     if manifest["files"][model] != identity["model_sha256"]:
         raise ValueError("Model identity differs from payload")
+    if identity != read_regular_json(SOURCE_ROOT / "runtime/speech/MODEL-IDENTITY.json"):
+        raise ValueError("Model identity differs from the current source pin")
     verify_build_identity(speech, manifest["files"])
     return {"files": len(actual_files), "symlinks": len(actual_links), "version": version}
 

@@ -34,7 +34,8 @@ and their resulting files, and records the toolchain, flags and output hashes.
 [Native provenance](../runtime/NATIVE-SOURCE.json) defines those inputs. The CPU
 backend uses a fixed instruction baseline, never `-march=native`; debug and
 assertion source paths are remapped. The desktop wrapper and CI also set
-`WHISPER_NATIVE=OFF` for the separate compatibility engine. Model provisioning downloads NVIDIA's exact
+`GGML_NATIVE=OFF` through the pinned [CMake configuration](../packaging/cmake/portable-cpu.cmake)
+for the separate compatibility engine. Model provisioning downloads NVIDIA's exact
 revision and requires the pinned size and SHA-256 in
 [model identity](../runtime/speech/MODEL-IDENTITY.json). It never substitutes another
 model, quantization or mutable revision. This reproduces the published model bytes;

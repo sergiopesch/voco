@@ -1,11 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# whisper.cpp otherwise targets the build host, even for distributed packages.
-# Its pinned compatibility option maps to GGML_NATIVE=OFF (fixed SIMD defaults).
-export WHISPER_NATIVE=OFF
-
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Use the actual GGML option; the old WHISPER_NATIVE=OFF alias is ineffective.
+export CMAKE_PROJECT_INCLUDE="${ROOT_DIR}/packaging/cmake/portable-cpu.cmake"
 APP_DIR="${ROOT_DIR}/apps/desktop"
 FEATURES="custom-protocol"
 case "${1:-}" in

@@ -26,6 +26,15 @@ class SpeechPackageTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
+        source = self.root / "source"
+        for name in ("runtime/NATIVE-SOURCE.json", "runtime/speech/nemo_bridge.cpp",
+                     "runtime/speech/cpu_check.c", "runtime/speech/MODEL-IDENTITY.json"):
+            copied = source / name
+            copied.parent.mkdir(parents=True, exist_ok=True)
+            copied.write_bytes((validator.SOURCE_ROOT / name).read_bytes())
+        source_patch = patch.object(validator, "SOURCE_ROOT", source)
+        source_patch.start()
+        self.addCleanup(source_patch.stop)
         self.speech = self.root / "usr/lib/voco/speech"
         (self.speech / "models").mkdir(parents=True)
         for name in ("stream_worker.py", "worker_main.py", "streaming.py", "adapters.py",
@@ -33,8 +42,12 @@ class SpeechPackageTests(unittest.TestCase):
                      "models/nemotron-speech-streaming-en-0.6b.q8_0.gguf"):
             (self.speech / name).write_bytes(b"fixture")
         (self.speech / "voco-cpu-check").chmod(0o755)
-        (self.speech / "MODEL-IDENTITY.json").write_text(json.dumps({"model_sha256":
-            package.digest(self.speech / "models/nemotron-speech-streaming-en-0.6b.q8_0.gguf")}))
+        source_model_identity = source / "runtime/speech/MODEL-IDENTITY.json"
+        model_identity = json.loads(source_model_identity.read_text())
+        model_identity["model_sha256"] = package.digest(
+            self.speech / "models/nemotron-speech-streaming-en-0.6b.q8_0.gguf")
+        source_model_identity.write_text(json.dumps(model_identity))
+        (self.speech / "MODEL-IDENTITY.json").write_bytes(source_model_identity.read_bytes())
         (self.speech / "lib").mkdir()
         for name in validator.NATIVE_FILES:
             (self.speech / name).write_bytes(b"native fixture")
@@ -117,6 +130,26 @@ class SpeechPackageTests(unittest.TestCase):
         (self.speech / "MODEL-IDENTITY.json").write_text('{"model_sha256":"incorrect"}')
         self.save_manifest()
         with self.assertRaisesRegex(ValueError, "Model identity"):
+            self.verify()
+
+    def test_coherently_replaced_model_and_identity_still_fail_source_pin(self):
+        model = self.speech / "models/nemotron-speech-streaming-en-0.6b.q8_0.gguf"
+        model.write_bytes(b"replacement model fixture")
+        identity_path = self.speech / "MODEL-IDENTITY.json"
+        identity = json.loads(identity_path.read_text())
+        identity["model_sha256"] = package.digest(model)
+        identity_path.write_text(json.dumps(identity))
+        self.save_manifest()
+        with self.assertRaisesRegex(ValueError, "Model identity differs from the current source pin"):
+            self.verify()
+
+    def test_model_provenance_fields_must_match_source_even_with_same_weights(self):
+        identity_path = self.speech / "MODEL-IDENTITY.json"
+        identity = json.loads(identity_path.read_text())
+        identity["revision"] = "0" * 40
+        identity_path.write_text(json.dumps(identity))
+        self.save_manifest()
+        with self.assertRaisesRegex(ValueError, "Model identity differs from the current source pin"):
             self.verify()
 
     def test_missing_guard_or_build_identity_even_with_new_manifest(self):

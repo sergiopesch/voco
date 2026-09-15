@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 env:
-  WHISPER_NATIVE: "OFF"
+  CMAKE_PROJECT_INCLUDE: ${{ github.workspace }}/packaging/cmake/portable-cpu.cmake
 
 concurrency:
   group: release-${{ github.ref }}
