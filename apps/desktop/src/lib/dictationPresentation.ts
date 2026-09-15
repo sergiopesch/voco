@@ -3,7 +3,6 @@ import type {
   DictationStatus,
   MicrophonePermission,
   OwnedPreeditStatus,
-  RealtimeStatus,
 } from "@/types";
 
 interface StatusLabelInput {
@@ -15,12 +14,9 @@ interface StatusLabelInput {
   cursorRequired: boolean;
   cursorSetupState: OwnedPreeditStatus["setupState"];
   dictationStatus: DictationStatus;
-  isRealtimeActive: boolean;
   microphonePermission: MicrophonePermission;
   nativeMicrophoneReady?: boolean | null;
   microphoneReady: boolean;
-  realtimeMuted: boolean;
-  realtimeStatus: RealtimeStatus;
 }
 
 export function deriveStatusLabel({
@@ -32,12 +28,9 @@ export function deriveStatusLabel({
   cursorRequired,
   cursorSetupState,
   dictationStatus,
-  isRealtimeActive,
   microphonePermission,
   nativeMicrophoneReady,
   microphoneReady,
-  realtimeMuted,
-  realtimeStatus,
 }: StatusLabelInput): string {
   if (dictationStatus === "starting") {
     return "Starting microphone";
@@ -53,17 +46,6 @@ export function deriveStatusLabel({
   if (dictationStatus === "processing") {
     return "Processing";
   }
-  if (isRealtimeActive) {
-    if (realtimeMuted) {
-      return "Realtime voice is muted";
-    }
-    if (realtimeStatus === "connecting") {
-      return "Connecting realtime voice";
-    }
-    return realtimeStatus === "speaking"
-      ? "Realtime voice is speaking"
-      : "Realtime voice is listening";
-  }
   if (hasRecovery) {
     return manualTranscriptReady ? "Transcript ready to copy" : "Recording needs recovery";
   }
@@ -78,9 +60,6 @@ export function deriveStatusLabel({
   }
   if (dictationStatus === "error") {
     return "Needs attention";
-  }
-  if (realtimeStatus === "error") {
-    return "Realtime voice needs attention";
   }
   if (nativeMicrophoneReady === false) return "Microphone setup required";
   if (nativeMicrophoneReady == null && microphonePermission === "denied") {

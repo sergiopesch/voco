@@ -1,18 +1,8 @@
-<!-- markdownlint-disable MD032 MD060 -->
-
-Current cut: the owner accepted installed +local7 and authorized the private
-2026.0.37 release cut. See [status and remaining public gates](../releases/2026.0.37.md).
-Earlier candidate preparation/deferral statements below are historical. The owner's
-installed application remains +local7 until a separately requested update.
-
-Current follow-up: private **+local7** contains the [bounded legacy keyboard optimization](keyboard-delivery-2026-09-15.md). +local6 was installed and successfully owner-tested. Older revision results below remain historical; use exact artifact receipts for the new candidate.
 # Testing
 
-Current candidate: [2026.0.37 release gates](../release-candidate.md).
-Current work: [`+local6` validation C results and remaining gates](stop-delivery-review-2026-09-15.md).
-Frozen baseline: [`+local5` cross-Linux results, including the failed Stop gate](cross-linux-review-2026-09-15.md).
-Prior baseline: [pre-release review and acceptance scope](pre-release-review-2026-09-15.md). Model selection
-and measurement boundaries: [round-3 comparison](model-comparison-2026-09-14.md).
+Current candidate: [2026.0.38 release gates](../release-candidate.md).
+Dated reports below are historical evidence, not qualification of a later binary.
+
 Run worker tests with `python3 -m unittest discover -s runtime/speech -p 'test_*.py'`;
 run the actual model protocol separately with `python3 runtime/speech/test_worker_protocol.py --output-dir /path/to/new/receipts`.
 NumPy/psutil and the pinned native/model payload must be present for relevant tests.
@@ -182,8 +172,6 @@ Use [browser-broker.md](./browser-broker.md) and the
 The older [cursor checklist](./cursor-streaming-manual-qa.md) and
 [results](./cursor-streaming-qa-results.md) describe the suspended IBus implementation.
 
-Use [local-intelligence-manual-qa.md](./local-intelligence-manual-qa.md) when validating optional
-localhost transcript enhancement or local assistant mode.
 
 ## Foundation regression gates
 

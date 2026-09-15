@@ -6,8 +6,6 @@ use std::path::PathBuf;
 
 pub const APP_DIR_NAME: &str = "voco";
 pub const LEGACY_APP_DIR_NAME: &str = "voice";
-const LEGACY_OPENCLAW_PROMPT_PREFIX: &str = "You are my electronics professor and robotics companion. Explain the answer step by step, call out Raspberry Pi wiring safety risks, and ask before any physical action that could damage hardware.";
-const DEFAULT_OPENCLAW_PROMPT_PREFIX: &str = "You are a helpful local voice assistant. Answer clearly and concisely, preserve the user's intent, state uncertainty honestly, and ask before taking actions with external or irreversible effects.";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -18,20 +16,12 @@ pub struct AppConfig {
     pub selected_mic: Option<String>,
     #[serde(default = "default_insertion_strategy")]
     pub insertion_strategy: InsertionStrategy,
-    #[serde(default = "default_transcript_target")]
+    #[serde(default = "default_transcript_target", skip_deserializing)]
     pub transcript_target: TranscriptTarget,
-    #[serde(default = "default_live_cursor_mode")]
+    #[serde(default = "default_live_cursor_mode", skip_deserializing)]
     pub live_cursor_mode: LiveCursorMode,
-    #[serde(default = "default_openclaw_agent")]
-    pub openclaw_agent: String,
-    #[serde(default = "default_openclaw_prompt_prefix")]
-    pub openclaw_prompt_prefix: String,
-    #[serde(default = "default_transcript_enhancement")]
+    #[serde(default = "default_transcript_enhancement", skip_deserializing)]
     pub transcript_enhancement: TranscriptEnhancement,
-    #[serde(default = "default_local_llm_endpoint")]
-    pub local_llm_endpoint: String,
-    #[serde(default)]
-    pub local_llm_model: Option<String>,
     #[serde(default)]
     pub onboarding_completed: bool,
     #[serde(default = "default_update_channel")]
@@ -55,20 +45,6 @@ pub struct AppConfigPatch {
     pub selected_mic: PatchField<Option<String>>,
     #[serde(default)]
     pub insertion_strategy: PatchField<InsertionStrategy>,
-    #[serde(default)]
-    pub transcript_target: PatchField<TranscriptTarget>,
-    #[serde(default)]
-    pub live_cursor_mode: PatchField<LiveCursorMode>,
-    #[serde(default)]
-    pub openclaw_agent: PatchField<String>,
-    #[serde(default)]
-    pub openclaw_prompt_prefix: PatchField<String>,
-    #[serde(default)]
-    pub transcript_enhancement: PatchField<TranscriptEnhancement>,
-    #[serde(default)]
-    pub local_llm_endpoint: PatchField<String>,
-    #[serde(default)]
-    pub local_llm_model: PatchField<Option<String>>,
     #[serde(default)]
     pub onboarding_completed: PatchField<bool>,
     #[serde(default)]
@@ -115,27 +91,6 @@ impl AppConfigPatch {
         }
         if let PatchField::Set(value) = self.insertion_strategy {
             config.insertion_strategy = value;
-        }
-        if let PatchField::Set(value) = self.transcript_target {
-            config.transcript_target = value;
-        }
-        if let PatchField::Set(value) = self.live_cursor_mode {
-            config.live_cursor_mode = value;
-        }
-        if let PatchField::Set(value) = self.openclaw_agent {
-            config.openclaw_agent = value;
-        }
-        if let PatchField::Set(value) = self.openclaw_prompt_prefix {
-            config.openclaw_prompt_prefix = value;
-        }
-        if let PatchField::Set(value) = self.transcript_enhancement {
-            config.transcript_enhancement = value;
-        }
-        if let PatchField::Set(value) = self.local_llm_endpoint {
-            config.local_llm_endpoint = value;
-        }
-        if let PatchField::Set(value) = self.local_llm_model {
-            config.local_llm_model = value;
         }
         if let PatchField::Set(value) = self.onboarding_completed {
             config.onboarding_completed = value;
@@ -195,20 +150,8 @@ fn default_live_cursor_mode() -> LiveCursorMode {
     LiveCursorMode::StableCursorStreaming
 }
 
-fn default_openclaw_agent() -> String {
-    "main".to_string()
-}
-
-fn default_openclaw_prompt_prefix() -> String {
-    DEFAULT_OPENCLAW_PROMPT_PREFIX.to_string()
-}
-
 fn default_transcript_enhancement() -> TranscriptEnhancement {
     TranscriptEnhancement::Off
-}
-
-fn default_local_llm_endpoint() -> String {
-    "http://127.0.0.1:8080/v1/chat/completions".to_string()
 }
 
 fn default_update_channel() -> UpdateChannel {
@@ -306,11 +249,7 @@ impl Default for AppConfig {
             insertion_strategy: InsertionStrategy::Auto,
             transcript_target: default_transcript_target(),
             live_cursor_mode: default_live_cursor_mode(),
-            openclaw_agent: default_openclaw_agent(),
-            openclaw_prompt_prefix: default_openclaw_prompt_prefix(),
             transcript_enhancement: default_transcript_enhancement(),
-            local_llm_endpoint: default_local_llm_endpoint(),
-            local_llm_model: None,
             onboarding_completed: false,
             update_channel: default_update_channel(),
             install_channel: default_install_channel(),
@@ -354,8 +293,12 @@ impl AppConfig {
         if path.exists() {
             secure_private_regular_file(&path)?;
             let content = fs::read_to_string(&path)?;
-            let mut config: Self = serde_json::from_str(&content)?;
-            if config.migrate_legacy_defaults() {
+            let config: Self = serde_json::from_str(&content)?;
+            // Removed modes are ignored on read and omitted on the next save.
+            // Preserve microphone, shortcut and other supported preferences.
+            if serde_json::to_value(&config)?
+                != serde_json::from_str::<serde_json::Value>(&content)?
+            {
                 if let Err(error) = config.save() {
                     warn!(
                         "Loaded legacy VOCO settings, but could not persist the optional default migration: {error}"
@@ -380,14 +323,6 @@ impl AppConfig {
     pub fn reset_to_defaults() -> Result<Self, Box<dyn std::error::Error>> {
         let path = Self::config_dir_for_recovery()?.join("config.json");
         reset_config_file(&path)
-    }
-
-    fn migrate_legacy_defaults(&mut self) -> bool {
-        if self.openclaw_prompt_prefix == LEGACY_OPENCLAW_PROMPT_PREFIX {
-            self.openclaw_prompt_prefix = default_openclaw_prompt_prefix();
-            return true;
-        }
-        false
     }
 }
 
@@ -586,220 +521,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn default_config_has_expected_values() {
-        let config = AppConfig::default();
-        assert_eq!(config.hotkey, "Alt+D");
-        assert!(config.selected_mic.is_none());
-        assert!(matches!(config.insertion_strategy, InsertionStrategy::Auto));
-        assert!(matches!(config.transcript_target, TranscriptTarget::Cursor));
-        assert!(matches!(
-            config.live_cursor_mode,
-            LiveCursorMode::StableCursorStreaming
-        ));
-        assert_eq!(config.openclaw_agent, "main");
-        assert!(config
-            .openclaw_prompt_prefix
-            .contains("helpful local voice assistant"));
-        assert!(matches!(
-            config.transcript_enhancement,
-            TranscriptEnhancement::Off
-        ));
-        assert_eq!(
-            config.local_llm_endpoint,
-            "http://127.0.0.1:8080/v1/chat/completions"
-        );
-        assert!(config.local_llm_model.is_none());
-        assert!(!config.onboarding_completed);
-        assert!(matches!(config.update_channel, UpdateChannel::Stable));
-        assert!(matches!(
-            config.install_channel,
-            InstallChannel::GithubRelease
-        ));
-        assert!(matches!(config.voice_profile, VoiceProfile::Default));
-    }
-
-    #[test]
-    fn config_serialization_round_trip() {
-        let config = AppConfig {
-            hotkey: "Ctrl+Shift+V".to_string(),
-            selected_mic: Some("test-mic".to_string()),
-            insertion_strategy: InsertionStrategy::Clipboard,
-            transcript_target: TranscriptTarget::OpenclawAgent,
-            live_cursor_mode: LiveCursorMode::FinalTextOnly,
-            openclaw_agent: "bench".to_string(),
-            openclaw_prompt_prefix: "Teach safely.".to_string(),
-            transcript_enhancement: TranscriptEnhancement::Conservative,
-            local_llm_endpoint: "http://localhost:9090/v1/chat/completions".to_string(),
-            local_llm_model: Some("gemma-4-12b-it-qat".to_string()),
-            onboarding_completed: true,
-            update_channel: UpdateChannel::Beta,
-            install_channel: InstallChannel::Appimage,
-            voice_profile: VoiceProfile::AccentAware,
-        };
-        let json = serde_json::to_string(&config).unwrap();
-        let parsed: AppConfig = serde_json::from_str(&json).unwrap();
-        assert_eq!(parsed.hotkey, "Ctrl+Shift+V");
-        assert_eq!(parsed.selected_mic, Some("test-mic".to_string()));
-        assert!(matches!(
-            parsed.insertion_strategy,
-            InsertionStrategy::Clipboard
-        ));
-        assert!(matches!(
-            parsed.transcript_target,
-            TranscriptTarget::OpenclawAgent
-        ));
-        assert!(matches!(
-            parsed.live_cursor_mode,
-            LiveCursorMode::FinalTextOnly
-        ));
-        assert_eq!(parsed.openclaw_agent, "bench");
-        assert_eq!(parsed.openclaw_prompt_prefix, "Teach safely.");
-        assert!(matches!(
-            parsed.transcript_enhancement,
-            TranscriptEnhancement::Conservative
-        ));
-        assert_eq!(
-            parsed.local_llm_endpoint,
-            "http://localhost:9090/v1/chat/completions"
-        );
-        assert_eq!(
-            parsed.local_llm_model.as_deref(),
-            Some("gemma-4-12b-it-qat")
-        );
-        assert!(parsed.onboarding_completed);
-        assert!(matches!(parsed.update_channel, UpdateChannel::Beta));
-        assert!(matches!(parsed.install_channel, InstallChannel::Appimage));
-        assert!(matches!(parsed.voice_profile, VoiceProfile::AccentAware));
-    }
-
-    #[test]
-    fn config_deserializes_with_defaults() {
-        let json = r#"{}"#;
-        let config: AppConfig = serde_json::from_str(json).unwrap();
-        assert_eq!(config.hotkey, "Alt+D");
-        assert!(matches!(config.insertion_strategy, InsertionStrategy::Auto));
-        assert!(matches!(config.transcript_target, TranscriptTarget::Cursor));
-        assert!(matches!(
-            config.live_cursor_mode,
-            LiveCursorMode::StableCursorStreaming
-        ));
-        assert_eq!(config.openclaw_agent, "main");
-        assert!(config
-            .openclaw_prompt_prefix
-            .contains("helpful local voice assistant"));
-        assert!(matches!(
-            config.transcript_enhancement,
-            TranscriptEnhancement::Off
-        ));
-        assert_eq!(
-            config.local_llm_endpoint,
-            "http://127.0.0.1:8080/v1/chat/completions"
-        );
-        assert!(config.local_llm_model.is_none());
-        assert!(!config.onboarding_completed);
-        assert!(matches!(config.update_channel, UpdateChannel::Stable));
-        assert!(matches!(
-            config.install_channel,
-            InstallChannel::GithubRelease
-        ));
-        assert!(matches!(config.voice_profile, VoiceProfile::Default));
-    }
-
-    #[test]
-    fn config_patch_changes_only_present_fields() {
-        let mut config = AppConfig {
-            selected_mic: Some("original-mic".to_string()),
-            local_llm_model: Some("original-model".to_string()),
-            ..AppConfig::default()
-        };
-        let patch: AppConfigPatch = serde_json::from_str(
-            r#"{"hotkey":"Alt+Shift+D","transcriptEnhancement":"conservative"}"#,
-        )
-        .unwrap();
-
-        patch.apply_to(&mut config);
-
-        assert_eq!(config.hotkey, "Alt+Shift+D");
-        assert!(matches!(
-            config.transcript_enhancement,
-            TranscriptEnhancement::Conservative
-        ));
-        assert_eq!(config.selected_mic.as_deref(), Some("original-mic"));
-        assert_eq!(config.local_llm_model.as_deref(), Some("original-model"));
-    }
-
-    #[test]
-    fn config_patch_distinguishes_missing_and_null_nullable_fields() {
-        let mut config = AppConfig {
-            selected_mic: Some("original-mic".to_string()),
-            local_llm_model: Some("original-model".to_string()),
-            ..AppConfig::default()
-        };
-        let patch: AppConfigPatch =
-            serde_json::from_str(r#"{"selectedMic":null,"localLlmModel":"new-model"}"#).unwrap();
-
-        patch.apply_to(&mut config);
-
-        assert!(config.selected_mic.is_none());
-        assert_eq!(config.local_llm_model.as_deref(), Some("new-model"));
-    }
-
-    #[test]
     fn config_patch_rejects_unknown_fields_and_null_non_nullable_values() {
         assert!(serde_json::from_str::<AppConfigPatch>(r#"{"unknown":true}"#).is_err());
         assert!(serde_json::from_str::<AppConfigPatch>(r#"{"hotkey":null}"#).is_err());
-    }
-
-    #[test]
-    fn exact_personalized_legacy_prompt_migrates_without_overwriting_custom_prompts() {
-        let mut legacy = AppConfig {
-            openclaw_prompt_prefix: LEGACY_OPENCLAW_PROMPT_PREFIX.to_string(),
-            ..AppConfig::default()
-        };
-        assert!(legacy.migrate_legacy_defaults());
-        assert_eq!(
-            legacy.openclaw_prompt_prefix,
-            DEFAULT_OPENCLAW_PROMPT_PREFIX
-        );
-
-        let mut customized = AppConfig {
-            openclaw_prompt_prefix: "Keep my custom instructions.".to_string(),
-            ..AppConfig::default()
-        };
-        assert!(!customized.migrate_legacy_defaults());
-        assert_eq!(
-            customized.openclaw_prompt_prefix,
-            "Keep my custom instructions."
-        );
-    }
-
-    #[test]
-    fn config_deserializes_legacy_show_hud_field() {
-        let json = r#"{"showHud":false,"hotkey":"Alt+Shift+D"}"#;
-        let config: AppConfig = serde_json::from_str(json).unwrap();
-        assert_eq!(config.hotkey, "Alt+Shift+D");
-        assert!(matches!(config.insertion_strategy, InsertionStrategy::Auto));
-        assert!(matches!(config.transcript_target, TranscriptTarget::Cursor));
-        assert!(matches!(
-            config.live_cursor_mode,
-            LiveCursorMode::StableCursorStreaming
-        ));
-        assert_eq!(config.openclaw_agent, "main");
-        assert!(matches!(
-            config.transcript_enhancement,
-            TranscriptEnhancement::Off
-        ));
-        assert_eq!(
-            config.local_llm_endpoint,
-            "http://127.0.0.1:8080/v1/chat/completions"
-        );
-        assert!(!config.onboarding_completed);
-        assert!(matches!(config.update_channel, UpdateChannel::Stable));
-        assert!(matches!(
-            config.install_channel,
-            InstallChannel::GithubRelease
-        ));
-        assert!(matches!(config.voice_profile, VoiceProfile::Default));
     }
 
     #[test]
@@ -1049,5 +773,60 @@ mod tests {
             .file_type()
             .is_symlink());
         let _ = fs::remove_dir_all(test_root);
+    }
+
+    #[test]
+    fn retired_options_migrate_to_direct_dictation_without_losing_preferences() {
+        let config: AppConfig = serde_json::from_str(
+            r#"{
+            "hotkey":"Super+D", "selectedMic":"usb-mic", "onboardingCompleted":true,
+            "transcriptTarget":"openclaw-speech", "liveCursorMode":"final-text-only",
+            "transcriptEnhancement":"conservative", "localLlmEndpoint":"http://localhost:8080",
+            "openclawAgent":"old-agent"
+        }"#,
+        )
+        .unwrap();
+        assert_eq!(config.hotkey, "Super+D");
+        assert_eq!(config.selected_mic.as_deref(), Some("usb-mic"));
+        assert!(config.onboarding_completed);
+        assert!(matches!(config.transcript_target, TranscriptTarget::Cursor));
+        assert!(matches!(
+            config.live_cursor_mode,
+            LiveCursorMode::StableCursorStreaming
+        ));
+        assert!(matches!(
+            config.transcript_enhancement,
+            TranscriptEnhancement::Off
+        ));
+        let value = serde_json::to_value(config).unwrap();
+        assert!(value.get("localLlmEndpoint").is_none());
+        assert!(value.get("openclawAgent").is_none());
+    }
+
+    #[test]
+    fn patches_reject_retired_modes_and_preserve_omitted_preferences() {
+        for field in [
+            "transcriptTarget",
+            "liveCursorMode",
+            "transcriptEnhancement",
+            "openclawAgent",
+            "localLlmModel",
+        ] {
+            assert!(
+                serde_json::from_value::<AppConfigPatch>(serde_json::json!({field:"removed"}))
+                    .is_err()
+            );
+        }
+        let mut config = AppConfig {
+            selected_mic: Some("usb".into()),
+            ..AppConfig::default()
+        };
+        let patch: AppConfigPatch = serde_json::from_str(r#"{"hotkey":"Super+D"}"#).unwrap();
+        patch.apply_to(&mut config);
+        assert_eq!(config.selected_mic.as_deref(), Some("usb"));
+        let clear: AppConfigPatch = serde_json::from_str(r#"{"selectedMic":null}"#).unwrap();
+        clear.apply_to(&mut config);
+        assert!(config.selected_mic.is_none());
+        assert_eq!(config.hotkey, "Super+D");
     }
 }

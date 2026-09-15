@@ -10,11 +10,8 @@ describe("status label presentation", () => {
     cursorRequired: false,
     cursorSetupState: "ready" as const,
     dictationStatus: "idle" as const,
-    isRealtimeActive: false,
     microphonePermission: "granted" as const,
     microphoneReady: true,
-    realtimeMuted: false,
-    realtimeStatus: "idle" as const,
   };
 
   it("shows startup without claiming the microphone is listening", () => {
@@ -33,32 +30,11 @@ describe("status label presentation", () => {
         cursorDeliveryState: "unreconciled",
         hasRecoverableTranscript: true,
         dictationStatus: "error",
-        realtimeStatus: "error",
       }),
     ).toBe("Transcript needs attention");
   });
 
-  it("prioritizes an active realtime session while retaining transcript recovery", () => {
-    expect(
-      deriveStatusLabel({
-        ...ready,
-        cursorDeliveryState: "unreconciled",
-        isRealtimeActive: true,
-        realtimeStatus: "listening",
-      }),
-    ).toBe("Realtime voice is listening");
-  });
 
-  it("presents a muted realtime session explicitly", () => {
-    expect(
-      deriveStatusLabel({
-        ...ready,
-        isRealtimeActive: true,
-        realtimeMuted: true,
-        realtimeStatus: "listening",
-      }),
-    ).toBe("Realtime voice is muted");
-  });
 
   it("distinguishes pending and preview-only cursor delivery", () => {
     expect(
@@ -79,18 +55,6 @@ describe("status label presentation", () => {
     ).toBe("Listening — preview only");
   });
 
-  it("surfaces realtime errors and idle cursor setup failures", () => {
-    expect(
-      deriveStatusLabel({ ...ready, realtimeStatus: "error" }),
-    ).toBe("Realtime voice needs attention");
-    expect(
-      deriveStatusLabel({
-        ...ready,
-        cursorRequired: true,
-        cursorSetupState: "not-enabled",
-      }),
-    ).toBe("Text delivery needs setup — manual copy available");
-  });
 
   it("treats completed manual dictation as a usable result", () => {
     expect(deriveStatusLabel({ ...ready, hasRecovery: true, manualTranscriptReady: true })).toBe("Transcript ready to copy");
@@ -102,7 +66,6 @@ describe("status label presentation", () => {
       deriveStatusLabel({
         ...ready,
         dictationStatus: "error",
-        realtimeStatus: "error",
       }),
     ).toBe("Needs attention");
   });

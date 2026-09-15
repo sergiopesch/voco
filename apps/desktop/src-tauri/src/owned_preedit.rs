@@ -12,7 +12,7 @@ use std::sync::{
 };
 use std::time::Duration;
 
-const PROTOCOL_VERSION: u32 = 5;
+const PROTOCOL_VERSION: u32 = 6;
 const EXACT_FIELD_REQUIRED: &str = "Automatic IBus delivery is disabled because the original text field cannot be verified. Recording remains available; review and copy the transcript in VOCO.";
 
 fn require_exact_field_delivery() -> Result<(), String> {

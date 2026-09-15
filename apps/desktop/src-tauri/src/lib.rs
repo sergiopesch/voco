@@ -14,7 +14,6 @@ mod focus_probe;
 #[cfg(target_os = "linux")]
 mod hotkey_state;
 mod insertion;
-mod local_intelligence;
 #[cfg(all(target_os = "linux", feature = "native-capture-dev"))]
 mod native_capture;
 mod native_capture_commands;
@@ -24,7 +23,6 @@ mod process_runner;
 mod shortcut_arbitration;
 mod shortcut_readiness;
 mod single_instance;
-mod spoken_commands;
 pub mod transcribe;
 mod trigger_socket;
 pub use transcribe::{hybrid, numerical_planner, vca2};
@@ -34,13 +32,8 @@ use config::{
     load_cached_update_check, save_cached_update_check, AppConfig, AppConfigPatch,
     CachedUpdateCheck, TranscriptEnhancement,
 };
-use local_intelligence::{
-    call_local_llm_chat, conservative_transcript_prompt, local_assistant_prompt,
-    validate_conservative_transcript,
-};
 use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
-use spoken_commands::apply_spoken_formatting_commands;
 use std::io::{Read, Write};
 use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
 use std::sync::{LazyLock, Mutex};
@@ -52,7 +45,6 @@ use transcribe::{WhisperMutex, WhisperState};
 // This collapses duplicate keyboard backends and duplicate evdev devices
 // without eating legitimate quick user toggles.
 static LAST_TOGGLE_MS: AtomicI64 = AtomicI64::new(-1);
-static LAST_REALTIME_TOGGLE_MS: AtomicI64 = AtomicI64::new(-1);
 
 // Evdev hotkey mode: 0 = Alt+D, 1 = Alt+Shift+D, 255 = custom (disabled)
 static EVDEV_HOTKEY_MODE: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
@@ -65,11 +57,8 @@ static SHORTCUT_RENDERER_HEARTBEAT_MS: AtomicI64 = AtomicI64::new(-1);
 #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 static EVDEV_LISTENER_STARTED: AtomicBool = AtomicBool::new(false);
 static HOTKEY_BINDING_VERSION: AtomicU64 = AtomicU64::new(0);
-static REALTIME_HOTKEY_BINDING_VERSION: AtomicU64 = AtomicU64::new(0);
 static FRONTEND_HOTKEY_HANDLER_READY: AtomicBool = AtomicBool::new(false);
 static PENDING_TOGGLE_BACKEND: LazyLock<Mutex<Option<String>>> = LazyLock::new(|| Mutex::new(None));
-static PENDING_REALTIME_TOGGLE_BACKEND: LazyLock<Mutex<Option<String>>> =
-    LazyLock::new(|| Mutex::new(None));
 static TRACE_START: LazyLock<Instant> = LazyLock::new(Instant::now);
 static TRACE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 static TRACE_FILE_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
@@ -82,17 +71,13 @@ static DEBUG_CAPTURE_WRITTEN: AtomicBool = AtomicBool::new(false);
 static DEBUG_CAPTURE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 static REGISTERED_PLUGIN_SHORTCUT: LazyLock<Mutex<Option<String>>> =
     LazyLock::new(|| Mutex::new(None));
-static REGISTERED_REALTIME_PLUGIN_SHORTCUT: LazyLock<Mutex<Option<String>>> =
-    LazyLock::new(|| Mutex::new(None));
 #[cfg(target_os = "linux")]
 static EVDEV_WATCHED_PATHS: LazyLock<Mutex<std::collections::HashSet<std::path::PathBuf>>> =
     LazyLock::new(|| Mutex::new(std::collections::HashSet::new()));
 
 const TOGGLE_DICTATION_EVENT: &str = "voco:toggle-dictation";
-const TOGGLE_REALTIME_EVENT: &str = "voco:toggle-realtime";
 const CONFIG_CHANGED_EVENT: &str = "voco:config-changed";
 const LEGACY_TOGGLE_DICTATION_EVENT: &str = "voice:toggle-dictation";
-const REALTIME_HOTKEY: &str = "Alt+Shift+R";
 const TOGGLE_DEBOUNCE_MS: i64 = 120;
 const MAX_AUDIO_SECONDS: usize = 600;
 const PREVIEW_SAMPLE_RATE: usize = 16_000;
@@ -105,7 +90,6 @@ const HIDDEN_WINDOW_SIZE: u32 = 1;
 const OVERLAY_CURSOR_OFFSET_X: i32 = 20;
 const OVERLAY_CURSOR_OFFSET_Y: i32 = 24;
 const OVERLAY_MARGIN: i32 = 16;
-const MAX_MODEL_RESPONSE_BYTES: usize = 2 * 1024 * 1024;
 
 #[derive(Debug, Clone, Copy, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -294,8 +278,7 @@ fn trace_frontend_hotkey_event(
         | "frontend_audio_prepare_started"
         | "frontend_audio_prepare_done"
         | "frontend_init_complete"
-        | "frontend_hotkey_listener_registered"
-        | "frontend_realtime_hotkey_listener_registered" => {
+        | "frontend_hotkey_listener_registered" => {
             trace_hotkey_event_with_fields(&event, None, fields.as_ref());
             Ok(())
         }
@@ -303,55 +286,13 @@ fn trace_frontend_hotkey_event(
             trace_hotkey_event(&event, None);
             FRONTEND_HOTKEY_HANDLER_READY.store(true, Ordering::SeqCst);
             replay_pending_toggle(&app);
-            replay_pending_realtime_toggle(&app);
             Ok(())
         }
         event if is_supported_dictation_trace_event(event) => {
             trace_hotkey_event_with_fields(event, None, fields.as_ref());
             Ok(())
         }
-        "frontend_toggle_received"
-        | "frontend_realtime_toggle_received"
-        | "realtime_start_requested"
-        | "realtime_stop_requested"
-        | "realtime_toggle_event_buffered"
-        | "pending_realtime_toggle_replayed"
-        | "eval_realtime_toggle_debounced"
-        | "realtime_client_secret_created"
-        | "realtime_websocket_connecting"
-        | "realtime_websocket_open"
-        | "realtime_websocket_closed"
-        | "realtime_websocket_error"
-        | "realtime_get_user_media_started"
-        | "realtime_get_user_media_done"
-        | "realtime_microphone_track_started"
-        | "realtime_microphone_track_settings"
-        | "realtime_audio_graph_connected"
-        | "realtime_session_created"
-        | "realtime_session_updated"
-        | "realtime_input_audio_chunk_sent"
-        | "realtime_input_audio_level_detected"
-        | "realtime_local_speech_started"
-        | "realtime_local_speech_stopped"
-        | "realtime_server_speech_started"
-        | "realtime_server_speech_stopped"
-        | "realtime_input_audio_commit_fallback_sent"
-        | "realtime_server_input_committed"
-        | "realtime_server_response_created"
-        | "realtime_output_audio_delta"
-        | "realtime_output_audio_delta_ignored_after_cancel"
-        | "realtime_output_audio_level_detected"
-        | "realtime_server_response_done"
-        | "realtime_response_cancel_sent"
-        | "realtime_response_cancel_ignored_error"
-        | "realtime_local_speech_commit_skipped_during_output"
-        | "realtime_microphone_muted"
-        | "realtime_microphone_unmuted"
-        | "realtime_response_create_fallback_sent"
-        | "realtime_no_speech_timeout"
-        | "realtime_no_response_timeout"
-        | "realtime_server_error"
-        | "realtime_start_failed" => {
+        "frontend_toggle_received" => {
             trace_hotkey_event_with_fields(&event, None, fields.as_ref());
             Ok(())
         }
@@ -569,14 +510,6 @@ fn validate_dictation_hotkey(hotkey: &str) -> Result<(), String> {
     let shortcut = hotkey
         .parse::<tauri_plugin_global_shortcut::Shortcut>()
         .map_err(|error| format!("Invalid hotkey '{hotkey}': {error}"))?;
-    let realtime_shortcut = REALTIME_HOTKEY
-        .parse::<tauri_plugin_global_shortcut::Shortcut>()
-        .map_err(|error| format!("Invalid built-in realtime hotkey: {error}"))?;
-    if shortcut == realtime_shortcut {
-        return Err(format!(
-            "{REALTIME_HOTKEY} is reserved for realtime conversation"
-        ));
-    }
     let required_modifiers = tauri_plugin_global_shortcut::Modifiers::ALT
         | tauri_plugin_global_shortcut::Modifiers::CONTROL
         | tauri_plugin_global_shortcut::Modifiers::SUPER
@@ -1359,816 +1292,6 @@ async fn paste_desktop_text(
         message: "Input task interrupted; review retained text before retrying.".into(),
         clipboard_changed: true,
     })?
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct OpenClawAgentResult {
-    agent: String,
-    response: String,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct OpenClawSpeechResult {
-    audio_path: String,
-    provider: Option<String>,
-    output_format: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct RealtimeClientSecretResult {
-    value: String,
-    expires_at: Option<i64>,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct TranscriptEnhancementResult {
-    text: String,
-    used_enhancement: bool,
-    warning: Option<String>,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct LocalLlmTestResult {
-    ok: bool,
-    detail: String,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct LocalLlmAgentResult {
-    response: String,
-}
-
-fn build_openclaw_message(transcript: &str, prompt_prefix: &str) -> String {
-    let transcript = transcript.trim();
-    let prompt_prefix = prompt_prefix.trim();
-
-    if prompt_prefix.is_empty() {
-        transcript.to_string()
-    } else {
-        format!("{prompt_prefix}\n\nUser said:\n{transcript}")
-    }
-}
-
-fn validate_openclaw_agent(agent: &str) -> Result<(), String> {
-    if agent.trim().is_empty() {
-        return Err("OpenClaw agent is required".to_string());
-    }
-    if agent.len() > 80 {
-        return Err("OpenClaw agent is too long (max 80 characters)".to_string());
-    }
-    if !agent
-        .chars()
-        .all(|character| character.is_ascii_alphanumeric() || matches!(character, '-' | '_' | '.'))
-    {
-        return Err(
-            "OpenClaw agent may only contain letters, numbers, dots, dashes, and underscores"
-                .to_string(),
-        );
-    }
-
-    Ok(())
-}
-
-fn clip_command_output(output: &str, max_chars: usize) -> String {
-    let trimmed = output.trim();
-    if trimmed.chars().count() <= max_chars {
-        return trimmed.to_string();
-    }
-
-    let mut clipped = trimmed.chars().take(max_chars).collect::<String>();
-    clipped.push_str("...");
-    clipped
-}
-
-fn wait_for_openclaw_agent(
-    child: std::process::Child,
-    timeout: std::time::Duration,
-) -> Result<std::process::Output, String> {
-    process_runner::wait_with_output(child, timeout, MAX_MODEL_RESPONSE_BYTES)
-        .map_err(|error| format!("Optional process failed: {error}"))
-}
-
-#[tauri::command(async)]
-fn ask_openclaw_agent(
-    transcript: String,
-    agent: String,
-    prompt_prefix: String,
-) -> Result<OpenClawAgentResult, String> {
-    let transcript = transcript.trim();
-    let agent = agent.trim();
-
-    if transcript.is_empty() {
-        return Err("No transcript to send to OpenClaw".to_string());
-    }
-    if transcript.len() > 100_000 {
-        return Err("Transcript too long for OpenClaw (max 100KB)".to_string());
-    }
-    if prompt_prefix.len() > 4_000 {
-        return Err("OpenClaw prompt prefix is too long (max 4KB)".to_string());
-    }
-    validate_openclaw_agent(agent)?;
-
-    let message = build_openclaw_message(transcript, &prompt_prefix);
-    let child = process_runner::command("openclaw")
-        .arg("agent")
-        .arg("--agent")
-        .arg(agent)
-        .arg("--thinking")
-        .arg("minimal")
-        .arg("--message")
-        .arg(&message)
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .spawn()
-        .map_err(|error| {
-            if error.kind() == std::io::ErrorKind::NotFound {
-                "OpenClaw CLI was not found in PATH".to_string()
-            } else {
-                format!("Failed to start OpenClaw: {error}")
-            }
-        })?;
-
-    let output = wait_for_openclaw_agent(child, std::time::Duration::from_secs(120))?;
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let stderr = String::from_utf8_lossy(&output.stderr);
-
-    if !output.status.success() {
-        let detail = if stderr.trim().is_empty() {
-            clip_command_output(&stdout, 800)
-        } else {
-            clip_command_output(&stderr, 800)
-        };
-        return Err(format!(
-            "OpenClaw exited with status {}: {detail}",
-            output.status
-        ));
-    }
-
-    let response = stdout.trim();
-    if response.is_empty() {
-        return Err("OpenClaw returned an empty response".to_string());
-    }
-
-    Ok(OpenClawAgentResult {
-        agent: agent.to_string(),
-        response: response.to_string(),
-    })
-}
-
-fn parse_openclaw_tts_output(output: &str) -> Result<OpenClawSpeechResult, String> {
-    let parsed: serde_json::Value = serde_json::from_str(output.trim())
-        .map_err(|error| format!("Failed to parse OpenClaw TTS output: {error}"))?;
-    let audio_path = parsed
-        .get("audioPath")
-        .and_then(|value| value.as_str())
-        .filter(|value| !value.trim().is_empty())
-        .ok_or_else(|| "OpenClaw TTS did not return an audio path".to_string())?
-        .to_string();
-    let provider = parsed
-        .get("provider")
-        .and_then(|value| value.as_str())
-        .map(|value| value.to_string());
-    let output_format = parsed
-        .get("outputFormat")
-        .and_then(|value| value.as_str())
-        .map(|value| value.to_string());
-
-    Ok(OpenClawSpeechResult {
-        audio_path,
-        provider,
-        output_format,
-    })
-}
-
-fn openclaw_tts_convert(text: &str) -> Result<OpenClawSpeechResult, String> {
-    let params = serde_json::json!({ "text": text }).to_string();
-    let child = process_runner::command("openclaw")
-        .arg("gateway")
-        .arg("call")
-        .arg("tts.convert")
-        .arg("--json")
-        .arg("--timeout")
-        .arg("30000")
-        .arg("--params")
-        .arg(params)
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .spawn()
-        .map_err(|error| {
-            if error.kind() == std::io::ErrorKind::NotFound {
-                "OpenClaw CLI was not found in PATH".to_string()
-            } else {
-                format!("Failed to start OpenClaw TTS: {error}")
-            }
-        })?;
-
-    let output = wait_for_openclaw_agent(child, std::time::Duration::from_secs(45))?;
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let stderr = String::from_utf8_lossy(&output.stderr);
-
-    if !output.status.success() {
-        let detail = if stderr.trim().is_empty() {
-            clip_command_output(&stdout, 800)
-        } else {
-            clip_command_output(&stderr, 800)
-        };
-        return Err(format!(
-            "OpenClaw TTS exited with status {}: {detail}",
-            output.status
-        ));
-    }
-
-    parse_openclaw_tts_output(&stdout)
-}
-
-fn play_audio_file(audio_path: &str) -> Result<(), String> {
-    let child = process_runner::command("ffplay")
-        .arg("-nodisp")
-        .arg("-autoexit")
-        .arg("-loglevel")
-        .arg("error")
-        .arg(audio_path)
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .spawn()
-        .map_err(|error| {
-            if error.kind() == std::io::ErrorKind::NotFound {
-                "ffplay was not found in PATH; install ffmpeg to play OpenClaw speech".to_string()
-            } else {
-                format!("Failed to start audio playback: {error}")
-            }
-        })?;
-
-    let output = wait_for_openclaw_agent(child, std::time::Duration::from_secs(120))?;
-    if output.status.success() {
-        return Ok(());
-    }
-
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let detail = if stderr.trim().is_empty() {
-        clip_command_output(&stdout, 800)
-    } else {
-        clip_command_output(&stderr, 800)
-    };
-    Err(format!(
-        "Audio playback exited with status {}: {detail}",
-        output.status
-    ))
-}
-
-#[tauri::command(async)]
-fn speak_openclaw_response(text: String) -> Result<OpenClawSpeechResult, String> {
-    let text = text.trim();
-    if text.is_empty() {
-        return Err("No OpenClaw response to speak".to_string());
-    }
-    if text.len() > 100_000 {
-        return Err("OpenClaw response too long for speech (max 100KB)".to_string());
-    }
-
-    let result = openclaw_tts_convert(text)?;
-    play_audio_file(&result.audio_path)?;
-    Ok(result)
-}
-
-fn read_bounded_response_body(
-    mut reader: impl Read,
-    max_bytes: usize,
-    context: &str,
-) -> Result<String, String> {
-    let mut body = Vec::with_capacity(max_bytes.min(64 * 1024));
-    reader
-        .by_ref()
-        .take(max_bytes.saturating_add(1) as u64)
-        .read_to_end(&mut body)
-        .map_err(|error| format!("Failed to read {context}: {error}"))?;
-    if body.len() > max_bytes {
-        return Err(format!("{context} exceeded the {max_bytes}-byte limit"));
-    }
-    String::from_utf8(body).map_err(|error| format!("{context} was not valid UTF-8: {error}"))
-}
-
-#[tauri::command(async)]
-fn enhance_transcript(
-    transcript: String,
-    mode: TranscriptEnhancement,
-    endpoint: String,
-    model: Option<String>,
-) -> TranscriptEnhancementResult {
-    let transcript = transcript.trim();
-    if transcript.is_empty() {
-        return TranscriptEnhancementResult {
-            text: String::new(),
-            used_enhancement: false,
-            warning: None,
-        };
-    }
-    if transcript.len() > 100_000 {
-        return TranscriptEnhancementResult {
-            text: transcript.to_string(),
-            used_enhancement: false,
-            warning: Some("Transcript too long for local enhancement".to_string()),
-        };
-    }
-
-    let formatted = apply_spoken_formatting_commands(transcript);
-    match mode {
-        TranscriptEnhancement::Off => TranscriptEnhancementResult {
-            text: transcript.to_string(),
-            used_enhancement: false,
-            warning: None,
-        },
-        TranscriptEnhancement::CommandsOnly => TranscriptEnhancementResult {
-            used_enhancement: formatted != transcript,
-            text: formatted,
-            warning: None,
-        },
-        TranscriptEnhancement::Conservative if formatted.is_empty() => {
-            TranscriptEnhancementResult {
-                text: formatted,
-                used_enhancement: true,
-                warning: None,
-            }
-        }
-        TranscriptEnhancement::Conservative => match call_local_llm_chat(
-            &endpoint,
-            conservative_transcript_prompt(),
-            &formatted,
-            model.as_deref(),
-            std::time::Duration::from_secs(12),
-        )
-        .and_then(|text| validate_conservative_transcript(&formatted, text))
-        {
-            Ok(text) => TranscriptEnhancementResult {
-                text,
-                used_enhancement: true,
-                warning: None,
-            },
-            Err(error) => TranscriptEnhancementResult {
-                text: transcript.to_string(),
-                used_enhancement: false,
-                warning: Some(error),
-            },
-        },
-    }
-}
-
-#[tauri::command(async)]
-fn test_local_llm(endpoint: String, model: Option<String>) -> LocalLlmTestResult {
-    match call_local_llm_chat(
-        &endpoint,
-        conservative_transcript_prompt(),
-        "test",
-        model.as_deref(),
-        std::time::Duration::from_secs(4),
-    ) {
-        Ok(_) => LocalLlmTestResult {
-            ok: true,
-            detail: "Local model endpoint responded.".to_string(),
-        },
-        Err(error) => LocalLlmTestResult {
-            ok: false,
-            detail: error,
-        },
-    }
-}
-
-#[tauri::command(async)]
-fn ask_local_llm_agent(
-    transcript: String,
-    endpoint: String,
-    model: Option<String>,
-) -> Result<LocalLlmAgentResult, String> {
-    let transcript = transcript.trim();
-    if transcript.is_empty() {
-        return Err("No transcript to send to local model".to_string());
-    }
-    if transcript.len() > 100_000 {
-        return Err("Transcript too long for local model (max 100KB)".to_string());
-    }
-
-    let response = call_local_llm_chat(
-        &endpoint,
-        local_assistant_prompt(),
-        transcript,
-        model.as_deref(),
-        std::time::Duration::from_secs(60),
-    )?;
-    Ok(LocalLlmAgentResult { response })
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct OpenClawBrowserActionInput {
-    action: String,
-    url: Option<String>,
-}
-
-fn normalize_public_browser_url(raw: &str) -> Result<String, String> {
-    let trimmed = raw.trim();
-    if trimmed.is_empty() {
-        return Err("Browser URL is required".to_string());
-    }
-    if trimmed.len() > 2048 || trimmed.chars().any(|ch| ch.is_control() || ch == '\\') {
-        return Err("Browser URL is invalid".to_string());
-    }
-
-    let with_scheme = if has_explicit_url_scheme(trimmed) {
-        trimmed.to_string()
-    } else if trimmed.chars().any(char::is_whitespace) {
-        format!(
-            "https://www.google.com/search?q={}",
-            url_query_escape(trimmed)
-        )
-    } else {
-        format!("https://{trimmed}")
-    };
-
-    let mut parsed =
-        reqwest::Url::parse(&with_scheme).map_err(|_| "Browser URL is invalid".to_string())?;
-    if !matches!(parsed.scheme(), "http" | "https") {
-        return Err("Only public http(s) browser URLs are supported".to_string());
-    }
-    if !parsed.username().is_empty() || parsed.password().is_some() {
-        return Err("Browser URLs must not include credentials".to_string());
-    }
-
-    let raw_host = parsed
-        .host_str()
-        .ok_or_else(|| "Browser URL must include a public host".to_string())?;
-    let host = raw_host
-        .strip_prefix('[')
-        .and_then(|host| host.strip_suffix(']'))
-        .unwrap_or(raw_host)
-        .trim_end_matches('.')
-        .to_ascii_lowercase();
-    if host.is_empty() {
-        return Err("Browser URL must include a public host".to_string());
-    }
-
-    if let Ok(address) = host.parse::<std::net::IpAddr>() {
-        if let std::net::IpAddr::V4(address) = address {
-            let input_host = raw_url_authority_host(&with_scheme)
-                .ok_or_else(|| "Browser URL host is invalid".to_string())?;
-            if input_host != address.to_string() {
-                return Err("Browser URL must use canonical IPv4 notation".to_string());
-            }
-        }
-        if !is_public_browser_ip(address) {
-            return Err("Browser URL must not target a private or special-use address".to_string());
-        }
-    } else {
-        validate_public_browser_hostname(&host)?;
-    }
-
-    // Drop a trailing DNS root dot so the validated host and serialized destination are identical.
-    parsed
-        .set_host(Some(&host))
-        .map_err(|_| "Browser URL host is invalid".to_string())?;
-    Ok(parsed.to_string())
-}
-
-fn raw_url_authority_host(value: &str) -> Option<&str> {
-    let (_, remainder) = value.split_once("://")?;
-    let authority = remainder.split(['/', '?', '#']).next()?;
-    let host_and_port = authority
-        .rsplit_once('@')
-        .map_or(authority, |(_, host)| host);
-    if let Some(bracketed) = host_and_port.strip_prefix('[') {
-        return bracketed.split_once(']').map(|(host, _)| host);
-    }
-    if let Some((host, port)) = host_and_port.rsplit_once(':') {
-        if !host.contains(':') && port.bytes().all(|byte| byte.is_ascii_digit()) {
-            return Some(host);
-        }
-    }
-    Some(host_and_port)
-}
-
-fn has_explicit_url_scheme(value: &str) -> bool {
-    let Some((scheme, _)) = value.split_once("://") else {
-        return false;
-    };
-    !scheme.is_empty()
-        && scheme.chars().enumerate().all(|(index, ch)| {
-            ch.is_ascii_alphabetic() || (index > 0 && matches!(ch, '0'..='9' | '+' | '-' | '.'))
-        })
-}
-
-fn validate_public_browser_hostname(host: &str) -> Result<(), String> {
-    if host.len() > 253 || !host.contains('.') {
-        return Err("Browser URL must use a public DNS name".to_string());
-    }
-
-    for label in host.split('.') {
-        if label.is_empty()
-            || label.len() > 63
-            || label.starts_with('-')
-            || label.ends_with('-')
-            || !label
-                .bytes()
-                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
-        {
-            return Err("Browser URL host is invalid".to_string());
-        }
-    }
-
-    const PRIVATE_OR_SPECIAL_SUFFIXES: &[&str] = &[
-        "localhost",
-        "local",
-        "localdomain",
-        "internal",
-        "intranet",
-        "lan",
-        "home",
-        "home.arpa",
-        "corp",
-        "private",
-        "onion",
-        "alt",
-        "test",
-        "invalid",
-        "example",
-    ];
-    if PRIVATE_OR_SPECIAL_SUFFIXES
-        .iter()
-        .any(|suffix| host == *suffix || host.ends_with(&format!(".{suffix}")))
-        || host.ends_with(".arpa")
-    {
-        return Err("Browser URL must not use a private or special-use hostname".to_string());
-    }
-
-    Ok(())
-}
-
-fn is_public_browser_ip(address: std::net::IpAddr) -> bool {
-    match address {
-        std::net::IpAddr::V4(address) => is_public_browser_ipv4(address),
-        std::net::IpAddr::V6(address) => {
-            if address.to_ipv4().is_some() {
-                return false;
-            }
-
-            let segments = address.segments();
-            let is_global_unicast = segments[0] & 0xe000 == 0x2000;
-            let is_ietf_special = segments[0] == 0x2001 && segments[1] <= 0x01ff;
-            let is_documentation = (segments[0] == 0x2001 && segments[1] == 0x0db8)
-                || (segments[0] == 0x3fff && segments[1] & 0xf000 == 0);
-            let is_six_to_four = segments[0] == 0x2002;
-
-            is_global_unicast && !is_ietf_special && !is_documentation && !is_six_to_four
-        }
-    }
-}
-
-fn is_public_browser_ipv4(address: std::net::Ipv4Addr) -> bool {
-    let [first, second, third, _] = address.octets();
-    !(first == 0
-        || first == 10
-        || first == 127
-        || first >= 224
-        || (first == 100 && (64..=127).contains(&second))
-        || (first == 169 && second == 254)
-        || (first == 172 && (16..=31).contains(&second))
-        || (first == 192 && second == 0 && third == 0)
-        || (first == 192 && second == 0 && third == 2)
-        || (first == 192 && second == 88 && third == 99)
-        || (first == 192 && second == 168)
-        || (first == 198 && matches!(second, 18 | 19))
-        || (first == 198 && second == 51 && third == 100)
-        || (first == 203 && second == 0 && third == 113))
-}
-
-fn url_query_escape(value: &str) -> String {
-    value
-        .bytes()
-        .flat_map(|byte| match byte {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
-                vec![byte as char]
-            }
-            b' ' => vec!['+'],
-            _ => format!("%{byte:02X}").chars().collect(),
-        })
-        .collect()
-}
-
-#[tauri::command(async)]
-fn invoke_openclaw_browser_action(request: OpenClawBrowserActionInput) -> Result<(), String> {
-    let action = request.action.as_str();
-    match action {
-        "open_url" | "navigate" => {
-            normalize_public_browser_url(request.url.as_deref().unwrap_or(""))?;
-        }
-        _ => return Err(format!("Unsupported OpenClaw browser action: {action}")),
-    }
-
-    Err("Realtime browser control is disabled: VOCO cannot yet enforce public-only DNS resolution and redirects in OpenClaw"
-        .to_string())
-}
-
-fn load_realtime_api_key() -> Result<String, String> {
-    if let Ok(value) = std::env::var("OPENAI_API_KEY") {
-        let value = value.trim().to_string();
-        if !value.is_empty() {
-            return Ok(value);
-        }
-    }
-
-    let path = dirs::home_dir()
-        .ok_or_else(|| "Cannot find home directory".to_string())?
-        .join(".openclaw")
-        .join("realtime.env");
-    let contents = read_private_realtime_env_file(&path)?;
-
-    if let Some(value) = parse_realtime_api_key_from_env_file(&contents) {
-        return Ok(value);
-    }
-
-    Err(format!("OPENAI_API_KEY is missing from {}", path.display()))
-}
-
-fn read_private_realtime_env_file(path: &std::path::Path) -> Result<String, String> {
-    const MAX_REALTIME_ENV_BYTES: u64 = 64 * 1024;
-
-    let mut options = std::fs::OpenOptions::new();
-    options.read(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        options
-            .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC | libc::O_NONBLOCK | libc::O_NOCTTY);
-    }
-    let file = options.open(path).map_err(|error| {
-        format!(
-            "Failed to open private key file {}: {error}",
-            path.display()
-        )
-    })?;
-    let metadata = file
-        .metadata()
-        .map_err(|error| format!("Failed to inspect key file {}: {error}", path.display()))?;
-    if !metadata.is_file() {
-        return Err(format!(
-            "Realtime key path {} must be a regular file",
-            path.display()
-        ));
-    }
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::MetadataExt;
-        if metadata.uid() != unsafe { libc::geteuid() } {
-            return Err(format!(
-                "Realtime key file {} is not owned by the current user",
-                path.display()
-            ));
-        }
-        if metadata.mode() & 0o077 != 0 {
-            return Err(format!(
-                "Realtime key file {} is accessible to other users; run chmod 600 on it",
-                path.display()
-            ));
-        }
-    }
-    if metadata.len() > MAX_REALTIME_ENV_BYTES {
-        return Err(format!("Realtime key file {} is too large", path.display()));
-    }
-
-    let mut contents = String::new();
-    file.take(MAX_REALTIME_ENV_BYTES + 1)
-        .read_to_string(&mut contents)
-        .map_err(|error| format!("Failed to read key file {}: {error}", path.display()))?;
-    if contents.len() as u64 > MAX_REALTIME_ENV_BYTES {
-        return Err(format!("Realtime key file {} is too large", path.display()));
-    }
-    Ok(contents)
-}
-
-fn parse_realtime_api_key_from_env_file(contents: &str) -> Option<String> {
-    for line in contents.lines() {
-        let line = line.trim();
-        if line.is_empty() || line.starts_with('#') {
-            continue;
-        }
-        let Some((key, value)) = line.split_once('=') else {
-            continue;
-        };
-        if key.trim().trim_start_matches("export ").trim() == "OPENAI_API_KEY" {
-            let value = value
-                .trim()
-                .trim_matches('"')
-                .trim_matches('\'')
-                .to_string();
-            if !value.is_empty() {
-                return Some(value);
-            }
-        }
-    }
-
-    None
-}
-
-fn realtime_session_config() -> serde_json::Value {
-    serde_json::json!({
-        "type": "realtime",
-        "model": "gpt-realtime-2",
-        "output_modalities": ["audio"],
-        "instructions": "You are the user's concise realtime voice companion. Answer in 1-2 short sentences. No preamble, no markdown, no waffle. Browser access and browser control are unavailable in this release. If the user asks you to browse, say briefly that you cannot access web pages and continue without claiming you opened, inspected, or changed anything.",
-        "reasoning": {
-            "effort": "low"
-        },
-        "audio": {
-            "input": {
-                "format": {
-                    "type": "audio/pcm",
-                    "rate": 24000
-                },
-                "turn_detection": {
-                    "type": "server_vad",
-                    "create_response": true,
-                    "interrupt_response": true
-                }
-            },
-            "output": {
-                "format": {
-                    "type": "audio/pcm",
-                    "rate": 24000
-                },
-                "voice": "marin"
-            }
-        }
-    })
-}
-
-fn realtime_error_detail(response_body: &str) -> String {
-    serde_json::from_str::<serde_json::Value>(response_body)
-        .ok()
-        .and_then(|value| {
-            value
-                .get("error")
-                .and_then(|error| error.get("message"))
-                .and_then(|message| message.as_str())
-                .map(|message| message.to_string())
-        })
-        .unwrap_or_else(|| clip_command_output(response_body, 800))
-}
-
-fn parse_realtime_client_secret_response(
-    response_body: &str,
-) -> Result<RealtimeClientSecretResult, String> {
-    let parsed: serde_json::Value = serde_json::from_str(response_body)
-        .map_err(|error| format!("Failed to parse Realtime session response: {error}"))?;
-    let value = parsed
-        .get("value")
-        .and_then(|value| value.as_str())
-        .filter(|value| !value.trim().is_empty())
-        .ok_or_else(|| "Realtime session response did not include a client secret".to_string())?
-        .to_string();
-    let expires_at = parsed.get("expires_at").and_then(|value| value.as_i64());
-
-    Ok(RealtimeClientSecretResult { value, expires_at })
-}
-
-#[tauri::command(async)]
-fn create_realtime_client_secret() -> Result<RealtimeClientSecretResult, String> {
-    let api_key = load_realtime_api_key()?;
-    let body = serde_json::json!({
-        "session": realtime_session_config()
-    });
-
-    let client = reqwest::blocking::Client::builder()
-        .timeout(std::time::Duration::from_secs(20))
-        .connect_timeout(std::time::Duration::from_secs(5))
-        .build()
-        .map_err(|error| format!("Failed to build Realtime session client: {error}"))?;
-    let response = client
-        .post("https://api.openai.com/v1/realtime/client_secrets")
-        .bearer_auth(api_key)
-        .header("Content-Type", "application/json")
-        .body(body.to_string())
-        .send()
-        .map_err(|error| format!("Failed to create Realtime session secret: {error}"))?;
-
-    let status = response.status();
-    let response_body = read_bounded_response_body(
-        response,
-        MAX_MODEL_RESPONSE_BYTES,
-        "Realtime session response",
-    )?;
-    if !status.is_success() {
-        let detail = realtime_error_detail(&response_body);
-        return Err(format!(
-            "OpenAI Realtime client secret request failed ({status}): {detail}"
-        ));
-    }
-
-    parse_realtime_client_secret_response(&response_body)
 }
 
 #[derive(Debug, Serialize)]
@@ -3148,8 +2271,7 @@ fn schedule_shortcut_arbitration(app: &tauri::AppHandle, snapshot: &ConfigSnapsh
             USE_EVDEV_HOTKEY.load(Ordering::SeqCst),
             IBUS_SHORTCUT_LEASE.has_authority(shortcut_monotonic_ms()),
         );
-        let result = sync_global_shortcut_binding(&handle, &hotkey, enable_plugin)
-            .and_then(|()| sync_realtime_global_shortcut_binding(&handle, enable_plugin));
+        let result = sync_global_shortcut_binding(&handle, &hotkey, enable_plugin);
         match result {
             Ok(()) => {}
             Err(error) => {
@@ -3227,7 +2349,6 @@ fn start_ibus_shortcut_listener(app_handle: tauri::AppHandle) {
                     };
                     let (event, last_toggle) = match trigger.mode.as_str() {
                         "dictation" => (TOGGLE_DICTATION_EVENT, &LAST_TOGGLE_MS),
-                        "realtime" => (TOGGLE_REALTIME_EVENT, &LAST_REALTIME_TOGGLE_MS),
                         _ => continue,
                     };
                     if !shortcut_arbitration::admit_toggle(
@@ -3277,63 +2398,20 @@ pub fn eval_toggle(app_handle: &tauri::AppHandle) {
     eval_toggle_with_backend(app_handle, "internal");
 }
 
-pub fn eval_realtime_toggle(app_handle: &tauri::AppHandle) {
-    eval_realtime_toggle_with_backend(app_handle, "internal");
-}
-
 // Keep passive duplicate suppression in one place so a rejected chord is visible.
 // X11 owner-events=false grabs consume their key; a pending IBus poll is not a
 // reason to discard that callback or to change its normal debounce behavior.
-fn suppress_passive_shortcut(backend: &str, realtime: bool) -> bool {
+fn suppress_passive_shortcut(backend: &str) -> bool {
     if IBUS_SHORTCUT_LEASE.suppresses_backend(backend, shortcut_monotonic_ms()) {
-        let event = if realtime {
-            "eval_realtime_toggle_suppressed_ibus"
-        } else {
-            "eval_toggle_suppressed_ibus"
-        };
+        let event = "eval_toggle_suppressed_ibus";
         trace_hotkey_event(event, Some(backend));
         return true;
     }
     if backend == "global_shortcut" && IBUS_SHORTCUT_LEASE.poll_in_flight() {
-        let event = if realtime {
-            "eval_realtime_toggle_x11_consumed_during_ibus_poll"
-        } else {
-            "eval_toggle_x11_consumed_during_ibus_poll"
-        };
+        let event = "eval_toggle_x11_consumed_during_ibus_poll";
         trace_hotkey_event(event, Some(backend));
     }
     false
-}
-
-fn eval_realtime_toggle_with_backend(app_handle: &tauri::AppHandle, backend_used: &str) {
-    trace_hotkey_event("eval_realtime_toggle_entered", Some(backend_used));
-
-    if suppress_passive_shortcut(backend_used, true) {
-        return;
-    }
-    if !shortcut_arbitration::admit_toggle(
-        &LAST_REALTIME_TOGGLE_MS,
-        shortcut_monotonic_ms(),
-        TOGGLE_DEBOUNCE_MS,
-    ) {
-        trace_hotkey_event("eval_realtime_toggle_debounced", Some(backend_used));
-        return;
-    }
-
-    if !FRONTEND_HOTKEY_HANDLER_READY.load(Ordering::SeqCst) {
-        buffer_realtime_toggle_until_frontend_ready(backend_used);
-        return;
-    }
-
-    emit_realtime_toggle_event(app_handle, backend_used);
-}
-
-fn emit_realtime_toggle_event(app_handle: &tauri::AppHandle, backend_used: &str) {
-    if let Err(e) = app_handle.emit_to("main", TOGGLE_REALTIME_EVENT, ()) {
-        error!("Failed to emit realtime toggle event: {e}");
-    } else {
-        trace_hotkey_event("realtime_toggle_event_emitted", Some(backend_used));
-    }
 }
 
 fn emit_toggle_event(app_handle: &tauri::AppHandle, backend_used: &str) {
@@ -3357,18 +2435,6 @@ fn buffer_toggle_until_frontend_ready(backend_used: &str) {
     trace_hotkey_event("toggle_event_buffered", Some(backend_used));
 }
 
-fn buffer_realtime_toggle_until_frontend_ready(backend_used: &str) {
-    let Ok(mut pending_backend) = PENDING_REALTIME_TOGGLE_BACKEND.lock() else {
-        error!("Failed to lock pending realtime toggle state");
-        return;
-    };
-
-    if pending_backend.is_none() {
-        *pending_backend = Some(backend_used.to_string());
-    }
-    trace_hotkey_event("realtime_toggle_event_buffered", Some(backend_used));
-}
-
 fn replay_pending_toggle(app_handle: &tauri::AppHandle) {
     let pending_backend = match PENDING_TOGGLE_BACKEND.lock() {
         Ok(mut pending_backend) => pending_backend.take(),
@@ -3384,25 +2450,10 @@ fn replay_pending_toggle(app_handle: &tauri::AppHandle) {
     }
 }
 
-fn replay_pending_realtime_toggle(app_handle: &tauri::AppHandle) {
-    let pending_backend = match PENDING_REALTIME_TOGGLE_BACKEND.lock() {
-        Ok(mut pending_backend) => pending_backend.take(),
-        Err(error) => {
-            error!("Failed to lock pending realtime toggle state: {error}");
-            None
-        }
-    };
-
-    if let Some(backend_used) = pending_backend {
-        trace_hotkey_event("pending_realtime_toggle_replayed", Some(&backend_used));
-        emit_realtime_toggle_event(app_handle, &backend_used);
-    }
-}
-
 fn eval_toggle_with_backend(app_handle: &tauri::AppHandle, backend_used: &str) {
     trace_hotkey_event("eval_toggle_entered", Some(backend_used));
 
-    if suppress_passive_shortcut(backend_used, false) {
+    if suppress_passive_shortcut(backend_used) {
         return;
     }
     if !shortcut_arbitration::admit_toggle(
@@ -3500,88 +2551,6 @@ fn register_global_shortcut_listener(app: &tauri::AppHandle, hotkey: &str) -> Re
     Ok(())
 }
 
-fn register_realtime_global_shortcut_listener(app: &tauri::AppHandle) -> Result<(), String> {
-    use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
-
-    let shortcut = REALTIME_HOTKEY
-        .parse::<Shortcut>()
-        .map_err(|e| format!("Invalid realtime hotkey '{REALTIME_HOTKEY}': {e}"))?;
-    let handle = app.clone();
-    let binding_version = REALTIME_HOTKEY_BINDING_VERSION.fetch_add(1, Ordering::SeqCst) + 1;
-
-    app.global_shortcut()
-        .on_shortcut(shortcut, move |_app, _shortcut, event| {
-            if event.state != tauri_plugin_global_shortcut::ShortcutState::Pressed {
-                return;
-            }
-
-            let current_version = REALTIME_HOTKEY_BINDING_VERSION.load(Ordering::SeqCst);
-            if current_version != binding_version {
-                debug!(
-                    "Ignoring stale realtime global shortcut callback (binding version {}, latest {})",
-                    binding_version, current_version
-                );
-                return;
-            }
-
-            if USE_EVDEV_HOTKEY.load(Ordering::SeqCst) {
-                debug!("{REALTIME_HOTKEY} detected via global shortcut plugin but evdev is preferred");
-                return;
-            }
-
-            debug!("{REALTIME_HOTKEY} detected via global shortcut plugin");
-            trace_hotkey_event(
-                "realtime_hotkey_event_received_global_shortcut",
-                Some("global_shortcut"),
-            );
-            eval_realtime_toggle_with_backend(&handle, "global_shortcut");
-        })
-        .map_err(|e| format!("Failed to register realtime global shortcut {REALTIME_HOTKEY}: {e}"))
-}
-
-fn sync_realtime_global_shortcut_binding(
-    app: &tauri::AppHandle,
-    enable_plugin_shortcut: bool,
-) -> Result<(), String> {
-    use tauri_plugin_global_shortcut::GlobalShortcutExt;
-
-    let mut current = REGISTERED_REALTIME_PLUGIN_SHORTCUT
-        .lock()
-        .map_err(|_| "Failed to lock realtime shortcut binding state".to_string())?;
-
-    if let Some(existing) = current.clone() {
-        if !enable_plugin_shortcut {
-            if app.global_shortcut().is_registered(existing.as_str()) {
-                app.global_shortcut()
-                    .unregister(existing.as_str())
-                    .map_err(|e| {
-                        format!("Failed to unregister realtime global shortcut {existing}: {e}")
-                    })?;
-            }
-            *current = None;
-            REALTIME_HOTKEY_BINDING_VERSION.fetch_add(1, Ordering::SeqCst);
-            info!("Unregistered realtime global shortcut {existing}");
-        }
-    }
-
-    if !enable_plugin_shortcut {
-        return Ok(());
-    }
-
-    if current.as_deref() == Some(REALTIME_HOTKEY) {
-        return Ok(());
-    }
-
-    register_realtime_global_shortcut_listener(app)?;
-    *current = Some(REALTIME_HOTKEY.to_string());
-    info!("Registered realtime global shortcut {REALTIME_HOTKEY}");
-    trace_hotkey_event(
-        "realtime_global_shortcut_registered",
-        Some("global_shortcut"),
-    );
-    Ok(())
-}
-
 fn sync_global_shortcut_binding(
     app: &tauri::AppHandle,
     hotkey: &str,
@@ -3642,7 +2611,6 @@ fn apply_hotkey_runtime_state(
         IBUS_SHORTCUT_LEASE.has_authority(shortcut_monotonic_ms()),
     );
     sync_global_shortcut_binding(app, new_hotkey, enable_plugin)?;
-    sync_realtime_global_shortcut_binding(app, enable_plugin)?;
 
     USE_EVDEV_HOTKEY.store(use_evdev_hotkey, Ordering::SeqCst);
     EVDEV_HOTKEY_MODE.store(hotkey_to_evdev_mode(new_hotkey), Ordering::SeqCst);
@@ -3945,13 +2913,6 @@ fn spawn_evdev_device_worker(
                                     );
                                     eval_toggle_with_backend(&app_handle, "evdev");
                                 }
-                                hotkey_state::HotkeyAction::Realtime => {
-                                    trace_hotkey_event(
-                                        "realtime_hotkey_event_received_evdev",
-                                        Some("evdev"),
-                                    );
-                                    eval_realtime_toggle_with_backend(&app_handle, "evdev");
-                                }
                             }
                         }
                         if synchronize_after_batch {
@@ -4184,13 +3145,6 @@ pub fn run() -> Result<(), String> {
             begin_desktop_shortcut_session,
             end_desktop_shortcut_session,
             paste_desktop_text,
-            ask_openclaw_agent,
-            speak_openclaw_response,
-            enhance_transcript,
-            test_local_llm,
-            ask_local_llm_agent,
-            invoke_openclaw_browser_action,
-            create_realtime_client_secret,
             get_runtime_diagnostics,
             get_owned_preedit_status,
             start_owned_preedit,
@@ -4236,9 +3190,6 @@ pub fn run() -> Result<(), String> {
             if let Ok(mut pending_backend) = PENDING_TOGGLE_BACKEND.lock() {
                 *pending_backend = None;
             }
-            if let Ok(mut pending_backend) = PENDING_REALTIME_TOGGLE_BACKEND.lock() {
-                *pending_backend = None;
-            }
             trace_hotkey_event("app_start", Some("internal"));
             start_ibus_shortcut_listener(app.handle().clone());
             let configured_hotkey = configured_hotkey();
@@ -4271,12 +3222,6 @@ pub fn run() -> Result<(), String> {
             if let Err(e) = sync_global_shortcut_binding(
                 &app_handle,
                 &hotkey,
-                should_register_global_shortcut(use_evdev_hotkey),
-            ) {
-                warn!("{e}");
-            }
-            if let Err(e) = sync_realtime_global_shortcut_binding(
-                &app_handle,
                 should_register_global_shortcut(use_evdev_hotkey),
             ) {
                 warn!("{e}");
@@ -4339,11 +3284,6 @@ pub fn run() -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::local_intelligence::{
-        build_local_llm_body, build_loopback_http_client, parse_local_llm_chat_response,
-        validate_local_llm_endpoint,
-    };
-
     #[test]
     fn startup_prepares_only_the_configured_recognizer() {
         use config::{LiveCursorMode, TranscriptTarget};
@@ -4442,28 +3382,6 @@ mod tests {
             std::fs::set_permissions(&directory, std::fs::Permissions::from_mode(0o700)).unwrap();
         }
         directory
-    }
-
-    #[test]
-    fn bounded_response_reader_accepts_body_at_limit() {
-        let body = b"12345678";
-        assert_eq!(
-            read_bounded_response_body(body.as_slice(), body.len(), "test response").unwrap(),
-            "12345678"
-        );
-    }
-
-    #[test]
-    fn bounded_response_reader_rejects_oversized_body() {
-        let error =
-            read_bounded_response_body(b"123456789".as_slice(), 8, "test response").unwrap_err();
-        assert!(error.contains("exceeded the 8-byte limit"));
-    }
-
-    #[test]
-    fn bounded_response_reader_rejects_invalid_utf8() {
-        let error = read_bounded_response_body([0xff].as_slice(), 8, "test response").unwrap_err();
-        assert!(error.contains("was not valid UTF-8"));
     }
 
     #[test]
@@ -4747,146 +3665,6 @@ mod tests {
     }
 
     #[test]
-    fn openclaw_message_uses_prompt_prefix_when_present() {
-        assert_eq!(
-            build_openclaw_message("check gpio 17", "Teach safely."),
-            "Teach safely.\n\nUser said:\ncheck gpio 17"
-        );
-    }
-
-    #[test]
-    fn openclaw_message_allows_empty_prompt_prefix() {
-        assert_eq!(
-            build_openclaw_message("  check gpio 17  ", "  "),
-            "check gpio 17"
-        );
-    }
-
-    #[test]
-    fn openclaw_agent_validation_rejects_shell_metacharacters() {
-        assert!(validate_openclaw_agent("main").is_ok());
-        assert!(validate_openclaw_agent("robotics.professor-1").is_ok());
-        assert!(validate_openclaw_agent("main; rm -rf /").is_err());
-    }
-
-    #[test]
-    fn openclaw_tts_output_parses_audio_path() {
-        let parsed = parse_openclaw_tts_output(
-            r#"{"audioPath":"/tmp/openclaw/voice.mp3","provider":"microsoft","outputFormat":"audio-24khz-48kbitrate-mono-mp3"}"#,
-        )
-        .unwrap();
-        assert_eq!(parsed.audio_path, "/tmp/openclaw/voice.mp3");
-        assert_eq!(parsed.provider.as_deref(), Some("microsoft"));
-        assert_eq!(
-            parsed.output_format.as_deref(),
-            Some("audio-24khz-48kbitrate-mono-mp3")
-        );
-    }
-
-    #[test]
-    fn openclaw_tts_output_requires_audio_path() {
-        assert!(parse_openclaw_tts_output(r#"{"provider":"microsoft"}"#)
-            .unwrap_err()
-            .contains("audio path"));
-    }
-
-    #[test]
-    fn local_llm_endpoint_validation_allows_only_loopback_http() {
-        assert!(validate_local_llm_endpoint("http://127.0.0.1:8080/v1/chat/completions").is_ok());
-        assert!(validate_local_llm_endpoint("http://localhost:8080/v1/chat/completions").is_ok());
-        assert!(validate_local_llm_endpoint("http://[::1]:8080/v1/chat/completions").is_ok());
-        assert!(validate_local_llm_endpoint("https://example.com/v1/chat/completions").is_err());
-        assert!(
-            validate_local_llm_endpoint("http://192.168.1.10:8080/v1/chat/completions").is_err()
-        );
-        assert!(
-            validate_local_llm_endpoint("http://user@localhost:8080/v1/chat/completions").is_err()
-        );
-    }
-
-    #[test]
-    fn loopback_http_client_does_not_follow_redirects() {
-        use std::io::{Read, Write};
-        use std::net::TcpListener;
-
-        let redirect_target = TcpListener::bind("127.0.0.1:0").unwrap();
-        redirect_target.set_nonblocking(true).unwrap();
-        let redirect_target_url = format!(
-            "http://127.0.0.1:{}",
-            redirect_target.local_addr().unwrap().port()
-        );
-
-        let redirect_source = TcpListener::bind("127.0.0.1:0").unwrap();
-        let redirect_source_url = format!(
-            "http://127.0.0.1:{}",
-            redirect_source.local_addr().unwrap().port()
-        );
-        let server = std::thread::spawn(move || {
-            let (mut stream, _) = redirect_source.accept().unwrap();
-            let mut request = [0_u8; 1024];
-            let _ = stream.read(&mut request).unwrap();
-            let response = format!(
-                "HTTP/1.1 307 Temporary Redirect\r\nLocation: {redirect_target_url}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
-            );
-            stream.write_all(response.as_bytes()).unwrap();
-        });
-
-        let client = build_loopback_http_client(
-            std::time::Duration::from_secs(2),
-            std::time::Duration::from_secs(1),
-        )
-        .unwrap();
-        let response = client
-            .post(redirect_source_url)
-            .body("private transcript")
-            .send()
-            .unwrap();
-        server.join().unwrap();
-
-        assert_eq!(response.status(), reqwest::StatusCode::TEMPORARY_REDIRECT);
-        assert_eq!(
-            redirect_target.accept().unwrap_err().kind(),
-            std::io::ErrorKind::WouldBlock
-        );
-    }
-
-    #[test]
-    fn spoken_formatting_commands_are_deterministic() {
-        assert_eq!(
-            apply_spoken_formatting_commands(
-                "first line command new paragraph command bullet point check gpio seventeen command new bullet stop"
-            ),
-            "first line\n\n- check gpio seventeen\n- stop"
-        );
-        assert_eq!(
-            apply_spoken_formatting_commands(
-                "write the old sentence command scratch that write the new one"
-            ),
-            "write the new one"
-        );
-        assert_eq!(
-            apply_spoken_formatting_commands(
-                "command code block let x equals one command end code block"
-            ),
-            "```\nlet x equals one\n```"
-        );
-    }
-
-    #[test]
-    fn failed_polish_preserves_raw_recognition_before_spoken_commands() {
-        let raw = "Old text command scratch that important tail";
-        let result = enhance_transcript(
-            raw.to_string(),
-            TranscriptEnhancement::Conservative,
-            "https://invalid.example".to_string(),
-            None,
-        );
-        assert_eq!(result.text, raw);
-        assert!(!result.used_enhancement);
-        assert!(result.warning.is_some());
-    }
-
-    #[test]
     fn consuming_shortcut_tracks_committed_config_without_plugin_reregistration() {
         let snapshot = |revision, hotkey: &str| ConfigSnapshot {
             revision,
@@ -4932,391 +3710,7 @@ mod tests {
         assert!(!shortcut_heartbeat_is_current(1000, 999));
     }
 
-    #[test]
-    fn completed_but_rewritten_polish_preserves_original_recognition() {
-        use std::net::TcpListener;
-        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let endpoint = format!(
-            "http://{}/v1/chat/completions",
-            listener.local_addr().unwrap()
-        );
-        let server = std::thread::spawn(move || {
-            let (mut stream, _) = listener.accept().unwrap();
-            stream
-                .set_read_timeout(Some(std::time::Duration::from_secs(2)))
-                .unwrap();
-            let mut request = [0_u8; 4096];
-            assert!(stream.read(&mut request).unwrap() > 0);
-            let body = r#"{"choices":[{"finish_reason":"stop","message":{"content":"Send 15 mg to Alice."}}]}"#;
-            write!(
-                stream,
-                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
-                body.len(),
-                body
-            )
-            .unwrap();
-        });
-        let original = "do not send 1.5 mg to alice";
-        let result = enhance_transcript(
-            original.to_string(),
-            TranscriptEnhancement::Conservative,
-            endpoint,
-            None,
-        );
-        server.join().unwrap();
-        assert_eq!(result.text, original);
-        assert!(!result.used_enhancement);
-        assert_eq!(
-            result.warning.as_deref(),
-            Some("Local polishing changed recognized content; original recognition preserved")
-        );
-    }
-
-    #[test]
-    fn intentional_empty_command_result_does_not_call_local_model() {
-        for mode in [
-            TranscriptEnhancement::CommandsOnly,
-            TranscriptEnhancement::Conservative,
-        ] {
-            let result = enhance_transcript(
-                "Old text command scratch that".to_string(),
-                mode,
-                "https://invalid.example".to_string(),
-                None,
-            );
-            assert_eq!(result.text, "");
-            assert!(result.used_enhancement);
-            assert!(result.warning.is_none());
-        }
-    }
-
-    #[test]
-    fn local_llm_body_uses_conservative_prompt_and_optional_model() {
-        let body = build_local_llm_body(
-            conservative_transcript_prompt(),
-            "hello world",
-            Some("gemma-local"),
-        );
-        assert_eq!(body["model"], "gemma-local");
-        assert_eq!(body["temperature"], 0);
-        assert_eq!(body["messages"][1]["content"], "hello world");
-        assert!(body["messages"][0]["content"]
-            .as_str()
-            .unwrap()
-            .contains("Preserve the speaker's words"));
-
-        let body = build_local_llm_body(local_assistant_prompt(), "hello world", None);
-        assert!(body.get("model").is_none());
-        assert!(body["messages"][0]["content"]
-            .as_str()
-            .unwrap()
-            .contains("concise local assistant"));
-    }
-
-    #[test]
-    fn local_llm_response_parser_reads_chat_completion_content() {
-        let parsed = parse_local_llm_chat_response(
-            r#"{"choices":[{"finish_reason":"stop","message":{"content":"Hello, world."}}]}"#,
-        )
-        .unwrap();
-        assert_eq!(parsed, "Hello, world.");
-
-        assert!(parse_local_llm_chat_response(
-            r#"{"choices":[{"finish_reason":"stop","message":{"content":""}}]}"#
-        )
-        .unwrap_err()
-        .contains("no text"));
-    }
-
-    #[test]
-    fn local_llm_chat_posts_to_loopback_without_auth_header() {
-        use std::io::{Read, Write};
-        use std::net::TcpListener;
-        use std::sync::mpsc;
-
-        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let endpoint = format!(
-            "http://127.0.0.1:{}/v1/chat/completions",
-            listener.local_addr().unwrap().port()
-        );
-        let (sender, receiver) = mpsc::channel();
-
-        std::thread::spawn(move || {
-            let (mut stream, _) = listener.accept().unwrap();
-            let mut request = Vec::new();
-            let mut buffer = [0u8; 1024];
-            loop {
-                let read = stream.read(&mut buffer).unwrap();
-                if read == 0 {
-                    break;
-                }
-                request.extend_from_slice(&buffer[..read]);
-                if request.windows(4).any(|window| window == b"\r\n\r\n")
-                    && String::from_utf8_lossy(&request).contains("hello local")
-                {
-                    break;
-                }
-            }
-            let request_text = String::from_utf8_lossy(&request).to_string();
-            sender.send(request_text).unwrap();
-
-            let body =
-                r#"{"choices":[{"finish_reason":"stop","message":{"content":"Hello, local."}}]}"#;
-            let response = format!(
-                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
-                body.len(),
-                body
-            );
-            stream.write_all(response.as_bytes()).unwrap();
-        });
-
-        let response = call_local_llm_chat(
-            &endpoint,
-            conservative_transcript_prompt(),
-            "hello local",
-            Some("gemma-local"),
-            std::time::Duration::from_secs(2),
-        )
-        .unwrap();
-
-        let request = receiver.recv().unwrap();
-        assert_eq!(response, "Hello, local.");
-        assert!(request.starts_with("POST /v1/chat/completions HTTP/1.1"));
-        assert!(request.contains("\"model\":\"gemma-local\""));
-        assert!(request.contains("\"content\":\"hello local\""));
-        assert!(!request.to_ascii_lowercase().contains("authorization:"));
-    }
-
-    #[test]
-    fn realtime_api_key_parses_env_file_exports_and_quotes() {
-        assert_eq!(
-            parse_realtime_api_key_from_env_file(
-                "\n# comment\nexport OPENAI_API_KEY='sk-test-value'\n"
-            )
-            .as_deref(),
-            Some("sk-test-value")
-        );
-        assert_eq!(
-            parse_realtime_api_key_from_env_file("OPENAI_API_KEY=\"sk-other\"").as_deref(),
-            Some("sk-other")
-        );
-        assert!(parse_realtime_api_key_from_env_file("OTHER=value").is_none());
-    }
-
     #[cfg(unix)]
-    #[test]
-    fn realtime_env_file_must_be_private_regular_and_user_owned() {
-        use std::os::unix::ffi::OsStrExt;
-        use std::os::unix::fs::{symlink, PermissionsExt};
-
-        let directory = std::env::temp_dir().join(format!(
-            "voco-realtime-key-test-{}-{}",
-            std::process::id(),
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
-        std::fs::create_dir_all(&directory).unwrap();
-        let path = directory.join("realtime.env");
-        std::fs::write(&path, "OPENAI_API_KEY=sk-private").unwrap();
-        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
-        assert!(read_private_realtime_env_file(&path)
-            .unwrap()
-            .contains("sk-private"));
-
-        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).unwrap();
-        assert!(read_private_realtime_env_file(&path)
-            .unwrap_err()
-            .contains("accessible to other users"));
-
-        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
-        let symlink_path = directory.join("linked.env");
-        symlink(&path, &symlink_path).unwrap();
-        assert!(read_private_realtime_env_file(&symlink_path).is_err());
-
-        let fifo_path = directory.join("fifo.env");
-        let fifo_path_bytes = std::ffi::CString::new(fifo_path.as_os_str().as_bytes()).unwrap();
-        assert_eq!(unsafe { libc::mkfifo(fifo_path_bytes.as_ptr(), 0o600) }, 0);
-        let started = std::time::Instant::now();
-        assert!(read_private_realtime_env_file(&fifo_path)
-            .unwrap_err()
-            .contains("regular file"));
-        assert!(started.elapsed() < std::time::Duration::from_secs(1));
-
-        std::fs::remove_dir_all(directory).unwrap();
-    }
-
-    #[test]
-    fn realtime_client_secret_response_requires_value() {
-        let parsed =
-            parse_realtime_client_secret_response(r#"{"value":"ek_test","expires_at":1756310470}"#)
-                .unwrap();
-        assert_eq!(parsed.value, "ek_test");
-        assert_eq!(parsed.expires_at, Some(1756310470));
-
-        assert!(
-            parse_realtime_client_secret_response(r#"{"expires_at":1756310470}"#)
-                .unwrap_err()
-                .contains("client secret")
-        );
-    }
-
-    #[test]
-    fn realtime_session_config_requests_audio_and_vad_responses() {
-        let config = realtime_session_config();
-
-        assert_eq!(config["output_modalities"][0], "audio");
-        assert_eq!(config["audio"]["input"]["format"]["type"], "audio/pcm");
-        assert_eq!(config["audio"]["input"]["format"]["rate"], 24000);
-        assert_eq!(config["audio"]["output"]["format"]["type"], "audio/pcm");
-        assert_eq!(config["audio"]["output"]["format"]["rate"], 24000);
-        assert_eq!(
-            config["audio"]["input"]["turn_detection"]["type"],
-            "server_vad"
-        );
-        assert_eq!(
-            config["audio"]["input"]["turn_detection"]["create_response"],
-            true
-        );
-        assert_eq!(
-            config["audio"]["input"]["turn_detection"]["interrupt_response"],
-            true
-        );
-        assert!(config.get("tools").is_none());
-        assert!(config.get("tool_choice").is_none());
-        let serialized = config.to_string();
-        assert!(!serialized.contains("openclaw_browser"));
-        assert!(!serialized.contains("inspect_page"));
-        assert!(!serialized.contains("list_tabs"));
-        assert!(!serialized.contains("Sergio"));
-        assert!(!serialized.contains("sergio"));
-    }
-
-    #[test]
-    fn browser_url_parser_normalizes_only_public_http_destinations() {
-        assert_eq!(
-            normalize_public_browser_url("example.com").unwrap(),
-            "https://example.com/"
-        );
-        assert_eq!(
-            normalize_public_browser_url("weather tomorrow").unwrap(),
-            "https://www.google.com/search?q=weather+tomorrow"
-        );
-        assert_eq!(
-            normalize_public_browser_url("HTTPS://EXAMPLE.COM.:443/path?q=1#heading").unwrap(),
-            "https://example.com/path?q=1#heading"
-        );
-        assert_eq!(
-            normalize_public_browser_url("example.com:8443/path").unwrap(),
-            "https://example.com:8443/path"
-        );
-        assert!(normalize_public_browser_url("https://8.8.8.8/dns-query").is_ok());
-        assert!(normalize_public_browser_url("https://[2606:4700:4700::1111]/").is_ok());
-    }
-
-    #[test]
-    fn browser_url_parser_rejects_credentials_private_names_and_malformed_inputs() {
-        for url in [
-            "ftp://example.com",
-            "https://user@example.com",
-            "https://user:password@example.com",
-            "http:///",
-            "https://localhost",
-            "https://api.localhost",
-            "https://printer.local",
-            "https://service.internal",
-            "https://host.localdomain",
-            "https://intranet",
-            "https://server.lan",
-            "https://router.home.arpa",
-            "https://service.corp",
-            "https://hidden.onion",
-            "https://example.test",
-            "https://example.invalid",
-            "https://example.example",
-            "https://bad_host.example.com",
-            "https://example.com\\private",
-            "https://example.com\nprivate",
-        ] {
-            assert!(
-                normalize_public_browser_url(url).is_err(),
-                "unexpectedly accepted {url}"
-            );
-        }
-    }
-
-    #[test]
-    fn browser_url_parser_rejects_non_public_and_odd_ip_literals() {
-        for url in [
-            "http://0.0.0.0",
-            "http://10.0.0.1",
-            "http://100.64.0.1",
-            "http://127.0.0.1",
-            "http://169.254.169.254/latest/meta-data",
-            "http://172.16.0.1",
-            "http://192.0.0.1",
-            "http://192.0.2.1",
-            "http://192.88.99.1",
-            "http://192.168.1.1",
-            "http://198.18.0.1",
-            "http://198.51.100.1",
-            "http://203.0.113.1",
-            "http://224.0.0.1",
-            "http://255.255.255.255",
-            "http://2130706433",
-            "http://0177.0.0.1",
-            "http://0x7f000001",
-            "http://134744072",
-            "http://0x08080808",
-            "http://010.010.010.010",
-            "http://[::]",
-            "http://[::1]",
-            "http://[::ffff:127.0.0.1]",
-            "http://[::ffff:10.0.0.1]",
-            "http://[::ffff:8.8.8.8]",
-            "http://[fc00::1]",
-            "http://[fd00::1]",
-            "http://[fe80::1]",
-            "http://[ff02::1]",
-            "http://[2001:db8::1]",
-            "http://[2002:7f00:1::]",
-            "http://[3fff::1]",
-        ] {
-            assert!(
-                normalize_public_browser_url(url).is_err(),
-                "unexpectedly accepted {url}"
-            );
-        }
-    }
-
-    #[test]
-    fn realtime_browser_backend_is_fail_closed_for_every_action() {
-        for action in ["open_url", "navigate"] {
-            let error = invoke_openclaw_browser_action(OpenClawBrowserActionInput {
-                action: action.to_string(),
-                url: Some("https://example.com".to_string()),
-            })
-            .unwrap_err();
-            assert!(error.contains("Realtime browser control is disabled"));
-        }
-
-        for action in [
-            "inspect_page",
-            "list_tabs",
-            "click_ref",
-            "type_ref",
-            "press_key",
-        ] {
-            let error = invoke_openclaw_browser_action(OpenClawBrowserActionInput {
-                action: action.to_string(),
-                url: None,
-            })
-            .unwrap_err();
-            assert!(error.contains("Unsupported OpenClaw browser action"));
-        }
-    }
-
     #[test]
     fn frontend_trace_fields_accept_only_non_content_audio_buckets() {
         assert!(FrontendTraceFields {
@@ -5438,23 +3832,6 @@ mod tests {
     }
 
     #[test]
-    fn realtime_hotkey_is_reserved_for_realtime() {
-        assert!(validate_dictation_hotkey("Alt+D").is_ok());
-        assert!(validate_dictation_hotkey("Alt+R").is_ok());
-        assert!(validate_dictation_hotkey("Ctrl+Shift+V").is_ok());
-        assert!(validate_dictation_hotkey("Command+D").is_ok());
-        assert!(validate_dictation_hotkey("Alt+")
-            .unwrap_err()
-            .contains("Invalid hotkey"));
-        assert!(validate_dictation_hotkey("Alt+Shift+R")
-            .unwrap_err()
-            .contains("reserved for realtime"));
-        assert!(validate_dictation_hotkey("shift + alt + keyr")
-            .unwrap_err()
-            .contains("reserved for realtime"));
-    }
-
-    #[test]
     fn dictation_hotkey_requires_a_non_shift_modifier() {
         for hotkey in ["D", "Shift+D", "F8", "Shift+Equal"] {
             assert!(
@@ -5467,7 +3844,7 @@ mod tests {
     }
 
     #[test]
-    fn invalid_or_reserved_persisted_hotkeys_fall_back_without_touching_valid_values() {
+    fn invalid_persisted_hotkeys_fall_back_without_touching_valid_values() {
         let mut invalid = AppConfig {
             hotkey: "Alt+".to_string(),
             ..AppConfig::default()
@@ -5479,8 +3856,8 @@ mod tests {
             hotkey: "shift + alt + r".to_string(),
             ..AppConfig::default()
         };
-        assert!(repair_invalid_configured_hotkey(&mut reserved).is_some());
-        assert_eq!(reserved.hotkey, "Alt+D");
+        assert!(repair_invalid_configured_hotkey(&mut reserved).is_none());
+        assert_eq!(reserved.hotkey, "shift + alt + r");
 
         let mut modifierless = AppConfig {
             hotkey: "F8".to_string(),

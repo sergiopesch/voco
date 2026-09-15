@@ -200,10 +200,6 @@ voco_validate_hotkey() {
     VOCO_HOTKEY_VALIDATION_ERROR="Hotkey must include Alt, Control, or Super in addition to the main key."
     return 1
   fi
-  if [[ "${has_shift}" == true && "${has_alt}" == true && "${has_control}" == false && "${has_super}" == false && "${key}" == "KEYR" ]]; then
-    VOCO_HOTKEY_VALIDATION_ERROR="Alt+Shift+R is reserved for realtime conversation."
-    return 1
-  fi
 
   return 0
 }

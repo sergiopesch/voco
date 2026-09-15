@@ -33,7 +33,7 @@ class ProtocolTests(unittest.TestCase):
         smoke_match = re.search(r"^PROTOCOL_VERSION = (\d+)$", smoke_client, re.MULTILINE)
         self.assertIsNotNone(rust_match)
         self.assertIsNotNone(smoke_match)
-        self.assertEqual(PROTOCOL_VERSION, 5)
+        self.assertEqual(PROTOCOL_VERSION, 6)
         self.assertEqual(int(rust_match.group(1)), PROTOCOL_VERSION)
         self.assertEqual(int(smoke_match.group(1)), PROTOCOL_VERSION)
 

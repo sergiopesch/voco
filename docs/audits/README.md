@@ -14,4 +14,3 @@ Historical audit index:
 Execution spec:
 
 - [Perfect Dictation Stabilization Spec](../perfect-dictation-stabilization-spec.md)
-- [Codex Stabilization Goal](../codex-goals/perfect-voco-stabilization-goal.md)

@@ -39,7 +39,6 @@ ENGINE_BUS_NAME = "org.freedesktop.IBus.Voco"
 ENGINE_PATH_PREFIX = "/org/freedesktop/IBus/Voco/Engine/"
 MAX_TEXT_BYTES = 1_000_000
 DEFAULT_DICTATION_HOTKEY = "Alt+D"
-REALTIME_HOTKEY = "Alt+Shift+R"
 SESSION_CONTROL_KEYVALS = {
     IBus.keyval_from_name("Alt_L"),
     IBus.keyval_from_name("Alt_R"),
@@ -240,13 +239,13 @@ class VocoCoordinator:
             self.consumed_shortcut_keys.discard(key)
         if not available:
             return False
-        for index, hotkey in enumerate(self.shortcut_specs):
+        for hotkey in self.shortcut_specs:
             if _matches_session_hotkey(keyval, state, hotkey):
                 token = secrets.token_hex(24)
                 self.pending_trigger = (token, engine, engine.context_revision,
                                         time.monotonic() + 2.0)
                 self.trigger_to_deliver = {"triggerId": token,
-                                           "mode": "dictation" if index == 0 else "realtime"}
+                                           "mode": "dictation"}
                 self.consumed_shortcut_keys.add(key)
                 return True
         return False
@@ -1064,7 +1063,6 @@ def session_control_hotkey_specs(
         configured_dictation_hotkey()
         if dictation_hotkey is None
         else dictation_hotkey,
-        REALTIME_HOTKEY,
     )
     return tuple(
         specification

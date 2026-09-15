@@ -55,7 +55,7 @@ export function NativeMicrophoneSettings({ controls, disabled }: {
       This choice lasts until VOCO closes or its device identity changes.</p> : null}
     <p>No audio is captured by this setup panel. Use Stop or Cancel during dictation.
       If the source changes or disconnects, VOCO stops and retains received audio for review.</p>
-    <p>This development backend requires PipeWire source identity metadata. Realtime voice retains its existing microphone setup.</p>
+    <p>Microphone identity is verified through PipeWire.</p>
     {controls.error ? <div role="alert" className="voco-inline-note voco-inline-note--error">{controls.error}</div> : null}
   </div>;
 }

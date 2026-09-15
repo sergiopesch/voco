@@ -24,11 +24,7 @@ export interface AppConfig {
   insertionStrategy: InsertionStrategy;
   transcriptTarget: TranscriptTarget;
   liveCursorMode: LiveCursorMode;
-  openclawAgent: string;
-  openclawPromptPrefix: string;
   transcriptEnhancement: TranscriptEnhancement;
-  localLlmEndpoint: string;
-  localLlmModel: string | null;
   onboardingCompleted: boolean;
   updateChannel: UpdateChannel;
   installChannel: InstallChannel;
@@ -177,38 +173,6 @@ export interface OwnedPreeditStatus {
   error: string | null;
 }
 
-export interface OpenClawAgentResult {
-  agent: string;
-  response: string;
-}
-
-export interface OpenClawSpeechResult {
-  audioPath: string;
-  provider: string | null;
-  outputFormat: string | null;
-}
-
-export interface TranscriptEnhancementResult {
-  text: string;
-  usedEnhancement: boolean;
-  warning: string | null;
-}
-
-export interface LocalLlmTestResult {
-  ok: boolean;
-  detail: string;
-}
-
-export interface LocalLlmAgentResult {
-  response: string;
-}
-
-export interface RealtimeClientSecretResult {
-  value: string;
-  expiresAt: number | null;
-}
-
-export type RealtimeStatus = "idle" | "connecting" | "listening" | "speaking" | "error";
 export type MicrophonePermission = "unknown" | "granted" | "denied";
 
 export interface RuntimeStatusSnapshot {
@@ -226,6 +190,4 @@ export interface RuntimeStatusSnapshot {
   cursorSetupState: OwnedPreeditStatus["setupState"];
   manualTranscriptReady: boolean;
   recoveryAvailable: boolean;
-  realtimeStatus: RealtimeStatus;
-  realtimeMuted: boolean;
 }

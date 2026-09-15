@@ -19,7 +19,6 @@ import {
   resetConfigToDefaults,
   saveConfigPatch,
   showNotification,
-  showStatusOverlay,
   syncRuntimeStatus,
   releaseBrowserRecording,
   traceHotkeyEvent,
@@ -34,10 +33,8 @@ import { UpdateCheckCoordinator } from "@/lib/updateCheckCoordinator";
 import { useGlobalShortcut } from "@/hooks/useGlobalShortcut";
 import { useDictation } from "@/hooks/useDictation";
 import { useNativeCaptureSettings } from "@/hooks/useNativeCaptureSettings";
-import { useRealtimeConversation } from "@/hooks/useRealtimeConversation";
 import { ControlPanel } from "@/components/ControlPanel";
 import { ConfigRecoveryPanel } from "@/components/ConfigRecoveryPanel";
-import { RealtimeMicVisual } from "@/components/RealtimeMicVisual";
 import { requiresVerifiedTextTarget } from "@/lib/dictationOutputPlan";
 import { probeMicrophoneAccess } from "@/lib/audioInput";
 import { MicrophoneRefresh, queryMicrophonePermission, microphoneAccessFailure } from "@/lib/microphoneRefresh";
@@ -52,17 +49,13 @@ import {
 import { placeTrayPopover } from "@/lib/popoverPlacement";
 import { showInteractiveWindow, WindowRemapFocusGuard, isWaylandSession } from "@/lib/windowRemap";
 import {
-  canActivateMode,
   canToggleDictationWithPermission,
-  deriveActivityMode,
   isDictationActive,
-  type ActivityMode,
 } from "@/lib/activityMode";
 import type {
   AppConfig,
   AudioDeviceOption,
   ConfigSnapshot,
-  RealtimeStatus,
   RuntimeDiagnostics,
 } from "@/types";
 
@@ -78,8 +71,6 @@ function getCaptureSelection() {
 const PANEL_MIN_SIZE = new LogicalSize(760, 560);
 const POPOVER_SIZE = new LogicalSize(420, 380);
 const POPOVER_RECOVERY_SIZE = new LogicalSize(420, 660);
-const REALTIME_OVERLAY_WIDTH = 340;
-const REALTIME_OVERLAY_HEIGHT = 156;
 
 type ResizeDirection =
   | "East"
@@ -123,67 +114,6 @@ function cleanupDeferredListener(
   };
 }
 
-
-function RealtimeOverlay({
-  status,
-  detail,
-  level,
-  muted,
-  onToggleMute,
-  onCancel,
-}: {
-  status: RealtimeStatus;
-  detail: string;
-  level: number;
-  muted: boolean;
-  onToggleMute: () => void;
-  onCancel: () => void;
-}) {
-  return (
-    <main
-      className="voco-overlay voco-realtime-overlay"
-      data-state={status}
-      aria-live="polite"
-    >
-      <RealtimeMicVisual
-        active={status !== "idle" && status !== "error" && !muted}
-        level={muted ? 0 : level}
-        status={status}
-        size="overlay"
-      />
-      <div className="voco-realtime-overlay__copy">
-        <span className="voco-overlay__eyebrow">Realtime Voice</span>
-        <strong className="voco-overlay__headline">
-          {muted
-            ? "Muted"
-            : status === "speaking"
-            ? "Speaking"
-            : status === "connecting"
-              ? "Connecting"
-              : "Listening"}
-        </strong>
-        <p className="voco-overlay__copy">{detail}</p>
-        <div className="voco-realtime-overlay__actions">
-          <button
-            className="voco-realtime-overlay__button"
-            type="button"
-            onClick={onToggleMute}
-            aria-pressed={muted}
-          >
-            {muted ? "Unmute" : "Mute"}
-          </button>
-          <button
-            className="voco-realtime-overlay__button voco-realtime-overlay__button--danger"
-            type="button"
-            onClick={onCancel}
-          >
-            Cancel
-          </button>
-        </div>
-      </div>
-    </main>
-  );
-}
 
 function ResizeHandles() {
   const startResize =
@@ -286,24 +216,13 @@ export function App() {
     toggle,
     onHotkeyPressed,
   } = useDictation({ getCaptureSelection });
-  const {
-    realtimeStatus,
-    realtimeDetail,
-    realtimeError,
-    realtimeLevel,
-    isRealtimeMuted,
-    isRealtimeActive,
-    toggleRealtime,
-    toggleRealtimeMute,
-    stopRealtime,
-  } = useRealtimeConversation(selectedDeviceId);
   const [initComplete, setInitComplete] = useState(false);
   const [runtimeDiagnostics, setRuntimeDiagnostics] = useState<RuntimeDiagnostics | null>(null);
   const [runtimeStatusEpoch, setRuntimeStatusEpoch] = useState<number | null>(null);
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [startupConfigError, setStartupConfigError] = useState<string | null>(null);
   const [settingsRequest, setSettingsRequest] = useState<{
-    section: "General" | "Audio" | "Hotkeys" | "Integrations";
+    section: "General" | "Audio" | "Hotkeys";
     id: number;
   }>({ section: "General", id: 0 });
   const [closeRequestId, setCloseRequestId] = useState(0);
@@ -336,13 +255,9 @@ export function App() {
   const diagnosticsInFlightRef = useRef(false);
   const diagnosticsExpiryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const runtimeStatusRevisionRef = useRef(0);
-  const activityModeRef = useRef<ActivityMode>("idle");
   const microphoneRefreshRef = useRef(new MicrophoneRefresh());
   const dictationStatusRef = useRef(status);
-  const realtimeStatusRef = useRef(realtimeStatus);
-  const realtimeActivationAllowedRef = useRef(false);
   dictationStatusRef.current = status;
-  realtimeStatusRef.current = realtimeStatus;
   const applyAuthoritativeConfig = useCallback(
     (snapshot: ConfigSnapshot): boolean => {
       if (
@@ -381,10 +296,7 @@ export function App() {
     },
     [dismissInteractiveSurface, setSurface],
   );
-  // Dictation stays in the tray; it must not map a transcript window over the
-  // destination. Realtime conversation keeps its separate explicit surface.
-  const realtimeOverlayVisible = surface === "hidden" && isRealtimeActive;
-  const overlayVisible = realtimeOverlayVisible;
+  // Dictation never maps a transcript window over the destination.
   const recoveryAvailable = Boolean(recovery);
   const popoverSize =
     recovery || hasRecoverableTranscript || (transcript.trim().length > 0 &&
@@ -401,12 +313,6 @@ export function App() {
     startupConfigError,
     settingsError,
   );
-  const realtimeActivationAllowed =
-    initComplete &&
-    config !== null &&
-    !runtimeConfigurationError &&
-    microphonePermission !== "denied";
-  realtimeActivationAllowedRef.current = realtimeActivationAllowed;
   const canHandleHotkey =
     initComplete && config !== null && !runtimeConfigurationError;
   const handleToggleRequest = useCallback(async (triggerId?: string, action?: DictationTriggerAction) => {
@@ -424,21 +330,6 @@ export function App() {
       await showNotification(
         "Panel hidden",
         "Focus the target text field, then press the dictation hotkey again.",
-      ).catch(() => {});
-      return;
-    }
-
-    const realtimeActive = !["idle", "error"].includes(
-      realtimeStatusRef.current,
-    );
-    if (
-      realtimeActive ||
-      !canActivateMode(activityModeRef.current, "dictation")
-    ) {
-      rejectBrowserStart();
-      await showNotification(
-        "Realtime voice is active",
-        "Stop realtime voice before starting dictation.",
       ).catch(() => {});
       return;
     }
@@ -465,18 +356,10 @@ export function App() {
       ).catch(() => {});
       return;
     }
-    const admitted = toggle(triggerId, action);
-    if (admitted && !dictationActive) {
-      activityModeRef.current = "dictation";
-    }
+    toggle(triggerId, action);
   }, [dismissInteractiveSurface, toggle]);
   const handlePrepareDictation = useCallback(async () => {
     if (isDictationActive(useStore.getState().status)) return;
-    if (!["idle", "error"].includes(realtimeStatusRef.current) ||
-        !canActivateMode(activityModeRef.current, "dictation")) {
-      await showNotification("Realtime voice is active", "Stop realtime voice before preparing dictation.").catch(() => {});
-      return;
-    }
     if (!dismissInteractiveSurface()) return;
     await hideStatusOverlay().catch(() => {});
     await showNotification(
@@ -485,62 +368,8 @@ export function App() {
     ).catch(() => {});
   }, [dismissInteractiveSurface]);
 
-  const handleRealtimeToggleRequest = useCallback(async () => {
-    // Native shortcut delivery can follow the DOM event that finished capture.
-    if (shortcutCaptureRef.current || performance.now() - shortcutCaptureReleasedAtRef.current < 350) return;
-    const dictationActive = isDictationActive(dictationStatusRef.current);
-    if (
-      dictationActive ||
-      !canActivateMode(activityModeRef.current, "realtime")
-    ) {
-      await showNotification(
-        "Dictation is active",
-        "Finish dictation before starting realtime voice.",
-      ).catch(() => {});
-      return;
-    }
-
-    const realtimeActive = !["idle", "error"].includes(
-      realtimeStatusRef.current,
-    );
-    if (!realtimeActive && !realtimeActivationAllowedRef.current) {
-      await showNotification(
-        "Realtime voice is unavailable",
-        useStore.getState().microphonePermission === "denied"
-          ? "Grant microphone access in VOCO settings before starting realtime voice."
-          : "Wait for VOCO to finish initializing and resolve any settings errors.",
-      ).catch(() => {});
-      return;
-    }
-    if (!realtimeActive && configSavePendingCountRef.current > 0) {
-      await showNotification(
-        "Settings are still saving",
-        "Wait for the microphone setting to finish saving, then press the realtime hotkey again.",
-      ).catch(() => {});
-      return;
-    }
-
-    if (useStore.getState().surface !== "hidden") {
-      if (!dismissInteractiveSurface()) return;
-      await hideStatusOverlay().catch(() => {});
-    }
-    if (
-      isDictationActive(dictationStatusRef.current) ||
-      !canActivateMode(activityModeRef.current, "realtime")
-    ) {
-      return;
-    }
-
-    if (!realtimeActive) {
-      activityModeRef.current = "realtime";
-    }
-    microphoneRefreshRef.current.invalidateRetry();
-    toggleRealtime();
-  }, [dismissInteractiveSurface, toggleRealtime]);
-
   useGlobalShortcut(
     handleToggleRequest,
-    handleRealtimeToggleRequest,
     () => {
       return canHandleHotkey;
     },
@@ -557,10 +386,6 @@ export function App() {
     appMountedLoggedRef.current = true;
     traceHotkeyEvent("frontend_app_mounted").catch(() => {});
   }, []);
-
-  useEffect(() => {
-    activityModeRef.current = deriveActivityMode(status, realtimeStatus);
-  }, [realtimeStatus, status]);
 
   useEffect(() => {
     return cleanupDeferredListener(
@@ -582,7 +407,6 @@ export function App() {
     });
     return () => { unsubscribe(); controller.dispose(); };
   }, []);
-  useEffect(() => { microphoneRefreshRef.current.invalidateRetry(); }, [realtimeStatus]);
 
   const refreshDevices = useCallback(async () => {
     if (useStore.getState().captureBackendMode !== "webkit") {
@@ -621,12 +445,10 @@ export function App() {
     const controller = microphoneRefreshRef.current;
     const current = controller.beginRetry();
     const deviceId = useStore.getState().selectedDeviceId;
-    const initialRealtime = realtimeStatusRef.current;
     const inactive = () => {
       const state = useStore.getState();
-      return current() && activityModeRef.current === "idle" && state.selectedDeviceId === deviceId &&
-        state.status !== "recording" && state.status !== "processing" &&
-        realtimeStatusRef.current === initialRealtime && (initialRealtime === "idle" || initialRealtime === "error");
+      return current() && !isDictationActive(state.status) && state.selectedDeviceId === deviceId &&
+        state.status !== "recording" && state.status !== "processing";
     };
     if (!inactive()) return false;
     try {
@@ -739,7 +561,7 @@ export function App() {
     }
   }, [refreshAuthoritativeConfig, refreshDevices, refreshRuntimeDiagnostics]);
 
-  const openSettings = useCallback(async (section: "General" | "Audio" | "Hotkeys" | "Integrations" = "General") => {
+  const openSettings = useCallback(async (section: "General" | "Audio" | "Hotkeys" = "General") => {
     const requestVersion = panelRequestVersionRef.current + 1;
     panelRequestVersionRef.current = requestVersion;
     const currentStatus = useStore.getState().status;
@@ -959,8 +781,6 @@ export function App() {
       cursorSetupState,
       manualTranscriptReady: recovery?.kind === "manual-copy",
       recoveryAvailable,
-      realtimeStatus,
-      realtimeMuted: isRealtimeMuted,
     }).catch((error) => {
       console.warn("Failed to synchronize VOCO runtime status:", error);
     });
@@ -970,11 +790,9 @@ export function App() {
     cursorSetupState,
     hasRecoverableTranscript,
     initComplete,
-    isRealtimeMuted,
     microphonePermission,
     microphoneReady,
     nativeMicrophoneReady,
-    realtimeStatus,
     runtimeConfigurationError,
     runtimeStatusEpoch,
     recoveryAvailable,
@@ -1002,19 +820,12 @@ export function App() {
         await currentWindow.setResizable(false).catch(() => {});
         await currentWindow.setMinSize(null).catch(() => {});
         await currentWindow
-          .setIgnoreCursorEvents(!overlayVisible)
+          .setIgnoreCursorEvents(true)
           .catch(() => {});
         if (!isCurrentRequest()) {
           return;
         }
-        if (overlayVisible) {
-          await showStatusOverlay(
-            REALTIME_OVERLAY_WIDTH,
-            REALTIME_OVERLAY_HEIGHT,
-          ).catch(() => {});
-        } else {
-          await hideStatusOverlay().catch(() => {});
-        }
+        await hideStatusOverlay().catch(() => {});
         return;
       }
 
@@ -1096,7 +907,7 @@ export function App() {
 
     const operation = surfaceSyncQueueRef.current.then(syncWindowSurface);
     surfaceSyncQueueRef.current = operation.catch(() => {});
-  }, [overlayVisible, popoverSize, realtimeOverlayVisible, surface]);
+  }, [popoverSize, surface]);
 
   useEffect(() => {
     if (surface !== "settings" && surface !== "onboarding") {
@@ -1218,12 +1029,9 @@ export function App() {
     cursorRequired,
     cursorSetupState,
     dictationStatus: status,
-    isRealtimeActive,
     microphonePermission,
     microphoneReady,
     nativeMicrophoneReady,
-    realtimeMuted: isRealtimeMuted,
-    realtimeStatus,
   });
 
   if (!config) {
@@ -1243,18 +1051,7 @@ export function App() {
     return null;
   }
 
-  if (surface === "hidden") {
-    return realtimeOverlayVisible ? (
-      <RealtimeOverlay
-        status={realtimeStatus}
-        detail={realtimeDetail}
-        level={realtimeLevel}
-        muted={isRealtimeMuted}
-        onToggleMute={toggleRealtimeMute}
-        onCancel={stopRealtime}
-      />
-    ) : null;
-  }
+  if (surface === "hidden") return null;
 
   return (
     <>
@@ -1287,13 +1084,6 @@ export function App() {
         closeRequestId={closeRequestId}
         requestedSection={settingsRequest.section}
         requestedSectionRequestId={settingsRequest.id}
-        isRealtimeActive={isRealtimeActive}
-        isRealtimeMuted={isRealtimeMuted}
-        realtimeActivationAllowed={realtimeActivationAllowed}
-        realtimeStatus={realtimeStatus}
-        realtimeDetail={realtimeDetail}
-        realtimeError={realtimeError}
-        realtimeLevel={realtimeLevel}
         selectedDeviceId={selectedDeviceId}
         availableDevices={availableDevices}
         microphonePermission={microphonePermission}
@@ -1306,7 +1096,6 @@ export function App() {
         onOpenReleasePage={(url) => openExternalUrl(url)}
         onRefreshRuntimeDiagnostics={refreshRuntimeDiagnostics}
         onOpenSettings={openSettings}
-        onToggleRealtime={() => void handleRealtimeToggleRequest()}
       />
       {surface === "settings" || surface === "onboarding" ? <ResizeHandles /> : null}
     </>

@@ -209,7 +209,7 @@
 .voco-preferences__disclosure > summary { padding: 18px 20px; cursor: pointer; font-size: 15px; font-weight: 500; }
 .voco-preferences .voco-preferences__disclosure > summary:focus-visible { outline-offset: -4px; border-radius: 17px; }
 .voco-preferences__disclosure[open] > summary { border-bottom: 1px solid var(--preferences-line); }
-.voco-preferences__window-actions { display: flex; justify-content: flex-end; margin-top: -12px; margin-bottom: 6px; }
+.voco-preferences__window-actions { display: flex; justify-content: flex-end; margin-top: -12px; margin-bottom: 6px; min-height: 42px; cursor: grab; touch-action: none; user-select: none; }
 .voco-preferences__window-actions .voco-button { min-height: 30px; padding: 5px 12px; font-size: 12px; }
 @media (max-width: 900px), (max-height: 650px) {
   .voco-preferences__brand h1 { font-size: 22px; }

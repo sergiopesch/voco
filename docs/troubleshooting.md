@@ -113,35 +113,15 @@ Legacy ydotool/xdotool/clipboard helper setup is documented separately in
 not require input injection. Do not change input-group membership without understanding
 the broader keyboard-device access it grants.
 
-## Tray, popover, dictation, and realtime controls disagree
+## Tray and panel controls disagree
 
-The tray is derived from one runtime snapshot containing runtime initialization, microphone
-readiness and permission, dictation phase, live-cursor delivery/setup, realtime phase, and mute
-state. Expected behavior includes:
+The tray and panel use the same runtime state: microphone readiness, model readiness,
+recording, processing and recovery. A recording can always be stopped; a new
+recording waits for capture/processing to finish. Retained transcripts remain
+available for review. Settings stays available to resolve a configuration problem.
 
-- `Transcribing…` is disabled while a final is processing.
-- `Review Transcript` replaces `Start Dictation` while an idle manual transcript is pending.
-  Reviewing text does not require microphone permission and never starts a recording.
-- `Review Recording` opens retained recovery after cancellation or failure, including recordings
-  that have no completed transcript yet.
-- Realtime cannot start during recording or processing, and dictation cannot start while realtime
-  is connecting, listening, or speaking.
-- A muted realtime session uses the neutral graphite icon and an explicit `Realtime voice muted`
-  label. It remains active, and `Stop Realtime Voice` remains available.
-- Known-denied microphone permission is a needs-attention state. New dictation and realtime starts
-  stay disabled until microphone access is retried from Settings.
-- During initialization or a blocking configuration error, the command popover cannot open or
-  start a new realtime session. An already-active realtime session can still open the popover to
-  stop safely, and retained transcripts or recordings remain available for review after initialization.
-  Settings remains available after initialization so configuration can be repaired.
-- `Open VOCO` shows the popover; clicking the tray icon again may hide it.
-- The popover deliberately has no dictation start button. Opening a focusable panel would move focus
-  away from the target, so focus the text field and use the configured hotkey.
-- `Escape` or focus loss hides the popover.
-
-If stale state remains after an operation has completed, reopen Settings and press `Refresh runtime
-checks`. Do not restart desktop services solely to refresh the panel; reserve `ibus restart` or a
-sign-out/in for an actual engine protocol upgrade.
+If the two surfaces disagree, collect local diagnostics with the exact package
+version and test time. Do not assume a successful key dispatch proves editor delivery.
 
 ## A hotkey or setting changes back unexpectedly
 
@@ -162,7 +142,7 @@ names, agent names, and other personal configuration.
 
 Custom dictation shortcuts must include Alt, Control, or Super plus a main key. Bare keys and
 Shift-only combinations are rejected because they would turn ordinary typing into a dictation
-control event. `Alt+Shift+R` remains reserved for realtime voice.
+control event. Alt+Shift+R is no longer reserved for a conversation mode.
 
 ## VOCO says local settings need attention
 

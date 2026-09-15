@@ -52,12 +52,11 @@ for measurement and recipient limitations.
 
 | Area | Implementation | Responsibility / constraint |
 | --- | --- | --- |
-| App orchestration and native IPC | `apps/desktop/src-tauri/src/lib.rs` | Command registration, startup, model readiness, optional integrations and shared limits. Keep platform authority in Rust. |
+| App orchestration and native IPC | `apps/desktop/src-tauri/src/lib.rs` | Command registration, startup, model readiness, cursor delivery and shared limits. Keep platform authority in Rust. |
 | UI | `apps/desktop/src/components/`, `src/store/` | Tray-associated controls, status, setup and recovery. No model inference or OS simulation in React. |
 | Capture | `apps/desktop/src/lib/audioInput.ts`, `audioCaptureBuffer.ts`, `audioCaptureFlush.ts`, `nativeCapture.ts`; `src-tauri/src/native_capture/` | Browser capture is default; native capture is a separately gated development path. Preserve sample ownership and drain ordering. |
 | Speech runtime | `runtime/speech/` | Selected pinned CPU runtime, bounded local protocol, content-free metrics. Model/native artifacts are provisioned separately from Git. |
 | Legacy/canonical recognition | `src-tauri/src/transcribe.rs`, `transcribe_corroboration.rs`; frontend canonical/checkpoint helpers | Separate Whisper and recovery behavior with its own quality gates; not an extra pass on every NVIDIA chunk. |
-| Text transformations | `src-tauri/src/spoken_commands.rs`, `local_intelligence.rs` | Explicit command/optional local enhancement logic; preserve recognized content and report rejected output. |
 | Input/focus | `src-tauri/src/insertion.rs`, `focus_probe.rs`, `resources/voco_desktop_target.py` | Desktop-specific compatibility, fresh preflight checks, bounded observation, no uncertain automatic retry. |
 | Shortcuts | `src-tauri/src/hotkey_state.rs`, `shortcut_arbitration.rs`, `shortcut_readiness.rs`, `owned_preedit.rs` and IBus resources | Admit one trigger. The optional IBus component does not authorize generic text mutation or switch the owner's input source. |
 | Shortcut arbitration | `src-tauri/src/shortcut_arbitration.rs`; registration/readiness and `suppress_passive_shortcut` in `lib.rs` | Completed IBus authority controls registration. Passive evdev also guards pending polls; an already-consuming X11 callback keeps shared debounce without that passive suppression. |
@@ -68,7 +67,7 @@ for measurement and recipient limitations.
 | Audio transport | `src-tauri/src/audio_transport.rs`, `vca2.rs`, `native_capture_commands.rs` | Validate binary headers, sample counts and finite values before decoding or retaining. |
 | Config and process lifecycle | `src-tauri/src/config.rs`, `single_instance.rs`, `trigger_socket.rs`, `process_runner.rs` | Private state, exclusive process ownership, bounded helper execution and reaping. |
 | Diagnostics | `src-tauri/src/performance.rs`, `runtime/speech/streaming.py::Metrics`, `scripts/report-*.py` | Bounded local logs; failures cannot stall dictation. Reports distinguish successful events, failures and unavailable evidence. |
-| Optional non-dictation logic | `src-tauri/src/hybrid.rs`, `numerical_planner.rs`, optional commands in `lib.rs`, corresponding frontend modules | Keep configuration/network/credential boundaries explicit. These are not required for core local dictation. |
+| Legacy recognition planning | `src-tauri/src/hybrid.rs`, `numerical_planner.rs`, corresponding frontend modules | Whisper recovery and numerical recognition checks; separate from the selected NVIDIA streaming path. |
 | Build/package | `scripts/build-desktop.sh`, `package-nvidia.py`, `verify-deb-package.sh`, `verify-speech-payload.py`, `packaging/` | Build matching application/host; require pinned complete payload; validate before publishing an artifact. |
 | Quality evidence | `scripts/test-*`, `scripts/dictation-quality*`, `tests/fixtures/`, `docs/testing/` | Tests/reports, not application features. Keep public fixtures separate from private owner recordings. |
 

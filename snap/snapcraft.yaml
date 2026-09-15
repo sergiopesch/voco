@@ -1,7 +1,7 @@
 name: voco
 title: VOCO
 base: core24
-version: '2026.0.37'
+version: '2026.0.38'
 summary: Local dictation at your cursor. Built for Linux.
 license: MIT
 website: https://github.com/sergiopesch/voco
@@ -17,10 +17,7 @@ description: |
   your device, with no account or subscription required. Text insertion depends
   on your desktop session and the target field.
 
-  Optional local model modes use your own localhost model server. Optional
-  OpenClaw modes may send transcript text according to your configured provider.
-  Realtime conversation sends microphone audio to OpenAI only after you
-  explicitly start that mode.
+
 
   This Snap still uses classic confinement intentionally. VOCO currently
   relies on desktop automation paths that are not an honest fit for strict

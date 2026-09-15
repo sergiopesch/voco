@@ -18,7 +18,7 @@ gi.require_version("IBus", "1.0")
 from gi.repository import GLib, IBus  # noqa: E402
 
 
-PROTOCOL_VERSION = 5
+PROTOCOL_VERSION = 6
 TEST_ENGINE_NAME = "voco"
 
 

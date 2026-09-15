@@ -5,9 +5,8 @@
 Core dictation runs locally and requires no VOCO account, sign-in, subscription, telemetry, or
 third-party credential. The complete NVIDIA candidate bundles its model. Normal cursor
 streaming with enhancement off warms the selected NVIDIA worker at startup without
-an implicit Whisper download. Configured legacy startup and explicit legacy transcription
-commands can download their separately pinned Whisper model. Automatic GitHub Releases metadata checks occur after startup. Local-model, OpenClaw, and OpenAI Realtime
-connections occur only when the user explicitly configures or starts those optional modes.
+an implicit Whisper download. Explicit legacy transcription
+commands can download their separately pinned Whisper model. Automatic GitHub Releases metadata checks occur after startup. Assistant and realtime connections were removed in 2026.0.38.
 
 ## Threat Model
 
@@ -20,7 +19,6 @@ connections occur only when the user explicitly configures or starts those optio
 - Captured browser element value and selection checked transiently inside the extension
 - Bounded accessible-field context held transiently by the native observation helper
 - Clipboard contents (replaced by native desktop delivery or explicit Copy; clipboard managers may retain dictated text)
-- Optional OpenAI and OpenClaw credentials managed outside VOCO's core configuration
 
 ### Attack Surface
 
@@ -30,9 +28,6 @@ connections occur only when the user explicitly configures or starts those optio
 - Audio capture (WebView getUserMedia)
 - Native desktop paste and compatibility insertion via external helpers (ydotool, xdotool, xclip, wl-copy)
 - Local Python speech worker, bounded IPC, native CPU libraries and packaged model
-- Optional OpenClaw CLI execution when the transcript target is set to OpenClaw
-- Optional localhost local-model calls for transcript enhancement or local assistant answers
-- Optional OpenAI Realtime HTTPS/WebSocket connection when realtime conversation is started
 - ASR model loading (local files)
 - Legacy Whisper model preparation/download (HTTPS from Hugging Face)
 - Automatic and manual GitHub Release checks (HTTPS to api.github.com)
@@ -49,8 +44,7 @@ connections occur only when the user explicitly configures or starts those optio
 - **Single-instance ownership**: A private per-user runtime lock is acquired before sockets,
   shortcuts, tray state, or model work, preventing two VOCO processes from stealing shared runtime
   resources or overwriting configuration concurrently
-- **No VOCO account**: Core dictation has no VOCO identity or credential; optional third-party
-  credentials are needed only for the corresponding OpenAI or OpenClaw feature
+- **No VOCO account**: Dictation requires no identity or credential.
 - **Tauri CSP**: Restrictive content security policy, no remote scripts
 - **Scoped permissions**: WebView permission grants restricted to UserMedia (microphone) only
 - **Input validation**: Audio length limit (10 minutes), text size limit (100KB), empty input rejected
@@ -60,23 +54,6 @@ connections occur only when the user explicitly configures or starts those optio
 - **Local core storage**: Config, models, state, and debug captures use local paths; VOCO does not
   provide cloud sync
 - **Shell safety**: Text passed as arguments (not interpolated), `--` separators used
-- **OpenClaw bridge safety**: The OpenClaw agent id is validated, transcript and prompt sizes are bounded, the CLI is launched without shell interpolation, and the request is timed out
-- **Loopback HTTP safety**: Local model URLs are parsed structurally, require a loopback
-  host and HTTP scheme, reject credentials, and never follow redirects. A port may be
-  explicit; omitted HTTP ports use the default port 80
-- **Local model safety**: Transcript enhancement and local assistant mode only accept loopback HTTP endpoints and do not attach auth headers. Their dedicated client ignores proxies, disables redirects, and pins `localhost` resolution to IPv4/IPv6 loopback. Incomplete, truncated, refused, or tool-call responses are rejected; enhancement failures preserve the raw recognition
-- **Realtime browser safety**: Browser collaboration remains disabled in this candidate. The Realtime
-  schema advertises no browser tool, the frontend returns a fixed unavailable result for any
-  unexpected function call without invoking OpenClaw, and the backend compatibility command rejects
-  every action without a network or browser call. This prevents authenticated-tab disclosure and
-  avoids claiming an SSRF guarantee that VOCO cannot enforce across OpenClaw DNS resolution,
-  redirects, final URLs, or private-network overrides. A strict public-URL parser remains covered as
-  defense in depth, but passing it does not authorize navigation
-- **Realtime key handling**: The standard OpenAI API key is read only by the Tauri backend from the
-  process environment or `~/.openclaw/realtime.env`; the frontend never receives the standard API
-  key. On Unix, the file must be a current-user-owned regular file with no group or world access;
-  symlinks and files larger than 64 KiB are rejected, and nonblocking/no-controlling-terminal open
-  flags prevent FIFO or device paths from hanging the check
 - **Explicit debug persistence**: Debug capture is disabled unless `VOCO_DEBUG_CAPTURE_AUDIO` is
   exactly `1`. At most the first completed dictation in an app process is saved. The capture
   directory is verified as a current-user-owned real directory and set to `0700`; new WAV and JSON
@@ -97,9 +74,9 @@ connections occur only when the user explicitly configures or starts those optio
   Unsafe existing paths are rejected without changing their permissions. Trigger sockets
   are `0600`, accepted peers require Linux `SO_PEERCRED` for the current user, and cleanup
   removes only the registered socket inode while its parent remains safe.
-- **IBus socket security**: The separate IBus control socket requires a private `XDG_RUNTIME_DIR`, a 0700 VOCO directory, a 0600 socket, Linux `SO_PEERCRED` same-user verification on both ends, one app connection, bounded protocol-v5 JSON messages, ordered request IDs, and no `/tmp` fallback
+- **IBus socket security**: The separate IBus control socket requires a private `XDG_RUNTIME_DIR`, a 0700 VOCO directory, a 0600 socket, Linux `SO_PEERCRED` same-user verification on both ends, one app connection, bounded protocol-v6 JSON messages, ordered request IDs, and no `/tmp` fallback
 - **Input-source safety**: VOCO never selects, switches, restores, registers, or restarts a desktop input source. Its package only advertises a rank-zero persistent component that the user explicitly enables
-- **Safe default**: Generic IBus mutation is disabled at the native client and protocol-v5 engine
+- **Safe default**: Generic IBus mutation is disabled at the native client and protocol-v6 engine
   dispatch boundaries. This does not disable the separately enabled desktop-paste route. Actual
   WebKit tests showed that focus can move between fields without changing IBus identity, metadata
   or cursor geometry; the old context-token mechanism is not sufficient authorization.
@@ -162,36 +139,22 @@ or publish personal benchmark transcripts. See [diagnostic retention](../testing
 | Update result cache | `~/.config/voco/update-cache.json` |
 | Privacy-safe timing trace | `${XDG_STATE_HOME:-$HOME/.local/state}/voco/hotkey-trace.jsonl` |
 | Optional debug WAV and transcript timeline | `${XDG_STATE_HOME:-$HOME/.local/state}/voco/debug-captures/` |
-| Optional local model endpoint | `~/.config/voco/config.json` |
-| Optional realtime API key | `~/.openclaw/realtime.env` |
-| Optional OpenClaw Gateway token | OpenClaw-managed env/auth files under `~/.openclaw/` |
 | IBus app control | `$XDG_RUNTIME_DIR/voco/ibus-engine.sock` (transient socket only) |
 | Browser broker | `$XDG_RUNTIME_DIR/voco-browser/exact-field.sock` (transient socket only) |
 
 ## Privacy
 
 - Normal dictation audio is processed locally and is not sent to an external transcription service
-- If local transcript enhancement or local assistant mode is enabled, transcript text is sent only to the configured localhost model endpoint
-- In OpenClaw mode, the transcript text is sent to the configured local OpenClaw CLI agent; what happens after that depends on the user's OpenClaw provider and agent configuration
-- Only after the user starts realtime conversation, microphone audio is streamed to OpenAI
-  Realtime over WebSocket until the session is stopped
-- Realtime requests use neutral user wording and do not send a universal person-specific safety
-  identifier shared across VOCO installations
-- Realtime browser collaboration is disabled: OpenAI receives no browser URL, tab metadata, page
-  content, or snapshot from VOCO
 - No telemetry, analytics, or crash reporting
 - Dictation transcripts normally remain in memory. With debug capture explicitly enabled, the JSON
   timeline persists transcript, preview, canonical-chunk, and cursor-delivery diagnostic data next
   to the captured WAV until the user deletes both files
-- Config stores preferences and user-supplied values such as local endpoints, prompts, model names,
-  and OpenClaw agent names. Review it before sharing; optional API keys are not stored there
 - whisper.cpp logging is suppressed (no audio content logged)
 - Automatic and manual update checks request only GitHub release metadata; they do not upload audio
   or transcripts
 - The input engine rejects transcript mutation requests. The browser extension retains its captured
   field checks and receipt journal in memory; existing page content, field names and URLs are not
   exported to the broker. Dictated append text is necessarily sent to the authorized extension.
-  Browser integration does not enable Realtime browser tools or page disclosure to OpenAI.
 - A malicious process already running as the same desktop user remains inside the local-user trust boundary
 
 ## Retention and Deletion
@@ -207,12 +170,6 @@ Removing the VOCO package does not remove per-user XDG data. See the uninstall c
 [Install](../install.md) when local config, models, caches, timing traces, and captures should also
 be removed.
 
-`~/.openclaw/realtime.env` and other files under `~/.openclaw/` are outside VOCO's XDG state and
-may be shared with OpenClaw or other tools. VOCO neither creates nor removes them during package
-installation or uninstall, and it only reads the realtime key file. Delete that key file separately
-only after confirming nothing else uses it.
-
-Local model acceptance criteria are documented in [Local Intelligence](../local-intelligence-spec.md).
 
 ## Permissions Required
 
@@ -222,6 +179,11 @@ Local model acceptance criteria are documented in [Local Intelligence](../local-
 | File system | Config and model storage (XDG dirs) |
 | Input group (Wayland, optional) | evdev hotkey fallback and legacy ydotool API, not required for manual copying |
 | Browser activeTab/scripting/nativeMessaging | Explicit-tab adapter injection and local native host communication |
+
+
+
+> The following dated reviews describe earlier revisions. Removed assistant surfaces
+> are historical; retained delivery and dependency findings still need their stated checks.
 
 ## Current review scope
 
