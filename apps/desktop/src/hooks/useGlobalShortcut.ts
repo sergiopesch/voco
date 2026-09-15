@@ -4,17 +4,14 @@ import { refreshShortcutHeartbeat, releaseBrowserRecording, traceHotkeyEvent } f
 import type { DictationTriggerAction } from "@/lib/dictationTrigger";
 
 const TOGGLE_EVENT = "voco:toggle-dictation";
-const TOGGLE_REALTIME_EVENT = "voco:toggle-realtime";
 
 export function shouldMarkHotkeyHandlerReady(
   dictationListenerRegistered: boolean,
-  realtimeListenerRegistered: boolean,
   canHandleHotkey: boolean,
   alreadyLogged: boolean,
 ) {
   return (
     dictationListenerRegistered &&
-    realtimeListenerRegistered &&
     canHandleHotkey &&
     !alreadyLogged
   );
@@ -22,7 +19,6 @@ export function shouldMarkHotkeyHandlerReady(
 
 export function useGlobalShortcut(
   toggle: (triggerId?: string, action?: DictationTriggerAction) => void,
-  toggleRealtime: (triggerId?: string) => void,
   shouldHandleHotkey: () => boolean,
   canHandleHotkey: boolean,
   appStartMs: number,
@@ -30,15 +26,12 @@ export function useGlobalShortcut(
 ) {
   const toggleRef = useRef(toggle);
   toggleRef.current = toggle;
-  const toggleRealtimeRef = useRef(toggleRealtime);
-  toggleRealtimeRef.current = toggleRealtime;
   const shouldHandleHotkeyRef = useRef(shouldHandleHotkey);
   shouldHandleHotkeyRef.current = shouldHandleHotkey;
   const onHotkeyPressedRef = useRef(onHotkeyPressed);
   onHotkeyPressedRef.current = onHotkeyPressed;
   const handlerReadyLoggedRef = useRef(false);
   const [dictationListenerRegistered, setDictationListenerRegistered] = useState(false);
-  const [realtimeListenerRegistered, setRealtimeListenerRegistered] = useState(false);
 
   useEffect(() => {
     const cleanupFns: Array<() => void> = [];
@@ -75,27 +68,6 @@ export function useGlobalShortcut(
         console.warn("Failed to register dictation toggle listener:", error);
       });
 
-    void getCurrentWindow()
-      .listen<{ triggerId?: string } | null>(TOGGLE_REALTIME_EVENT, (event) => {
-        if (!shouldHandleHotkeyRef.current()) {
-          return;
-        }
-        toggleRealtimeRef.current(event.payload?.triggerId);
-      })
-      .then((cleanup) => {
-        if (disposed) {
-          cleanup();
-          return;
-        }
-
-        cleanupFns.push(cleanup);
-        setRealtimeListenerRegistered(true);
-        traceHotkeyEvent("frontend_realtime_hotkey_listener_registered").catch(() => {});
-      })
-      .catch((error) => {
-        console.warn("Failed to register realtime toggle listener:", error);
-      });
-
     return () => {
       disposed = true;
       cleanupFns.forEach((cleanup) => cleanup());
@@ -103,7 +75,7 @@ export function useGlobalShortcut(
   }, [appStartMs]);
 
   useEffect(() => {
-    if (!dictationListenerRegistered || !realtimeListenerRegistered || !canHandleHotkey) return;
+    if (!dictationListenerRegistered || !canHandleHotkey) return;
     const refresh = () => { void refreshShortcutHeartbeat(true).catch(() => {}); };
     refresh();
     const timer = window.setInterval(refresh, 1_000);
@@ -111,13 +83,12 @@ export function useGlobalShortcut(
       window.clearInterval(timer);
       void refreshShortcutHeartbeat(false).catch(() => {});
     };
-  }, [canHandleHotkey, dictationListenerRegistered, realtimeListenerRegistered]);
+  }, [canHandleHotkey, dictationListenerRegistered]);
 
   useEffect(() => {
     if (
       !shouldMarkHotkeyHandlerReady(
         dictationListenerRegistered,
-        realtimeListenerRegistered,
         canHandleHotkey,
         handlerReadyLoggedRef.current,
       )
@@ -127,5 +98,5 @@ export function useGlobalShortcut(
 
     handlerReadyLoggedRef.current = true;
     traceHotkeyEvent("frontend_hotkey_handler_ready").catch(() => {});
-  }, [canHandleHotkey, dictationListenerRegistered, realtimeListenerRegistered]);
+  }, [canHandleHotkey, dictationListenerRegistered]);
 }

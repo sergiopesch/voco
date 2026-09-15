@@ -1068,13 +1068,13 @@ class SessionControlHotkeyTests(unittest.TestCase):
         self.register("V", state)
         self.assert_ownership_intact()
 
-    def test_fixed_realtime_hotkey_preserves_the_active_lease(self) -> None:
+    def test_retired_realtime_hotkey_does_not_preserve_the_active_lease(self) -> None:
         state = (
             int(IBus.ModifierType.MOD1_MASK)
             | int(IBus.ModifierType.SHIFT_MASK)
         )
         self.register("R", state)
-        self.assert_ownership_intact()
+        self.assertFalse(self.coordinator.ownership_intact)
 
     def test_configured_single_function_key_cannot_preserve_the_lease(self) -> None:
         self.engine._voco_session_control_hotkeys = session_control_hotkey_specs("F8")

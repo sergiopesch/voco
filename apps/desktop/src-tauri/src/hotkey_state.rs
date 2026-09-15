@@ -7,7 +7,6 @@ use std::path::{Path, PathBuf};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum HotkeyAction {
     Dictation,
-    Realtime,
 }
 
 #[derive(Default)]
@@ -101,7 +100,6 @@ impl HotkeyState {
             Key::KEY_D if (dictation_mode == 0 && !shift) || (dictation_mode == 1 && shift) => {
                 Some(HotkeyAction::Dictation)
             }
-            Key::KEY_R if shift => Some(HotkeyAction::Realtime),
             _ => None,
         }
     }
@@ -204,10 +202,7 @@ mod tests {
         );
         key(&mut state, "first", Key::KEY_D, 0, 0);
         assert_eq!(key(&mut state, "first", Key::KEY_D, 1, 0), None);
-        assert_eq!(
-            key(&mut state, "first", Key::KEY_R, 1, 255),
-            Some(HotkeyAction::Realtime)
-        );
+        assert_eq!(key(&mut state, "first", Key::KEY_R, 1, 255), None);
     }
 
     #[test]

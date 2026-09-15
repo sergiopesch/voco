@@ -19,7 +19,6 @@
       <li>GitHub Release update checks for manual install channels</li>
       <li>Linux-specific install, upgrade, and troubleshooting guidance</li>
     </ul>
-    <p>Optional local model modes can enhance transcripts or answer questions through your own localhost model server. Optional OpenClaw modes may send transcript text according to your configured provider. Realtime conversation sends microphone audio to OpenAI only after you explicitly start that mode.</p>
   </description>
   <categories>
     <category>Utility</category>
@@ -30,7 +29,7 @@
   <url type="vcs-browser">https://github.com/sergiopesch/voco</url>
   <content_rating type="oars-1.1" />
   <releases>
-    <release version="2026.0.37" date="2026-09-15">
+    <release version="2026.0.38" date="2026-09-15">
       <description>
         <p>Adds persistent VOCO Dictation input-source support with revisable live preedit, authoritative local checkpoints, exact-prefix delivery, and recoverable fail-closed final transcripts.</p>
         <p>Unifies tray and settings state, adds safe configuration recovery and single-instance ownership, and hardens model-cache integrity, installers, private IPC, and release verification.</p>
@@ -39,7 +38,7 @@
     <release version="2026.0.17" date="2026-07-11">
       <description>
         <p>Adds bounded 10-minute dictation, chunked local transcription, append-only live cursor previews, and safer final transcript reconciliation.</p>
-        <p>Improves audio capture throughput and memory use, adds optional local model and realtime assistant paths, and hardens Linux packaging and release verification.</p>
+        <p>Simplifies settings to direct cursor dictation, removes assistant modes, and improves settings-window dragging.</p>
       </description>
     </release>
   </releases>

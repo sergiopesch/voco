@@ -8,17 +8,10 @@ import type {
   ConfigSnapshot,
   DebugDictationCaptureResult,
   InsertionResult,
-  LocalLlmAgentResult,
-  LocalLlmTestResult,
-  OpenClawAgentResult,
-  OpenClawSpeechResult,
   OwnedPreeditStatus,
   PreviewTranscription,
-  RealtimeClientSecretResult,
   RuntimeDiagnostics,
   RuntimeStatusSnapshot,
-  TranscriptEnhancement,
-  TranscriptEnhancementResult,
 } from "@/types";
 
 export async function getConfig(): Promise<ConfigSnapshot> {
@@ -176,59 +169,6 @@ export async function cancelOwnedPreedit(sessionId: number): Promise<OwnedPreedi
 
 export async function releaseBrowserRecording(triggerId: string): Promise<void> {
   return invoke("release_browser_recording", { triggerId });
-}
-
-export async function askOpenClawAgent(
-  transcript: string,
-  agent: string,
-  promptPrefix: string,
-): Promise<OpenClawAgentResult> {
-  return invoke<OpenClawAgentResult>("ask_openclaw_agent", {
-    transcript,
-    agent,
-    promptPrefix,
-  });
-}
-
-export async function speakOpenClawResponse(text: string): Promise<OpenClawSpeechResult> {
-  return invoke<OpenClawSpeechResult>("speak_openclaw_response", { text });
-}
-
-export async function enhanceTranscript(
-  transcript: string,
-  mode: TranscriptEnhancement,
-  endpoint: string,
-  model: string | null,
-): Promise<TranscriptEnhancementResult> {
-  return invoke<TranscriptEnhancementResult>("enhance_transcript", {
-    transcript,
-    mode,
-    endpoint,
-    model,
-  });
-}
-
-export async function testLocalLlm(
-  endpoint: string,
-  model: string | null,
-): Promise<LocalLlmTestResult> {
-  return invoke<LocalLlmTestResult>("test_local_llm", { endpoint, model });
-}
-
-export async function askLocalLlmAgent(
-  transcript: string,
-  endpoint: string,
-  model: string | null,
-): Promise<LocalLlmAgentResult> {
-  return invoke<LocalLlmAgentResult>("ask_local_llm_agent", {
-    transcript,
-    endpoint,
-    model,
-  });
-}
-
-export async function createRealtimeClientSecret(): Promise<RealtimeClientSecretResult> {
-  return invoke<RealtimeClientSecretResult>("create_realtime_client_secret");
 }
 
 export async function syncRuntimeStatus(snapshot: RuntimeStatusSnapshot): Promise<void> {

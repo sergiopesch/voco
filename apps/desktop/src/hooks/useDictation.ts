@@ -7,7 +7,6 @@ import { AudioCaptureFlushError, CAPTURE_INPUT_INTERRUPTED, createAudioCaptureFl
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useStore } from "@/store/useStore";
 import {
-  askOpenClawAgent,
   checkpointOwnedPreedit,
   debugDictationCaptureEnabled,
   debugNativeCaptureEnabled,
@@ -26,7 +25,6 @@ import {
   showNotification,
   saveDebugDictationCapture,
   saveDebugNativeRetainedSource,
-  speakOpenClawResponse,
   startOwnedPreedit,
   traceHotkeyEvent,
   updateOwnedPreedit,
@@ -73,10 +71,6 @@ import {
   startSession,
 } from "@/lib/dictationSession";
 import type { DictationPreviewToken } from "@/lib/dictationSession";
-import {
-  askLocalAssistantForDictation,
-  enhanceTranscriptForDictation,
-} from "@/lib/localIntelligence";
 import { monitorCaptureHealth } from "@/lib/captureHealth";
 import { captureSampleLimit, errorMessage, resumeCanonicalForRecovery } from "@/lib/dictationRecovery";
 import { admitsDictationTrigger, type DictationTriggerAction } from "@/lib/dictationTrigger";
@@ -2703,126 +2697,8 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
 
       useStore.getState().setRawTranscript(transcript);
       setTranscript(transcript);
-      const config = sessionConfigRef.current;
-      let transcriptForOutput = transcript;
-      if (config?.transcriptEnhancement && config.transcriptEnhancement !== "off") {
-        setInterimTranscript(
-          config.transcriptEnhancement === "commands-only"
-            ? "Applying voice commands..."
-            : "Polishing transcript locally...",
-        );
-        const enhancementStartedAt = performance.now();
-        const enhancement = await enhanceTranscriptForDictation(transcript, config);
-        assertOutputAllowed(stoppingSessionId);
-        transcriptForOutput = enhancement.text;
-        const enhancementDurationMs = Math.round(
-          performance.now() - enhancementStartedAt,
-        );
-        console.info(
-          `[timing] transcript enhancement completed: ${enhancementDurationMs}ms`,
-        );
-        traceDictationEvent("dictation_enhancement_completed", {
-          durationMs: enhancementDurationMs,
-        }).catch(() => {});
-        if (enhancement.warning) {
-          console.warn("Transcript enhancement skipped:", enhancement.warning);
-        }
-      }
-
-      setTranscript(transcriptForOutput);
-      if (!transcriptForOutput.trim()) {
-        await clearLiveCursorText().catch(() => {});
-        finalizeIdleState();
-        return;
-      }
-      let textToInsert = transcriptForOutput;
-
-      if (config?.transcriptTarget === "local-agent") {
-        setInterimTranscript("Asking local model...");
-        const localAssistantStartedAt = performance.now();
-        try {
-          const response = await askLocalAssistantForDictation(transcriptForOutput, config);
-          assertOutputAllowed(stoppingSessionId);
-          const localAssistantDurationMs = Math.round(
-            performance.now() - localAssistantStartedAt,
-          );
-          console.info(
-            `[timing] local assistant completed: ${localAssistantDurationMs}ms`,
-          );
-          traceDictationEvent("dictation_local_assistant_completed", {
-            durationMs: localAssistantDurationMs,
-          }).catch(() => {});
-          textToInsert = response;
-          setTranscript(response);
-          setInterimTranscript("Typing local model answer at your cursor...");
-        } catch (err) {
-          if (!isCurrentSession(stoppingSessionId)) return;
-          const detail = err instanceof Error ? err.message : String(err);
-          showNotification(
-            "Local model request failed",
-            detail || "VOCO could not complete the local model request.",
-          ).catch(() => {});
-          phaseRef.current = "error";
-          sessionRef.current = failSession(sessionRef.current);
-          retainCurrentTranscript("output-failed");
-          setStatus("error");
-          retainRecovery(cancelledRef.current ?? `Local model request failed: ${detail}`, false);
-          await clearLiveCursorText().catch((error) => {
-            console.warn("Failed to clear live cursor text after local model error:", error);
-          });
-          return;
-        }
-      } else if (
-        config?.transcriptTarget === "openclaw-agent" ||
-        config?.transcriptTarget === "openclaw-speech"
-      ) {
-        setInterimTranscript("Asking OpenClaw...");
-        try {
-          const result = await askOpenClawAgent(
-            transcriptForOutput,
-            config.openclawAgent,
-            config.openclawPromptPrefix,
-          );
-          assertOutputAllowed(stoppingSessionId);
-          textToInsert = result.response;
-          setTranscript(result.response);
-          if (config.transcriptTarget === "openclaw-speech") {
-            setInterimTranscript("Speaking OpenClaw's answer...");
-            assertOutputAllowed(stoppingSessionId);
-            setCanCancel(false);
-            await speakOpenClawResponse(result.response);
-            if (!isCurrentSession(stoppingSessionId)) return;
-            finalizeIdleState();
-            return;
-          }
-          setInterimTranscript("Typing OpenClaw's answer at your cursor...");
-        } catch (err) {
-          if (!isCurrentSession(stoppingSessionId)) return;
-          const detail = err instanceof Error ? err.message : String(err);
-          showNotification(
-            config?.transcriptTarget === "openclaw-speech"
-              ? "OpenClaw speech failed"
-              : "OpenClaw request failed",
-            detail || "VOCO could not complete the OpenClaw request.",
-          ).catch(() => {});
-          phaseRef.current = "error";
-          sessionRef.current = failSession(sessionRef.current);
-          retainCurrentTranscript("output-failed");
-          setStatus("error");
-          setError(
-            config?.transcriptTarget === "openclaw-speech"
-              ? `OpenClaw speech failed: ${detail}`
-              : `OpenClaw request failed: ${detail}`,
-          );
-          retainRecovery(cancelledRef.current ?? `OpenClaw output failed: ${detail}`, false);
-          await clearLiveCursorText().catch((error) => {
-            console.warn("Failed to clear live cursor text after OpenClaw error:", error);
-          });
-          return;
-        }
-      } else {
-        setInterimTranscript("Typing at your cursor...");
-      }
+      const textToInsert = transcript;
+      setInterimTranscript("Typing at your cursor...");
 
       assertOutputAllowed(stoppingSessionId);
 

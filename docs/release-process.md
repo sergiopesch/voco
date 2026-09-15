@@ -1,169 +1,49 @@
-> **Current gate:** the owner authorized the `2026.0.37` cut after accepting +local7.
-> This is a private draft promotion of accepted application/runtime bytes, followed
-> by final benchmarks before public sharing. See [the cut record](releases/2026.0.37.md).
-> Historical commands below describe the automated public channel; do not push the
-> release tag until portable NVIDIA provisioning and the public gates are satisfied.
+# Release process
 
-# Release Process
+Release tags use `voco.<version>`. Keep public releases separate from private
+candidate preparation. Never move a cut tag or replace its frozen artifacts.
 
-VOCO releases are cut from git tags in the form `voco.<version>`.
+## Prepare
 
-## NVIDIA packaging gate
+1. Start from the current default branch and use a dedicated release branch.
+2. Update all version metadata with the same version. Keep historical records unchanged.
+3. Run the source, renderer, worker, native delivery and package checks in
+   [AGENTS.md](../AGENTS.md). Pass the unchanged Whisper accuracy gate.
+4. Update product, install, architecture and security docs. Describe limitations
+   without publishing personal audio, transcripts or local machine paths.
+5. Build a complete NVIDIA package using pinned runtime/model artifacts. Verify
+   its payload, licenses, ELF dependencies, native install/remove and checksums.
+6. Review the diff and require all CI checks before merging to the default branch.
 
-The public workflow now invokes `scripts/package-nvidia.py` and requires complete
-runtime verification. Before a release, finish portable, pinned provisioning of
-model/native artifacts and retain the required notices. Verify the **complete** assembled package and downloaded
-draft asset, including `/usr/lib/voco/speech`, model digest and runtime dependencies.
-Base-bundle verification alone cannot qualify NVIDIA dictation. A local `2026.0.37` testing package
-and its GitHub review branch must not be confused with a `voco.<version>` release tag.
+## Cut a private draft
 
-## Accepted-artifact draft cut
+Record the exact merged commit, source tree, build environment and package SHA-256.
+Create an annotated local tag at that commit. Create a **draft** GitHub release
+with versioned package, source archive, checksums, provenance and concise release
+notes. Download the uploaded assets and verify every byte before marking the cut ready.
+If a signing key is unavailable, say the tag is unsigned; checksums are integrity
+checks, not a substitute for signatures.
 
-For 2026.0.37, retain the exact owner-accepted application, helper and model hashes.
-Finalize Debian metadata/docs with the complete assembler and verify every runtime
-file against +local7. Commit the reviewed source and pass all unchanged CI before
-merging. Record an annotated local `voco.2026.0.37` tag at the verified master commit.
-Create a **draft** GitHub release targeting that commit, attach canonical versioned
-assets/checksums and provenance, then download and verify every attached byte.
-The remote tag remains absent until public-channel readiness; a draft must never
-be described as downloadable through public install commands.
+The hosted tag workflow still needs portable pinned NVIDIA provisioning from a
+fresh clone. Until that is implemented and verified, keep the tag local and use
+verified isolated build artifacts for the draft. Do not push a tag into a known
+incomplete workflow or substitute mutable downloads. This changes the delivery
+mechanism, not the test gates.
 
-This exception changes the cut mechanism, not required test criteria. The hosted
-release workflow cannot reconstruct ignored native NVIDIA artifacts from a fresh
-clone yet. Do not run it with mutable/unverified downloads or count the old workflow
-as passed. Portable provisioning, default-desktop coverage, dictation-only product
-scope and final publication approval remain explicit gates. If final benchmarking
-changes application bytes, create a new candidate and repeat affected checks; do
-not silently replace a frozen cut's artifacts or move an accepted tag.
+The [2026.0.37 cut](releases/2026.0.37.md) is historical and immutable. The .38
+cleanup has new application/helper bytes and must be built and tested again;
+its package cannot inherit .37 qualification merely because the model is unchanged.
 
-## Quick path
+## Publish
 
-1. Start from current `master`:
+Finish final artifact benchmarks, manual acceptance and performance documentation.
+Obtain explicit publication approval, then activate the release channel and verify
+the published installer, versioned assets and latest aliases. Keep the previous
+release available for rollback. Follow-up changes require a new version.
 
-```bash
-git checkout master
-git pull --ff-only origin master
-npm ci
-```
+## Repository hygiene
 
-2. Run the release checks:
-
-```bash
-npm run verify:versions
-npm run check
-npm run lint
-npm test
-npm run test:private-ibus
-npm --workspace @voco/desktop run build:frontend
-npm run rehearse:release
-cargo audit --file apps/desktop/src-tauri/Cargo.lock
-cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml
-cargo clippy --locked --manifest-path apps/desktop/src-tauri/Cargo.toml --all-targets --all-features -- -D warnings
-```
-
-3. Commit and push:
-
-```bash
-git status --short
-git add <reviewed-release-files>
-git diff --cached --check
-git diff --cached --stat
-git commit -m "Cut release <version>"
-git push origin master
-```
-
-4. Create and push the release tag:
-
-```bash
-git tag -a voco.<version> -m "VOCO <version>"
-git push origin voco.<version>
-```
-
-5. Wait for the GitHub release workflow to create a draft with all verified assets, inspect it, then
-   publish the draft manually only after release sign-off. Verify it contains:
-- `voco_<version>_amd64.deb`
-- `voco_checksums.txt`
-- the Debian package contains `/usr/share/ibus/component/voco.xml`, the executable
-  `/usr/libexec/voco-ibus-engine`, and the three root-owned modules under `/usr/lib/voco/ibus/`
-- `scripts/verify-deb-package.sh <package.deb> <version>` confirms the package dependencies,
-  paths, ownership, modes, exact desktop/AppStream identity, icons, engine payload, and absence of
-  Python test/cache artifacts
-- package installation does not alter the test user's enabled input sources
-
-## Rehearsal details
-
-Before creating a release tag, run:
-
-```bash
-npm run rehearse:release
-```
-
-This checks:
-- version metadata consistency across shipped manifests
-- shell helper syntax for install and packaging scripts
-- public install docs still require checksum verification and do not recommend `curl | bash`
-- the README keeps the guided installer as the primary install path
-- the README keeps a robust manual `.deb` fallback using `wget -O`
-- the release helper comment stays pinned to the exact release tag
-- generated GitHub release notes for the current version
-- expected asset names:
-  - `voco_<version>_amd64.deb`
-  - `voco_latest_amd64.deb`
-  - `VOCO-<version>-x86_64.AppImage` only for a future fully pinned AppImage pipeline
-  - `voco_checksums.txt`
-
-## Release Trigger
-
-The GitHub release workflow runs on tags matching:
-- `voco.*`
-
-The workflow rejects a tag unless it exactly matches `voco.<package.json version>`.
-
-## Current Output
-
-The release workflow:
-- builds the Debian bundle
-- installs lockfile-pinned `cargo-audit 0.22.2` under the repository's pinned Rust toolchain before
-  scanning the exact application lockfile
-- runs the private headless IBus lifecycle in an isolated namespace
-- verifies the built Debian bundle before collecting release assets
-- omits AppImage while Tauri's Linux packaging helpers are not all immutable and checksum-pinned
-- generates checksums
-- renders the GitHub release body from `scripts/render-release-body.sh`
-- uploads the verified payload from a read-only build job, then creates the draft in a separate
-  no-checkout job with release-write permission
-
-## Publish checklist
-
-- bump the repo version everywhere required by `npm run verify:versions`
-- run `npm run rehearse:release`
-- record `git rev-parse HEAD` after pushing and ensure every required CI job is green for that exact
-  `master` commit before tagging
-- confirm the exact lockfile passes RustSec and npm dependency audits before tagging
-- create an annotated tag as `voco.<version>` at that exact green commit
-- verify the GitHub Release contains the expected assets and notes
-- download the draft assets, verify `voco_checksums.txt`, and rerun
-  `scripts/verify-deb-package.sh` against the downloaded versioned `.deb`
-- publish the draft only after those downloaded artifacts pass
-
-## Manual test before tagging
-
-- start VOCO only inside the disposable remote desktop described in the testing guide
-- complete onboarding
-- test dictation with `Alt+D`
-- manually add/select `VOCO Dictation`; verify normal GB-layout typing while idle
-- verify source switch, focus loss, app exit, target close, and package-version mismatch fail closed
-- confirm tray launch, settings, and hide-to-tray still work
-- run `npm run report:linux-runtime` if Linux insertion changed
-
-Do not substitute uncontrolled active-workstation injection for the disposable desktop.
-The owner separately requested manual laptop acceptance of this candidate; record that
-physical evidence without treating it as a replacement for package/isolation checks. If the remote provider is
-unavailable, publishing requires explicit owner acceptance of a documented release exception after
-the final package passes the source, saved-audio, package-verifier, private-IBus, and installed
-local-container gates. Record the local-container `cbx_...` ID and keep the remote/physical matrix
-explicitly pending in the QA results and release notes. A local container does not count as remote
-or physical desktop coverage.
-
-Treat the `.deb` as the release path. Do not attach an AppImage until the complete linuxdeploy and
-appimagetool chain is sourced immutably and verified by checksum.
+Remove remote branches only when their exact tips are already merged, and retain
+the recorded commit IDs. Do not delete dirty local worktrees or unresolved PRs.
+Keep security updates separate when their dependency graph fails compilation;
+never waive a gate or ignore an advisory just to clear the PR list.

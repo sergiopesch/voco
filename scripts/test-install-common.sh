@@ -31,11 +31,8 @@ for hotkey in \
   "OPTION+SHIFT+R" \
   "Alt+Alt+Shift+R"
 do
-  if voco_validate_hotkey "${hotkey}"; then
-    fail "reserved realtime alias '${hotkey}' was accepted"
-  fi
-  if [[ "${VOCO_HOTKEY_VALIDATION_ERROR}" != *"reserved"* ]]; then
-    fail "reserved realtime alias '${hotkey}' returned the wrong error"
+  if ! voco_validate_hotkey "${hotkey}"; then
+    fail "dictation alias '${hotkey}' was rejected"
   fi
 done
 

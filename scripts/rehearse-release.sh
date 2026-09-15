@@ -32,20 +32,16 @@ echo "  appimage: ${APPIMAGE_NAME}"
   fi
   for installer in install scripts/lib/install-common.sh; do
     grep -F 'Examples: Ctrl+Shift+V, Super+D, Alt+Shift+T' "${installer}" > /dev/null
-    grep -F 'Alt+Shift+R is reserved for realtime conversation.' "${installer}" > /dev/null
     grep -F 'existing config preserved' "${installer}" > /dev/null
   done
   if grep -RInE 'raw.githubusercontent.com/.*/master/install|bash <\(curl|curl -s .*install' README.md docs install; then
     echo "Unsafe installer reference found in docs or helper comments"
     exit 1
   fi
-  grep -F 'sha256sum --check' docs/install.md > /dev/null
-  grep -F 'raw.githubusercontent.com/sergiopesch/voco/${TAG}/install' docs/install.md > /dev/null
+  grep -F 'sha256sum -c' docs/install.md > /dev/null
+  grep -F 'wget "$BASE/$TAG/install" -O voco-install' docs/install.md > /dev/null
   grep -F "raw.githubusercontent.com/sergiopesch/voco/${TAG_NAME}/install" install > /dev/null
-  grep -F "raw.githubusercontent.com/sergiopesch/voco/${TAG_NAME}/install" README.md > /dev/null
-  grep -F 'wget -O voco_latest_amd64.deb https://github.com/sergiopesch/voco/releases/latest/download/voco_latest_amd64.deb' README.md > /dev/null
-  grep -F 'wget https://github.com/sergiopesch/voco/releases/latest/download/voco_latest_checksums.txt' README.md > /dev/null
-  grep -F 'sha256sum --check voco_latest_checksums.txt' README.md > /dev/null
+  grep -F 'sha256sum -c voco_latest_checksums.txt' README.md > /dev/null
   grep -F -- '- "voco.*"' .github/workflows/release.yml > /dev/null
   if grep -F -- '- "v*"' .github/workflows/release.yml > /dev/null; then
     echo "Release workflow still accepts non-canonical v* tags"

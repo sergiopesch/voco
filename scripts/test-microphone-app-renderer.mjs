@@ -90,6 +90,7 @@ try {
                 return () => delete window.listeners[event];
               };
               if (name.startsWith('on')) return async () => () => {};
+              if (name === 'startDragging') return async () => { window.dragRequests = (window.dragRequests || 0) + 1; };
               if (name === 'scaleFactor') return async () => 1;
               if (name === 'isFocused') return async () => true;
               return async () => {};
@@ -106,6 +107,8 @@ try {
     await page.route('**/app-microphone-check', r => r.fulfill({
         contentType: 'text/html',
         body: `
+          <title>VOCO isolated settings</title>
+          <link rel="stylesheet" href="/src/styles.css">
           <div id="root"></div>
           <script type="module">
             import React from '/node_modules/.vite/deps/react.js';
@@ -137,11 +140,11 @@ try {
             insertionStrategy: 'auto',
             transcriptTarget: 'cursor',
             liveCursorMode: 'final-text-only',
-            openclawAgent: 'main',
-            openclawPromptPrefix: '',
+
+
             transcriptEnhancement: 'off',
-            localLlmEndpoint: 'http://127.0.0.1:8080/v1/chat/completions',
-            localLlmModel: null,
+
+
             onboardingCompleted: false,
             updateChannel: 'stable',
             installChannel: 'github-release',
@@ -177,9 +180,6 @@ try {
                 return 1;
             if (name === 'loadCachedUpdateState')
                 return null;
-            if (name === 'createRealtimeClientSecret')
-                return new Promise(() => {
-                });
             return false;
         };
         const media = new EventTarget();
@@ -515,28 +515,6 @@ try {
         }
     await load();
     await page.evaluate(() => {
-        window.deferProbe = true;
-    });
-    await retry();
-    await page.waitForFunction(() => window.probes.length === 1);
-    await page.evaluate(() => {
-        window.store.getState().setSurface('hidden');
-        window.listeners['voco:toggle-realtime']({
-            payload: {}
-        });
-    });
-    await page.waitForFunction(() => window.calls.some(c => c[0] === 'createRealtimeClientSecret'));
-    await page.evaluate(() => window.probes[0].resolve());
-    await page.waitForTimeout(70);
-    assert.equal(await page.evaluate(() => window.store.getState().microphoneReady), false);
-    assert.equal(await page.evaluate(() => window.tracks.at(-1).stops), 1);
-    assert.equal(await page.evaluate(() => window.probes.length), 1);
-    results.push({
-        case: 'retry-after-real-realtime-admission',
-        passed: true
-    });
-    await load();
-    await page.evaluate(() => {
         window.deferEnums = true;
         navigator.mediaDevices.dispatchEvent(new Event('devicechange'));
     });
@@ -652,6 +630,34 @@ try {
         results.push({case:'dictation-keeps-window-hidden-'+status,passed:true});
     }
     await page.screenshot({path:path.join(out,'hidden-dictation.png')});
+    await load();
+    await page.evaluate(() => window.store.setState({surface:'settings',status:'idle'}));
+    await page.getByRole('heading', {name:'Overview',exact:true}).waitFor();
+    assert.equal(await page.title(), 'VOCO isolated settings');
+    assert.equal(new URL(page.url()).pathname, '/app-microphone-check');
+    for (const label of ['Appearance','Integrations','Realtime conversation']) {
+        assert.equal(await page.getByRole('button', {name:label,exact:true}).count(), 0);
+    }
+    const bar = page.getByLabel('Move VOCO window', {exact:true});
+    await bar.click({position:{x:12,y:20}});
+    assert.equal(await page.evaluate(() => window.dragRequests), 1);
+    await bar.click({position:{x:12,y:20},button:'right'});
+    assert.equal(await page.evaluate(() => window.dragRequests), 1);
+    await page.getByRole('button', {name:'Dictation',exact:true}).click();
+    await page.getByRole('heading', {name:'Dictation',exact:true}).waitFor();
+    assert.equal(await page.getByRole('combobox').count(),0);
+    assert.equal(await page.locator('vite-error-overlay').count(),0);
+    await page.screenshot({path:path.join(out,'dictation-settings.png')});
+    await page.setViewportSize({width:760,height:560});
+    await page.screenshot({path:path.join(out,'dictation-settings-compact.png')});
+    await page.emulateMedia({reducedMotion:'reduce'});
+    await page.screenshot({path:path.join(out,'dictation-settings-reduced-motion.png')});
+    await page.getByRole('button', {name:'Hide to tray',exact:true}).click();
+    await page.waitForFunction(() => window.store.getState().surface === 'hidden');
+    assert.equal(await page.evaluate(() => window.dragRequests),1);
+    assert.equal(await page.evaluate(() => Boolean(window.listeners['voco:toggle-realtime'])),false);
+    results.push({case:'dictation-only-settings-and-single-drag-request',passed:true,
+        scope:'Rendered App, mocked native startDragging; actual compositor movement requires native test'});
     assert.deepEqual(errors, []);
     await save('RESULTS.json', {
         passed: true,

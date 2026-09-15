@@ -17,7 +17,7 @@ from gi.repository import Gtk, Gdk, IBus, WebKit2
 spec = importlib.util.spec_from_file_location('private_ibus', Path(__file__).with_name('test-private-ibus-engine.py'))
 helper = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(helper)
-helper.PROTOCOL_VERSION = 5
+helper.PROTOCOL_VERSION = 6
 pump = helper.pump_events
 root = Path(os.environ['VOCO_NATIVE_TEST_ROOT'])
 assert os.environ['DISPLAY'] == ':0'

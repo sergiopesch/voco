@@ -13,7 +13,6 @@ const HOTKEY_PRESETS: &[&str] = &["Alt+D", "Alt+Shift+D"];
 pub struct TrayState {
     pub tray_id: String,
     pub toggle_item: MenuItem<tauri::Wry>,
-    pub realtime_item: MenuItem<tauri::Wry>,
     pub open_panel_item: MenuItem<tauri::Wry>,
     pub settings_item: MenuItem<tauri::Wry>,
     pub hotkey_menu: Submenu<tauri::Wry>,
@@ -29,8 +28,6 @@ pub struct TrayState {
     pub cursor_setup_state: String,
     pub manual_transcript_ready: bool,
     pub recovery_available: bool,
-    pub realtime_status: RealtimeStatus,
-    pub realtime_muted: bool,
     pub configuration_error: bool,
     pub model_download_status: ModelDownloadStatus,
     pub runtime_initialized: bool,
@@ -58,16 +55,6 @@ pub enum CursorDeliveryState {
     Owned,
     PreviewOnly,
     Unreconciled,
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum RealtimeStatus {
-    Idle,
-    Connecting,
-    Listening,
-    Speaking,
-    Error,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Default, Deserialize)]
@@ -108,8 +95,6 @@ pub struct RuntimeStatusSnapshot {
     pub manual_transcript_ready: bool,
     #[serde(default)]
     pub recovery_available: bool,
-    pub realtime_status: RealtimeStatus,
-    pub realtime_muted: bool,
     #[serde(skip)]
     model_download_status: ModelDownloadStatus,
 }
@@ -131,8 +116,6 @@ impl Default for RuntimeStatusSnapshot {
             cursor_setup_state: String::new(),
             manual_transcript_ready: false,
             recovery_available: false,
-            realtime_status: RealtimeStatus::Idle,
-            realtime_muted: false,
             model_download_status: ModelDownloadStatus::Checking,
         }
     }
@@ -141,7 +124,6 @@ impl Default for RuntimeStatusSnapshot {
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 enum TrayVisualState {
     NotReady,
-    Muted,
     Ready,
     Recording,
     Processing,
@@ -154,8 +136,6 @@ struct TrayPresentation {
     dictation_label: &'static str,
     dictation_enabled: bool,
     dictation_action: TrayDictationAction,
-    realtime_label: &'static str,
-    realtime_enabled: bool,
     popover_enabled: bool,
     settings_enabled: bool,
     hotkey_menu_enabled: bool,
@@ -175,13 +155,6 @@ enum TrayLeftClickAction {
     Ignore,
 }
 
-fn realtime_is_active(status: RealtimeStatus) -> bool {
-    matches!(
-        status,
-        RealtimeStatus::Connecting | RealtimeStatus::Listening | RealtimeStatus::Speaking
-    )
-}
-
 fn dictation_is_active(status: DictationStatus) -> bool {
     matches!(
         status,
@@ -199,7 +172,6 @@ fn hotkeys_equivalent(left: &str, right: &str) -> bool {
 }
 
 fn derive_tray_presentation(snapshot: &RuntimeStatusSnapshot) -> TrayPresentation {
-    let realtime_active = realtime_is_active(snapshot.realtime_status);
     let dictation_active = dictation_is_active(snapshot.dictation_status);
     let (visual_state, tooltip) = if !snapshot.runtime_initialized {
         match snapshot.model_download_status {
@@ -220,12 +192,12 @@ fn derive_tray_presentation(snapshot: &RuntimeStatusSnapshot) -> TrayPresentatio
                 "VOCO — Initializing…".to_string(),
             ),
         }
-    } else if snapshot.manual_transcript_ready && !dictation_active && !realtime_active {
+    } else if snapshot.manual_transcript_ready && !dictation_active {
         (
             TrayVisualState::Ready,
             "VOCO — Transcript ready to copy".to_string(),
         )
-    } else if snapshot.recovery_available && !dictation_active && !realtime_active {
+    } else if snapshot.recovery_available && !dictation_active {
         (
             TrayVisualState::Processing,
             "VOCO — Recording needs recovery".to_string(),
@@ -234,7 +206,6 @@ fn derive_tray_presentation(snapshot: &RuntimeStatusSnapshot) -> TrayPresentatio
         || matches!(snapshot.cursor_delivery, CursorDeliveryState::Unreconciled))
         && !snapshot.configuration_error
         && !dictation_active
-        && !realtime_active
     {
         (
             TrayVisualState::NotReady,
@@ -270,30 +241,6 @@ fn derive_tray_presentation(snapshot: &RuntimeStatusSnapshot) -> TrayPresentatio
                 TrayVisualState::Processing,
                 "VOCO — Transcribing".to_string(),
             ),
-            DictationStatus::Idle | DictationStatus::Error
-                if realtime_active && snapshot.realtime_muted =>
-            {
-                (
-                    TrayVisualState::Muted,
-                    "VOCO — Realtime voice muted".to_string(),
-                )
-            }
-            DictationStatus::Idle | DictationStatus::Error if realtime_active => {
-                match snapshot.realtime_status {
-                    RealtimeStatus::Connecting => (
-                        TrayVisualState::Processing,
-                        "VOCO — Connecting realtime voice".to_string(),
-                    ),
-                    RealtimeStatus::Speaking => (
-                        TrayVisualState::Recording,
-                        "VOCO — Realtime voice speaking".to_string(),
-                    ),
-                    _ => (
-                        TrayVisualState::Recording,
-                        "VOCO — Realtime voice listening".to_string(),
-                    ),
-                }
-            }
             DictationStatus::Idle | DictationStatus::Error if snapshot.configuration_error => (
                 TrayVisualState::NotReady,
                 "VOCO — Settings need attention".to_string(),
@@ -301,10 +248,6 @@ fn derive_tray_presentation(snapshot: &RuntimeStatusSnapshot) -> TrayPresentatio
             DictationStatus::Error => (
                 TrayVisualState::NotReady,
                 "VOCO — Needs attention".to_string(),
-            ),
-            DictationStatus::Idle if matches!(snapshot.realtime_status, RealtimeStatus::Error) => (
-                TrayVisualState::NotReady,
-                "VOCO — Realtime voice needs attention".to_string(),
             ),
             DictationStatus::Idle if snapshot.native_microphone_ready == Some(false) => (
                 TrayVisualState::NotReady,
@@ -374,15 +317,11 @@ fn derive_tray_presentation(snapshot: &RuntimeStatusSnapshot) -> TrayPresentatio
     let browser_allowed = !matches!(snapshot.microphone_permission, MicrophonePermission::Denied);
     let dictation_allowed =
         runtime_ready && snapshot.native_microphone_ready.unwrap_or(browser_allowed);
-    let realtime_allowed = runtime_ready && browser_allowed;
 
     let (dictation_label, dictation_action) = match snapshot.dictation_status {
         DictationStatus::Starting => ("Stop after microphone starts", TrayDictationAction::Toggle),
         DictationStatus::Recording => ("Stop Dictation", TrayDictationAction::Toggle),
         DictationStatus::Processing => ("Transcribing…", TrayDictationAction::Ignore),
-        DictationStatus::Idle | DictationStatus::Error if realtime_active => {
-            ("Start Dictation", TrayDictationAction::Ignore)
-        }
         DictationStatus::Idle | DictationStatus::Error
             if snapshot.runtime_initialized
                 && (snapshot.manual_transcript_ready || snapshot.recovery_available) =>
@@ -405,17 +344,9 @@ fn derive_tray_presentation(snapshot: &RuntimeStatusSnapshot) -> TrayPresentatio
             },
         ),
     };
-    let (realtime_label, realtime_enabled) = if realtime_active {
-        ("Stop Realtime Voice", true)
-    } else if dictation_active {
-        ("Start Realtime Voice", false)
-    } else {
-        ("Start Realtime Voice", realtime_allowed)
-    };
     let popover_enabled = snapshot.runtime_initialized
         && !dictation_active
         && (!snapshot.configuration_error
-            || realtime_active
             || snapshot.manual_transcript_ready
             || snapshot.recovery_available);
 
@@ -425,8 +356,6 @@ fn derive_tray_presentation(snapshot: &RuntimeStatusSnapshot) -> TrayPresentatio
         dictation_label,
         dictation_enabled: dictation_action != TrayDictationAction::Ignore,
         dictation_action,
-        realtime_label,
-        realtime_enabled,
         popover_enabled,
         settings_enabled: snapshot.runtime_initialized && !dictation_active,
         hotkey_menu_enabled: snapshot.runtime_initialized
@@ -466,7 +395,6 @@ fn tray_debug_enabled() -> bool {
 fn tray_state_label(state: TrayVisualState) -> &'static str {
     match state {
         TrayVisualState::NotReady => "not-ready",
-        TrayVisualState::Muted => "muted",
         TrayVisualState::Ready => "ready",
         TrayVisualState::Recording => "recording",
         TrayVisualState::Processing => "processing",
@@ -489,8 +417,6 @@ fn runtime_snapshot_from_tray_state(tray_state: &TrayState) -> RuntimeStatusSnap
         cursor_setup_state: tray_state.cursor_setup_state.clone(),
         manual_transcript_ready: tray_state.manual_transcript_ready,
         recovery_available: tray_state.recovery_available,
-        realtime_status: tray_state.realtime_status,
-        realtime_muted: tray_state.realtime_muted,
         model_download_status: tray_state.model_download_status,
     }
 }
@@ -521,17 +447,10 @@ fn tray_settings_allowed(app: &tauri::AppHandle) -> bool {
         .unwrap_or(false)
 }
 
-fn tray_realtime_toggle_allowed(app: &tauri::AppHandle) -> bool {
-    current_tray_presentation(app)
-        .map(|presentation| presentation.realtime_enabled)
-        .unwrap_or(false)
-}
-
 pub fn setup_tray(app: &tauri::App, hotkey_label: &str) -> Result<(), Box<dyn std::error::Error>> {
     let quit = MenuItemBuilder::with_id("quit", "Quit VOCO").build(app)?;
     let open_panel = MenuItemBuilder::with_id("open_panel", "Open VOCO").build(app)?;
     let toggle = MenuItemBuilder::with_id("toggle", "Start Dictation").build(app)?;
-    let realtime = MenuItemBuilder::with_id("realtime", "Start Realtime Voice").build(app)?;
     let settings = MenuItemBuilder::with_id("settings", "Settings").build(app)?;
 
     // Build hotkey submenu with presets
@@ -559,7 +478,6 @@ pub fn setup_tray(app: &tauri::App, hotkey_label: &str) -> Result<(), Box<dyn st
     let menu = MenuBuilder::new(app)
         .item(&open_panel)
         .item(&toggle)
-        .item(&realtime)
         .item(&settings)
         .item(&PredefinedMenuItem::separator(app)?)
         .item(&hotkey_menu)
@@ -636,9 +554,6 @@ pub fn setup_tray(app: &tauri::App, hotkey_label: &str) -> Result<(), Box<dyn st
                     }
                     Some(TrayDictationAction::Ignore) | None => {}
                 },
-                "realtime" if tray_realtime_toggle_allowed(app) => {
-                    crate::eval_realtime_toggle(app);
-                }
                 "settings" if tray_settings_allowed(app) => {
                     let _ = app.emit_to("main", "voco:open-settings", ());
                 }
@@ -660,7 +575,6 @@ pub fn setup_tray(app: &tauri::App, hotkey_label: &str) -> Result<(), Box<dyn st
     app.manage(Mutex::new(TrayState {
         tray_id,
         toggle_item: toggle,
-        realtime_item: realtime,
         open_panel_item: open_panel,
         settings_item: settings,
         hotkey_menu,
@@ -676,8 +590,6 @@ pub fn setup_tray(app: &tauri::App, hotkey_label: &str) -> Result<(), Box<dyn st
         cursor_setup_state: String::new(),
         manual_transcript_ready: false,
         recovery_available: false,
-        realtime_status: RealtimeStatus::Idle,
-        realtime_muted: false,
         configuration_error: false,
         model_download_status: ModelDownloadStatus::Checking,
         runtime_initialized: false,
@@ -746,8 +658,6 @@ pub fn update_runtime_status(app: &tauri::AppHandle, snapshot: RuntimeStatusSnap
     tray_state.cursor_setup_state = snapshot.cursor_setup_state;
     tray_state.manual_transcript_ready = snapshot.manual_transcript_ready;
     tray_state.recovery_available = snapshot.recovery_available;
-    tray_state.realtime_status = snapshot.realtime_status;
-    tray_state.realtime_muted = snapshot.realtime_muted;
     tray_state.configuration_error = snapshot.configuration_error;
     tray_state.runtime_initialized = snapshot.runtime_initialized;
     apply_tray_state(app, &tray_state);
@@ -796,12 +706,6 @@ fn apply_tray_state(app: &tauri::AppHandle, tray_state: &TrayState) {
         .toggle_item
         .set_enabled(presentation.dictation_enabled);
     let _ = tray_state
-        .realtime_item
-        .set_text(presentation.realtime_label);
-    let _ = tray_state
-        .realtime_item
-        .set_enabled(presentation.realtime_enabled);
-    let _ = tray_state
         .open_panel_item
         .set_enabled(presentation.popover_enabled);
     let _ = tray_state
@@ -845,8 +749,6 @@ pub fn begin_runtime_status_session(app: &tauri::AppHandle) -> Result<u64, Strin
     tray_state.cursor_setup_state.clear();
     tray_state.manual_transcript_ready = false;
     tray_state.recovery_available = false;
-    tray_state.realtime_status = RealtimeStatus::Idle;
-    tray_state.realtime_muted = false;
     tray_state.configuration_error = false;
     tray_state.runtime_initialized = false;
     let epoch = tray_state.runtime_epoch;
@@ -869,7 +771,6 @@ fn create_mic_icon(size: u32, state: TrayVisualState) -> Vec<u8> {
     // Status belongs to the badge; the microphone stays silver in every state.
     let icon_bytes = match state {
         TrayVisualState::NotReady => include_bytes!("../../public/tray/not-ready.png").as_slice(),
-        TrayVisualState::Muted => include_bytes!("../../public/tray/muted.png").as_slice(),
         TrayVisualState::Ready => include_bytes!("../../public/tray/ready.png").as_slice(),
         TrayVisualState::Recording => include_bytes!("../../public/tray/recording.png").as_slice(),
         TrayVisualState::Processing => {
@@ -899,7 +800,6 @@ mod tests {
     fn tray_assets_are_square_and_keep_the_microphone_stable() {
         let states = [
             TrayVisualState::NotReady,
-            TrayVisualState::Muted,
             TrayVisualState::Ready,
             TrayVisualState::Recording,
             TrayVisualState::Processing,
@@ -955,7 +855,6 @@ mod tests {
         assert_eq!(presentation.tooltip, "VOCO — Ready to listen");
         assert_eq!(presentation.dictation_label, "Start Dictation");
         assert!(presentation.dictation_enabled);
-        assert!(presentation.realtime_enabled);
         assert!(presentation.popover_enabled);
         assert!(presentation.settings_enabled);
         assert!(presentation.hotkey_menu_enabled);
@@ -1015,12 +914,10 @@ mod tests {
             TrayDictationAction::Ignore
         );
         snapshot.dictation_status = DictationStatus::Idle;
-        snapshot.realtime_status = RealtimeStatus::Listening;
         assert_eq!(
             derive_tray_presentation(&snapshot).dictation_action,
-            TrayDictationAction::Ignore
+            TrayDictationAction::ReviewRecovery
         );
-        snapshot.realtime_status = RealtimeStatus::Idle;
         snapshot.runtime_initialized = false;
         assert_eq!(
             derive_tray_presentation(&snapshot).dictation_action,
@@ -1046,7 +943,6 @@ mod tests {
             );
             assert!(presentation.popover_enabled);
             assert!(presentation.dictation_enabled);
-            assert!(!presentation.realtime_enabled);
         }
         snapshot.recovery_available = false;
         assert_eq!(
@@ -1064,7 +960,6 @@ mod tests {
         assert_eq!(presentation.visual_state, TrayVisualState::Processing);
         assert_eq!(presentation.dictation_label, "Stop after microphone starts");
         assert!(presentation.dictation_enabled);
-        assert!(!presentation.realtime_enabled);
         assert!(!presentation.popover_enabled);
         assert!(!presentation.settings_enabled);
         assert!(!presentation.hotkey_menu_enabled);
@@ -1113,7 +1008,6 @@ mod tests {
         let owned = derive_tray_presentation(&snapshot);
         assert_eq!(owned.tooltip, "VOCO — Listening · target verified");
         assert_eq!(owned.dictation_label, "Stop Dictation");
-        assert!(!owned.realtime_enabled);
         assert!(!owned.popover_enabled);
         assert!(!owned.settings_enabled);
         assert!(!owned.hotkey_menu_enabled);
@@ -1148,59 +1042,9 @@ mod tests {
         assert_eq!(presentation.visual_state, TrayVisualState::Processing);
         assert_eq!(presentation.dictation_label, "Transcribing…");
         assert!(!presentation.dictation_enabled);
-        assert!(!presentation.realtime_enabled);
         assert!(!presentation.popover_enabled);
         assert!(!presentation.settings_enabled);
         assert!(!presentation.hotkey_menu_enabled);
-    }
-
-    #[test]
-    fn realtime_disables_dictation_until_it_stops() {
-        let mut snapshot = ready_snapshot();
-        snapshot.realtime_status = RealtimeStatus::Listening;
-        let presentation = derive_tray_presentation(&snapshot);
-        assert_eq!(presentation.tooltip, "VOCO — Realtime voice listening");
-        assert!(!presentation.dictation_enabled);
-        assert_eq!(presentation.realtime_label, "Stop Realtime Voice");
-        assert!(presentation.realtime_enabled);
-
-        snapshot.dictation_status = DictationStatus::Error;
-        let from_prior_error = derive_tray_presentation(&snapshot);
-        assert_eq!(from_prior_error.tooltip, "VOCO — Realtime voice listening");
-        assert_eq!(from_prior_error.visual_state, TrayVisualState::Recording);
-
-        snapshot.dictation_status = DictationStatus::Idle;
-        snapshot.cursor_delivery = CursorDeliveryState::Unreconciled;
-        snapshot.has_recoverable_transcript = true;
-        let with_recoverable_transcript = derive_tray_presentation(&snapshot);
-        assert_eq!(
-            with_recoverable_transcript.tooltip,
-            "VOCO — Realtime voice listening"
-        );
-        assert_eq!(
-            with_recoverable_transcript.visual_state,
-            TrayVisualState::Recording
-        );
-
-        snapshot.realtime_status = RealtimeStatus::Idle;
-        let after_realtime = derive_tray_presentation(&snapshot);
-        assert_eq!(after_realtime.tooltip, "VOCO — Transcript needs attention");
-    }
-
-    #[test]
-    fn muted_realtime_is_neutral_but_remains_stoppable() {
-        let mut snapshot = ready_snapshot();
-        snapshot.realtime_status = RealtimeStatus::Listening;
-        snapshot.realtime_muted = true;
-
-        let presentation = derive_tray_presentation(&snapshot);
-
-        assert_eq!(presentation.visual_state, TrayVisualState::Muted);
-        assert_eq!(presentation.tooltip, "VOCO — Realtime voice muted");
-        assert_eq!(presentation.realtime_label, "Stop Realtime Voice");
-        assert!(presentation.realtime_enabled);
-        assert!(presentation.popover_enabled);
-        assert!(!presentation.dictation_enabled);
     }
 
     #[test]
@@ -1254,7 +1098,6 @@ mod tests {
         assert_eq!(presentation.visual_state, TrayVisualState::NotReady);
         assert_eq!(presentation.tooltip, "VOCO — Microphone needs permission");
         assert!(!presentation.dictation_enabled);
-        assert!(!presentation.realtime_enabled);
         assert!(presentation.popover_enabled);
         assert!(presentation.settings_enabled);
     }
@@ -1266,7 +1109,6 @@ mod tests {
         snapshot.native_microphone_ready = Some(true);
         let ready = derive_tray_presentation(&snapshot);
         assert!(ready.dictation_enabled);
-        assert!(!ready.realtime_enabled);
         assert_eq!(ready.tooltip, "VOCO — Ready to listen");
         snapshot.native_microphone_ready = Some(false);
         let unselected = derive_tray_presentation(&snapshot);
@@ -1277,7 +1119,7 @@ mod tests {
     }
 
     #[test]
-    fn runtime_snapshot_deserializes_frontend_permission_and_muted_state() {
+    fn runtime_snapshot_deserializes_frontend_permission_state() {
         let snapshot: RuntimeStatusSnapshot = serde_json::from_value(serde_json::json!({
             "epoch": 8,
             "revision": 13,
@@ -1289,15 +1131,12 @@ mod tests {
             "cursorDelivery": "inactive",
             "cursorRequired": false,
             "cursorSetupState": "ready",
-            "manualTranscriptReady": false,
-            "realtimeStatus": "listening",
-            "realtimeMuted": true
+            "manualTranscriptReady": false
         }))
         .expect("frontend runtime snapshot should deserialize");
 
         assert!(snapshot.runtime_initialized);
         assert_eq!(snapshot.microphone_permission, MicrophonePermission::Denied);
-        assert!(snapshot.realtime_muted);
         assert!(!snapshot.recovery_available);
         let recovery: RuntimeStatusSnapshot = serde_json::from_value(serde_json::json!({
             "epoch": 8, "revision": 14, "runtimeInitialized": true,
@@ -1305,7 +1144,7 @@ mod tests {
             "microphonePermission": "denied", "dictationStatus": "error",
             "cursorDelivery": "inactive", "cursorRequired": false,
             "cursorSetupState": "ready", "manualTranscriptReady": false,
-            "recoveryAvailable": true, "realtimeStatus": "idle", "realtimeMuted": false
+            "recoveryAvailable": true
         }))
         .expect("retained recovery status should deserialize");
         assert!(recovery.recovery_available);
@@ -1334,7 +1173,6 @@ mod tests {
         assert_eq!(initializing.visual_state, TrayVisualState::NotReady);
         assert_eq!(initializing.tooltip, "VOCO — Initializing…");
         assert!(!initializing.dictation_enabled);
-        assert!(!initializing.realtime_enabled);
         assert!(!initializing.popover_enabled);
         assert!(!initializing.settings_enabled);
 
@@ -1344,7 +1182,6 @@ mod tests {
         assert_eq!(progress.visual_state, TrayVisualState::Processing);
         assert_eq!(progress.tooltip, "VOCO — Downloading speech model 42%");
         assert!(progress.dictation_enabled);
-        assert!(progress.realtime_enabled);
 
         downloading.model_download_status = ModelDownloadStatus::Failed;
         let failed = derive_tray_presentation(&downloading);
@@ -1362,7 +1199,6 @@ mod tests {
         assert_eq!(presentation.visual_state, TrayVisualState::NotReady);
         assert_eq!(presentation.tooltip, "VOCO — Settings need attention");
         assert!(!presentation.dictation_enabled);
-        assert!(!presentation.realtime_enabled);
         assert!(!presentation.popover_enabled);
         assert!(presentation.settings_enabled);
         assert!(!presentation.hotkey_menu_enabled);
@@ -1390,7 +1226,7 @@ mod tests {
             TrayLeftClickAction::Ignore
         );
 
-        config_error.realtime_status = RealtimeStatus::Listening;
+        config_error.recovery_available = true;
         assert_eq!(
             derive_tray_left_click_action(&config_error),
             TrayLeftClickAction::ShowPopover

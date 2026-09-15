@@ -1,24 +1,15 @@
 # Architecture
 
-This describes the 2026.0.37 pre-release candidate. Package revision and
-release gates are recorded in [candidate status](../release-candidate.md).
-
-Use the [code map](code-map.md) for implementation ownership and the
-[current Stop-delivery review](../testing/stop-delivery-review-2026-09-15.md) for
-the `+local6` validation C changes, passing strict Stop matrix (34 selected/35 attempts)
-and remaining qualification gates. `+local5` remains
-the frozen cross-Linux baseline; `+local3` remains installed.
-Normal validation C continuation passed in five userspaces (five selected/eight
-attempts), with root X11 and IBus checked according to the actually owned route.
-This does not qualify their default compositor, physical audio or every recipient.
+VOCO 2026.0.38 provides local, direct-cursor dictation. Read [the code map](code-map.md)
+and [release status](../release-candidate.md) for navigation and qualification.
 
 ## Startup and recognizer selection
 
-The backend owns eager model preparation. Cursor output with enhancement Off and
-desktop paste/streaming enabled warms the existing serialized NVIDIA worker; it
+The backend owns eager model preparation. Default desktop dictation with
+paste/streaming enabled warms the existing serialized NVIDIA worker; it
 marks readiness only after the worker's model load and synthetic audio warmup
 succeed. Queue-module import performs no warmup. Failed NVIDIA startup does not
-download Whisper as an implicit fallback. Configured legacy startup and explicit
+download Whisper as an implicit fallback. Explicit
 Whisper commands retain their separate model preparation. Browser triggers select
 their route per session, so startup does not infer their future use.
 
@@ -66,7 +57,7 @@ The zero gate detects digital silence, not speech onset or arbitrary background 
 ## Delivery contracts
 
 Desktop paste/streaming are enabled unless their launcher overrides are `0`.
-Live streaming also depends on the session's output/enhancement configuration.
+The application fixes cursor output, stable streaming and enhancement off.
 Desktop paste replaces clipboard text and leaves it there; a leading join space can
 be typed separately to preserve address-bar separators. Known terminals use their
 paste chord. VOCO does not submit Enter or rewrite arbitrary editor text after Stop.
@@ -76,7 +67,7 @@ from every sensitive field. See [delivery policy](../testing/desktop-paste.md).
 The explicitly enabled Chromium adapter is a separate, stronger exact-element
 contract: element/document identity, caret and acknowledged prefix are checked
 before edits. Password fields, rich editors and unsupported fields are rejected.
-IBus remains shortcut-only; protocol 5 rejects text mutation. Neither integration
+IBus remains shortcut-only; protocol 6 rejects text mutation. Neither integration
 establishes universal desktop or Wayland qualification.
 
 Legacy Whisper preview/final and hybrid recognition remain in `transcribe.rs` and
@@ -128,7 +119,7 @@ field-level settings updates and writes private atomic configuration. Single-ins
 ownership prevents two VOCO processes from competing for sockets or shortcuts.
 `trigger_socket.rs` owns trigger-path validation, same-UID peer checks and cleanup
 of only the socket inodes registered by this process.
-The backend tray reducer combines microphone, model, dictation and realtime states.
+The backend tray reducer combines microphone, model and dictation states.
 Normal dictation stays out of the way without opening a transcript preview. The
 Crystal Sidebar and rounded glass controls retain OS accessibility preferences.
 A hotkey should be used with the intended destination focused.

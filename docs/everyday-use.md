@@ -1,57 +1,48 @@
-# Everyday use
+# Using VOCO
 
-The 2026.0.37 local candidate combines the Crystal Sidebar interface with
-CPU-local NVIDIA Nemotron English streaming. It is awaiting owner laptop acceptance;
-see [candidate status](release-candidate.md).
+## Dictation
 
-## First dictation
+Check your microphone during setup, then hide VOCO and focus an editable field.
+Press the recording shortcut (default **Alt+D**), wait for Listening, and speak.
+Words appear progressively. Press the shortcut again to finish; the final words
+and punctuation are delivered before VOCO returns to Ready.
 
-Open Microphone settings and check the sound meter. A moving meter proves audio
-arrives, not recognition or delivery. Finish setup, focus an editable destination,
-then use the configured recording shortcut (default Alt+D). Wait for Listening,
-speak, and keep that field focused until Stop has flushed the remaining words.
-Dictation stays in the tray without automatically opening a preview window.
+Keep the intended field focused. VOCO uses clipboard paste, replaces clipboard
+text, leaves it there and never presses Enter. Recognized terminals use their
+paste chord without changing terminal settings. Protected, custom, remote and rich
+editors need individual testing. The generic desktop route appends text; it does
+not rewrite the entire message after Stop.
 
-The default desktop route appends recognized words through clipboard paste. It
-replaces clipboard text and leaves it there. Known terminals use the terminal paste
-chord without keybinding changes. VOCO never sends Enter. Focus checks are best-effort;
-no universal application support or exact-widget guarantee is claimed. Read-only,
-protected, custom and rich fields need separate qualification. Stop appends the tail;
-it does not safely rewrite the entire already-delivered message.
+## Settings
 
-The optional Chromium exact-field extension is a separate route for eligible plain
-controls in an explicitly enabled tab, using Alt+Shift+V. IBus supplies optional
-consuming shortcuts and never mutates text. See [delivery policy](testing/desktop-paste.md).
+Settings cover Overview, Microphone, Dictation, Shortcuts, Updates and
+Troubleshooting. Drag the top bar or the VOCO brand area to move the window.
+Resize using its edges. Hide to tray closes the panel without quitting.
 
-## Recovery and daily controls
+There is one output behavior: direct cursor dictation. Assistant integrations,
+conversation, enhancement and output-mode selectors are removed. Upgrades ignore
+retired settings and preserve your microphone and shortcut. The interface follows
+system motion, contrast and transparency preferences without an Appearance page.
 
-The panel shows normal Copy results separately from failed or interrupted recordings.
-When available, **Retry transcription** uses retained audio without inserting text
-automatically. Copy the text you need, then clear or discard the current recovery
-before starting another recording. If older retained transcript entries are present,
-review and dismiss them explicitly. Copying does not dismiss text.
+Microphone choices save immediately. Shortcut edits have a Save action. If you
+hide the window with unsaved edits, choose Save and hide, Discard and hide, or
+Keep editing. Recording is paused while capturing a new shortcut.
 
-Audio and transcript recovery are in memory only. Closing VOCO loses them. Review
-the original field before pasting after uncertain delivery, since it may contain
-some of your words already. Performance logs do not contain this audio or text.
+## Recovery
 
-**Hide to dictate** hides the panel without starting recording. The microphone name
-opens Microphone settings. **More** contains guidance and optional Realtime
-conversation. Escape inside More closes it and returns focus to its trigger.
-Realtime streams audio to OpenAI while active; ordinary dictation stays local.
+If delivery is interrupted, open VOCO to review the retained transcript. Check the
+destination before pasting: it may already contain some of your words. VOCO never
+blindly retries uncertain delivery. Copying does not dismiss a transcript.
 
-## Settings and appearance
+Where available, Retry transcription uses retained audio without automatically
+inserting it. Clear or discard recovery before starting another recording.
+Recovery stays in memory only and is lost when VOCO exits.
 
-Eight settings pages cover Overview, Microphone, Dictation, Shortcuts, Appearance,
-Integrations, Updates and Troubleshooting. Choice controls save automatically.
-Text edits have explicit Save actions. Hiding with pending edits offers Save and
-hide, Discard and hide, or Keep editing. Shortcut capture cannot also start dictation.
+## Optional browser integration
 
-The selected silver microphone, graphite surfaces, Crystal Sidebar and glass controls
-are the default. There is no glass toggle. OS reduced motion, increased contrast,
-forced colors and reduced transparency remain respected. The sound meter continues
-to provide functional feedback. Small windows scroll, and section changes focus
-headings. These checks do not establish assistive-technology certification.
+The packaged Chromium extension remains a separate dictation route for eligible
+plain fields in an explicitly enabled tab. Its shortcut is **Alt+Shift+V**. It
+checks the original field and stops on focus changes or edits. IBus supplies
+consuming recording shortcuts; it never mutates text. See [delivery details](testing/desktop-paste.md).
 
-See [laptop performance](testing/laptop-performance.md) for log collection and
-[combined laptop testing](testing/combined-laptop-testing.md) for the test checklist.
+[Diagnostics](testing/laptop-performance.md) explains optional local metrics.

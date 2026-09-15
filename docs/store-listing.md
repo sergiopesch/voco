@@ -48,9 +48,7 @@ VOCO is designed for:
 ## Privacy / Trust Copy
 
 VOCO needs microphone access for voice input. Normal dictation is transcribed on-device and does
-not require an account or cloud transcription service. Optional OpenClaw modes may send transcript
-text according to the user's OpenClaw provider configuration. Microphone audio is sent to OpenAI
-only when the user explicitly starts the optional Realtime conversation mode.
+not require an account or cloud transcription service. There are no assistant or cloud conversation modes.
 
 Configuration stays local on the machine. VOCO automatically requests GitHub Releases metadata for
 update awareness, without uploading audio or transcripts. A developer-only environment flag can

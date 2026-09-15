@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/nicegui/tauri2-schema/main/tauri.conf.json",
   "productName": "VOCO",
-  "version": "2026.0.37",
+  "version": "2026.0.38",
   "identifier": "com.sergiopesch.voco",
   "build": {
     "frontendDist": "../dist",
@@ -28,7 +28,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' ipc: http://ipc.localhost https://api.github.com https://api.openai.com wss://api.openai.com; media-src 'self' mediastream:"
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' ipc: http://ipc.localhost https://api.github.com; media-src 'self' mediastream:"
     }
   },
   "bundle": {
@@ -38,7 +38,7 @@
     ],
     "category": "Utility",
     "shortDescription": "Turn speech into text at your cursor with local dictation",
-    "longDescription": "Your voice, typed. Built for Linux. VOCO turns speech into text at your cursor. Press a hotkey, speak, and press it again to finish. Normal dictation is transcribed on your device and needs no account or subscription. VOCO stays in the tray and guides microphone and hotkey setup. Text insertion depends on your desktop session and the target field. Optional local model modes use your own localhost model server. OpenClaw modes may send transcript text according to your configured provider. Realtime conversation sends microphone audio to OpenAI only after you explicitly start that mode.",
+    "longDescription": "Your voice, typed. VOCO turns speech into text at your cursor on Linux. Press a shortcut, speak, and press it again to finish. English recognition runs locally on the CPU with no account or subscription. VOCO stays in the tray and offers microphone and shortcut setup. Delivery uses clipboard paste and depends on the desktop session and target field. Interrupted transcripts remain available for recovery.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

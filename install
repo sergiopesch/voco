@@ -6,11 +6,11 @@ set -euo pipefail
 #
 # VOCO — release install helper
 # Usage:
-#   wget https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.37/install -O voco-install
+#   wget https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.38/install -O voco-install
 #   chmod +x voco-install
 #   ./voco-install
 
-VERSION="2026.0.37"
+VERSION="2026.0.38"
 RELEASE_TAG="voco.${VERSION}"
 DEB_URL="https://github.com/sergiopesch/voco/releases/download/${RELEASE_TAG}/voco_${VERSION}_amd64.deb"
 CHECKSUMS_URL="https://github.com/sergiopesch/voco/releases/download/${RELEASE_TAG}/voco_checksums.txt"
@@ -229,10 +229,6 @@ voco_validate_hotkey() {
   fi
   if [[ "${has_alt}" == false && "${has_control}" == false && "${has_super}" == false ]]; then
     VOCO_HOTKEY_VALIDATION_ERROR="Hotkey must include Alt, Control, or Super in addition to the main key."
-    return 1
-  fi
-  if [[ "${has_shift}" == true && "${has_alt}" == true && "${has_control}" == false && "${has_super}" == false && "${key}" == "KEYR" ]]; then
-    VOCO_HOTKEY_VALIDATION_ERROR="Alt+Shift+R is reserved for realtime conversation."
     return 1
   fi
 

@@ -234,9 +234,7 @@ Structured logging via `log` + `env_logger`. Default level: `info`. Set `RUST_LO
 
 ## Product Specs
 
-- [Local intelligence](../local-intelligence-spec.md)
 - [Streaming ASR feel](../streaming-asr-spec.md)
-- [Local intent router](../local-intent-router-spec.md)
 
 ## Speech recovery
 
