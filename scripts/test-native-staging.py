@@ -1,7 +1,10 @@
 import importlib.util
 from pathlib import Path
 import tempfile
+import subprocess
+import sys
 import unittest
+from unittest.mock import patch
 
 spec = importlib.util.spec_from_file_location('native_staging', Path(__file__).with_name('stage-native-packages.py'))
 staging = importlib.util.module_from_spec(spec)
@@ -59,12 +62,47 @@ class InventoryTests(unittest.TestCase):
 
 class DependencyTests(unittest.TestCase):
     def test_current_dependencies_have_explicit_mappings(self):
-        staging.validate_debian_dependencies('python3, python3-numpy, at-spi2-core, ibus')
+        staging.validate_debian_dependencies('python3, python3-numpy, at-spi2-core, ibus, '
+                                             'libc6 (>= 2.39), libstdc++6 (>= 13.2.0)')
 
     def test_unknown_empty_alternative_and_versioned_dependencies_fail_closed(self):
         for value in ('', 'python3, new-runtime', 'python3 (>= 3.14)', 'python3 | pypy'):
             with self.subTest(value=value), self.assertRaisesRegex(ValueError, 'requires review'):
                 staging.validate_debian_dependencies(value)
+
+    def test_missing_lower_or_stronger_runtime_floors_require_mapping_review(self):
+        for value in ('libc6, libstdc++6', 'libc6 (>= 2.39)',
+                      'libc6 (>= 2.38), libstdc++6 (>= 13.2.0)',
+                      'libc6 (>= 2.40), libstdc++6 (>= 13.2.0)',
+                      'libc6 (>= 2.39), libstdc++6 (>= 13.1.0)',
+                      'libc6 (>= 2.39), libstdc++6 (>= 14)'):
+            with self.subTest(value=value), self.assertRaisesRegex(ValueError, 'requires review'):
+                staging.validate_debian_dependencies(value)
+
+    def test_generated_native_recipes_retain_reviewed_runtime_floors(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            control = root / 'payload/DEBIAN/control'
+            control.parent.mkdir(parents=True)
+            control.write_text('Package: voco\nVersion: 2026.0.39+local1\nArchitecture: amd64\n'
+                               'Maintainer: Test <test@example.invalid>\nDescription: fixture\n'
+                               'Depends: python3, libc6 (>= 2.39), libstdc++6 (>= 13.2.0)\n')
+            data = root / 'payload/usr/share/voco/data'
+            data.parent.mkdir(parents=True)
+            data.write_text('package fixture')
+            deb = root / 'fixture.deb'
+            subprocess.run(['dpkg-deb', '--build', str(root / 'payload'), str(deb)],
+                           check=True, capture_output=True)
+            verifier = root / 'verifier.sh'
+            verifier.write_text('# Fixture verifier; only recipe generation is tested here.\nexit 0\n')
+            output = root / 'recipes'
+            with patch.object(sys, 'argv', ['stage-native-packages.py', str(deb), str(output),
+                                           '--sha256', staging.digest(deb), '--verifier', str(verifier)]):
+                staging.main()
+            rpm = (output / 'voco.spec').read_text()
+            arch = (output / 'PKGBUILD').read_text()
+            self.assertIn('Requires: glibc >= 2.39, libstdc++ >= 13.2.0, python3,', rpm)
+            self.assertIn("depends=('glibc>=2.39' 'gcc-libs>=13.2.0' 'python'", arch)
 
 
 if __name__ == '__main__':

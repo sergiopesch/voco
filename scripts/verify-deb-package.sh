@@ -15,7 +15,7 @@ METAINFO_PATH="/usr/share/metainfo/com.sergiopesch.voco.metainfo.xml"
 TAURI_DESKTOP_SOURCE="${ROOT_DIR}/packaging/tauri/VOCO.desktop"
 TAURI_METAINFO_SOURCE="${ROOT_DIR}/packaging/tauri/com.sergiopesch.voco.metainfo.xml"
 
-for command in dpkg-deb desktop-file-validate appstreamcli python3 rg readelf; do
+for command in dpkg dpkg-deb desktop-file-validate appstreamcli python3 rg readelf; do
   if ! command -v "${command}" >/dev/null 2>&1; then
     echo "Required package verification command is unavailable: ${command}" >&2
     exit 1
@@ -51,6 +51,19 @@ for dependency in ibus python3 python3-gi gir1.2-ibus-1.0 python3-numpy python3-
     exit 1
   fi
 done
+
+python3 - "${ROOT_DIR}/scripts/package-nvidia.py" "${PACKAGE_DEPENDS}" <<'PY'
+import importlib.util
+import sys
+
+spec = importlib.util.spec_from_file_location("package_nvidia", sys.argv[1])
+package = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(package)
+try:
+    package.validate_runtime_dependency_floors(sys.argv[2])
+except ValueError as error:
+    raise SystemExit(str(error))
+PY
 
 PACKAGE_LISTING="$(dpkg-deb -c "${DEB_PATH}")"
 assert_entry() {

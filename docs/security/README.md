@@ -295,3 +295,18 @@ for raw receipt locations and application acceptance limits.
 See [browser broker acceptance](../testing/browser-broker.md) and the current native evidence for
 measured guarantees and remaining coverage. These are bounded engineering claims, not a claim of
 world-leading or universal transcription quality.
+
+## Release privacy and provenance
+
+The public package builder uses a fixed CPU baseline and neutral source paths.
+Pinned NeMo/GGML sources, checked patches and NVIDIA model hashes are recorded in
+`runtime/NATIVE-SOURCE.json` and `runtime/speech/MODEL-IDENTITY.json`. Package
+verification binds shipped identities to these source pins and checks native hashes.
+
+Only explicitly listed documentation, notices and runtime files enter the complete
+package. The unpacked artifact is scanned for personal home paths and common
+credential formats, including compiled libraries and model bytes. Pattern scanning
+is a limited check, not a guarantee against all sensitive data. Review attachments
+and Git metadata separately; never publish private recordings or raw diagnostics.
+
+Report vulnerabilities through the [private reporting instructions](../../SECURITY.md).

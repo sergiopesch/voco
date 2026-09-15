@@ -452,6 +452,76 @@ class PayloadModeTests(unittest.TestCase):
                 package.normalize_payload_modes(root)
 
 
+class RuntimeDependencyTests(unittest.TestCase):
+    def test_missing_and_weaker_floors_are_added_without_changing_other_dependencies(self):
+        other = "python3 (>= 3.12), xclip | wl-clipboard, custom-runtime:any"
+        for runtime in ("", ", libc6, libstdc++6", ", libc6 (>= 2.35), libstdc++6 (>= 12)"):
+            with self.subTest(runtime=runtime):
+                updated = package.add_runtime_dependency_floors(other + runtime)
+                self.assertEqual(updated, other + ", libc6 (>= 2.39), libstdc++6 (>= 13.2.0)")
+                package.validate_runtime_dependency_floors(updated)
+
+    def test_stricter_base_constraints_are_preserved(self):
+        original = "libc6 (>= 2.40), libstdc++6 (>= 14.2.0-1), python3"
+        self.assertEqual(package.add_runtime_dependency_floors(original), original)
+        package.validate_runtime_dependency_floors(original)
+
+    def test_conflicting_or_ambiguous_base_constraints_require_review(self):
+        for value in ("libc6 (<< 2.40)", "libc6 (= 2.40)", "libc6:any",
+                      "libc6 | other-libc", "other-libc | libc6", "libc6, libc6 (>= 2.39)",
+                      "libstdc++6 (>= invalid)", "python3,,libc6"):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                package.add_runtime_dependency_floors(value)
+
+    def test_verifier_rejects_missing_unversioned_and_lower_floors(self):
+        for value in ("python3", "libc6, libstdc++6", "libc6 (>= 2.38), libstdc++6 (>= 13.2.0)",
+                      "libc6 (>= 2.39), libstdc++6 (>= 13.1.0)"):
+            with self.subTest(value=value), self.assertRaisesRegex(ValueError, "requires"):
+                package.validate_runtime_dependency_floors(value)
+
+    def test_folded_control_depends_preserves_unrelated_fields(self):
+        original = ("Package: voco\nDepends: python3,\n xclip, libc6 (>= 2.40)\n"
+                    "Description: fixture\n preserved continuation\nVersion: 2026.0.39\n")
+        updated = package.control_with_runtime_floors(original)
+        self.assertEqual(updated, ("Package: voco\nDepends: python3, xclip, libc6 (>= 2.40), "
+                                   "libstdc++6 (>= 13.2.0)\nDescription: fixture\n"
+                                   " preserved continuation\nVersion: 2026.0.39\n"))
+        with self.assertRaisesRegex(ValueError, "Duplicate"):
+            package.control_with_runtime_floors("Depends: libc6\nDepends: python3\n")
+
+    def test_shell_verifier_enforces_floors_before_payload_checks(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            control = root / "payload/DEBIAN/control"
+            control.parent.mkdir(parents=True)
+            tools = root / "tools"
+            tools.mkdir()
+            for name in ("desktop-file-validate", "appstreamcli", "rg", "readelf"):
+                tool = tools / name
+                tool.write_text("#!/bin/sh\nexit 99\n")
+                tool.chmod(0o755)
+            required = ("ibus, python3, python3-gi, gir1.2-ibus-1.0, python3-numpy, "
+                        "python3-psutil, libsentencepiece0, xclip, gir1.2-atspi-2.0, at-spi2-core")
+            for floors, expected in (("", "requires libc6"),
+                                     (", libc6 (>= 2.38), libstdc++6 (>= 13.2.0)", "requires libc6"),
+                                     (", libc6 (>= 2.39), libstdc++6 (>= 12)", "requires libstdc++6"),
+                                     (", libc6 (>= 2.39), libstdc++6 (>= 13.2.0)",
+                                      "Expected exactly one packaged entry")):
+                with self.subTest(floors=floors):
+                    control.write_text("Package: voco\nVersion: 2026.0.39\nArchitecture: amd64\n"
+                                       "Maintainer: Test <test@example.invalid>\nDescription: fixture\n"
+                                       f"Depends: {required}{floors}\n")
+                    deb = root / "fixture.deb"
+                    subprocess.run(["dpkg-deb", "--build", str(control.parents[1]), str(deb)],
+                                   check=True, capture_output=True)
+                    result = subprocess.run(["bash", str(package.ROOT / "scripts/verify-deb-package.sh"),
+                                             str(deb), "2026.0.39"],
+                                            env={**os.environ, "PATH": str(tools) + os.pathsep + os.environ["PATH"]},
+                                            capture_output=True, text=True)
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn(expected, result.stderr)
+
+
 class BasePackageTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()

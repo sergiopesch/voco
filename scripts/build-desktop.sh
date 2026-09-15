@@ -16,6 +16,9 @@ if (( $# > 1 )); then
   exit 2
 fi
 python3 "${ROOT_DIR}/vendor/verify.py"
+# The pinned wrapper does not track arbitrary CMake option changes for Cargo.
+# Discard only its release objects so cached host-native code cannot be bundled.
+cargo clean --manifest-path "${APP_DIR}/src-tauri/Cargo.toml" --release -p whisper-rs-sys
 # The browser host links the application library, whose Tauri context embeds
 # frontend assets even before the later bundle command runs. Support clean trees.
 npm --prefix "${APP_DIR}" run build:frontend

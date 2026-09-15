@@ -5,12 +5,14 @@ import hashlib
 import json
 import os
 from pathlib import Path, PurePosixPath
+import re
 import shutil
 import stat
 import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
+RUNTIME_DEPENDENCY_FLOORS = {"libc6": "2.39", "libstdc++6": "13.2.0"}
 VENDORED_NOTICES = {
     "global-hotkey": ("VOCO-PATCH.md", "VOCO-UPSTREAM.json", "LICENSE-APACHE", "LICENSE-MIT", "LICENSE.spdx"),
     "glib": ("VOCO-PATCH.md", "VOCO-UPSTREAM.json", "upstream-fix.patch", "LICENSE", "COPYRIGHT"),
@@ -31,6 +33,70 @@ NVIDIA_NOTICES = (
     "GGML-LICENSE", "LICENSE", "NOTICE", "NVIDIA-MODEL-CARD.md",
     "NVIDIA-NOTICE.txt", "NVIDIA-OPEN-MODEL-LICENSE.html", "THIRD_PARTY_NOTICES.md",
 )
+
+
+def runtime_dependency_entries(value):
+    entries = [part.strip() for part in value.split(",")] if value.strip() else []
+    if any(not entry for entry in entries):
+        raise ValueError("Malformed Debian dependency list")
+    found = {}
+    for index, entry in enumerate(entries):
+        names = re.findall(r"(?:^|\|)\s*(libc6|libstdc\+\+6)(?=[\s:(]|$)", entry)
+        if not names:
+            continue
+        name = names[0]
+        match = re.fullmatch(re.escape(name) + r"(?:\s*\(>=\s*([^\s()]+)\))?", entry)
+        if len(names) != 1 or not match or name in found:
+            raise ValueError(f"Runtime dependency constraint requires review: {name}")
+        version = match.group(1)
+        if version and subprocess.run(["dpkg", "--validate-version", version],
+                                      capture_output=True).returncode != 0:
+            raise ValueError(f"Invalid runtime dependency version: {name}")
+        found[name] = (index, version)
+    return entries, found
+
+
+def add_runtime_dependency_floors(value):
+    """Raise known ABI floors while retaining stricter >= constraints verbatim."""
+    entries, found = runtime_dependency_entries(value)
+    for name, floor in RUNTIME_DEPENDENCY_FLOORS.items():
+        if name not in found:
+            entries.append(f"{name} (>= {floor})")
+            continue
+        index, version = found[name]
+        if version is None or subprocess.run(
+                ["dpkg", "--compare-versions", version, "lt", floor],
+                capture_output=True).returncode == 0:
+            entries[index] = f"{name} (>= {floor})"
+    return ", ".join(entries)
+
+
+def validate_runtime_dependency_floors(value):
+    _, found = runtime_dependency_entries(value)
+    for name, floor in RUNTIME_DEPENDENCY_FLOORS.items():
+        version = found.get(name, (None, None))[1]
+        if version is None or subprocess.run(
+                ["dpkg", "--compare-versions", version, "ge", floor],
+                capture_output=True).returncode != 0:
+            raise ValueError(f"Debian package requires {name} (>= {floor})")
+
+
+def control_with_runtime_floors(value):
+    """Rewrite only Depends, including folded lines; preserve other fields."""
+    lines = value.splitlines()
+    matches = [index for index, line in enumerate(lines) if line.lower().startswith("depends:")]
+    if len(matches) > 1:
+        raise ValueError("Duplicate Debian Depends fields require review")
+    if not matches:
+        return "\n".join(lines + ["Depends: " + add_runtime_dependency_floors("")]) + "\n"
+    start = matches[0]
+    end = start + 1
+    while end < len(lines) and lines[end].startswith((" ", "\t")):
+        end += 1
+    current = " ".join([lines[start].split(":", 1)[1].strip(),
+                        *[line.strip() for line in lines[start + 1:end]]])
+    lines[start:end] = ["Depends: " + add_runtime_dependency_floors(current)]
+    return "\n".join(lines) + "\n"
 
 
 def relative_parts(name):
@@ -215,6 +281,8 @@ def main():
         stage = Path(directory) / "stage"
         subprocess.run(["dpkg-deb", "-R", str(base), str(stage)], check=True)
         validate_base_executables(stage)
+        control = stage / "DEBIAN/control"
+        control_metadata = control_with_runtime_floors(control.read_text())
         subprocess.run(["python3", str(ROOT / "scripts/verify-glib-backport.py")], check=True)
         speech = stage / "usr/lib/voco/speech"
         copy_speech_payload(ROOT, speech)
@@ -232,8 +300,7 @@ def main():
         (speech / "MANIFEST.json").write_text(json.dumps(identity, indent=2) + "\n")
         normalize_payload_modes(speech)
         normalize_payload_modes(doc)
-        control = stage / "DEBIAN/control"
-        lines = [line for line in control.read_text().splitlines()
+        lines = [line for line in control_metadata.splitlines()
                  if not line.startswith(("Version:", "Installed-Size:"))]
         files = [p for p in sorted(stage.rglob("*")) if p.is_file() and not p.is_symlink()
                  and p.relative_to(stage).parts[0] != "DEBIAN"]

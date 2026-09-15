@@ -15,6 +15,10 @@ import subprocess
 import tarfile
 import tempfile
 
+DEBIAN_RUNTIME_FLOORS = {'libc6 (>= 2.39)', 'libstdc++6 (>= 13.2.0)'}
+RPM_RUNTIME_FLOORS = ['glibc >= 2.39', 'libstdc++ >= 13.2.0']
+ARCH_RUNTIME_FLOORS = ['glibc>=2.39', 'gcc-libs>=13.2.0']
+
 
 def digest(path):
     with path.open('rb') as stream:
@@ -32,7 +36,8 @@ def validate_debian_dependencies(value):
     # Versioned/alternative requirements also need a deliberate translation;
     # silently deleting their constraint would broaden the accepted platforms.
     dependencies = {part.strip() for part in value.split(',')}
-    if not dependencies or not dependencies <= mapped:
+    if (not DEBIAN_RUNTIME_FLOORS <= dependencies
+            or not dependencies <= mapped | DEBIAN_RUNTIME_FLOORS):
         raise ValueError('Native dependency mapping requires review for this Debian package')
 
 
@@ -111,7 +116,7 @@ def main():
     }, indent=2) + '\n')
     # Dependencies are explicit per distro. Automatic ELF dependencies remain on
     # RPM; private recognizer libraries must not become public system provides.
-    fedora = 'python3 python3-numpy python3-psutil sentencepiece-libs gstreamer1-plugins-base gstreamer1-plugins-good gtk3 webkit2gtk4.1 libayatana-appindicator-gtk3 ibus python3-gobject at-spi2-core xclip xdotool wl-clipboard ydotool'.split()
+    fedora = RPM_RUNTIME_FLOORS + 'python3 python3-numpy python3-psutil sentencepiece-libs gstreamer1-plugins-base gstreamer1-plugins-good gtk3 webkit2gtk4.1 libayatana-appindicator-gtk3 ibus python3-gobject at-spi2-core xclip xdotool wl-clipboard ydotool'.split()
     spec = f'''Name: voco
 Version: {version}
 Release: {revision}.local
@@ -154,7 +159,7 @@ tar -xf %{{SOURCE0}} -C %{{buildroot}} --no-same-owner --same-permissions
         else:
             spec += row['path'] + '\n'
     (args.output / 'voco.spec').write_text(spec)
-    arch = 'glibc gcc-libs python python-numpy python-psutil sentencepiece gst-plugins-good gtk3 webkit2gtk-4.1 libayatana-appindicator ibus python-gobject at-spi2-core xclip xdotool wl-clipboard ydotool'.split()
+    arch = ARCH_RUNTIME_FLOORS + 'python python-numpy python-psutil sentencepiece gst-plugins-good gtk3 webkit2gtk-4.1 libayatana-appindicator ibus python-gobject at-spi2-core xclip xdotool wl-clipboard ydotool'.split()
     (args.output / 'PKGBUILD').write_text(f'''# Exact prebuilt local candidate; no download, install hook or source rebuild.
 pkgname=voco
 pkgver={version}

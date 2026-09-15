@@ -6,7 +6,8 @@ package alone is incomplete. Model weights and compiled libraries stay out of Gi
 
 ## Support matrix
 
-The build baseline is Ubuntu 24.04, x86_64, GCC 13. The native speech backend
+The build baseline is Ubuntu 24.04, x86_64, GCC 13. Packages require glibc 2.39
+and libstdc++ 13.2 or newer; native wrappers retain those ABI floors. The native speech backend
 requires OS-enabled AVX, AVX2, FMA, F16C, BMI2 and SSE4.2. A standalone baseline
 CPU check runs before loading those libraries and fails clearly on unsupported
 hardware. It does not enable instructions the operating system has disabled.

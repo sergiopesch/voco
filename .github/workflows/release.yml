@@ -73,6 +73,10 @@ jobs:
         with:
           workspaces: apps/desktop/src-tauri
 
+      # The pinned wrapper does not track arbitrary CMake inputs in Cargo's cache.
+      - name: Clear cached compatibility-engine objects
+        run: cargo clean --manifest-path apps/desktop/src-tauri/Cargo.toml -p whisper-rs-sys
+
       - name: Install Node dependencies
         run: npm ci
 
