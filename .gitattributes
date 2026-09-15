@@ -1,3 +1,6 @@
 # Preserve pinned third-party source and notices byte-for-byte.
 vendor/** -whitespace linguist-vendored
 runtime/notices/** -whitespace
+
+# Exact upstream-derived patch context is part of the pinned patch digest.
+runtime/patches/*.patch -whitespace
