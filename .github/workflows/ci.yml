@@ -14,6 +14,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  code-guide:
+    name: Code Guide
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+          fetch-depth: 0 # The reader serves an explicitly pinned historical snapshot.
+      - name: Verify the local guide and pinned source catalog
+        working-directory: docs/guide
+        env:
+          VOCO_SOURCE: ../..
+        run: python3 -m unittest discover -s tests -v
+
   rust-security:
     name: RustSec Audit
     runs-on: ubuntu-24.04

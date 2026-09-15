@@ -1,0 +1,45 @@
+# Inside VOCO
+
+A visual field guide to VOCO. Follow a spoken word through the app, then open the code that does the work.
+
+## Start locally
+
+Python 3.10+ and Git are the only requirements. From the VOCO repository root:
+
+```sh
+python3 docs/guide/serve.py --repo .
+```
+
+Open **http://127.0.0.1:8785**. Stop with Ctrl+C. No build, npm install, account, API key or internet connection is needed to study. The guide follows the 2026.0.39 application snapshot, not later documentation additions. The VOCO checkout must contain commit `fb957ff052547c24be92265b6b5343a4c29aff4b` (2026.0.39).
+
+## What is inside
+
+- 18 chapters: recording, audio queues, recognition, delivery, recovery, settings, Linux, privacy, performance, tests, packaging and dependencies.
+- Clickable journeys, five kinds of small teaching simulations, quizzes and a glossary.
+- A complete index of 1,122 tracked files. Search paths, groups and detected function/type names.
+- A read-only viewer of the exact pinned Git blobs, with line numbers and symbol jumps.
+
+Start with **The big picture**, work through the chapters, then follow the source links. Progress stays in this browser’s local storage.
+
+## Scope and privacy
+
+The lessons explain the important layers and their contracts. The file catalog covers every tracked entry; its generic group descriptions are navigation aids, **not a hand-written, line-by-line explanation of every upstream library**. Binary files and text over 2 MB have metadata only. Model weights and installed runtime binaries live outside the Git source snapshot.
+
+The server binds only to `127.0.0.1`. It rejects foreign Host/Origin requests, exposes no write API and serves source only from catalogued Git blobs. It never serves the checkout directory, uncommitted files, personal recordings or credentials. There is no analytics, remote font, CDN or public deployment configuration. Do not add a tunnel, bind to all interfaces or enable GitHub Pages.
+
+The interactive exercises are teaching simulations, not microphone capture or performance measurements. Private benchmarks and launch-media exports are not part of this guide.
+
+## Maintain it
+
+Read [AGENTS.md](AGENTS.md) and [DESIGN.md](DESIGN.md). When deliberately updating the source snapshot, review the lessons against that exact commit, then regenerate and test:
+
+```sh
+cd docs/guide
+python3 tools/catalog.py --repo ../..
+python3 tools/write_lessons.py
+VOCO_SOURCE=../.. python3 -m unittest discover -s tests -v
+```
+
+`tools/catalog.py` is the pinned inventory builder. `tools/write_lessons.py` is the authored chapter source. `site/app.js` handles navigation and source reading; `site/diagrams.js` contains the small simulations. `serve.py` is the loopback-only read boundary.
+
+See [VERIFICATION.md](VERIFICATION.md) for checks and limitations. VOCO source and identity retain their upstream notices; bundled Geist fonts use the SIL Open Font License.

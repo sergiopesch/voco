@@ -45,6 +45,8 @@ Audio stays on your device. Optional local performance logs contain timings and
 counts, not recordings or dictated text. Update checks contact GitHub.
 [Diagnostics](docs/testing/laptop-performance.md) · [Security](docs/security/README.md).
 
+Curious how it works? Explore the [visual code guide](docs/guide/README.md).
+
 ## Contribute
 
 Start with [development setup](docs/contributing.md), [the code map](docs/architecture/code-map.md)

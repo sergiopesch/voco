@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>Inside VOCO</title>
+    <link rel="icon" href="assets/voco.png" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to chapter</a
+    ><button id="menu-toggle" aria-controls="sidebar" aria-expanded="false">
+      Chapters
+    </button>
+    <aside id="sidebar">
+      <a class="brand" href="#big-picture"
+        ><img src="assets/voco.png" alt="" /><span
+          ><strong>VOCO</strong><small>Inside VOCO</small></span
+        ></a
+      ><label class="search"
+        ><span class="sr-only">Find a chapter or file</span
+        ><input
+          id="search"
+          type="search"
+          placeholder="Find a chapter or file"
+          autocomplete="off"
+      /></label>
+      <nav id="chapters" aria-label="Chapters"></nav>
+      <div class="rail-bottom">
+        <a href="#files">All source files <span id="file-count"></span></a
+        ><a href="#glossary">Glossary</a><small id="reading-progress"></small>
+      </div>
+    </aside>
+    <main id="main" tabindex="-1">
+      <header class="utility">
+        <span>2026.0.39</span><span>Runs only on this computer</span>
+      </header>
+      <div id="content">
+        <h1>Inside VOCO</h1>
+        <p>Opening the guide…</p>
+      </div>
+    </main>
+    <dialog id="source-dialog" aria-labelledby="source-title">
+      <header class="source-header">
+        <div>
+          <small>Exact source · <span id="source-commit"></span></small>
+          <h2 id="source-title"></h2>
+        </div>
+        <button id="close-source" aria-label="Close source viewer">
+          Close
+        </button>
+      </header>
+      <p id="source-role"></p>
+      <details id="symbol-list">
+        <summary>Jump to a function or type</summary>
+        <div></div>
+      </details>
+      <div id="source-body" tabindex="0" aria-label="Source code"></div>
+    </dialog>
+    <script type="module" src="app.js"></script>
+  </body>
+</html>
