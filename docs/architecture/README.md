@@ -1,7 +1,38 @@
 # Architecture
 
-This describes the 2026.0.35 application testing candidate. Package revision and
+This describes the 2026.0.37 pre-release candidate. Package revision and
 release gates are recorded in [candidate status](../release-candidate.md).
+
+Use the [code map](code-map.md) for implementation ownership and the
+[current Stop-delivery review](../testing/stop-delivery-review-2026-09-15.md) for
+the `+local6` validation C changes, passing strict Stop matrix (34 selected/35 attempts)
+and remaining qualification gates. `+local5` remains
+the frozen cross-Linux baseline; `+local3` remains installed.
+Normal validation C continuation passed in five userspaces (five selected/eight
+attempts), with root X11 and IBus checked according to the actually owned route.
+This does not qualify their default compositor, physical audio or every recipient.
+
+## Startup and recognizer selection
+
+The backend owns eager model preparation. Cursor output with enhancement Off and
+desktop paste/streaming enabled warms the existing serialized NVIDIA worker; it
+marks readiness only after the worker's model load and synthetic audio warmup
+succeed. Queue-module import performs no warmup. Failed NVIDIA startup does not
+download Whisper as an implicit fallback. Configured legacy startup and explicit
+Whisper commands retain their separate model preparation. Browser triggers select
+their route per session, so startup does not infer their future use.
+
+The existing tray has one model-status slot, not independent status for every
+optional recognizer. A later explicit Whisper failure can still affect that status;
+this round does not redesign per-session readiness.
+
+Shortcut arbitration separates completed IBus authority from a poll in flight.
+Registration, config synchronization and readiness use only unexpired Armed/Uncertain
+authority. Passive evdev also suppresses during a pending poll because it may observe
+a chord consumed by IBus. X11 root/scoped grabs use `owner_events=false`: their
+callback already consumed the chord and proceeds through the existing shared
+debounce. A pending poll must neither discard that callback nor revoke an existing
+registration. The one-second IBus bound and plugin-generation checks are unchanged.
 
 ## Current dictation path
 
@@ -20,8 +51,11 @@ release gates are recorded in [candidate status](../release-candidate.md).
    English 0.6B model, context 1, four CPU threads and the pool backend.
 5. The frontend appends accepted live words through `insertion.rs`. `focus_probe.rs`
    checks the current destination and terminal category. Clipboard and key helpers
-   perform paste; they do not return recipient text/paint acknowledgements.
-6. Stop flushes the stream and remaining suffix. Focus loss, revised already-delivered
+   perform paste. Eligible accessible controls provide bounded sampled local-region
+   confirmation; unsupported controls have dispatch evidence only. Neither is
+   compositor paint or atomic ownership. See [observation](../testing/delivery-observation.md).
+6. Stop drains capture into the live stream before finishing and flushing the
+   remaining suffix. Focus loss, revised already-delivered
    text or uncertain delivery preserves recovery instead of blindly replaying text.
 
 The candidate batches released silence-preroll frames into at most one second per
@@ -52,9 +86,48 @@ retain distinct configuration and network boundaries; see [security](../security
 
 ## State, UI and lifecycle
 
+For eligible desktop streams, `desktopShortcutSession.ts` owns a UUID from before
+capture until final queue drain. Native `desktop_shortcut.rs` uses the existing
+global-hotkey actor to move the configured X11 passive grab from root to the exact
+input-focus window. The root ancestor grab caused the observed GTK/AT-SPI focus
+loss during Stop; an exact-window grab avoids that mechanism in the isolated
+proof. Full candidate/toolkit qualification is separate. No focus event is ignored
+and no target token is exempted from verification. Only an initially unavailable
+target is probed once more after acquisition; valid initial tokens never refresh.
+
+The actor restores root scope on finish, real focus departure, window loss,
+registration change or fixed 650-second expiry (600 seconds of capture plus
+50 seconds for finalization). This does not extend delivery deadlines. Automatic
+restoration ends session authority; degraded restoration blocks further delivery
+and cannot be advertised as shortcut-ready. Begin/end serialize with recipient
+observation. The frontend cleans uncertain begin replies and prevents stale
+completion from releasing a newer UUID. Unsupported/Wayland routes retain their
+existing behavior, with no configuration changes or renewal timer.
+
+The main renderer's PageLoad Started event synchronously increments a native epoch
+before scheduling old-scope cleanup off the UI thread. Preflight captures that
+epoch before its blocking target probe; Begin checks the immutable epoch before
+and after acquisition, releasing any scope obtained across a reload. Background
+cleanup selects only older epochs, and delivery readiness rejects registered old
+ownership immediately. UUIDs still isolate recordings within a renderer. Generic
+paste IPC is not epoch-bound; this is shortcut-lifetime protection, not a universal
+guarantee that all previously queued renderer work is cancelled.
+
+This is a pinned patch to the existing `global-hotkey` 0.7.0 dependency, not a new
+hotkey engine. See [upstream provenance and patch boundaries](../../vendor/global-hotkey/VOCO-PATCH.md).
+The actor waits on the X11 fd and a nonblocking command signal with `libc::poll`;
+it has no periodic idle wakeup. Buffered X events are drained before waiting,
+commands are queued before signaling, and the sole scheduled deadline is the
+original lease expiry. Interrupted waits preserve that deadline; failed fds
+close the actor and degrade any active lease. This removes the former artificial
+50 ms polling ceiling, while root restoration remains asynchronous with respect
+to other X clients. The existing locked libc version is unchanged.
+
 `useDictation.ts` coordinates capture, delivery and recovery; `config.rs` serializes
 field-level settings updates and writes private atomic configuration. Single-instance
 ownership prevents two VOCO processes from competing for sockets or shortcuts.
+`trigger_socket.rs` owns trigger-path validation, same-UID peer checks and cleanup
+of only the socket inodes registered by this process.
 The backend tray reducer combines microphone, model, dictation and realtime states.
 Normal dictation stays out of the way without opening a transcript preview. The
 Crystal Sidebar and rounded glass controls retain OS accessibility preferences.
@@ -65,7 +138,10 @@ A hotkey should be used with the intended destination focused.
 `performance.rs` records bounded application timing/resource metadata;
 `runtime/speech/streaming.py` records worker stages. Both are opt-in through
 `VOCO_PERFORMANCE_LOG=1`. Session hashes correlate app IPC and worker requests;
-this is not yet an end-to-end cursor paint clock. See
+this is not yet an end-to-end cursor paint clock. Successful native dispatches and
+finished terminals are reported as outcomes, not failures; missing/unknown records
+remain explicit. Worker metrics reject unsafe file targets and fail independently
+of recognition. See
 [measurement scope and retention](../testing/laptop-performance.md).
 
 The complete Debian package combines Tauri's base package with `runtime/speech`,

@@ -13,6 +13,21 @@ text. Open VOCO recovery and inspect the destination before copying: some words 
 already have arrived. Do not repeatedly replay an uncertain insertion. The optional
 Chromium exact-field adapter uses a separate contract; IBus remains shortcut-only.
 
+## Spaces appear as the letter S
+
+The .37+local2 candidate used the wrong separator name for legacy ydotool 0.1.x.
+The fixed revision passes a literal space; modern ydotool uses keycode 57 and
+xdotool uses its `space` keysym. Verify the installed and running revision before
+testing. Do not remap S or change recipient-app shortcuts to work around this bug.
+
+## Final words or punctuation need review
+
+Stop must drain the captured tail before the worker finishes. The final candidate
+regressions cover this ordering. Normal dictation remains append-only: it does not
+rewrite previously inserted sentences after Stop. A good transcript in one test
+does not establish punctuation quality across voices and speaking styles. Keep
+recognition accuracy, exact delivery and whole-message refinement separate.
+
 ## The tray says Review Transcript instead of Start Dictation
 
 A manual transcript is still pending. Choose `Review Transcript` to open it, then use
@@ -35,7 +50,7 @@ The development Debian candidate includes a native host and unpacked extension f
 [installation](install.md) for explicit browser setup; building the package does not activate an
 extension in the current profile. Once enabled, click the extension action to authorize the tab,
 focus an eligible plain-text input or textarea, and use `Alt+Shift+V` to start and stop. The ordinary
-VOCO hotkey remains the manual-copy route.
+VOCO hotkey uses the separate native desktop-paste route.
 
 The extension requires a collapsed selection and a supported editable control. Password/recognized-sensitive
 controls, rich editors, unsupported frames, disabled/read-only inputs and fields marked private
@@ -225,5 +240,7 @@ npm run report:linux-runtime
 The published binary artifact is the GitHub Release `.deb`. Ubuntu is the primary reference
 environment; Debian-derived distributions are best-effort. AppImage publication is paused until its
 complete packaging toolchain is pinned; local experimental AppImages do not install desktop/browser
-registration files. The current NVIDIA 2026.0.35 work is a local candidate;
-this documentation does not imply it has been installed or published. Flatpak, Flathub, Snap, and Ubuntu App Center are not published VOCO release channels.
+registration files. The private NVIDIA candidate is `2026.0.37+local6`; the owner
+still has `+local3` installed. Check [current candidate gates](release-candidate.md)
+and the exact artifact's external receipts before testing; this documentation does
+not authorize installation or publication. Flatpak, Flathub, Snap, and Ubuntu App Center are not published VOCO release channels.

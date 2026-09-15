@@ -1,6 +1,6 @@
 {
   "name": "voco",
-  "version": "2026.0.35",
+  "version": "2026.0.37",
   "private": true,
   "workspaces": [
     "apps/*"
@@ -10,7 +10,7 @@
     "build": "npm run build -w apps/desktop",
     "lint": "npm run lint -w apps/desktop",
     "check": "npm run check --workspaces --if-present",
-    "test": "npm run test:speech-report && npm run test:speech-package && npm run test:speech-runtime && PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-report-performance.py && node --test scripts/audio-worklet-capture.test.mjs && npm run test:native-capture-audit && npm run test:owned-preedit && PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-native-kde-identity.py && PYTHONDONTWRITEBYTECODE=1 python3 scripts/speech-evaluation.test.py && PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-physical-speech-session.py && node --test scripts/comparative-dictation.test.mjs && PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-wayland-capture-continuity.py && node scripts/speech-score.test.mjs && node --test scripts/speech-integrity.test.mjs scripts/speech-integrity-cli.test.mjs && node scripts/speech-continuity.test.mjs && node --test scripts/browser-long-accuracy.test.mjs && node scripts/report-cursor-streaming-trace.test.mjs && node scripts/report-dictation-baseline-config.test.mjs && node scripts/reset-cursor-streaming-trace.test.mjs && npm run test --workspaces --if-present",
+    "test": "npm run test:delivery-observation && npm run test:dictation-quality && npm run test:dictation-quality-events && npm run test:speech-report && npm run test:speech-package && npm run test:native-package && npm run test:speech-runtime && PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-report-performance.py && node --test scripts/audio-worklet-capture.test.mjs && npm run test:native-capture-audit && npm run test:owned-preedit && PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-native-kde-identity.py && PYTHONDONTWRITEBYTECODE=1 python3 scripts/speech-evaluation.test.py && PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-physical-speech-session.py && node --test scripts/comparative-dictation.test.mjs && PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-wayland-capture-continuity.py && node scripts/speech-score.test.mjs && node --test scripts/speech-integrity.test.mjs scripts/speech-integrity-cli.test.mjs && node scripts/speech-continuity.test.mjs && node --test scripts/browser-long-accuracy.test.mjs && node scripts/report-cursor-streaming-trace.test.mjs && node scripts/report-dictation-baseline-config.test.mjs && node scripts/reset-cursor-streaming-trace.test.mjs && npm run test --workspaces --if-present",
     "test:owned-preedit": "PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 apps/desktop/src-tauri/resources/voco_ibus_ownership_test.py && PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 apps/desktop/src-tauri/resources/voco_ibus_protocol_test.py && PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 apps/desktop/src-tauri/resources/voco_ibus_engine_test.py",
     "test:speech-continuity": "CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS:-2} cargo build --locked --manifest-path apps/desktop/src-tauri/Cargo.toml --example preview_replay_worker && node scripts/test-speech-continuity.mjs",
     "test:speech-baseline": "CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS:-2} cargo build --locked --manifest-path apps/desktop/src-tauri/Cargo.toml --example preview_replay_worker && node scripts/test-speech-baseline.mjs",
@@ -39,7 +39,11 @@
     "test:native-capture-audit": "PYTHONDONTWRITEBYTECODE=1 python3 scripts/test_verify_native_capture_audit.py",
     "test:speech-runtime": "PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -m unittest discover -s runtime/speech -p \"test_*.py\"",
     "test:speech-package": "PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-speech-package.py",
-    "test:speech-report": "PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-report-speech-timing.py"
+    "test:speech-report": "PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-report-speech-timing.py",
+    "test:dictation-quality": "node --test scripts/dictation-quality.test.mjs",
+    "test:dictation-quality-events": "PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-report-dictation-quality-events.py",
+    "test:delivery-observation": "PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 scripts/test-desktop-delivery-observation.py",
+    "test:native-package": "PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-native-staging.py"
   },
   "engines": {
     "node": ">=20"

@@ -1,7 +1,21 @@
 # Install
 
-The current source is an unpublished `2026.0.35` local candidate. Published-channel
+Current cut: the owner accepted installed +local7 and authorized the private
+2026.0.37 release cut. See [status and remaining public gates](releases/2026.0.37.md).
+Earlier candidate preparation/deferral statements below are historical. The owner's
+installed application remains +local7 until a separately requested update.
+
+Current follow-up: private **+local7** contains the [bounded legacy keyboard optimization](testing/keyboard-delivery-2026-09-15.md). +local6 was installed and successfully owner-tested. Older revision results below remain historical; use exact artifact receipts for the new candidate.
+
+The current source is an unpublished `2026.0.37` local candidate. Published-channel
 commands below do not install it. Read [candidate gates](release-candidate.md) first.
+The owner now runs verified `+local6`; `+local4` was an earlier isolated baseline. The private `+local6` candidate preserves `+local5` as the
+historical failed Stop baseline. Validation C passed 34 selected Stop cases from
+35 attempts, five userspace continuation cases from eight attempts, and all 65
+model-protocol cases. See [the current review](testing/stop-delivery-review-2026-09-15.md)
+for scope and remaining gaps. Each supplied package requires its external exact-SHA
+and install/parity/remove receipts. These instructions do not resume installation
+on the owner's laptop.
 
 ## Local candidate
 
@@ -22,6 +36,17 @@ Desktop paste and streaming default on (launcher overrides `VOCO_DESKTOP_PASTE=0
 and `VOCO_DESKTOP_STREAM=0` disable their respective paths). Inspect old per-user
 launchers when diagnosing mismatched runtime or logging behavior. Installation does
 not qualify each destination, change application keybindings, or authorize release.
+
+For Cursor output with enhancement Off and both desktop paths enabled, the backend
+warms the bundled NVIDIA runtime and marks readiness only after a successful worker
+response. The default startup does not prepare or download Whisper. A configured
+legacy path or later explicit legacy transcription still ensures that separate model.
+A failed NVIDIA warmup reports a model problem instead of silently downloading Whisper.
+
+The [current userspace tests](testing/stop-delivery-review-2026-09-15.md) distinguish application
+userspace checks from native package installation and physical desktop qualification.
+RPM/Arch candidates need their own external native verification receipts; do not
+use the Debian installer on those systems or infer a published support channel.
 
 
 VOCO ships through GitHub Releases first. Ubuntu is the primary reference and release-test
@@ -245,10 +270,11 @@ This checks version alignment, install-script safety, and generated release note
 
 - Config: `~/.config/voco/config.json`
 - Update result cache: `~/.config/voco/update-cache.json`
-- Models: `~/.local/share/voco/models/`
+- Legacy Whisper models: `~/.local/share/voco/models/`
+- Packaged NVIDIA model/runtime: `/usr/lib/voco/speech/`
 - Privacy-safe timing trace: `${XDG_STATE_HOME:-$HOME/.local/state}/voco/hotkey-trace.jsonl`
 - Optional debug captures: `${XDG_STATE_HOME:-$HOME/.local/state}/voco/debug-captures/`
-- Socket: `$XDG_RUNTIME_DIR/voco.sock` when `XDG_RUNTIME_DIR` is set, otherwise `${TMPDIR:-/tmp}/voco-$(id -u)/voco.sock`
+- Trigger socket: `$XDG_RUNTIME_DIR/voco.sock` when `XDG_RUNTIME_DIR` is set, otherwise `${TMPDIR:-/tmp}/voco-$(id -u)/voco.sock`; runtime/fallback directories must pass ownership, privacy and real-directory checks. Invalid existing paths are rejected without chmod or unlink. The legacy `voice.sock` alias uses the same protections.
 - Persistent IBus control socket: `$XDG_RUNTIME_DIR/voco/ibus-engine.sock` (owner-only; no `/tmp` fallback)
 
 OpenClaw voice-bridge settings are stored in the same config file. That mode is opt-in and requires the `openclaw` CLI to resolve from the app's runtime `PATH`. The spoken-answer OpenClaw mode also requires OpenClaw TTS to be configured and `ffplay` from FFmpeg to resolve from `PATH`.
@@ -341,9 +367,18 @@ rm -rf -- \
 The same `~/.openclaw` ownership warning above applies to source installs.
 
 
-For the progressive .29 candidate, add `VOCO_DESKTOP_STREAM=1` to the launcher.
-Enhancement-off native sessions append recognized phrases during recording and
-flush the remaining tail at Stop. The package includes `gir1.2-atspi-2.0` for
-content-free focus metadata and automatic terminal paste selection. No target-app
-settings need changing. Review [the progressive delivery contract](testing/desktop-paste.md)
-and its continuous-speech/focus limits before evaluating broader compatibility.
+## Candidate identity and launch environment
+
+Application version `2026.0.37` can accompany successive Debian revisions such as
+`2026.0.37+local3`. Compare the package hash, installed files and running executable
+with the delivery receipt. A process started before an upgrade may still execute
+the old binary until restarted. Preserve recovery text before quitting.
+
+Performance logging is opt-in; a previously running process cannot gain the setting
+from a second launch. Quit it normally, then launch with `VOCO_PERFORMANCE_LOG=1`
+when testing. The model and worker should report ready before recording.
+
+The current progressive path is enabled by default. Legacy instructions to set
+`VOCO_DESKTOP_STREAM=1` explicitly applied to earlier candidates. On Wayland, keep
+the supported ydotool service available; no recipient keybinding changes are needed.
+See [delivery](testing/desktop-paste.md) and [review status](testing/pre-release-review-2026-09-15.md).

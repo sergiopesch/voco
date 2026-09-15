@@ -1,6 +1,6 @@
 # Everyday use
 
-The 2026.0.35 local candidate combines the Crystal Sidebar interface with
+The 2026.0.37 local candidate combines the Crystal Sidebar interface with
 CPU-local NVIDIA Nemotron English streaming. It is awaiting owner laptop acceptance;
 see [candidate status](release-candidate.md).
 

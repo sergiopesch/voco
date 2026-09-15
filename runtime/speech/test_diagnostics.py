@@ -55,6 +55,57 @@ class DiagnosticsTests(unittest.TestCase):
         self.assertEqual(diagnostic['error_code'], 'runtime_dependency_missing')
         self.assertEqual(set(diagnostic), {'event', 'stage', 'error_type', 'error_code'})
 
+    def test_unsafe_metrics_paths_disable_logging_without_touching_targets(self):
+        for kind in ('symlink', 'hardlink', 'fifo', 'public_file', 'public_directory', 'directory_link'):
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp) / 'voco/stream-performance'
+                root.mkdir(parents=True, mode=0o700)
+                target = Path(tmp) / 'target'
+                target.write_text('retained sentinel')
+                target.chmod(0o600)
+                log = root / 'worker.jsonl'
+                if kind == 'symlink':
+                    log.symlink_to(target)
+                elif kind == 'hardlink':
+                    os.link(target, log)
+                elif kind == 'fifo':
+                    os.mkfifo(log, 0o600)
+                elif kind == 'public_file':
+                    log.write_text('retained log')
+                    log.chmod(0o644)
+                elif kind == 'public_directory':
+                    root.chmod(0o755)
+                else:
+                    root.rmdir()
+                    other = Path(tmp) / 'other'
+                    other.mkdir(mode=0o700)
+                    root.symlink_to(other, target_is_directory=True)
+                with patch.dict(os.environ, {'XDG_STATE_HOME': tmp, 'VOCO_PERFORMANCE_LOG': '1'}), patch('sys.stderr', new_callable=io.StringIO) as errors:
+                    started = time.monotonic()
+                    metrics = Metrics()
+                    self.assertFalse(metrics.enabled)
+                    metrics.emit('ignored')
+                    metrics.close()
+                    self.assertLess(time.monotonic() - started, 1)
+                    self.assertEqual(errors.getvalue().strip(), '{"event":"worker_metrics_unavailable"}')
+                self.assertEqual(target.read_text(), 'retained sentinel')
+                self.assertEqual(target.stat().st_mode & 0o777, 0o600)
+                if kind == 'public_file':
+                    self.assertEqual(log.read_text(), 'retained log')
+                    self.assertEqual(log.stat().st_mode & 0o777, 0o644)
+
+    def test_rotated_worker_logs_remain_private(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {'XDG_STATE_HOME': tmp, 'VOCO_PERFORMANCE_LOG': '1'}):
+            metrics = Metrics()
+            metrics.handler.maxBytes = 500
+            for index in range(30):
+                metrics.emit('fixture', count=index)
+            metrics.close()
+            logs = list((Path(tmp) / 'voco/stream-performance').glob('worker.jsonl*'))
+            self.assertGreater(len(logs), 1)
+            self.assertLessEqual(len(logs), 4)
+            self.assertTrue(all(p.stat().st_mode & 0o777 == 0o600 for p in logs))
+
     def test_full_queue_close_finishes_after_slow_disk_recovers(self):
         with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {'XDG_STATE_HOME': tmp, 'VOCO_PERFORMANCE_LOG': '1'}):
             metrics = Metrics()

@@ -152,6 +152,173 @@ pub fn speech_queue_failure(request: &Value) -> Result<(), String> {
     Ok(())
 }
 
+/// Numeric summaries and finite vocabularies only. Unknown fields (including
+/// text, titles and payload hashes) are discarded at the native trust boundary.
+pub fn speech_quality(request: &Value) -> Result<(), String> {
+    if request["event"] == "native_dispatch" {
+        return Err("Native dispatch metadata requires a native producer".into());
+    }
+    record_speech_quality(request, false)
+}
+
+pub fn native_speech_quality(request: &Value) -> Result<(), String> {
+    if request["event"] != "native_dispatch" {
+        return Err("Invalid native quality stage".into());
+    }
+    record_speech_quality(request, true)
+}
+
+fn record_speech_quality(request: &Value, native: bool) -> Result<(), String> {
+    let mut safe = speech_quality_payload(request).ok_or("Invalid speech quality metadata")?;
+    // Only actual native insertion can attest to its bounded field observation.
+    if native {
+        safe["destination_content_observation"] = json!(if request["field_observed"] == true {
+            "observed"
+        } else {
+            "unavailable"
+        });
+        if let Some(value) = request["context_separator"].as_bool() {
+            safe["context_separator"] = json!(value);
+        }
+        if let Some(value) = request["observation_wait_ms"].as_u64() {
+            safe["observation_wait_ms"] = json!(value.min(86_400_000));
+        }
+    }
+    emit(safe);
+    Ok(())
+}
+
+fn speech_quality_payload(request: &Value) -> Option<Value> {
+    let event = request["event"].as_str()?;
+    if !matches!(
+        event,
+        "hypothesis"
+            | "delivery_requested"
+            | "delivery_dispatched"
+            | "delivery_failed"
+            | "terminal"
+            | "native_dispatch"
+    ) {
+        return None;
+    }
+    // Only accept a generated UUID-shaped stream identifier; never hash text as
+    // an identity. Its hash uses the same convention as existing worker records.
+    let session = request["session"].as_str()?;
+    if session.len() != 36
+        || !session.bytes().enumerate().all(|(i, c)| {
+            if matches!(i, 8 | 13 | 18 | 23) {
+                c == b'-'
+            } else {
+                c.is_ascii_hexdigit()
+            }
+        })
+    {
+        return None;
+    }
+    let mut safe = json!({"event":"speech_quality", "stage":event,
+        "stream_session_hash":format!("{:x}", Sha256::digest(session.as_bytes())),
+        "sample_observation_scope":"queue_ingress",
+        "clock_domain":if event == "native_dispatch" { "rust_instant_duration_ms" } else { "frontend_performance_duration_ms" }});
+    for key in [
+        "dictation_session_id",
+        "quality_seq",
+        "quality_dropped",
+        "hypothesis_seq",
+        "previous_hypothesis_seq",
+        "committed_hypothesis_seq",
+        "delivery_seq",
+        "active_delivery_seq",
+        "failed_delivery_seq",
+        "pending_delivery_count",
+        "hypothesis_count",
+        "delivery_count",
+        "dispatched_count",
+        "coalesced_hypotheses",
+        "captured_samples",
+        "enqueued_samples",
+        "responded_samples",
+        "buffered_samples",
+        "capture_callback_count",
+        "sample_rate",
+        "sample_start",
+        "sample_end",
+    ] {
+        if let Some(value) = request[key].as_u64() {
+            safe[key] = json!(value);
+        }
+    }
+    for key in [
+        "duration_ms",
+        "queue_age_ms",
+        "max_queue_age_ms",
+        "pending_age_ms",
+        "latest_age_ms",
+    ] {
+        if let Some(value) = request[key]
+            .as_f64()
+            .filter(|v| v.is_finite() && *v >= 0.0 && *v <= 86_400_000.0)
+        {
+            safe[key] = json!(value);
+        }
+    }
+    for prefix in [
+        "recognized",
+        "previous",
+        "committed",
+        "target",
+        "suffix",
+        "accepted",
+        "dispatched",
+        "input",
+        "payload",
+        "routed",
+    ] {
+        for unit in ["utf16_units", "utf8_bytes", "unicode_scalars"] {
+            let key = format!("{prefix}_{unit}");
+            if let Some(value) = request[&key].as_u64() {
+                safe[&key] = json!(value);
+            }
+        }
+    }
+    for key in [
+        "append_only",
+        "changed",
+        "finish_responded",
+        "accepted_equals_dispatched",
+        "leading_separator",
+        "terminal",
+        "clipboard_changed",
+    ] {
+        if let Some(value) = request[key].as_bool() {
+            safe[key] = json!(value);
+        }
+    }
+    if let Some(outcome) = request["outcome"].as_str().filter(|s| {
+        matches!(
+            *s,
+            "finished"
+                | "incomplete"
+                | "cancelled"
+                | "failed"
+                | "dispatched"
+                | "rejected"
+                | "no-mutation"
+                | "uncertain"
+        )
+    }) {
+        safe["outcome"] = json!(outcome);
+    }
+    if let Some(source) = request["source"]
+        .as_str()
+        .filter(|s| matches!(*s, "push" | "finish"))
+    {
+        safe["source"] = json!(source);
+    }
+    // Generic desktop insertion has no recipient-content observation capability.
+    safe["destination_content_observation"] = json!("unavailable");
+    Some(safe)
+}
+
 /// Correlate IPC with worker records without exporting request content.
 pub fn speech_exchange(request: &Value, result: &Result<Value, String>, elapsed: Duration) {
     if RECORDER.get().is_none() {
@@ -209,10 +376,11 @@ fn speech_worker_failure_payload(
     status: Option<std::process::ExitStatus>,
 ) -> Option<Value> {
     use std::os::unix::process::ExitStatusExt;
-    if !matches!(stage, "startup" | "exchange") {
+    if !matches!(stage, "startup" | "exchange" | "liveness") {
         return None;
     }
     let reason = match error {
+        "worker exited while idle" => "idle_exit",
         "worker closed output" => "output_eof",
         "worker disconnected" => "channel_disconnected",
         "worker request channel full" => "request_backlog",
@@ -461,6 +629,61 @@ impl RotatingWriter {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn idle_worker_exit_metadata_is_finite_and_preserves_observed_status() {
+        use std::os::unix::process::ExitStatusExt;
+        let record = speech_worker_failure_payload(
+            "liveness",
+            "worker exited while idle",
+            Some(std::process::ExitStatus::from_raw(7 << 8)),
+        )
+        .unwrap();
+        assert_eq!(
+            record,
+            json!({"event":"speech_worker_failed", "stage":"liveness",
+            "reason":"idle_exit", "exit_observed":true, "exit_code":7, "exit_signal":null})
+        );
+        let private = speech_worker_failure_payload("liveness", "PRIVATE_SENTINEL", None).unwrap();
+        assert_eq!(private["reason"], "transport_failed");
+        assert!(!private.to_string().contains("PRIVATE_SENTINEL"));
+    }
+
+    #[test]
+    fn frontend_cannot_claim_native_dispatch_provenance() {
+        let record =
+            json!({"event":"native_dispatch", "session":"12345678-1234-1234-1234-123456789abc"});
+        assert!(speech_quality(&record).is_err());
+        assert!(native_speech_quality(&record).is_ok());
+        assert!(native_speech_quality(&json!({"event":"hypothesis"})).is_err());
+    }
+
+    #[test]
+    fn quality_metadata_excludes_content_and_refuses_forged_receipt() {
+        let request = json!({"event":"hypothesis", "session":"12345678-1234-1234-1234-123456789abc",
+            "hypothesis_seq":4, "recognized_utf8_bytes":7, "recognized_unicode_scalars":3,
+            "recognized_utf16_units":4, "text":"PRIVATE_SENTINEL", "audio":[0.123],
+            "title":"PRIVATE_SENTINEL", "path":"/PRIVATE_SENTINEL", "payload_hash":"PRIVATE_SENTINEL",
+            "destination_content_observation":"verified", "append_only":true, "duration_ms":-3,
+            "outcome":"PRIVATE_SENTINEL"});
+        let safe = speech_quality_payload(&request).unwrap();
+        assert!(!safe.to_string().contains("PRIVATE_SENTINEL"));
+        assert_eq!(safe["hypothesis_seq"], 4);
+        assert_eq!(safe["recognized_utf8_bytes"], 7);
+        assert_eq!(safe["recognized_unicode_scalars"], 3);
+        assert_eq!(safe["recognized_utf16_units"], 4);
+        assert_eq!(safe["destination_content_observation"], "unavailable");
+        assert!(safe.get("duration_ms").is_none());
+        assert!(safe.get("outcome").is_none());
+        assert!(speech_quality_payload(
+            &json!({"event":"private words", "session":request["session"]})
+        )
+        .is_none());
+        assert!(
+            speech_quality_payload(&json!({"event":"terminal", "session":"private words"}))
+                .is_none()
+        );
+    }
+
     #[test]
     fn worker_failure_is_sanitized_and_missing_status_is_not_zero() {
         use std::os::unix::process::ExitStatusExt;

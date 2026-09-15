@@ -4,6 +4,12 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DEB_PATH="${1:?usage: verify-deb-package.sh <package.deb> [expected-version]}"
 EXPECTED_VERSION="${2:-$(node -p "require('${ROOT_DIR}/package.json').version")}"
+# Isolated package tests validate local metadata without conflating unavailable
+# network with a malformed artifact. Release validation keeps URL checks enabled.
+APPSTREAM_OPTIONS=()
+if [[ "${VOCO_PACKAGE_VERIFY_OFFLINE:-0}" == 1 ]]; then
+  APPSTREAM_OPTIONS+=(--no-net)
+fi
 DESKTOP_PATH="/usr/share/applications/VOCO.desktop"
 METAINFO_PATH="/usr/share/metainfo/com.sergiopesch.voco.metainfo.xml"
 TAURI_DESKTOP_SOURCE="${ROOT_DIR}/packaging/tauri/VOCO.desktop"
@@ -39,7 +45,7 @@ PACKAGE_DEPENDS="$(dpkg-deb -f "${DEB_PATH}" Depends)"
   exit 1
 }
 
-for dependency in ibus python3 python3-gi gir1.2-ibus-1.0 python3-numpy python3-psutil libsentencepiece0 xclip gir1.2-atspi-2.0; do
+for dependency in ibus python3 python3-gi gir1.2-ibus-1.0 python3-numpy python3-psutil libsentencepiece0 xclip gir1.2-atspi-2.0 at-spi2-core; do
   if ! grep -Eq "(^|, )${dependency}( \\([^)]*\\))?(,|$)" <<<"${PACKAGE_DEPENDS}"; then
     echo "Debian package is missing dependency: ${dependency}" >&2
     exit 1
@@ -201,8 +207,8 @@ PY
 python3 "${ROOT_DIR}/scripts/verify-speech-payload.py" "${EXTRACT_ROOT}" "${EXPECTED_VERSION}"
 
 desktop-file-validate "${EXTRACT_ROOT}${DESKTOP_PATH}"
-appstreamcli validate "${EXTRACT_ROOT}${METAINFO_PATH}"
-appstreamcli validate-tree "${EXTRACT_ROOT}"
+appstreamcli validate "${APPSTREAM_OPTIONS[@]}" "${EXTRACT_ROOT}${METAINFO_PATH}"
+appstreamcli validate-tree "${APPSTREAM_OPTIONS[@]}" "${EXTRACT_ROOT}"
 
 [[ "$(stat -c '%a' "${EXTRACT_ROOT}/usr/libexec/voco-ibus-engine")" == "755" ]]
 for path in \

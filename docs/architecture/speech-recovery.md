@@ -1,6 +1,13 @@
 # Local speech recovery
 
-VOCO keeps the existing base.en model and normal decoding parameters. A bounded
+The default .37 pipeline uses NVIDIA Nemotron. Its Stop path drains captured
+samples into the live stream before finish; worker loss during a session retains
+recovery and never replays audio automatically. Known-dead idle workers may be
+recreated at the next start/warmup boundary. See [architecture](README.md).
+
+## Legacy Whisper decoder recovery
+
+The separate Whisper path keeps the existing base.en model and normal decoding parameters. A bounded
 recovery pass addresses decoder failures and two acoustic boundary conditions.
 Full-session, canonical-chunk and preview transcription share the same controller
 in `apps/desktop/src-tauri/src/transcribe.rs`.
