@@ -106,43 +106,44 @@ class SpeechPackageTests(unittest.TestCase):
             self.verify()
 
 
-class VendoredShortcutNoticeTests(unittest.TestCase):
+class VendoredNoticeTests(unittest.TestCase):
     def test_ships_exact_notice_bytes_and_preserves_document_link_layout(self):
         with tempfile.TemporaryDirectory() as temporary:
             doc = Path(temporary) / "usr/share/doc/voco"
-            package.copy_vendored_shortcut_notices(package.ROOT, doc)
-            expected = {"VOCO-PATCH.md", "VOCO-UPSTREAM.json", "LICENSE-APACHE", "LICENSE-MIT", "LICENSE.spdx"}
-            copied = doc / "vendor/global-hotkey"
-            self.assertEqual({path.name for path in copied.iterdir()}, expected)
-            for name in expected:
-                self.assertEqual((copied / name).read_bytes(),
-                                 (package.ROOT / "vendor/global-hotkey" / name).read_bytes())
-            provenance = json.loads((copied / "VOCO-UPSTREAM.json").read_text())
-            self.assertEqual(provenance["version"], "0.7.0")
-            self.assertEqual(provenance["upstream_git_commit"], "dc7a755790ccbef1971b6c59eceb90d107df1feb")
-            # Both source README/AGENTS and nested architecture/security links
-            # resolve to this same installed notice without installing vendor code.
-            nested = doc / "docs/security"
-            nested.mkdir(parents=True)
-            self.assertEqual((nested / "../../vendor/global-hotkey/VOCO-PATCH.md").resolve(),
-                             (copied / "VOCO-PATCH.md").resolve())
-            self.assertFalse((copied / "src").exists())
+            package.copy_vendored_notices(package.ROOT, doc)
+            for crate, names in package.VENDORED_NOTICES.items():
+                copied = doc / "vendor" / crate
+                self.assertEqual({path.name for path in copied.iterdir()}, set(names))
+                for name in names:
+                    self.assertEqual((copied / name).read_bytes(),
+                                     (package.ROOT / "vendor" / crate / name).read_bytes())
+                nested = doc / "docs/security"
+                nested.mkdir(parents=True, exist_ok=True)
+                self.assertEqual((nested / "../../vendor" / crate / "VOCO-PATCH.md").resolve(),
+                                 (copied / "VOCO-PATCH.md").resolve())
+                self.assertFalse((copied / "src").exists())
+            provenance = json.loads((doc / "vendor/glib/VOCO-UPSTREAM.json").read_text())
+            self.assertEqual(provenance["version"], "0.18.5")
+            self.assertEqual(provenance["fix_commit"], "b5a4071e439bef2b5eea76c3aa25e5ae84839e34")
 
     def test_missing_or_linked_notice_fails_before_any_notice_copy(self):
-        for replacement in ("missing", "symlink"):
-            with self.subTest(replacement=replacement), tempfile.TemporaryDirectory() as temporary:
-                root = Path(temporary)
-                source = root / "vendor/global-hotkey"
-                source.mkdir(parents=True)
-                for name in package.VENDORED_SHORTCUT_NOTICES:
-                    (source / name).write_text("notice fixture")
-                (source / "LICENSE-MIT").unlink()
-                if replacement == "symlink":
-                    (source / "LICENSE-MIT").symlink_to("LICENSE-APACHE")
-                doc = root / "out"
-                with self.assertRaisesRegex(ValueError, "regular vendored shortcut notice"):
-                    package.copy_vendored_shortcut_notices(root, doc)
-                self.assertFalse(doc.exists())
+        for crate, names in package.VENDORED_NOTICES.items():
+            for replacement in ("missing", "symlink"):
+                with self.subTest(crate=crate, replacement=replacement), tempfile.TemporaryDirectory() as temporary:
+                    root = Path(temporary)
+                    for dependency, files in package.VENDORED_NOTICES.items():
+                        source = root / "vendor" / dependency
+                        source.mkdir(parents=True)
+                        for name in files:
+                            (source / name).write_text("notice fixture")
+                    target = root / "vendor" / crate / names[0]
+                    target.unlink()
+                    if replacement == "symlink":
+                        target.symlink_to(names[1])
+                    doc = root / "out"
+                    with self.assertRaisesRegex(ValueError, "regular vendored notice"):
+                        package.copy_vendored_notices(root, doc)
+                    self.assertFalse(doc.exists())
 
 
 class PayloadModeTests(unittest.TestCase):

@@ -234,3 +234,10 @@ See [Native capture development](native-capture-development.md) for the optional
 
 [Quality attribution and scorer](dictation-quality.md) describes diagnostic .36,
 the privacy boundary, and why helper completion is not confirmed insertion.
+
+## glib iterator safety
+
+Run `python3 scripts/verify-glib-backport.py`, then
+`python3 scripts/test-glib-variant.py --output /tmp/voco-glib-check` using a fresh
+output directory. The latter uses the resolved dependency and production optimization
+without starting a desktop. Add `--debug` for the debug control.

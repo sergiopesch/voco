@@ -54,3 +54,8 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+Vendored glib 0.18.5 (gtk-rs), MIT license
+Source: https://github.com/gtk-rs/gtk-rs-core
+Local change: upstream RUSTSEC-2024-0429 iterator out-pointer safety backport.
+Full license and provenance: vendor/glib/LICENSE, VOCO-UPSTREAM.json, VOCO-PATCH.md.

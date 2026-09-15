@@ -31,6 +31,11 @@ stable streaming and enhancement off. Patches reject removed fields. These fixed
 snapshot fields remain for the legacy dictation engine contract; they are not
 settings. Preserve microphone, shortcut and onboarding state during migration.
 
+glib 0.18.5 is vendored with the exact upstream RUSTSEC-2024-0429 fix. Keep
+all GTK/WebKit consumers on that single patched copy. Verify source provenance
+and optimized iterator regression before accepting a dependency change; adding
+glib 0.20 directly leaves the GTK dependency behind. [Backport](vendor/glib/VOCO-PATCH.md).
+
 ## Delivery invariants
 
 - Warm the selected worker before reporting readiness. Imports do not start it.
@@ -71,6 +76,8 @@ npm test
 npm run test:dictation-renderer
 npm run test:microphone-renderer
 npm run test:chromium-exact-field
+python3 scripts/verify-glib-backport.py
+python3 scripts/test-glib-variant.py --output /tmp/voco-glib-check
 cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml
 cargo clippy --locked --manifest-path apps/desktop/src-tauri/Cargo.toml -- -D warnings
 npm run build
@@ -91,8 +98,8 @@ isolation, not a remote VM or proof of a distribution's default desktop.
 
 ## Release and evidence
 
-Current development version: **2026.0.38**, dictation-only cleanup. The `.37` cut
-and its accepted `+local7` app are frozen historical evidence. New bytes need fresh
+Current development version: **2026.0.39**, glib iterator safety backport. The `.38` and `.37` cuts
+and the accepted `+local7` app are frozen historical evidence. New bytes need fresh
 checks and artifact receipts; do not reuse an older result as current qualification.
 
 Pass all CI gates, including Whisper accuracy. No waiver is authorized. Keep a
