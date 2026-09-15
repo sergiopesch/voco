@@ -2,7 +2,7 @@
 
 ## Current NVIDIA candidate
 
-The 2026.0.35 application and worker share opt-in `VOCO_PERFORMANCE_LOG=1`.
+The 2026.0.37 application and worker share opt-in `VOCO_PERFORMANCE_LOG=1`.
 Start the **complete** candidate through its verified launcher/binary after normal
 shutdown; an extracted base package cannot supply the speech runtime by itself.
 Capture package/executable, worker and model hashes with every comparison.
@@ -20,11 +20,13 @@ python3 scripts/report-speech-performance.py "${XDG_STATE_HOME:-$HOME/.local/sta
 python3 scripts/report-performance.py --json
 ```
 
-The Rust `speech_worker_failed` event adds finite `stage` (`startup` or `exchange`),
+The Rust `speech_worker_failed` event adds finite `stage` (`startup`, `exchange` or `liveness`),
 finite `reason`, `exit_observed`, and nullable numeric `exit_code`/`exit_signal`.
 The exit status is observed before cleanup kills the child; null means unavailable,
 not success. Exchange outcomes include `worker_eof`, `worker_disconnected` and
-`request_backlog`. No arbitrary exception or child stderr is copied into these events.
+`request_backlog`. An idle child found exited at the next start/warmup records `liveness`/`idle_exit`
+before replacement, including its observed exit status. Mid-session failures are
+not replayed. No arbitrary exception or child stderr is copied into these events.
 
 Worker startup failures use fixed stages (`runtime_import`, `model_initialize`);
 import-stage errors may occur before file metrics are available and are recorded
@@ -290,3 +292,12 @@ the first desktop dispatch. A dispatch timestamp alone still does not prove the
 target received text: first-word comparisons require independent field readback
 and a known playback/onset reference. Compare different recording-to-speech delays
 because cadence alignment can change the apparent first-word result.
+
+## Current interpretation
+
+Use [quality attribution](dictation-quality.md) for per-session sample, hypothesis
+and delivery reconciliation. Equal accepted/dispatched byte counts do not prove
+recipient content: a wrong one-byte key can preserve that equality. Report
+`destination_content_observation` explicitly. Owner-reported Codex success is
+manual acceptance evidence, not an automated field-readback or cursor-paint clock.
+See [pre-release review](pre-release-review-2026-09-15.md).

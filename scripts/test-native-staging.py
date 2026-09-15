@@ -1,0 +1,71 @@
+import importlib.util
+from pathlib import Path
+import tempfile
+import unittest
+
+spec = importlib.util.spec_from_file_location('native_staging', Path(__file__).with_name('stage-native-packages.py'))
+staging = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(staging)
+
+
+class InventoryTests(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name) / 'payload'
+        self.root.mkdir()
+        self.file = self.root / 'data'
+        self.file.write_bytes(b'payload')
+        self.file.chmod(0o644)
+
+    def test_exact_bytes_and_modes_are_recorded(self):
+        rows = staging.inventory(self.root)
+        self.assertEqual(rows, [{'path':'/data', 'kind':'file', 'mode':0o644,
+                                'sha256':staging.digest(self.file)}])
+
+    def test_relative_loader_links_are_retained(self):
+        (self.root / 'alias').symlink_to('data')
+        rows = staging.inventory(self.root)
+        self.assertEqual(rows[0]['kind'], 'symlink')
+        self.assertEqual(rows[0]['target'], 'data')
+
+    def test_absolute_broken_and_escaping_links_are_rejected(self):
+        for target in ('missing', '../outside', str(self.file)):
+            with self.subTest(target=target):
+                link = self.root / 'alias'
+                link.symlink_to(target)
+                with self.assertRaisesRegex(ValueError, 'Unsafe package link'):
+                    staging.inventory(self.root)
+                link.unlink()
+
+    def test_world_write_and_set_id_are_rejected(self):
+        for mode in (0o646, 0o4755, 0o2755):
+            self.file.chmod(mode)
+            with self.subTest(mode=mode), self.assertRaisesRegex(ValueError, 'Unsafe package permissions'):
+                staging.inventory(self.root)
+
+    def test_group_mode_is_preserved_for_pre_normalization_reference(self):
+        self.file.chmod(0o664)
+        self.assertEqual(staging.inventory(self.root)[0]['mode'], 0o664)
+
+    def test_spec_and_shell_metacharacters_are_not_accepted_as_paths(self):
+        for name in ('bad%macro', 'bad\nline', '$(unexpected)'):
+            path = self.root / name
+            path.write_text('fixture')
+            with self.subTest(name=name), self.assertRaisesRegex(ValueError, 'Unsupported package pathname'):
+                staging.inventory(self.root)
+            path.unlink()
+
+
+class DependencyTests(unittest.TestCase):
+    def test_current_dependencies_have_explicit_mappings(self):
+        staging.validate_debian_dependencies('python3, python3-numpy, at-spi2-core, ibus')
+
+    def test_unknown_empty_alternative_and_versioned_dependencies_fail_closed(self):
+        for value in ('', 'python3, new-runtime', 'python3 (>= 3.14)', 'python3 | pypy'):
+            with self.subTest(value=value), self.assertRaisesRegex(ValueError, 'requires review'):
+                staging.validate_debian_dependencies(value)
+
+
+if __name__ == '__main__':
+    unittest.main()

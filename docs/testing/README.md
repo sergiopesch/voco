@@ -1,12 +1,50 @@
 <!-- markdownlint-disable MD032 MD060 -->
+
+Current cut: the owner accepted installed +local7 and authorized the private
+2026.0.37 release cut. See [status and remaining public gates](../releases/2026.0.37.md).
+Earlier candidate preparation/deferral statements below are historical. The owner's
+installed application remains +local7 until a separately requested update.
+
+Current follow-up: private **+local7** contains the [bounded legacy keyboard optimization](keyboard-delivery-2026-09-15.md). +local6 was installed and successfully owner-tested. Older revision results below remain historical; use exact artifact receipts for the new candidate.
 # Testing
 
-Current candidate: [2026.0.35 release gates](../release-candidate.md). Model selection
+Current candidate: [2026.0.37 release gates](../release-candidate.md).
+Current work: [`+local6` validation C results and remaining gates](stop-delivery-review-2026-09-15.md).
+Frozen baseline: [`+local5` cross-Linux results, including the failed Stop gate](cross-linux-review-2026-09-15.md).
+Prior baseline: [pre-release review and acceptance scope](pre-release-review-2026-09-15.md). Model selection
 and measurement boundaries: [round-3 comparison](model-comparison-2026-09-14.md).
 Run worker tests with `python3 -m unittest discover -s runtime/speech -p 'test_*.py'`;
 run the actual model protocol separately with `python3 runtime/speech/test_worker_protocol.py --output-dir /path/to/new/receipts`.
 NumPy/psutil and the pinned native/model payload must be present for relevant tests.
 Never count a missing model or an unrun protocol case as a pass.
+
+The [X11 follow-up](x11-stop-delivery-followup.md) records the reproduced root-grab
+failure and current exact-focus session-grab acceptance plan. Logical frontend
+shortcut begin/end traces also occur on native no-op routes; they do not prove
+physical X11 scope. Match candidate/fixture hashes and preserve all attempted
+trial denominators. Default GNOME, KDE, Cinnamon and Omarchy/Hyprland desktops,
+physical audio and owner applications still require their own acceptance.
+The current review includes paired event-driven versus polling-actor callback and
+idle tests. A planned zero-delay shortcut was scheduled by a helper after XSync;
+it is not an atomic same-server-batch test. Zero sampled CPU ticks means below the
+10 ms accounting resolution, not zero cost or measured app energy savings.
+Renderer-reload tests cover epoch-bound shortcut Begin/cleanup and replacement
+UUIDs; generic paste IPC remains a separate contract. Final source checks passed
+498 Rust test executions and 459 frontend tests (2 optional skips), with full npm,
+20 assembler tests and static checks passing. The strict Stop matrix passed
+34 selected cases from 35 attempts; model protocol passed 65 cases in five userspaces.
+Normal userspace/shortcut continuation passed five selected cases from eight attempts.
+Three original fixtures incorrectly assumed root-X11 ownership when IBus owned the
+shortcut; corrected real Start/Stop checks passed and failed receipts are retained.
+Use each supplied artifact's external native install/parity/remove receipts; see
+the [current review](stop-delivery-review-2026-09-15.md).
+The packaged-UI reload attempt found no supported action; Ctrl+R did not initialize
+a second renderer. Epoch race tests pass, but active-owner full-app reload remains
+unqualified; no debugger/backdoor or child-process kill substituted for that test.
+Validation B stopped after two attempts: one completion under its original harness,
+then a pre-capture startup failure. Do not reclassify the first using C's tightened
+actual-Stop-overlap/focus-identity gates. C includes consuming-X11 versus passive-evdev
+arbitration tests; preserve actual attempted denominators for the native matrix.
 
 See the [historical foundational acceptance record](foundations-iteration-13-2026-09-06.md)
 for implemented changes, reproduced regressions, verification and open coverage.
@@ -52,7 +90,8 @@ npm run dev
 
 3. Test the product:
 - install the Debian package in the disposable VM so the persistent component exists
-- manually add and select `VOCO Dictation` in Input Sources
+- optionally add and select `VOCO Dictation` only when testing consuming IBus shortcuts;
+  the default NVIDIA desktop-paste route does not require changing Input Sources
 - allow microphone access
 - finish onboarding
 - press `Alt+D`
@@ -202,3 +241,8 @@ proof from pending native desktop and microphone validation.
 See [Native capture development](native-capture-development.md) for the optional native backend, explicit app-session source selection and its separate qualification gates.
 
 - [Combined UI, UX and laptop testing](combined-laptop-testing.md)
+
+## Exact text and delivery quality
+
+[Quality attribution and scorer](dictation-quality.md) describes diagnostic .36,
+the privacy boundary, and why helper completion is not confirmed insertion.

@@ -129,30 +129,72 @@ impl Worker {
     }
 }
 static WORKER: LazyLock<Mutex<Option<Worker>>> = LazyLock::new(|| Mutex::new(None));
+
+fn request_metadata(request: &Value) -> Value {
+    // Logging needs four bounded identifiers, never a second copy of each audio
+    // packet. Keep this projection finite even for an invalid IPC request.
+    serde_json::json!({
+        "op": request["op"].as_str().filter(|op|
+            matches!(*op, "warmup" | "start" | "push" | "finish" | "cancel")
+        ).unwrap_or("invalid"),
+        "session": request["session"].as_str().filter(|session| session.len() <= 80),
+        "seq": request["seq"].as_u64(),
+        "dictation_session_id": request["dictation_session_id"].as_u64(),
+    })
+}
+
 fn exchange(request: Value) -> Result<Value, String> {
     let mut guard = WORKER.lock().map_err(|_| "worker lock failed")?;
+    exchange_with_worker(request, &mut guard, Worker::start)
+}
+
+fn exchange_with_worker(
+    request: Value,
+    guard: &mut Option<Worker>,
+    create_worker: impl FnOnce() -> Result<Worker, String>,
+) -> Result<Value, String> {
+    // An idle worker can exit without an exchange observing its closed pipes.
+    // Only these pre-session boundaries may replace a known-dead child. A live
+    // child or an uncertain liveness result must never cause request replay.
+    if request["op"] == "warmup" || request["op"] == "start" {
+        if let Some(worker) = guard.as_mut() {
+            if worker
+                .child
+                .try_wait()
+                .map_err(|_| "worker liveness check failed")?
+                .is_some()
+            {
+                worker.record_failure("liveness", "worker exited while idle");
+                guard.take();
+            }
+        }
+    }
     if guard.is_none() {
         if request["op"] != "warmup" && request["op"] != "start" {
             return Err("worker lost; recording retained for recovery".into());
         }
-        *guard = Some(Worker::start()?);
+        *guard = Some(create_worker()?);
     }
     if request["op"] == "warmup" {
         return Ok(serde_json::json!({"ready": true}));
     }
     let worker = guard.as_mut().ok_or("worker missing")?;
+    // Retain only the response identity; transfer ownership of the audio array
+    // through the channel instead of cloning its JSON number values again.
+    let session = request["session"].clone();
+    let seq = request["seq"].clone();
     let result: Result<Value, String> = (|| {
         worker
             .requests
             .as_ref()
             .ok_or("worker closed")?
-            .try_send(request.clone())
+            .try_send(request)
             .map_err(|error| match error {
                 mpsc::TrySendError::Full(_) => "worker request channel full",
                 mpsc::TrySendError::Disconnected(_) => "worker disconnected",
             })?;
         let response = receive_response(&worker.responses, Duration::from_secs(10), false)?;
-        if response["session"] != request["session"] || response["seq"] != request["seq"] {
+        if response["session"] != session || response["seq"] != seq {
             return Err("worker response identity mismatch".into());
         }
         if response.get("error").is_some() {
@@ -166,16 +208,32 @@ fn exchange(request: Value) -> Result<Value, String> {
     }
     result
 }
+// Backend startup owns eager warmup. Session starts use the same serialized
+// worker slot, so an early recording cannot create a second model process.
+pub(crate) fn warmup() -> Result<(), String> {
+    let request = serde_json::json!({"op": "warmup"});
+    let metadata = request_metadata(&request);
+    let started = Instant::now();
+    let result = exchange(request);
+    crate::performance::speech_exchange(&metadata, &result, started.elapsed());
+    result.map(|_| ())
+}
+
 #[tauri::command]
 pub async fn benchmark_stream(request: Value) -> Result<Value, String> {
+    if request["op"] == "quality" {
+        crate::performance::speech_quality(&request)?;
+        return Ok(serde_json::json!({"logged":true}));
+    }
     if request["op"] == "diagnostic" {
         crate::performance::speech_queue_failure(&request)?;
         return Ok(serde_json::json!({"logged":true}));
     }
     tauri::async_runtime::spawn_blocking(move || {
+        let metadata = request_metadata(&request);
         let started = Instant::now();
-        let result = exchange(request.clone());
-        crate::performance::speech_exchange(&request, &result, started.elapsed());
+        let result = exchange(request);
+        crate::performance::speech_exchange(&metadata, &result, started.elapsed());
         result
     })
     .await
@@ -184,6 +242,201 @@ pub async fn benchmark_stream(request: Value) -> Result<Value, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn exited_worker() -> Worker {
+        let mut child = Command::new("/bin/true").spawn().unwrap();
+        child.wait().unwrap();
+        let (requests, receiver) = mpsc::sync_channel(1);
+        drop(receiver);
+        let (sender, responses) = mpsc::channel();
+        drop(sender);
+        Worker {
+            child,
+            requests: Some(requests),
+            responses,
+            io_thread: None,
+        }
+    }
+
+    fn live_worker(requests_seen: std::sync::Arc<Mutex<Vec<Value>>>, fail_request: bool) -> Worker {
+        let child = Command::new("/bin/sleep").arg("30").spawn().unwrap();
+        let (requests, receiver) = mpsc::sync_channel::<Value>(1);
+        let (sender, responses) = mpsc::channel();
+        let io_thread = thread::spawn(move || {
+            for request in receiver {
+                let response = if fail_request {
+                    Err("worker response timed out".into())
+                } else {
+                    Ok(
+                        serde_json::json!({"session":request["session"], "seq":request["seq"],
+                        "text":null, "mode":"append-only"}),
+                    )
+                };
+                requests_seen.lock().unwrap().push(request);
+                if sender.send(response).is_err() {
+                    break;
+                }
+            }
+        });
+        Worker {
+            child,
+            requests: Some(requests),
+            responses,
+            io_thread: Some(io_thread),
+        }
+    }
+
+    #[test]
+    fn audio_array_is_moved_to_worker_without_a_second_allocation() {
+        let seen = std::sync::Arc::new(Mutex::new(Vec::new()));
+        let mut slot = Some(live_worker(seen.clone(), false));
+        let request = serde_json::json!({
+            "op":"push", "session":"fixture", "seq":1,
+            "audio":vec![0.25_f32; 960], "rate":48000,
+        });
+        let allocation = request["audio"].as_array().unwrap().as_ptr() as usize;
+        exchange_with_worker(request, &mut slot, || {
+            panic!("worker unexpectedly replaced")
+        })
+        .unwrap();
+        let received = seen.lock().unwrap();
+        assert_eq!(
+            received[0]["audio"].as_array().unwrap().as_ptr() as usize,
+            allocation
+        );
+        assert_eq!(received[0]["audio"].as_array().unwrap().len(), 960);
+        assert_eq!(received[0]["audio"][959], 0.25);
+    }
+
+    #[test]
+    fn telemetry_projection_preserves_only_bounded_identifiers() {
+        let metadata = request_metadata(&serde_json::json!({
+            "op":"push", "session":"fixture", "seq":3, "dictation_session_id":4,
+            "audio":[0.25], "text":"private fixture", "rate":48000,
+        }));
+        assert_eq!(
+            metadata,
+            serde_json::json!({
+                "op":"push", "session":"fixture", "seq":3, "dictation_session_id":4,
+            })
+        );
+        let invalid = request_metadata(&serde_json::json!({
+            "op":"private fixture", "session":"x".repeat(81),
+            "seq":["private fixture"], "dictation_session_id":-1,
+        }));
+        assert_eq!(
+            invalid,
+            serde_json::json!({
+                "op":"invalid", "session":null, "seq":null, "dictation_session_id":null,
+            })
+        );
+    }
+
+    #[test]
+    fn moved_request_still_rejects_mismatched_response_identity() {
+        for response in [
+            serde_json::json!({"session":"wrong", "seq":1}),
+            serde_json::json!({"session":"fixture", "seq":2}),
+        ] {
+            let mut slot = Some(live_worker(Default::default(), false));
+            let (sender, responses) = mpsc::channel();
+            sender.send(Ok(response)).unwrap();
+            slot.as_mut().unwrap().responses = responses;
+            let result = exchange_with_worker(
+                serde_json::json!({"op":"push", "session":"fixture", "seq":1, "audio":[0.25]}),
+                &mut slot,
+                || panic!("request must never replay"),
+            );
+            assert_eq!(result.unwrap_err(), "worker response identity mismatch");
+            assert!(slot.is_none());
+        }
+    }
+
+    #[test]
+    fn known_dead_worker_is_replaced_only_before_start_or_warmup() {
+        for op in ["start", "warmup"] {
+            let seen = std::sync::Arc::new(Mutex::new(Vec::new()));
+            let creates = std::cell::Cell::new(0);
+            let mut slot = Some(exited_worker());
+            let request = serde_json::json!({"op":op, "session":"fixture", "seq":0});
+            let result = exchange_with_worker(request.clone(), &mut slot, || {
+                creates.set(creates.get() + 1);
+                Ok(live_worker(seen.clone(), false))
+            });
+            assert!(result.is_ok());
+            assert_eq!(creates.get(), 1);
+            assert!(slot.as_mut().unwrap().child.try_wait().unwrap().is_none());
+            assert_eq!(
+                seen.lock().unwrap().as_slice(),
+                if op == "start" {
+                    std::slice::from_ref(&request)
+                } else {
+                    &[]
+                }
+            );
+        }
+    }
+
+    #[test]
+    fn live_worker_is_reused_at_start_boundary() {
+        let seen = std::sync::Arc::new(Mutex::new(Vec::new()));
+        let mut slot = Some(live_worker(seen.clone(), false));
+        let pid = slot.as_ref().unwrap().child.id();
+        let request = serde_json::json!({"op":"start", "session":"fixture", "seq":0});
+        exchange_with_worker(request.clone(), &mut slot, || {
+            panic!("live worker replaced")
+        })
+        .unwrap();
+        assert_eq!(slot.as_ref().unwrap().child.id(), pid);
+        assert_eq!(seen.lock().unwrap().as_slice(), &[request]);
+    }
+
+    #[test]
+    fn repeated_warmup_reuses_live_worker_without_starting_a_session() {
+        let seen = std::sync::Arc::new(Mutex::new(Vec::new()));
+        let mut slot = Some(live_worker(seen.clone(), false));
+        let pid = slot.as_ref().unwrap().child.id();
+        for _ in 0..2 {
+            let result =
+                exchange_with_worker(serde_json::json!({"op":"warmup"}), &mut slot, || {
+                    panic!("warmup replaced a live worker")
+                })
+                .unwrap();
+            assert_eq!(result["ready"], true);
+            assert_eq!(slot.as_ref().unwrap().child.id(), pid);
+        }
+        assert!(seen.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn audio_and_finish_never_restart_or_replay_after_worker_exit() {
+        for op in ["push", "finish"] {
+            let mut slot = Some(exited_worker());
+            let result = exchange_with_worker(
+                serde_json::json!({"op":op, "session":"fixture", "seq":1}),
+                &mut slot,
+                || panic!("in-session request restarted worker"),
+            );
+            assert_eq!(result.unwrap_err(), "worker disconnected");
+            assert!(slot.is_none());
+        }
+    }
+
+    #[test]
+    fn uncertain_start_is_not_issued_twice() {
+        let seen = std::sync::Arc::new(Mutex::new(Vec::new()));
+        let creates = std::cell::Cell::new(0);
+        let mut slot = Some(exited_worker());
+        let request = serde_json::json!({"op":"start", "session":"fixture", "seq":0});
+        let result = exchange_with_worker(request.clone(), &mut slot, || {
+            creates.set(creates.get() + 1);
+            Ok(live_worker(seen.clone(), true))
+        });
+        assert_eq!(result.unwrap_err(), "worker response timed out");
+        assert_eq!(creates.get(), 1);
+        assert_eq!(seen.lock().unwrap().as_slice(), &[request]);
+        assert!(slot.is_none());
+    }
+
     #[test]
     fn closed_output_and_disconnected_channel_are_not_timeouts() {
         assert_eq!(

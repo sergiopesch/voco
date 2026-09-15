@@ -1,18 +1,36 @@
 # Linux Packaging
 
-VOCO's v1 packaging plan is intentionally staged.
+Current cut: the owner accepted installed +local7 and authorized the private
+2026.0.37 release cut. See [status and remaining public gates](releases/2026.0.37.md).
+Earlier candidate preparation/deferral statements below are historical. The owner's
+installed application remains +local7 until a separately requested update.
+
+Current follow-up: private **+local7** contains the [bounded legacy keyboard optimization](testing/keyboard-delivery-2026-09-15.md). +local6 was installed and successfully owner-tested. Older revision results below remain historical; use exact artifact receipts for the new candidate.
+
+Candidate packaging and distribution qualification are separate stages. The private
+candidate is `2026.0.37+local7`; `+local6` remains installed, and `+local4`/`+local5`
+remain historical evidence. See [the current review](testing/stop-delivery-review-2026-09-15.md)
+for validation C results and remaining scope. Final Debian/RPM/Arch qualification
+is supplied outside each package in exact-SHA, payload-parity and install/remove
+receipts. Source documents do not self-attest to their containing package hash.
 
 ## Complete NVIDIA candidate
 
-The package and application version are both `2026.0.35`. This testing candidate
+The application version is `2026.0.37`; Debian candidate revisions may append
+`+localN` without changing the application UI version. This testing candidate
 is not published. Tauri builds a **base** Debian bundle;
 it must be assembled with the pinned NVIDIA runtime/model before installation:
 
+Use the repository build wrapper: it supplies the production protocol feature and
+bundles the browser host. A direct Tauri bundle omits that host and fails verification.
+
 ```bash
-python3 scripts/package-nvidia.py /path/to/tauri-base.deb /path/to/voco_2026.0.35_amd64.deb --debian-version 2026.0.35
+npm run build
+python3 scripts/package-nvidia.py /path/to/tauri-base.deb /path/to/voco_2026.0.37_amd64.deb --debian-version 2026.0.37
 ```
 
-The assembler validates the base version and runtime payload, verifies the pinned
+The assembler validates the base version and matching regular app/browser-host
+executables before copying the large model payload. It validates the runtime, verifies the pinned
 model digest, includes native libraries and notices, and produces a payload manifest
 and package receipt. Inspect its actual successful output and run package/runtime
 checks before delivery; the command alone is not a pass. Keep base and complete
@@ -21,6 +39,9 @@ artifacts distinct. Record the complete package SHA-256 and installed version.
 The model/runtime files under `runtime/speech` are separate from the MIT application:
 retain `runtime/notices` and model provenance, including the NVIDIA model terms.
 The complete package needs Python, NumPy, psutil and the declared native dependencies.
+Debian metadata explicitly includes `at-spi2-core` as well as `gir1.2-atspi-2.0`:
+GI bindings alone do not provide the accessibility bus/registry service needed by
+the sampled-field helper in a minimal userspace.
 A source snapshot with absent model/native artifacts cannot build this complete
 package merely by running npm install. Verify artifacts rather than silently fetching
 an unpinned replacement. Never package personal benchmark recordings or test logs.
@@ -76,7 +97,7 @@ appimagetool chain can be supplied from immutable, checksum-verified sources.
 ## Later
 
 - strict-confinement investigation only if VOCO stops depending on host-level desktop automation
-- RPM if Fedora-class support becomes a priority
+- Native RPM and Arch candidates require per-artifact external build, dependency, payload and install/remove receipts; private verification does not establish a published or signed release channel
 
 ## Asset Naming
 
@@ -104,7 +125,13 @@ Current primary validation target:
 
 Debian-derived distributions are best-effort. The `.deb` format and dependency metadata target
 Debian-family package managers, but that compatibility is not a substitute for a recorded desktop
-runtime test.
+runtime test. The current baseline passed actual application/GTK/X11 virtual-microphone
+checks in Ubuntu 26, Debian 13, Fedora 44, Linux Mint 22.3 and genuine Omarchy 4.0.3
+official ISO-derived installer userspace after dependency provisioning. It does not
+include an installed Hyprland compositor in this test. These checks share the host kernel and do not run each distribution's
+default compositor, installed desktop or physical microphone. Native RPM/Arch
+packaging and broader stress-case acceptance require their own receipts; see
+[the evidence matrix](testing/cross-linux-review-2026-09-15.md#baseline-userspace-results).
 
 The optional consuming-shortcut IBus component remains package-owned at
 `/usr/share/ibus/component/voco.xml` and `/usr/libexec/voco-ibus-engine`. Protocol 5
@@ -202,13 +229,15 @@ attempted after a clipboard mutation or uncertain dispatch. See
 [desktop paste verification](testing/desktop-paste.md).
 
 
-The .29 package also depends on `gir1.2-atspi-2.0`. The bounded Python focus probe
-is embedded in the Rust executable and uses the packaged Python/GI runtime. It
-returns only an opaque focus token and a paste-gesture class; it does not read
-application text or change accessibility settings. Inaccessible targets fall back
-to the existing ordinary paste gesture, without a universal acceptance claim.
+The current package depends on `gir1.2-atspi-2.0` and `at-spi2-core`. The bounded
+Python helper is embedded in the Rust executable and uses Python/GI plus the AT-SPI
+service. Focus discovery returns opaque identity and paste-gesture metadata. Eligible
+fields also permit bounded transient local-region text readback during delivery
+observation; that text is not logged or returned to the frontend. The helper does
+not change accessibility settings. Unsupported controls retain best-effort delivery,
+without a universal acceptance claim. See [observation](testing/delivery-observation.md).
 
-## NVIDIA local testing candidate (2026.0.35)
+## NVIDIA local testing candidate (2026.0.37)
 
 The local candidate bundles Nemotron Speech Streaming English 0.6B Q8_0, its
 modified CPU runtime, Python worker and model notices under `/usr/lib/voco/speech`
@@ -227,6 +256,10 @@ Desktop paste and streaming are enabled by default for this authorized candidate
 `VOCO_DESKTOP_PASTE=0` or `VOCO_DESKTOP_STREAM=0` can disable the corresponding
 path. Existing target checks, enhancement behavior and Whisper recovery remain.
 The English NVIDIA model is used for normal enhancement-off desktop streaming.
+Startup prepares that selected runtime through the serialized worker and waits for
+actual warmup success before readiness. It does not implicitly download Whisper
+for the default path. Legacy-selected startup and explicit legacy transcription
+retain the separate Whisper model check/download.
 
 `VOCO_PERFORMANCE_LOG=1` enables private, rotating local metrics. Worker records
 include model/runtime identity, monotonic and wall clocks, hashed stream identity,
@@ -241,3 +274,47 @@ Run `python3 /usr/share/doc/voco/report-speech-performance.py
 `report-performance.py` against `~/.local/state/voco/performance` for capture,
 paste and stop stages. Neither report proves that text appeared in a target field;
 that needs independent field readback. Missing recordings remain unavailable.
+
+## Native Fedora and Arch candidate recipes
+
+`scripts/stage-native-packages.py` stages an RPM spec and Arch PKGBUILD from a
+complete, hash-verified Debian candidate. These are native package-manager wrappers
+around the same prebuilt application/model bytes, not a portable source rebuild.
+They preserve file hashes and relative loader links, disable strip/debug rewriting,
+and declare distro-specific runtime dependencies. Unknown Debian dependency
+constraints or maintainer actions require review rather than silent translation.
+
+```bash
+python3 scripts/stage-native-packages.py COMPLETE.deb FRESH_DIRECTORY \
+  --sha256 EXPECTED_SHA256 \
+  --verifier /absolute/path/to/voco/scripts/verify-deb-package.sh
+```
+
+Build the generated `voco.spec` with `rpmbuild` in a disposable Fedora builder, or
+`PKGBUILD` with `makepkg` in a disposable Arch builder. Never run package install or
+removal tests on the owner desktop. `scripts/verify-native-install.py` compares the
+installed payload's bytes, links, application-owned modes, ownership and ELF closure
+against `payload-inventory.json`; `--removed` checks removal of all files/links.
+It requires a disposable Docker environment. Shared system directory modes remain
+owned by the distribution. Run `npm run test:native-package` for staging-boundary
+regressions.
+
+Fedora explicitly requires the base/good GStreamer plugins; upstream WebKit's weak
+recommendations do not ensure capture works in a minimal installation. Arch needs
+`gst-plugins-good` and a separately verified SentencePiece package. The cross-Linux
+evidence includes a locally built SentencePiece 0.2.1 support package from pinned
+upstream source with 141 upstream tests passing. It is not an official Arch
+repository or signed public VOCO package. Retain its source, Apache notice and hash
+receipt; do not silently run an arbitrary AUR recipe.
+
+The NVIDIA assembler normalizes staged runtime/docs to 0755 directories and
+0644/0755 files, preserves symlinks without following them and rejects special
+objects. Neither native recipe installs scripts that alter input sources, shortcuts,
+browser profiles or input permissions. Standard distro package-manager hooks still
+apply. Public signing, repositories, source provisioning and default desktop
+acceptance remain separate release work.
+
+For a deliberately network-disabled verification job, set
+`VOCO_PACKAGE_VERIFY_OFFLINE=1` when invoking `scripts/verify-deb-package.sh`. This
+runs local AppStream validation with `--no-net`; it does not validate external URLs.
+Omit the variable for the release job's normal online URL checks.

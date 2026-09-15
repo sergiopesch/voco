@@ -10,7 +10,7 @@ use std::{
 
 struct Probe {
     child: Child,
-    requests: Option<mpsc::SyncSender<u64>>,
+    requests: Option<mpsc::SyncSender<Value>>,
     responses: mpsc::Receiver<Result<Value, ()>>,
     reader: Option<JoinHandle<()>>,
     sequence: u64,
@@ -57,12 +57,13 @@ impl Probe {
             .map_err(|_| ())?;
         let mut input = child.stdin.take().ok_or(())?;
         let mut output = BufReader::new(child.stdout.take().ok_or(())?);
-        let (tx, rx) = mpsc::sync_channel(1);
+        let (tx, rx) = mpsc::sync_channel::<Value>(1);
         let (result_tx, result_rx) = mpsc::channel();
         let reader = thread::spawn(move || {
-            for seq in rx {
+            for request in rx {
+                let seq = request["seq"].as_u64().unwrap_or(0);
                 let result = (|| {
-                    serde_json::to_writer(&mut input, &json!({"seq":seq})).map_err(|_| ())?;
+                    serde_json::to_writer(&mut input, &request).map_err(|_| ())?;
                     input
                         .write_all(b"\n")
                         .and_then(|_| input.flush())
@@ -83,18 +84,33 @@ impl Probe {
             sequence: 0,
         })
     }
+    #[cfg(test)]
     fn request(&mut self, timeout: Duration) -> Result<Value, ()> {
+        self.request_with(json!({}), timeout)
+    }
+    fn request_with(&mut self, mut request: Value, timeout: Duration) -> Result<Value, ()> {
         self.sequence = self.sequence.checked_add(1).ok_or(())?;
         self.requests
             .as_ref()
             .ok_or(())?
-            .send(self.sequence)
+            .send({
+                request["seq"] = json!(self.sequence);
+                request
+            })
             .map_err(|_| ())?;
         self.responses.recv_timeout(timeout).map_err(|_| ())?
     }
 }
 static PROBE: LazyLock<Mutex<Option<Probe>>> = LazyLock::new(|| Mutex::new(None));
 pub(crate) fn probe() -> Result<Value, ()> {
+    probe_with(json!({"op":"probe"}))
+}
+
+pub(crate) fn probe_with(request: Value) -> Result<Value, ()> {
+    probe_with_timeout(request, Duration::from_millis(800))
+}
+
+pub(crate) fn probe_with_timeout(request: Value, timeout: Duration) -> Result<Value, ()> {
     let mut guard = PROBE.lock().map_err(|_| ())?;
     if guard.is_none() {
         *guard = Some(Probe::start(include_str!(
@@ -104,7 +120,7 @@ pub(crate) fn probe() -> Result<Value, ()> {
     let result = guard
         .as_mut()
         .ok_or(())?
-        .request(Duration::from_millis(800));
+        .request_with(request, timeout.min(Duration::from_millis(800)));
     if result.is_err() {
         guard.take();
     }

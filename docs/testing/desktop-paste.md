@@ -1,8 +1,11 @@
-> **Current contract (2026.0.35).** Native desktop paste and streaming are enabled
+> **Current contract (2026.0.37).** Native desktop paste and streaming are enabled
 > by default unless their launcher flags are `0`. NVIDIA Nemotron provides continuous
 > English streaming; the older Whisper 30-second preview limit below belongs to an
 > earlier path. Clipboard replacement, no Enter, no uncertain replay, terminal chord
-> selection and best-effort focus guards remain. A focus token is not exact-widget
+> selection and best-effort focus guards remain. Eligible controls also have bounded
+> [sampled readback](delivery-observation.md); unsupported controls remain unobserved.
+> Legacy ydotool needs a literal space argument, not xdotool's `space` keysym.
+> A focus token is not exact-widget
 > ownership; protected fields are not universally detected. No automatic whole-message
 > rewrite or physical Wayland/application-wide qualification is claimed. See
 > [current architecture](../architecture/README.md) and [candidate gates](../release-candidate.md).

@@ -1,8 +1,12 @@
 """Package acceptance must reject corrupt files, missing models and escaped links."""
 import importlib.util
 import json
+import os
 from pathlib import Path
 import tempfile
+import subprocess
+import sys
+from unittest.mock import patch
 import unittest
 
 
@@ -100,6 +104,152 @@ class SpeechPackageTests(unittest.TestCase):
         self.save_manifest()
         with self.assertRaisesRegex(ValueError, "Model identity"):
             self.verify()
+
+
+class VendoredShortcutNoticeTests(unittest.TestCase):
+    def test_ships_exact_notice_bytes_and_preserves_document_link_layout(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            doc = Path(temporary) / "usr/share/doc/voco"
+            package.copy_vendored_shortcut_notices(package.ROOT, doc)
+            expected = {"VOCO-PATCH.md", "VOCO-UPSTREAM.json", "LICENSE-APACHE", "LICENSE-MIT", "LICENSE.spdx"}
+            copied = doc / "vendor/global-hotkey"
+            self.assertEqual({path.name for path in copied.iterdir()}, expected)
+            for name in expected:
+                self.assertEqual((copied / name).read_bytes(),
+                                 (package.ROOT / "vendor/global-hotkey" / name).read_bytes())
+            provenance = json.loads((copied / "VOCO-UPSTREAM.json").read_text())
+            self.assertEqual(provenance["version"], "0.7.0")
+            self.assertEqual(provenance["upstream_git_commit"], "dc7a755790ccbef1971b6c59eceb90d107df1feb")
+            # Both source README/AGENTS and nested architecture/security links
+            # resolve to this same installed notice without installing vendor code.
+            nested = doc / "docs/security"
+            nested.mkdir(parents=True)
+            self.assertEqual((nested / "../../vendor/global-hotkey/VOCO-PATCH.md").resolve(),
+                             (copied / "VOCO-PATCH.md").resolve())
+            self.assertFalse((copied / "src").exists())
+
+    def test_missing_or_linked_notice_fails_before_any_notice_copy(self):
+        for replacement in ("missing", "symlink"):
+            with self.subTest(replacement=replacement), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                source = root / "vendor/global-hotkey"
+                source.mkdir(parents=True)
+                for name in package.VENDORED_SHORTCUT_NOTICES:
+                    (source / name).write_text("notice fixture")
+                (source / "LICENSE-MIT").unlink()
+                if replacement == "symlink":
+                    (source / "LICENSE-MIT").symlink_to("LICENSE-APACHE")
+                doc = root / "out"
+                with self.assertRaisesRegex(ValueError, "regular vendored shortcut notice"):
+                    package.copy_vendored_shortcut_notices(root, doc)
+                self.assertFalse(doc.exists())
+
+
+class PayloadModeTests(unittest.TestCase):
+    def test_modes_are_independent_of_checkout_permissions(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "payload"
+            root.mkdir(mode=0o777)
+            child = root / "nested"
+            child.mkdir(mode=0o700)
+            data, executable = child / "model", child / "worker"
+            data.write_bytes(b"model fixture")
+            executable.write_bytes(b"worker fixture")
+            data.chmod(0o666)
+            executable.chmod(0o6777)
+            package.normalize_payload_modes(root)
+            self.assertEqual(root.stat().st_mode & 0o7777, 0o755)
+            self.assertEqual(child.stat().st_mode & 0o7777, 0o755)
+            self.assertEqual(data.stat().st_mode & 0o7777, 0o644)
+            self.assertEqual(executable.stat().st_mode & 0o7777, 0o755)
+            self.assertEqual(data.read_bytes(), b"model fixture")
+            self.assertEqual(executable.read_bytes(), b"worker fixture")
+
+    def test_file_and_directory_symlinks_are_not_followed(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            root, outside = base / "payload", base / "outside"
+            root.mkdir(); outside.mkdir()
+            file = outside / "data"
+            file.write_bytes(b"outside")
+            file.chmod(0o666); outside.chmod(0o777)
+            (root / "dir-link").symlink_to(outside, target_is_directory=True)
+            (root / "file-link").symlink_to(file)
+            package.normalize_payload_modes(root)
+            self.assertEqual(file.stat().st_mode & 0o777, 0o666)
+            self.assertEqual(outside.stat().st_mode & 0o777, 0o777)
+            self.assertEqual((root / "file-link").readlink(), file)
+            self.assertEqual((root / "dir-link").readlink(), outside)
+
+    def test_symlink_root_is_rejected_without_changing_target(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            target = base / "target"; target.mkdir(); target.chmod(0o777)
+            link = base / "link"; link.symlink_to(target, target_is_directory=True)
+            with self.assertRaisesRegex(ValueError, "regular directory"):
+                package.normalize_payload_modes(link)
+            self.assertEqual(target.stat().st_mode & 0o777, 0o777)
+
+    def test_special_file_is_rejected(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            os.mkfifo(root / "pipe")
+            with self.assertRaisesRegex(ValueError, "Unsupported payload object"):
+                package.normalize_payload_modes(root)
+
+
+class BasePackageTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        self.stage = self.root / "base"
+        for name in ("usr/bin/voco", "usr/libexec/voco-browser-host"):
+            path = self.stage / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b"fixture executable")
+            path.chmod(0o755)
+
+    def test_wrapper_executables_are_required(self):
+        package.validate_base_executables(self.stage)
+
+    def test_missing_app_or_browser_host(self):
+        for name in ("usr/bin/voco", "usr/libexec/voco-browser-host"):
+            with self.subTest(name=name):
+                path = self.stage / name
+                path.rename(path.with_suffix(".saved"))
+                with self.assertRaisesRegex(ValueError, "run npm run build"):
+                    package.validate_base_executables(self.stage)
+                path.with_suffix(".saved").rename(path)
+
+    def test_nonexecutable_and_symlink_are_rejected(self):
+        host = self.stage / "usr/libexec/voco-browser-host"
+        host.chmod(0o644)
+        with self.assertRaises(ValueError):
+            package.validate_base_executables(self.stage)
+        host.unlink()
+        host.symlink_to("../bin/voco")
+        with self.assertRaises(ValueError):
+            package.validate_base_executables(self.stage)
+
+    def test_actual_incomplete_deb_fails_before_runtime_copy_or_publication(self):
+        (self.stage / "usr/libexec/voco-browser-host").unlink()
+        control = self.stage / "DEBIAN/control"
+        control.parent.mkdir()
+        control.write_text("Package: voco\nVersion: 2026.0.37\nArchitecture: amd64\n"
+                           "Maintainer: Test <test@example.invalid>\nDescription: test fixture\n")
+        base = self.root / "base.deb"
+        subprocess.run(["dpkg-deb", "--build", str(self.stage), str(base)],
+                       check=True, capture_output=True)
+        (self.root / "package.json").write_text('{"version":"2026.0.37"}')
+        output = self.root / "candidate.deb"
+        with patch.object(package, "ROOT", self.root), patch.object(sys, "argv", [
+            "package-nvidia.py", str(base), str(output),
+        ]), patch.object(package.shutil, "copy2") as copy:
+            with self.assertRaisesRegex(ValueError, "browser-host"):
+                package.main()
+            copy.assert_not_called()
+        self.assertFalse(output.exists())
 
 
 if __name__ == "__main__":

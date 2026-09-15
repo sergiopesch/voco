@@ -1,3 +1,4 @@
+import type { PasteCorrelation } from "./benchmarkPhraseQueue";
 import { invoke } from "@tauri-apps/api/core";
 import { encodeAudioRequest } from "@/lib/audioTransport";
 import type {
@@ -96,12 +97,20 @@ export async function insertText(text: string, strategy: string): Promise<Insert
   return invoke<InsertionResult>("insert_text", { text, strategy });
 }
 
-export async function getDesktopPasteStatus(): Promise<{ enabled: boolean; available: boolean; detail: string; streamingEnabled?: boolean; targetToken?: string | null }> {
+export async function getDesktopPasteStatus(): Promise<{ enabled: boolean; available: boolean; detail: string; shortcutEpoch: number; streamingEnabled?: boolean; targetToken?: string | null }> {
   return invoke("get_desktop_paste_status");
 }
 
-export async function pasteDesktopText(text: string, expectedTargetToken?: string | null): Promise<{ strategy: "clipboard"; outcome: "dispatched"; pasteMetrics?: { terminal: boolean; targetProbeMs: number; preflightMs: number; clipboardMs: number; keyboardMs: number } }> {
-  return invoke("paste_desktop_text", { text, expectedTargetToken: expectedTargetToken ?? null });
+export async function beginDesktopShortcutSession(sessionId: string, shortcutEpoch: number): Promise<void> {
+  return invoke("begin_desktop_shortcut_session", { sessionId, shortcutEpoch });
+}
+
+export async function endDesktopShortcutSession(sessionId: string): Promise<void> {
+  return invoke("end_desktop_shortcut_session", { sessionId });
+}
+
+export async function pasteDesktopText(text: string, expectedTargetToken?: string | null, correlation?: PasteCorrelation): Promise<{ strategy: "clipboard"; outcome: "dispatched"; pasteMetrics?: { terminal: boolean; targetProbeMs: number; preflightMs: number; clipboardMs: number; keyboardMs: number } }> {
+  return invoke("paste_desktop_text", { text, expectedTargetToken: expectedTargetToken ?? null, correlation: correlation ?? null });
 }
 
 export async function getOwnedPreeditStatus(): Promise<OwnedPreeditStatus> {

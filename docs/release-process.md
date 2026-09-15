@@ -1,8 +1,8 @@
-> **Current gate:** `2026.0.35` is a local candidate, not an authorized release.
-> Complete candidate checks and owner laptop testing first. The owner must approve
-> a release cut, followed by further installed/artifact testing before public sharing.
-> See [candidate status](release-candidate.md). Commands below describe a later
-> authorized release workflow; do not run tagging/publishing steps during preparation.
+> **Current gate:** the owner authorized the `2026.0.37` cut after accepting +local7.
+> This is a private draft promotion of accepted application/runtime bytes, followed
+> by final benchmarks before public sharing. See [the cut record](releases/2026.0.37.md).
+> Historical commands below describe the automated public channel; do not push the
+> release tag until portable NVIDIA provisioning and the public gates are satisfied.
 
 # Release Process
 
@@ -14,8 +14,27 @@ The public workflow now invokes `scripts/package-nvidia.py` and requires complet
 runtime verification. Before a release, finish portable, pinned provisioning of
 model/native artifacts and retain the required notices. Verify the **complete** assembled package and downloaded
 draft asset, including `/usr/lib/voco/speech`, model digest and runtime dependencies.
-Base-bundle verification alone cannot qualify NVIDIA dictation. A local `2026.0.35` testing package
+Base-bundle verification alone cannot qualify NVIDIA dictation. A local `2026.0.37` testing package
 and its GitHub review branch must not be confused with a `voco.<version>` release tag.
+
+## Accepted-artifact draft cut
+
+For 2026.0.37, retain the exact owner-accepted application, helper and model hashes.
+Finalize Debian metadata/docs with the complete assembler and verify every runtime
+file against +local7. Commit the reviewed source and pass all unchanged CI before
+merging. Record an annotated local `voco.2026.0.37` tag at the verified master commit.
+Create a **draft** GitHub release targeting that commit, attach canonical versioned
+assets/checksums and provenance, then download and verify every attached byte.
+The remote tag remains absent until public-channel readiness; a draft must never
+be described as downloadable through public install commands.
+
+This exception changes the cut mechanism, not required test criteria. The hosted
+release workflow cannot reconstruct ignored native NVIDIA artifacts from a fresh
+clone yet. Do not run it with mutable/unverified downloads or count the old workflow
+as passed. Portable provisioning, default-desktop coverage, dictation-only product
+scope and final publication approval remain explicit gates. If final benchmarking
+changes application bytes, create a new candidate and repeat affected checks; do
+not silently replace a frozen cut's artifacts or move an accepted tag.
 
 ## Quick path
 

@@ -1,4 +1,6 @@
-//! Admission is shared by consuming IBus and passive fallback backends.
+//! Separate confirmed IBus authority from uncertainty while its poll is in flight.
+//! Passive evdev can observe a chord that IBus consumes, so it keeps both guards.
+//! An X11 grab callback already consumed its chord and uses shared debounce only.
 use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 
 // Matches the engine's monotonic poll-trigger arm lifetime. Start this bound
@@ -43,8 +45,25 @@ impl ConsumingLease {
         self.polling.store(false, Ordering::SeqCst);
     }
 
+    /// Only a completed Armed/Uncertain reply can change fallback registration.
+    /// A later pending poll must not revoke an existing consuming X11 grab.
+    pub fn has_authority(&self, now: i64) -> bool {
+        now < self.expires_at.load(Ordering::SeqCst)
+    }
+
+    pub fn poll_in_flight(&self) -> bool {
+        self.polling.load(Ordering::SeqCst)
+    }
+
     pub fn is_current(&self, now: i64) -> bool {
-        self.polling.load(Ordering::SeqCst) || now < self.expires_at.load(Ordering::SeqCst)
+        self.poll_in_flight() || self.has_authority(now)
+    }
+
+    pub fn suppresses_backend(&self, backend: &str, now: i64) -> bool {
+        // The X11 backend uses owner_events=false for both root and scoped grabs.
+        // Its callback proves the key was delivered to the grabbing client,
+        // not the destination's ordinary IBus process_key_event route.
+        backend == "evdev" && self.is_current(now)
     }
 }
 
@@ -128,5 +147,65 @@ mod tests {
         lease.begin_poll();
         lease.finish_poll(1100, PollOutcome::Disarmed);
         assert!(!lease.is_current(1100));
+    }
+
+    #[test]
+    fn pending_disarmed_poll_blocks_only_passive_events_not_registration_or_x11() {
+        let lease = ConsumingLease::new();
+        lease.finish_poll(1000, PollOutcome::Disarmed);
+        lease.begin_poll();
+        assert!(lease.suppresses_backend("evdev", 1050));
+        assert!(!lease.suppresses_backend("global_shortcut", 1050));
+        assert!(!lease.has_authority(1050));
+    }
+
+    #[test]
+    fn queued_registration_check_is_not_changed_by_a_later_pending_poll() {
+        let lease = ConsumingLease::new();
+        lease.finish_poll(1000, PollOutcome::Disarmed); // Schedules main-thread sync.
+        assert!(!lease.has_authority(1000));
+        lease.begin_poll(); // Main thread runs during the next round trip.
+        assert!(!lease.has_authority(1050)); // Keep the existing X11 registration.
+        lease.finish_poll(1060, PollOutcome::Armed);
+        assert!(lease.has_authority(1060)); // A real reply still changes authority.
+    }
+
+    #[test]
+    fn armed_and_uncertain_leases_keep_passive_duplicate_guard_until_expiry() {
+        for outcome in [PollOutcome::Armed, PollOutcome::Uncertain] {
+            let lease = ConsumingLease::new();
+            lease.finish_poll(1000, outcome);
+            for now in [1000, 1999] {
+                assert!(lease.has_authority(now));
+                assert!(lease.suppresses_backend("evdev", now));
+                assert!(!lease.suppresses_backend("global_shortcut", now));
+            }
+            assert!(!lease.has_authority(2000));
+            assert!(!lease.suppresses_backend("evdev", 2000));
+        }
+    }
+
+    #[test]
+    fn pending_poll_cannot_renew_expired_registration_authority() {
+        let lease = ConsumingLease::new();
+        lease.finish_poll(1000, PollOutcome::Armed);
+        lease.begin_poll();
+        assert!(!lease.has_authority(2000));
+        assert!(lease.suppresses_backend("evdev", 2000));
+        lease.finish_poll(2100, PollOutcome::Unavailable);
+        assert!(!lease.has_authority(2100));
+        assert!(!lease.suppresses_backend("evdev", 2100));
+    }
+
+    #[test]
+    fn consuming_x11_admission_still_uses_the_shared_debounce() {
+        let lease = ConsumingLease::new();
+        let last = AtomicI64::new(-1);
+        lease.begin_poll();
+        assert!(!lease.suppresses_backend("global_shortcut", 1000));
+        assert!(admit_toggle(&last, 1000, 90));
+        assert!(!admit_toggle(&last, 1089, 90));
+        assert!(admit_toggle(&last, 1090, 90));
+        assert!(lease.suppresses_backend("evdev", 1090));
     }
 }

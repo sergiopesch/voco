@@ -1,5 +1,5 @@
 import {BenchmarkPhraseQueue} from '../lib/benchmarkPhraseQueue';
-import { DesktopPhraseSegmenter, DesktopPreviewCadence } from "@/lib/desktopPhraseStream";
+import { DesktopShortcutSession } from "@/lib/desktopShortcutSession";
 import { createCaptureDescriptor, retainedSampleRate, type CaptureDescriptor, type CaptureSelection } from "@/lib/captureDescriptor";
 import { beginNativeCapture, type NativeCaptureSession } from "@/lib/nativeCapture";
 import { encodeNativeRetainedSource, type NativeCaptureTerminalOutcome } from "@/lib/nativeCaptureAudit";
@@ -14,6 +14,8 @@ import {
   finishCanonicalOwnedPreedit,
   getOwnedPreeditStatus,
   getDesktopPasteStatus,
+  beginDesktopShortcutSession,
+  endDesktopShortcutSession,
   pasteDesktopText,
   transcribeAudio,
   transcribeHybridChunk,
@@ -280,9 +282,9 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
   const desktopStreamEnabledRef = useRef(false);
   const desktopTargetTokenRef = useRef<string | null>(null);
   const desktopPhraseQueueRef = useRef<BenchmarkPhraseQueue | null>(null);
-  const desktopPhraseSegmenterRef = useRef<DesktopPhraseSegmenter | null>(null);
-  const desktopPhraseEndRef = useRef(0);
-  const desktopPreviewCadenceRef = useRef<DesktopPreviewCadence | null>(null);
+  const desktopShortcutSessionRef = useRef<DesktopShortcutSession | null>(null);
+  const desktopShortcutCleanupRef = useRef<Promise<boolean>>(Promise.resolve(true));
+  const desktopStreamedSampleCountRef = useRef(0);
   const desktopPhrasePasteCountRef = useRef(0);
   const ownedPreeditSessionIdRef = useRef<number | null>(null);
   const ownedPreeditProgressiveRef = useRef(false);
@@ -1783,11 +1785,16 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
   }
 
   function enqueueDesktopPhrase(end: number) {
-    const start = desktopPhraseEndRef.current;
-    if (end <= start || !desktopPhraseQueueRef.current) return;
-    desktopPhraseEndRef.current = end;
-    desktopPhraseQueueRef.current.enqueue(collectAudioSamplesRange(audioBufferRef.current, start, end - start));
-    desktopPreviewCadenceRef.current?.reset(end);
+    const queue = desktopPhraseQueueRef.current;
+    if (!queue) return;
+    const start = desktopStreamedSampleCountRef.current;
+    // Stop drains capture after the recording phase has ended. Forward only the
+    // retained tail that live delivery has not already offered to the recognizer.
+    if (end > start) {
+      queue.pushAudio(collectAudioSamplesRange(audioBufferRef.current, start, end - start), recordingSampleRate());
+      desktopStreamedSampleCountRef.current = end;
+    }
+    queue.enqueue();
     traceDictationEvent("dictation_desktop_phrase_queued", { durationMs: Math.round((end - start) / recordingSampleRate() * 1000) }).catch(() => {});
   }
 
@@ -1801,9 +1808,13 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
       maxSamples,
     );
     pumpCanonicalCheckpoints();
-    if (desktopPhraseSegmenterRef.current && phaseRef.current === "recording") {
+    // The production worker owns streaming boundaries; queue existence is the
+    // only live-delivery gate. Stop-drained samples are forwarded at finalization.
+    const queue = desktopPhraseQueueRef.current;
+    if (queue && phaseRef.current === "recording") {
       const accepted = samples.subarray(0, appendResult.appendedSampleCount);
-      desktopPhraseQueueRef.current?.pushAudio(accepted, sampleRate);
+      queue.pushAudio(accepted, sampleRate);
+      desktopStreamedSampleCountRef.current += accepted.length;
     }
 
     if (
@@ -2023,8 +2034,20 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
     state.setLastDictationResult({ completedAt: Date.now(), outcome: "needs-recovery" });
   }
 
+  function releaseDesktopShortcutSession(owned = desktopShortcutSessionRef.current): Promise<boolean> {
+    if (!owned) return desktopShortcutCleanupRef.current;
+    if (desktopShortcutSessionRef.current === owned) desktopShortcutSessionRef.current = null;
+    // Mark disposal immediately, including when begin is still pending. The next
+    // Start waits for both this owner and any preceding cleanup before acquiring.
+    const release = owned.dispose();
+    desktopShortcutCleanupRef.current = Promise.all([desktopShortcutCleanupRef.current, release])
+      .then(results => results.every(Boolean));
+    return desktopShortcutCleanupRef.current;
+  }
+
   function finalizeIdleState() {
     if (disposedRef.current) return;
+    void releaseDesktopShortcutSession();
     const completed = useStore.getState();
     if (!completed.recovery && completed.transcript.trim() && completed.transcript !== "(no speech detected)") {
       if (cursorDeliveryStateRef.current === "unreconciled") retainCurrentTranscript("delivery-unconfirmed");
@@ -2071,9 +2094,8 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
     desktopTargetTokenRef.current = null;
     desktopPhraseQueueRef.current?.cancel();
     desktopPhraseQueueRef.current = null;
-    desktopPhraseSegmenterRef.current = null;
-    desktopPhraseEndRef.current = 0;
-    desktopPreviewCadenceRef.current = null;
+    void releaseDesktopShortcutSession();
+    desktopStreamedSampleCountRef.current = 0;
     desktopPhrasePasteCountRef.current = 0;
     manualCopyRequestedRef.current = !triggerId?.startsWith("browser:");
     cancelledRef.current = null;
@@ -2087,6 +2109,8 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
     phaseRef.current = "starting";
     traceDictationEvent("recording_state_requested").catch(() => {});
     let nativeAttempt: { generation: number; selectionToken: string } | null = null;
+    let ownedShortcut: DesktopShortcutSession | null = null;
+    let shortcutEpoch: number | null = null;
     const invalidateNativeSelection = () => {
       if (!nativeAttempt || !isCurrentSession(startingSessionId) ||
           captureGenerationRef.current !== nativeAttempt.generation) return;
@@ -2107,6 +2131,7 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
             throw new Error(paste.detail);
           }
           desktopPasteSessionRef.current = true;
+          shortcutEpoch = paste.shortcutEpoch;
           desktopTargetTokenRef.current = paste.targetToken ?? null;
           desktopStreamEnabledRef.current = Boolean(paste.streamingEnabled) && sessionConfigRef.current?.transcriptEnhancement === "off";
           manualCopyRequestedRef.current = false;
@@ -2115,6 +2140,43 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
           sessionConfigRef.current = { ...sessionConfigRef.current, liveCursorMode: "final-text-only" };
           traceDictationEvent("dictation_desktop_paste_session_started").catch(() => {});
         }
+      }
+      // Capture waits for the native lease ACK (or a confirmed unsupported-route
+      // no-op). A held Start shortcut may obscure the first target probe.
+      if (desktopStreamEnabledRef.current) {
+        if (!await desktopShortcutCleanupRef.current) {
+          throw new Error("VOCO could not confirm shortcut cleanup. Restart VOCO if the shortcut stays reserved.");
+        }
+        assertOutputAllowed(startingSessionId);
+        if (shortcutEpoch === null) throw new Error("Recording shortcut preflight is unavailable.");
+        ownedShortcut = new DesktopShortcutSession({
+          begin: beginDesktopShortcutSession,
+          end: endDesktopShortcutSession,
+        }, shortcutEpoch, confirmed => {
+          void traceHotkeyEvent(confirmed ? "dictation_desktop_shortcut_released" : "dictation_desktop_shortcut_release_failed",
+            { dictationSessionId: startingSessionId }).catch(() => {});
+          if (!confirmed && !disposedRef.current) {
+            useStore.getState().setCaptureNotice("VOCO could not confirm shortcut cleanup. Restart VOCO if the shortcut stays reserved.");
+          }
+        });
+        desktopShortcutSessionRef.current = ownedShortcut;
+        try {
+          await ownedShortcut.acquire();
+        } catch (error) {
+          if (isCurrentSession(startingSessionId) && !cancelledRef.current) {
+            void traceDictationEvent("dictation_desktop_shortcut_acquire_failed").catch(() => {});
+          }
+          throw error;
+        }
+        assertOutputAllowed(startingSessionId);
+        if (desktopTargetTokenRef.current === null) {
+          const paste = await getDesktopPasteStatus();
+          assertOutputAllowed(startingSessionId);
+          desktopTargetTokenRef.current = paste.targetToken ?? null;
+        }
+        // Never replace an initially valid target: an intervening focus change
+        // must still be rejected by the native paste guard, not silently rebased.
+        void traceDictationEvent("dictation_desktop_shortcut_acquired").catch(() => {});
       }
       const captureSelection = captureSelectionRef.current?.() ?? { backend: "webkit" as const };
       if (captureSelection.backend === "native" && !captureSelection.selectionToken) {
@@ -2277,29 +2339,16 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
       phaseRef.current = "recording";
       if (desktopStreamEnabledRef.current) {
         const rate = recordingSampleRate();
-        desktopPhraseSegmenterRef.current = new DesktopPhraseSegmenter(rate);
-        desktopPreviewCadenceRef.current = new DesktopPreviewCadence(rate);
-        desktopPhraseQueueRef.current = new BenchmarkPhraseQueue(async (audio, role) => {
-          assertOutputAllowed(startingSessionId);
-          if (audio.length < rate * 0.3 || audio.every(sample => Math.abs(sample) < 0.000001)) return "";
-          removeDcOffsetInPlace(audio);
-          const prepared = Math.abs(rate - TARGET_SAMPLE_RATE) > 1
-            ? await resampleAudioForTranscription(audio, rate, TARGET_SAMPLE_RATE) : audio;
-          assertOutputAllowed(startingSessionId);
-          const started = performance.now();
-          const text = role === "preview"
-            ? (await previewTranscribeAudio(prepared, true))?.text ?? ""
-            : await transcribeAudio(prepared);
-          assertOutputAllowed(startingSessionId);
-          traceDictationEvent(role === "preview" ? "dictation_desktop_preview_transcribed" : "dictation_desktop_phrase_transcribed", { durationMs: Math.round(performance.now() - started) }).catch(() => {});
-          return text;
-        }, async (text) => {
+        desktopPhraseQueueRef.current = new BenchmarkPhraseQueue(async (text, correlation) => {
           assertOutputAllowed(startingSessionId);
           const started = performance.now();
           desktopPhrasePasteCountRef.current++;
           traceDictationEvent("dictation_desktop_paste_requested").catch(() => {});
-          const result = await pasteDesktopText(text, desktopTargetTokenRef.current);
-          if (result.outcome !== "dispatched") throw new Error("Desktop phrase paste was not acknowledged.");
+          const result = await pasteDesktopText(text, desktopTargetTokenRef.current, correlation);
+          if (result.outcome !== "dispatched") throw new Error("Desktop phrase paste was not dispatched.");
+          // The old queue still records its actual native outcome, but a late
+          // completion must not update a replacement session's UI or timings.
+          if (!isCurrentSession(startingSessionId) || cancelledRef.current) return;
           traceDesktopPasteMetrics(result);
           traceDictationEvent("dictation_desktop_paste_dispatched", { durationMs: Math.round(performance.now() - started) }).catch(() => {});
           if (desktopPhrasePasteCountRef.current === 1 && recordingStartedAtMsRef.current !== null) {
@@ -2314,7 +2363,7 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
           traceDictationEvent("dictation_desktop_stream_failed").catch(() => {});
           useStore.getState().setCaptureNotice("Live delivery paused. Stop recording to recover your transcript; review the target before pasting again.");
         }, (event, durationMs) => {
-          if (event === "appended") desktopPreviewCadenceRef.current?.settleStartup();
+          if (!isCurrentSession(startingSessionId) || cancelledRef.current) return;
           const name = event === "appended" ? "dictation_desktop_live_prefix_dispatched"
             : `dictation_desktop_snapshot_${event}`;
           traceDictationEvent(name, durationMs === undefined ? null : { durationMs }).catch(() => {});
@@ -2323,6 +2372,7 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
         // aligned with the complete retained source, including that prefix.
         const prefix = collectAudioSamplesRange(audioBufferRef.current, 0, audioBufferRef.current.sampleCount);
         desktopPhraseQueueRef.current.pushAudio(prefix, rate);
+        desktopStreamedSampleCountRef.current = prefix.length;
         traceDictationEvent("dictation_desktop_stream_started").catch(() => {});
       }
       nativeCaptureRef.current?.startDelivery();
@@ -2339,6 +2389,7 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
         void stopRecording();
       }
     } catch (err) {
+      if (ownedShortcut) await releaseDesktopShortcutSession(ownedShortcut);
       if (!isCurrentSession(startingSessionId)) return;
       if (!cancelledRef.current) invalidateNativeSelection();
       await teardownAudioGraph().catch(() => {});
@@ -2478,7 +2529,6 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
           assertOutputAllowed(stoppingSessionId);
           traceDictationEvent("dictation_desktop_stream_flush_completed", { durationMs: Math.round(performance.now() - waitStarted) }).catch(() => {});
           if (stopRequestedAtMsRef.current !== null) traceDictationEvent("dictation_stop_to_final_transcript", { durationMs: Math.round(performance.now() - stopRequestedAtMsRef.current) }).catch(() => {});
-          desktopPhraseSegmenterRef.current = null;
           desktopPhraseQueueRef.current = null;
           finalizeIdleState();
         } catch (error) {
@@ -2858,6 +2908,7 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
 
   function retainRecovery(reason: string, keepAudio = true) {
     if (disposedRef.current) return;
+    void releaseDesktopShortcutSession();
     releaseRecordingOrigin();
     traceDictationEvent("dictation_recovery_retained", {
       trackSampleRate: recordingSampleRate(),
@@ -2925,6 +2976,7 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
     if (phaseRef.current === "idle" || phaseRef.current === "error" || phaseRef.current === "finalizing" || cancelledRef.current) return;
     cancelledRef.current = reason;
     desktopPhraseQueueRef.current?.cancel();
+    void releaseDesktopShortcutSession();
     if (canonicalSessionRef.current?.delivery === "owned") {
       canonicalSessionRef.current = markCanonicalDeliveryUncertain(canonicalSessionRef.current);
     }
@@ -3031,6 +3083,7 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
     return () => {
       disposedRef.current = true;
       desktopPhraseQueueRef.current?.cancel();
+      void releaseDesktopShortcutSession();
       recoveryWaitRef.current?.cancel();
       recoveryWaitRef.current = null;
       releaseRecordingOrigin();

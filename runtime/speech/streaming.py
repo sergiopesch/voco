@@ -4,6 +4,7 @@ import json
 import logging
 from logging.handlers import RotatingFileHandler
 import os
+import stat
 import sys
 from pathlib import Path
 import time
@@ -179,8 +180,19 @@ class PrivateRotatingHandler(RotatingFileHandler):
         raise OSError("metrics write failed")
 
     def _open(self):
-        descriptor = os.open(self.baseFilename, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
-        return os.fdopen(descriptor, 'a', encoding='utf-8')
+        # Opening a FIFO must not stall model startup. Inspect the opened inode,
+        # not a prior path check; never follow links or chmod an unrelated target.
+        descriptor = os.open(self.baseFilename, os.O_WRONLY | os.O_CREAT | os.O_APPEND
+                             | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC, 0o600)
+        try:
+            metadata = os.fstat(descriptor)
+            if (not stat.S_ISREG(metadata.st_mode) or metadata.st_uid != os.geteuid()
+                    or metadata.st_mode & 0o077 or metadata.st_nlink != 1):
+                raise OSError("metrics file must be private, owned and regular")
+            return os.fdopen(descriptor, 'a', encoding='utf-8')
+        except BaseException:
+            os.close(descriptor)
+            raise
 
 class Metrics:
     """Bounded asynchronous local logging. Disk failures never reject speech."""
@@ -205,11 +217,14 @@ class Metrics:
     def _initialize(self):
         root = Path(os.environ.get('XDG_STATE_HOME', str(Path.home()/'.local/state')))/'voco/stream-performance'
         root.mkdir(mode=0o700, parents=True, exist_ok=True)
+        metadata = root.lstat()
+        if (not stat.S_ISDIR(metadata.st_mode) or metadata.st_uid != os.geteuid()
+                or metadata.st_mode & 0o077):
+            raise OSError("metrics directory must be private, owned and real")
         self.logger = logging.getLogger('voco-stream-'+self.run_id)
         self.logger.setLevel(logging.INFO)
         self.logger.propagate = False
         self.handler = PrivateRotatingHandler(root/'worker.jsonl', maxBytes=8*1024*1024, backupCount=3)
-        os.chmod(root/'worker.jsonl', 0o600)
         self.logger.addHandler(self.handler)
         self.process = psutil.Process()
         self.queue = queue.Queue(maxsize=256)

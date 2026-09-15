@@ -1,9 +1,9 @@
-> **Historical distribution readiness checklist.** Versioned findings below are retained for provenance; use [current candidate gates](release-candidate.md) for 2026.0.35 status and release authorization.
+> **Historical distribution readiness checklist.** Versioned findings below are retained for provenance; use [current candidate gates](release-candidate.md) for the latest private candidate status and release authorization.
 
 # Distribution Readiness
 
 Channel checklist originally reviewed July 15, 2026. Foundations update: September 5, 2026.
-The current candidate is uninstalled and unpublished; see [iteration 3 acceptance](testing/foundations-iteration-3-2026-09-05.md).
+The candidate in that September 5 review was uninstalled and unpublished; see [iteration 3 acceptance](testing/foundations-iteration-3-2026-09-05.md). Later validation is recorded in [the current review](testing/stop-delivery-review-2026-09-15.md).
 
 This document is a gate checklist, not proof that the current workspace or next release candidate
 passed it. Record candidate-specific command output and desktop evidence in the testing results and

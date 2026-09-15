@@ -28,6 +28,51 @@ def cpu_delta(starts, ends):
         return None
     delta=values[2]+values[3]-values[0]-values[1]
     return delta if delta>=0 else None
+def app_diagnostics(rows):
+    """Count explicit diagnostic events, not incidents or missing outcomes.
+
+    A single delivery can produce multiple failure records. Cancellation and
+    uncertainty remain outcomes; neither is proof of a transport failure.
+    """
+    exchange_failures = {
+        'startup_timeout', 'response_timeout', 'identity_mismatch', 'request_rejected',
+        'runtime_missing', 'spawn_failed', 'worker_lost', 'startup_failed', 'worker_eof',
+        'worker_disconnected', 'request_backlog', 'transport_failed',
+    }
+    queue_failures = {
+        'transport_failed', 'backlog_limit', 'response_invalid', 'prefix_revision',
+        'insertion_failed', 'capture_invalid',
+    }
+    failures = collections.Counter()
+    outcomes = collections.Counter()
+    unknown = 0
+    for row in rows:
+        event, stage, outcome = row.get('event'), row.get('stage'), row.get('outcome')
+        if event == 'speech_exchange' and outcome == 'ok':
+            continue
+        if event == 'speech_exchange' and isinstance(outcome, str) and outcome in exchange_failures:
+            failures[outcome] += 1
+        elif event == 'speech_queue_failed' and isinstance(row.get('reason'), str) and row['reason'] in queue_failures:
+            failures[row['reason']] += 1
+        elif event == 'speech_quality' and stage in ('hypothesis', 'delivery_requested', 'delivery_dispatched') and outcome is None:
+            continue
+        elif event == 'speech_quality' and stage == 'delivery_failed' and outcome is None:
+            failures['delivery_failed'] += 1
+        elif event == 'speech_quality' and stage == 'terminal' and isinstance(outcome, str) and outcome in ('finished', 'failed', 'cancelled', 'incomplete'):
+            outcomes['terminal:' + outcome] += 1
+            if outcome == 'failed':
+                failures['terminal_failed'] += 1
+        elif event == 'speech_quality' and stage == 'native_dispatch' and isinstance(outcome, str) and outcome in ('dispatched', 'rejected', 'no-mutation', 'uncertain'):
+            outcomes['native_dispatch:' + outcome] += 1
+            if outcome == 'rejected':
+                failures['native_rejected'] += 1
+        else:
+            # Future/invalid schema stays visible without echoing arbitrary data
+            # or interpreting a missing success marker as an application error.
+            unknown += 1
+    return {'app_failures': dict(failures), 'app_outcomes': dict(outcomes),
+            'app_unclassified_records': unknown}
+
 sessions=[]
 for run in sorted({r.get('run_id') for r in worker if isinstance(r.get('run_id'),str) and r['run_id']}):
     records=sorted([r for r in worker if r.get('run_id')==run],key=lambda r:r.get('event_seq',0) if type(r.get('event_seq')) is int else 0)
@@ -48,8 +93,8 @@ for run in sorted({r.get('run_id') for r in worker if isinstance(r.get('run_id')
             'first_nonzero_audio_s':next((r['first_nonzero_audio_s'] for r in requests if r.get('first_nonzero_audio_s') is not None),None),
             'request_ms':dist(r.get('total_ms') for r in requests),'queue_age_ms':dist(r.get('queue_age_ms') for r in requests),
             'errors':dict(collections.Counter(r.get('error_code','unknown') for r in rows if r['event']=='request_failed')),
-            'app_failures':dict(collections.Counter(r.get('reason',r.get('outcome')) for r in matching if r.get('reason') or r.get('outcome')!='ok'))})
-print(json.dumps({'scope':'Worker recognition and app IPC only; first hypothesis is not verified cursor appearance or acoustic onset. CPU/RSS exclude other app processes. First nonzero sample is not speech onset. Missing timing fields remain unavailable.',
+            **app_diagnostics(matching)})
+print(json.dumps({'scope':'Worker recognition and app IPC only; first hypothesis is not verified cursor appearance or acoustic onset. CPU/RSS exclude other app processes. First nonzero sample is not speech onset. Missing timing fields remain unavailable. App failure counts are diagnostic records, not distinct incidents; cancellation and uncertainty are reported separately as outcomes.',
     'coverage':{'worker_records':len(worker),'backend_records':len(backend),'invalid_lines':invalid+bad,
         'worker_dropped_events':sum(max((r.get('dropped_events',0) for r in worker if r.get('run_id')==run),default=0) for run in {r.get('run_id') for r in worker if isinstance(r.get('run_id'),str)})},
     'startup_failures':[{'run_id':r.get('run_id'),'stage':r.get('stage'),'error_code':r.get('error_code')} for r in worker if r['event']=='worker_startup_failed'],

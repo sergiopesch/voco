@@ -9,6 +9,7 @@ mod browser_broker;
 mod browser_protocol;
 mod browser_socket;
 mod config;
+mod desktop_shortcut;
 mod focus_probe;
 #[cfg(target_os = "linux")]
 mod hotkey_state;
@@ -25,6 +26,7 @@ mod shortcut_readiness;
 mod single_instance;
 mod spoken_commands;
 pub mod transcribe;
+mod trigger_socket;
 pub use transcribe::{hybrid, numerical_planner, vca2};
 mod tray;
 
@@ -365,6 +367,10 @@ fn is_supported_dictation_trace_event(event: &str) -> bool {
             | "dictation_trigger_start_admitted"
             | "dictation_trigger_stop_admitted"
             | "dictation_trigger_toggle_admitted"
+            | "dictation_desktop_shortcut_acquired"
+            | "dictation_desktop_shortcut_released"
+            | "dictation_desktop_shortcut_acquire_failed"
+            | "dictation_desktop_shortcut_release_failed"
             | "dictation_desktop_target_probe_completed"
             | "dictation_desktop_paste_preflight_completed"
             | "dictation_desktop_clipboard_write_completed"
@@ -1318,16 +1324,41 @@ fn insert_text(
 }
 
 #[tauri::command(async)]
+fn begin_desktop_shortcut_session(session_id: String, shortcut_epoch: u64) -> Result<(), String> {
+    insertion::begin_shortcut_session(&session_id, shortcut_epoch)
+}
+
+#[tauri::command(async)]
+fn end_desktop_shortcut_session(session_id: String) -> Result<(), String> {
+    insertion::end_shortcut_session(&session_id)
+}
+
+#[tauri::command(async)]
 fn get_desktop_paste_status() -> insertion::DesktopPasteStatus {
     insertion::desktop_paste_status()
 }
 
 #[tauri::command(async)]
-fn paste_desktop_text(
+async fn paste_desktop_text(
     text: String,
     expected_target_token: Option<String>,
+    correlation: Option<insertion::PasteCorrelation>,
 ) -> Result<insertion::InsertionResult, insertion::InsertionError> {
-    insertion::desktop_paste_for_target(&text, expected_target_token.as_deref())
+    // Recipient observation can wait on another app. Keep the UI/capture IPC
+    // event loop responsive while the blocking native transaction settles.
+    tauri::async_runtime::spawn_blocking(move || {
+        insertion::correlated_desktop_paste(
+            &text,
+            expected_target_token.as_deref(),
+            correlation.as_ref(),
+        )
+    })
+    .await
+    .map_err(|_| insertion::InsertionError {
+        outcome: insertion::DeliveryOutcome::Uncertain,
+        message: "Input task interrupted; review retained text before retrying.".into(),
+        clipboard_changed: true,
+    })?
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -2214,7 +2245,7 @@ fn shortcut_runtime_status(bridge_available: bool) -> shortcut_readiness::Status
         return unknown();
     };
     let now = shortcut_monotonic_ms();
-    SHORTCUT_OBSERVATIONS.status(shortcut_readiness::Snapshot {
+    let mut status = SHORTCUT_OBSERVATIONS.status(shortcut_readiness::Snapshot {
         hotkey: &config.hotkey,
         revision: CONFIG_REVISION.load(Ordering::SeqCst),
         now,
@@ -2223,13 +2254,19 @@ fn shortcut_runtime_status(bridge_available: bool) -> shortcut_readiness::Status
                 SHORTCUT_RENDERER_HEARTBEAT_MS.load(Ordering::SeqCst),
                 now,
             ),
-        consuming_lease: IBUS_SHORTCUT_LEASE.is_current(now),
+        consuming_lease: IBUS_SHORTCUT_LEASE.has_authority(now),
         plugin_hotkey: plugin.as_deref(),
         use_evdev: USE_EVDEV_HOTKEY.load(Ordering::SeqCst),
         evdev_mode: EVDEV_HOTKEY_MODE.load(Ordering::SeqCst),
         configured_evdev_mode: hotkey_to_evdev_mode(&config.hotkey),
         bridge_available,
-    })
+    });
+    if status.route == Some("global-shortcut") && desktop_shortcut::degraded() {
+        status.state = "unavailable";
+        status.detail =
+            "Shortcut restoration could not be confirmed. Restart VOCO before using it.";
+    }
+    status
 }
 
 #[tauri::command(async)]
@@ -2863,6 +2900,45 @@ fn validate_model_content_length(content_length: Option<u64>) -> Result<(), Stri
     Ok(())
 }
 
+fn prepare_selected_startup_model(
+    config: &AppConfig,
+    paste_enabled: bool,
+    stream_enabled: bool,
+    warm_stream: impl FnOnce() -> Result<(), String>,
+    prepare_legacy: impl FnOnce() -> Result<(), String>,
+) -> Result<(), String> {
+    // Match the normal desktop queue's config/env eligibility. Browser triggers
+    // are selected per session; their explicit Whisper commands still ensure the
+    // legacy model lazily. Target focus/helper readiness is checked at recording.
+    if matches!(config.transcript_target, config::TranscriptTarget::Cursor)
+        && matches!(config.transcript_enhancement, TranscriptEnhancement::Off)
+        && paste_enabled
+        && stream_enabled
+    {
+        warm_stream()
+    } else {
+        prepare_legacy()
+    }
+}
+
+fn prepare_model_at_startup(app: &tauri::AppHandle) -> Result<(), String> {
+    let config = AppConfig::load().map_err(|error| error.to_string())?;
+    prepare_selected_startup_model(
+        &config,
+        insertion::desktop_paste_enabled(),
+        insertion::desktop_stream_enabled(),
+        || {
+            info!("Preparing NVIDIA streaming model at startup");
+            benchmark_stream::warmup()?;
+            // Path presence is not readiness: warmup validates the worker's
+            // ready response after its model load and synthetic audio warmup.
+            tray::update_model_download_status(app, tray::ModelDownloadStatus::Ready);
+            Ok(())
+        },
+        || ensure_model_downloaded(app),
+    )
+}
+
 fn ensure_model_downloaded(app_handle: &tauri::AppHandle) -> Result<(), String> {
     let result = ensure_model_downloaded_inner(app_handle);
     if result.is_err() {
@@ -3070,7 +3146,7 @@ fn schedule_shortcut_arbitration(app: &tauri::AppHandle, snapshot: &ConfigSnapsh
         }
         let enable_plugin = should_register_shortcut_fallback(
             USE_EVDEV_HOTKEY.load(Ordering::SeqCst),
-            IBUS_SHORTCUT_LEASE.is_current(shortcut_monotonic_ms()),
+            IBUS_SHORTCUT_LEASE.has_authority(shortcut_monotonic_ms()),
         );
         let result = sync_global_shortcut_binding(&handle, &hotkey, enable_plugin)
             .and_then(|()| sync_realtime_global_shortcut_binding(&handle, enable_plugin));
@@ -3205,12 +3281,34 @@ pub fn eval_realtime_toggle(app_handle: &tauri::AppHandle) {
     eval_realtime_toggle_with_backend(app_handle, "internal");
 }
 
+// Keep passive duplicate suppression in one place so a rejected chord is visible.
+// X11 owner-events=false grabs consume their key; a pending IBus poll is not a
+// reason to discard that callback or to change its normal debounce behavior.
+fn suppress_passive_shortcut(backend: &str, realtime: bool) -> bool {
+    if IBUS_SHORTCUT_LEASE.suppresses_backend(backend, shortcut_monotonic_ms()) {
+        let event = if realtime {
+            "eval_realtime_toggle_suppressed_ibus"
+        } else {
+            "eval_toggle_suppressed_ibus"
+        };
+        trace_hotkey_event(event, Some(backend));
+        return true;
+    }
+    if backend == "global_shortcut" && IBUS_SHORTCUT_LEASE.poll_in_flight() {
+        let event = if realtime {
+            "eval_realtime_toggle_x11_consumed_during_ibus_poll"
+        } else {
+            "eval_toggle_x11_consumed_during_ibus_poll"
+        };
+        trace_hotkey_event(event, Some(backend));
+    }
+    false
+}
+
 fn eval_realtime_toggle_with_backend(app_handle: &tauri::AppHandle, backend_used: &str) {
     trace_hotkey_event("eval_realtime_toggle_entered", Some(backend_used));
 
-    if matches!(backend_used, "evdev" | "global_shortcut")
-        && IBUS_SHORTCUT_LEASE.is_current(shortcut_monotonic_ms())
-    {
+    if suppress_passive_shortcut(backend_used, true) {
         return;
     }
     if !shortcut_arbitration::admit_toggle(
@@ -3304,9 +3402,7 @@ fn replay_pending_realtime_toggle(app_handle: &tauri::AppHandle) {
 fn eval_toggle_with_backend(app_handle: &tauri::AppHandle, backend_used: &str) {
     trace_hotkey_event("eval_toggle_entered", Some(backend_used));
 
-    if matches!(backend_used, "evdev" | "global_shortcut")
-        && IBUS_SHORTCUT_LEASE.is_current(shortcut_monotonic_ms())
-    {
+    if suppress_passive_shortcut(backend_used, false) {
         return;
     }
     if !shortcut_arbitration::admit_toggle(
@@ -3399,7 +3495,9 @@ fn register_global_shortcut_listener(app: &tauri::AppHandle, hotkey: &str) -> Re
             trace_hotkey_event("hotkey_event_received_global_shortcut", Some("global_shortcut"));
             eval_toggle_with_backend(&handle, "global_shortcut");
         })
-        .map_err(|e| format!("Failed to register global shortcut {hotkey}: {e}"))
+        .map_err(|e| format!("Failed to register global shortcut {hotkey}: {e}"))?;
+    desktop_shortcut::registered(Some(shortcut.id()));
+    Ok(())
 }
 
 fn register_realtime_global_shortcut_listener(app: &tauri::AppHandle) -> Result<(), String> {
@@ -3504,6 +3602,7 @@ fn sync_global_shortcut_binding(
             }
             *current = None;
             HOTKEY_BINDING_VERSION.fetch_add(1, Ordering::SeqCst);
+            desktop_shortcut::registered(None);
             info!("Unregistered previous global shortcut {existing}");
         }
     }
@@ -3540,7 +3639,7 @@ fn apply_hotkey_runtime_state(
 
     let enable_plugin = should_register_shortcut_fallback(
         use_evdev_hotkey,
-        IBUS_SHORTCUT_LEASE.is_current(shortcut_monotonic_ms()),
+        IBUS_SHORTCUT_LEASE.has_authority(shortcut_monotonic_ms()),
     );
     sync_global_shortcut_binding(app, new_hotkey, enable_plugin)?;
     sync_realtime_global_shortcut_binding(app, enable_plugin)?;
@@ -3581,14 +3680,6 @@ pub fn change_hotkey_runtime(app: &tauri::AppHandle, new_hotkey: &str) -> Result
 
 // --- Socket listener ---
 
-fn socket_base_dir_from(runtime_dir: Option<std::ffi::OsString>) -> std::path::PathBuf {
-    if let Some(runtime_dir) = runtime_dir {
-        return std::path::PathBuf::from(runtime_dir);
-    }
-
-    std::env::temp_dir().join(format!("voco-{}", current_effective_uid()))
-}
-
 #[cfg(target_os = "linux")]
 fn current_effective_uid() -> u32 {
     // SAFETY: `geteuid` has no preconditions and simply returns the current process euid.
@@ -3600,33 +3691,10 @@ fn current_effective_uid() -> u32 {
     0
 }
 
-fn socket_base_dir() -> std::path::PathBuf {
-    socket_base_dir_from(std::env::var_os("XDG_RUNTIME_DIR"))
-}
-
-fn socket_path() -> std::path::PathBuf {
-    socket_base_dir().join("voco.sock")
-}
-
-fn legacy_socket_path() -> std::path::PathBuf {
-    socket_base_dir().join("voice.sock")
-}
-
-fn cleanup_socket_paths<I>(paths: I)
-where
-    I: IntoIterator<Item = std::path::PathBuf>,
-{
-    for path in paths {
-        match std::fs::remove_file(&path) {
-            Ok(_) => {}
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-            Err(error) => warn!("Failed to remove socket {}: {error}", path.display()),
-        }
-    }
-}
-
 fn cleanup_socket_files() {
-    cleanup_socket_paths([socket_path(), legacy_socket_path()]);
+    if let Err(error) = trigger_socket::shutdown() {
+        warn!("Trigger socket cleanup preserved an unsafe or changed entry: {error}");
+    }
 }
 
 #[cfg(target_os = "linux")]
@@ -3661,61 +3729,42 @@ fn install_socket_cleanup_signal_handler() {
     }
 }
 
-fn ensure_socket_parent_dir(path: &std::path::Path) -> Result<(), String> {
-    let parent = path
-        .parent()
-        .ok_or_else(|| format!("Socket path has no parent: {}", path.display()))?;
-    std::fs::create_dir_all(parent)
-        .map_err(|e| format!("Failed to create socket dir {}: {e}", parent.display()))?;
-
-    if std::env::var_os("XDG_RUNTIME_DIR").is_none() {
-        #[cfg(target_os = "linux")]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            std::fs::set_permissions(parent, std::fs::Permissions::from_mode(0o700))
-                .map_err(|e| format!("Failed to secure socket dir {}: {e}", parent.display()))?;
-        }
-    }
-
-    Ok(())
-}
-
 fn start_socket_listener(app_handle: tauri::AppHandle) {
-    use std::os::unix::net::UnixListener;
-
-    for path in [socket_path(), legacy_socket_path()] {
+    let paths = match trigger_socket::paths() {
+        Ok(paths) => paths,
+        Err(error) => {
+            error!("Trigger sockets unavailable: {error}");
+            return;
+        }
+    };
+    for path in paths {
         let handle = app_handle.clone();
         std::thread::spawn(move || loop {
-            if let Err(e) = ensure_socket_parent_dir(&path) {
-                error!("{e}");
-                std::thread::sleep(std::time::Duration::from_secs(2));
-                continue;
-            }
-
-            let _ = std::fs::remove_file(&path);
-
-            let listener = match UnixListener::bind(&path) {
-                Ok(l) => l,
-                Err(e) => {
-                    error!("Failed to create socket at {}: {e}", path.display());
+            let listener = match trigger_socket::bind(&path) {
+                Ok(listener) => listener,
+                Err(error) => {
+                    error!(
+                        "Failed to create trigger socket at {}: {error}",
+                        path.display()
+                    );
                     std::thread::sleep(std::time::Duration::from_secs(2));
                     continue;
                 }
             };
-
-            use std::os::unix::fs::PermissionsExt;
-            let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600));
             info!("Socket listener ready: {}", path.display());
-
             for stream in listener.incoming() {
                 match stream {
-                    Ok(_) => {
+                    Ok(stream) => {
+                        if let Err(error) = trigger_socket::validate_peer(&stream) {
+                            warn!("Rejected trigger connection: {error}");
+                            continue;
+                        }
                         debug!("Toggle received via socket");
                         trace_hotkey_event("socket_toggle_received", Some("socket"));
                         eval_toggle_with_backend(&handle, "socket");
                     }
-                    Err(e) => {
-                        warn!("Socket accept error (will rebind): {e}");
+                    Err(error) => {
+                        warn!("Socket accept error (will rebind): {error}");
                         break;
                     }
                 }
@@ -3894,18 +3943,14 @@ fn spawn_evdev_device_worker(
                                         "hotkey_event_received_evdev",
                                         Some("evdev"),
                                     );
-                                    if !IBUS_SHORTCUT_LEASE.is_current(shortcut_monotonic_ms()) {
-                                        eval_toggle_with_backend(&app_handle, "evdev");
-                                    }
+                                    eval_toggle_with_backend(&app_handle, "evdev");
                                 }
                                 hotkey_state::HotkeyAction::Realtime => {
                                     trace_hotkey_event(
                                         "realtime_hotkey_event_received_evdev",
                                         Some("evdev"),
                                     );
-                                    if !IBUS_SHORTCUT_LEASE.is_current(shortcut_monotonic_ms()) {
-                                        eval_realtime_toggle_with_backend(&app_handle, "evdev");
-                                    }
+                                    eval_realtime_toggle_with_backend(&app_handle, "evdev");
                                 }
                             }
                         }
@@ -4091,6 +4136,15 @@ pub fn run() -> Result<(), String> {
         .on_page_load(|webview, payload| {
             if matches!(payload.event(), tauri::webview::PageLoadEvent::Started) {
                 if webview.label() == "main" {
+                    let shortcut_epoch = desktop_shortcut::invalidate_renderer();
+                    // Revoke authorization immediately; wait for bounded pending
+                    // delivery/X11 cleanup off the UI thread. A late job cannot
+                    // release a replacement renderer's newer ownership.
+                    tauri::async_runtime::spawn_blocking(move || {
+                        if insertion::reset_shortcut_renderer(shortcut_epoch).is_err() {
+                            log::warn!("Renderer reset could not confirm shortcut cleanup");
+                        }
+                    });
                     native_capture_commands::reset_renderer();
                 }
                 // A renderer reload discards its session ids. Close the
@@ -4127,6 +4181,8 @@ pub fn run() -> Result<(), String> {
             save_debug_dictation_capture,
             insert_text,
             get_desktop_paste_status,
+            begin_desktop_shortcut_session,
+            end_desktop_shortcut_session,
             paste_desktop_text,
             ask_openclaw_agent,
             speak_openclaw_response,
@@ -4253,10 +4309,14 @@ pub fn run() -> Result<(), String> {
                 send_notification("Hotkey repaired", &notice);
             }
 
-            let download_handle = app.handle().clone();
+            let model_handle = app.handle().clone();
             std::thread::spawn(move || {
-                if let Err(e) = ensure_model_downloaded(&download_handle) {
-                    error!("Model auto-download failed: {e}");
+                if let Err(error) = prepare_model_at_startup(&model_handle) {
+                    tray::update_model_download_status(
+                        &model_handle,
+                        tray::ModelDownloadStatus::Failed,
+                    );
+                    error!("Selected speech model startup failed: {error}");
                 }
             });
 
@@ -4283,6 +4343,88 @@ mod tests {
         build_local_llm_body, build_loopback_http_client, parse_local_llm_chat_response,
         validate_local_llm_endpoint,
     };
+
+    #[test]
+    fn startup_prepares_only_the_configured_recognizer() {
+        use config::{LiveCursorMode, TranscriptTarget};
+        for target in [
+            TranscriptTarget::Cursor,
+            TranscriptTarget::LocalAgent,
+            TranscriptTarget::OpenclawAgent,
+            TranscriptTarget::OpenclawSpeech,
+        ] {
+            for enhancement in [
+                TranscriptEnhancement::Off,
+                TranscriptEnhancement::Conservative,
+                TranscriptEnhancement::CommandsOnly,
+            ] {
+                for paste_enabled in [false, true] {
+                    for stream_enabled in [false, true] {
+                        for live_cursor_mode in [
+                            LiveCursorMode::StableCursorStreaming,
+                            LiveCursorMode::PreviewOverlayOnly,
+                            LiveCursorMode::FinalTextOnly,
+                        ] {
+                            let config = AppConfig {
+                                transcript_target: target.clone(),
+                                transcript_enhancement: enhancement.clone(),
+                                live_cursor_mode,
+                                ..AppConfig::default()
+                            };
+                            let stream_calls = std::cell::Cell::new(0);
+                            let legacy_calls = std::cell::Cell::new(0);
+                            prepare_selected_startup_model(
+                                &config,
+                                paste_enabled,
+                                stream_enabled,
+                                || {
+                                    stream_calls.set(stream_calls.get() + 1);
+                                    Ok(())
+                                },
+                                || {
+                                    legacy_calls.set(legacy_calls.get() + 1);
+                                    Ok(())
+                                },
+                            )
+                            .unwrap();
+                            let streaming = matches!(target, TranscriptTarget::Cursor)
+                                && matches!(enhancement, TranscriptEnhancement::Off)
+                                && paste_enabled
+                                && stream_enabled;
+                            assert_eq!(stream_calls.get(), usize::from(streaming));
+                            assert_eq!(legacy_calls.get(), usize::from(!streaming));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn failed_nvidia_startup_does_not_download_or_retry_whisper() {
+        let error = prepare_selected_startup_model(
+            &AppConfig::default(),
+            true,
+            true,
+            || Err("worker did not become ready".into()),
+            || panic!("NVIDIA startup failure must not download Whisper"),
+        )
+        .unwrap_err();
+        assert_eq!(error, "worker did not become ready");
+    }
+
+    #[test]
+    fn failed_legacy_startup_does_not_warm_nvidia() {
+        let error = prepare_selected_startup_model(
+            &AppConfig::default(),
+            false,
+            true,
+            || panic!("legacy startup must not warm NVIDIA"),
+            || Err("legacy model unavailable".into()),
+        )
+        .unwrap_err();
+        assert_eq!(error, "legacy model unavailable");
+    }
 
     fn model_test_directory(label: &str) -> std::path::PathBuf {
         let directory = std::env::temp_dir().join(format!(
@@ -5284,47 +5426,6 @@ mod tests {
         assert!(!is_supported_dictation_trace_event(
             "dictation_transcript_text"
         ));
-    }
-
-    #[test]
-    fn socket_path_uses_xdg_runtime_dir() {
-        assert!(socket_path().to_str().unwrap().ends_with("voco.sock"));
-    }
-
-    #[test]
-    fn socket_base_dir_uses_private_tmp_fallback_without_runtime_dir() {
-        let path = socket_base_dir_from(None);
-        assert!(path.starts_with(std::env::temp_dir()));
-        assert!(path
-            .file_name()
-            .and_then(|name| name.to_str())
-            .unwrap_or_default()
-            .starts_with("voco-"));
-    }
-
-    #[test]
-    fn cleanup_socket_paths_removes_existing_files() {
-        let unique = format!(
-            "voco-cleanup-test-{}-{}",
-            std::process::id(),
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        );
-        let temp_dir = std::env::temp_dir().join(unique);
-        std::fs::create_dir_all(&temp_dir).unwrap();
-
-        let primary = temp_dir.join("voco.sock");
-        let legacy = temp_dir.join("voice.sock");
-        std::fs::write(&primary, b"").unwrap();
-        std::fs::write(&legacy, b"").unwrap();
-
-        cleanup_socket_paths([primary.clone(), legacy.clone()]);
-
-        assert!(!primary.exists());
-        assert!(!legacy.exists());
-        std::fs::remove_dir_all(temp_dir).unwrap();
     }
 
     #[test]

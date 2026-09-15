@@ -213,7 +213,7 @@ fn derive_tray_presentation(snapshot: &RuntimeStatusSnapshot) -> TrayPresentatio
             ),
             ModelDownloadStatus::Failed => (
                 TrayVisualState::NotReady,
-                "VOCO — Speech model download needs attention".to_string(),
+                "VOCO — Speech model needs attention".to_string(),
             ),
             ModelDownloadStatus::Checking | ModelDownloadStatus::Ready => (
                 TrayVisualState::NotReady,
@@ -334,7 +334,7 @@ fn derive_tray_presentation(snapshot: &RuntimeStatusSnapshot) -> TrayPresentatio
             {
                 (
                     TrayVisualState::NotReady,
-                    "VOCO — Speech model download needs attention".to_string(),
+                    "VOCO — Speech model needs attention".to_string(),
                 )
             }
             DictationStatus::Idle
@@ -1349,10 +1349,7 @@ mod tests {
         downloading.model_download_status = ModelDownloadStatus::Failed;
         let failed = derive_tray_presentation(&downloading);
         assert_eq!(failed.visual_state, TrayVisualState::NotReady);
-        assert_eq!(
-            failed.tooltip,
-            "VOCO — Speech model download needs attention"
-        );
+        assert_eq!(failed.tooltip, "VOCO — Speech model needs attention");
         assert!(failed.dictation_enabled);
     }
 
