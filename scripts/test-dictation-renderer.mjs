@@ -47,7 +47,10 @@ export const calls = window.nativeCalls = [];
 const state = () => ({ sessionId: 101, setupState: "ready", engineActive: true, focusLost: false, ownershipIntact: true, finalizationOutcome: "committed", committedCharacterCount: 0 });
 export const startOwnedPreedit = async (...args) => { calls.push(['startOwnedPreedit', ...args]); if(window.deferLease) await new Promise(resolve=>window.resolveLease=resolve); if (!window.lease) throw new Error('No eligible original field'); return state(); };
 export const getOwnedPreeditStatus = async () => state();
-export const getDesktopPasteStatus = async () => ({enabled:Boolean(window.desktopPaste),streamingEnabled:Boolean(window.desktopStream),targetToken:window.desktopTargetToken??null,available:!window.pasteUnavailable,detail:'Paste helper unavailable'});
+export const getDesktopPasteStatus = async () => ({enabled:Boolean(window.desktopPaste),streamingEnabled:Boolean(window.desktopStream),shortcutEpoch:1,targetToken:window.desktopTargetToken??null,available:!window.pasteUnavailable,detail:'Paste helper unavailable'});
+// Model the native shortcut lease API used by the real hook; no desktop input is touched.
+export const beginDesktopShortcutSession = async (id, epoch) => { if(typeof id !== 'string' || epoch !== 1) throw new Error('Invalid shortcut preflight'); calls.push(['beginDesktopShortcutSession',id,epoch]); };
+export const endDesktopShortcutSession = async (id) => { calls.push(['endDesktopShortcutSession',id]); };
 export const pasteDesktopText = async (text) => { calls.push(['pasteDesktopText',text]); if(window.failPaste) throw new Error('Uncertain paste dispatch'); return {strategy:'clipboard',outcome:'dispatched',pasteMetrics:window.pasteMetrics?{terminal:true,targetProbeMs:60,preflightMs:5,clipboardMs:8,keyboardMs:350}:undefined}; };
 export const cancelOwnedPreedit = async (...args) => { calls.push(['cancelOwnedPreedit',...args]); return state(); };
 export const releaseBrowserRecording = async (triggerId) => { calls.push(['releaseBrowserRecording',triggerId]); };
