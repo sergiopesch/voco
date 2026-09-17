@@ -25,14 +25,13 @@ If a signing key is unavailable, say the tag is unsigned; checksums are integrit
 checks, not a substitute for signatures.
 
 The hosted tag workflow still needs portable pinned NVIDIA provisioning from a
-fresh clone. Until that is implemented and verified, keep the tag local and use
-verified isolated build artifacts for the draft. Do not push a tag into a known
-incomplete workflow or substitute mutable downloads. This changes the delivery
+fresh clone. Do not re-enable it or push a later tag into that assembler. Public
+releases attach verified local NVIDIA packages. This changes the delivery
 mechanism, not the test gates.
 
-The [2026.0.37 cut](releases/2026.0.37.md) is historical and immutable. The .38
-dictation-only cut is also frozen. The .39 glib backport changes native
-application bytes and requires fresh qualification despite unchanged speech models.
+The [2026.0.37 cut](releases/2026.0.37.md) and the .38 dictation-only cut are
+historical and immutable. [2026.0.39](releases/2026.0.39.md) is the current
+public release.
 
 ## Publish
 
@@ -40,6 +39,10 @@ Finish final artifact benchmarks, manual acceptance and performance documentatio
 Obtain explicit publication approval, then activate the release channel and verify
 the published installer, versioned assets and latest aliases. Keep the previous
 release available for rollback. Follow-up changes require a new version.
+
+2026.0.39 was published from verified local artifacts. Previous public release
+2026.0.21 remains available for rollback. The hosted Release workflow stays
+disabled.
 
 ## Repository hygiene
 
