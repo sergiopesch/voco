@@ -26,8 +26,8 @@ sudo apt install ./voco_latest_amd64.deb
 Run the install command only if checksum verification passes.
 Ubuntu x86_64 is the reference platform. See the [installation guide](docs/install.md)
 for setup, upgrades, source builds and Linux compatibility.
-The newest development candidate may be newer than the latest public download;
-[release status](docs/release-candidate.md) keeps that distinction clear.
+The current public download is 2026.0.39.
+[Release status](docs/release-candidate.md) records later private candidates separately.
 
 ## Dictate anywhere you type
 

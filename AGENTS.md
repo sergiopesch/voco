@@ -98,13 +98,13 @@ isolation, not a remote VM or proof of a distribution's default desktop.
 
 ## Release and evidence
 
-Current development version: **2026.0.39**, glib iterator safety backport. The `.38` and `.37` cuts
-and the accepted `+local7` app are frozen historical evidence. New bytes need fresh
-checks and artifact receipts; do not reuse an older result as current qualification.
+Current public release: **2026.0.39**, glib iterator safety backport. The `.38` and `.37` cuts
+are frozen historical evidence. New product bytes need a new version, fresh checks
+and artifact receipts; do not reuse an older result as current qualification.
 
 Pass all CI gates, including Whisper accuracy. No waiver is authorized. Keep a
 clean commit, exact package/source hashes, licenses, checksums and release notes.
-Create a private draft for review; public publication requires explicit sign-off.
-Owner acceptance, userspace checks, native install/remove, physical audio and
-compositor/application behavior are distinct evidence levels. Never claim fastest,
-most accurate, universal compatibility or stability from a limited test corpus.
+The hosted Release workflow must not assemble NVIDIA installers. Userspace checks,
+native install/remove, physical audio and compositor/application behavior are
+distinct evidence levels. Never claim fastest, most accurate, universal
+compatibility or stability from a limited test corpus.
