@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability privately
+    url: https://github.com/sergiopesch/voco/security/advisories/new
+    about: Do not disclose vulnerabilities or personal data in public issues.
+  - name: Installation and troubleshooting
+    url: https://github.com/sergiopesch/voco/blob/master/docs/install.md
+    about: Setup instructions and Linux compatibility.
