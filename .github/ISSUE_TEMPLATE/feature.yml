@@ -1,0 +1,10 @@
+name: Improvement idea
+description: Suggest a focused improvement to local dictation.
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What would this help you do?
+      description: Describe the problem and your preferred outcome. Keep VOCO's minimal dictation focus in mind.
+    validations:
+      required: true

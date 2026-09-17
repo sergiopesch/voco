@@ -50,8 +50,9 @@ Curious how it works? Explore the [visual code guide](docs/guide/README.md).
 ## Contribute
 
 Start with [development setup](docs/contributing.md), [the code map](docs/architecture/code-map.md)
-and [AGENTS.md](AGENTS.md). Tests and benchmark methods are indexed in
-[testing](docs/testing/README.md).
+and [AGENTS.md](AGENTS.md). Please follow the [code of conduct](CODE_OF_CONDUCT.md).
+Report vulnerabilities via the [security policy](SECURITY.md), not a public issue.
+Tests and benchmark methods are indexed in [testing](docs/testing/README.md).
 
 ## License
 
