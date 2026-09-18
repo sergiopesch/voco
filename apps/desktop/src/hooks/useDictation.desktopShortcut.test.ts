@@ -1,11 +1,12 @@
-// Execute the production lifecycle functions with deterministic IPC. This proves
+// Execute the production lifecycle factory with deterministic IPC. This proves
 // ownership ordering, not physical shortcut delivery or microphone capture.
 import { expect, it, vi } from "vitest";
-import ts from "typescript";
-import source from "./useDictation.ts?raw";
 import { DesktopShortcutSession } from "@/lib/desktopShortcutSession";
 import * as session from "@/lib/dictationSession";
-import { errorMessage } from "@/lib/dictationRecovery";
+import {
+  createDictationRecording,
+  type DictationRecordingEnv,
+} from "@/lib/dictationRecording";
 
 function deferred() {
   let resolve!: () => void;
@@ -14,33 +15,10 @@ function deferred() {
   return { promise, resolve, reject };
 }
 
-function production(scope: Record<string, unknown>) {
-  const names = ["releaseDesktopShortcutSession", "startRecording", "stopRecording", "finalizeIdleState", "retainRecovery", "cancelRecording", "isCurrentSession", "assertOutputAllowed"];
-  const ast = ts.createSourceFile("useDictation.ts", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-  const found = new Map<string, string>();
-  function visit(node: ts.Node) {
-    if (ts.isFunctionDeclaration(node) && node.name && names.includes(node.name.text)) found.set(node.name.text, node.getText(ast));
-    if (ts.isReturnStatement(node) && node.expression && ts.isArrowFunction(node.expression) && node.expression.body.getText(ast).includes("disposedRef.current = true")) {
-      found.set("unmount", `function unmount() ${node.expression.body.getText(ast)}`);
-    }
-    ts.forEachChild(node, visit);
-  }
-  visit(ast);
-  if (found.size !== names.length + 1) throw new Error("Production shortcut lifecycle functions unavailable");
-  const code = ts.transpileModule([...found.values()].join("\n"), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } }).outputText;
-  return new Function(...Object.keys(scope), `${code}; return {${[...names, "unmount"].join(",")}};`)(...Object.values(scope)) as {
-    startRecording(trigger?: string): Promise<void>;
-    stopRecording(): Promise<void>;
-    cancelRecording(reason?: string): Promise<void>;
-    finalizeIdleState(): void;
-    retainRecovery(reason: string): void;
-    releaseDesktopShortcutSession(owner?: DesktopShortcutSession): Promise<boolean>;
-    unmount(): void;
-  };
-}
-
 function harness() {
   const ref = <T>(current: T) => ({ current });
+  const noop = vi.fn();
+  const asyncNoop = vi.fn(async () => {});
   const phase = ref("idle");
   const current = ref(session.createDictationSessionState());
   const owner = ref<DesktopShortcutSession | null>(null);
@@ -55,37 +33,138 @@ function harness() {
     recovery: null as unknown, transcript: "", setCaptureNotice: vi.fn(),
     setSurface: vi.fn(), setLastDictationResult: vi.fn(), setRawTranscript: vi.fn(),
     setRecovery: vi.fn((value: unknown) => { state.recovery = value; }),
+    selectedDeviceId: null as string | null,
   };
   const status = { shortcutEpoch: 7, enabled: true, available: true, streamingEnabled: true, targetToken: "guarded-target" as string | null };
   const target = ref<string | null>(null);
   const pasteStatus = vi.fn(async () => status);
   // Deliberately end startup at source selection after shortcut acquisition.
   // The real failure path must release ownership; no microphone is opened.
-  const captureSelection = vi.fn(() => ({ backend: "native", selectionToken: "" }));
+  const captureSelection = vi.fn(() => ({ backend: "native" as const, selectionToken: "" }));
   const trace = vi.fn(async () => {});
   const setError = vi.fn();
-  const scope: Record<string, unknown> = {
-    ...session, requestSessionStop: session.requestStop, DesktopShortcutSession, errorMessage,
-    useStore: { getState: () => state }, phaseRef: phase, sessionRef: current,
-    desktopShortcutSessionRef: owner, desktopShortcutCleanupRef: cleanup,
-    desktopPhraseQueueRef: queue, cancelledRef: cancelled, disposedRef: disposed,
+  const env = {
+    phaseRef: phase,
+    sessionRef: current,
+    disposedRef: disposed,
+    cancelledRef: cancelled,
+    desktopShortcutSessionRef: owner,
+    desktopShortcutCleanupRef: cleanup,
+    desktopPhraseQueueRef: queue,
     desktopTargetTokenRef: target,
-    beginDesktopShortcutSession: begin, endDesktopShortcutSession: end,
-    getDesktopPasteStatus: pasteStatus, captureSelectionRef: ref(captureSelection),
-    traceDictationEvent: trace, traceHotkeyEvent: trace, setError,
-    teardownAudioGraph: vi.fn(async () => 16000), clearLiveCursorText: vi.fn(async () => {}),
-    showNotification: vi.fn(async () => {}), waitForLiveCursorInsertion: vi.fn(async () => {}),
-    recordingSampleRate: () => 16000, AudioCaptureFlushError: class extends Error {},
-    audioBufferRef: ref({ sampleCount: 0 }), cursorDeliveryStateRef: ref("idle"),
-    lifecycleEpochRef: ref(0), audioContextRef: ref(null),
-    ownedPreeditSessionIdRef: ref(null), primedStreamRef: ref(null),
+    desktopPasteSessionRef: ref(false),
+    desktopStreamEnabledRef: ref(false),
+    desktopStreamedSampleCountRef: ref(0),
+    desktopPhrasePasteCountRef: ref(0),
+    manualCopyRequestedRef: ref(false),
+    activeTriggerIdRef: ref<string | undefined>(undefined),
+    recoveryAudioRef: ref<Float32Array | null>(null),
+    recoverySessionIdRef: ref<string | null>(null),
+    recoveryWaitRef: ref<{ cancel: () => void } | null>(null),
+    sessionConfigRef: ref(null),
+    nativeCaptureRef: ref(null),
+    captureDescriptorRef: ref(null),
+    captureSelectionRef: ref(captureSelection),
+    captureGenerationRef: ref(0),
+    canonicalSessionRef: ref(null),
+    canonicalGenerationRef: ref(0),
+    canonicalCheckpointInFlightRef: ref(null),
+    canonicalCheckpointDeferredRef: ref(false),
+    livePreviewInFlightRef: ref(null),
+    recordingStartedAtMsRef: ref<number | null>(null),
+    stopRequestedAtMsRef: ref<number | null>(null),
+    firstHotkeyPressMsRef: ref<number | null>(null),
+    initialHotkeyLatencyLoggedRef: ref(false),
+    lastLivePreviewTextRef: ref(""),
+    liveCursorCandidateTextRef: ref(""),
+    liveDraftConfirmedTextRef: ref(""),
+    liveCursorTextRef: ref(""),
+    livePreviewAudioStartSampleRef: ref(0),
+    liveCursorInsertionDisabledRef: ref(false),
+    liveCursorFallbackNotifiedRef: ref(false),
+    livePreviewFailureNotifiedRef: ref(false),
+    livePreviewNextDelayMsRef: ref(0),
+    firstLiveTextInsertedRef: ref(false),
+    debugPreviewFramesRef: ref([]),
+    debugCanonicalChunksRef: ref([]),
+    debugCaptureEnabledRef: ref(false),
+    debugNativeCaptureEnabledRef: ref(false),
+    audioBufferRef: ref({ sampleCount: 0, chunks: [] }),
+    cursorDeliveryStateRef: ref("idle"),
+    lifecycleEpochRef: ref(0),
+    audioContextRef: ref(null),
+    ownedPreeditSessionIdRef: ref(null),
+    primedStreamRef: ref(null),
     primedStreamPromiseRef: ref(null),
+    captureHealthRef: ref(null),
+    workletFlushRef: ref(null),
+    streamRef: ref(null),
+    sourceRef: ref(null),
+    workletRef: ref(null),
+    processorRef: ref(null),
+    silentSinkRef: ref(null),
+    primedDeviceIdRef: ref(null),
+    ownedPreeditProgressiveRef: ref(false),
+    ownedPreeditCommittedTextRef: ref(""),
+    ownedPreeditActiveRef: ref(false),
+    useStore: { getState: () => state },
+    beginDesktopShortcutSession: begin,
+    endDesktopShortcutSession: end,
+    getDesktopPasteStatus: pasteStatus,
+    pasteDesktopText: vi.fn(async () => ({ outcome: "dispatched" })),
+    traceDictationEvent: trace,
+    traceHotkeyEvent: trace,
+    showNotification: asyncNoop,
+    setCancellationPending: noop,
+    setCanCancel: noop,
+    setStatus: noop,
+    setInterimTranscript: noop,
+    setTranscript: noop,
+    setError,
+    setMicrophoneReadyState: noop,
+    clearTranscript: noop,
+    resetAudioLevel: noop,
+    updateAudioLevel: noop,
+    clearCapturedAudio: noop,
+    clearCanonicalAudioCache: noop,
+    transitionCursorDelivery: noop,
+    retainCurrentTranscript: noop,
+    resetOwnedPreeditState: noop,
+    beginOwnedPreedit: noop,
+    shouldUseOwnedPreedit: () => false,
+    shouldRunLivePreview: () => false,
+    scheduleLivePreview: noop,
+    stopLivePreview: noop,
+    clearLivePreviewTimer: noop,
+    recordingSampleRate: () => 16000,
+    appendRecordingSamples: () => 0,
+    enqueueDesktopPhrase: noop,
+    teardownAudioGraph: vi.fn(async () => 16000),
+    disconnectAudioGraph: noop,
+    clearLiveCursorText: asyncNoop,
+    waitForLiveCursorInsertion: asyncNoop,
+    replaceLiveCursorTextWithFinal: vi.fn(async () => "none" as const),
+    completeCanonicalRecording: asyncNoop,
+    transcribeAudio: vi.fn(async () => ""),
+    persistDebugCapture: asyncNoop,
+    ensureAudioContext: vi.fn(async () => ({}) as AudioContext),
+    openTracedMicrophoneStream: vi.fn(async () => ({ getTracks: () => [] }) as unknown as MediaStream),
+    connectWorklet: vi.fn(async () => true),
+    connectScriptProcessor: noop,
+    traceDesktopPasteMetrics: noop,
+    debugNativeCaptureEnabled: vi.fn(async () => false),
+    debugDictationCaptureEnabled: vi.fn(async () => false),
+    beginNativeCapture: vi.fn(),
+    releaseBrowserRecording: asyncNoop,
+    cancelOwnedPreedit: asyncNoop,
+  } as unknown as DictationRecordingEnv;
+  const recording = createDictationRecording(env);
+  return {
+    ...recording,
+    unmount: recording.dispose,
+    state, phase, current, owner, cleanup, cancelled, queue, begin, end, status,
+    pasteStatus, captureSelection, trace, setError, disposed, target,
   };
-  for (const name of ["activeTriggerIdRef", "recoveryAudioRef", "sessionConfigRef", "recoverySessionIdRef", "nativeCaptureRef", "captureDescriptorRef", "canonicalSessionRef", "recordingStartedAtMsRef", "stopRequestedAtMsRef", "canonicalCheckpointInFlightRef", "livePreviewInFlightRef", "recoveryWaitRef", "captureHealthRef", "workletFlushRef"]) scope[name] = ref(null);
-  for (const name of ["desktopStreamedSampleCountRef", "desktopPhrasePasteCountRef", "captureGenerationRef"]) scope[name] = ref(0);
-  for (const name of ["desktopPasteSessionRef", "desktopStreamEnabledRef", "manualCopyRequestedRef"]) scope[name] = ref(false);
-  for (const name of ["releaseRecordingOrigin", "setCancellationPending", "setCanCancel", "setStatus", "setInterimTranscript", "setMicrophoneReadyState", "resetAudioLevel", "clearCapturedAudio", "clearCanonicalAudioCache", "transitionCursorDelivery", "retainCurrentTranscript", "setTranscript", "stopLivePreview", "enqueueDesktopPhrase", "clearLivePreviewTimer", "disconnectAudioGraph", "resetOwnedPreeditState"]) scope[name] = vi.fn();
-  return { ...production(scope), state, phase, current, owner, cleanup, cancelled, queue, begin, end, status, pasteStatus, captureSelection, trace, setError, disposed, target };
 }
 
 it("captures a read-only target first, then waits for begin before source selection; failed startup cleans up", async () => {

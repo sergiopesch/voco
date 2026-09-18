@@ -1,7 +1,7 @@
 // Exercise the actual hook callbacks and queue with a delayed native dispatch.
 import { beforeEach, expect, it, vi } from "vitest";
 import ts from "typescript";
-import source from "./useDictation.ts?raw";
+import source from "@/lib/dictationRecording.ts?raw";
 const transport = vi.hoisted(() => vi.fn().mockResolvedValue({}));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: transport }));
 import { BenchmarkPhraseQueue, type PasteCorrelation } from "@/lib/benchmarkPhraseQueue";
