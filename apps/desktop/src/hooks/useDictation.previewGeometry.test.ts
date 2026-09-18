@@ -1,16 +1,12 @@
-// Execute the actual hook's collection, async preparation, decoding, and sealing
-// functions. Capture and owned-preedit are deterministic; no native model is run.
+// Execute live-preview collection, async preparation, decoding, and sealing.
+// Capture and owned-preedit are deterministic; no native model is run.
 import { describe, expect, it, vi } from "vitest";
-import ts from "typescript";
-import source from "./useDictation.ts?raw";
 import * as sessions from "@/lib/dictationSession";
 import * as buffers from "@/lib/audioCaptureBuffer";
-import { removeDcOffsetInPlace } from "@/lib/audioLevel";
-import { withCursorAppendSeparator } from "@/lib/liveCommitPolicy";
 import {
-  previewGeometryWithinSnapshot,
-  reviseOwnedPreedit
-} from "@/lib/livePreviewWindow";
+  createLivePreviewRunner,
+  type LivePreviewRunnerEnv,
+} from "@/lib/livePreviewRunner";
 import type { PreviewTranscription } from "@/types";
 
 // Regression geometry observed from a real 16,384-sample prepared preview:
@@ -46,46 +42,6 @@ function deferred<T>() {
   };
 }
 
-function actualHookFunctions(scope: Record<string, unknown>) {
-  const ast = ts.createSourceFile(
-    "useDictation.ts",
-    source,
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.TS,
-  );
-  const names = ["runLivePreview", "updateLiveCursorText", "stopLivePreview", "clearCapturedAudio"];
-  const found = new Map<string, string>();
-  function visit(node: ts.Node) {
-    if (
-      ts.isFunctionDeclaration(node) &&
-      node.name &&
-      names.includes(node.name.text)
-    ) {
-      found.set(node.name.text, node.getText(ast));
-    }
-    ts.forEachChild(node, visit);
-  }
-  visit(ast);
-  if (found.size !== names.length) {
-    throw new Error("Actual preview hook functions unavailable");
-  }
-  const code = ts.transpileModule([...found.values()].join("\n"), {
-    compilerOptions: {
-      target: ts.ScriptTarget.ES2022,
-      module: ts.ModuleKind.None
-    },
-  }).outputText;
-  return new Function(
-    ...Object.keys(scope),
-    code + ";return {runLivePreview, stopLivePreview, clearCapturedAudio};",
-  )(...Object.values(scope)) as {
-    runLivePreview(token: sessions.DictationPreviewToken): Promise<void>;
-    stopLivePreview(): void;
-    clearCapturedAudio(): void;
-  };
-}
-
 function harness(sampleRate: number, startSample: number, windowSamples: number) {
   const preparation = deferred<Float32Array>();
   const inference = deferred<PreviewTranscription>();
@@ -108,37 +64,23 @@ function harness(sampleRate: number, startSample: number, windowSamples: number)
   const publish = vi.fn(async () => { });
   const interim = vi.fn();
   const warning = vi.fn();
-  const scope = {
-    ...sessions,
-    ...buffers,
-    removeDcOffsetInPlace,
-    previewGeometryWithinSnapshot,
-    reviseOwnedPreedit,
-    withCursorAppendSeparator,
+  const cache = ref(null as { key: string; preview: PreviewTranscription; preparedSampleCount: number } | null);
+  const run = createLivePreviewRunner({
     sessionRef,
     clearLivePreviewTimer: vi.fn(),
     captureDescriptorRef: ref(null),
     livePreviewInFlightRef: ref<Promise<void> | null>(null),
-    livePreviewCacheRef: ref(null),
+    livePreviewCacheRef: cache,
     recordingSampleRate: () => sampleRate,
     shouldRunLivePreview: () => true,
     shouldUseFastLiveConfirmation: () => false,
     scheduleLivePreview: vi.fn(),
     usesCanonicalCursorStreaming: () => true,
-    sessionConfigRef: ref(null),
+    sessionConfigRef: ref({ transcriptTarget: "cursor", liveCursorMode: "stable-cursor-streaming" }),
     livePreviewAudioStartSampleRef: nextStart,
     audioBufferRef: ref(audio),
-    LIVE_PREVIEW_MAX_SECONDS: 6,
-    ANCHORED_LIVE_PREVIEW_MAX_SECONDS: 20,
-    LIVE_PREVIEW_MIN_SECONDS: 0.7,
-    LIVE_PREVIEW_CONFIRMATION_INTERVAL_MS: 100,
-    LIVE_PREVIEW_MIN_INTERVAL_MS: 100,
-    TARGET_SAMPLE_RATE: 16000,
     resampleAudioBuffer: vi.fn(() => preparation.promise),
     previewTranscribeAudio: native,
-    performance,
-    recordPreviewDuration: sessions.recordPreviewDuration,
-    nextLivePreviewDelay: () => 100,
     livePreviewNextDelayMsRef: ref(100),
     traceDictationEvent: vi.fn(async () => { }),
     lastLivePreviewTextRef: ref(""),
@@ -147,6 +89,7 @@ function harness(sampleRate: number, startSample: number, windowSamples: number)
     console: { warn: warning },
     liveCursorInsertionDisabledRef: ref(false),
     livePreviewFailureNotifiedRef: ref(false),
+    liveCursorFallbackNotifiedRef: ref(false),
     showNotification: vi.fn(async () => { }),
     liveCursorCandidateTextRef: candidate,
     waitForOwnedPreeditStart: async () => true,
@@ -155,9 +98,7 @@ function harness(sampleRate: number, startSample: number, windowSamples: number)
     liveDraftConfirmedTextRef: confirmed,
     ownedPreeditCommittedTextRef: ref(""),
     publishOwnedPreedit: publish,
-
-  };
-  const run = actualHookFunctions(scope);
+  } as unknown as LivePreviewRunnerEnv);
   return {
     run: () => run.runLivePreview(sessions.createPreviewToken(sessionRef.current)),
     stop: () => run.stopLivePreview(),
@@ -174,7 +115,7 @@ function harness(sampleRate: number, startSample: number, windowSamples: number)
     confirmed,
     candidate,
     sessionRef,
-    cache: scope.livePreviewCacheRef,
+    cache,
   };
 }
 
