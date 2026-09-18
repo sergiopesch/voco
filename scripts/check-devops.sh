@@ -35,7 +35,13 @@ bash -n \
   scripts/test-browser-full-app.sh \
   scripts/test-browser-toolbar-app.sh \
   scripts/verify-deb-package.sh \
+  scripts/verify-release.sh \
+  scripts/sign-release-checksums.sh \
+  scripts/setup-release-signing.sh \
+  scripts/test-verify-release.sh \
   scripts/lib/install-common.sh
+
+bash scripts/test-verify-release.sh
 
 for installer in install scripts/lib/install-common.sh; do
   rg -q 'local session_type="\$\{XDG_SESSION_TYPE:-x11\}"' "${installer}"

@@ -26,11 +26,11 @@ npm run lint -w apps/desktop
 npm run build:frontend -w apps/desktop
 ```
 
-The focused tests execute the actual hook declarations with controlled timers,
-deferred preparation and session state. They cover initial and subsequent deadlines
-at 16, 44.1 and 48 kHz, canonical work, source-block preparation, planner errors,
-invalidation before and after native enqueue, normal delivery, and retained audio.
-They require no microphone or new production API.
+The focused tests call `createLivePreviewSchedule` and `createLivePreviewRunner`
+with controlled timers, deferred preparation and session state. They cover initial
+and subsequent deadlines at 16, 44.1 and 48 kHz, canonical work, source-block
+preparation, planner errors, invalidation before and after native enqueue, normal
+delivery, and retained audio. They require no microphone or new public hook API.
 
 Mounted verification additionally exercised the unchanged audio processor and the
 browser resampler. The six-second input was paced against elapsed time, with full
