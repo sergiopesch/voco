@@ -58,7 +58,8 @@ mechanism, not the test gates.
 
 The [2026.0.37 cut](releases/2026.0.37.md) and the .38 dictation-only cut are
 historical and immutable. [2026.0.39](releases/2026.0.39.md) is the current
-public release.
+public release. 2026.0.40 is a private candidate in this tree and needs fresh
+qualification before any public cut.
 
 ## Publish
 
