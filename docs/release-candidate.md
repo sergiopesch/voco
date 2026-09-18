@@ -13,7 +13,8 @@ Checksums verify file integrity; they are not a publisher signature. Isolated de
 prove every Linux desktop, compositor or application.
 
 **2026.0.40 is the next private candidate.** This tree versions the live-preview
-and Stop-tail extract already on master. It is not a public download.
+and Stop-tail extract already on master and refreshes leaf npm/cargo
+dependencies. It is not a public download.
 Sign only this cut (`git tag -s` and checksum `.asc`); never retag 0.39.
 
 ## Hosted builds
