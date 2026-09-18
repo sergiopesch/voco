@@ -17,11 +17,14 @@ keeps its separate Whisper preparation. See [startup](README.md#startup-and-reco
 1. `apps/desktop/src/App.tsx` mounts the thin UI and dictation hook. The store in
    `src/store/useStore.ts` represents preferences and visible state; it does not
    own native input authority.
-2. `src/hooks/useDictation.ts` admits a start/stop, owns capture and retained audio,
-   and guards asynchronous work with the originating recording session. Capture
-   descriptors in `src/lib/captureDescriptor.ts` keep sample-rate/provenance facts
-   attached to retained samples. `desktopShortcutSession.ts` owns the UUID-bound
-   native shortcut session with its immutable preflight renderer epoch before capture, through final drain, and cleans up
+2. `src/hooks/useDictation.ts` admits a start/stop and wires capture, preview and
+   recovery. Live-preview timer/canonical-pump ownership lives in
+   `src/lib/livePreviewSchedule.ts`; frozen-snapshot decode and cursor update live in
+   `src/lib/livePreviewRunner.ts`; append-only Stop-tail accounting lives in
+   `src/lib/desktopCaptureTail.ts`. Capture descriptors in `src/lib/captureDescriptor.ts`
+   keep sample-rate/provenance facts attached to retained samples.
+   `desktopShortcutSession.ts` owns the UUID-bound native shortcut session with its
+   immutable preflight renderer epoch before capture, through final drain, and cleans up
    failed/cancelled/stale starts without touching a replacement owner.
 3. `src/lib/benchmarkPhraseQueue.ts` serializes bounded NVIDIA requests. Recording
    capture continues while a paste is in flight. A newer append-only hypothesis
@@ -55,6 +58,9 @@ for measurement and recipient limitations.
 | App orchestration and native IPC | `apps/desktop/src-tauri/src/lib.rs` | Command registration, startup, model readiness, cursor delivery and shared limits. Keep platform authority in Rust. |
 | UI | `apps/desktop/src/components/`, `src/store/` | Tray-associated controls, status, setup and recovery. No model inference or OS simulation in React. |
 | Capture | `apps/desktop/src/lib/audioInput.ts`, `audioCaptureBuffer.ts`, `audioCaptureFlush.ts`, `nativeCapture.ts`; `src-tauri/src/native_capture/` | Browser capture is default; native capture is a separately gated development path. Preserve sample ownership and drain ordering. |
+| Live preview schedule | `src/lib/livePreviewSchedule.ts` | Owns the preview timer versus canonical-pump interaction. Sample arrivals without canonical work must not postpone a pending preview. |
+| Live preview decode | `src/lib/livePreviewRunner.ts` | Frozen-snapshot decode, geometry checks and owned-preedit cursor update. Token invalidation must not enqueue stale native work. |
+| Desktop capture tail | `src/lib/desktopCaptureTail.ts` | Append-only sample accounting and Stop-tail forwarding into the NVIDIA queue. Do not recopy an already streamed recording. |
 | Speech runtime | `runtime/speech/` | Selected pinned CPU runtime, bounded local protocol, content-free metrics. Model/native artifacts are provisioned separately from Git. |
 | Legacy/canonical recognition | `src-tauri/src/transcribe.rs`, `transcribe_corroboration.rs`; frontend canonical/checkpoint helpers | Separate Whisper and recovery behavior with its own quality gates; not an extra pass on every NVIDIA chunk. |
 | Input/focus | `src-tauri/src/insertion.rs`, `focus_probe.rs`, `resources/voco_desktop_target.py` | Desktop-specific compatibility, fresh preflight checks, bounded observation, no uncertain automatic retry. |
