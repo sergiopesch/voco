@@ -13,8 +13,9 @@ Checksums verify file integrity; they are not a publisher signature. Isolated de
 prove every Linux desktop, compositor or application.
 
 **2026.0.40 is the next private candidate.** This tree versions the live-preview
-and Stop-tail extract already on master and refreshes leaf npm/cargo
-dependencies. It is not a public download.
+and Stop-tail extract already on master, refreshes leaf npm/cargo dependencies,
+and updates Tauri 2.11.1 / wry 0.55.1 / serde_with 3.23.0 on the vendored glib
+0.18.5 patch. It is not a public download.
 Sign only this cut (`git tag -s` and checksum `.asc`); never retag 0.39.
 
 ## Hosted builds
@@ -26,6 +27,6 @@ verified from a fresh clone. See [release process](release-process.md).
 
 ## Later work
 
-Tauri, serde_with and other GTK/WebKit stack updates stay off this candidate
-until they compile against the vendored glib 0.18.5 patch. Frozen 2026.0.39,
-2026.0.38 and 2026.0.37 cuts remain historical.
+GTK 0.18, WebKit2GTK 2.0 and the single patched glib 0.18.5 copy stay in place.
+The failed React bump stays off this candidate. Frozen 2026.0.39, 2026.0.38 and
+2026.0.37 cuts remain historical.

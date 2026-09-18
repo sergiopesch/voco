@@ -26,17 +26,18 @@ the fingerprint out of band before trusting a fresh clone.
 The glib iterator defect [RUSTSEC-2024-0429](https://rustsec.org/advisories/RUSTSEC-2024-0429)
 is fixed in this cut with a pinned upstream patch.
 
-These GitHub Dependabot alerts remain open on purpose. They are not part of
-2026.0.39; merging them would change native application bytes and need a new
-version plus a new package:
+These GitHub Dependabot alerts remain open on purpose for the public 2026.0.39
+cut. They are not part of that package; merging them would change native bytes:
 
 - **Tauri origin confusion (medium).** The affected origin branch is
-  Windows/Android-specific; this Linux artifact does not use it.
-- **serde_with KeyValueMap panic (medium).** VOCO uses `skip_serializing_none`,
+  Windows/Android-specific; the 2026.0.39 Linux artifact does not use it.
+- **serde_with KeyValueMap panic (medium).** 2026.0.39 uses `skip_serializing_none`,
   not the affected KeyValueMap adapter.
 - **rand custom-logger reentry (low).** The affected rand log feature is
   disabled.
 
-These are scoped applicability notes, not a claim that every advisory is
-irrelevant forever. Reassess if dependencies, features, consumers or supported
-platforms change. Open update PRs stay separate until a qualified follow-up cut.
+The 2026.0.40 candidate updates Tauri to 2.11.1 and serde_with to 3.23.0 while
+keeping the vendored glib 0.18.5 patch as the only resolved copy. The rand note
+still applies. These are scoped applicability notes, not a claim that every
+advisory is irrelevant forever. Reassess if dependencies, features, consumers or
+supported platforms change.
