@@ -98,7 +98,8 @@ isolation, not a remote VM or proof of a distribution's default desktop.
 
 ## Release and evidence
 
-Current public release: **2026.0.39**, glib iterator safety backport. The `.38` and `.37` cuts
+Current public release: **2026.0.39**, glib iterator safety backport. This source is
+the **2026.0.40** candidate, not a public cut. The `.38` and `.37` cuts
 are frozen historical evidence. New product bytes need a new version, fresh checks
 and artifact receipts; do not reuse an older result as current qualification.
 

@@ -12,6 +12,10 @@ The Debian package is amd64. The tag is unsigned and must stay that way.
 Checksums verify file integrity; they are not a publisher signature. Isolated delivery tests do not
 prove every Linux desktop, compositor or application.
 
+**2026.0.40 is the next private candidate.** This tree versions the live-preview
+and Stop-tail extract already on master. It is not a public download.
+Sign only this cut (`git tag -s` and checksum `.asc`); never retag 0.39.
+
 ## Hosted builds
 
 The GitHub Actions Release workflow must not assemble or publish NVIDIA
@@ -21,6 +25,6 @@ verified from a fresh clone. See [release process](release-process.md).
 
 ## Later work
 
-Further product-code changes require a new version. Frozen 2026.0.38 and
-2026.0.37 cuts remain historical. Open dependency PRs stay separate when they
-cannot compile with the current GTK/WebKit stack.
+Tauri, serde_with and other GTK/WebKit stack updates stay off this candidate
+until they compile against the vendored glib 0.18.5 patch. Frozen 2026.0.39,
+2026.0.38 and 2026.0.37 cuts remain historical.

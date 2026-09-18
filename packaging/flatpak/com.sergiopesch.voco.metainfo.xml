@@ -29,6 +29,11 @@
   <url type="vcs-browser">https://github.com/sergiopesch/voco</url>
   <content_rating type="oars-1.1" />
   <releases>
+    <release version="2026.0.40" date="2026-09-18">
+      <description>
+        <p>Candidate source for the next VOCO cut. Local dictation, tray-first UI and streaming cursor delivery are unchanged. Public download remains 2026.0.39 until this version is qualified and published.</p>
+      </description>
+    </release>
     <release version="2026.0.39" date="2026-09-15">
       <description>
         <p>Adds persistent VOCO Dictation input-source support with revisable live preedit, authoritative local checkpoints, exact-prefix delivery, and recoverable fail-closed final transcripts.</p>
