@@ -15,7 +15,10 @@ sudo apt install ./voco_latest_amd64.deb
 ```
 
 Continue only if verification succeeds. These files refer to the latest public
-release, which may differ from the development candidate.
+release, which may differ from the development candidate. Checksums are integrity
+checks. The current public tag is unsigned. Signed cuts also ship `*.asc`; verify
+those with `scripts/verify-release.sh` and the `KEYS` file from git, after checking
+the fingerprint out of band.
 
 ### Guided installer
 

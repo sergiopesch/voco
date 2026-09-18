@@ -1,33 +1,14 @@
-// Execute the production hook's capture/Stop-tail functions and actual NVIDIA
-// queue with deterministic capture and worker IPC; no microphone/model required.
+// Execute production capture/Stop-tail accounting and the actual NVIDIA queue
+// with deterministic capture and worker IPC; no microphone/model required.
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import ts from "typescript";
-import source from "./useDictation.ts?raw";
 import * as buffers from "@/lib/audioCaptureBuffer";
-import { captureSampleLimit } from "@/lib/dictationRecovery";
 const transport = vi.hoisted(() => vi.fn().mockResolvedValue({}));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: transport }));
 import { BenchmarkPhraseQueue } from "@/lib/benchmarkPhraseQueue";
-
-function functions(scope: Record<string, unknown>) {
-  const ast = ts.createSourceFile("useDictation.ts", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-  const names = ["appendRecordingSamples", "enqueueDesktopPhrase", "teardownAudioGraph"];
-  const found = new Map<string, string>();
-  function visit(node: ts.Node) {
-    if (ts.isFunctionDeclaration(node) && node.name && names.includes(node.name.text)) found.set(node.name.text, node.getText(ast));
-    ts.forEachChild(node, visit);
-  }
-  visit(ast);
-  if (found.size !== names.length) throw new Error("Production capture/Stop functions unavailable");
-  const code = ts.transpileModule([...found.values()].join("\n"), {
-    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None },
-  }).outputText;
-  return new Function(...Object.keys(scope), `${code}; return {${names.join(",")}};`)(...Object.values(scope)) as {
-    appendRecordingSamples(samples: Float32Array): number;
-    enqueueDesktopPhrase(end: number): void;
-    teardownAudioGraph(): Promise<number>;
-  };
-}
+import {
+  createDesktopCaptureTail,
+  type DesktopCaptureTailEnv,
+} from "@/lib/desktopCaptureTail";
 
 function harness(rate = 16000, limitSeconds = 600) {
   const buffer = buffers.createAudioCaptureBuffer();
@@ -40,18 +21,18 @@ function harness(rate = 16000, limitSeconds = 600) {
   const native = { current: null as null | { stopAndDrain(): Promise<void> } };
   const flush = vi.fn(async () => {});
   const disconnect = vi.fn();
-  const fns = functions({
-    ...buffers, captureSampleLimit, collectAudioSamplesRange: collect,
-    recordingSampleRate: () => rate, MAX_AUDIO_SECONDS: limitSeconds,
+  const fns = createDesktopCaptureTail({
+    recordingSampleRate: () => rate, maxAudioSeconds: limitSeconds,
     captureHealthRef: { current: null }, pumpCanonicalCheckpoints: vi.fn(),
     phaseRef: phase, audioBufferRef: { current: buffer },
     desktopPhraseQueueRef: { current: queue },
     desktopStreamedSampleCountRef: sent,
     traceDictationEvent: vi.fn(async () => {}), stopRecording: vi.fn(),
     nativeCaptureRef: native, cancelledRef: { current: null },
-    persistNativeRetainedSource: vi.fn(), AudioCaptureFlushError: class extends Error {},
+    persistNativeRetainedSource: vi.fn(),
     flushCaptureSamples: flush, disconnectAudioGraph: disconnect,
-  });
+    collectAudioSamplesRange: collect,
+  } as unknown as DesktopCaptureTailEnv);
   const stop = async () => {
     phase.current = "stopping";
     await fns.teardownAudioGraph();
