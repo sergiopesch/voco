@@ -1,16 +1,12 @@
-// Execute actual hook functions with deterministic dependencies and timers.
+// Execute the live-preview scheduler with deterministic dependencies and timers.
 // Mounted React/worklet coverage is retained separately; these tests require
 // no microphone, native decoder, or new public hook API.
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { clampLivePreviewDelay } from "@/lib/liveCommitPolicy";
-import ts from "typescript";
 import * as sessions from "@/lib/dictationSession";
-import source from "./useDictation.ts?raw";
-interface HookFunctions {
-  clearLivePreviewTimer(): void;
-  scheduleLivePreview(delayMs?: number): void;
-  pumpCanonicalCheckpoints(): void;
-}
+import {
+  createLivePreviewSchedule,
+  type LivePreviewScheduleEnv,
+} from "@/lib/livePreviewSchedule";
 
 function deferred() {
   let resolve!: () => void;
@@ -20,29 +16,7 @@ function deferred() {
     resolve
   };
 }
-function extract(text: string, scope: Record<string, unknown>) {
-  const ast = ts.createSourceFile("hook.ts", text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-  const names = ["clearLivePreviewTimer", "scheduleLivePreview", "pumpCanonicalCheckpoints"];
-  const found = new Map<string, string>();
-  function visit(n: ts.Node) {
-    if (ts.isFunctionDeclaration(n) && n.name && names.includes(n.name.text)) {
-      found.set(n.name.text, n.getText(ast));
-    }
-    ts.forEachChild(n, visit);
-  }
-  visit(ast);
-  if (found.size !== names.length) {
-    throw Error("Actual source function missing");
-  }
-  const code = ts.transpileModule([...found.values()].join("\n"), {
-    compilerOptions: {
-      target: ts.ScriptTarget.ES2022,
-      module: ts.ModuleKind.None
-    }
-  }).outputText;
-  return new Function(...Object.keys(scope), code + ";return {clearLivePreviewTimer,scheduleLivePreview,pumpCanonicalCheckpoints};")(...Object.values(scope)) as HookFunctions;
-}
-function harness(text = source) {
+function harness() {
   vi.useFakeTimers();
   vi.setSystemTime(0);
   const sessionRef = {
@@ -113,9 +87,7 @@ function harness(text = source) {
     prepareCanonicalSourceBlock,
     isCurrentSession: (id: number) => id === sessionRef.current.sessionId,
     shouldRunLivePreview: () => !sessionRef.current.livePreviewDisabled,
-    createPreviewToken: sessions.createPreviewToken,
     shouldUseFastLiveConfirmation: () => false,
-    clampLivePreviewDelay,
     window: {
       setTimeout,
       clearTimeout: clear
@@ -132,8 +104,8 @@ function harness(text = source) {
       livePreviewNextDelayMsRef.current = 450;
       api.scheduleLivePreview();
     }
-  };
-  const api = extract(text, scope);
+  } as unknown as LivePreviewScheduleEnv;
+  const api = createLivePreviewSchedule(scope);
   return {
     api,
     times,

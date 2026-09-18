@@ -35,10 +35,8 @@ import {
   removeDcOffsetInPlace,
 } from "@/lib/audioLevel";
 import {
-  appendAudioSamplesUpTo,
   appendAudioSamples,
   collectAudioSamplesRange,
-  collectRecentAudioSamples,
   createAudioCaptureBuffer,
   drainAudioCaptureBuffer,
   clearAudioCaptureBuffer,
@@ -55,39 +53,31 @@ import {
   clearCommittedCursorText,
   consumeQueuedStop,
   createDictationSessionState,
-  createPreviewToken,
   disableLiveCursorInsertion,
   disableLivePreview,
   failSession,
   finishSessionIdle,
   invalidateLivePreview,
-  isActivePreviewToken,
   markFinalizing,
   markProcessing,
   markRecording,
-  recordPreviewDuration,
   requestStop as requestSessionStop,
   requestToggle as requestSessionToggle,
   startSession,
 } from "@/lib/dictationSession";
 import type { DictationPreviewToken } from "@/lib/dictationSession";
 import { monitorCaptureHealth } from "@/lib/captureHealth";
-import { captureSampleLimit, errorMessage, resumeCanonicalForRecovery } from "@/lib/dictationRecovery";
+import { errorMessage, resumeCanonicalForRecovery } from "@/lib/dictationRecovery";
 import { admitsDictationTrigger, type DictationTriggerAction } from "@/lib/dictationTrigger";
 import {
-  LIVE_PREVIEW_CONFIRMATION_INTERVAL_MS,
   LIVE_PREVIEW_INITIAL_DELAY_MS,
   LIVE_PREVIEW_MIN_INTERVAL_MS,
-  clampLivePreviewDelay,
-  nextLivePreviewDelay,
+  TARGET_SAMPLE_RATE,
   shouldUseFastLivePreviewConfirmation,
-  withCursorAppendSeparator,
 } from "@/lib/liveCommitPolicy";
-import {
-  reviseOwnedPreedit,
-  previewGeometryWithinSnapshot,
-  type PreviewAudioSnapshot,
-} from "@/lib/livePreviewWindow";
+import { createLivePreviewSchedule } from "@/lib/livePreviewSchedule";
+import { createLivePreviewRunner } from "@/lib/livePreviewRunner";
+import { MAX_AUDIO_SECONDS, createDesktopCaptureTail } from "@/lib/desktopCaptureTail";
 import {
   acknowledgeCanonicalDelivery,
   activateCanonicalDelivery,
@@ -134,13 +124,6 @@ import type {
   PreviewTranscription,
 } from "@/types";
 
-const TARGET_SAMPLE_RATE = 16000;
-const MAX_AUDIO_SECONDS = 600;
-// Owned preedit can safely revise an early hypothesis, so the first preview
-// does not need to wait for a full second of audio.
-const LIVE_PREVIEW_MIN_SECONDS = 0.7;
-const LIVE_PREVIEW_MAX_SECONDS = 6;
-const ANCHORED_LIVE_PREVIEW_MAX_SECONDS = 20;
 const AUDIO_LEVEL_ATTACK = 0.68;
 const AUDIO_LEVEL_RELEASE = 0.24;
 const AUDIO_LEVEL_FLOOR = 0.01;
@@ -498,27 +481,80 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
     setAudioLevel(0);
   }, [setAudioLevel]);
 
+  const livePreviewScheduleRef = useRef<ReturnType<typeof createLivePreviewSchedule> | null>(null);
+  // Once per mount: env is refs plus functions that read .current. Rebuilding on
+  // audio-level renders would allocate without changing dictation behavior.
+  if (livePreviewScheduleRef.current === null) {
+    livePreviewScheduleRef.current = createLivePreviewSchedule({
+    sessionRef,
+    phaseRef,
+    canonicalSessionRef,
+    canonicalCheckpointInFlightRef,
+    canonicalCheckpointDeferredRef,
+    livePreviewTimeoutRef,
+    livePreviewNextDelayMsRef,
+    audioBufferRef,
+    planCanonicalWork,
+    planNextCompleteSourceBlock,
+    processCanonicalWork,
+    prepareCanonicalSourceBlock,
+    isCurrentSession,
+    shouldRunLivePreview,
+    shouldUseFastLiveConfirmation,
+    runLivePreview,
+    traceDictationEvent,
+    });
+  }
+  const livePreviewSchedule = livePreviewScheduleRef.current;
+
+  const livePreviewRunnerRef = useRef<ReturnType<typeof createLivePreviewRunner> | null>(null);
+  if (livePreviewRunnerRef.current === null) {
+    livePreviewRunnerRef.current = createLivePreviewRunner({
+    sessionRef,
+    phaseRef,
+    sessionConfigRef,
+    audioBufferRef,
+    captureDescriptorRef,
+    livePreviewInFlightRef,
+    livePreviewCacheRef,
+    livePreviewNextDelayMsRef,
+    livePreviewAudioStartSampleRef,
+    lastLivePreviewTextRef,
+    liveCursorCandidateTextRef,
+    liveDraftConfirmedTextRef,
+    liveCursorInsertionDisabledRef,
+    livePreviewFailureNotifiedRef,
+    liveCursorFallbackNotifiedRef,
+    ownedPreeditActiveRef,
+    ownedPreeditCommittedTextRef,
+    ownedPreeditProgressiveRef,
+    liveCursorTextRef,
+    debugCaptureEnabledRef,
+    debugPreviewFramesRef,
+    recordingSampleRate,
+    shouldRunLivePreview,
+    shouldUseFastLiveConfirmation,
+    scheduleLivePreview,
+    clearLivePreviewTimer,
+    usesCanonicalCursorStreaming,
+    resampleAudioBuffer,
+    previewTranscribeAudio,
+    setInterimTranscript,
+    waitForOwnedPreeditStart,
+    publishOwnedPreedit,
+    traceDictationEvent,
+    showNotification,
+    transitionCursorDelivery,
+    });
+  }
+  const livePreviewRunner = livePreviewRunnerRef.current;
+
   function clearLivePreviewTimer() {
-    if (livePreviewTimeoutRef.current !== null) {
-      window.clearTimeout(livePreviewTimeoutRef.current);
-      livePreviewTimeoutRef.current = null;
-    }
+    livePreviewSchedule.clearLivePreviewTimer();
   }
 
   function scheduleLivePreview(delayMs = livePreviewNextDelayMsRef.current) {
-    clearLivePreviewTimer();
-    if (canonicalCheckpointInFlightRef.current) {
-      return;
-    }
-    const token = createPreviewToken(sessionRef.current);
-    const safeDelayMs = clampLivePreviewDelay(
-      delayMs,
-      shouldUseFastLiveConfirmation(),
-    );
-    livePreviewTimeoutRef.current = window.setTimeout(() => {
-      livePreviewTimeoutRef.current = null;
-      void runLivePreview(token);
-    }, safeDelayMs);
+    livePreviewSchedule.scheduleLivePreview(delayMs);
   }
 
   function shouldRunLivePreview() {
@@ -673,249 +709,7 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
   }
 
   async function runLivePreview(token: DictationPreviewToken): Promise<void> {
-    if (
-      !isActivePreviewToken(sessionRef.current, token) ||
-      !shouldRunLivePreview()
-    ) {
-      return;
-    }
-
-    if (livePreviewInFlightRef.current) {
-      scheduleLivePreview(
-        shouldUseFastLiveConfirmation()
-          ? LIVE_PREVIEW_CONFIRMATION_INTERVAL_MS
-          : LIVE_PREVIEW_MIN_INTERVAL_MS,
-      );
-      return;
-    }
-
-    const previewPromise: Promise<void> = (async () => {
-      const sampleRate = recordingSampleRate();
-      const usesAnchoredCursorWindow = usesCanonicalCursorStreaming(
-        sessionConfigRef.current,
-      );
-      const previewStartSample = usesAnchoredCursorWindow
-        ? Math.min(
-            livePreviewAudioStartSampleRef.current,
-            audioBufferRef.current.sampleCount,
-          )
-        : Math.max(
-            0,
-            audioBufferRef.current.sampleCount -
-              Math.round(sampleRate * LIVE_PREVIEW_MAX_SECONDS),
-          );
-      const maximumSamples = Math.round(sampleRate * (usesAnchoredCursorWindow
-        ? ANCHORED_LIVE_PREVIEW_MAX_SECONDS : LIVE_PREVIEW_MAX_SECONDS));
-      const previewEndSample = Math.min(audioBufferRef.current.sampleCount, previewStartSample + maximumSamples);
-      const sourceSampleCount = previewEndSample - previewStartSample;
-      if (sourceSampleCount < sampleRate * LIVE_PREVIEW_MIN_SECONDS) {
-        if (shouldUseFastLiveConfirmation()) {
-          livePreviewNextDelayMsRef.current = LIVE_PREVIEW_CONFIRMATION_INTERVAL_MS;
-        }
-        traceDictationEvent("dictation_live_preview_skipped_short_audio").catch(() => {});
-        return;
-      }
-
-      const key = `${token.sessionId}:${token.generation}:${sampleRate}:${previewStartSample}:${previewEndSample}`;
-      const cached = livePreviewCacheRef.current?.key === key ? livePreviewCacheRef.current : null;
-      let preview: PreviewTranscription | null;
-      let preparedSampleCount: number;
-      if (cached) {
-        preview = cached.preview;
-        preparedSampleCount = cached.preparedSampleCount;
-        // Replay normal confirmation/geometry checks, without another native
-        // decode or a fabricated zero-duration recognition measurement.
-        traceDictationEvent("dictation_live_preview_reused").catch(() => {});
-      } else {
-        const previewSamples = usesAnchoredCursorWindow
-          ? collectAudioSamplesRange(audioBufferRef.current, previewStartSample, maximumSamples)
-          : collectRecentAudioSamples(audioBufferRef.current, maximumSamples);
-        let prepared = removeDcOffsetInPlace(previewSamples);
-        if (Math.abs(sampleRate - TARGET_SAMPLE_RATE) > 1) {
-          prepared = await resampleAudioBuffer(prepared, sampleRate, TARGET_SAMPLE_RATE);
-        }
-        if (!isActivePreviewToken(sessionRef.current, token)) return;
-        preparedSampleCount = prepared.length;
-        const startedAt = performance.now();
-        preview = await previewTranscribeAudio(prepared);
-        const durationMs = Math.round(performance.now() - startedAt);
-        if (!isActivePreviewToken(sessionRef.current, token)) return;
-        sessionRef.current = recordPreviewDuration(sessionRef.current, token, durationMs);
-        livePreviewNextDelayMsRef.current = nextLivePreviewDelay(durationMs, shouldUseFastLiveConfirmation());
-        traceDictationEvent("dictation_live_preview_completed", { durationMs }).catch(() => {});
-        // Null also means busy/unavailable at the native boundary. It must be
-        // retried, not cached as proof of silent audio.
-        livePreviewCacheRef.current = preview?.text.trim()
-          ? { key, preview, preparedSampleCount } : null;
-      }
-
-      const normalizedPreview = preview?.text.trim() ?? "";
-      if (normalizedPreview.length === 0) {
-        if (shouldUseFastLiveConfirmation()) {
-          livePreviewNextDelayMsRef.current = LIVE_PREVIEW_CONFIRMATION_INTERVAL_MS;
-        }
-        traceDictationEvent("dictation_live_preview_empty").catch(() => {});
-        return;
-      }
-
-      if (isActivePreviewToken(sessionRef.current, token) && preview) {
-        const previewChanged = normalizedPreview !== lastLivePreviewTextRef.current;
-        lastLivePreviewTextRef.current = normalizedPreview;
-        if (previewChanged) {
-          setInterimTranscript(normalizedPreview);
-        }
-        await updateLiveCursorText(
-          normalizedPreview,
-          preview,
-          sampleRate,
-          previewStartSample,
-          previewEndSample,
-          {
-            preparedSampleCount,
-            sourceSampleCount,
-            sourceSampleRate: sampleRate,
-          },
-        );
-        if (debugCaptureEnabledRef.current) {
-          debugPreviewFramesRef.current.push({
-            sequence: debugPreviewFramesRef.current.length + 1,
-            sourceSampleRate: sampleRate,
-            capturedSampleCount: audioBufferRef.current.sampleCount,
-            previewStartSample,
-            preview,
-            stateAfter: {
-              candidateText: liveCursorCandidateTextRef.current,
-              committedWindowText: "",
-              committedCursorText: ownedPreeditProgressiveRef.current
-                ? ownedPreeditCommittedTextRef.current
-                : liveCursorTextRef.current,
-              nextPreviewStartSample: livePreviewAudioStartSampleRef.current,
-              blockedCommitCount: 0,
-              cursorInsertionDisabled:
-                liveCursorInsertionDisabledRef.current ||
-                sessionRef.current.liveCursorInsertionDisabled,
-            },
-          });
-        }
-        traceDictationEvent(
-          previewChanged
-            ? "dictation_live_preview_updated"
-            : "dictation_live_preview_confirmed",
-        ).catch(() => {});
-      }
-    })()
-      .catch((error) => {
-        console.warn("Live dictation preview failed:", error);
-        if (isActivePreviewToken(sessionRef.current, token)) {
-          sessionRef.current = disableLivePreview(sessionRef.current);
-          liveCursorInsertionDisabledRef.current = true;
-          traceDictationEvent("dictation_live_cursor_overlay_fallback").catch(() => {});
-          if (!livePreviewFailureNotifiedRef.current) {
-            livePreviewFailureNotifiedRef.current = true;
-            setInterimTranscript(
-              "Live preview paused. Final insertion will still run when you stop dictation.",
-            );
-            showNotification(
-              "Live preview paused",
-              "VOCO could not produce a live preview. Final insertion will still run when you stop dictation.",
-            ).catch(() => {});
-          }
-        }
-        traceDictationEvent("dictation_live_preview_failed").catch(() => {});
-      })
-      .finally(() => {
-        if (livePreviewInFlightRef.current === previewPromise) {
-          livePreviewInFlightRef.current = null;
-        }
-        if (
-          isActivePreviewToken(sessionRef.current, token)
-        ) {
-          scheduleLivePreview();
-        }
-      });
-
-    livePreviewInFlightRef.current = previewPromise;
-    await previewPromise;
-  }
-
-  async function updateLiveCursorText(
-    nextText: string,
-    preview: PreviewTranscription,
-    sampleRate: number,
-    previewStartSample: number,
-    previewEndSample: number,
-    snapshot: PreviewAudioSnapshot,
-  ) {
-    const config = sessionConfigRef.current;
-    if (
-      !usesCanonicalCursorStreaming(config) ||
-      sessionRef.current.liveCursorInsertionDisabled ||
-      liveCursorInsertionDisabledRef.current
-    ) {
-      return;
-    }
-
-    const previousCandidate = liveCursorCandidateTextRef.current;
-    liveCursorCandidateTextRef.current = nextText;
-
-    const ownedPreeditActive = await waitForOwnedPreeditStart();
-    if (phaseRef.current !== "recording") {
-      return;
-    }
-    if (
-      ownedPreeditActive &&
-      ownedPreeditActiveRef.current
-    ) {
-      const revision = reviseOwnedPreedit(
-        liveDraftConfirmedTextRef.current,
-        previousCandidate,
-        nextText,
-        preview,
-        previewGeometryWithinSnapshot(preview, snapshot),
-      );
-      liveDraftConfirmedTextRef.current = revision.confirmedText;
-      liveCursorCandidateTextRef.current = revision.candidateText;
-      if (revision.advanceDurationMs > 0) {
-        livePreviewAudioStartSampleRef.current = Math.min(
-          previewStartSample +
-            Math.max(
-              1,
-              Math.round((revision.advanceDurationMs / 1000) * sampleRate),
-            ),
-          previewEndSample,
-        );
-        traceDictationEvent("dictation_live_preview_window_advanced", {
-          chunkCount: revision.advancedSegmentCount,
-          durationMs: revision.advanceDurationMs,
-        }).catch(() => {});
-      }
-
-      const confirmedText = ownedPreeditCommittedTextRef.current;
-      const preeditText = withCursorAppendSeparator(
-        confirmedText,
-        revision.provisionalText,
-      );
-      await publishOwnedPreedit(
-        confirmedText,
-        preeditText,
-        confirmedText + preeditText,
-        nextText,
-      );
-      return;
-    }
-
-    sessionRef.current = disableLiveCursorInsertion(sessionRef.current);
-    liveCursorInsertionDisabledRef.current = true;
-    transitionCursorDelivery("ownership-unavailable");
-    setInterimTranscript(nextText);
-    traceDictationEvent("dictation_live_cursor_overlay_fallback").catch(() => {});
-    if (!liveCursorFallbackNotifiedRef.current) {
-      liveCursorFallbackNotifiedRef.current = true;
-      showNotification(
-        "Live cursor streaming unavailable",
-        "VOCO cannot prove ownership of this target, so it will not type a later result into another field.",
-      ).catch(() => {});
-    }
+    return livePreviewRunner.runLivePreview(token);
   }
 
   async function publishOwnedPreedit(
@@ -1023,11 +817,7 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
   }
 
   function stopLivePreview() {
-    clearLivePreviewTimer();
-    livePreviewCacheRef.current = null;
-    lastLivePreviewTextRef.current = "";
-    liveCursorCandidateTextRef.current = "";
-    liveDraftConfirmedTextRef.current = "";
+    livePreviewRunner.stopLivePreview();
   }
 
   async function clearLiveCursorText() {
@@ -1460,72 +1250,7 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
   }
 
   function pumpCanonicalCheckpoints(): void {
-    if (
-      canonicalCheckpointInFlightRef.current ||
-      canonicalCheckpointDeferredRef.current ||
-      phaseRef.current !== "recording" ||
-      !canonicalSessionRef.current
-    ) {
-      return;
-    }
-
-    // Sample arrivals without canonical work must not postpone a pending preview.
-    // Keep planner errors in the existing asynchronous deferred-checkpoint path.
-    try {
-      if (
-        !planCanonicalWork(canonicalSessionRef.current, false) &&
-        !planNextCompleteSourceBlock(
-          canonicalSessionRef.current,
-          audioBufferRef.current.sampleCount,
-        )
-      ) {
-        return;
-      }
-    } catch {
-      // The unchanged pump below handles invalid state and reports the failure.
-    }
-
-    const pumpSessionId = sessionRef.current.sessionId;
-    const pump = (async () => {
-      try {
-        while (phaseRef.current === "recording" && isCurrentSession(pumpSessionId)) {
-          const state = canonicalSessionRef.current;
-          if (!state) {
-            return;
-          }
-          const work = planCanonicalWork(state, false);
-          if (work) {
-            await processCanonicalWork(work, true);
-            continue;
-          }
-          const sourceBlock = planNextCompleteSourceBlock(
-            state,
-            audioBufferRef.current.sampleCount,
-          );
-          if (!sourceBlock) {
-            return;
-          }
-          await prepareCanonicalSourceBlock(sourceBlock);
-        }
-      } catch (error) {
-        if (!isCurrentSession(pumpSessionId)) return;
-        if (!canonicalCheckpointDeferredRef.current) {
-          traceDictationEvent("dictation_canonical_checkpoint_failed").catch(
-            () => {},
-          );
-        }
-        canonicalCheckpointDeferredRef.current = true;
-        console.warn("Canonical cursor checkpoint deferred until stop:", error);
-      }
-    })().finally(() => {
-      if (canonicalCheckpointInFlightRef.current === pump) {
-        canonicalCheckpointInFlightRef.current = null;
-      }
-      if (phaseRef.current === "recording" && shouldRunLivePreview()) {
-        scheduleLivePreview();
-      }
-    });
-    canonicalCheckpointInFlightRef.current = pump;
+    livePreviewSchedule.pumpCanonicalCheckpoints();
   }
 
   async function transcribeCanonicalRemainderAtStop(
@@ -1761,9 +1486,7 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
   }
 
   function clearCapturedAudio(): void {
-    livePreviewCacheRef.current = null;
-    clearAudioCaptureBuffer(audioBufferRef.current);
-    captureDescriptorRef.current = null;
+    livePreviewRunner.clearCapturedAudio();
   }
 
   function traceDesktopPasteMetrics(result: Awaited<ReturnType<typeof pasteDesktopText>>) {
@@ -1778,49 +1501,33 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
     traceDictationEvent(metrics.terminal ? "dictation_desktop_terminal_route_dispatched" : "dictation_desktop_standard_route_dispatched").catch(() => {});
   }
 
+  const desktopCaptureRef = useRef<ReturnType<typeof createDesktopCaptureTail> | null>(null);
+  if (desktopCaptureRef.current === null) {
+    desktopCaptureRef.current = createDesktopCaptureTail({
+      audioBufferRef,
+      desktopPhraseQueueRef,
+      desktopStreamedSampleCountRef,
+      phaseRef,
+      captureHealthRef,
+      nativeCaptureRef,
+      cancelledRef,
+      recordingSampleRate,
+      pumpCanonicalCheckpoints,
+      stopRecording,
+      persistNativeRetainedSource,
+      flushCaptureSamples,
+      disconnectAudioGraph,
+      traceDictationEvent,
+    });
+  }
+  const desktopCapture = desktopCaptureRef.current;
+
   function enqueueDesktopPhrase(end: number) {
-    const queue = desktopPhraseQueueRef.current;
-    if (!queue) return;
-    const start = desktopStreamedSampleCountRef.current;
-    // Stop drains capture after the recording phase has ended. Forward only the
-    // retained tail that live delivery has not already offered to the recognizer.
-    if (end > start) {
-      queue.pushAudio(collectAudioSamplesRange(audioBufferRef.current, start, end - start), recordingSampleRate());
-      desktopStreamedSampleCountRef.current = end;
-    }
-    queue.enqueue();
-    traceDictationEvent("dictation_desktop_phrase_queued", { durationMs: Math.round((end - start) / recordingSampleRate() * 1000) }).catch(() => {});
+    desktopCapture.enqueueDesktopPhrase(end);
   }
 
   function appendRecordingSamples(samples: Float32Array): number {
-    const sampleRate = recordingSampleRate();
-    captureHealthRef.current?.samplesReceived();
-    const maxSamples = captureSampleLimit(sampleRate, MAX_AUDIO_SECONDS);
-    const appendResult = appendAudioSamplesUpTo(
-      audioBufferRef.current,
-      samples,
-      maxSamples,
-    );
-    pumpCanonicalCheckpoints();
-    // The production worker owns streaming boundaries; queue existence is the
-    // only live-delivery gate. Stop-drained samples are forwarded at finalization.
-    const queue = desktopPhraseQueueRef.current;
-    if (queue && phaseRef.current === "recording") {
-      const accepted = samples.subarray(0, appendResult.appendedSampleCount);
-      queue.pushAudio(accepted, sampleRate);
-      desktopStreamedSampleCountRef.current += accepted.length;
-    }
-
-    if (
-      phaseRef.current === "recording" &&
-      appendResult.reachedLimit
-    ) {
-      traceDictationEvent("dictation_recording_limit_reached", {
-        durationMs: MAX_AUDIO_SECONDS * 1000,
-      }).catch(() => {});
-      void stopRecording();
-    }
-    return appendResult.appendedSampleCount;
+    return desktopCapture.appendRecordingSamples(samples);
   }
 
   const connectSilentSink = useCallback(
@@ -1974,25 +1681,7 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
   }
 
   async function teardownAudioGraph() {
-    const rate = recordingSampleRate();
-    const native = nativeCaptureRef.current;
-    if (native) {
-      try { await native.stopAndDrain(); }
-      catch {
-        persistNativeRetainedSource(native, "interrupted");
-        throw new AudioCaptureFlushError();
-      }
-      persistNativeRetainedSource(native, cancelledRef.current ? "cancelled" : "healthy-stop");
-      return rate;
-    }
-    captureHealthRef.current?.dispose();
-    captureHealthRef.current = null;
-    try {
-      await flushCaptureSamples();
-    } finally {
-      disconnectAudioGraph();
-    }
-    return rate;
+    return desktopCapture.teardownAudioGraph();
   }
 
   function disconnectAudioGraph() {

@@ -1,0 +1,16 @@
+# VOCO release signing key
+# User ID: Sergio Peschiera (VOCO releases) <speschiera@gmail.com>
+# Fingerprint: B33C7C6AAEC8C20433A7A837540796453D8E3865
+# Verify this fingerprint out of band before importing KEYS from a clone.
+# Do not append unrelated keys to this file.
+
+-----BEGIN PGP PUBLIC KEY BLOCK-----
+
+mDMEaq1NqxYJKwYBBAHaRw8BAQdAIcImavoX/+NqEo8iX/ETdvQQ7f0mDfyTqCOm
+0K4LiT+0N1NlcmdpbyBQZXNjaGllcmEgKFZPQ08gcmVsZWFzZXMpIDxzcGVzY2hp
+ZXJhQGdtYWlsLmNvbT6ImQQTFgoAQRYhBLM8fGquyMIEM6eoN1QHlkU9jjhlBQJq
+rU2rAhsDBQkDwmcABQsJCAcCAiICBhUKCQgLAgQWAgMBAh4HAheAAAoJEFQHlkU9
+jjhlCIsBAKoU2eWKTm6mdHLtzT2PKcQSUK1AM11FdLlOw1zpVRsHAP9HIYd/NZgS
+Y+EXy/e+tcN9fD9Oqige9hJtQkhMxgYeDA==
+=iIu2
+-----END PGP PUBLIC KEY BLOCK-----
