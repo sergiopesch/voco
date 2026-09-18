@@ -3800,12 +3800,22 @@ mod tests {
 
     #[test]
     fn dictation_trace_event_allowlist_covers_frontend_emissions() {
-        let hook = include_str!("../../src/hooks/useDictation.ts");
-        let emitted_events: Vec<_> = hook
-            .split("traceDictationEvent(")
-            .skip(1)
-            .filter_map(|call| call.trim_start().strip_prefix('"'))
-            .filter_map(|literal| literal.split_once('"').map(|(event, _)| event))
+        let sources = [
+            include_str!("../../src/hooks/useDictation.ts"),
+            include_str!("../../src/lib/dictationRecording.ts"),
+            include_str!("../../src/lib/livePreviewSchedule.ts"),
+            include_str!("../../src/lib/livePreviewRunner.ts"),
+            include_str!("../../src/lib/desktopCaptureTail.ts"),
+        ];
+        let emitted_events: Vec<_> = sources
+            .iter()
+            .flat_map(|source| {
+                source
+                    .split("traceDictationEvent(")
+                    .skip(1)
+                    .filter_map(|call| call.trim_start().strip_prefix('"'))
+                    .filter_map(|literal| literal.split_once('"').map(|(event, _)| event))
+            })
             .collect();
         assert!(
             emitted_events.len() > 30,
