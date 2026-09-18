@@ -18,7 +18,8 @@ keeps its separate Whisper preparation. See [startup](README.md#startup-and-reco
    `src/store/useStore.ts` represents preferences and visible state; it does not
    own native input authority.
 2. `src/hooks/useDictation.ts` admits a start/stop and wires capture, preview and
-   recovery. Live-preview timer/canonical-pump ownership lives in
+   recovery. Start/Stop/Cancel and shortcut-session boundaries live in
+   `src/lib/dictationRecording.ts`; live-preview timer/canonical-pump ownership lives in
    `src/lib/livePreviewSchedule.ts`; frozen-snapshot decode and cursor update live in
    `src/lib/livePreviewRunner.ts`; append-only Stop-tail accounting lives in
    `src/lib/desktopCaptureTail.ts`. Capture descriptors in `src/lib/captureDescriptor.ts`
