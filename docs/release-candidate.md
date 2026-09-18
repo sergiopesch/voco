@@ -8,8 +8,8 @@ model and streaming cursor delivery.
 - Source tag: `voco.2026.0.39` (`fb957ff052547c24be92265b6b5343a4c29aff4b`)
 - [Release record](releases/2026.0.39.md)
 
-The Debian package is amd64. The tag is unsigned. Checksums verify file
-integrity; they are not a publisher signature. Isolated delivery tests do not
+The Debian package is amd64. The tag is unsigned and must stay that way.
+Checksums verify file integrity; they are not a publisher signature. Isolated delivery tests do not
 prove every Linux desktop, compositor or application.
 
 ## Hosted builds

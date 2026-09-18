@@ -24,6 +24,33 @@ notes. Download the uploaded assets and verify every byte before marking the cut
 If a signing key is unavailable, say the tag is unsigned; checksums are integrity
 checks, not a substitute for signatures.
 
+## Signed tags and checksums
+
+Publisher signatures are created on the signing laptop. The hosted Release
+workflow must not hold the private key or assemble NVIDIA installers.
+
+One-time setup (interactive; never paste the private key into chat or CI):
+
+```bash
+bash scripts/setup-release-signing.sh
+```
+
+That wizard creates a 2-year ed25519 key, writes the **public** key to `KEYS`,
+opens GitHub's GPG key form, and enables `tag.gpgSign` for this clone only. It
+refuses to retag `voco.2026.0.39`.
+
+For each **new** version, after checksums exist:
+
+```bash
+git tag -s "voco.<version>" -m "VOCO <version>"
+git tag -v "voco.<version>"
+bash scripts/sign-release-checksums.sh voco_<version>_checksums.txt voco_latest_checksums.txt
+bash scripts/verify-release.sh --keys KEYS voco_<version>_checksums.txt
+```
+
+Attach both the checksum files and the `.asc` signatures to the GitHub release.
+Do not move or recreate an already published tag to add a signature.
+
 The hosted tag workflow still needs portable pinned NVIDIA provisioning from a
 fresh clone. Do not re-enable it or push a later tag into that assembler. Public
 releases attach verified local NVIDIA packages. This changes the delivery

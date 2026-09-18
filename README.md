@@ -24,6 +24,9 @@ sudo apt install ./voco_latest_amd64.deb
 ```
 
 Run the install command only if checksum verification passes.
+Checksums detect a damaged or swapped file. They do not prove who published it.
+The current public tag is unsigned. When a release includes `*.asc` and `KEYS`,
+verify publisher identity with `bash scripts/verify-release.sh voco_latest_checksums.txt`.
 Ubuntu x86_64 is the reference platform. See the [installation guide](docs/install.md)
 for setup, upgrades, source builds and Linux compatibility.
 The current public download is 2026.0.39.
