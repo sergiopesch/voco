@@ -1,5 +1,29 @@
 # Verification · 2026.0.39 study guide
 
+## Evaluation chapter update · 19 September 2026
+
+The source catalog remains pinned to .39. A nineteenth chapter now explains the
+later .41 TypeSafe evaluation, with curated context/thread comparisons and explicit
+limits. No raw benchmark logs, speech transcripts or credentials enter the site.
+
+Nine standard-library tests pass, including the dated comparison contract and all
+original server/source protections. Chapter generation is reproducible. The
+separate evaluation tools pass six Python and five Node tests; 28 existing text
+quality/comparison regression tests also pass.
+
+Checked in the in-app browser: the new journey's Next control, consequential-error
+quiz feedback, pinned source modal, exact-file search, new glossary entries, both
+comparison tables, and the narrow chapter drawer. At a 390 × 844 viewport the
+document width and scroll width both measured 375 px (remaining space is the
+scrollbar); the table scrolls within its own region. The temporary viewport was
+reset. No error or warning console entries were recorded during these flows.
+
+One initial unittest invocation used the repository root and discovered no guide
+tests. It was not counted as a pass; the corrected invocation from `docs/guide`
+ran all nine successfully. This verifies the guide, not physical dictation quality.
+
+## Original application tour · 15 September 2026
+
 Verified on 15 September 2026 against VOCO commit `fb957ff052547c24be92265b6b5343a4c29aff4b`.
 
 ## Automated checks

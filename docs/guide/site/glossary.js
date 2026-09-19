@@ -1,4 +1,12 @@
 export const glossary = [
+  ["TypeSafe", "A service for typed semantic judgments. VOCO uses it only in optional development evaluation of public or synthetic text, never in live dictation."],
+  ["Jev", "TypeSafe's text-only evaluator. We pin its version and validate its judgments against reference cases."],
+  ["Score", "A TypeSafe position on ordered descriptions. A normalized score is not a percentage of correct words."],
+  ["Noul", "TypeSafe's probability that a narrowly defined statement is true. It has no separate confidence value."],
+  ["Held-out set", "Examples kept apart from the examples used to choose a change. Repeated exposure can eventually turn a test set into a development set."],
+  ["Calibration", "Checking how model judgments and probabilities agree with independently labeled outcomes."],
+  ["RTF", "Real-time factor: processing time divided by audio duration. The report must specify whether processing includes IPC, waiting, or only inference."],
+  ["CER", "Character error rate: substitutions, deletions and insertions divided by reference characters, with normalization and Unicode units stated."],
   ["API", "An agreed set of operations one piece of software offers another."],
   [
     "ASR",
@@ -191,4 +199,4 @@ export const glossary = [
     "X11",
     "A Linux window-system protocol used by one of VOCO’s desktop integration paths.",
   ],
-];
+].sort(([a], [b]) => a.localeCompare(b));
