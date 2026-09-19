@@ -9,6 +9,8 @@ export interface DictationRecovery {
   targetMayContainText: boolean;
 }
 
+export const LIVE_DELIVERY_PAUSED = "Live delivery paused. Stop recording to recover your transcript; review the target before pasting again.";
+
 // Cap source capture independently of device rate, including unusually high-rate devices.
 export const MAX_CAPTURE_SAMPLES = 32 * 1024 * 1024; // 128 MiB of Float32 source audio.
 

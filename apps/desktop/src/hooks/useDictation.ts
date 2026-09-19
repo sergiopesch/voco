@@ -60,7 +60,7 @@ import {
 } from "@/lib/dictationSession";
 import type { DictationPreviewToken } from "@/lib/dictationSession";
 import { monitorCaptureHealth } from "@/lib/captureHealth";
-import { errorMessage, resumeCanonicalForRecovery } from "@/lib/dictationRecovery";
+import { errorMessage, LIVE_DELIVERY_PAUSED, resumeCanonicalForRecovery } from "@/lib/dictationRecovery";
 import { admitsDictationTrigger, type DictationTriggerAction } from "@/lib/dictationTrigger";
 import {
   LIVE_PREVIEW_MIN_INTERVAL_MS,
@@ -1922,6 +1922,10 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
       assertOutputAllowed(recoverySessionId);
       useStore.getState().setRawTranscript(transcript);
       setTranscript(transcript || "(no speech detected)");
+      // Remove the completed action prompt, preserving capture/tail uncertainty.
+      if (useStore.getState().captureNotice === LIVE_DELIVERY_PAUSED) {
+        useStore.getState().setCaptureNotice(null);
+      }
       retainRecovery(`Recovered locally${useNvidia ? " with the bundled NVIDIA model" : " with Whisper"}. Review any text already in the target, then copy the text you need. Nothing was inserted automatically.`, false);
       finalizeIdleState();
     } catch (error) {

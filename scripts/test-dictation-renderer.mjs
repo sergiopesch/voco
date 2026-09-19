@@ -994,6 +994,7 @@ assert.equal(await page.evaluate(()=>window.store.getState().transcript),'Recove
 assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length),1);
 assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>c[0]==='transcribeAudio')),false);
 assert.equal(await page.evaluate(()=>window.recoveryRequests.filter(r=>r.op==='push').reduce((n,r)=>n+r.audio.length,0)),48000);
+assert.equal(await page.evaluate(()=>window.store.getState().captureNotice),null,'Successful recovery must remove the obsolete Stop recording prompt');
 results.push('Recovery after uncertain NVIDIA paste uses all retained source with the bundled recognizer and does not resend any target text.');
 
 

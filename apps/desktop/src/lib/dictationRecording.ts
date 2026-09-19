@@ -28,7 +28,7 @@ import {
   startSession,
   type DictationSessionState,
 } from "@/lib/dictationSession";
-import { errorMessage } from "@/lib/dictationRecovery";
+import { errorMessage, LIVE_DELIVERY_PAUSED } from "@/lib/dictationRecovery";
 import {
   LIVE_PREVIEW_INITIAL_DELAY_MS,
   LIVE_PREVIEW_MIN_INTERVAL_MS,
@@ -730,7 +730,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
         }, () => {
           if (!isCurrentSession(startingSessionId) || cancelledRef.current) return;
           traceDictationEvent("dictation_desktop_stream_failed").catch(() => {});
-          useStore.getState().setCaptureNotice("Live delivery paused. Stop recording to recover your transcript; review the target before pasting again.");
+          useStore.getState().setCaptureNotice(LIVE_DELIVERY_PAUSED);
         }, (event, durationMs) => {
           if (!isCurrentSession(startingSessionId) || cancelledRef.current) return;
           const name = event === "appended" ? "dictation_desktop_live_prefix_dispatched"
