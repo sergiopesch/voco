@@ -27,8 +27,9 @@ isolated runtime before publication. Record source and package SHA-256 identitie
 Do not include personal recordings, transcripts, API credentials or private receipts.
 
 The package requires Python 3, NumPy, psutil and the declared native dependencies.
-The worker defaults to at most four CPU threads, capped to its CPU affinity. This
-avoids oversubscribing one- or two-core machines. Explicit research overrides stay
+The worker defaults to at most four CPU threads, leaving one CPU from its affinity
+available for desktop work, with a minimum of one recognizer thread. This avoids
+oversubscribing a constrained desktop while the receiving application is active. Explicit research overrides stay
 explicit; diagnostics record the effective thread count. CPU quotas imposed without
 matching affinity remain a separate performance constraint.
 Its ABI floor includes glibc 2.39 and libstdc++ 13.2.0. X11 helpers are required;

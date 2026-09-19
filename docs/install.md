@@ -73,6 +73,16 @@ helper and its service are installed and configured. The optional VOCO IBus sour
 VOCO’s setup diagnostics for your session; do not change another app’s keybindings.
 See [troubleshooting](troubleshooting.md).
 
+### Wayland compositor shortcuts
+
+Assign `voco --toggle` to an unused, non-repeating key in your desktop's shortcut
+settings, and keep VOCO running. Prefer a key without modifiers, such as **F8**.
+Alt can activate browser menus, and holding Ctrl/Meta during Stop can interfere
+with the final paste. Test Start and Stop in your editor before normal use.
+The compositor binding is separate from VOCO's built-in shortcut setting; the
+command cannot identify which key your desktop assigned. See the
+[Hyprland example](linux-support.md#hyprland-shortcut-integration-in-the-43-candidate).
+
 ### GNOME tray integration
 
 VOCO keeps its controls in the system tray. Stock Fedora GNOME needs the

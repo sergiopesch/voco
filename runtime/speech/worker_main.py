@@ -14,9 +14,10 @@ def configure_cpu_threads():
         available = len(os.sched_getaffinity(0))
     except (AttributeError, OSError):
         available = os.cpu_count() or 1
-    # The native pool spins between tasks. Oversubscribing a two-core desktop
-    # with four workers can exceed the startup deadline instead of running faster.
-    os.environ['NEMO_SPEECH_CPU_THREADS'] = str(max(1, min(4, available)))
+    # Leave a CPU available for capture, the compositor and the receiving app.
+    # A two-core Firefox/KDE trial exceeded the queue deadline with two workers;
+    # one worker completed the same real-time fixture without changing the model.
+    os.environ['NEMO_SPEECH_CPU_THREADS'] = str(max(1, min(4, available - 1)))
 
 
 def error_code(error):

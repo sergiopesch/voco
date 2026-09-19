@@ -47,8 +47,13 @@ socket fails without retries. Use the same `XDG_RUNTIME_DIR` as the running app.
 For the Hyprland 0.56 Lua configuration tested in the development VM:
 
 ```lua
-hl.bind("ALT + D", hl.dsp.exec_cmd("voco --toggle"))
+hl.bind("F8", hl.dsp.exec_cmd("voco --toggle"))
 ```
+
+Use an unused key without modifiers, such as F8, for a compositor command.
+Alt can activate application menus; held Ctrl/Meta modifiers can alter a final
+paste while Stop is being handled. Do not assume a compositor consumes modifier
+events. Test both Start and Stop in the receiving application.
 
 Use the syntax of your installed Hyprland release. Keep the binding non-repeating,
 check for conflicts and preserve existing Omarchy dictation bindings. The command

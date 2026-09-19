@@ -162,7 +162,7 @@ def main():
     spec = f'''Name: voco
 Version: {version}
 Release: {rpm_release}
-Summary: Local Linux dictation candidate
+Summary: Local English dictation for Linux
 License: MIT AND Apache-2.0 AND LicenseRef-NVIDIA-Open-Model
 URL: https://github.com/sergiopesch/voco
 Source0: voco-payload.tar
@@ -175,7 +175,7 @@ Requires: {', '.join(dependencies)}
 %global __requires_exclude ^lib(ggml(-base|-cpu)?|nemo_speech_asr(_c)?|bench_nemo_pool)\\.so.*$
 
 %description
-Local testing candidate with a pinned NVIDIA runtime and model. Native package
+Local English dictation with a pinned NVIDIA runtime and model. Native package
 metadata wraps the exact verified prebuilt payload. No desktop configuration is
 changed during installation. Model terms are included with the payload.
 

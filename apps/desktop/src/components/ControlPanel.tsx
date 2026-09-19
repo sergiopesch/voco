@@ -1075,7 +1075,8 @@ export function ControlPanel({
                       {waylandDesktop ? <div className="voco-inline-note">
                         <strong>Desktop shortcut</strong>
                         <p>You can assign <code>voco --toggle</code> to a non-repeating shortcut in your desktop settings.
-                          Keep VOCO running and use that shortcut to start and stop dictation.</p>
+                          Keep VOCO running and use that shortcut to start and stop dictation.
+                          Prefer an unused key without modifiers, such as F8: held modifiers can interfere with the final paste.</p>
                         <p>The shortcut above and its status describe VOCO’s built-in keyboard handling.
                           Your desktop controls external bindings; VOCO cannot verify which keys you assigned.</p>
                       </div> : null}

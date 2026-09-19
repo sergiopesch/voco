@@ -1631,6 +1631,10 @@
         "text": "A fresh Fedora GNOME setup queued about 970 accessibility events after hiding the panel. The old 256-event budget rejected Start. The candidate drains ordinary transition backlogs within a 50 ms time limit, while still refusing an unsettled destination. Installed Fedora GNOME and openSUSE KDE tests then passed repeated dictation, focus departure and explicit recovery after source loss."
       },
       {
+        "title": "Test the receiving application",
+        "text": "Kate and Konsole accepted the public fixture in a booted KDE guest. Firefox exposed both shortcut-modifier interference and CPU contention that GTK-only tests had missed. Two controlled trials passed with an unused F8 compositor binding and one recognizer thread on two CPUs, but Stop took 2.0 and 3.0 seconds. The next candidate leaves one CPU available for desktop work, capped at four recognizer threads, and needs fresh package qualification. These controls are evidence, not a universal speed claim."
+      },
+      {
         "title": "Safe upgrades",
         "text": "Debian preserves existing directory modes during upgrades. A real legacy-install test exposed inherited group-write permissions. A narrowly checked migration repairs only the known package-owned mode, preserving custom permissions and personal settings."
       },
