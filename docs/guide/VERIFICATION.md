@@ -1,5 +1,17 @@
 # Guide verification history
 
+## Public .42 source refresh · 19 September 2026
+
+The source catalog now pins the .42 release-preparation commit recorded in
+`site/catalog.json`. Version metadata is read from that commit, and tests compare
+every catalog path/blob and version against Git. The 19 chapters cite this source,
+including the explicit NVIDIA recovery implementation and evaluation tools.
+The before/after experiment tables keep their original .41 measurement identity.
+
+Nine server, source, generation and chapter-contract tests pass after this refresh.
+External-facing language identifies the test hardware without referring to a
+particular reader or personal machine. Historical checks below remain dated.
+
 ## Historical evaluation chapter update · 19 September 2026
 
 At this checkpoint the source catalog remained pinned to .39. A nineteenth chapter now explains the
