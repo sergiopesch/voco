@@ -54,8 +54,19 @@ A companion RPM builds the existing dependency from upstream commit
 `31646a467d2051eb904e0b45de3a73e91fe1c1e3`, with an exact archive hash and source RPM.
 The inherited test option `SPM_ENABLE_TEST` was ineffective. Corrected recipes use
 `SPM_BUILD_TEST=ON`; CTest ran its upstream suite successfully and now fails if no
-tests are discovered. Arch's revised companion recipe still needs a fresh native
-build; older source-build evidence does not qualify this revision.
+tests are discovered. The revised Arch 0.2.1-2 companion was also built in a fresh
+local Crabbox lease: its one CTest suite passed, a disposable container signing key
+was used for native installation, and `pacman -Qkk` reported 23 files with none
+altered. The shared library resolved all dependencies. This test key is not a
+public release trust root.
+
+Both installed RPM workers subsequently completed the eight development and four
+held-out public fixtures with context 1, four worker threads and 20 ms packets.
+Each run had 238 reference words, six normalized lexical edits (2.52% WER), and
+zero failed trials. These were unpaced worker-protocol checks under separate
+two-CPU container limits, using the .43 evaluation harness at `9f8819d` against
+the repackaged .42 runtime. They do not measure microphone startup, text appearing
+in a recipient, punctuation accuracy or performance under a default desktop.
 
 ## Source validation
 
