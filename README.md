@@ -30,8 +30,9 @@ them with `bash scripts/verify-release.sh voco_latest_checksums.txt` after check
 the key fingerprint through a trusted independent channel.
 Ubuntu x86_64 is the reference platform. See the [installation guide](docs/install.md)
 for setup, upgrades, source builds and Linux compatibility.
-The latest release is 2026.0.42.
-[Release notes](docs/releases/2026.0.42.md) describe changes and tested scope.
+The [latest published release](https://github.com/sergiopesch/voco/releases/latest)
+is authoritative for available downloads. [Release status](docs/release-candidate.md)
+separates published assets from source and qualification work.
 
 ## Dictate anywhere you type
 
@@ -51,12 +52,12 @@ counts, not recordings or dictated text. Update checks contact GitHub.
 
 Curious how it works? Explore the [visual code guide](docs/guide/README.md).
 
-## Linux package development
+## Native Linux packages
 
-The next release is being qualified with separate Debian, Fedora, openSUSE and
-Arch packages, including Omarchy/Hyprland integration. These are development
-candidates. The .43 candidate uses explicit native microphone permission on
-Wayland so dictation can start with its panel hidden; X11 keeps browser capture.
+The 2026.0.43 package profiles cover Debian, Fedora, openSUSE and Arch, including
+Omarchy/Hyprland integration. Install only assets attached to a published release.
+This version uses explicit native microphone permission on Wayland so dictation
+can start with its panel hidden; X11 keeps browser capture.
 See the [support matrix](docs/linux-support.md),
 [native package installation](docs/install-native.md) and
 [.43 changes and qualification](docs/releases/2026.0.43.md).

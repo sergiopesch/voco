@@ -120,7 +120,8 @@ isolation, not a remote VM or proof of a distribution's default desktop.
 
 ## Release and evidence
 
-Development version: **2026.0.43**. Public release: **2026.0.42**.
+Source version: **2026.0.43**. Verify the current public release on GitHub and
+installed version from the package manager; do not infer either from source.
 The .43 package and desktop evidence is recorded in
 [the support matrix](docs/linux-support.md); preserve per-artifact receipts and
 complete signatures, final CI and downloaded-asset verification before publication. Publication status is authoritative on GitHub Releases;

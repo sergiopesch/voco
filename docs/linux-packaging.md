@@ -1,10 +1,10 @@
 # Linux packaging
 
-VOCO 2026.0.42 is distributed as a complete Debian amd64 package. Model weights,
-native libraries and their notices are included; no recognition download or GPU
-is required for normal English dictation and explicit recovery. The 2026.0.43 candidate adds separate Fedora, openSUSE and Arch/Omarchy
-profiles. Check [release status](release-candidate.md) before treating candidate
-artifacts as public downloads.
+VOCO packages include model weights, native libraries and their notices; no
+recognition download or GPU is required for normal English dictation and explicit
+recovery. Version 2026.0.43 provides Debian, Fedora, openSUSE and Arch/Omarchy
+profiles. Check [release status](release-candidate.md): build artifacts become
+public downloads only when attached to a published release.
 
 ## Build and assemble
 

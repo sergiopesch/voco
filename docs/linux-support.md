@@ -1,7 +1,9 @@
 # Linux packages and qualification
 
-The public release is **2026.0.42**, distributed as a Debian amd64 package.
-**2026.0.43 is development work, not a public or recommended replacement yet.**
+This matrix records **2026.0.43** package and desktop qualification. Only assets
+attached to a published [GitHub release](https://github.com/sergiopesch/voco/releases)
+are public downloads; source metadata and local receipts do not establish availability.
+The earlier .42 release supplied a Debian amd64 package.
 
 VOCO shares its recognition model and application source across distributions.
 Native packages provide the dependencies and desktop integration appropriate to

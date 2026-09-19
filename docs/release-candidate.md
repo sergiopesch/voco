@@ -1,25 +1,26 @@
 # Release status
 
-**2026.0.43 is an unpublished release candidate.** Final Debian, Fedora, openSUSE
-and Arch package bytes have native installation and desktop evidence, including
-Omarchy. Signing, final CI and uploaded-asset verification remain release gates.
-See [Linux support](linux-support.md), [candidate changes](releases/2026.0.43.md)
-and [native installation](install-native.md). No new public release or host upgrade
-has occurred.
+The [latest published GitHub release](https://github.com/sergiopesch/voco/releases/latest)
+is authoritative for current downloads. A source version, local test receipt or
+private draft does not establish publication or installation.
 
+This source snapshot contains **2026.0.43**: Debian, Fedora, openSUSE and Arch
+package profiles, native Wayland capture and Omarchy integration. Final package
+and desktop evidence is recorded in [Linux support](linux-support.md) and the
+[qualification report](testing/linux-release-2026-09-19.md). Publication requires
+publisher signatures, all protected CI gates and verified uploaded/downloaded
+assets. Use the [native installation guide](install-native.md) only with a
+matching published release.
 
-**2026.0.42** combines safer capture admission, explicit offline NVIDIA recovery,
-maintainability and dependency updates, and the public TypeSafe evaluation guide.
+- [.43 changes and measured limits](releases/2026.0.43.md)
+- [Earlier .42 release and assets](https://github.com/sergiopesch/voco/releases/tag/voco.2026.0.42)
+- [.42 changes and qualification scope](releases/2026.0.42.md)
+- [General installation and signature verification](install.md)
 
-- [Release and assets](https://github.com/sergiopesch/voco/releases/tag/voco.2026.0.42)
-- [Changes and qualification scope](releases/2026.0.42.md)
-- [Installation and signature verification](install.md)
-
-Only a published GitHub release establishes availability; source version metadata
-or a draft does not. The public .42 delivery format is Debian amd64; the additional
-.43 channels remain candidates until publication.
-No changes to the speech model, context setting or thread default are promoted
-from the small TypeSafe experiments.
+The .42 Debian release combined safer capture admission, explicit offline recovery
+and the TypeSafe guide. The .43 model and context remain unchanged; CPU thread
+selection now reserves desktop headroom, supported by the separate installed
+worker and desktop checks. No new semantic score is claimed for these changes.
 
 ## Release boundaries
 

@@ -1,8 +1,9 @@
 # Native Linux packages
 
-**2026.0.43 is still a candidate.** These instructions describe its prepared
-package channels; they do not establish that a public download exists. Check
-[release status](release-candidate.md) first. The public .42 release is Debian-only.
+These instructions describe the **2026.0.43** package channels. Use them only
+with assets from the matching published [GitHub release](https://github.com/sergiopesch/voco/releases).
+Source files and drafts do not establish availability; check
+[release status](release-candidate.md) first. The earlier .42 release is Debian-only.
 
 Choose the package for your distribution. Recognition uses the same bundled CPU
 model in every format; the native dependency profile is what differs.

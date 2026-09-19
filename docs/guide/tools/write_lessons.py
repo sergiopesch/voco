@@ -972,7 +972,7 @@ lesson(
     [
         "VOCO keeps a shared recognition model and application source. Native Debian, Fedora, openSUSE and Arch packages translate that application into dependencies each system understands.",
         "The desktop matters too. A package can install correctly while a compositor handles windows, shortcuts or clipboard access differently. Omarchy needs Hyprland testing as well as Arch package testing.",
-        "The .43 work is a development candidate. Public .42 remains the released Debian package. The support matrix separates final package and desktop evidence from signing and public availability.",
+        "The .43 source snapshot has bounded qualification evidence. The support matrix separates final package and desktop evidence from signing and public availability; only a published GitHub release establishes a download.",
     ],
     [
         ("Package", "Resolve native dependencies and verify every installed payload file."),
@@ -1000,7 +1000,7 @@ lesson(
         (B + "trigger_socket.rs", "Private, single-attempt compositor control transport."),
         ("docs/testing/linux-release-2026-09-19.md", "Dated outcomes and qualification limits."),
     ],
-    "These are development experiments, not a released universal Linux installer. The Omarchy long-session result uses virtual audio and one GTK recipient. Ubuntu GNOME Wayland/X11, Fedora GNOME Wayland and openSUSE KDE Wayland also have installed virtual-audio trials. Debian and Mint container checks establish package behavior, not their default desktops. Physical microphones and the wider application matrix still need their own evidence.",
+    "These measurements cover the listed guests and scenarios; published availability is a separate check. The Omarchy long-session result uses virtual audio and one GTK recipient. Ubuntu GNOME Wayland/X11, Fedora GNOME Wayland and openSUSE KDE Wayland also have installed virtual-audio trials. Debian and Mint container checks establish package behavior, not their default desktops. Physical microphones and the wider application matrix still need their own evidence.",
     "The RPM installs, but dictation fails under the default compositor. Is that distribution ready?",
     ["Yes: installation is sufficient", "No: package and desktop acceptance are separate gates"],
     1,
