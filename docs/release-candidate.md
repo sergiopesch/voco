@@ -12,12 +12,16 @@ The Debian package is amd64. The tag is unsigned and must stay that way.
 Checksums verify file integrity; they are not a publisher signature. Isolated delivery tests do not
 prove every Linux desktop, compositor or application.
 
-**2026.0.40 is the next private candidate.** This tree versions the live-preview
-and Stop-tail extract already on master, refreshes leaf npm/cargo dependencies,
-and updates Tauri 2.11.1 / wry 0.55.1 / serde_with 3.23.0 on the vendored glib
-0.18.5 patch, with React and react-dom kept at the same 19.3.0 version. It is
-not a public download.
-Sign only this cut (`git tag -s` and checksum `.asc`); never retag 0.39.
+**2026.0.41 is the next private reliability candidate.** It prevents automatic
+NVIDIA delivery after AudioWorklet fallback and uses the bundled NVIDIA model for
+explicit recovery of normal dictation. Recovery does not insert text or download
+Whisper. A private, bounded worker prevents late recovery requests from disturbing
+live dictation; its temporary memory cost is separate from normal dictation.
+
+The candidate includes the prior unreleased lifecycle extraction and dependency
+updates. Public 0.39 remains frozen and unsigned; do not retag it or install 0.40.
+This source version is not evidence of package acceptance or publication.
+See [the recovery decision](decisions/2026-09-19-local-recovery.md) for scope and gates.
 
 ## Hosted builds
 

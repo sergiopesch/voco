@@ -3,7 +3,9 @@
 ## Design Principle: Local-First, No VOCO Account
 
 Core dictation runs locally and requires no VOCO account, sign-in, subscription, telemetry, or
-third-party credential. The complete NVIDIA candidate bundles its model. Normal cursor
+third-party credential. The complete NVIDIA candidate bundles its model. Explicit recovery of normal
+dictation uses that model in a separate bounded worker, retains audio on failure,
+and never automatically delivers the recovered transcript. Normal cursor
 streaming with enhancement off warms the selected NVIDIA worker at startup without
 an implicit Whisper download. Explicit legacy transcription
 commands can download their separately pinned Whisper model. Automatic GitHub Releases metadata checks occur after startup. Assistant and realtime connections were removed in 2026.0.38.

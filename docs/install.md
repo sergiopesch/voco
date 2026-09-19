@@ -63,7 +63,8 @@ app’s keybindings. See [troubleshooting](troubleshooting.md).
 
 The model lives under `/usr/lib/voco/speech`. Readiness follows worker warmup.
 The default path does not download Whisper; explicit legacy/browser dictation
-uses that separately pinned model. A failed NVIDIA warmup reports an error.
+uses that separately pinned model. Explicit recovery of normal NVIDIA dictation
+also uses the bundled NVIDIA model and works without a Whisper cache. A failed NVIDIA warmup reports an error.
 
 ## Source development
 

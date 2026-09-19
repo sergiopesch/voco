@@ -35,7 +35,11 @@ destination before pasting: it may already contain some of your words. VOCO neve
 blindly retries uncertain delivery. Copying does not dismiss a transcript.
 
 Where available, Retry transcription uses retained audio without automatically
-inserting it. Clear or discard recovery before starting another recording.
+inserting it. Normal NVIDIA dictation recovers with the bundled local model,
+including while offline; it does not download Whisper. The result identifies the
+recognizer used. Browser/legacy dictation retains its separate Whisper recovery.
+Cancel stops waiting immediately and keeps the audio; an outstanding native
+request may finish before its worker is released. Clear or discard recovery before starting another recording.
 Recovery stays in memory only and is lost when VOCO exits.
 
 ## Optional browser integration

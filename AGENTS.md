@@ -42,6 +42,10 @@ glib 0.20 directly leaves the GTK dependency behind. [Backport](vendor/glib/VOCO
 - Flush Stop audio into the same live stream before finish; do not copy/replay a
   whole recording. Recover a dead worker only at a safe session boundary.
 - Keep bounded queues, deadlines, sequence/sample accounting and recovery.
+- Unverified ScriptProcessor fallback cannot enter automatic NVIDIA delivery.
+- Explicit NVIDIA recovery uses `recover_stream` and the bundled runtime, with no
+  destination callback or Whisper fallback. Preserve source samples/rate; publish
+  only a completed result. Cancel keeps audio and stale cleanup is session-bound.
 - Legacy ydotool requires a literal space argument, not `space`. Its paste delay
   is 24 ms; modern numeric arguments and terminal gestures have separate contracts.
 - X11 shortcut scope belongs to the exact focus window, UUID and renderer epoch
@@ -99,7 +103,7 @@ isolation, not a remote VM or proof of a distribution's default desktop.
 ## Release and evidence
 
 Current public release: **2026.0.39**, glib iterator safety backport. This source is
-the **2026.0.40** candidate, not a public cut. The `.38` and `.37` cuts
+the **2026.0.41** candidate, not a public cut. The `.38` and `.37` cuts
 are frozen historical evidence. New product bytes need a new version, fresh checks
 and artifact receipts; do not reuse an older result as current qualification.
 

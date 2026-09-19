@@ -60,6 +60,7 @@ export type DictationRecordingPhase =
   | "error";
 
 type LiveFinalizationResult = "none" | "safe" | "unreconciled";
+type CaptureAdmission = "pending" | "automatic" | "manual-review";
 
 /**
  * Owns Start, Stop and Cancel, including shortcut-session boundaries and
@@ -544,6 +545,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
         void traceDictationEvent("dictation_desktop_shortcut_acquired").catch(() => {});
       }
       const captureSelection = captureSelectionRef.current?.() ?? { backend: "webkit" as const };
+      let captureAdmission: CaptureAdmission = "pending";
       if (captureSelection.backend === "native" && !captureSelection.selectionToken) {
         throw new Error("Choose and allow a native microphone in Audio settings.");
       }
@@ -602,6 +604,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
         }
         nativeCaptureRef.current = native;
         captureDescriptorRef.current = native.descriptor;
+        captureAdmission = "automatic";
       } else {
         nativeCaptureRef.current = null;
         audioContext = await ensureAudioContext();
@@ -674,6 +677,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
         // The legacy fallback retains received audio for explicit manual recovery.
         const workletOk = await connectWorklet(audioContext!, source);
         assertOutputAllowed(startingSessionId);
+        captureAdmission = workletOk ? "automatic" : "manual-review";
         if (!workletOk) {
           sessionRef.current = disableLivePreview(sessionRef.current);
           liveCursorInsertionDisabledRef.current = true;
@@ -702,7 +706,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
 
       sessionRef.current = markRecording(sessionRef.current);
       phaseRef.current = "recording";
-      if (desktopStreamEnabledRef.current) {
+      if (desktopStreamEnabledRef.current && captureAdmission === "automatic") {
         const rate = recordingSampleRate();
         desktopPhraseQueueRef.current = new BenchmarkPhraseQueue(async (text, correlation) => {
           assertOutputAllowed(startingSessionId);
@@ -1147,7 +1151,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     if (recoveryWait) {
       recoveryWaitRef.current = null;
       recoveryWait.cancel();
-      retainRecovery("Recovery waiting cancelled. Audio remains available to retry or discard. The previous local operation may still be finishing.");
+      retainRecovery("Recovery cancelled. Audio remains available to retry or discard. The previous local operation may still be finishing.");
       return;
     }
     if (phaseRef.current === "idle" || phaseRef.current === "error" || phaseRef.current === "finalizing" || cancelledRef.current) return;

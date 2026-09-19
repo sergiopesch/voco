@@ -3118,6 +3118,7 @@ pub fn run() -> Result<(), String> {
         })
         .invoke_handler(tauri::generate_handler![
             benchmark_stream::benchmark_stream,
+            benchmark_stream::recover_stream,
             native_capture_commands::native_capture_capabilities,
             native_capture_commands::native_capture_list_sources,
             native_capture_commands::native_capture_select_source,

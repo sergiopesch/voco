@@ -21,6 +21,10 @@ The application version is `2026.0.37`; Debian candidate revisions may append
 is not published. Tauri builds a **base** Debian bundle;
 it must be assembled with the pinned NVIDIA runtime/model before installation:
 
+The build wrapper forces a host-independent Whisper AVX2/FMA/F16C baseline and
+rebuilds its release objects to avoid cached host-native instructions. This does
+not establish portability of the separately provisioned NVIDIA payload.
+
 Use the repository build wrapper: it supplies the production protocol feature and
 bundles the browser host. A direct Tauri bundle omits that host and fails verification.
 
