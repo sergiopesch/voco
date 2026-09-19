@@ -121,8 +121,9 @@ isolation, not a remote VM or proof of a distribution's default desktop.
 ## Release and evidence
 
 Development version: **2026.0.43**. Public release: **2026.0.42**.
-The .43 Linux package milestone is not release-qualified; follow
-[the support plan](docs/linux-support.md) and preserve per-artifact receipts. Publication status is authoritative on GitHub Releases;
+The .43 package and desktop evidence is recorded in
+[the support matrix](docs/linux-support.md); preserve per-artifact receipts and
+complete signatures, final CI and downloaded-asset verification before publication. Publication status is authoritative on GitHub Releases;
 a version in source alone is not proof of a published or installed package.
 Frozen .39 and earlier cuts remain immutable. New product bytes need a new version,
 fresh checks and artifact receipts.
@@ -135,12 +136,16 @@ distinct evidence levels. Never claim fastest, most accurate, universal
 compatibility or stability from a limited test corpus.
 
 Native packages share the qualified application/model, but use explicit distro
-dependency mappings. Keep RPM licenses installed under nodocs policies. Companion
+dependency mappings, including the native package for `notify-send`. Keep RPM licenses installed under nodocs policies. Companion
 SentencePiece recipes must use SPM_BUILD_TEST and fail when no tests run.
+Document modifier-independent Hyprland bindings or explicitly checked Ctrl/Shift
+variants on other compositors; do not silently overwrite desktop shortcuts.
+Browser qualification must keep diagnostic DOM logging separate from latency
+measurements: repeatedly copying a growing transcript can stall the recipient.
 The control CLI connects once to the owner-only socket; do not add retries or
 launch/focus side effects. It does not prove a compositor keybinding exists.
 The .43 candidate uses native capture on Wayland and WebKit capture on X11.
-The Wayland change is approved but still needs exact-artifact qualification. Keep
+The Wayland change is approved and has installed-VM evidence. Keep
 explicit source selection and app-session permission, with no idle recording or
 silent device switching. Native capture permits real window hiding. Preserve the
 failed WebKit hidden-start experiment and independently verify audio retention.

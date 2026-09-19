@@ -8,15 +8,17 @@ Native packages provide the dependencies and desktop integration appropriate to
 that system. A different package format alone does not improve recognition speed.
 Hardware tuning needs matched accuracy and latency measurements.
 
-| Target | Package plan | Remaining qualification |
+| Target | Package | Observed qualification on final candidate bytes |
 | --- | --- | --- |
-| Ubuntu 24.04+, Debian 13, Mint 22.3 | Debian `.deb` | Exact .43 artifact, installed GNOME/X11 sessions and upgrades |
-| Fedora 44 | Fedora `.rpm` | Exact .43 artifact and installed GNOME/KDE sessions |
-| openSUSE Tumbleweed | Separate openSUSE `.rpm` | Exact .43 artifact, companion tokenizer package and installed KDE/GNOME sessions |
-| Arch Linux | Pacman package | Exact .43 artifact and maintained tokenizer dependency |
-| Omarchy | Arch package with Hyprland setup | Exact .43 artifact, default Omarchy session and application matrix |
+| Ubuntu 24.04 | Debian `.deb` | Public .42 upgrade, GNOME Wayland/X11 repeated dictation, X11 long dictation, focus departure and explicit recovery |
+| Ubuntu 26.04, Debian 13, Mint 22.3 | Same Debian `.deb` | Container install/upgrade/reinstall/remove and complete payload checks; no default-desktop claim |
+| Fedora 44 | Fedora `.rpm` | Native installation and GNOME Wayland repeated/long dictation, focus departure and source-loss recovery |
+| openSUSE Tumbleweed | Separate openSUSE `.rpm` | Native installation with companion tokenizer; KDE Wayland, Firefox, Kate and Konsole |
+| Arch / Omarchy 4.0.4 | Pacman package | Native installation with companion tokenizer; packaged Omarchy Hyprland/Quickshell desktop, repeated and long dictation, focus departure and source-loss recovery |
 
-This is the intended scope, not a certification list. Older distribution releases,
+These are bounded test results, not certification of every desktop in each family.
+Fedora KDE, openSUSE GNOME and other Arch desktops were not independently qualified.
+Publisher signatures and public-download verification are separate release gates. Older distribution releases,
 other CPU architectures, AppImage, Flatpak and Snap have no new support claim.
 The current prebuilt payload requires glibc 2.39+, compatible libstdc++ and
 AVX2/FMA/F16C. Do not remove those floors to make an installer accept an older OS.
@@ -87,21 +89,20 @@ silently switch it. Native capture requires PipeWire's Pulse compatibility serve
 and its stable source identity metadata. A lost or changed source requires explicit
 selection and permission again. There is no automatic browser fallback.
 
-The installed .43 Arch candidate was tested with Omarchy 4.0.4's packaged
-Hyprland/Quickshell configuration in a booted guest. Fresh hidden Start delivered
-14/14 normalized words (Stop-to-idle 244 ms); repeated sessions delivered 28/28
-(246 and 235 ms). A 577.68-second public repetition delivered 1,162/1,162 normalized
-words and finished in 920 ms after Stop. These are individual observations, not
-percentiles. All 25,508,763 captured frames matched retained renderer audio, and
-full-source waveform correlation exceeded 0.9995 in each quarter. Focus departure
-halted delivery; source removal retained audio for explicit Retry/Copy without
-automatic replay.
+The final .43 Arch candidate was tested with Omarchy 4.0.4's packaged
+Hyprland/Quickshell configuration in a booted guest. Repeated sessions delivered
+28/28 normalized words. A 577.68-second public repetition delivered 1,162/1,162
+normalized words and reached idle 922 ms after Stop. All 25,505,676 retained native
+frames matched the renderer; independent waveform alignment covered every quarter.
+Focus departure left the other field empty; source removal retained audio for
+explicit Retry/Copy without automatic replay. These are individual observations,
+not latency percentiles or a hardware ranking.
 
-This guest uses the packaged desktop defaults but a supplied kernel and direct
-boot, with virtual audio and a GTK recipient. It is not clean ISO/bootloader,
-physical microphone or arbitrary application certification. Debian-family upgrades
-and native Fedora/openSUSE installation have separate userspace receipts; the full
-installed GNOME/KDE and recipient matrix remains a release gate.
+The guest uses packaged desktop defaults with a supplied kernel and direct boot.
+It does not qualify the Omarchy ISO installer or bootloader. All desktop speech
+trials use virtual audio. Physical microphones, suspend/resume and arbitrary
+applications need separate evidence. See [native installation](install-native.md)
+for the appropriate package and explicit desktop setup.
 
 See [the dated experiment report](testing/linux-release-2026-09-19.md),
 [packaging](linux-packaging.md), and [the evaluation protocol](testing/typesafe-evaluation.md).

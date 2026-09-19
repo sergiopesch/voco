@@ -57,7 +57,9 @@ The next release is being qualified with separate Debian, Fedora, openSUSE and
 Arch packages, including Omarchy/Hyprland integration. These are development
 candidates. The .43 candidate uses explicit native microphone permission on
 Wayland so dictation can start with its panel hidden; X11 keeps browser capture.
-See the [support plan and release gates](docs/linux-support.md).
+See the [support matrix](docs/linux-support.md),
+[native package installation](docs/install-native.md) and
+[.43 changes and qualification](docs/releases/2026.0.43.md).
 
 ## Contribute
 

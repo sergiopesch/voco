@@ -1,8 +1,9 @@
 # Linux release development · 19 September 2026
 
-**Not a release qualification or publication receipt.** Public/installed .42 stays
-unchanged. The .43 candidate adds compositor control and packaging foundations;
-hidden-window audio and the full desktop matrix remain open.
+**Qualification evidence, not a publication receipt.** Public/installed .42 stays
+unchanged. This report preserves the .43 development attempts and final package
+checks below; earlier open gates describe their historical stage. Publisher signing
+and public-download verification are separate from these local tests.
 
 ## Hyprland experiments
 
@@ -405,3 +406,133 @@ with all three keys checked for conflicts. This reproduces the missing-modifier
 binding failure; it does not establish the exact key state during trial 77.
 Only isolated guest bindings changed. Product guidance now explains the tested
 setup, and packages explicitly depend on the distribution's notification command.
+
+### Long capture on the new Omarchy default
+
+Trial 83 used local7 with its default three recognizer threads, the packaged
+Omarchy desktop and modifier-independent F8. It completed 577.68 seconds of public
+speech, delivered 1,162/1,162 normalized words, left the other field empty and
+reached idle 981 ms after Stop. Native/renderer audit comparison matched all
+25,505,676 frames. Offline whole-waveform alignment passed, with quarter
+correlations 0.99951–0.99953. The offline resampling is analysis, not proof of the
+application resampler. Trial 84 failed KDE recipient focus setup while the guest
+was locked; it did not reach dictation. Both attempts remain in the denominator.
+
+### Firefox harness overhead and final package preparation
+
+Trial 85 delivered 741 of 1,162 words before an insertion-verification timeout;
+its Stop command did arrive and retained recovery. It remains a failed long run.
+The diagnostic browser page had accumulated 4,486,706 bytes in a second textarea,
+copying the entire current transcript for every key/paste/input event. That
+instrumentation can itself block browser event handling. A subsequent control
+removes the DOM logger entirely while keeping the independent 100 ms AT-SPI text
+observer. Earlier DOM-logged trials are not clean browser latency benchmarks.
+Final-package trial 87 completed all 1,162 words without the DOM logger. This
+supports the instrumentation-overhead explanation; it does not establish a product
+speed improvement or erase trial 85.
+
+The final-version Debian candidate has SHA-256
+`9eb239e99af7804d24a89f7cb3316998941354ac8e7f2a53c2067e701a8c4fc4`;
+its application hash is
+`f634e62146a44ffe213636fa8456ff59337c68249e443fccc4578385f8a5499b`.
+It passed upgrade, reinstall, removal, user-state preservation and 225-entry/9-ELF
+payload verification in Ubuntu 26.04, Debian 13 and Mint 22.3 containers. The final
+Arch and openSUSE profiles passed native install/reinstall/remove and the same
+payload parity in their owned VMs. Ordinary RPM documentation is explicitly
+requested for full parity; license retention is checked before that request.
+These receipts do not yet establish publication, publisher signatures or final
+installed desktop acceptance.
+
+## Final installed package acceptance
+
+All four native profiles contain the same application SHA-256 shown above.
+Fedora and openSUSE use distinct dependency declarations; Arch/Omarchy use the
+maintained companion tokenizer package. Seven install environments passed native
+install/upgrade, reinstall, removal, user-state preservation and 225-entry/9-ELF
+payload checks: Ubuntu 24.04 GNOME, Ubuntu 26.04, Debian 13, Mint 22.3, Fedora 44,
+openSUSE Tumbleweed and Omarchy. Ubuntu 24.04 upgraded the actual public .42 package;
+the three Debian-family containers used the preserved .37 legacy baseline.
+Fedora, openSUSE and Arch exercised fresh installation plus reinstall/removal.
+
+Final installed worker controls on Fedora, openSUSE and Ubuntu used one recognition
+thread; Omarchy used three, matching their affinity-based defaults. Each completed
+all 12 public fixtures, with 238 reference words, six lexical edits and 2.52%
+normalized WER. Every final transcript exactly matched the earlier control. These
+unpaced tests measure lexical parity; worker acknowledgements are not user Start
+latency and no first-word or punctuation timing can be inferred from them.
+
+| Final desktop | Trial(s) | Result |
+| --- | --- | --- |
+| Omarchy 4.0.4 / Hyprland 0.56.2 | 86, 91, 92, 94 | Long delivery, focus departure, source-loss Retry/Copy and repeated dictation passed |
+| Fedora 44 / GNOME Wayland | 88–90 | Repeated dictation, focus departure and source-loss Retry/Copy passed |
+| Ubuntu 24.04 / GNOME Wayland | 95, 96, 102 | Repeated dictation, focus departure and source-loss Retry/Copy passed |
+| openSUSE Tumbleweed / KDE Wayland | 87, 98–101, 103 | Long Firefox, focus departure, source-loss Retry/Copy, Kate, Konsole and repeated dictation passed |
+| Ubuntu 24.04 / GNOME X11 | 104, 105, 107 | Built-in Alt+D repeated dictation, focus departure and killed-worker Retry/Copy passed |
+
+Repeated tests delivered 28/28 normalized words into the same field. Kate and
+Konsole each received 14/14 words; Konsole's independent PTY receiver observed no
+Enter, and speech was never executed as a shell command. Every focus-departure
+case left the second field empty. Recovery cases required explicit action and
+performed no automatic transcript replay.
+
+Trial 86 delivered 1,162/1,162 normalized words over 577.68 seconds and stopped in
+922 ms. Native-to-renderer comparison matched all 25,505,676 retained frames;
+independent full-source waveform alignment passed with quarter correlations
+0.99951–0.99953. Trial 87 delivered the same 1,162 words into Firefox and stopped
+in 376 ms, with a settled browser and no DOM transcript logger. These are separate
+individual VM observations, not percentiles, physical-device results or a ranking
+between desktops. The two-vCPU guests' CPU quota includes QEMU overhead.
+
+The first independently observed field change followed the synthetic shortcut by
+1,799 ms in Omarchy trial 86, 2,808 ms in Firefox trial 87, 2,060 ms in Kate trial
+100 and 2,202 ms in Konsole trial 101. The harness waits for capture before playing
+its fixture, so these include that controlled start sequence. GTK callbacks and
+100 ms external-recipient observations have different resolution. None measures
+physical keypress or pixel-paint latency. Per-word acoustic alignment and audited
+punctuation references remain unavailable.
+
+### Retained final-harness failures
+
+- Trial 93 could not find the virtual source removed by trial 92; the source was
+  restored before the successful repeat 94. It failed before recording.
+- Trial 97 completed recovery but its verifier expected the AT-SPI role label
+  `button`; Ubuntu reports `push button`. The corrected enum-based lookup passed
+  trial 102. The application was unchanged.
+- Trial 106 failed tray discovery on a departed D-Bus owner and an `@`-suffixed
+  registration. The adapter normalizes that name, skips absent owners and restricts
+  activation to the exact test-app PID. Trial 107 then passed without product changes.
+- Trial 108 used the 580-second fixture for onboarding, exceeding its 30-second
+  setup deadline. The corrected harness keeps onboarding short and reserves the
+  long fixture for dictation. The failed setup and a subsequent controller launch
+  error before any guest trial are preserved separately.
+
+These failed attempts remain evidence; they are not converted into successful
+product checks. Source changes after application build commit `95c0276` are
+release documentation, guide catalog and release-body tooling only. Signing may
+change RPM archive hashes; release provenance must verify unchanged payload bytes.
+
+### Extended GNOME Wayland control
+
+Final Fedora trial 109 delivered all 1,162 words over 577.68 seconds, leaving the
+second field empty. Stop-to-idle was 2,813 ms. This is a slow observed completion;
+it does not meet a sub-second responsiveness claim and does not qualify the
+reference-machine percentile targets. All 25,510,527 retained native frames
+matched the renderer. Whole-fixture waveform correlation was 0.99510, with all
+four quarters above 0.9950. No queue limit was relaxed and no audio was dropped.
+The fixture's first observed field change followed its synthetic shortcut by
+1,828 ms; the same capture-before-playback and non-pixel boundaries apply.
+
+### Extended X11 control and final attempt count
+
+Trial 110 used the final Debian package in Ubuntu 24.04 GNOME X11, WebKit capture
+and the built-in Alt+D shortcut. It delivered all 1,162 words over 577.68 seconds,
+left the second field empty and reached idle 367 ms after Stop. The first field
+change followed the synthetic shortcut by 1,928 ms. Native-capture audit results
+from Wayland are not attributed to this X11 path.
+
+Trials 86–110 comprise 25 final-package desktop attempts: 21 completed acceptance
+scenarios and four retained harness/setup failures (93, 97, 106, 108). The separate
+controller launch error happened before a guest trial. Earlier product failures
+remain above, with their original candidate identities. This is an attempt count,
+not a reliability percentage or an independent-speaker sample. The isolated VMs
+were powered down after collecting their receipts.

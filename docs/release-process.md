@@ -21,8 +21,8 @@ Record the exact merged commit, source tree, build environment and package SHA-2
 Create an annotated local tag at that commit. Create a **draft** GitHub release
 with versioned package, source archive, checksums, provenance and concise release
 notes. Download the uploaded assets and verify every byte before marking the cut ready.
-If a signing key is unavailable, say the tag is unsigned; checksums are integrity
-checks, not a substitute for signatures.
+If the signing key is unavailable, keep this release pending. Checksums are
+integrity checks, not a substitute for the required publisher signatures.
 
 ## Signed tags and checksums
 
@@ -84,5 +84,14 @@ Build Fedora and openSUSE RPMs from their explicit dependency profiles; preserve
 companion source packages and all bundled licenses. Validate nodocs license
 retention as well as full-document payload parity. Keep native package revisions,
 checksums and signatures independent. A successful .deb test or a renamed RPM is
-not acceptance for another channel. Do not publish .43 until its outstanding
-capture and desktop gates are complete.
+not acceptance for another channel. Sign each RPM header and each Arch package
+with the publisher key; never publish disposable guest-test signatures. Verify
+RPM headers in an isolated RPM key database and Arch detached signatures against
+the checked publisher key. Signing may change RPM archive hashes, so compare
+installed payload identity with the qualified unsigned candidate afterward.
+
+Provide a signed manifest per platform, listing only that platform's package and
+required companion. Keep the complete versioned manifest for source, provenance,
+validation and all release assets. Preserve the Debian latest alias for existing
+users; do not point it at a different package format. Verify the exact uploaded
+and anonymously downloaded bytes before publishing and upgrading the host.

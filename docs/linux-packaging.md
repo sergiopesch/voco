@@ -2,8 +2,9 @@
 
 VOCO 2026.0.42 is distributed as a complete Debian amd64 package. Model weights,
 native libraries and their notices are included; no recognition download or GPU
-is required for normal English dictation and explicit recovery. Other packaging
-formats below remain experimental.
+is required for normal English dictation and explicit recovery. The 2026.0.43 candidate adds separate Fedora, openSUSE and Arch/Omarchy
+profiles. Check [release status](release-candidate.md) before treating candidate
+artifacts as public downloads.
 
 ## Build and assemble
 
@@ -15,8 +16,8 @@ NVIDIA payload has its own identity and qualification requirements.
 ```bash
 npm ci
 npm run build
-python3 scripts/package-nvidia.py /path/to/tauri-base.deb /path/to/voco_2026.0.42_amd64.deb --debian-version 2026.0.42
-bash scripts/verify-deb-package.sh /path/to/voco_2026.0.42_amd64.deb
+python3 scripts/package-nvidia.py /path/to/tauri-base.deb /path/to/voco_2026.0.43_amd64.deb --debian-version 2026.0.43
+bash scripts/verify-deb-package.sh /path/to/voco_2026.0.43_amd64.deb
 ```
 
 A base Tauri bundle is incomplete and must never be published as VOCO. The assembler
@@ -93,16 +94,9 @@ pinned artifacts with mutable downloads.
 AppImage remains a local packaging experiment and is not published until the full linuxdeploy and
 appimagetool chain can be supplied from immutable, checksum-verified sources.
 
-## Next
-
-- Ubuntu App Center review path after local snap install and runtime validation
-- Flatpak sandbox validation to determine whether Flathub is a real fit
-- release workflow polish for the channels that already build cleanly
-
-## Later
-
-- strict-confinement investigation only if VOCO stops depending on host-level desktop automation
-- Native RPM and Arch candidates require per-artifact external build, dependency, payload and install/remove receipts; private verification does not establish a published or signed release channel
+Native RPM and Arch channels require independent build, dependency, payload,
+install/remove and desktop receipts. Flatpak, Snap and AppImage remain research
+formats; no store submission or additional channel is implied by their recipes.
 
 ## Asset Naming
 
@@ -226,7 +220,7 @@ bash ./scripts/package-appimage.sh
 
 ## GNOME desktop clipboard dependency
 
-The 2026.0.28 Debian candidate depends on `xclip`. On GNOME Wayland with `DISPLAY`,
+The Debian package depends on `xclip`. On GNOME Wayland with `DISPLAY`,
 native desktop paste uses its XWayland clipboard bridge, then `ydotool` for the
 Wayland keyboard gesture. This avoids the locally reproduced `wl-copy` temporary
 focus-surface timeout. Other Wayland desktops retain `wl-copy`. No fallback is
@@ -242,9 +236,9 @@ observation; that text is not logged or returned to the frontend. The helper doe
 not change accessibility settings. Unsupported controls retain best-effort delivery,
 without a universal acceptance claim. See [observation](testing/delivery-observation.md).
 
-## NVIDIA local testing candidate (2026.0.37)
+## Bundled NVIDIA runtime
 
-The local candidate bundles Nemotron Speech Streaming English 0.6B Q8_0, its
+The complete package bundles Nemotron Speech Streaming English 0.6B Q8_0, its
 modified CPU runtime, Python worker and model notices under `/usr/lib/voco/speech`
 and `/usr/share/doc/voco/nvidia`. Ubuntu supplies `python3`, `python3-numpy`,
 `python3-psutil` and `libsentencepiece0`. No Homebrew, virtual environment, network
@@ -257,14 +251,12 @@ verifies the fixed model hash, adds a runtime SHA-256 manifest and regenerates t
 Debian file inventory. Install the resulting complete package with apt so declared
 dependencies are resolved. A base Tauri package alone is incomplete for NVIDIA.
 
-Desktop paste and streaming are enabled by default for this authorized candidate;
-`VOCO_DESKTOP_PASTE=0` or `VOCO_DESKTOP_STREAM=0` can disable the corresponding
-path. Existing target checks, enhancement behavior and Whisper recovery remain.
-The English NVIDIA model is used for normal enhancement-off desktop streaming.
-Startup prepares that selected runtime through the serialized worker and waits for
-actual warmup success before readiness. It does not implicitly download Whisper
-for the default path. Legacy-selected startup and explicit legacy transcription
-retain the separate Whisper model check/download.
+Normal dictation and explicit interrupted-audio Retry use the bundled NVIDIA
+model. Recovery never automatically replays text into a destination. Startup warms
+the selected recognizer before readiness; it does not download Whisper for this
+path. The separate legacy/browser compatibility path retains its own Whisper model
+check. Product settings do not expose enhancement, assistant or alternate output
+modes.
 
 `VOCO_PERFORMANCE_LOG=1` enables private, rotating local metrics. Worker records
 include model/runtime identity, monotonic and wall clocks, hashed stream identity,
@@ -295,7 +287,7 @@ python3 scripts/stage-native-packages.py COMPLETE.deb FRESH_DIRECTORY \
   --verifier /absolute/path/to/voco/scripts/verify-deb-package.sh
 ```
 
-Final versions such as `2026.0.42` use native package revision `1`. Use
+Final versions such as `2026.0.43` use native package revision `1`. Use
 `--native-release 2` for a packaging-only revision of the same final payload.
 This does not authorize changing application/model bytes under the same version.
 Legacy `+localN` candidates retain their previous native revision mapping; do not
@@ -341,8 +333,8 @@ runs local AppStream validation with `--no-net`; it does not validate external U
 Omit the variable for the release job's normal online URL checks.
 
 The [2026-09-19 Omarchy qualification](testing/omarchy-native-2026-09-19.md)
-records native Arch package checks and booted Hyprland trials, including the
-permission and hidden-window issues that still block public Omarchy support.
+records the earlier Arch/Hyprland baseline. The [current experiment report](testing/linux-release-2026-09-19.md)
+records the native-capture fixes, tested desktop packages and final artifact checks.
 
 ## Distribution-specific RPM profiles
 

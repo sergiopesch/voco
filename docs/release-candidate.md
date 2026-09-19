@@ -1,8 +1,11 @@
 # Release status
 
-**2026.0.43 is an unpublished development candidate.** Native packaging,
-compositor shortcuts and hidden-window audio are under qualification.
-See [Linux support](linux-support.md). No new release has been cut or installed.
+**2026.0.43 is an unpublished release candidate.** Final Debian, Fedora, openSUSE
+and Arch package bytes have native installation and desktop evidence, including
+Omarchy. Signing, final CI and uploaded-asset verification remain release gates.
+See [Linux support](linux-support.md), [candidate changes](releases/2026.0.43.md)
+and [native installation](install-native.md). No new public release or host upgrade
+has occurred.
 
 
 **2026.0.42** combines safer capture admission, explicit offline NVIDIA recovery,
@@ -13,7 +16,8 @@ maintainability and dependency updates, and the public TypeSafe evaluation guide
 - [Installation and signature verification](install.md)
 
 Only a published GitHub release establishes availability; source version metadata
-or a draft does not. The Debian amd64 package is the supported delivery format.
+or a draft does not. The public .42 delivery format is Debian amd64; the additional
+.43 channels remain candidates until publication.
 No changes to the speech model, context setting or thread default are promoted
 from the small TypeSafe experiments.
 

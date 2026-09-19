@@ -8,30 +8,35 @@ cat <<EOF_BODY
 
 Local English dictation for Linux. Speak and your words appear at the cursor.
 
-- One direct delivery path with live words and punctuation.
-- Minimal settings and a draggable window header.
-- Assistant, conversation, enhancement and appearance controls removed.
-- Microphone and shortcut preferences preserved on upgrade.
 - Local NVIDIA CPU recognition; no account or cloud transcription.
+- Live words and punctuation, with explicit recovery after interrupted dictation.
+- Native Wayland capture with source selection and permission for the app session.
+- Separate Debian, Fedora, openSUSE and Arch dependency profiles; documented Omarchy setup.
+- Microphone and shortcut preferences preserved on upgrade.
+
+[Changes and measured limits](https://github.com/sergiopesch/voco/blob/${TAG_NAME}/docs/releases/${VERSION}.md).
 
 ## Install
 
-Download the Debian package and checksum file attached to this release. Then:
+Choose the native package for your distribution and download its platform checksum
+manifest, matching signature and public \`KEYS\` asset. Verify the publisher key
+fingerprint through a trusted independent channel. The source verification script
+checks every listed file and its signature in an isolated keyring:
 
 \`\`\`bash
-grep " voco_${VERSION}_amd64.deb\$" voco_checksums.txt | sha256sum --check -
-sudo apt install ./voco_${VERSION}_amd64.deb
+bash scripts/verify-release.sh --keys KEYS PLATFORM_checksums.txt
 \`\`\`
 
-Continue only if checksum verification succeeds. Quit VOCO before upgrading;
-copy any needed recovery text first. Restart the input engine after upgrading
-if diagnostics report an older helper. IBus protocol 6 is dictation-shortcut-only.
+The complete \`voco_checksums.txt\` covers the release assets; platform manifests
+avoid requiring unrelated packages. Continue only after signature and checksum
+verification succeeds. Quit VOCO before upgrading and copy needed recovery text.
 
-[Setup and troubleshooting](https://github.com/sergiopesch/voco/blob/${TAG_NAME}/docs/install.md).
+[Package selection, native install commands and desktop setup](https://github.com/sergiopesch/voco/blob/${TAG_NAME}/docs/install-native.md).
+[General setup and troubleshooting](https://github.com/sergiopesch/voco/blob/${TAG_NAME}/docs/install.md).
 
 ## Scope
 
-Ubuntu x86_64 is the reference platform. Text delivery uses clipboard paste,
+Prebuilt packages require x86-64 with AVX2/FMA/F16C and glibc 2.39+. Text delivery uses clipboard paste,
 replaces clipboard text and never presses Enter. Protected or custom editors,
 other compositors and physical audio need their own testing. Generic desktop
 paste cannot safely rewrite an entire message after Stop. The bundled model is

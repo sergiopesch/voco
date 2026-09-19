@@ -51,7 +51,7 @@ echo "  appimage: ${APPIMAGE_NAME}"
   bash ./scripts/render-release-body.sh "${VERSION}" "${TAG_NAME}" > "${TMP_DIR}/release-body-no-appimage.md"
   bash ./scripts/render-release-body.sh "${VERSION}" "${TAG_NAME}" "${APPIMAGE_NAME}" > "${TMP_DIR}/release-body-with-appimage.md"
   grep -F 'voco_checksums.txt' "${TMP_DIR}/release-body-no-appimage.md" > /dev/null
-  grep -F "grep \" voco_${VERSION}_amd64.deb\$\" voco_checksums.txt | sha256sum --check -" "${TMP_DIR}/release-body-no-appimage.md" > /dev/null
+  grep -F 'bash scripts/verify-release.sh --keys KEYS PLATFORM_checksums.txt' "${TMP_DIR}/release-body-no-appimage.md" > /dev/null
   grep -F "grep \" ${APPIMAGE_NAME}\$\" voco_checksums.txt | sha256sum --check -" "${TMP_DIR}/release-body-with-appimage.md" > /dev/null
 )
 

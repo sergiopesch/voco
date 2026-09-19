@@ -70,7 +70,7 @@ lesson(
         ),
         (
             "The current route",
-            "VOCO 2026.0.42 uses NVIDIA Nemotron English 0.6B Q8 on the CPU. Names containing benchmark in the streaming code are historical; they do real production work.",
+            "VOCO uses NVIDIA Nemotron English 0.6B Q8 on the CPU. Names containing benchmark in the streaming code are historical; they do real production work.",
         ),
         (
             "Keep the boundary clear",
@@ -972,7 +972,7 @@ lesson(
     [
         "VOCO keeps a shared recognition model and application source. Native Debian, Fedora, openSUSE and Arch packages translate that application into dependencies each system understands.",
         "The desktop matters too. A package can install correctly while a compositor handles windows, shortcuts or clipboard access differently. Omarchy needs Hyprland testing as well as Arch package testing.",
-        "The .43 work is a development candidate. Public .42 remains the released Debian package. The support plan records what is measured and what still blocks each additional package.",
+        "The .43 work is a development candidate. Public .42 remains the released Debian package. The support matrix separates final package and desktop evidence from signing and public availability.",
     ],
     [
         ("Package", "Resolve native dependencies and verify every installed payload file."),
@@ -984,12 +984,12 @@ lesson(
     [
         ("Before: a transparent tile", "Hyprland kept the off-screen VOCO window tiled. An isolated test reproduced it even though short dictation worked."),
         ("Why hiding alone failed", "A diagnostic native hide removed the tile, but a fresh WebKit microphone request did not become active within 25 seconds. That failed attempt led to native capture qualification."),
-        ("After: native capture while hidden", "The installed .43 Arch candidate passed fresh setup under Omarchy’s packaged desktop configuration: 14 normalized words, a truly hidden panel, an unchanged second field and a 244 ms Stop. A 577.68-second repetition delivered 1,162 normalized words and passed independent full-audio checks. These individual VM observations do not certify physical microphones or arbitrary apps."),
+        ("After: native capture while hidden", "The final .43 Arch candidate passed repeated dictation under Omarchy’s packaged desktop configuration with a truly hidden panel and an unchanged second field. A 577.68-second repetition delivered all 1,162 normalized words and reached idle 922 ms after Stop. All 25,505,676 retained frames matched native capture, with independent whole-waveform alignment. These individual VM observations do not certify physical microphones or arbitrary apps."),
         ("A measured shortcut improvement", "The candidate's voco --toggle command used a compositor binding without keyboard-device access. One isolated fixture delivered all 14 words and left the second field unchanged. This does not certify every shortcut or application."),
-        ("Fit the available CPUs", "A two-core VM took 35.37 seconds to warm a four-thread recognizer, exceeding startup limits. Two threads took 1.53 seconds in a controlled check. The candidate leaves one CPU from process affinity available for desktop work, with at least one recognizer thread and at most four. All 12 public fixtures produced identical transcripts across the tested Fedora, openSUSE and two-core Ubuntu workers: six lexical edits in 238 words. This small corpus does not establish worldwide accuracy."),
+        ("Fit the available CPUs", "A two-core VM took 35.37 seconds to warm a four-thread recognizer, exceeding startup limits. Two threads took 1.53 seconds in a controlled check. The candidate leaves one CPU from process affinity available for desktop work, with at least one recognizer thread and at most four. All 12 public fixtures produced identical transcripts across the final Fedora, openSUSE, Ubuntu and Omarchy workers: six lexical edits in 238 words. This small corpus does not establish worldwide accuracy."),
         ("Reject an unknown destination", "An X11 focus-switch test caught text continuing into a second field. GNOME exposed both the client and its decoration as active, and VOCO incorrectly allowed an unbound paste. The candidate distinguishes the decoration and requires a destination token. The installed regression then left the second field empty and retained recovery. Successful ordinary dictation had not exposed this bug."),
         ("Let desktop focus settle safely", "A fresh Fedora GNOME setup queued about 970 accessibility events after hiding the panel. The old 256-event budget rejected Start. The candidate drains ordinary transition backlogs within a 50 ms time limit, while still refusing an unsettled destination. Installed Fedora GNOME and openSUSE KDE tests then passed repeated dictation, focus departure and explicit recovery after source loss."),
-        ("Test the receiving application", "Kate and Konsole accepted the public fixture in a booted KDE guest. Firefox exposed both shortcut-modifier interference and CPU contention that GTK-only tests had missed. The updated candidate delivered all 280 words in a 139.2-second Firefox trial and stopped in 627 ms after the browser settled. Cold-start CPU-pressure failures remain recorded. Separate controls showed that Stop bindings must also accept the Ctrl and Shift modifiers used by clipboard delivery: Omarchy uses ignore_mods; KDE can bind the key and its Ctrl variants. These observations do not establish universal speed or compatibility."),
+        ("Test the receiving application", "Kate and Konsole accepted the public fixture in a booted KDE guest. Firefox exposed both shortcut-modifier interference and CPU contention that GTK-only tests had missed. The final package delivered all 1,162 words in a 577.68-second Firefox trial and stopped in 376 ms after the browser settled. Its page had no growing DOM diagnostic logger; a preceding logged attempt timed out after 741 words, showing why measurement overhead must remain explicit. Cold-start CPU-pressure failures remain recorded. Separate controls showed that Stop bindings must also accept the Ctrl and Shift modifiers used by clipboard delivery: Omarchy uses ignore_mods; KDE can bind the key and its Ctrl variants. A separate final Fedora GNOME ten-minute run delivered all 1,162 words with full retained-audio parity but took 2,813 ms after Stop. These observations do not establish universal speed or compatibility."),
         ("Safe upgrades", "Debian preserves existing directory modes during upgrades. A real legacy-install test exposed inherited group-write permissions. A narrowly checked migration repairs only the known package-owned mode, preserving custom permissions and personal settings."),
         ("Keep obligations installed", "RPM can omit ordinary documentation on minimal systems. License files need explicit license metadata so those terms remain installed."),
         ("What TypeSafe contributes", "Optional semantic judgments assess a transcript's meaning. Exact code and real desktop tests establish package identity, audio timing, destination safety and compatibility. A language-model score cannot replace those checks."),
@@ -1000,7 +1000,7 @@ lesson(
         (B + "trigger_socket.rs", "Private, single-attempt compositor control transport."),
         ("docs/testing/linux-release-2026-09-19.md", "Dated outcomes and qualification limits."),
     ],
-    "These are development experiments, not a released universal Linux installer. The Omarchy long-session result uses virtual audio and one GTK recipient. Fedora GNOME and openSUSE KDE also have installed virtual-audio trials. Physical microphones and the wider application matrix still need their own evidence.",
+    "These are development experiments, not a released universal Linux installer. The Omarchy long-session result uses virtual audio and one GTK recipient. Ubuntu GNOME Wayland/X11, Fedora GNOME Wayland and openSUSE KDE Wayland also have installed virtual-audio trials. Debian and Mint container checks establish package behavior, not their default desktops. Physical microphones and the wider application matrix still need their own evidence.",
     "The RPM installs, but dictation fails under the default compositor. Is that distribution ready?",
     ["Yes: installation is sufficient", "No: package and desktop acceptance are separate gates"],
     1,
