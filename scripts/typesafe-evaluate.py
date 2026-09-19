@@ -50,6 +50,22 @@ def questions(formatting):
     return result
 
 
+def fingerprint(value):
+    return hashlib.sha256(json.dumps(value, sort_keys=True, allow_nan=False).encode()).hexdigest()
+
+
+def rubric_identity(records):
+    """Bind the actual per-case questions, including audited-formatting variants."""
+    rubrics = {}
+    cases = []
+    for record in records:
+        qs = record['request']['questions']
+        identity = fingerprint(qs)
+        rubrics[identity] = qs
+        cases.append({'id': record['id'], 'rubricSha256': identity})
+    return {'rubricSha256': fingerprint(cases), 'rubrics': rubrics, 'caseRubrics': cases}
+
+
 def validate_response(response, expected):
     if not isinstance(response, dict) or response.get('model') != MODEL:
         raise ValueError('unexpected model identity')
@@ -190,7 +206,7 @@ def main():
         qs=questions(case['formattingAudited'])
         payload={'model':MODEL, 'state':{'reference':case['reference'],'transcript':case['transcript']},'questions':qs}
         record={'id':case['id'], 'request':payload,
-                'requestSha256':hashlib.sha256(json.dumps(payload,sort_keys=True).encode()).hexdigest()}
+                'requestSha256':fingerprint(payload), 'rubricSha256':fingerprint(qs)}
         if not args.send:
             record['status']='not_sent'
         else:
@@ -212,8 +228,8 @@ def main():
         with (args.output/f'{len(results):03}.json').open('x') as handle:
             json.dump(record,handle,indent=2,allow_nan=False);handle.write('\n')
         print(f"{case['id']}: {record['status']}",flush=True)
-    summary={'schemaVersion':1,'provenance':source['provenance'],'model':MODEL,
-             'rubricSha256':hashlib.sha256(json.dumps(questions(True),sort_keys=True).encode()).hexdigest(),
+    summary={'schemaVersion':2,'provenance':source['provenance'],'model':MODEL,
+             **rubric_identity(results),
              'inputSha256':hashlib.sha256(args.input.read_bytes()).hexdigest(),
              'attempted':len(results),'scored':sum(x['status']=='scored' for x in results),
              'sentEvaluations':len(results) if args.send else 0,

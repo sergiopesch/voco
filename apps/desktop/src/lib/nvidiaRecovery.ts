@@ -50,7 +50,7 @@ export class NvidiaRecovery {
   }
 
   private async run(audio: Float32Array, rate: number): Promise<string> {
-    if (!Number.isInteger(rate) || rate < 8000 || rate > 96000 ||
+    if (!Number.isInteger(rate) || rate < 8000 || rate > 384000 ||
         !audio.length || audio.length > captureSampleLimit(rate) || !audio.every(Number.isFinite)) {
       throw new Error("Invalid recovery audio.");
     }

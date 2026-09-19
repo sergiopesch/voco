@@ -18,6 +18,14 @@ def main():
     parser.add_argument('--output',type=Path,required=True)
     args=parser.parse_args()
     source=json.loads(args.evaluation.read_text())
+    identity=judge.rubric_identity(source['results'])
+    for row in source['results']:
+        if row['requestSha256'] != judge.fingerprint(row['request']):
+            raise ValueError('Retained request identity mismatch')
+        if 'rubricSha256' in row and row['rubricSha256'] != judge.fingerprint(row['request']['questions']):
+            raise ValueError('Retained case rubric identity mismatch')
+    if source['schemaVersion'] >= 2 and any(source.get(key) != value for key,value in identity.items()):
+        raise ValueError('Retained evaluation rubric identity mismatch')
     valid=[];invalid=[]
     for row in source['results']:
         try:
@@ -39,7 +47,8 @@ def main():
         group=('baseline' if row['id'].startswith('baseline-') else
                'context0' if row['id'].startswith('context0-') else 'all')
         groups.setdefault(group,[]).append(row)
-    result={'schemaVersion':1,'model':source['model'],'rubricSha256':source['rubricSha256'],
+    result={'schemaVersion':2,'model':source['model'],**identity,
+            'legacyReportedRubricSha256':source['rubricSha256'] if source['schemaVersion']==1 else None,
             'scope':'judge_challenge_not_voco_quality' if args.labels else 'public_transcript_judgments',
             'requested':source['attempted'],'valid':len(valid),'invalidIds':invalid,
             'initialValidationErrors':source['errors'],'groups':{k:summary(v) for k,v in groups.items()},

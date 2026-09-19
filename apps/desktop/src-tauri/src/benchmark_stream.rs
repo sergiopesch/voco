@@ -181,7 +181,7 @@ fn recover_with_worker(
                 .as_array()
                 .ok_or("invalid recovery audio")?;
             let count = audio.len() as u64;
-            if !(8_000..=96_000).contains(&rate)
+            if !(8_000..=384_000).contains(&rate)
                 || slot.rate.is_some_and(|previous| previous != rate)
                 || count == 0
                 || count > rate
@@ -421,6 +421,31 @@ mod tests {
         assert!(slot.worker.is_none());
         assert!(slot.session.is_none());
         assert!(!std::path::Path::new(&format!("/proc/{new_pid}")).exists());
+    }
+
+    #[test]
+    fn recovery_preserves_high_source_rates_and_samples() {
+        for rate in [176_400, 192_000, 384_000] {
+            let seen = std::sync::Arc::new(Mutex::new(Vec::new()));
+            let mut slot = RecoveryWorker::default();
+            recover_with_worker(
+                serde_json::json!({"op":"start","session":"high-rate","seq":0}),
+                &mut slot,
+                || Ok(live_worker(seen.clone(), false)),
+            )
+            .unwrap();
+            let audio = vec![0.25_f32; rate / 10];
+            recover_with_worker(
+                serde_json::json!({"op":"push","session":"high-rate","seq":1,
+                "rate":rate,"audio":audio}),
+                &mut slot,
+                || panic!("push must reuse worker"),
+            )
+            .unwrap();
+            let requests = seen.lock().unwrap();
+            assert_eq!(requests[1]["rate"], rate);
+            assert_eq!(requests[1]["audio"], serde_json::json!(audio));
+        }
     }
 
     #[test]

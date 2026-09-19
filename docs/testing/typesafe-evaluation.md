@@ -150,3 +150,13 @@ instructions. Run one CPU experiment at a time to avoid contaminating timings.
 
 See [the dated before/after report](typesafe-results-2026-09-19.md) for actual
 outcomes, judge limitations, rejected candidates and the next evidence gaps.
+
+### Rubric identity
+
+Evaluation schema 2 records each case's actual question hash, the corresponding
+question variants and a hash of the ordered case-to-rubric mapping. Unaudited
+punctuation cases therefore cannot be confused with the full three-question rubric.
+The report tool verifies retained request hashes and recomputes these identities.
+For older schema-1 receipts it preserves the original aggregate field separately as
+`legacyReportedRubricSha256`; that field described the full rubric even when some
+requests omitted punctuation. Historical responses and scores remain unchanged.

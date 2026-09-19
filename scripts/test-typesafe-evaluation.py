@@ -65,6 +65,44 @@ class EvaluationTests(unittest.TestCase):
     def test_redirect_is_not_followed(self):
         self.assertIsNone(judge.NoRedirect().redirect_request(None,None,302,'',{},'https://other.example'))
 
+    def test_mixed_rubrics_bind_actual_questions_and_report_legacy_identity(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path=Path(folder);source=path/'input.json';output=path/'output'
+            source.write_text(json.dumps({'provenance':'synthetic-calibration','cases':[
+                {'id':str(flag),'reference':'Hello.','transcript':'Hello.','formattingAudited':flag}
+                for flag in (False,True)]}))
+            previous_umask=os.umask(0o077)
+            try:
+                with mock.patch.object(sys,'argv',['typesafe-evaluate.py','--input',str(source),
+                                                  '--output',str(output)]), contextlib.redirect_stdout(io.StringIO()):
+                    judge.main()
+            finally:os.umask(previous_umask)
+            evaluation=json.loads((output/'evaluation.json').read_text())
+            self.assertEqual(len(evaluation['rubrics']),2)
+            self.assertNotEqual(*[r['rubricSha256'] for r in evaluation['caseRubrics']])
+            for row in evaluation['results']:
+                self.assertEqual(evaluation['rubrics'][row['rubricSha256']],row['request']['questions'])
+                self.assertEqual(row['requestSha256'],judge.fingerprint(row['request']))
+            self.assertEqual(evaluation['rubricSha256'],judge.fingerprint(evaluation['caseRubrics']))
+            reporter_spec=importlib.util.spec_from_file_location('reporter',Path(__file__).with_name('report-typesafe-evaluation.py'))
+            reporter=importlib.util.module_from_spec(reporter_spec);reporter_spec.loader.exec_module(reporter)
+            def report(destination):
+                with mock.patch.object(sys,'argv',['report-typesafe-evaluation.py','--evaluation',str(output/'evaluation.json'),
+                                                  '--output',str(destination)]), contextlib.redirect_stdout(io.StringIO()):
+                    reporter.main()
+            report(path/'report.json')
+            self.assertEqual(json.loads((path/'report.json').read_text())['rubricSha256'],evaluation['rubricSha256'])
+            evaluation['schemaVersion']=1
+            evaluation['rubricSha256']=judge.fingerprint(judge.questions(True))
+            (output/'evaluation.json').write_text(json.dumps(evaluation))
+            report(path/'legacy-report.json')
+            legacy=json.loads((path/'legacy-report.json').read_text())
+            self.assertEqual(legacy['legacyReportedRubricSha256'],evaluation['rubricSha256'])
+            self.assertEqual(legacy['rubricSha256'],judge.fingerprint(evaluation['caseRubrics']))
+            evaluation['results'][0]['request']['questions']=judge.questions(True)
+            (output/'evaluation.json').write_text(json.dumps(evaluation))
+            with self.assertRaisesRegex(ValueError,'request identity mismatch'):report(path/'tampered.json')
+
     def test_nonfinite_response_preserves_failure_and_continues_next_case(self):
         for token in ('NaN', 'Infinity', '-Infinity', '1e999', '-1e999'):
             with self.subTest(token=token), tempfile.TemporaryDirectory() as folder:

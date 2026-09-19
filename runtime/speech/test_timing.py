@@ -48,12 +48,21 @@ class TimingTests(unittest.TestCase):
         self.assertEqual(set(self.session.metrics),{'asr_ms','gate_ms','vad_ms','recognizer_push_ms','result_drain_ms','recognizer_push_calls','first_nonzero_audio_s','gate_released_frames'})
 
     def test_coalescing_preserves_samples_and_one_second_limit_at_all_rates(self):
-        for rate in (8000, 16000, 44100, 48000, 96000):
+        for rate in (8000, 16000, 44100, 48000, 96000, 176400, 192000, 384000):
             frames = [np.arange(round(rate * .64), dtype=np.float32),
                       np.arange(rate, dtype=np.float32)]
             batched = streaming.coalesce_frames(frames, rate)
             self.assertTrue(all(0 < len(frame) <= rate for frame in batched))
             np.testing.assert_array_equal(np.concatenate(frames), np.concatenate(batched))
+
+    def test_high_rate_samples_reach_model_unchanged(self):
+        for rate in (176400, 192000, 384000):
+            self.session.start()
+            audio=np.sin(np.arange(rate//10, dtype=np.float32)/20)
+            self.session.push(audio, rate);self.session.finish()
+            np.testing.assert_array_equal(np.concatenate(self.session.model.frames), audio)
+        self.session.start()
+        with self.assertRaises(ValueError):self.session.push([.25],384001)
 
     def test_coalescing_single_frame_does_not_copy(self):
         frames = [np.ones(320, np.float32)]

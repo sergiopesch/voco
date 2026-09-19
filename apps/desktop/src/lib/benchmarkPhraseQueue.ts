@@ -234,7 +234,7 @@ export class BenchmarkPhraseQueue {
 
   pushAudio(audio: Float32Array, rate: number) {
     if (this.cancelled || this.failure || this.ending) return;
-    if (!Number.isInteger(rate) || rate < 8000 || rate > 96000 || !audio.every(Number.isFinite)) {
+    if (!Number.isInteger(rate) || rate < 8000 || rate > 384000 || !audio.every(Number.isFinite)) {
       this.fail(new Error("Invalid capture audio"), "capture_invalid");
       return;
     }
