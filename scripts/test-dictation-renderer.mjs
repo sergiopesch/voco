@@ -161,7 +161,7 @@ await page.addInitScript(() => {
    let text = null;
    if(request.op === 'push') {
      if(request.rate !== 16000 || !Array.isArray(request.audio) || !request.audio.length ||
-       request.audio.length > 320 || !request.audio.every(Number.isFinite)) throw new Error('Invalid stream PCM packet');
+       request.audio.length > 1600 || !request.audio.every(Number.isFinite)) throw new Error('Invalid stream PCM packet');
      if(window.deferInference) {
        await new Promise(resolve => window.resolveInference = resolve);
        window.deferInference = false;
@@ -1030,14 +1030,14 @@ await page.evaluate(()=>{
    window.captureWorklet.port.onmessage({data:{type:'samples',data:batch.slice(from,to)}});
  }
 });
-await page.waitForFunction(()=>window.benchmarkAudioSamples===32320);
+await page.waitForFunction(()=>window.benchmarkAudioSamples===32000);
 assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length),0);
 await stop(); await page.waitForFunction(()=>window.store.getState().status==='idle');
 assert.deepEqual(await page.evaluate(()=>window.benchmarkRequests.filter(r=>r.op==='push').flatMap(r=>r.audio)),await page.evaluate(()=>window.expectedStreamAudio));
-assert.deepEqual(await page.evaluate(()=>window.benchmarkRequests.filter(r=>r.op==='push').map(r=>r.audio.length)),[...Array(101).fill(320),1]);
+assert.deepEqual(await page.evaluate(()=>window.benchmarkRequests.filter(r=>r.op==='push').map(r=>r.audio.length)),[...Array(20).fill(1600),321]);
 assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').map(c=>c[1])),['Exact captured samples.']);
 assert.equal(await page.evaluate(()=>window.benchmarkRequests.filter(r=>r.op==='finish').length),1);
-results.push('Irregular callbacks retain every speech and silence sample in 20 ms packets, flush the one-sample tail exactly once, and deliver only the final recognized text.');
+results.push('Irregular callbacks retain every speech and silence sample in 100 ms packets, flush the partial tail exactly once, and deliver only the final recognized text.');
 
 await load(); await page.evaluate(()=>{
  window.desktopPaste=true;window.desktopStream=true;
@@ -1056,7 +1056,7 @@ await page.evaluate(()=>window.samples(0.3));
 await page.waitForFunction(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length===2);
 assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').map(c=>c[1])),['Words appe','ar during speech']);
 await page.evaluate(()=>window.samples(0.25));
-await page.waitForFunction(()=>window.benchmarkAudioSamples===24640);
+await page.waitForFunction(()=>window.benchmarkAudioSamples===24000);
 assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length),2);
 await stop(); await page.waitForFunction(()=>window.store.getState().status==='idle');
 assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').map(c=>c[1])),['Words appe','ar during speech',' before stopping now.']);
@@ -1074,13 +1074,13 @@ for(let second=1;second<=21;second++) {
  await page.evaluate(()=>window.samples(1));
  await page.waitForFunction(samples=>window.benchmarkAudioSamples===samples,second*16000);
 }
-assert.equal(await page.evaluate(()=>window.benchmarkRequests.filter(r=>r.op==='push').length),1050);
+assert.equal(await page.evaluate(()=>window.benchmarkRequests.filter(r=>r.op==='push').length),210);
 assert.equal(await page.evaluate(()=>window.benchmarkRequests.some(r=>r.op==='diagnostic')),false);
 assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>['previewTranscribeAudio','transcribeAudio'].includes(c[0]))),false);
 await stop(); await page.waitForFunction(()=>window.store.getState().status==='idle');
 assert.equal(await page.evaluate(()=>window.benchmarkRequests.filter(r=>r.op==='finish').length),1);
 assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').map(c=>c[1])),['Long stream completed.']);
-results.push('A stream exceeding 20 seconds maintains sequenced 20 ms IPC packets, avoids whole-history decoding and finishes once after all captured audio.');
+results.push('A stream exceeding 20 seconds maintains sequenced 100 ms IPC packets, avoids whole-history decoding and finishes once after all captured audio.');
 
 if (evidence) await writeFile(path.join(evidence,'diagnostics.json'),JSON.stringify({results,errors,consoleMessages},null,2));
 assert.equal(consoleMessages.filter(message=>message.startsWith('Canonical cursor checkpoint deferred until stop: Error: no canonical transcription is in flight')).length,0, 'Output cancellation must not invalidate an otherwise valid local recognition receipt');

@@ -99,11 +99,11 @@ describe("NVIDIA capture drain and Stop-tail accounting", () => {
     expect(h.collect).not.toHaveBeenCalled();expect(received()).toEqual([]);
   });
   it("cancellation retains drained audio but cannot send or paste the late tail", async () => {
-    const h=harness(); const live=fixture(320),tail=fixture(55,320);
+    const h=harness(); const live=fixture(1600),tail=fixture(55,1600);
     h.appendRecordingSamples(live);await vi.waitFor(()=>expect(received()).toEqual(Array.from(live)));
     h.queue.cancel();h.flush.mockImplementation(async()=>{h.appendRecordingSamples(tail);});
     await h.stop();
-    expect(h.buffer.sampleCount).toBe(375);expect(received()).toEqual(Array.from(live));
+    expect(h.buffer.sampleCount).toBe(1655);expect(received()).toEqual(Array.from(live));
     expect(h.paste).not.toHaveBeenCalled();
     expect(transport.mock.calls.some(c=>c[1].request.op==='finish')).toBe(false);
   });

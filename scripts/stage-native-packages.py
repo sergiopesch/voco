@@ -206,7 +206,7 @@ tar -xf %{{SOURCE0}} -C %{{buildroot}} --no-same-owner --same-permissions
 pkgname=voco
 pkgver={version}
 pkgrel={revision}
-pkgdesc='Local Linux dictation candidate with pinned NVIDIA runtime'
+pkgdesc='Local English dictation with a bundled offline speech model'
 arch=('x86_64')
 url='https://github.com/sergiopesch/voco'
 license=('MIT' 'Apache-2.0' 'LicenseRef-NVIDIA-Open-Model')

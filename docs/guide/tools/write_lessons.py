@@ -259,7 +259,7 @@ lesson(
     [
         "A queue is a waiting line for work. It lets microphone capture continue while an earlier request is being processed.",
         "Each box carries a session and sequence number. Those labels stop a late reply from being mistaken for the next box.",
-        "A bounded queue has a maximum size. If the worker falls too far behind, keeping unlimited audio would make memory and delay grow.",
+        "A bounded queue has a maximum size. If the worker falls too far behind, keeping unlimited audio would make memory and delay grow. The candidate groups 100 ms of audio per worker request to reduce IPC overhead; Stop sends any remaining partial packet immediately.",
     ],
     [
         ("Capture", "A new ordered block of audio arrives."),
@@ -424,7 +424,7 @@ lesson(
         ),
         (
             "Observation has limits",
-            "Accessible-field samples are best-effort local observations, not atomic ownership or compositor paint. A target can still change between checks.",
+            "Accessible-field samples are best-effort local observations, not atomic ownership or compositor paint. Firefox can report newly inserted text before its caret catches up. VOCO waits within the existing three-second limit for exact text and position to agree; an intermediate sample cannot confirm delivery, and an uncertain paste is never replayed. A target can still change between checks.",
         ),
     ],
     [

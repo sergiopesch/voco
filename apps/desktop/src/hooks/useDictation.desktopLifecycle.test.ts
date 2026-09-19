@@ -56,7 +56,7 @@ it.each(["cancelled", "restarted"])("keeps late native success out of the %s ses
     return new BenchmarkPhraseQueue(paste, vi.fn(), vi.fn(), preview, startingSessionId);
   };
   const oldQueue = create(1);
-  oldQueue.pushAudio(new Float32Array(320), 16000);
+  oldQueue.pushAudio(new Float32Array(1600), 16000);
   await vi.waitFor(() => expect(release).toBeDefined());
   cancelledRef.current = "cancelled";
   oldQueue.cancel();
@@ -78,7 +78,7 @@ it.each(["cancelled", "restarted"])("keeps late native success out of the %s ses
     .find(r => r.op === "quality" && r.event === "terminal" && r.dictation_session_id === 1);
   expect(terminal).toMatchObject({ outcome: "cancelled", dispatched_count: 1 });
   if (newQueue) {
-    newQueue.pushAudio(new Float32Array(320),16000);newQueue.enqueue();await newQueue.finish();
+    newQueue.pushAudio(new Float32Array(1600),16000);newQueue.enqueue();await newQueue.finish();
     expect(trace.mock.calls.filter(c => c[0] === "dictation_desktop_live_prefix_dispatched")).toHaveLength(1);
     expect(desktopPhrasePasteCountRef.current).toBe(1);
     expect(metrics).toHaveBeenCalledOnce();

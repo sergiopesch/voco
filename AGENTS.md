@@ -43,6 +43,8 @@ glib 0.20 directly leaves the GTK dependency behind. [Backport](vendor/glib/VOCO
 - Flush Stop audio into the same live stream before finish; do not copy/replay a
   whole recording. Recover a dead worker only at a safe session boundary.
 - Keep bounded queues, deadlines, sequence/sample accounting and recovery.
+  Production worker IPC groups 100 ms of audio; Stop flushes the partial packet.
+  Preserve the three-second backlog bound and verify every retained sample.
 - Unverified ScriptProcessor fallback cannot enter automatic NVIDIA delivery.
 - Explicit NVIDIA recovery uses `recover_stream` and the bundled runtime, with no
   destination callback or Whisper fallback. Preserve source samples/rate; publish
@@ -55,6 +57,8 @@ glib 0.20 directly leaves the GTK dependency behind. [Backport](vendor/glib/VOCO
   proceed through debounce; passive evdev retains its duplicate guard.
 - IBus protocol 6 is dictation-shortcut-only; older helpers must reconnect after upgrade. Never restore text mutation there.
 - Bounded accessible-field observations are not atomic ownership or cursor paint.
+  Content and caret can propagate separately. Exact expected content at an earlier
+  known caret is pending, never receipt; retain the deadline and no-replay rule.
 - Automatic desktop insertion requires a bound, nonempty destination token. An
   unavailable preflight is never permission to paste unguarded. GNOME X11's
   `mutter-x11-frames` decoration is not a second destination; retain rejection for

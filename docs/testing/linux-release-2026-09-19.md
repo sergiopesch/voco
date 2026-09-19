@@ -312,7 +312,7 @@ before trial 58. Trial 56 is a failed trial, not a successful Kate result.
 Firefox trials exposed two independent failures. Alt+D activated its menu; an
 instrumented DOM event trace and VM screenshot preserved that result (60, 63–65).
 A Ctrl+Meta+D compositor binding allowed initial delivery, but held modifiers at
-Stop interfered with the final clipboard gesture (66–68). An unused F8 binding
+Stop interfered with the final clipboard gesture (67–68); trial 66 instead hit the audio backlog bound. An unused F8 binding
 removed modifier interference, while the two-thread recognizer still exceeded the
 bounded queue age in the two-core guest (69). The queue limit was not relaxed.
 
@@ -342,3 +342,40 @@ completed all 12 public fixtures: 238 reference words and six lexical edits
 (2.52% normalized WER). Every final transcript matched the earlier four-thread
 corpus exactly. This establishes parity only for this small corpus; punctuation
 references are unaudited and no TypeSafe API score was generated.
+
+
+### Sustained Firefox packet experiment
+
+Short-session success did not qualify sustained dictation: trial 72 used F8 and
+one recognizer thread but exceeded the three-second backlog bound after roughly
+12 seconds of processed audio during a 139.2-second fixture. Audio was retained;
+this is a failed release gate, not a completed long-session result.
+
+The next isolated candidate changes production audio IPC packets from 20 to
+100 ms (50 to ten requests per second). This permits up to 80 ms more packet
+collection time; Stop still flushes a partial packet immediately. The three-second
+queue bound is unchanged. Exact-sample tests cover irregular callbacks, original
+sample rates, ordered packets, cancellation and final partial-packet delivery.
+The one-thread worker control completed all 12 fixtures with exactly the same
+transcripts and six errors in 238 words as the 20 ms control. This is worker-only
+accuracy evidence; sustained recipient tests remain required.
+
+
+The local6 package (application SHA-256
+`634efc49d055a87af28aedfa25fab44f410fb52df4500d67aa660c757778c7bb`)
+passed native RPM payload parity. Trial 73 failed desktop focus setup before
+recording. Trial 74 still hit the audio backlog bound during Firefox startup.
+After a 60-second browser settling period, trial 75 kept audio queue age below
+282 ms but stopped on uncertain insertion after about 54 seconds. This is not a
+successful long-session result. Diagnostic trial 76 identified a specific AT-SPI
+transition: text count advanced from 463 to 465 while the caret remained at 463.
+The observer had classified that intermediate state as an unrelated edit.
+
+Five additional regression cases cover content arriving before the caret,
+standalone-space progress, never acknowledging a stale caret, unrelated caret
+positions and wrong text. The observer change passes all 46 readback tests and
+27 focus tests. It waits only for exact expected text at a prior known collapsed
+caret, within the unchanged three-second deadline. Full installed verification
+is still required. Profiling in trial 76 is diagnostic evidence, not a latency
+benchmark. All these guests retain two vCPUs and a two-core container CPU quota;
+the quota also includes QEMU overhead.

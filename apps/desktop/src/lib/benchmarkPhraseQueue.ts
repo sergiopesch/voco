@@ -249,7 +249,10 @@ export class BenchmarkPhraseQueue {
     this.capturedSamples += audio.length;
     this.captureRate = rate;
     this.rate = rate;
-    const count = Math.round(rate * 0.02);
+    // Ten bounded requests per second amortize JSON/IPC work on busy desktops.
+    // This adds at most 100 ms of packet collection; Stop flushes the tail below.
+    // The independent three-second backlog limit and sample accounting remain.
+    const count = Math.round(rate * 0.1);
     let offset = 0;
     // Fill only one packet at a time. Splicing a complete callback repeatedly
     // shifts its remaining samples and temporarily retains an unbounded buffer.

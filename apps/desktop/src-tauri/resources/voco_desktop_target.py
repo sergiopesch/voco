@@ -343,6 +343,21 @@ def delivery_stage(snapshot, node):
                     and current == space_position
                     and read_slice(iface, left, start + 1 + len(after)) == before + ' ' + after):
                 stage = 1
+        if stage == -1 and not selected and not current[4]:
+            # Firefox may expose the inserted content/count before its caret
+            # update, even across two reads. Only the exact expected local text
+            # at an earlier known caret is indeterminate, never acknowledged.
+            # The caller's existing deadline bounds this wait; no paste is replayed.
+            prior_carets = {start}
+            if payload.startswith(' ') and len(payload) > 1 and not payload[1].isspace():
+                prior_carets.add(start + 1)
+            if (current[0] == new_count and current[1] in prior_carets
+                    and read_slice(iface, left, new_caret + len(after)) == before + payload + after):
+                stage = None
+            elif (payload.startswith(' ') and len(payload) > 1 and not payload[1].isspace()
+                    and current == (count + 1, start, start, start, False)
+                    and read_slice(iface, left, start + 1 + len(after)) == before + ' ' + after):
+                stage = None
         if text_position(node)[1] != current:
             return None
     except (InconsistentPosition, InconsistentText):

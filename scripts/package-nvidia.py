@@ -139,7 +139,7 @@ def main():
         copy_vendored_notices(ROOT, doc)
         identity = {"version": package_version, "application_version": version,
                     "backend": "CPU native pool", "context": 1, "cpu_threads": 4,
-                    "cpu_thread_policy": "At most four, capped to process CPU affinity; explicit research overrides preserved",
+                    "cpu_thread_policy": "At most four, reserving one CPU from process affinity for desktop work (minimum one); explicit research overrides preserved",
                     **payload_inventory(speech)}
         (speech / "MANIFEST.json").write_text(json.dumps(identity, indent=2) + "\n")
         normalize_payload_modes(speech)
