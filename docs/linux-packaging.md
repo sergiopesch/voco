@@ -33,6 +33,14 @@ repositories may not provide it, so the recommendation must not block X11 instal
 `gir1.2-atspi-2.0` provide the accessibility bus and bindings. Package installation
 does not change the selected input source or restart IBus.
 
+The .43 Debian package repairs inherited `0775` permissions on its own root-owned
+directories to `0755` during configuration. The reviewed migration uses directory
+descriptors, rejects symlink traversal and leaves user files, custom modes and
+`dpkg-statoverride` entries unchanged. Missing documentation directories are allowed
+when the system uses `path-exclude`. The verifier checks the exact generated hook;
+native RPM and Arch packages omit it because their managers apply archive modes.
+Upgrade qualification includes legacy installations, not only fresh extraction.
+
 The .43 candidate additionally links libpulse (`libpulse-dev` on Debian build
 hosts, `libpulse0` at runtime). Fedora, openSUSE and Arch profiles map that library
 to their native package names. Native Wayland capture requires PipeWire's Pulse

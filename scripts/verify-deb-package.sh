@@ -108,18 +108,14 @@ if awk '{ print $NF }' <<<"${PACKAGE_LISTING}" | rg -q '(__pycache__|\.pyc$|_tes
   exit 1
 fi
 
-if dpkg-deb --ctrl-tarfile "${DEB_PATH}" | tar -tf - \
-  | rg -q '(^|/)(preinst|postinst|prerm|postrm|config|triggers)$'; then
-  echo "Debian package unexpectedly mutates installation state via maintainer scripts." >&2
-  exit 1
-fi
-
 EXTRACT_ROOT="$(mktemp -d)"
 cleanup() {
   rm -rf "${EXTRACT_ROOT}"
 }
 trap cleanup EXIT INT TERM
 dpkg-deb -x "${DEB_PATH}" "${EXTRACT_ROOT}"
+dpkg-deb -e "${DEB_PATH}" "${EXTRACT_ROOT}/DEBIAN"
+python3 "${ROOT_DIR}/scripts/debian_maintainer.py" "${EXTRACT_ROOT}/DEBIAN" "${EXTRACT_ROOT}"
 # A development binary may link Pulse directly; never rely on a desktop's
 # incidental transitive installation to satisfy that runtime dependency.
 for executable in /usr/bin/voco /usr/libexec/voco-browser-host; do

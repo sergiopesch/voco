@@ -123,10 +123,12 @@ def main():
     with tempfile.TemporaryDirectory(prefix='voco-native-package-') as temporary:
         control = Path(temporary) / 'control'
         subprocess.run(['dpkg-deb', '-e', str(args.deb.resolve()), str(control)], check=True)
-        if any(path.name not in ('control', 'md5sums') for path in control.iterdir()):
-            raise ValueError('Debian maintainer actions require explicit native package review')
         payload = Path(temporary) / 'payload'
         subprocess.run(['dpkg-deb', '-x', str(args.deb.resolve()), str(payload)], check=True)
+        # RPM and pacman apply directory modes themselves. Deliberately omit only
+        # the byte-verified Debian legacy repair; reject any other maintainer action.
+        from debian_maintainer import verify_control
+        verify_control(control, payload)
         entries = inventory(payload)
         archive = args.output / 'voco-payload.tar'
         with tarfile.open(archive, 'w', format=tarfile.PAX_FORMAT) as tar:

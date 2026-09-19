@@ -37,7 +37,7 @@
     "test:native-capture-callbacks": "python3 scripts/test-native-capture-callbacks.py",
     "test:native-capture-audit": "PYTHONDONTWRITEBYTECODE=1 python3 scripts/test_verify_native_capture_audit.py",
     "test:speech-runtime": "PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -m unittest discover -s runtime/speech -p \"test_*.py\"",
-    "test:speech-package": "PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-speech-package.py",
+    "test:speech-package": "PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-speech-package.py && PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-debian-maintainer.py",
     "test:speech-report": "PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-report-speech-timing.py",
     "test:dictation-quality": "node --test scripts/dictation-quality.test.mjs",
     "test:dictation-quality-events": "PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-report-dictation-quality-events.py",
