@@ -1076,7 +1076,7 @@ export function ControlPanel({
                         <strong>Desktop shortcut</strong>
                         <p>You can assign <code>voco --toggle</code> to a non-repeating shortcut in your desktop settings.
                           Keep VOCO running and use that shortcut to start and stop dictation.
-                          Prefer an unused key without modifiers, such as F8: held modifiers can interfere with the final paste.</p>
+                          Use an unused key such as F8. Configure the desktop binding to also work with Ctrl and Ctrl+Shift, which clipboard delivery briefly uses.</p>
                         <p>The shortcut above and its status describe VOCO’s built-in keyboard handling.
                           Your desktop controls external bindings; VOCO cannot verify which keys you assigned.</p>
                       </div> : null}

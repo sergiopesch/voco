@@ -54,6 +54,7 @@
         "desktopTemplate": "../../../packaging/tauri/VOCO.desktop",
         "depends": [
           "libpulse0",
+          "libnotify-bin",
           "ibus",
           "python3",
           "gir1.2-ibus-1.0",

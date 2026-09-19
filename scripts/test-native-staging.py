@@ -72,6 +72,8 @@ class DependencyTests(unittest.TestCase):
         suse = staging.rpm_dependencies('opensuse')
         self.assertIn('pulseaudio-libs', fedora)
         self.assertIn('libpulse0', suse)
+        self.assertIn('libnotify-tools', suse)
+        self.assertIn('libnotify', staging.rpm_dependencies('fedora'))
         self.assertIn('sentencepiece-libs', fedora)
         self.assertNotIn('sentencepiece-libs', suse)
         self.assertIn('libsentencepiece0', suse)

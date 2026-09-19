@@ -227,7 +227,7 @@ if appimage.get("files", {}).get(
 ) != tauri_metainfo_source:
     raise SystemExit("AppImage AppStream metadata is not mapped from the Tauri variant")
 required_dependencies = {"ibus", "python3", "python3-gi", "gir1.2-ibus-1.0",
-                         "xdotool", "xclip", "wl-clipboard",
+                         "xdotool", "xclip", "wl-clipboard", "libnotify-bin",
                          "libc6 (>= 2.39)", "libstdc++6 (>= 13.2.0)"}
 if not required_dependencies.issubset(deb.get("depends", [])):
     raise SystemExit("Debian IBus runtime dependencies are incomplete")

@@ -1620,7 +1620,7 @@
       },
       {
         "title": "Fit the available CPUs",
-        "text": "A two-core VM took 35.37 seconds to warm a four-thread recognizer, exceeding startup limits. Two threads took 1.53 seconds in a controlled check. The candidate caps its default at the available CPUs, up to four. All 12 public fixtures produced identical transcripts across the tested Fedora, openSUSE and two-core Ubuntu workers: six lexical edits in 238 words. This small corpus does not establish worldwide accuracy."
+        "text": "A two-core VM took 35.37 seconds to warm a four-thread recognizer, exceeding startup limits. Two threads took 1.53 seconds in a controlled check. The candidate leaves one CPU from process affinity available for desktop work, with at least one recognizer thread and at most four. All 12 public fixtures produced identical transcripts across the tested Fedora, openSUSE and two-core Ubuntu workers: six lexical edits in 238 words. This small corpus does not establish worldwide accuracy."
       },
       {
         "title": "Reject an unknown destination",
@@ -1632,7 +1632,7 @@
       },
       {
         "title": "Test the receiving application",
-        "text": "Kate and Konsole accepted the public fixture in a booted KDE guest. Firefox exposed both shortcut-modifier interference and CPU contention that GTK-only tests had missed. Two controlled trials passed with an unused F8 compositor binding and one recognizer thread on two CPUs, but Stop took 2.0 and 3.0 seconds. The next candidate leaves one CPU available for desktop work, capped at four recognizer threads, and needs fresh package qualification. These controls are evidence, not a universal speed claim."
+        "text": "Kate and Konsole accepted the public fixture in a booted KDE guest. Firefox exposed both shortcut-modifier interference and CPU contention that GTK-only tests had missed. The updated candidate delivered all 280 words in a 139.2-second Firefox trial and stopped in 627 ms after the browser settled. Cold-start CPU-pressure failures remain recorded. Separate controls showed that Stop bindings must also accept the Ctrl and Shift modifiers used by clipboard delivery: Omarchy uses ignore_mods; KDE can bind the key and its Ctrl variants. These observations do not establish universal speed or compatibility."
       },
       {
         "title": "Safe upgrades",

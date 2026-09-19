@@ -379,3 +379,29 @@ caret, within the unchanged three-second deadline. Full installed verification
 is still required. Profiling in trial 76 is diagnostic evidence, not a latency
 benchmark. All these guests retain two vCPUs and a two-core container CPU quota;
 the quota also includes QEMU overhead.
+
+
+### Installed Firefox and modifier controls
+
+Local7 (application SHA-256
+`97bbdda1fc224e8748654dd7994400952156157a0e2813da75b7ab87107fe4a9`)
+contains the 100 ms packet and bounded Firefox observation fixes. Trial 77 delivered
+all 280 words without a backlog or insertion error, but the compositor did not
+send the Stop command; it remains a failed trial. Repeat trial 78 passed the
+139.2-second fixture with 280/280 normalized words, Stop-to-idle 627 ms and maximum
+audio queue age 352 ms. Both used a 60-second browser settling period. These do
+not erase the cold-browser resource-pressure failures or prove physical CPU speed.
+
+Omarchy trial 79 passed two sessions at the same caret, delivering 28 words with
+Stop-to-idle 223 and 253 ms on the new three-thread default. The Hyprland F8 binding
+used `ignore_mods = true`. Trial 82 repeated this test with Ctrl+F8 for every
+trigger and completed both sessions. Its controller was interrupted after guest
+completion; the completed field receipt, application trace and harness `ok` were
+subsequently recovered without rerunning or replacing the trial.
+
+KDE trial 80 deliberately sent Ctrl+F7 for Stop while only F7 was bound and failed
+to stop. Trial 81 passed after adding Ctrl+F7 and Ctrl+Shift+F7 to the same command,
+with all three keys checked for conflicts. This reproduces the missing-modifier
+binding failure; it does not establish the exact key state during trial 77.
+Only isolated guest bindings changed. Product guidance now explains the tested
+setup, and packages explicitly depend on the distribution's notification command.

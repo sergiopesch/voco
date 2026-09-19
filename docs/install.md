@@ -76,9 +76,11 @@ See [troubleshooting](troubleshooting.md).
 ### Wayland compositor shortcuts
 
 Assign `voco --toggle` to an unused, non-repeating key in your desktop's shortcut
-settings, and keep VOCO running. Prefer a key without modifiers, such as **F8**.
-Alt can activate browser menus, and holding Ctrl/Meta during Stop can interfere
-with the final paste. Test Start and Stop in your editor before normal use.
+settings, and keep VOCO running. Use an unused key such as **F8**, with a binding
+that also accepts Ctrl and Ctrl+Shift: clipboard delivery briefly uses those
+modifiers. Hyprland supports `ignore_mods`; KDE can assign the three variants to
+one command. Check every variant for conflicts. Avoid holding Alt or Meta during
+Stop, and test Start and Stop in your editor before normal use.
 The compositor binding is separate from VOCO's built-in shortcut setting; the
 command cannot identify which key your desktop assigned. See the
 [Hyprland example](linux-support.md#hyprland-shortcut-integration-in-the-43-candidate).
