@@ -13,9 +13,13 @@ export interface CaptureDescriptor {
 }
 
 export function createCaptureDescriptor(value: CaptureDescriptor): CaptureDescriptor {
+  // Capture admission must match the bundled recognizer and explicit recovery.
+  // Validate before connecting the microphone graph or accepting source samples.
+  if (!Number.isSafeInteger(value.sourceSampleRate) || value.sourceSampleRate < 8000 || value.sourceSampleRate > 96000) {
+    throw new Error("VOCO requires a microphone sample rate from 8 to 96 kHz. Choose a supported format in your audio settings.");
+  }
   if (!Number.isSafeInteger(value.sessionId) || value.sessionId <= 0 ||
       !Number.isSafeInteger(value.generation) || value.generation < 0 ||
-      !Number.isSafeInteger(value.sourceSampleRate) || value.sourceSampleRate < 8000 || value.sourceSampleRate > 384000 ||
       value.deliveredChannels !== 1 ||
       (value.backend === "native" ? value.sourceChannels !== 2 || value.conversion !== "s16le-stereo-average" || !value.sourceIdentity :
         value.backend !== "webkit" || value.sourceChannels !== 1 || value.conversion !== "webaudio-mono")) {

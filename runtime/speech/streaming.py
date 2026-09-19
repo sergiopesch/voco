@@ -133,7 +133,7 @@ class StreamingSession:
         self.metrics = {}; self.chunks = 0; self.first_nonzero_audio_s = None
     def push(self, data, rate):
         if not self.active: raise ValueError('inactive session')
-        if type(rate) is not int or rate < 8000 or rate > 384000 or (self.rate and self.rate != rate): raise ValueError('sample rate')
+        if type(rate) is not int or rate < 8000 or rate > 96000 or (self.rate and self.rate != rate): raise ValueError('sample rate')
         data = np.asarray(data, np.float32)
         if data.ndim != 1 or not len(data) or len(data) > rate or not np.isfinite(data).all(): raise ValueError('audio shape')
         if self.first_nonzero_audio_s is None:

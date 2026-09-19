@@ -106,3 +106,7 @@ This removes the package and preserves personal settings. VOCO uses XDG director
 under `~/.config/voco`, `~/.local/share/voco`, `~/.local/state/voco` and `~/.cache/voco`.
 Inspect these separately before choosing to remove personal data. Files belonging
 to other applications are never part of a VOCO uninstall.
+
+Microphone capture formats must be between 8 and 96 kHz, matching the bundled
+recognizer and recovery runtime. An unsupported format is rejected before recording
+starts; select a supported format in the system audio settings.

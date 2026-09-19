@@ -10,7 +10,7 @@ beforeEach(() => {
   }));
 });
 
-it.each([8000, 16000, 44100, 48000, 96000, 176400, 192000, 384000])("preserves every source sample at %i Hz without delivery or resampling", async rate => {
+it.each([8000, 16000, 44100, 48000, 96000])("preserves every source sample at %i Hz without delivery or resampling", async rate => {
   const audio = Float32Array.from({ length: Math.round(rate * 0.25) + 1 }, (_, i) => Math.sin(i / 20));
   const original = audio.slice();
   const recovery = new NvidiaRecovery();
@@ -73,7 +73,7 @@ it("requires a final transcript rather than treating a missing finish as success
 it.each([
   [new Float32Array(), 16000], [new Float32Array([NaN]), 16000],
   [new Float32Array([Infinity]), 16000], [new Float32Array(1), 0],
-  [new Float32Array(1), 16000.5], [new Float32Array(1), 384001],
+  [new Float32Array(1), 16000.5], [new Float32Array(1), 192000],
   [new Float32Array(8000 * 600 + 1), 8000],
 ])("rejects invalid capture before opening a worker", async (audio, rate) => {
   await expect(new NvidiaRecovery().transcribe(audio, rate)).rejects.toThrow("Invalid recovery audio");

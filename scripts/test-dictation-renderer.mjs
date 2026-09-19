@@ -560,6 +560,19 @@ assert.equal(admissionEvents.filter(e=>e==='dictation_trigger_stop_admitted').le
 assert.equal(admissionEvents.filter(e=>e==='dictation_trigger_start_rejected').length,1);
 assert.equal(admissionEvents.filter(e=>e==='dictation_trigger_stop_rejected').length,2);
 results.push('Directed browser events preserve action: duplicate starts and foreign stops cannot toggle; a late matching stop cannot start another recording.');
+for (const rate of [96001,176400,192000,384000]) {
+  await load();
+  await page.evaluate(rate => {
+    const Base=window.AudioContext;
+    window.AudioContext=class extends Base {sampleRate=rate;};
+    window.hook.toggle();
+  },rate);
+  await page.waitForFunction(()=>window.store.getState().status==='error');
+  assert.equal(await page.evaluate(()=>window.captureReady()),false);
+  assert.equal(await page.evaluate(()=>window.benchmarkRequests.some(r=>['start','push','finish'].includes(r.op))),false);
+  assert.equal(await page.evaluate(()=>window.traceEvents.some(c=>c[0]==='recording_state_active')),false);
+  results.push(`Unsupported ${rate} Hz is rejected before recording, worker delivery or audio graph admission.`);
+}
 for (const failureStage of ['audio-context', 'microphone-after-claim']) {
   await load();
   await page.evaluate(stage => {

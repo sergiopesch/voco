@@ -79,7 +79,7 @@ describe('pinned append-only candidate',()=>{
   await expect(queue.finish()).rejects.toThrow('undefined');
   expect(failure).toHaveBeenCalledOnce();
  });
- it.each([8000,22050,44100,48000,96000,176400,192000,384000])('keeps packet geometry at %i Hz',async rate=>{
+ it.each([8000,22050,44100,48000,96000])('keeps packet geometry at %i Hz',async rate=>{
   worker.mockImplementation(async(_c,{request:r})=>({...r,mode:'append-only',text:null}));
   const {queue}=make();const count=Math.round(rate*.02);
   const audio=Float32Array.from({length:count*2+7},(_,i)=>i/(count*3));
