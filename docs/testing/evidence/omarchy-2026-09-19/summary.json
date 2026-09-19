@@ -84,5 +84,19 @@
     "Hidden transparent VOCO window remains mapped and tiled under minimal Hyprland.",
     "Custom SentencePiece prerequisite and production native-package signing/distribution not qualified.",
     "Default Omarchy configuration, browser/editor/terminal matrix, suspend/resume and physical microphones remain unqualified."
-  ]
+  ],
+  "defaultUserNegativeControl": {
+    "driver": "QEMU emulated keyboard, same as successful trials",
+    "extraKeyboardAcl": false,
+    "onboardingPassed": true,
+    "captureStarted": false,
+    "fieldUnchanged": true,
+    "failure": "Timed out waiting for capture active; no accessible evdev keyboard"
+  },
+  "vmAttemptCounts": {
+    "total": 10,
+    "completedConfiguredAcceptance": 3,
+    "negativePermissionControls": 1,
+    "earlierHarnessSetupOrDriverFailures": 6
+  }
 }
