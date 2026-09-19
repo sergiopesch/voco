@@ -335,3 +335,10 @@ public speech: 1,162/1,162 normalized words, the second field empty, Stop 829 ms
 All 25,512,291 frames matched retained renderer audio; offline full-waveform
 alignment passed, with quarter correlations 0.9949–0.9951. This retains local5's
 four-thread identity and does not qualify the changed default by itself.
+
+
+The explicit one-thread openSUSE and three-thread Omarchy worker controls each
+completed all 12 public fixtures: 238 reference words and six lexical edits
+(2.52% normalized WER). Every final transcript matched the earlier four-thread
+corpus exactly. This establishes parity only for this small corpus; punctuation
+references are unaudited and no TypeSafe API score was generated.
