@@ -148,7 +148,7 @@ class GuideTests(unittest.TestCase):
     def test_evaluation_is_dated_and_separate_from_release_source(self):
         chapters = json.loads((ROOT / "site/chapters.json").read_text())
         chapter = next(c for c in chapters if c["id"] == "typesafe")
-        self.assertIn(".42", chapter["sourceNote"])
+        self.assertIn(self.server.catalog["version"], chapter["sourceNote"])
         self.assertIn(".41", chapter["comparison"]["title"])
         self.assertIn("not", chapter["comparison"]["limits"])
         for comparison in [chapter["comparison"], *chapter["comparison"].get("additional", [])]:

@@ -53,6 +53,9 @@ python3 tools/write_lessons.py
 VOCO_SOURCE=../.. python3 -m unittest discover -s tests -v
 ```
 
+Restart any running guide server after regenerating the catalog. It loads its
+pinned source identity at startup.
+
 `tools/catalog.py` is the pinned inventory builder. `tools/write_lessons.py` is the authored chapter source. `site/app.js` handles navigation and source reading; `site/diagrams.js` contains the small simulations. `serve.py` is the loopback-only read boundary.
 
 See [VERIFICATION.md](VERIFICATION.md) for checks and limitations. VOCO source and identity retain their upstream notices; bundled Geist fonts use the SIL Open Font License.

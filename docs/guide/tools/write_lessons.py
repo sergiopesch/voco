@@ -963,7 +963,7 @@ lesson(
 )
 summary_path = Path(__file__).resolve().parents[2] / "testing/typesafe-summary-2026-09-19.json"
 chapters[-1]["comparison"] = json.loads(summary_path.read_text())
-chapters[-1]["sourceNote"] = "Evaluation tools from the pinned source snapshot. Tables retain their original .41 experiment identity."
+chapters[-1]["sourceNote"] = "Evaluation tools from the pinned 2026.0.43 development snapshot. Tables retain their original .41 experiment identity."
 
 lesson(
     "linux-support",
