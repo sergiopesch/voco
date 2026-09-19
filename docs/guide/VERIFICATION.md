@@ -2,7 +2,7 @@
 
 ## Final .43 package evidence · 19 September 2026
 
-The catalog pins `7b7b8a9293b17b7e178089f7793c95adeacecfa1`, including the
+The catalog pins `c0b657f2299fb477d297786fe5d0606e88e7e4cc`, including the
 final package and desktop report. Twenty chapters distinguish public availability
 from candidate evidence, retain the original TypeSafe experiment identity and
 explain measured fixes and remaining gaps. No private recordings or credentials
