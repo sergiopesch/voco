@@ -37,8 +37,21 @@ Use `npm run build` for the base bundle, then the NVIDIA assembler and full
 package verifier from [packaging](linux-packaging.md). A direct Tauri bundle may
 omit the matching browser host.
 
-Use Python with NumPy, psutil and required GI bindings. On the reference laptop
-this is `/usr/bin/python3`; bare `python3` can select a different environment.
+Use Python with NumPy, psutil and required GI bindings. Use `/usr/bin/python3` for distribution-provided GI bindings; a virtual environment
+or bare `python3` may select a different interpreter.
 Keep synthetic audio/input tests in private fixtures and retain exact evidence
-separately from source. [Pre-release review](testing/pre-release-review-2026-09-15.md)
-tracks this candidate's scope and remaining acceptance gates.
+separately from source. The [release process](release-process.md) and [latest release notes](releases/2026.0.42.md)
+explain qualification boundaries.
+
+## Sending a change
+
+Open a focused pull request against `master`. Include the user-visible behavior,
+reproduction or relevant tests, and documentation changes. The branch requires
+Code Guide, Frontend Checks, Rust Check & Test, and RustSec Audit; resolve review
+conversations before merging. Never bypass a failing speech or security gate.
+
+Use public or synthetic fixtures. Do not attach personal audio, transcripts,
+clipboard contents, credentials or unredacted diagnostic logs to public issues.
+The [security policy](../SECURITY.md) explains private vulnerability reporting.
+Evaluation contributions should follow the [TypeSafe protocol](testing/typesafe-evaluation.md)
+and distinguish measured results from targets and missing evidence.

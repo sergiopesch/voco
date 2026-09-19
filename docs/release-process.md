@@ -56,10 +56,9 @@ fresh clone. Do not re-enable it or push a later tag into that assembler. Public
 releases attach verified local NVIDIA packages. This changes the delivery
 mechanism, not the test gates.
 
-The [2026.0.37 cut](releases/2026.0.37.md) and the .38 dictation-only cut are
-historical and immutable. [2026.0.39](releases/2026.0.39.md) is the current
-public release. 2026.0.40 is a private candidate in this tree and needs fresh
-qualification before any public cut.
+Historical cuts and published tags are immutable. The release version is recorded
+in package metadata; confirm the current public release on GitHub before cutting a
+new version. The .40 and .41 development milestones are superseded by .42.
 
 ## Publish
 
@@ -68,9 +67,8 @@ Obtain explicit publication approval, then activate the release channel and veri
 the published installer, versioned assets and latest aliases. Keep the previous
 release available for rollback. Follow-up changes require a new version.
 
-2026.0.39 was published from verified local artifacts. Previous public release
-2026.0.21 remains available for rollback. The hosted Release workflow stays
-disabled.
+Keep 2026.0.39 available for rollback after publishing .42. Never relabel an older
+package as a new build. The hosted Release workflow stays disabled.
 
 ## Repository hygiene
 

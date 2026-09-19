@@ -149,53 +149,62 @@ fn recover_with_worker(
         .as_str()
         .filter(|value| !value.is_empty() && value.len() <= 80)
         .ok_or("invalid recovery session")?;
-    let seq = request["seq"].as_u64().ok_or("invalid recovery sequence")?;
-    let op = request["op"].as_str().ok_or("invalid recovery operation")?;
-    match op {
-        "cancel" => {
-            // Late cleanup can only release its own worker, never a replacement
-            // recovery or the persistent live recognition worker.
-            if slot.session.as_deref() == Some(session) {
-                *slot = RecoveryWorker::default();
+    let session = session.to_owned();
+    let result = (|| {
+        let seq = request["seq"].as_u64().ok_or("invalid recovery sequence")?;
+        let op = request["op"].as_str().ok_or("invalid recovery operation")?;
+        match op {
+            "cancel" => {
+                // Late cleanup can only release its own worker, never a replacement
+                // recovery or the persistent live recognition worker.
+                if slot.session.as_deref() == Some(session.as_str()) {
+                    *slot = RecoveryWorker::default();
+                }
+                return Ok(
+                    serde_json::json!({"session":session,"seq":seq,"mode":"append-only","text":null}),
+                );
             }
-            return Ok(
-                serde_json::json!({"session":session,"seq":seq,"mode":"append-only","text":null}),
-            );
+            "start" if seq == 0 => {
+                // A new explicit attempt supersedes abandoned recovery after renderer
+                // replacement. Neither session has any destination capability.
+                *slot = RecoveryWorker {
+                    session: Some(session.clone()),
+                    ..Default::default()
+                };
+            }
+            "push" | "finish" if slot.session.as_deref() == Some(session.as_str()) => {}
+            _ => return Err("inactive or invalid recovery request".into()),
         }
-        "start" if seq == 0 => {
-            // A new explicit attempt supersedes abandoned recovery after renderer
-            // replacement. Neither session has any destination capability.
-            *slot = RecoveryWorker {
-                session: Some(session.to_owned()),
-                ..Default::default()
-            };
+        if op == "push" {
+            let rate = request["rate"].as_u64().ok_or("invalid recovery rate")?;
+            let audio = request["audio"]
+                .as_array()
+                .ok_or("invalid recovery audio")?;
+            let count = audio.len() as u64;
+            if !(8_000..=96_000).contains(&rate)
+                || slot.rate.is_some_and(|previous| previous != rate)
+                || count == 0
+                || count > rate
+                || slot.samples + count > (rate * 600).min(32 * 1024 * 1024)
+                || !audio
+                    .iter()
+                    .all(|value| value.as_f64().is_some_and(|v| (v as f32).is_finite()))
+            {
+                return Err("invalid recovery audio bounds".into());
+            }
+            slot.rate = Some(rate);
+            slot.samples += count;
         }
-        "push" | "finish" if slot.session.as_deref() == Some(session) => {}
-        _ => return Err("inactive or invalid recovery request".into()),
-    }
-    if op == "push" {
-        let rate = request["rate"].as_u64().ok_or("invalid recovery rate")?;
-        let audio = request["audio"]
-            .as_array()
-            .ok_or("invalid recovery audio")?;
-        let count = audio.len() as u64;
-        if !(8_000..=96_000).contains(&rate)
-            || slot.rate.is_some_and(|previous| previous != rate)
-            || count == 0
-            || count > rate
-            || slot.samples + count > (rate * 600).min(32 * 1024 * 1024)
-            || !audio
-                .iter()
-                .all(|value| value.as_f64().is_some_and(|v| (v as f32).is_finite()))
-        {
-            return Err("invalid recovery audio bounds".into());
+        let finished = op == "finish";
+        let result = exchange_with_worker(request, &mut slot.worker, create_worker);
+        if finished {
+            *slot = RecoveryWorker::default();
         }
-        slot.rate = Some(rate);
-        slot.samples += count;
-    }
-    let finished = op == "finish";
-    let result = exchange_with_worker(request, &mut slot.worker, create_worker);
-    if finished || result.is_err() {
+        result
+    })();
+    // Validation failures must release this session even if the renderer never
+    // sends its final Cancel. A stale request cannot release a replacement.
+    if result.is_err() && slot.session.as_deref() == Some(session.as_str()) {
         *slot = RecoveryWorker::default();
     }
     result
@@ -415,25 +424,67 @@ mod tests {
     }
 
     #[test]
-    fn recovery_rejects_bad_geometry_without_replaying_or_retaining_failed_worker() {
-        let mut slot = RecoveryWorker {
-            worker: Some(live_worker(Default::default(), false)),
-            session: Some("fixture".into()),
-            rate: Some(16000),
-            samples: 16000 * 600,
-        };
-        for request in [
+    fn recovery_reaps_its_worker_on_each_validation_failure() {
+        let requests = [
             serde_json::json!({"op":"push","session":"fixture","seq":1,"rate":16000,"audio":[0.1]}),
             serde_json::json!({"op":"push","session":"fixture","seq":1,"rate":48000,"audio":[0.1]}),
             serde_json::json!({"op":"push","session":"fixture","seq":1,"rate":16000,"audio":[1e100]}),
+            serde_json::json!({"op":"push","session":"fixture","seq":1,"audio":[0.1]}),
+            serde_json::json!({"op":"push","session":"fixture","seq":1,"rate":16000,"audio":"invalid"}),
+            serde_json::json!({"op":"push","session":"fixture","seq":1,"rate":16000,"audio":[]}),
+            serde_json::json!({"op":"push","session":"fixture","seq":1,"rate":16000,"audio":vec![0.1;16001]}),
+            serde_json::json!({"op":"push","session":"fixture","seq":-1,"rate":16000,"audio":[0.1]}),
+            serde_json::json!({"op":"start","session":"fixture","seq":1}),
             serde_json::json!({"op":"warmup","session":"fixture","seq":1}),
+            serde_json::json!({"session":"fixture","seq":1}),
+        ];
+        for (index, request) in requests.into_iter().enumerate() {
+            let seen = std::sync::Arc::new(Mutex::new(Vec::new()));
+            let mut slot = RecoveryWorker {
+                worker: Some(live_worker(seen.clone(), false)),
+                session: Some("fixture".into()),
+                rate: Some(16000),
+                samples: if index == 0 { 16000 * 600 } else { 0 },
+            };
+            let pid = slot.worker.as_ref().unwrap().child.id();
+            assert!(recover_with_worker(request, &mut slot, || panic!(
+                "invalid input must not create a worker"
+            ))
+            .is_err());
+            assert!(slot.worker.is_none());
+            assert!(slot.session.is_none());
+            assert!(!std::path::Path::new(&format!("/proc/{pid}")).exists());
+            assert!(seen.lock().unwrap().is_empty());
+        }
+    }
+
+    #[test]
+    fn recovery_validation_failure_cannot_reap_another_session() {
+        let mut slot = RecoveryWorker {
+            worker: Some(live_worker(Default::default(), false)),
+            session: Some("replacement".into()),
+            ..Default::default()
+        };
+        let pid = slot.worker.as_ref().unwrap().child.id();
+        for request in [
+            serde_json::json!({"op":"push","session":"old","seq":-1}),
+            serde_json::json!({"op":"push","session":"old","seq":1,"rate":0,"audio":[]}),
+            serde_json::json!({"op":"start","session":"old","seq":1}),
+            serde_json::json!({"op":"cancel","session":"","seq":1}),
+            serde_json::json!({"op":"cancel","seq":1}),
         ] {
             assert!(recover_with_worker(request, &mut slot, || panic!(
                 "invalid input must not create a worker"
             ))
             .is_err());
+            assert_eq!(slot.worker.as_ref().unwrap().child.id(), pid);
+            assert!(std::path::Path::new(&format!("/proc/{pid}")).exists());
         }
-        slot = RecoveryWorker::default();
+    }
+
+    #[test]
+    fn recovery_reaps_worker_after_failed_start() {
+        let mut slot = RecoveryWorker::default();
         assert!(recover_with_worker(
             serde_json::json!({"op":"start","session":"failure","seq":0}),
             &mut slot,

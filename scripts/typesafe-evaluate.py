@@ -126,6 +126,13 @@ class ServiceFailure(RuntimeError):
         self.attempts = attempts
 
 
+def finite_json_number(value):
+    number = float(value)
+    if not math.isfinite(number):
+        raise ValueError('nonfinite response number')
+    return number
+
+
 def request(payload, key):
     body = json.dumps(payload, allow_nan=False).encode()
     opener = urllib.request.build_opener(NoRedirect)
@@ -137,7 +144,10 @@ def request(payload, key):
                 raw = reply.read(1_000_001)
                 if len(raw) > 1_000_000:
                     raise ValueError('response size limit')
-                return json.loads(raw), attempt+1
+                # Reject nonstandard constants and overflowing exponents before
+                # retaining a response that cannot be written as strict JSON.
+                return json.loads(raw, parse_float=finite_json_number,
+                                  parse_constant=finite_json_number), attempt+1
         except urllib.error.HTTPError as error:
             if error.code not in (429,529) or attempt == 2:
                 # Do not print service response bodies, headers, or credentials.

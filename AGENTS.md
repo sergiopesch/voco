@@ -108,10 +108,11 @@ isolation, not a remote VM or proof of a distribution's default desktop.
 
 ## Release and evidence
 
-Current public release: **2026.0.39**, glib iterator safety backport. This source is
-the **2026.0.41** candidate, not a public cut. The `.38` and `.37` cuts
-are frozen historical evidence. New product bytes need a new version, fresh checks
-and artifact receipts; do not reuse an older result as current qualification.
+Release version: **2026.0.42**, combining capture/recovery reliability and the
+public evaluation guide. Publication status is authoritative on GitHub Releases;
+a version in source alone is not proof of a published or installed package.
+Frozen .39 and earlier cuts remain immutable. New product bytes need a new version,
+fresh checks and artifact receipts.
 
 Pass all CI gates, including Whisper accuracy. No waiver is authorized. Keep a
 clean commit, exact package/source hashes, licenses, checksums and release notes.

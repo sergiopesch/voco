@@ -1,8 +1,8 @@
-# Verification · 2026.0.39 study guide
+# Guide verification history
 
-## Evaluation chapter update · 19 September 2026
+## Historical evaluation chapter update · 19 September 2026
 
-The source catalog remains pinned to .39. A nineteenth chapter now explains the
+At this checkpoint the source catalog remained pinned to .39. A nineteenth chapter now explains the
 later .41 TypeSafe evaluation, with curated context/thread comparisons and explicit
 limits. No raw benchmark logs, speech transcripts or credentials enter the site.
 

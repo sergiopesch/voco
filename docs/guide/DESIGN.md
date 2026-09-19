@@ -20,5 +20,5 @@ Intentional functional additions: quizzes, read progress, glossary, searchable f
 Narrow layout was inspected at 390 × 844: stacked diagram, chapter drawer and no horizontal overflow. The closed drawer is hidden from keyboard and accessibility navigation. Motion runs only after Play, has a pause button and stops at the final step. CSS transitions respect reduced motion; contrast and print variants remain available.
 
 The TypeSafe comparison uses a semantic table within a keyboard-focusable horizontal
-scroll region on narrow screens. It retains the same palette and type. The original
-source catalog remains pinned; new research results are explicitly separate.
+scroll region on narrow screens. It retains the same palette and type. The source catalog is refreshed deliberately for the .42 release; dated research
+results retain their original .41 identity.

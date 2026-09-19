@@ -1,6 +1,8 @@
 # Install VOCO
 
-Ubuntu x86_64 is the reference platform. Debian-derived systems are best-effort.
+Ubuntu 24.04 or later on x86_64 is the package dependency baseline; AVX2, FMA
+and F16C CPU support are required. Tested environments are listed in the release
+notes. Debian-derived systems are best-effort.
 A complete Debian package includes the NVIDIA English model and CPU runtime.
 A plain Tauri bundle is incomplete. See [packaging](linux-packaging.md).
 
@@ -16,7 +18,7 @@ sudo apt install ./voco_latest_amd64.deb
 
 Continue only if verification succeeds. These files refer to the latest public
 release, which may differ from the development candidate. Checksums are integrity
-checks. The current public tag is unsigned. Signed cuts also ship `*.asc`; verify
+checks. Release 2026.0.42 also ships signed checksums (`*.asc`); verify
 those with `scripts/verify-release.sh` and the `KEYS` file from git, after checking
 the fingerprint out of band.
 
@@ -83,8 +85,9 @@ or assembling a complete package. Source checks alone do not qualify an installe
 
 ## Other Linux systems
 
-Userspace checks cover Ubuntu, Debian, Fedora, Linux Mint and an Omarchy-related Arch
-profile. This is not proof of every distribution’s default compositor, audio stack
+Historical userspace checks cover Ubuntu, Debian, Fedora, Linux Mint and an
+Omarchy-related Arch profile. Consult the [current release notes](releases/2026.0.42.md)
+for checks run on this release. This is not proof of every distribution’s default compositor, audio stack
 or application. RPM/Arch packages require their own native receipts. AppImage,
 Flatpak and Snap are experimental scaffolding, not published support channels.
 See [the compatibility evidence](testing/cross-linux-review-2026-09-15.md).

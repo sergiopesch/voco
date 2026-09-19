@@ -86,6 +86,8 @@ def git(repo, *args):
 
 
 def build(repo, commit):
+    commit = git(repo, "rev-parse", commit + "^{commit}").decode().strip()
+    version = json.loads(git(repo, "show", commit + ":package.json"))["version"]
     entries = []
     raw = git(repo, "ls-tree", "-r", "-l", "-z", commit)
     for item in raw.split(b"\0"):
@@ -143,7 +145,7 @@ def build(repo, commit):
         )
     return {
         "commit": commit,
-        "version": "2026.0.39",
+        "version": version,
         "fileCount": len(entries),
         "scope": "Every tracked entry at the pinned commit. Binary files are catalogued; text files up to 2 MB are readable through the local server. Group roles are navigation aids, not hand-written reviews of every file.",
         "files": entries,

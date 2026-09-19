@@ -134,7 +134,7 @@ evaluate identical reference/transcript pairs.
 | Finish acknowledgement, median | 66.7 ms | 59.8 ms |
 | First hypothesis, median | 1,175.1 ms | 1,170.5 ms |
 
-This is **11.2% less median service time** on this Ryzen laptop, but only 4.6 ms
+This is **11.2% less median service time** on the AMD Ryzen 7 PRO 8840HS test system, but only 4.6 ms
 earlier first text. The six-thread runs occurred later rather than in a second
 counterbalanced A/B sequence; energy, thermals, loaded desktop behavior and other
 CPU classes were not qualified. It is a promising machine-specific follow-up,
@@ -148,7 +148,7 @@ Four isolated GTK/X11 desktop trials ran A–B–B–A against the **same sealed
 executable**, with only the context environment variable changed. They used public
 fixture `422-122949-0000`, a private PulseAudio virtual microphone, private Xvfb /
 Openbox / D-Bus / IBus, and a network-disabled container with four CPU cores of
-quota and a 6 GiB memory limit. No test speech entered the owner's desktop.
+quota and a 6 GiB memory limit. No test speech entered the active desktop.
 
 Executable SHA-256: `f8a7b7de8846060f0f37535ddc7ea42370fd56ed535aa2a380dd0d4453626438`.
 Image SHA-256: `ef2ef2d506962abb881de2eda9c9c140a2c7bb2237a0c1c9502d5d050c8bd1df`.
@@ -168,7 +168,7 @@ launch is not first-word end, and the harness deliberately waits for active capt
 before playing the fixture, so it does not qualify speech-on-shortcut onset clipping.
 The final text change happened before Stop in these trials; Stop-to-idle is not a
 measure of a demanding final speech tail. The field update count includes punctuation
-updates. Physical microphone, default compositor and owner-app acceptance remain
+updates. Physical microphone, default compositor and application acceptance remain
 separate.
 
 ## Reproduction, retained evidence and next work

@@ -1,86 +1,63 @@
-# Linux Packaging
+# Linux packaging
 
-Current cut: the owner accepted installed +local7 and authorized the private
-2026.0.37 release cut. See [status and remaining public gates](releases/2026.0.37.md).
-Earlier candidate preparation/deferral statements below are historical. The owner's
-installed application remains +local7 until a separately requested update.
+VOCO 2026.0.42 is distributed as a complete Debian amd64 package. Model weights,
+native libraries and their notices are included; no recognition download or GPU
+is required for normal English dictation and explicit recovery. Other packaging
+formats below remain experimental.
 
-Current follow-up: private **+local7** contains the [bounded legacy keyboard optimization](testing/keyboard-delivery-2026-09-15.md). +local6 was installed and successfully owner-tested. Older revision results below remain historical; use exact artifact receipts for the new candidate.
+## Build and assemble
 
-Candidate packaging and distribution qualification are separate stages. The private
-candidate is `2026.0.37+local7`; `+local6` remains installed, and `+local4`/`+local5`
-remain historical evidence. See [the current review](testing/stop-delivery-review-2026-09-15.md)
-for validation C results and remaining scope. Final Debian/RPM/Arch qualification
-is supplied outside each package in exact-SHA, payload-parity and install/remove
-receipts. Source documents do not self-attest to their containing package hash.
-
-## Complete NVIDIA candidate
-
-The application version is `2026.0.37`; Debian candidate revisions may append
-`+localN` without changing the application UI version. This testing candidate
-is not published. Tauri builds a **base** Debian bundle;
-it must be assembled with the pinned NVIDIA runtime/model before installation:
-
-The build wrapper forces a host-independent Whisper AVX2/FMA/F16C baseline and
-rebuilds its release objects to avoid cached host-native instructions. This does
-not establish portability of the separately provisioned NVIDIA payload.
-
-Use the repository build wrapper: it supplies the production protocol feature and
-bundles the browser host. A direct Tauri bundle omits that host and fails verification.
+Use a clean tagged checkout and the repository build wrapper. It builds both the
+application and native browser host, and forces the Whisper AVX2/FMA/F16C CPU
+baseline while disabling host-native and AVX-512/AMX flags. The separately pinned
+NVIDIA payload has its own identity and qualification requirements.
 
 ```bash
+npm ci
 npm run build
-python3 scripts/package-nvidia.py /path/to/tauri-base.deb /path/to/voco_2026.0.37_amd64.deb --debian-version 2026.0.37
+python3 scripts/package-nvidia.py /path/to/tauri-base.deb /path/to/voco_2026.0.42_amd64.deb --debian-version 2026.0.42
+bash scripts/verify-deb-package.sh /path/to/voco_2026.0.42_amd64.deb
 ```
 
-The assembler validates the base version and matching regular app/browser-host
-executables before copying the large model payload. It validates the runtime, verifies the pinned
-model digest, includes native libraries and notices, and produces a payload manifest
-and package receipt. Inspect its actual successful output and run package/runtime
-checks before delivery; the command alone is not a pass. Keep base and complete
-artifacts distinct. Record the complete package SHA-256 and installed version.
+A base Tauri bundle is incomplete and must never be published as VOCO. The assembler
+checks versions, app/browser-host executables, model identity, native libraries,
+relative symlinks and notices, and emits a payload manifest and receipt. Verify the
+complete artifact, dependency resolution, install/upgrade/remove behavior and
+isolated runtime before publication. Record source and package SHA-256 identities.
+Do not include personal recordings, transcripts, API credentials or private receipts.
 
-The model/runtime files under `runtime/speech` are separate from the MIT application:
-retain `runtime/notices` and model provenance, including the NVIDIA model terms.
-The complete package needs Python, NumPy, psutil and the declared native dependencies.
-Debian metadata explicitly includes `at-spi2-core` as well as `gir1.2-atspi-2.0`:
-GI bindings alone do not provide the accessibility bus/registry service needed by
-the sampled-field helper in a minimal userspace.
-A source snapshot with absent model/native artifacts cannot build this complete
-package merely by running npm install. Verify artifacts rather than silently fetching
-an unpinned replacement. Never package personal benchmark recordings or test logs.
-
-See [candidate gates](release-candidate.md) for owner acceptance and release sequencing.
-The GitHub release workflow now explicitly assembles the NVIDIA payload, and the
-package verifier requires the complete runtime. Portable, pinned provisioning of
-the model/native artifacts remains unresolved before public release: host-native
-binaries and this laptop's successful package check do not establish a reproducible
-portable build. Do not upload a base bundle as this candidate.
+The package requires Python 3, NumPy, psutil and the declared native dependencies.
+Its ABI floor includes glibc 2.39 and libstdc++ 13.2.0. `at-spi2-core` and
+`gir1.2-atspi-2.0` provide the accessibility bus and bindings. Package installation
+does not change the selected input source or restart IBus.
 
 ## Runtime provisioning
 
-GitHub source intentionally excludes model weights and compiled native runtime
-artifacts. The local candidate workspace contains the tested payload, but `git clone`
-and `npm ci` alone do not provide it. Before running NVIDIA protocol tests or
-assembling the complete Debian package, provision these paths separately:
+Git excludes model weights and compiled native libraries. `git clone` and `npm ci`
+are enough for source-only checks, but not a complete NVIDIA package. Provision:
 
 - `runtime/speech/models/nemotron-speech-streaming-en-0.6b.q8_0.gguf`
 - `runtime/speech/libbench_nemo_pool.so`
-- `runtime/speech/lib/`, including its relative native-library links
+- `runtime/speech/lib/`, preserving relative native-library links
 
-Use the verified candidate payload and its SHA-256 inventory. Preserve relative
-links, required notices, and `runtime/speech/MODEL-IDENTITY.json`; the assembler
-checks the model against that identity and rejects escaping or broken payload links.
-Retain the complete package manifest and build receipt so the native-library hashes
-remain traceable. The NVIDIA model is pinned to revision
-`ebe59e5a817142986528bbbee5dba8db7b38ed50`; the converted GGUF digest is
+The .42 release reuses the verified .39 model/native payload. Extract that payload
+from the immutable versioned release package after verifying its published checksum;
+copy only the model and native libraries into the matching source checkout. Keep
+the Python worker code from the source checkout. Preserve `MODEL-IDENTITY.json`,
+model terms, native-library licenses, source provenance and payload hashes.
+
+The NVIDIA upstream revision is `ebe59e5a817142986528bbbee5dba8db7b38ed50`.
+Converted model SHA-256:
 `d9a01898d2a611c8764e23a1c2f45e70bbd5a425dc4de93692ac951dd603812d`.
-Downloading a similarly named upstream model is not equivalent to this converted
-artifact or to the modified native runtime.
+Pool library SHA-256:
+`c0f48428446b37a2008ca4d4d6e131f4bb4d0a7d536e11182f2cccc6f3043fd4`.
+The package verifier binds the packaged identity to source pins and rejects broken
+or escaping links. A similarly named upstream download is not an equivalent artifact.
 
-An independently reproducible, portable native build and immutable artifact
-provisioning remain release gates. Do not silently fetch mutable replacements or
-commit binaries, model weights, private recordings or benchmark transcripts to Git.
+This is artifact-based provisioning, not an independently reproducible native/model
+conversion build. That reproducibility gap remains documented; retain the exact
+payload inventory with releases. Hosted installer publication remains disabled;
+never silently replace pinned artifacts with mutable downloads.
 
 ## Published-channel structure
 
@@ -129,7 +106,7 @@ Current primary validation target:
 
 Debian-derived distributions are best-effort. The `.deb` format and dependency metadata target
 Debian-family package managers, but that compatibility is not a substitute for a recorded desktop
-runtime test. The current baseline passed actual application/GTK/X11 virtual-microphone
+runtime test. Historical baselines passed actual application/GTK/X11 virtual-microphone
 checks in Ubuntu 26, Debian 13, Fedora 44, Linux Mint 22.3 and genuine Omarchy 4.0.3
 official ISO-derived installer userspace after dependency provisioning. It does not
 include an installed Hyprland compositor in this test. These checks share the host kernel and do not run each distribution's
@@ -138,7 +115,7 @@ packaging and broader stress-case acceptance require their own receipts; see
 [the evidence matrix](testing/cross-linux-review-2026-09-15.md#baseline-userspace-results).
 
 The optional consuming-shortcut IBus component remains package-owned at
-`/usr/share/ibus/component/voco.xml` and `/usr/libexec/voco-ibus-engine`. Protocol 5
+`/usr/share/ibus/component/voco.xml` and `/usr/libexec/voco-ibus-engine`. Protocol 6
 rejects text mutation. The package does not select an input source or restart IBus.
 
 The Chromium integration packages `/usr/libexec/voco-browser-host`, native host

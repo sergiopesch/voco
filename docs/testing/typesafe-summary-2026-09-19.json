@@ -101,7 +101,7 @@
         ]
       ],
       "scope": "24 trials per setting across the same 12 public fixtures. The six-thread runs followed the earlier baseline; this follow-up was not counterbalanced in time.",
-      "decision": "Promising local compute headroom: 11.2% less median service time on this Ryzen laptop, with only 4.6 ms earlier first text. Retain the portable four-thread default until loaded-desktop, energy and other-CPU checks support a change.",
+      "decision": "Promising local compute headroom: 11.2% less median service time on the AMD Ryzen 7 PRO 8840HS test system, with only 4.6 ms earlier first text. Retain the portable four-thread default until loaded-desktop, energy and other-CPU checks support a change.",
       "limits": "This is not a shipped speedup or a six-thread desktop qualification. Complete text parity allows reuse of existing semantic judgments; no extra TypeSafe calls or new independent speakers are implied."
     }
   ]
