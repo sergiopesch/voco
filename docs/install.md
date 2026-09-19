@@ -109,4 +109,5 @@ to other applications are never part of a VOCO uninstall.
 
 Microphone capture formats must be between 8 and 96 kHz, matching the bundled
 recognizer and recovery runtime. An unsupported format is rejected before recording
-starts; select a supported format in the system audio settings.
+starts; select a supported format in the system audio settings, then restart VOCO
+so its audio context uses the new format.
