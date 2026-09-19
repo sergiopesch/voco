@@ -226,15 +226,15 @@ export function ControlPanel({
   const updateInstallCopy = useMemo(() => {
     switch (config.installChannel) {
       case "appimage":
-        return "AppImage publication is paused while its packaging toolchain is being pinned. Move to the verified GitHub Release .deb or rebuild from source for updates.";
+        return "AppImage publication is paused while its packaging toolchain is being pinned. Choose the native package for your distribution on GitHub Releases, or rebuild from source for updates.";
       case "source":
         return "This build is treated as self-managed from source. Pull the repo and rebuild when you want to update.";
       case "flatpak":
-        return "Flatpak distribution is not currently verified. Choose GitHub Release (.deb) or Source for accurate update instructions.";
+        return "Flatpak distribution is not currently verified. Choose GitHub Release or Source for accurate update instructions.";
       case "snap":
-        return "Snap distribution is not currently verified. Choose GitHub Release (.deb) or Source for accurate update instructions.";
+        return "Snap distribution is not currently verified. Choose GitHub Release or Source for accurate update instructions.";
       default:
-        return "This build is treated as a GitHub Release install. Download and install the next release manually.";
+        return "This build is treated as a GitHub Release install. Download the native package for your distribution and install the next release manually.";
     }
   }, [config.installChannel]);
   const updateStatusCopy = useMemo(() => {
@@ -258,7 +258,7 @@ export function ControlPanel({
 
     switch (config.installChannel) {
       case "appimage":
-        return `AppImage publication is paused. Install the verified ${updateState.latestRelease.version} .deb from GitHub Releases or rebuild that tag from source.`;
+        return `AppImage publication is paused. Choose the ${updateState.latestRelease.version} native package for your distribution on GitHub Releases, or rebuild that tag from source.`;
       case "source":
         return `Pull the repo, checkout ${updateState.latestRelease.version} or newer, and rebuild locally.`;
       case "flatpak":
@@ -266,7 +266,7 @@ export function ControlPanel({
       case "snap":
         return "This legacy Snap setting is not a verified update path. Use the GitHub release instead.";
       default:
-        return `Download the ${updateState.latestRelease.version} release from GitHub and install it over your current build.`;
+        return `Download the ${updateState.latestRelease.version} native package for your distribution from GitHub and install it over your current build.`;
     }
   }, [config.installChannel, updateState.latestRelease, updateState.status]);
   const lastCheckedLabel = useMemo(() => {
@@ -1098,7 +1098,7 @@ export function ControlPanel({
                   <details className="voco-preferences__card voco-preferences__disclosure"><summary>Update preferences and installation details</summary>
                     <div className="voco-preferences__form">
                       <label className="voco-field voco-preferences__field-row"><span>Installation method for update instructions</span><select value={config.installChannel} onChange={(event) => void savePatch({ installChannel: event.target.value as AppConfig["installChannel"] })}>
-                        <option value="github-release">GitHub Release (.deb)</option>{config.installChannel === "appimage" ? <option value="appimage" disabled>AppImage (legacy, publication paused)</option> : null}<option value="source">Source build</option>{config.installChannel === "flatpak" ? <option value="flatpak" disabled>Flatpak (legacy, unverified)</option> : null}{config.installChannel === "snap" ? <option value="snap" disabled>Snap (legacy, unverified)</option> : null}
+                        <option value="github-release">GitHub Release</option>{config.installChannel === "appimage" ? <option value="appimage" disabled>AppImage (legacy, publication paused)</option> : null}<option value="source">Source build</option>{config.installChannel === "flatpak" ? <option value="flatpak" disabled>Flatpak (legacy, unverified)</option> : null}{config.installChannel === "snap" ? <option value="snap" disabled>Snap (legacy, unverified)</option> : null}
                       </select></label>
                       <p className="voco-preferences__helper">VOCO currently publishes and verifies the GitHub Release .deb. AppImage, Flatpak, and Snap are not current published release channels.</p>
                       <label className="voco-field voco-preferences__field-row"><span>Update channel</span><select value={config.updateChannel} onChange={(event) => void savePatch({ updateChannel: event.target.value as AppConfig["updateChannel"] })}><option value="stable">Stable</option><option value="beta">Beta</option></select></label>
