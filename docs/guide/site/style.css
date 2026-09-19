@@ -839,3 +839,12 @@ dialog::backdrop {
     font-size: 28pt;
   }
 }
+
+/* Contain the measured comparison on narrow screens without shrinking text. */
+.evaluation-comparison { margin-block: 2rem; min-width: 0; }
+.table-scroll { max-width: 100%; overflow-x: auto; border: 1px solid var(--line, #ddd); border-radius: 12px; }
+.evaluation-table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+.evaluation-table caption { text-align: left; padding: 1rem; font-weight: 600; }
+.evaluation-table th, .evaluation-table td { text-align: left; vertical-align: top; padding: .8rem 1rem; border-top: 1px solid var(--line, #ddd); min-width: 9rem; }
+.evaluation-table thead th { background: var(--panel, #f4f4f4); }
+.evaluation-table tbody th { font-weight: 500; }

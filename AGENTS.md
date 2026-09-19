@@ -92,6 +92,12 @@ speech into a live user session. Python worker tests require NumPy and psutil;
 protocol tests also require the pinned model/runtime. Record unavailable checks
 as unavailable, never passed. Preserve failures and attempted-trial denominators.
 
+For optimization work follow [the TypeSafe evaluation protocol](docs/testing/typesafe-evaluation.md).
+Keep deterministic timing/accuracy separate from optional semantic judgments. The
+TypeSafe client is research tooling only: explicit public/synthetic text, never
+personal speech or live delivery. Preserve baseline/candidate identities, missing
+measurements and rejected experiments; run `npm run test:dictation-evaluation`.
+
 Source excludes model weights and compiled runtime payloads. Follow
 [runtime provisioning](docs/linux-packaging.md#runtime-provisioning); never replace
 missing pinned artifacts with mutable downloads. A base Tauri `.deb` is incomplete:

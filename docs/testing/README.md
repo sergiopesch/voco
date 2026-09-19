@@ -1,7 +1,12 @@
 # Testing
 
-Current candidate: [2026.0.38 release gates](../release-candidate.md).
+Current public release and private candidate: [release gates](../release-candidate.md).
 Dated reports below are historical evidence, not qualification of a later binary.
+
+The [TypeSafe evaluation protocol](typesafe-evaluation.md) defines timing, word and
+punctuation accuracy, semantic judgments, corpus requirements and rejection rules.
+The [19 September before/after experiment](typesafe-results-2026-09-19.md) records
+actual local-worker comparisons and live Jev scores, separately from product QA.
 
 Run worker tests with `python3 -m unittest discover -s runtime/speech -p 'test_*.py'`;
 run the actual model protocol separately with `python3 runtime/speech/test_worker_protocol.py --output-dir /path/to/new/receipts`.

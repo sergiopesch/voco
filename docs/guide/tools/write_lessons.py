@@ -926,6 +926,45 @@ lesson(
     1,
     "Understanding ownership makes later changes safer and more focused.",
 )
+lesson(
+    "typesafe",
+    "Measure before we optimize.",
+    "A quicker transcript is useful only if it keeps your words, meaning and punctuation intact.",
+    [
+        "This is a dated research chapter added after the pinned .39 code tour. The experiment starts from the unshipped .41 candidate. Its results do not describe a new installed release.",
+        "A stopwatch and exact text comparison answer different questions from a language model. Code measures timing, word errors and delivery failures. TypeSafe judges whether a transcript preserves meaning.",
+        "We give Jev a public reference and a transcript, plus separate questions for meaning and consequential mistakes. Punctuation judgments need an audited reference. Personal dictation never enters this research service; VOCO itself remains local.",
+        "We challenge the judge before trusting it, freeze the speech fixtures, then run the same audio through baseline and candidate settings. We keep unsuccessful experiments because they explain why a tempting change was rejected.",
+    ],
+    [
+        ("Define", "Freeze timing boundaries, reference text, rubric and rejection rules before measuring."),
+        ("Measure", "Replay the same public audio and record timings, word errors and resources."),
+        ("Judge", "Ask TypeSafe narrow questions about meaning; retain probabilities and uncertainty."),
+        ("Compare", "Compare repeated trials and separate speakers. Missing evidence stays missing."),
+        ("Decide", "Reject regressions. A higher average never excuses a wrong destination or lost meaning."),
+    ],
+    [
+        ("What the TypeSafe skill needs from us", "Evidence, explicit question criteria, a model version, an API key for live evaluation and independently labeled cases. The skill does not award a built-in app grade."),
+        ("What a score means", "Meaning has four concrete levels: contradicted or absent; an important detail wrong; only a minor detail lost; all meaning preserved. A score divided by three and multiplied by 100 is a rubric position, not word accuracy. Confidence is not a truth guarantee."),
+        ("Check the judge too", "The 16 authored challenge cases produced 10 true material-error flags and six true negatives at a provisional 0.5 threshold. This small synthetic check is not independent human calibration. An invented action still received 2.10/3 for overall meaning, so the separate consequential-error question matters."),
+        ("The measurements still missing", "These public audiobook references have no audited punctuation or word-end times. We cannot honestly score punctuation accuracy, word-end-to-screen latency, physical microphone quality or worldwide rank from them."),
+        ("Where to reproduce it", "The current checkout adds scripts/evaluate-dictation-worker.py, scripts/typesafe-evaluate.py and docs/testing/typesafe-evaluation.md. The source buttons here remain pinned .39 building blocks; they do not pretend the newer evaluation scripts shipped in .39."),
+    ],
+    [
+        ("scripts/dictation-quality.mjs", "Separates word, character, punctuation and delivery comparisons."),
+        (R + "streaming.py", "Owns the local session and explicit model context."),
+        ("scripts/speech-score.mjs", "Computes reproducible word substitutions, deletions and insertions."),
+    ],
+    "The comparison is an experiment, not a world ranking or a release. Worker output, observed recipient text and painted pixels are different boundaries. No production setting changes automatically from a TypeSafe score.",
+    "A candidate has a higher meaning score but inserts text into the wrong window. What happens?",
+    ["Accept it because its average improved", "Reject it: delivery safety is a separate hard gate", "Ask the model to average the two"],
+    1,
+    "Safety failures cannot be compensated by better speed or a higher semantic score.",
+)
+summary_path = Path(__file__).resolve().parents[2] / "testing/typesafe-summary-2026-09-19.json"
+chapters[-1]["comparison"] = json.loads(summary_path.read_text())
+chapters[-1]["sourceNote"] = "Pinned .39 measurement building blocks; newer evaluation tools are described in the chapter."
+
 # Fail closed if a lesson cites a path absent from the pinned source.
 root = Path(__file__).resolve().parents[1]
 catalog = json.loads((root / "site/catalog.json").read_text())
