@@ -455,6 +455,7 @@ try {
   ]);
   if (responses.some((r) => !r.ok)) throw Error("Guide data could not load");
   [chapters, catalog] = await Promise.all(responses.map((r) => r.json()));
+  document.querySelector("#source-version").textContent = catalog.version;
   files = catalog.files;
   byPath = new Map(files.map((f) => [f.path, f]));
   done = new Set([...done].filter((id) => chapters.some((c) => c.id === id)));
