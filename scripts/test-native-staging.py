@@ -67,5 +67,26 @@ class DependencyTests(unittest.TestCase):
                 staging.validate_debian_dependencies(value)
 
 
+class VersionTests(unittest.TestCase):
+    def test_final_release_and_package_revision(self):
+        self.assertEqual(staging.package_version('2026.0.42'), ('2026.0.42', '1', False))
+        self.assertEqual(staging.package_version('2026.0.42', '2'), ('2026.0.42', '2', False))
+
+    def test_local_candidate_is_preserved(self):
+        self.assertEqual(staging.package_version('2026.0.40+local5'), ('2026.0.40', '5', True))
+
+    def test_invalid_versions_and_revision_overrides_fail(self):
+        for version, revision in [('2026.0.42;bad', None), ('2026.0.42+local0', None),
+                                  ('2026.0.42', '0'), ('2026.0.42', '1;bad'),
+                                  ('2026.0.42+local5', '2')]:
+            with self.subTest(version=version, revision=revision), self.assertRaises(ValueError):
+                staging.package_version(version, revision)
+
+    def test_reviewed_abi_floors_and_new_helpers(self):
+        staging.validate_debian_dependencies('libc6 (>= 2.39), libstdc++6 (>= 13.2.0), xdotool, wl-clipboard')
+        with self.assertRaises(ValueError):
+            staging.validate_debian_dependencies('libc6 (>= 2.44)')
+
+
 if __name__ == '__main__':
     unittest.main()

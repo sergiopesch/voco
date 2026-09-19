@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Stage native-package recipes from an already verified, immutable VOCO payload.
 
-This packages prebuilt candidate bytes, not a portable source rebuild. Build the
+This packages prebuilt release or candidate bytes, not a portable source rebuild. Build the
 recipes using the native distro tools and verify install/remove and payload parity
 before describing either artifact as tested. No installation scripts are emitted.
 """
@@ -27,13 +27,26 @@ def validate_debian_dependencies(value):
         'ibus', 'python3', 'gir1.2-ibus-1.0', 'python3-gi', 'xclip',
         'gir1.2-atspi-2.0', 'at-spi2-core', 'python3-numpy', 'python3-psutil',
         'libsentencepiece0', 'libayatana-appindicator3-1', 'libwebkit2gtk-4.1-0',
-        'libgtk-3-0',
+        'libgtk-3-0', 'xdotool', 'wl-clipboard',
+        'libc6 (>= 2.39)', 'libstdc++6 (>= 13.2.0)',
     }
-    # Versioned/alternative requirements also need a deliberate translation;
+    # Only the reviewed ABI floors below have native translations. Other
+    # versioned/alternative requirements need a deliberate translation;
     # silently deleting their constraint would broaden the accepted platforms.
     dependencies = {part.strip() for part in value.split(',')}
     if not dependencies or not dependencies <= mapped:
         raise ValueError('Native dependency mapping requires review for this Debian package')
+
+
+def package_version(value, native_release=None):
+    match = re.fullmatch(r'(\d{4}\.\d+\.\d+)(?:\+local([1-9]\d*))?', value)
+    if not match:
+        raise ValueError('Expected a final or local VOCO version')
+    version, local_revision = match.groups()
+    if native_release is not None and (local_revision or not re.fullmatch(r'[1-9]\d*', native_release)):
+        raise ValueError('Native release must be a positive integer for a final version')
+    revision = local_revision or native_release or '1'
+    return version, revision, bool(local_revision)
 
 
 def inventory(root):
@@ -67,15 +80,16 @@ def main():
     parser.add_argument('output', type=Path)
     parser.add_argument('--sha256', required=True)
     parser.add_argument('--verifier', required=True, type=Path)
+    parser.add_argument('--native-release', help='Positive package revision for a final release (default: 1)')
     args = parser.parse_args()
     if digest(args.deb) != args.sha256:
         raise ValueError('Debian artifact hash mismatch')
     identity = subprocess.check_output(['dpkg-deb', '-f', str(args.deb), 'Package', 'Version', 'Architecture'], text=True)
     fields = dict(line.split(': ', 1) for line in identity.splitlines())
-    match = re.fullmatch(r'(\d{4}\.\d+\.\d+)\+local(\d+)', fields['Version'])
-    if fields['Package'] != 'voco' or fields['Architecture'] != 'amd64' or not match:
-        raise ValueError('Expected a local VOCO amd64 candidate')
-    version, revision = match.groups()
+    if fields['Package'] != 'voco' or fields['Architecture'] != 'amd64':
+        raise ValueError('Expected a VOCO amd64 package')
+    version, revision, local = package_version(fields['Version'], args.native_release)
+    rpm_release = f'{revision}.local' if local else revision
     depends = subprocess.check_output(['dpkg-deb', '-f', str(args.deb), 'Depends'], text=True)
     validate_debian_dependencies(depends.strip())
     # Use the repository's complete-payload verifier before recipe generation.
@@ -106,15 +120,17 @@ def main():
     (args.output / 'payload-inventory.json').write_text(json.dumps(entries, indent=2) + '\n')
     (args.output / 'provenance.json').write_text(json.dumps({
         'debian_version': fields['Version'], 'debian_sha256': args.sha256,
-        'application_version': version, 'native_release': f'{revision}.local',
+        'application_version': version, 'native_release': rpm_release,
+        'channel': 'local-candidate' if local else 'final-payload',
         'payload_tar_sha256': archive_hash, 'scope': 'Exact prebuilt candidate payload; not a portable source rebuild',
     }, indent=2) + '\n')
     # Dependencies are explicit per distro. Automatic ELF dependencies remain on
     # RPM; private recognizer libraries must not become public system provides.
     fedora = 'python3 python3-numpy python3-psutil sentencepiece-libs gstreamer1-plugins-base gstreamer1-plugins-good gtk3 webkit2gtk4.1 libayatana-appindicator-gtk3 ibus python3-gobject at-spi2-core xclip xdotool wl-clipboard ydotool'.split()
+    fedora += ['glibc >= 2.39', 'libstdc++ >= 13.2.0']
     spec = f'''Name: voco
 Version: {version}
-Release: {revision}.local
+Release: {rpm_release}
 Summary: Local Linux dictation candidate
 License: MIT AND Apache-2.0 AND LicenseRef-NVIDIA-Open-Model
 URL: https://github.com/sergiopesch/voco
@@ -154,8 +170,8 @@ tar -xf %{{SOURCE0}} -C %{{buildroot}} --no-same-owner --same-permissions
         else:
             spec += row['path'] + '\n'
     (args.output / 'voco.spec').write_text(spec)
-    arch = 'glibc gcc-libs python python-numpy python-psutil sentencepiece gst-plugins-good gtk3 webkit2gtk-4.1 libayatana-appindicator ibus python-gobject at-spi2-core xclip xdotool wl-clipboard ydotool'.split()
-    (args.output / 'PKGBUILD').write_text(f'''# Exact prebuilt local candidate; no download, install hook or source rebuild.
+    arch = 'glibc>=2.39 gcc-libs>=13.2.0 python python-numpy python-psutil sentencepiece gst-plugins-good gtk3 webkit2gtk-4.1 libayatana-appindicator ibus python-gobject at-spi2-core xclip xdotool wl-clipboard ydotool'.split()
+    (args.output / 'PKGBUILD').write_text(f'''# Exact verified prebuilt payload; no download, install hook or source rebuild.
 pkgname=voco
 pkgver={version}
 pkgrel={revision}
@@ -167,7 +183,7 @@ depends=({' '.join(repr(dep) for dep in arch)})
 source=('voco-payload.tar')
 sha256sums=('{archive_hash}')
 noextract=('voco-payload.tar')
-options=('!strip' '!debug')
+options=('!strip' '!debug' '!purge' '!zipman' '!libtool' '!staticlibs')
 package() {{
   bsdtar -xf "$srcdir/voco-payload.tar" -C "$pkgdir"
 }}
