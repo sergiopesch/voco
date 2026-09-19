@@ -3,7 +3,7 @@
 from pathlib import Path
 import argparse, hashlib, json, re, subprocess
 
-DEFAULT_COMMIT = "35d514ed35613719f15d2f293499b011dcc41207"
+DEFAULT_COMMIT = "27b5a2f76e2dcc902a4779a6cd3dbb6c436b9505"
 GROUPS = [
     ("apps/desktop/src-tauri/native/", "Native audio bridge", "C code connecting native microphone capture to the Rust boundary."),
     ("apps/desktop/src-tauri/examples/", "Replay and research tools", "An executable replay, fixture or measurement example; not the ordinary app entry point."),
