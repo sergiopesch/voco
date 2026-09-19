@@ -14,7 +14,7 @@ mod focus_probe;
 #[cfg(target_os = "linux")]
 mod hotkey_state;
 mod insertion;
-#[cfg(all(target_os = "linux", feature = "native-capture-dev"))]
+#[cfg(all(target_os = "linux", feature = "native-capture"))]
 mod native_capture;
 mod native_capture_commands;
 mod owned_preedit;
@@ -25,6 +25,13 @@ mod shortcut_readiness;
 mod single_instance;
 pub mod transcribe;
 mod trigger_socket;
+
+/// Request one toggle from the running application without launching a window.
+pub fn toggle_running_application() -> Result<(), String> {
+    trigger_socket::toggle().map_err(|error| {
+        format!("Could not reach VOCO's private control socket: {error}. Open VOCO in this desktop session first.")
+    })
+}
 pub use transcribe::{hybrid, numerical_planner, vca2};
 mod tray;
 
@@ -1518,6 +1525,11 @@ fn main_window(app: &tauri::AppHandle) -> Result<tauri::WebviewWindow<tauri::Wry
 }
 
 fn hide_overlay_window(window: &tauri::WebviewWindow<tauri::Wry>) -> Result<(), String> {
+    if native_capture_commands::uses_native_backend() {
+        return window
+            .hide()
+            .map_err(|e| format!("Failed to hide VOCO window: {e}"));
+    }
     window
         .set_size(tauri::Size::Physical(tauri::PhysicalSize::new(
             HIDDEN_WINDOW_SIZE,

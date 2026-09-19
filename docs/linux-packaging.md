@@ -27,11 +27,30 @@ isolated runtime before publication. Record source and package SHA-256 identitie
 Do not include personal recordings, transcripts, API credentials or private receipts.
 
 The package requires Python 3, NumPy, psutil and the declared native dependencies.
+The worker defaults to at most four CPU threads, capped to its CPU affinity. This
+avoids oversubscribing one- or two-core machines. Explicit research overrides stay
+explicit; diagnostics record the effective thread count. CPU quotas imposed without
+matching affinity remain a separate performance constraint.
 Its ABI floor includes glibc 2.39 and libstdc++ 13.2.0. X11 helpers are required;
-ydotool is recommended for Wayland and needs a working input service. Debian 13
+ydotool and the separately packaged Ubuntu ydotoold are recommended for Wayland;
+the input service must also be configured and running. Debian 13
 repositories may not provide it, so the recommendation must not block X11 installs. `at-spi2-core` and
 `gir1.2-atspi-2.0` provide the accessibility bus and bindings. Package installation
 does not change the selected input source or restart IBus.
+
+The .43 Debian package repairs inherited `0775` permissions on its own root-owned
+directories to `0755` during configuration. The reviewed migration uses directory
+descriptors, rejects symlink traversal and leaves user files, custom modes and
+`dpkg-statoverride` entries unchanged. Missing documentation directories are allowed
+when the system uses `path-exclude`. The verifier checks the exact generated hook;
+native RPM and Arch packages omit it because their managers apply archive modes.
+Upgrade qualification includes legacy installations, not only fresh extraction.
+
+The .43 candidate additionally links libpulse (`libpulse-dev` on Debian build
+hosts, `libpulse0` at runtime). Fedora, openSUSE and Arch profiles map that library
+to their native package names. Native Wayland capture requires PipeWire's Pulse
+compatibility server and explicit microphone selection/session permission;
+installing the client library alone does not establish that capture works.
 
 ## Runtime provisioning
 
@@ -263,7 +282,7 @@ that needs independent field readback. Missing recordings remain unavailable.
 ## Native Fedora and Arch candidate recipes
 
 `scripts/stage-native-packages.py` stages an RPM spec and Arch PKGBUILD from a
-complete, hash-verified Debian candidate. These are native package-manager wrappers
+complete, hash-verified Debian release or local candidate. These are native package-manager wrappers
 around the same prebuilt application/model bytes, not a portable source rebuild.
 They preserve file hashes and relative loader links, disable strip/debug rewriting,
 and declare distro-specific runtime dependencies. Unknown Debian dependency
@@ -274,6 +293,20 @@ python3 scripts/stage-native-packages.py COMPLETE.deb FRESH_DIRECTORY \
   --sha256 EXPECTED_SHA256 \
   --verifier /absolute/path/to/voco/scripts/verify-deb-package.sh
 ```
+
+Final versions such as `2026.0.42` use native package revision `1`. Use
+`--native-release 2` for a packaging-only revision of the same final payload.
+This does not authorize changing application/model bytes under the same version.
+Legacy `+localN` candidates retain their previous native revision mapping; do not
+assume a final revision `1` upgrades a previously installed local revision `N`.
+Unknown versions, dependency constraints and revision overrides are rejected.
+The reviewed Debian ABI floors map to Arch `glibc>=2.39`, `gcc-libs>=13.2.0`
+and RPM `glibc >= 2.39`, `libstdc++ >= 13.2.0` requirements.
+
+Native package signatures are separate from Debian release signatures. Public
+Arch delivery needs a documented trusted signing key and a maintained dependency
+source. Isolated tests may use an explicitly disposable signing key trusted only
+inside the test guest; never ask end users to disable signature verification.
 
 Build the generated `voco.spec` with `rpmbuild` in a disposable Fedora builder, or
 `PKGBUILD` with `makepkg` in a disposable Arch builder. Never run package install or
@@ -303,3 +336,20 @@ For a deliberately network-disabled verification job, set
 `VOCO_PACKAGE_VERIFY_OFFLINE=1` when invoking `scripts/verify-deb-package.sh`. This
 runs local AppStream validation with `--no-net`; it does not validate external URLs.
 Omit the variable for the release job's normal online URL checks.
+
+The [2026-09-19 Omarchy qualification](testing/omarchy-native-2026-09-19.md)
+records native Arch package checks and booted Hyprland trials, including the
+permission and hidden-window issues that still block public Omarchy support.
+
+## Distribution-specific RPM profiles
+
+`stage-native-packages.py --rpm-distribution fedora` is the default. Use
+`--rpm-distribution opensuse` for the Tumbleweed dependency profile. Each output
+records its profile in provenance; qualify and sign each native artifact separately.
+Do not rename a Fedora RPM and call it an openSUSE build.
+
+The [SentencePiece companion recipes](../packaging/dependencies/sentencepiece/README.md)
+provide reviewed source builds where no system library package is available.
+RPM recipes mark bundled licenses with `%license`, preserving them on minimal
+`nodocs` installations. Full payload parity requires documents enabled.
+See [the current scope and gates](linux-support.md).

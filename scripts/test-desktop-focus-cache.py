@@ -69,6 +69,25 @@ class FocusTests(unittest.TestCase):
     def test_multiple_active_windows_reject(self):
         self.app.children.append(Node('/other',states=['active']))
         self.assertIsNone(helper.probe()['token'])
+    def test_mutter_decoration_is_not_a_second_dictation_destination(self):
+        decoration = Node('/decoration', states=['active'])
+        decorator = Node('/decorator', [decoration])
+        decorator.get_process_id = lambda: 51515151
+        self.desktop.children.insert(0, decorator)
+        def executable(path, **_):
+            return Path('/usr/libexec/mutter-x11-frames' if '51515151' in str(path) else '/usr/bin/python3')
+        with patch.object(Path, 'resolve', executable):
+            before = helper.probe()
+            self.assertEqual(before['scope'], 'control')
+            self.assertIsNotNone(before['token'])
+            self.a.states.clear(); self.b.states.add('focused')
+            self.assertNotEqual(before['token'], helper.probe()['token'])
+            self.window.states.clear()
+            self.assertIsNone(helper.probe()['token'])
+    def test_unreadable_decorator_identity_does_not_resolve_ambiguity(self):
+        self.desktop.children.append(Node('/unknown-app', [Node('/unknown', states=['active'])]))
+        with patch.object(Path, 'resolve', side_effect=OSError('process disappeared')):
+            self.assertIsNone(helper.probe()['token'])
     def test_terminal_role_and_role_changes_are_fresh(self):
         self.assertEqual(helper.probe()['shortcut'],'ctrl+v')
         self.a.role='terminal'

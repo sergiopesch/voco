@@ -1,18 +1,18 @@
-# Native capture development backend
+# Native capture backend and qualification
 
-The optional Linux capture backend is being qualified against the existing WebKit path. It does not change the pinned speech model, recognition policy, mono preparation, resampling, or automatic text-delivery safeguards. Passing protocol or renderer mocks alone does not qualify audio continuity or physical microphones.
+The .43 candidate selects native capture for Wayland sessions and retains WebKit capture on X11. This selection is under release qualification; public .42 is unchanged. It does not change the pinned speech model, recognition policy, mono preparation, resampling, or automatic text-delivery safeguards. Passing protocol or renderer mocks alone does not qualify audio continuity or physical microphones.
 
 ## Build and enable
 
-Ordinary builds keep WebKit capture. To include the development backend, build with `bash scripts/build-desktop.sh --native-capture-dev` and the libpulse development headers/library available to the build environment. The backend also requires the exact runtime setting `VOCO_DEV_NATIVE_CAPTURE=1`. Neither switch alone enables native capture. No helper daemon or privileged service is installed for native capture.
+Ordinary .43 builds include the `native-capture` feature and require libpulse development headers/library. Wayland selects this backend without a runtime flag. X11 keeps WebKit capture; `VOCO_DEV_NATIVE_CAPTURE=1` explicitly selects native capture for development there. The older `--native-capture-dev` build option remains a compatibility alias. No helper daemon or privileged service is installed for capture. Native mode uses real window hiding so recording can start while the panel is unmapped.
 
 The first version requires PipeWire's `object.serial` source identity metadata through its Pulse compatibility server. Unsupported sources remain visible but cannot be approved. VOCO connects only to the existing current user's `/run/user/<uid>/pulse/native` socket, verifies ownership, and disables autospawn. It does not use an environment-selected remote server.
 
 ## Selection and privacy
 
-In Audio settings, choose a native input, acknowledge direct microphone access for the current app session, and select **Use this microphone**. This is separate from browser microphone permission. **System default (current device)** resolves to a concrete current source; it never follows later default changes silently. Opening settings, refreshing devices and retrying setup do not record audio or open WebKit microphone preview in native mode.
+In Microphone settings, choose a native input, acknowledge direct microphone access for the current app session, and select **Use this microphone**. This is separate from browser microphone permission. **System default (current device)** resolves to a concrete current source; it never follows later default changes silently. Opening settings, refreshing devices and retrying setup do not record audio or open WebKit microphone preview in native mode.
 
-A healthy recording Stop, Cancel or retained-audio discard does not revoke that app-session choice. Approval is bound to the audio-server connection and exact source name, index and object serial. Device-list revisions, labels, idle-state changes and a changed system default do not transfer or revoke an unchanged approved source. Renderer reload, app shutdown or an unhealthy capture invalidates the relevant state. After an interruption, refresh devices and explicitly choose and allow the source again. No failure falls back to WebKit or reconnects during recording. Realtime voice continues to use its existing browser microphone path and permission, separately from native dictation readiness.
+A healthy recording Stop, Cancel or retained-audio discard does not revoke that app-session choice. Approval is bound to the audio-server connection and exact source name, index and object serial. Device-list revisions, labels, idle-state changes and a changed system default do not transfer or revoke an unchanged approved source. Renderer reload, app shutdown or an unhealthy capture invalidates the relevant state. After an interruption, refresh devices and explicitly choose and allow the source again. No failure falls back to WebKit or reconnects during recording.
 
 ## Audio and ownership contract
 
@@ -30,10 +30,10 @@ Stop requires acknowledged cork and timing-barrier receipts plus delivery and AC
 - `VOCO_RENDERER_EVIDENCE_DIR=<new-directory> npm run test:microphone-renderer`: existing actual-App WebKit settings checks with media/native mocks.
 - `VOCO_RENDERER_EVIDENCE_DIR=<new-directory> npm run test:native-capture-renderer`: actual-App native setup, recording and recovery checks with native/media/transcription mocks.
 - `VOCO_RENDERER_EVIDENCE_DIR=<new-directory> npm run test:dictation-renderer`: broader dictation renderer regression checks.
-- `cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml --lib`, repeated with `--features native-capture-dev`: default and native manager/protocol contracts. Native tests use a fake backend and do not connect to microphones.
+- `cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml --lib`, with native capture included by default: manager/protocol contracts. Native tests use a fake backend and do not connect to microphones.
 - The C shim's `VC_UNIT_TEST` mode exercises queue and operation ownership without connecting to Pulse; strict compilation and ASAN/UBSAN runs complement Rust tests.
 
-Installed Linux qualification must use a prospectively identified package, guest, source and public fixture, retain raw/prepared audio and complete coverage, and apply the existing waveform thresholds unchanged. Physical microphone qualification needs separate consent and complete reference evidence. Native capture remains a development option until those results justify a production decision.
+Installed Linux qualification must use a prospectively identified package, guest, source and public fixture, retain raw/prepared audio and complete coverage, and apply the existing waveform thresholds unchanged. Physical microphone qualification needs separate consent and complete reference evidence. Native Wayland capture is approved for this candidate, but publication still requires exact-artifact qualification.
 
 ## Installed qualification
 
@@ -53,8 +53,8 @@ change source selection automatically. Do not interpret a missing audit bundle a
 The [candidate04 delivery record](../../../foundations-evidence/iteration-13/application-integration/native/backend-integration-01/NATIVE-AUDIT-DELIVERY-04.md)
 binds the exact source, package, outcomes, failed attempt and independent reviews. Its
 frozen source snapshot retains the earlier pre-install wording; this working documentation
-records the later result. Package03's prepared-wave evidence remains separate. Native
-capture still requires both development switches and explicit app-session approval; wider
+records the later result. Package03's prepared-wave evidence remains separate. That historical candidate required both development switches. Current .43 builds
+select native capture on Wayland but retain explicit app-session approval; wider
 speech, desktop, physical microphone and destination qualification remain open.
 
 ## Optional native audit
@@ -105,7 +105,7 @@ an armed IBus poll or the applicable live keyboard/global registration; an uncer
 consuming IBus lease withholds passive-route readiness. Frontend observations expire and
 late replies cannot restore readiness after configuration or surface changes. None of
 these observations registers a new shortcut, changes trigger admission, grants raw-input
-access, selects IBus automatically or enables native capture by default. The microphone
+access, selects IBus automatically or changes the platform capture selection. The microphone
 footer identifies the approved native source rather than substituting the browser default.
 
 The initial

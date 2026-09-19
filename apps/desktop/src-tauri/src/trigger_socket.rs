@@ -1,7 +1,8 @@
 //! Owner-only legacy dictation triggers. Paths preserve the documented XDG/TMPDIR layout.
 use std::fs::{self, DirBuilder};
 use std::io;
-use std::os::fd::AsRawFd;
+use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
+use std::os::unix::ffi::OsStrExt;
 use std::os::unix::fs::{DirBuilderExt, FileTypeExt, MetadataExt, PermissionsExt};
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::{Path, PathBuf};
@@ -37,6 +38,63 @@ fn private_directory(path: &Path) -> io::Result<()> {
 
 pub fn paths() -> io::Result<[PathBuf; 2]> {
     resolve_paths(std::env::var_os("XDG_RUNTIME_DIR"), &std::env::temp_dir())
+}
+
+/// Connect once: the legacy server treats connection acceptance as the trigger.
+/// Success means queued, not that recording has started or stopped.
+pub fn toggle() -> io::Result<()> {
+    connect_trigger(&paths()?[0])
+}
+
+fn connect_trigger(path: &Path) -> io::Result<()> {
+    private_directory(
+        path.parent()
+            .ok_or_else(|| rejected("Missing trigger parent"))?,
+    )?;
+    SocketIdentity::at(path)?;
+    if fs::symlink_metadata(path)?.mode() & 0o777 != 0o600 {
+        return Err(rejected("Trigger socket must have private permissions"));
+    }
+    // Nonblocking connect bounds a full listener queue without a helper process
+    // or retries that could toggle twice. The directory excludes other users.
+    let mut address: libc::sockaddr_un = unsafe { std::mem::zeroed() };
+    let bytes = path.as_os_str().as_bytes();
+    if bytes.len() >= address.sun_path.len() || bytes.contains(&0) {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "Invalid trigger socket path",
+        ));
+    }
+    address.sun_family = libc::AF_UNIX as libc::sa_family_t;
+    for (target, source) in address.sun_path.iter_mut().zip(bytes) {
+        *target = *source as libc::c_char;
+    }
+    // SAFETY: socket takes constants; ownership of a successful descriptor is
+    // transferred immediately. The initialized address lives through connect.
+    let raw = unsafe {
+        libc::socket(
+            libc::AF_UNIX,
+            libc::SOCK_STREAM | libc::SOCK_CLOEXEC | libc::SOCK_NONBLOCK,
+            0,
+        )
+    };
+    if raw < 0 {
+        return Err(io::Error::last_os_error());
+    }
+    let socket = unsafe { OwnedFd::from_raw_fd(raw) };
+    let result = unsafe {
+        libc::connect(
+            socket.as_raw_fd(),
+            (&address as *const libc::sockaddr_un).cast(),
+            (std::mem::offset_of!(libc::sockaddr_un, sun_path) + bytes.len() + 1)
+                as libc::socklen_t,
+        )
+    };
+    if result == 0 {
+        Ok(())
+    } else {
+        Err(io::Error::last_os_error())
+    }
 }
 
 fn resolve_paths(
@@ -249,6 +307,41 @@ mod tests {
         fn drop(&mut self) {
             fs::remove_dir_all(&self.0).unwrap();
         }
+    }
+
+    #[test]
+    fn client_connects_once_without_mutating_socket() {
+        let root = Directory::new();
+        let listener = SocketRegistry::default().bind(&root.socket()).unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let identity = SocketIdentity::at(&root.socket()).unwrap();
+        connect_trigger(&root.socket()).unwrap();
+        let (peer, _) = listener.accept().unwrap();
+        validate_peer(&peer).unwrap();
+        assert_eq!(
+            listener.accept().unwrap_err().kind(),
+            io::ErrorKind::WouldBlock
+        );
+        assert!(SocketIdentity::at(&root.socket()).unwrap() == identity);
+    }
+
+    #[test]
+    fn client_rejects_missing_stale_public_and_symlink_targets() {
+        let root = Directory::new();
+        assert!(connect_trigger(&root.socket()).is_err());
+        let listener = UnixListener::bind(root.socket()).unwrap();
+        fs::set_permissions(root.socket(), fs::Permissions::from_mode(0o666)).unwrap();
+        assert!(connect_trigger(&root.socket()).is_err());
+        fs::set_permissions(root.socket(), fs::Permissions::from_mode(0o600)).unwrap();
+        let alias = root.0.join("alias.sock");
+        symlink(root.socket(), &alias).unwrap();
+        assert!(connect_trigger(&alias).is_err());
+        drop(listener);
+        assert_eq!(
+            connect_trigger(&root.socket()).unwrap_err().kind(),
+            io::ErrorKind::ConnectionRefused
+        );
+        assert!(root.socket().exists());
     }
 
     #[test]

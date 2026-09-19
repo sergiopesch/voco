@@ -1,4 +1,5 @@
 import importlib.util
+import json
 from pathlib import Path
 import tempfile
 import unittest
@@ -58,13 +59,63 @@ class InventoryTests(unittest.TestCase):
 
 
 class DependencyTests(unittest.TestCase):
+    def test_rpm_licenses_survive_nodocs_policy(self):
+        for path in ['/usr/share/doc/voco/nvidia/NVIDIA-OPEN-MODEL-LICENSE.html',
+                     '/usr/share/doc/voco/vendor/glib/COPYRIGHT',
+                     '/usr/share/doc/voco/vendor/global-hotkey/LICENSE-MIT']:
+            self.assertEqual(staging.rpm_file_entry(path), '%license ' + path)
+        path = '/usr/share/doc/voco/README.md'
+        self.assertEqual(staging.rpm_file_entry(path), path)
+
+    def test_rpm_profiles_preserve_native_names_and_abi_floors(self):
+        fedora = staging.rpm_dependencies('fedora')
+        suse = staging.rpm_dependencies('opensuse')
+        self.assertIn('pulseaudio-libs', fedora)
+        self.assertIn('libpulse0', suse)
+        self.assertIn('sentencepiece-libs', fedora)
+        self.assertNotIn('sentencepiece-libs', suse)
+        self.assertIn('libsentencepiece0', suse)
+        self.assertIn('libstdc++ >= 13.2.0', fedora)
+        self.assertIn('libstdc++6 >= 13.2.0', suse)
+        for profile in (fedora, suse):
+            self.assertIn('glibc >= 2.39', profile)
+            self.assertIn('python3-numpy', profile)
+            self.assertEqual(len(profile), len(set(profile)))
+
+    def test_unknown_rpm_distribution_fails_closed(self):
+        with self.assertRaises(ValueError):
+            staging.rpm_dependencies('unknown')
+
     def test_current_dependencies_have_explicit_mappings(self):
-        staging.validate_debian_dependencies('python3, python3-numpy, at-spi2-core, ibus')
+        config = json.loads((Path(__file__).resolve().parents[1] /
+            'apps/desktop/src-tauri/tauri.conf.json').read_text())
+        staging.validate_debian_dependencies(', '.join(config['bundle']['linux']['deb']['depends']))
 
     def test_unknown_empty_alternative_and_versioned_dependencies_fail_closed(self):
         for value in ('', 'python3, new-runtime', 'python3 (>= 3.14)', 'python3 | pypy'):
             with self.subTest(value=value), self.assertRaisesRegex(ValueError, 'requires review'):
                 staging.validate_debian_dependencies(value)
+
+
+class VersionTests(unittest.TestCase):
+    def test_final_release_and_package_revision(self):
+        self.assertEqual(staging.package_version('2026.0.42'), ('2026.0.42', '1', False))
+        self.assertEqual(staging.package_version('2026.0.42', '2'), ('2026.0.42', '2', False))
+
+    def test_local_candidate_is_preserved(self):
+        self.assertEqual(staging.package_version('2026.0.40+local5'), ('2026.0.40', '5', True))
+
+    def test_invalid_versions_and_revision_overrides_fail(self):
+        for version, revision in [('2026.0.42;bad', None), ('2026.0.42+local0', None),
+                                  ('2026.0.42', '0'), ('2026.0.42', '1;bad'),
+                                  ('2026.0.42+local5', '2')]:
+            with self.subTest(version=version, revision=revision), self.assertRaises(ValueError):
+                staging.package_version(version, revision)
+
+    def test_reviewed_abi_floors_and_new_helpers(self):
+        staging.validate_debian_dependencies('libc6 (>= 2.39), libstdc++6 (>= 13.2.0), xdotool, wl-clipboard')
+        with self.assertRaises(ValueError):
+            staging.validate_debian_dependencies('libc6 (>= 2.44)')
 
 
 if __name__ == '__main__':

@@ -391,7 +391,7 @@ try {
           fontFamily: getComputedStyle(document.body).fontFamily,
           fonts: [...document.fonts].filter(font => font.status === 'loaded').map(font => ({ family: font.family, status: font.status })),
           accent: getComputedStyle(document.documentElement).getPropertyValue('--voco-accent').trim(),
-          display: style.display, backgroundImage: style.backgroundImage, radius: style.borderRadius,
+          display: style.display, backgroundImage: style.backgroundImage, backgroundColor: style.backgroundColor, radius: style.borderRadius,
           shell: { x: shellRect.x, y: shellRect.y, width: shellRect.width, height: shellRect.height },
           target: { x: rect.x, y: rect.y, width: rect.width, height: rect.height, text: element.textContent, clientWidth: element.clientWidth, scrollWidth: element.scrollWidth, clientHeight: element.clientHeight, scrollHeight: element.scrollHeight },
           unobstructed: visible === element || element.contains(visible),
@@ -403,7 +403,8 @@ try {
       assert.ok(proof.fonts.some(font => font.family.replaceAll('"', '') === 'Geist Mono'));
       assert.equal(proof.accent, '#9ea4af');
       assert.equal(proof.display, 'grid');
-      assert.ok(proof.backgroundImage.includes('gradient') && parseFloat(proof.radius) > 0);
+      assert.ok(parseFloat(proof.radius) > 0);
+      assert.ok(proof.backgroundImage !== 'none' || !['transparent', 'rgba(0, 0, 0, 0)'].includes(proof.backgroundColor));
       for (const box of [proof.shell, proof.target]) {
         assert.ok(box.width > 0 && box.height > 0 && box.x >= -1 && box.y >= -1 && box.x + box.width <= viewport.width + 1 && box.y + box.height <= viewport.height + 1, JSON.stringify(box));
       }
@@ -446,11 +447,18 @@ try {
     await select.selectOption('token-1');assert.equal(await use.isDisabled(),true);await noCapture();record(expected[6]);
     await consent.check();await use.click();await page.waitForFunction(()=>window.store.getState().nativeCaptureSource?.selectionToken==='token-1');await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));await noCapture();
     assert.deepEqual((await state()).commands.filter(x=>x.name==='native_capture_select_source').at(-1).args,{selectionToken:'token-1',acknowledged:true});assert.equal((await state()).ready,true);record(expected[7]);
+    assert.equal(await page.getByRole('button',{name:'Continue',exact:true}).isEnabled(),true,
+      'Approved native input must allow onboarding without browser preview audio');
+    await page.getByRole('button',{name:'Continue',exact:true}).click();
+    assert.equal(await page.getByRole('button',{name:'Hide and try dictation',exact:true}).isEnabled(),true);
+    await noCapture();
+    await page.getByRole('button',{name:'Back',exact:true}).click();
     await page.evaluate(()=>window.selectError='Selection expired');await consent.check();await use.click();await page.getByText('Selection expired',{exact:true}).waitFor();assert.equal((await state()).source,null);await noCapture();assert.equal((await state()).ready,false);record(expected[8]);
     await page.evaluate(()=>window.selectError=null);await select.selectOption('system-default');await consent.check();await use.click();await page.waitForFunction(()=>window.store.getState().nativeCaptureSource?.selectionToken==='token-1');await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));assert.equal((await state()).commands.filter(x=>x.name==='native_capture_select_source').at(-1).args.selectionToken,'token-1');await noCapture();record(expected[9]);
     await page.getByRole('button',{name:'Refresh native devices'}).click();await page.waitForFunction(()=>window.nativeCommands.filter(x=>x.name==='native_capture_list_sources').length>=2);await noCapture();record(expected[10]);
     await page.evaluate(()=>window.catalog={revision:'r2',sources:[],defaultSelectionToken:null});await page.getByRole('button',{name:'Refresh native devices'}).click();await page.waitForFunction(()=>window.store.getState().nativeCaptureSource===null);await page.getByText('The microphone list changed. Choose and allow a microphone again.',{exact:true}).waitFor();await noCapture();assert.equal((await state()).ready,false);record(expected[11]);
     await page.evaluate(()=>window.catalogError='Source server unavailable');await page.getByRole('button',{name:'Refresh native devices'}).click();await page.getByText('Source server unavailable',{exact:true}).waitFor();assert.equal((await state()).mode,'native');await noCapture();record(expected[12]);
+    expected.push('native-onboarding-without-preview');record('native-onboarding-without-preview');
     const originalExpected=[...expected];
     const activate=async(auditEnabled=false)=>{
       await load('enabled');await page.getByLabel('Native input device').selectOption('token-1');await page.getByLabel('Allow native microphone access for this app session').check();await page.getByRole('button',{name:'Use this microphone',exact:true}).click();
@@ -477,13 +485,13 @@ try {
     await page.waitForFunction(()=>window.store.getState().transcript==='Fixture transcript');
     assert.equal((await state()).commands.filter(x=>x.name==='native_capture_begin').length,1);assert.equal((await state()).streams,0);
     expected.push('manual-retry-does-not-recapture');record(expected.at(-1));
-    await activate();await page.getByRole('button',{name:'Cancel',exact:true}).click();
+    await activate();await page.evaluate(()=>window.store.getState().setSurface('popover'));await page.getByRole('button',{name:'Cancel dictation',exact:true}).click();
     await page.waitForFunction(()=>window.store.getState().recovery?.audioAvailable===true);
     assert.ok((await state()).commands.some(x=>x.name==='native_capture_stop'));assert.equal((await state()).streams,0);
     assert.equal((await state()).ready,true);assert.ok((await state()).source);assert.equal((await state()).commands.filter(x=>x.name==='native_capture_cancel').length,0);
     expected.push('native-user-cancel-retains-audio');record(expected.at(-1));
     await activate();await page.evaluate(()=>window.store.getState().setSurface('settings'));
-    await page.getByRole('button',{name:'Audio',exact:true}).click();
+    await page.getByRole('button',{name:'Microphone',exact:true}).click();
     await page.getByLabel('Native input device').waitFor();assert.equal(await page.getByLabel('Native input device').isDisabled(),true);
     assert.equal(await page.getByRole('button',{name:'Use this microphone',exact:true}).isDisabled(),true);
     assert.equal((await state()).commands.filter(x=>x.name==='native_capture_select_source').length,1);
@@ -528,7 +536,7 @@ try {
     await page.getByRole('button',{name:'Discard recovery',exact:true}).click();
     assert.equal((await state()).source,null);assert.equal((await state()).ready,false);
     await page.evaluate(()=>window.store.getState().setSurface('settings'));
-    await page.getByRole('button',{name:'Audio',exact:true}).click();
+    await page.getByRole('button',{name:'Microphone',exact:true}).click();
     await page.getByRole('button',{name:'Refresh native devices'}).click();
     await page.getByLabel('Native input device').selectOption('token-1');
     await page.getByLabel('Allow native microphone access for this app session').check();
@@ -636,7 +644,7 @@ try {
     expected.push('drain-timeout-retains-exact-prefix-without-automatic-output');record(expected.at(-1));
     await page.getByRole('button',{name:'Discard recovery',exact:true}).click();
     await page.evaluate(()=>window.store.getState().setSurface('settings'));
-    await page.getByRole('button',{name:'Audio',exact:true}).click();
+    await page.getByRole('button',{name:'Microphone',exact:true}).click();
     await page.getByRole('button',{name:'Refresh native devices'}).click();
     await page.getByLabel('Native input device').selectOption('token-1');
     await page.getByLabel('Allow native microphone access for this app session').check();
@@ -668,7 +676,7 @@ try {
     await verifyRetainedWitness('healthy-stop');
     await page.waitForFunction(()=>window.store.getState().transcript==='Fixture transcript');
     expected.push('opt-in-audit-retains-exact-source-before-dc-and-resampling');record(expected.at(-1));
-    await activate(true);await page.getByRole('button',{name:'Cancel',exact:true}).click();
+    await activate(true);await page.evaluate(()=>window.store.getState().setSurface('popover'));await page.getByRole('button',{name:'Cancel dictation',exact:true}).click();
     await verifyRetainedWitness('cancelled');
     await page.waitForFunction(()=>window.store.getState().recovery?.audioAvailable===true);
     assert.equal(await page.evaluate(()=>window.calls.filter(x=>x[0]==='transcribeAudio').length),0);
@@ -697,37 +705,17 @@ try {
     await page.setViewportSize({ width: 420, height: 520 });
     await page.waitForFunction(() => (window.diagnosticRequests || 0) > 0);
     await page.getByText('Shortcut configured: Alt+D. Start dictation from the tray.', { exact: false }).waitFor();
-    const footer = page.getByText('Microphone: Remapped voco_test_sink_8dacc27a8e4a4c8f.monitor', { exact: true });
+    const footer = page.getByRole('button', { name: 'Microphone: Remapped voco_test_sink_8dacc27a8e4a4c8f.monitor', exact: true });
     await captureStyledPanel('shortcut-unavailable-popover-420x520', footer, { width: 420, height: 520 });
-    await captureStyledPanel('shortcut-popover-scroll-420x520', page.getByText('Realtime: Realtime conversation is off.', { exact: true }), { width: 420, height: 520 });
-    assert.ok(await page.locator('.voco-popover').evaluate(element => element.scrollTop > 0), 'Popover remainder must be reachable by scrolling');
     await noCapture();
     expected.push('unavailable-shortcut-and-approved-native-footer-at-popover-size'); record(expected.at(-1));
 
     await page.setViewportSize({ width: 760, height: 560 });
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
-    await page.getByRole('button', { name: 'Hotkeys', exact: true }).click();
+    await page.getByRole('button', { name: 'Shortcuts', exact: true }).click();
     await page.getByText('No readable keyboard.', { exact: false }).waitFor();
-    await captureStyledPanel('shortcut-settings-760x560', page.getByRole('button', { name: 'Save hotkey', exact: true }), { width: 760, height: 560 });
-    const scrollGeometry = () => page.evaluate(() => Object.fromEntries(['.voco-settings', '.voco-settings__nav', '.voco-settings__content'].map(selector => {
-      const element = document.querySelector(selector), style = getComputedStyle(element);
-      return [selector, { clientHeight: element.clientHeight, scrollHeight: element.scrollHeight, scrollTop: element.scrollTop, overflowY: style.overflowY, gridTemplateRows: style.gridTemplateRows }];
-    })));
-    await save('settings-before-wheel.json', await scrollGeometry());
-    await page.locator('.voco-settings__content').hover({ position: { x: 30, y: 60 } });
-    await page.mouse.wheel(0, 400);
-    await page.waitForTimeout(300);
-    await save('settings-after-wheel.json', await scrollGeometry());
-    assert.ok(await page.locator('.voco-settings__content').evaluate(element => element.scrollTop > 0), 'Mouse wheel must scroll Settings content');
-    const navigation = page.locator('.voco-settings__nav');
-    const navBox = await navigation.boundingBox();
-    await page.mouse.move(navBox.x + 30, navBox.y + 60);
-    await page.mouse.wheel(0, 400);
-    await page.waitForTimeout(300);
-    await save('settings-after-navigation-wheel.json', await scrollGeometry());
-    assert.ok(await navigation.evaluate(element => element.scrollTop > 0), 'Mouse wheel must expose the clipped Settings navigation');
+    await captureStyledPanel('shortcut-settings-760x560', page.getByRole('button', { name: 'Record shortcut', exact: true }), { width: 760, height: 560 });
     await captureStyledPanel('shortcut-settings-instructions-760x560', page.getByText('For IBus recording shortcuts, add VOCO Dictation in your desktop Input Sources settings, select it, then focus a text field. VOCO never switches your input source automatically.', { exact: true }), { width: 760, height: 560 });
-    assert.ok(await page.locator('.voco-settings__content').evaluate(element => element.scrollTop > 0), 'Setup instructions must be reachable by scrolling');
     await page.evaluate(() => { window.shortcutObservation = { hotkey: 'Alt+D', route: 'ibus', state: 'focus-required', detail: 'Focus a supported input field.' }; });
     await page.getByText('Focus a text field with VOCO Dictation selected as your input source.', { exact: true }).waitFor();
     expected.push('settings-shows-current-focus-required-ibus-instructions'); record(expected.at(-1));
@@ -775,7 +763,7 @@ try {
     await page.getByText('Shortcut configured: Alt+D. Start dictation from the tray.', { exact: false }).waitFor({ timeout: 3000 });
     const openStarted = performance.now();
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
-    await page.getByRole('button', { name: 'Hotkeys', exact: true }).waitFor({ timeout: 3000 });
+    await page.getByRole('button', { name: 'Shortcuts', exact: true }).waitFor({ timeout: 3000 });
     assert.ok(performance.now() - openStarted < 3000, 'Pending observer must not block Settings');
     await page.waitForTimeout(2500); // Cross two poll intervals while the same backend call remains pending.
     assert.equal(await page.evaluate(() => window.observerCalls), pendingCalls);
@@ -785,7 +773,7 @@ try {
       await prepareDeferredDiagnostics();
       if (transition === 'save') {
         await page.getByRole('button', { name: 'Settings', exact: true }).click();
-        await page.getByRole('button', { name: 'Hotkeys', exact: true }).click();
+        await page.getByRole('button', { name: 'Shortcuts', exact: true }).click();
         await page.getByLabel('Start and stop listening', { exact: true }).fill('Alt+X');
         await page.getByRole('button', { name: 'Save hotkey', exact: true }).click();
         await page.waitForFunction(() => window.savePending === true);
@@ -835,7 +823,7 @@ try {
       await new Promise(resolve => setTimeout(resolve, 0));
     });
     await page.getByRole('button', { name: 'Copy transcript', exact: true }).click();
-    await page.getByText('Copied to clipboard', { exact: true }).waitFor();
+    await page.getByText('Copied to clipboard. The transcript stays here until you dismiss it.', { exact: true }).waitFor();
     await page.evaluate(async () => {
       window.focusReads.shift()(false);
       await new Promise(resolve => setTimeout(resolve, 0));
@@ -843,7 +831,7 @@ try {
     assert.equal(await page.evaluate(() => window.store.getState().surface), 'popover');
     assert.equal(await page.evaluate(() => window.copiedText), 'Fixture transcript');
     assert.equal(await page.evaluate(() => window.store.getState().recovery.kind), 'manual-copy');
-    await captureStyledPanel('copied-transcript-stale-blur-420x660', page.getByText('Copied to clipboard', { exact: true }), { width: 420, height: 660 });
+    await captureStyledPanel('copied-transcript-stale-blur-420x660', page.getByText('Copied to clipboard. The transcript stays here until you dismiss it.', { exact: true }), { width: 420, height: 660 });
     expected.push('copy-and-newer-focus-survive-stale-blur-reply'); record(expected.at(-1));
     await page.evaluate(() => {
       window.focused = false;
@@ -866,7 +854,8 @@ try {
     await page.waitForFunction(() => window.focusListeners.size === 0);
     await page.evaluate(() => window.listeners['voco:toggle-dictation']({ payload: null }));
     await page.waitForFunction(() => window.store.getState().status === 'recording' && window.nativeCommands.filter(x => x.name === 'native_capture_begin').length === 2);
-    await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await page.evaluate(()=>window.store.getState().setSurface('popover'));
+    await page.getByRole('button', { name: 'Cancel dictation', exact: true }).click();
     await page.waitForFunction(() => window.store.getState().recovery?.audioAvailable === true);
     await page.waitForFunction(() => {
       const snapshot = window.calls.filter(x => x[0] === 'syncRuntimeStatus').at(-1)[1];

@@ -62,7 +62,7 @@ for measurement and recipient limitations.
 | --- | --- | --- |
 | App orchestration and native IPC | `apps/desktop/src-tauri/src/lib.rs` | Command registration, startup, model readiness, cursor delivery and shared limits. Keep platform authority in Rust. |
 | UI | `apps/desktop/src/components/`, `src/store/` | Tray-associated controls, status, setup and recovery. No model inference or OS simulation in React. |
-| Capture | `apps/desktop/src/lib/audioInput.ts`, `audioCaptureBuffer.ts`, `audioCaptureFlush.ts`, `nativeCapture.ts`; `src-tauri/src/native_capture/` | Browser capture is default; native capture is a separately gated development path. Preserve sample ownership and drain ordering. |
+| Capture | `apps/desktop/src/lib/audioInput.ts`, `audioCaptureBuffer.ts`, `audioCaptureFlush.ts`, `nativeCapture.ts`; `src-tauri/src/native_capture/` | The .43 candidate selects native capture on Wayland and browser capture on X11. Native input requires explicit source selection and app-session permission. Preserve sample ownership and drain ordering. |
 | Live preview schedule | `src/lib/livePreviewSchedule.ts` | Owns the preview timer versus canonical-pump interaction. Sample arrivals without canonical work must not postpone a pending preview. |
 | Live preview decode | `src/lib/livePreviewRunner.ts` | Frozen-snapshot decode, geometry checks and owned-preedit cursor update. Token invalidation must not enqueue stale native work. |
 | Desktop capture tail | `src/lib/desktopCaptureTail.ts` | Append-only sample accounting and Stop-tail forwarding into the NVIDIA queue. Do not recopy an already streamed recording. |
@@ -129,3 +129,9 @@ These do not change the recognition or delivery pipeline.
 The glib 0.18.5 dependency is pinned under `vendor/glib` with an upstream iterator
 safety backport. `verify-glib-backport.py` checks its full source and resolution;
 `test-glib-variant.py` runs the optimized regression without launching the app.
+
+The .43 candidate adds `voco --toggle` in `src-tauri/src/main.rs`, calling the
+existing owner-only trigger transport. It uses one nonblocking connection; no
+retry, GUI startup or recording-state acknowledgment is implied. Native packaging
+selects Fedora/openSUSE dependency profiles explicitly and preserves license files
+when RPM excludes ordinary documentation. See [Linux support](../linux-support.md).

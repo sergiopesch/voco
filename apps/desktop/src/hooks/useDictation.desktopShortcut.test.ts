@@ -200,7 +200,7 @@ it.each(["browser", "enhancement", "not-streaming"])("retains the existing %s ro
   expect(h.begin).not.toHaveBeenCalled(); expect(h.end).not.toHaveBeenCalled();
 });
 
-it.each([null, "first-visible-target"])("reprobes an initially obscured target after the native ACK: %s", async target => {
+it.each(["first-visible-target"])("reprobes an initially obscured target after the native ACK: %s", async target => {
   const h = harness();
   h.status.targetToken = null;
   h.pasteStatus.mockResolvedValueOnce(h.status).mockResolvedValueOnce({ ...h.status, targetToken: target });
@@ -211,6 +211,17 @@ it.each([null, "first-visible-target"])("reprobes an initially obscured target a
   expect(h.target.current).toBe(target);
   expect(h.captureSelection).toHaveBeenCalledOnce();
   expect(h.end).toHaveBeenCalledOnce();
+});
+
+it("rejects an unbound destination after shortcut acquisition without opening a microphone", async () => {
+  const h = harness();
+  h.status.targetToken = null;
+  await h.startRecording();
+  expect(h.pasteStatus).toHaveBeenCalledTimes(2);
+  expect(h.captureSelection).not.toHaveBeenCalled();
+  expect(h.setError).toHaveBeenCalledWith(expect.stringContaining("destination"));
+  expect(h.end).toHaveBeenCalledExactlyOnceWith(h.begin.mock.calls[0]![0]);
+  expect(h.owner.current).toBeNull();
 });
 
 it("never reprobes or replaces an initially valid target after shortcut acquisition", async () => {

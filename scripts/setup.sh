@@ -136,25 +136,26 @@ if command -v apt &>/dev/null; then
     bash -c 'sudo apt update -qq 2>/dev/null && sudo apt install -y -qq \
       pkg-config libglib2.0-dev libsoup-3.0-dev \
       libjavascriptcoregtk-4.1-dev libwebkit2gtk-4.1-dev \
-      libayatana-appindicator3-dev clang mold \
+      libayatana-appindicator3-dev libpulse-dev clang mold \
       ibus gir1.2-ibus-1.0 python3-gi 2>/dev/null'
 else
   warn "Not using apt — install manually: pkg-config libglib2.0-dev libsoup-3.0-dev"
-  warn "libjavascriptcoregtk-4.1-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev"
-  warn "For automatic text delivery, install IBus, its GI bindings, and system Python 3"
+  warn "libjavascriptcoregtk-4.1-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev libpulse-dev"
+  warn "For IBus shortcut integration, install IBus, its GI bindings, and system Python 3"
 fi
 
 if [[ -x /usr/bin/python3 ]] && /usr/bin/python3 -c 'import gi; gi.require_version("IBus", "1.0"); from gi.repository import IBus' 2>/dev/null; then
-  ok "IBus automatic text delivery runtime"
+  ok "IBus shortcut runtime"
 else
-  warn "Automatic text delivery unavailable — install ibus gir1.2-ibus-1.0 python3-gi"
+  warn "IBus shortcut integration unavailable — install ibus gir1.2-ibus-1.0 python3-gi"
 fi
 
 SESSION="${XDG_SESSION_TYPE:-x11}"
 if [[ "$SESSION" == "wayland" ]]; then
   command -v ydotool &>/dev/null && ok "ydotool" || dim "Wayland paste helper missing: install ydotool and configure its input service"
+  command -v ydotoold &>/dev/null && ok "ydotoold" || dim "Wayland input daemon missing: Ubuntu packages ydotoold separately"
   command -v wl-copy &>/dev/null && ok "wl-clipboard" || dim "wl-clipboard missing: required on supported wlroots desktops; GNOME uses xclip"
-  groups | grep -q '\binput\b' && ok "input group" || warn "Run: sudo usermod -aG input \$USER"
+  dim "Wayland needs a configured input daemon; follow docs/platform/README.md for scoped device/socket access"
 else
   command -v xdotool &>/dev/null && ok "xdotool" || dim "X11 paste helper missing: install xdotool"
   command -v xclip &>/dev/null && ok "xclip" || dim "X11 clipboard helper missing: install xclip"

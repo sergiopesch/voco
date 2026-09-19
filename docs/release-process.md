@@ -76,3 +76,13 @@ Remove remote branches only when their exact tips are already merged, and retain
 the recorded commit IDs. Do not delete dirty local worktrees or unresolved PRs.
 Keep security updates separate when their dependency graph fails compilation;
 never waive a gate or ignore an advisory just to clear the PR list.
+
+## Additional native Linux channels
+
+Follow [the support gates](linux-support.md) for each distribution and desktop.
+Build Fedora and openSUSE RPMs from their explicit dependency profiles; preserve
+companion source packages and all bundled licenses. Validate nodocs license
+retention as well as full-document payload parity. Keep native package revisions,
+checksums and signatures independent. A successful .deb test or a renamed RPM is
+not acceptance for another channel. Do not publish .43 until its outstanding
+capture and desktop gates are complete.

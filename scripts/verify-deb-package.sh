@@ -45,7 +45,7 @@ PACKAGE_DEPENDS="$(dpkg-deb -f "${DEB_PATH}" Depends)"
   exit 1
 }
 
-for dependency in ibus python3 python3-gi gir1.2-ibus-1.0 python3-numpy python3-psutil libsentencepiece0 xclip xdotool wl-clipboard gir1.2-atspi-2.0 at-spi2-core; do
+for dependency in ibus python3 python3-gi gir1.2-ibus-1.0 python3-numpy python3-psutil libsentencepiece0 libpulse0 xclip xdotool wl-clipboard gir1.2-atspi-2.0 at-spi2-core; do
   if ! grep -Eq "(^|, )${dependency}( \\([^)]*\\))?(,|$)" <<<"${PACKAGE_DEPENDS}"; then
     echo "Debian package is missing dependency: ${dependency}" >&2
     exit 1
@@ -59,7 +59,7 @@ for floor in 'libc6 (>= 2.39)' 'libstdc++6 (>= 13.2.0)'; do
   fi
 done
 
-if [[ "$(dpkg-deb -f "${DEB_PATH}" Recommends)" != "ydotool" ]]; then
+if [[ "$(dpkg-deb -f "${DEB_PATH}" Recommends)" != "ydotool, ydotoold" ]]; then
   echo "Debian package must recommend the session-specific Wayland input helper." >&2
   exit 1
 fi
@@ -108,18 +108,14 @@ if awk '{ print $NF }' <<<"${PACKAGE_LISTING}" | rg -q '(__pycache__|\.pyc$|_tes
   exit 1
 fi
 
-if dpkg-deb --ctrl-tarfile "${DEB_PATH}" | tar -tf - \
-  | rg -q '(^|/)(preinst|postinst|prerm|postrm|config|triggers)$'; then
-  echo "Debian package unexpectedly mutates installation state via maintainer scripts." >&2
-  exit 1
-fi
-
 EXTRACT_ROOT="$(mktemp -d)"
 cleanup() {
   rm -rf "${EXTRACT_ROOT}"
 }
 trap cleanup EXIT INT TERM
 dpkg-deb -x "${DEB_PATH}" "${EXTRACT_ROOT}"
+dpkg-deb -e "${DEB_PATH}" "${EXTRACT_ROOT}/DEBIAN"
+python3 "${ROOT_DIR}/scripts/debian_maintainer.py" "${EXTRACT_ROOT}/DEBIAN" "${EXTRACT_ROOT}"
 # A development binary may link Pulse directly; never rely on a desktop's
 # incidental transitive installation to satisfy that runtime dependency.
 for executable in /usr/bin/voco /usr/libexec/voco-browser-host; do

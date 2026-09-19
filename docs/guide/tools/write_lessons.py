@@ -88,7 +88,7 @@ lesson(
         ),
         (R + "stream_worker.py", "Starts the selected local speech worker."),
     ],
-    "This guide describes a pinned 2026.0.42 source snapshot. It does not promise every Linux app or compositor accepts delivery.",
+    "This guide describes a pinned development source snapshot recorded in its catalog. It does not promise every Linux app or compositor accepts delivery.",
     "Which part owns the text box you are dictating into?",
     ["VOCO always owns it", "The receiving application", "The speech model"],
     1,
@@ -209,12 +209,12 @@ lesson(
     [
         "Imagine writing down the height of a wave many times each second. The list of heights is digital audio.",
         "Sample rate means how many measurements happen in one second. It must travel with the numbers, like units on a ruler.",
-        "An AudioWorklet collects small ordered pieces while the interface does other work. The default path uses WebKit audio capture.",
+        "The .43 candidate uses native audio capture on Wayland so the panel can stay hidden. X11 uses WebKit and an AudioWorklet to collect ordered pieces while the interface does other work.",
     ],
     [
-        ("Permission", "Ask the operating system/browser layer for microphone access."),
-        ("Device", "Use the selected input device, or the current default."),
-        ("Samples", "Capture ordered blocks of floating-point audio."),
+        ("Permission", "On Wayland, explicitly allow the selected source for this app session. On X11, use browser microphone permission."),
+        ("Device", "Bind the recording to the selected input. Native system-default selection resolves to a specific source."),
+        ("Samples", "Capture ordered blocks and retain their sample rate through conversion."),
         ("Descriptor", "Keep source, rate and sample-count information together."),
         ("Queue", "Offer the blocks to the recording’s speech queue."),
     ],
@@ -228,8 +228,8 @@ lesson(
             "Calling 44,100 samples “one second at 16 kHz” changes the meaning of the audio. Rate validation and resampling must be deliberate.",
         ),
         (
-            "An optional route is not the default",
-            "The native capture modules form a separately gated development path. Seeing those files does not mean the normal desktop session uses them.",
+            "Permission is not a recording",
+            "Selecting and allowing a native source does not open a recording. Start begins capture; Stop closes it. A removed source cannot silently become a different microphone.",
         ),
     ],
     [
@@ -242,7 +242,7 @@ lesson(
         (F + "lib/audioResampling.ts", "Handles explicit sample-rate conversion."),
         (
             B + "native_capture_commands.rs",
-            "Commands for the separately gated native capture path.",
+            "Native source selection, permission and bounded capture commands.",
         ),
     ],
     "The waveform below is a teaching drawing. It never activates your microphone.",
@@ -963,7 +963,47 @@ lesson(
 )
 summary_path = Path(__file__).resolve().parents[2] / "testing/typesafe-summary-2026-09-19.json"
 chapters[-1]["comparison"] = json.loads(summary_path.read_text())
-chapters[-1]["sourceNote"] = "Evaluation tools from the pinned .42 source snapshot. Tables retain their original .41 experiment identity."
+chapters[-1]["sourceNote"] = "Evaluation tools from the pinned 2026.0.43 development snapshot. Tables retain their original .41 experiment identity."
+
+lesson(
+    "linux-support",
+    "One VOCO, different Linux desktops.",
+    "A download is ready only when installation, microphone, shortcut and text delivery work together.",
+    [
+        "VOCO keeps a shared recognition model and application source. Native Debian, Fedora, openSUSE and Arch packages translate that application into dependencies each system understands.",
+        "The desktop matters too. A package can install correctly while a compositor handles windows, shortcuts or clipboard access differently. Omarchy needs Hyprland testing as well as Arch package testing.",
+        "The .43 work is a development candidate. Public .42 remains the released Debian package. The support plan records what is measured and what still blocks each additional package.",
+    ],
+    [
+        ("Package", "Resolve native dependencies and verify every installed payload file."),
+        ("Desktop", "Run the intended compositor in a booted guest and finish fresh-user setup."),
+        ("Dictation", "Send public fixture audio, observe the receiving field and check Start and Stop."),
+        ("Failures", "Switch focus, repeat sessions, interrupt devices and retain recovery safely."),
+        ("Release", "Sign exact qualified artifacts and verify the downloaded copies before installation."),
+    ],
+    [
+        ("Before: a transparent tile", "Hyprland kept the off-screen VOCO window tiled. An isolated test reproduced it even though short dictation worked."),
+        ("Why hiding alone failed", "A diagnostic native hide removed the tile, but a fresh WebKit microphone request did not become active within 25 seconds. That failed attempt led to native capture qualification."),
+        ("After: native capture while hidden", "The installed .43 Arch candidate passed fresh setup under Omarchy’s packaged desktop configuration: 14 normalized words, a truly hidden panel, an unchanged second field and a 244 ms Stop. A 577.68-second repetition delivered 1,162 normalized words and passed independent full-audio checks. These individual VM observations do not certify physical microphones or arbitrary apps."),
+        ("A measured shortcut improvement", "The candidate's voco --toggle command used a compositor binding without keyboard-device access. One isolated fixture delivered all 14 words and left the second field unchanged. This does not certify every shortcut or application."),
+        ("Fit the available CPUs", "A two-core VM took 35.37 seconds to warm a four-thread recognizer, exceeding startup limits. Two threads took 1.53 seconds in a controlled check. The candidate caps its default at the available CPUs, up to four. All 12 public fixtures produced identical transcripts across the tested Fedora, openSUSE and two-core Ubuntu workers: six lexical edits in 238 words. This small corpus does not establish worldwide accuracy."),
+        ("Reject an unknown destination", "An X11 focus-switch test caught text continuing into a second field. GNOME exposed both the client and its decoration as active, and VOCO incorrectly allowed an unbound paste. The candidate distinguishes the decoration and requires a destination token. The installed regression then left the second field empty and retained recovery. Successful ordinary dictation had not exposed this bug."),
+        ("Safe upgrades", "Debian preserves existing directory modes during upgrades. A real legacy-install test exposed inherited group-write permissions. A narrowly checked migration repairs only the known package-owned mode, preserving custom permissions and personal settings."),
+        ("Keep obligations installed", "RPM can omit ordinary documentation on minimal systems. License files need explicit license metadata so those terms remain installed."),
+        ("What TypeSafe contributes", "Optional semantic judgments assess a transcript's meaning. Exact code and real desktop tests establish package identity, audio timing, destination safety and compatibility. A language-model score cannot replace those checks."),
+    ],
+    [
+        ("docs/linux-support.md", "The support scope, setup and remaining release gates."),
+        ("scripts/stage-native-packages.py", "Explicit native dependency profiles and license metadata."),
+        (B + "trigger_socket.rs", "Private, single-attempt compositor control transport."),
+        ("docs/testing/linux-release-2026-09-19.md", "Dated outcomes and qualification limits."),
+    ],
+    "These are development experiments, not a released universal Linux installer. The Omarchy long-session result uses virtual audio and one GTK recipient. Physical microphones, other default desktops and the wider application matrix still need their own evidence.",
+    "The RPM installs, but dictation fails under the default compositor. Is that distribution ready?",
+    ["Yes: installation is sufficient", "No: package and desktop acceptance are separate gates"],
+    1,
+    "A native package is only one part of the experience. The microphone, shortcut, window and destination must work together.",
+)
 
 # Fail closed if a lesson cites a path absent from the pinned source.
 root = Path(__file__).resolve().parents[1]

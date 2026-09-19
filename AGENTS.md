@@ -19,7 +19,8 @@ Read [README](README.md), [the code map](docs/architecture/code-map.md) and
 The production path is `runtime/speech/` → Rust `benchmark_stream.rs` →
 `benchmarkPhraseQueue.ts` → `insertion.rs`. Despite their historical names,
 these are production modules. The selected runtime is NVIDIA Nemotron English
-0.6B Q8 CPU. Whisper and Chromium exact-field dictation are separate compatibility
+0.6B Q8 CPU. Keep the default worker count capped to process affinity and at most
+four threads; preserve explicit research overrides and record actual counts. Whisper and Chromium exact-field dictation are separate compatibility
 paths with their own checks. Research model adapters are not selectable products.
 
 Rust owns OS integration, files, processes, packaging and validation. React owns
@@ -54,6 +55,10 @@ glib 0.20 directly leaves the GTK dependency behind. [Backport](vendor/glib/VOCO
   proceed through debounce; passive evdev retains its duplicate guard.
 - IBus protocol 6 is dictation-shortcut-only; older helpers must reconnect after upgrade. Never restore text mutation there.
 - Bounded accessible-field observations are not atomic ownership or cursor paint.
+- Automatic desktop insertion requires a bound, nonempty destination token. An
+  unavailable preflight is never permission to paste unguarded. GNOME X11's
+  `mutter-x11-frames` decoration is not a second destination; retain rejection for
+  genuinely ambiguous active clients and test focus departure in a real session.
 - Logs are optional, private and bounded. No dictated text, audio, clipboard values,
   URLs or window titles in performance logs. Reject unsafe log/socket targets.
 
@@ -79,6 +84,7 @@ npm run lint
 npm test
 npm run test:dictation-renderer
 npm run test:microphone-renderer
+npm run test:native-capture-renderer
 npm run test:chromium-exact-field
 python3 scripts/verify-glib-backport.py
 python3 scripts/test-glib-variant.py --output /tmp/voco-glib-check
@@ -108,8 +114,9 @@ isolation, not a remote VM or proof of a distribution's default desktop.
 
 ## Release and evidence
 
-Release version: **2026.0.42**, combining capture/recovery reliability and the
-public evaluation guide. Publication status is authoritative on GitHub Releases;
+Development version: **2026.0.43**. Public release: **2026.0.42**.
+The .43 Linux package milestone is not release-qualified; follow
+[the support plan](docs/linux-support.md) and preserve per-artifact receipts. Publication status is authoritative on GitHub Releases;
 a version in source alone is not proof of a published or installed package.
 Frozen .39 and earlier cuts remain immutable. New product bytes need a new version,
 fresh checks and artifact receipts.
@@ -120,3 +127,16 @@ The hosted Release workflow must not assemble NVIDIA installers. Userspace check
 native install/remove, physical audio and compositor/application behavior are
 distinct evidence levels. Never claim fastest, most accurate, universal
 compatibility or stability from a limited test corpus.
+
+Native packages share the qualified application/model, but use explicit distro
+dependency mappings. Keep RPM licenses installed under nodocs policies. Companion
+SentencePiece recipes must use SPM_BUILD_TEST and fail when no tests run.
+The control CLI connects once to the owner-only socket; do not add retries or
+launch/focus side effects. It does not prove a compositor keybinding exists.
+The .43 candidate uses native capture on Wayland and WebKit capture on X11.
+The Wayland change is approved but still needs exact-artifact qualification. Keep
+explicit source selection and app-session permission, with no idle recording or
+silent device switching. Native capture permits real window hiding. Preserve the
+failed WebKit hidden-start experiment and independently verify audio retention.
+The debug audit needs all three explicit flags and completed private bundles;
+wait for their COMMIT receipts before terminating an audited test process.

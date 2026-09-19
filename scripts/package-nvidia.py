@@ -9,6 +9,7 @@ import shutil
 import stat
 import subprocess
 import tempfile
+from debian_maintainer import render_postinst
 
 ROOT = Path(__file__).resolve().parents[1]
 VENDORED_NOTICES = {
@@ -138,10 +139,14 @@ def main():
         copy_vendored_notices(ROOT, doc)
         identity = {"version": package_version, "application_version": version,
                     "backend": "CPU native pool", "context": 1, "cpu_threads": 4,
+                    "cpu_thread_policy": "At most four, capped to process CPU affinity; explicit research overrides preserved",
                     **payload_inventory(speech)}
         (speech / "MANIFEST.json").write_text(json.dumps(identity, indent=2) + "\n")
         normalize_payload_modes(speech)
         normalize_payload_modes(doc)
+        postinst = stage / 'DEBIAN/postinst'
+        postinst.write_text(render_postinst(stage))
+        postinst.chmod(0o755)
         control = stage / "DEBIAN/control"
         lines = [line for line in control.read_text().splitlines()
                  if not line.startswith(("Version:", "Installed-Size:"))]

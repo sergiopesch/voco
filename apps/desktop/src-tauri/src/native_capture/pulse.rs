@@ -20,6 +20,16 @@ struct Catalog {
     default_name: [c_char; 512],
     sources: [RawSource; 128],
 }
+
+fn empty_catalog() -> Box<Catalog> {
+    let mut catalog = Box::<Catalog>::new_uninit();
+    // SAFETY: Catalog contains only integer fields/arrays, for which zero is
+    // valid. Initialize in place instead of creating a large stack temporary.
+    unsafe {
+        catalog.as_mut_ptr().write_bytes(0, 1);
+        catalog.assume_init()
+    }
+}
 #[repr(C)]
 struct RawStatus {
     frames: u64,
@@ -85,7 +95,8 @@ fn raw_matches(raw: &RawSource, source: &Source) -> bool {
 
 pub struct Pulse {
     ptr: NonNull<std::ffi::c_void>,
-    catalog: Option<Catalog>,
+    // Keep the bounded device table out of the capture worker's stack frames.
+    catalog: Option<Box<Catalog>>,
 }
 impl Pulse {
     pub fn connect() -> Result<Self, String> {
@@ -104,7 +115,7 @@ impl Pulse {
         Ok(Self { ptr, catalog: None })
     }
     pub fn enumerate(&mut self, epoch: u64) -> Result<(u64, Vec<Source>, Option<String>), String> {
-        let mut catalog: Box<Catalog> = Box::new(unsafe { std::mem::zeroed() });
+        let mut catalog = empty_catalog();
         if unsafe { vc_enumerate(self.ptr.as_ptr(), &mut *catalog) } != 0 {
             return Err(self
                 .status()
@@ -143,7 +154,7 @@ impl Pulse {
                 is_monitor: raw.monitor != 0,
             });
         }
-        self.catalog = Some(*catalog);
+        self.catalog = Some(catalog);
         Ok((revision, sources, default_token))
     }
     pub fn begin(&mut self, source: &Source, revision: u64) -> Result<(), String> {
@@ -229,6 +240,21 @@ impl Drop for Pulse {
 #[cfg(test)]
 mod identity_tests {
     use super::*;
+    #[test]
+    fn device_catalog_initializes_on_a_small_worker_stack() {
+        let catalog = std::thread::Builder::new()
+            .stack_size(64 * 1024)
+            .spawn(empty_catalog)
+            .unwrap()
+            .join()
+            .unwrap();
+        assert_eq!(catalog.count, 0);
+        assert_eq!(catalog.revision, 0);
+        assert!(catalog
+            .sources
+            .iter()
+            .all(|source| source.name.iter().all(|c| *c == 0)));
+    }
 
     #[test]
     fn raw_begin_lookup_rejects_index_reuse_and_missing_serial() {

@@ -51,6 +51,14 @@ counts, not recordings or dictated text. Update checks contact GitHub.
 
 Curious how it works? Explore the [visual code guide](docs/guide/README.md).
 
+## Linux package development
+
+The next release is being qualified with separate Debian, Fedora, openSUSE and
+Arch packages, including Omarchy/Hyprland integration. These are development
+candidates. The .43 candidate uses explicit native microphone permission on
+Wayland so dictation can start with its panel hidden; X11 keeps browser capture.
+See the [support plan and release gates](docs/linux-support.md).
+
 ## Contribute
 
 Start with [development setup](docs/contributing.md), [the code map](docs/architecture/code-map.md)

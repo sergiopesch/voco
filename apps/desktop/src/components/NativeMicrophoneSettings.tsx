@@ -24,7 +24,7 @@ export function NativeMicrophoneSettings({ controls, disabled }: {
     </div>;
   }
   return <div className="voco-native-microphone">
-    <p><strong>Native microphone · development</strong></p>
+    <p><strong>Microphone access</strong></p>
     <p>VOCO will use your Linux audio server directly, outside the browser microphone permission prompt.
       Choose a microphone and allow access for this app session. Recording starts only from your dictation controls.</p>
     <label className="voco-field">
