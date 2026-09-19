@@ -85,6 +85,13 @@ def unavailable():
             "events_tracked": TRACKER.listener is not None}
 
 
+def process_binary(pid):
+    try:
+        return Path(f"/proc/{pid}/exe").resolve(strict=True).name
+    except OSError:
+        return ""
+
+
 def probe():
     import gi
     gi.require_version("Atspi", "2.0")
@@ -109,17 +116,19 @@ def probe():
                 window = app.get_child_at_index(j)
                 window.clear_cache_single()
                 if window.get_state_set().contains(Atspi.StateType.ACTIVE):
-                    active.append((app, window))
+                    # GNOME X11 exports the active client and its server-side
+                    # decoration as separate accessible applications. The frame
+                    # service is not a dictation destination. Unknown processes
+                    # still count, so real ambiguity remains a rejection.
+                    if process_binary(app.get_process_id()) != "mutter-x11-frames":
+                        active.append((app, window))
         except Exception:
             continue
     if len(active) != 1:
         return unavailable()
     app, window = active[0]
     pid = app.get_process_id()
-    try:
-        binary = Path(f"/proc/{pid}/exe").resolve().name
-    except OSError:
-        binary = ""
+    binary = process_binary(pid)
     terminal = binary in TERMINALS
     focused = TRACKER.focused_hint(window, pid, Atspi)
     pending = [] if focused is not None else [window]

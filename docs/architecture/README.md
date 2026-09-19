@@ -122,7 +122,12 @@ of only the socket inodes registered by this process.
 The backend tray reducer combines microphone, model and dictation states.
 Normal dictation stays out of the way without opening a transcript preview. The
 Crystal Sidebar and rounded glass controls retain OS accessibility preferences.
-A hotkey should be used with the intended destination focused.
+A hotkey should be used with the intended destination focused. Automatic desktop
+insertion requires a nonempty destination token; unavailable focus metadata
+rejects startup after shortcut acquisition and independently rejects paste at the
+Rust boundary. GNOME X11's separate `mutter-x11-frames` accessibility application
+is excluded from active-client discovery. Other active-client ambiguity remains a
+rejection. A window-level token is still weaker than exact-control observation.
 
 ## Diagnostics and package identity
 

@@ -55,6 +55,10 @@ glib 0.20 directly leaves the GTK dependency behind. [Backport](vendor/glib/VOCO
   proceed through debounce; passive evdev retains its duplicate guard.
 - IBus protocol 6 is dictation-shortcut-only; older helpers must reconnect after upgrade. Never restore text mutation there.
 - Bounded accessible-field observations are not atomic ownership or cursor paint.
+- Automatic desktop insertion requires a bound, nonempty destination token. An
+  unavailable preflight is never permission to paste unguarded. GNOME X11's
+  `mutter-x11-frames` decoration is not a second destination; retain rejection for
+  genuinely ambiguous active clients and test focus departure in a real session.
 - Logs are optional, private and bounded. No dictated text, audio, clipboard values,
   URLs or window titles in performance logs. Reject unsafe log/socket targets.
 

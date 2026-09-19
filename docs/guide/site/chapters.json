@@ -1620,7 +1620,11 @@
       },
       {
         "title": "Fit the available CPUs",
-        "text": "A two-core VM took 35.37 seconds to warm a four-thread recognizer, exceeding startup limits. Two threads took 1.53 seconds in a controlled check. The candidate now caps its default at the available CPUs, up to four; accuracy and desktop tests must accompany that change."
+        "text": "A two-core VM took 35.37 seconds to warm a four-thread recognizer, exceeding startup limits. Two threads took 1.53 seconds in a controlled check. The candidate caps its default at the available CPUs, up to four. All 12 public fixtures produced identical transcripts across the tested Fedora, openSUSE and two-core Ubuntu workers: six lexical edits in 238 words. This small corpus does not establish worldwide accuracy."
+      },
+      {
+        "title": "Reject an unknown destination",
+        "text": "An X11 focus-switch test caught text continuing into a second field. GNOME exposed both the client and its decoration as active, and VOCO incorrectly allowed an unbound paste. The candidate distinguishes the decoration and requires a destination token. The installed regression then left the second field empty and retained recovery. Successful ordinary dictation had not exposed this bug."
       },
       {
         "title": "Safe upgrades",

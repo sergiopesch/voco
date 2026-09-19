@@ -59,6 +59,11 @@ Open VOCO from the application menu, finish microphone setup, and focus a text
 field. Press **Alt+D** to start and again to stop. You can change the shortcut in
 Settings. Known terminal paste shortcuts are selected automatically.
 
+The .43 candidate requires a verifiable destination before automatic desktop
+dictation. If it cannot identify the destination, focus an accessible text field
+and try again. Changing fields during a recording stops delivery; review retained
+text before copying it. Some applications expose only window-level identity.
+
 On X11, desktop paste uses xclip and xdotool. On Wayland, it uses ydotool plus
 the appropriate clipboard helper; its input service and permissions may require
 setup. The .43 candidate recommends both ydotool and ydotoold because Ubuntu 24.04
@@ -67,6 +72,27 @@ If it is unavailable, X11 remains usable; Wayland paste is unavailable until the
 helper and its service are installed and configured. The optional VOCO IBus source handles shortcuts, not text mutation. Follow
 VOCO’s setup diagnostics for your session; do not change another app’s keybindings.
 See [troubleshooting](troubleshooting.md).
+
+### GNOME tray integration
+
+VOCO keeps its controls in the system tray. Stock Fedora GNOME needs the
+distribution's AppIndicator extension; the .43 Fedora package recommends it when
+GNOME is installed. If it is missing:
+
+```bash
+sudo dnf install gnome-shell-extension-appindicator
+```
+
+Sign out and back in after installing the extension, then enable it in GNOME
+Extensions or run:
+
+```bash
+gnome-extensions enable appindicatorsupport@rgcjonas.gmail.com
+```
+
+Confirm VOCO's tray icon is visible before hiding its window. Ubuntu's packaged
+GNOME session and KDE/Omarchy have their own tray integrations. Installing an
+extension does not configure microphone access, a compositor shortcut or ydotoold.
 
 The model lives under `/usr/lib/voco/speech`. Readiness follows worker warmup.
 The default path does not download Whisper; explicit legacy/browser dictation

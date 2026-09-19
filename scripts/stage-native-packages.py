@@ -155,6 +155,10 @@ def main():
     # Dependencies are explicit per distro. Automatic ELF dependencies remain on
     # RPM; private recognizer libraries must not become public system provides.
     dependencies = rpm_dependencies(args.rpm_distribution)
+    # Stock Fedora GNOME has no StatusNotifier host. Install its distro extension
+    # only when GNOME is present; enabling it remains an explicit user action.
+    recommendations = ('Recommends: (gnome-shell-extension-appindicator if gnome-shell)\n'
+                       if args.rpm_distribution == 'fedora' else '')
     spec = f'''Name: voco
 Version: {version}
 Release: {rpm_release}
@@ -164,7 +168,7 @@ URL: https://github.com/sergiopesch/voco
 Source0: voco-payload.tar
 BuildArch: x86_64
 Requires: {', '.join(dependencies)}
-%global debug_package %{{nil}}
+{recommendations}%global debug_package %{{nil}}
 %global _binary_payload w3.zstdio
 %global __os_install_post %{{nil}}
 %global __provides_exclude_from ^/usr/lib/voco/.*$

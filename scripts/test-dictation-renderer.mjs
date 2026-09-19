@@ -47,7 +47,7 @@ export const calls = window.nativeCalls = [];
 const state = () => ({ sessionId: 101, setupState: "ready", engineActive: true, focusLost: false, ownershipIntact: true, finalizationOutcome: "committed", committedCharacterCount: 0 });
 export const startOwnedPreedit = async (...args) => { calls.push(['startOwnedPreedit', ...args]); if(window.deferLease) await new Promise(resolve=>window.resolveLease=resolve); if (!window.lease) throw new Error('No eligible original field'); return state(); };
 export const getOwnedPreeditStatus = async () => state();
-export const getDesktopPasteStatus = async () => ({enabled:Boolean(window.desktopPaste),streamingEnabled:Boolean(window.desktopStream),shortcutEpoch:1,targetToken:window.desktopTargetToken??null,available:!window.pasteUnavailable,detail:'Paste helper unavailable'});
+export const getDesktopPasteStatus = async () => ({enabled:Boolean(window.desktopPaste),streamingEnabled:Boolean(window.desktopStream),shortcutEpoch:1,targetToken:window.desktopTargetToken === undefined ? 'synthetic-destination' : window.desktopTargetToken,available:!window.pasteUnavailable,detail:'Paste helper unavailable'});
 // Model the native shortcut lease API used by the real hook; no desktop input is touched.
 export const beginDesktopShortcutSession = async (id, epoch) => { if(typeof id !== 'string' || epoch !== 1) throw new Error('Invalid shortcut preflight'); calls.push(['beginDesktopShortcutSession',id,epoch]); };
 export const endDesktopShortcutSession = async (id) => { calls.push(['endDesktopShortcutSession',id]); };
@@ -962,6 +962,14 @@ await page.evaluate(()=>window.hook.toggle());await page.waitForFunction(()=>win
 assert.equal(await page.evaluate(()=>window.tracks.length),0);
 assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>c[0]==='pasteDesktopText')),false);
 results.push('Unavailable desktop paste fails preflight before requesting the microphone.');
+for (const streaming of [false, true]) {
+  await load();await page.evaluate(streaming=>{window.desktopPaste=true;window.desktopStream=streaming;window.desktopTargetToken=null;},streaming);
+  await page.evaluate(()=>window.hook.toggle());await page.waitForFunction(()=>window.store.getState().status==='error');
+  assert.equal(await page.evaluate(()=>window.tracks.length),0);
+  assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>c[0]==='pasteDesktopText')),false);
+  assert.match(await page.evaluate(()=>window.store.getState().error),/destination/);
+}
+results.push('An unbound destination rejects streaming and final-paste startup before microphone capture or input dispatch.');
 await load();await page.evaluate(()=>{window.desktopPaste=true;window.failPaste=true;});
 await start();await stop();await page.waitForFunction(()=>window.store.getState().status==='error');
 assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length),1);

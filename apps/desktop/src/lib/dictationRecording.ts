@@ -544,6 +544,9 @@ export function createDictationRecording(env: DictationRecordingEnv) {
         // must still be rejected by the native paste guard, not silently rebased.
         void traceDictationEvent("dictation_desktop_shortcut_acquired").catch(() => {});
       }
+      if (desktopPasteSessionRef.current && !desktopTargetTokenRef.current) {
+        throw new Error("VOCO could not verify the dictation destination. Focus an accessible text field and try again.");
+      }
       const captureSelection = captureSelectionRef.current?.() ?? { backend: "webkit" as const };
       let captureAdmission: CaptureAdmission = "pending";
       if (captureSelection.backend === "native" && !captureSelection.selectionToken) {

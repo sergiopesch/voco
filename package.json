@@ -41,7 +41,7 @@
     "test:speech-report": "PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-report-speech-timing.py",
     "test:dictation-quality": "node --test scripts/dictation-quality.test.mjs",
     "test:dictation-quality-events": "PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-report-dictation-quality-events.py",
-    "test:delivery-observation": "PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 scripts/test-desktop-delivery-observation.py",
+    "test:delivery-observation": "PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 scripts/test-desktop-focus-cache.py && PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 scripts/test-desktop-delivery-observation.py",
     "test:native-package": "PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-native-staging.py",
     "test:dictation-evaluation": "PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-typesafe-evaluation.py && node --test scripts/score-dictation-worker.test.mjs"
   },

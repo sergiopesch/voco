@@ -187,5 +187,62 @@ and warm, exceeding the application's startup deadline. A controlled two-thread
 run took 1.53 seconds (model load about 412 ms in both). The default worker count
 now respects CPU affinity, capped at four, while explicit research overrides remain
 unchanged. This is a startup result in one constrained VM, not an accuracy or
-hardware speed claim. Full worker and installed desktop checks follow this change;
-previous trials retain their earlier worker identity.
+hardware speed claim. Previous trials retain their earlier worker identity.
+
+The CPU-aware `+local3` Debian package has SHA-256
+`762ed95dd2b4d089f41c4a982192c2f7099f53c16723c69852a38445beadbaf3`.
+Its installed workers completed all 12 public fixtures on Fedora, openSUSE and
+the two-core Ubuntu guest: 238 reference words, six edits (2.52% normalized WER)
+and identical transcripts across those runs. The separate four-thread Ubuntu
+corpus control was stopped after one fixture and is not a completed comparison.
+No new TypeSafe semantic score or punctuation claim follows from lexical WER.
+
+| Trial | Installed local3 desktop | Outcome |
+| --- | --- | --- |
+| 22 | Ubuntu 24.04 GNOME Wayland | Fresh setup, 14 words; Stop 385 ms; automatic two-thread warmup 2.11 seconds |
+| 23 | Same guest, repeated sessions | 28 words, second field unchanged |
+| 24 | Same guest, focus switch | Delivery halted, second field unchanged |
+| 25 | Omarchy packaged defaults, Arch revision 3 | Repeated sessions, 28 words |
+| 26 | Ubuntu GNOME X11 | Fresh setup, 14 words |
+| 27 | Same X11 guest, repeated sessions | 28 words |
+| 28 | Same X11 guest, focus switch | **Failed:** later words entered the second field |
+| 29 | Repeated X11 failure with bounded diagnostics | **Failed again:** both client and Mutter decoration reported active |
+
+## X11 destination regression
+
+GNOME X11 exposes `mutter-x11-frames` as a separate active accessibility
+application alongside the focused client. VOCO treated the pair as unavailable
+focus metadata. A second defect allowed automatic paste with no bound destination
+token, so the existing mismatch check could not protect the receiving field.
+
+The fix excludes the identified decoration process from destination discovery;
+other ambiguous active applications still fail closed. Startup rejects a missing
+destination after shortcut acquisition, and the Rust insertion boundary rejects
+missing or empty tokens before any desktop operation. Window-level identities
+remain available for controls without accessible text readback; that limited
+scope does not establish exact-field receipt.
+
+Both the decoration regression and startup admission test failed before the fix
+and passed afterward. The complete focus suite is now included in `npm test`.
+Installed local4 trial 30 reran the original X11 scenario successfully: the first
+field retained its already delivered prefix, the second remained empty, and
+recovery was retained. The packaged executable is SHA-256
+`47af238ffe96490f8a0b3a61587c5c75c65ed7d521aeab7eb203556a7117ea35`;
+the local4 Debian package is
+`aed0b9a7e00edf4ea33fdc58f10dbb1a45f82c108ba87241da54bad463861aeb`.
+These are unsigned qualification candidates, not public release assets.
+
+Local4 trial 31 passed two X11 recordings (28 normalized words); trial 32 passed
+the same repeated-session scenario after restoring GNOME Wayland. The second
+field remained empty in both. Code gates passed 381 Rust library tests (one
+explicit export helper ignored), 438 frontend unit tests (two existing skips),
+71 renderer lifecycle scenarios and 42 native-capture renderer scenarios. The
+renderer suites mock OS/media boundaries; the VM trials exercise actual delivery.
+Clippy and formatting pass. ESLint retains four existing orchestration warnings.
+
+A fresh Fedora 44 cloud guest with installed GNOME required its packaged
+AppIndicator extension to provide the tray. The Fedora package now recommends
+that extension conditionally on GNOME, and installation guidance explains the
+explicit user enable step. Trial 33 failed in fixture setup because a desktop
+restart removed the virtual source; it is retained as a failed attempt and is
+not dictation evidence.
