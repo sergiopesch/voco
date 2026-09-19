@@ -1,4 +1,5 @@
 import importlib.util
+import json
 from pathlib import Path
 import tempfile
 import unittest
@@ -69,6 +70,8 @@ class DependencyTests(unittest.TestCase):
     def test_rpm_profiles_preserve_native_names_and_abi_floors(self):
         fedora = staging.rpm_dependencies('fedora')
         suse = staging.rpm_dependencies('opensuse')
+        self.assertIn('pulseaudio-libs', fedora)
+        self.assertIn('libpulse0', suse)
         self.assertIn('sentencepiece-libs', fedora)
         self.assertNotIn('sentencepiece-libs', suse)
         self.assertIn('libsentencepiece0', suse)
@@ -84,7 +87,9 @@ class DependencyTests(unittest.TestCase):
             staging.rpm_dependencies('unknown')
 
     def test_current_dependencies_have_explicit_mappings(self):
-        staging.validate_debian_dependencies('python3, python3-numpy, at-spi2-core, ibus')
+        config = json.loads((Path(__file__).resolve().parents[1] /
+            'apps/desktop/src-tauri/tauri.conf.json').read_text())
+        staging.validate_debian_dependencies(', '.join(config['bundle']['linux']['deb']['depends']))
 
     def test_unknown_empty_alternative_and_versioned_dependencies_fail_closed(self):
         for value in ('', 'python3, new-runtime', 'python3 (>= 3.14)', 'python3 | pypy'):

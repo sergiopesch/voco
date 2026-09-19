@@ -27,7 +27,7 @@ def validate_debian_dependencies(value):
         'ibus', 'python3', 'gir1.2-ibus-1.0', 'python3-gi', 'xclip',
         'gir1.2-atspi-2.0', 'at-spi2-core', 'python3-numpy', 'python3-psutil',
         'libsentencepiece0', 'libayatana-appindicator3-1', 'libwebkit2gtk-4.1-0',
-        'libgtk-3-0', 'xdotool', 'wl-clipboard',
+        'libgtk-3-0', 'libpulse0', 'xdotool', 'wl-clipboard',
         'libc6 (>= 2.39)', 'libstdc++6 (>= 13.2.0)',
     }
     # Only the reviewed ABI floors below have native translations. Other

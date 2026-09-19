@@ -45,7 +45,7 @@ PACKAGE_DEPENDS="$(dpkg-deb -f "${DEB_PATH}" Depends)"
   exit 1
 }
 
-for dependency in ibus python3 python3-gi gir1.2-ibus-1.0 python3-numpy python3-psutil libsentencepiece0 xclip xdotool wl-clipboard gir1.2-atspi-2.0 at-spi2-core; do
+for dependency in ibus python3 python3-gi gir1.2-ibus-1.0 python3-numpy python3-psutil libsentencepiece0 libpulse0 xclip xdotool wl-clipboard gir1.2-atspi-2.0 at-spi2-core; do
   if ! grep -Eq "(^|, )${dependency}( \\([^)]*\\))?(,|$)" <<<"${PACKAGE_DEPENDS}"; then
     echo "Debian package is missing dependency: ${dependency}" >&2
     exit 1
