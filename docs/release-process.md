@@ -26,7 +26,7 @@ checks, not a substitute for signatures.
 
 ## Signed tags and checksums
 
-Publisher signatures are created on the signing laptop. The hosted Release
+Publisher signatures are created on the maintainer’s local signing environment. The hosted Release
 workflow must not hold the private key or assemble NVIDIA installers.
 
 One-time setup (interactive; never paste the private key into chat or CI):

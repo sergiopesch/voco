@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Container-only native install/remove parity receipt against verified payload."""
+"""Read-only native install/remove parity receipt in an owned test container or VM."""
 import argparse
 import hashlib
 import json
@@ -10,9 +10,13 @@ import subprocess
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('inventory', type=Path)
 parser.add_argument('--removed', action='store_true')
+parser.add_argument('--isolated-vm', action='store_true',
+                    help='Explicitly allow an owned qualification VM; never use on the live desktop')
 args = parser.parse_args()
-if not Path('/.dockerenv').exists():
-    raise SystemExit('This verification only runs in the isolated test container')
+isolated_vm = args.isolated_vm and subprocess.run(
+    ['systemd-detect-virt', '--vm', '--quiet'], timeout=5, check=False).returncode == 0
+if not Path('/.dockerenv').exists() and not isolated_vm:
+    raise SystemExit('This verification requires an isolated test container or explicit test VM')
 rows = json.loads(args.inventory.read_text())
 errors = []
 checked = 0

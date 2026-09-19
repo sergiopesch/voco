@@ -2,6 +2,7 @@
 import hashlib
 import json
 import sys
+import time
 import uuid
 from pathlib import Path
 
@@ -99,9 +100,14 @@ def probe():
     Atspi.set_timeout(80, 80)
     TRACKER.start(Atspi)
     context = GLib.MainContext.default()
-    for _ in range(256):
+    # Hiding a WebKit setup window on GNOME can queue nearly 1000 events.
+    # Bound both work and elapsed time; never bind through an unsettled queue.
+    drain_deadline = time.monotonic() + .05
+    for _ in range(4096):
         if not context.pending():
             break
+        if time.monotonic() >= drain_deadline:
+            return unavailable()
         context.iteration(False)
     if context.pending():
         return unavailable()  # Do not act on a partially drained event backlog.

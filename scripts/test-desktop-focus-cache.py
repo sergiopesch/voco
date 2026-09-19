@@ -164,7 +164,31 @@ class FocusTests(unittest.TestCase):
         calls=[]
         GLib.MainContext.default=lambda:types.SimpleNamespace(pending=lambda:True,iteration=lambda _:calls.append(1))
         self.assertIsNone(helper.probe()['token'])
-        self.assertEqual(len(calls),256)
+        self.assertLessEqual(len(calls),4096)
+        self.assertGreater(len(calls),0)
+    def test_window_transition_backlog_is_drained_before_binding(self):
+        from gi.repository import GLib
+        before=helper.probe()['token']
+        remaining=[1000]
+        def iteration(_):
+            remaining[0]-=1
+            if remaining[0]==0:
+                self.a.states.clear();self.b.states.add('focused')
+                self.event(self.b,True)
+        GLib.MainContext.default=lambda:types.SimpleNamespace(pending=lambda:remaining[0]>0,iteration=iteration)
+        after=helper.probe()
+        self.assertEqual(after['scope'],'control')
+        self.assertEqual(remaining[0],0)
+        self.assertIsNotNone(after['token'])
+        self.assertNotEqual(before,after['token'])
+    def test_slow_event_backlog_has_a_time_budget(self):
+        from gi.repository import GLib
+        import itertools
+        calls=[]
+        GLib.MainContext.default=lambda:types.SimpleNamespace(pending=lambda:True,iteration=lambda _:calls.append(1))
+        with patch('time.monotonic', side_effect=itertools.count(0, .01)):
+            self.assertIsNone(helper.probe()['token'])
+        self.assertLess(len(calls),10)
     def test_output_contains_only_finite_metadata_and_opaque_token(self):
         result=helper.probe()
         self.assertEqual(set(result),{'shortcut','token','scope','events_tracked'})

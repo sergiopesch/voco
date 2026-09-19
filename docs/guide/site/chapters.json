@@ -1627,6 +1627,10 @@
         "text": "An X11 focus-switch test caught text continuing into a second field. GNOME exposed both the client and its decoration as active, and VOCO incorrectly allowed an unbound paste. The candidate distinguishes the decoration and requires a destination token. The installed regression then left the second field empty and retained recovery. Successful ordinary dictation had not exposed this bug."
       },
       {
+        "title": "Let desktop focus settle safely",
+        "text": "A fresh Fedora GNOME setup queued about 970 accessibility events after hiding the panel. The old 256-event budget rejected Start. The candidate drains ordinary transition backlogs within a 50 ms time limit, while still refusing an unsettled destination. Installed Fedora GNOME and openSUSE KDE tests then passed repeated dictation, focus departure and explicit recovery after source loss."
+      },
+      {
         "title": "Safe upgrades",
         "text": "Debian preserves existing directory modes during upgrades. A real legacy-install test exposed inherited group-write permissions. A narrowly checked migration repairs only the known package-owned mode, preserving custom permissions and personal settings."
       },
@@ -1657,7 +1661,7 @@
         "why": "Dated outcomes and qualification limits."
       }
     ],
-    "caution": "These are development experiments, not a released universal Linux installer. The Omarchy long-session result uses virtual audio and one GTK recipient. Physical microphones, other default desktops and the wider application matrix still need their own evidence.",
+    "caution": "These are development experiments, not a released universal Linux installer. The Omarchy long-session result uses virtual audio and one GTK recipient. Fedora GNOME and openSUSE KDE also have installed virtual-audio trials. Physical microphones and the wider application matrix still need their own evidence.",
     "quiz": {
       "question": "The RPM installs, but dictation fails under the default compositor. Is that distribution ready?",
       "answers": [

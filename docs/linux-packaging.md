@@ -313,7 +313,9 @@ Build the generated `voco.spec` with `rpmbuild` in a disposable Fedora builder, 
 removal tests on the owner desktop. `scripts/verify-native-install.py` compares the
 installed payload's bytes, links, application-owned modes, ownership and ELF closure
 against `payload-inventory.json`; `--removed` checks removal of all files/links.
-It requires a disposable Docker environment. Shared system directory modes remain
+It requires a disposable Docker environment, or explicit `--isolated-vm` in an
+owned qualification VM verified by `systemd-detect-virt`. Never use the VM override
+on the live user desktop. Shared system directory modes remain
 owned by the distribution. Run `npm run test:native-package` for staging-boundary
 regressions.
 
