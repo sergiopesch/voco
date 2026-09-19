@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "upstream": "https://github.com/NVIDIA/NeMo-Speech.cpp",
+  "revision": "a5b6953c4a579a2bbd1c0913ad8a85c2a4d99953",
+  "ggmlRevision": "c03b4e2bcece5134827881af90242086daf75be5",
+  "patches": {
+    "first-chunk.patch": "617e3d67a0f92296346f154eeee826ec8ca6afdc8c44bfdc061cd510346e0f32",
+    "thread-pool.patch": "ab84627970075b78a72afdf3d82356d3ab6a8630bf21eb2214a50cfc9fcb9563"
+  },
+  "bridgeSha256": "12b19b9d76d3c2d4e0eeec62ad90468dcbc4538f8a733dab7e795852d7bcaba0",
+  "options": {
+    "CMAKE_BUILD_TYPE": "Release",
+    "CMAKE_BUILD_WITH_INSTALL_RPATH": "ON",
+    "CMAKE_C_FLAGS": "-march=x86-64 -mtune=generic -ffile-prefix-map=/build=/usr/src/voco-native -fdebug-prefix-map=/build=/usr/src/voco-native",
+    "CMAKE_CXX_FLAGS": "-march=x86-64 -mtune=generic -ffile-prefix-map=/build=/usr/src/voco-native -fdebug-prefix-map=/build=/usr/src/voco-native",
+    "NEMO_SPEECH_BUILD_ASR": "ON",
+    "NEMO_SPEECH_BUILD_DIAR": "OFF",
+    "NEMO_SPEECH_BUILD_TTS": "OFF",
+    "NEMO_SPEECH_BUILD_NMT": "OFF",
+    "NEMO_SPEECH_GGML_PATCHED": "OFF",
+    "NEMO_SPEECH_BUILD_MIC_CAPTURE": "OFF",
+    "GGML_OPENMP": "OFF",
+    "GGML_NATIVE": "OFF",
+    "GGML_AVX": "ON",
+    "GGML_AVX2": "ON",
+    "GGML_FMA": "ON",
+    "GGML_F16C": "ON",
+    "GGML_AVX512": "OFF",
+    "GGML_AVX512_VBMI": "OFF",
+    "GGML_AVX512_VNNI": "OFF",
+    "GGML_AVX512_BF16": "OFF",
+    "GGML_AVX_VNNI": "OFF",
+    "GGML_AMX_TILE": "OFF",
+    "GGML_AMX_INT8": "OFF",
+    "GGML_AMX_BF16": "OFF",
+    "GGML_BMI2": "OFF"
+  },
+  "compiler": "c++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0",
+  "cmake": "cmake version 3.28.3",
+  "files": {
+    "lib/libggml-base.so.0.12.0": "cf2ed93612bb438f6c12d64c7bbaf695f4f7e27e9a3f416e5f9d5a7fec45a4d4",
+    "lib/libggml-cpu.so.0.12.0": "9078ee18c22ad59905251efb2a319a8043d04fa3365c2d8ac049a6a3d124bcd5",
+    "lib/libggml.so.0.12.0": "ce15f1736da73b49a489eea3d65585997edb5281b1aecea7b1bf9e2283690ac2",
+    "lib/libnemo_speech_asr.so": "a7005f4be3d2a03d66457b9724f7cedfd08fd16f0424b56c57f14cec6f6bad38",
+    "lib/libnemo_speech_asr_c.so.1": "92510f5ea8ddb27aab987a0a4e11c0912015f2e9b517cd02a36f0cfb5a32d0a6",
+    "libbench_nemo_pool.so": "88e6655521f41ba85613dbfbd29c87efdce652865113f8aafeac7b6751d308ac"
+  },
+  "symlinks": {
+    "lib/libggml-base.so": "libggml-base.so.0",
+    "lib/libggml-base.so.0": "libggml-base.so.0.12.0",
+    "lib/libggml-cpu.so": "libggml-cpu.so.0",
+    "lib/libggml-cpu.so.0": "libggml-cpu.so.0.12.0",
+    "lib/libggml.so": "libggml.so.0",
+    "lib/libggml.so.0": "libggml.so.0.12.0",
+    "lib/libnemo_speech_asr_c.so": "libnemo_speech_asr_c.so.1"
+  }
+}

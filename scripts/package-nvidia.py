@@ -119,7 +119,7 @@ def main():
         speech.mkdir(parents=True)
         source = ROOT / "runtime/speech"
         for name in ("stream_worker.py", "worker_main.py", "streaming.py", "adapters.py",
-                     "MODEL-IDENTITY.json", "libbench_nemo_pool.so"):
+                     "MODEL-IDENTITY.json", "NATIVE-BUILD.json", "libbench_nemo_pool.so"):
             shutil.copy2(source / name, speech / name)
         for name in ("lib", "models"):
             shutil.copytree(source / name, speech / name, symlinks=True)

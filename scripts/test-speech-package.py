@@ -39,6 +39,11 @@ class SpeechPackageTests(unittest.TestCase):
             (self.speech / name).write_bytes(b"native fixture")
         for name, target in validator.NATIVE_LINKS.items():
             (self.speech / name).symlink_to(target)
+        (self.speech / "NATIVE-BUILD.json").write_text(json.dumps({
+            "files": {name: package.digest(self.speech / name)
+                      for name in validator.NATIVE_FILES | {"libbench_nemo_pool.so"}},
+            "symlinks": validator.NATIVE_LINKS,
+        }))
         self.save_manifest()
 
     def save_manifest(self):
@@ -103,6 +108,18 @@ class SpeechPackageTests(unittest.TestCase):
         (self.speech / "MODEL-IDENTITY.json").write_text('{"model_sha256":"incorrect"}')
         self.save_manifest()
         with self.assertRaisesRegex(ValueError, "Model identity"):
+            self.verify()
+
+    def test_native_identity_rejects_changed_binary_even_with_updated_manifest(self):
+        (self.speech / "libbench_nemo_pool.so").write_bytes(b"unqualified rebuild")
+        self.save_manifest()
+        with self.assertRaisesRegex(ValueError, "Native build identity"):
+            self.verify()
+
+    def test_native_identity_is_required(self):
+        (self.speech / "NATIVE-BUILD.json").unlink()
+        self.save_manifest()
+        with self.assertRaisesRegex(ValueError, "Incomplete"):
             self.verify()
 
 

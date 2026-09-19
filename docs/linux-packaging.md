@@ -42,24 +42,26 @@ are enough for source-only checks, but not a complete NVIDIA package. Provision:
 - `runtime/speech/libbench_nemo_pool.so`
 - `runtime/speech/lib/`, preserving relative native-library links
 
-The .42 release reuses the verified .39 model/native payload. Extract that payload
-from the immutable versioned release package after verifying its published checksum;
-copy only the model and native libraries into the matching source checkout. Keep
-the Python worker code from the source checkout. Preserve `MODEL-IDENTITY.json`,
-model terms, native-library licenses, source provenance and payload hashes.
+The .42 release keeps the verified .39 model and rebuilds the native runtime with
+an explicit AVX2/FMA/F16C baseline, relative library paths and neutral source paths.
+Extract the model from a checksum-verified versioned release package. Either use
+that same package's complete native payload and `NATIVE-BUILD.json`, or follow the
+[pinned native build recipe](../runtime/native/README.md) and qualify the new bytes.
+Keep Python worker code from the matching source checkout. Preserve model terms,
+native-library licenses, source provenance and the payload manifest.
 
-The NVIDIA upstream revision is `ebe59e5a817142986528bbbee5dba8db7b38ed50`.
+The NVIDIA model revision is `ebe59e5a817142986528bbbee5dba8db7b38ed50`.
 Converted model SHA-256:
 `d9a01898d2a611c8764e23a1c2f45e70bbd5a425dc4de93692ac951dd603812d`.
-Pool library SHA-256:
-`c0f48428446b37a2008ca4d4d6e131f4bb4d0a7d536e11182f2cccc6f3043fd4`.
-The package verifier binds the packaged identity to source pins and rejects broken
-or escaping links. A similarly named upstream download is not an equivalent artifact.
+Native source commits, patches, compiler options and output hashes are recorded in
+`runtime/speech/NATIVE-BUILD.json`. The package verifier rejects mixed native
+receipts and binaries, broken links and model hash mismatches. A similarly named
+upstream download is not an equivalent artifact.
 
-This is artifact-based provisioning, not an independently reproducible native/model
-conversion build. That reproducibility gap remains documented; retain the exact
-payload inventory with releases. Hosted installer publication remains disabled;
-never silently replace pinned artifacts with mutable downloads.
+The native build recipe is public; independent model conversion to these exact
+GGUF bytes remains a reproducibility gap. Retain the exact payload inventory with
+releases. Hosted installer publication remains disabled; never silently replace
+pinned artifacts with mutable downloads.
 
 ## Published-channel structure
 
