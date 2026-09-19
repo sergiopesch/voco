@@ -59,9 +59,11 @@ Open VOCO from the application menu, finish microphone setup, and focus a text
 field. Press **Alt+D** to start and again to stop. You can change the shortcut in
 Settings. Known terminal paste shortcuts are selected automatically.
 
-On Wayland, desktop paste may require the packaged input helpers and the VOCO
-IBus source. Follow the setup diagnostics for your session; do not change another
-app’s keybindings. See [troubleshooting](troubleshooting.md).
+On X11, desktop paste uses xclip and xdotool. On Wayland, it uses ydotool plus
+the appropriate clipboard helper; its input service and permissions may require
+setup. The optional VOCO IBus source handles shortcuts, not text mutation. Follow
+VOCO’s setup diagnostics for your session; do not change another app’s keybindings.
+See [troubleshooting](troubleshooting.md).
 
 The model lives under `/usr/lib/voco/speech`. Readiness follows worker warmup.
 The default path does not download Whisper; explicit legacy/browser dictation

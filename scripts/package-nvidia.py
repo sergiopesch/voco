@@ -133,7 +133,8 @@ def main():
             shutil.copy2(ROOT / "scripts" / name, doc / name)
         for name in ("README.md", "AGENTS.md"):
             shutil.copy2(ROOT / name, doc / name)
-        shutil.copytree(ROOT / "docs", doc / "docs", dirs_exist_ok=True)
+        shutil.copytree(ROOT / "docs", doc / "docs", dirs_exist_ok=True,
+                        ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
         copy_vendored_notices(ROOT, doc)
         identity = {"version": package_version, "application_version": version,
                     "backend": "CPU native pool", "context": 1, "cpu_threads": 4,

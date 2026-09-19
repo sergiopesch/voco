@@ -657,12 +657,12 @@ fi
 
 SESSION="${XDG_SESSION_TYPE:-x11}"
 if [[ "$SESSION" == "wayland" ]]; then
-  command -v ydotool &>/dev/null && ok "ydotool" || dim "Optional compatibility helper missing: ydotool (automatic dictation uses IBus)"
-  command -v wl-copy &>/dev/null && ok "wl-clipboard" || dim "Optional compatibility helper missing: wl-clipboard (automatic dictation uses IBus)"
+  command -v ydotool &>/dev/null && ok "ydotool" || dim "Wayland paste helper missing: install ydotool and configure its input service"
+  command -v wl-copy &>/dev/null && ok "wl-clipboard" || dim "wl-clipboard missing: required on supported wlroots desktops; GNOME uses xclip"
   groups | grep -q '\binput\b' && ok "input group" || warn "Run: sudo usermod -aG input \$USER"
 else
-  command -v xdotool &>/dev/null && ok "xdotool" || dim "Optional compatibility helper missing: xdotool (automatic dictation uses IBus)"
-  command -v xclip &>/dev/null && ok "xclip" || dim "Optional compatibility helper missing: xclip (automatic dictation uses IBus)"
+  command -v xdotool &>/dev/null && ok "xdotool" || dim "X11 paste helper missing: install xdotool"
+  command -v xclip &>/dev/null && ok "xclip" || dim "X11 clipboard helper missing: install xclip"
 fi
 
 # ─── Download ───────────────────────────────────────────

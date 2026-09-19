@@ -62,7 +62,12 @@
           "at-spi2-core",
           "python3-numpy",
           "python3-psutil",
-          "libsentencepiece0"
+          "libsentencepiece0",
+          "xdotool",
+          "ydotool",
+          "wl-clipboard",
+          "libc6 (>= 2.39)",
+          "libstdc++6 (>= 13.2.0)"
         ],
         "files": {
           "/usr/share/metainfo/com.sergiopesch.voco.metainfo.xml": "../../../packaging/tauri/com.sergiopesch.voco.metainfo.xml",
