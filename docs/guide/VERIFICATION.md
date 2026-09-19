@@ -1,5 +1,19 @@
 # Guide verification history
 
+## Final .43 package evidence · 19 September 2026
+
+The catalog pins `7b7b8a9293b17b7e178089f7793c95adeacecfa1`, including the
+final package and desktop report. Twenty chapters distinguish public availability
+from candidate evidence, retain the original TypeSafe experiment identity and
+explain measured fixes and remaining gaps. No private recordings or credentials
+were added.
+
+Browser checks verified the final Linux chapter, exact pinned report in the source
+reader, installation-file search, glossary, journey step and quiz feedback. The
+390 × 844 responsive check measured 375 px for both content and scroll width; the
+chapter drawer opened correctly. The viewport override was reset. No console
+warnings or errors were observed. Nine guide tests pass after regeneration.
+
 ## Linux package chapter · 19 September 2026
 
 Twenty chapters now include separate package/desktop gates and the unsuccessful
