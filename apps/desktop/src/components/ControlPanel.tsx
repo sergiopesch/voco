@@ -199,6 +199,10 @@ export function ControlPanel({
   const [hotkeyDraft, setHotkeyDraft] = useState(config.hotkey);
   const [hotkeyError, setHotkeyError] = useState<string | null>(null);
   const nativePreviewDisabled = Boolean(nativeMicrophone && nativeMicrophone.mode !== "webkit");
+  const waylandDesktop = runtimeDiagnostics?.sessionType.toLowerCase() === "wayland";
+  const microphoneSetupReady = nativePreviewDisabled
+    ? nativeMicrophone?.mode === "native" && Boolean(nativeMicrophone.selected)
+    : microphoneChecked;
   const hotkeyDirty = hotkeyDraft !== config.hotkey;
   const hasUnsavedChanges = hotkeyDirty;
   const dictationBusy = dictationStatus === "starting" || dictationStatus === "recording" || dictationStatus === "processing";
@@ -826,7 +830,9 @@ export function ControlPanel({
               <section className="voco-onboarding__step">
                 <h2 tabIndex={-1}>Microphone and hotkey</h2>
                 <p>
-                  Speak a few words to check your microphone, then choose your dictation shortcut.
+                  {nativePreviewDisabled
+                    ? "Choose and allow your microphone, then configure your dictation shortcut. Audio is tested when you try your first dictation."
+                    : "Speak a few words to check your microphone, then choose your dictation shortcut."}
                 </p>
                 {nativeMicrophone && nativeMicrophone.mode !== "webkit" ? (
                   <NativeMicrophoneSettings controls={nativeMicrophone}
@@ -918,7 +924,7 @@ export function ControlPanel({
                         onOnboardingStepChange(2);
                       }
                     }}
-                    disabled={saving || dictationBusy || !microphoneChecked || Boolean(previewError)}
+                    disabled={saving || dictationBusy || !microphoneSetupReady || Boolean(previewError)}
                   >
                     Continue
                   </button>
@@ -931,13 +937,15 @@ export function ControlPanel({
               <section className="voco-onboarding__step">
                 <h2 tabIndex={-1}>Try your first dictation</h2>
                 <div className="voco-readiness" aria-label="Dictation readiness">
-                  <p className="voco-readiness__item" role="status" data-ready={microphoneChecked}>Microphone: {microphoneChecked ? "audio detected in setup" : "not checked yet"}</p>
+                  <p className="voco-readiness__item" role="status" data-ready={microphoneSetupReady}>Microphone: {nativePreviewDisabled
+                    ? microphoneSetupReady ? "selected and allowed; ready to try dictation" : "choose and allow a microphone"
+                    : microphoneChecked ? "audio detected in setup" : "not checked yet"}</p>
                   <p className="voco-readiness__item" data-ready={inputSourceReady}>Recording integration: {ownedPreeditLabel}</p>
                   <p role="status">First dictation: {lastDictationResult?.outcome === "delivered" ? "a delivery completed this session; check the words in your text field" : "not yet verified"}</p>
                 </div>
                 <p>Your words appear directly in the focused text field.</p>
                 <div className="voco-onboarding__actions">
-                  <button className="voco-button voco-button--primary" disabled={saving || dictationBusy || !microphoneChecked}
+                  <button className="voco-button voco-button--primary" disabled={saving || dictationBusy || !microphoneSetupReady}
                     onClick={() => void prepareFirstDictation()}>Hide and try dictation</button>
                 </div>
                 <ol className="voco-dictation-guide">
@@ -1062,6 +1070,15 @@ export function ControlPanel({
                         {hotkeyDirty || hotkeyError ? <button className="voco-button voco-button--primary" onClick={() => void saveHotkey()} disabled={saving}>Save hotkey</button> : null}
                       </div>
                       <p className="voco-preferences__helper" id="voco-hotkey-feedback" role="status">{hotkeyError ?? (recordingShortcut ? "Press a modifier and key. Escape cancels." : shortcut.instruction)}</p>
+                      <p className="voco-preferences__helper">{shortcut.detail}</p>
+                      {shortcut.setup ? <p className="voco-preferences__helper">{shortcut.setup}</p> : null}
+                      {waylandDesktop ? <div className="voco-inline-note">
+                        <strong>Desktop shortcut</strong>
+                        <p>You can assign <code>voco --toggle</code> to a non-repeating shortcut in your desktop settings.
+                          Keep VOCO running and use that shortcut to start and stop dictation.</p>
+                        <p>The shortcut above and its status describe VOCO’s built-in keyboard handling.
+                          Your desktop controls external bindings; VOCO cannot verify which keys you assigned.</p>
+                      </div> : null}
                     </div>
                   </div>
                 </section>

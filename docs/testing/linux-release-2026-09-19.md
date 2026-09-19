@@ -87,3 +87,34 @@ the reference installation. Physical microphone acceptance is recorded independe
 
 The public guide explains these boundaries. See [Linux support](../linux-support.md)
 and [TypeSafe evaluation](typesafe-evaluation.md) for the distinct metric contracts.
+
+## Native Wayland follow-up
+
+The .43 candidate now includes native capture by default and selects it for
+Wayland sessions. X11 retains WebKit capture. Explicit source selection and
+app-session permission remain required; there is no idle recording or automatic
+source switch. This product change is approved; release qualification is ongoing.
+
+The work fixed two observed defects: browser-preview-only onboarding blocked an
+approved native input, and an inline native source catalog exhausted the debug
+capture thread stack. The renderer regression exercises the original blocked
+Continue step; the catalog is now allocated and initialized on the heap, including
+a small-stack regression check. The actual-App native renderer suite passes 42
+cases with mocked native boundaries. Rust tests pass 380 cases with one explicit
+offline export helper ignored, and frontend unit tests pass 438 with two existing
+skips. These are code checks, distinct from the real VM tests below.
+
+| Trial | Build and conditions | Outcome |
+| --- | --- | --- |
+| 04 | Diagnostic native capture and native-hide shim | Fresh setup and hidden Start; 14/14 normalized words; Stop 326 ms. Audit could not write under an untrusted ancestor. |
+| 05 | Same diagnostic build; private runtime directory | Two recordings, 28/28 normalized words; Stops 382 and 285 ms; second field unchanged. |
+| 06 | Diagnostic build, 577.68-second public repetition | 1,162/1,162 normalized words; Stop 4,444 ms. Harness terminated before audit persistence; no retained-audio qualification. |
+| 07 | Production build; no development flag or hide shim | Fresh setup and native hidden Start; 14/14 normalized words; Stop 236 ms; second field unchanged. |
+
+Trial 01 preserved a stack crash, and trials 02/03 exposed stale harness assumptions
+about native accessible controls before recording. Trial 08 was not launched on its
+first attempt because a harness replacement assertion failed. Failed attempts are
+retained rather than reclassified as passes. Timings are single observations in a
+four-vCPU software-rendered guest. Punctuation normalization is not punctuation
+accuracy, field mutation is not painted text, and the minimal Hyprland session is
+not a complete default Omarchy installation.

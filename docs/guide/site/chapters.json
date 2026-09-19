@@ -236,20 +236,20 @@
     "story": [
       "Imagine writing down the height of a wave many times each second. The list of heights is digital audio.",
       "Sample rate means how many measurements happen in one second. It must travel with the numbers, like units on a ruler.",
-      "An AudioWorklet collects small ordered pieces while the interface does other work. The default path uses WebKit audio capture."
+      "The .43 candidate uses native audio capture on Wayland so the panel can stay hidden. X11 uses WebKit and an AudioWorklet to collect ordered pieces while the interface does other work."
     ],
     "steps": [
       {
         "label": "Permission",
-        "detail": "Ask the operating system/browser layer for microphone access."
+        "detail": "On Wayland, explicitly allow the selected source for this app session. On X11, use browser microphone permission."
       },
       {
         "label": "Device",
-        "detail": "Use the selected input device, or the current default."
+        "detail": "Bind the recording to the selected input. Native system-default selection resolves to a specific source."
       },
       {
         "label": "Samples",
-        "detail": "Capture ordered blocks of floating-point audio."
+        "detail": "Capture ordered blocks and retain their sample rate through conversion."
       },
       {
         "label": "Descriptor",
@@ -270,8 +270,8 @@
         "text": "Calling 44,100 samples \u201cone second at 16 kHz\u201d changes the meaning of the audio. Rate validation and resampling must be deliberate."
       },
       {
-        "title": "An optional route is not the default",
-        "text": "The native capture modules form a separately gated development path. Seeing those files does not mean the normal desktop session uses them."
+        "title": "Permission is not a recording",
+        "text": "Selecting and allowing a native source does not open a recording. Start begins capture; Stop closes it. A removed source cannot silently become a different microphone."
       }
     ],
     "files": [
@@ -293,7 +293,7 @@
       },
       {
         "path": "apps/desktop/src-tauri/src/native_capture_commands.rs",
-        "why": "Commands for the separately gated native capture path."
+        "why": "Native source selection, permission and bounded capture commands."
       }
     ],
     "caution": "The waveform below is a teaching drawing. It never activates your microphone.",
@@ -1607,8 +1607,12 @@
         "text": "Hyprland kept the off-screen VOCO window tiled. An isolated test reproduced it even though short dictation worked."
       },
       {
-        "title": "After a diagnostic hide",
-        "text": "A real native hide removed the tile, but a fresh WebKit microphone request did not become active within 25 seconds. Hiding after capture began passed one 14-word fixture. The simple visual fix was therefore not promoted."
+        "title": "Why hiding alone failed",
+        "text": "A diagnostic native hide removed the tile, but a fresh WebKit microphone request did not become active within 25 seconds. That failed attempt led to native capture qualification."
+      },
+      {
+        "title": "After: native capture while hidden",
+        "text": "The .43 production build selected native capture on Wayland without development flags. One fresh-user test delivered all 14 normalized words with the panel unmapped and left a second field empty. Stop took 236 ms in this single VM trial. Exact packages and default desktops still need their own qualification."
       },
       {
         "title": "A measured shortcut improvement",

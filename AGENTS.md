@@ -79,6 +79,7 @@ npm run lint
 npm test
 npm run test:dictation-renderer
 npm run test:microphone-renderer
+npm run test:native-capture-renderer
 npm run test:chromium-exact-field
 python3 scripts/verify-glib-backport.py
 python3 scripts/test-glib-variant.py --output /tmp/voco-glib-check
@@ -127,6 +128,10 @@ dependency mappings. Keep RPM licenses installed under nodocs policies. Companio
 SentencePiece recipes must use SPM_BUILD_TEST and fail when no tests run.
 The control CLI connects once to the owner-only socket; do not add retries or
 launch/focus side effects. It does not prove a compositor keybinding exists.
-Hyprland native hiding blocks fresh WebKit microphone startup in the current
-experiment. Do not promote native capture or retain an idle microphone stream
-without the product/privacy decision and independent qualification.
+The .43 candidate uses native capture on Wayland and WebKit capture on X11.
+The Wayland change is approved but still needs exact-artifact qualification. Keep
+explicit source selection and app-session permission, with no idle recording or
+silent device switching. Native capture permits real window hiding. Preserve the
+failed WebKit hidden-start experiment and independently verify audio retention.
+The debug audit needs all three explicit flags and completed private bundles;
+wait for their COMMIT receipts before terminating an audited test process.

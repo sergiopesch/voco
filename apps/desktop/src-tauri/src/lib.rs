@@ -14,7 +14,7 @@ mod focus_probe;
 #[cfg(target_os = "linux")]
 mod hotkey_state;
 mod insertion;
-#[cfg(all(target_os = "linux", feature = "native-capture-dev"))]
+#[cfg(all(target_os = "linux", feature = "native-capture"))]
 mod native_capture;
 mod native_capture_commands;
 mod owned_preedit;
@@ -1525,6 +1525,11 @@ fn main_window(app: &tauri::AppHandle) -> Result<tauri::WebviewWindow<tauri::Wry
 }
 
 fn hide_overlay_window(window: &tauri::WebviewWindow<tauri::Wry>) -> Result<(), String> {
+    if native_capture_commands::uses_native_backend() {
+        return window
+            .hide()
+            .map_err(|e| format!("Failed to hide VOCO window: {e}"));
+    }
     window
         .set_size(tauri::Size::Physical(tauri::PhysicalSize::new(
             HIDDEN_WINDOW_SIZE,

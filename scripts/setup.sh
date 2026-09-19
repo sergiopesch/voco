@@ -136,11 +136,11 @@ if command -v apt &>/dev/null; then
     bash -c 'sudo apt update -qq 2>/dev/null && sudo apt install -y -qq \
       pkg-config libglib2.0-dev libsoup-3.0-dev \
       libjavascriptcoregtk-4.1-dev libwebkit2gtk-4.1-dev \
-      libayatana-appindicator3-dev clang mold \
+      libayatana-appindicator3-dev libpulse-dev clang mold \
       ibus gir1.2-ibus-1.0 python3-gi 2>/dev/null'
 else
   warn "Not using apt — install manually: pkg-config libglib2.0-dev libsoup-3.0-dev"
-  warn "libjavascriptcoregtk-4.1-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev"
+  warn "libjavascriptcoregtk-4.1-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev libpulse-dev"
   warn "For automatic text delivery, install IBus, its GI bindings, and system Python 3"
 fi
 

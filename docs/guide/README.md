@@ -25,7 +25,8 @@ retain the separate .41 research identity; they are not .42 latency benchmarks.
 Start with **The big picture**, work through the chapters, then follow the source links. Progress stays in this browser’s local storage.
 
 The Linux chapter explains why package installation and desktop dictation need
-separate checks, including the unresolved Hyprland microphone-startup experiment.
+separate checks, including the Hyprland hidden-start failure and the native-capture candidate that
+addresses it. Before/after results retain their specific test conditions.
 It does not announce a new release.
 
 ## Scope and privacy

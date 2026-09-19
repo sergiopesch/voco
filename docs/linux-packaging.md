@@ -33,6 +33,12 @@ repositories may not provide it, so the recommendation must not block X11 instal
 `gir1.2-atspi-2.0` provide the accessibility bus and bindings. Package installation
 does not change the selected input source or restart IBus.
 
+The .43 candidate additionally links libpulse (`libpulse-dev` on Debian build
+hosts, `libpulse0` at runtime). Fedora, openSUSE and Arch profiles map that library
+to their native package names. Native Wayland capture requires PipeWire's Pulse
+compatibility server and explicit microphone selection/session permission;
+installing the client library alone does not establish that capture works.
+
 ## Runtime provisioning
 
 Git excludes model weights and compiled native libraries. `git clone` and `npm ci`

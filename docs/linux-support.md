@@ -14,7 +14,7 @@ Hardware tuning needs matched accuracy and latency measurements.
 | Fedora 44 | Fedora `.rpm` | Exact .43 artifact and installed GNOME/KDE sessions |
 | openSUSE Tumbleweed | Separate openSUSE `.rpm` | Exact .43 artifact, companion tokenizer package and installed KDE/GNOME sessions |
 | Arch Linux | Pacman package | Exact .43 artifact and maintained tokenizer dependency |
-| Omarchy | Arch package with Hyprland setup | Hidden microphone startup, default Omarchy session and application matrix |
+| Omarchy | Arch package with Hyprland setup | Exact .43 artifact, default Omarchy session and application matrix |
 
 This is the intended scope, not a certification list. Older distribution releases,
 other CPU architectures, AppImage, Flatpak and Snap have no new support claim.
@@ -53,24 +53,36 @@ hl.bind("ALT + D", hl.dsp.exec_cmd("voco --toggle"))
 Use the syntax of your installed Hyprland release. Keep the binding non-repeating,
 check for conflicts and preserve existing Omarchy dictation bindings. The command
 cannot discover which keys the compositor assigned; VOCO's configured-key
-readiness currently describes its built-in keyboard routes. This diagnostic gap
-still needs resolution before Omarchy qualification.
+readiness describes its built-in keyboard routes. Wayland Shortcuts settings
+explain the compositor command and this distinction; a desktop binding must be
+tested in that desktop session.
 
 Shortcut handling and text delivery are separate. Wayland paste still needs a
 working `ydotoold` service and the clipboard helper, with narrowly scoped access.
 Never grant broad keyboard-device access merely to make a compositor binding work.
 
-## The open window issue
+## Hidden-window capture in the .43 candidate
 
-A booted Hyprland VM reproduced a transparent tile after Hide. The current app
-shrinks and moves the window instead of unmapping it. A diagnostic native hide
-removed the tile, but a new WebKit microphone request then failed to reach capture
-within 25 seconds. Hiding after capture began passed one short, 14-word fixture.
-That is not evidence for long-session capture continuity.
+Earlier Hyprland tests reproduced a transparent tile when VOCO moved its WebKit
+window off screen. Unmapping that window removed the tile but blocked a fresh
+WebKit microphone request. The .43 candidate now selects the native audio backend
+on Wayland and actually hides its window. X11 retains WebKit capture.
 
-The existing native audio backend is a candidate solution. It is still gated and
-requires explicit source selection and app-session microphone permission. No
-production capture change has been approved or qualified by these experiments.
+In Microphone settings, select a source, allow direct access for this app session,
+and choose **Use this microphone**. This does not start recording. The current
+system default resolves to one specific source; later default changes do not
+silently switch it. Native capture requires PipeWire's Pulse compatibility server
+and its stable source identity metadata. A lost or changed source requires explicit
+selection and permission again. There is no automatic browser fallback.
+
+An isolated Hyprland VM passed fresh hidden Start using the normal production
+build without development flags: 14 words matched after punctuation normalization,
+the second field stayed empty, and Stop-to-idle was 236 ms in that one short trial.
+A separate diagnostic build delivered 1,162 normalized words during a 577.68-second
+repetition fixture. Its audit files were interrupted by the test harness during
+shutdown, so that run does not qualify retained-audio continuity. These are
+candidate observations, not package, default Omarchy or physical microphone
+certification.
 
 See [the dated experiment report](testing/linux-release-2026-09-19.md),
 [packaging](linux-packaging.md), and [the evaluation protocol](testing/typesafe-evaluation.md).

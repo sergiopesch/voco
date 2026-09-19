@@ -1,5 +1,5 @@
-//! The native development backend is gated in Rust as well as in the renderer.
-//! Normal builds expose capabilities only and cannot construct an audio worker.
+//! Wayland capture owns a native stream only after explicit source permission.
+//! X11 retains WebKit unless the development override is explicitly requested.
 use serde::Serialize;
 use serde_json::Value;
 use std::sync::OnceLock;
@@ -9,17 +9,20 @@ static STATE: OnceLock<CaptureState> = OnceLock::new();
 
 pub struct CaptureState {
     enabled: bool,
-    #[cfg(all(target_os = "linux", feature = "native-capture-dev"))]
+    #[cfg(all(target_os = "linux", feature = "native-capture"))]
     service: Result<Option<crate::native_capture::NativeCaptureService>, String>,
 }
 
 pub fn initialize() {
     STATE.get_or_init(|| {
-        let enabled = cfg!(all(target_os = "linux", feature = "native-capture-dev"))
-            && std::env::var("VOCO_DEV_NATIVE_CAPTURE").as_deref() == Ok("1");
+        let enabled = enabled_for_session(
+            cfg!(all(target_os = "linux", feature = "native-capture")),
+            crate::is_wayland_session(),
+            std::env::var("VOCO_DEV_NATIVE_CAPTURE").as_deref() == Ok("1"),
+        );
         CaptureState {
             enabled,
-            #[cfg(all(target_os = "linux", feature = "native-capture-dev"))]
+            #[cfg(all(target_os = "linux", feature = "native-capture"))]
             service: if enabled {
                 crate::native_capture::NativeCaptureService::new().map(Some)
             } else {
@@ -27,6 +30,14 @@ pub fn initialize() {
             },
         }
     });
+}
+
+fn enabled_for_session(compiled: bool, wayland: bool, development_override: bool) -> bool {
+    compiled && (wayland || development_override)
+}
+
+pub(crate) fn uses_native_backend() -> bool {
+    STATE.get().is_some_and(|state| state.enabled)
 }
 
 fn state() -> Result<&'static CaptureState, String> {
@@ -74,9 +85,9 @@ pub fn native_capture_capabilities(window: WebviewWindow) -> Result<Capabilities
 #[tauri::command]
 pub fn debug_native_capture_enabled(window: WebviewWindow) -> Result<bool, String> {
     require_main(&window)?;
-    #[cfg(all(target_os = "linux", feature = "native-capture-dev"))]
+    #[cfg(all(target_os = "linux", feature = "native-capture"))]
     return Ok(state()?.enabled && crate::native_capture::retained::enabled());
-    #[cfg(not(all(target_os = "linux", feature = "native-capture-dev")))]
+    #[cfg(not(all(target_os = "linux", feature = "native-capture")))]
     Ok(false)
 }
 
@@ -89,7 +100,7 @@ pub fn save_debug_native_retained_source(
     if !state()?.enabled {
         return Ok(None);
     }
-    #[cfg(all(target_os = "linux", feature = "native-capture-dev"))]
+    #[cfg(all(target_os = "linux", feature = "native-capture"))]
     {
         let service = state()?
             .service
@@ -101,7 +112,7 @@ pub fn save_debug_native_retained_source(
             service.verify_stopped(identity)
         })
     }
-    #[cfg(not(all(target_os = "linux", feature = "native-capture-dev")))]
+    #[cfg(not(all(target_os = "linux", feature = "native-capture")))]
     {
         let _ = request;
         Ok(None)
@@ -109,7 +120,7 @@ pub fn save_debug_native_retained_source(
 }
 
 #[cfg_attr(
-    not(all(target_os = "linux", feature = "native-capture-dev")),
+    not(all(target_os = "linux", feature = "native-capture")),
     allow(dead_code)
 )]
 enum Operation {
@@ -121,7 +132,7 @@ enum Operation {
     Cancel(Value),
 }
 
-#[cfg(all(target_os = "linux", feature = "native-capture-dev"))]
+#[cfg(all(target_os = "linux", feature = "native-capture"))]
 fn json(value: impl Serialize) -> Result<Response, String> {
     serde_json::to_string(&value)
         .map(Response::new)
@@ -131,16 +142,16 @@ fn json(value: impl Serialize) -> Result<Response, String> {
 async fn perform(window: WebviewWindow, operation: Operation) -> Result<Response, String> {
     require_main(&window)?;
     if !state()?.enabled {
-        return Err("Native capture development backend is disabled".into());
+        return Err("Native capture backend is disabled".into());
     }
-    #[cfg(all(target_os = "linux", feature = "native-capture-dev"))]
+    #[cfg(all(target_os = "linux", feature = "native-capture"))]
     {
         let service = state()?
             .service
             .as_ref()
             .map_err(Clone::clone)?
             .as_ref()
-            .ok_or("Native capture development backend is disabled")?
+            .ok_or("Native capture backend is disabled")?
             .clone();
         tauri::async_runtime::spawn_blocking(move || {
             let decode_error =
@@ -167,10 +178,10 @@ async fn perform(window: WebviewWindow, operation: Operation) -> Result<Response
         .await
         .map_err(|e| e.to_string())?
     }
-    #[cfg(not(all(target_os = "linux", feature = "native-capture-dev")))]
+    #[cfg(not(all(target_os = "linux", feature = "native-capture")))]
     {
         let _ = operation;
-        Err("Native capture development backend is not compiled in".into())
+        Err("Native capture backend is not compiled in".into())
     }
 }
 
@@ -216,7 +227,7 @@ pub async fn native_capture_cancel(
 }
 
 pub fn reset_renderer() {
-    #[cfg(all(target_os = "linux", feature = "native-capture-dev"))]
+    #[cfg(all(target_os = "linux", feature = "native-capture"))]
     if let Some(Ok(Some(service))) = STATE.get().map(|s| &s.service) {
         if let Err(error) = service.reset_renderer() {
             log::warn!("Native capture renderer reset failed: {error}");
@@ -225,7 +236,7 @@ pub fn reset_renderer() {
 }
 
 pub fn shutdown() {
-    #[cfg(all(target_os = "linux", feature = "native-capture-dev"))]
+    #[cfg(all(target_os = "linux", feature = "native-capture"))]
     if let Some(Ok(Some(service))) = STATE.get().map(|s| &s.service) {
         if let Err(error) = service.shutdown() {
             log::warn!("Native capture shutdown failed: {error}");
@@ -236,6 +247,13 @@ pub fn shutdown() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn native_capture_selection_preserves_x11_and_requires_compiled_support() {
+        assert!(enabled_for_session(true, true, false));
+        assert!(!enabled_for_session(true, false, false));
+        assert!(enabled_for_session(true, false, true));
+        assert!(!enabled_for_session(false, true, true));
+    }
     #[test]
     fn capture_rejects_other_windows_and_untrusted_origins() {
         for url in [

@@ -209,12 +209,12 @@ lesson(
     [
         "Imagine writing down the height of a wave many times each second. The list of heights is digital audio.",
         "Sample rate means how many measurements happen in one second. It must travel with the numbers, like units on a ruler.",
-        "An AudioWorklet collects small ordered pieces while the interface does other work. The default path uses WebKit audio capture.",
+        "The .43 candidate uses native audio capture on Wayland so the panel can stay hidden. X11 uses WebKit and an AudioWorklet to collect ordered pieces while the interface does other work.",
     ],
     [
-        ("Permission", "Ask the operating system/browser layer for microphone access."),
-        ("Device", "Use the selected input device, or the current default."),
-        ("Samples", "Capture ordered blocks of floating-point audio."),
+        ("Permission", "On Wayland, explicitly allow the selected source for this app session. On X11, use browser microphone permission."),
+        ("Device", "Bind the recording to the selected input. Native system-default selection resolves to a specific source."),
+        ("Samples", "Capture ordered blocks and retain their sample rate through conversion."),
         ("Descriptor", "Keep source, rate and sample-count information together."),
         ("Queue", "Offer the blocks to the recording’s speech queue."),
     ],
@@ -228,8 +228,8 @@ lesson(
             "Calling 44,100 samples “one second at 16 kHz” changes the meaning of the audio. Rate validation and resampling must be deliberate.",
         ),
         (
-            "An optional route is not the default",
-            "The native capture modules form a separately gated development path. Seeing those files does not mean the normal desktop session uses them.",
+            "Permission is not a recording",
+            "Selecting and allowing a native source does not open a recording. Start begins capture; Stop closes it. A removed source cannot silently become a different microphone.",
         ),
     ],
     [
@@ -242,7 +242,7 @@ lesson(
         (F + "lib/audioResampling.ts", "Handles explicit sample-rate conversion."),
         (
             B + "native_capture_commands.rs",
-            "Commands for the separately gated native capture path.",
+            "Native source selection, permission and bounded capture commands.",
         ),
     ],
     "The waveform below is a teaching drawing. It never activates your microphone.",
@@ -983,7 +983,8 @@ lesson(
     ],
     [
         ("Before: a transparent tile", "Hyprland kept the off-screen VOCO window tiled. An isolated test reproduced it even though short dictation worked."),
-        ("After a diagnostic hide", "A real native hide removed the tile, but a fresh WebKit microphone request did not become active within 25 seconds. Hiding after capture began passed one 14-word fixture. The simple visual fix was therefore not promoted."),
+        ("Why hiding alone failed", "A diagnostic native hide removed the tile, but a fresh WebKit microphone request did not become active within 25 seconds. That failed attempt led to native capture qualification."),
+        ("After: native capture while hidden", "The .43 production build selected native capture on Wayland without development flags. One fresh-user test delivered all 14 normalized words with the panel unmapped and left a second field empty. Stop took 236 ms in this single VM trial. Exact packages and default desktops still need their own qualification."),
         ("A measured shortcut improvement", "The candidate's voco --toggle command used a compositor binding without keyboard-device access. One isolated fixture delivered all 14 words and left the second field unchanged. This does not certify every shortcut or application."),
         ("Keep obligations installed", "RPM can omit ordinary documentation on minimal systems. License files need explicit license metadata so those terms remain installed."),
         ("What TypeSafe contributes", "Optional semantic judgments assess a transcript's meaning. Exact code and real desktop tests establish package identity, audio timing, destination safety and compatibility. A language-model score cannot replace those checks."),

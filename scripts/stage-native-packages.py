@@ -52,11 +52,11 @@ def package_version(value, native_release=None):
 def rpm_dependencies(distribution):
     common = 'python3 python3-numpy python3-psutil python3-gobject ibus at-spi2-core xclip xdotool wl-clipboard ydotool'.split()
     if distribution == 'fedora':
-        return common + 'sentencepiece-libs gstreamer1-plugins-base gstreamer1-plugins-good gtk3 webkit2gtk4.1 libayatana-appindicator-gtk3'.split() + ['glibc >= 2.39', 'libstdc++ >= 13.2.0']
+        return common + 'pulseaudio-libs sentencepiece-libs gstreamer1-plugins-base gstreamer1-plugins-good gtk3 webkit2gtk4.1 libayatana-appindicator-gtk3'.split() + ['glibc >= 2.39', 'libstdc++ >= 13.2.0']
     if distribution == 'opensuse':
         # Tumbleweed's default Python provides these unversioned capabilities.
         # libsentencepiece0 is built from the reviewed companion source recipe.
-        return common + 'libsentencepiece0 gstreamer-plugins-base gstreamer-plugins-good libgtk-3-0 libwebkit2gtk-4_1-0 libayatana-appindicator3-1 typelib-1_0-IBus-1_0 typelib-1_0-Atspi-2_0'.split() + ['glibc >= 2.39', 'libstdc++6 >= 13.2.0']
+        return common + 'libpulse0 libsentencepiece0 gstreamer-plugins-base gstreamer-plugins-good libgtk-3-0 libwebkit2gtk-4_1-0 libayatana-appindicator3-1 typelib-1_0-IBus-1_0 typelib-1_0-Atspi-2_0'.split() + ['glibc >= 2.39', 'libstdc++6 >= 13.2.0']
     raise ValueError('Unknown RPM distribution')
 
 
@@ -195,7 +195,7 @@ tar -xf %{{SOURCE0}} -C %{{buildroot}} --no-same-owner --same-permissions
         else:
             spec += rpm_file_entry(row['path']) + '\n'
     (args.output / 'voco.spec').write_text(spec)
-    arch = 'glibc>=2.39 gcc-libs>=13.2.0 python python-numpy python-psutil sentencepiece gst-plugins-good gtk3 webkit2gtk-4.1 libayatana-appindicator ibus python-gobject at-spi2-core xclip xdotool wl-clipboard ydotool'.split()
+    arch = 'glibc>=2.39 gcc-libs>=13.2.0 libpulse python python-numpy python-psutil sentencepiece gst-plugins-good gtk3 webkit2gtk-4.1 libayatana-appindicator ibus python-gobject at-spi2-core xclip xdotool wl-clipboard ydotool'.split()
     (args.output / 'PKGBUILD').write_text(f'''# Exact verified prebuilt payload; no download, install hook or source rebuild.
 pkgname=voco
 pkgver={version}
