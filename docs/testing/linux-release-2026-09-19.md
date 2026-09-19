@@ -26,9 +26,8 @@ The diagnostic preload is confined to the guest and is not a shipped fix.
 No ten-minute continuity or physical-microphone claim follows from these results.
 
 The observed failure boundary is a new WebKit microphone request while the window
-is unmapped. The existing native capture backend remains a gated development
-option. Promoting it changes capture architecture and the explicit permission/setup
-flow and requires a product decision followed by separate qualification.
+is unmapped. At that stage native capture was a gated development option. Its promotion was
+subsequently approved and qualified separately below.
 
 ## Native RPM profile tests
 
@@ -118,3 +117,75 @@ retained rather than reclassified as passes. Timings are single observations in 
 four-vCPU software-rendered guest. Punctuation normalization is not punctuation
 accuracy, field mutation is not painted text, and the minimal Hyprland session is
 not a complete default Omarchy installation.
+
+## Installed candidate and upgrade follow-up
+
+The packaged executable is SHA-256
+`f559d61b44c68d62cd0e9c3c1b3d3a066faceded3c5b45277551c9b3c6a7ad9c`.
+The pre-package executable used for trials 09–12 is
+`d091792369fdc8c55aa017d04d36e1c73bbd44def1d2381f32403c874c319e95`;
+Tauri strips its packaged copy. Keep those identities distinct.
+
+| Trial | Conditions | Outcome |
+| --- | --- | --- |
+| 09 | Pre-package production build; 577.68 seconds | 1,162 normalized words, Stop 1,102 ms; completed native/renderer audit and full-reference waveform pass |
+| 10 | Same build; repeated sessions | 28 normalized words; Stops 240 and 233 ms |
+| 11 | Same build; focus departure | Delivery halted; second field unchanged |
+| 12 | Same build; virtual source removed | Explicit recovery and Copy passed without destination replay |
+| 14 | Installed Arch package; Omarchy packaged defaults | Fresh onboarding and hidden Start; 14 normalized words; Stop 244 ms |
+| 15 | Same installed package/defaults; 577.68 seconds | 1,162 normalized words; Stop 920 ms; complete audio verification below |
+| 16 | Same installed package/defaults; repeated sessions | 28 normalized words; Stops 246 and 235 ms |
+| 17 | Same installed package/defaults; focus departure | Delivery halted after the initial partial phrase; second field unchanged |
+| 20 | Same installed package/defaults; source removal | Real tray Retry/Copy passed; zero automatic paste requests or field mutations during recovery |
+
+The installed long trial verified all 25,508,763 frames and 26,171 blocks against
+renderer retention, using an independently planned descriptor. Source waveform
+correlation exceeded 0.9995 in all four quarters; the predeclared threshold was
+0.90. Offline resampling was used only for waveform analysis. This proves neither
+physical microphone quality nor the application's resampler in isolation.
+
+Preserved failures include trial 08's small runtime-filesystem exhaustion, trial
+13's stale compositor instance selection, trial 18's assumption that the harness
+owned tray discovery, and trial 19's stale accessibility node. Corrected tests use
+disk storage, the live compositor instance, the actual Quickshell tray and guarded
+accessibility traversal. Trial 20 recovery took 52.65 seconds during concurrent
+VM/container work; this is a measured slow observation, not a recovery-speed claim.
+The guest has Omarchy 4.0.4/Hyprland 0.56.2 with packaged desktop defaults, but uses
+direct kernel boot without an ESP. Limine hooks reported that limitation; missing
+base services and pending Omarchy migrations preclude clean-installer acceptance.
+
+Fedora 44 and openSUSE Tumbleweed local-container packages passed upgrade,
+reinstall/remove, 225-entry/nine-ELF parity and 14-license checks. Their installed
+workers each processed 12 public fixtures: 238 words, six normalized edits (2.52%
+WER), with matching runtime hashes and transcripts. These are userspace/worker
+checks, not default desktop or hardware-latency evidence.
+
+Ubuntu 26.04, Debian 13 and Mint 22.3 upgrades exposed a real packaging defect:
+dpkg retained legacy root-owned `0775` directories despite archive modes of `0755`.
+The reviewed .43 postinst now repairs only that known mode on listed VOCO-owned
+directories, preserving administrator overrides and user files. Six focused tests
+cover idempotence, custom permissions, filtered docs, symlinks, ownership and hook
+verification. All three corrected upgrade/reinstall/remove trials passed complete
+225-entry/nine-ELF parity and settings-marker preservation. Their original minimal
+image documentation filters were recorded; full parity explicitly retained docs.
+
+Local Debian revision `2026.0.43+local2` has SHA-256
+`35f692e0f224f7d8b05961c8054e47ff1ca25c8337154d02d4e2c15adcbdf829`.
+It changes package metadata/documentation, retaining the same application bytes.
+None of these local candidates is a signed public release. Final artifacts still
+need exact-identity checks, required CI and the remaining desktop matrix.
+
+## Two-core Ubuntu GNOME finding
+
+A fresh account in the Ubuntu 24.04 GNOME Wayland VM exposed two additional gaps.
+Ubuntu packages `ydotool` and `ydotoold` separately; the candidate now recommends
+both and documents the required service without automatically widening input
+permissions. The first trial correctly rejected an unavailable paste route.
+
+With two virtual CPUs, the fixed four-thread recognizer took 35.37 seconds to load
+and warm, exceeding the application's startup deadline. A controlled two-thread
+run took 1.53 seconds (model load about 412 ms in both). The default worker count
+now respects CPU affinity, capped at four, while explicit research overrides remain
+unchanged. This is a startup result in one constrained VM, not an accuracy or
+hardware speed claim. Full worker and installed desktop checks follow this change;
+previous trials retain their earlier worker identity.

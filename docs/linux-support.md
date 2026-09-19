@@ -75,14 +75,21 @@ silently switch it. Native capture requires PipeWire's Pulse compatibility serve
 and its stable source identity metadata. A lost or changed source requires explicit
 selection and permission again. There is no automatic browser fallback.
 
-An isolated Hyprland VM passed fresh hidden Start using the normal production
-build without development flags: 14 words matched after punctuation normalization,
-the second field stayed empty, and Stop-to-idle was 236 ms in that one short trial.
-A separate diagnostic build delivered 1,162 normalized words during a 577.68-second
-repetition fixture. Its audit files were interrupted by the test harness during
-shutdown, so that run does not qualify retained-audio continuity. These are
-candidate observations, not package, default Omarchy or physical microphone
-certification.
+The installed .43 Arch candidate was tested with Omarchy 4.0.4's packaged
+Hyprland/Quickshell configuration in a booted guest. Fresh hidden Start delivered
+14/14 normalized words (Stop-to-idle 244 ms); repeated sessions delivered 28/28
+(246 and 235 ms). A 577.68-second public repetition delivered 1,162/1,162 normalized
+words and finished in 920 ms after Stop. These are individual observations, not
+percentiles. All 25,508,763 captured frames matched retained renderer audio, and
+full-source waveform correlation exceeded 0.9995 in each quarter. Focus departure
+halted delivery; source removal retained audio for explicit Retry/Copy without
+automatic replay.
+
+This guest uses the packaged desktop defaults but a supplied kernel and direct
+boot, with virtual audio and a GTK recipient. It is not clean ISO/bootloader,
+physical microphone or arbitrary application certification. Debian-family upgrades
+and native Fedora/openSUSE installation have separate userspace receipts; the full
+installed GNOME/KDE and recipient matrix remains a release gate.
 
 See [the dated experiment report](testing/linux-release-2026-09-19.md),
 [packaging](linux-packaging.md), and [the evaluation protocol](testing/typesafe-evaluation.md).

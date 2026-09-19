@@ -1612,11 +1612,19 @@
       },
       {
         "title": "After: native capture while hidden",
-        "text": "The .43 production build selected native capture on Wayland without development flags. One fresh-user test delivered all 14 normalized words with the panel unmapped and left a second field empty. Stop took 236 ms in this single VM trial. Exact packages and default desktops still need their own qualification."
+        "text": "The installed .43 Arch candidate passed fresh setup under Omarchy\u2019s packaged desktop configuration: 14 normalized words, a truly hidden panel, an unchanged second field and a 244 ms Stop. A 577.68-second repetition delivered 1,162 normalized words and passed independent full-audio checks. These individual VM observations do not certify physical microphones or arbitrary apps."
       },
       {
         "title": "A measured shortcut improvement",
         "text": "The candidate's voco --toggle command used a compositor binding without keyboard-device access. One isolated fixture delivered all 14 words and left the second field unchanged. This does not certify every shortcut or application."
+      },
+      {
+        "title": "Fit the available CPUs",
+        "text": "A two-core VM took 35.37 seconds to warm a four-thread recognizer, exceeding startup limits. Two threads took 1.53 seconds in a controlled check. The candidate now caps its default at the available CPUs, up to four; accuracy and desktop tests must accompany that change."
+      },
+      {
+        "title": "Safe upgrades",
+        "text": "Debian preserves existing directory modes during upgrades. A real legacy-install test exposed inherited group-write permissions. A narrowly checked migration repairs only the known package-owned mode, preserving custom permissions and personal settings."
       },
       {
         "title": "Keep obligations installed",
@@ -1645,7 +1653,7 @@
         "why": "Dated outcomes and qualification limits."
       }
     ],
-    "caution": "These are development experiments, not a released universal Linux installer. Physical microphones, default desktop configurations and long-session continuity require their own evidence.",
+    "caution": "These are development experiments, not a released universal Linux installer. The Omarchy long-session result uses virtual audio and one GTK recipient. Physical microphones, other default desktops and the wider application matrix still need their own evidence.",
     "quiz": {
       "question": "The RPM installs, but dictation fails under the default compositor. Is that distribution ready?",
       "answers": [

@@ -59,7 +59,7 @@ for floor in 'libc6 (>= 2.39)' 'libstdc++6 (>= 13.2.0)'; do
   fi
 done
 
-if [[ "$(dpkg-deb -f "${DEB_PATH}" Recommends)" != "ydotool" ]]; then
+if [[ "$(dpkg-deb -f "${DEB_PATH}" Recommends)" != "ydotool, ydotoold" ]]; then
   echo "Debian package must recommend the session-specific Wayland input helper." >&2
   exit 1
 fi

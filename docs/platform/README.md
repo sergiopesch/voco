@@ -64,33 +64,39 @@ merely to copy a transcript. Installed physical Wayland qualification remains pe
 
 ### ydotoold (ydotool daemon)
 
-ydotool v1.0+ requires the `ydotoold` daemon to be running. On older versions (0.x), ydotool communicates with uinput directly.
+VOCO requires a running `ydotoold` for automatic Wayland paste, including when
+using the legacy 0.1.x client. The persistent virtual device avoids per-command
+creation delays. Modern clients also require access to the daemon socket.
 
-**Check if ydotoold is needed:**
+Ubuntu 24.04 provides the client and daemon separately:
+
 ```bash
-ydotool type "test"  # If this errors with "socket not found", you need ydotoold
+sudo apt install ydotool ydotoold
 ```
 
-**Start ydotoold:**
-```bash
-# One-time (current session)
-ydotoold &
+This installs the tools; it does not guarantee an active service. Check without
+injecting keys into the current application:
 
-# Persistent (systemd user service, if available)
-systemctl --user enable --now ydotoold
+```bash
+command -v ydotool ydotoold
+pgrep -x ydotoold
+systemctl --user status ydotoold
 ```
 
-**If ydotoold is not available as a service:**
-```bash
-# Add to ~/.bashrc or ~/.profile for auto-start
-pgrep -x ydotoold > /dev/null || ydotoold &
-```
+Use your distribution's packaged service when available and its documented socket
+permissions. VOCO's session must be able to reach that socket; an arbitrary daemon
+running as another user is not proof of access. Where no service exists, the daemon
+needs narrowly scoped access to `/dev/uinput` and a service managed for your login.
+Do not add it blindly to shell startup files or grant all keyboard-device access.
+The package deliberately does not change system device permissions.
 
-**Troubleshooting:**
-- `Permission denied`: ensure user is in `input` group and has uinput access
-- `Socket not found`: ydotoold is not running — start it manually
-- In the legacy helper API, `auto` falls back only when the typing helper did not start. A failed or timed-out helper may already have typed a prefix, so VOCO reports uncertain delivery and never retries the whole transcript.
-- In strict `type-simulation` mode, VOCO reports the failure instead of touching the clipboard
+`Permission denied` indicates device/socket access needs configuration. `Socket
+not found` indicates an unavailable daemon or a mismatched socket path. After
+setup, use a disposable text field to verify actual delivery. Settings diagnostics
+check prerequisites; only that destination test proves the complete path.
+
+A failed or timed-out helper may already have typed a prefix. VOCO retains uncertain
+output for explicit review and never retries the whole transcript automatically.
 
 ## Compatibility Helpers on X11
 
@@ -100,7 +106,7 @@ pgrep -x ydotoold > /dev/null || ydotoold &
 
 ## Known Limitations
 
-- Automatic delivery is limited to explicitly authorized eligible Chromium plain-text controls; other apps require manual copying
+- Native desktop paste and the separately authorized Chromium exact-field adapter have different target contracts; neither establishes support for every application
 - Rich editors, password controls and recognized sensitive metadata, selected ranges and unsupported frames are not browser adapter targets
 - Direct captured-element mutation may not participate in native browser undo history
 - Native Wayland, broad browser/app compatibility and physical microphone journeys require their own current evidence; isolated X11 tests do not prove them

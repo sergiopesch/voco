@@ -84,7 +84,8 @@
           "/usr/share/voco/chromium/content.js": "../../../integrations/chromium/content.js"
         },
         "recommends": [
-          "ydotool"
+          "ydotool",
+          "ydotoold"
         ]
       }
     }

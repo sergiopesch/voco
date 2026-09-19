@@ -19,7 +19,8 @@ Read [README](README.md), [the code map](docs/architecture/code-map.md) and
 The production path is `runtime/speech/` → Rust `benchmark_stream.rs` →
 `benchmarkPhraseQueue.ts` → `insertion.rs`. Despite their historical names,
 these are production modules. The selected runtime is NVIDIA Nemotron English
-0.6B Q8 CPU. Whisper and Chromium exact-field dictation are separate compatibility
+0.6B Q8 CPU. Keep the default worker count capped to process affinity and at most
+four threads; preserve explicit research overrides and record actual counts. Whisper and Chromium exact-field dictation are separate compatibility
 paths with their own checks. Research model adapters are not selectable products.
 
 Rust owns OS integration, files, processes, packaging and validation. React owns

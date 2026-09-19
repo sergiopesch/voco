@@ -27,8 +27,13 @@ isolated runtime before publication. Record source and package SHA-256 identitie
 Do not include personal recordings, transcripts, API credentials or private receipts.
 
 The package requires Python 3, NumPy, psutil and the declared native dependencies.
+The worker defaults to at most four CPU threads, capped to its CPU affinity. This
+avoids oversubscribing one- or two-core machines. Explicit research overrides stay
+explicit; diagnostics record the effective thread count. CPU quotas imposed without
+matching affinity remain a separate performance constraint.
 Its ABI floor includes glibc 2.39 and libstdc++ 13.2.0. X11 helpers are required;
-ydotool is recommended for Wayland and needs a working input service. Debian 13
+ydotool and the separately packaged Ubuntu ydotoold are recommended for Wayland;
+the input service must also be configured and running. Debian 13
 repositories may not provide it, so the recommendation must not block X11 installs. `at-spi2-core` and
 `gir1.2-atspi-2.0` provide the accessibility bus and bindings. Package installation
 does not change the selected input source or restart IBus.

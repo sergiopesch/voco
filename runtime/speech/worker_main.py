@@ -7,6 +7,18 @@ import sys
 import time
 
 
+def configure_cpu_threads():
+    if 'NEMO_SPEECH_CPU_THREADS' in os.environ:
+        return
+    try:
+        available = len(os.sched_getaffinity(0))
+    except (AttributeError, OSError):
+        available = os.cpu_count() or 1
+    # The native pool spins between tasks. Oversubscribing a two-core desktop
+    # with four workers can exceed the startup deadline instead of running faster.
+    os.environ['NEMO_SPEECH_CPU_THREADS'] = str(max(1, min(4, available)))
+
+
 def error_code(error):
     known = {
         'identity': 'invalid_identity', 'object': 'invalid_object', 'operation': 'invalid_operation',
@@ -123,6 +135,7 @@ def serve(protocol, source, model, metrics):
 
 
 def main(protocol):
+    configure_cpu_threads()
     try:
         from streaming import StreamingSession, Metrics
     except Exception as error:
