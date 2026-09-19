@@ -61,7 +61,9 @@ Settings. Known terminal paste shortcuts are selected automatically.
 
 On X11, desktop paste uses xclip and xdotool. On Wayland, it uses ydotool plus
 the appropriate clipboard helper; its input service and permissions may require
-setup. The optional VOCO IBus source handles shortcuts, not text mutation. Follow
+setup. The package recommends ydotool because availability differs by distribution.
+If it is unavailable, X11 remains usable; Wayland paste is unavailable until the
+helper and its service are installed and configured. The optional VOCO IBus source handles shortcuts, not text mutation. Follow
 VOCO’s setup diagnostics for your session; do not change another app’s keybindings.
 See [troubleshooting](troubleshooting.md).
 

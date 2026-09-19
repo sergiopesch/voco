@@ -64,7 +64,6 @@
           "python3-psutil",
           "libsentencepiece0",
           "xdotool",
-          "ydotool",
           "wl-clipboard",
           "libc6 (>= 2.39)",
           "libstdc++6 (>= 13.2.0)"
@@ -82,7 +81,10 @@
           "/usr/share/voco/chromium/manifest.json": "../../../integrations/chromium/manifest.json",
           "/usr/share/voco/chromium/background.js": "../../../integrations/chromium/background.js",
           "/usr/share/voco/chromium/content.js": "../../../integrations/chromium/content.js"
-        }
+        },
+        "recommends": [
+          "ydotool"
+        ]
       }
     }
   },

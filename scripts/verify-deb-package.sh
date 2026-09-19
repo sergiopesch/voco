@@ -45,7 +45,7 @@ PACKAGE_DEPENDS="$(dpkg-deb -f "${DEB_PATH}" Depends)"
   exit 1
 }
 
-for dependency in ibus python3 python3-gi gir1.2-ibus-1.0 python3-numpy python3-psutil libsentencepiece0 xclip xdotool ydotool wl-clipboard gir1.2-atspi-2.0 at-spi2-core; do
+for dependency in ibus python3 python3-gi gir1.2-ibus-1.0 python3-numpy python3-psutil libsentencepiece0 xclip xdotool wl-clipboard gir1.2-atspi-2.0 at-spi2-core; do
   if ! grep -Eq "(^|, )${dependency}( \\([^)]*\\))?(,|$)" <<<"${PACKAGE_DEPENDS}"; then
     echo "Debian package is missing dependency: ${dependency}" >&2
     exit 1
@@ -58,6 +58,11 @@ for floor in 'libc6 (>= 2.39)' 'libstdc++6 (>= 13.2.0)'; do
     exit 1
   fi
 done
+
+if [[ "$(dpkg-deb -f "${DEB_PATH}" Recommends)" != "ydotool" ]]; then
+  echo "Debian package must recommend the session-specific Wayland input helper." >&2
+  exit 1
+fi
 
 PACKAGE_LISTING="$(dpkg-deb -c "${DEB_PATH}")"
 assert_entry() {
