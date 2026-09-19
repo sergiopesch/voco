@@ -263,7 +263,7 @@ that needs independent field readback. Missing recordings remain unavailable.
 ## Native Fedora and Arch candidate recipes
 
 `scripts/stage-native-packages.py` stages an RPM spec and Arch PKGBUILD from a
-complete, hash-verified Debian candidate. These are native package-manager wrappers
+complete, hash-verified Debian release or local candidate. These are native package-manager wrappers
 around the same prebuilt application/model bytes, not a portable source rebuild.
 They preserve file hashes and relative loader links, disable strip/debug rewriting,
 and declare distro-specific runtime dependencies. Unknown Debian dependency
@@ -274,6 +274,20 @@ python3 scripts/stage-native-packages.py COMPLETE.deb FRESH_DIRECTORY \
   --sha256 EXPECTED_SHA256 \
   --verifier /absolute/path/to/voco/scripts/verify-deb-package.sh
 ```
+
+Final versions such as `2026.0.42` use native package revision `1`. Use
+`--native-release 2` for a packaging-only revision of the same final payload.
+This does not authorize changing application/model bytes under the same version.
+Legacy `+localN` candidates retain their previous native revision mapping; do not
+assume a final revision `1` upgrades a previously installed local revision `N`.
+Unknown versions, dependency constraints and revision overrides are rejected.
+The reviewed Debian ABI floors map to Arch `glibc>=2.39`, `gcc-libs>=13.2.0`
+and RPM `glibc >= 2.39`, `libstdc++ >= 13.2.0` requirements.
+
+Native package signatures are separate from Debian release signatures. Public
+Arch delivery needs a documented trusted signing key and a maintained dependency
+source. Isolated tests may use an explicitly disposable signing key trusted only
+inside the test guest; never ask end users to disable signature verification.
 
 Build the generated `voco.spec` with `rpmbuild` in a disposable Fedora builder, or
 `PKGBUILD` with `makepkg` in a disposable Arch builder. Never run package install or
@@ -303,3 +317,7 @@ For a deliberately network-disabled verification job, set
 `VOCO_PACKAGE_VERIFY_OFFLINE=1` when invoking `scripts/verify-deb-package.sh`. This
 runs local AppStream validation with `--no-net`; it does not validate external URLs.
 Omit the variable for the release job's normal online URL checks.
+
+The [2026-09-19 Omarchy qualification](testing/omarchy-native-2026-09-19.md)
+records native Arch package checks and booted Hyprland trials, including the
+permission and hidden-window issues that still block public Omarchy support.
