@@ -89,6 +89,10 @@ or assembling a complete package. Source checks alone do not qualify an installe
 
 ## Other Linux systems
 
+See the [Linux support plan](linux-support.md) for .43 native package work and
+its outstanding gates. Development recipes are not public installers.
+
+
 Historical userspace checks cover Ubuntu, Debian, Fedora, Linux Mint and an
 Omarchy-related Arch profile. Consult the [current release notes](releases/2026.0.42.md)
 for checks run on this release. This is not proof of every distribution’s default compositor, audio stack

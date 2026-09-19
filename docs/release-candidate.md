@@ -1,5 +1,10 @@
 # Release status
 
+**2026.0.43 is an unpublished development candidate.** Native packaging,
+compositor shortcuts and hidden-window audio are under qualification.
+See [Linux support](linux-support.md). No new release has been cut or installed.
+
+
 **2026.0.42** combines safer capture admission, explicit offline NVIDIA recovery,
 maintainability and dependency updates, and the public TypeSafe evaluation guide.
 

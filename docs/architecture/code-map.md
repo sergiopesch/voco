@@ -129,3 +129,9 @@ These do not change the recognition or delivery pipeline.
 The glib 0.18.5 dependency is pinned under `vendor/glib` with an upstream iterator
 safety backport. `verify-glib-backport.py` checks its full source and resolution;
 `test-glib-variant.py` runs the optimized regression without launching the app.
+
+The .43 candidate adds `voco --toggle` in `src-tauri/src/main.rs`, calling the
+existing owner-only trigger transport. It uses one nonblocking connection; no
+retry, GUI startup or recording-state acknowledgment is implied. Native packaging
+selects Fedora/openSUSE dependency profiles explicitly and preserves license files
+when RPM excludes ordinary documentation. See [Linux support](../linux-support.md).

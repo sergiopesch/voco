@@ -49,6 +49,29 @@ def package_version(value, native_release=None):
     return version, revision, bool(local_revision)
 
 
+def rpm_dependencies(distribution):
+    common = 'python3 python3-numpy python3-psutil python3-gobject ibus at-spi2-core xclip xdotool wl-clipboard ydotool'.split()
+    if distribution == 'fedora':
+        return common + 'sentencepiece-libs gstreamer1-plugins-base gstreamer1-plugins-good gtk3 webkit2gtk4.1 libayatana-appindicator-gtk3'.split() + ['glibc >= 2.39', 'libstdc++ >= 13.2.0']
+    if distribution == 'opensuse':
+        # Tumbleweed's default Python provides these unversioned capabilities.
+        # libsentencepiece0 is built from the reviewed companion source recipe.
+        return common + 'libsentencepiece0 gstreamer-plugins-base gstreamer-plugins-good libgtk-3-0 libwebkit2gtk-4_1-0 libayatana-appindicator3-1 typelib-1_0-IBus-1_0 typelib-1_0-Atspi-2_0'.split() + ['glibc >= 2.39', 'libstdc++6 >= 13.2.0']
+    raise ValueError('Unknown RPM distribution')
+
+
+def rpm_file_entry(path):
+    # RPM's nodocs policy must never discard bundled licensing obligations.
+    name = Path(path).name
+    license_names = {'COPYRIGHT', 'NOTICE', 'THIRD-PARTY-NOTICES.txt',
+                     'THIRD_PARTY_NOTICES.md', 'NVIDIA-NOTICE.txt',
+                     'NVIDIA-OPEN-MODEL-LICENSE.html', 'NVIDIA-MODEL-CARD.md',
+                     'GGML-LICENSE'}
+    is_license = path.startswith('/usr/share/doc/voco/') and (
+        name.startswith('LICENSE') or name in license_names)
+    return ('%license ' if is_license else '') + path
+
+
 def inventory(root):
     result = []
     for path in sorted(root.rglob('*')):
@@ -81,6 +104,8 @@ def main():
     parser.add_argument('--sha256', required=True)
     parser.add_argument('--verifier', required=True, type=Path)
     parser.add_argument('--native-release', help='Positive package revision for a final release (default: 1)')
+    parser.add_argument('--rpm-distribution', choices=('fedora', 'opensuse'), default='fedora',
+                        help='Native RPM dependency profile (default: fedora)')
     args = parser.parse_args()
     if digest(args.deb) != args.sha256:
         raise ValueError('Debian artifact hash mismatch')
@@ -122,12 +147,12 @@ def main():
         'debian_version': fields['Version'], 'debian_sha256': args.sha256,
         'application_version': version, 'native_release': rpm_release,
         'channel': 'local-candidate' if local else 'final-payload',
+        'rpm_distribution': args.rpm_distribution,
         'payload_tar_sha256': archive_hash, 'scope': 'Exact prebuilt candidate payload; not a portable source rebuild',
     }, indent=2) + '\n')
     # Dependencies are explicit per distro. Automatic ELF dependencies remain on
     # RPM; private recognizer libraries must not become public system provides.
-    fedora = 'python3 python3-numpy python3-psutil sentencepiece-libs gstreamer1-plugins-base gstreamer1-plugins-good gtk3 webkit2gtk4.1 libayatana-appindicator-gtk3 ibus python3-gobject at-spi2-core xclip xdotool wl-clipboard ydotool'.split()
-    fedora += ['glibc >= 2.39', 'libstdc++ >= 13.2.0']
+    dependencies = rpm_dependencies(args.rpm_distribution)
     spec = f'''Name: voco
 Version: {version}
 Release: {rpm_release}
@@ -136,7 +161,7 @@ License: MIT AND Apache-2.0 AND LicenseRef-NVIDIA-Open-Model
 URL: https://github.com/sergiopesch/voco
 Source0: voco-payload.tar
 BuildArch: x86_64
-Requires: {', '.join(fedora)}
+Requires: {', '.join(dependencies)}
 %global debug_package %{{nil}}
 %global _binary_payload w3.zstdio
 %global __os_install_post %{{nil}}
@@ -168,7 +193,7 @@ tar -xf %{{SOURCE0}} -C %{{buildroot}} --no-same-owner --same-permissions
             if any(row['path'] == prefix or row['path'].startswith(prefix + '/') for prefix in owned):
                 spec += '%dir ' + row['path'] + '\n'
         else:
-            spec += row['path'] + '\n'
+            spec += rpm_file_entry(row['path']) + '\n'
     (args.output / 'voco.spec').write_text(spec)
     arch = 'glibc>=2.39 gcc-libs>=13.2.0 python python-numpy python-psutil sentencepiece gst-plugins-good gtk3 webkit2gtk-4.1 libayatana-appindicator ibus python-gobject at-spi2-core xclip xdotool wl-clipboard ydotool'.split()
     (args.output / 'PKGBUILD').write_text(f'''# Exact verified prebuilt payload; no download, install hook or source rebuild.

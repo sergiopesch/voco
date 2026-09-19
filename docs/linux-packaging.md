@@ -321,3 +321,16 @@ Omit the variable for the release job's normal online URL checks.
 The [2026-09-19 Omarchy qualification](testing/omarchy-native-2026-09-19.md)
 records native Arch package checks and booted Hyprland trials, including the
 permission and hidden-window issues that still block public Omarchy support.
+
+## Distribution-specific RPM profiles
+
+`stage-native-packages.py --rpm-distribution fedora` is the default. Use
+`--rpm-distribution opensuse` for the Tumbleweed dependency profile. Each output
+records its profile in provenance; qualify and sign each native artifact separately.
+Do not rename a Fedora RPM and call it an openSUSE build.
+
+The [SentencePiece companion recipes](../packaging/dependencies/sentencepiece/README.md)
+provide reviewed source builds where no system library package is available.
+RPM recipes mark bundled licenses with `%license`, preserving them on minimal
+`nodocs` installations. Full payload parity requires documents enabled.
+See [the current scope and gates](linux-support.md).

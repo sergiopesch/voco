@@ -58,6 +58,31 @@ class InventoryTests(unittest.TestCase):
 
 
 class DependencyTests(unittest.TestCase):
+    def test_rpm_licenses_survive_nodocs_policy(self):
+        for path in ['/usr/share/doc/voco/nvidia/NVIDIA-OPEN-MODEL-LICENSE.html',
+                     '/usr/share/doc/voco/vendor/glib/COPYRIGHT',
+                     '/usr/share/doc/voco/vendor/global-hotkey/LICENSE-MIT']:
+            self.assertEqual(staging.rpm_file_entry(path), '%license ' + path)
+        path = '/usr/share/doc/voco/README.md'
+        self.assertEqual(staging.rpm_file_entry(path), path)
+
+    def test_rpm_profiles_preserve_native_names_and_abi_floors(self):
+        fedora = staging.rpm_dependencies('fedora')
+        suse = staging.rpm_dependencies('opensuse')
+        self.assertIn('sentencepiece-libs', fedora)
+        self.assertNotIn('sentencepiece-libs', suse)
+        self.assertIn('libsentencepiece0', suse)
+        self.assertIn('libstdc++ >= 13.2.0', fedora)
+        self.assertIn('libstdc++6 >= 13.2.0', suse)
+        for profile in (fedora, suse):
+            self.assertIn('glibc >= 2.39', profile)
+            self.assertIn('python3-numpy', profile)
+            self.assertEqual(len(profile), len(set(profile)))
+
+    def test_unknown_rpm_distribution_fails_closed(self):
+        with self.assertRaises(ValueError):
+            staging.rpm_dependencies('unknown')
+
     def test_current_dependencies_have_explicit_mappings(self):
         staging.validate_debian_dependencies('python3, python3-numpy, at-spi2-core, ibus')
 

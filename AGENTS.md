@@ -108,8 +108,9 @@ isolation, not a remote VM or proof of a distribution's default desktop.
 
 ## Release and evidence
 
-Release version: **2026.0.42**, combining capture/recovery reliability and the
-public evaluation guide. Publication status is authoritative on GitHub Releases;
+Development version: **2026.0.43**. Public release: **2026.0.42**.
+The .43 Linux package milestone is not release-qualified; follow
+[the support plan](docs/linux-support.md) and preserve per-artifact receipts. Publication status is authoritative on GitHub Releases;
 a version in source alone is not proof of a published or installed package.
 Frozen .39 and earlier cuts remain immutable. New product bytes need a new version,
 fresh checks and artifact receipts.
@@ -120,3 +121,12 @@ The hosted Release workflow must not assemble NVIDIA installers. Userspace check
 native install/remove, physical audio and compositor/application behavior are
 distinct evidence levels. Never claim fastest, most accurate, universal
 compatibility or stability from a limited test corpus.
+
+Native packages share the qualified application/model, but use explicit distro
+dependency mappings. Keep RPM licenses installed under nodocs policies. Companion
+SentencePiece recipes must use SPM_BUILD_TEST and fail when no tests run.
+The control CLI connects once to the owner-only socket; do not add retries or
+launch/focus side effects. It does not prove a compositor keybinding exists.
+Hyprland native hiding blocks fresh WebKit microphone startup in the current
+experiment. Do not promote native capture or retain an idle microphone stream
+without the product/privacy decision and independent qualification.

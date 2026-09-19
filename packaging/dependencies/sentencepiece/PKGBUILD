@@ -1,0 +1,26 @@
+# Local dependency build from immutable upstream source, not an AUR download.
+pkgname=sentencepiece
+pkgver=0.2.1
+pkgrel=2
+pkgdesc='Unsupervised text tokenizer (pinned local VOCO dependency build)'
+arch=('x86_64')
+url='https://github.com/google/sentencepiece'
+license=('Apache-2.0')
+depends=('glibc' 'gcc-libs')
+makedepends=('cmake')
+source=('sentencepiece-31646a467d2051eb904e0b45de3a73e91fe1c1e3.tar.gz::https://codeload.github.com/google/sentencepiece/tar.gz/31646a467d2051eb904e0b45de3a73e91fe1c1e3')
+sha256sums=('b4eb17e6bea5c9380ddd79d04d01d6aa5e280be8f3e3cef1f745a80e6d9451ce')
+options=('!debug')
+build() {
+  cmake -S "$srcdir/sentencepiece-31646a467d2051eb904e0b45de3a73e91fe1c1e3" -B build \
+    -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr \
+    -DSPM_ENABLE_SHARED=ON -DSPM_ENABLE_TCMALLOC=OFF -DSPM_BUILD_TEST=ON
+  cmake --build build --parallel 4
+}
+check() {
+  ctest --test-dir build --output-on-failure --no-tests=error
+}
+package() {
+  DESTDIR="$pkgdir" cmake --install build
+  install -Dm644 "$srcdir/sentencepiece-31646a467d2051eb904e0b45de3a73e91fe1c1e3/LICENSE" "$pkgdir/usr/share/licenses/sentencepiece/LICENSE"
+}

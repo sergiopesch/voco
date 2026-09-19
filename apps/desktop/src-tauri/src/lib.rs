@@ -25,6 +25,13 @@ mod shortcut_readiness;
 mod single_instance;
 pub mod transcribe;
 mod trigger_socket;
+
+/// Request one toggle from the running application without launching a window.
+pub fn toggle_running_application() -> Result<(), String> {
+    trigger_socket::toggle().map_err(|error| {
+        format!("Could not reach VOCO's private control socket: {error}. Open VOCO in this desktop session first.")
+    })
+}
 pub use transcribe::{hybrid, numerical_planner, vca2};
 mod tray;
 
