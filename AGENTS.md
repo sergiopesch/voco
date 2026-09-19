@@ -42,6 +42,10 @@ glib 0.20 directly leaves the GTK dependency behind. [Backport](vendor/glib/VOCO
 - Flush Stop audio into the same live stream before finish; do not copy/replay a
   whole recording. Recover a dead worker only at a safe session boundary.
 - Keep bounded queues, deadlines, sequence/sample accounting and recovery.
+- Unverified ScriptProcessor fallback cannot enter automatic NVIDIA delivery.
+- Explicit NVIDIA recovery uses `recover_stream` and the bundled runtime, with no
+  destination callback or Whisper fallback. Preserve source samples/rate; publish
+  only a completed result. Cancel keeps audio and stale cleanup is session-bound.
 - Legacy ydotool requires a literal space argument, not `space`. Its paste delay
   is 24 ms; modern numeric arguments and terminal gestures have separate contracts.
 - X11 shortcut scope belongs to the exact focus window, UUID and renderer epoch
@@ -88,6 +92,12 @@ speech into a live user session. Python worker tests require NumPy and psutil;
 protocol tests also require the pinned model/runtime. Record unavailable checks
 as unavailable, never passed. Preserve failures and attempted-trial denominators.
 
+For optimization work follow [the TypeSafe evaluation protocol](docs/testing/typesafe-evaluation.md).
+Keep deterministic timing/accuracy separate from optional semantic judgments. The
+TypeSafe client is research tooling only: explicit public/synthetic text, never
+personal speech or live delivery. Preserve baseline/candidate identities, missing
+measurements and rejected experiments; run `npm run test:dictation-evaluation`.
+
 Source excludes model weights and compiled runtime payloads. Follow
 [runtime provisioning](docs/linux-packaging.md#runtime-provisioning); never replace
 missing pinned artifacts with mutable downloads. A base Tauri `.deb` is incomplete:
@@ -98,10 +108,11 @@ isolation, not a remote VM or proof of a distribution's default desktop.
 
 ## Release and evidence
 
-Current public release: **2026.0.39**, glib iterator safety backport. This source is
-the **2026.0.40** candidate, not a public cut. The `.38` and `.37` cuts
-are frozen historical evidence. New product bytes need a new version, fresh checks
-and artifact receipts; do not reuse an older result as current qualification.
+Release version: **2026.0.42**, combining capture/recovery reliability and the
+public evaluation guide. Publication status is authoritative on GitHub Releases;
+a version in source alone is not proof of a published or installed package.
+Frozen .39 and earlier cuts remain immutable. New product bytes need a new version,
+fresh checks and artifact receipts.
 
 Pass all CI gates, including Whisper accuracy. No waiver is authorized. Keep a
 clean commit, exact package/source hashes, licenses, checksums and release notes.

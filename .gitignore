@@ -60,3 +60,7 @@ runtime/speech/*.so
 
 # Also ignore a reused dependency-directory symlink.
 node_modules
+
+# Real-worker protocol receipts belong in external evidence directories.
+runtime/speech/worker-protocol*.json
+runtime/speech/worker-protocol.stderr

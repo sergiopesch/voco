@@ -5,7 +5,7 @@
 
 Speak. Your words appear at the cursor.
 
-I’m building VOCO to make dictation on Linux fast, simple and private. Speech
+VOCO makes dictation on Linux simple and private. Speech
 recognition runs on your computer. No account, subscription or cloud transcription.
 
 - **Live dictation:** words and punctuation appear as you speak.
@@ -25,12 +25,13 @@ sudo apt install ./voco_latest_amd64.deb
 
 Run the install command only if checksum verification passes.
 Checksums detect a damaged or swapped file. They do not prove who published it.
-The current public tag is unsigned. When a release includes `*.asc` and `KEYS`,
-verify publisher identity with `bash scripts/verify-release.sh voco_latest_checksums.txt`.
+Release 2026.0.42 provides a signed tag and detached checksum signatures. Verify
+them with `bash scripts/verify-release.sh voco_latest_checksums.txt` after checking
+the key fingerprint through a trusted independent channel.
 Ubuntu x86_64 is the reference platform. See the [installation guide](docs/install.md)
 for setup, upgrades, source builds and Linux compatibility.
-The current public download is 2026.0.39.
-[Release status](docs/release-candidate.md) records later private candidates separately.
+The latest release is 2026.0.42.
+[Release notes](docs/releases/2026.0.42.md) describe changes and tested scope.
 
 ## Dictate anywhere you type
 

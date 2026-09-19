@@ -1,32 +1,28 @@
 # Release status
 
-**2026.0.39 is the current public release.** It backports the upstream glib
-iterator safety fix while retaining VOCO's dictation-only UI, NVIDIA English
-model and streaming cursor delivery.
+**2026.0.42** combines safer capture admission, explicit offline NVIDIA recovery,
+maintainability and dependency updates, and the public TypeSafe evaluation guide.
 
-- [GitHub release](https://github.com/sergiopesch/voco/releases/tag/voco.2026.0.39)
-- Source tag: `voco.2026.0.39` (`fb957ff052547c24be92265b6b5343a4c29aff4b`)
-- [Release record](releases/2026.0.39.md)
+- [Release and assets](https://github.com/sergiopesch/voco/releases/tag/voco.2026.0.42)
+- [Changes and qualification scope](releases/2026.0.42.md)
+- [Installation and signature verification](install.md)
 
-The Debian package is amd64. The tag is unsigned and must stay that way.
-Checksums verify file integrity; they are not a publisher signature. Isolated delivery tests do not
-prove every Linux desktop, compositor or application.
+Only a published GitHub release establishes availability; source version metadata
+or a draft does not. The Debian amd64 package is the supported delivery format.
+No changes to the speech model, context setting or thread default are promoted
+from the small TypeSafe experiments.
 
-**2026.0.40 is the next private candidate.** This tree versions the live-preview
-and Stop-tail extract already on master, refreshes leaf npm/cargo dependencies,
-and updates Tauri 2.11.1 / wry 0.55.1 / serde_with 3.23.0 on the vendored glib
-0.18.5 patch, with React and react-dom kept at the same 19.3.0 version. It is
-not a public download.
-Sign only this cut (`git tag -s` and checksum `.asc`); never retag 0.39.
+## Release boundaries
 
-## Hosted builds
+2026.0.39 remains available for rollback. Its unsigned tag and frozen artifacts
+must never be moved or replaced. The .40 and .41 versions were development
+milestones; .42 is the combined release.
 
-The GitHub Actions Release workflow must not assemble or publish NVIDIA
-installers. Public 2026.0.39 used verified local artifacts. Do not re-enable
-hosted installer publication until portable pinned NVIDIA provisioning is
-verified from a fresh clone. See [release process](release-process.md).
-
-## Later work
+The hosted GitHub Release workflow stays disabled. Maintainers build and verify
+complete local NVIDIA packages, then upload exact artifacts under the
+[release process](release-process.md). Checksums establish integrity; signed tags
+and checksum files additionally bind them to the stated signing key.
 
 GTK 0.18, WebKit2GTK 2.0 and the single patched glib 0.18.5 copy stay in place.
-Frozen 2026.0.39, 2026.0.38 and 2026.0.37 cuts remain historical.
+Userspace fixtures are not certification of every compositor, physical microphone
+or application. Known limitations remain explicit in the release notes.

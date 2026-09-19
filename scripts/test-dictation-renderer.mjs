@@ -138,6 +138,14 @@ await page.addInitScript(() => {
  window.benchmarkRequests = [];
  window.benchmarkAudioSamples = 0;
  window.__TAURI_INTERNALS__ = {invoke: async (command, {request}) => {
+   if(command === 'recover_stream') {
+     (window.recoveryRequests ??= []).push(request);
+     if(request.op === 'push' && window.deferRecovery) {
+       await new Promise(resolve => window.resolveRecovery = resolve);
+     }
+     if(window.failRecovery && request.op === 'push') throw new Error('Synthetic recovery worker failure');
+     return {session:request.session,seq:request.seq,mode:'append-only',text:request.op==='finish'?'Recovered with bundled NVIDIA.':null};
+   }
    if(command !== 'benchmark_stream') throw new Error('Unexpected native command: ' + command);
    window.benchmarkRequests.push(request);
    if(request.op === 'warmup' || request.op === 'diagnostic') return {};
@@ -172,7 +180,7 @@ await page.addInitScript(() => {
  Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async(text)=>{window.copiedText=text;}}});
  class AudioNode { connect(){} disconnect(){this.disconnected=true;} }
  window.AudioContext = class { constructor(){window.contexts.push(this);} sampleRate=16000; state='running'; destination={}; audioWorklet={addModule:async()=>{if(window.failWorkletModule) throw new Error('Synthetic worklet startup failure');}}; createMediaStreamSource(){return new AudioNode();} createGain(){return Object.assign(new AudioNode(),{gain:{value:0}});} createScriptProcessor(){const processor = new AudioNode(); window.processor=processor; return processor;} close(){this.state='closed'; return Promise.resolve();} resume(){return Promise.resolve();} };
- window.AudioWorkletNode = class extends AudioNode { constructor(){super();window.captureWorklet=this;this.port={onmessage:null,postMessage:()=>queueMicrotask(()=>this.port.onmessage?.({data:{type:'flushed',complete:true}})),close(){this.closed=true;}};} };
+ window.AudioWorkletNode = class extends AudioNode { constructor(){super();if(window.failWorkletConstruction) throw new Error('Synthetic worklet construction failure');window.captureWorklet=this;this.port={onmessage:null,postMessage:()=>queueMicrotask(()=>this.port.onmessage?.({data:{type:'flushed',complete:true}})),close(){this.closed=true;}};} };
  window.captureReady = () => Boolean(window.captureWorklet?.port.onmessage || window.processor?.onaudioprocess);
  window.samples = seconds => {const audio = Float32Array.from({length:Math.floor(16000*seconds)},(_,i)=>Math.sin(i/20)*0.2); if(window.captureWorklet?.port.onmessage) window.captureWorklet.port.onmessage({data:{type:'samples',data:audio}}); else window.processor.onaudioprocess({inputBuffer:{getChannelData:()=>audio}});};
 });
@@ -315,6 +323,64 @@ async function gapCases() {
 }
 await gapCases();
 if (!gapOnly) {
+// Default NVIDIA route must honor the same capture-completeness policy.
+for (const failure of ['module', 'construction']) {
+  await load();
+  await page.evaluate(failure=>{
+    window.desktopPaste=true;window.desktopStream=true;
+    window.failWorkletModule=failure==='module';window.failWorkletConstruction=failure==='construction';
+  },failure);
+  await start(1);
+  assert.equal(await page.evaluate(()=>Boolean(window.processor?.onaudioprocess)),true);
+  assert.equal(await page.evaluate(()=>window.benchmarkRequests.some(r=>['start','push'].includes(r.op))),false);
+  assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>c[0]==='pasteDesktopText')),false);
+  await stop();await recovered();
+  assert.equal(await page.evaluate(()=>window.store.getState().recovery.audioAvailable),true);
+  assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>['transcribeAudio','pasteDesktopText'].includes(c[0]))),false);
+  await page.getByRole('button',{name:'Retry transcription',exact:true}).click();
+  await page.waitForFunction(()=>window.store.getState().recovery?.audioAvailable===false);
+  assert.equal(await page.evaluate(()=>window.store.getState().transcript),'Recovered with bundled NVIDIA.');
+  assert.match(await page.evaluate(()=>window.store.getState().recovery.reason),/bundled NVIDIA/);
+  assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>['transcribeAudio','pasteDesktopText'].includes(c[0]))),false);
+  assert.equal(await page.evaluate(()=>window.recoveryRequests.filter(r=>r.op==='push').reduce((n,r)=>n+r.audio.length,0)),16000);
+  assert.match(await page.evaluate(()=>window.store.getState().captureNotice),/could not be confirmed/);
+  results.push(`NVIDIA ${failure} fallback retains source without automatic inference or paste; explicit local recovery never calls Whisper or delivers.`);
+}
+
+await load();await page.evaluate(()=>{window.desktopPaste=true;window.desktopStream=true;window.failWorkletModule=true;});
+await start(1);await stop();await recovered();
+await page.evaluate(()=>{window.deferRecovery=true;});
+await page.getByRole('button',{name:'Retry transcription',exact:true}).click();
+await page.waitForFunction(()=>Boolean(window.resolveRecovery));
+await page.getByRole('button',{name:'Cancel dictation',exact:true}).click();
+await page.waitForFunction(()=>window.store.getState().status==='error' && !window.store.getState().recovery.retrying);
+assert.equal(await page.evaluate(()=>window.store.getState().recovery.audioAvailable),true);
+const firstRecovery=await page.evaluate(()=>window.recoveryRequests[0].session);
+await page.getByRole('button',{name:'Retry transcription',exact:true}).click();
+assert.equal(await page.evaluate(()=>window.recoveryRequests.filter(r=>r.op==='start').length),1);
+await page.evaluate(()=>{window.deferRecovery=false;window.failRecovery=true;window.resolveRecovery();});
+await page.waitForFunction(()=>window.recoveryRequests.filter(r=>r.op==='start').length===2 && !window.store.getState().recovery.retrying);
+assert.equal(await page.evaluate(()=>window.store.getState().recovery.audioAvailable),true);
+assert.equal(await page.evaluate(()=>window.store.getState().transcript),'');
+await page.evaluate(()=>{window.failRecovery=false;});
+await page.getByRole('button',{name:'Retry transcription',exact:true}).click();
+await page.waitForFunction(()=>window.store.getState().recovery?.audioAvailable===false);
+assert.notEqual(await page.evaluate(()=>window.recoveryRequests.filter(r=>r.op==='start').at(-1).session),firstRecovery);
+assert.equal(await page.evaluate(()=>window.store.getState().transcript),'Recovered with bundled NVIDIA.');
+assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>['transcribeAudio','pasteDesktopText'].includes(c[0]))),false);
+results.push('NVIDIA recovery cancels promptly, waits for old cleanup, preserves audio through worker failure and succeeds on explicit retry without insertion.');
+
+await load();await page.evaluate(()=>{window.desktopPaste=true;window.desktopStream=true;window.failWorkletModule=true;});
+await start(1);await stop();await recovered();
+await page.evaluate(()=>{window.deferRecovery=true;});
+await page.getByRole('button',{name:'Retry transcription',exact:true}).click();
+await page.waitForFunction(()=>Boolean(window.resolveRecovery));
+await page.evaluate(()=>{window.reactRoot.unmount();window.store.getState().setTranscript('Replacement state');window.deferRecovery=false;window.resolveRecovery();});
+await page.waitForFunction(()=>window.recoveryRequests.some(r=>r.op==='cancel'));
+assert.equal(await page.evaluate(()=>window.store.getState().transcript),'Replacement state');
+assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>c[0]==='pasteDesktopText')),false);
+results.push('Unmount cancels the recovery worker and suppresses a late transcript.');
+
 for (const canonical of [false, true]) {
   await load();
   await page.evaluate(canonical=>{window.failWorkletModule=true;window.captureInferenceAudio=true;window.lease=true;if(canonical) window.store.getState().setConfig({...window.store.getState().config,liveCursorMode:'stable-cursor-streaming'});},canonical);
@@ -390,7 +456,7 @@ await page.getByText('Waiting for the previous local operation to finish. Cancel
 await page.getByRole('button',{name:'Cancel dictation',exact:true}).click();
 await page.waitForFunction(()=>window.store.getState().status==='error' && !window.store.getState().recovery.retrying);
 const cancelledWaitRecovery = await page.evaluate(()=>JSON.stringify(window.store.getState().recovery));
-assert.match(cancelledWaitRecovery,/waiting cancelled/i);
+assert.match(cancelledWaitRecovery,/Recovery cancelled/i);
 assert.equal(await page.evaluate(()=>window.store.getState().recovery.audioAvailable),true);
 assert.match(await page.evaluate(()=>window.store.getState().captureNotice),/end of this recording could not be confirmed/i);
 await page.evaluate(()=>{window.deferCanonical=false;window.resolveCanonical();});
@@ -494,6 +560,19 @@ assert.equal(admissionEvents.filter(e=>e==='dictation_trigger_stop_admitted').le
 assert.equal(admissionEvents.filter(e=>e==='dictation_trigger_start_rejected').length,1);
 assert.equal(admissionEvents.filter(e=>e==='dictation_trigger_stop_rejected').length,2);
 results.push('Directed browser events preserve action: duplicate starts and foreign stops cannot toggle; a late matching stop cannot start another recording.');
+for (const rate of [96001,176400,192000,384000]) {
+  await load();
+  await page.evaluate(rate => {
+    const Base=window.AudioContext;
+    window.AudioContext=class extends Base {sampleRate=rate;};
+    window.hook.toggle();
+  },rate);
+  await page.waitForFunction(()=>window.store.getState().status==='error');
+  assert.equal(await page.evaluate(()=>window.captureReady()),false);
+  assert.equal(await page.evaluate(()=>window.benchmarkRequests.some(r=>['start','push','finish'].includes(r.op))),false);
+  assert.equal(await page.evaluate(()=>window.traceEvents.some(c=>c[0]==='recording_state_active')),false);
+  results.push(`Unsupported ${rate} Hz is rejected before recording, worker delivery or audio graph admission.`);
+}
 for (const failureStage of ['audio-context', 'microphone-after-claim']) {
   await load();
   await page.evaluate(stage => {
@@ -922,6 +1001,15 @@ await page.evaluate(()=>window.samples(1));await stop();await page.waitForFuncti
 assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length),1);
 assert.equal(await page.evaluate(()=>window.store.getState().recovery.targetMayContainText),true);
 results.push('Uncertain progressive paste retains text/audio and never sends queued phrases or a final duplicate.');
+await page.getByRole('button',{name:'Retry transcription',exact:true}).click();
+await page.waitForFunction(()=>window.store.getState().recovery?.audioAvailable===false);
+assert.equal(await page.evaluate(()=>window.store.getState().transcript),'Recovered with bundled NVIDIA.');
+assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length),1);
+assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>c[0]==='transcribeAudio')),false);
+assert.equal(await page.evaluate(()=>window.recoveryRequests.filter(r=>r.op==='push').reduce((n,r)=>n+r.audio.length,0)),48000);
+assert.equal(await page.evaluate(()=>window.store.getState().captureNotice),null,'Successful recovery must remove the obsolete Stop recording prompt');
+results.push('Recovery after uncertain NVIDIA paste uses all retained source with the bundled recognizer and does not resend any target text.');
+
 
 await load(); await page.evaluate(()=>{window.desktopPaste=true;window.desktopStream=true;window.streamTextAt=[];window.streamFinalText='Exact captured samples.';});
 await start(0);

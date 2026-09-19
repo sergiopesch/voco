@@ -2,6 +2,8 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Use the actual GGML option; the old WHISPER_NATIVE=OFF alias is ineffective.
+export CMAKE_PROJECT_INCLUDE="${ROOT_DIR}/packaging/cmake/portable-cpu.cmake"
 APP_DIR="${ROOT_DIR}/apps/desktop"
 FEATURES="custom-protocol"
 case "${1:-}" in
@@ -14,6 +16,9 @@ if (( $# > 1 )); then
   exit 2
 fi
 python3 "${ROOT_DIR}/vendor/verify.py"
+# Arbitrary CMake changes are not tracked by the pinned wrapper. Rebuild only
+# its release objects so cached host-native code cannot enter this package.
+cargo clean --manifest-path "${APP_DIR}/src-tauri/Cargo.toml" --release -p whisper-rs-sys
 # The browser host links the application library, whose Tauri context embeds
 # frontend assets even before the later bundle command runs. Support clean trees.
 npm --prefix "${APP_DIR}" run build:frontend

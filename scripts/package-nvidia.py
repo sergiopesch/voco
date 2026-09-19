@@ -119,7 +119,7 @@ def main():
         speech.mkdir(parents=True)
         source = ROOT / "runtime/speech"
         for name in ("stream_worker.py", "worker_main.py", "streaming.py", "adapters.py",
-                     "MODEL-IDENTITY.json", "libbench_nemo_pool.so"):
+                     "MODEL-IDENTITY.json", "NATIVE-BUILD.json", "libbench_nemo_pool.so"):
             shutil.copy2(source / name, speech / name)
         for name in ("lib", "models"):
             shutil.copytree(source / name, speech / name, symlinks=True)
@@ -133,7 +133,8 @@ def main():
             shutil.copy2(ROOT / "scripts" / name, doc / name)
         for name in ("README.md", "AGENTS.md"):
             shutil.copy2(ROOT / name, doc / name)
-        shutil.copytree(ROOT / "docs", doc / "docs", dirs_exist_ok=True)
+        shutil.copytree(ROOT / "docs", doc / "docs", dirs_exist_ok=True,
+                        ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
         copy_vendored_notices(ROOT, doc)
         identity = {"version": package_version, "application_version": version,
                     "backend": "CPU native pool", "context": 1, "cpu_threads": 4,

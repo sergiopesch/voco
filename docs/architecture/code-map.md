@@ -18,7 +18,8 @@ keeps its separate Whisper preparation. See [startup](README.md#startup-and-reco
    `src/store/useStore.ts` represents preferences and visible state; it does not
    own native input authority.
 2. `src/hooks/useDictation.ts` admits a start/stop and wires capture, preview and
-   recovery. Start/Stop/Cancel and shortcut-session boundaries live in
+   recovery. Capture admission prevents automatic NVIDIA delivery when only unverified
+   ScriptProcessor input is available. Start/Stop/Cancel and shortcut-session boundaries live in
    `src/lib/dictationRecording.ts`; live-preview timer/canonical-pump ownership lives in
    `src/lib/livePreviewSchedule.ts`; frozen-snapshot decode and cursor update live in
    `src/lib/livePreviewRunner.ts`; append-only Stop-tail accounting lives in
@@ -46,7 +47,10 @@ keeps its separate Whisper preparation. See [startup](README.md#startup-and-reco
    not proof that a recipient displayed the text.
 7. At Stop, the hook drains capture, forwards only retained samples not yet offered
    to the queue, then finishes recognition and pending delivery. Retained audio
-   supports recovery. Cancelled or old callbacks cannot update a replacement session.
+   supports recovery. `nvidiaRecovery.ts` submits explicit NVIDIA retries through
+   `recover_stream`, a private worker lifetime with no delivery callback. It keeps
+   the source rate/samples, publishes only the final result, and releases the worker
+   on finish, failure or cancellation; late cancellation cannot release a replacement. Cancelled or old callbacks cannot update a replacement session.
 
 Paths in steps 2–7 are relative to `apps/desktop` unless prefixed with `runtime/`.
 See [architecture](README.md) and [delivery observation](../testing/delivery-observation.md)
@@ -63,7 +67,7 @@ for measurement and recipient limitations.
 | Live preview decode | `src/lib/livePreviewRunner.ts` | Frozen-snapshot decode, geometry checks and owned-preedit cursor update. Token invalidation must not enqueue stale native work. |
 | Desktop capture tail | `src/lib/desktopCaptureTail.ts` | Append-only sample accounting and Stop-tail forwarding into the NVIDIA queue. Do not recopy an already streamed recording. |
 | Speech runtime | `runtime/speech/` | Selected pinned CPU runtime, bounded local protocol, content-free metrics. Model/native artifacts are provisioned separately from Git. |
-| Legacy/canonical recognition | `src-tauri/src/transcribe.rs`, `transcribe_corroboration.rs`; frontend canonical/checkpoint helpers | Separate Whisper and recovery behavior with its own quality gates; not an extra pass on every NVIDIA chunk. |
+| Legacy/canonical recognition | `src-tauri/src/transcribe.rs`, `transcribe_corroboration.rs`; frontend canonical/checkpoint helpers | Separate Whisper/browser recovery behavior with its own quality gates; not an extra pass on every NVIDIA chunk. |
 | Input/focus | `src-tauri/src/insertion.rs`, `focus_probe.rs`, `resources/voco_desktop_target.py` | Desktop-specific compatibility, fresh preflight checks, bounded observation, no uncertain automatic retry. |
 | Shortcuts | `src-tauri/src/hotkey_state.rs`, `shortcut_arbitration.rs`, `shortcut_readiness.rs`, `owned_preedit.rs` and IBus resources | Admit one trigger. The optional IBus component does not authorize generic text mutation or switch the owner's input source. |
 | Shortcut arbitration | `src-tauri/src/shortcut_arbitration.rs`; registration/readiness and `suppress_passive_shortcut` in `lib.rs` | Completed IBus authority controls registration. Passive evdev also guards pending polls; an already-consuming X11 callback keeps shared debounce without that passive suppression. |

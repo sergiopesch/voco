@@ -1,4 +1,5 @@
 import {BenchmarkPhraseQueue} from '../lib/benchmarkPhraseQueue';
+import { NvidiaRecovery } from "@/lib/nvidiaRecovery";
 import { DesktopShortcutSession } from "@/lib/desktopShortcutSession";
 import { retainedSampleRate, type CaptureDescriptor, type CaptureSelection } from "@/lib/captureDescriptor";
 import { beginNativeCapture, type NativeCaptureSession } from "@/lib/nativeCapture";
@@ -59,7 +60,7 @@ import {
 } from "@/lib/dictationSession";
 import type { DictationPreviewToken } from "@/lib/dictationSession";
 import { monitorCaptureHealth } from "@/lib/captureHealth";
-import { errorMessage, resumeCanonicalForRecovery } from "@/lib/dictationRecovery";
+import { errorMessage, LIVE_DELIVERY_PAUSED, resumeCanonicalForRecovery } from "@/lib/dictationRecovery";
 import { admitsDictationTrigger, type DictationTriggerAction } from "@/lib/dictationTrigger";
 import {
   LIVE_PREVIEW_MIN_INTERVAL_MS,
@@ -171,6 +172,7 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
   const lifecycleEpochRef = useRef(0);
   const cancelledRef = useRef<string | null>(null);
   const recoveryWaitRef = useRef<{ cancel: () => void } | null>(null);
+  const nvidiaRecoveryRef = useRef<NvidiaRecovery | null>(null);
   const captureHealthRef = useRef<ReturnType<typeof monitorCaptureHealth> | null>(null);
   const recoveryAudioRef = useRef<Float32Array | null>(null);
   const recoverySessionIdRef = useRef<string | null>(null);
@@ -1859,20 +1861,27 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
     setCanCancel(true);
     setCancellationPending(false);
     setInterimTranscript("Waiting for the previous local operation to finish...");
-    // Cancelling this attempt never cancels native work. Every subsequent Retry
-    // still waits for the same pending operations before reopening output.
+    // Cancellation cannot interrupt an outstanding native request. A subsequent
+    // Retry waits for that request and its private recovery worker cleanup.
+    let nativeRecovery: NvidiaRecovery | null = null;
     let cancelWait: () => void = () => {};
-    const cancelled = new Promise<false>((resolve) => { cancelWait = () => resolve(false); });
+    const cancelled = new Promise<false>((resolve) => {
+      cancelWait = () => { nativeRecovery?.cancel(); resolve(false); };
+    });
     const attempt = { cancel: cancelWait };
     recoveryWaitRef.current = attempt;
     const settled = Promise.all([
       canonicalCheckpointInFlightRef.current?.catch(() => {}),
       livePreviewInFlightRef.current?.catch(() => {}),
       waitForLiveCursorInsertion(),
+      nvidiaRecoveryRef.current?.settled(),
     ]).then(() => true);
     const ready = await Promise.race([settled, cancelled]);
     if (!ready || recoveryWaitRef.current !== attempt || !isCurrentSession(recoverySessionId)) return;
-    recoveryWaitRef.current = null;
+    // Keep the cancellation token throughout NVIDIA recovery. Cancelling returns
+    // the UI immediately; the next Retry waits for its private worker cleanup.
+    const useNvidia = desktopStreamEnabledRef.current;
+    if (!useNvidia) recoveryWaitRef.current = null;
     useStore.getState().setRecovery({ ...recovery, retrying: true,
       reason: "Recovering the audio received locally. The result will stay in VOCO.",
     });
@@ -1884,7 +1893,17 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
     setInterimTranscript("Recovering transcription locally. The result will stay in VOCO.");
     try {
       let transcript: string;
-      if (canonicalSessionRef.current) {
+      if (useNvidia) {
+        nativeRecovery = new NvidiaRecovery();
+        nvidiaRecoveryRef.current = nativeRecovery;
+        const audio = collectAudioSamplesRange(audioBufferRef.current, 0, audioBufferRef.current.sampleCount);
+        const result = await Promise.race([
+          nativeRecovery.transcribe(audio, recordingSampleRate()).then(text => ({ text })),
+          cancelled,
+        ]);
+        if (result === false || recoveryWaitRef.current !== attempt || !isCurrentSession(recoverySessionId)) return;
+        transcript = result.text;
+      } else if (canonicalSessionRef.current) {
         canonicalSessionRef.current = resumeCanonicalForRecovery(canonicalSessionRef.current);
         const result = await transcribeCanonicalRemainderAtStop(audioBufferRef.current.sampleCount);
         transcript = result.transcript;
@@ -1903,11 +1922,18 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
       assertOutputAllowed(recoverySessionId);
       useStore.getState().setRawTranscript(transcript);
       setTranscript(transcript || "(no speech detected)");
-      retainRecovery("Recovered locally. Review any text already in the target, then copy the text you need. Nothing was inserted automatically.", false);
+      // Remove the completed action prompt, preserving capture/tail uncertainty.
+      if (useStore.getState().captureNotice === LIVE_DELIVERY_PAUSED) {
+        useStore.getState().setCaptureNotice(null);
+      }
+      retainRecovery(`Recovered locally${useNvidia ? " with the bundled NVIDIA model" : " with Whisper"}. Review any text already in the target, then copy the text you need. Nothing was inserted automatically.`, false);
       finalizeIdleState();
     } catch (error) {
       if (!isCurrentSession(recoverySessionId)) return;
+      if (useNvidia && recoveryWaitRef.current !== attempt) return;
       retainRecovery(cancelledRef.current ?? `Recovery transcription failed: ${errorMessage(error)}`);
+    } finally {
+      if (recoveryWaitRef.current === attempt) recoveryWaitRef.current = null;
     }
   }
 

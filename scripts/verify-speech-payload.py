@@ -27,7 +27,7 @@ def verify(root, version):
     if manifest["version"] != version:
         raise ValueError("Speech manifest version differs from package")
     required = {"stream_worker.py", "worker_main.py", "streaming.py", "adapters.py",
-                "MODEL-IDENTITY.json", "libbench_nemo_pool.so",
+                "MODEL-IDENTITY.json", "NATIVE-BUILD.json", "libbench_nemo_pool.so",
                 "models/nemotron-speech-streaming-en-0.6b.q8_0.gguf"}
     if not (required | NATIVE_FILES).issubset(manifest["files"]):
         raise ValueError("Incomplete speech runtime manifest")
@@ -52,6 +52,13 @@ def verify(root, version):
     model = "models/nemotron-speech-streaming-en-0.6b.q8_0.gguf"
     if manifest["files"][model] != identity["model_sha256"]:
         raise ValueError("Model identity differs from payload")
+    native = json.loads((speech / "NATIVE-BUILD.json").read_text())
+    if set(native["files"]) != NATIVE_FILES | {"libbench_nemo_pool.so"}:
+        raise ValueError("Native build inventory is incomplete")
+    if any(manifest["files"].get(name) != sha for name, sha in native["files"].items()):
+        raise ValueError("Native build identity differs from payload")
+    if native["symlinks"] != NATIVE_LINKS:
+        raise ValueError("Native build link identity differs from payload")
     return {"files": len(actual_files), "symlinks": len(actual_links), "version": version}
 
 

@@ -16,6 +16,7 @@ concurrency:
 jobs:
   code-guide:
     name: Code Guide
+    timeout-minutes: 10
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
@@ -30,6 +31,7 @@ jobs:
 
   rust-security:
     name: RustSec Audit
+    timeout-minutes: 20
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
@@ -48,6 +50,7 @@ jobs:
 
   check:
     name: Frontend Checks
+    timeout-minutes: 30
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
@@ -145,6 +148,7 @@ jobs:
 
   rust:
     name: Rust Check & Test
+    timeout-minutes: 60
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6

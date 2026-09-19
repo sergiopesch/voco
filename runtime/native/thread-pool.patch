@@ -1,0 +1,87 @@
+--- a/src/runtime/ggml/backend.cpp
++++ b/src/runtime/ggml/backend.cpp
+@@ -7,11 +7,28 @@
+ #include <algorithm>
+ #include <cstdlib>
+ #include <mutex>
++#include <ggml-cpu.h>
+ 
+ #include "model_logging.h"
+ #include "runtime.h"
+ 
+ namespace ggml_runtime {
++
++// Explicit experiment setting; default remains the upstream four threads.
++int cpu_threads() {
++    static const int value = [] {
++        const char* raw = std::getenv("NEMO_SPEECH_CPU_THREADS");
++        if (!raw) return 4;
++        char* end = nullptr;
++        const long parsed = std::strtol(raw, &end, 10);
++        if (end == raw || *end != '\0' || parsed < 1 || parsed > 16)
++            throw std::invalid_argument("NEMO_SPEECH_CPU_THREADS must be between 1 and 16");
++        return static_cast<int>(parsed);
++    }();
++    return value;
++}
++
++
+ 
+ BackendManager::BackendManager(Params params) {
+     nemo_speech::common::ensure_ggml_logging();
+@@ -121,6 +138,15 @@
+     }
+     GGMLF_LOG_INFO("Using CPU backend\n");
+     backends.emplace_back(backend_cpu);
++    // Sessions sharing this manager serialize compute. The pool is owned by the
++    // manager and outlives all backend handles; no global pool or cross-model reuse.
++    if (std::getenv("NEMO_SPEECH_DISABLE_POOL") == nullptr) {
++        auto pool_params = ggml_threadpool_params_default(cpu_threads());
++        pool_params.poll = 0; // sleep between graphs instead of burning idle CPU
++        cpu_threadpool_.reset(ggml_threadpool_new(&pool_params), ggml_threadpool_free);
++        if (!cpu_threadpool_) throw std::runtime_error("CPU thread pool creation failed");
++        ggml_backend_cpu_set_threadpool(backend_cpu, cpu_threadpool_.get());
++    }
+ 
+     auto* cpu_dev = ggml_backend_dev_by_type(GGML_BACKEND_DEVICE_TYPE_CPU);
+     auto* cpu_reg = ggml_backend_dev_backend_reg(cpu_dev);
+--- a/src/runtime/ggml/runtime.h
++++ b/src/runtime/ggml/runtime.h
+@@ -171,6 +171,8 @@
+     char* pe_bin_path = nullptr;
+ };
+ 
++int cpu_threads();
++
+ // Owns ggml backend handles shared by one or more Sessions.
+ class BackendManager {
+    public:
+@@ -203,6 +205,8 @@
+    private:
+     Params params;
+     ggml_backend_t borrowed_gpu_backend_ = nullptr;
++    // Members are destroyed in reverse order: backends release before this pool.
++    std::shared_ptr<ggml_threadpool> cpu_threadpool_;
+     std::vector<ggml_backend_ptr> backends;
+     // Non-owning alias into `backends`.
+     ggml_backend_t gpu_backend = nullptr;
+--- a/src/runtime/ggml/session.cpp
++++ b/src/runtime/ggml/session.cpp
+@@ -6,6 +6,8 @@
+ // Licensed under the MIT License. See THIRD_PARTY_NOTICES.md.
+ #include <algorithm>
+ #include <chrono>
++#include <cstdlib>
++#include <stdexcept>
+ #include <mutex>
+ #include <unordered_set>
+ 
+@@ -908,7 +910,7 @@
+         }
+ 
+         auto _t2 = _clk::now();
+-        if (!ggml_graph_compute_helper_async(sched.get(), cr.gf, 4)) {
++        if (!ggml_graph_compute_helper_async(sched.get(), cr.gf, cpu_threads())) {
+             GGMLF_LOG_ERROR("Failed to compute graph\n");
+             throw std::runtime_error("failed to compute graph");
+         }

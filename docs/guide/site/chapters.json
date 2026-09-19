@@ -37,7 +37,7 @@
       },
       {
         "title": "The current route",
-        "text": "The selected .39 product uses NVIDIA Nemotron English 0.6B Q8 on the CPU. Names containing benchmark in the streaming code are historical; they do real production work."
+        "text": "VOCO 2026.0.42 uses NVIDIA Nemotron English 0.6B Q8 on the CPU. Names containing benchmark in the streaming code are historical; they do real production work."
       },
       {
         "title": "Keep the boundary clear",
@@ -58,7 +58,7 @@
         "why": "Starts the selected local speech worker."
       }
     ],
-    "caution": "This guide describes the pinned 2026.0.39 source. It does not promise every Linux app or compositor accepts delivery.",
+    "caution": "This guide describes a pinned 2026.0.42 source snapshot. It does not promise every Linux app or compositor accepts delivery.",
     "quiz": {
       "question": "Which part owns the text box you are dictating into?",
       "answers": [
@@ -691,7 +691,7 @@
     "intro": "A good helper says \u201cI\u2019m not sure\u201d instead of pretending the job is done.",
     "story": [
       "A microphone can disappear, a worker can stop, a window can change, or a paste can be uncertain.",
-      "VOCO keeps recovery explicit. It must not blindly retry text that may already have reached another app.",
+      "VOCO keeps recovery explicit. Retry transcribes retained normal-dictation audio with the bundled NVIDIA model, then offers the result for review and Copy. It does not paste it into another application.",
       "Retained audio or text belongs to the recording that produced it. An old error must not overwrite a new session\u2019s state."
     ],
     "steps": [
@@ -713,7 +713,7 @@
       },
       {
         "label": "Retry safely",
-        "detail": "Start a deliberate recovery or a new session."
+        "detail": "Recover locally, review the result and copy deliberately."
       }
     ],
     "facts": [
@@ -726,8 +726,8 @@
         "text": "States such as idle, starting, recording and processing make allowed transitions visible. They are more reliable than several unrelated booleans."
       },
       {
-        "title": "Retention is bounded",
-        "text": "Recovery support is not a promise to keep every recording forever. Follow the configured limits and explicit recovery workflow."
+        "title": "A separate recovery worker",
+        "text": "Recovery preserves the original sample rate and uses a bounded private worker. Cancel retains the audio, suppresses late results and cleans up that session; it cannot cancel a newer recovery or live dictation."
       }
     ],
     "files": [
@@ -740,8 +740,8 @@
         "why": "Keeps recording identity and lifecycle facts."
       },
       {
-        "path": "apps/desktop/src/lib/activityMode.ts",
-        "why": "Defines the activity-state helpers."
+        "path": "apps/desktop/src/lib/nvidiaRecovery.ts",
+        "why": "Runs explicit offline recovery without a destination callback."
       },
       {
         "path": "apps/desktop/src-tauri/src/benchmark_stream.rs",
@@ -1218,7 +1218,7 @@
         "why": "Documents release and acceptance gates."
       }
     ],
-    "caution": "The .39 release remains a candidate until its remaining acceptance/publication gates are met. This learning site does not publish the app.",
+    "caution": "Published releases are available on GitHub with versioned artifacts, checksums and documented test scope. This learning site does not publish or install the app.",
     "quiz": {
       "question": "Is a version string enough to prove two packages are identical?",
       "answers": [
@@ -1236,7 +1236,7 @@
     "intro": "You can build a bicycle with borrowed parts, but you still need to know which parts you fitted.",
     "story": [
       "A dependency is software that VOCO uses rather than rewriting. Vendored code is a copy kept in the repository.",
-      "The .39 source vendors glib 0.18.5 with a specific upstream iterator-safety fix. Other GTK/WebKit users must resolve to that same patched copy.",
+      "VOCO vendors glib 0.18.5 with a specific upstream iterator-safety fix. Other GTK/WebKit users must resolve to that same patched copy.",
       "A dependency name on a list is not enough. We need the actual resolved version, patch, license and tests."
     ],
     "steps": [
@@ -1379,5 +1379,195 @@
       "why": "Understanding ownership makes later changes safer and more focused."
     },
     "lab": "journey"
+  },
+  {
+    "id": "typesafe",
+    "title": "Measure before we optimize.",
+    "intro": "A quicker transcript is useful only if it keeps your words, meaning and punctuation intact.",
+    "story": [
+      "This chapter teaches the evaluation method used by VOCO contributors. The dated measurements were collected on the .41 development snapshot; the .42 release preserves its model and defaults. These experiments are not fresh .42 performance measurements.",
+      "A stopwatch and exact text comparison answer different questions from a language model. Code measures timing, word errors and delivery failures. TypeSafe judges whether a transcript preserves meaning.",
+      "We give Jev a public reference and a transcript, plus separate questions for meaning and consequential mistakes. Punctuation judgments need an audited reference. Personal dictation never enters this research service; VOCO itself remains local.",
+      "We challenge the judge before trusting it, freeze the speech fixtures, then run the same audio through baseline and candidate settings. We keep unsuccessful experiments because they explain why a tempting change was rejected."
+    ],
+    "steps": [
+      {
+        "label": "Define",
+        "detail": "Freeze timing boundaries, reference text, rubric and rejection rules before measuring."
+      },
+      {
+        "label": "Measure",
+        "detail": "Replay the same public audio and record timings, word errors and resources."
+      },
+      {
+        "label": "Judge",
+        "detail": "Ask TypeSafe narrow questions about meaning; retain probabilities and uncertainty."
+      },
+      {
+        "label": "Compare",
+        "detail": "Compare repeated trials and separate speakers. Missing evidence stays missing."
+      },
+      {
+        "label": "Decide",
+        "detail": "Reject regressions. A higher average never excuses a wrong destination or lost meaning."
+      }
+    ],
+    "facts": [
+      {
+        "title": "What contributors provide",
+        "text": "Evidence, explicit question criteria, a model version, an API key for live evaluation and independently labeled cases. The skill does not award a built-in app grade."
+      },
+      {
+        "title": "What a score means",
+        "text": "Meaning has four concrete levels: contradicted or absent; an important detail wrong; only a minor detail lost; all meaning preserved. A score divided by three and multiplied by 100 is a rubric position, not word accuracy. Confidence is not a truth guarantee."
+      },
+      {
+        "title": "Check the judge too",
+        "text": "The 16 authored challenge cases produced 10 true material-error flags and six true negatives at a provisional 0.5 threshold. This small synthetic check is not independent human calibration. An invented action still received 2.10/3 for overall meaning, so the separate consequential-error question matters."
+      },
+      {
+        "title": "The measurements still missing",
+        "text": "These public audiobook references have no audited punctuation or word-end times. We cannot honestly score punctuation accuracy, word-end-to-screen latency, physical microphone quality or worldwide rank from them."
+      },
+      {
+        "title": "Where to reproduce it",
+        "text": "Follow docs/testing/typesafe-evaluation.md. Provision the pinned runtime, use public fixtures, freeze the rubric and reference text, then run the local measurement and optional TypeSafe tools. Keep API keys and raw receipts out of Git."
+      }
+    ],
+    "files": [
+      {
+        "path": "scripts/evaluate-dictation-worker.py",
+        "why": "Measures the real pinned worker with public audio fixtures."
+      },
+      {
+        "path": "scripts/typesafe-evaluate.py",
+        "why": "Asks narrow semantic questions only after explicit opt-in."
+      },
+      {
+        "path": "docs/testing/typesafe-evaluation.md",
+        "why": "Defines metric boundaries, targets and reproducible commands."
+      }
+    ],
+    "caution": "The comparison is an experiment, not a world ranking or a release. Worker output, observed recipient text and painted pixels are different boundaries. No production setting changes automatically from a TypeSafe score.",
+    "quiz": {
+      "question": "A candidate has a higher meaning score but inserts text into the wrong window. What happens?",
+      "answers": [
+        "Accept it because its average improved",
+        "Reject it: delivery safety is a separate hard gate",
+        "Ask the model to average the two"
+      ],
+      "correct": 1,
+      "why": "Safety failures cannot be compensated by better speed or a higher semantic score."
+    },
+    "lab": "journey",
+    "comparison": {
+      "title": "19 September 2026 \u00b7 same .41 runtime and model",
+      "headers": [
+        "Measure",
+        "Before: context 1, 4 threads",
+        "Experiment: context 0, 4 threads"
+      ],
+      "scope": "24 paired real-time worker trials across 12 public-fixture speakers. A\u2013B\u2013B\u2013A run order. TypeSafe judged one transcript per speaker and setting; repeated playback does not add independent speakers. Four isolated packaged GTK/X11 trials use one public clip, two trials per setting; their ranges are descriptive and state observation polls every 50 ms.",
+      "rows": [
+        [
+          "Word error rate, all 12 speakers",
+          "2.52%",
+          "2.10%"
+        ],
+        [
+          "Word error rate, 4 held-out speakers",
+          "2.56%",
+          "2.56%"
+        ],
+        [
+          "Worker first text from paced replay, median",
+          "1175.1 ms",
+          "1167.6 ms"
+        ],
+        [
+          "Worker finish acknowledgement, median",
+          "66.7 ms",
+          "76.5 ms"
+        ],
+        [
+          "Worker service / audio duration, median",
+          "0.257",
+          "0.384"
+        ],
+        [
+          "TypeSafe meaning, 8 development speakers",
+          "95.79 / 100",
+          "97.29 / 100"
+        ],
+        [
+          "TypeSafe meaning, 4 held-out speakers",
+          "86.50 / 100",
+          "86.17 / 100"
+        ],
+        [
+          "Private GTK: Start command \u2192 active observation",
+          "50.7\u201350.7 ms",
+          "50.8\u2013101.0 ms"
+        ],
+        [
+          "Private GTK: playback launch \u2192 first field text",
+          "1365.5\u20131380.8 ms",
+          "1455.0\u20131457.8 ms"
+        ],
+        [
+          "Private GTK: Stop command \u2192 idle observation",
+          "207.3\u2013207.8 ms",
+          "207.4\u2013208.5 ms"
+        ],
+        [
+          "Punctuation accuracy / word-end-to-screen lag",
+          "Not measured",
+          "Not measured"
+        ]
+      ],
+      "decision": "Decision: retain the current context 1 setting. Context 0 improves one development recognition error but uses about 49% more service time, barely changes first-text timing and does not improve held-out accuracy or meaning.",
+      "limits": "Experimental results, not a shipped before/after improvement or worldwide ranking. Word timestamps and punctuation gold are absent. These worker numbers are not shortcut, recipient or pixel-paint timings. TypeSafe scores are rubric positions, not percentages of correct words.",
+      "additional": [
+        {
+          "title": "Same context 1 \u00b7 CPU-thread follow-up",
+          "headers": [
+            "Worker measure",
+            "Before: 4 threads",
+            "Experiment: 6 threads"
+          ],
+          "rows": [
+            [
+              "Word error rate",
+              "2.52%",
+              "2.52%"
+            ],
+            [
+              "Complete transcript parity",
+              "Reference arm",
+              "24 / 24 paired final texts identical"
+            ],
+            [
+              "Median service / audio duration",
+              "0.257",
+              "0.228"
+            ],
+            [
+              "Median finish acknowledgement",
+              "66.7 ms",
+              "59.8 ms"
+            ],
+            [
+              "Median first hypothesis from paced replay",
+              "1175.1 ms",
+              "1170.5 ms"
+            ]
+          ],
+          "scope": "24 trials per setting across the same 12 public fixtures. The six-thread runs followed the earlier baseline; this follow-up was not counterbalanced in time.",
+          "decision": "Promising local compute headroom: 11.2% less median service time on the AMD Ryzen 7 PRO 8840HS test system, with only 4.6 ms earlier first text. Retain the portable four-thread default until loaded-desktop, energy and other-CPU checks support a change.",
+          "limits": "This is not a shipped speedup or a six-thread desktop qualification. Complete text parity allows reuse of existing semantic judgments; no extra TypeSafe calls or new independent speakers are implied."
+        }
+      ]
+    },
+    "sourceNote": "Evaluation tools from the pinned .42 source snapshot. Tables retain their original .41 experiment identity."
   }
 ]

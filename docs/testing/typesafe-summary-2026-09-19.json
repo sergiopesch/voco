@@ -1,0 +1,108 @@
+{
+  "title": "19 September 2026 \u00b7 same .41 runtime and model",
+  "headers": [
+    "Measure",
+    "Before: context 1, 4 threads",
+    "Experiment: context 0, 4 threads"
+  ],
+  "scope": "24 paired real-time worker trials across 12 public-fixture speakers. A\u2013B\u2013B\u2013A run order. TypeSafe judged one transcript per speaker and setting; repeated playback does not add independent speakers. Four isolated packaged GTK/X11 trials use one public clip, two trials per setting; their ranges are descriptive and state observation polls every 50 ms.",
+  "rows": [
+    [
+      "Word error rate, all 12 speakers",
+      "2.52%",
+      "2.10%"
+    ],
+    [
+      "Word error rate, 4 held-out speakers",
+      "2.56%",
+      "2.56%"
+    ],
+    [
+      "Worker first text from paced replay, median",
+      "1175.1 ms",
+      "1167.6 ms"
+    ],
+    [
+      "Worker finish acknowledgement, median",
+      "66.7 ms",
+      "76.5 ms"
+    ],
+    [
+      "Worker service / audio duration, median",
+      "0.257",
+      "0.384"
+    ],
+    [
+      "TypeSafe meaning, 8 development speakers",
+      "95.79 / 100",
+      "97.29 / 100"
+    ],
+    [
+      "TypeSafe meaning, 4 held-out speakers",
+      "86.50 / 100",
+      "86.17 / 100"
+    ],
+    [
+      "Private GTK: Start command \u2192 active observation",
+      "50.7\u201350.7 ms",
+      "50.8\u2013101.0 ms"
+    ],
+    [
+      "Private GTK: playback launch \u2192 first field text",
+      "1365.5\u20131380.8 ms",
+      "1455.0\u20131457.8 ms"
+    ],
+    [
+      "Private GTK: Stop command \u2192 idle observation",
+      "207.3\u2013207.8 ms",
+      "207.4\u2013208.5 ms"
+    ],
+    [
+      "Punctuation accuracy / word-end-to-screen lag",
+      "Not measured",
+      "Not measured"
+    ]
+  ],
+  "decision": "Decision: retain the current context 1 setting. Context 0 improves one development recognition error but uses about 49% more service time, barely changes first-text timing and does not improve held-out accuracy or meaning.",
+  "limits": "Experimental results, not a shipped before/after improvement or worldwide ranking. Word timestamps and punctuation gold are absent. These worker numbers are not shortcut, recipient or pixel-paint timings. TypeSafe scores are rubric positions, not percentages of correct words.",
+  "additional": [
+    {
+      "title": "Same context 1 \u00b7 CPU-thread follow-up",
+      "headers": [
+        "Worker measure",
+        "Before: 4 threads",
+        "Experiment: 6 threads"
+      ],
+      "rows": [
+        [
+          "Word error rate",
+          "2.52%",
+          "2.52%"
+        ],
+        [
+          "Complete transcript parity",
+          "Reference arm",
+          "24 / 24 paired final texts identical"
+        ],
+        [
+          "Median service / audio duration",
+          "0.257",
+          "0.228"
+        ],
+        [
+          "Median finish acknowledgement",
+          "66.7 ms",
+          "59.8 ms"
+        ],
+        [
+          "Median first hypothesis from paced replay",
+          "1175.1 ms",
+          "1170.5 ms"
+        ]
+      ],
+      "scope": "24 trials per setting across the same 12 public fixtures. The six-thread runs followed the earlier baseline; this follow-up was not counterbalanced in time.",
+      "decision": "Promising local compute headroom: 11.2% less median service time on the AMD Ryzen 7 PRO 8840HS test system, with only 4.6 ms earlier first text. Retain the portable four-thread default until loaded-desktop, energy and other-CPU checks support a change.",
+      "limits": "This is not a shipped speedup or a six-thread desktop qualification. Complete text parity allows reuse of existing semantic judgments; no extra TypeSafe calls or new independent speakers are implied."
+    }
+  ]
+}

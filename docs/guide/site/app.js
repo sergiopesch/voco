@@ -24,6 +24,7 @@ const titles = [
   "Building and shipping",
   "Borrowed libraries",
   "Reading the code",
+  "TypeSafe and measured improvement",
 ];
 let chapters = [],
   catalog,
@@ -187,7 +188,7 @@ function renderChapter(ch) {
     "section",
     { class: "source-links" },
     node("h2", {}, "Find it in the code"),
-    node("p", {}, "Open the exact implementation of each part."),
+    node("p", {}, ch.sourceNote || "Open the exact implementation of each part."),
   );
   for (const f of ch.files) {
     const b = node(
@@ -214,6 +215,20 @@ function renderChapter(ch) {
       ),
     );
   content.append(facts);
+  for (const comparison of ch.comparison ? [ch.comparison, ...(ch.comparison.additional || [])] : []) {
+    const table = node("table", { class: "evaluation-table" },
+      node("caption", {}, comparison.title),
+      node("thead", {}, node("tr", {}, ...comparison.headers.map(text => node("th", { scope: "col" }, text)))),
+      node("tbody", {}, ...comparison.rows.map(row => node("tr", {},
+        node("th", { scope: "row" }, row[0]), ...row.slice(1).map(text => node("td", {}, text))))),
+    );
+    content.append(node("section", { class: "evaluation-comparison", "aria-label": "Measured before and after" },
+      node("h2", {}, "Before and after the experiment"),
+      node("p", {}, comparison.scope),
+      node("div", { class: "table-scroll", tabindex: "0", role: "region", "aria-label": "Comparison table, scroll horizontally on small screens" }, table),
+      node("p", {}, comparison.decision),
+      node("p", {}, comparison.limits)));
+  }
   const interactive = lab(ch.lab);
   if (interactive) content.append(interactive);
   content.append(
@@ -440,6 +455,7 @@ try {
   ]);
   if (responses.some((r) => !r.ok)) throw Error("Guide data could not load");
   [chapters, catalog] = await Promise.all(responses.map((r) => r.json()));
+  document.querySelector("#source-version").textContent = catalog.version;
   files = catalog.files;
   byPath = new Map(files.map((f) => [f.path, f]));
   done = new Set([...done].filter((id) => chapters.some((c) => c.id === id)));

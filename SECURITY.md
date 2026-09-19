@@ -21,23 +21,19 @@ detached checksum signatures. Verify a signed cut with
 `scripts/verify-release.sh` against the `KEYS` file from this repository; check
 the fingerprint out of band before trusting a fresh clone.
 
-## Current public release (2026.0.39)
+## Release 2026.0.42
 
 The glib iterator defect [RUSTSEC-2024-0429](https://rustsec.org/advisories/RUSTSEC-2024-0429)
-is fixed in this cut with a pinned upstream patch.
+is fixed with the pinned upstream backport. Tauri 2.11.1 and serde_with 3.23.0
+include the updates previously deferred from .39. The GTK stack still resolves to
+one patched glib 0.18.5 copy.
 
-These GitHub Dependabot alerts remain open on purpose for the public 2026.0.39
-cut. They are not part of that package; merging them would change native bytes:
+The remaining low-severity rand custom-logger reentry advisory is tracked rather
+than dismissed. Its affected `log` feature is disabled in this dependency graph.
+RustSec also reports maintenance warnings for parts of the GTK stack; a passing
+audit is not a claim that all dependencies are actively maintained or defect-free.
+Reassess applicability when features, platforms or dependencies change.
 
-- **Tauri origin confusion (medium).** The affected origin branch is
-  Windows/Android-specific; the 2026.0.39 Linux artifact does not use it.
-- **serde_with KeyValueMap panic (medium).** 2026.0.39 uses `skip_serializing_none`,
-  not the affected KeyValueMap adapter.
-- **rand custom-logger reentry (low).** The affected rand log feature is
-  disabled.
-
-The 2026.0.40 candidate updates Tauri to 2.11.1 and serde_with to 3.23.0 while
-keeping the vendored glib 0.18.5 patch as the only resolved copy. The rand note
-still applies. These are scoped applicability notes, not a claim that every
-advisory is irrelevant forever. Reassess if dependencies, features, consumers or
-supported platforms change.
+TypeSafe evaluation is an optional contributor tool. It requires explicit sending
+and a separate API credential; the installed app never calls TypeSafe. Send only
+public or synthetic evaluation text. See [the protocol](docs/testing/typesafe-evaluation.md).

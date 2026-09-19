@@ -10,13 +10,16 @@ Python 3.10+ and Git are the only requirements. From the VOCO repository root:
 python3 docs/guide/serve.py --repo .
 ```
 
-Open **http://127.0.0.1:8785**. Stop with Ctrl+C. No build, npm install, account, API key or internet connection is needed to study. The guide follows the 2026.0.39 application snapshot, not later documentation additions. The VOCO checkout must contain commit `fb957ff052547c24be92265b6b5343a4c29aff4b` (2026.0.39).
+Open **http://127.0.0.1:8785**. Stop with Ctrl+C. No build, npm install, account, API key or internet connection is needed to study. The code tour follows a pinned 2026.0.42 source snapshot recorded in
+`site/catalog.json`. Clone the repository with its history (or fetch that recorded
+commit) so the read-only viewer can resolve the exact blobs. The TypeSafe tables
+retain the separate .41 research identity; they are not .42 latency benchmarks.
 
 ## What is inside
 
-- 18 chapters: recording, audio queues, recognition, delivery, recovery, settings, Linux, privacy, performance, tests, packaging and dependencies.
+- 19 chapters: the 18-part application tour plus TypeSafe evaluation, concrete criteria and measured before/after experiments.
 - Clickable journeys, five kinds of small teaching simulations, quizzes and a glossary.
-- A complete index of 1,122 tracked files. Search paths, groups and detected function/type names.
+- A complete index of the tracked files at the pinned source snapshot. Search paths, groups and detected function/type names.
 - A read-only viewer of the exact pinned Git blobs, with line numbers and symbol jumps.
 
 Start with **The big picture**, work through the chapters, then follow the source links. Progress stays in this browser’s local storage.
@@ -28,6 +31,12 @@ The lessons explain the important layers and their contracts. The file catalog c
 The server binds only to `127.0.0.1`. It rejects foreign Host/Origin requests, exposes no write API and serves source only from catalogued Git blobs. It never serves the checkout directory, uncommitted files, personal recordings or credentials. There is no analytics, remote font, CDN or public deployment configuration. Do not add a tunnel, bind to all interfaces or enable GitHub Pages.
 
 The interactive exercises are teaching simulations, not microphone capture or performance measurements. Private benchmarks and launch-media exports are not part of this guide.
+
+The TypeSafe chapter includes a curated, dated aggregate comparison; raw benchmark
+logs, transcripts and API credentials remain outside the guide. It makes no API
+calls. The separate opt-in research runner and rubric are documented in
+[the evaluation protocol](../testing/typesafe-evaluation.md) and
+[the results](../testing/typesafe-results-2026-09-19.md).
 
 ## Maintain it
 

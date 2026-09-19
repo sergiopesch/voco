@@ -70,7 +70,7 @@ lesson(
         ),
         (
             "The current route",
-            "The selected .39 product uses NVIDIA Nemotron English 0.6B Q8 on the CPU. Names containing benchmark in the streaming code are historical; they do real production work.",
+            "VOCO 2026.0.42 uses NVIDIA Nemotron English 0.6B Q8 on the CPU. Names containing benchmark in the streaming code are historical; they do real production work.",
         ),
         (
             "Keep the boundary clear",
@@ -88,7 +88,7 @@ lesson(
         ),
         (R + "stream_worker.py", "Starts the selected local speech worker."),
     ],
-    "This guide describes the pinned 2026.0.39 source. It does not promise every Linux app or compositor accepts delivery.",
+    "This guide describes a pinned 2026.0.42 source snapshot. It does not promise every Linux app or compositor accepts delivery.",
     "Which part owns the text box you are dictating into?",
     ["VOCO always owns it", "The receiving application", "The speech model"],
     1,
@@ -503,7 +503,7 @@ lesson(
     "A good helper says “I’m not sure” instead of pretending the job is done.",
     [
         "A microphone can disappear, a worker can stop, a window can change, or a paste can be uncertain.",
-        "VOCO keeps recovery explicit. It must not blindly retry text that may already have reached another app.",
+        "VOCO keeps recovery explicit. Retry transcribes retained normal-dictation audio with the bundled NVIDIA model, then offers the result for review and Copy. It does not paste it into another application.",
         "Retained audio or text belongs to the recording that produced it. An old error must not overwrite a new session’s state.",
     ],
     [
@@ -511,7 +511,7 @@ lesson(
         ("Identify", "Keep the failed work attached to its session."),
         ("Retain", "Preserve available recovery material."),
         ("Explain", "Show a useful recovery state instead of false success."),
-        ("Retry safely", "Start a deliberate recovery or a new session."),
+        ("Retry safely", "Recover locally, review the result and copy deliberately."),
     ],
     [
         (
@@ -523,8 +523,8 @@ lesson(
             "States such as idle, starting, recording and processing make allowed transitions visible. They are more reliable than several unrelated booleans.",
         ),
         (
-            "Retention is bounded",
-            "Recovery support is not a promise to keep every recording forever. Follow the configured limits and explicit recovery workflow.",
+            "A separate recovery worker",
+            "Recovery preserves the original sample rate and uses a bounded private worker. Cancel retains the audio, suppresses late results and cleans up that session; it cannot cancel a newer recovery or live dictation.",
         ),
     ],
     [
@@ -533,7 +533,7 @@ lesson(
             F + "lib/dictationSession.ts",
             "Keeps recording identity and lifecycle facts.",
         ),
-        (F + "lib/activityMode.ts", "Defines the activity-state helpers."),
+        (F + "lib/nvidiaRecovery.ts", "Runs explicit offline recovery without a destination callback."),
         (
             B + "benchmark_stream.rs",
             "Reaps failed workers and controls restart boundaries.",
@@ -823,7 +823,7 @@ lesson(
         ("scripts/verify-speech-payload.py", "Verifies speech runtime/model identity."),
         ("docs/release-process.md", "Documents release and acceptance gates."),
     ],
-    "The .39 release remains a candidate until its remaining acceptance/publication gates are met. This learning site does not publish the app.",
+    "Published releases are available on GitHub with versioned artifacts, checksums and documented test scope. This learning site does not publish or install the app.",
     "Is a version string enough to prove two packages are identical?",
     ["Yes", "No; compare exact artifacts and hashes"],
     1,
@@ -835,7 +835,7 @@ lesson(
     "You can build a bicycle with borrowed parts, but you still need to know which parts you fitted.",
     [
         "A dependency is software that VOCO uses rather than rewriting. Vendored code is a copy kept in the repository.",
-        "The .39 source vendors glib 0.18.5 with a specific upstream iterator-safety fix. Other GTK/WebKit users must resolve to that same patched copy.",
+        "VOCO vendors glib 0.18.5 with a specific upstream iterator-safety fix. Other GTK/WebKit users must resolve to that same patched copy.",
         "A dependency name on a list is not enough. We need the actual resolved version, patch, license and tests.",
     ],
     [
@@ -926,6 +926,45 @@ lesson(
     1,
     "Understanding ownership makes later changes safer and more focused.",
 )
+lesson(
+    "typesafe",
+    "Measure before we optimize.",
+    "A quicker transcript is useful only if it keeps your words, meaning and punctuation intact.",
+    [
+        "This chapter teaches the evaluation method used by VOCO contributors. The dated measurements were collected on the .41 development snapshot; the .42 release preserves its model and defaults. These experiments are not fresh .42 performance measurements.",
+        "A stopwatch and exact text comparison answer different questions from a language model. Code measures timing, word errors and delivery failures. TypeSafe judges whether a transcript preserves meaning.",
+        "We give Jev a public reference and a transcript, plus separate questions for meaning and consequential mistakes. Punctuation judgments need an audited reference. Personal dictation never enters this research service; VOCO itself remains local.",
+        "We challenge the judge before trusting it, freeze the speech fixtures, then run the same audio through baseline and candidate settings. We keep unsuccessful experiments because they explain why a tempting change was rejected.",
+    ],
+    [
+        ("Define", "Freeze timing boundaries, reference text, rubric and rejection rules before measuring."),
+        ("Measure", "Replay the same public audio and record timings, word errors and resources."),
+        ("Judge", "Ask TypeSafe narrow questions about meaning; retain probabilities and uncertainty."),
+        ("Compare", "Compare repeated trials and separate speakers. Missing evidence stays missing."),
+        ("Decide", "Reject regressions. A higher average never excuses a wrong destination or lost meaning."),
+    ],
+    [
+        ("What contributors provide", "Evidence, explicit question criteria, a model version, an API key for live evaluation and independently labeled cases. The skill does not award a built-in app grade."),
+        ("What a score means", "Meaning has four concrete levels: contradicted or absent; an important detail wrong; only a minor detail lost; all meaning preserved. A score divided by three and multiplied by 100 is a rubric position, not word accuracy. Confidence is not a truth guarantee."),
+        ("Check the judge too", "The 16 authored challenge cases produced 10 true material-error flags and six true negatives at a provisional 0.5 threshold. This small synthetic check is not independent human calibration. An invented action still received 2.10/3 for overall meaning, so the separate consequential-error question matters."),
+        ("The measurements still missing", "These public audiobook references have no audited punctuation or word-end times. We cannot honestly score punctuation accuracy, word-end-to-screen latency, physical microphone quality or worldwide rank from them."),
+        ("Where to reproduce it", "Follow docs/testing/typesafe-evaluation.md. Provision the pinned runtime, use public fixtures, freeze the rubric and reference text, then run the local measurement and optional TypeSafe tools. Keep API keys and raw receipts out of Git."),
+    ],
+    [
+        ("scripts/evaluate-dictation-worker.py", "Measures the real pinned worker with public audio fixtures."),
+        ("scripts/typesafe-evaluate.py", "Asks narrow semantic questions only after explicit opt-in."),
+        ("docs/testing/typesafe-evaluation.md", "Defines metric boundaries, targets and reproducible commands."),
+    ],
+    "The comparison is an experiment, not a world ranking or a release. Worker output, observed recipient text and painted pixels are different boundaries. No production setting changes automatically from a TypeSafe score.",
+    "A candidate has a higher meaning score but inserts text into the wrong window. What happens?",
+    ["Accept it because its average improved", "Reject it: delivery safety is a separate hard gate", "Ask the model to average the two"],
+    1,
+    "Safety failures cannot be compensated by better speed or a higher semantic score.",
+)
+summary_path = Path(__file__).resolve().parents[2] / "testing/typesafe-summary-2026-09-19.json"
+chapters[-1]["comparison"] = json.loads(summary_path.read_text())
+chapters[-1]["sourceNote"] = "Evaluation tools from the pinned .42 source snapshot. Tables retain their original .41 experiment identity."
+
 # Fail closed if a lesson cites a path absent from the pinned source.
 root = Path(__file__).resolve().parents[1]
 catalog = json.loads((root / "site/catalog.json").read_text())

@@ -117,6 +117,8 @@ class GuideTests(unittest.TestCase):
                 actual[path.decode()] = meta.decode().split()[2]
         self.assertEqual(actual, {p: e["blob"] for p, e in self.server.entries.items()})
         self.assertEqual(len(actual), self.server.catalog["fileCount"])
+        package = json.loads(subprocess.check_output(["git", "-C", str(self.repo), "show", self.server.catalog["commit"] + ":package.json"]))
+        self.assertEqual(self.server.catalog["version"], package["version"])
         self.assertTrue(
             any(
                 e["text"] and p.endswith(".cpp") for p, e in self.server.entries.items()
@@ -132,7 +134,7 @@ class GuideTests(unittest.TestCase):
 
     def test_lessons_cite_real_paths_and_valid_quizzes(self):
         chapters = json.loads((ROOT / "site/chapters.json").read_text())
-        self.assertEqual(len(chapters), 18)
+        self.assertEqual(len(chapters), 19)
         self.assertEqual(len({c["id"] for c in chapters}), len(chapters))
         for chapter in chapters:
             with self.subTest(chapter=chapter["id"]):
@@ -142,6 +144,17 @@ class GuideTests(unittest.TestCase):
                 self.assertIn(
                     chapter["quiz"]["correct"], range(len(chapter["quiz"]["answers"]))
                 )
+
+    def test_evaluation_is_dated_and_separate_from_release_source(self):
+        chapters = json.loads((ROOT / "site/chapters.json").read_text())
+        chapter = next(c for c in chapters if c["id"] == "typesafe")
+        self.assertIn(".42", chapter["sourceNote"])
+        self.assertIn(".41", chapter["comparison"]["title"])
+        self.assertIn("not", chapter["comparison"]["limits"])
+        for comparison in [chapter["comparison"], *chapter["comparison"].get("additional", [])]:
+            self.assertEqual(len(comparison["headers"]), 3)
+            self.assertTrue(comparison["rows"])
+            self.assertTrue(all(len(row) == 3 for row in comparison["rows"]))
 
 
 if __name__ == "__main__":
