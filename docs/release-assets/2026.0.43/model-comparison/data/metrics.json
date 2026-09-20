@@ -1,0 +1,718 @@
+{
+  "date": "2026-09-14",
+  "models": [
+    "nvidia-candidate",
+    "moonshine-small-text",
+    "moonshine-medium-text",
+    "qwen-0.6B",
+    "qwen-1.7B",
+    "parakeet",
+    "whisper"
+  ],
+  "names": [
+    "NVIDIA Nemotron 0.6B Q8",
+    "Moonshine Small",
+    "Moonshine Medium",
+    "Qwen3-ASR 0.6B",
+    "Qwen3-ASR 1.7B",
+    "Parakeet TDT v3",
+    "Whisper base.en"
+  ],
+  "configurations": [
+    {
+      "model": "nvidia-candidate",
+      "context": 1,
+      "gate": "zero",
+      "coalesce_retained_frames": true
+    },
+    {
+      "model": "moonshine-small-text",
+      "update_interval_s": 0.2,
+      "return_audio_data": false
+    },
+    {
+      "model": "moonshine-medium-text",
+      "update_interval_s": 0.2,
+      "return_audio_data": false
+    },
+    {
+      "model": "qwen-0.6B",
+      "chunk": 2,
+      "hold": 0,
+      "rollback": 5
+    },
+    {
+      "model": "qwen-1.7B",
+      "chunk": 2,
+      "hold": 0,
+      "rollback": 5
+    },
+    {
+      "model": "parakeet",
+      "mode": "offline",
+      "punctuation": true
+    },
+    {
+      "model": "whisper",
+      "mode": "offline"
+    }
+  ],
+  "metrics": [
+    {
+      "key": "01-word-error-rate",
+      "title": "Word error rate",
+      "subtitle": "Same recordings. Same references. All seven tested configurations.",
+      "values": [
+        5.331882480957563,
+        7.616974972796518,
+        7.943416757344941,
+        4.6789989118607185,
+        6.420021762785637,
+        7.181719260065289,
+        9.357997823721437
+      ],
+      "ranges": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "aggregation": "pooled errors / reference words",
+      "unit": "%",
+      "decimals": 2,
+      "direction": "LOWER IS BETTER",
+      "scope": "all",
+      "missing": "Not measured",
+      "boundary": "round3",
+      "notes": [
+        "Ignores punctuation and case; number rendering still affects errors.",
+        "919 distinct reference positions, replayed three times: 2,757 word observations per model."
+      ]
+    },
+    {
+      "key": "02-normalized-word-error-rate",
+      "title": "Contraction-normalized word error rate",
+      "subtitle": "Same recordings. Same references. All seven tested configurations.",
+      "values": [
+        4.6789989118607185,
+        6.9640914036996735,
+        7.290533188248096,
+        4.461371055495103,
+        5.984766050054407,
+        6.528835690968444,
+        8.705114254624592
+      ],
+      "ranges": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "aggregation": "pooled errors / reference words",
+      "unit": "%",
+      "decimals": 2,
+      "direction": "LOWER IS BETTER",
+      "scope": "all",
+      "missing": "Not measured",
+      "boundary": "round3",
+      "notes": [
+        "Also expands contractions; this is a separate sensitivity score, not semantic accuracy.",
+        "919 distinct reference positions, replayed three times: 2,757 word observations per model."
+      ]
+    },
+    {
+      "key": "03-first-output",
+      "title": "First recognizer output",
+      "subtitle": "Median from audio sample zero \u00b7 nine trials per streaming configuration.",
+      "values": [
+        1.4971213019998686,
+        1.9650572870014003,
+        1.9678054780015373,
+        2.7275565979980456,
+        3.709768532000453,
+        null,
+        null
+      ],
+      "ranges": [
+        [
+          1.174333786999341,
+          1.8169471400033217
+        ],
+        [
+          1.3517210819991305,
+          1.9781158010009676
+        ],
+        [
+          1.351596000000427,
+          1.995784360999096
+        ],
+        [
+          2.7136169920013344,
+          2.771629070997733
+        ],
+        [
+          3.6707675010002276,
+          3.782771357000456
+        ],
+        null,
+        null
+      ],
+      "aggregation": "median",
+      "unit": "s",
+      "decimals": 3,
+      "direction": "LOWER IS BETTER",
+      "scope": "all",
+      "notes": [
+        "Recognizer callback timing, not first correct word, cursor appearance or pixel paint.",
+        "Parakeet and Whisper used offline adapters in this comparison."
+      ],
+      "missing": "Not measured \u00b7 offline adapter",
+      "boundary": "round3"
+    },
+    {
+      "key": "04-cpu-work",
+      "title": "CPU work per second of audio",
+      "subtitle": "Median across nine trials \u00b7 lower values mean less measured CPU work.",
+      "values": [
+        0.9385991133321645,
+        3.165243296356417,
+        3.7528103902181775,
+        2.974835646597408,
+        6.6789786543127985,
+        0.4337395842662846,
+        0.8030689663391997
+      ],
+      "ranges": [
+        [
+          0.931360082545306,
+          0.9571953284457418
+        ],
+        [
+          3.1547044077567503,
+          3.4159254559653434
+        ],
+        [
+          3.6863917269189237,
+          3.8393912805568955
+        ],
+        [
+          2.1163957284233366,
+          3.1355270278092404
+        ],
+        [
+          4.960232357280618,
+          6.9580786340842655
+        ],
+        [
+          0.3628044867707329,
+          0.7379669087161522
+        ],
+        [
+          0.7545002782287071,
+          0.9828561964196345
+        ]
+      ],
+      "aggregation": "median",
+      "unit": "CPU s / audio s",
+      "decimals": 3,
+      "direction": "LOWER IS BETTER",
+      "scope": "all",
+      "notes": [
+        "Total CPU work across threads, including replay controller; excludes model load and warmup.",
+        "CPU-only execution; runtimes use different thread settings. This is not battery consumption."
+      ],
+      "missing": "Not measured",
+      "boundary": "round3"
+    },
+    {
+      "key": "05-memory",
+      "title": "Peak sampled resident memory",
+      "subtitle": "Maximum across nine trials \u00b7 process-tree RSS, including startup.",
+      "values": [
+        0.97833251953125,
+        0.5209236145019531,
+        0.8400917053222656,
+        2.864166259765625,
+        6.799278259277344,
+        3.1175765991210938,
+        0.4025840759277344
+      ],
+      "ranges": [
+        [
+          0.9497299194335938,
+          0.97833251953125
+        ],
+        [
+          0.4869842529296875,
+          0.5209236145019531
+        ],
+        [
+          0.7933235168457031,
+          0.8400917053222656
+        ],
+        [
+          2.7526283264160156,
+          2.864166259765625
+        ],
+        [
+          6.654167175292969,
+          6.799278259277344
+        ],
+        [
+          0.9498672485351562,
+          3.1175765991210938
+        ],
+        [
+          0.3688774108886719,
+          0.4025840759277344
+        ]
+      ],
+      "aggregation": "max",
+      "unit": "GiB",
+      "decimals": 3,
+      "direction": "LOWER IS BETTER",
+      "scope": "all",
+      "notes": [
+        "Sampled process-tree sum includes model load and warmup; shared pages may count more than once.",
+        "Samples can miss short-lived peaks. This is not whole-system memory use."
+      ],
+      "missing": "Not measured",
+      "boundary": "round3"
+    },
+    {
+      "key": "06-completion-tail",
+      "title": "Work remaining after speech ends",
+      "subtitle": "Same 303.712-second recording \u00b7 median of three streaming trials.",
+      "values": [
+        0.08959022400085814,
+        0.0014576419998775236,
+        0.03079779099789448,
+        1.996661283999856,
+        236.64319409400196,
+        null,
+        null
+      ],
+      "ranges": [
+        [
+          0.08722229699924355,
+          0.09220764600104303
+        ],
+        [
+          0.001139743999374332,
+          0.002131681001628749
+        ],
+        [
+          0.03009265099899494,
+          0.03931776899844408
+        ],
+        [
+          1.8194537419985863,
+          2.0010883340000873
+        ],
+        [
+          235.57857280000098,
+          237.97098737800115
+        ],
+        null,
+        null
+      ],
+      "aggregation": "median",
+      "unit": "s",
+      "decimals": 3,
+      "direction": "LOWER IS BETTER",
+      "scope": "long",
+      "notes": [
+        "Completion minus scheduled audio end; queued work remains visible. This is not app Stop-to-idle.",
+        "Logarithmic seconds axis; labels use ms below one second. Each equal axis step represents a 10\u00d7 change."
+      ],
+      "missing": "Not measured \u00b7 offline adapter",
+      "boundary": "round3"
+    },
+    {
+      "key": "07-progress-at-audio-end",
+      "title": "Text available when audio ends",
+      "subtitle": "Same 303.712-second recording \u00b7 median of three streaming trials.",
+      "values": [
+        100.0,
+        100.0,
+        100.0,
+        98.14241486068111,
+        55.4858934169279,
+        null,
+        null
+      ],
+      "ranges": [
+        [
+          100.0,
+          100.0
+        ],
+        [
+          100.0,
+          100.0
+        ],
+        [
+          100.0,
+          100.0
+        ],
+        [
+          98.14241486068111,
+          98.14241486068111
+        ],
+        [
+          55.4858934169279,
+          55.956112852664575
+        ],
+        null,
+        null
+      ],
+      "aggregation": "median",
+      "unit": "%",
+      "decimals": 2,
+      "direction": "HIGHER MEANS MORE OUTPUT",
+      "scope": "long",
+      "notes": [
+        "Hypothesis word count / final hypothesis word count. Provisional words may be revised.",
+        "This measures output progress, not word accuracy or text committed to another application."
+      ],
+      "missing": "Not measured \u00b7 offline adapter",
+      "boundary": "round3"
+    },
+    {
+      "key": "08-prefix-revisions",
+      "title": "Completed-prefix revisions",
+      "subtitle": "Same 303.712-second recording \u00b7 median count across three streaming trials.",
+      "values": [
+        0.0,
+        170.0,
+        206.0,
+        0.0,
+        0.0,
+        null,
+        null
+      ],
+      "ranges": [
+        [
+          0.0,
+          0.0
+        ],
+        [
+          170.0,
+          170.0
+        ],
+        [
+          206.0,
+          206.0
+        ],
+        [
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0
+        ],
+        null,
+        null
+      ],
+      "aggregation": "median",
+      "unit": "revisions",
+      "decimals": 0,
+      "direction": "DESCRIPTIVE \u00b7 NOT AN ACCURACY SCORE",
+      "scope": "long",
+      "notes": [
+        "Counts changes to earlier completed hypothesis words; unfinished-word extensions are excluded.",
+        "Revisions can be useful corrections. A zero count does not prove that the recognized text is correct."
+      ],
+      "missing": "Not measured \u00b7 offline adapter",
+      "boundary": "round3"
+    },
+    {
+      "key": "09-update-gap",
+      "title": "Longest observed text-update gap",
+      "subtitle": "Same 303.712-second recording \u00b7 maximum across three streaming trials.",
+      "values": [
+        3.9998489879981207,
+        3.6111831730013364,
+        3.5418781519983895,
+        8.374561937998806,
+        12.552954074002628,
+        null,
+        null
+      ],
+      "ranges": [
+        [
+          3.996522511999501,
+          3.9998489879981207
+        ],
+        [
+          3.554321807998349,
+          3.6111831730013364
+        ],
+        [
+          3.5154936719991383,
+          3.5418781519983895
+        ],
+        [
+          8.346201549000398,
+          8.374561937998806
+        ],
+        [
+          12.470721113000764,
+          12.552954074002628
+        ],
+        null,
+        null
+      ],
+      "aggregation": "max",
+      "unit": "s",
+      "decimals": 3,
+      "direction": "DESCRIPTIVE \u00b7 INCLUDES SILENCE",
+      "scope": "long",
+      "notes": [
+        "Intervals between recognizer text changes can include legitimate silence and punctuation updates.",
+        "This is not voiced-speech lag or a percentile estimate. No acoustic word-end alignment was available."
+      ],
+      "missing": "Not measured \u00b7 offline adapter",
+      "boundary": "round3"
+    },
+    {
+      "key": "10-model-load",
+      "title": "Model loading time",
+      "subtitle": "Median across nine process launches \u00b7 retained filesystem cache conditions.",
+      "values": [
+        0.3998250420008844,
+        0.26587907100110897,
+        0.3995438080019085,
+        0.475713242,
+        1.137609197,
+        0.039444850001018494,
+        0.084959965
+      ],
+      "ranges": [
+        [
+          0.3901264389969583,
+          0.4134282710001571
+        ],
+        [
+          0.2388039090001257,
+          0.28302660299959825
+        ],
+        [
+          0.3657227319999947,
+          0.44448340099916095
+        ],
+        [
+          0.461281314,
+          0.51334319
+        ],
+        [
+          1.112650298,
+          1.179859642
+        ],
+        [
+          0.038115086001198506,
+          0.04484595800022362
+        ],
+        [
+          0.080209184,
+          0.095545182
+        ]
+      ],
+      "aggregation": "median",
+      "unit": "s",
+      "decimals": 3,
+      "direction": "LOWER IS BETTER",
+      "scope": "all",
+      "notes": [
+        "Adapter-reported loading boundary; runtime initialization is not identical across implementations.",
+        "OS caches were uncontrolled. This is not cold-boot startup or shortcut-to-ready latency."
+      ],
+      "missing": "Not measured",
+      "boundary": "round3"
+    },
+    {
+      "key": "11-warmup",
+      "title": "Warmup decoding time",
+      "subtitle": "Median across nine trials \u00b7 same separate 2.09-second public warmup.",
+      "values": [
+        1.0089691399989533,
+        0.6623524210008327,
+        0.694881526997051,
+        0.760780219,
+        1.85375066,
+        0.6083692620013608,
+        1.324829134
+      ],
+      "ranges": [
+        [
+          0.9971497310034465,
+          1.0384341389981273
+        ],
+        [
+          0.6249478669997188,
+          0.6904237540002214
+        ],
+        [
+          0.6196868350016302,
+          0.7401883129969065
+        ],
+        [
+          0.755968401,
+          0.784644961
+        ],
+        [
+          1.826704636,
+          1.916509477
+        ],
+        [
+          0.599878158998763,
+          0.621254975998454
+        ],
+        [
+          1.237699608,
+          1.40850214
+        ]
+      ],
+      "aggregation": "median",
+      "unit": "s",
+      "decimals": 3,
+      "direction": "LOWER IS BETTER",
+      "scope": "all",
+      "notes": [
+        "Adapter-reported warmup; separate from model load and the measured comparison recordings.",
+        "These runtime boundaries do not establish end-to-end application readiness."
+      ],
+      "missing": "Not measured",
+      "boundary": "round3"
+    },
+    {
+      "key": "12-offline-decode",
+      "title": "Full-recording offline decoding",
+      "subtitle": "Same 303.712-second recording \u00b7 median of three offline trials.",
+      "values": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        58.692275505,
+        39.91664735299855
+      ],
+      "ranges": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        [
+          58.616073701999994,
+          58.89111094100008
+        ],
+        [
+          39.71145222400082,
+          40.07245915599924
+        ]
+      ],
+      "aggregation": "median",
+      "unit": "s",
+      "decimals": 3,
+      "direction": "LOWER IS BETTER",
+      "scope": "long",
+      "notes": [
+        "Entire recording decoded offline by the tested Parakeet and Whisper adapters.",
+        "Streaming completion tails are a different metric and are not inserted into this comparison."
+      ],
+      "missing": "Not measured \u00b7 streaming adapter",
+      "boundary": "round3"
+    },
+    {
+      "key": "13-earlier-public-speech",
+      "title": "Earlier public-speech accuracy",
+      "subtitle": "Separate cohort \u00b7 40 public speakers \u00b7 998 reference words \u00b7 four integrations.",
+      "values": [
+        1.3026052104208417,
+        2.7054108216432864,
+        1.9038076152304608,
+        null,
+        null,
+        null,
+        2.3046092184368736
+      ],
+      "ranges": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "aggregation": "pooled errors / reference words",
+      "unit": "%",
+      "decimals": 2,
+      "direction": "LOWER IS BETTER",
+      "scope": "public",
+      "missing": "Not tested in this cohort",
+      "boundary": "public40",
+      "notes": [
+        "Do not combine these rates with the one-speaker recorded-speech comparison. WER excludes punctuation.",
+        "Previously evaluated corpus; the NVIDIA\u2013Moonshine Medium accuracy difference is not conclusive."
+      ]
+    },
+    {
+      "key": "14-earlier-app-stop",
+      "title": "Earlier application Stop-to-idle",
+      "subtitle": "Separate application test \u00b7 isolated X11 / GTK \u00b7 one 47-word public clip.",
+      "values": [
+        165,
+        null,
+        null,
+        null,
+        null,
+        null,
+        2859
+      ],
+      "ranges": [
+        [
+          161,
+          165
+        ],
+        null,
+        null,
+        null,
+        null,
+        null,
+        [
+          2579,
+          3066
+        ]
+      ],
+      "aggregation": "median completed trials",
+      "unit": "ms",
+      "decimals": 0,
+      "direction": "LOWER IS BETTER",
+      "scope": "native",
+      "missing": [
+        "Not tested in this cohort",
+        "Incomplete \u00b7 prototype trial failed",
+        "Incomplete \u00b7 prototype trial failed",
+        "Not tested in this cohort",
+        "Not tested in this cohort",
+        "Not tested in this cohort",
+        "Not tested in this cohort"
+      ],
+      "boundary": "native",
+      "notes": [
+        "NVIDIA / VOCO .34 and Whisper / .33: three completed trials each. Different complete app integrations.",
+        "Moonshine: one unsuccessful prototype trial per model; no successful Stop time. Not release .43 timings."
+      ]
+    }
+  ],
+  "numericFieldChecks": 1008
+}

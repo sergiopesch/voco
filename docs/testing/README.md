@@ -1,5 +1,9 @@
 # Testing
 
+The [public benchmark gallery](../release-assets/2026.0.43/README.md) presents the
+matched seven-model comparison and separate historical cohorts, with 8K graphics,
+numeric data and measurement boundaries.
+
 Current public release and private candidate: [release gates](../release-candidate.md).
 Dated reports below are historical evidence, not qualification of a later binary.
 The [.43 Linux qualification report](linux-release-2026-09-19.md) tracks native
