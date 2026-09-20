@@ -2,6 +2,9 @@
 
 Current public release and private candidate: [release gates](../release-candidate.md).
 Dated reports below are historical evidence, not qualification of a later binary.
+The [.43 Linux qualification report](linux-release-2026-09-19.md) tracks native
+packages and the Wayland hidden-capture change. See the [native capture contract](native-capture-development.md)
+for explicit permission, interruption recovery and independently verified audio audits.
 
 The [TypeSafe evaluation protocol](typesafe-evaluation.md) defines timing, word and
 punctuation accuracy, semantic judgments, corpus requirements and rejection rules.
@@ -246,3 +249,9 @@ Run `python3 scripts/verify-glib-backport.py`, then
 `python3 scripts/test-glib-variant.py --output /tmp/voco-glib-check` using a fresh
 output directory. The latter uses the resolved dependency and production optimization
 without starting a desktop. Add `--debug` for the debug control.
+
+## Current Linux package milestone
+
+[19 September native packaging and Hyprland experiments](linux-release-2026-09-19.md)
+records the .43 development work, successful checks and unresolved release gates.
+It is not a publication or universal compatibility claim.

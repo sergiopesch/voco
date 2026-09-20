@@ -10,19 +10,24 @@ Python 3.10+ and Git are the only requirements. From the VOCO repository root:
 python3 docs/guide/serve.py --repo .
 ```
 
-Open **http://127.0.0.1:8785**. Stop with Ctrl+C. No build, npm install, account, API key or internet connection is needed to study. The code tour follows a pinned 2026.0.42 source snapshot recorded in
+Open **http://127.0.0.1:8785**. Stop with Ctrl+C. No build, npm install, account, API key or internet connection is needed to study. The code tour follows a pinned 2026.0.43 development source snapshot recorded in
 `site/catalog.json`. Clone the repository with its history (or fetch that recorded
 commit) so the read-only viewer can resolve the exact blobs. The TypeSafe tables
 retain the separate .41 research identity; they are not .42 latency benchmarks.
 
 ## What is inside
 
-- 19 chapters: the 18-part application tour plus TypeSafe evaluation, concrete criteria and measured before/after experiments.
+- 20 chapters: the application tour, TypeSafe evaluation with measured before/after experiments, and Linux package/desktop qualification.
 - Clickable journeys, five kinds of small teaching simulations, quizzes and a glossary.
 - A complete index of the tracked files at the pinned source snapshot. Search paths, groups and detected function/type names.
 - A read-only viewer of the exact pinned Git blobs, with line numbers and symbol jumps.
 
 Start with **The big picture**, work through the chapters, then follow the source links. Progress stays in this browser’s local storage.
+
+The Linux chapter explains why package installation and desktop dictation need
+separate checks, including the Hyprland hidden-start failure and the native-capture candidate that
+addresses it. Before/after results retain their specific test conditions.
+It does not announce a new release.
 
 ## Scope and privacy
 
@@ -49,6 +54,13 @@ python3 tools/write_lessons.py
 VOCO_SOURCE=../.. python3 -m unittest discover -s tests -v
 ```
 
+Restart any running guide server after regenerating the catalog. It loads its
+pinned source identity at startup.
+
 `tools/catalog.py` is the pinned inventory builder. `tools/write_lessons.py` is the authored chapter source. `site/app.js` handles navigation and source reading; `site/diagrams.js` contains the small simulations. `serve.py` is the loopback-only read boundary.
 
 See [VERIFICATION.md](VERIFICATION.md) for checks and limitations. VOCO source and identity retain their upstream notices; bundled Geist fonts use the SIL Open Font License.
+
+For the release-polish refresh, see [the dated verification record](../testing/linux-release-2026-09-20.md).
+It separates the earlier long/recovery evidence from fresh checks after an Updates
+help-text change; the code tour remains pinned to the reviewed product source.

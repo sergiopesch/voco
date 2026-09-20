@@ -1,5 +1,36 @@
 # Guide verification history
 
+## Final .43 package evidence · 19 September 2026
+
+The catalog pins `c0b657f2299fb477d297786fe5d0606e88e7e4cc`, including the
+final package and desktop report. Twenty chapters distinguish public availability
+from candidate evidence, retain the original TypeSafe experiment identity and
+explain measured fixes and remaining gaps. No private recordings or credentials
+were added.
+
+Browser checks verified the final Linux chapter, exact pinned report in the source
+reader, installation-file search, glossary, journey step and quiz feedback. The
+390 × 844 responsive check measured 375 px for both content and scroll width; the
+chapter drawer opened correctly. The viewport override was reset. No console
+warnings or errors were observed. Nine guide tests pass after regeneration.
+
+## Linux package chapter · 19 September 2026
+
+Twenty chapters now include separate package/desktop gates and the unsuccessful
+Hyprland hidden-microphone experiment. The source catalog pins the .43 development
+commit a2f3c36b7434; it does not announce a release. All nine guide tests pass.
+
+Browser checks passed for the new navigation label, journey steps, quiz feedback,
+pinned trigger-client source, file search, glossary and mobile chapter drawer.
+At 390 × 844, content and scroll widths both measured 375 px. No console errors
+or warnings were observed. The temporary viewport override was reset.
+
+Initial checks caught an omitted navigation title, an outdated source-note
+assertion and an incorrect unittest working directory; these were corrected.
+Regenerating a catalog requires restarting the guide server before browser checks,
+because the server retains its pinned catalog in memory.
+
+
 ## Public .42 source refresh · 19 September 2026
 
 The source catalog now pins the .42 release-preparation commit recorded in

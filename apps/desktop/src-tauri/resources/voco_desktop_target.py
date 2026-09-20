@@ -2,6 +2,7 @@
 import hashlib
 import json
 import sys
+import time
 import uuid
 from pathlib import Path
 
@@ -85,6 +86,13 @@ def unavailable():
             "events_tracked": TRACKER.listener is not None}
 
 
+def process_binary(pid):
+    try:
+        return Path(f"/proc/{pid}/exe").resolve(strict=True).name
+    except OSError:
+        return ""
+
+
 def probe():
     import gi
     gi.require_version("Atspi", "2.0")
@@ -92,9 +100,14 @@ def probe():
     Atspi.set_timeout(80, 80)
     TRACKER.start(Atspi)
     context = GLib.MainContext.default()
-    for _ in range(256):
+    # Hiding a WebKit setup window on GNOME can queue nearly 1000 events.
+    # Bound both work and elapsed time; never bind through an unsettled queue.
+    drain_deadline = time.monotonic() + .05
+    for _ in range(4096):
         if not context.pending():
             break
+        if time.monotonic() >= drain_deadline:
+            return unavailable()
         context.iteration(False)
     if context.pending():
         return unavailable()  # Do not act on a partially drained event backlog.
@@ -109,17 +122,19 @@ def probe():
                 window = app.get_child_at_index(j)
                 window.clear_cache_single()
                 if window.get_state_set().contains(Atspi.StateType.ACTIVE):
-                    active.append((app, window))
+                    # GNOME X11 exports the active client and its server-side
+                    # decoration as separate accessible applications. The frame
+                    # service is not a dictation destination. Unknown processes
+                    # still count, so real ambiguity remains a rejection.
+                    if process_binary(app.get_process_id()) != "mutter-x11-frames":
+                        active.append((app, window))
         except Exception:
             continue
     if len(active) != 1:
         return unavailable()
     app, window = active[0]
     pid = app.get_process_id()
-    try:
-        binary = Path(f"/proc/{pid}/exe").resolve().name
-    except OSError:
-        binary = ""
+    binary = process_binary(pid)
     terminal = binary in TERMINALS
     focused = TRACKER.focused_hint(window, pid, Atspi)
     pending = [] if focused is not None else [window]
@@ -328,6 +343,21 @@ def delivery_stage(snapshot, node):
                     and current == space_position
                     and read_slice(iface, left, start + 1 + len(after)) == before + ' ' + after):
                 stage = 1
+        if stage == -1 and not selected and not current[4]:
+            # Firefox may expose the inserted content/count before its caret
+            # update, even across two reads. Only the exact expected local text
+            # at an earlier known caret is indeterminate, never acknowledged.
+            # The caller's existing deadline bounds this wait; no paste is replayed.
+            prior_carets = {start}
+            if payload.startswith(' ') and len(payload) > 1 and not payload[1].isspace():
+                prior_carets.add(start + 1)
+            if (current[0] == new_count and current[1] in prior_carets
+                    and read_slice(iface, left, new_caret + len(after)) == before + payload + after):
+                stage = None
+            elif (payload.startswith(' ') and len(payload) > 1 and not payload[1].isspace()
+                    and current == (count + 1, start, start, start, False)
+                    and read_slice(iface, left, start + 1 + len(after)) == before + ' ' + after):
+                stage = None
         if text_position(node)[1] != current:
             return None
     except (InconsistentPosition, InconsistentText):

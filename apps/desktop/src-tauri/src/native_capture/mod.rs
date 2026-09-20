@@ -421,7 +421,7 @@ impl<B: CaptureBackend> Worker<B> {
                     .ok_or("Source selection is stale")?;
                 if source.object_serial.is_none() {
                     return Err(
-                        "This development backend requires a PipeWire source object serial".into(),
+                        "Native capture requires a PipeWire source identity; check that PipeWire and its Pulse compatibility service are running".into(),
                     );
                 }
                 self.approved = Some(token);

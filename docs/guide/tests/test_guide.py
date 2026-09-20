@@ -134,7 +134,7 @@ class GuideTests(unittest.TestCase):
 
     def test_lessons_cite_real_paths_and_valid_quizzes(self):
         chapters = json.loads((ROOT / "site/chapters.json").read_text())
-        self.assertEqual(len(chapters), 19)
+        self.assertEqual(len(chapters), 20)
         self.assertEqual(len({c["id"] for c in chapters}), len(chapters))
         for chapter in chapters:
             with self.subTest(chapter=chapter["id"]):
@@ -148,7 +148,7 @@ class GuideTests(unittest.TestCase):
     def test_evaluation_is_dated_and_separate_from_release_source(self):
         chapters = json.loads((ROOT / "site/chapters.json").read_text())
         chapter = next(c for c in chapters if c["id"] == "typesafe")
-        self.assertIn(".42", chapter["sourceNote"])
+        self.assertIn(self.server.catalog["version"], chapter["sourceNote"])
         self.assertIn(".41", chapter["comparison"]["title"])
         self.assertIn("not", chapter["comparison"]["limits"])
         for comparison in [chapter["comparison"], *chapter["comparison"].get("additional", [])]:

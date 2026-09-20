@@ -1,0 +1,102 @@
+{
+  "version": "2026.0.42",
+  "nativePackageRevision": 3,
+  "publiclyReleased": false,
+  "crabboxLease": "cbx_bc97498470fe",
+  "sourceCommit": "15e47942ce1ce9e2b56d0b1ddd6b1e7493468f2a",
+  "packageChecks": {
+    "native-parity": {
+      "stage": "installed",
+      "checked": 218,
+      "elf_objects": 9,
+      "passed": true
+    },
+    "upgrade-parity": {
+      "stage": "installed",
+      "checked": 218,
+      "elf_objects": 9,
+      "passed": true
+    },
+    "remove-parity": {
+      "stage": "removed",
+      "checked": 169,
+      "elf_objects": 0,
+      "passed": true
+    },
+    "reinstall-parity": {
+      "stage": "installed",
+      "checked": 218,
+      "elf_objects": 9,
+      "passed": true
+    },
+    "final-parity": {
+      "stage": "installed",
+      "checked": 218,
+      "elf_objects": 9,
+      "passed": true
+    }
+  },
+  "waylandTrials": [
+    {
+      "case": "delivery",
+      "completed": true,
+      "sessions": 1,
+      "observedText": "He was young no spear had touched him, no poison lurked in his wine.",
+      "otherFieldUnchanged": true,
+      "firstFieldMutationMs": 1066.7838659999802,
+      "stopToIdleMs": [
+        246
+      ],
+      "recoveryRetained": false,
+      "appSha256": "7248d33d106a978c74d358051ced956eeabbb53a3da109c5bfe214e0a41d2361"
+    },
+    {
+      "case": "repeated",
+      "completed": true,
+      "sessions": 2,
+      "observedText": "He was young no spear had touched him, no poison lurked in his wine. He was young no spear had touched him, no poison lurked in his wine.",
+      "otherFieldUnchanged": true,
+      "firstFieldMutationMs": 1064.5524280000132,
+      "stopToIdleMs": [
+        240,
+        242
+      ],
+      "recoveryRetained": false,
+      "appSha256": "7248d33d106a978c74d358051ced956eeabbb53a3da109c5bfe214e0a41d2361"
+    },
+    {
+      "case": "focus-switch",
+      "completed": true,
+      "sessions": 1,
+      "observedText": "He was",
+      "otherFieldUnchanged": true,
+      "firstFieldMutationMs": 1075.3858809999883,
+      "stopToIdleMs": [],
+      "recoveryRetained": true,
+      "appSha256": "7248d33d106a978c74d358051ced956eeabbb53a3da109c5bfe214e0a41d2361"
+    }
+  ],
+  "fullOmarchyInstallerQualified": false,
+  "scope": "Omarchy 4.0.3 ISO-derived userspace updated with Arch packages; booted QEMU/KVM, minimal Hyprland configuration, software rendering and virtual inputs/audio. Not a stock Omarchy installation.",
+  "nativePackageSha256": "3b50fdf3d594b09538b93ac6986ad747e18be0f48cd3c506bc1d45c55de8cfb5",
+  "readinessGaps": [
+    "Normal user lacks evdev keyboard permissions; test grants applied only to emulated VM keyboards and ydotoold provisioned explicitly.",
+    "Hidden transparent VOCO window remains mapped and tiled under minimal Hyprland.",
+    "Custom SentencePiece prerequisite and production native-package signing/distribution not qualified.",
+    "Default Omarchy configuration, browser/editor/terminal matrix, suspend/resume and physical microphones remain unqualified."
+  ],
+  "defaultUserNegativeControl": {
+    "driver": "QEMU emulated keyboard, same as successful trials",
+    "extraKeyboardAcl": false,
+    "onboardingPassed": true,
+    "captureStarted": false,
+    "fieldUnchanged": true,
+    "failure": "Timed out waiting for capture active; no accessible evdev keyboard"
+  },
+  "vmAttemptCounts": {
+    "total": 10,
+    "completedConfiguredAcceptance": 3,
+    "negativePermissionControls": 1,
+    "earlierHarnessSetupOrDriverFailures": 6
+  }
+}

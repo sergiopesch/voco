@@ -199,6 +199,10 @@ export function ControlPanel({
   const [hotkeyDraft, setHotkeyDraft] = useState(config.hotkey);
   const [hotkeyError, setHotkeyError] = useState<string | null>(null);
   const nativePreviewDisabled = Boolean(nativeMicrophone && nativeMicrophone.mode !== "webkit");
+  const waylandDesktop = runtimeDiagnostics?.sessionType.toLowerCase() === "wayland";
+  const microphoneSetupReady = nativePreviewDisabled
+    ? nativeMicrophone?.mode === "native" && Boolean(nativeMicrophone.selected)
+    : microphoneChecked;
   const hotkeyDirty = hotkeyDraft !== config.hotkey;
   const hasUnsavedChanges = hotkeyDirty;
   const dictationBusy = dictationStatus === "starting" || dictationStatus === "recording" || dictationStatus === "processing";
@@ -222,15 +226,15 @@ export function ControlPanel({
   const updateInstallCopy = useMemo(() => {
     switch (config.installChannel) {
       case "appimage":
-        return "AppImage publication is paused while its packaging toolchain is being pinned. Move to the verified GitHub Release .deb or rebuild from source for updates.";
+        return "AppImage publication is paused while its packaging toolchain is being pinned. Choose the native package for your distribution on GitHub Releases, or rebuild from source for updates.";
       case "source":
         return "This build is treated as self-managed from source. Pull the repo and rebuild when you want to update.";
       case "flatpak":
-        return "Flatpak distribution is not currently verified. Choose GitHub Release (.deb) or Source for accurate update instructions.";
+        return "Flatpak distribution is not currently verified. Choose GitHub Release or Source for accurate update instructions.";
       case "snap":
-        return "Snap distribution is not currently verified. Choose GitHub Release (.deb) or Source for accurate update instructions.";
+        return "Snap distribution is not currently verified. Choose GitHub Release or Source for accurate update instructions.";
       default:
-        return "This build is treated as a GitHub Release install. Download and install the next release manually.";
+        return "This build is treated as a GitHub Release install. Download the native package for your distribution and install the next release manually.";
     }
   }, [config.installChannel]);
   const updateStatusCopy = useMemo(() => {
@@ -254,7 +258,7 @@ export function ControlPanel({
 
     switch (config.installChannel) {
       case "appimage":
-        return `AppImage publication is paused. Install the verified ${updateState.latestRelease.version} .deb from GitHub Releases or rebuild that tag from source.`;
+        return `AppImage publication is paused. Choose the ${updateState.latestRelease.version} native package for your distribution on GitHub Releases, or rebuild that tag from source.`;
       case "source":
         return `Pull the repo, checkout ${updateState.latestRelease.version} or newer, and rebuild locally.`;
       case "flatpak":
@@ -262,7 +266,7 @@ export function ControlPanel({
       case "snap":
         return "This legacy Snap setting is not a verified update path. Use the GitHub release instead.";
       default:
-        return `Download the ${updateState.latestRelease.version} release from GitHub and install it over your current build.`;
+        return `Download the ${updateState.latestRelease.version} native package for your distribution from GitHub and install it over your current build.`;
     }
   }, [config.installChannel, updateState.latestRelease, updateState.status]);
   const lastCheckedLabel = useMemo(() => {
@@ -826,7 +830,9 @@ export function ControlPanel({
               <section className="voco-onboarding__step">
                 <h2 tabIndex={-1}>Microphone and hotkey</h2>
                 <p>
-                  Speak a few words to check your microphone, then choose your dictation shortcut.
+                  {nativePreviewDisabled
+                    ? "Choose and allow your microphone, then configure your dictation shortcut. Audio is tested when you try your first dictation."
+                    : "Speak a few words to check your microphone, then choose your dictation shortcut."}
                 </p>
                 {nativeMicrophone && nativeMicrophone.mode !== "webkit" ? (
                   <NativeMicrophoneSettings controls={nativeMicrophone}
@@ -918,7 +924,7 @@ export function ControlPanel({
                         onOnboardingStepChange(2);
                       }
                     }}
-                    disabled={saving || dictationBusy || !microphoneChecked || Boolean(previewError)}
+                    disabled={saving || dictationBusy || !microphoneSetupReady || Boolean(previewError)}
                   >
                     Continue
                   </button>
@@ -931,13 +937,15 @@ export function ControlPanel({
               <section className="voco-onboarding__step">
                 <h2 tabIndex={-1}>Try your first dictation</h2>
                 <div className="voco-readiness" aria-label="Dictation readiness">
-                  <p className="voco-readiness__item" role="status" data-ready={microphoneChecked}>Microphone: {microphoneChecked ? "audio detected in setup" : "not checked yet"}</p>
+                  <p className="voco-readiness__item" role="status" data-ready={microphoneSetupReady}>Microphone: {nativePreviewDisabled
+                    ? microphoneSetupReady ? "selected and allowed; ready to try dictation" : "choose and allow a microphone"
+                    : microphoneChecked ? "audio detected in setup" : "not checked yet"}</p>
                   <p className="voco-readiness__item" data-ready={inputSourceReady}>Recording integration: {ownedPreeditLabel}</p>
                   <p role="status">First dictation: {lastDictationResult?.outcome === "delivered" ? "a delivery completed this session; check the words in your text field" : "not yet verified"}</p>
                 </div>
                 <p>Your words appear directly in the focused text field.</p>
                 <div className="voco-onboarding__actions">
-                  <button className="voco-button voco-button--primary" disabled={saving || dictationBusy || !microphoneChecked}
+                  <button className="voco-button voco-button--primary" disabled={saving || dictationBusy || !microphoneSetupReady}
                     onClick={() => void prepareFirstDictation()}>Hide and try dictation</button>
                 </div>
                 <ol className="voco-dictation-guide">
@@ -1062,6 +1070,16 @@ export function ControlPanel({
                         {hotkeyDirty || hotkeyError ? <button className="voco-button voco-button--primary" onClick={() => void saveHotkey()} disabled={saving}>Save hotkey</button> : null}
                       </div>
                       <p className="voco-preferences__helper" id="voco-hotkey-feedback" role="status">{hotkeyError ?? (recordingShortcut ? "Press a modifier and key. Escape cancels." : shortcut.instruction)}</p>
+                      <p className="voco-preferences__helper">{shortcut.detail}</p>
+                      {shortcut.setup ? <p className="voco-preferences__helper">{shortcut.setup}</p> : null}
+                      {waylandDesktop ? <div className="voco-inline-note">
+                        <strong>Desktop shortcut</strong>
+                        <p>You can assign <code>voco --toggle</code> to a non-repeating shortcut in your desktop settings.
+                          Keep VOCO running and use that shortcut to start and stop dictation.
+                          Use an unused key such as F8. Configure the desktop binding to also work with Ctrl and Ctrl+Shift, which clipboard delivery briefly uses.</p>
+                        <p>The shortcut above and its status describe VOCO’s built-in keyboard handling.
+                          Your desktop controls external bindings; VOCO cannot verify which keys you assigned.</p>
+                      </div> : null}
                     </div>
                   </div>
                 </section>
@@ -1081,9 +1099,9 @@ export function ControlPanel({
                   <details className="voco-preferences__card voco-preferences__disclosure"><summary>Update preferences and installation details</summary>
                     <div className="voco-preferences__form">
                       <label className="voco-field voco-preferences__field-row"><span>Installation method for update instructions</span><select value={config.installChannel} onChange={(event) => void savePatch({ installChannel: event.target.value as AppConfig["installChannel"] })}>
-                        <option value="github-release">GitHub Release (.deb)</option>{config.installChannel === "appimage" ? <option value="appimage" disabled>AppImage (legacy, publication paused)</option> : null}<option value="source">Source build</option>{config.installChannel === "flatpak" ? <option value="flatpak" disabled>Flatpak (legacy, unverified)</option> : null}{config.installChannel === "snap" ? <option value="snap" disabled>Snap (legacy, unverified)</option> : null}
+                        <option value="github-release">GitHub Release</option>{config.installChannel === "appimage" ? <option value="appimage" disabled>AppImage (legacy, publication paused)</option> : null}<option value="source">Source build</option>{config.installChannel === "flatpak" ? <option value="flatpak" disabled>Flatpak (legacy, unverified)</option> : null}{config.installChannel === "snap" ? <option value="snap" disabled>Snap (legacy, unverified)</option> : null}
                       </select></label>
-                      <p className="voco-preferences__helper">VOCO currently publishes and verifies the GitHub Release .deb. AppImage, Flatpak, and Snap are not current published release channels.</p>
+                      <p className="voco-preferences__helper">Choose the Debian, Fedora, openSUSE, or Arch package for your distribution from the published GitHub Release. Omarchy uses the Arch package. AppImage, Flatpak, and Snap are not current published release channels.</p>
                       <label className="voco-field voco-preferences__field-row"><span>Update channel</span><select value={config.updateChannel} onChange={(event) => void savePatch({ updateChannel: event.target.value as AppConfig["updateChannel"] })}><option value="stable">Stable</option><option value="beta">Beta</option></select></label>
                       <p className="voco-preferences__helper">{updateInstallCopy}</p>
                       <p className="voco-preferences__helper">{config.updateChannel === "beta" ? "Beta updates should be treated as higher-churn builds with faster feedback cycles." : "Stable updates should remain the default for day-to-day use."}</p>

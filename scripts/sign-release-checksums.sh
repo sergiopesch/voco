@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Detach-sign checksum files for a VOCO release. Run on the signing laptop only.
+# Detach-sign checksum files for a VOCO release. Run on the maintainer’s local signing environment only.
 # Does not upload, retag, or store the passphrase.
 set -euo pipefail
 

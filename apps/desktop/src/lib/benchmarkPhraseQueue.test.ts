@@ -16,13 +16,13 @@ describe('pinned append-only candidate',()=>{
  });
  it('appends exactly once and preserves final punctuation',async()=>{
   let n=0;worker.mockImplementation(async(_c,{request:r})=>({...r,mode:'append-only',text:r.op==='start'?null:r.op==='finish'?'Every elevation.':['Every elevat','Every elevation'][n++]}));
-  const {queue,paste}=make();queue.pushAudio(new Float32Array(640),16000);queue.enqueue();await queue.finish();
+  const {queue,paste}=make();queue.pushAudio(new Float32Array(3200),16000);queue.enqueue();await queue.finish();
   expect(paste.mock.calls.map(c=>c[0]).join('')).toBe('Every elevation.');
   expect(paste.mock.calls.map(c=>c[0])).toEqual(['Every elevat','ion','.']);
  });
  it('retains a revision and refuses to paste it',async()=>{
   let n=0;worker.mockImplementation(async(_c,{request:r})=>({...r,mode:'append-only',text:r.op==='start'?null:['Hello','Hallo'][n++]}));
-  const {queue,paste,observed,failure}=make();queue.pushAudio(new Float32Array(640),16000);await expect(queue.finish()).rejects.toThrow('revised');
+  const {queue,paste,observed,failure}=make();queue.pushAudio(new Float32Array(3200),16000);await expect(queue.finish()).rejects.toThrow('revised');
   expect(paste).toHaveBeenCalledTimes(1);expect(observed).toHaveBeenLastCalledWith('Hallo');expect(failure).toHaveBeenCalledOnce();
   expect(transport).toHaveBeenCalledWith('benchmark_stream',{request:expect.objectContaining({op:'diagnostic',reason:'prefix_revision'})});
  });
@@ -33,7 +33,7 @@ describe('pinned append-only candidate',()=>{
  it('ignores an in-flight response after cancellation',async()=>{
   let resolve!:(x:unknown)=>void;let inflight:Record<string,unknown>={};
   worker.mockImplementation(async(_c,{request:r})=>r.op==='push'?new Promise(done=>{resolve=done;inflight=r;}):({...r,mode:'append-only',text:null}));
-  const {queue,paste}=make();queue.pushAudio(new Float32Array(320),16000);
+  const {queue,paste}=make();queue.pushAudio(new Float32Array(1600),16000);
   await vi.waitFor(()=>expect(resolve).toBeDefined());queue.cancel();resolve({...inflight,mode:'append-only',text:'Late text'});await queue.finish();expect(paste).not.toHaveBeenCalled();
   expect(requests()[requests().length-1]?.op).toBe('cancel');
  });
@@ -46,7 +46,7 @@ describe('pinned append-only candidate',()=>{
   let release!:()=>void;const pasted:string[]=[];
   const paste=vi.fn(async(text:string)=>{pasted.push(text);if(pasted.length===1)await new Promise<void>(done=>{release=done;});});
   const queue=new BenchmarkPhraseQueue(paste,vi.fn(),vi.fn(),vi.fn());
-  queue.pushAudio(new Float32Array(960),16000);
+  queue.pushAudio(new Float32Array(4800),16000);
   await vi.waitFor(()=>expect(requests()).toHaveLength(4));
   expect(paste).toHaveBeenCalledTimes(1);release();await queue.finish();
   expect(pasted).toEqual(['Every',' elevation.']);
@@ -55,13 +55,13 @@ describe('pinned append-only candidate',()=>{
  it('preserves every sample across irregular callback boundaries and flushes the tail',async()=>{
   worker.mockImplementation(async(_c,{request:r})=>({...r,mode:'append-only',text:null}));
   const {queue}=make();
-  const audio=Float32Array.from({length:1001},(_,i)=>i/1024);
+  const audio=Float32Array.from({length:4841},(_,i)=>i/8192);
   queue.pushAudio(audio.subarray(0,111),16000);
-  queue.pushAudio(audio.subarray(111,878),16000);
-  queue.pushAudio(audio.subarray(878),16000);
+  queue.pushAudio(audio.subarray(111,2878),16000);
+  queue.pushAudio(audio.subarray(2878),16000);
   queue.enqueue();await queue.finish();
   const packets=transport.mock.calls.map(c=>c[1].request).filter(r=>r.op==='push');
-  expect(packets.map(r=>r.audio.length)).toEqual([320,320,320,41]);
+  expect(packets.map(r=>r.audio.length)).toEqual([1600,1600,1600,41]);
   expect(packets.flatMap(r=>r.audio)).toEqual(Array.from(audio));
  });
  it('rejects sample rate changes before the first complete packet',async()=>{
@@ -81,7 +81,7 @@ describe('pinned append-only candidate',()=>{
  });
  it.each([8000,22050,44100,48000,96000])('keeps packet geometry at %i Hz',async rate=>{
   worker.mockImplementation(async(_c,{request:r})=>({...r,mode:'append-only',text:null}));
-  const {queue}=make();const count=Math.round(rate*.02);
+  const {queue}=make();const count=Math.round(rate*.1);
   const audio=Float32Array.from({length:count*2+7},(_,i)=>i/(count*3));
   queue.pushAudio(audio.subarray(0,3),rate);queue.pushAudio(audio.subarray(3),rate);
   queue.enqueue();await queue.finish();
@@ -114,7 +114,7 @@ describe('privacy-preserving delivery attribution', () => {
  it('reports coalescing and a pending delivery without mistaking it for lost recognition', async () => {
   let n=0;worker.mockImplementation(async (_c,{request:r}) => ({...r,mode:'append-only',text:r.op==='start'?null:['A','A b','A bc'][n++]}));
   let release!:()=>void;const paste=vi.fn(async()=>{if(paste.mock.calls.length===1)await new Promise<void>(done=>{release=done;});});
-  const queue=new BenchmarkPhraseQueue(paste,vi.fn(),vi.fn(),vi.fn());queue.pushAudio(new Float32Array(960),16000);
+  const queue=new BenchmarkPhraseQueue(paste,vi.fn(),vi.fn(),vi.fn());queue.pushAudio(new Float32Array(4800),16000);
   await vi.waitFor(()=>expect(requests()).toHaveLength(4));release();await queue.finish();
   const deliveries=quality().filter(e=>e.event==='delivery_requested');
   expect(deliveries.map(e=>[e.delivery_seq,e.hypothesis_seq,e.coalesced_hypotheses])).toEqual([[1,1,0],[2,3,1]]);
@@ -124,13 +124,13 @@ describe('privacy-preserving delivery attribution', () => {
  it('keeps uncertain delivery explicit and does not leak rejection content', async () => {
   worker.mockImplementation(async (_c,{request:r})=>({...r,mode:'append-only',text:r.op==='start'?null:'secret_SENTINEL'}));
   const queue=new BenchmarkPhraseQueue(async()=>{throw new Error('secret_SENTINEL /private/path window title');},vi.fn(),vi.fn(),vi.fn());
-  queue.pushAudio(new Float32Array(320),16000);await expect(queue.finish()).rejects.toThrow('secret_SENTINEL');
+  queue.pushAudio(new Float32Array(1600),16000);await expect(queue.finish()).rejects.toThrow('secret_SENTINEL');
   expect(quality()[quality().length-1]).toMatchObject({outcome:'failed',failed_delivery_seq:1,pending_delivery_count:0,dispatched_count:0,accepted_equals_dispatched:false,destination_content_observation:'unavailable'});
   expect(JSON.stringify(quality())).not.toContain('SENTINEL');
  });
  it('keeps diagnostics rejection independent of successful dictation', async () => {
   transport.mockImplementation(async (_c,{request:r})=>{if(r.op==='quality')throw new Error('disk unavailable');return {...r,mode:'append-only',text:r.op==='start'?null:'Hello'};});
-  const {queue,paste,failure}=make();queue.pushAudio(new Float32Array(320),16000);queue.enqueue();await queue.finish();
+  const {queue,paste,failure}=make();queue.pushAudio(new Float32Array(1600),16000);queue.enqueue();await queue.finish();
   expect(paste).toHaveBeenCalledOnce();expect(failure).not.toHaveBeenCalled();
  });
 });
@@ -143,7 +143,7 @@ describe('bounded diagnostic transport', () => {
    if(r.op==='quality')return new Promise<void>(done=>releases.push(done));
    return {...r,mode:'append-only',text:r.op==='start'?null:'x'.repeat(++n)};
   });
-  const {queue,paste}=make();queue.pushAudio(new Float32Array(320*20),16000);
+  const {queue,paste}=make();queue.pushAudio(new Float32Array(1600*20),16000);
   await vi.waitFor(()=>expect(requests()).toHaveLength(21));
   expect(releases).toHaveLength(32);expect(paste).toHaveBeenCalledTimes(20);
   releases.forEach(release=>release());await Promise.resolve();await Promise.resolve();await Promise.resolve();
@@ -167,14 +167,14 @@ describe('exact suffix preservation with attributed diagnostics', () => {
   ['https://', 'https://example.test/a_b?x=2026-09-15'],
  ])('preserves the exact final payload for %j', async (first, final) => {
   worker.mockImplementation(async (_c,{request:r})=>({...r,mode:'append-only',text:r.op==='start'?null:r.op==='finish'?final:first}));
-  const {queue,paste}=make();queue.pushAudio(new Float32Array(320),16000);queue.enqueue();await queue.finish();
+  const {queue,paste}=make();queue.pushAudio(new Float32Array(1600),16000);queue.enqueue();await queue.finish();
   expect(paste.mock.calls.map(c=>c[0]).join('')).toBe(final);
   expect(quality()[quality().length-1]).toMatchObject({outcome:'finished',accepted_equals_dispatched:true,...textLengths(final,'dispatched')});
  });
  it('waits for an in-flight dispatch on cancellation and reports its weaker outcome', async () => {
   worker.mockImplementation(async (_c,{request:r})=>({...r,mode:'append-only',text:r.op==='push'?'Hello':null}));
   let release!:()=>void;const paste=vi.fn(async()=>new Promise<void>(done=>{release=done;}));
-  const queue=new BenchmarkPhraseQueue(paste,vi.fn(),vi.fn(),vi.fn());queue.pushAudio(new Float32Array(320),16000);
+  const queue=new BenchmarkPhraseQueue(paste,vi.fn(),vi.fn(),vi.fn());queue.pushAudio(new Float32Array(1600),16000);
   await vi.waitFor(()=>expect(release).toBeDefined());queue.cancel();
   expect(quality().some(e=>e.event==='terminal')).toBe(false);release();await queue.finish();
   expect(quality()[quality().length-1]).toMatchObject({outcome:'cancelled',dispatched_count:1,destination_content_observation:'unavailable'});
@@ -185,9 +185,24 @@ describe('exact suffix preservation with attributed diagnostics', () => {
 it('keeps coalesced delivery linked to a recorded hypothesis when identical replies repeat', async () => {
  let n=0;worker.mockImplementation(async (_c,{request:r})=>({...r,mode:'append-only',text:r.op==='start'?null:['A','A b','A b'][n++]}));
  let release!:()=>void;const paste=vi.fn(async()=>{if(paste.mock.calls.length===1)await new Promise<void>(done=>{release=done;});});
- const queue=new BenchmarkPhraseQueue(paste,vi.fn(),vi.fn(),vi.fn());queue.pushAudio(new Float32Array(960),16000);
+ const queue=new BenchmarkPhraseQueue(paste,vi.fn(),vi.fn(),vi.fn());queue.pushAudio(new Float32Array(4800),16000);
  await vi.waitFor(()=>expect(requests()).toHaveLength(4));release();await queue.finish();
  const hypotheses=quality().filter(e=>e.event==='hypothesis').map(e=>e.hypothesis_seq);
  const deliveries=quality().filter(e=>e.event==='delivery_requested').map(e=>e.hypothesis_seq);
  expect(hypotheses).toEqual([1,2]);expect(deliveries).toEqual([1,2]);
+});
+
+it('uses ten ordered audio requests per second and flushes Stop without waiting for another callback', async () => {
+ worker.mockImplementation(async (_c,{request:r})=>({...r,mode:'append-only',text:null}));
+ const {queue}=make();
+ const audio=Float32Array.from({length:44117},(_,i)=>Math.sin(i/37));
+ for(let offset=0;offset<audio.length;offset+=882) queue.pushAudio(audio.subarray(offset,offset+882),44100);
+ queue.enqueue(); await queue.finish();
+ const pushes=requests().filter(r=>r.op==='push');
+ expect(pushes).toHaveLength(11);
+ expect(pushes.slice(0,10).every(r=>r.audio.length===4410)).toBe(true);
+ expect(pushes[10].audio.length).toBe(17);
+ expect(pushes.flatMap(r=>r.audio)).toEqual(Array.from(audio));
+ expect(requests()[requests().length-1]?.op).toBe('finish');
+ expect(quality()[quality().length-1]).toMatchObject({captured_samples:44117,enqueued_samples:44117,responded_samples:44117,buffered_samples:0});
 });

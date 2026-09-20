@@ -290,6 +290,15 @@ fn desktop_paste_for_target(
     expected_target: Option<&str>,
     first_delivery: bool,
 ) -> Result<InsertionResult, InsertionError> {
+    // No IPC caller may turn a missing preflight identity into an unguarded
+    // paste. Reject before probing, reading a field or mutating the clipboard.
+    let expected_target = expected_target
+        .filter(|token| !token.is_empty())
+        .ok_or_else(|| {
+            InsertionError::rejected(
+                "No dictation destination was verified. Focus a text field and start again.",
+            )
+        })?;
     if !desktop_paste_enabled() {
         return Err(InsertionError::rejected("Desktop paste is not enabled."));
     }
@@ -311,7 +320,7 @@ fn desktop_paste_for_target(
     let target_started = Instant::now();
     let target = desktop_target();
     let target_probe_ms = target_started.elapsed().as_millis() as u64;
-    if expected_target.is_some() && expected_target != target.token.as_deref() {
+    if Some(expected_target) != target.token.as_deref() {
         crate::performance::destination_check(
             &target.scope,
             target.events_tracked,
@@ -325,11 +334,7 @@ fn desktop_paste_for_target(
         &target.scope,
         target.events_tracked,
         "paste",
-        if expected_target.is_some() {
-            "matched"
-        } else {
-            "unverified"
-        },
+        "matched",
         target_probe_ms,
     );
     let terminal = target.shortcut == "ctrl+shift+v";
@@ -1029,6 +1034,18 @@ fn clipboard_transaction(
 mod tests {
     use super::*;
     use std::cell::Cell;
+
+    #[test]
+    fn missing_destination_rejects_before_any_desktop_operation() {
+        for target in [None, Some("")] {
+            let error = desktop_paste_for_target("Synthetic phrase.", target, true).unwrap_err();
+            assert_eq!(error.outcome, DeliveryOutcome::Rejected);
+            assert!(!error.clipboard_changed);
+            assert!(error
+                .message
+                .contains("No dictation destination was verified"));
+        }
+    }
 
     #[test]
     fn observation_waits_for_content_and_never_retries_uncertain_delivery() {

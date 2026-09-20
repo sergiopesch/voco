@@ -69,6 +69,25 @@ class FocusTests(unittest.TestCase):
     def test_multiple_active_windows_reject(self):
         self.app.children.append(Node('/other',states=['active']))
         self.assertIsNone(helper.probe()['token'])
+    def test_mutter_decoration_is_not_a_second_dictation_destination(self):
+        decoration = Node('/decoration', states=['active'])
+        decorator = Node('/decorator', [decoration])
+        decorator.get_process_id = lambda: 51515151
+        self.desktop.children.insert(0, decorator)
+        def executable(path, **_):
+            return Path('/usr/libexec/mutter-x11-frames' if '51515151' in str(path) else '/usr/bin/python3')
+        with patch.object(Path, 'resolve', executable):
+            before = helper.probe()
+            self.assertEqual(before['scope'], 'control')
+            self.assertIsNotNone(before['token'])
+            self.a.states.clear(); self.b.states.add('focused')
+            self.assertNotEqual(before['token'], helper.probe()['token'])
+            self.window.states.clear()
+            self.assertIsNone(helper.probe()['token'])
+    def test_unreadable_decorator_identity_does_not_resolve_ambiguity(self):
+        self.desktop.children.append(Node('/unknown-app', [Node('/unknown', states=['active'])]))
+        with patch.object(Path, 'resolve', side_effect=OSError('process disappeared')):
+            self.assertIsNone(helper.probe()['token'])
     def test_terminal_role_and_role_changes_are_fresh(self):
         self.assertEqual(helper.probe()['shortcut'],'ctrl+v')
         self.a.role='terminal'
@@ -145,7 +164,31 @@ class FocusTests(unittest.TestCase):
         calls=[]
         GLib.MainContext.default=lambda:types.SimpleNamespace(pending=lambda:True,iteration=lambda _:calls.append(1))
         self.assertIsNone(helper.probe()['token'])
-        self.assertEqual(len(calls),256)
+        self.assertLessEqual(len(calls),4096)
+        self.assertGreater(len(calls),0)
+    def test_window_transition_backlog_is_drained_before_binding(self):
+        from gi.repository import GLib
+        before=helper.probe()['token']
+        remaining=[1000]
+        def iteration(_):
+            remaining[0]-=1
+            if remaining[0]==0:
+                self.a.states.clear();self.b.states.add('focused')
+                self.event(self.b,True)
+        GLib.MainContext.default=lambda:types.SimpleNamespace(pending=lambda:remaining[0]>0,iteration=iteration)
+        after=helper.probe()
+        self.assertEqual(after['scope'],'control')
+        self.assertEqual(remaining[0],0)
+        self.assertIsNotNone(after['token'])
+        self.assertNotEqual(before,after['token'])
+    def test_slow_event_backlog_has_a_time_budget(self):
+        from gi.repository import GLib
+        import itertools
+        calls=[]
+        GLib.MainContext.default=lambda:types.SimpleNamespace(pending=lambda:True,iteration=lambda _:calls.append(1))
+        with patch('time.monotonic', side_effect=itertools.count(0, .01)):
+            self.assertIsNone(helper.probe()['token'])
+        self.assertLess(len(calls),10)
     def test_output_contains_only_finite_metadata_and_opaque_token(self):
         result=helper.probe()
         self.assertEqual(set(result),{'shortcut','token','scope','events_tracked'})

@@ -1,16 +1,26 @@
 # Release status
 
-**2026.0.42** combines safer capture admission, explicit offline NVIDIA recovery,
-maintainability and dependency updates, and the public TypeSafe evaluation guide.
+The [latest published GitHub release](https://github.com/sergiopesch/voco/releases/latest)
+is authoritative for current downloads. A source version, local test receipt or
+private draft does not establish publication or installation.
 
-- [Release and assets](https://github.com/sergiopesch/voco/releases/tag/voco.2026.0.42)
-- [Changes and qualification scope](releases/2026.0.42.md)
-- [Installation and signature verification](install.md)
+This source snapshot contains **2026.0.43**: Debian, Fedora, openSUSE and Arch
+package profiles, native Wayland capture and Omarchy integration. Final package
+and desktop evidence is recorded in [Linux support](linux-support.md) and the
+[qualification report](testing/linux-release-2026-09-19.md). Publication requires
+publisher signatures, all protected CI gates and verified uploaded/downloaded
+assets. Use the [native installation guide](install-native.md) only with a
+matching published release.
 
-Only a published GitHub release establishes availability; source version metadata
-or a draft does not. The Debian amd64 package is the supported delivery format.
-No changes to the speech model, context setting or thread default are promoted
-from the small TypeSafe experiments.
+- [.43 changes and measured limits](releases/2026.0.43.md)
+- [Earlier .42 release and assets](https://github.com/sergiopesch/voco/releases/tag/voco.2026.0.42)
+- [.42 changes and qualification scope](releases/2026.0.42.md)
+- [General installation and signature verification](install.md)
+
+The .42 Debian release combined safer capture admission, explicit offline recovery
+and the TypeSafe guide. The .43 model and context remain unchanged; CPU thread
+selection now reserves desktop headroom, supported by the separate installed
+worker and desktop checks. No new semantic score is claimed for these changes.
 
 ## Release boundaries
 
@@ -26,3 +36,7 @@ and checksum files additionally bind them to the stated signing key.
 GTK 0.18, WebKit2GTK 2.0 and the single patched glib 0.18.5 copy stay in place.
 Userspace fixtures are not certification of every compositor, physical microphone
 or application. Known limitations remain explicit in the release notes.
+
+The [20 September polish verification](testing/linux-release-2026-09-20.md) records the refreshed application identity, seven
+package checks, four desktop scenarios and preserved setup failures. Earlier long
+and recovery measurements remain attributed to their original engine build.

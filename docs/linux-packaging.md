@@ -1,9 +1,10 @@
 # Linux packaging
 
-VOCO 2026.0.42 is distributed as a complete Debian amd64 package. Model weights,
-native libraries and their notices are included; no recognition download or GPU
-is required for normal English dictation and explicit recovery. Other packaging
-formats below remain experimental.
+VOCO packages include model weights, native libraries and their notices; no
+recognition download or GPU is required for normal English dictation and explicit
+recovery. Version 2026.0.43 provides Debian, Fedora, openSUSE and Arch/Omarchy
+profiles. Check [release status](release-candidate.md): build artifacts become
+public downloads only when attached to a published release.
 
 ## Build and assemble
 
@@ -15,8 +16,8 @@ NVIDIA payload has its own identity and qualification requirements.
 ```bash
 npm ci
 npm run build
-python3 scripts/package-nvidia.py /path/to/tauri-base.deb /path/to/voco_2026.0.42_amd64.deb --debian-version 2026.0.42
-bash scripts/verify-deb-package.sh /path/to/voco_2026.0.42_amd64.deb
+python3 scripts/package-nvidia.py /path/to/tauri-base.deb /path/to/voco_2026.0.43_amd64.deb --debian-version 2026.0.43
+bash scripts/verify-deb-package.sh /path/to/voco_2026.0.43_amd64.deb
 ```
 
 A base Tauri bundle is incomplete and must never be published as VOCO. The assembler
@@ -27,11 +28,31 @@ isolated runtime before publication. Record source and package SHA-256 identitie
 Do not include personal recordings, transcripts, API credentials or private receipts.
 
 The package requires Python 3, NumPy, psutil and the declared native dependencies.
+The worker defaults to at most four CPU threads, leaving one CPU from its affinity
+available for desktop work, with a minimum of one recognizer thread. This avoids
+oversubscribing a constrained desktop while the receiving application is active. Explicit research overrides stay
+explicit; diagnostics record the effective thread count. CPU quotas imposed without
+matching affinity remain a separate performance constraint.
 Its ABI floor includes glibc 2.39 and libstdc++ 13.2.0. X11 helpers are required;
-ydotool is recommended for Wayland and needs a working input service. Debian 13
+ydotool and the separately packaged Ubuntu ydotoold are recommended for Wayland;
+the input service must also be configured and running. Debian 13
 repositories may not provide it, so the recommendation must not block X11 installs. `at-spi2-core` and
 `gir1.2-atspi-2.0` provide the accessibility bus and bindings. Package installation
 does not change the selected input source or restart IBus.
+
+The .43 Debian package repairs inherited `0775` permissions on its own root-owned
+directories to `0755` during configuration. The reviewed migration uses directory
+descriptors, rejects symlink traversal and leaves user files, custom modes and
+`dpkg-statoverride` entries unchanged. Missing documentation directories are allowed
+when the system uses `path-exclude`. The verifier checks the exact generated hook;
+native RPM and Arch packages omit it because their managers apply archive modes.
+Upgrade qualification includes legacy installations, not only fresh extraction.
+
+The .43 candidate additionally links libpulse (`libpulse-dev` on Debian build
+hosts, `libpulse0` at runtime). Fedora, openSUSE and Arch profiles map that library
+to their native package names. Native Wayland capture requires PipeWire's Pulse
+compatibility server and explicit microphone selection/session permission;
+installing the client library alone does not establish that capture works.
 
 ## Runtime provisioning
 
@@ -73,16 +94,9 @@ pinned artifacts with mutable downloads.
 AppImage remains a local packaging experiment and is not published until the full linuxdeploy and
 appimagetool chain can be supplied from immutable, checksum-verified sources.
 
-## Next
-
-- Ubuntu App Center review path after local snap install and runtime validation
-- Flatpak sandbox validation to determine whether Flathub is a real fit
-- release workflow polish for the channels that already build cleanly
-
-## Later
-
-- strict-confinement investigation only if VOCO stops depending on host-level desktop automation
-- Native RPM and Arch candidates require per-artifact external build, dependency, payload and install/remove receipts; private verification does not establish a published or signed release channel
+Native RPM and Arch channels require independent build, dependency, payload,
+install/remove and desktop receipts. Flatpak, Snap and AppImage remain research
+formats; no store submission or additional channel is implied by their recipes.
 
 ## Asset Naming
 
@@ -206,7 +220,7 @@ bash ./scripts/package-appimage.sh
 
 ## GNOME desktop clipboard dependency
 
-The 2026.0.28 Debian candidate depends on `xclip`. On GNOME Wayland with `DISPLAY`,
+The Debian package depends on `xclip`. On GNOME Wayland with `DISPLAY`,
 native desktop paste uses its XWayland clipboard bridge, then `ydotool` for the
 Wayland keyboard gesture. This avoids the locally reproduced `wl-copy` temporary
 focus-surface timeout. Other Wayland desktops retain `wl-copy`. No fallback is
@@ -222,9 +236,9 @@ observation; that text is not logged or returned to the frontend. The helper doe
 not change accessibility settings. Unsupported controls retain best-effort delivery,
 without a universal acceptance claim. See [observation](testing/delivery-observation.md).
 
-## NVIDIA local testing candidate (2026.0.37)
+## Bundled NVIDIA runtime
 
-The local candidate bundles Nemotron Speech Streaming English 0.6B Q8_0, its
+The complete package bundles Nemotron Speech Streaming English 0.6B Q8_0, its
 modified CPU runtime, Python worker and model notices under `/usr/lib/voco/speech`
 and `/usr/share/doc/voco/nvidia`. Ubuntu supplies `python3`, `python3-numpy`,
 `python3-psutil` and `libsentencepiece0`. No Homebrew, virtual environment, network
@@ -237,14 +251,12 @@ verifies the fixed model hash, adds a runtime SHA-256 manifest and regenerates t
 Debian file inventory. Install the resulting complete package with apt so declared
 dependencies are resolved. A base Tauri package alone is incomplete for NVIDIA.
 
-Desktop paste and streaming are enabled by default for this authorized candidate;
-`VOCO_DESKTOP_PASTE=0` or `VOCO_DESKTOP_STREAM=0` can disable the corresponding
-path. Existing target checks, enhancement behavior and Whisper recovery remain.
-The English NVIDIA model is used for normal enhancement-off desktop streaming.
-Startup prepares that selected runtime through the serialized worker and waits for
-actual warmup success before readiness. It does not implicitly download Whisper
-for the default path. Legacy-selected startup and explicit legacy transcription
-retain the separate Whisper model check/download.
+Normal dictation and explicit interrupted-audio Retry use the bundled NVIDIA
+model. Recovery never automatically replays text into a destination. Startup warms
+the selected recognizer before readiness; it does not download Whisper for this
+path. The separate legacy/browser compatibility path retains its own Whisper model
+check. Product settings do not expose enhancement, assistant or alternate output
+modes.
 
 `VOCO_PERFORMANCE_LOG=1` enables private, rotating local metrics. Worker records
 include model/runtime identity, monotonic and wall clocks, hashed stream identity,
@@ -263,7 +275,7 @@ that needs independent field readback. Missing recordings remain unavailable.
 ## Native Fedora and Arch candidate recipes
 
 `scripts/stage-native-packages.py` stages an RPM spec and Arch PKGBUILD from a
-complete, hash-verified Debian candidate. These are native package-manager wrappers
+complete, hash-verified Debian release or local candidate. These are native package-manager wrappers
 around the same prebuilt application/model bytes, not a portable source rebuild.
 They preserve file hashes and relative loader links, disable strip/debug rewriting,
 and declare distro-specific runtime dependencies. Unknown Debian dependency
@@ -275,12 +287,28 @@ python3 scripts/stage-native-packages.py COMPLETE.deb FRESH_DIRECTORY \
   --verifier /absolute/path/to/voco/scripts/verify-deb-package.sh
 ```
 
+Final versions such as `2026.0.43` use native package revision `1`. Use
+`--native-release 2` for a packaging-only revision of the same final payload.
+This does not authorize changing application/model bytes under the same version.
+Legacy `+localN` candidates retain their previous native revision mapping; do not
+assume a final revision `1` upgrades a previously installed local revision `N`.
+Unknown versions, dependency constraints and revision overrides are rejected.
+The reviewed Debian ABI floors map to Arch `glibc>=2.39`, `gcc-libs>=13.2.0`
+and RPM `glibc >= 2.39`, `libstdc++ >= 13.2.0` requirements.
+
+Native package signatures are separate from Debian release signatures. Public
+Arch delivery needs a documented trusted signing key and a maintained dependency
+source. Isolated tests may use an explicitly disposable signing key trusted only
+inside the test guest; never ask end users to disable signature verification.
+
 Build the generated `voco.spec` with `rpmbuild` in a disposable Fedora builder, or
 `PKGBUILD` with `makepkg` in a disposable Arch builder. Never run package install or
 removal tests on the owner desktop. `scripts/verify-native-install.py` compares the
 installed payload's bytes, links, application-owned modes, ownership and ELF closure
 against `payload-inventory.json`; `--removed` checks removal of all files/links.
-It requires a disposable Docker environment. Shared system directory modes remain
+It requires a disposable Docker environment, or explicit `--isolated-vm` in an
+owned qualification VM verified by `systemd-detect-virt`. Never use the VM override
+on the live user desktop. Shared system directory modes remain
 owned by the distribution. Run `npm run test:native-package` for staging-boundary
 regressions.
 
@@ -303,3 +331,20 @@ For a deliberately network-disabled verification job, set
 `VOCO_PACKAGE_VERIFY_OFFLINE=1` when invoking `scripts/verify-deb-package.sh`. This
 runs local AppStream validation with `--no-net`; it does not validate external URLs.
 Omit the variable for the release job's normal online URL checks.
+
+The [2026-09-19 Omarchy qualification](testing/omarchy-native-2026-09-19.md)
+records the earlier Arch/Hyprland baseline. The [current experiment report](testing/linux-release-2026-09-19.md)
+records the native-capture fixes, tested desktop packages and final artifact checks.
+
+## Distribution-specific RPM profiles
+
+`stage-native-packages.py --rpm-distribution fedora` is the default. Use
+`--rpm-distribution opensuse` for the Tumbleweed dependency profile. Each output
+records its profile in provenance; qualify and sign each native artifact separately.
+Do not rename a Fedora RPM and call it an openSUSE build.
+
+The [SentencePiece companion recipes](../packaging/dependencies/sentencepiece/README.md)
+provide reviewed source builds where no system library package is available.
+RPM recipes mark bundled licenses with `%license`, preserving them on minimal
+`nodocs` installations. Full payload parity requires documents enabled.
+See [the current scope and gates](linux-support.md).

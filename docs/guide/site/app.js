@@ -25,6 +25,7 @@ const titles = [
   "Borrowed libraries",
   "Reading the code",
   "TypeSafe and measured improvement",
+  "Linux package qualification",
 ];
 let chapters = [],
   catalog,
@@ -55,7 +56,7 @@ function renderNav(query = "") {
       "a",
       { href: "#" + ch.id },
       node("span", {}, done.has(ch.id) ? "✓" : String(i + 1).padStart(2, "0")),
-      node("span", {}, titles[i]),
+      node("span", {}, titles[i] ?? ch.title),
     );
     if (location.hash === "#" + ch.id || (!location.hash && i === 0))
       a.setAttribute("aria-current", "page");
@@ -291,7 +292,7 @@ function renderChapter(ch) {
       node(
         "a",
         { href: "#" + chapters[index + 1].id },
-        "Next: " + titles[index + 1],
+        "Next: " + (titles[index + 1] ?? chapters[index + 1].title),
       ),
     );
   else end.append(node("a", { href: "#files" }, "Explore all source files"));

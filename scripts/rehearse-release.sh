@@ -51,7 +51,13 @@ echo "  appimage: ${APPIMAGE_NAME}"
   bash ./scripts/render-release-body.sh "${VERSION}" "${TAG_NAME}" > "${TMP_DIR}/release-body-no-appimage.md"
   bash ./scripts/render-release-body.sh "${VERSION}" "${TAG_NAME}" "${APPIMAGE_NAME}" > "${TMP_DIR}/release-body-with-appimage.md"
   grep -F 'voco_checksums.txt' "${TMP_DIR}/release-body-no-appimage.md" > /dev/null
-  grep -F "grep \" voco_${VERSION}_amd64.deb\$\" voco_checksums.txt | sha256sum --check -" "${TMP_DIR}/release-body-no-appimage.md" > /dev/null
+  for platform in debian fedora opensuse arch; do
+    grep -F "gpg --verify voco_${VERSION}_${platform}_checksums.txt.asc voco_${VERSION}_${platform}_checksums.txt && sha256sum --check --strict voco_${VERSION}_${platform}_checksums.txt" "${TMP_DIR}/release-body-no-appimage.md" > /dev/null
+  done
+  if grep -F 'PLATFORM_checksums.txt' "${TMP_DIR}/release-body-no-appimage.md"; then
+    echo "Release verification still contains an unresolved platform placeholder"
+    exit 1
+  fi
   grep -F "grep \" ${APPIMAGE_NAME}\$\" voco_checksums.txt | sha256sum --check -" "${TMP_DIR}/release-body-with-appimage.md" > /dev/null
 )
 

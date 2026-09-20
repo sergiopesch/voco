@@ -7,6 +7,19 @@ import sys
 import time
 
 
+def configure_cpu_threads():
+    if 'NEMO_SPEECH_CPU_THREADS' in os.environ:
+        return
+    try:
+        available = len(os.sched_getaffinity(0))
+    except (AttributeError, OSError):
+        available = os.cpu_count() or 1
+    # Leave a CPU available for capture, the compositor and the receiving app.
+    # A two-core Firefox/KDE trial exceeded the queue deadline with two workers;
+    # one worker completed the same real-time fixture without changing the model.
+    os.environ['NEMO_SPEECH_CPU_THREADS'] = str(max(1, min(4, available - 1)))
+
+
 def error_code(error):
     known = {
         'identity': 'invalid_identity', 'object': 'invalid_object', 'operation': 'invalid_operation',
@@ -123,6 +136,7 @@ def serve(protocol, source, model, metrics):
 
 
 def main(protocol):
+    configure_cpu_threads()
     try:
         from streaming import StreamingSession, Metrics
     except Exception as error:

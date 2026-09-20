@@ -40,7 +40,7 @@ omit the matching browser host.
 Use Python with NumPy, psutil and required GI bindings. Use `/usr/bin/python3` for distribution-provided GI bindings; a virtual environment
 or bare `python3` may select a different interpreter.
 Keep synthetic audio/input tests in private fixtures and retain exact evidence
-separately from source. The [release process](release-process.md) and [latest release notes](releases/2026.0.42.md)
+separately from source. The [release process](release-process.md) and [release status](release-candidate.md)
 explain qualification boundaries.
 
 ## Sending a change

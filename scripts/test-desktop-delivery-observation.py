@@ -329,6 +329,37 @@ class ObservationTests(unittest.TestCase):
         self.field.get_character_count = count
         self.assertEqual(self.verify(receipt)['observation'], 'pending')
         self.assertEqual(self.verify(receipt)['observation'], 'observed')
+    def test_expected_content_with_old_caret_waits_for_alignment(self):
+        self.field_value('Before ')
+        receipt = self.prepare('word')
+        self.field_value('Before word', 7)
+        self.assertEqual(self.verify(receipt)['observation'], 'pending')
+        self.field.caret = 11
+        self.assertEqual(self.verify(receipt)['observation'], 'observed')
+    def test_old_caret_alone_never_acknowledges_delivery(self):
+        receipt = self.prepare('word')
+        self.field_value('word', 0)
+        for _ in range(4):
+            self.assertEqual(self.verify(receipt)['observation'], 'pending')
+    def test_standalone_space_count_can_precede_caret(self):
+        self.field_value('Before')
+        receipt = self.prepare(' word', first=False)
+        self.field_value('Before ', 6)
+        self.assertEqual(self.verify(receipt)['observation'], 'pending')
+        self.field.caret = 7
+        self.assertEqual(self.verify(receipt)['observation'], 'pending')
+        self.field_value('Before word', 7)
+        self.assertEqual(self.verify(receipt)['observation'], 'pending')
+        self.field.caret = 11
+        self.assertEqual(self.verify(receipt)['observation'], 'observed')
+    def test_wrong_content_with_old_caret_fails_closed(self):
+        receipt = self.prepare('word')
+        self.field_value('oops', 0)
+        self.assertEqual(self.verify(receipt)['observation'], 'changed')
+    def test_expected_content_with_unrelated_caret_fails_closed(self):
+        receipt = self.prepare('word')
+        self.field_value('word', 2)
+        self.assertEqual(self.verify(receipt)['observation'], 'changed')
     def test_stable_wrong_text_after_torn_position_is_changed(self):
         receipt = self.prepare('word')
         original = self.field.get_character_count

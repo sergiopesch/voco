@@ -73,3 +73,16 @@ The owner session's successful dispatch records did not attest correct recipient
 text: content observation was unavailable. Do not use byte-count agreement to
 claim spaces, punctuation or words were correct. Final punctuation quality and
 safe whole-message refinement remain separate acceptance work.
+
+
+### Firefox content/caret propagation
+
+An isolated KDE/Firefox trial on the .43 candidate exposed a transient valid
+count with an old caret: content length changed from 463 to 465 while the caret
+remained at 463. The previous observer rejected that sample although the intended
+text arrived. The bounded observer now treats exact expected local content with
+an earlier known collapsed caret as pending. This also covers the standalone
+leading-space transition. It never acknowledges that intermediate state: two
+aligned expected text/position samples are still required. Wrong text, unrelated
+caret offsets, focus changes and backwards confirmed progress still fail closed.
+The three-second deadline and prohibition on replay are unchanged.

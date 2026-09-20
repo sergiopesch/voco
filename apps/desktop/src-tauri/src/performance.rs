@@ -499,7 +499,7 @@ fn write_events(
         .map(|bytes| format!("{:x}", Sha256::digest(bytes)));
     let header = json!({"event":"run_metadata", "version":env!("CARGO_PKG_VERSION"),
         "executable_sha256":executable_hash, "model":"nemotron-speech-streaming-en-0.6b-q8-context1", "fallback_model":"base.en",
-        "native_capture_compiled":cfg!(feature="native-capture-dev"),
+        "native_capture_compiled":cfg!(feature="native-capture"),
         "desktop_paste_enabled":crate::insertion::desktop_paste_enabled(),
         "desktop_stream_enabled":crate::insertion::desktop_stream_enabled(),
         "desktop_clipboard_helper":crate::insertion::desktop_clipboard_helper(),

@@ -3,14 +3,11 @@
 
 ## Supported Platforms
 
-| Platform         | Status            | Notes                                        |
-| ---------------- | ----------------- | -------------------------------------------- |
-| Ubuntu (X11)     | Reference target  | Candidate-specific desktop evidence required |
-| Ubuntu (Wayland) | Primary reference | Candidate-specific desktop evidence required |
-| Debian-derived   | Best-effort       | Likely to work, not regularly tested         |
-| Other Linux      | Experimental      | May work, not supported                      |
-| macOS            | Not targeted      | Not in scope                                 |
-| Windows          | Not targeted      | Not in scope                                 |
+VOCO targets Linux x86-64. The [Linux support matrix](../linux-support.md) records
+package families, runtime floors and qualification limits. The public release is
+2026.0.42; native Debian, Fedora, openSUSE and Arch/Omarchy packages for 2026.0.43
+remain candidates until their exact artifacts pass release acceptance.
+macOS and Windows are outside the current scope.
 
 ## Requirements
 
@@ -42,7 +39,7 @@ Hotkey backend selection:
 - Settings -> Advanced shows the detected session and whether insertion helpers are currently available. Presence is a prerequisite, not proof of delivery to a target.
 - The evdev fallback tracks left/right Alt, Shift, Control, and Super independently for each open keyboard. Extra Control/Super modifiers reject the default matches; repeats do not retrigger. Disconnect clears only that device's state, and reopening revalidates capabilities and the virtual-device exclusion before synchronizing currently held keys. Dropped kernel events suppress activation until the stream has been resynchronized; synthetic recovery never triggers a hotkey.
 - Native IBus, global-shortcut, evdev and external socket triggers use the configured desktop output route.
-  Protocol-v5 IBus text operations are disabled even for apparently safe metadata.
+  Protocol-v6 IBus is shortcut-only; older helpers must reconnect after upgrade.
 - The browser extension uses `Alt+Shift+V` after the user enables it in a tab. It addresses the
   captured plain-text DOM element; no global shortcut grab or IBus insertion is used for this route.
 - Native GTK/WebKit tests demonstrated a shared-context wrong-target failure, including controls
@@ -64,33 +61,39 @@ merely to copy a transcript. Installed physical Wayland qualification remains pe
 
 ### ydotoold (ydotool daemon)
 
-ydotool v1.0+ requires the `ydotoold` daemon to be running. On older versions (0.x), ydotool communicates with uinput directly.
+VOCO requires a running `ydotoold` for automatic Wayland paste, including when
+using the legacy 0.1.x client. The persistent virtual device avoids per-command
+creation delays. Modern clients also require access to the daemon socket.
 
-**Check if ydotoold is needed:**
+Ubuntu 24.04 provides the client and daemon separately:
+
 ```bash
-ydotool type "test"  # If this errors with "socket not found", you need ydotoold
+sudo apt install ydotool ydotoold
 ```
 
-**Start ydotoold:**
-```bash
-# One-time (current session)
-ydotoold &
+This installs the tools; it does not guarantee an active service. Check without
+injecting keys into the current application:
 
-# Persistent (systemd user service, if available)
-systemctl --user enable --now ydotoold
+```bash
+command -v ydotool ydotoold
+pgrep -x ydotoold
+systemctl --user status ydotoold
 ```
 
-**If ydotoold is not available as a service:**
-```bash
-# Add to ~/.bashrc or ~/.profile for auto-start
-pgrep -x ydotoold > /dev/null || ydotoold &
-```
+Use your distribution's packaged service when available and its documented socket
+permissions. VOCO's session must be able to reach that socket; an arbitrary daemon
+running as another user is not proof of access. Where no service exists, the daemon
+needs narrowly scoped access to `/dev/uinput` and a service managed for your login.
+Do not add it blindly to shell startup files or grant all keyboard-device access.
+The package deliberately does not change system device permissions.
 
-**Troubleshooting:**
-- `Permission denied`: ensure user is in `input` group and has uinput access
-- `Socket not found`: ydotoold is not running — start it manually
-- In the legacy helper API, `auto` falls back only when the typing helper did not start. A failed or timed-out helper may already have typed a prefix, so VOCO reports uncertain delivery and never retries the whole transcript.
-- In strict `type-simulation` mode, VOCO reports the failure instead of touching the clipboard
+`Permission denied` indicates device/socket access needs configuration. `Socket
+not found` indicates an unavailable daemon or a mismatched socket path. After
+setup, use a disposable text field to verify actual delivery. Settings diagnostics
+check prerequisites; only that destination test proves the complete path.
+
+A failed or timed-out helper may already have typed a prefix. VOCO retains uncertain
+output for explicit review and never retries the whole transcript automatically.
 
 ## Compatibility Helpers on X11
 
@@ -100,31 +103,35 @@ pgrep -x ydotoold > /dev/null || ydotoold &
 
 ## Known Limitations
 
-- Automatic delivery is limited to explicitly authorized eligible Chromium plain-text controls; other apps require manual copying
+- Native desktop paste and the separately authorized Chromium exact-field adapter have different target contracts; neither establishes support for every application
 - Rich editors, password controls and recognized sensitive metadata, selected ranges and unsupported frames are not browser adapter targets
 - Direct captured-element mutation may not participate in native browser undo history
 - Native Wayland, broad browser/app compatibility and physical microphone journeys require their own current evidence; isolated X11 tests do not prove them
 - Deadline checks assume a shared trustworthy host clock; arbitrary wall-clock rollback is outside their guarantee
-- Flatpak may require portal permissions for mic access
+- Flatpak is not a published or qualified distribution format
 - Some Wayland compositors block simulated input used by the compatibility helpers
-- First launch requires internet for model download (~142 MB)
+- Complete NVIDIA packages bundle the selected model for offline dictation. The
+  separately selected legacy Whisper path may download its own model.
 - AppImage publication is paused because Tauri/linuxdeploy still uses mutable helper downloads;
   local experiments require an explicitly supplied, checksum-verified final appimagetool
 
 ## Packaging
 
-| Format   | Status         | Notes                                                                 |
-| -------- | -------------- | --------------------------------------------------------------------- |
-| .deb     | Development build plus existing release channel | Current candidate changes are not proof of installation/publication |
-| .rpm     | Not configured | Can be added to tauri.conf.json targets                               |
-| AppImage | Local experiment | Not published until the complete packaging toolchain is pinned      |
+The complete Debian package is the common payload source. Explicit dependency
+profiles produce separate Fedora and openSUSE RPMs and an Arch pacman package.
+All packages include the desktop notification command through their native
+`libnotify` package mapping. See [packaging](../linux-packaging.md) for assembly,
+SentencePiece companion packages, verification and release requirements.
+AppImage remains a local experiment until its complete toolchain is pinned;
+Flatpak and Snap are not published.
 
 ## Data Locations
 
 | Data   | Path                                                                           |
 | ------ | ------------------------------------------------------------------------------ |
 | Config | `~/.config/voco/config.json`                                                   |
-| Models | `~/.local/share/voco/models/`                                                  |
+| Bundled NVIDIA models | `/usr/lib/voco/speech/models/`                                                  |
+| Optional legacy models | `~/.local/share/voco/models/` |
 | State  | `${XDG_STATE_HOME:-$HOME/.local/state}/voco/`                                  |
 | Socket | `$XDG_RUNTIME_DIR/voco.sock` or `${TMPDIR:-/tmp}/voco-$(id -u)/voco.sock`       |
 | Browser broker | `$XDG_RUNTIME_DIR/voco-browser/exact-field.sock` |

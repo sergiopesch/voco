@@ -1,4 +1,27 @@
 fn main() {
+    let arguments: Vec<_> = std::env::args_os().skip(1).collect();
+    match arguments.as_slice() {
+        [] => {}
+        [arg] if arg == "--toggle" => {
+            if let Err(error) = voco_lib::toggle_running_application() {
+                eprintln!("{error}");
+                std::process::exit(1);
+            }
+            return;
+        }
+        [arg] if arg == "--version" => {
+            println!("VOCO {}", env!("CARGO_PKG_VERSION"));
+            return;
+        }
+        [arg] if arg == "--help" || arg == "-h" => {
+            println!("Usage: voco [--toggle | --version | --help]\n\nWithout arguments, launch VOCO.\n--toggle  Request Start/Stop from VOCO already running in this desktop session.\n          Does not change focus, launch VOCO, or confirm recording state.");
+            return;
+        }
+        _ => {
+            eprintln!("Unknown arguments. Run voco --help for usage.");
+            std::process::exit(2);
+        }
+    }
     if let Err(error) = voco_lib::run() {
         eprintln!("VOCO could not start: {error}");
         #[cfg(target_os = "linux")]
