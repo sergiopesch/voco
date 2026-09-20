@@ -119,6 +119,21 @@ class FocusTests(unittest.TestCase):
         self.assertEqual(helper.probe()['shortcut'],'ctrl+shift+v')
         self.a.role='entry'
         self.assertEqual(helper.probe()['shortcut'],'ctrl+v')
+    def test_terminal_without_editable_flag_accepts_valid_caret(self):
+        self.a.role = 'terminal'; self.a.states.discard('editable')
+        self.assertEqual(helper.probe()['input_state'], 'editable')
+        self.assertIsNotNone(helper.probe()['token'])
+    def test_terminal_without_text_interface_rejects(self):
+        self.a.role = 'terminal'; self.a.states.discard('editable')
+        self.a.get_text_iface = lambda: None
+        self.assertIsNone(helper.probe()['token'])
+        self.assertEqual(helper.probe()['input_state'], 'unavailable')
+    def test_terminal_without_valid_caret_rejects(self):
+        from gi.repository import Atspi
+        self.a.role = 'terminal'; self.a.states.discard('editable')
+        Atspi.Text.get_caret_offset = lambda _: -1
+        self.assertIsNone(helper.probe()['token'])
+        self.assertEqual(helper.probe()['input_state'], 'unavailable')
     def test_unvisited_large_subtree_is_not_invalidated(self):
         hidden=Node('/hidden',[Node('/leaf') for _ in range(10000)])
         self.window.children=[hidden,self.a]

@@ -63,14 +63,14 @@ with full-resolution release graphics, exact values and methods.
 
 ## Native Linux packages
 
-**2026.0.44** updates onboarding and missing-cursor feedback for Ubuntu/Debian.
+**2026.0.45** updates onboarding and missing-cursor feedback for Ubuntu/Debian.
 Fedora, openSUSE and Arch/Omarchy packages remain at **2026.0.43**; download those
 from their matching release. Install only assets attached to a published release.
 Wayland uses native microphone capture so dictation can start with its panel
 hidden; X11 keeps browser capture.
 See the [support matrix](docs/linux-support.md),
 [native package installation](docs/install-native.md) and
-[.44 changes and qualification](docs/releases/2026.0.44.md).
+[.45 changes and qualification](docs/releases/2026.0.45.md).
 
 ## Contribute
 

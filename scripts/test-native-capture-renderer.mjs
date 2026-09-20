@@ -474,6 +474,40 @@ try {
         assert.equal(await page.evaluate(() => window.copiedText),undefined);
         assert.equal(await page.evaluate(()=>window.nativeCommands.some(c=>c.name==='benchmark_stream'&&c.args.request.op==='quality')),false);
       };
+      for (const scenario of ['onboarding-toggle', 'dictation-toggle', 'dictation-stop', 'browser-stop']) {
+        await loadTest();
+        await page.evaluate(scenario => {
+          const previous = window.nativeInvoke;
+          window.nativeInvoke = async (name,args) => {
+            if (name === 'native_capture_select_source') {
+              await new Promise(resolve => { window.finishSelection = resolve; });
+            }
+            return previous(name,args);
+          };
+          if (scenario !== 'onboarding-toggle') window.store.getState().setSurface('hidden');
+        }, scenario);
+        if (scenario === 'onboarding-toggle') {
+          await page.getByRole('button',{name:'Start Test',exact:true}).click();
+        } else {
+          await page.evaluate(scenario => window.listeners['voco:toggle-dictation']({payload:
+            scenario === 'browser-stop' ? {triggerId:'browser:pending-test',action:'start'} : null}), scenario);
+        }
+        await page.waitForFunction(()=>Boolean(window.finishSelection));
+        await page.evaluate(scenario => {
+          window.listeners['voco:toggle-dictation']({payload: scenario.endsWith('-stop') ? {action:'stop'} : null});
+          window.finishSelection();
+        }, scenario);
+        await page.waitForFunction(()=>window.store.getState().nativeCaptureSource!==null);
+        // Allow the original async handler and any incorrectly admitted start to settle.
+        await page.evaluate(()=>new Promise(resolve=>setTimeout(resolve,100)));
+        assert.equal(await page.evaluate(()=>window.nativeCommands.some(c=>c.name==='native_capture_begin')),false,scenario);
+        assert.equal(await page.evaluate(()=>window.calls.some(c=>c[0]==='getDesktopPasteStatus')),false,scenario);
+        assert.equal(await page.evaluate(()=>window.store.getState().status),'idle',scenario);
+        if (scenario === 'onboarding-toggle') assert.equal(await page.evaluate(()=>window.store.getState().surface),'onboarding');
+        if (scenario === 'browser-stop') assert.ok(await page.evaluate(()=>window.calls.some(c=>c[0]==='releaseBrowserRecording'&&c[1]==='browser:pending-test')));
+        await noOutput();
+        results.push({case:scenario+'-cancels-pending-microphone-setup',passed:true});
+      }
       await loadTest();
       assert.equal(await page.evaluate(()=>window.nativeCommands.some(c=>c.name==='native_capture_begin')),false);
       assert.equal(await page.getByRole('button',{name:'Finish Onboarding'}).isDisabled(),true);

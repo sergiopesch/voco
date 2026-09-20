@@ -98,9 +98,7 @@ def cursor_state(node, atspi):
         role = node.get_role()
         if role == atspi.Role.PASSWORD_TEXT:
             return "protected"
-        if role == atspi.Role.TERMINAL:
-            return "editable"
-        if state.contains(atspi.StateType.EDITABLE):
+        if role == atspi.Role.TERMINAL or state.contains(atspi.StateType.EDITABLE):
             # A writable field must expose a valid caret, including an empty field.
             text_position(node)
             return "editable"

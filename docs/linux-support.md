@@ -1,7 +1,7 @@
 # Linux packages and qualification
 
-**2026.0.44** is an Ubuntu/Debian onboarding and cursor-feedback update. Its
-[release notes](releases/2026.0.44.md) describe its own verification and limits.
+**2026.0.45** is an Ubuntu/Debian onboarding and cursor-feedback update. Its
+[release notes](releases/2026.0.45.md) describe its own verification and limits.
 The .43 desktop results below remain historical .43 evidence, not qualification
 of .44 on those desktops. Other native package channels remain at .43.
 
