@@ -152,3 +152,8 @@ silent device switching. Native capture permits real window hiding. Preserve the
 failed WebKit hidden-start experiment and independently verify audio retention.
 The debug audit needs all three explicit flags and completed private bundles;
 wait for their COMMIT receipts before terminating an audited test process.
+
+The [20 September refresh](docs/testing/linux-release-2026-09-20.md) distinguishes
+exact refreshed-binary package/smoke checks from the prior engine build's long and
+recovery evidence. Preserve both identities; documentation-only edits do not require
+rebuilding the qualified application. Bundled docs retain their assembly snapshot.

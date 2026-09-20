@@ -10,13 +10,18 @@ Native packages provide the dependencies and desktop integration appropriate to
 that system. A different package format alone does not improve recognition speed.
 Hardware tuning needs matched accuracy and latency measurements.
 
-| Target | Package | Observed qualification on final candidate bytes |
+| Target | Package | Engine qualification; refreshed-build scope below |
 | --- | --- | --- |
 | Ubuntu 24.04 | Debian `.deb` | Public .42 upgrade, GNOME Wayland/X11 repeated dictation, X11 long dictation, focus departure and explicit recovery |
 | Ubuntu 26.04, Debian 13, Mint 22.3 | Same Debian `.deb` | Container install/upgrade/reinstall/remove and complete payload checks; no default-desktop claim |
 | Fedora 44 | Fedora `.rpm` | Native installation and GNOME Wayland repeated/long dictation, focus departure and source-loss recovery |
 | openSUSE Tumbleweed | Separate openSUSE `.rpm` | Native installation with companion tokenizer; KDE Wayland, Firefox, Kate and Konsole |
 | Arch / Omarchy 4.0.4 | Pacman package | Native installation with companion tokenizer; packaged Omarchy Hyprland/Quickshell desktop, repeated and long dictation, focus departure and source-loss recovery |
+
+The [20 September refresh](testing/linux-release-2026-09-20.md) changes Updates
+help copy and bundled documentation. All seven package lifecycles and four desktop
+scenarios were repeated. Long/recovery results below retain the preceding engine
+build identity; they are not exact-byte measurements of the refreshed application.
 
 These are bounded test results, not certification of every desktop in each family.
 Fedora KDE, openSUSE GNOME and other Arch desktops were not independently qualified.

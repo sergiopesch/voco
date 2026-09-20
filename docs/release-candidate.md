@@ -36,3 +36,7 @@ and checksum files additionally bind them to the stated signing key.
 GTK 0.18, WebKit2GTK 2.0 and the single patched glib 0.18.5 copy stay in place.
 Userspace fixtures are not certification of every compositor, physical microphone
 or application. Known limitations remain explicit in the release notes.
+
+The [20 September polish verification](testing/linux-release-2026-09-20.md) records the refreshed application identity, seven
+package checks, four desktop scenarios and preserved setup failures. Earlier long
+and recovery measurements remain attributed to their original engine build.

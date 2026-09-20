@@ -60,3 +60,7 @@ pinned source identity at startup.
 `tools/catalog.py` is the pinned inventory builder. `tools/write_lessons.py` is the authored chapter source. `site/app.js` handles navigation and source reading; `site/diagrams.js` contains the small simulations. `serve.py` is the loopback-only read boundary.
 
 See [VERIFICATION.md](VERIFICATION.md) for checks and limitations. VOCO source and identity retain their upstream notices; bundled Geist fonts use the SIL Open Font License.
+
+For the release-polish refresh, see [the dated verification record](../testing/linux-release-2026-09-20.md).
+It separates the earlier long/recovery evidence from fresh checks after an Updates
+help-text change; the code tour remains pinned to the reviewed product source.
