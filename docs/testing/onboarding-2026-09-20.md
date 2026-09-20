@@ -90,3 +90,39 @@ all receiving applications, a native Wayland session, or installed-package
 onboarding. Custom controls that expose no accessible caret are deliberately
 rejected. This change does not establish the original .43 paste-failure root cause;
 its previous logs did not retain the native error message.
+
+## Release-cut qualification
+
+The subsequent release cut exercised this exact Debian package in a fresh Ubuntu
+24.04 container, using Xvfb, a private D-Bus session and a remapped PulseAudio
+virtual microphone. The application, WebKit capture, bundled NVIDIA recognizer,
+clipboard integration and installed Python helpers were real. Only the tray-host
+discovery service and audio source were test fixtures.
+
+- Fresh setup showed recognized words and Finish Onboarding persisted completion.
+- A second fresh profile repeated setup, then Alt+D delivered recognized text
+  into an independently running GTK entry and Stop returned to idle.
+- All 298 package inventory entries matched after installation; nine ELF objects
+  had resolved dependencies. Package removal was checked against the same inventory.
+- The packaged, stripped application SHA-256 is
+  `12f09c9c25a1ed7cc851902474f4fc6a9062d74052ecc017ccbae41640e71833`.
+  The earlier candidate's `appSha256` described the unstripped build output;
+  release provenance distinguishes these identities explicitly.
+
+The first audio-environment launch did not start PulseAudio because a configured
+server variable prevented autospawn. The next trial used a monitor-only source,
+which WebKit correctly excluded. Adding a remapped microphone allowed setup to
+pass. The initial delivery harness hosted its GTK entry in the polling process;
+that process failed to serve accessibility requests promptly and VOCO retained
+recovery. Moving the entry to an independent GTK event loop passed. These failed
+attempts remain in the private run evidence. Ubuntu's minimal container also
+excludes documentation during installation; reinstalling with that exclusion
+removed verified the complete package inventory.
+
+![Installed onboarding with real local recognition](assets/2026.0.44-onboarding.png)
+
+These are X11 container results, not booted Wayland, physical microphone or audible
+speaker acceptance. Protected hosted CI, including the unchanged Whisper accuracy
+gate, and signed public-download verification are recorded in the release's
+attached validation file. The user's desktop remains uninstalled for a separate
+public-download acceptance test.
