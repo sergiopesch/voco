@@ -15,26 +15,16 @@ recognition runs on your computer. No account, subscription or cloud transcripti
 
 ## Get started
 
-Install the latest public Ubuntu/Debian x86_64 package. These links follow the
-latest release automatically:
+Install the current public Ubuntu/Debian x86_64 release with one command:
 
 ```bash
-(
-  set -e
-  mkdir -p ~/Downloads/voco-install
-  cd ~/Downloads/voco-install
-  curl -fLO https://github.com/sergiopesch/voco/releases/latest/download/voco_latest_amd64.deb
-  curl -fLO https://github.com/sergiopesch/voco/releases/latest/download/voco_latest_checksums.txt
-  sha256sum -c voco_latest_checksums.txt
-  sudo apt install ./voco_latest_amd64.deb
-)
+wget -qO voco-install https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.45/install && bash voco-install
 ```
 
-Installation stops if a download or checksum verification fails.
-Checksums detect a damaged or swapped file. They do not prove who published it.
-Releases also provide a signed tag and detached checksum signatures. Verify
-them with `bash scripts/verify-release.sh voco_latest_checksums.txt` after checking
-the key fingerprint through a trusted independent channel.
+The guided installer downloads **2026.0.45**, verifies the package checksum and
+installs its dependencies. Open VOCO afterward to start your voice test.
+[Manual installation and signature verification](docs/install.md#published-release).
+
 Ubuntu x86_64 is the reference platform. See the [installation guide](docs/install.md)
 for setup, upgrades, source builds and Linux compatibility.
 The [latest published release](https://github.com/sergiopesch/voco/releases/latest)

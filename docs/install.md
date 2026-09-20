@@ -8,14 +8,22 @@ A plain Tauri bundle is incomplete. See [packaging](linux-packaging.md).
 
 ## Published release
 
-The [README command](../README.md#get-started) downloads and installs the latest
-public Ubuntu/Debian package without a version-specific URL. For a manual download,
-get `voco_latest_amd64.deb` and `voco_latest_checksums.txt` from
-[the latest release](https://github.com/sergiopesch/voco/releases/latest). From that folder:
+The [README command](../README.md#get-started) runs the guided installer from
+the current published **2026.0.45** tag. It downloads that exact release and
+verifies its package checksum before installation.
+
+For a manual installation, these links always follow the latest public release:
 
 ```bash
-sha256sum -c voco_latest_checksums.txt
-sudo apt install ./voco_latest_amd64.deb
+(
+  set -e
+  mkdir -p ~/Downloads/voco-install
+  cd ~/Downloads/voco-install
+  curl -fLO https://github.com/sergiopesch/voco/releases/latest/download/voco_latest_amd64.deb
+  curl -fLO https://github.com/sergiopesch/voco/releases/latest/download/voco_latest_checksums.txt
+  sha256sum -c voco_latest_checksums.txt
+  sudo apt install ./voco_latest_amd64.deb
+)
 ```
 
 Continue only if verification succeeds. These files refer to the latest public
