@@ -4,7 +4,13 @@ The [latest published GitHub release](https://github.com/sergiopesch/voco/releas
 is authoritative for current downloads. A source version, local test receipt or
 private draft does not establish publication or installation.
 
-This source snapshot contains **2026.0.43**: Debian, Fedora, openSUSE and Arch
+This source snapshot is **2026.0.45**, the Ubuntu/Debian onboarding and
+cursor-warning release. See [release notes](releases/2026.0.45.md) and
+[the review-fix record](testing/onboarding-2026-09-20-fixes.md) for checks and limits.
+Fedora, openSUSE and Arch/Omarchy downloads remain at **2026.0.43**.
+Confirm publication and exact assets on GitHub before installing.
+
+The preceding **2026.0.43** release contains: Debian, Fedora, openSUSE and Arch
 package profiles, native Wayland capture and Omarchy integration. Final package
 and desktop evidence is recorded in [Linux support](linux-support.md) and the
 [qualification report](testing/linux-release-2026-09-19.md). Publication requires
@@ -21,6 +27,9 @@ The .42 Debian release combined safer capture admission, explicit offline recove
 and the TypeSafe guide. The .43 model and context remain unchanged; CPU thread
 selection now reserves desktop headroom, supported by the separate installed
 worker and desktop checks. No new semantic score is claimed for these changes.
+
+The signed .44 tag remains immutable and unpublished. The .45 cut corrects
+pending-start cancellation and terminal-caret validation found during review.
 
 ## Release boundaries
 

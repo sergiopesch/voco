@@ -18,6 +18,12 @@ describe("directed browser recording triggers", () => {
       expect(admitsDictationTrigger(phase, "browser:a", "browser:a", "stop")).toBe(false);
     }
   });
+  it("keeps onboarding Start and Stop bound to their own test", () => {
+    expect(admitsDictationTrigger("idle", undefined, "onboarding:test", "start")).toBe(true);
+    expect(admitsDictationTrigger("recording", "onboarding:test", "onboarding:test", "start")).toBe(false);
+    expect(admitsDictationTrigger("recording", "onboarding:test", "onboarding:test", "stop")).toBe(true);
+    expect(admitsDictationTrigger("recording", "browser:a", "onboarding:test", "stop")).toBe(false);
+  });
   it("retains native toggle semantics and rejects unqualified directed messages", () => {
     expect(admitsDictationTrigger("recording", undefined)).toBe(true);
     expect(admitsDictationTrigger("idle", undefined, "ibus:a", "start")).toBe(false);

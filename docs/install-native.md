@@ -1,7 +1,8 @@
 # Native Linux packages
 
-These instructions describe the **2026.0.43** package channels. Use them only
-with assets from the matching published [GitHub release](https://github.com/sergiopesch/voco/releases).
+Ubuntu/Debian packages are **2026.0.45**. Fedora, openSUSE and Arch/Omarchy packages
+remain **2026.0.43**. Use each channel only with assets from its matching published
+[GitHub release](https://github.com/sergiopesch/voco/releases).
 Source files and drafts do not establish availability; check
 [release status](release-candidate.md) first. The earlier .42 release is Debian-only.
 
@@ -10,7 +11,7 @@ model in every format; the native dependency profile is what differs.
 
 | System | Package | Additional package |
 | --- | --- | --- |
-| Ubuntu, Debian, Mint | `voco_2026.0.43_amd64.deb` | Resolved by apt |
+| Ubuntu, Debian, Mint | `voco_2026.0.45_amd64.deb` | Resolved by apt |
 | Fedora 44 | `voco-2026.0.43-1.fedora.x86_64.rpm` | Resolved by dnf |
 | openSUSE Tumbleweed | `voco-2026.0.43-1.opensuse.x86_64.rpm` | `libsentencepiece0-0.2.1-2.x86_64.rpm` |
 | Arch, Omarchy | `voco-2026.0.43-1-x86_64.pkg.tar.zst` | `sentencepiece-0.2.1-2-x86_64.pkg.tar.zst` |
@@ -47,7 +48,7 @@ not install a system microphone service or change your desktop shortcuts.
 Debian family:
 
 ```bash
-sudo apt install ./voco_2026.0.43_amd64.deb
+sudo apt install ./voco_2026.0.45_amd64.deb
 ```
 
 Fedora, after importing the verified public publisher key:
@@ -80,8 +81,9 @@ Release source and license assets remain available for inspection and rebuilding
 
 ## Finish desktop setup
 
-Open VOCO, select a microphone and complete [first launch](install.md#first-launch).
-On Wayland, explicitly allow the selected source for this app session. Install and
+Open VOCO and complete [first launch](install.md#first-launch). In .44, Start Test
+selects and allows the default microphone. In .43, select and allow the microphone
+explicitly for the app session. Install and
 configure the distribution's input daemon for paste with narrowly scoped access;
 [helper setup](platform/README.md#ydotoold-ydotool-daemon) explains the boundary.
 GNOME may need its packaged AppIndicator extension to expose the tray controls.

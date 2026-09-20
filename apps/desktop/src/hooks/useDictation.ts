@@ -1991,6 +1991,15 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
     }
   }, []);
 
+  const finishOnboardingTest = useCallback(async () => {
+    if (useStore.getState().dictationPurpose !== "onboarding") return false;
+    if (sessionRef.current.phase === "recording") {
+      sessionRef.current = requestSessionToggle(sessionRef.current).state;
+      await stopRecording();
+    }
+    return useStore.getState().status === "idle" && useStore.getState().onboardingTestPassed;
+  }, []);
+
   const onHotkeyPressed = useCallback(() => {
     if (initialHotkeyPressLoggedRef.current) {
       return;
@@ -2011,6 +2020,7 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
     cancelRecording,
     retryRecovery,
     discardRecovery,
+    finishOnboardingTest,
     toggle,
     onHotkeyPressed,
   };

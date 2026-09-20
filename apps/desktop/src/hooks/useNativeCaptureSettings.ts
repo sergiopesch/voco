@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useStore } from "@/store/useStore";
+import { errorMessage } from "@/lib/dictationRecovery";
 import {
   listNativeCaptureSources,
   nativeCaptureEnabled,
@@ -18,6 +19,7 @@ export interface NativeMicrophoneControls {
   initialize: () => Promise<void>;
   refresh: () => Promise<void>;
   select: (token: string) => Promise<void>;
+  ensureDefault: (replaceSelection?: boolean) => Promise<void>;
 }
 
 export function useNativeCaptureSettings(): NativeMicrophoneControls {
@@ -51,7 +53,7 @@ export function useNativeCaptureSettings(): NativeMicrophoneControls {
       if (!mounted.current || request.current !== id) return;
       setSources(null);
       useStore.getState().setNativeCaptureSource(null);
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(errorMessage(cause));
     } finally {
       if (mounted.current && request.current === id) setBusy(false);
     }
@@ -70,7 +72,7 @@ export function useNativeCaptureSettings(): NativeMicrophoneControls {
     } catch (cause) {
       if (!mounted.current || request.current !== id) return;
       useStore.getState().setCaptureBackendMode("pending");
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(errorMessage(cause));
       setBusy(false);
       throw cause;
     }
@@ -89,11 +91,35 @@ export function useNativeCaptureSettings(): NativeMicrophoneControls {
       useStore.getState().setNativeCaptureSource(source);
       setError(null);
     } catch (cause) {
-      if (mounted.current && request.current === id) setError(cause instanceof Error ? cause.message : String(cause));
+      if (mounted.current && request.current === id) setError(errorMessage(cause));
     } finally {
       if (mounted.current && request.current === id) setBusy(false);
     }
   }, []);
 
-  return { mode, sources, selected, busy, error, initialize, refresh, select };
+  const ensureDefault = useCallback(async (replaceSelection = false) => {
+    const state = useStore.getState();
+    if (state.captureBackendMode === "pending") throw new Error("Microphone setup is still loading. Please try again.");
+    if (state.captureBackendMode !== "native" || (state.nativeCaptureSource && !replaceSelection)) return;
+    const id = ++request.current;
+    const assertCurrent = () => {
+      if (!mounted.current || request.current !== id) throw new Error("Microphone selection changed. Please start again.");
+    };
+    setBusy(true);
+    try {
+      const next = await listNativeCaptureSources();
+      assertCurrent();
+      setSources(next);
+      const source = next.sources.find(source => source.selectionToken === next.defaultSelectionToken && source.objectSerial && !source.isMonitor);
+      if (!source) throw new Error("No default microphone is available. Connect a microphone or choose one in Microphone settings.");
+      const selection = await selectNativeCaptureSource(source.selectionToken);
+      assertCurrent();
+      useStore.getState().setNativeCaptureSource(selection);
+      setError(null);
+    } finally {
+      if (mounted.current && request.current === id) setBusy(false);
+    }
+  }, []);
+
+  return { mode, sources, selected, busy, error, initialize, refresh, select, ensureDefault };
 }

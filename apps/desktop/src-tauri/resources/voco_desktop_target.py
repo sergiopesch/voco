@@ -81,9 +81,30 @@ class FocusTracker:
 TRACKER = FocusTracker()
 
 
-def unavailable():
-    return {"shortcut": "ctrl+v", "token": None, "scope": "unavailable",
+def unavailable(input_state="unavailable"):
+    return {"shortcut": "ctrl+v", "token": None, "scope": "unavailable", "input_state": input_state,
             "events_tracked": TRACKER.listener is not None}
+
+
+def cursor_state(node, atspi):
+    """Classify the actual focused control without reading any field contents."""
+    if node is None:
+        return "unavailable"
+    try:
+        node.clear_cache_single()
+        state = node.get_state_set()
+        if not state.contains(atspi.StateType.FOCUSED):
+            return "none"
+        role = node.get_role()
+        if role == atspi.Role.PASSWORD_TEXT:
+            return "protected"
+        if role == atspi.Role.TERMINAL or state.contains(atspi.StateType.EDITABLE):
+            # A writable field must expose a valid caret, including an empty field.
+            text_position(node)
+            return "editable"
+        return "none"
+    except Exception:
+        return "unavailable"
 
 
 def process_binary(pid):
@@ -131,7 +152,7 @@ def probe():
         except Exception:
             continue
     if len(active) != 1:
-        return unavailable()
+        return unavailable("none" if not active else "unavailable")
     app, window = active[0]
     pid = app.get_process_id()
     binary = process_binary(pid)
@@ -161,11 +182,14 @@ def probe():
     if focused is not None:
         TRACKER.observe(focused)
         terminal = terminal or focused.get_role() == Atspi.Role.TERMINAL
+    input_state = cursor_state(focused, Atspi)
+    if input_state != "editable":
+        return unavailable(input_state)
     focused_path = focused.path if focused is not None else ''
     identity = f"{TRACKER.nonce}:{TRACKER.generation}:{pid}:{window.path}:{focused_path}"
     return {"shortcut": "ctrl+shift+v" if terminal else "ctrl+v",
             "token": hashlib.sha256(identity.encode()).hexdigest(),
-            "scope": "control" if focused is not None else "window",
+            "scope": "control", "input_state": input_state,
             "events_tracked": TRACKER.listener is not None}
 
 

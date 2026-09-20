@@ -140,8 +140,8 @@ describe("ControlPanel", () => {
       surface: "onboarding",
       onboardingStep: 2,
     });
-    expect(onboardingMarkup).toContain("focus a text field");
-    expect(onboardingMarkup).toContain("Your words appear directly");
+    expect(onboardingMarkup).toContain("click in a text field");
+    expect(onboardingMarkup).toContain("this test only displays words here");
   });
 
 
@@ -212,7 +212,7 @@ describe("Crystal Sidebar settings", () => {
 describe("microphone preview gating", () => {
 
   it("opens only on the inactive onboarding or Audio surfaces", () => {
-    expect(shouldOpenMicrophonePreview("onboarding", 1, "General")).toBe(true);
+    expect(shouldOpenMicrophonePreview("onboarding", 1, "General")).toBe(false);
     expect(shouldOpenMicrophonePreview("settings", 0, "Audio")).toBe(true);
     expect(shouldOpenMicrophonePreview("settings", 0, "General")).toBe(false);
     expect(shouldOpenMicrophonePreview("popover", 0, "Audio")).toBe(false);
@@ -221,23 +221,21 @@ describe("microphone preview gating", () => {
 
 
 describe("guided dictation and settings journeys", () => {
-  it("does not equate permission with a completed microphone or dictation check", () => {
-    const mic = renderPanel({ surface: "onboarding", onboardingStep: 1, microphonePermission: "granted" });
-    expect(mic).toMatch(/<button[^>]*disabled=""[^>]*>Continue<\/button>/);
-    expect(mic).toContain("Set up microphone later");
-    const firstTry = renderPanel({ surface: "onboarding", onboardingStep: 2, microphonePermission: "granted" });
-    expect(firstTry).toContain("First dictation: not yet verified");
-    expect(firstTry).toMatch(/<button[^>]*disabled=""[^>]*>Hide and try dictation<\/button>/);
-    expect(firstTry).toContain("Set up later");
-    expect(firstTry).not.toContain("Finish setup");
+  it("requires a successful voice test before completing onboarding", () => {
+    const markup = renderPanel({ surface: "onboarding", microphonePermission: "granted", onStartTest: vi.fn() });
+    expect(markup).toMatch(/<button[^>]*disabled=""[^>]*>Finish Onboarding<\/button>/);
+    expect(markup).toContain("Start Test");
+    expect(markup).not.toContain("Set up later");
+    expect(markup).not.toContain("Hide and try dictation");
   });
 
-  it("names and identifies the current setup step", () => {
-    const markup = renderPanel({ surface: "onboarding", onboardingStep: 1 });
-    expect(markup).toContain('aria-label="Setup progress"');
-    expect(markup).toContain('aria-current="step"');
-    expect(markup).toContain("2. Microphone");
-    expect(markup).toContain('aria-describedby="voco-hotkey-feedback"');
+  it("offers one voice test with system defaults and a signal meter", () => {
+    const markup = renderPanel({ surface: "onboarding" });
+    expect(markup).toContain('aria-label="Voice setup"');
+    expect(markup).toContain('aria-label="Microphone signal"');
+    expect(markup).toContain('aria-label="Test transcript"');
+    expect(markup).toContain("System default");
+    expect(markup).toContain("Test speaker");
   });
 
   it("keeps configured shortcuts in the core guide and output instructions", () => {

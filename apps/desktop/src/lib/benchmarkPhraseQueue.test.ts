@@ -26,6 +26,13 @@ describe('pinned append-only candidate',()=>{
   expect(paste).toHaveBeenCalledTimes(1);expect(observed).toHaveBeenLastCalledWith('Hallo');expect(failure).toHaveBeenCalledOnce();
   expect(transport).toHaveBeenCalledWith('benchmark_stream',{request:expect.objectContaining({op:'diagnostic',reason:'prefix_revision'})});
  });
+ it('preserves the native insertion rejection message for recovery',async()=>{
+  worker.mockImplementation(async(_c,{request:r})=>({...r,mode:'append-only',text:r.op==='push'?'Synthetic phrase':null}));
+  const failure={outcome:'rejected',message:'Click in a text field and try again.',clipboardChanged:false};
+  const queue=new BenchmarkPhraseQueue(async()=>{throw failure},vi.fn(),vi.fn(),vi.fn());
+  queue.pushAudio(new Float32Array(1600),16000);
+  await expect(queue.finish()).rejects.toThrow(failure.message);
+ });
  it('bounds queued audio and retains recovery without sending a partial backlog',async()=>{
   const {queue,failure}=make();queue.pushAudio(new Float32Array(16000*4),16000);
   await expect(queue.finish()).rejects.toThrow('three seconds');expect(failure).toHaveBeenCalledOnce();expect(transport).toHaveBeenCalledWith('benchmark_stream',{request:expect.objectContaining({op:'diagnostic',reason:'backlog_limit'})});

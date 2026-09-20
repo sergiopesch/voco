@@ -8,8 +8,10 @@ A plain Tauri bundle is incomplete. See [packaging](linux-packaging.md).
 
 ## Published release
 
-Download `voco_latest_amd64.deb` and `voco_latest_checksums.txt` from
-[GitHub Releases](https://github.com/sergiopesch/voco/releases). From that folder:
+The [README command](../README.md#get-started) downloads and installs the latest
+public Ubuntu/Debian package without a version-specific URL. For a manual download,
+get `voco_latest_amd64.deb` and `voco_latest_checksums.txt` from
+[the latest release](https://github.com/sergiopesch/voco/releases/latest). From that folder:
 
 ```bash
 sha256sum -c voco_latest_checksums.txt
@@ -18,7 +20,7 @@ sudo apt install ./voco_latest_amd64.deb
 
 Continue only if verification succeeds. These files refer to the latest public
 release, which may differ from the development candidate. Checksums are integrity
-checks. Release 2026.0.42 also ships signed checksums (`*.asc`); verify
+checks. Releases also ship signed checksums (`*.asc`); verify
 those with `scripts/verify-release.sh` and the `KEYS` file from git, after checking
 the fingerprint out of band.
 
@@ -55,18 +57,21 @@ migrate retired output/assistant settings to direct dictation. A purge is unnece
 
 ## First launch
 
-Open VOCO from the application menu, finish microphone setup, and focus a text
-field. Press **Alt+D** to start and again to stop. You can change the shortcut in
+Open VOCO from the application menu. In .44, your system microphone and speaker
+are selected. Click **Start Test**, speak, and check that the signal band moves
+and your words appear. Click **Finish Onboarding**, then focus a text field.
+Press **Alt+D** to start and again to stop. You can change the shortcut in
 Settings. Known terminal paste shortcuts are selected automatically.
 
-The .43 candidate requires a verifiable destination before automatic desktop
-dictation. If it cannot identify the destination, focus an accessible text field
-and try again. Changing fields during a recording stops delivery; review retained
-text before copying it. Some applications expose only window-level identity.
+The .44 release requires a verifiable editable cursor before automatic desktop
+dictation. If no cursor is available, VOCO displays a notification; click in an
+accessible text field and try again. Password fields are excluded. Changing fields
+during a recording stops delivery; review retained text before copying it.
+Custom controls that do not expose an accessible cursor are not supported.
 
 On X11, desktop paste uses xclip and xdotool. On Wayland, it uses ydotool plus
 the appropriate clipboard helper; its input service and permissions may require
-setup. The .43 candidate recommends both ydotool and ydotoold because Ubuntu 24.04
+setup. The Debian package recommends both ydotool and ydotoold because Ubuntu 24.04
 packages the client and daemon separately. Availability differs by distribution.
 If it is unavailable, X11 remains usable; Wayland paste is unavailable until the
 helper and its service are installed and configured. The optional VOCO IBus source handles shortcuts, not text mutation. Follow

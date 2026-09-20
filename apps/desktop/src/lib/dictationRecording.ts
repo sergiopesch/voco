@@ -390,7 +390,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     setStatus("error");
     setError(reason);
     setInterimTranscript("");
-    useStore.getState().setSurface("popover");
+    useStore.getState().setSurface(useStore.getState().dictationPurpose === "onboarding" ? "onboarding" : "popover");
   }
 
   function retainManualTranscript() {
@@ -415,7 +415,9 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     if (disposedRef.current) return;
     void releaseDesktopShortcutSession();
     const completed = useStore.getState();
-    if (!completed.recovery && completed.transcript.trim() && completed.transcript !== "(no speech detected)") {
+    if (completed.dictationPurpose === "onboarding") {
+      completed.setOnboardingTestPassed(!completed.recovery && Boolean(completed.transcript.trim()) && completed.transcript !== "(no speech detected)");
+    } else if (!completed.recovery && completed.transcript.trim() && completed.transcript !== "(no speech detected)") {
       if (cursorDeliveryStateRef.current === "unreconciled") retainCurrentTranscript("delivery-unconfirmed");
       else completed.setLastDictationResult({ completedAt: Date.now(), outcome: "delivered" });
     }
@@ -454,9 +456,12 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       void showNotification("Previous transcript available", "Copy any text you need, then clear the previous transcript before starting another.").catch(() => {});
       return;
     }
+    const onboardingTest = triggerId === "onboarding:test";
+    useStore.getState().setDictationPurpose(onboardingTest ? "onboarding" : "cursor");
+    if (onboardingTest) useStore.getState().setOnboardingTestPassed(false);
     activeTriggerIdRef.current = triggerId;
     desktopPasteSessionRef.current = false;
-    desktopStreamEnabledRef.current = false;
+    desktopStreamEnabledRef.current = onboardingTest;
     desktopTargetTokenRef.current = null;
     desktopPhraseQueueRef.current?.cancel();
     desktopPhraseQueueRef.current = null;
@@ -472,6 +477,9 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     const startingSessionId = sessionRef.current.sessionId;
     recoverySessionIdRef.current = crypto.randomUUID();
     sessionConfigRef.current = useStore.getState().config;
+    if (onboardingTest && sessionConfigRef.current) {
+      sessionConfigRef.current = { ...sessionConfigRef.current, liveCursorMode: "final-text-only" };
+    }
     phaseRef.current = "starting";
     traceDictationEvent("recording_state_requested").catch(() => {});
     let nativeAttempt: { generation: number; selectionToken: string } | null = null;
@@ -487,12 +495,14 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       }
     };
 
+    let startFailureTitle = "Dictation could not start";
     try {
-      if (!triggerId?.startsWith("browser:") && sessionConfigRef.current?.transcriptTarget === "cursor") {
+      if (!onboardingTest && !triggerId?.startsWith("browser:") && sessionConfigRef.current?.transcriptTarget === "cursor") {
         const paste = await getDesktopPasteStatus();
         assertOutputAllowed(startingSessionId);
         if (paste?.enabled) {
           if (!paste.available) {
+            startFailureTitle = paste.targetToken ? "Dictation unavailable" : "No text cursor available";
             traceDictationEvent("dictation_desktop_paste_unavailable").catch(() => {});
             throw new Error(paste.detail);
           }
@@ -509,7 +519,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       }
       // Capture waits for the native lease ACK (or a confirmed unsupported-route
       // no-op). A held Start shortcut may obscure the first target probe.
-      if (desktopStreamEnabledRef.current) {
+      if (desktopStreamEnabledRef.current && !onboardingTest) {
         if (!await desktopShortcutCleanupRef.current) {
           throw new Error("VOCO could not confirm shortcut cleanup. Restart VOCO if the shortcut stays reserved.");
         }
@@ -547,6 +557,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       if (desktopPasteSessionRef.current && !desktopTargetTokenRef.current) {
         throw new Error("VOCO could not verify the dictation destination. Focus an accessible text field and try again.");
       }
+      startFailureTitle = "Microphone could not start";
       const captureSelection = captureSelectionRef.current?.() ?? { backend: "webkit" as const };
       let captureAdmission: CaptureAdmission = "pending";
       if (captureSelection.backend === "native" && !captureSelection.selectionToken) {
@@ -627,7 +638,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
         );
       }
       if (shouldUseOwnedPreedit()) transitionCursorDelivery("canonical-started");
-      beginOwnedPreedit(sessionRef.current.sessionId, triggerId);
+      if (!onboardingTest) beginOwnedPreedit(sessionRef.current.sessionId, triggerId);
       debugCaptureEnabledRef.current = await debugDictationCaptureEnabled().catch(
         () => false,
       );
@@ -713,6 +724,8 @@ export function createDictationRecording(env: DictationRecordingEnv) {
         const rate = recordingSampleRate();
         desktopPhraseQueueRef.current = new BenchmarkPhraseQueue(async (text, correlation) => {
           assertOutputAllowed(startingSessionId);
+          // Onboarding exercises recognition without owning or mutating another app.
+          if (onboardingTest) return;
           const started = performance.now();
           desktopPhrasePasteCountRef.current++;
           traceDictationEvent("dictation_desktop_paste_requested").catch(() => {});
@@ -730,16 +743,17 @@ export function createDictationRecording(env: DictationRecordingEnv) {
           if (!isCurrentSession(startingSessionId)) return;
           setTranscript(text);
           useStore.getState().setRawTranscript(text);
-        }, () => {
+        }, (error) => {
           if (!isCurrentSession(startingSessionId) || cancelledRef.current) return;
           traceDictationEvent("dictation_desktop_stream_failed").catch(() => {});
-          useStore.getState().setCaptureNotice(LIVE_DELIVERY_PAUSED);
+          if (onboardingTest) setError(`Voice test paused: ${error.message} Stop Test, then try again.`);
+          else useStore.getState().setCaptureNotice(LIVE_DELIVERY_PAUSED);
         }, (event, durationMs) => {
-          if (!isCurrentSession(startingSessionId) || cancelledRef.current) return;
+          if (!isCurrentSession(startingSessionId) || cancelledRef.current || onboardingTest) return;
           const name = event === "appended" ? "dictation_desktop_live_prefix_dispatched"
             : `dictation_desktop_snapshot_${event}`;
           traceDictationEvent(name, durationMs === undefined ? null : { durationMs }).catch(() => {});
-        }, startingSessionId);
+        }, startingSessionId, !onboardingTest);
         // Audio can arrive while the worklet is starting. Keep planner offsets
         // aligned with the complete retained source, including that prefix.
         const prefix = collectAudioSamplesRange(audioBufferRef.current, 0, audioBufferRef.current.sampleCount);
@@ -791,8 +805,8 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       sessionRef.current = failSession(sessionRef.current);
       phaseRef.current = "error";
       showNotification(
-        "Microphone initialization failed",
-        "Use your recording shortcut to try microphone initialization again.",
+        startFailureTitle,
+        errorMessage(err),
       ).catch(() => {});
 
       if (err instanceof DOMException) {
@@ -806,7 +820,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
           setError(`Microphone error: ${err.message}`);
         }
       } else {
-        setError(`Failed to start recording: ${err}`);
+        setError(errorMessage(err));
       }
     }
   }
@@ -905,7 +919,9 @@ export function createDictationRecording(env: DictationRecordingEnv) {
           finalizeIdleState();
         } catch (error) {
           traceDictationEvent("dictation_desktop_stream_failed").catch(() => {});
-          retainRecovery(cancelledRef.current ?? `Progressive delivery stopped: ${errorMessage(error)}. Review the target before copying retained text.`);
+          retainRecovery(cancelledRef.current ?? (useStore.getState().dictationPurpose === "onboarding"
+            ? `Voice test stopped: ${errorMessage(error)}. You can try the test again.`
+            : `Progressive delivery stopped: ${errorMessage(error)}. Review the target before copying retained text.`));
         }
         return;
       }

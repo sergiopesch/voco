@@ -38,6 +38,10 @@ interface AppState {
   nativeCaptureSource: NativeCaptureSource | null;
   setCaptureBackendMode: (mode: CaptureBackendMode) => void;
   setNativeCaptureSource: (source: NativeCaptureSource | null) => void;
+  dictationPurpose: "cursor" | "onboarding";
+  onboardingTestPassed: boolean;
+  setDictationPurpose: (purpose: "cursor" | "onboarding") => void;
+  setOnboardingTestPassed: (passed: boolean) => void;
   status: DictationStatus;
   transcript: string;
   rawTranscript: string;
@@ -95,6 +99,10 @@ export const useStore = create<AppState>((set) => ({
     nativeCaptureSource,
     microphoneReady: state.captureBackendMode === "native" ? Boolean(nativeCaptureSource) : state.microphoneReady,
   })),
+  dictationPurpose: "cursor",
+  onboardingTestPassed: false,
+  setDictationPurpose: (dictationPurpose) => set({ dictationPurpose }),
+  setOnboardingTestPassed: (onboardingTestPassed) => set({ onboardingTestPassed }),
   status: "idle",
   transcript: "",
   rawTranscript: "",
@@ -148,6 +156,7 @@ export const useStore = create<AppState>((set) => ({
     set((state) => ({
       config,
       selectedDeviceId: config.selectedMic,
+      onboardingTestPassed: state.config?.onboardingCompleted && !config.onboardingCompleted ? false : state.onboardingTestPassed,
       surface: deriveSurfaceForConfig(state.surface, state.config, config),
     })),
   setSurface: (surface) => set({ surface }),

@@ -16,6 +16,8 @@ import { openMicrophoneStream } from "@/lib/audioInput";
 import { createAnimationFrameLease } from "@/lib/animationFrameLease";
 import type { DictationRecovery } from "@/lib/dictationRecovery";
 import { microphoneLabel, shortcutPresentation } from "@/lib/shortcutPresentation";
+import { Onboarding } from "@/components/Onboarding";
+import { useStore } from "@/store/useStore";
 import { NativeMicrophoneSettings } from "@/components/NativeMicrophoneSettings";
 import type { NativeMicrophoneControls } from "@/hooks/useNativeCaptureSettings";
 import { SettingsIcon } from "@/components/SettingsIcon";
@@ -24,6 +26,10 @@ import vocoBrandImage from "../../../../assets/voco-symbol-ui.png";
 
 interface ControlPanelProps {
   nativeMicrophone?: NativeMicrophoneControls;
+  onStartTest?: () => void;
+  onStopTest?: () => void;
+  onFinishTest?: () => Promise<boolean>;
+  testPreparing?: boolean;
   surface: "onboarding" | "settings" | "popover";
   onboardingStep: number;
   config: AppConfig;
@@ -78,7 +84,7 @@ type PanelSection = (typeof PANEL_SECTIONS)[number];
 
 export function shouldOpenMicrophonePreview(
   surface: ControlPanelProps["surface"],
-  onboardingStep: number,
+  _onboardingStep: number,
   activeSection: PanelSection,
   dictationStatus: DictationStatus = "idle",
 ): boolean {
@@ -86,7 +92,6 @@ export function shouldOpenMicrophonePreview(
     return false;
   }
   return (
-    (surface === "onboarding" && onboardingStep === 1) ||
     (surface === "settings" && activeSection === "Audio")
   );
 }
@@ -109,6 +114,10 @@ export function shortcutFromKeyboardEvent(event: Pick<KeyboardEvent, "key" | "al
 
 export function ControlPanel({
   nativeMicrophone,
+  onStartTest,
+  onStopTest,
+  onFinishTest,
+  testPreparing = false,
   surface,
   onboardingStep,
   config,
@@ -173,6 +182,7 @@ export function ControlPanel({
     surface === "settings" ? requestedSection : "General",
   );
   const [savingCount, setSavingCount] = useState(0);
+  const [finishingTest, setFinishingTest] = useState(false);
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
   const [confirmHide, setConfirmHide] = useState(false);
   const [microphoneChecked, setMicrophoneChecked] = useState(false);
@@ -200,13 +210,12 @@ export function ControlPanel({
   const [hotkeyError, setHotkeyError] = useState<string | null>(null);
   const nativePreviewDisabled = Boolean(nativeMicrophone && nativeMicrophone.mode !== "webkit");
   const waylandDesktop = runtimeDiagnostics?.sessionType.toLowerCase() === "wayland";
-  const microphoneSetupReady = nativePreviewDisabled
-    ? nativeMicrophone?.mode === "native" && Boolean(nativeMicrophone.selected)
-    : microphoneChecked;
+  const audioLevel = useStore(state => state.audioLevel);
+  const testPassed = useStore(state => state.onboardingTestPassed);
+  const testPurpose = useStore(state => state.dictationPurpose);
   const hotkeyDirty = hotkeyDraft !== config.hotkey;
   const hasUnsavedChanges = hotkeyDirty;
   const dictationBusy = dictationStatus === "starting" || dictationStatus === "recording" || dictationStatus === "processing";
-  const inputSourceReady = runtimeDiagnostics?.ownedPreedit.setupState === "ready";
   const [previewLevel, setPreviewLevel] = useState(0);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [microphoneRetryRevision, setMicrophoneRetryRevision] = useState(0);
@@ -577,6 +586,7 @@ export function ControlPanel({
   }
 
   function requestHide() {
+    if (isOnboarding && (dictationBusy || testPreparing)) return;
     if (hasUnsavedChanges) setConfirmHide(true);
     else hidePanel();
   }
@@ -587,13 +597,21 @@ export function ControlPanel({
   }
 
   async function prepareFirstDictation() {
-    if (saving || dictationBusy) return;
-    const result = await savePatch({ onboardingCompleted: true, voiceProfile: "default" });
-    if (result.ok) {
-      onDraftStateChange?.(false);
-      if (onPrepareDictation) onPrepareDictation();
-      else hidePanel();
-    }
+    if (saving || finishingTest || testPreparing) return;
+    if (dictationBusy && (dictationStatus !== "recording" || !onFinishTest)) return;
+    setFinishingTest(true);
+    try {
+      const passed = onFinishTest ? await onFinishTest() : testPassed;
+      if (!passed) return;
+      const result = await savePatch({ onboardingCompleted: true, voiceProfile: "default", selectedMic: null });
+      if (result.ok) {
+        useStore.getState().clearTranscript();
+        useStore.getState().setDictationPurpose("cursor");
+        onDraftStateChange?.(false);
+        if (onPrepareDictation) onPrepareDictation();
+        else hidePanel();
+      }
+    } finally { setFinishingTest(false); }
   }
 
   async function saveHotkey(): Promise<boolean> {
@@ -661,6 +679,7 @@ export function ControlPanel({
             </button> : <button
               className="voco-button voco-button--ghost voco-button--compact"
               onClick={requestHide}
+              disabled={isOnboarding && (dictationBusy || testPreparing)}
             >
               Hide to tray
             </button>}
@@ -790,177 +809,26 @@ export function ControlPanel({
             {microphoneSaveError ? <p className="voco-inline-note voco-inline-note--error" role="alert">{microphoneSaveError}</p> : null}
           </section>
         ) : isOnboarding ? (
-          <section className="voco-panel__content">
-            <ol className="voco-onboarding__progress" aria-label="Setup progress">
-              {["Welcome", "Microphone", "First dictation"].map((label, step) => <li key={label}
-                className="voco-onboarding__progress-item" aria-current={onboardingStep === step ? "step" : undefined}>
-                <span className={`voco-onboarding__dot ${onboardingStep === step ? "voco-onboarding__dot--active" : onboardingStep > step ? "voco-onboarding__dot--complete" : ""}`} aria-hidden="true" />
-                <span className="voco-onboarding__step-label">{step + 1}. {label}</span>
-              </li>)}
-            </ol>
-
-            {onboardingStep === 0 ? (
-              <section className="voco-onboarding__step">
-                <h2 tabIndex={-1}>Welcome to VOCO</h2>
-                <p>
-                  Your voice, typed. Built for Linux.
-                </p>
-                <div className="voco-onboarding__actions">
-                  <button
-                    className="voco-button voco-button--primary"
-                    onClick={() => onOnboardingStepChange(1)}
-                  >
-                    Start setup
-                  </button>
-                  <button
-                    className="voco-button voco-button--secondary"
-                    disabled={saving}
-                    onClick={async () => {
-                      const result = await savePatch({ onboardingCompleted: true });
-                      if (result.ok) hidePanel();
-                    }}
-                  >
-                    Set up later
-                  </button>
-                </div>
-              </section>
-            ) : null}
-
-            {onboardingStep === 1 ? (
-              <section className="voco-onboarding__step">
-                <h2 tabIndex={-1}>Microphone and hotkey</h2>
-                <p>
-                  {nativePreviewDisabled
-                    ? "Choose and allow your microphone, then configure your dictation shortcut. Audio is tested when you try your first dictation."
-                    : "Speak a few words to check your microphone, then choose your dictation shortcut."}
-                </p>
-                {nativeMicrophone && nativeMicrophone.mode !== "webkit" ? (
-                  <NativeMicrophoneSettings controls={nativeMicrophone}
-                    disabled={["recording", "processing"].includes(dictationStatus)} />
-                ) : <>
-                <label className="voco-field">
-                  <span>Input device</span>
-                  <select
-                    value={selectedDeviceId ?? ""}
-                    disabled={saving || dictationBusy}
-                    onChange={(event) =>
-                      void selectMicrophone(event.target.value || null)
-                    }
-                  >
-                    <option value="">System default</option>
-                    {availableDevices.map((device) => (
-                      <option key={device.deviceId} value={device.deviceId}>
-                        {device.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <div className="voco-inline-note" role="status">
-                  <strong>Microphone:</strong> {selectedDeviceLabel} · {microphoneChecked ? "Audio detected" : "Waiting for audio"}
-                </div>
-                <div className="voco-meter">
-                  <span className="voco-meter__label">Live level</span>
-                  <div className="voco-meter__track" aria-hidden="true">
-                    <div
-                      className="voco-meter__fill"
-                      style={{ transform: `scaleX(${previewLevel})` }}
-                    />
-                  </div>
-                  <span className="voco-meter__hint">
-                    Speak normally. The bar should move. Audio here is a microphone check, not a dictation test.
-                  </span>
-                </div>
-                </>}
-                <label className="voco-field">
-                  <span>Dictation shortcut</span>
-                  <input
-                      disabled={saving}
-                    value={recordingShortcut ? "Press your shortcut…" : hotkeyDraft}
-                    aria-invalid={Boolean(hotkeyError)} aria-describedby="voco-hotkey-feedback"
-                    onBlur={() => { if (recordingShortcut) endShortcutCapture(); }}
-                    onChange={(event) => setHotkeyDraft(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (recordingShortcut) { captureShortcut(event); return; }
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        void saveHotkey();
-                      }
-                    }}
-                  />
-                </label>
-                <button className="voco-button voco-button--secondary" disabled={saving} onClick={beginShortcutCapture}>Record shortcut</button>
-                <p id="voco-hotkey-feedback" role="status">{hotkeyError ?? (recordingShortcut ? "Press a modifier and key. Escape cancels." : shortcut.instruction)}</p>
-                {previewError ? (
-                  <div className="voco-inline-note voco-inline-note--error" role="alert">
-                    {previewError}
-                  </div>
-                ) : null}
-                {microphoneSaveError ? (
-                  <div className="voco-inline-note voco-inline-note--error" role="alert">
-                    {microphoneSaveError}
-                  </div>
-                ) : null}
-                <div className="voco-onboarding__actions">
-                  {(!nativeMicrophone || nativeMicrophone.mode === "webkit") ? (
-                  <button
-                    className="voco-button voco-button--ghost"
-                    onClick={() => void retryMicrophonePreview()}
-                    disabled={dictationBusy}
-                  >
-                    Retry microphone access
-                  </button>
-                  ) : null}
-                  <button
-                    className="voco-button voco-button--secondary"
-                    onClick={() => onOnboardingStepChange(0)}
-                  >
-                    Back
-                  </button>
-                  <button
-                    className="voco-button voco-button--primary"
-                    onClick={async () => {
-                      const hotkeySaved = await saveHotkey();
-                      if (hotkeySaved) {
-                        onOnboardingStepChange(2);
-                      }
-                    }}
-                    disabled={saving || dictationBusy || !microphoneSetupReady || Boolean(previewError)}
-                  >
-                    Continue
-                  </button>
-                  <button className="voco-button voco-button--ghost" disabled={saving} onClick={async () => { if (await saveHotkey()) onOnboardingStepChange(2); }}>Set up microphone later</button>
-                </div>
-              </section>
-            ) : null}
-
-            {onboardingStep === 2 ? (
-              <section className="voco-onboarding__step">
-                <h2 tabIndex={-1}>Try your first dictation</h2>
-                <div className="voco-readiness" aria-label="Dictation readiness">
-                  <p className="voco-readiness__item" role="status" data-ready={microphoneSetupReady}>Microphone: {nativePreviewDisabled
-                    ? microphoneSetupReady ? "selected and allowed; ready to try dictation" : "choose and allow a microphone"
-                    : microphoneChecked ? "audio detected in setup" : "not checked yet"}</p>
-                  <p className="voco-readiness__item" data-ready={inputSourceReady}>Recording integration: {ownedPreeditLabel}</p>
-                  <p role="status">First dictation: {lastDictationResult?.outcome === "delivered" ? "a delivery completed this session; check the words in your text field" : "not yet verified"}</p>
-                </div>
-                <p>Your words appear directly in the focused text field.</p>
-                <div className="voco-onboarding__actions">
-                  <button className="voco-button voco-button--primary" disabled={saving || dictationBusy || !microphoneSetupReady}
-                    onClick={() => void prepareFirstDictation()}>Hide and try dictation</button>
-                </div>
-                <ol className="voco-dictation-guide">
-                  <li>Hide this panel and focus a text field in your app.</li>
-                  <li>Press <code>{config.hotkey}</code>, wait for Listening, then speak.</li>
-                  <li>Press <code>{config.hotkey}</code> again to finish. Review the text before sending it.</li>
-                </ol>
-                <div className="voco-onboarding__actions">
-                  <button className="voco-button voco-button--secondary" onClick={() => onOnboardingStepChange(1)}>Back</button>
-                  <button className="voco-button voco-button--ghost" disabled={saving}
-                    onClick={async () => { const result = await savePatch({ onboardingCompleted: true }); if (result.ok) hidePanel(); }}>Set up later</button>
-                </div>
-              </section>
-            ) : null}
-          </section>
+          <Onboarding
+            microphone={nativeMicrophone?.mode === "native"
+              ? nativeMicrophone.sources?.sources.find(source => source.selectionToken === nativeMicrophone.sources?.defaultSelectionToken)?.label || "System default"
+              : "System default"}
+            status={dictationStatus}
+            audioLevel={audioLevel}
+            transcript={testPurpose === "onboarding" ? transcript : ""}
+            passed={testPassed}
+            failed={Boolean(errorMessage)}
+            attempted={testPurpose === "onboarding"}
+            setupError={recovery && testPurpose !== "onboarding" ? "Recover or discard your previous dictation before starting the voice test." : nativeMicrophone?.error}
+            onRetrySetup={() => void nativeMicrophone?.initialize().catch(() => {})}
+            preparing={testPreparing || finishingTest}
+            saving={saving}
+            blocked={Boolean(recovery && testPurpose !== "onboarding") || !onStartTest || nativeMicrophone?.mode === "pending"}
+            hotkey={config.hotkey}
+            onStart={() => onStartTest?.()}
+            onStop={() => onStopTest?.()}
+            onFinish={prepareFirstDictation}
+          />
         ) : (
           <section className="voco-settings voco-preferences">
             <aside className="voco-preferences__sidebar">
@@ -1147,7 +1015,7 @@ export function ControlPanel({
 
         {isOnboarding ? (
           <footer className="voco-panel__footer">
-            <span className="voco-save-status" role="status">{saving ? "Saving…" : hasUnsavedChanges ? "Unsaved text changes — use the Save button for the edited group." : saveFeedback ?? "Choices save automatically. Text fields have a Save button."}</span>
+            <span className="voco-save-status" role="status">{saving ? "Saving…" : hasUnsavedChanges ? "Unsaved text changes — use the Save button for the edited group." : saveFeedback ?? "Finish your voice test, then choose Finish Onboarding."}</span>
           </footer>
         ) : null}
       </section>

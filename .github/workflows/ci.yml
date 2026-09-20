@@ -112,6 +112,13 @@ jobs:
       - name: Chromium exact-field adversarial regression
         run: npm run test:chromium-exact-field
 
+      - name: Onboarding speech test and missing-cursor regression
+        timeout-minutes: 5
+        run: npm run test:native-capture-renderer
+        env:
+          VOCO_RENDERER_SUITE: onboarding
+          VOCO_RENDERER_EVIDENCE_DIR: ${{ runner.temp }}/voco-onboarding-renderer
+
       - name: Private headless IBus lifecycle
         run: bash scripts/test-private-ibus-engine-hosted.sh
 
@@ -137,6 +144,7 @@ jobs:
             ${{ runner.temp }}/voco-native-desktop/
             ${{ runner.temp }}/voco-native-wayland/
             ${{ runner.temp }}/voco-native-capture-renderer/
+            ${{ runner.temp }}/voco-onboarding-renderer/
           if-no-files-found: ignore
           retention-days: 7
 

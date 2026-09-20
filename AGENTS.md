@@ -120,7 +120,7 @@ isolation, not a remote VM or proof of a distribution's default desktop.
 
 ## Release and evidence
 
-Source version: **2026.0.43**. Verify the current public release on GitHub and
+Source version: **2026.0.45** (Ubuntu/Debian release). Verify the current public release on GitHub and
 installed version from the package manager; do not infer either from source.
 The .43 package and desktop evidence is recorded in
 [the support matrix](docs/linux-support.md); preserve per-artifact receipts and
@@ -147,8 +147,12 @@ The control CLI connects once to the owner-only socket; do not add retries or
 launch/focus side effects. It does not prove a compositor keybinding exists.
 The .43 candidate uses native capture on Wayland and WebKit capture on X11.
 The Wayland change is approved and has installed-VM evidence. Keep
-explicit source selection and app-session permission, with no idle recording or
-silent device switching. Native capture permits real window hiding. Preserve the
+automatic default microphone selection on explicit Start Test/recording actions,
+with no idle recording or silent device switching during capture. Onboarding
+uses the production recognition queue with local-only transcript output. Never
+acquire an external text destination, shortcut lease, clipboard or preedit output
+for the onboarding test. Finish must flush capture and recognition successfully
+before saving completion. Require a verified editable caret before cursor dictation. Native capture permits real window hiding. Preserve the
 failed WebKit hidden-start experiment and independently verify audio retention.
 The debug audit needs all three explicit flags and completed private bundles;
 wait for their COMMIT receipts before terminating an audited test process.
