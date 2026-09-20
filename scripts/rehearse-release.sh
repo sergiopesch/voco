@@ -41,7 +41,8 @@ echo "  appimage: ${APPIMAGE_NAME}"
   grep -F 'sha256sum -c' docs/install.md > /dev/null
   grep -F 'wget "$BASE/$TAG/install" -O voco-install' docs/install.md > /dev/null
   grep -F "raw.githubusercontent.com/sergiopesch/voco/${TAG_NAME}/install" install > /dev/null
-  grep -F 'sha256sum -c voco_latest_checksums.txt' README.md > /dev/null
+  grep -F "wget -qO voco-install https://raw.githubusercontent.com/sergiopesch/voco/${TAG_NAME}/install && bash voco-install" README.md > /dev/null
+  grep -F 'sha256sum -c voco_latest_checksums.txt' docs/install.md > /dev/null
   grep -F -- '- "voco.*"' .github/workflows/release.yml > /dev/null
   if grep -F -- '- "v*"' .github/workflows/release.yml > /dev/null; then
     echo "Release workflow still accepts non-canonical v* tags"
