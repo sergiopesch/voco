@@ -1,0 +1,29 @@
+{
+  "passed": true,
+  "recomputedMainMetricValuesIncludingMissing": 84,
+  "pngsVerifiedAt7680x4320": 15,
+  "svgsWithAllSevenModelsAndMatchingValues": 15,
+  "pdfPages": 15,
+  "overviewFirst": true,
+  "galleryLinks": "passed",
+  "textPrivacyScan": "passed",
+  "created": "2026-09-20",
+  "rawNumericFieldComparisons": 1008,
+  "retainedSourceHashesMatched": 69,
+  "mainCohortSelectedTrials": 63,
+  "mainCohortAttempts": 64,
+  "visualReview": "All 15 figure previews inspected. Figure text extents checked inside canvas during rendering.",
+  "pngBackground": "All 15 exports checked: opaque white corners.",
+  "scope": "Existing measurements rendered into new graphics. No benchmark reruns, personal transcripts or audio.",
+  "rounding": "Display values rounded as documented; exact recorded floats retained in JSON and CSV.",
+  "mainCohort": "one speaker, three previously used recordings, seven configurations",
+  "historicalCohorts": "public40 and native are kept separate; missing values and failed trials preserved",
+  "repositoryPresentation": {
+    "gallery": "../README.md",
+    "sourceCollection": "VOCO release assets / model-comparison-8k",
+    "zipOmitted": "Avoid duplicating binary exports in git; use individual PNG, SVG and PDF downloads.",
+    "pngAndPdfByteIdenticalToLocalCollection": true,
+    "svgChange": "Trailing whitespace normalized; XML element tags, text and normalized attributes compared unchanged.",
+    "csvChange": "CRLF converted to LF; numeric values unchanged."
+  }
+}

@@ -1,0 +1,278 @@
+[
+  {
+    "source": "personal-benchmark-2026-09-14/round3/comparison.csv",
+    "sha256": "bc0de421a0f19f81981093c3e4a404026024f511c8fbbffd289758849ad1ffb1"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/SUMMARY.json",
+    "sha256": "b89536ad1d4f3ed8b3329fb0037a92ed7ea294027d4d0e4b24eb7c83035677c5"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/FROZEN-CONFIG.json",
+    "sha256": "2d744abd3b964f839de055e95dae41f141506766758137c5f3e1be7577d993bf"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/VALIDATION.json",
+    "sha256": "94f499714880e040b9c5ffdc33c8b6701f4afd19d0f3aeb82228edffaaaedff8"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/nvidia-candidate-short-r1.json",
+    "sha256": "eca00645c14936ddc86f52990ada25449f3fbe9bf83cc81ce6a955417131d954"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/moonshine-small-text-short-r1.json",
+    "sha256": "9472a7c99c2d7a1304787ea6f3ee6245917969bf49d161db913d5f83655e160e"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/moonshine-medium-text-short-r1.json",
+    "sha256": "093a1e542065961d471a787ff33d792ec807b21dceb199c6e6ada6d4b4774063"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/qwen-0.6B-short-r1.json",
+    "sha256": "e7d119d506bb0bc77377f2848b699665d507f674322d91af2527e7213e0c6c78"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/qwen-1.7B-short-r1.json",
+    "sha256": "54331ea754bf55a46ad55db6ae5779fb0f876970bd4906919997925bebc2fca8"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/parakeet-short-r1.json",
+    "sha256": "0b9aab1fd9774eb080d004af8146586599922dc4bf00d617264557cf4ec1cfa0"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/whisper-short-r1.json",
+    "sha256": "f16a16bc5fb966c1244f453adabee08d2e0145edeb335de8eba898801f0f655a"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/moonshine-small-text-medium-r1.json",
+    "sha256": "5b0264008806ec79db67cabbba025eca28ba9de9f47168f5091bc053a06ae408"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/moonshine-medium-text-medium-r1.json",
+    "sha256": "f2a52ae49587d308412559bacf19e0a786fff2770b45c2b32e8f58841d1e4b77"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/qwen-0.6B-medium-r1.json",
+    "sha256": "1da49ad2f2fbd2dd8c23de7a9f57827405e37c3bec0a243d11676c83da2e6305"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/qwen-1.7B-medium-r1.json",
+    "sha256": "0fb725cf818e125367d862a0a96e602906ff8514b3ca7f55b02c6681589ba5dc"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/parakeet-medium-r1.json",
+    "sha256": "dc8167bc9cce1b5074f2fdc958c50f5a8377aeb31e39e31c0e7af17c7d199c87"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/whisper-medium-r1.json",
+    "sha256": "91ff0b54d4079bffd45bde0082e0bbd2441b82305227e2476a0ee5ac874a026a"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/nvidia-candidate-medium-r1.json",
+    "sha256": "ae77edb59c96c7a3dd4b0a42c070e06c925e1799023fcac7ae538402e5316116"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/moonshine-medium-text-long-r1.json",
+    "sha256": "834e035f2074040546c25bfe34f2e039b0c97a77da28e617608060f05443b121"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/qwen-0.6B-long-r1.json",
+    "sha256": "3ac1bf81e30bf96d3216c7e36b53ed106a96aa351343446273f351c7f34c1fcc"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/qwen-1.7B-long-r1.json",
+    "sha256": "b1998bef6b780d7461ac6db146796175fdc6a9a3fed766d981c8ad10ce804a7f"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/parakeet-long-r1.json",
+    "sha256": "230923e0fd33326b065f5f984a303cf7c0c72128fb14f7e7d4c50547b94f2d60"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/whisper-long-r1.json",
+    "sha256": "68bd391d4b41b0eaf43cae804632a725994a44865d081044ba1dc25705635e82"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/nvidia-candidate-long-r1.json",
+    "sha256": "897f035f0e3e6b153601fb9868a80ffed53a450a7f0793e7c6b2318fb6429e9f"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/moonshine-small-text-long-r1.json",
+    "sha256": "a9681ff945b531857eb8c76baf0d0c420ba93a4ca3f4ae85cb0817187420e46e"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/moonshine-small-text-medium-r2.json",
+    "sha256": "d7a9907ba46d0995341403a01b869dfb646c9bb74cf17acd465f33b57003f515"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/moonshine-medium-text-medium-r2.json",
+    "sha256": "6db727f5840aa3317648cfad0246b39e1a6a06a2851912cb7687a6e4f682459f"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/qwen-0.6B-medium-r2.json",
+    "sha256": "bc47ccb203636b1191a887f351363f9d0350d5555a8c31d626933795e6e391af"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/qwen-1.7B-medium-r2.json",
+    "sha256": "bc233c315e46208a25ff5c6dec1c66ede26338cf548f58716687772e4b79e51c"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/parakeet-medium-r2.json",
+    "sha256": "198443e1bd1b0c0cd3da13e49bbc971373a427492ae75ecea41c74a633a08dba"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/whisper-medium-r2.json",
+    "sha256": "5f43c9aae75dacbbefe32efed7155ee5087379a0cfdff7a0efddc916ce55a61c"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/nvidia-candidate-medium-r2.json",
+    "sha256": "5416585d6a65f6cd124994aac8caeb7851420cbdc086927f47ad02fc279499fc"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/moonshine-medium-text-long-r2.json",
+    "sha256": "427b857d4cb0c8ec9b937ce06b3cc2f05d0db80b3add87b96c84db56db6ce5e8"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/qwen-0.6B-long-r2.json",
+    "sha256": "55ee4bbb51ab70b685d7f3ff225870a88bf7b7565e469a3a6c1c6a4a924230a2"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/qwen-1.7B-long-r2.json",
+    "sha256": "967d6aba625e9d4a0fc20e73e22f2364cdbfa390526b384dc3aa82b1d0c2ffd4"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/parakeet-long-r2.json",
+    "sha256": "9cbcc02cf8141fa4aa7c008301d7a30a1b0d4ff30a25a7134547b171d8f15ece"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/whisper-long-r2.json",
+    "sha256": "3e018c6b7616f030065f1196c2d5733c03c99ba73a43b22ec9e8de7e853836b1"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/nvidia-candidate-long-r2.json",
+    "sha256": "9f9129886010509083384024ae79a2f7e068b5be62610f1b173efe7734c6b219"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/moonshine-small-text-long-r2.json",
+    "sha256": "7b6f2879b3b5482e1d10ba23636ed5edc01751fc036ee5f47d48caa4e2ec747c"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/qwen-0.6B-short-r2.json",
+    "sha256": "6919c67293e92989554e37ad46d1e9497b223775467cc45b715d34f4d8079031"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/qwen-1.7B-short-r2.json",
+    "sha256": "999bf9dac25858a09dbbc7d753cbaec5f17fdf86610291a4257d19f18c5d07fd"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/parakeet-short-r2.json",
+    "sha256": "88c284e192993b71a45b5cf5098eb2cf8bcc680718a9a60c048a2a21287541f4"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/whisper-short-r2.json",
+    "sha256": "4187b7674869447a6526fb98d7aa795b44838676057f04a82986ca93795e7d35"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/nvidia-candidate-short-r2.json",
+    "sha256": "485480560245af382b578ca00cf1cbc52a99bd7f105dd8c59f694d29b6708fcb"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/moonshine-small-text-short-r2.json",
+    "sha256": "f607917803307eca58254bb07f489901aa8ff467d19120d474cdee1a81f4b714"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/moonshine-medium-text-short-r2.json",
+    "sha256": "70fdf5c63d679f0caf76c51350e20a894bca84b4a5f365e46a8493d0e38931b3"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/moonshine-medium-text-long-r3.json",
+    "sha256": "08136a1247111dafd7e5a20644564377fde4f8cedd0dc5f6af23dac54e264913"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/qwen-0.6B-long-r3.json",
+    "sha256": "713a5684f3149e1cd91fd2194e0d02bf5fc794004bade23cd34bb554f4a49383"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/qwen-1.7B-long-r3.json",
+    "sha256": "45038bf380649bf21a95d3202a4e064618de0c8aa3e0cdc961cc4d7007a6bc05"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/parakeet-long-r3.json",
+    "sha256": "c8795628f6decc28f57d7e850c7e696f2823cfb824c022d19fbcb33a4a5bb9ea"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/whisper-long-r3.json",
+    "sha256": "bfbc58cfd4879fbfb9963cc7899b748b71e672f93b452f6a52c160dafbf1def1"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/nvidia-candidate-long-r3.json",
+    "sha256": "d84294bbc150fe4d400cbd0d1c60f8687dfb37acc2f79f9ffd0ffc7df74c6002"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/moonshine-small-text-long-r3.json",
+    "sha256": "78b7aadfd7d8e8d8eb641c81b388a9ef9eb8f7a9901149822914975a80e16c82"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/qwen-0.6B-short-r3.json",
+    "sha256": "8ec482b6b8fa68c0d27378c560b8a353e77e0a2bad9a20df7ffe37bcef8e4ab5"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/qwen-1.7B-short-r3.json",
+    "sha256": "bc170035a654d61969b8050e5013f3850ef5244ea1f70cc2479f98b57b80c53a"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/parakeet-short-r3.json",
+    "sha256": "5c5dcbcea4371c5a6b522b766c9590ffceb31857e806cf6d20121bcf3dfe85e2"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/whisper-short-r3.json",
+    "sha256": "b55b1e1334755cd85cf8ea66b7d1921be4de050569ea091f1887c098f70dec3d"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/nvidia-candidate-short-r3.json",
+    "sha256": "9198eba8824ba0abfd3430c5c82eaf5b86d959ba8503d40a27af06bff99bf96e"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/moonshine-small-text-short-r3.json",
+    "sha256": "e09da8959723a43243c0d0f7259992ca9f6aff1aabbc23300934b10bafdef7b2"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/moonshine-medium-text-short-r3.json",
+    "sha256": "f54de632a795662c5f362b4fde54f5db9a62322e70dd9d49f504ea48c37b271b"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/qwen-1.7B-medium-r3.json",
+    "sha256": "084befcecfa4995f178d64ae91925243b61b27d37db1bbc4268e9baae6f712fa"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/parakeet-medium-r3.json",
+    "sha256": "49bfea49c721ee5fd30effaeb52374950f2416c2c3ba90412f139333d83886c8"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/whisper-medium-r3.json",
+    "sha256": "718319b1bfc8d60301d66a598cf8ed7c5cba0e16febe11edde77ace0c405b674"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/nvidia-candidate-medium-r3.json",
+    "sha256": "d5b6eba2893e2787edb58f44b1ce4d2f7523614f747a729c09ef24f51d1c1fd8"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/moonshine-small-text-medium-r3.json",
+    "sha256": "a0edf6fed338a5d245ebf6b60c435d4369838890b4ae8abe0c2daf57adfacc9f"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/moonshine-medium-text-medium-r3.json",
+    "sha256": "9be05a5953bbb1cd676a736f3b5afaf039565140e82015c34581d513ad556cac"
+  },
+  {
+    "source": "personal-benchmark-2026-09-14/round3/results/qwen-0.6B-medium-r3.json",
+    "sha256": "df1c5a0fb930b5eaad1af474f5c0a11c297bb4632f5da0e29526c9ac319ea388"
+  },
+  {
+    "source": "model-comparison-2026-09-13/MODEL-RESULTS.json",
+    "sha256": "14cee9042b7a2774e0ea76c1436c282060c25563292ad957fada27e2ac7ed52f"
+  },
+  {
+    "source": "model-comparison-2026-09-13/NATIVE-RESULTS.json",
+    "sha256": "9e269ce111148b2cd56a6e54df850beb5ecf0aa0a15a626b6df08c4e16201063"
+  }
+]

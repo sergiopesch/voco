@@ -51,6 +51,8 @@ counts, not recordings or dictated text. Update checks contact GitHub.
 [Diagnostics](docs/testing/laptop-performance.md) · [Security](docs/security/README.md).
 
 Curious how it works? Explore the [visual code guide](docs/guide/README.md).
+Compare the tested models in the [benchmark gallery](docs/release-assets/2026.0.43/README.md),
+with full-resolution release graphics, exact values and methods.
 
 ## Native Linux packages
 

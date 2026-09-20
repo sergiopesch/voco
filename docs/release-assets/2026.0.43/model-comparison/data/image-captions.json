@@ -1,0 +1,77 @@
+[
+  {
+    "key": "00-overview",
+    "title": "Seven configurations. The measured tradeoffs.",
+    "caption": "All seven configurations, same one-speaker corpus. WER, normalized WER, first callback, CPU work and sampled memory. No composite grade."
+  },
+  {
+    "key": "01-word-error-rate",
+    "title": "Word error rate",
+    "caption": "Same recordings. Same references. All seven tested configurations. Ignores punctuation and case; number rendering still affects errors. 919 distinct reference positions, replayed three times: 2,757 word observations per model. One speaker \u00b7 3 previously used recordings \u00b7 919 distinct reference words \u00b7 63 selected successes / 64 attempts. 14 Sep 2026 \u00b7 AMD Ryzen 7 PRO 8840HS \u00b7 CPU only \u00b7 runtime thread settings differ \u00b7 no general model ranking."
+  },
+  {
+    "key": "02-normalized-word-error-rate",
+    "title": "Contraction-normalized word error rate",
+    "caption": "Same recordings. Same references. All seven tested configurations. Also expands contractions; this is a separate sensitivity score, not semantic accuracy. 919 distinct reference positions, replayed three times: 2,757 word observations per model. One speaker \u00b7 3 previously used recordings \u00b7 919 distinct reference words \u00b7 63 selected successes / 64 attempts. 14 Sep 2026 \u00b7 AMD Ryzen 7 PRO 8840HS \u00b7 CPU only \u00b7 runtime thread settings differ \u00b7 no general model ranking."
+  },
+  {
+    "key": "03-first-output",
+    "title": "First recognizer output",
+    "caption": "Median from audio sample zero \u00b7 nine trials per streaming configuration. Recognizer callback timing, not first correct word, cursor appearance or pixel paint. Parakeet and Whisper used offline adapters in this comparison. One speaker \u00b7 3 previously used recordings \u00b7 919 distinct reference words \u00b7 63 selected successes / 64 attempts. 14 Sep 2026 \u00b7 AMD Ryzen 7 PRO 8840HS \u00b7 CPU only \u00b7 runtime thread settings differ \u00b7 no general model ranking."
+  },
+  {
+    "key": "04-cpu-work",
+    "title": "CPU work per second of audio",
+    "caption": "Median across nine trials \u00b7 lower values mean less measured CPU work. Total CPU work across threads, including replay controller; excludes model load and warmup. CPU-only execution; runtimes use different thread settings. This is not battery consumption. One speaker \u00b7 3 previously used recordings \u00b7 919 distinct reference words \u00b7 63 selected successes / 64 attempts. 14 Sep 2026 \u00b7 AMD Ryzen 7 PRO 8840HS \u00b7 CPU only \u00b7 runtime thread settings differ \u00b7 no general model ranking."
+  },
+  {
+    "key": "05-memory",
+    "title": "Peak sampled resident memory",
+    "caption": "Maximum across nine trials \u00b7 process-tree RSS, including startup. Sampled process-tree sum includes model load and warmup; shared pages may count more than once. Samples can miss short-lived peaks. This is not whole-system memory use. One speaker \u00b7 3 previously used recordings \u00b7 919 distinct reference words \u00b7 63 selected successes / 64 attempts. 14 Sep 2026 \u00b7 AMD Ryzen 7 PRO 8840HS \u00b7 CPU only \u00b7 runtime thread settings differ \u00b7 no general model ranking."
+  },
+  {
+    "key": "06-completion-tail",
+    "title": "Work remaining after speech ends",
+    "caption": "Same 303.712-second recording \u00b7 median of three streaming trials. Completion minus scheduled audio end; queued work remains visible. This is not app Stop-to-idle. Logarithmic seconds axis; labels use ms below one second. Each equal axis step represents a 10\u00d7 change. Long-recording slice \u00b7 one speaker \u00b7 303.712 s \u00b7 3 repeats per model \u00b7 drawn from the 63/64-trial comparison. 14 Sep 2026 \u00b7 AMD Ryzen 7 PRO 8840HS \u00b7 CPU only \u00b7 runtime thread settings differ \u00b7 no general model ranking."
+  },
+  {
+    "key": "07-progress-at-audio-end",
+    "title": "Text available when audio ends",
+    "caption": "Same 303.712-second recording \u00b7 median of three streaming trials. Hypothesis word count / final hypothesis word count. Provisional words may be revised. This measures output progress, not word accuracy or text committed to another application. Long-recording slice \u00b7 one speaker \u00b7 303.712 s \u00b7 3 repeats per model \u00b7 drawn from the 63/64-trial comparison. 14 Sep 2026 \u00b7 AMD Ryzen 7 PRO 8840HS \u00b7 CPU only \u00b7 runtime thread settings differ \u00b7 no general model ranking."
+  },
+  {
+    "key": "08-prefix-revisions",
+    "title": "Completed-prefix revisions",
+    "caption": "Same 303.712-second recording \u00b7 median count across three streaming trials. Counts changes to earlier completed hypothesis words; unfinished-word extensions are excluded. Revisions can be useful corrections. A zero count does not prove that the recognized text is correct. Long-recording slice \u00b7 one speaker \u00b7 303.712 s \u00b7 3 repeats per model \u00b7 drawn from the 63/64-trial comparison. 14 Sep 2026 \u00b7 AMD Ryzen 7 PRO 8840HS \u00b7 CPU only \u00b7 runtime thread settings differ \u00b7 no general model ranking."
+  },
+  {
+    "key": "09-update-gap",
+    "title": "Longest observed text-update gap",
+    "caption": "Same 303.712-second recording \u00b7 maximum across three streaming trials. Intervals between recognizer text changes can include legitimate silence and punctuation updates. This is not voiced-speech lag or a percentile estimate. No acoustic word-end alignment was available. Long-recording slice \u00b7 one speaker \u00b7 303.712 s \u00b7 3 repeats per model \u00b7 drawn from the 63/64-trial comparison. 14 Sep 2026 \u00b7 AMD Ryzen 7 PRO 8840HS \u00b7 CPU only \u00b7 runtime thread settings differ \u00b7 no general model ranking."
+  },
+  {
+    "key": "10-model-load",
+    "title": "Model loading time",
+    "caption": "Median across nine process launches \u00b7 retained filesystem cache conditions. Adapter-reported loading boundary; runtime initialization is not identical across implementations. OS caches were uncontrolled. This is not cold-boot startup or shortcut-to-ready latency. One speaker \u00b7 3 previously used recordings \u00b7 919 distinct reference words \u00b7 63 selected successes / 64 attempts. 14 Sep 2026 \u00b7 AMD Ryzen 7 PRO 8840HS \u00b7 CPU only \u00b7 runtime thread settings differ \u00b7 no general model ranking."
+  },
+  {
+    "key": "11-warmup",
+    "title": "Warmup decoding time",
+    "caption": "Median across nine trials \u00b7 same separate 2.09-second public warmup. Adapter-reported warmup; separate from model load and the measured comparison recordings. These runtime boundaries do not establish end-to-end application readiness. One speaker \u00b7 3 previously used recordings \u00b7 919 distinct reference words \u00b7 63 selected successes / 64 attempts. 14 Sep 2026 \u00b7 AMD Ryzen 7 PRO 8840HS \u00b7 CPU only \u00b7 runtime thread settings differ \u00b7 no general model ranking."
+  },
+  {
+    "key": "12-offline-decode",
+    "title": "Full-recording offline decoding",
+    "caption": "Same 303.712-second recording \u00b7 median of three offline trials. Entire recording decoded offline by the tested Parakeet and Whisper adapters. Streaming completion tails are a different metric and are not inserted into this comparison. Long-recording slice \u00b7 one speaker \u00b7 303.712 s \u00b7 3 repeats per model \u00b7 drawn from the 63/64-trial comparison. 14 Sep 2026 \u00b7 AMD Ryzen 7 PRO 8840HS \u00b7 CPU only \u00b7 runtime thread settings differ \u00b7 no general model ranking."
+  },
+  {
+    "key": "13-earlier-public-speech",
+    "title": "Earlier public-speech accuracy",
+    "caption": "Separate cohort \u00b7 40 public speakers \u00b7 998 reference words \u00b7 four integrations. Do not combine these rates with the one-speaker recorded-speech comparison. WER excludes punctuation. Previously evaluated corpus; the NVIDIA\u2013Moonshine Medium accuracy difference is not conclusive. 14 Sep 2026 \u00b7 160 completed inferences \u00b7 CPU only \u00b7 NVIDIA 13, Small 27, Medium 19, Whisper 23 word errors. Historical regression corpus; NVIDIA vs Medium descriptive 95% WER-difference interval: \u22120.11 to +1.41 pp."
+  },
+  {
+    "key": "14-earlier-app-stop",
+    "title": "Earlier application Stop-to-idle",
+    "caption": "Separate application test \u00b7 isolated X11 / GTK \u00b7 one 47-word public clip. NVIDIA / VOCO .34 and Whisper / .33: three completed trials each. Different complete app integrations. Moonshine: one unsuccessful prototype trial per model; no successful Stop time. Not release .43 timings. 14 Sep 2026 \u00b7 6 completed trials + 2 failed feasibility trials \u00b7 CPU only \u00b7 field/state observation, not pixel paint. Observed Stop ranges: NVIDIA 161\u2013165 ms; Whisper 2,579\u20133,066 ms. Small sample; no percentile guarantee."
+  }
+]

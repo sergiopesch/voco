@@ -157,3 +157,12 @@ The [20 September refresh](docs/testing/linux-release-2026-09-20.md) distinguish
 exact refreshed-binary package/smoke checks from the prior engine build's long and
 recovery evidence. Preserve both identities; documentation-only edits do not require
 rebuilding the qualified application. Bundled docs retain their assembly snapshot.
+
+## Public benchmark assets
+
+The [release-assets index](docs/release-assets/README.md) links GitHub-rendered galleries.
+Keep each metric tied to its original corpus, configuration, aggregation and date;
+never fill missing scores using another cohort or count failed trials as completed.
+When editing a collection, verify its numeric exports, relative links and checksums.
+Public assets contain numeric summaries only; keep personal audio, transcripts and
+private raw evidence outside the repository. Historical media does not requalify a release.

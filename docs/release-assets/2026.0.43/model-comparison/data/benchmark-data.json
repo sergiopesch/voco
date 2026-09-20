@@ -1,0 +1,1500 @@
+{
+  "created": "2026-09-20",
+  "hardware": "AMD Ryzen 7 PRO 8840HS; CPU only",
+  "seven_model": {
+    "date": "2026-09-14",
+    "distinct_recordings": 3,
+    "speakers": 1,
+    "distinct_reference_words": 919,
+    "repeats": 3,
+    "selected_successful_trials": 63,
+    "attempts": 64,
+    "models": [
+      {
+        "model": "nvidia-candidate",
+        "name": "Nemotron 0.6B (batched)",
+        "successful": 9,
+        "failed": 0,
+        "mode": "paced-streaming",
+        "total_edits": 147,
+        "total_reference_words": 2757,
+        "normalized_edits": 129,
+        "normalized_reference_words": 2757,
+        "wer": 0.05331882480957562,
+        "normalized_wer": 0.046789989118607184,
+        "cpu_ratio": 0.9385991133321645,
+        "peak_rss_mib": 1001.8125,
+        "first_text_s": 1.4971213019998686,
+        "prefix_revisions": 0
+      },
+      {
+        "model": "moonshine-small-text",
+        "name": "Moonshine Small",
+        "successful": 9,
+        "failed": 0,
+        "mode": "paced-streaming",
+        "total_edits": 210,
+        "total_reference_words": 2757,
+        "normalized_edits": 192,
+        "normalized_reference_words": 2757,
+        "wer": 0.07616974972796518,
+        "normalized_wer": 0.06964091403699674,
+        "cpu_ratio": 3.165243296356417,
+        "peak_rss_mib": 533.42578125,
+        "first_text_s": 1.9650572870014003,
+        "prefix_revisions": 726
+      },
+      {
+        "model": "moonshine-medium-text",
+        "name": "Moonshine Medium",
+        "successful": 9,
+        "failed": 0,
+        "mode": "paced-streaming",
+        "total_edits": 219,
+        "total_reference_words": 2757,
+        "normalized_edits": 201,
+        "normalized_reference_words": 2757,
+        "wer": 0.0794341675734494,
+        "normalized_wer": 0.07290533188248095,
+        "cpu_ratio": 3.7528103902181775,
+        "peak_rss_mib": 860.25390625,
+        "first_text_s": 1.9678054780015373,
+        "prefix_revisions": 852
+      },
+      {
+        "model": "qwen-0.6B",
+        "name": "Qwen3-ASR 0.6B",
+        "successful": 9,
+        "failed": 0,
+        "mode": "paced-streaming",
+        "total_edits": 129,
+        "total_reference_words": 2757,
+        "normalized_edits": 123,
+        "normalized_reference_words": 2757,
+        "wer": 0.046789989118607184,
+        "normalized_wer": 0.04461371055495103,
+        "cpu_ratio": 2.974835646597408,
+        "peak_rss_mib": 2932.90625,
+        "first_text_s": 2.7275565979980456,
+        "prefix_revisions": 0
+      },
+      {
+        "model": "qwen-1.7B",
+        "name": "Qwen3-ASR 1.7B",
+        "successful": 9,
+        "failed": 0,
+        "mode": "paced-streaming",
+        "total_edits": 177,
+        "total_reference_words": 2757,
+        "normalized_edits": 165,
+        "normalized_reference_words": 2757,
+        "wer": 0.06420021762785637,
+        "normalized_wer": 0.05984766050054407,
+        "cpu_ratio": 6.6789786543127985,
+        "peak_rss_mib": 6962.4609375,
+        "first_text_s": 3.709768532000453,
+        "prefix_revisions": 0
+      },
+      {
+        "model": "parakeet",
+        "name": "Parakeet TDT v3",
+        "successful": 9,
+        "failed": 0,
+        "mode": "offline-full-utterance",
+        "total_edits": 198,
+        "total_reference_words": 2757,
+        "normalized_edits": 180,
+        "normalized_reference_words": 2757,
+        "wer": 0.07181719260065289,
+        "normalized_wer": 0.06528835690968444,
+        "cpu_ratio": 0.4337395842662846,
+        "peak_rss_mib": 3192.3984375,
+        "first_text_s": null,
+        "prefix_revisions": 0
+      },
+      {
+        "model": "whisper",
+        "name": "Whisper base.en",
+        "successful": 9,
+        "failed": 0,
+        "mode": "offline-full-utterance",
+        "total_edits": 258,
+        "total_reference_words": 2757,
+        "normalized_edits": 240,
+        "normalized_reference_words": 2757,
+        "wer": 0.09357997823721437,
+        "normalized_wer": 0.08705114254624592,
+        "cpu_ratio": 0.8030689663391997,
+        "peak_rss_mib": 412.24609375,
+        "first_text_s": null,
+        "prefix_revisions": 0
+      }
+    ]
+  },
+  "public_model": {
+    "accuracy": {
+      "moonshine-medium": {
+        "clips": 40,
+        "successful": 40,
+        "errors": 19,
+        "reference_words": 998,
+        "wer_percent": 1.9038076152304608,
+        "exact_clips": 30,
+        "audio_seconds": 364.36,
+        "failures": [],
+        "clips_with_hypothesis_rewrite": 39
+      },
+      "moonshine-small": {
+        "clips": 40,
+        "successful": 40,
+        "errors": 27,
+        "reference_words": 998,
+        "wer_percent": 2.7054108216432864,
+        "exact_clips": 26,
+        "audio_seconds": 364.36,
+        "failures": [],
+        "clips_with_hypothesis_rewrite": 40
+      },
+      "nvidia": {
+        "clips": 40,
+        "successful": 40,
+        "errors": 13,
+        "reference_words": 998,
+        "wer_percent": 1.3026052104208417,
+        "exact_clips": 32,
+        "audio_seconds": 364.36,
+        "failures": [],
+        "clips_with_hypothesis_rewrite": 0
+      },
+      "whisper": {
+        "clips": 40,
+        "successful": 40,
+        "errors": 23,
+        "reference_words": 998,
+        "wer_percent": 2.3046092184368736,
+        "exact_clips": 25,
+        "audio_seconds": 364.36,
+        "failures": [],
+        "clips_with_hypothesis_rewrite": null
+      }
+    },
+    "paired_accuracy": {
+      "moonshine-medium minus moonshine-small": {
+        "paired_speakers": 40,
+        "a_fewer_errors": 7,
+        "tied": 31,
+        "a_more_errors": 2,
+        "wer_difference_percentage_points": -0.8016032064128256,
+        "descriptive_speaker_bootstrap_95_interval_pp": [
+          -1.5952143569292123,
+          -0.09861932938856016
+        ]
+      },
+      "moonshine-medium minus nvidia": {
+        "paired_speakers": 40,
+        "a_fewer_errors": 3,
+        "tied": 30,
+        "a_more_errors": 7,
+        "wer_difference_percentage_points": 0.6012024048096192,
+        "descriptive_speaker_bootstrap_95_interval_pp": [
+          -0.1079913606911447,
+          1.4145810663764962
+        ]
+      },
+      "moonshine-medium minus whisper": {
+        "paired_speakers": 40,
+        "a_fewer_errors": 10,
+        "tied": 23,
+        "a_more_errors": 7,
+        "wer_difference_percentage_points": -0.4008016032064128,
+        "descriptive_speaker_bootstrap_95_interval_pp": [
+          -1.737242128121607,
+          0.7486631016042781
+        ]
+      },
+      "moonshine-small minus nvidia": {
+        "paired_speakers": 40,
+        "a_fewer_errors": 3,
+        "tied": 27,
+        "a_more_errors": 10,
+        "wer_difference_percentage_points": 1.4028056112224447,
+        "descriptive_speaker_bootstrap_95_interval_pp": [
+          0.2827521206409048,
+          2.7370478983382207
+        ]
+      },
+      "moonshine-small minus whisper": {
+        "paired_speakers": 40,
+        "a_fewer_errors": 10,
+        "tied": 21,
+        "a_more_errors": 9,
+        "wer_difference_percentage_points": 0.4008016032064128,
+        "descriptive_speaker_bootstrap_95_interval_pp": [
+          -1.1337868480725624,
+          1.8793273986152323
+        ]
+      },
+      "nvidia minus whisper": {
+        "paired_speakers": 40,
+        "a_fewer_errors": 10,
+        "tied": 26,
+        "a_more_errors": 4,
+        "wer_difference_percentage_points": -1.002004008016032,
+        "descriptive_speaker_bootstrap_95_interval_pp": [
+          -2.1649484536082473,
+          -0.09285051067780872
+        ]
+      }
+    },
+    "paced": {
+      "nvidia": {
+        "trials": 16,
+        "unique_clips": 8,
+        "failures": [],
+        "first_partial_s": {
+          "count": 16,
+          "median": 1.0165350125025725,
+          "min": 0.696572440007003,
+          "max": 1.495693967997795
+        },
+        "stable_correct_first_s": {
+          "count": 16,
+          "median": 1.0963737750062137,
+          "min": 0.696572440007003,
+          "max": 1.4995683360029943
+        },
+        "stable_correct_missing": 0,
+        "first_partial_correct_count": 12,
+        "first_partial_incomplete_reference_prefix_count": 4,
+        "first_partial_wrong_leading_word_count": 0,
+        "flush_ms": {
+          "count": 16,
+          "median": 82.98138949612621,
+          "min": 64.03983500786126,
+          "max": 105.55740400741342
+        },
+        "cpu_seconds_per_audio_second": 0.9206404194127586,
+        "peak_process_rss_mib": 974.44140625,
+        "max_backlog_ms": 73.24911699106451,
+        "clips_with_hypothesis_rewrite": 0,
+        "round_wer_percent": [
+          2.5,
+          2.5
+        ],
+        "startup_s": {
+          "count": 2,
+          "median": 1.191814489000535,
+          "min": 1.1907107000006363,
+          "max": 1.192918278000434
+        }
+      },
+      "moonshine-small": {
+        "trials": 16,
+        "unique_clips": 8,
+        "failures": [],
+        "first_partial_s": {
+          "count": 16,
+          "median": 1.4282270969997626,
+          "min": 1.3685342559911078,
+          "max": 1.5060597849951591
+        },
+        "stable_correct_first_s": {
+          "count": 16,
+          "median": 1.4688306174939498,
+          "min": 1.3685342559911078,
+          "max": 2.276534742995864
+        },
+        "stable_correct_missing": 0,
+        "first_partial_correct_count": 12,
+        "first_partial_incomplete_reference_prefix_count": 2,
+        "first_partial_wrong_leading_word_count": 2,
+        "flush_ms": {
+          "count": 16,
+          "median": 193.00222750462126,
+          "min": 26.039716991363093,
+          "max": 303.88193600811064
+        },
+        "cpu_seconds_per_audio_second": 4.0252429877200395,
+        "peak_process_rss_mib": 544.15625,
+        "max_backlog_ms": 3509.3408300017472,
+        "clips_with_hypothesis_rewrite": 16,
+        "round_wer_percent": [
+          4.375,
+          4.375
+        ],
+        "startup_s": {
+          "count": 2,
+          "median": 0.25805478749680333,
+          "min": 0.2570863599976292,
+          "max": 0.25902321499597747
+        }
+      },
+      "moonshine-medium": {
+        "trials": 16,
+        "unique_clips": 8,
+        "failures": [],
+        "first_partial_s": {
+          "count": 16,
+          "median": 1.5182633194999653,
+          "min": 1.4114202250057133,
+          "max": 1.551502125992556
+        },
+        "stable_correct_first_s": {
+          "count": 16,
+          "median": 1.5250904239946976,
+          "min": 1.4114202250057133,
+          "max": 2.2997232920024544
+        },
+        "stable_correct_missing": 0,
+        "first_partial_correct_count": 12,
+        "first_partial_incomplete_reference_prefix_count": 2,
+        "first_partial_wrong_leading_word_count": 2,
+        "flush_ms": {
+          "count": 16,
+          "median": 155.79480700398562,
+          "min": 26.57935100432951,
+          "max": 630.8873280067928
+        },
+        "cpu_seconds_per_audio_second": 4.466349773581186,
+        "peak_process_rss_mib": 920.39453125,
+        "max_backlog_ms": 1881.1308900185395,
+        "clips_with_hypothesis_rewrite": 14,
+        "round_wer_percent": [
+          5.0,
+          5.0
+        ],
+        "startup_s": {
+          "count": 2,
+          "median": 0.3819667854986619,
+          "min": 0.3792996590054827,
+          "max": 0.38463391199184116
+        }
+      }
+    }
+  },
+  "native_delivery": {
+    "rows": [
+      {
+        "trial": "moonshine-medium",
+        "passed": false,
+        "first_field_ms": 2392,
+        "first_correct_word_ms": 2392.268313007662,
+        "stop_to_idle_ms": null,
+        "all_reference_words_seen": false,
+        "app_sha256": "561f6599618ef43bf270a34965c6ae7c737011298f56e0a7d614123ae6d6a6f8"
+      },
+      {
+        "trial": "moonshine-small",
+        "passed": false,
+        "first_field_ms": 2311,
+        "first_correct_word_ms": 2310.9031390049495,
+        "stop_to_idle_ms": null,
+        "all_reference_words_seen": false,
+        "app_sha256": "561f6599618ef43bf270a34965c6ae7c737011298f56e0a7d614123ae6d6a6f8"
+      },
+      {
+        "trial": "nvidia-1",
+        "passed": true,
+        "first_field_ms": 1597,
+        "first_correct_word_ms": 1596.8780429975595,
+        "stop_to_idle_ms": 165,
+        "all_reference_words_seen": true,
+        "app_sha256": "58b73b5f6c23c4f98f0d28265de1520640e513125bbe3fc0cdf562d522bc86c3"
+      },
+      {
+        "trial": "nvidia-2",
+        "passed": true,
+        "first_field_ms": 1589,
+        "first_correct_word_ms": 1589.1051919898018,
+        "stop_to_idle_ms": 165,
+        "all_reference_words_seen": true,
+        "app_sha256": "58b73b5f6c23c4f98f0d28265de1520640e513125bbe3fc0cdf562d522bc86c3"
+      },
+      {
+        "trial": "nvidia-3",
+        "passed": true,
+        "first_field_ms": 1630,
+        "first_correct_word_ms": 1630.2039159927517,
+        "stop_to_idle_ms": 161,
+        "all_reference_words_seen": true,
+        "app_sha256": "58b73b5f6c23c4f98f0d28265de1520640e513125bbe3fc0cdf562d522bc86c3"
+      },
+      {
+        "trial": "whisper-1",
+        "passed": true,
+        "first_field_ms": 1666,
+        "first_correct_word_ms": 1665.589316005935,
+        "stop_to_idle_ms": 2859,
+        "all_reference_words_seen": true,
+        "app_sha256": "ffdf1568db50543020759472ce9fb47a9e2687f058579dad5b46a104cfc44f79"
+      },
+      {
+        "trial": "whisper-2",
+        "passed": true,
+        "first_field_ms": 1652,
+        "first_correct_word_ms": 1651.5500440000324,
+        "stop_to_idle_ms": 2579,
+        "all_reference_words_seen": true,
+        "app_sha256": "ffdf1568db50543020759472ce9fb47a9e2687f058579dad5b46a104cfc44f79"
+      },
+      {
+        "trial": "whisper-3",
+        "passed": true,
+        "first_field_ms": 1662,
+        "first_correct_word_ms": 1661.573967008735,
+        "stop_to_idle_ms": 3066,
+        "all_reference_words_seen": true,
+        "app_sha256": "ffdf1568db50543020759472ce9fb47a9e2687f058579dad5b46a104cfc44f79"
+      }
+    ],
+    "paired_word_delivery": [
+      {
+        "trial": 1,
+        "nvidia_earlier_words": 46,
+        "reference_words": 47,
+        "median_nvidia_advantage_ms": 1262.190179011668,
+        "per_word_advantage_ms": [
+          68.71127300837543,
+          -44.71337000722997,
+          1272.1184070105664,
+          1272.1184070105664,
+          337.6828110049246,
+          347.3646640049992,
+          253.61848999455106,
+          454.77406500140205,
+          641.5254640014609,
+          319.0849620004883,
+          671.2729499995476,
+          496.79640200338326,
+          195.51103899721056,
+          319.46090699057095,
+          300.7320620090468,
+          1638.721102004638,
+          1638.721102004638,
+          1443.6508390062954,
+          1443.6508390062954,
+          1267.6366940140724,
+          797.9527020070236,
+          473.8136310043046,
+          757.3665590025485,
+          645.8929499931401,
+          1127.680682009668,
+          947.3517980077304,
+          2071.2270280055236,
+          1462.174316009623,
+          1462.174316009623,
+          1157.8743960126303,
+          982.5698130152887,
+          1353.8335380144417,
+          1576.640433006105,
+          1896.0090780019527,
+          1720.5320819921326,
+          1235.4966239945497,
+          1600.3966040007072,
+          1262.190179011668,
+          828.4904910105979,
+          2391.111381002702,
+          1937.3061330115888,
+          4631.410314992536,
+          3982.514817005722,
+          3797.404087992618,
+          3459.1448139981367,
+          3284.56081400509,
+          3109.9108000053093
+        ],
+        "whisper_word_times_s": [
+          1.665589316005935,
+          2.1978792709996924,
+          3.7054179810074857,
+          3.7054179810074857,
+          3.7054179810074857,
+          4.220547506003641,
+          4.7348856659955345,
+          5.278781807006453,
+          5.773216417001095,
+          5.773216417001095,
+          6.300126524001826,
+          6.300126524001826,
+          6.300126524001826,
+          7.342561858997215,
+          7.833725570002571,
+          10.10306458400737,
+          10.10306458400737,
+          10.10306458400737,
+          10.10306458400737,
+          10.10306458400737,
+          10.10306458400737,
+          10.713443214001018,
+          11.34524895400682,
+          11.989432197995484,
+          12.668645844009006,
+          12.668645844009006,
+          13.7925210740068,
+          13.7925210740068,
+          13.7925210740068,
+          14.461782851009048,
+          14.461782851009048,
+          15.120312633007416,
+          15.80952569800138,
+          16.625064981999458,
+          16.625064981999458,
+          16.625064981999458,
+          17.460663959005615,
+          17.460663959005615,
+          17.460663959005615,
+          20.013843420005287,
+          20.013843420005287,
+          23.18347312900005,
+          23.18347312900005,
+          23.18347312900005,
+          23.18347312900005,
+          23.18347312900005,
+          23.18347312900005
+        ],
+        "nvidia_word_times_s": [
+          1.5968780429975595,
+          2.2425926410069223,
+          2.433299573996919,
+          2.433299573996919,
+          3.367735170002561,
+          3.8731828419986414,
+          4.4812671760009835,
+          4.824007742005051,
+          5.131690952999634,
+          5.454131455000606,
+          5.628853574002278,
+          5.803330121998442,
+          6.104615485004615,
+          7.023100952006644,
+          7.532993507993524,
+          8.464343482002732,
+          8.464343482002732,
+          8.659413745001075,
+          8.659413745001075,
+          8.835427889993298,
+          9.305111882000347,
+          10.239629582996713,
+          10.587882395004272,
+          11.343539248002344,
+          11.540965161999338,
+          11.721294046001276,
+          11.721294046001276,
+          12.330346757997177,
+          12.330346757997177,
+          13.303908454996417,
+          13.479213037993759,
+          13.766479094992974,
+          14.232885264995275,
+          14.729055903997505,
+          14.904532900007325,
+          15.389568358004908,
+          15.860267355004908,
+          16.198473779993947,
+          16.632173467995017,
+          17.622732039002585,
+          18.076537286993698,
+          18.552062814007513,
+          19.200958311994327,
+          19.38606904100743,
+          19.724328315001912,
+          19.89891231499496,
+          20.07356232899474
+        ]
+      },
+      {
+        "trial": 2,
+        "nvidia_earlier_words": 46,
+        "reference_words": 47,
+        "median_nvidia_advantage_ms": 1253.9727410039632,
+        "per_word_advantage_ms": [
+          62.444852010230534,
+          -48.08959500223864,
+          1466.8794410099508,
+          1271.1209560075076,
+          336.90482200472616,
+          392.4454530060757,
+          259.6217690006597,
+          438.24156500340905,
+          651.5578260004986,
+          327.991641999688,
+          658.8400049949996,
+          483.96032000891864,
+          186.95891900279094,
+          324.5016620057868,
+          305.19246800395194,
+          1638.417063993984,
+          1638.417063993984,
+          1442.701298990869,
+          1442.701298990869,
+          1268.073136001476,
+          797.7893079951173,
+          495.9382539964281,
+          2105.85257600178,
+          1345.9367199975532,
+          1154.5406929944875,
+          979.6859649941325,
+          979.6859649941325,
+          1014.3790449947119,
+          1014.3790449947119,
+          1180.541727997479,
+          1004.9710559978848,
+          1376.5995139983715,
+          1606.1831610131776,
+          1915.0509960018098,
+          1739.280638998025,
+          1253.9727410039632,
+          2018.737880003755,
+          1681.23596800433,
+          1241.6452020115685,
+          2619.427915007691,
+          1979.3656370020472,
+          4348.077235001256,
+          3704.126198004815,
+          3519.2744759988273,
+          3181.6655629954766,
+          3006.784786004573,
+          2831.7804469988914
+        ],
+        "whisper_word_times_s": [
+          1.6515500440000324,
+          2.1894101849902654,
+          3.704379221002455,
+          3.704379221002455,
+          3.704379221002455,
+          4.2658944529976,
+          4.740852584989625,
+          5.2617882789927535,
+          5.782545907990425,
+          5.782545907990425,
+          6.2887323159957305,
+          6.2887323159957305,
+          6.2887323159957305,
+          7.3487601230008295,
+          7.834510863001924,
+          10.104228536991286,
+          10.104228536991286,
+          10.104228536991286,
+          10.104228536991286,
+          10.104228536991286,
+          10.104228536991286,
+          10.73581496499537,
+          12.688500028991257,
+          12.688500028991257,
+          12.688500028991257,
+          12.688500028991257,
+          12.688500028991257,
+          13.346923570992658,
+          13.346923570992658,
+          14.48201102699386,
+          14.48201102699386,
+          15.14559798099799,
+          15.840948507000576,
+          16.64546833699569,
+          16.64546833699569,
+          16.64546833699569,
+          17.875230120000197,
+          17.875230120000197,
+          17.875230120000197,
+          20.237230270999135,
+          20.237230270999135,
+          22.90333245099464,
+          22.90333245099464,
+          22.90333245099464,
+          22.90333245099464,
+          22.90333245099464,
+          22.90333245099464
+        ],
+        "nvidia_word_times_s": [
+          1.5891051919898018,
+          2.237499779992504,
+          2.237499779992504,
+          2.4332582649949472,
+          3.3674743989977287,
+          3.873448999991524,
+          4.481230815988965,
+          4.823546713989344,
+          5.130988081989926,
+          5.454554265990737,
+          5.629892311000731,
+          5.804771995986812,
+          6.1017733969929395,
+          7.024258460995043,
+          7.529318394997972,
+          8.465811472997302,
+          8.465811472997302,
+          8.661527238000417,
+          8.661527238000417,
+          8.83615540098981,
+          9.306439228996169,
+          10.239876710998942,
+          10.582647452989477,
+          11.342563308993704,
+          11.53395933599677,
+          11.708814063997124,
+          11.708814063997124,
+          12.332544525997946,
+          12.332544525997946,
+          13.30146929899638,
+          13.477039970995975,
+          13.76899846699962,
+          14.234765345987398,
+          14.730417340993881,
+          14.906187697997666,
+          15.391495595991728,
+          15.856492239996442,
+          16.193994151995867,
+          16.633584917988628,
+          17.617802355991444,
+          18.257864633997087,
+          18.555255215993384,
+          19.199206252989825,
+          19.384057974995812,
+          19.721666887999163,
+          19.896547664990067,
+          20.07155200399575
+        ]
+      },
+      {
+        "trial": 3,
+        "nvidia_earlier_words": 47,
+        "reference_words": 47,
+        "median_nvidia_advantage_ms": 1319.2197350144852,
+        "per_word_advantage_ms": [
+          31.370051015983336,
+          47.25128100835718,
+          1404.3908650055528,
+          1229.8852120002266,
+          310.9184220083989,
+          351.5511220030021,
+          202.97908700013068,
+          395.5334380152635,
+          594.4629040022846,
+          267.176848006784,
+          618.9800940046553,
+          444.41761399502866,
+          142.74793000367936,
+          517.078169999877,
+          257.71507700846996,
+          1603.5851490014466,
+          1603.5851490014466,
+          1603.5851490014466,
+          1413.861310997163,
+          1238.8816090096952,
+          947.1125790005317,
+          599.9035150016425,
+          2484.1567590046907,
+          1668.5305220162263,
+          1493.4548090095632,
+          1319.2197350144852,
+          1145.0833850103663,
+          1384.2292799963616,
+          1209.4862020021537,
+          1421.2984800105914,
+          1246.6114270064281,
+          944.2803720012307,
+          1182.6918370061321,
+          1574.9776300071971,
+          1272.8684920002706,
+          1776.0608899989165,
+          2373.021774008521,
+          2034.9012010119623,
+          1859.3042900029104,
+          2546.813427004963,
+          2088.524363003671,
+          1587.2869650047505,
+          4147.8772750124335,
+          4147.8772750124335,
+          3650.794555011089,
+          3650.794555011089,
+          3475.5641620140523
+        ],
+        "whisper_word_times_s": [
+          1.661573967008735,
+          2.1844269989960594,
+          3.7165762619988527,
+          3.7165762619988527,
+          3.7165762619988527,
+          4.267250416000024,
+          4.7210419369948795,
+          5.261944148005568,
+          5.762684743996942,
+          5.762684743996942,
+          6.289283335994696,
+          6.289283335994696,
+          6.289283335994696,
+          7.31189758599794,
+          7.827978917004657,
+          10.110769097998855,
+          10.110769097998855,
+          10.110769097998855,
+          10.110769097998855,
+          10.110769097998855,
+          10.110769097998855,
+          10.737240895003197,
+          12.948510058005922,
+          12.948510058005922,
+          12.948510058005922,
+          12.948510058005922,
+          12.948510058005922,
+          13.612274034996517,
+          13.612274034996517,
+          14.757392448998871,
+          14.757392448998871,
+          14.757392448998871,
+          15.456399517002865,
+          16.19701902399538,
+          16.19701902399538,
+          17.022802685998613,
+          18.26789542500046,
+          18.26789542500046,
+          18.26789542500046,
+          20.205319932996645,
+          20.205319932996645,
+          20.205319932996645,
+          23.390324028005125,
+          23.390324028005125,
+          23.390324028005125,
+          23.390324028005125,
+          23.390324028005125
+        ],
+        "nvidia_word_times_s": [
+          1.6302039159927517,
+          2.1371757179877022,
+          2.3121853969933,
+          2.486691049998626,
+          3.405657839990454,
+          3.9156992939970223,
+          4.518062849994749,
+          4.866410709990305,
+          5.168221839994658,
+          5.495507895990158,
+          5.670303241990041,
+          5.844865721999668,
+          6.146535405991017,
+          6.794819415998063,
+          7.570263839996187,
+          8.507183948997408,
+          8.507183948997408,
+          8.507183948997408,
+          8.696907787001692,
+          8.87188748898916,
+          9.163656518998323,
+          10.137337380001554,
+          10.464353299001232,
+          11.279979535989696,
+          11.45505524899636,
+          11.629290322991437,
+          11.803426672995556,
+          12.228044755000155,
+          12.402787832994363,
+          13.33609396898828,
+          13.510781021992443,
+          13.81311207699764,
+          14.273707679996733,
+          14.622041393988184,
+          14.92415053199511,
+          15.246741795999696,
+          15.89487365099194,
+          16.2329942239885,
+          16.40859113499755,
+          17.65850650599168,
+          18.116795569992973,
+          18.618032967991894,
+          19.24244675299269,
+          19.24244675299269,
+          19.739529472994036,
+          19.739529472994036,
+          19.914759865991073
+        ]
+      }
+    ]
+  },
+  "typesafe_worker": {
+    "baseline": {
+      "config": {
+        "context": 1,
+        "threads": 4,
+        "packetMs": 20,
+        "gate": "zero",
+        "paced": true,
+        "repeats": 1,
+        "split": "all"
+      },
+      "quality": {
+        "trials": 24,
+        "words": 476,
+        "errors": 12,
+        "wer": 0.025210084033613446
+      },
+      "splits": {
+        "development": {
+          "trials": 16,
+          "words": 320,
+          "errors": 8,
+          "wer": 0.025
+        },
+        "held-out": {
+          "trials": 8,
+          "words": 156,
+          "errors": 4,
+          "wer": 0.02564102564102564
+        }
+      },
+      "coldReadyMs": {
+        "n": 2,
+        "median": 1162.6275150001675,
+        "p95": 1168.7290080008097,
+        "max": 1168.7290080008097,
+        "tailQualified": false,
+        "note": "Descriptive nearest-rank; repeated fixtures are not independent speakers."
+      },
+      "startAckMs": {
+        "n": 24,
+        "median": 0.12201899971842067,
+        "p95": 0.15767600052640773,
+        "max": 0.16431800031568855,
+        "tailQualified": false,
+        "note": "Descriptive nearest-rank; repeated fixtures are not independent speakers."
+      },
+      "finishAckMs": {
+        "n": 24,
+        "median": 66.66397400022106,
+        "p95": 101.57095599970489,
+        "max": 103.66987399993377,
+        "tailQualified": false,
+        "note": "Descriptive nearest-rank; repeated fixtures are not independent speakers."
+      },
+      "firstHypothesisMs": {
+        "n": 24,
+        "median": 1175.0606189998507,
+        "p95": 1494.7679830002016,
+        "max": 1497.7934649996314,
+        "tailQualified": false,
+        "note": "Descriptive nearest-rank; repeated fixtures are not independent speakers."
+      },
+      "serviceRtf": {
+        "n": 24,
+        "median": 0.2572146412808402,
+        "p95": 0.27949218195666126,
+        "max": 0.281994721534743,
+        "tailQualified": false,
+        "note": "Descriptive nearest-rank; repeated fixtures are not independent speakers."
+      },
+      "perSessionMedianUpdateGapMs": {
+        "n": 24,
+        "median": 162.35162899920397,
+        "p95": 319.5524140000998,
+        "max": 320.72116999916034,
+        "tailQualified": false,
+        "note": "Descriptive nearest-rank; repeated fixtures are not independent speakers."
+      },
+      "maxObservedUpdateGapMs": 1601.3569109991295,
+      "perSessionMedianNewWords": {
+        "n": 24,
+        "median": 1,
+        "p95": 1,
+        "max": 1,
+        "tailQualified": false,
+        "note": "Descriptive nearest-rank; repeated fixtures are not independent speakers."
+      },
+      "revisions": 0,
+      "maxSampledWorkerRssBytes": 1012367360
+    },
+    "candidate": {
+      "config": {
+        "context": 0,
+        "threads": 4,
+        "packetMs": 20,
+        "gate": "zero",
+        "paced": true,
+        "repeats": 1,
+        "split": "all"
+      },
+      "quality": {
+        "trials": 24,
+        "words": 476,
+        "errors": 10,
+        "wer": 0.02100840336134454
+      },
+      "splits": {
+        "development": {
+          "trials": 16,
+          "words": 320,
+          "errors": 6,
+          "wer": 0.01875
+        },
+        "held-out": {
+          "trials": 8,
+          "words": 156,
+          "errors": 4,
+          "wer": 0.02564102564102564
+        }
+      },
+      "coldReadyMs": {
+        "n": 2,
+        "median": 1285.146361000443,
+        "p95": 1321.090806999564,
+        "max": 1321.090806999564,
+        "tailQualified": false,
+        "note": "Descriptive nearest-rank; repeated fixtures are not independent speakers."
+      },
+      "startAckMs": {
+        "n": 24,
+        "median": 0.11575699954846641,
+        "p95": 0.192622000213305,
+        "max": 0.33306499972241,
+        "tailQualified": false,
+        "note": "Descriptive nearest-rank; repeated fixtures are not independent speakers."
+      },
+      "finishAckMs": {
+        "n": 24,
+        "median": 76.53027299966197,
+        "p95": 79.82398900003318,
+        "max": 84.56281400049193,
+        "tailQualified": false,
+        "note": "Descriptive nearest-rank; repeated fixtures are not independent speakers."
+      },
+      "firstHypothesisMs": {
+        "n": 24,
+        "median": 1167.6125829999364,
+        "p95": 1488.9581529996576,
+        "max": 1489.5139929994912,
+        "tailQualified": false,
+        "note": "Descriptive nearest-rank; repeated fixtures are not independent speakers."
+      },
+      "serviceRtf": {
+        "n": 24,
+        "median": 0.38379680335493754,
+        "p95": 0.40546124925018184,
+        "max": 0.40617929952266546,
+        "tailQualified": false,
+        "note": "Descriptive nearest-rank; repeated fixtures are not independent speakers."
+      },
+      "perSessionMedianUpdateGapMs": {
+        "n": 24,
+        "median": 161.17915299946617,
+        "p95": 239.60242199973436,
+        "max": 239.69048900016787,
+        "tailQualified": false,
+        "note": "Descriptive nearest-rank; repeated fixtures are not independent speakers."
+      },
+      "maxObservedUpdateGapMs": 1520.902309000121,
+      "perSessionMedianNewWords": {
+        "n": 24,
+        "median": 1,
+        "p95": 1,
+        "max": 1,
+        "tailQualified": false,
+        "note": "Descriptive nearest-rank; repeated fixtures are not independent speakers."
+      },
+      "revisions": 0,
+      "maxSampledWorkerRssBytes": 1011544064
+    },
+    "pairedTrialCount": 24,
+    "independentSpeakers": 12,
+    "boundary": "real_worker_json_protocol_no_capture_or_destination",
+    "sourceCommit": "946ce185c7cab68ecb9ab20aaa837c8febc18c77",
+    "modelSha256": "d9a01898d2a611c8764e23a1c2f45e70bbd5a425dc4de93692ac951dd603812d",
+    "productionChangePromoted": false,
+    "limitation": "Small worker-only experiment. No recipient, physical microphone, punctuation gold, word-end alignment or world ranking."
+  },
+  "typesafe_summary": {
+    "title": "19 September 2026 \u00b7 same .41 runtime and model",
+    "headers": [
+      "Measure",
+      "Before: context 1, 4 threads",
+      "Experiment: context 0, 4 threads"
+    ],
+    "scope": "24 paired real-time worker trials across 12 public-fixture speakers. A\u2013B\u2013B\u2013A run order. TypeSafe judged one transcript per speaker and setting; repeated playback does not add independent speakers. Four isolated packaged GTK/X11 trials use one public clip, two trials per setting; their ranges are descriptive and state observation polls every 50 ms.",
+    "rows": [
+      [
+        "Word error rate, all 12 speakers",
+        "2.52%",
+        "2.10%"
+      ],
+      [
+        "Word error rate, 4 held-out speakers",
+        "2.56%",
+        "2.56%"
+      ],
+      [
+        "Worker first text from paced replay, median",
+        "1175.1 ms",
+        "1167.6 ms"
+      ],
+      [
+        "Worker finish acknowledgement, median",
+        "66.7 ms",
+        "76.5 ms"
+      ],
+      [
+        "Worker service / audio duration, median",
+        "0.257",
+        "0.384"
+      ],
+      [
+        "TypeSafe meaning, 8 development speakers",
+        "95.79 / 100",
+        "97.29 / 100"
+      ],
+      [
+        "TypeSafe meaning, 4 held-out speakers",
+        "86.50 / 100",
+        "86.17 / 100"
+      ],
+      [
+        "Private GTK: Start command \u2192 active observation",
+        "50.7\u201350.7 ms",
+        "50.8\u2013101.0 ms"
+      ],
+      [
+        "Private GTK: playback launch \u2192 first field text",
+        "1365.5\u20131380.8 ms",
+        "1455.0\u20131457.8 ms"
+      ],
+      [
+        "Private GTK: Stop command \u2192 idle observation",
+        "207.3\u2013207.8 ms",
+        "207.4\u2013208.5 ms"
+      ],
+      [
+        "Punctuation accuracy / word-end-to-screen lag",
+        "Not measured",
+        "Not measured"
+      ]
+    ],
+    "decision": "Decision: retain the current context 1 setting. Context 0 improves one development recognition error but uses about 49% more service time, barely changes first-text timing and does not improve held-out accuracy or meaning.",
+    "limits": "Experimental results, not a shipped before/after improvement or worldwide ranking. Word timestamps and punctuation gold are absent. These worker numbers are not shortcut, recipient or pixel-paint timings. TypeSafe scores are rubric positions, not percentages of correct words.",
+    "additional": [
+      {
+        "title": "Same context 1 \u00b7 CPU-thread follow-up",
+        "headers": [
+          "Worker measure",
+          "Before: 4 threads",
+          "Experiment: 6 threads"
+        ],
+        "rows": [
+          [
+            "Word error rate",
+            "2.52%",
+            "2.52%"
+          ],
+          [
+            "Complete transcript parity",
+            "Reference arm",
+            "24 / 24 paired final texts identical"
+          ],
+          [
+            "Median service / audio duration",
+            "0.257",
+            "0.228"
+          ],
+          [
+            "Median finish acknowledgement",
+            "66.7 ms",
+            "59.8 ms"
+          ],
+          [
+            "Median first hypothesis from paced replay",
+            "1175.1 ms",
+            "1170.5 ms"
+          ]
+        ],
+        "scope": "24 trials per setting across the same 12 public fixtures. The six-thread runs followed the earlier baseline; this follow-up was not counterbalanced in time.",
+        "decision": "Promising local compute headroom: 11.2% less median service time on the AMD Ryzen 7 PRO 8840HS test system, with only 4.6 ms earlier first text. Retain the portable four-thread default until loaded-desktop, energy and other-CPU checks support a change.",
+        "limits": "This is not a shipped speedup or a six-thread desktop qualification. Complete text parity allows reuse of existing semantic judgments; no extra TypeSafe calls or new independent speakers are implied."
+      }
+    ]
+  },
+  "linux": {
+    "version": "2026.0.43",
+    "applicationSha256": "c04a65c215387aa021cdb8a174a1e5c18834cf62cc3b47ce68f424dca8840301",
+    "productSource": "f05c264d35c2ada65b4015e4b14af8982afea04b",
+    "packageLifecycle": [
+      {
+        "platform": "Ubuntu 24.04",
+        "scope": "booted GNOME X11 guest; verified public .42 upgrade",
+        "receipts": [
+          {
+            "stage": "installed",
+            "passed": true,
+            "checked": 227,
+            "elfObjects": 9,
+            "receiptSha256": "8594ed7409e2ec99e019dab45527c8ad23cd95366c1ebec274ae5ebf306247a8"
+          },
+          {
+            "stage": "reinstalled",
+            "passed": true,
+            "checked": 227,
+            "elfObjects": 9,
+            "receiptSha256": "8594ed7409e2ec99e019dab45527c8ad23cd95366c1ebec274ae5ebf306247a8"
+          },
+          {
+            "stage": "removed",
+            "passed": true,
+            "checked": 176,
+            "elfObjects": 0,
+            "receiptSha256": "4216602994559cc65003ba8bfddc17563bfb5d4bc2353b263f59ccc39c8a4a12"
+          }
+        ],
+        "userStateMarkerPreserved": true
+      },
+      {
+        "platform": "Ubuntu 26.04",
+        "scope": "local container; .37 baseline",
+        "receipts": [
+          {
+            "stage": "installed",
+            "passed": true,
+            "checked": 227,
+            "elfObjects": 9,
+            "receiptSha256": "8594ed7409e2ec99e019dab45527c8ad23cd95366c1ebec274ae5ebf306247a8"
+          },
+          {
+            "stage": "reinstalled",
+            "passed": true,
+            "checked": 227,
+            "elfObjects": 9,
+            "receiptSha256": "8594ed7409e2ec99e019dab45527c8ad23cd95366c1ebec274ae5ebf306247a8"
+          },
+          {
+            "stage": "removed",
+            "passed": true,
+            "checked": 176,
+            "elfObjects": 0,
+            "receiptSha256": "4216602994559cc65003ba8bfddc17563bfb5d4bc2353b263f59ccc39c8a4a12"
+          }
+        ],
+        "userStateMarkerPreserved": true
+      },
+      {
+        "platform": "Debian 13",
+        "scope": "local container; .37 baseline",
+        "receipts": [
+          {
+            "stage": "installed",
+            "passed": true,
+            "checked": 227,
+            "elfObjects": 9,
+            "receiptSha256": "8594ed7409e2ec99e019dab45527c8ad23cd95366c1ebec274ae5ebf306247a8"
+          },
+          {
+            "stage": "reinstalled",
+            "passed": true,
+            "checked": 227,
+            "elfObjects": 9,
+            "receiptSha256": "8594ed7409e2ec99e019dab45527c8ad23cd95366c1ebec274ae5ebf306247a8"
+          },
+          {
+            "stage": "removed",
+            "passed": true,
+            "checked": 176,
+            "elfObjects": 0,
+            "receiptSha256": "4216602994559cc65003ba8bfddc17563bfb5d4bc2353b263f59ccc39c8a4a12"
+          }
+        ],
+        "userStateMarkerPreserved": true
+      },
+      {
+        "platform": "Mint 22.3",
+        "scope": "local container; .37 baseline",
+        "receipts": [
+          {
+            "stage": "installed",
+            "passed": true,
+            "checked": 227,
+            "elfObjects": 9,
+            "receiptSha256": "8594ed7409e2ec99e019dab45527c8ad23cd95366c1ebec274ae5ebf306247a8"
+          },
+          {
+            "stage": "reinstalled",
+            "passed": true,
+            "checked": 227,
+            "elfObjects": 9,
+            "receiptSha256": "8594ed7409e2ec99e019dab45527c8ad23cd95366c1ebec274ae5ebf306247a8"
+          },
+          {
+            "stage": "removed",
+            "passed": true,
+            "checked": 176,
+            "elfObjects": 0,
+            "receiptSha256": "4216602994559cc65003ba8bfddc17563bfb5d4bc2353b263f59ccc39c8a4a12"
+          }
+        ],
+        "userStateMarkerPreserved": true
+      },
+      {
+        "platform": "Fedora 44",
+        "scope": "booted GNOME Wayland guest",
+        "receipts": [
+          {
+            "stage": "installed",
+            "passed": true,
+            "checked": 227,
+            "elfObjects": 9,
+            "receiptSha256": "8594ed7409e2ec99e019dab45527c8ad23cd95366c1ebec274ae5ebf306247a8"
+          },
+          {
+            "stage": "reinstalled",
+            "passed": true,
+            "checked": 227,
+            "elfObjects": 9,
+            "receiptSha256": "8594ed7409e2ec99e019dab45527c8ad23cd95366c1ebec274ae5ebf306247a8"
+          },
+          {
+            "stage": "removed",
+            "passed": true,
+            "checked": 176,
+            "elfObjects": 0,
+            "receiptSha256": "4216602994559cc65003ba8bfddc17563bfb5d4bc2353b263f59ccc39c8a4a12"
+          }
+        ],
+        "userStateMarkerPreserved": true
+      },
+      {
+        "platform": "openSUSE Tumbleweed 20260917",
+        "scope": "booted KDE Wayland guest",
+        "receipts": [
+          {
+            "stage": "installed",
+            "passed": true,
+            "checked": 227,
+            "elfObjects": 9,
+            "receiptSha256": "8594ed7409e2ec99e019dab45527c8ad23cd95366c1ebec274ae5ebf306247a8"
+          },
+          {
+            "stage": "reinstalled",
+            "passed": true,
+            "checked": 227,
+            "elfObjects": 9,
+            "receiptSha256": "8594ed7409e2ec99e019dab45527c8ad23cd95366c1ebec274ae5ebf306247a8"
+          },
+          {
+            "stage": "removed",
+            "passed": true,
+            "checked": 176,
+            "elfObjects": 0,
+            "receiptSha256": "4216602994559cc65003ba8bfddc17563bfb5d4bc2353b263f59ccc39c8a4a12"
+          }
+        ],
+        "userStateMarkerPreserved": true
+      },
+      {
+        "platform": "Omarchy 4.0.4",
+        "scope": "booted packaged Hyprland/Quickshell; supplied kernel",
+        "receipts": [
+          {
+            "stage": "installed",
+            "passed": true,
+            "checked": 227,
+            "elfObjects": 9,
+            "receiptSha256": "8594ed7409e2ec99e019dab45527c8ad23cd95366c1ebec274ae5ebf306247a8"
+          },
+          {
+            "stage": "reinstalled",
+            "passed": true,
+            "checked": 227,
+            "elfObjects": 9,
+            "receiptSha256": "8594ed7409e2ec99e019dab45527c8ad23cd95366c1ebec274ae5ebf306247a8"
+          },
+          {
+            "stage": "removed",
+            "passed": true,
+            "checked": 176,
+            "elfObjects": 0,
+            "receiptSha256": "4216602994559cc65003ba8bfddc17563bfb5d4bc2353b263f59ccc39c8a4a12"
+          }
+        ],
+        "userStateMarkerPreserved": true
+      }
+    ],
+    "desktop": {
+      "applicationSha256": "c04a65c215387aa021cdb8a174a1e5c18834cf62cc3b47ce68f424dca8840301",
+      "boundary": "Synthetic VM trigger to independently observed text; not physical input or pixel paint. GTK change callbacks and external recipient 100 ms observations differ. Not percentiles.",
+      "trials": [
+        {
+          "trial": 112,
+          "case": "delivery",
+          "completed": true,
+          "words": 14,
+          "otherFieldEmpty": true,
+          "stopToIdleMs": [
+            498
+          ],
+          "syntheticTriggerToFirstFieldObservationMs": 2544,
+          "privateFieldReceiptSha256": "7acf316d442c2326f9ed2be5f0b3afa5b7057e63c50c3c2c1334d92c14af66e2"
+        },
+        {
+          "trial": 114,
+          "case": "same-caret",
+          "completed": true,
+          "words": 28,
+          "otherFieldEmpty": true,
+          "stopToIdleMs": [
+            452,
+            446
+          ],
+          "syntheticTriggerToFirstFieldObservationMs": 1936,
+          "privateFieldReceiptSha256": "8dbbb9808824b95d17566e9b32b3fefdaf44be3a9321bd6fa87ea8d200ad7636"
+        },
+        {
+          "trial": 115,
+          "case": "same-caret",
+          "completed": true,
+          "words": 28,
+          "otherFieldEmpty": true,
+          "stopToIdleMs": [
+            220,
+            262
+          ],
+          "syntheticTriggerToFirstFieldObservationMs": 1840,
+          "privateFieldReceiptSha256": "71b9a96d49ed643725d4b2e861a59e05ab9d41aa2c4c5ce2bb0ebb2b286cd970"
+        },
+        {
+          "trial": 116,
+          "case": "same-caret",
+          "completed": true,
+          "words": 28,
+          "otherFieldEmpty": true,
+          "stopToIdleMs": [
+            490,
+            466
+          ],
+          "syntheticTriggerToFirstFieldObservationMs": 1913,
+          "privateFieldReceiptSha256": "3a086c0b2417bd0ece07885206e80c60d2b2931e6034aed37a752faeebc6175d"
+        }
+      ]
+    },
+    "finalDesktopAttempts": 6,
+    "finalDesktopPasses": 4,
+    "retainedSetupFailures": [
+      {
+        "trial": 111,
+        "reason": "Guest GNOME overview prevented recipient focus before recording."
+      },
+      {
+        "trial": 113,
+        "reason": "Focus conditional alone did not dismiss GNOME overview; dismissed explicitly before passing 114."
+      }
+    ],
+    "retainedPackageSetupFailure": "First Omarchy lifecycle attempt stopped after removal because the disposable pacman test keyring was empty after reboot. Restored test-key trust and repeated complete lifecycle successfully; no publisher trust claim from that test signature.",
+    "qualificationRationale": "Earlier long-recording, recovery, focus-departure and worker-corpus trials apply to the preserved f634 build. The refreshed c04 build changes one Updates helper sentence and packaged documentation; all speech/OS-integration source and remaining payload entries are unchanged. Seven package lifecycles and four fresh-user desktop scenarios were repeated on the refreshed binary. Earlier timings are not relabeled as refreshed-binary measurements.",
+    "limitations": [
+      "Virtual sources do not certify physical microphones, suspend/resume, ISO installers or arbitrary applications.",
+      "Fedora long Stop-to-idle was 2813 ms; no sub-second or percentile claim.",
+      "Cold Firefox startup in constrained two-vCPU guests previously triggered bounded backlog recovery.",
+      "Independent physical Start, pixel paint, acoustic word alignment and audited punctuation measurements remain unavailable.",
+      "Debian/Mint container checks do not establish their default desktops.",
+      "No global ranking, universal Linux support or independently calibrated semantic score.",
+      "One previously assessed low-severity rand advisory remains open; no open secret-scanning alerts on the checked repository.",
+      "Refreshed-build smoke timings are individual observations, not latency distributions; earlier full engine tests retain their exact previous binary identity.",
+      "Native lifecycle tests precede publisher signing; header/detached-signature verification and exact payload parity are separate required publication gates."
+    ],
+    "desktopLabels": {
+      "112": "openSUSE / KDE Wayland / Firefox",
+      "114": "Fedora / GNOME Wayland / GTK",
+      "115": "Omarchy / Hyprland / GTK",
+      "116": "Ubuntu / GNOME X11 / GTK"
+    }
+  }
+}

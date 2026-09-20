@@ -1,0 +1,262 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
+  "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1152pt" height="648pt" viewBox="0 0 1152 648" xmlns="http://www.w3.org/2000/svg" version="1.1">
+ <metadata>
+  <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+   <cc:Work>
+    <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
+    <dc:date>2026-09-20T16:13:55.419598</dc:date>
+    <dc:format>image/svg+xml</dc:format>
+    <dc:creator>
+     <cc:Agent>
+      <dc:title>Matplotlib v3.11.2, https://matplotlib.org/</dc:title>
+     </cc:Agent>
+    </dc:creator>
+   </cc:Work>
+  </rdf:RDF>
+ </metadata>
+ <defs>
+  <style type="text/css">*{stroke-linejoin: round; stroke-linecap: butt}</style>
+ </defs>
+ <g id="figure_1">
+  <g id="patch_1">
+   <path d="M 0 648
+L 1152 648
+L 1152 0
+L 0 0
+z
+" style="fill: #ffffff"/>
+  </g>
+  <g id="axes_1">
+   <g id="patch_2">
+    <path d="M 391.68 479.52
+L 858.24 479.52
+L 858.24 184.68
+L 391.68 184.68
+z
+" style="fill: #ffffff"/>
+   </g>
+   <g id="matplotlib.axis_1">
+    <g id="xtick_1">
+     <g id="line2d_1">
+      <path d="M 391.68 479.52
+L 391.68 184.68
+" clip-path="url(#pe3fb2129af)" style="fill: none; stroke: #e5ebef; stroke-width: 0.6; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_2"/>
+     <g id="text_1">
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #536875" x="391.68" y="495.117656" transform="rotate(-0 391.68 495.117656)">0.0</text>
+     </g>
+    </g>
+    <g id="xtick_2">
+     <g id="line2d_3">
+      <path d="M 485.7101 479.52
+L 485.7101 184.68
+" clip-path="url(#pe3fb2129af)" style="fill: none; stroke: #e5ebef; stroke-width: 0.6; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_4"/>
+     <g id="text_2">
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #536875" x="485.7101" y="495.117656" transform="rotate(-0 485.7101 495.117656)">0.8</text>
+     </g>
+    </g>
+    <g id="xtick_3">
+     <g id="line2d_5">
+      <path d="M 579.7402 479.52
+L 579.7402 184.68
+" clip-path="url(#pe3fb2129af)" style="fill: none; stroke: #e5ebef; stroke-width: 0.6; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_6"/>
+     <g id="text_3">
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #536875" x="579.7402" y="495.117656" transform="rotate(-0 579.7402 495.117656)">1.6</text>
+     </g>
+    </g>
+    <g id="xtick_4">
+     <g id="line2d_7">
+      <path d="M 673.7703 479.52
+L 673.7703 184.68
+" clip-path="url(#pe3fb2129af)" style="fill: none; stroke: #e5ebef; stroke-width: 0.6; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_8"/>
+     <g id="text_4">
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #536875" x="673.7703" y="495.117656" transform="rotate(-0 673.7703 495.117656)">2.4</text>
+     </g>
+    </g>
+    <g id="xtick_5">
+     <g id="line2d_9">
+      <path d="M 767.800401 479.52
+L 767.800401 184.68
+" clip-path="url(#pe3fb2129af)" style="fill: none; stroke: #e5ebef; stroke-width: 0.6; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_10"/>
+     <g id="text_5">
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #536875" x="767.800401" y="495.117656" transform="rotate(-0 767.800401 495.117656)">3.2</text>
+     </g>
+    </g>
+    <g id="text_6">
+     <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #536875" x="624.96" y="513.117656" transform="rotate(-0 624.96 513.117656)">s</text>
+    </g>
+   </g>
+   <g id="matplotlib.axis_2"/>
+   <g id="patch_3">
+    <path d="M 391.68 479.52
+L 858.24 479.52
+" style="fill: none; stroke: #e5ebef; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
+   </g>
+   <g id="patch_4">
+    <path d="M 391.68 199.422
+L 567.648082 199.422
+L 567.648082 215.617437
+L 391.68 215.617437
+z
+" clip-path="url(#pe3fb2129af)" style="fill: #087f67"/>
+   </g>
+   <g id="patch_5">
+    <path d="M 391.68 240.948761
+L 622.648167 240.948761
+L 622.648167 257.144197
+L 391.68 257.144197
+z
+" clip-path="url(#pe3fb2129af)" style="fill: #516d80"/>
+   </g>
+   <g id="patch_6">
+    <path d="M 391.68 282.475521
+L 622.971183 282.475521
+L 622.971183 298.670958
+L 391.68 298.670958
+z
+" clip-path="url(#pe3fb2129af)" style="fill: #516d80"/>
+   </g>
+   <g id="patch_7">
+    <path d="M 391.68 324.002282
+L 712.270525 324.002282
+L 712.270525 340.197718
+L 391.68 340.197718
+z
+" clip-path="url(#pe3fb2129af)" style="fill: #516d80"/>
+   </g>
+   <g id="patch_8">
+    <path d="M 391.68 365.529042
+L 827.717383 365.529042
+L 827.717383 381.724479
+L 391.68 381.724479
+z
+" clip-path="url(#pe3fb2129af)" style="fill: #516d80"/>
+   </g>
+  </g>
+  <g id="line2d_11">
+   <path d="M 63.36 143.856
+L 1088.64 143.856
+" style="fill: none; stroke: #e5ebef; stroke-width: 0.8; stroke-linecap: square"/>
+  </g>
+  <g id="line2d_12">
+   <path d="M 63.36 528.12
+L 1088.64 528.12
+" style="fill: none; stroke: #e5ebef; stroke-width: 0.8; stroke-linecap: square"/>
+  </g>
+  <g id="text_7">
+   <text style="font-weight: 700; font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #087f67" x="63.36" y="38.232" transform="rotate(-0 63.36 38.232)">VOCO  /  LOCAL SPEECH BENCHMARK</text>
+  </g>
+  <g id="text_8">
+   <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: end; fill: #536875" x="1088.64" y="38.232" transform="rotate(-0 1088.64 38.232)">03 / 14</text>
+  </g>
+  <g id="text_9">
+   <text style="font-weight: 700; font-size: 29px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #132d3d" x="63.36" y="85.536" transform="rotate(-0 63.36 85.536)">First recognizer output</text>
+  </g>
+  <g id="text_10">
+   <text style="font-size: 12px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #536875" x="63.36" y="119.232" transform="rotate(-0 63.36 119.232)">Median from audio sample zero · nine trials per streaming configuration.</text>
+  </g>
+  <g id="text_11">
+   <text style="font-weight: 700; font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #536875" x="63.36" y="168.48" transform="rotate(-0 63.36 168.48)">MODEL / TESTED CONFIGURATION</text>
+  </g>
+  <g id="text_12">
+   <text style="font-weight: 700; font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: end; fill: #536875" x="1088.64" y="168.48" transform="rotate(-0 1088.64 168.48)">LOWER IS BETTER</text>
+  </g>
+  <g id="text_13">
+   <text style="font-weight: 700; font-size: 13.2px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #132d3d" x="63.36" y="207.708625" transform="rotate(-0 63.36 207.708625)">NVIDIA Nemotron 0.6B Q8</text>
+  </g>
+  <g id="text_14">
+   <text style="font-size: 7.4px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #087f67" x="63.36" y="219.183718" transform="rotate(-0 63.36 219.183718)">SELECTED DEFAULT · STREAMING ADAPTER</text>
+  </g>
+  <g id="text_15">
+   <text style="font-weight: 700; font-size: 21px; font-family: 'DejaVu Sans'; text-anchor: end; fill: #087f67" x="1088.64" y="212.974796" transform="rotate(-0 1088.64 212.974796)">1.497</text>
+  </g>
+  <g id="text_16">
+   <text style="font-size: 13.2px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #132d3d" x="63.36" y="249.235901" transform="rotate(-0 63.36 249.235901)">Moonshine Small</text>
+  </g>
+  <g id="text_17">
+   <text style="font-size: 7.4px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #536875" x="63.36" y="260.710479" transform="rotate(-0 63.36 260.710479)">STREAMING ADAPTER</text>
+  </g>
+  <g id="text_18">
+   <text style="font-weight: 700; font-size: 21px; font-family: 'DejaVu Sans'; text-anchor: end; fill: #516d80" x="1088.64" y="254.501557" transform="rotate(-0 1088.64 254.501557)">1.965</text>
+  </g>
+  <g id="text_19">
+   <text style="font-size: 13.2px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #132d3d" x="63.36" y="290.762661" transform="rotate(-0 63.36 290.762661)">Moonshine Medium</text>
+  </g>
+  <g id="text_20">
+   <text style="font-size: 7.4px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #536875" x="63.36" y="302.237239" transform="rotate(-0 63.36 302.237239)">STREAMING ADAPTER</text>
+  </g>
+  <g id="text_21">
+   <text style="font-weight: 700; font-size: 21px; font-family: 'DejaVu Sans'; text-anchor: end; fill: #516d80" x="1088.64" y="296.028318" transform="rotate(-0 1088.64 296.028318)">1.968</text>
+  </g>
+  <g id="text_22">
+   <text style="font-size: 13.2px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #132d3d" x="63.36" y="332.288906" transform="rotate(-0 63.36 332.288906)">Qwen3-ASR 0.6B</text>
+  </g>
+  <g id="text_23">
+   <text style="font-size: 7.4px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #536875" x="63.36" y="343.764" transform="rotate(-0 63.36 343.764)">STREAMING ADAPTER</text>
+  </g>
+  <g id="text_24">
+   <text style="font-weight: 700; font-size: 21px; font-family: 'DejaVu Sans'; text-anchor: end; fill: #516d80" x="1088.64" y="337.555078" transform="rotate(-0 1088.64 337.555078)">2.728</text>
+  </g>
+  <g id="text_25">
+   <text style="font-size: 13.2px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #132d3d" x="63.36" y="373.815667" transform="rotate(-0 63.36 373.815667)">Qwen3-ASR 1.7B</text>
+  </g>
+  <g id="text_26">
+   <text style="font-size: 7.4px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #536875" x="63.36" y="385.290761" transform="rotate(-0 63.36 385.290761)">STREAMING ADAPTER</text>
+  </g>
+  <g id="text_27">
+   <text style="font-weight: 700; font-size: 21px; font-family: 'DejaVu Sans'; text-anchor: end; fill: #516d80" x="1088.64" y="379.081839" transform="rotate(-0 1088.64 379.081839)">3.710</text>
+  </g>
+  <g id="text_28">
+   <text style="font-size: 13.2px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #132d3d" x="63.36" y="415.342943" transform="rotate(-0 63.36 415.342943)">Parakeet TDT v3</text>
+  </g>
+  <g id="text_29">
+   <text style="font-size: 7.4px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #536875" x="63.36" y="426.817521" transform="rotate(-0 63.36 426.817521)">OFFLINE ADAPTER</text>
+  </g>
+  <g id="text_30">
+   <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #536875" x="403.2" y="418.011373" transform="rotate(-0 403.2 418.011373)">Not measured · offline adapter</text>
+  </g>
+  <g id="text_31">
+   <text style="font-size: 17px; font-family: 'DejaVu Sans'; text-anchor: end; fill: #536875" x="1088.64" y="419.569537" transform="rotate(-0 1088.64 419.569537)">—</text>
+  </g>
+  <g id="text_32">
+   <text style="font-size: 13.2px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #132d3d" x="63.36" y="456.869704" transform="rotate(-0 63.36 456.869704)">Whisper base.en</text>
+  </g>
+  <g id="text_33">
+   <text style="font-size: 7.4px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #536875" x="63.36" y="468.344282" transform="rotate(-0 63.36 468.344282)">OFFLINE ADAPTER</text>
+  </g>
+  <g id="text_34">
+   <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #536875" x="403.2" y="459.538133" transform="rotate(-0 403.2 459.538133)">Not measured · offline adapter</text>
+  </g>
+  <g id="text_35">
+   <text style="font-size: 17px; font-family: 'DejaVu Sans'; text-anchor: end; fill: #536875" x="1088.64" y="461.096297" transform="rotate(-0 1088.64 461.096297)">—</text>
+  </g>
+  <g id="text_36">
+   <text style="font-size: 9.2px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #536875" x="63.36" y="550.152" transform="rotate(-0 63.36 550.152)">Recognizer callback timing, not first correct word, cursor appearance or pixel paint.</text>
+  </g>
+  <g id="text_37">
+   <text style="font-size: 9.2px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #536875" x="63.36" y="572.832" transform="rotate(-0 63.36 572.832)">Parakeet and Whisper used offline adapters in this comparison.</text>
+  </g>
+  <g id="text_38">
+   <text style="font-size: 9.2px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #536875" x="63.36" y="595.512" transform="rotate(-0 63.36 595.512)">One speaker · 3 previously used recordings · 919 distinct reference words · 63 selected successes / 64 attempts.</text>
+  </g>
+  <g id="text_39">
+   <text style="font-size: 9.2px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #536875" x="63.36" y="623.376" transform="rotate(-0 63.36 623.376)">14 Sep 2026 · AMD Ryzen 7 PRO 8840HS · CPU only · runtime thread settings differ · no general model ranking.</text>
+  </g>
+ </g>
+ <defs>
+  <clipPath id="pe3fb2129af">
+   <rect x="391.68" y="184.68" width="466.56" height="294.84"/>
+  </clipPath>
+ </defs>
+</svg>
