@@ -1643,6 +1643,10 @@
         "text": "RPM can omit ordinary documentation on minimal systems. License files need explicit license metadata so those terms remain installed."
       },
       {
+        "title": "Keep build identities honest",
+        "text": "The 20 September release polish changed one Updates help sentence and bundled documentation. The refreshed c04a65c application passed all seven package lifecycles and four installed desktop scenarios: repeated sessions on Fedora, Omarchy and Ubuntu, plus Firefox on openSUSE. Their observed Stop times were 220\u2013498 ms. Earlier long and recovery tests above belong to the preceding f634e621 engine build; they were not rerun or relabeled. Two post-login Fedora focus setup failures and one temporary Omarchy test-keyring failure remain recorded. These small samples are not latency percentiles."
+      },
+      {
         "title": "What TypeSafe contributes",
         "text": "Optional semantic judgments assess a transcript's meaning. Exact code and real desktop tests establish package identity, audio timing, destination safety and compatibility. A language-model score cannot replace those checks."
       }
@@ -1663,6 +1667,10 @@
       {
         "path": "docs/testing/linux-release-2026-09-19.md",
         "why": "Dated outcomes and qualification limits."
+      },
+      {
+        "path": "docs/testing/linux-release-2026-09-20.md",
+        "why": "Refreshed package checks and exact-build evidence boundaries."
       }
     ],
     "caution": "These measurements cover the listed guests and scenarios; published availability is a separate check. The Omarchy long-session result uses virtual audio and one GTK recipient. Ubuntu GNOME Wayland/X11, Fedora GNOME Wayland and openSUSE KDE Wayland also have installed virtual-audio trials. Debian and Mint container checks establish package behavior, not their default desktops. Physical microphones and the wider application matrix still need their own evidence.",
