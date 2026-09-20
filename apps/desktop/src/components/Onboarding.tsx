@@ -1,3 +1,6 @@
+import { StatusMark } from "./StatusMark";
+import { VoiceSignal } from "./VoiceSignal";
+import { SettingsIcon } from "./SettingsIcon";
 import { useState } from "react";
 import type { DictationStatus } from "@/types";
 
@@ -79,12 +82,7 @@ export function Onboarding({ microphone, status, audioLevel, transcript, passed,
       {onOpenDesktopSetupGuide ? <button className="voco-button voco-button--ghost" onClick={onOpenDesktopSetupGuide}>Open setup instructions</button> : null}
     </div> : null}
     {speakerError ? <p role="alert">{speakerError}</p> : null}
-    <div className="voco-setup__meter" role="meter" aria-label="Microphone signal"
-      aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(level * 100)}>
-      <div className="voco-setup__signal" aria-hidden="true" style={{ transform: `scaleX(${level})` }} />
-      <span className="voco-setup__meter-center" aria-hidden="true" />
-    </div>
-    <p className="voco-setup__status" role="status">{checkingDesktopSetup ? "Checking desktop input…"
+    <p className="voco-setup__status" role="status"><StatusMark state={setupError || desktopSetupError || failed || status === "error" ? "attention" : busy ? "working" : recording ? "listening" : passed ? "success" : "idle"} /><span>{checkingDesktopSetup ? "Checking desktop input…"
       : preparing || status === "starting" ? "Getting your microphone ready…"
       : recording && failed ? "Test paused. Stop Test, then try again."
       : recording ? "Listening — speak naturally and watch your words appear."
@@ -93,14 +91,14 @@ export function Onboarding({ microphone, status, audioLevel, transcript, passed,
       : passed ? "Your voice test worked. Finish onboarding to check desktop setup."
       : status === "error" ? "The test could not finish. Check the message above, then try again."
       : attempted ? "No speech was recognized. Try again and speak for a few seconds."
-      : "Click Start Test when you’re ready to speak."}</p>
+      : "Click Start Test when you’re ready to speak."}</span></p>
     <div className="voco-setup__transcript" role="region" aria-label="Test transcript" tabIndex={0}>
       {transcript && transcript !== "(no speech detected)" ? transcript : <span>Your words will appear here…</span>}
     </div>
     <p className="voco-setup__privacy">Start Test turns on your microphone. Your speech stays on this computer; this test only displays words here.</p>
     <div className="voco-setup__actions">
-      <button className="voco-button voco-button--secondary" disabled={busy || blocked || speakerPlaying}
-        onClick={recording ? onStop : onStart}>{recording ? "Stop Test" : passed || status === "error" ? "Test again" : "Start Test"}</button>
+      <div className="voco-voice-control" data-recording={recording}><button className="voco-button voco-button--secondary voco-voice-pill" disabled={busy || blocked || speakerPlaying}
+        onClick={recording ? onStop : onStart}><SettingsIcon name="microphone" /><span>{recording ? "Stop Test" : passed || status === "error" ? "Test again" : "Start Test"}</span></button><span className="voco-voice-pill__reveal"><VoiceSignal level={level} active={recording} /></span></div>
       <button className="voco-button voco-button--primary" disabled={busy || blocked || failed || !(passed || (recording && transcript.trim() && transcript !== "(no speech detected)"))}
         onClick={() => void onFinish()}>Finish Onboarding</button>
     </div>

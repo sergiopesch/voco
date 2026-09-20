@@ -121,7 +121,8 @@ output and appearance choices; retained transcripts appear before these groups
 and take priority over previous delivery-success copy. Updates and Troubleshooting
 remain in a separate app-settings navigation group.
 
-Use native buttons, selects, inputs and disclosures inside the material treatment.
+Use semantic buttons, inputs and disclosures inside the material treatment.
+Microphone selectors use the controlled listbox described below; other selects stay native.
 Reduce motion reports the system preference as On, Off or Unavailable rather than
 offering a misleading second switch. Output descriptions are associated with
 their controls, and the microphone check has qualitative status text alongside
@@ -155,3 +156,52 @@ shared defaults; smaller controls keep appropriate nonzero radii. Settings textu
 is clipped to the window radius, and grouped row hover/focus states stay inside
 their rounded boundaries. Checkbox controls keep native keyboard/checked semantics.
 OS reduced motion, contrast and transparency fallbacks remain authoritative.
+
+## Shared interaction motion
+
+Onboarding, the React tray popover and settings share the Silver Lens motion
+vocabulary in `apps/desktop/src/motion.css`: 150 ms feedback and 220 ms settling,
+with silver state marks, a recording capsule, and a sliding device-menu highlight.
+The silver microphone, existing Adwaita/Lucide icons, graphite materials and Geist
+fonts remain the source of identity. No additional icon or animation package is
+required. These are original VOCO presentation components inspired by the React
+Bits micro-interaction patterns; no React Bits source is vendored.
+
+`VoiceSignal` consumes the owner's audio level; it never opens a microphone or
+simulates speech. The labelled onboarding Start/Stop button remains separate from
+the accessible meter. The popover keeps its microphone artwork and adds the same
+level display while listening. Active dictation prioritises the finish instruction;
+getting-started guidance remains in More and in the idle view. Recovery stays
+persistent. Native tray menus are unchanged.
+
+`StatusMark` is decorative beside readable status text. Pending, working,
+listening, success and attention are supplied by the owning operation. A passed
+voice test never implies desktop-input readiness. Settings save/copy results use
+the actual promise outcome. Only working indicators loop, and reduced motion
+removes that animation as well as the level interpolation and expanding surfaces.
+Contrast and transparency fallbacks remain authoritative.
+
+`DeviceSelect` uses a labelled combobox and listbox with arrow keys, Home/End,
+typeahead, Enter/Space, Escape and Tab. Disabled devices cannot be selected, long
+names wrap in a bounded scrolling menu, and Escape dismisses without applying a
+choice. Native microphone access still requires acknowledgement and the explicit
+Use this microphone action; changing the draft resets acknowledgement. Tooltips
+support focus and Escape, keep essential instructions in the page, and warm up
+between adjacent controls without an idle loop.
+
+### Review and verification
+
+Run `npm run test:brand-motion` with an exclusive `VOCO_RENDERER_EVIDENCE_DIR` to
+exercise the production presentation components using synthetic fixture state.
+The suite defaults to Chromium; set `VOCO_MOTION_BROWSERS=chromium,webkit` when
+both browser runtimes and their host libraries are installed. Use
+`VOCO_RENDERER_PORT` to isolate the test server from other work. The native capture
+renderer suite also accepts that port override. On hosts with exhausted file
+watchers, `CHOKIDAR_USEPOLLING=1 CHOKIDAR_INTERVAL=1500` applies to that process only.
+
+The dev-only `/tests/brand-motion.html` fixture supports `surface=onboarding`,
+`surface=popover` or `surface=settings`, and `state=starting`, `recording`,
+`processing`, `success` or `error`. Its Start/Stop actions change synthetic state;
+this is not a microphone or native desktop trial and is not a production entry.
+Use the full native-capture renderer suite for the mocked App/recording integration,
+and separately qualify installed WebKitGTK and physical audio before release.

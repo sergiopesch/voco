@@ -184,7 +184,7 @@ describe("Crystal Sidebar settings", () => {
     const markup = renderPanel({ surface: "settings", requestedSection: "Audio", dictationStatus });
     expect(markup).toContain("Microphone check paused during dictation");
     expect(markup).not.toContain("Waiting for sound");
-    expect(markup).toMatch(/<select[^>]*disabled=""/);
+    expect(markup).toMatch(/<button[^>]*role="combobox"[^>]*disabled=""/);
   });
 
   it.each([false, true])("uses glass regardless of the retired reduced-effects preference %s", (reduced) => {

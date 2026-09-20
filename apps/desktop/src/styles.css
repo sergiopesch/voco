@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "./preferences.css";
+@import "./motion.css";
 
 :root {
   --voco-radius-window: 28px;
@@ -1501,7 +1502,7 @@ input[type="checkbox"]:disabled { opacity: 0.5; }
   input[type="checkbox"]:checked { background: Highlight; color: HighlightText; forced-color-adjust: none; }
 }
 
-/* The setup signal expands from the centre using actual microphone samples. */
+/* Voice setup content; shared signal and state motion lives in motion.css. */
 .voco-setup { display: flex; flex-direction: column; gap: 16px; }
 .voco-setup > * { flex-shrink: 0; }
 .voco-setup__intro { max-width: 660px; }
@@ -1512,9 +1513,6 @@ input[type="checkbox"]:disabled { opacity: 0.5; }
 .voco-setup__devices > div { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; }
 .voco-setup__devices strong { font-size: 13px; overflow-wrap: anywhere; }
 .voco-setup__device-label { font-size: 12px; opacity: .65; }
-.voco-setup__meter { position: relative; height: 36px; overflow: hidden; border: 1px solid currentColor; border-radius: 6px; background: rgba(127,127,127,.08); }
-.voco-setup__signal { position: absolute; inset: 0; transform-origin: center; background: #68b99a; transition: transform 75ms linear; }
-.voco-setup__meter-center { position: absolute; left: 50%; top: 8px; bottom: 8px; width: 1px; background: currentColor; opacity: .4; }
 .voco-setup__status { margin: 0; min-height: 22px; font-size: 13px; }
 .voco-setup__transcript { min-height: 112px; max-height: 190px; overflow: auto; border: 1px solid rgba(127,127,127,.4); border-radius: 10px; padding: 20px; font-size: 20px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
 .voco-setup__transcript > span { opacity: .5; }
@@ -1522,8 +1520,6 @@ input[type="checkbox"]:disabled { opacity: 0.5; }
 .voco-setup__actions { display: flex; gap: 12px; flex-wrap: wrap; }
 /* Keep the completion action painted while its scroll container is resized. */
 .voco-panel[data-surface="onboarding"] .voco-setup__actions .voco-button--primary { -webkit-backdrop-filter: none; backdrop-filter: none; }
-@media (prefers-reduced-motion: reduce) { .voco-setup__signal { transition: none; } }
-@media (forced-colors: active) { .voco-setup__signal { background: Highlight; forced-color-adjust: none; } }
 @media (max-width: 700px) { .voco-setup__devices { grid-template-columns: 1fr; gap: 10px; } }
 
 .voco-panel[data-surface="onboarding"] .voco-setup { padding: 24px 30px; }

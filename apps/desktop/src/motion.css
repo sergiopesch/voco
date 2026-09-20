@@ -1,0 +1,79 @@
+/* Shared Silver Lens motion. Functional state always comes from VOCO's owners. */
+:root {
+  --voco-motion-fast: 150ms;
+  --voco-motion-settle: 220ms;
+  --voco-motion-ease: cubic-bezier(.2, .8, .2, 1);
+}
+.voco-status-mark { display: inline-flex; flex: 0 0 20px; width: 20px; height: 20px; vertical-align: middle; color: var(--voco-accent-highlight); }
+.voco-status-mark svg { width: 100%; height: 100%; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.voco-status-mark__ring { opacity: .4; transform-origin: center; transition: opacity var(--voco-motion-fast); }
+.voco-status-mark__check { stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset var(--voco-motion-settle) var(--voco-motion-ease); }
+.voco-status-mark__attention, .voco-status-mark__dot { opacity: 0; transition: opacity var(--voco-motion-fast); }
+.voco-status-mark__dot { fill: currentColor; stroke: none; }
+.voco-status-mark[data-state="working"] .voco-status-mark__ring { opacity: 1; stroke-dasharray: 29 15; animation: voco-status-turn 1.1s linear infinite; }
+.voco-status-mark[data-state="success"] .voco-status-mark__check { stroke-dashoffset: 0; }
+.voco-status-mark[data-state="listening"] .voco-status-mark__dot,
+.voco-status-mark[data-state="attention"] .voco-status-mark__attention { opacity: 1; }
+.voco-status-mark[data-state="attention"] { color: var(--voco-error); }
+@keyframes voco-status-turn { to { transform: rotate(360deg); } }
+.voco-panel .voco-setup__status { display: flex; align-items: flex-start; gap: 9px; line-height: 1.55; }
+.voco-panel .voco-popover__state-main strong { display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
+.voco-motion-feedback .voco-status-mark { margin-right: 7px; }
+.voco-motion-feedback { animation: voco-feedback-in var(--voco-motion-fast) ease-out; }
+@keyframes voco-feedback-in { from { opacity: 0; } to { opacity: 1; } }
+
+.voco-voice-signal { display: inline-flex; align-items: center; justify-content: center; gap: 3px; width: 58px; height: 26px; flex: 0 0 auto; color: var(--voco-accent-highlight); }
+.voco-voice-signal > span { width: 3px; height: 100%; border-radius: 3px; background: currentColor; transform: scaleY(var(--signal)); transition: transform 75ms linear; }
+.voco-voice-signal[data-active="false"] { opacity: .45; }
+.voco-panel .voco-voice-pill { display: inline-flex; align-items: center; gap: 9px; border-radius: 24px; min-height: 44px; }
+.voco-voice-pill > .voco-settings-icon { width: 18px; height: 18px; }
+.voco-voice-control { display: inline-flex; align-items: center; border: 1px solid var(--voco-divider); border-radius: 24px; background: var(--voco-surface); }
+.voco-panel .voco-voice-control > .voco-voice-pill { border-color: transparent; background: transparent; }
+.voco-voice-pill__reveal { display: inline-flex; width: 0; opacity: 0; overflow: hidden; margin-right: 0; transition: width var(--voco-motion-settle) var(--voco-motion-ease), opacity var(--voco-motion-fast), margin-right var(--voco-motion-settle); }
+.voco-voice-control[data-recording="true"] .voco-voice-pill__reveal { width: 58px; opacity: 1; margin-right: 14px; }
+.voco-panel .voco-voice-control[data-recording="true"] { border-color: var(--voco-accent-highlight); background: linear-gradient(135deg, #dce5f025, #dce5f009), var(--voco-surface); }
+.voco-panel .voco-lens { display: flex; align-items: center; justify-content: center; }
+.voco-lens__signal { width: 0; opacity: 0; overflow: hidden; transition: width var(--voco-motion-settle) var(--voco-motion-ease), opacity var(--voco-motion-fast); }
+.voco-lens[data-recording="true"] .voco-lens__signal { width: 76px; opacity: 1; }
+
+.voco-device-select { position: relative; min-width: 0; width: 100%; }
+.voco-device-select__trigger { display: flex; justify-content: space-between; align-items: center; gap: 12px; width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid var(--voco-divider); border-radius: var(--voco-radius-control); background: var(--voco-surface); color: var(--voco-text); font: inherit; text-align: left; cursor: pointer; transition: border-color var(--voco-motion-fast), background var(--voco-motion-fast); }
+.voco-device-select__trigger > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.voco-device-select__trigger > img { flex: 0 0 14px; width: 14px; height: 14px; transform: rotate(90deg); transition: transform var(--voco-motion-fast); }
+.voco-device-select__trigger[aria-expanded="true"] { border-color: var(--voco-accent); }
+.voco-device-select__trigger[aria-expanded="true"] > img { transform: rotate(-90deg); }
+.voco-device-select__trigger:disabled { opacity: .5; cursor: default; }
+.voco-device-select__menu { position: absolute; z-index: 30; inset: calc(100% + 6px) 0 auto; padding: 4px; border: 1px solid var(--voco-accent); border-radius: 14px; background: var(--voco-surface); box-shadow: 0 12px 28px #0007, inset 0 1px #ffffff16; transform-origin: top; animation: voco-select-in var(--voco-motion-fast) var(--voco-motion-ease); }
+.voco-device-select__menu[data-above="true"] { inset: auto 0 calc(100% + 6px); transform-origin: bottom; }
+.voco-device-select__list { position: relative; max-height: min(240px, 40vh); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.voco-device-select__option { position: relative; display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 8px 10px; border-radius: 9px; font-size: 13px; line-height: 1.4; cursor: pointer; }
+.voco-device-select__option > span:first-child { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.voco-device-select__option[aria-disabled="true"] { opacity: .45; cursor: not-allowed; }
+.voco-device-select__check { width: 14px; flex: 0 0 14px; }
+.voco-device-select__highlight { position: absolute; inset: 0 0 auto; background: #dce5f01c; border: 1px solid #dce5f024; border-radius: 9px; pointer-events: none; transition: transform var(--voco-motion-fast) var(--voco-motion-ease), height var(--voco-motion-fast); }
+@keyframes voco-select-in { from { opacity: 0; transform: scale(.98) translateY(-3px); } to { opacity: 1; transform: none; } }
+
+.voco-tooltip { position: relative; display: inline-flex; min-width: 0; }
+.voco-tooltip__bubble { position: absolute; z-index: 40; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); width: max-content; max-width: min(240px, 70vw); padding: 7px 10px; border: 1px solid var(--voco-accent); border-radius: 10px; color: var(--voco-text); background: var(--voco-surface); box-shadow: 0 6px 20px #0005; font-size: 12px; line-height: 1.4; text-align: center; animation: voco-feedback-in var(--voco-motion-fast) ease-out; }
+.voco-tooltip[data-align="end"] .voco-tooltip__bubble { left: auto; right: 0; transform: none; bottom: auto; top: calc(100% + 8px); }
+.voco-popover__footer > .voco-tooltip { max-width: calc(100% - 75px); }
+.voco-panel .voco-device-select__trigger:focus-visible { outline: 2px solid var(--voco-accent-highlight); outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) {
+  .voco-status-mark *, .voco-voice-signal > span, .voco-voice-pill__reveal, .voco-lens__signal,
+  .voco-device-select *, .voco-motion-feedback, .voco-tooltip__bubble { animation: none !important; transition: none !important; }
+}
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  .voco-device-select__highlight { background: #46505e; border-color: var(--voco-accent-highlight); }
+  .voco-panel .voco-voice-control[data-recording="true"] { background: var(--voco-surface); }
+}
+@media (forced-colors: active) {
+  .voco-status-mark, .voco-status-mark[data-state="attention"], .voco-voice-signal { color: CanvasText; }
+  .voco-voice-signal > span { background: CanvasText; forced-color-adjust: none; }
+  .voco-device-select__trigger, .voco-device-select__menu, .voco-tooltip__bubble { background: Canvas; color: CanvasText; border-color: ButtonText; }
+  .voco-device-select__highlight { background: Canvas; border: 2px solid Highlight; }
+  .voco-panel .voco-device-select__trigger:focus-visible { outline-color: Highlight; }
+}
+/* Field captions must not style the selector's value or its option labels. */
+.voco-panel .voco-device-select span { text-transform: none; letter-spacing: normal; color: inherit; font-size: inherit; font-weight: inherit; }
+.voco-popover__footer > .voco-tooltip { position: absolute; left: 0; top: 8px; width: calc(100% - 80px); max-width: none; }
+.voco-popover__footer > .voco-tooltip > .voco-device-picker { position: relative; top: auto; max-width: 100%; }

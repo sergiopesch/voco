@@ -34,6 +34,10 @@ const styleLinks = Object.values(styleBindings).map(binding => `<link rel="style
 await writeFile(path.join(out, 'STYLE-SOURCE.json'), JSON.stringify({ mainSha256: createHash('sha256').update(mainEntry).digest('hex'), imports: styleBindings }, null, 2) + '\n', { flag: 'wx' });
 const results = [], errors = [], consoleWarnings = [];
 let server, browser, page;
+const chooseNative = async value => {
+    await page.getByRole('combobox', { name: 'Native input device', exact: true }).click();
+    await page.getByRole('listbox', { name: 'Native input device', exact: true }).locator(`[data-value="${value}"]`).click();
+};
 const save = (n, v) => writeFile(path.join(out, n), JSON.stringify(v, null, 2) + '\n', {
     flag: 'wx'
 });
@@ -50,7 +54,7 @@ try {
         logLevel: 'warn',
         server: {
             host: '127.0.0.1',
-            port: 0,
+            port: Number(process.env.VOCO_RENDERER_PORT ?? 0),
             hmr: false,
             fs: {
                 allow: [
@@ -670,23 +674,23 @@ try {
     await load('pending');await page.getByRole('button',{name:'Retry capture setup'}).waitFor();await noCapture();assert.equal((await state()).mode,'pending');record(expected[1]);
     await load('error');await page.getByText('Capability unavailable',{exact:true}).waitFor();await noCapture();assert.equal((await state()).mode,'pending');record(expected[2]);
     await page.evaluate(()=>window.captureScenario='enabled');await page.getByRole('button',{name:'Retry capture setup'}).click();
-    await page.getByLabel('Native input device').waitFor();await noCapture();assert.equal((await state()).mode,'native');record(expected[3]);
-    await load('enabled');const select=page.getByLabel('Native input device');await select.waitFor();await page.evaluate(()=>navigator.mediaDevices.dispatchEvent(new Event('devicechange')));await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));await noCapture();assert.equal(await page.getByRole('button',{name:'Retry microphone access',exact:true}).count(),0);record(expected[4]);
+    await page.getByRole('combobox', { name: 'Native input device', exact: true }).waitFor();await noCapture();assert.equal((await state()).mode,'native');record(expected[3]);
+    await load('enabled');const select=page.getByRole('combobox', { name: 'Native input device', exact: true });await select.waitFor();await page.evaluate(()=>navigator.mediaDevices.dispatchEvent(new Event('devicechange')));await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));await noCapture();assert.equal(await page.getByRole('button',{name:'Retry microphone access',exact:true}).count(),0);record(expected[4]);
     const use=page.getByRole('button',{name:'Use this microphone',exact:true});const consent=page.getByLabel('Allow native microphone access for this app session');
     assert.equal(await use.isDisabled(),true);assert.equal(await consent.isDisabled(),true);assert.equal((await state()).source,null);record(expected[5]);
-    await select.selectOption('token-1');assert.equal(await use.isDisabled(),true);await noCapture();record(expected[6]);
+    await chooseNative('token-1');assert.equal(await use.isDisabled(),true);await noCapture();record(expected[6]);
     await consent.check();await use.click();await page.waitForFunction(()=>window.store.getState().nativeCaptureSource?.selectionToken==='token-1');await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));await noCapture();
     assert.deepEqual((await state()).commands.filter(x=>x.name==='native_capture_select_source').at(-1).args,{selectionToken:'token-1',acknowledged:true});assert.equal((await state()).ready,true);record(expected[7]);
     await noCapture();
     await page.evaluate(()=>window.selectError='Selection expired');await consent.check();await use.click();await page.getByText('Selection expired',{exact:true}).waitFor();assert.equal((await state()).source,null);await noCapture();assert.equal((await state()).ready,false);record(expected[8]);
-    await page.evaluate(()=>window.selectError=null);await select.selectOption('system-default');await consent.check();await use.click();await page.waitForFunction(()=>window.store.getState().nativeCaptureSource?.selectionToken==='token-1');await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));assert.equal((await state()).commands.filter(x=>x.name==='native_capture_select_source').at(-1).args.selectionToken,'token-1');await noCapture();record(expected[9]);
+    await page.evaluate(()=>window.selectError=null);await chooseNative('system-default');await consent.check();await use.click();await page.waitForFunction(()=>window.store.getState().nativeCaptureSource?.selectionToken==='token-1');await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));assert.equal((await state()).commands.filter(x=>x.name==='native_capture_select_source').at(-1).args.selectionToken,'token-1');await noCapture();record(expected[9]);
     await page.getByRole('button',{name:'Refresh native devices'}).click();await page.waitForFunction(()=>window.nativeCommands.filter(x=>x.name==='native_capture_list_sources').length>=2);await noCapture();record(expected[10]);
     await page.evaluate(()=>window.catalog={revision:'r2',sources:[],defaultSelectionToken:null});await page.getByRole('button',{name:'Refresh native devices'}).click();await page.waitForFunction(()=>window.store.getState().nativeCaptureSource===null);await page.getByText('The microphone list changed. Choose and allow a microphone again.',{exact:true}).waitFor();await noCapture();assert.equal((await state()).ready,false);record(expected[11]);
     await page.evaluate(()=>window.catalogError='Source server unavailable');await page.getByRole('button',{name:'Refresh native devices'}).click();await page.getByText('Source server unavailable',{exact:true}).waitFor();assert.equal((await state()).mode,'native');await noCapture();record(expected[12]);
     expected.push('native-settings-without-preview');record('native-settings-without-preview');
     const originalExpected=[...expected];
     const activate=async(auditEnabled=false)=>{
-      await load('enabled');await page.getByLabel('Native input device').selectOption('token-1');await page.getByLabel('Allow native microphone access for this app session').check();await page.getByRole('button',{name:'Use this microphone',exact:true}).click();
+      await load('enabled');await chooseNative('token-1');await page.getByLabel('Allow native microphone access for this app session').check();await page.getByRole('button',{name:'Use this microphone',exact:true}).click();
       await page.waitForFunction(()=>window.store.getState().nativeCaptureSource!==null);
       await page.evaluate(enabled=>{window.auditEnabled=enabled;window.allowBegin=true;window.store.getState().setSurface('hidden');},auditEnabled);
       await page.waitForFunction(()=>window.listeners['voco:toggle-dictation']);
@@ -717,7 +721,7 @@ try {
     expected.push('native-user-cancel-retains-audio');record(expected.at(-1));
     await activate();await page.evaluate(()=>window.store.getState().setSurface('settings'));
     await page.getByRole('button',{name:'Microphone',exact:true}).click();
-    await page.getByLabel('Native input device').waitFor();assert.equal(await page.getByLabel('Native input device').isDisabled(),true);
+    await page.getByRole('combobox', { name: 'Native input device', exact: true }).waitFor();assert.equal(await page.getByRole('combobox', { name: 'Native input device', exact: true }).isDisabled(),true);
     assert.equal(await page.getByRole('button',{name:'Use this microphone',exact:true}).isDisabled(),true);
     assert.equal((await state()).commands.filter(x=>x.name==='native_capture_select_source').length,1);
     const listsBefore=(await state()).commands.filter(x=>x.name==='native_capture_list_sources').length;
@@ -732,10 +736,12 @@ try {
     assert.equal(await page.evaluate(()=>window.calls.filter(x=>x[0]==='transcribeAudio').length),0);
     assert.equal((await state()).streams,0);assert.equal((await state()).commands.filter(x=>x.name==='native_capture_begin').length,1);
     expected.push('native-tail-failure-retains-prefix-without-auto-transcription');record(expected.at(-1));
-    await load('enabled');await page.getByLabel('Native input device').waitFor();
+    await load('enabled');await page.getByRole('combobox', { name: 'Native input device', exact: true }).waitFor();
     await page.evaluate(()=>{window.source={...window.source,objectSerial:null};window.catalog={revision:'unsupported',sources:[window.source],defaultSelectionToken:'token-1'};});
     await page.getByRole('button',{name:'Refresh native devices'}).click();
-    await page.waitForFunction(()=>document.querySelector('option[value="system-default"]')?.disabled===true);
+    await page.getByRole('combobox', { name: 'Native input device', exact: true }).click();
+    await page.waitForFunction(()=>document.querySelector('[role="option"][data-value="system-default"]')?.getAttribute('aria-disabled')==='true');
+    await page.getByRole('combobox', { name: 'Native input device', exact: true }).press('Escape');
     assert.equal(await page.getByRole('button',{name:'Use this microphone',exact:true}).isDisabled(),true);assert.equal((await state()).source,null);assert.equal((await state()).ready,false);await noCapture();
     expected.push('unsupported-default-source-cannot-be-approved');record(expected.at(-1));
     const beginAgain=async()=>{
@@ -763,7 +769,7 @@ try {
     await page.evaluate(()=>window.store.getState().setSurface('settings'));
     await page.getByRole('button',{name:'Microphone',exact:true}).click();
     await page.getByRole('button',{name:'Refresh native devices'}).click();
-    await page.getByLabel('Native input device').selectOption('token-1');
+    await chooseNative('token-1');
     await page.getByLabel('Allow native microphone access for this app session').check();
     await page.getByRole('button',{name:'Use this microphone',exact:true}).click();
     await page.waitForFunction(()=>window.store.getState().nativeCaptureSource!==null);
@@ -781,7 +787,7 @@ try {
         assert.equal(await page.evaluate(()=>window.calls.filter(x=>x[0]==='syncRuntimeStatus').at(-1)[1].nativeMicrophoneReady),null);
       } else {
         await noCapture();assert.equal(await page.evaluate(()=>window.workletLoads||0),0);
-        await page.getByLabel('Native input device').selectOption('token-1');
+        await chooseNative('token-1');
         await page.getByLabel('Allow native microphone access for this app session').check();
         await page.getByRole('button',{name:'Use this microphone',exact:true}).click();
         await page.waitForFunction(()=>window.store.getState().microphoneReady===true);
@@ -791,7 +797,7 @@ try {
       }
       expected.push('failed-setup-retry-'+recoveredMode+'-completes-initialization');record(expected.at(-1));
     }
-    await load('enabled');await page.getByLabel('Native input device').selectOption('token-1');
+    await load('enabled');await chooseNative('token-1');
     await page.getByLabel('Allow native microphone access for this app session').check();
     await page.getByRole('button',{name:'Use this microphone',exact:true}).click();
     await page.waitForFunction(()=>window.store.getState().nativeCaptureSource!==null);
@@ -802,7 +808,7 @@ try {
     assert.equal((await state()).ready,false);assert.equal((await state()).streams,0);assert.equal((await state()).enums,0);
     assert.equal(await page.evaluate(()=>window.calls.filter(x=>x[0]==='transcribeAudio').length),0);
     expected.push('native-start-failure-revokes-grant-without-fallback');record(expected.at(-1));
-    await load('enabled');await page.getByLabel('Native input device').selectOption('token-1');
+    await load('enabled');await chooseNative('token-1');
     await page.getByLabel('Allow native microphone access for this app session').check();
     await page.getByRole('button',{name:'Use this microphone',exact:true}).click();
     await page.waitForFunction(()=>window.store.getState().nativeCaptureSource!==null);
@@ -871,7 +877,7 @@ try {
     await page.evaluate(()=>window.store.getState().setSurface('settings'));
     await page.getByRole('button',{name:'Microphone',exact:true}).click();
     await page.getByRole('button',{name:'Refresh native devices'}).click();
-    await page.getByLabel('Native input device').selectOption('token-1');
+    await chooseNative('token-1');
     await page.getByLabel('Allow native microphone access for this app session').check();
     await page.getByRole('button',{name:'Use this microphone',exact:true}).click();
     await page.waitForFunction(()=>window.store.getState().nativeCaptureSource!==null);

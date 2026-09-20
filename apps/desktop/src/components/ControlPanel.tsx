@@ -1,3 +1,7 @@
+import { DeviceSelect } from "./DeviceSelect";
+import { StatusMark } from "./StatusMark";
+import { VoiceSignal } from "./VoiceSignal";
+import { Tooltip } from "./Tooltip";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent, PointerEvent } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -188,13 +192,14 @@ export function ControlPanel({
   const [savingCount, setSavingCount] = useState(0);
   const [finishingTest, setFinishingTest] = useState(false);
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
+  const [saveOutcome, setSaveOutcome] = useState<"idle" | "success" | "attention">("idle");
   const [confirmHide, setConfirmHide] = useState(false);
   const [microphoneChecked, setMicrophoneChecked] = useState(false);
   const [recordingShortcut, setRecordingShortcut] = useState(false);
   const headingContainerRef = useRef<HTMLElement>(null);
   const saving = savingCount > 0;
   const [microphoneSaveError, setMicrophoneSaveError] = useState<string | null>(null);
-  const [copyStatus, setCopyStatus] = useState<{ id: string; text: string } | null>(null);
+  const [copyStatus, setCopyStatus] = useState<{ id: string; text: string; outcome: "success" | "attention" } | null>(null);
   const previousCloseRequestRef = useRef(closeRequestId);
   const microphoneSaveRequestRef = useRef(0);
   const copyRequestRef = useRef(0);
@@ -499,12 +504,15 @@ export function ControlPanel({
   ): Promise<{ ok: true } | { ok: false; message: string }> {
     setSavingCount((count) => count + 1);
     setSaveFeedback(null);
+    setSaveOutcome("idle");
     try {
       await onConfigChange(patch);
       setSaveFeedback("Saved on this device.");
+      setSaveOutcome("success");
       return { ok: true };
     } catch (error) {
       setSaveFeedback("Changes could not be saved. Review the error and try again.");
+      setSaveOutcome("attention");
       return {
         ok: false,
         message:
@@ -546,7 +554,7 @@ export function ControlPanel({
       ) {
         return;
       }
-      setCopyStatus({ id: entryId, text: "Copied to clipboard. The transcript stays here until you dismiss it." });
+      setCopyStatus({ id: entryId, outcome: "success", text: "Copied to clipboard. The transcript stays here until you dismiss it." });
     } catch (error) {
       if (
         copyRequestRef.current !== requestId ||
@@ -554,7 +562,7 @@ export function ControlPanel({
       ) {
         return;
       }
-      setCopyStatus({ id: entryId, text: `Copy failed: ${error instanceof Error ? error.message : String(error)}` });
+      setCopyStatus({ id: entryId, outcome: "attention", text: `Copy failed: ${error instanceof Error ? error.message : String(error)}` });
     }
   }
 
@@ -701,9 +709,9 @@ export function ControlPanel({
             </div>
           </div>
           <div className="voco-panel__hero-actions">
-            {isPopover ? <button className="voco-glass voco-icon-button" aria-label="Settings" title="Settings" onClick={() => void onOpenSettings()}>
+            {isPopover ? <Tooltip text="Open settings" align="end"><button className="voco-glass voco-icon-button" aria-label="Settings" onClick={() => void onOpenSettings()}>
               <img src="/icons/settings.svg" className="voco-ui-icon" alt="" />
-            </button> : <button
+            </button></Tooltip> : <button
               className="voco-button voco-button--ghost voco-button--compact"
               onClick={requestHide}
               disabled={isOnboarding && (dictationBusy || testPreparing)}
@@ -732,12 +740,13 @@ export function ControlPanel({
 
         {isPopover ? (
           <section className="voco-popover" data-priority={hasRecoverableTranscript || dictationBusy || statusLabel.length > 30 ? "status" : undefined}>
-            <div className="voco-lens" aria-hidden="true">
+            <div className="voco-lens" data-recording={dictationStatus === "recording"}>
               <img src={vocoBrandImage} alt="" />
+              <span className="voco-lens__signal"><VoiceSignal level={audioLevel} active={dictationStatus === "recording"} /></span>
             </div>
             <div className="voco-popover__state">
               <div className="voco-popover__state-main">
-                <strong role="status" aria-live="polite">{desktopSetupError ? "Setup needed" : statusLabel === "Ready to listen" ? "Ready" : statusLabel}</strong>
+                <strong role="status" aria-live="polite"><StatusMark state={desktopSetupError || hasRecoverableTranscript || dictationStatus === "error" ? "attention" : dictationStatus === "recording" ? "listening" : dictationBusy ? "working" : "idle"} />{desktopSetupError ? "Setup needed" : statusLabel === "Ready to listen" ? "Ready" : statusLabel}</strong>
                 <kbd className="voco-glass voco-shortcut">{config.hotkey}</kbd>
               </div>
               {dictationBusy ?
@@ -787,13 +796,13 @@ export function ControlPanel({
                   {recovery.kind === "manual-copy" ? "Clear transcript" : "Discard recovery"}
                 </button> : null}
                 </div>
-                {copyStatus?.id === "current" ? <span>{copyStatus.text}</span> : null}
+                {copyStatus?.id === "current" ? <span className="voco-motion-feedback" role="status"><StatusMark state={copyStatus.outcome} />{copyStatus.text}</span> : null}
                 {recovery ? <span>{recovery.kind === "manual-copy" ? "Copy your text, then clear this transcript to start another recording." : "Copy any text you need, then discard this recovery to start another recording."}</span> : null}
               </div>
             ) : null}
-            <div className="voco-inline-note voco-popover__dictation-hint">
+            {!dictationBusy ? <div className="voco-inline-note voco-popover__dictation-hint">
               {shortcut.instruction} In an enabled Chromium tab, focus a plain text field and press <code>Alt+Shift+V</code> for direct delivery.
-            </div>
+            </div> : null}
             {!hasCurrentRecovery && recoveryEntries.length > 0 ? <section className="voco-popover__recovery" aria-label="Saved transcripts" role="region">
               <h2 tabIndex={-1}>Transcript kept safely in VOCO</h2>
               <p>{recoveryEntries.length} transcript{recoveryEntries.length === 1 ? "" : "s"} available to recover. Kept until VOCO exits.</p>
@@ -806,7 +815,7 @@ export function ControlPanel({
                   <button className="voco-button voco-button--primary" onClick={() => void copyRecoveredTranscript(entry)}>Copy transcript</button>
                   {onDismissRecoverableTranscript && entry.id !== "current" ? <button className="voco-button voco-button--ghost" onClick={() => onDismissRecoverableTranscript(entry.id)}>Dismiss transcript</button> : null}
                 </div>
-                {copyStatus?.id === entry.id ? <span role="status">{copyStatus.text}</span> : null}
+                {copyStatus?.id === entry.id ? <span className="voco-motion-feedback" role="status"><StatusMark state={copyStatus.outcome} />{copyStatus.text}</span> : null}
               </article>)}
             </section> : null}
             <div className="voco-popover__actions">
@@ -814,9 +823,9 @@ export function ControlPanel({
                 onClick={prepareDictation}>Hide to dictate</button>
             </div>
             <div className="voco-popover__footer">
-              <button className="voco-device-picker" title={`Microphone: ${selectedDeviceLabel}`} aria-label={`Microphone: ${selectedDeviceLabel}`} onClick={() => void onOpenSettings("Audio")}>
+              <Tooltip text="Open microphone settings"><button className="voco-device-picker" aria-label={`Microphone: ${selectedDeviceLabel}`} onClick={() => void onOpenSettings("Audio")}>
                 <span>{selectedDeviceLabel}</span><img src="/icons/chevron-right.svg" className="voco-ui-icon" alt="" />
-              </button>
+              </button></Tooltip>
               <details className="voco-more"
                 onKeyDown={(event) => { if (event.key === "Escape" && event.currentTarget.open) { event.preventDefault(); event.stopPropagation(); event.currentTarget.open = false; event.currentTarget.querySelector("summary")?.focus(); } }}>
                 <summary>More<img src="/icons/chevron-right.svg" className="voco-ui-icon" alt="" /></summary>
@@ -919,13 +928,11 @@ export function ControlPanel({
                   {nativePreviewDisabled && nativeMicrophone ? <NativeMicrophoneSettings controls={nativeMicrophone} disabled={dictationBusy} /> : <>
                   <div className="voco-preferences__group"><h3 className="voco-preferences__group-title">Input</h3>
                     <div className="voco-preferences__card voco-preferences__form">
-                      <label className="voco-field voco-preferences__field-row"><span>Input device</span>
-                        <select value={selectedDeviceId ?? ""} disabled={saving || dictationBusy}
-                          onChange={(event) => void selectMicrophone(event.target.value || null)}>
-                          <option value="">System default</option>
-                          {availableDevices.map((device) => <option key={device.deviceId} value={device.deviceId}>{device.label}</option>)}
-                        </select>
-                      </label>
+                      <div className="voco-field voco-preferences__field-row"><span>Input device</span>
+                        <DeviceSelect label="Input device" value={selectedDeviceId ?? ""} disabled={saving || dictationBusy}
+                          onChange={value => void selectMicrophone(value || null)}
+                          options={[{ value: "", label: "System default" }, ...availableDevices.map(device => ({ value: device.deviceId, label: device.label }))]} />
+                      </div>
                       {microphoneSaveError ? <div className="voco-inline-note voco-inline-note--error" role="alert">{microphoneSaveError}</div> : null}
                       <div className="voco-preferences__actions"><button className="voco-button voco-button--ghost" onClick={() => void onRefreshDevices()}>Refresh devices</button></div>
                     </div>
@@ -966,7 +973,7 @@ export function ControlPanel({
                         <label className="voco-field"><span>Start and stop listening</span><input disabled={saving} value={recordingShortcut ? "Press your shortcut…" : hotkeyDraft} aria-invalid={Boolean(hotkeyError)} aria-describedby="voco-hotkey-feedback"
                           onBlur={() => { if (recordingShortcut) endShortcutCapture(); }} onChange={(event) => setHotkeyDraft(event.target.value)}
                           onKeyDown={(event) => { if (recordingShortcut) { captureShortcut(event); return; } if (event.key === "Enter") { event.preventDefault(); void saveHotkey(); } }} /></label>
-                        <button className="voco-button voco-button--secondary" disabled={saving} onClick={beginShortcutCapture}>Record shortcut</button>
+                        <Tooltip text="Press a modifier and key; Escape cancels."><button className="voco-button voco-button--secondary" disabled={saving} onClick={beginShortcutCapture}>Record shortcut</button></Tooltip>
                         {hotkeyDirty || hotkeyError ? <button className="voco-button voco-button--primary" onClick={() => void saveHotkey()} disabled={saving}>Save hotkey</button> : null}
                       </div>
                       <p className="voco-preferences__helper" id="voco-hotkey-feedback" role="status">{hotkeyError ?? (recordingShortcut ? "Press a modifier and key. Escape cancels." : shortcut.instruction)}</p>
@@ -1041,7 +1048,7 @@ export function ControlPanel({
                   </div>
                 </section>
               ) : null}
-              {saving || hasUnsavedChanges || saveFeedback ? <p className="voco-preferences__feedback" role="status">{saving ? "Saving…" : hasUnsavedChanges ? "Unsaved text changes — use the Save button for the edited group." : saveFeedback}</p> : null}
+              {saving || hasUnsavedChanges || saveFeedback ? <p className="voco-preferences__feedback voco-motion-feedback" role="status"><StatusMark state={saving ? "working" : hasUnsavedChanges ? "idle" : saveOutcome} />{saving ? "Saving…" : hasUnsavedChanges ? "Unsaved text changes — use the Save button for the edited group." : saveFeedback}</p> : null}
             </div>
           </section>
         )}

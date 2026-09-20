@@ -17,6 +17,7 @@
     "verify:cursor-acceptance": "node scripts/report-cursor-streaming-trace.mjs --strict",
     "test:browser-full-app": "bash scripts/test-browser-full-app.sh",
     "test:chromium-exact-field": "node scripts/chromium-background.test.cjs && node scripts/test-chromium-exact-field.mjs",
+    "test:brand-motion": "node scripts/test-brand-motion.mjs",
     "test:dictation-renderer": "node scripts/test-dictation-renderer.mjs",
     "test:microphone-renderer": "node scripts/test-microphone-app-renderer.mjs",
     "test:private-ibus": "PYTHONDONTWRITEBYTECODE=1 bash scripts/test-private-ibus-engine.sh",
