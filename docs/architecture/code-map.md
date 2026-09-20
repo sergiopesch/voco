@@ -142,5 +142,12 @@ when RPM excludes ordinary documentation. See [Linux support](../linux-support.m
 The `onboarding:test` trigger reuses `dictationRecording.ts` and
 `BenchmarkPhraseQueue` with an output callback that never touches another app.
 Capture and final recognition must complete before onboarding is saved.
+The .46 candidate then calls `get_desktop_input_status`: a fresh, bounded helper
+check with no target lookup, key injection or clipboard mutation. This is separate
+from `get_desktop_paste_status`, which also requires a verified cursor when normal
+dictation begins. The latter returns a typed setup/cursor failure so the UI does
+not misclassify missing dependencies as missing focus.
+`voco --check-desktop-input` exposes the same prerequisite check for installation
+and troubleshooting, without launching the GUI.
 `voco_desktop_target.py` classifies focused editable controls without reading
 contents; `insertion.rs` refuses recording preflight without a verified cursor.

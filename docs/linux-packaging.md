@@ -28,6 +28,8 @@ isolated runtime before publication. Record source and package SHA-256 identitie
 Do not include personal recordings, transcripts, API credentials or private receipts.
 
 The package requires Python 3, NumPy, psutil and the declared native dependencies.
+The .46 metadata explicitly includes the `pgrep` provider (`procps` on Debian/openSUSE,
+`procps-ng` on Fedora/Arch), used to check the Wayland input daemon.
 The worker defaults to at most four CPU threads, leaving one CPU from its affinity
 available for desktop work, with a minimum of one recognizer thread. This avoids
 oversubscribing a constrained desktop while the receiving application is active. Explicit research overrides stay
@@ -35,7 +37,13 @@ explicit; diagnostics record the effective thread count. CPU quotas imposed with
 matching affinity remain a separate performance constraint.
 Its ABI floor includes glibc 2.39 and libstdc++ 13.2.0. X11 helpers are required;
 ydotool and the separately packaged Ubuntu ydotoold are recommended for Wayland;
-the input service must also be configured and running. Debian 13
+the input service must also be configured and running. The .46 guided installer
+uses APT for the local package and explicitly requests both Wayland packages when
+running on Wayland; dependency repair after `dpkg -i` is insufficient. The package
+includes an opt-in per-login `voco-ydotoold.service`. The installer starts it only
+with existing device access, preserves a working daemon and verifies readiness
+without sending keys. It does not change device permissions or group membership.
+Debian 13
 repositories may not provide it, so the recommendation must not block X11 installs. `at-spi2-core` and
 `gir1.2-atspi-2.0` provide the accessibility bus and bindings. Package installation
 does not change the selected input source or restart IBus.

@@ -1,5 +1,7 @@
 # Testing
 
+[Wayland installation and onboarding readiness](wayland-install-2026-09-20.md) records the .46 regression fix and installed-guest scope.
+
 The [public benchmark gallery](../release-assets/2026.0.43/README.md) presents the
 matched seven-model comparison and separate historical cohorts, with 8K graphics,
 numeric data and measurement boundaries.

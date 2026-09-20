@@ -120,7 +120,7 @@ isolation, not a remote VM or proof of a distribution's default desktop.
 
 ## Release and evidence
 
-Source version: **2026.0.45** (Ubuntu/Debian release). Verify the current public release on GitHub and
+Source version: **2026.0.46** (unpublished Ubuntu/Debian candidate). Verify the current public release on GitHub and
 installed version from the package manager; do not infer either from source.
 The .43 package and desktop evidence is recorded in
 [the support matrix](docs/linux-support.md); preserve per-artifact receipts and
@@ -152,7 +152,11 @@ with no idle recording or silent device switching during capture. Onboarding
 uses the production recognition queue with local-only transcript output. Never
 acquire an external text destination, shortcut lease, clipboard or preedit output
 for the onboarding test. Finish must flush capture and recognition successfully
-before saving completion. Require a verified editable caret before cursor dictation. Native capture permits real window hiding. Preserve the
+before saving completion. Then check desktop input prerequisites without binding
+an external target or sending keys; a missing cursor inside onboarding is expected.
+The guided installer must use APT to install the local package and explicitly require
+the Wayland client and daemon on Wayland. Successful package installation alone is
+not desktop readiness. Require a verified editable caret before cursor dictation. Native capture permits real window hiding. Preserve the
 failed WebKit hidden-start experiment and independently verify audio retention.
 The debug audit needs all three explicit flags and completed private bundles;
 wait for their COMMIT receipts before terminating an audited test process.

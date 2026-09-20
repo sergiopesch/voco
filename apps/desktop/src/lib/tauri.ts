@@ -7,6 +7,7 @@ import type {
   CanonicalTranscription,
   ConfigSnapshot,
   DebugDictationCaptureResult,
+  DesktopInputStatus,
   InsertionResult,
   OwnedPreeditStatus,
   PreviewTranscription,
@@ -90,7 +91,11 @@ export async function insertText(text: string, strategy: string): Promise<Insert
   return invoke<InsertionResult>("insert_text", { text, strategy });
 }
 
-export async function getDesktopPasteStatus(): Promise<{ enabled: boolean; available: boolean; detail: string; shortcutEpoch: number; streamingEnabled?: boolean; targetToken?: string | null }> {
+export async function getDesktopInputStatus(): Promise<DesktopInputStatus> {
+  return invoke("get_desktop_input_status");
+}
+
+export async function getDesktopPasteStatus(): Promise<{ enabled: boolean; available: boolean; detail: string; shortcutEpoch: number; streamingEnabled?: boolean; targetToken?: string | null; failureReason?: "setup" | "cursor" | null }> {
   return invoke("get_desktop_paste_status");
 }
 

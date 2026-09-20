@@ -73,6 +73,8 @@ class DependencyTests(unittest.TestCase):
         self.assertIn('pulseaudio-libs', fedora)
         self.assertIn('libpulse0', suse)
         self.assertIn('libnotify-tools', suse)
+        self.assertIn('procps', suse)
+        self.assertIn('procps-ng', staging.rpm_dependencies('fedora'))
         self.assertIn('libnotify', staging.rpm_dependencies('fedora'))
         self.assertIn('sentencepiece-libs', fedora)
         self.assertNotIn('sentencepiece-libs', suse)
@@ -115,7 +117,7 @@ class VersionTests(unittest.TestCase):
                 staging.package_version(version, revision)
 
     def test_reviewed_abi_floors_and_new_helpers(self):
-        staging.validate_debian_dependencies('libc6 (>= 2.39), libstdc++6 (>= 13.2.0), xdotool, wl-clipboard')
+        staging.validate_debian_dependencies('libc6 (>= 2.39), libstdc++6 (>= 13.2.0), xdotool, wl-clipboard, procps')
         with self.assertRaises(ValueError):
             staging.validate_debian_dependencies('libc6 (>= 2.44)')
 

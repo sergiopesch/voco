@@ -1,5 +1,24 @@
 # Troubleshooting
 
+## Voice test works, but dictation does not start
+
+On Wayland, the .45 guided installer could skip `ydotool` and `ydotoold` even
+though microphone recognition worked. A banner naming `ydotool` is a desktop
+input setup failure. Installing the binaries alone is insufficient: the daemon
+must run with accessible device and socket permissions for your login. Follow
+[Wayland helper setup](platform/README.md#ydotoold-ydotool-daemon).
+
+The .46 candidate installs the helpers explicitly and checks desktop input before
+saving onboarding completion. After repairing setup, click **Check desktop setup**
+and **Finish Onboarding**; the voice test does not need an external text field.
+With .46 you can also run `voco --check-desktop-input`. It checks prerequisites
+without launching VOCO, recording speech, copying text or sending keystrokes.
+A passing check still requires a real dictation trial in your intended application.
+
+**No text cursor available** has a different meaning: click in an accessible text
+field before pressing your shortcut. Password fields and unsupported custom editors
+remain excluded. VOCO must not record and paste blindly when the target is unknown.
+
 ## VOCO records but does not type into the active application
 
 The current candidate normally streams NVIDIA recognition through desktop paste.

@@ -146,6 +146,7 @@ export interface DictationRecordingEnv {
     available?: boolean;
     streamingEnabled?: boolean;
     targetToken?: string | null;
+    failureReason?: "setup" | "cursor" | null;
     shortcutEpoch?: number | null;
     detail?: string;
   }>;
@@ -502,7 +503,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
         assertOutputAllowed(startingSessionId);
         if (paste?.enabled) {
           if (!paste.available) {
-            startFailureTitle = paste.targetToken ? "Dictation unavailable" : "No text cursor available";
+            startFailureTitle = paste.failureReason === "cursor" ? "No text cursor available" : "Dictation setup incomplete";
             traceDictationEvent("dictation_desktop_paste_unavailable").catch(() => {});
             throw new Error(paste.detail);
           }

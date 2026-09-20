@@ -10,6 +10,10 @@ interface OnboardingProps {
   failed: boolean;
   attempted: boolean;
   setupError?: string | null;
+  desktopSetupError?: string | null;
+  checkingDesktopSetup?: boolean;
+  onCheckDesktopSetup?: () => void;
+  onOpenDesktopSetupGuide?: () => void;
   onRetrySetup?: () => void;
   preparing: boolean;
   saving: boolean;
@@ -21,11 +25,11 @@ interface OnboardingProps {
 }
 
 export function Onboarding({ microphone, status, audioLevel, transcript, passed,
-  failed, preparing, saving, blocked, hotkey, onStart, onStop, onFinish, attempted, setupError, onRetrySetup }: OnboardingProps) {
+  failed, preparing, saving, blocked, hotkey, onStart, onStop, onFinish, attempted, setupError, onRetrySetup, desktopSetupError, checkingDesktopSetup, onCheckDesktopSetup, onOpenDesktopSetupGuide }: OnboardingProps) {
   const [speakerError, setSpeakerError] = useState<string | null>(null);
   const [speakerPlaying, setSpeakerPlaying] = useState(false);
   const recording = status === "recording";
-  const busy = preparing || status === "starting" || status === "processing" || saving;
+  const busy = checkingDesktopSetup || preparing || status === "starting" || status === "processing" || saving;
   const level = recording ? Math.max(0, Math.min(1, audioLevel)) : 0;
 
   async function testSpeaker() {
@@ -69,17 +73,24 @@ export function Onboarding({ microphone, status, audioLevel, transcript, passed,
       </div>
     </div>
     {setupError ? <p role="alert">{setupError} {onRetrySetup ? <button className="voco-button voco-button--ghost" disabled={busy || recording} onClick={onRetrySetup}>Retry microphone setup</button> : null}</p> : null}
+    {desktopSetupError ? <div role="alert"><p><strong>Desktop setup needs attention.</strong> {desktopSetupError}</p>
+      <p>You can test your voice here, but dictation in other apps is not ready. Complete the desktop input setup in the installation guide, then check again.</p>
+      <button className="voco-button voco-button--secondary" disabled={busy || recording} onClick={onCheckDesktopSetup}>Check desktop setup</button>
+      {onOpenDesktopSetupGuide ? <button className="voco-button voco-button--ghost" onClick={onOpenDesktopSetupGuide}>Open setup instructions</button> : null}
+    </div> : null}
     {speakerError ? <p role="alert">{speakerError}</p> : null}
     <div className="voco-setup__meter" role="meter" aria-label="Microphone signal"
       aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(level * 100)}>
       <div className="voco-setup__signal" aria-hidden="true" style={{ transform: `scaleX(${level})` }} />
       <span className="voco-setup__meter-center" aria-hidden="true" />
     </div>
-    <p className="voco-setup__status" role="status">{preparing || status === "starting" ? "Getting your microphone ready…"
+    <p className="voco-setup__status" role="status">{checkingDesktopSetup ? "Checking desktop input…"
+      : preparing || status === "starting" ? "Getting your microphone ready…"
       : recording && failed ? "Test paused. Stop Test, then try again."
       : recording ? "Listening — speak naturally and watch your words appear."
       : status === "processing" ? "Finishing your test…"
-      : passed ? "Your voice test worked. You’re ready to finish onboarding."
+      : passed && desktopSetupError ? "Your voice test worked. Complete desktop setup before finishing onboarding."
+      : passed ? "Your voice test worked. Finish onboarding to check desktop setup."
       : status === "error" ? "The test could not finish. Check the message above, then try again."
       : attempted ? "No speech was recognized. Try again and speak for a few seconds."
       : "Click Start Test when you’re ready to speak."}</p>

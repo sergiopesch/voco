@@ -6,11 +6,11 @@ set -euo pipefail
 #
 # VOCO — release install helper
 # Usage:
-#   wget https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.45/install -O voco-install
+#   wget https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.46/install -O voco-install
 #   chmod +x voco-install
 #   ./voco-install
 
-VERSION="2026.0.45"
+VERSION="2026.0.46"
 RELEASE_TAG="voco.${VERSION}"
 DEB_URL="https://github.com/sergiopesch/voco/releases/download/${RELEASE_TAG}/voco_${VERSION}_amd64.deb"
 CHECKSUMS_URL="https://github.com/sergiopesch/voco/releases/download/${RELEASE_TAG}/voco_checksums.txt"
@@ -346,19 +346,56 @@ voco_install_deb_package() {
   local deb_file="$1"
   local expected_version="$2"
   local expected_architecture="$3"
+  local -a packages
 
   VOCO_INSTALL_ERROR=""
-  VOCO_INSTALL_USED_APT_FIX=false
-
-  if ! sudo dpkg -i "${deb_file}" > /dev/null 2>&1; then
-    VOCO_INSTALL_USED_APT_FIX=true
-    if ! sudo apt-get install -f -y -qq > /dev/null 2>&1; then
-      VOCO_INSTALL_ERROR="dpkg failed and apt could not resolve the package dependencies."
-      return 1
-    fi
+  deb_file="$(realpath -- "${deb_file}")" || return 1
+  packages=("${deb_file}")
+  # These are optional in package metadata so X11-only distributions can install.
+  # Wayland needs both, even when APT recommendations are disabled by the owner.
+  if [[ "${XDG_SESSION_TYPE:-x11}" == wayland ]]; then
+    packages+=(ydotool ydotoold)
   fi
-
+  if ! sudo apt-get install -y -- "${packages[@]}"; then
+    VOCO_INSTALL_ERROR="APT could not install VOCO and its desktop dependencies. Resolve the error above, then run the installer again."
+    return 1
+  fi
   voco_verify_installed_package "${expected_version}" "${expected_architecture}"
+}
+
+voco_verify_desktop_input() {
+  VOCO_INPUT_ERROR=""
+  if ! VOCO_INPUT_ERROR="$(voco --check-desktop-input 2>&1)"; then
+    return 1
+  fi
+}
+
+voco_wayland_device_access() {
+  [[ -c /dev/uinput && -w /dev/uinput ]]
+}
+
+voco_start_wayland_service() {
+  [[ "${XDG_SESSION_TYPE:-x11}" == wayland ]] || return 0
+  # Reuse a working service, including a distribution/admin-managed daemon.
+  voco_verify_desktop_input && return 0
+  if ! voco_wayland_device_access; then
+    VOCO_INPUT_ERROR="This login cannot access /dev/uinput. Complete the Wayland device-permission setup before starting the input service."
+    return 1
+  fi
+  if pgrep -x ydotoold >/dev/null 2>&1; then
+    VOCO_INPUT_ERROR="An existing ydotoold is running but is unavailable to this login. Check its socket permissions; VOCO will not replace that service."
+    return 1
+  fi
+  if ! systemctl --user enable --now voco-ydotoold.service; then
+    VOCO_INPUT_ERROR="Could not start the VOCO input service. Check: systemctl --user status voco-ydotoold.service"
+    return 1
+  fi
+  local attempt
+  for attempt in {1..10}; do
+    if voco_verify_desktop_input; then return 0; fi
+    sleep 0.2
+  done
+  return 1
 }
 
 voco_write_default_config() {
@@ -495,9 +532,9 @@ voco_run_hotkey_setup() {
   echo
   echo -e "  VOCO uses a global hotkey to start and stop listening."
   if [[ "${existing_hotkey_valid}" == true ]]; then
-    echo -e "  Your current hotkey is ${BOLD}${hotkey}${NC} — press it anywhere to dictate."
+    echo -e "  Your current hotkey is ${BOLD}${hotkey}${NC} — use it with a text field focused."
   else
-    echo -e "  The default is ${BOLD}${hotkey}${NC} — press it anywhere to dictate."
+    echo -e "  The default is ${BOLD}${hotkey}${NC} — use it with a text field focused."
   fi
   echo
 
@@ -615,7 +652,11 @@ run_step() {
   fi
 }
 
-trap 'spinner_stop' EXIT
+voco_install_cleanup() {
+  spinner_stop
+  if [[ -n "${VOCO_DOWNLOAD_DIR:-}" ]]; then rm -rf -- "${VOCO_DOWNLOAD_DIR}"; fi
+}
+trap voco_install_cleanup EXIT
 
 SECONDS=0
 
@@ -659,7 +700,7 @@ SESSION="${XDG_SESSION_TYPE:-x11}"
 if [[ "$SESSION" == "wayland" ]]; then
   command -v ydotool &>/dev/null && ok "ydotool" || dim "Wayland paste helper missing: install ydotool and configure its input service"
   command -v wl-copy &>/dev/null && ok "wl-clipboard" || dim "wl-clipboard missing: required on supported wlroots desktops; GNOME uses xclip"
-  groups | grep -q '\binput\b' && ok "input group" || warn "Run: sudo usermod -aG input \$USER"
+  groups | grep -q '\binput\b' && ok "input group" || dim "If Alt+D is unavailable, configure a desktop shortcut for: voco --toggle"
 else
   command -v xdotool &>/dev/null && ok "xdotool" || dim "X11 paste helper missing: install xdotool"
   command -v xclip &>/dev/null && ok "xclip" || dim "X11 clipboard helper missing: install xclip"
@@ -669,10 +710,10 @@ fi
 echo
 echo -e "  ${BOLD}${GRAPHITE}[2/3]${NC} ${BOLD}Download${NC}"
 
-TMPDIR=$(mktemp -d)
-DEB_FILE="${TMPDIR}/voco_${VERSION}_amd64.deb"
-CHECKSUM_FILE="${TMPDIR}/voco_checksums.txt"
-DEB_CHECKSUM_FILE="${TMPDIR}/voco_${VERSION}_amd64.deb.sha256"
+VOCO_DOWNLOAD_DIR=$(mktemp -d)
+DEB_FILE="${VOCO_DOWNLOAD_DIR}/voco_${VERSION}_amd64.deb"
+CHECKSUM_FILE="${VOCO_DOWNLOAD_DIR}/voco_checksums.txt"
+DEB_CHECKSUM_FILE="${VOCO_DOWNLOAD_DIR}/voco_${VERSION}_amd64.deb.sha256"
 
 run_step "Downloading VOCO v${VERSION}" \
   wget -q -O "$DEB_FILE" "$DEB_URL"
@@ -687,7 +728,7 @@ if ! grep -F "  $(basename "$DEB_FILE")" "$CHECKSUM_FILE" > "$DEB_CHECKSUM_FILE"
   err "Could not find a checksum entry for $(basename "$DEB_FILE")"
 fi
 
-if (cd "$TMPDIR" && sha256sum --check "$(basename "$DEB_CHECKSUM_FILE")" >/dev/null 2>&1); then
+if (cd "$VOCO_DOWNLOAD_DIR" && sha256sum --check "$(basename "$DEB_CHECKSUM_FILE")" >/dev/null 2>&1); then
   ok "Package checksum verified"
 else
   err "Package checksum verification failed"
@@ -701,19 +742,24 @@ echo
 echo -e "  ${BOLD}${GRAPHITE}[3/3]${NC} ${BOLD}Install${NC}"
 
 if voco_install_deb_package "$DEB_FILE" "$VERSION" "amd64"; then
-  if [[ "${VOCO_INSTALL_USED_APT_FIX}" == true ]]; then
-    ok "VOCO installed (dependencies resolved)"
-  else
-    ok "VOCO installed"
-  fi
+  ok "VOCO and desktop dependencies installed"
 else
   err "Installation failed: ${VOCO_INSTALL_ERROR}"
 fi
 
-rm -rf "$TMPDIR"
+rm -rf "$VOCO_DOWNLOAD_DIR"
 voco_run_hotkey_setup "Alt+D"
 HOTKEY="${VOCO_SELECTED_HOTKEY}"
 CONFIG_FILE="${VOCO_CONFIG_FILE}"
+
+if ! voco_start_wayland_service || ! voco_verify_desktop_input; then
+  warn "VOCO is installed, but desktop input setup is incomplete."
+  dim "${VOCO_INPUT_ERROR}"
+  dim "Setup instructions: https://github.com/sergiopesch/voco/blob/master/docs/platform/README.md#ydotoold-ydotool-daemon"
+  dim "After setup, run: voco --check-desktop-input"
+  exit 2
+fi
+ok "Desktop input prerequisites verified"
 
 # ─── Done ───────────────────────────────────────────────
 ELAPSED=$SECONDS

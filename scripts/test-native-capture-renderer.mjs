@@ -233,6 +233,7 @@ try {
                     revision: 1,
                     config: window.config
                 };
+            if (name === 'getDesktopInputStatus') return {available:true,detail:'Desktop input is ready.'};
             if (name === 'getRuntimeDiagnostics')
                 return {
                     sessionType: 'wayland',
@@ -458,7 +459,7 @@ try {
             }
             if (name === 'getDesktopPasteStatus') {
               window.calls.push([name,...args]);
-              return {enabled:true,available:false,targetToken:null,detail:'Click in a text field, then press your dictation shortcut to start.'};
+              return {enabled:true,available:false,targetToken:null,failureReason:'cursor',detail:'Click in a text field, then press your dictation shortcut to start.'};
             }
             return previous(name,args);
           };
@@ -507,6 +508,36 @@ try {
         if (scenario === 'browser-stop') assert.ok(await page.evaluate(()=>window.calls.some(c=>c[0]==='releaseBrowserRecording'&&c[1]==='browser:pending-test')));
         await noOutput();
         results.push({case:scenario+'-cancels-pending-microphone-setup',passed:true});
+      }
+      for (const problem of ['missing-helper', 'stopped-daemon', 'probe-failed', 'probe-timeout']) {
+        await loadTest();
+        await page.evaluate(problem => {
+          const previous = window.nativeCall;
+          window.nativeCall = async (name, args) => {
+            if (name === 'getDesktopInputStatus') {
+              window.calls.push([name, ...args]);
+              if (window.setupRepaired) return {available:true,detail:'Desktop input is ready.'};
+              if (problem === 'probe-failed') throw new Error('Input check unavailable');
+              if (problem === 'probe-timeout') return new Promise(()=>{});
+              return {available:false,detail:problem === 'missing-helper'
+                ? 'Install ydotool and ydotoold, then retry setup.'
+                : 'Start the ydotoold desktop input service before dictating.'};
+            }
+            return previous(name,args);
+          };
+        }, problem);
+        await page.getByRole('button',{name:'Start Test',exact:true}).click();
+        await page.getByRole('region',{name:'Test transcript'}).getByText('This is my voice test',{exact:true}).waitFor();
+        await page.getByRole('button',{name:'Finish Onboarding'}).click();
+        await page.waitForFunction(()=>window.store.getState().status==='idle');
+        assert.equal(await page.evaluate(()=>window.config.onboardingCompleted),false,problem+' must block completion');
+        await page.getByRole('button',{name:'Check desktop setup',exact:true}).waitFor();
+        await noOutput();
+        await page.evaluate(()=>{window.setupRepaired=true;});
+        await page.getByRole('button',{name:'Finish Onboarding'}).click();
+        await page.waitForFunction(()=>window.config.onboardingCompleted&&window.store.getState().surface==='hidden');
+        await noOutput();
+        results.push({case:'onboarding-blocks-'+problem+'-and-finishes-after-repair-without-external-cursor',passed:true});
       }
       await loadTest();
       assert.equal(await page.evaluate(()=>window.nativeCommands.some(c=>c.name==='native_capture_begin')),false);
@@ -593,6 +624,19 @@ try {
       assert.equal(await page.evaluate(()=>window.nativeCommands.some(c=>c.name==='native_capture_begin')),false);
       assert.equal(await page.evaluate(()=>window.store.getState().surface),'hidden');
       results.push({case:'no-cursor-notification-without-capture-or-focus-steal',passed:true});
+      await loadTest();
+      await page.evaluate(() => {
+        const previous = window.nativeCall;
+        window.nativeCall = async (name, args) => name === 'getDesktopPasteStatus'
+          ? {enabled:true,available:false,targetToken:null,failureReason:'setup',detail:'Install ydotool and ydotoold.'}
+          : previous(name,args);
+        window.store.getState().setSurface('hidden');
+      });
+      await page.evaluate(()=>window.listeners['voco:toggle-dictation']?.({payload:null}));
+      await page.waitForFunction(()=>window.calls.some(c=>c[0]==='showNotification'&&c[1]==='Dictation setup incomplete'));
+      assert.equal(await page.evaluate(()=>window.nativeCommands.some(c=>c.name==='native_capture_begin')),false);
+      assert.equal(await page.evaluate(()=>window.store.getState().surface),'hidden');
+      results.push({case:'missing-helper-is-not-reported-as-missing-cursor',passed:true});
       await loadTest('off');
       await page.evaluate(()=>{window.config.selectedMic='previous-mic';window.store.getState().setConfig({...window.config});});
       assert.equal(await page.evaluate(()=>window.streamRequests||0),0);
@@ -909,7 +953,7 @@ try {
       window.deferDiagnostics = false;
     });
     await page.getByText('Shortcut configured: Alt+X. Start dictation from the tray.', { exact: false }).waitFor();
-    assert.equal(await page.getByText('Press Alt+D to record and copy.', { exact: true }).count(), 0);
+    assert.equal(await page.getByText('Press Alt+D to dictate at your cursor.', { exact: true }).count(), 0);
     await noCapture();
     expected.push('late-old-key-diagnostic-cannot-advertise-new-configuration'); record(expected.at(-1));
     const prepareDeferredDiagnostics = async () => {
@@ -934,7 +978,7 @@ try {
         };
         window.store.getState().setSurface('popover');
       });
-      await page.getByText('Press Alt+D to record and copy.', { exact: false }).waitFor();
+      await page.getByText('Press Alt+D to dictate at your cursor.', { exact: false }).waitFor();
       await page.evaluate(() => { window.holdObserver = true; });
       await page.waitForFunction(() => typeof window.finishObserver === 'function');
     };
@@ -970,7 +1014,7 @@ try {
         await new Promise(resolve => setTimeout(resolve, 50));
       });
       assert.equal(await page.evaluate(() => window.store.getState().ownedPreeditSetupState), setupBefore, 'Rejected late observer must not publish any diagnostics');
-      assert.equal(await page.getByText('Press Alt+D to record and copy.', { exact: false }).count(), 0);
+      assert.equal(await page.getByText('Press Alt+D to dictate at your cursor.', { exact: false }).count(), 0);
       if (transition === 'save') await page.evaluate(() => window.finishSave());
       await noCapture();
       expected.push('late-observer-after-' + transition + '-cannot-publish'); record(expected.at(-1));

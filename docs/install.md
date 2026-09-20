@@ -10,7 +10,10 @@ A plain Tauri bundle is incomplete. See [packaging](linux-packaging.md).
 
 The [README command](../README.md#get-started) runs the guided installer from
 the current published **2026.0.45** tag. It downloads that exact release and
-verifies its package checksum before installation.
+verifies its package checksum before installation. On Wayland, this older installer
+can omit the input helpers; complete the [Wayland setup](platform/README.md#ydotoold-ydotool-daemon)
+before testing dictation in another app. The .46 candidate repairs dependency
+installation and refuses to finish onboarding while desktop input is unavailable.
 
 For a manual installation, these links always follow the latest public release:
 
@@ -65,13 +68,16 @@ migrate retired output/assistant settings to direct dictation. A purge is unnece
 
 ## First launch
 
-Open VOCO from the application menu. In .44, your system microphone and speaker
+Open VOCO from the application menu. Your system microphone and speaker
 are selected. Click **Start Test**, speak, and check that the signal band moves
-and your words appear. Click **Finish Onboarding**, then focus a text field.
+and your words appear. In the .46 candidate, **Finish Onboarding** also checks desktop input prerequisites.
+If setup needs attention, complete the indicated setup and click **Check desktop setup**.
+Your successful voice test remains available; an external cursor is not required
+for this check. Once onboarding finishes, focus a text field.
 Press **Alt+D** to start and again to stop. You can change the shortcut in
 Settings. Known terminal paste shortcuts are selected automatically.
 
-The .44 release requires a verifiable editable cursor before automatic desktop
+VOCO requires a verifiable editable cursor before automatic desktop
 dictation. If no cursor is available, VOCO displays a notification; click in an
 accessible text field and try again. Password fields are excluded. Changing fields
 during a recording stops delivery; review retained text before copying it.
@@ -146,15 +152,19 @@ its outstanding gates. Development recipes are not public installers.
 
 
 Historical userspace checks cover Ubuntu, Debian, Fedora, Linux Mint and an
-Omarchy-related Arch profile. Consult the [current release notes](releases/2026.0.42.md)
-for checks run on this release. This is not proof of every distribution’s default compositor, audio stack
+Omarchy-related Arch profile. Consult the [.45 release notes](releases/2026.0.45.md)
+for the recorded checks, and [release status](release-candidate.md) for newer candidates. This is not proof of every distribution’s default compositor, audio stack
 or application. RPM/Arch packages require their own native receipts. AppImage,
 Flatpak and Snap are experimental scaffolding, not published support channels.
 See [the compatibility evidence](testing/cross-linux-review-2026-09-15.md).
 
 ## Remove
 
+Quit VOCO first. If the .46 installer enabled its per-login input service, stop
+and disable that service before removing the package:
+
 ```bash
+systemctl --user disable --now voco-ydotoold.service
 sudo apt remove voco
 ```
 

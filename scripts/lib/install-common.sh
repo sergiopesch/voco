@@ -315,19 +315,56 @@ voco_install_deb_package() {
   local deb_file="$1"
   local expected_version="$2"
   local expected_architecture="$3"
+  local -a packages
 
   VOCO_INSTALL_ERROR=""
-  VOCO_INSTALL_USED_APT_FIX=false
-
-  if ! sudo dpkg -i "${deb_file}" > /dev/null 2>&1; then
-    VOCO_INSTALL_USED_APT_FIX=true
-    if ! sudo apt-get install -f -y -qq > /dev/null 2>&1; then
-      VOCO_INSTALL_ERROR="dpkg failed and apt could not resolve the package dependencies."
-      return 1
-    fi
+  deb_file="$(realpath -- "${deb_file}")" || return 1
+  packages=("${deb_file}")
+  # These are optional in package metadata so X11-only distributions can install.
+  # Wayland needs both, even when APT recommendations are disabled by the owner.
+  if [[ "${XDG_SESSION_TYPE:-x11}" == wayland ]]; then
+    packages+=(ydotool ydotoold)
   fi
-
+  if ! sudo apt-get install -y -- "${packages[@]}"; then
+    VOCO_INSTALL_ERROR="APT could not install VOCO and its desktop dependencies. Resolve the error above, then run the installer again."
+    return 1
+  fi
   voco_verify_installed_package "${expected_version}" "${expected_architecture}"
+}
+
+voco_verify_desktop_input() {
+  VOCO_INPUT_ERROR=""
+  if ! VOCO_INPUT_ERROR="$(voco --check-desktop-input 2>&1)"; then
+    return 1
+  fi
+}
+
+voco_wayland_device_access() {
+  [[ -c /dev/uinput && -w /dev/uinput ]]
+}
+
+voco_start_wayland_service() {
+  [[ "${XDG_SESSION_TYPE:-x11}" == wayland ]] || return 0
+  # Reuse a working service, including a distribution/admin-managed daemon.
+  voco_verify_desktop_input && return 0
+  if ! voco_wayland_device_access; then
+    VOCO_INPUT_ERROR="This login cannot access /dev/uinput. Complete the Wayland device-permission setup before starting the input service."
+    return 1
+  fi
+  if pgrep -x ydotoold >/dev/null 2>&1; then
+    VOCO_INPUT_ERROR="An existing ydotoold is running but is unavailable to this login. Check its socket permissions; VOCO will not replace that service."
+    return 1
+  fi
+  if ! systemctl --user enable --now voco-ydotoold.service; then
+    VOCO_INPUT_ERROR="Could not start the VOCO input service. Check: systemctl --user status voco-ydotoold.service"
+    return 1
+  fi
+  local attempt
+  for attempt in {1..10}; do
+    if voco_verify_desktop_input; then return 0; fi
+    sleep 0.2
+  done
+  return 1
 }
 
 voco_write_default_config() {
@@ -464,9 +501,9 @@ voco_run_hotkey_setup() {
   echo
   echo -e "  VOCO uses a global hotkey to start and stop listening."
   if [[ "${existing_hotkey_valid}" == true ]]; then
-    echo -e "  Your current hotkey is ${BOLD}${hotkey}${NC} — press it anywhere to dictate."
+    echo -e "  Your current hotkey is ${BOLD}${hotkey}${NC} — use it with a text field focused."
   else
-    echo -e "  The default is ${BOLD}${hotkey}${NC} — press it anywhere to dictate."
+    echo -e "  The default is ${BOLD}${hotkey}${NC} — use it with a text field focused."
   fi
   echo
 

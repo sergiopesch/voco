@@ -6,6 +6,7 @@ import type {
   AudioDeviceOption,
   CursorDeliveryState,
   DictationStatus,
+  DesktopInputStatus,
   MicrophonePermission,
   RuntimeDiagnostics,
   RecoverableTranscript,
@@ -16,6 +17,7 @@ import { openMicrophoneStream } from "@/lib/audioInput";
 import { createAnimationFrameLease } from "@/lib/animationFrameLease";
 import type { DictationRecovery } from "@/lib/dictationRecovery";
 import { microphoneLabel, shortcutPresentation } from "@/lib/shortcutPresentation";
+import { getDesktopInputStatus } from "@/lib/tauri";
 import { Onboarding } from "@/components/Onboarding";
 import { useStore } from "@/store/useStore";
 import { NativeMicrophoneSettings } from "@/components/NativeMicrophoneSettings";
@@ -70,6 +72,8 @@ interface ControlPanelProps {
   onRefreshRuntimeDiagnostics: () => Promise<void>;
   onOpenSettings: (section?: "General" | "Audio" | "Hotkeys") => Promise<void>;
 }
+
+const DESKTOP_SETUP_GUIDE = "https://github.com/sergiopesch/voco/blob/master/docs/platform/README.md#ydotoold-ydotool-daemon";
 
 const PANEL_SECTIONS = [
   "General",
@@ -211,6 +215,10 @@ export function ControlPanel({
   const nativePreviewDisabled = Boolean(nativeMicrophone && nativeMicrophone.mode !== "webkit");
   const waylandDesktop = runtimeDiagnostics?.sessionType.toLowerCase() === "wayland";
   const audioLevel = useStore(state => state.audioLevel);
+  const [inputReadiness, setInputReadiness] = useState<DesktopInputStatus | null>(null);
+  const [checkingInput, setCheckingInput] = useState(false);
+  const desktopInput = isOnboarding ? inputReadiness ?? runtimeDiagnostics?.desktopInput : runtimeDiagnostics?.desktopInput;
+  const desktopSetupError = desktopInput?.available === false ? desktopInput.detail : null;
   const testPassed = useStore(state => state.onboardingTestPassed);
   const testPurpose = useStore(state => state.dictationPurpose);
   const hotkeyDirty = hotkeyDraft !== config.hotkey;
@@ -231,7 +239,7 @@ export function ControlPanel({
     }
   };
   const selectedDeviceLabel = microphoneLabel(nativeMicrophone?.mode, nativeMicrophone?.selected, selectedDeviceId, availableDevices);
-  const shortcut = shortcutPresentation(config.hotkey, runtimeDiagnostics?.shortcut);
+  const shortcut = shortcutPresentation(config.hotkey, runtimeDiagnostics?.shortcut, desktopInput);
   const updateInstallCopy = useMemo(() => {
     switch (config.installChannel) {
       case "appimage":
@@ -315,13 +323,12 @@ export function ControlPanel({
       : `Missing: ${runtimeDiagnostics.typeSimulation.missingCommands.join(", ")}`;
   }, [runtimeDiagnostics]);
   const clipboardLabel = useMemo(() => {
-    if (!runtimeDiagnostics) {
+    if (!runtimeDiagnostics || !desktopInput) {
       return "Runtime checks unavailable.";
     }
-    return runtimeDiagnostics.clipboard.available
-      ? "Ready"
-      : `Missing: ${runtimeDiagnostics.clipboard.missingCommands.join(", ")}`;
-  }, [runtimeDiagnostics]);
+    if (desktopSetupError) return "Setup required";
+    return "Ready";
+  }, [runtimeDiagnostics, desktopInput, desktopSetupError]);
   const ownedPreeditLabel = useMemo(() => {
     if (!runtimeDiagnostics) {
       return "Runtime checks unavailable.";
@@ -596,13 +603,33 @@ export function ControlPanel({
     hidePanel();
   }
 
+  async function checkDesktopSetup(): Promise<boolean> {
+    setCheckingInput(true);
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const result = await Promise.race([
+        getDesktopInputStatus(),
+        new Promise<null>(resolve => { timeout = setTimeout(() => resolve(null), 3500); }),
+      ]);
+      if (!result || typeof result.available !== "boolean") throw new Error("Missing readiness result");
+      setInputReadiness(result);
+      return result.available;
+    } catch {
+      setInputReadiness({ available: false, detail: "Could not check desktop input. Check desktop setup again before finishing onboarding." });
+      return false;
+    } finally {
+      if (timeout !== undefined) clearTimeout(timeout);
+      setCheckingInput(false);
+    }
+  }
+
   async function prepareFirstDictation() {
-    if (saving || finishingTest || testPreparing) return;
+    if (saving || finishingTest || testPreparing || checkingInput) return;
     if (dictationBusy && (dictationStatus !== "recording" || !onFinishTest)) return;
     setFinishingTest(true);
     try {
       const passed = onFinishTest ? await onFinishTest() : testPassed;
-      if (!passed) return;
+      if (!passed || !(await checkDesktopSetup())) return;
       const result = await savePatch({ onboardingCompleted: true, voiceProfile: "default", selectedMic: null });
       if (result.ok) {
         useStore.getState().clearTranscript();
@@ -710,7 +737,7 @@ export function ControlPanel({
             </div>
             <div className="voco-popover__state">
               <div className="voco-popover__state-main">
-                <strong role="status" aria-live="polite">{statusLabel === "Ready to listen" ? "Ready" : statusLabel}</strong>
+                <strong role="status" aria-live="polite">{desktopSetupError ? "Setup needed" : statusLabel === "Ready to listen" ? "Ready" : statusLabel}</strong>
                 <kbd className="voco-glass voco-shortcut">{config.hotkey}</kbd>
               </div>
               {dictationBusy ?
@@ -821,6 +848,10 @@ export function ControlPanel({
             attempted={testPurpose === "onboarding"}
             setupError={recovery && testPurpose !== "onboarding" ? "Recover or discard your previous dictation before starting the voice test." : nativeMicrophone?.error}
             onRetrySetup={() => void nativeMicrophone?.initialize().catch(() => {})}
+            desktopSetupError={desktopSetupError}
+            onCheckDesktopSetup={() => void checkDesktopSetup()}
+            onOpenDesktopSetupGuide={() => void onOpenReleasePage(DESKTOP_SETUP_GUIDE)}
+            checkingDesktopSetup={checkingInput}
             preparing={testPreparing || finishingTest}
             saving={saving}
             blocked={Boolean(recovery && testPurpose !== "onboarding") || !onStartTest || nativeMicrophone?.mode === "pending"}
@@ -847,7 +878,7 @@ export function ControlPanel({
               <div className="voco-preferences__window-actions" onPointerDown={(event) => void handleHeaderPointerDown(event)} aria-label="Move VOCO window"><button className="voco-button voco-button--ghost voco-button--compact" onClick={requestHide}>Hide to tray</button></div>
               {activeSection === "General" ? (
                 <section className="voco-preferences__page">
-                  <div className="voco-preferences__heading"><h2 tabIndex={-1}>Overview</h2><p className="voco-preferences__status" role="status">{statusLabel}</p></div>
+                  <div className="voco-preferences__heading"><h2 tabIndex={-1}>Overview</h2><p className="voco-preferences__status" role="status">{desktopSetupError ? "Desktop setup required" : statusLabel}</p></div>
                   {hasRecoverableTranscript ? <div className="voco-preferences__recovery" role="status">
                     <strong>{hasCurrentRecovery ? recovery?.kind === "manual-copy" ? "Transcript ready to copy" : "Recording needs recovery" : recoveryEntries.length === 1 ? "A transcript needs attention" : `${recoveryEntries.length} transcripts need attention`}</strong>
                     <p>Kept in VOCO until you dismiss them or exit the app.</p>
@@ -868,15 +899,16 @@ export function ControlPanel({
                       </button>
                       <button className="voco-preferences__row voco-preferences__row--link" onClick={() => setActiveSection("Output")}>
                         <span className="voco-preferences__badge"><SettingsIcon name="output" /></span>
-                        <span className="voco-preferences__row-copy"><strong>Output</strong><small>Direct to your cursor</small></span>
+                        <span className="voco-preferences__row-copy"><strong>Output</strong><small>{desktopSetupError ? "Desktop setup required" : "Direct to your cursor"}</small></span>
                         <span className="voco-preferences__chevron" aria-hidden="true"><SettingsIcon name="chevron" /></span>
                       </button>
                     </div>
                   </div>
                   <div className="voco-preferences__actions">
-                    <button className="voco-button voco-button--primary" disabled={saving || dictationBusy} onClick={prepareDictation}><SettingsIcon name="Audio" />Hide to dictate</button>
+                    <button className="voco-button voco-button--primary" disabled={saving || dictationBusy || Boolean(desktopSetupError)} onClick={prepareDictation}><SettingsIcon name="Audio" />Hide to dictate</button>
                   </div>
                   <p className="voco-preferences__helper">{shortcut.instruction}</p>
+                  {desktopSetupError ? <button className="voco-button voco-button--secondary" onClick={() => setActiveSection("Advanced")}>Review desktop setup</button> : null}
                   {!hasRecoverableTranscript && lastDictationResult?.outcome === "delivered" ? <p className="voco-preferences__helper" role="status">A dictation was delivered this session. Check your text field to confirm the result.</p> : null}
                 </section>
               ) : null}
@@ -1003,6 +1035,7 @@ export function ControlPanel({
                   </details> : null}
                   <div className="voco-preferences__actions">
                     <button className="voco-button voco-button--secondary" onClick={() => void onRefreshRuntimeDiagnostics()}>Refresh runtime checks</button>
+                    {desktopSetupError ? <button className="voco-button voco-button--secondary" onClick={() => void onOpenReleasePage(DESKTOP_SETUP_GUIDE)}>Open setup instructions</button> : null}
                     <button className="voco-button voco-button--ghost" disabled={saving || hasUnsavedChanges} title={hasUnsavedChanges ? "Save text changes before restarting setup." : undefined}
                       onClick={async () => { const result = await savePatch({ onboardingCompleted: false }); if (result.ok) { onOnboardingStepChange(0); onSurfaceChange("onboarding"); } }}>Re-run onboarding</button>
                   </div>

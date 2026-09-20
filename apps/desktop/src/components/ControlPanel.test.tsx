@@ -75,7 +75,7 @@ describe("ControlPanel", () => {
   it("keeps popover dictation focus-safe and names the microphone clearly", () => {
     const markup = renderPanel();
     expect(markup).toContain("Shortcut configured: Alt+D. Start dictation from the tray.");
-    expect(markup).not.toContain("Press Alt+D to record and copy.");
+    expect(markup).not.toContain("Press Alt+D to dictate at your cursor.");
     expect(markup).toContain("focus a text field");
     expect(markup).toContain("Alt+D");
     expect(markup).toContain("Microphone: System default");
@@ -89,7 +89,7 @@ describe("ControlPanel", () => {
       sessionType: "wayland", typeSimulation: support, clipboard: support,
       ownedPreedit: { available: false, ready: false, setupState: "safety-disabled", detail: "Manual copy", sessionId: null, engineActive: false, focusLost: false, progressiveCommitActive: false, committedCharacterCount: 0, ownershipIntact: false, finalizationOutcome: null, error: null },
     } });
-    expect(markup).toContain("Press Alt+D to record and copy.");
+    expect(markup).toContain("Press Alt+D to dictate at your cursor.");
     expect(markup).toContain("focus a text field");
     expect(markup).not.toContain("Start listening");
   });
