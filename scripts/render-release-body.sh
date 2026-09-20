@@ -18,14 +18,44 @@ Local English dictation for Linux. Speak and your words appear at the cursor.
 
 ## Install
 
-Choose the native package for your distribution and download its platform checksum
-manifest, matching signature and public \`KEYS\` asset. Verify the publisher key
-fingerprint through a trusted independent channel. The source verification script
-checks every listed file and its signature in an isolated keyring:
+Download the package and any companion listed in the
+[native installation guide](https://github.com/sergiopesch/voco/blob/${TAG_NAME}/docs/install-native.md),
+plus \`KEYS\` and the matching checksum manifest and \`.asc\` signature:
+
+| Distribution | Manifest |
+| --- | --- |
+| Ubuntu / Debian / Mint | \`voco_${VERSION}_debian_checksums.txt\` |
+| Fedora | \`voco_${VERSION}_fedora_checksums.txt\` |
+| openSUSE | \`voco_${VERSION}_opensuse_checksums.txt\` |
+| Arch / Omarchy | \`voco_${VERSION}_arch_checksums.txt\` |
+
+First check that the public key's fingerprint is
+\`B33C7C6AAEC8C20433A7A837540796453D8E3865\`, confirming it through a trusted
+independent channel. These commands use GnuPG and coreutils; no repository checkout
+or downloaded verification script is required. Run them in the download folder.
+
+For Debian, Ubuntu or Mint:
 
 \`\`\`bash
-bash scripts/verify-release.sh --keys KEYS PLATFORM_checksums.txt
+gpg --show-keys --fingerprint KEYS
+gpg --import KEYS
+gpg --verify voco_${VERSION}_debian_checksums.txt.asc voco_${VERSION}_debian_checksums.txt && sha256sum --check --strict voco_${VERSION}_debian_checksums.txt
 \`\`\`
+
+For Fedora, openSUSE or Arch/Omarchy, use the corresponding complete command:
+
+\`\`\`bash
+# Fedora
+gpg --verify voco_${VERSION}_fedora_checksums.txt.asc voco_${VERSION}_fedora_checksums.txt && sha256sum --check --strict voco_${VERSION}_fedora_checksums.txt
+# openSUSE
+gpg --verify voco_${VERSION}_opensuse_checksums.txt.asc voco_${VERSION}_opensuse_checksums.txt && sha256sum --check --strict voco_${VERSION}_opensuse_checksums.txt
+# Arch / Omarchy
+gpg --verify voco_${VERSION}_arch_checksums.txt.asc voco_${VERSION}_arch_checksums.txt && sha256sum --check --strict voco_${VERSION}_arch_checksums.txt
+\`\`\`
+
+Read the fingerprint and import the checked public key once before running your
+platform command. Continue to installation only after GnuPG reports a good
+signature from that exact key and every listed file reports \`OK\`.
 
 The complete \`voco_checksums.txt\` covers the release assets; platform manifests
 avoid requiring unrelated packages. Continue only after signature and checksum
