@@ -34,6 +34,9 @@ function harness() {
     setSurface: vi.fn(), setLastDictationResult: vi.fn(), setRawTranscript: vi.fn(),
     setRecovery: vi.fn((value: unknown) => { state.recovery = value; }),
     selectedDeviceId: null as string | null,
+    dictationPurpose: "cursor" as "cursor" | "onboarding",
+    setDictationPurpose: vi.fn((purpose: "cursor" | "onboarding") => { state.dictationPurpose = purpose; }),
+    setOnboardingTestPassed: vi.fn(),
   };
   const status = { shortcutEpoch: 7, enabled: true, available: true, streamingEnabled: true, targetToken: "guarded-target" as string | null };
   const target = ref<string | null>(null);

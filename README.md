@@ -15,17 +15,24 @@ recognition runs on your computer. No account, subscription or cloud transcripti
 
 ## Get started
 
-Download the Debian package and checksum file from
-[Releases](https://github.com/sergiopesch/voco/releases). In the download folder:
+Install the latest public Ubuntu/Debian x86_64 package. These links follow the
+latest release automatically:
 
 ```bash
-sha256sum -c voco_latest_checksums.txt
-sudo apt install ./voco_latest_amd64.deb
+(
+  set -e
+  mkdir -p ~/Downloads/voco-install
+  cd ~/Downloads/voco-install
+  curl -fLO https://github.com/sergiopesch/voco/releases/latest/download/voco_latest_amd64.deb
+  curl -fLO https://github.com/sergiopesch/voco/releases/latest/download/voco_latest_checksums.txt
+  sha256sum -c voco_latest_checksums.txt
+  sudo apt install ./voco_latest_amd64.deb
+)
 ```
 
-Run the install command only if checksum verification passes.
+Installation stops if a download or checksum verification fails.
 Checksums detect a damaged or swapped file. They do not prove who published it.
-Release 2026.0.42 provides a signed tag and detached checksum signatures. Verify
+Releases also provide a signed tag and detached checksum signatures. Verify
 them with `bash scripts/verify-release.sh voco_latest_checksums.txt` after checking
 the key fingerprint through a trusted independent channel.
 Ubuntu x86_64 is the reference platform. See the [installation guide](docs/install.md)
@@ -36,7 +43,7 @@ separates published assets from source and qualification work.
 
 ## Dictate anywhere you type
 
-1. Open VOCO and check your microphone.
+1. Open VOCO, click **Start Test**, speak, then **Finish Onboarding** once your words appear. Your default microphone and speaker are selected.
 2. Focus a text field, press `Alt+D`, and speak.
 3. Press `Alt+D` again to finish. Review your text before sending it.
 
@@ -56,13 +63,14 @@ with full-resolution release graphics, exact values and methods.
 
 ## Native Linux packages
 
-The 2026.0.43 package profiles cover Debian, Fedora, openSUSE and Arch, including
-Omarchy/Hyprland integration. Install only assets attached to a published release.
-This version uses explicit native microphone permission on Wayland so dictation
-can start with its panel hidden; X11 keeps browser capture.
+**2026.0.44** updates onboarding and missing-cursor feedback for Ubuntu/Debian.
+Fedora, openSUSE and Arch/Omarchy packages remain at **2026.0.43**; download those
+from their matching release. Install only assets attached to a published release.
+Wayland uses native microphone capture so dictation can start with its panel
+hidden; X11 keeps browser capture.
 See the [support matrix](docs/linux-support.md),
 [native package installation](docs/install-native.md) and
-[.43 changes and qualification](docs/releases/2026.0.43.md).
+[.44 changes and qualification](docs/releases/2026.0.44.md).
 
 ## Contribute
 

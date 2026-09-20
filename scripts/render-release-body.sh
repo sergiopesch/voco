@@ -3,6 +3,8 @@ set -euo pipefail
 VERSION="${1:?usage: render-release-body.sh <version> <tag> [appimage-name]}"
 TAG_NAME="${2:?release tag required}"
 APPIMAGE_NAME="${3:-}"
+PLATFORMS=(debian)
+if [[ "$VERSION" == "2026.0.43" ]]; then PLATFORMS+=(fedora opensuse arch); fi
 cat <<EOF_BODY
 # VOCO ${VERSION}
 
@@ -10,8 +12,8 @@ Local English dictation for Linux. Speak and your words appear at the cursor.
 
 - Local NVIDIA CPU recognition; no account or cloud transcription.
 - Live words and punctuation, with explicit recovery after interrupted dictation.
-- Native Wayland capture with source selection and permission for the app session.
-- Separate Debian, Fedora, openSUSE and Arch dependency profiles; documented Omarchy setup.
+- Default microphone selection, a live speech test and Finish Onboarding.
+- Clear feedback when no editable text cursor is available.
 - Microphone and shortcut preferences preserved on upgrade.
 
 [Changes and measured limits](https://github.com/sergiopesch/voco/blob/${TAG_NAME}/docs/releases/${VERSION}.md).
@@ -22,12 +24,9 @@ Download the package and any companion listed in the
 [native installation guide](https://github.com/sergiopesch/voco/blob/${TAG_NAME}/docs/install-native.md),
 plus \`KEYS\` and the matching checksum manifest and \`.asc\` signature:
 
-| Distribution | Manifest |
-| --- | --- |
-| Ubuntu / Debian / Mint | \`voco_${VERSION}_debian_checksums.txt\` |
-| Fedora | \`voco_${VERSION}_fedora_checksums.txt\` |
-| openSUSE | \`voco_${VERSION}_opensuse_checksums.txt\` |
-| Arch / Omarchy | \`voco_${VERSION}_arch_checksums.txt\` |
+This release updates the Ubuntu/Debian package. Other native channels remain at
+[2026.0.43](https://github.com/sergiopesch/voco/releases/tag/voco.2026.0.43).
+Use \`voco_${VERSION}_debian_checksums.txt\` for the Debian package.
 
 First check that the public key's fingerprint is
 \`B33C7C6AAEC8C20433A7A837540796453D8E3865\`, confirming it through a trusted
@@ -42,16 +41,20 @@ gpg --import KEYS
 gpg --verify voco_${VERSION}_debian_checksums.txt.asc voco_${VERSION}_debian_checksums.txt && sha256sum --check --strict voco_${VERSION}_debian_checksums.txt
 \`\`\`
 
-For Fedora, openSUSE or Arch/Omarchy, use the corresponding complete command:
+EOF_BODY
+if [[ "${#PLATFORMS[@]}" -gt 1 ]]; then
+  for platform in "${PLATFORMS[@]:1}"; do
+    cat <<EOF_PLATFORM
+
+For ${platform}:
 
 \`\`\`bash
-# Fedora
-gpg --verify voco_${VERSION}_fedora_checksums.txt.asc voco_${VERSION}_fedora_checksums.txt && sha256sum --check --strict voco_${VERSION}_fedora_checksums.txt
-# openSUSE
-gpg --verify voco_${VERSION}_opensuse_checksums.txt.asc voco_${VERSION}_opensuse_checksums.txt && sha256sum --check --strict voco_${VERSION}_opensuse_checksums.txt
-# Arch / Omarchy
-gpg --verify voco_${VERSION}_arch_checksums.txt.asc voco_${VERSION}_arch_checksums.txt && sha256sum --check --strict voco_${VERSION}_arch_checksums.txt
+gpg --verify voco_${VERSION}_${platform}_checksums.txt.asc voco_${VERSION}_${platform}_checksums.txt && sha256sum --check --strict voco_${VERSION}_${platform}_checksums.txt
 \`\`\`
+EOF_PLATFORM
+  done
+fi
+cat <<EOF_BODY
 
 Read the fingerprint and import the checked public key once before running your
 platform command. Continue to installation only after GnuPG reports a good

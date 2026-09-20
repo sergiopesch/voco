@@ -1,5 +1,10 @@
 # Linux packages and qualification
 
+**2026.0.44** is an Ubuntu/Debian onboarding and cursor-feedback update. Its
+[release notes](releases/2026.0.44.md) describe its own verification and limits.
+The .43 desktop results below remain historical .43 evidence, not qualification
+of .44 on those desktops. Other native package channels remain at .43.
+
 This matrix records **2026.0.43** package and desktop qualification. Only assets
 attached to a published [GitHub release](https://github.com/sergiopesch/voco/releases)
 are public downloads; source metadata and local receipts do not establish availability.

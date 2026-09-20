@@ -10,7 +10,7 @@ export function admitsDictationTrigger(
   action?: DictationTriggerAction,
 ): boolean {
   if (action === undefined) return true;
-  if (!triggerId?.startsWith("browser:")) return false;
+  if (triggerId !== "onboarding:test" && !triggerId?.startsWith("browser:")) return false;
   if (action === "start") return phase === "idle" || phase === "error";
   return triggerId === activeTriggerId && (phase === "starting" || phase === "recording");
 }

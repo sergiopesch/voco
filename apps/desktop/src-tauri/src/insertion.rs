@@ -247,19 +247,25 @@ pub fn desktop_paste_status() -> DesktopPasteStatus {
     );
     DesktopPasteStatus {
         shortcut_epoch,
-        target_token: target.token,
+        target_token: target.token.clone(),
         streaming_enabled: desktop_stream_enabled(),
         enabled,
-        available: compatibility.is_ok(),
-        detail: compatibility
-            .err()
-            .map(|e| e.message)
-            .unwrap_or(support.detail),
+        available: compatibility.is_ok() && target.input_state == "editable" && target.token.is_some(),
+        detail: compatibility.err().map(|e| e.message).unwrap_or_else(|| {
+            match target.input_state.as_str() {
+                "editable" if target.token.is_some() => support.detail,
+                "none" => "Click in a text field, then press your dictation shortcut to start.".into(),
+                "protected" => "Dictation is unavailable in password fields. Click in another text field and try again.".into(),
+                _ => "VOCO cannot verify a text cursor here. Click in an editable text field and try again.".into(),
+            }
+        }),
     }
 }
 
 #[derive(Debug, serde::Deserialize)]
 struct DesktopTarget {
+    #[serde(default = "unknown_focus_scope")]
+    input_state: String,
     shortcut: String,
     token: Option<String>,
     #[serde(default = "unknown_focus_scope")]
@@ -274,6 +280,7 @@ fn unknown_focus_scope() -> String {
 
 fn desktop_target() -> DesktopTarget {
     let unknown = || DesktopTarget {
+        input_state: unknown_focus_scope(),
         shortcut: "ctrl+v".into(),
         token: None,
         scope: unknown_focus_scope(),

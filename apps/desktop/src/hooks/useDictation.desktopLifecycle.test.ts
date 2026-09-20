@@ -46,7 +46,7 @@ it.each(["cancelled", "restarted"])("keeps late native success out of the %s ses
     return { strategy: "clipboard", outcome: "dispatched" };
   });
   const create = (startingSessionId: number) => {
-    const { paste, preview } = callbacks({
+    const { paste, preview } = callbacks({ onboardingTest: false,
       startingSessionId, cancelledRef, desktopPhrasePasteCountRef,
       recordingStartedAtMsRef, desktopTargetTokenRef,
       isCurrentSession: (id: number) => id === currentSession,

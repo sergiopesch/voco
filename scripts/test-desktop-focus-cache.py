@@ -14,6 +14,7 @@ spec.loader.exec_module(helper)
 class Node:
     def __init__(self, path, children=(), states=(), role='entry'):
         self.path, self.children, self.states, self.role = path, list(children), set(states), role
+        if role == "entry": self.states.add("editable")
         self.parent = None
         for child in self.children: child.parent = self
         self.cache = {}
@@ -28,6 +29,7 @@ class Node:
     def get_child_count(self): return len(self.value('children', self.children[:]))
     def get_child_at_index(self, i): return self.value('children', self.children[:])[i]
     def get_state_set(self): return types.SimpleNamespace(contains=self.value('states', self.states.copy()).__contains__)
+    def get_text_iface(self): return self
     def get_role(self): return self.value('role', self.role)
     def get_process_id(self): return 42424242
     def get_parent(self): return self.parent
@@ -43,20 +45,43 @@ class FocusTests(unittest.TestCase):
         self.window = Node('/window', [self.a, self.b], ['active'])
         self.app = Node('/app', [self.window])
         self.desktop = Node('/desktop', [self.app])
-        atspi = types.SimpleNamespace(StateType=types.SimpleNamespace(ACTIVE='active', FOCUSED='focused'),
-            Role=types.SimpleNamespace(TERMINAL='terminal'), set_timeout=lambda *args:None, get_desktop=lambda _:self.desktop)
+        atspi = types.SimpleNamespace(StateType=types.SimpleNamespace(ACTIVE='active', FOCUSED='focused', EDITABLE='editable'),
+            Role=types.SimpleNamespace(TERMINAL='terminal', PASSWORD_TEXT='password'),
+            Text=types.SimpleNamespace(get_character_count=lambda _:0, get_caret_offset=lambda _:0, get_n_selections=lambda _:0), set_timeout=lambda *args:None, get_desktop=lambda _:self.desktop)
         context = types.SimpleNamespace(pending=lambda:False)
         glib = types.SimpleNamespace(MainContext=types.SimpleNamespace(default=lambda:context))
         gi = types.ModuleType('gi');gi.require_version=lambda *args:None
         repository = types.ModuleType('gi.repository');repository.Atspi=atspi;repository.GLib=glib
         self.modules = patch.dict(sys.modules, {'gi':gi, 'gi.repository':repository})
         self.modules.start();self.addCleanup(self.modules.stop)
+    def test_button_is_not_a_text_cursor(self):
+        self.a.role = 'button'; self.a.states.discard('editable')
+        result = helper.probe()
+        self.assertIsNone(result['token'])
+        self.assertEqual(result['input_state'], 'none')
+    def test_password_is_never_a_dictation_destination(self):
+        self.a.role = 'password'
+        result = helper.probe()
+        self.assertIsNone(result['token'])
+        self.assertEqual(result['input_state'], 'protected')
+    def test_read_only_text_rejects(self):
+        self.a.states.discard('editable')
+        self.assertIsNone(helper.probe()['token'])
+    def test_empty_editable_field_accepts_zero_caret(self):
+        self.assertEqual(helper.probe()['input_state'], 'editable')
+        self.assertIsNotNone(helper.probe()['token'])
+    def test_unavailable_caret_is_not_permission_to_paste(self):
+        from gi.repository import Atspi
+        Atspi.Text.get_caret_offset = lambda _: -1
+        result = helper.probe()
+        self.assertIsNone(result['token'])
+        self.assertEqual(result['input_state'], 'unavailable')
     def test_focus_changes_are_not_cached(self):
         a=helper.probe()['token']
-        self.a.states.clear();self.b.states.add('focused')
+        self.a.states.clear();self.b.states.update(['focused','editable'])
         b=helper.probe()['token']
         self.assertNotEqual(a,b)
-        self.a.states.add('focused');self.b.states.clear()
+        self.a.states.update(['focused','editable']);self.b.states.clear()
         self.assertNotEqual(a,helper.probe()['token'])
     def test_replaced_children_are_refetched(self):
         before=helper.probe()['token']
@@ -80,7 +105,7 @@ class FocusTests(unittest.TestCase):
             before = helper.probe()
             self.assertEqual(before['scope'], 'control')
             self.assertIsNotNone(before['token'])
-            self.a.states.clear(); self.b.states.add('focused')
+            self.a.states.clear(); self.b.states.update(['focused','editable'])
             self.assertNotEqual(before['token'], helper.probe()['token'])
             self.window.states.clear()
             self.assertIsNone(helper.probe()['token'])
@@ -127,24 +152,24 @@ class FocusTests(unittest.TestCase):
         self.assertTrue(all(n.clears==0 for n in self.window.children[:-1]))
     def test_stale_hint_is_not_trusted(self):
         helper.probe();self.a.states.clear()
-        self.assertEqual(helper.probe()['scope'],'window')
+        self.assertIsNone(helper.probe()['token'])
     def test_foreign_window_hint_is_not_trusted(self):
         self.a.states.clear()
         other=Node('/elsewhere',[Node('/foreign',states=['focused'])])
         self.event(other.children[0],True)
-        self.assertEqual(helper.probe()['scope'],'window')
+        self.assertIsNone(helper.probe()['token'])
     def test_cyclic_parent_chain_is_bounded(self):
         self.a.states.clear();node=Node('/cycle',states=['focused']);node.parent=node
         self.event(node,True)
-        self.assertEqual(helper.probe()['scope'],'window')
+        self.assertIsNone(helper.probe()['token'])
         self.assertLessEqual(node.clears,33)
     def test_missing_focus_exposes_window_scope(self):
         self.a.states.clear();result=helper.probe()
-        self.assertEqual(result['scope'],'window')
+        self.assertIsNone(result['token'])
         self.assertFalse(result['events_tracked'])
     def test_window_focused_is_not_control_verification(self):
         self.a.states.clear();self.window.states.add('focused')
-        self.assertEqual(helper.probe()['scope'],'window')
+        self.assertIsNone(helper.probe()['token'])
     def test_helper_restart_invalidates_old_token(self):
         token=helper.probe()['token'];helper.TRACKER=helper.FocusTracker()
         self.assertNotEqual(token,helper.probe()['token'])
@@ -173,7 +198,7 @@ class FocusTests(unittest.TestCase):
         def iteration(_):
             remaining[0]-=1
             if remaining[0]==0:
-                self.a.states.clear();self.b.states.add('focused')
+                self.a.states.clear();self.b.states.update(['focused','editable'])
                 self.event(self.b,True)
         GLib.MainContext.default=lambda:types.SimpleNamespace(pending=lambda:remaining[0]>0,iteration=iteration)
         after=helper.probe()
@@ -191,7 +216,7 @@ class FocusTests(unittest.TestCase):
         self.assertLess(len(calls),10)
     def test_output_contains_only_finite_metadata_and_opaque_token(self):
         result=helper.probe()
-        self.assertEqual(set(result),{'shortcut','token','scope','events_tracked'})
+        self.assertEqual(set(result),{'shortcut','token','scope','events_tracked','input_state'})
         self.assertEqual(len(result['token']),64)
 
     def test_undiscovered_control_without_event_is_found_past_30(self):
@@ -207,7 +232,7 @@ class FocusTests(unittest.TestCase):
         self.window.children=children
         calls=[];original=self.window.get_child_at_index
         self.window.get_child_at_index=lambda i:(calls.append(i),original(i))[1]
-        self.assertEqual(helper.probe()['scope'],'window')
+        self.assertIsNone(helper.probe()['token'])
         self.assertLessEqual(len(calls),127)
 
 if __name__=='__main__':unittest.main()

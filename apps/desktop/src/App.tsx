@@ -7,6 +7,7 @@ import {
 } from "@tauri-apps/api/dpi";
 import { availableMonitors, currentMonitor, getCurrentWindow } from "@tauri-apps/api/window";
 import { useStore } from "@/store/useStore";
+import { errorMessage } from "@/lib/dictationRecovery";
 import {
   getConfig,
   beginRuntimeStatusSession,
@@ -213,9 +214,12 @@ export function App() {
     cancelRecording,
     retryRecovery,
     discardRecovery,
+    finishOnboardingTest,
     toggle,
     onHotkeyPressed,
   } = useDictation({ getCaptureSelection });
+  const [testPreparing, setTestPreparing] = useState(false);
+  const startRequestRef = useRef(false);
   const [initComplete, setInitComplete] = useState(false);
   const [runtimeDiagnostics, setRuntimeDiagnostics] = useState<RuntimeDiagnostics | null>(null);
   const [runtimeStatusEpoch, setRuntimeStatusEpoch] = useState<number | null>(null);
@@ -275,7 +279,9 @@ export function App() {
     [setConfig],
   );
   const dismissInteractiveSurface = useCallback((): boolean => {
-    const currentSurface = useStore.getState().surface;
+    const state = useStore.getState();
+    const currentSurface = state.surface;
+    if (currentSurface === "onboarding" && (startRequestRef.current || isDictationActive(state.status))) return false;
     if (draftsDirtyRef.current && (currentSurface === "settings" || currentSurface === "onboarding")) {
       setCloseRequestId((request) => request + 1);
       return false;
@@ -322,7 +328,12 @@ export function App() {
       }
     };
     if (shortcutCaptureRef.current || performance.now() - shortcutCaptureReleasedAtRef.current < 350) { rejectBrowserStart(); return; }
-    const currentSurface = useStore.getState().surface;
+    const currentState = useStore.getState();
+    if (currentState.surface === "onboarding" && currentState.dictationPurpose === "onboarding" && isDictationActive(currentState.status)) {
+      toggle("onboarding:test", "stop");
+      return;
+    }
+    const currentSurface = currentState.surface;
     if (currentSurface !== "hidden" && action !== "stop") {
       rejectBrowserStart();
       if (!dismissInteractiveSurface()) return;
@@ -336,11 +347,20 @@ export function App() {
 
     const dictationActive = isDictationActive(dictationStatusRef.current);
     const captureState = useStore.getState();
-    if (!dictationActive && (captureState.captureBackendMode === "pending" ||
-        (captureState.captureBackendMode === "native" && !captureState.nativeCaptureSource))) {
-      rejectBrowserStart();
-      await showNotification("Microphone setup required", "Choose and allow a native microphone in Audio settings, or retry capture setup if the backend is unavailable.").catch(() => {});
-      return;
+    if (!dictationActive && captureState.captureBackendMode !== "webkit") {
+      if (startRequestRef.current) return;
+      startRequestRef.current = true;
+      try {
+        await nativeMicrophone.ensureDefault();
+      } catch (cause) {
+        rejectBrowserStart();
+        const message = errorMessage(cause);
+        setError(message);
+        await showNotification("Microphone setup required", message).catch(() => {});
+        return;
+      } finally { startRequestRef.current = false; }
+      // Do not start from a stale request after an interactive panel opened.
+      if (useStore.getState().surface !== "hidden") return;
     }
     if (
       captureState.captureBackendMode === "webkit" &&
@@ -357,7 +377,31 @@ export function App() {
       return;
     }
     toggle(triggerId, action);
-  }, [dismissInteractiveSurface, toggle]);
+  }, [dismissInteractiveSurface, nativeMicrophone.ensureDefault, setError, toggle]);
+  const handleStartTest = useCallback(async () => {
+    const state = useStore.getState();
+    if (startRequestRef.current || isDictationActive(state.status) || state.surface !== "onboarding") return;
+    if (state.recovery && state.dictationPurpose !== "onboarding") {
+      setError("Finish recovering your previous dictation before starting the voice test.");
+      return;
+    }
+    startRequestRef.current = true;
+    setTestPreparing(true);
+    setError(null);
+    try {
+      if (state.dictationPurpose === "onboarding") discardRecovery();
+      await nativeMicrophone.ensureDefault(true);
+      if (useStore.getState().surface !== "onboarding") return;
+      if (useStore.getState().captureBackendMode === "webkit") useStore.getState().setSelectedDeviceId(null);
+      toggle("onboarding:test", "start");
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      startRequestRef.current = false;
+      setTestPreparing(false);
+    }
+  }, [discardRecovery, nativeMicrophone.ensureDefault, setError, toggle]);
+
   const handlePrepareDictation = useCallback(async () => {
     if (isDictationActive(useStore.getState().status)) return;
     if (!dismissInteractiveSurface()) return;
@@ -1057,6 +1101,10 @@ export function App() {
     <>
       <ControlPanel
         nativeMicrophone={{ ...nativeMicrophone, initialize: retryCaptureSetup }}
+        onStartTest={() => void handleStartTest()}
+        onStopTest={() => toggle("onboarding:test", "stop")}
+        onFinishTest={finishOnboardingTest}
+        testPreparing={testPreparing || !initComplete}
         surface={surface}
         onboardingStep={onboardingStep}
         config={config}

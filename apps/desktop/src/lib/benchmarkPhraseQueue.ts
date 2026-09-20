@@ -1,6 +1,7 @@
 // Production NVIDIA stream: serialize bounded audio IPC and append-only delivery.
 // Capture/recovery belong to the hook; target checks and key dispatch remain native.
 import { invoke } from "@tauri-apps/api/core";
+import { errorMessage } from "./dictationRecovery";
 import { type DesktopStreamEvent } from "./desktopPhraseStream";
 
 
@@ -31,7 +32,7 @@ export function textLengths(text: string, prefix: string): Record<string, number
 export class BenchmarkPhraseQueue {
   private pending: Promise<void> = Promise.resolve();
   private cancelled = false;
-  private failure: unknown = null;
+  private failure: Error | null = null;
   private committed = "";
   private buffered: number[] = [];
   private rate = 16000;
@@ -65,6 +66,7 @@ export class BenchmarkPhraseQueue {
   private qualityDropped = 0;
 
   private quality(event: string, fields: Record<string, number | boolean | string | null> = {}) {
+    if (!this.recordDeliveryQuality) return;
     // Bound IPC independently of the native recorder's bounded disk queue.
     const qualitySeq = this.qualitySeq++;
     if (this.qualityInFlight >= 32) { this.qualityDropped++; return; }
@@ -100,21 +102,22 @@ export class BenchmarkPhraseQueue {
   constructor(
     private paste: (text: string, correlation: PasteCorrelation) => Promise<void>,
     private observed: (text: string) => void,
-    private onFailure: () => void,
+    private onFailure: (error: Error) => void,
     private onPreview: (event: DesktopStreamEvent, durationMs?: number) => void,
     private dictationSessionId?: number,
+    private recordDeliveryQuality = true,
   ) {
     this.schedule("start");
   }
 
   private fail(error: unknown, reason = "transport_failed") {
     if (this.failure) return;
-    this.failure = error instanceof Error ? error : new Error(String(error));
+    this.failure = error instanceof Error ? error : new Error(errorMessage(error));
     this.buffered = [];
     void invoke("benchmark_stream", {
       request: { op: "diagnostic", reason, session: this.session, dictation_session_id: this.dictationSessionId },
     }).catch(() => {});
-    this.onFailure();
+    this.onFailure(this.failure);
   }
 
   private schedule(op: string, audio?: number[]) {

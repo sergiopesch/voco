@@ -4,7 +4,13 @@ The [latest published GitHub release](https://github.com/sergiopesch/voco/releas
 is authoritative for current downloads. A source version, local test receipt or
 private draft does not establish publication or installation.
 
-This source snapshot contains **2026.0.43**: Debian, Fedora, openSUSE and Arch
+This source snapshot is **2026.0.44**, the Ubuntu/Debian onboarding and
+cursor-warning release. See [release notes](releases/2026.0.44.md) and
+[the candidate record](testing/onboarding-2026-09-20.md) for checks and limits.
+Fedora, openSUSE and Arch/Omarchy downloads remain at **2026.0.43**.
+Confirm publication and exact assets on GitHub before installing.
+
+The preceding **2026.0.43** release contains: Debian, Fedora, openSUSE and Arch
 package profiles, native Wayland capture and Omarchy integration. Final package
 and desktop evidence is recorded in [Linux support](linux-support.md) and the
 [qualification report](testing/linux-release-2026-09-19.md). Publication requires

@@ -298,28 +298,27 @@ try {
             }
         };
     });
-    // Each case starts a fresh App and enters the actual onboarding microphone step.
+    // Each case starts a fresh App and enters the actual Microphone settings.
     const load = async (failPreview = false, resumeMode = 'normal') => {
         await page.goto(origin + '/app-microphone-check');
         await page.waitForFunction(() => window.store?.getState().availableDevices.length === 1);
         await page.evaluate(({failPreview, resumeMode}) => {
-            window.store.getState().setSurface('onboarding');
+            window.store.getState().setSurface('settings');
             window.failNextStream = failPreview;
             window.resumeMode = resumeMode;
         }, {failPreview, resumeMode});
         await page.getByRole('button', {
-            name: 'Start setup',
+            name: 'Microphone',
             exact: true
         }).click();
-        await page.getByRole('button', {
-            name: 'Retry microphone access',
-            exact: true
-        }).waitFor();
+        await page.getByRole('combobox', { name: /Input device/ }).waitFor();
     };
-    const retry = () => page.getByRole('button', {
-        name: 'Retry microphone access',
-        exact: true
-    }).click();
+    const retry = async () => {
+        await page.evaluate(() => window.store.getState().setMicrophonePermission('denied'));
+        await page.getByRole('button', {name:'Retry microphone access',exact:true}).click();
+        // Restore the pre-probe permission state while the injected request is pending.
+        if (await page.evaluate(() => window.deferProbe)) await page.evaluate(() => window.store.getState().setMicrophonePermission('unknown'));
+    };
     // Optional Permissions API support must not suppress enumeration or access.
     for (const mode of [
         'missing', 'throw', 'reject'
@@ -632,6 +631,7 @@ try {
     await page.screenshot({path:path.join(out,'hidden-dictation.png')});
     await load();
     await page.evaluate(() => window.store.setState({surface:'settings',status:'idle'}));
+    await page.getByRole('button', {name:'Overview',exact:true}).click();
     await page.getByRole('heading', {name:'Overview',exact:true}).waitFor();
     assert.equal(await page.title(), 'VOCO isolated settings');
     assert.equal(new URL(page.url()).pathname, '/app-microphone-check');

@@ -1,11 +1,29 @@
 # Using VOCO
 
+## First-time setup (.44 candidate)
+
+VOCO selects your system microphone and speaker. **Test speaker** plays a short
+sound through the default output. Click **Start Test** and speak: the signal band
+moves with microphone input and your words appear inside setup. This test does not
+paste into other apps or change the clipboard. Microphone capture begins only when
+you start the test.
+
+When words appear, click **Finish Onboarding**. VOCO stops capture, collects the
+final words and saves completion only if the test succeeded. **Stop Test** lets you
+review the result first. Silence and recognition failures keep setup incomplete;
+retry after checking the displayed message. This flow is in the local .44 candidate,
+not the previously published .43 package.
+
 ## Dictation
 
 Check your microphone during setup, then hide VOCO and focus an editable field.
 Press the recording shortcut (default **Alt+D**), wait for Listening, and speak.
 Words appear progressively. Press the shortcut again to finish; the final words
 and punctuation are delivered before VOCO returns to Ready.
+
+If no editable cursor can be verified, VOCO shows a desktop notification and does
+not record. Click in a text field and press the shortcut again. Password fields
+are excluded. Some custom controls do not expose an accessible caret.
 
 Keep the intended field focused. VOCO uses clipboard paste, replaces clipboard
 text, leaves it there and never presses Enter. Recognized terminals use their
