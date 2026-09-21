@@ -6,11 +6,11 @@ set -euo pipefail
 #
 # VOCO — release install helper
 # Usage:
-#   wget https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.46/install -O voco-install
+#   wget https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.47/install -O voco-install
 #   chmod +x voco-install
 #   ./voco-install
 
-VERSION="2026.0.46"
+VERSION="2026.0.47"
 RELEASE_TAG="voco.${VERSION}"
 DEB_URL="https://github.com/sergiopesch/voco/releases/download/${RELEASE_TAG}/voco_${VERSION}_amd64.deb"
 CHECKSUMS_URL="https://github.com/sergiopesch/voco/releases/download/${RELEASE_TAG}/voco_checksums.txt"
@@ -372,7 +372,7 @@ voco_install_deb_package() {
 
 voco_verify_desktop_input() {
   VOCO_INPUT_ERROR=""
-  if ! VOCO_INPUT_ERROR="$(voco --check-desktop-input 2>&1)"; then
+  if ! VOCO_INPUT_ERROR="$(/usr/bin/voco --check-desktop-input 2>&1)"; then
     return 1
   fi
 }
@@ -707,7 +707,6 @@ fi
 rm -rf "$VOCO_DOWNLOAD_DIR"
 voco_run_hotkey_setup "Alt+D"
 HOTKEY="${VOCO_SELECTED_HOTKEY}"
-CONFIG_FILE="${VOCO_CONFIG_FILE}"
 
 if ! voco_start_wayland_service || ! voco_verify_desktop_input; then
   warn "VOCO is installed. Desktop setup needs one more step."

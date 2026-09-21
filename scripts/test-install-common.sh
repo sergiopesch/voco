@@ -368,6 +368,9 @@ if [[ "${MOCK_INPUT_READY}" != true && ! -f "${MOCK_INPUT_READY_FILE:-/nonexiste
 echo "Desktop input is ready."
 SH
 chmod 0700 "${MOCK_BIN}/voco"
+# Shadow only the packaged command; a PATH-installed legacy VOCO must never run.
+/usr/bin/voco() { "${MOCK_BIN}/voco" "$@"; }
+voco() { fail "Readiness used a PATH VOCO instead of the verified package"; }
 export MOCK_INPUT_READY=false
 if voco_verify_desktop_input; then fail "Installer accepted incomplete desktop setup"; fi
 [[ "$VOCO_INPUT_ERROR" == 'Start ydotoold for this login.' ]] || fail "Lost the actionable input error"

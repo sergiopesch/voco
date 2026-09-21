@@ -1,7 +1,7 @@
 name: voco
 title: VOCO
 base: core24
-version: '2026.0.46'
+version: '2026.0.47'
 summary: Local dictation at your cursor. Built for Linux.
 license: MIT
 website: https://github.com/sergiopesch/voco

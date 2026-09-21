@@ -120,7 +120,7 @@ isolation, not a remote VM or proof of a distribution's default desktop.
 
 ## Release and evidence
 
-Source version: **2026.0.46** (unpublished Ubuntu/Debian candidate). Verify the current public release on GitHub and
+Source version: **2026.0.47** (unpublished Ubuntu/Debian candidate). Verify the current public release on GitHub and
 installed version from the package manager; do not infer either from source.
 The .43 package and desktop evidence is recorded in
 [the support matrix](docs/linux-support.md); preserve per-artifact receipts and
@@ -175,3 +175,9 @@ never fill missing scores using another cohort or count failed trials as complet
 When editing a collection, verify its numeric exports, relative links and checksums.
 Public assets contain numeric summaries only; keep personal audio, transcripts and
 private raw evidence outside the repository. Historical media does not requalify a release.
+
+The recorded public installer version is `packaging/published-release.json`. Keep
+README pinned to that version until publication is verified, then update both.
+The guided installer checks `/usr/bin/voco`, not an older PATH override. Release
+the optional GNOME 46 panel archive separately; never enable it in a user profile
+as a package-install side effect. Preserve screenshot proof outside build caches.

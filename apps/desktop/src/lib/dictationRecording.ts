@@ -44,8 +44,10 @@ import {
   type CanonicalCursorSession,
 } from "@/lib/canonicalCursorSession";
 import { monitorCaptureHealth } from "@/lib/captureHealth";
-import type { AppConfig } from "@/types";
-import type { HotkeyTraceFields } from "@/lib/tauri";
+import type { DebugPreviewFrame, DebugCanonicalChunk, PendingDebugCapture } from "./debugCaptureTypes";
+import type { useStore as appStore } from "@/store/useStore";
+import type { AppConfig, DictationStatus } from "@/types";
+import type { HotkeyTraceFields, pasteDesktopText } from "@/lib/tauri";
 import type { CursorDeliveryEvent } from "@/lib/dictationDelivery";
 
 export type Ref<T> = { current: T };
@@ -114,8 +116,8 @@ export interface DictationRecordingEnv {
   livePreviewFailureNotifiedRef: Ref<boolean>;
   livePreviewNextDelayMsRef: Ref<number>;
   firstLiveTextInsertedRef: Ref<boolean>;
-  debugPreviewFramesRef: Ref<unknown[]>;
-  debugCanonicalChunksRef: Ref<unknown[]>;
+  debugPreviewFramesRef: Ref<DebugPreviewFrame[]>;
+  debugCanonicalChunksRef: Ref<DebugCanonicalChunk[]>;
   debugCaptureEnabledRef: Ref<boolean>;
   debugNativeCaptureEnabledRef: Ref<boolean>;
   audioBufferRef: Ref<AudioCaptureBuffer>;
@@ -137,8 +139,7 @@ export interface DictationRecordingEnv {
   ownedPreeditCommittedTextRef: Ref<string>;
   ownedPreeditActiveRef: Ref<boolean>;
   // Store and native helpers are injected so tests can substitute them.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  useStore: { getState: () => any };
+  useStore: Pick<typeof appStore, "getState">;
   beginDesktopShortcutSession: (id: string, epoch: number) => Promise<void>;
   endDesktopShortcutSession: (id: string) => Promise<void>;
   getDesktopPasteStatus: () => Promise<{
@@ -150,26 +151,13 @@ export interface DictationRecordingEnv {
     shortcutEpoch?: number | null;
     detail?: string;
   }>;
-  pasteDesktopText: (
-    text: string,
-    targetToken?: string | null,
-    correlation?: any,
-  ) => Promise<{
-    outcome: string;
-    pasteMetrics?: {
-      targetProbeMs?: number;
-      preflightMs?: number;
-      clipboardMs?: number;
-      keyboardMs?: number;
-      terminal?: boolean;
-    };
-  }>;
+  pasteDesktopText: typeof pasteDesktopText;
   traceDictationEvent: (event: string, fields?: HotkeyTraceFields | null) => Promise<void>;
   traceHotkeyEvent: (event: string, fields?: HotkeyTraceFields | null) => Promise<void>;
   showNotification: (title: string, body: string) => Promise<void>;
   setCancellationPending: (value: boolean) => void;
   setCanCancel: (value: boolean) => void;
-  setStatus: (status: any) => void;
+  setStatus: (status: DictationStatus) => void;
   setInterimTranscript: (text: string) => void;
   setTranscript: (text: string) => void;
   setError: (error: string | null) => void;
@@ -203,12 +191,12 @@ export interface DictationRecordingEnv {
     dictationSessionId: number,
   ) => Promise<void>;
   transcribeAudio: (samples: Float32Array) => Promise<string>;
-  persistDebugCapture: (pending: any) => Promise<void>;
+  persistDebugCapture: (pending: PendingDebugCapture) => Promise<void>;
   ensureAudioContext: () => Promise<AudioContext>;
   openTracedMicrophoneStream: (deviceId: string | null) => Promise<MediaStream>;
   connectWorklet: (audioContext: AudioContext, source: MediaStreamAudioSourceNode) => Promise<boolean>;
   connectScriptProcessor: (audioContext: AudioContext, source: MediaStreamAudioSourceNode) => void;
-  traceDesktopPasteMetrics: (result: any) => void;
+  traceDesktopPasteMetrics: (result: Awaited<ReturnType<typeof pasteDesktopText>>) => void;
   debugNativeCaptureEnabled: () => Promise<boolean>;
   debugDictationCaptureEnabled: () => Promise<boolean>;
   beginNativeCapture: typeof beginNativeCapture;

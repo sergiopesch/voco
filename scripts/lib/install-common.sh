@@ -334,7 +334,7 @@ voco_install_deb_package() {
 
 voco_verify_desktop_input() {
   VOCO_INPUT_ERROR=""
-  if ! VOCO_INPUT_ERROR="$(voco --check-desktop-input 2>&1)"; then
+  if ! VOCO_INPUT_ERROR="$(/usr/bin/voco --check-desktop-input 2>&1)"; then
     return 1
   fi
 }

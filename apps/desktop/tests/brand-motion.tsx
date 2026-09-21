@@ -1,4 +1,5 @@
 // Isolated presentation fixture. No App bootstrap, microphone, clipboard or native commands.
+import desktopPackage from "../package.json";
 import { useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { ComponentProps } from "react";
@@ -34,7 +35,7 @@ function Fixture() {
     statusLabel={status === "recording" ? "Listening" : status === "starting" ? "Getting ready" : status === "processing" ? "Finishing" : status === "error" ? "Needs attention" : "Ready to listen"}
     errorMessage={initial === "error" ? "The test could not finish. Try again when your microphone is ready." : null}
     cursorDeliveryState={initial === "error" ? "unreconciled" : "inactive"} transcript={transcript}
-    updateState={{ status: "idle", currentVersion: "2026.0.46", latestRelease: null, lastCheckedAt: null, error: null }}
+    updateState={{ status: "idle", currentVersion: desktopPackage.version, latestRelease: null, lastCheckedAt: null, error: null }}
     runtimeDiagnostics={null} requestedSection={section} requestedSectionRequestId={0}
     selectedDeviceId={null} availableDevices={[]} microphonePermission="unknown"
     nativeMicrophone={{ mode: "native", sources: { revision: "1", defaultSelectionToken: "desk", sources }, selected, busy: false, error: null,

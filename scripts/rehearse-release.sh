@@ -38,7 +38,8 @@ echo "  appimage: ${APPIMAGE_NAME}"
   grep -F 'wget "$BASE/$TAG/install" -O voco-install' docs/install.md > /dev/null
   grep -F "raw.githubusercontent.com/sergiopesch/voco/${TAG_NAME}/install" install > /dev/null
   # README stays pinned to the published release while source is a new candidate.
-  grep -E '^wget -qO voco-install https://raw.githubusercontent.com/sergiopesch/voco/voco\.[0-9]{4}\.[0-9]+\.[0-9]+/install && bash voco-install$' README.md > /dev/null
+  PUBLISHED_VERSION="$(node -p "require('./packaging/published-release.json').version")"
+  grep -Fx "wget -qO voco-install https://raw.githubusercontent.com/sergiopesch/voco/voco.${PUBLISHED_VERSION}/install && bash voco-install" README.md > /dev/null
   grep -F 'sha256sum -c voco_latest_checksums.txt' docs/install.md > /dev/null
   grep -F -- '- "voco.*"' .github/workflows/release.yml > /dev/null
   if grep -F -- '- "v*"' .github/workflows/release.yml > /dev/null; then

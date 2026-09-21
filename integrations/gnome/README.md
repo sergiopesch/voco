@@ -2,7 +2,7 @@
 
 This development integration keeps VOCO's microphone and active dictation capsule
 inside the system panel. It expands horizontally for Starting, Listening and
-Processing, then contracts at idle. Review remains visible for unresolved recovery.
+Finishing, then contracts at idle. Review remains visible for unresolved recovery.
 The microphone and Stop button issue an explicit Stop during capture. At idle the
 microphone opens settings; Review opens the existing recovery interface on request.
 No recording window is opened by the extension.
@@ -31,8 +31,8 @@ gnome-extensions enable voco-panel@voco.local
 Disable with `gnome-extensions disable voco-panel@voco.local`. The ordinary VOCO
 tray returns on detach, or within approximately six seconds after lost heartbeats.
 The archive builder does not install, enable, replace other extensions or alter the
-running application. This is an unshipped source integration, not a qualified app
-release. Package/version/release gates remain separate.
+running application. The .47 release cut includes this archive as an optional GNOME 46 companion.
+It is never enabled automatically. Other Shell versions remain unqualified.
 
 ## Bridge
 
