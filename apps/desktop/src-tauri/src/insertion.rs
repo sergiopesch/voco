@@ -197,6 +197,7 @@ pub struct RuntimeDiagnostics {
 #[derive(Debug, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DesktopPasteStatus {
+    pub failure_reason: Option<DesktopPasteFailure>,
     pub shortcut_epoch: u64,
     pub target_token: Option<String>,
     pub streaming_enabled: bool,
@@ -213,29 +214,78 @@ pub fn desktop_stream_enabled() -> bool {
     std::env::var("VOCO_DESKTOP_STREAM").as_deref() != Ok("0")
 }
 
-pub fn desktop_paste_status() -> DesktopPasteStatus {
-    // Capture before the blocking probe so a late old-renderer preflight stays stale.
-    let shortcut_epoch = crate::desktop_shortcut::renderer_epoch();
-    let enabled = desktop_paste_enabled();
-    if !enabled {
-        return DesktopPasteStatus {
-            shortcut_epoch,
-            target_token: None,
-            streaming_enabled: false,
-            enabled,
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DesktopInputStatus {
+    pub available: bool,
+    pub detail: String,
+}
+
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum DesktopPasteFailure {
+    Setup,
+    Cursor,
+}
+
+/// Check input prerequisites without observing a target or sending keys.
+/// Onboarding must remain local even while checking readiness for later dictation.
+pub fn desktop_input_status() -> DesktopInputStatus {
+    if !desktop_paste_enabled() {
+        return DesktopInputStatus {
             available: false,
             detail: "Desktop paste is not enabled.".into(),
         };
     }
     let preflight = input_preflight();
     let support = preflight.diagnostics.clipboard;
-    let compatibility = if support.available && matches!(preflight.session, SessionKind::Wayland) {
+    let compatibility = if !support.available {
+        Err(InsertionError::rejected(support.detail))
+    } else if matches!(preflight.session, SessionKind::Wayland) {
         wayland_paste_arguments(preflight.daemon_running).map(|_| ())
-    } else if support.available {
-        Ok(())
     } else {
-        Err(InsertionError::rejected(support.detail.clone()))
+        Ok(())
     };
+    match compatibility {
+        Ok(()) => DesktopInputStatus {
+            available: true,
+            detail: "Desktop input is ready. Focus a text field to dictate.".into(),
+        },
+        Err(error) => DesktopInputStatus {
+            available: false,
+            detail: error.message,
+        },
+    }
+}
+
+pub fn desktop_paste_diagnostics() -> (DesktopInputStatus, DesktopPasteStatus) {
+    // Capture before the blocking probe so a late old-renderer preflight stays stale.
+    let shortcut_epoch = crate::desktop_shortcut::renderer_epoch();
+    let input = desktop_input_status();
+    let paste = desktop_paste_status_with_input(shortcut_epoch, &input);
+    (input, paste)
+}
+
+pub fn desktop_paste_status() -> DesktopPasteStatus {
+    desktop_paste_diagnostics().1
+}
+
+fn desktop_paste_status_with_input(
+    shortcut_epoch: u64,
+    input: &DesktopInputStatus,
+) -> DesktopPasteStatus {
+    let enabled = desktop_paste_enabled();
+    if !input.available {
+        return DesktopPasteStatus {
+            shortcut_epoch,
+            target_token: None,
+            streaming_enabled: false,
+            enabled,
+            available: false,
+            failure_reason: Some(DesktopPasteFailure::Setup),
+            detail: input.detail.clone(),
+        };
+    }
     let target_started = Instant::now();
     let target = desktop_target();
     crate::performance::destination_check(
@@ -245,20 +295,20 @@ pub fn desktop_paste_status() -> DesktopPasteStatus {
         "observed",
         target_started.elapsed().as_millis() as u64,
     );
+    let available = target.input_state == "editable" && target.token.is_some();
     DesktopPasteStatus {
         shortcut_epoch,
         target_token: target.token.clone(),
         streaming_enabled: desktop_stream_enabled(),
         enabled,
-        available: compatibility.is_ok() && target.input_state == "editable" && target.token.is_some(),
-        detail: compatibility.err().map(|e| e.message).unwrap_or_else(|| {
-            match target.input_state.as_str() {
-                "editable" if target.token.is_some() => support.detail,
-                "none" => "Click in a text field, then press your dictation shortcut to start.".into(),
-                "protected" => "Dictation is unavailable in password fields. Click in another text field and try again.".into(),
-                _ => "VOCO cannot verify a text cursor here. Click in an editable text field and try again.".into(),
-            }
-        }),
+        available,
+        failure_reason: if available { None } else { Some(DesktopPasteFailure::Cursor) },
+        detail: match target.input_state.as_str() {
+            "editable" if target.token.is_some() => input.detail.clone(),
+            "none" => "Click in a text field, then press your dictation shortcut to start.".into(),
+            "protected" => "Dictation is unavailable in password fields. Click in another text field and try again.".into(),
+            _ => "VOCO cannot verify a text cursor here. Click in an editable text field and try again.".into(),
+        },
     }
 }
 
@@ -1003,7 +1053,16 @@ fn wayland_paste_arguments(daemon_running: bool) -> Result<Vec<&'static str>, In
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
-    paste_arguments_from_help(&help)
+    paste_arguments_from_probe(&help)
+}
+
+fn paste_arguments_from_probe(help: &str) -> Result<Vec<&'static str>, InsertionError> {
+    // Legacy clients can exit successfully after falling back to direct uinput.
+    // A daemon owned by a different login must not produce a false ready result.
+    if help.contains("ydotoold backend unavailable") {
+        return Err(InsertionError::rejected("The desktop paste helper cannot reach its input service. Start ydotoold for this login, then check desktop setup again."));
+    }
+    paste_arguments_from_help(help)
 }
 
 fn clipboard_transaction(
@@ -1164,6 +1223,16 @@ mod tests {
             "Start the ydotoold desktop input service before dictating."
         );
         assert_eq!(scans.get(), 2);
+    }
+
+    #[test]
+    fn legacy_client_fallback_is_not_desktop_readiness() {
+        let help = "Each key sequence ctrl+Backspace";
+        assert!(paste_arguments_from_probe(help).is_ok());
+        let fallback = format!(
+            "{help}\nydotool: notice: ydotoold backend unavailable (may have latency+delay issues)"
+        );
+        assert!(paste_arguments_from_probe(&fallback).is_err());
     }
 
     #[test]

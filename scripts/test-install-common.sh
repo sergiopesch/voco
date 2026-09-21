@@ -327,71 +327,88 @@ reset_mock_package_case() {
   export MOCK_APT_OUTCOME=installed
 }
 
-reset_mock_package_case
-voco_install_deb_package "${MOCK_DEB}" "${MOCK_EXPECTED_VERSION}" "${MOCK_EXPECTED_ARCHITECTURE}" ||
-  fail "verified direct dpkg install was rejected: ${VOCO_INSTALL_ERROR}"
-[[ "${VOCO_INSTALL_USED_APT_FIX}" == false ]] ||
-  fail "direct dpkg install incorrectly reported dependency repair"
-if grep -q '^apt-get' "${MOCK_PACKAGE_LOG}"; then
-  fail "direct dpkg success unexpectedly invoked apt dependency repair"
-fi
+# APT must receive the local package and the Wayland helpers in one transaction,
+# even when all hard package dependencies are already installed.
+for session in x11 wayland; do
+  reset_mock_package_case
+  export XDG_SESSION_TYPE="$session"
+  voco_install_deb_package "${MOCK_DEB}" "${MOCK_EXPECTED_VERSION}" "${MOCK_EXPECTED_ARCHITECTURE}" ||
+    fail "APT install was rejected: ${VOCO_INSTALL_ERROR}"
+  grep -Fq "install -y -- ${MOCK_DEB}" "${MOCK_PACKAGE_LOG}" ||
+    fail "installer did not ask APT to resolve the local package through APT"
+  if [[ "$session" == wayland ]]; then
+    grep -Fq "${MOCK_DEB} ydotool ydotoold" "${MOCK_PACKAGE_LOG}" ||
+      fail "Wayland helpers were not explicitly installed"
+  elif grep -q 'ydotool' "${MOCK_PACKAGE_LOG}"; then
+    fail "X11 installation required Wayland-only packages"
+  fi
+  if grep -q '^dpkg\s' "${MOCK_PACKAGE_LOG}"; then
+    fail "installer bypassed APT dependency resolution"
+  fi
+done
 
+for outcome in removed wrong-version wrong-architecture unpacked; do
+  reset_mock_package_case
+  export MOCK_APT_OUTCOME="$outcome"
+  if voco_install_deb_package "${MOCK_DEB}" "${MOCK_EXPECTED_VERSION}" "${MOCK_EXPECTED_ARCHITECTURE}"; then
+    fail "APT result $outcome was incorrectly accepted"
+  fi
+  [[ -n "$VOCO_INSTALL_ERROR" ]] || fail "Missing package verification error"
+done
 reset_mock_package_case
-export MOCK_DPKG_INSTALL_EXIT=1
-voco_install_deb_package "${MOCK_DEB}" "${MOCK_EXPECTED_VERSION}" "${MOCK_EXPECTED_ARCHITECTURE}" ||
-  fail "verified apt-repaired install was rejected: ${VOCO_INSTALL_ERROR}"
-[[ "${VOCO_INSTALL_USED_APT_FIX}" == true ]] ||
-  fail "apt-repaired install did not report dependency repair"
-grep -q $'^apt-get\tinstall -f -y -qq$' "${MOCK_PACKAGE_LOG}" ||
-  fail "dependency repair did not use the expected apt-get invocation"
-grep -q $'^dpkg-query\t-W ' "${MOCK_PACKAGE_LOG}" ||
-  fail "apt-repaired install was not verified with dpkg-query"
-
-reset_mock_package_case
-export MOCK_DPKG_INSTALL_EXIT=1
-export MOCK_APT_OUTCOME=removed
-if voco_install_deb_package "${MOCK_DEB}" "${MOCK_EXPECTED_VERSION}" "${MOCK_EXPECTED_ARCHITECTURE}"; then
-  fail "apt repair that removed VOCO was accepted"
-fi
-[[ "${VOCO_INSTALL_ERROR}" == *"is not installed"* ]] ||
-  fail "removed VOCO returned an unclear verification error: ${VOCO_INSTALL_ERROR}"
-
-reset_mock_package_case
-export MOCK_DPKG_INSTALL_EXIT=1
-export MOCK_APT_OUTCOME=wrong-version
-if voco_install_deb_package "${MOCK_DEB}" "${MOCK_EXPECTED_VERSION}" "${MOCK_EXPECTED_ARCHITECTURE}"; then
-  fail "apt repair that installed the wrong VOCO version was accepted"
-fi
-[[ "${VOCO_INSTALL_ERROR}" == *"version is 2026.0.20; expected 2026.0.21"* ]] ||
-  fail "wrong VOCO version returned an unclear verification error: ${VOCO_INSTALL_ERROR}"
-
-reset_mock_package_case
-export MOCK_DPKG_INSTALL_EXIT=1
-export MOCK_APT_OUTCOME=wrong-architecture
-if voco_install_deb_package "${MOCK_DEB}" "${MOCK_EXPECTED_VERSION}" "${MOCK_EXPECTED_ARCHITECTURE}"; then
-  fail "apt repair that installed the wrong VOCO architecture was accepted"
-fi
-[[ "${VOCO_INSTALL_ERROR}" == *"architecture is arm64; expected amd64"* ]] ||
-  fail "wrong VOCO architecture returned an unclear verification error: ${VOCO_INSTALL_ERROR}"
-
-reset_mock_package_case
-export MOCK_DPKG_INSTALL_EXIT=1
-export MOCK_APT_OUTCOME=unpacked
-if voco_install_deb_package "${MOCK_DEB}" "${MOCK_EXPECTED_VERSION}" "${MOCK_EXPECTED_ARCHITECTURE}"; then
-  fail "apt repair that left VOCO unpacked was accepted"
-fi
-[[ "${VOCO_INSTALL_ERROR}" == *"not fully installed"* ]] ||
-  fail "unpacked VOCO returned an unclear verification error: ${VOCO_INSTALL_ERROR}"
-
-reset_mock_package_case
-export MOCK_DPKG_INSTALL_EXIT=1
 export MOCK_APT_EXIT=100
 if voco_install_deb_package "${MOCK_DEB}" "${MOCK_EXPECTED_VERSION}" "${MOCK_EXPECTED_ARCHITECTURE}"; then
-  fail "failed apt dependency repair was accepted"
+  fail "Failed APT installation was accepted"
 fi
-[[ "${VOCO_INSTALL_ERROR}" == *"apt could not resolve"* ]] ||
-  fail "failed apt repair returned an unclear error: ${VOCO_INSTALL_ERROR}"
-
+[[ "$VOCO_INSTALL_ERROR" == *APT* ]] || fail "APT failure returned an unclear error"
+cat > "${MOCK_BIN}/voco" <<'SH'
+#!/usr/bin/env bash
+[[ "$*" == --check-desktop-input ]] || exit 64
+if [[ "${MOCK_INPUT_READY}" != true && ! -f "${MOCK_INPUT_READY_FILE:-/nonexistent}" ]]; then echo "Start ydotoold for this login." >&2; exit 1; fi
+echo "Desktop input is ready."
+SH
+chmod 0700 "${MOCK_BIN}/voco"
+# Shadow only the packaged command; a PATH-installed legacy VOCO must never run.
+/usr/bin/voco() { "${MOCK_BIN}/voco" "$@"; }
+voco() { fail "Readiness used a PATH VOCO instead of the verified package"; }
+export MOCK_INPUT_READY=false
+if voco_verify_desktop_input; then fail "Installer accepted incomplete desktop setup"; fi
+[[ "$VOCO_INPUT_ERROR" == 'Start ydotoold for this login.' ]] || fail "Lost the actionable input error"
+export MOCK_INPUT_READY=true
+voco_verify_desktop_input || fail "Installer rejected repaired input setup"
+export MOCK_INPUT_READY_FILE="${TEST_ROOT}/input-ready"
+cat > "${MOCK_BIN}/systemctl" <<'SH'
+#!/usr/bin/env bash
+printf 'systemctl\t%s\n' "$*" >> "${MOCK_PACKAGE_LOG:?}"
+[[ "${MOCK_SERVICE_FAIL:-false}" == false ]] || exit 1
+touch "${MOCK_INPUT_READY_FILE}"
+SH
+cat > "${MOCK_BIN}/pgrep" <<'SH'
+#!/usr/bin/env bash
+[[ "${MOCK_DAEMON_RUNNING:-false}" == true ]]
+SH
+chmod 0700 "${MOCK_BIN}/systemctl" "${MOCK_BIN}/pgrep"
+voco_wayland_device_access() { [[ "${MOCK_DEVICE_ACCESS:-false}" == true ]]; }
+export XDG_SESSION_TYPE=wayland MOCK_INPUT_READY=false MOCK_DEVICE_ACCESS=false MOCK_DAEMON_RUNNING=false
+: > "$MOCK_PACKAGE_LOG"
+if voco_start_wayland_service; then fail "Service started without device access"; fi
+[[ "$VOCO_INPUT_ERROR" == *'/dev/uinput'* ]] || fail "Missing device guidance"
+[[ ! -s "$MOCK_PACKAGE_LOG" ]] || fail "Missing access changed services"
+export MOCK_DEVICE_ACCESS=true MOCK_DAEMON_RUNNING=true
+if voco_start_wayland_service; then fail "Replaced an inaccessible existing daemon"; fi
+[[ ! -s "$MOCK_PACKAGE_LOG" ]] || fail "Existing daemon changed services"
+export MOCK_DAEMON_RUNNING=false MOCK_SERVICE_FAIL=true
+if voco_start_wayland_service; then fail "Accepted a failed service start"; fi
+export MOCK_SERVICE_FAIL=false
+voco_start_wayland_service || fail "Could not start service with existing device access"
+grep -Fq 'enable --now voco-ydotoold.service' "$MOCK_PACKAGE_LOG" || fail "Wrong service activation"
+: > "$MOCK_PACKAGE_LOG"
+export MOCK_DEVICE_ACCESS=false
+voco_start_wayland_service || fail "Working existing daemon was not reused"
+[[ ! -s "$MOCK_PACKAGE_LOG" ]] || fail "Working daemon was reconfigured"
+rm -f "$MOCK_INPUT_READY_FILE"
+export XDG_SESSION_TYPE=x11
+voco_start_wayland_service || fail "X11 tried to configure Wayland service"
+[[ ! -s "$MOCK_PACKAGE_LOG" ]] || fail "X11 changed Wayland services"
 export PATH="${ORIGINAL_PATH}"
-
 echo "Installer helper behavior is valid."

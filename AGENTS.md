@@ -120,7 +120,7 @@ isolation, not a remote VM or proof of a distribution's default desktop.
 
 ## Release and evidence
 
-Source version: **2026.0.45** (Ubuntu/Debian release). Verify the current public release on GitHub and
+Source version: **2026.0.47** (unpublished Ubuntu/Debian candidate). Verify the current public release on GitHub and
 installed version from the package manager; do not infer either from source.
 The .43 package and desktop evidence is recorded in
 [the support matrix](docs/linux-support.md); preserve per-artifact receipts and
@@ -147,12 +147,17 @@ The control CLI connects once to the owner-only socket; do not add retries or
 launch/focus side effects. It does not prove a compositor keybinding exists.
 The .43 candidate uses native capture on Wayland and WebKit capture on X11.
 The Wayland change is approved and has installed-VM evidence. Keep
-automatic default microphone selection on explicit Start Test/recording actions,
+automatic default microphone selection on explicit Start test/recording actions
+when no approved microphone is selected,
 with no idle recording or silent device switching during capture. Onboarding
 uses the production recognition queue with local-only transcript output. Never
 acquire an external text destination, shortcut lease, clipboard or preedit output
 for the onboarding test. Finish must flush capture and recognition successfully
-before saving completion. Require a verified editable caret before cursor dictation. Native capture permits real window hiding. Preserve the
+before saving completion. Then check desktop input prerequisites without binding
+an external target or sending keys; a missing cursor inside onboarding is expected.
+The guided installer must use APT to install the local package and explicitly require
+the Wayland client and daemon on Wayland. Successful package installation alone is
+not desktop readiness. Require a verified editable caret before cursor dictation. Native capture permits real window hiding. Preserve the
 failed WebKit hidden-start experiment and independently verify audio retention.
 The debug audit needs all three explicit flags and completed private bundles;
 wait for their COMMIT receipts before terminating an audited test process.
@@ -170,3 +175,9 @@ never fill missing scores using another cohort or count failed trials as complet
 When editing a collection, verify its numeric exports, relative links and checksums.
 Public assets contain numeric summaries only; keep personal audio, transcripts and
 private raw evidence outside the repository. Historical media does not requalify a release.
+
+The recorded public installer version is `packaging/published-release.json`. Keep
+README pinned to that version until publication is verified, then update both.
+The guided installer checks `/usr/bin/voco`, not an older PATH override. Release
+the optional GNOME 46 panel archive separately; never enable it in a user profile
+as a package-install side effect. Preserve screenshot proof outside build caches.

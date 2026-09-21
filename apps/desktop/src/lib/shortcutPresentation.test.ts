@@ -21,8 +21,14 @@ describe("shortcut presentation", () => {
     expect(shortcutPresentation("Alt+D", null).setup).toContain("never switches");
   });
   it("advertises only the matching verified configured key", () => {
-    expect(shortcutPresentation("Alt+D", available).instruction).toBe("Press Alt+D to record and copy.");
+    expect(shortcutPresentation("Alt+D", available).instruction).toBe("Press Alt+D to dictate at your cursor.");
   });
+});
+
+it("does not promise dictation when the shortcut works but input setup is missing", () => {
+  const result = shortcutPresentation("Alt+D", available, { available: false, detail: "Start ydotoold." });
+  expect(result.instruction).toBe("Desktop setup required. Start ydotoold.");
+  expect(result.instruction).not.toContain("Press Alt+D");
 });
 
 describe("diagnostics request ownership", () => {

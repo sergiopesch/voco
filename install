@@ -6,11 +6,11 @@ set -euo pipefail
 #
 # VOCO — release install helper
 # Usage:
-#   wget https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.45/install -O voco-install
+#   wget https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.47/install -O voco-install
 #   chmod +x voco-install
 #   ./voco-install
 
-VERSION="2026.0.45"
+VERSION="2026.0.47"
 RELEASE_TAG="voco.${VERSION}"
 DEB_URL="https://github.com/sergiopesch/voco/releases/download/${RELEASE_TAG}/voco_${VERSION}_amd64.deb"
 CHECKSUMS_URL="https://github.com/sergiopesch/voco/releases/download/${RELEASE_TAG}/voco_checksums.txt"
@@ -25,6 +25,13 @@ YELLOW='\033[33m'
 RED='\033[31m'
 WHITE='\033[37m'
 NC='\033[0m'
+
+VOCO_TERMINAL_MOTION=false
+if [[ -t 1 && "${TERM:-dumb}" != dumb && -z "${NO_COLOR+x}" ]]; then
+  VOCO_TERMINAL_MOTION=true
+else
+  BOLD='' DIM='' GRAPHITE='' GRAPHITE_SOFT='' GREEN='' YELLOW='' RED='' WHITE='' NC=''
+fi
 
 ok()   { printf "  ${GREEN}✓${NC} %s\n" "$*"; }
 warn() { printf "  ${YELLOW}⚠${NC} %s\n" "$*"; }
@@ -346,19 +353,56 @@ voco_install_deb_package() {
   local deb_file="$1"
   local expected_version="$2"
   local expected_architecture="$3"
+  local -a packages
 
   VOCO_INSTALL_ERROR=""
-  VOCO_INSTALL_USED_APT_FIX=false
-
-  if ! sudo dpkg -i "${deb_file}" > /dev/null 2>&1; then
-    VOCO_INSTALL_USED_APT_FIX=true
-    if ! sudo apt-get install -f -y -qq > /dev/null 2>&1; then
-      VOCO_INSTALL_ERROR="dpkg failed and apt could not resolve the package dependencies."
-      return 1
-    fi
+  deb_file="$(realpath -- "${deb_file}")" || return 1
+  packages=("${deb_file}")
+  # These are optional in package metadata so X11-only distributions can install.
+  # Wayland needs both, even when APT recommendations are disabled by the owner.
+  if [[ "${XDG_SESSION_TYPE:-x11}" == wayland ]]; then
+    packages+=(ydotool ydotoold)
   fi
-
+  if ! sudo apt-get install -y -- "${packages[@]}"; then
+    VOCO_INSTALL_ERROR="APT could not install VOCO and its desktop dependencies. Resolve the error above, then run the installer again."
+    return 1
+  fi
   voco_verify_installed_package "${expected_version}" "${expected_architecture}"
+}
+
+voco_verify_desktop_input() {
+  VOCO_INPUT_ERROR=""
+  if ! VOCO_INPUT_ERROR="$(/usr/bin/voco --check-desktop-input 2>&1)"; then
+    return 1
+  fi
+}
+
+voco_wayland_device_access() {
+  [[ -c /dev/uinput && -w /dev/uinput ]]
+}
+
+voco_start_wayland_service() {
+  [[ "${XDG_SESSION_TYPE:-x11}" == wayland ]] || return 0
+  # Reuse a working service, including a distribution/admin-managed daemon.
+  voco_verify_desktop_input && return 0
+  if ! voco_wayland_device_access; then
+    VOCO_INPUT_ERROR="This login cannot access /dev/uinput. Complete the Wayland device-permission setup before starting the input service."
+    return 1
+  fi
+  if pgrep -x ydotoold >/dev/null 2>&1; then
+    VOCO_INPUT_ERROR="An existing ydotoold is running but is unavailable to this login. Check its socket permissions; VOCO will not replace that service."
+    return 1
+  fi
+  if ! systemctl --user enable --now voco-ydotoold.service; then
+    VOCO_INPUT_ERROR="Could not start the VOCO input service. Check: systemctl --user status voco-ydotoold.service"
+    return 1
+  fi
+  local attempt
+  for attempt in {1..10}; do
+    if voco_verify_desktop_input; then return 0; fi
+    sleep 0.2
+  done
+  return 1
 }
 
 voco_write_default_config() {
@@ -428,8 +472,6 @@ voco_run_hotkey_setup() {
   local hotkey="${1:-Alt+D}"
   local config_dir="${HOME}/.config/voco"
   local config_file="${config_dir}/config.json"
-  local session_type="${XDG_SESSION_TYPE:-x11}"
-  local alternate_wayland_hotkey="Alt+Shift+D"
   local existing_hotkey=""
   local existing_hotkey_valid=false
   local config_exists=false
@@ -490,61 +532,9 @@ voco_run_hotkey_setup() {
     warn "Legacy Voice config is a symlink, is not a regular user-owned file, or could not be copied; it was preserved without modification."
   fi
 
-  echo
-  echo -e "  ${BOLD}${GRAPHITE}Quick Setup${NC}"
-  echo
-  echo -e "  VOCO uses a global hotkey to start and stop listening."
-  if [[ "${existing_hotkey_valid}" == true ]]; then
-    echo -e "  Your current hotkey is ${BOLD}${hotkey}${NC} — press it anywhere to dictate."
-  else
-    echo -e "  The default is ${BOLD}${hotkey}${NC} — press it anywhere to dictate."
-  fi
-  echo
-
-  if [[ -t 0 ]]; then
-    printf "  ${WHITE}${BOLD}▸${NC} Happy with ${BOLD}%s${NC}? [Y/n] " "${hotkey}"
-    read -r ANSWER </dev/tty 2>/dev/null || ANSWER="y"
-    ANSWER="${ANSWER:-y}"
-
-    if [[ "$ANSWER" =~ ^[Nn] ]]; then
-      echo
-      if [[ "$session_type" == "wayland" ]]; then
-        echo -e "  ${DIM}Wayland note: VOCO is currently most reliable with ${BOLD}Alt+D${NC}${DIM} or ${BOLD}${alternate_wayland_hotkey}${NC}${DIM}.${NC}"
-        printf "  ${WHITE}${BOLD}▸${NC} Use ${BOLD}%s${NC} instead? [y/N] " "${alternate_wayland_hotkey}"
-        read -r WAYLAND_ALTERNATE </dev/tty 2>/dev/null || WAYLAND_ALTERNATE="n"
-        WAYLAND_ALTERNATE="${WAYLAND_ALTERNATE:-n}"
-
-        if [[ "$WAYLAND_ALTERNATE" =~ ^[Yy] ]]; then
-          hotkey="$alternate_wayland_hotkey"
-          ok "Hotkey set to ${BOLD}${hotkey}${NC}"
-        else
-          warn "Keeping ${BOLD}${hotkey}${NC}. Change it later from the tray if needed."
-          dim "Custom hotkeys may be less reliable on Wayland right now."
-        fi
-      else
-        echo -e "  ${DIM}Examples: Ctrl+Shift+V, Super+D, Alt+Shift+T${NC}"
-        while true; do
-          printf "  ${WHITE}${BOLD}▸${NC} Enter your preferred hotkey: "
-          read -r CUSTOM_HOTKEY </dev/tty 2>/dev/null || CUSTOM_HOTKEY=""
-          CUSTOM_HOTKEY="$(voco_trim "${CUSTOM_HOTKEY}")"
-          if [[ -z "${CUSTOM_HOTKEY}" ]]; then
-            ok "Keeping ${BOLD}${hotkey}${NC}"
-            break
-          fi
-          if voco_validate_hotkey "${CUSTOM_HOTKEY}"; then
-            hotkey="${CUSTOM_HOTKEY}"
-            ok "Hotkey set to ${BOLD}${hotkey}${NC}"
-            break
-          fi
-          warn "${VOCO_HOTKEY_VALIDATION_ERROR} Try another hotkey."
-        done
-      fi
-    else
-      ok "Hotkey: ${BOLD}${hotkey}${NC}"
-    fi
-  elif [[ "${config_exists}" == true ]]; then
+  if [[ "${config_exists}" == true ]]; then
     if [[ "${existing_hotkey_valid}" == true ]]; then
-      ok "Hotkey: ${BOLD}${hotkey}${NC} (existing config preserved)"
+      ok "Shortcut: ${hotkey} (existing settings kept)"
     else
       warn "Existing config preserved; VOCO will validate its hotkey on launch."
     fi
@@ -552,7 +542,7 @@ voco_run_hotkey_setup() {
     VOCO_CONFIG_FILE="${config_file}"
     return 0
   else
-    ok "Hotkey: ${BOLD}${hotkey}${NC} (default)"
+    ok "Shortcut: ${hotkey}"
   fi
 
   mkdir -p -m 0700 "${config_dir}"
@@ -568,7 +558,6 @@ voco_run_hotkey_setup() {
     fi
   else
     voco_write_default_config "${config_file}" "${hotkey}"
-    dim "Config saved to ${config_file}"
   fi
   chmod 0600 "${config_file}"
 
@@ -576,65 +565,91 @@ voco_run_hotkey_setup() {
   VOCO_CONFIG_FILE="${config_file}"
 }
 
-# ─── Spinner ────────────────────────────────────────────
-SPINNER_PID=""
-spinner_start() {
-  local msg="$1"
-  (
-    local frames=("⣾" "⣽" "⣻" "⢿" "⡿" "⣟" "⣯" "⣷")
-    local i=0
-    while true; do
-      printf "\r    ${GRAPHITE_SOFT}${frames[$i]}${NC} ${DIM}%s${NC}" "$msg"
-      i=$(( (i + 1) % ${#frames[@]} ))
-      sleep 0.07
-    done
-  ) &
-  SPINNER_PID=$!
-}
-
-spinner_stop() {
-  [[ -z "$SPINNER_PID" ]] && return
-  kill "$SPINNER_PID" 2>/dev/null; wait "$SPINNER_PID" 2>/dev/null || true
-  printf "\r\033[K"
-  SPINNER_PID=""
-}
-
-run_step() {
-  local msg="$1"; shift
-  spinner_start "$msg"
-  local log; log=$(mktemp)
-  if "$@" > "$log" 2>&1; then
-    spinner_stop
-    ok "$msg"
-    rm -f "$log"
-  else
-    spinner_stop
-    tail -10 "$log" | while IFS= read -r l; do dim "  $l"; done
-    rm -f "$log"
-    err "$msg failed"
+# Download output is measured from bytes received, never simulated percentages.
+DOWNLOAD_PID=""
+VOCO_INSTALL_LOG=""
+VOCO_KEEP_LOG=false
+voco_download() {
+  local label="$1" destination="$2" url="$3"
+  local started=$SECONDS bytes elapsed detail width initial_bytes
+  initial_bytes=$(stat -c %s "$destination" 2>/dev/null || printf '0')
+  if [[ -z "$VOCO_INSTALL_LOG" ]]; then
+    VOCO_INSTALL_LOG=$(mktemp "${TMPDIR:-/tmp}/voco-install.XXXXXX.log")
   fi
+  dim "$label"
+  wget --continue --tries=3 --waitretry=2 --timeout=30 -O "$destination" "$url" >> "$VOCO_INSTALL_LOG" 2>&1 &
+  DOWNLOAD_PID=$!
+  while kill -0 "$DOWNLOAD_PID" 2>/dev/null; do
+    if [[ "$VOCO_TERMINAL_MOTION" == true ]]; then
+      bytes=$(stat -c %s "$destination" 2>/dev/null || printf '0')
+      elapsed=$((SECONDS - started))
+      detail=$(awk -v bytes="$bytes" -v initial="$initial_bytes" -v elapsed="$elapsed" 'BEGIN {
+        if (bytes < 1048576) printf "%.1f KiB received", bytes / 1024;
+        else printf "%.1f MiB received", bytes / 1048576;
+        if (elapsed > 0) printf " · %.1f MiB/s avg", (bytes > initial ? bytes - initial : 0) / 1048576 / elapsed;
+      }')
+      width="${VOCO_TERMINAL_COLUMNS:-80}"
+      [[ "$width" =~ ^[0-9]+$ ]] || width=80
+      width=$((width > 10 ? width - 6 : 4))
+      if (( ${#detail} > width )); then detail="${detail:0:width-1}…"; fi
+      printf "\r\033[K  ${GRAPHITE_SOFT}↓${NC} %s" "$detail"
+    fi
+    sleep 0.25
+  done
+  local result=0
+  wait "$DOWNLOAD_PID" || result=$?
+  DOWNLOAD_PID=""
+  if [[ "$VOCO_TERMINAL_MOTION" == true ]]; then printf '\r\033[K'; fi
+  if (( result != 0 )); then
+    VOCO_KEEP_LOG=true
+    warn "The download stopped."
+    if (( result == 8 )); then
+      dim "This release file is unavailable. Check the release page:"
+      dim "https://github.com/sergiopesch/voco/releases/tag/${RELEASE_TAG}"
+    else
+      dim "Check your connection and run the installer again."
+    fi
+    dim "Details: ${VOCO_INSTALL_LOG}"
+    return "$result"
+  fi
+  bytes=$(stat -c %s "$destination")
+  detail=$(awk -v bytes="$bytes" 'BEGIN { if (bytes < 1048576) printf "%.1f KiB", bytes / 1024; else printf "%.1f MiB", bytes / 1048576 }')
+  ok "$label — ${detail} received"
 }
 
-trap 'spinner_stop' EXIT
-
-SECONDS=0
+voco_install_cleanup() {
+  if [[ -n "$DOWNLOAD_PID" ]]; then
+    kill "$DOWNLOAD_PID" 2>/dev/null || true
+    wait "$DOWNLOAD_PID" 2>/dev/null || true
+  fi
+  if [[ -n "${VOCO_DOWNLOAD_DIR:-}" ]]; then rm -rf -- "${VOCO_DOWNLOAD_DIR}"; fi
+  if [[ -n "$VOCO_INSTALL_LOG" && "$VOCO_KEEP_LOG" != true ]]; then rm -f -- "$VOCO_INSTALL_LOG"; fi
+}
+trap voco_install_cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 # ─── Header ─────────────────────────────────────────────
 echo
+VOCO_TERMINAL_COLUMNS="$(tput cols 2>/dev/null || printf '80')"
+if [[ "$VOCO_TERMINAL_MOTION" == true && "$VOCO_TERMINAL_COLUMNS" =~ ^[0-9]+$ && "$VOCO_TERMINAL_COLUMNS" -ge 64 ]]; then
 echo -e "  ${GRAPHITE_SOFT}${BOLD}██╗   ██╗ ██████╗  ██████╗ ██████╗ ${NC}"
 echo -e "  ${GRAPHITE_SOFT}${BOLD}██║   ██║██╔═══██╗██╔════╝██╔═══██╗${NC}"
 echo -e "  ${GRAPHITE_SOFT}${BOLD}██║   ██║██║   ██║██║     ██║   ██║${NC}"
 echo -e "  ${GRAPHITE_SOFT}${BOLD}╚██╗ ██╔╝██║   ██║██║     ██║   ██║${NC}"
 echo -e "  ${GRAPHITE}${BOLD} ╚████╔╝ ╚██████╔╝╚██████╗╚██████╔╝${NC}"
 echo -e "  ${GRAPHITE}${BOLD}  ╚═══╝   ╚═════╝  ╚═════╝ ╚═════╝ ${NC}"
+else
+  printf '  VOCO\n'
+fi
 echo
-echo -e "  ${DIM}Your voice, typed. Built for Linux.${NC}"
-echo -e "  ${DIM}────────────────────────────────────────────────────────────${NC}"
+echo -e "  ${DIM}Your voice, typed.${NC}"
+echo -e "  ${DIM}────────────────────────────${NC}"
 echo -e "  ${DIM}v${VERSION}${NC}"
 echo
 
 # ─── Checks ─────────────────────────────────────────────
-echo -e "  ${BOLD}${GRAPHITE}[1/3]${NC} ${BOLD}Checks${NC}"
+echo -e "  ${BOLD}${GRAPHITE}[1/3]${NC} ${BOLD}Check your system${NC}"
 
 if [[ "$(uname)" != "Linux" ]]; then
   err "VOCO only supports Linux. Detected: $(uname)"
@@ -644,40 +659,26 @@ if [[ "$(dpkg --print-architecture 2>/dev/null)" != "amd64" ]]; then
   err "Only amd64 (x86_64) is supported. Detected: $(dpkg --print-architecture 2>/dev/null || uname -m)"
 fi
 
-ok "Linux $(uname -r)"
-ok "$(dpkg --print-architecture)"
+ok "Linux · x86_64"
 
-# Check runtime dependencies
-if dpkg -s libwebkit2gtk-4.1-0 &>/dev/null; then
-  ok "libwebkit2gtk-4.1"
-else
-  warn "libwebkit2gtk-4.1-0 not installed"
-  dim "Run: sudo apt install libwebkit2gtk-4.1-0 libgtk-3-0 libayatana-appindicator3-1"
-fi
-
-SESSION="${XDG_SESSION_TYPE:-x11}"
-if [[ "$SESSION" == "wayland" ]]; then
-  command -v ydotool &>/dev/null && ok "ydotool" || dim "Wayland paste helper missing: install ydotool and configure its input service"
-  command -v wl-copy &>/dev/null && ok "wl-clipboard" || dim "wl-clipboard missing: required on supported wlroots desktops; GNOME uses xclip"
-  groups | grep -q '\binput\b' && ok "input group" || warn "Run: sudo usermod -aG input \$USER"
-else
-  command -v xdotool &>/dev/null && ok "xdotool" || dim "X11 paste helper missing: install xdotool"
-  command -v xclip &>/dev/null && ok "xclip" || dim "X11 clipboard helper missing: install xclip"
-fi
+# APT resolves package dependencies in the install stage. Readiness is checked
+# after installation, when helpers and services can actually be available.
+dim "Desktop dependencies are checked during installation."
 
 # ─── Download ───────────────────────────────────────────
 echo
-echo -e "  ${BOLD}${GRAPHITE}[2/3]${NC} ${BOLD}Download${NC}"
+echo -e "  ${BOLD}${GRAPHITE}[2/3]${NC} ${BOLD}Download VOCO${NC}"
 
-TMPDIR=$(mktemp -d)
-DEB_FILE="${TMPDIR}/voco_${VERSION}_amd64.deb"
-CHECKSUM_FILE="${TMPDIR}/voco_checksums.txt"
-DEB_CHECKSUM_FILE="${TMPDIR}/voco_${VERSION}_amd64.deb.sha256"
+VOCO_DOWNLOAD_DIR=$(mktemp -d)
+DEB_FILE="${VOCO_DOWNLOAD_DIR}/voco_${VERSION}_amd64.deb"
+CHECKSUM_FILE="${VOCO_DOWNLOAD_DIR}/voco_checksums.txt"
+DEB_CHECKSUM_FILE="${VOCO_DOWNLOAD_DIR}/voco_${VERSION}_amd64.deb.sha256"
 
-run_step "Downloading VOCO v${VERSION}" \
-  wget -q -O "$DEB_FILE" "$DEB_URL"
-run_step "Downloading release checksums" \
-  wget -q -O "$CHECKSUM_FILE" "$CHECKSUMS_URL"
+dim "Includes English speech recognition. Speech stays on this computer."
+voco_download "VOCO v${VERSION}" "$DEB_FILE" "$DEB_URL" || exit 1
+if ! voco_download "Release checksums" "$CHECKSUM_FILE" "$CHECKSUMS_URL"; then
+  exit 1
+fi
 
 if ! command -v sha256sum >/dev/null 2>&1; then
   err "sha256sum is required to verify the downloaded package"
@@ -687,49 +688,41 @@ if ! grep -F "  $(basename "$DEB_FILE")" "$CHECKSUM_FILE" > "$DEB_CHECKSUM_FILE"
   err "Could not find a checksum entry for $(basename "$DEB_FILE")"
 fi
 
-if (cd "$TMPDIR" && sha256sum --check "$(basename "$DEB_CHECKSUM_FILE")" >/dev/null 2>&1); then
+if (cd "$VOCO_DOWNLOAD_DIR" && sha256sum --check "$(basename "$DEB_CHECKSUM_FILE")" >/dev/null 2>&1); then
   ok "Package checksum verified"
 else
-  err "Package checksum verification failed"
+  err "The download could not be verified. Run the installer again; nothing was installed."
 fi
-
-DEB_SIZE=$(du -h "$DEB_FILE" | cut -f1)
-dim "Package: voco_${VERSION}_amd64.deb (${DEB_SIZE})"
 
 # ─── Install ────────────────────────────────────────────
 echo
-echo -e "  ${BOLD}${GRAPHITE}[3/3]${NC} ${BOLD}Install${NC}"
+echo -e "  ${BOLD}${GRAPHITE}[3/3]${NC} ${BOLD}Install VOCO${NC}"
 
 if voco_install_deb_package "$DEB_FILE" "$VERSION" "amd64"; then
-  if [[ "${VOCO_INSTALL_USED_APT_FIX}" == true ]]; then
-    ok "VOCO installed (dependencies resolved)"
-  else
-    ok "VOCO installed"
-  fi
+  ok "VOCO installed"
 else
   err "Installation failed: ${VOCO_INSTALL_ERROR}"
 fi
 
-rm -rf "$TMPDIR"
+rm -rf "$VOCO_DOWNLOAD_DIR"
 voco_run_hotkey_setup "Alt+D"
 HOTKEY="${VOCO_SELECTED_HOTKEY}"
-CONFIG_FILE="${VOCO_CONFIG_FILE}"
+
+if ! voco_start_wayland_service || ! voco_verify_desktop_input; then
+  warn "VOCO is installed. Desktop setup needs one more step."
+  dim "${VOCO_INPUT_ERROR}"
+  dim "Setup instructions: https://github.com/sergiopesch/voco/blob/master/docs/platform/README.md#ydotoold-ydotool-daemon"
+  dim "After setup, run: voco --check-desktop-input"
+  exit 2
+fi
+ok "Desktop input prerequisites verified"
 
 # ─── Done ───────────────────────────────────────────────
-ELAPSED=$SECONDS
-
 echo
-echo -e "  ${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "  ${GREEN}${BOLD}  Installed in ${ELAPSED}s!${NC}"
-echo -e "  ${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+ok "Installed. Let's try your voice."
+dim "Open VOCO from your app launcher, or run: voco"
+dim "Choose Start test, speak, then Finish test."
+dim "VOCO checks setup before you choose Done."
 echo
-echo -e "  ${WHITE}${BOLD}▸${NC} Open ${BOLD}VOCO${NC} from your app launcher"
-echo -e "  ${WHITE}${BOLD}▸${NC} Or run: ${GRAPHITE_SOFT}voco${NC}"
-echo -e "  ${WHITE}${BOLD}▸${NC} Click ${BOLD}Start Test${NC}, speak, then ${BOLD}Finish Onboarding${NC}"
-echo
-echo -e "  ${DIM}The English speech model is included; recognition runs locally.${NC}"
-echo -e "  ${DIM}Focus a text field, then press ${BOLD}${HOTKEY}${NC}${DIM} to dictate!${NC}"
-echo
-echo -e "  ${DIM}You can change the hotkey anytime from the system tray icon${NC}"
-echo -e "  ${DIM}or edit ${CONFIG_FILE}${NC}"
+dim "Your shortcut is ${HOTKEY}. Change it in Shortcut."
 echo

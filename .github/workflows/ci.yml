@@ -95,6 +95,11 @@ jobs:
       - name: Install renderer test browser
         run: npx playwright install --with-deps chromium
 
+      - name: Branded interface and panel state regression
+        run: npm run test:brand-motion && node --test scripts/test-panel-model.mjs
+        env:
+          VOCO_RENDERER_EVIDENCE_DIR: ${{ runner.temp }}/voco-brand-motion
+
       - name: Dictation renderer lifecycle regression
         run: npm run test:dictation-renderer
 
@@ -145,6 +150,7 @@ jobs:
             ${{ runner.temp }}/voco-native-wayland/
             ${{ runner.temp }}/voco-native-capture-renderer/
             ${{ runner.temp }}/voco-onboarding-renderer/
+            ${{ runner.temp }}/voco-brand-motion/
           if-no-files-found: ignore
           retention-days: 7
 

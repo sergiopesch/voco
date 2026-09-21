@@ -45,7 +45,7 @@ PACKAGE_DEPENDS="$(dpkg-deb -f "${DEB_PATH}" Depends)"
   exit 1
 }
 
-for dependency in ibus python3 python3-gi gir1.2-ibus-1.0 python3-numpy python3-psutil libsentencepiece0 libpulse0 libnotify-bin xclip xdotool wl-clipboard gir1.2-atspi-2.0 at-spi2-core; do
+for dependency in ibus python3 python3-gi gir1.2-ibus-1.0 python3-numpy python3-psutil procps libsentencepiece0 libpulse0 libnotify-bin xclip xdotool wl-clipboard gir1.2-atspi-2.0 at-spi2-core; do
   if ! grep -Eq "(^|, )${dependency}( \\([^)]*\\))?(,|$)" <<<"${PACKAGE_DEPENDS}"; then
     echo "Debian package is missing dependency: ${dependency}" >&2
     exit 1
@@ -90,6 +90,7 @@ assert_entry /usr/lib/voco/ibus/voco_ibus_engine.py -rw-r--r--
 assert_entry /usr/lib/voco/ibus/voco_ibus_ownership.py -rw-r--r--
 assert_entry /usr/lib/voco/ibus/voco_ibus_protocol.py -rw-r--r--
 assert_entry /usr/bin/voco -rwxr-xr-x
+assert_entry /usr/lib/systemd/user/voco-ydotoold.service -rw-r--r--
 assert_entry /usr/share/doc/voco/THIRD-PARTY-NOTICES.txt -rw-r--r--
 assert_entry /usr/libexec/voco-browser-host -rwxr-xr-x
 assert_entry /etc/opt/chrome/native-messaging-hosts/com.voco.exact_field.json -rw-r--r--
@@ -128,6 +129,7 @@ for executable in /usr/bin/voco /usr/libexec/voco-browser-host; do
 done
 
 cmp "${ROOT_DIR}/vendor/THIRD-PARTY-NOTICES.txt" "${EXTRACT_ROOT}/usr/share/doc/voco/THIRD-PARTY-NOTICES.txt"
+cmp "${ROOT_DIR}/packaging/systemd/voco-ydotoold.service" "${EXTRACT_ROOT}/usr/lib/systemd/user/voco-ydotoold.service"
 
 mapfile -t packaged_desktop_files < <(
   find "${EXTRACT_ROOT}/usr/share/applications" -maxdepth 1 -type f -name '*.desktop' -print

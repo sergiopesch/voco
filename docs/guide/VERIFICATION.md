@@ -1,5 +1,15 @@
 # Guide verification history
 
+## Wayland installer follow-up · 20 September 2026
+
+The Linux chapter now explains the .45 guided-installer dependency gap and the
+.46 candidate readiness boundary. The .43 source catalog remains pinned. All nine
+guide tests and lesson-regeneration checks pass. Browser checks covered the new
+lesson, journey controls, quiz feedback, pinned source viewer, installation-file
+search, glossary entries and the narrow chapter drawer. At 390 × 844, content and
+scroll widths were both 390 px. The viewport was restored and the test browser
+closed. No browser errors were reported. These checks qualify the guide only.
+
 ## Final .43 package evidence · 19 September 2026
 
 The catalog pins `c0b657f2299fb477d297786fe5d0606e88e7e4cc`, including the

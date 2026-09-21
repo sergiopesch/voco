@@ -27,7 +27,9 @@ Start with **The big picture**, work through the chapters, then follow the sourc
 The Linux chapter explains why package installation and desktop dictation need
 separate checks, including the Hyprland hidden-start failure and the native-capture candidate that
 addresses it. Before/after results retain their specific test conditions.
-It does not announce a new release.
+It also records the .45 fresh-install dependency gap and the .46 candidate’s
+separate desktop readiness check. Those later findings do not change the pinned
+source viewer or announce a new release.
 
 ## Scope and privacy
 

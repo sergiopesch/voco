@@ -1635,6 +1635,10 @@
         "text": "Kate and Konsole accepted the public fixture in a booted KDE guest. Firefox exposed both shortcut-modifier interference and CPU contention that GTK-only tests had missed. The final package delivered all 1,162 words in a 577.68-second Firefox trial and stopped in 376 ms after the browser settled. Its page had no growing DOM diagnostic logger; a preceding logged attempt timed out after 741 words, showing why measurement overhead must remain explicit. Cold-start CPU-pressure failures remain recorded. Separate controls showed that Stop bindings must also accept the Ctrl and Shift modifiers used by clipboard delivery: Omarchy uses ignore_mods; KDE can bind the key and its Ctrl variants. A separate final Fedora GNOME ten-minute run delivered all 1,162 words with full retained-audio parity but took 2,813 ms after Stop. These observations do not establish universal speed or compatibility."
       },
       {
+        "title": "Test the actual installation command",
+        "text": "A fresh .45 Ubuntu Wayland installation on 20 September passed its local voice test, then rejected all 11 dictation attempts before recording. The short installer used dpkg and dependency repair, which skipped the recommended ydotool client and daemon. Earlier package tests used APT directly on X11, so they did not cover that journey. The .46 source candidate installs Wayland helpers explicitly and checks desktop input before onboarding completes. A voice test, helper readiness and verified cursor delivery are three separate checks. These follow-up findings describe newer work; the code viewer remains pinned to its recorded .43 snapshot."
+      },
+      {
         "title": "Safe upgrades",
         "text": "Debian preserves existing directory modes during upgrades. A real legacy-install test exposed inherited group-write permissions. A narrowly checked migration repairs only the known package-owned mode, preserving custom permissions and personal settings."
       },

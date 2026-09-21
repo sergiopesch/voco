@@ -1,3 +1,4 @@
+import type { DebugPreviewFrame, PendingDebugCapture, DebugCanonicalChunk } from "@/lib/debugCaptureTypes";
 import {BenchmarkPhraseQueue} from '../lib/benchmarkPhraseQueue';
 import { NvidiaRecovery } from "@/lib/nvidiaRecovery";
 import { DesktopShortcutSession } from "@/lib/desktopShortcutSession";
@@ -91,7 +92,6 @@ import {
 import type {
   CanonicalCursorSession,
   CanonicalSourceBlock,
-  CanonicalTranscriptionRange,
   CanonicalWork,
 } from "@/lib/canonicalCursorSession";
 import type { HybridResponse } from "@/lib/hybridSession";
@@ -120,39 +120,6 @@ const AUDIO_LEVEL_FLOOR = 0.01;
 
 type DictationPhase = DictationStatus | "stopping" | "finalizing";
 type LiveFinalizationResult = "none" | "safe" | "unreconciled";
-interface DebugPreviewFrame {
-  sequence: number;
-  sourceSampleRate: number;
-  capturedSampleCount: number;
-  previewStartSample: number;
-  preview: PreviewTranscription;
-  stateAfter: {
-    candidateText: string;
-    committedWindowText: string;
-    committedCursorText: string;
-    nextPreviewStartSample: number;
-    blockedCommitCount: number;
-    cursorInsertionDisabled: boolean;
-  };
-}
-
-interface PendingDebugCapture {
-  audio: Float32Array;
-  completedTranscript: string;
-  committedCursorText: string;
-  cursorInsertionDisabled: boolean;
-  needsFullAudioReference: boolean;
-  previewFrames: DebugPreviewFrame[];
-  sessionId: number;
-  canonicalChunks?: DebugCanonicalChunk[];
-}
-
-interface DebugCanonicalChunk {
-  sequence: number;
-  range: CanonicalTranscriptionRange;
-  result: HybridResponse;
-}
-
 export function useDictation(options: { getCaptureSelection?: () => CaptureSelection } = {}) {
   const captureSelectionRef = useRef(options.getCaptureSelection);
   captureSelectionRef.current = options.getCaptureSelection;

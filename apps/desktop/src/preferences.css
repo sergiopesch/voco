@@ -215,3 +215,11 @@
   .voco-preferences__brand h1 { font-size: 22px; }
   .voco-preferences__window-actions { margin-top: -12px; }
 }
+
+/* Keep both everyday choices visible together at the standard window size. */
+.voco-preferences .voco-preferences__page { gap: 14px; }
+.voco-preferences__form { gap: 12px; padding: 16px; }
+.voco-preferences__window-actions { gap: 8px; }
+.voco-native-microphone > p { color: var(--preferences-muted); font-size: 13px; line-height: 1.5; }
+.voco-preferences__shortcut-summary { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.voco-preferences__shortcut-summary > span { flex: 1; }

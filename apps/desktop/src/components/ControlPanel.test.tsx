@@ -74,9 +74,9 @@ describe("Silver Lens output guidance", () => {
 describe("ControlPanel", () => {
   it("keeps popover dictation focus-safe and names the microphone clearly", () => {
     const markup = renderPanel();
-    expect(markup).toContain("Shortcut configured: Alt+D. Start dictation from the tray.");
-    expect(markup).not.toContain("Press Alt+D to record and copy.");
-    expect(markup).toContain("focus a text field");
+    expect(markup).toContain("Check shortcut setup in Help.");
+    expect(markup).not.toContain("Press Alt+D to dictate at your cursor.");
+    expect(markup).toContain("Alt+D");
     expect(markup).toContain("Alt+D");
     expect(markup).toContain("Microphone: System default");
     expect(markup).not.toContain("Start listening");
@@ -89,8 +89,8 @@ describe("ControlPanel", () => {
       sessionType: "wayland", typeSimulation: support, clipboard: support,
       ownedPreedit: { available: false, ready: false, setupState: "safety-disabled", detail: "Manual copy", sessionId: null, engineActive: false, focusLost: false, progressiveCommitActive: false, committedCharacterCount: 0, ownershipIntact: false, finalizationOutcome: null, error: null },
     } });
-    expect(markup).toContain("Press Alt+D to record and copy.");
-    expect(markup).toContain("focus a text field");
+    expect(markup).toContain("Focus a text field, then use your shortcut.");
+    expect(markup).toContain("Alt+D");
     expect(markup).not.toContain("Start listening");
   });
 
@@ -122,7 +122,7 @@ describe("ControlPanel", () => {
   it("renders a compact, actionable settings navigation", () => {
     const markup = renderPanel({ surface: "settings" });
     expect(markup).toContain('aria-current="page"');
-    expect(markup).toContain("Troubleshooting");
+    expect(markup).toContain("Help");
     expect(markup).toContain('aria-label="App settings"');
     expect(markup).not.toContain("Accent-aware recognition is planned");
   });
@@ -133,14 +133,14 @@ describe("ControlPanel", () => {
       requestedSection: "Output",
     });
     expect(settingsMarkup).toContain("Keep the same field focused");
-    expect(settingsMarkup).toContain("If delivery is interrupted");
-    expect(settingsMarkup).toContain("your transcript stays available");
+    expect(settingsMarkup).toContain("If delivery stops");
+    expect(settingsMarkup).toContain("copying missing text from VOCO");
 
     const onboardingMarkup = renderPanel({
       surface: "onboarding",
       onboardingStep: 2,
     });
-    expect(onboardingMarkup).toContain("click in a text field");
+    expect(onboardingMarkup).not.toContain(">Done</button>");
     expect(onboardingMarkup).toContain("this test only displays words here");
   });
 
@@ -158,7 +158,7 @@ describe("Crystal Sidebar settings", () => {
     });
     expect(markup).toContain("A transcript needs attention");
     expect(markup).toContain("Review saved transcripts");
-    expect(markup.indexOf("A transcript needs attention")).toBeLessThan(markup.indexOf("Your setup"));
+    expect(markup.indexOf("A transcript needs attention")).toBeLessThan(markup.indexOf("voco-preferences__group-title"));
     expect(markup).not.toContain("A dictation was delivered this session");
     expect(markup).not.toContain("Keep this text");
   });
@@ -184,7 +184,7 @@ describe("Crystal Sidebar settings", () => {
     const markup = renderPanel({ surface: "settings", requestedSection: "Audio", dictationStatus });
     expect(markup).toContain("Microphone check paused during dictation");
     expect(markup).not.toContain("Waiting for sound");
-    expect(markup).toMatch(/<select[^>]*disabled=""/);
+    expect(markup).toMatch(/<button[^>]*role="combobox"[^>]*disabled=""/);
   });
 
   it.each([false, true])("uses glass regardless of the retired reduced-effects preference %s", (reduced) => {
@@ -223,8 +223,8 @@ describe("microphone preview gating", () => {
 describe("guided dictation and settings journeys", () => {
   it("requires a successful voice test before completing onboarding", () => {
     const markup = renderPanel({ surface: "onboarding", microphonePermission: "granted", onStartTest: vi.fn() });
-    expect(markup).toMatch(/<button[^>]*disabled=""[^>]*>Finish Onboarding<\/button>/);
-    expect(markup).toContain("Start Test");
+    expect(markup).not.toContain(">Done</button>");
+    expect(markup).toContain("Start test");
     expect(markup).not.toContain("Set up later");
     expect(markup).not.toContain("Hide and try dictation");
   });
@@ -235,7 +235,7 @@ describe("guided dictation and settings journeys", () => {
     expect(markup).toContain('aria-label="Microphone signal"');
     expect(markup).toContain('aria-label="Test transcript"');
     expect(markup).toContain("System default");
-    expect(markup).toContain("Test speaker");
+    expect(markup).not.toContain("Test speaker");
   });
 
   it("keeps configured shortcuts in the core guide and output instructions", () => {
@@ -272,7 +272,7 @@ describe("guided dictation and settings journeys", () => {
 
   it("puts update status and action before optional preferences", () => {
     const markup = renderPanel({ surface: "settings", requestedSection: "Updates" });
-    expect(markup.indexOf("Check for updates")).toBeLessThan(markup.indexOf("Update preferences and installation details"));
+    expect(markup.indexOf("Check for updates")).toBeLessThan(markup.indexOf("Update settings"));
     expect(markup.match(/>Check for updates</g)).toHaveLength(1);
   });
 
@@ -305,7 +305,7 @@ describe("dictation-only product", () => {
       for (const retired of ["OpenClaw", "Ask local", "Realtime", "Live cursor mode", "Transcript enhancement", "Appearance", "Integrations"]) expect(markup).not.toContain(retired);
     }
     const output = renderPanel({ surface: "settings", requestedSection: "Output" });
-    expect(output).toContain("Direct to your cursor");
+    expect(output).toContain("How to dictate");
     expect(output).toContain("never presses Enter");
     expect(output).not.toContain("<select");
   });

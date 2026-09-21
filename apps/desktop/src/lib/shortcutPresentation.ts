@@ -1,18 +1,20 @@
-import type { AudioDeviceOption, ShortcutDiagnostics } from "@/types";
+import type { AudioDeviceOption, DesktopInputStatus, ShortcutDiagnostics } from "@/types";
 
 export function unknownShortcut(hotkey: string): ShortcutDiagnostics {
   return { hotkey, route: null, state: "unknown", detail: "Shortcut availability has not been verified." };
 }
 
-export function shortcutPresentation(hotkey: string, observation?: ShortcutDiagnostics | null) {
+export function shortcutPresentation(hotkey: string, observation?: ShortcutDiagnostics | null, desktopInput?: DesktopInputStatus | null) {
   const current = observation && observation.hotkey === hotkey ? observation : unknownShortcut(hotkey);
   const available = current.state === "available" && current.route !== null;
   return {
     available,
-    instruction: available
+    instruction: desktopInput?.available === false
+      ? `Desktop setup required. ${desktopInput.detail}`
+      : available
       ? current.route === "ibus"
-        ? `Focus a supported text field and press ${hotkey} to record and copy.`
-        : `Press ${hotkey} to record and copy.`
+        ? `Focus a supported text field and press ${hotkey} to dictate at your cursor.`
+        : `Press ${hotkey} to dictate at your cursor.`
       : `Shortcut configured: ${hotkey}. Start dictation from the tray.`,
     detail: current.detail,
     setup: current.state === "focus-required"

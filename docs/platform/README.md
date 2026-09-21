@@ -4,9 +4,10 @@
 ## Supported Platforms
 
 VOCO targets Linux x86-64. The [Linux support matrix](../linux-support.md) records
-package families, runtime floors and qualification limits. The public release is
-2026.0.42; native Debian, Fedora, openSUSE and Arch/Omarchy packages for 2026.0.43
-remain candidates until their exact artifacts pass release acceptance.
+package families, runtime floors and qualification limits. The public Ubuntu/Debian release is
+2026.0.45; Fedora, openSUSE and Arch/Omarchy packages remain at 2026.0.43.
+The .47 installer/readiness fix is a source candidate; consult GitHub Releases
+for published assets.
 macOS and Windows are outside the current scope.
 
 ## Requirements
@@ -36,7 +37,7 @@ Hotkey backend selection:
 - Wayland + `Alt+D` / `Alt+Shift+D` -> passive evdev fallback, suppressed while IBus is armed
 - Other combinations -> Tauri global-shortcut fallback
 - Runtime hotkey changes update backend preference immediately
-- Settings -> Advanced shows the detected session and whether insertion helpers are currently available. Presence is a prerequisite, not proof of delivery to a target.
+- Settings → Help → Technical details shows the detected session and whether insertion helpers are currently available. Presence is a prerequisite, not proof of delivery to a target.
 - The evdev fallback tracks left/right Alt, Shift, Control, and Super independently for each open keyboard. Extra Control/Super modifiers reject the default matches; repeats do not retrigger. Disconnect clears only that device's state, and reopening revalidates capabilities and the virtual-device exclusion before synchronizing currently held keys. Dropped kernel events suppress activation until the stream has been resynchronized; synthetic recovery never triggers a hotkey.
 - Native IBus, global-shortcut, evdev and external socket triggers use the configured desktop output route.
   Protocol-v6 IBus is shortcut-only; older helpers must reconnect after upgrade.
@@ -52,7 +53,7 @@ Hotkey backend selection:
 
 Native desktop paste needs working input/clipboard helpers; the exact-field browser
 adapter and explicit Copy use different contracts. Do not add broad input privileges
-merely to copy a transcript. Installed physical Wayland qualification remains pending.
+merely to copy a transcript. Physical microphone and compositor coverage remain scoped to the support matrix.
 
 - ydotool works via uinput (kernel-level, compositor-independent)
 - Device/daemon access depends on host setup; evdev access commonly uses the `input` group. Membership grants broad keyboard-device access and is not required just for explicit Copy
@@ -78,7 +79,34 @@ injecting keys into the current application:
 command -v ydotool ydotoold
 pgrep -x ydotoold
 systemctl --user status ydotoold
+# In .47 and later:
+voco --check-desktop-input
 ```
+
+The .47 candidate includes `voco-ydotoold.service`, a service for your login.
+Its guided installer reuses a working daemon. Otherwise, when your login already
+has write access to `/dev/uinput`, it enables and starts this service, then checks
+that the client can use it. The service runs as you, uses a private socket umask,
+and stops with your graphical session. It is not started by package installation
+alone. For a manual .47 package install with existing device access:
+
+```bash
+systemctl --user enable --now voco-ydotoold.service
+voco --check-desktop-input
+```
+
+If your login lacks device access, or another daemon is running but inaccessible,
+the installer reports incomplete setup and exits with status 2. It does not change
+`input` group membership, device permissions or an administrator's service.
+Device access must follow the machine owner's policy. The Ubuntu 0.1.x client
+uses a fixed owner-only socket in `/tmp`; do not start competing daemons for
+different logins or make the socket world-writable.
+
+Desktop input readiness does not establish shortcut availability. On a fresh GNOME
+account without keyboard-device access, use the documented
+[compositor shortcut](../install.md#wayland-compositor-shortcuts), or configure
+the optional IBus recording source. Neither requires granting raw keyboard access
+just to invoke `voco --toggle`.
 
 Use your distribution's packaged service when available and its documented socket
 permissions. VOCO's session must be able to reach that socket; an arbitrary daemon

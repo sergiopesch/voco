@@ -1,18 +1,25 @@
 # Using VOCO
 
-## First-time setup (.44 candidate)
+In the .47 candidate, a successful voice test is followed by a desktop input check
+before onboarding completes. **Desktop setup required** means helpers or their
+service need attention; it is different from **No text cursor available**. Repair
+setup using the [installation guide](install.md), then retry the check.
 
-VOCO selects your system microphone and speaker. **Test speaker** plays a short
-sound through the default output. Click **Start Test** and speak: the signal band
-moves with microphone input and your words appear inside setup. This test does not
-paste into other apps or change the clipboard. Microphone capture begins only when
-you start the test.
+## First-time setup (design candidate)
 
-When words appear, click **Finish Onboarding**. VOCO stops capture, collects the
-final words and saves completion only if the test succeeded. **Stop Test** lets you
-review the result first. Silence and recognition failures keep setup incomplete;
-retry after checking the displayed message. This flow is in the local .44 candidate,
-not the previously published .43 package.
+Choose **Start test** and speak. The signal moves with microphone input and your
+words appear here. Speech stays on this computer; the test never pastes into
+other apps or changes the clipboard. Choose **Change microphone** to select a
+different input inside setup, then **Back to test**. VOCO uses your selection, or the system
+default if you have not selected a microphone.
+
+Choose **Finish test** to stop capture and collect the final words. After a
+successful test, VOCO checks desktop input automatically. **Your voice, ready.**
+shows your shortcut and explains that VOCO stays in the tray. **Done** rechecks
+readiness and saves completion. Changing microphones requires a new test. Silence,
+recognition failures and incomplete desktop setup keep onboarding open with an
+action to retry. These interface changes are on the isolated design branch and
+are not an installed or published release.
 
 ## Dictation
 
@@ -33,8 +40,9 @@ not rewrite the entire message after Stop.
 
 ## Settings
 
-Settings cover Overview, Microphone, Dictation, Shortcuts, Updates and
-Troubleshooting. Drag the top bar or the VOCO brand area to move the window.
+Settings contains microphone controls. Shortcut has its own sidebar section,
+with **Alt+D** as the default. Updates and Help are separate destinations; Help
+groups troubleshooting by symptom. Drag the top bar or the VOCO brand area to move the window.
 Resize using its edges. Hide to tray closes the panel without quitting.
 
 There is one output behavior: direct cursor dictation. Assistant integrations,
@@ -42,7 +50,9 @@ conversation, enhancement and output-mode selectors are removed. Upgrades ignore
 retired settings and preserve your microphone and shortcut. The interface follows
 system motion, contrast and transparency preferences without an Appearance page.
 
-Microphone choices save immediately. Shortcut edits have a Save action. If you
+Browser microphone choices save immediately. Native capture requires session
+consent and **Use this microphone**. Selecting a device does not start capture.
+Choose **Change shortcut**, edit or record keys, then **Apply shortcut** or **Cancel**. If you
 hide the window with unsaved edits, choose Save and hide, Discard and hide, or
 Keep editing. Recording is paused while capturing a new shortcut.
 

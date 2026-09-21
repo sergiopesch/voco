@@ -246,11 +246,7 @@ TOML
     printf "    ${DIM}Package: %s (%s)${NC}\n" "$(basename "$DEB")" "$DEB_SIZE"
     EXPECTED_VERSION="$(node -p "require('${ROOT_DIR}/package.json').version")"
     if voco_install_deb_package "$DEB" "$EXPECTED_VERSION" "amd64"; then
-      if [[ "${VOCO_INSTALL_USED_APT_FIX}" == true ]]; then
-        ok "VOCO installed (dependencies resolved)"
-      else
-        ok "VOCO installed"
-      fi
+      ok "VOCO and desktop dependencies installed"
     else
       err "Installation failed: ${VOCO_INSTALL_ERROR}"
       exit 1
@@ -260,6 +256,11 @@ TOML
     exit 1
   fi
 
+  if ! voco_start_wayland_service || ! voco_verify_desktop_input; then
+    warn "VOCO is installed, but desktop input setup is incomplete: ${VOCO_INPUT_ERROR}"
+    dim "See docs/platform/README.md before dictating."
+    exit 2
+  fi
   voco_run_hotkey_setup "Alt+D"
   HOTKEY="${VOCO_SELECTED_HOTKEY}"
   CONFIG_FILE="${VOCO_CONFIG_FILE}"

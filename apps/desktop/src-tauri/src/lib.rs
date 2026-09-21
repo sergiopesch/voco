@@ -26,6 +26,16 @@ mod single_instance;
 pub mod transcribe;
 mod trigger_socket;
 
+/// Check input prerequisites without launching a window or sending keys.
+pub fn check_desktop_input() -> Result<String, String> {
+    let status = insertion::desktop_input_status();
+    if status.available {
+        Ok(status.detail)
+    } else {
+        Err(status.detail)
+    }
+}
+
 /// Request one toggle from the running application without launching a window.
 pub fn toggle_running_application() -> Result<(), String> {
     trigger_socket::toggle().map_err(|error| {
@@ -33,6 +43,8 @@ pub fn toggle_running_application() -> Result<(), String> {
     })
 }
 pub use transcribe::{hybrid, numerical_planner, vca2};
+#[cfg(target_os = "linux")]
+mod panel;
 mod tray;
 
 use config::{
@@ -1187,6 +1199,12 @@ fn write_private_debug_capture_pair(
     Ok((audio_path, timeline_path))
 }
 
+#[tauri::command]
+fn sync_panel_level(app: tauri::AppHandle, epoch: u64, level: f64) {
+    #[cfg(target_os = "linux")]
+    panel::update_level(&app, epoch, level);
+}
+
 // --- Text insertion & notifications ---
 
 #[tauri::command]
@@ -1239,7 +1257,7 @@ fn show_notification(summary: String, body: String) {
 #[tauri::command]
 fn open_external_url(url: String) -> Result<(), String> {
     if !is_allowed_external_url(&url) {
-        return Err("Only VOCO GitHub release URLs are supported".to_string());
+        return Err("Only VOCO release and desktop setup URLs are supported".to_string());
     }
 
     process_runner::spawn_desktop_launcher(process_runner::command("xdg-open").arg(&url))
@@ -1271,6 +1289,11 @@ fn begin_desktop_shortcut_session(session_id: String, shortcut_epoch: u64) -> Re
 #[tauri::command(async)]
 fn end_desktop_shortcut_session(session_id: String) -> Result<(), String> {
     insertion::end_shortcut_session(&session_id)
+}
+
+#[tauri::command(async)]
+fn get_desktop_input_status() -> insertion::DesktopInputStatus {
+    insertion::desktop_input_status()
 }
 
 #[tauri::command(async)]
@@ -1309,6 +1332,7 @@ struct RuntimeDiagnostics {
     owned_preedit: owned_preedit::OwnedPreeditStatus,
     shortcut: shortcut_readiness::Status,
     desktop_paste: insertion::DesktopPasteStatus,
+    desktop_input: insertion::DesktopInputStatus,
 }
 
 struct BrowserIntegration(Option<browser_broker::BrowserBroker>);
@@ -1345,11 +1369,13 @@ fn get_runtime_diagnostics(
     state: tauri::State<'_, owned_preedit::OwnedPreeditService>,
 ) -> RuntimeDiagnostics {
     let owned_preedit = state.status();
+    let (desktop_input, desktop_paste) = insertion::desktop_paste_diagnostics();
     RuntimeDiagnostics {
         insertion: insertion::runtime_diagnostics(),
         shortcut: shortcut_runtime_status(owned_preedit.available),
         owned_preedit,
-        desktop_paste: insertion::desktop_paste_status(),
+        desktop_paste,
+        desktop_input,
     }
 }
 
@@ -2018,8 +2044,10 @@ fn remove_stale_model_temp_file(path: &std::path::Path) -> Result<(), String> {
 }
 
 fn is_allowed_external_url(url: &str) -> bool {
-    url.strip_prefix("https://github.com/sergiopesch/voco/releases/tag/")
-        .is_some_and(|tag| !tag.is_empty() && !tag.contains(['\r', '\n', '\\']))
+    url == "https://github.com/sergiopesch/voco/blob/master/docs/platform/README.md#ydotoold-ydotool-daemon"
+        || url
+            .strip_prefix("https://github.com/sergiopesch/voco/releases/tag/")
+            .is_some_and(|tag| !tag.is_empty() && !tag.contains(['\r', '\n', '\\']))
 }
 
 fn validate_model_content_length(content_length: Option<u64>) -> Result<(), String> {
@@ -3155,6 +3183,7 @@ pub fn run() -> Result<(), String> {
             save_debug_dictation_capture,
             insert_text,
             get_desktop_paste_status,
+            get_desktop_input_status,
             begin_desktop_shortcut_session,
             end_desktop_shortcut_session,
             paste_desktop_text,
@@ -3170,6 +3199,7 @@ pub fn run() -> Result<(), String> {
             release_browser_recording,
             begin_runtime_status_session,
             sync_runtime_status,
+            sync_panel_level,
             trace_frontend_hotkey_event,
             has_pending_hotkey_toggle,
             show_status_overlay,
@@ -3262,6 +3292,8 @@ pub fn run() -> Result<(), String> {
             if let Err(e) = tray::setup_tray(app, &hotkey) {
                 error!("Failed to setup tray: {e}");
             }
+            #[cfg(target_os = "linux")]
+            panel::setup(app.handle());
             if let Some(notice) = configured_hotkey.repair_notice {
                 warn!("{notice}");
                 send_notification("Hotkey repaired", &notice);
@@ -3533,7 +3565,13 @@ mod tests {
     }
 
     #[test]
-    fn external_url_allowlist_only_accepts_voco_release_tags() {
+    fn external_url_allowlist_accepts_voco_releases_and_exact_setup_guide() {
+        assert!(is_allowed_external_url(
+            "https://github.com/sergiopesch/voco/blob/master/docs/platform/README.md#ydotoold-ydotool-daemon"
+        ));
+        assert!(!is_allowed_external_url(
+            "https://github.com/sergiopesch/voco/blob/master/docs/platform/README.md?redirect=elsewhere"
+        ));
         assert!(is_allowed_external_url(
             "https://github.com/sergiopesch/voco/releases/tag/voco.2026.0.16"
         ));

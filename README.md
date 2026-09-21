@@ -22,7 +22,10 @@ wget -qO voco-install https://raw.githubusercontent.com/sergiopesch/voco/voco.20
 ```
 
 The guided installer downloads **2026.0.45**, verifies the package checksum and
-installs its dependencies. Open VOCO afterward to start your voice test.
+installs the package. On Wayland, .45 can omit input helpers; complete the
+[desktop input setup](docs/platform/README.md#ydotoold-ydotool-daemon) before dictating.
+The .47 source candidate fixes this installation gap and checks readiness before
+onboarding finishes; it is not yet a published download.
 [Manual installation and signature verification](docs/install.md#published-release).
 
 Ubuntu x86_64 is the reference platform. See the [installation guide](docs/install.md)
@@ -33,7 +36,7 @@ separates published assets from source and qualification work.
 
 ## Dictate anywhere you type
 
-1. Open VOCO, click **Start Test**, speak, then **Finish Onboarding** once your words appear. Your default microphone and speaker are selected.
+1. Open VOCO, choose **Start test**, speak, then **Finish test**. Choose **Done** to check desktop setup and finish.
 2. Focus a text field, press `Alt+D`, and speak.
 3. Press `Alt+D` again to finish. Review your text before sending it.
 

@@ -43,10 +43,6 @@ bash -n \
 
 bash scripts/test-verify-release.sh
 
-for installer in install scripts/lib/install-common.sh; do
-  rg -q 'local session_type="\$\{XDG_SESSION_TYPE:-x11\}"' "${installer}"
-  rg -q 'local alternate_wayland_hotkey="Alt\+Shift\+D"' "${installer}"
-done
 PYTHONDONTWRITEBYTECODE=1 python3 - <<'PY'
 import re
 from pathlib import Path
@@ -60,6 +56,9 @@ function_names = (
     "voco_migrate_legacy_config",
     "voco_verify_installed_package",
     "voco_install_deb_package",
+    "voco_verify_desktop_input",
+    "voco_wayland_device_access",
+    "voco_start_wayland_service",
     "voco_write_default_config",
     "voco_merge_hotkey_into_existing_config",
     "voco_run_hotkey_setup",
@@ -79,6 +78,7 @@ print("Standalone and source installer helpers are in sync.")
 PY
 
 bash scripts/test-install-common.sh
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-install-presentation.py
 
 node --check scripts/comparative-dictation.mjs
 node --check scripts/comparative-dictation.test.mjs

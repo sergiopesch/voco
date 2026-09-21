@@ -4,8 +4,11 @@ The [latest published GitHub release](https://github.com/sergiopesch/voco/releas
 is authoritative for current downloads. A source version, local test receipt or
 private draft does not establish publication or installation.
 
-This source snapshot is **2026.0.45**, the Ubuntu/Debian onboarding and
-cursor-warning release. See [release notes](releases/2026.0.45.md) and
+This source snapshot is **2026.0.47**, an unpublished Ubuntu/Debian installer
+and desktop readiness candidate. The current public Ubuntu/Debian release is
+**2026.0.45**, the onboarding and cursor-warning release.
+See [.47 candidate changes](releases/2026.0.47.md) and
+[verification scope](testing/wayland-install-2026-09-20.md). See [release notes](releases/2026.0.45.md) and
 [the review-fix record](testing/onboarding-2026-09-20-fixes.md) for checks and limits.
 Fedora, openSUSE and Arch/Omarchy downloads remain at **2026.0.43**.
 Confirm publication and exact assets on GitHub before installing.

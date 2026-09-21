@@ -21,6 +21,7 @@ import {
   saveConfigPatch,
   showNotification,
   syncRuntimeStatus,
+  syncPanelLevel,
   releaseBrowserRecording,
   traceHotkeyEvent,
 } from "@/lib/tauri";
@@ -35,6 +36,8 @@ import { useGlobalShortcut } from "@/hooks/useGlobalShortcut";
 import { useDictation } from "@/hooks/useDictation";
 import { useNativeCaptureSettings } from "@/hooks/useNativeCaptureSettings";
 import { ControlPanel } from "@/components/ControlPanel";
+import { StatusMark } from "@/components/StatusMark";
+import vocoBrandImage from "../../../assets/voco-symbol-ui.png";
 import { ConfigRecoveryPanel } from "@/components/ConfigRecoveryPanel";
 import { requiresVerifiedTextTarget } from "@/lib/dictationOutputPlan";
 import { probeMicrophoneAccess } from "@/lib/audioInput";
@@ -226,7 +229,7 @@ export function App() {
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [startupConfigError, setStartupConfigError] = useState<string | null>(null);
   const [settingsRequest, setSettingsRequest] = useState<{
-    section: "General" | "Audio" | "Hotkeys";
+    section: "General" | "Audio" | "Hotkeys" | "Advanced" | "Output" | "Updates";
     id: number;
   }>({ section: "General", id: 0 });
   const [closeRequestId, setCloseRequestId] = useState(0);
@@ -400,9 +403,8 @@ export function App() {
     setError(null);
     try {
       if (state.dictationPurpose === "onboarding") discardRecovery();
-      await nativeMicrophone.ensureDefault(true);
+      await nativeMicrophone.ensureDefault();
       if (request.cancelled || useStore.getState().surface !== "onboarding") return;
-      if (useStore.getState().captureBackendMode === "webkit") useStore.getState().setSelectedDeviceId(null);
       toggle("onboarding:test", "start");
     } catch (cause) {
       if (!request.cancelled) setError(errorMessage(cause));
@@ -615,7 +617,7 @@ export function App() {
     }
   }, [refreshAuthoritativeConfig, refreshDevices, refreshRuntimeDiagnostics]);
 
-  const openSettings = useCallback(async (section: "General" | "Audio" | "Hotkeys" = "General") => {
+  const openSettings = useCallback(async (section: "General" | "Audio" | "Hotkeys" | "Advanced" | "Output" | "Updates" = "General") => {
     const requestVersion = panelRequestVersionRef.current + 1;
     panelRequestVersionRef.current = requestVersion;
     const currentStatus = useStore.getState().status;
@@ -814,6 +816,23 @@ export function App() {
 
     void runUpdateCheck(config.updateChannel);
   }, [config?.updateChannel, initComplete, runUpdateCheck, updateCheckCoordinator]);
+
+  useEffect(() => {
+    if (runtimeStatusEpoch === null || status !== "recording") return;
+    // Capture events drive the panel even when WebKit's hidden-window timers
+    // are throttled. Do not subscribe the whole App to audio frames.
+    let pending = false;
+    let lastSentAt = -Infinity;
+    return useStore.subscribe((state) => {
+      const now = performance.now();
+      if (state.status !== "recording" || pending || now - lastSentAt < 100) return;
+      pending = true;
+      lastSentAt = now;
+      void syncPanelLevel(runtimeStatusEpoch, state.audioLevel)
+        .catch(() => {})
+        .finally(() => { pending = false; });
+    });
+  }, [runtimeStatusEpoch, status]);
 
   useEffect(() => {
     if (runtimeStatusEpoch === null) {
@@ -1102,7 +1121,9 @@ export function App() {
         </>
       );
     }
-    return null;
+    return <main className="voco-panel" data-surface="onboarding"><section className="voco-panel__shell voco-opening">
+      <img src={vocoBrandImage} alt="" /><h1>VOCO</h1><p role="status"><StatusMark state="working" />Opening VOCO…</p>
+    </section></main>;
   }
 
   if (surface === "hidden") return null;

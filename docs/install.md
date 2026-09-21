@@ -10,7 +10,10 @@ A plain Tauri bundle is incomplete. See [packaging](linux-packaging.md).
 
 The [README command](../README.md#get-started) runs the guided installer from
 the current published **2026.0.45** tag. It downloads that exact release and
-verifies its package checksum before installation.
+verifies its package checksum before installation. On Wayland, this older installer
+can omit the input helpers; complete the [Wayland setup](platform/README.md#ydotoold-ydotool-daemon)
+before testing dictation in another app. The .47 candidate repairs dependency
+installation and refuses to finish onboarding while desktop input is unavailable.
 
 For a manual installation, these links always follow the latest public release:
 
@@ -65,13 +68,17 @@ migrate retired output/assistant settings to direct dictation. A purge is unnece
 
 ## First launch
 
-Open VOCO from the application menu. In .44, your system microphone and speaker
-are selected. Click **Start Test**, speak, and check that the signal band moves
-and your words appear. Click **Finish Onboarding**, then focus a text field.
+Open VOCO from the application menu. Your system microphone and speaker
+are selected. Click **Start test**, speak, and check that the signal band moves
+and your words appear. On the design branch, choose **Finish test**. VOCO then checks desktop input
+prerequisites before showing **Your voice, ready.** and **Done**.
+If setup needs attention, complete the indicated setup and click **Check desktop setup**.
+Your successful voice test remains available; an external cursor is not required
+for this check. Once onboarding finishes, focus a text field.
 Press **Alt+D** to start and again to stop. You can change the shortcut in
-Settings. Known terminal paste shortcuts are selected automatically.
+the **Shortcut** section. Known terminal paste shortcuts are selected automatically.
 
-The .44 release requires a verifiable editable cursor before automatic desktop
+VOCO requires a verifiable editable cursor before automatic desktop
 dictation. If no cursor is available, VOCO displays a notification; click in an
 accessible text field and try again. Password fields are excluded. Changing fields
 during a recording stops delivery; review retained text before copying it.
@@ -146,15 +153,19 @@ its outstanding gates. Development recipes are not public installers.
 
 
 Historical userspace checks cover Ubuntu, Debian, Fedora, Linux Mint and an
-Omarchy-related Arch profile. Consult the [current release notes](releases/2026.0.42.md)
-for checks run on this release. This is not proof of every distribution’s default compositor, audio stack
+Omarchy-related Arch profile. Consult the [.45 release notes](releases/2026.0.45.md)
+for the recorded checks, and [release status](release-candidate.md) for newer candidates. This is not proof of every distribution’s default compositor, audio stack
 or application. RPM/Arch packages require their own native receipts. AppImage,
 Flatpak and Snap are experimental scaffolding, not published support channels.
 See [the compatibility evidence](testing/cross-linux-review-2026-09-15.md).
 
 ## Remove
 
+Quit VOCO first. If the .47 installer enabled its per-login input service, stop
+and disable that service before removing the package:
+
 ```bash
+systemctl --user disable --now voco-ydotoold.service
 sudo apt remove voco
 ```
 
@@ -167,3 +178,16 @@ Microphone capture formats must be between 8 and 96 kHz, matching the bundled
 recognizer and recovery runtime. An unsupported format is rejected before recording
 starts; select a supported format in the system audio settings, then restart VOCO
 so its audio context uses the new format.
+
+### Installer presentation candidate
+
+The design branch shows measured download bytes and average speed in colour
+terminals, and static lines for redirected output, NO_COLOR or TERM=dumb. The
+progress has no estimated percentage or time remaining. Downloads make at most
+three attempts and continue partial transfers within that run when the server
+supports it. Interrupted runs remove temporary downloads; running the installer
+again starts fresh. Checksums are always verified before APT runs.
+
+A failed download prints the path to a private diagnostic log. A missing release
+file points to the versioned release page; connection failures suggest checking
+the connection and rerunning. Successful runs remove the temporary log.

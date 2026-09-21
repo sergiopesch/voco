@@ -30,10 +30,6 @@ echo "  appimage: ${APPIMAGE_NAME}"
     echo "Installer still advertises a reserved hotkey or stale package size"
     exit 1
   fi
-  for installer in install scripts/lib/install-common.sh; do
-    grep -F 'Examples: Ctrl+Shift+V, Super+D, Alt+Shift+T' "${installer}" > /dev/null
-    grep -F 'existing config preserved' "${installer}" > /dev/null
-  done
   if grep -RInE 'raw.githubusercontent.com/.*/master/install|bash <\(curl|curl -s .*install' README.md docs install; then
     echo "Unsafe installer reference found in docs or helper comments"
     exit 1
@@ -41,7 +37,9 @@ echo "  appimage: ${APPIMAGE_NAME}"
   grep -F 'sha256sum -c' docs/install.md > /dev/null
   grep -F 'wget "$BASE/$TAG/install" -O voco-install' docs/install.md > /dev/null
   grep -F "raw.githubusercontent.com/sergiopesch/voco/${TAG_NAME}/install" install > /dev/null
-  grep -F "wget -qO voco-install https://raw.githubusercontent.com/sergiopesch/voco/${TAG_NAME}/install && bash voco-install" README.md > /dev/null
+  # README stays pinned to the published release while source is a new candidate.
+  PUBLISHED_VERSION="$(node -p "require('./packaging/published-release.json').version")"
+  grep -Fx "wget -qO voco-install https://raw.githubusercontent.com/sergiopesch/voco/voco.${PUBLISHED_VERSION}/install && bash voco-install" README.md > /dev/null
   grep -F 'sha256sum -c voco_latest_checksums.txt' docs/install.md > /dev/null
   grep -F -- '- "voco.*"' .github/workflows/release.yml > /dev/null
   if grep -F -- '- "v*"' .github/workflows/release.yml > /dev/null; then
