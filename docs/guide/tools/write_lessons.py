@@ -585,7 +585,7 @@ lesson(
         ),
         (
             "Finishing setup is a handoff",
-            "The .50 candidate leaves Ready visible after Done and routes a second launch to the existing idle app. During capture, launcher activation keeps the text destination focused. The next candidate keeps microphone selection in the same setup canvas and returns to the test after applying it. Its fallback tray selects measured volume frames from a fixed, retained image set; silence settles the bars and Stop restores Ready. These changes do not alter the pinned .43 source viewer.",
+            "The .51 release cut includes the .50 handoff: Ready stays visible after Done, and a second launch opens the existing idle app. During capture, launcher activation keeps the text destination focused. Microphone selection stays in the same setup canvas and returns to Start test after applying it. Alt+D replaces Ready with measured volume bars from a fixed, retained image set; silence settles the bars and Stop restores Ready. The GNOME companion follows measured levels and system reduced motion. These changes do not alter the pinned .43 source viewer.",
         ),
     ],
     [

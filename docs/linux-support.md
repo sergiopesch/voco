@@ -1,9 +1,10 @@
 # Linux packages and qualification
 
-**2026.0.45** is an Ubuntu/Debian onboarding and cursor-feedback update. Its
-[release notes](releases/2026.0.45.md) describe its own verification and limits.
+**2026.0.51** is an Ubuntu/Debian tray, setup and recognition-engine release cut. Its
+[release notes](releases/2026.0.51.md) and
+[qualification record](testing/tray-setup-2026-09-21.md) describe its verification and limits.
 The .43 desktop results below remain historical .43 evidence, not qualification
-of .44 on those desktops. Other native package channels remain at .43.
+of .51 on those desktops. Other native package channels remain at .43.
 
 This matrix records **2026.0.43** package and desktop qualification. Only assets
 attached to a published [GitHub release](https://github.com/sergiopesch/voco/releases)
