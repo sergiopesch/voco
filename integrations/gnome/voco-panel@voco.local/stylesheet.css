@@ -1,0 +1,11 @@
+.voco-panel { -natural-hpadding: 3px; -minimum-hpadding: 2px; }
+.voco-panel-active { border-radius: 99px; background-color: rgba(190, 198, 208, 0.14); }
+.voco-panel-box { spacing: 4px; padding: 0 4px; }
+.voco-panel-button { border-radius: 99px; padding: 0 4px; }
+.voco-panel-button:focus { box-shadow: inset 0 0 0 1px #dfe3e9; }
+.voco-panel-detail { spacing: 6px; }
+.voco-panel-status { font-size: 0.9em; }
+.voco-panel-stop { border-radius: 99px; padding: 0 7px; background-color: rgba(220, 225, 232, 0.14); }
+.voco-panel-stop:hover, .voco-panel-stop:focus { background-color: rgba(220, 225, 232, 0.28); }
+.voco-panel-wave { spacing: 2px; }
+.voco-panel-bar { width: 2px; height: 14px; border-radius: 2px; background-color: #dfe3e9; }

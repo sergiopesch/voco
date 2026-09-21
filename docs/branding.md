@@ -172,7 +172,10 @@ simulates speech. The labelled onboarding Start/Stop button remains separate fro
 the accessible meter. The popover keeps its microphone artwork and adds the same
 level display while listening. Active dictation prioritises the finish instruction;
 getting-started guidance remains in More and in the idle view. Recovery stays
-persistent. Native tray menus are unchanged.
+persistent. The [GNOME panel extension](../integrations/gnome/README.md) supersedes
+the floating recording presentation when attached: the unchanged microphone
+expands horizontally into a silver capsule inside the panel. Native tray menus
+remain the fallback when it is absent.
 
 `StatusMark` is decorative beside readable status text. Pending, working,
 listening, success and attention are supplied by the owning operation. A passed

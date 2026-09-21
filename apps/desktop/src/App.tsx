@@ -21,6 +21,7 @@ import {
   saveConfigPatch,
   showNotification,
   syncRuntimeStatus,
+  syncPanelLevel,
   releaseBrowserRecording,
   traceHotkeyEvent,
 } from "@/lib/tauri";
@@ -814,6 +815,23 @@ export function App() {
 
     void runUpdateCheck(config.updateChannel);
   }, [config?.updateChannel, initComplete, runUpdateCheck, updateCheckCoordinator]);
+
+  useEffect(() => {
+    if (runtimeStatusEpoch === null || status !== "recording") return;
+    // Capture events drive the panel even when WebKit's hidden-window timers
+    // are throttled. Do not subscribe the whole App to audio frames.
+    let pending = false;
+    let lastSentAt = -Infinity;
+    return useStore.subscribe((state) => {
+      const now = performance.now();
+      if (state.status !== "recording" || pending || now - lastSentAt < 100) return;
+      pending = true;
+      lastSentAt = now;
+      void syncPanelLevel(runtimeStatusEpoch, state.audioLevel)
+        .catch(() => {})
+        .finally(() => { pending = false; });
+    });
+  }, [runtimeStatusEpoch, status]);
 
   useEffect(() => {
     if (runtimeStatusEpoch === null) {

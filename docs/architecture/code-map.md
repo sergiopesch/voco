@@ -87,6 +87,14 @@ The repository also contains package-channel experiments, static brand assets,
 vendored native dependencies and historical specifications. Follow current release
 gates; a draft file is not evidence that its channel or feature is shipped.
 
+## GNOME panel presentation
+
+`integrations/gnome/` contains the optional GNOME 46 panel extension.
+`src-tauri/src/panel.rs` owns its leased session-bus connection; `tray.rs` derives
+state from the same authoritative snapshot as the native tray. `App.tsx` forwards
+only the normalized meter level during recording. No transcript or audio samples
+are sent to the panel. See the [integration contract](../../integrations/gnome/README.md).
+
 ## Where to put a change
 
 Keep changes in the component that owns the invariant. Do not add parallel frontend

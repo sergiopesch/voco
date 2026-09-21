@@ -236,3 +236,7 @@ export async function saveCachedUpdateState(cache: CachedUpdateCheck): Promise<v
 export async function getRuntimeDiagnostics(): Promise<RuntimeDiagnostics> {
   return invoke<RuntimeDiagnostics>("get_runtime_diagnostics");
 }
+
+export async function syncPanelLevel(epoch: number, level: number): Promise<void> {
+  return invoke("sync_panel_level", { epoch, level });
+}

@@ -43,6 +43,8 @@ pub fn toggle_running_application() -> Result<(), String> {
     })
 }
 pub use transcribe::{hybrid, numerical_planner, vca2};
+#[cfg(target_os = "linux")]
+mod panel;
 mod tray;
 
 use config::{
@@ -1195,6 +1197,12 @@ fn write_private_debug_capture_pair(
     }
 
     Ok((audio_path, timeline_path))
+}
+
+#[tauri::command]
+fn sync_panel_level(app: tauri::AppHandle, epoch: u64, level: f64) {
+    #[cfg(target_os = "linux")]
+    panel::update_level(&app, epoch, level);
 }
 
 // --- Text insertion & notifications ---
@@ -3191,6 +3199,7 @@ pub fn run() -> Result<(), String> {
             release_browser_recording,
             begin_runtime_status_session,
             sync_runtime_status,
+            sync_panel_level,
             trace_frontend_hotkey_event,
             has_pending_hotkey_toggle,
             show_status_overlay,
@@ -3283,6 +3292,8 @@ pub fn run() -> Result<(), String> {
             if let Err(e) = tray::setup_tray(app, &hotkey) {
                 error!("Failed to setup tray: {e}");
             }
+            #[cfg(target_os = "linux")]
+            panel::setup(app.handle());
             if let Some(notice) = configured_hotkey.repair_notice {
                 warn!("{notice}");
                 send_notification("Hotkey repaired", &notice);

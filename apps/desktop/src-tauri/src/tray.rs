@@ -714,6 +714,8 @@ fn apply_tray_state(app: &tauri::AppHandle, tray_state: &TrayState) {
     let _ = tray_state
         .hotkey_menu
         .set_enabled(presentation.hotkey_menu_enabled);
+    #[cfg(target_os = "linux")]
+    crate::panel::publish();
 }
 
 fn accept_runtime_snapshot(
@@ -792,9 +794,141 @@ fn create_mic_icon(size: u32, state: TrayVisualState) -> Vec<u8> {
     canvas.into_raw()
 }
 
+/// Only presentation state crosses the panel bus: never transcript or audio.
+#[cfg(target_os = "linux")]
+pub fn panel_snapshot(app: &tauri::AppHandle) -> Option<serde_json::Value> {
+    let state = app.try_state::<TrayMutex>()?;
+    let state = state.lock().ok()?;
+    let snapshot = runtime_snapshot_from_tray_state(&state);
+    Some(panel_presentation(&snapshot))
+}
+
+#[cfg(target_os = "linux")]
+fn panel_presentation(snapshot: &RuntimeStatusSnapshot) -> serde_json::Value {
+    let presentation = derive_tray_presentation(snapshot);
+    let status = match snapshot.dictation_status {
+        _ if !snapshot.runtime_initialized
+            && snapshot.model_download_status != ModelDownloadStatus::Failed =>
+        {
+            "initializing"
+        }
+        DictationStatus::Starting => "starting",
+        DictationStatus::Recording => "recording",
+        DictationStatus::Processing => "processing",
+        _ if snapshot.manual_transcript_ready
+            || snapshot.recovery_available
+            || snapshot.has_recoverable_transcript
+            || snapshot.cursor_delivery == CursorDeliveryState::Unreconciled =>
+        {
+            "recovery"
+        }
+        _ if presentation.visual_state == TrayVisualState::NotReady => "attention",
+        _ => "idle",
+    };
+    serde_json::json!({
+        "version": 1, "status": status, "description": presentation.tooltip,
+        "token": format!("{}:{}", snapshot.epoch, snapshot.revision),
+        "canStop": matches!(snapshot.dictation_status, DictationStatus::Starting | DictationStatus::Recording),
+        "canOpen": presentation.settings_enabled,
+        "level": crate::panel::level(snapshot.epoch, snapshot.dictation_status),
+    })
+}
+
+#[cfg(target_os = "linux")]
+pub fn panel_visibility(app: &tauri::AppHandle, visible: bool) {
+    if let Some(state) = app.try_state::<TrayMutex>() {
+        if let Ok(state) = state.lock() {
+            if let Some(tray) = app.tray_by_id(&state.tray_id) {
+                let _ = tray.set_visible(visible);
+            }
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
+pub fn panel_action(app: &tauri::AppHandle, action: &str, token: &str) -> bool {
+    let Some(snapshot) = panel_snapshot(app) else {
+        return false;
+    };
+    if snapshot["token"].as_str() != Some(token) {
+        return false;
+    }
+    match action {
+        "stop" if snapshot["canStop"] == true => {
+            // Explicit stop is rejected at idle by the renderer; never send a toggle
+            // that could start a new recording after an asynchronous state change.
+            app.emit_to(
+                "main",
+                "voco:toggle-dictation",
+                serde_json::json!({"action":"stop"}),
+            )
+            .is_ok()
+        }
+        "open" if snapshot["canOpen"] == true => {
+            if snapshot["status"] == "recovery" {
+                app.emit_to(
+                    "main",
+                    "voco:show-popover",
+                    crate::TrayPopoverAnchor::default(),
+                )
+                .is_ok()
+            } else {
+                app.emit_to("main", "voco:open-settings", ()).is_ok()
+            }
+        }
+        _ => false,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn panel_actions_never_open_a_window_during_capture() {
+        let mut snapshot = ready_snapshot();
+        snapshot.epoch = 4;
+        snapshot.revision = 9;
+        for status in [
+            DictationStatus::Starting,
+            DictationStatus::Recording,
+            DictationStatus::Processing,
+        ] {
+            snapshot.dictation_status = status;
+            let panel = panel_presentation(&snapshot);
+            assert_eq!(panel["canOpen"], false);
+            assert_eq!(panel["canStop"], status != DictationStatus::Processing);
+            assert_eq!(panel["token"], "4:9");
+        }
+        snapshot.dictation_status = DictationStatus::Idle;
+        snapshot.recovery_available = true;
+        snapshot.native_microphone_ready = Some(false);
+        let panel = panel_presentation(&snapshot);
+        assert_eq!(panel["status"], "recovery");
+        assert_eq!(panel["canOpen"], true);
+        assert_eq!(panel["canStop"], false);
+        assert_eq!(panel["level"], 0.0);
+        let mut fields: Vec<_> = panel
+            .as_object()
+            .unwrap()
+            .keys()
+            .map(String::as_str)
+            .collect();
+        fields.sort_unstable();
+        assert_eq!(
+            fields,
+            [
+                "canOpen",
+                "canStop",
+                "description",
+                "level",
+                "status",
+                "token",
+                "version"
+            ]
+        );
+    }
 
     #[test]
     fn tray_assets_are_square_and_keep_the_microphone_stable() {
