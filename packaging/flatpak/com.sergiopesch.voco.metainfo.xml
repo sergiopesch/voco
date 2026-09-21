@@ -13,9 +13,9 @@
     <p>Your voice, typed. Built for Linux. VOCO turns speech into text at your cursor. Press a hotkey, speak, and press it again to finish. Normal dictation is transcribed on your device and needs no account or subscription.</p>
     <p>VOCO stays in the tray, with a compact panel for microphone feedback and dictation status. Text insertion depends on your desktop session and the target field.</p>
     <ul>
-      <li>Local speech transcription with Whisper</li>
+      <li>Local English speech transcription with Nemotron</li>
       <li>Setup for your microphone, hotkey, and Linux text insertion options</li>
-      <li>Transcript preview and final-text-only options</li>
+      <li>Live cursor dictation and explicit transcript recovery</li>
       <li>GitHub Release update checks for manual install channels</li>
       <li>Linux-specific install, upgrade, and troubleshooting guidance</li>
     </ul>

@@ -243,7 +243,7 @@ for (const failure of ['module', 'construction']) {
   assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>['transcribeAudio','pasteDesktopText'].includes(c[0]))),false);
   assert.equal(await page.evaluate(()=>window.recoveryRequests.filter(r=>r.op==='push').reduce((n,r)=>n+r.audio.length,0)),16000);
   assert.match(await page.evaluate(()=>window.store.getState().captureNotice),/could not be confirmed/);
-  results.push(`NVIDIA ${failure} fallback retains source without automatic inference or paste; explicit local recovery never calls Whisper or delivers.`);
+  results.push(`NVIDIA ${failure} fallback retains source without automatic inference or paste; explicit local recovery uses the same recognizer without delivery.`);
 }
 
 await load();await page.evaluate(()=>{window.desktopPaste=true;window.desktopStream=true;window.failWorkletModule=true;});

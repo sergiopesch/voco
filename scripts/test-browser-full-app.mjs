@@ -9,7 +9,7 @@ import {freezeLongPlayback} from './browser-long-accuracy.mjs';
 import {scoreTranscript} from './speech-score.mjs';
 import {scoreSpeechIntegrity} from './speech-integrity.mjs';
 const longCapture = process.env.VOCO_BROWSER_LONG_CAPTURE === '1';
-assert.notEqual(process.env.VOCO_BROWSER_DIAG_SECOND_CAPTURE, '1', 'The retired Whisper debug-capture mode is unavailable; use VOCO_BROWSER_LONG_CAPTURE=1 for full-reference Nemotron delivery.');
+assert.notEqual(process.env.VOCO_BROWSER_DIAG_SECOND_CAPTURE, '1', 'The retired debug-capture mode is unavailable; use VOCO_BROWSER_LONG_CAPTURE=1 for full-reference Nemotron delivery.');
 const root = process.env.VOCO_BROWSER_TEST_ROOT;
 assert.ok(root && process.env.XDG_RUNTIME_DIR === `${root}/runtime` && process.env.DISPLAY === ':0');
 const hash = async p => crypto.createHash('sha256').update(await fs.readFile(p)).digest('hex');

@@ -42,7 +42,7 @@ const lines=createInterface({input:child.stdout})[Symbol.asyncIterator]();
 const report={schemaVersion:3,startedAt:new Date().toISOString(),modelSha256:identity.model_sha256,
   manifestSha256:hashFile(manifestPath),workerSha256:hashFile(worker),nativeBuildSha256:hashFile(path.join(root,'runtime/speech/NATIVE-BUILD.json')),
   source:{gitHead:execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim(),gitDirty:Boolean(execFileSync('git',['status','--porcelain'],{cwd:root,encoding:'utf8'}).trim())},
-  note:'Pinned Nemotron, production streaming worker, 100 ms packets, original corpus thresholds. Excludes microphones, Tauri IPC and field delivery. Historical Whisper evidence is not requalified.',
+  note:'Pinned Nemotron, production streaming worker, 100 ms packets, original corpus thresholds. Excludes microphones, Tauri IPC and field delivery. Historical decoder evidence is not requalified.',
   fixtures:[],silence:[],variants:[],continuity:null,passed:false};
 async function read(){
   let timer;

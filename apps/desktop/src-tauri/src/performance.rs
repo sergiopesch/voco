@@ -420,13 +420,13 @@ fn write_events(
         .and_then(|p| fs::read(p).ok())
         .map(|bytes| format!("{:x}", Sha256::digest(bytes)));
     let header = json!({"event":"run_metadata", "version":env!("CARGO_PKG_VERSION"),
-        "executable_sha256":executable_hash, "model":"nemotron-speech-streaming-en-0.6b-q8-context1", "fallback_model":"base.en",
+        "executable_sha256":executable_hash, "model":"nemotron-speech-streaming-en-0.6b-q8-context1",
         "native_capture_compiled":cfg!(feature="native-capture"),
         "desktop_paste_enabled":crate::insertion::desktop_paste_enabled(),
         "desktop_stream_enabled":crate::insertion::desktop_stream_enabled(),
         "desktop_clipboard_helper":crate::insertion::desktop_clipboard_helper(),
         "session_type":crate::session_type_label(), "logical_cpus":std::thread::available_parallelism().ok().map(|n|n.get()),
-        "resource_scope":"Rust process including native decoder threads; excludes WebKit/helper processes",
+        "resource_scope":"Rust process; excludes speech worker, WebKit and helper processes",
         "started_unix_us":epoch});
     let mut seq = 0u64;
     let mut write = |writer: &mut RotatingWriter, mut value: Value| -> io::Result<()> {

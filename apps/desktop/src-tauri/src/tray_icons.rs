@@ -34,12 +34,13 @@ impl MeterEnvelope {
 
 fn meter_rgba(frame: usize) -> Vec<u8> {
     let level = frame.min(METER_FRAMES - 1) as f64 / (METER_FRAMES - 1) as f64;
-    let weights = [0.35, 0.65, 0.9, 1.0, 0.8, 0.55, 0.3];
+    // Five thicker bars remain distinct when the panel scales to a 16px icon.
+    let weights = [0.45, 0.8, 1.0, 0.8, 0.45];
     let mut rgba = vec![0; 32 * 32 * 4];
     // Supersample rounded ends; fractional heights keep quiet speech legible.
     for (bar, weight) in weights.iter().enumerate() {
-        let center_x = 4.0 + bar as f64 * 4.0;
-        let half_height = (3.0 + 23.0 * level * weight) / 2.0;
+        let center_x = 4.0 + bar as f64 * 6.0;
+        let half_height = (3.5 + 23.0 * level * weight) / 2.0;
         for y in 0..32 {
             for x in 0..32 {
                 let mut coverage = 0;
@@ -47,8 +48,8 @@ fn meter_rgba(frame: usize) -> Vec<u8> {
                     for sx in 0..4 {
                         let dx = (x as f64 + (sx as f64 + 0.5) / 4.0 - center_x).abs();
                         let dy = (y as f64 + (sy as f64 + 0.5) / 4.0 - 16.0).abs();
-                        let end = (dy - (half_height - 1.25)).max(0.0);
-                        if dx * dx + end * end <= 1.25 * 1.25 {
+                        let end = (dy - (half_height - 1.75)).max(0.0);
+                        if dx * dx + end * end <= 1.75 * 1.75 {
                             coverage += 1;
                         }
                     }

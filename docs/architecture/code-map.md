@@ -182,7 +182,9 @@ recording and processing refuse activation focus changes. The legacy `--toggle`
 transport retains its single-attempt contract.
 
 `tray_icons.rs` retains four state PNGs and 64 pre-rendered audio-meter PNGs in a
-private process directory. A recording-only GLib timer smooths measured volume
+private process directory. Worker updates release the state lock before dispatching
+GTK presentation on the main thread, so Shell requests cannot deadlock with it.
+A recording-only GLib timer smooths measured volume
 with a fast attack and short release, selects an existing frame, and stops at the
 recording boundary. Stale samples settle to silence; reduced motion uses direct
 level changes. No audio update writes another image or opens a window.

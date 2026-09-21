@@ -1,3 +1,5 @@
+> Historical implementation, retired in .51. The current single-engine stream and explicit recovery contract are described in [Architecture](README.md#startup-and-recognizer-selection). Paths and decoder behavior below refer to earlier commits.
+
 # Hybrid recognition and audio ownership
 
 The application uses the existing local base.en model. `transcribe_audio` invokes

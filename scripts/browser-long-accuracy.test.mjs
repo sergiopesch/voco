@@ -43,9 +43,9 @@ test('natural plan uses every fixture through the 37 second cutoff and manifest 
   assert.throws(()=>freezeLongPlayback(manifestBytes,Buffer.from(JSON.stringify({...p,selectedBeforeInference:false})),audio,sources));
 });
 
-test('CLI rejects retired Whisper diagnostics before checking sandbox or starting apps',()=>{
+test('CLI rejects retired diagnostics before checking sandbox or starting apps',()=>{
   const result=spawnSync(process.execPath,[fileURLToPath(new URL('./test-browser-full-app.mjs',import.meta.url))],{env:{...process.env,VOCO_BROWSER_DIAG_SECOND_CAPTURE:'1'},encoding:'utf8'});
-  assert.notEqual(result.status,0);assert.match(result.stderr,/The retired Whisper debug-capture mode is unavailable/);
+  assert.notEqual(result.status,0);assert.match(result.stderr,/The retired debug-capture mode is unavailable/);
 });
 
 for (const field of ['canonicalText', 'finalTranscript']) {

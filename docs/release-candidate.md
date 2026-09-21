@@ -5,7 +5,9 @@ is authoritative for current downloads. A source version, local test receipt or
 private draft does not establish publication or installation.
 
 The recorded public Ubuntu/Debian release is **2026.0.47**. Source **2026.0.51**
-is unreleased Nemotron-only development. Whisper has been removed from recognition,
+combines the live tray meter, compact microphone setup and Nemotron-only recognition.
+It is a local test candidate, not a published release. See [the combined verification record](testing/tray-setup-2026-09-21.md).
+Whisper has been removed from recognition,
 downloads and native dependencies; see [the retirement record](testing/nemotron-only-2026-09-21.md).
 
 The frozen **2026.0.50** local candidate contains packaged panel setup, visible
