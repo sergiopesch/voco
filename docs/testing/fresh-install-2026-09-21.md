@@ -172,8 +172,11 @@ editor/accessibility trial is still open.
 
 The complete Ubuntu/Debian candidate is **686,868,062 bytes** (655.0 MiB), SHA-256
 `d9c240bec1166a383091b03f47661ffb602b276f933a260bc35fbd5043aff90a`.
-Its application SHA-256 is
-`ffc6a1d5c12040f9e8255fa9e65cb42ad0afa6126a09e7fd2d4c08ecebd34fdd`.
+Its packaged application SHA-256 is
+`2109b79ef11f59bf241449d54957a4bf3cdad3aa04ffabf211bebc34bac37f43`.
+The earlier unbundled build tested separately has SHA-256
+`ffc6a1d5c12040f9e8255fa9e65cb42ad0afa6126a09e7fd2d4c08ecebd34fdd`;
+these are distinct executable identities, not interchangeable receipts.
 The package verifier passed, including the pinned model/runtime and companion
 browser host. Bundled documentation retains its assembly snapshot.
 
@@ -197,7 +200,8 @@ verification in 0.536 s. An XZ level 6 experiment saved only about another 5.4 M
 but needed 124.62 s to encode and 25.73 s to decode and hash; it was rejected.
 These are local compression measurements, not network download benchmarks.
 
-The exact candidate binary completed a fresh native onboarding journey under
+Both the unbundled build and the exact installed candidate executable completed
+a fresh native onboarding journey under
 private X11, D-Bus and PulseAudio using a public speech fixture. Start test,
 speech, Finish test and Done saved completion with the default **Alt+D** shortcut.
 The read-only cursor check then verified a separate GTK text field, and actual
@@ -229,3 +233,15 @@ diffs and hashes are private. Existing application processes have not been
 restarted. The user must fully quit and reopen both apps to test those settings.
 No global accessibility preference, browser profile or confinement policy changed.
 The public installer remains pinned to .47 until a separately qualified release.
+
+### Installed host handoff
+
+APT installed .48 after the owner's desktop authentication. `dpkg --verify voco`
+returned no discrepancies, the installed executable exactly matched the package,
+and `voco --check-desktop-input` passed with `voco-ydotoold.service` active. A further
+isolated native journey used the installed executable and installed speech worker;
+fresh onboarding and Alt+D delivery into the separate GTK field passed again.
+The old .47 process was stopped. The owner's configuration and diagnostics were
+backed up privately before resetting only `onboardingCompleted` to false for the
+next launch. Alt+D and other preferences were preserved. VOCO is ready to open
+from the app launcher for the owner's physical microphone and Codex/Brave trial.
