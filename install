@@ -6,11 +6,11 @@ set -euo pipefail
 #
 # VOCO — release install helper
 # Usage:
-#   wget https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.47/install -O voco-install
+#   wget https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.48/install -O voco-install
 #   chmod +x voco-install
 #   ./voco-install
 
-VERSION="2026.0.47"
+VERSION="2026.0.48"
 RELEASE_TAG="voco.${VERSION}"
 DEB_URL="https://github.com/sergiopesch/voco/releases/download/${RELEASE_TAG}/voco_${VERSION}_amd64.deb"
 CHECKSUMS_URL="https://github.com/sergiopesch/voco/releases/download/${RELEASE_TAG}/voco_checksums.txt"
@@ -362,6 +362,14 @@ voco_install_deb_package() {
   # Wayland needs both, even when APT recommendations are disabled by the owner.
   if [[ "${XDG_SESSION_TYPE:-x11}" == wayland ]]; then
     packages+=(ydotool ydotoold)
+    # APT downloaded and checked these in parallel with VOCO. Supplying the local
+    # archives lets the final dependency transaction reuse them without root cache writes.
+    if [[ -n "${4:-}" ]]; then
+      local helper_deb
+      for helper_deb in "$4"/ydotool_*.deb "$4"/ydotoold_*.deb; do
+        [[ -f "$helper_deb" && ! -L "$helper_deb" ]] && packages+=("$helper_deb")
+      done
+    fi
   fi
   if ! sudo apt-get install -y -- "${packages[@]}"; then
     VOCO_INSTALL_ERROR="APT could not install VOCO and its desktop dependencies. Resolve the error above, then run the installer again."
@@ -567,6 +575,8 @@ voco_run_hotkey_setup() {
 
 # Download output is measured from bytes received, never simulated percentages.
 DOWNLOAD_PID=""
+HELPER_DOWNLOAD_PID=""
+HELPER_DOWNLOAD_READY=""
 VOCO_INSTALL_LOG=""
 VOCO_KEEP_LOG=false
 voco_download() {
@@ -618,7 +628,48 @@ voco_download() {
   ok "${detail} received · ${elapsed}s"
 }
 
+# Only the Wayland helpers are prefetched. APT still resolves the complete
+# application transaction after VOCO's checksum has passed. No sudo or install here.
+voco_start_helper_prefetch() {
+  [[ "${XDG_SESSION_TYPE:-x11}" == wayland ]] || return 0
+  local helper status
+  local -a missing=()
+  for helper in ydotool ydotoold; do
+    status=$(dpkg-query -W -f='${Status}' "$helper" 2>/dev/null || true)
+    [[ "$status" == 'install ok installed' ]] || missing+=("$helper")
+  done
+  (( ${#missing[@]} > 0 )) || return 0
+  mkdir -m 755 "$VOCO_DOWNLOAD_DIR/helpers"
+  if [[ -z "$VOCO_INSTALL_LOG" ]]; then
+    VOCO_INSTALL_LOG=$(mktemp "${TMPDIR:-/tmp}/voco-install.XXXXXX.log")
+  fi
+  dim "Downloading desktop helpers alongside VOCO."
+  (
+    cd "$VOCO_DOWNLOAD_DIR/helpers"
+    umask 022
+    exec apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=20 \
+      -o Acquire::https::Timeout=20 download "${missing[@]}"
+  ) >> "$VOCO_INSTALL_LOG" 2>&1 &
+  HELPER_DOWNLOAD_PID=$!
+}
+
+voco_finish_helper_prefetch() {
+  [[ -n "$HELPER_DOWNLOAD_PID" ]] || return 0
+  if wait "$HELPER_DOWNLOAD_PID"; then
+    HELPER_DOWNLOAD_READY="$VOCO_DOWNLOAD_DIR/helpers"
+    ok "Desktop helpers downloaded"
+  else
+    VOCO_KEEP_LOG=true
+    dim "APT will fetch any remaining desktop helpers during installation."
+  fi
+  HELPER_DOWNLOAD_PID=""
+}
+
 voco_install_cleanup() {
+  if [[ -n "$HELPER_DOWNLOAD_PID" ]]; then
+    kill "$HELPER_DOWNLOAD_PID" 2>/dev/null || true
+    wait "$HELPER_DOWNLOAD_PID" 2>/dev/null || true
+  fi
   if [[ -n "$DOWNLOAD_PID" ]]; then
     kill "$DOWNLOAD_PID" 2>/dev/null || true
     wait "$DOWNLOAD_PID" 2>/dev/null || true
@@ -676,6 +727,7 @@ CHECKSUM_FILE="${VOCO_DOWNLOAD_DIR}/voco_checksums.txt"
 DEB_CHECKSUM_FILE="${VOCO_DOWNLOAD_DIR}/voco_${VERSION}_amd64.deb.sha256"
 
 dim "Includes English speech recognition. Speech stays on this computer."
+voco_start_helper_prefetch
 voco_download "VOCO v${VERSION}" "$DEB_FILE" "$DEB_URL" || exit 1
 if ! voco_download "Release checksums" "$CHECKSUM_FILE" "$CHECKSUMS_URL"; then
   exit 1
@@ -703,7 +755,8 @@ echo -e "  ${BOLD}${GRAPHITE}[3/3]${NC} ${BOLD}Install VOCO${NC}"
 # unprivileged download user read the verified package without widening user dirs.
 chmod 755 "$VOCO_DOWNLOAD_DIR"
 chmod 644 "$DEB_FILE"
-if voco_install_deb_package "$DEB_FILE" "$VERSION" "amd64"; then
+voco_finish_helper_prefetch
+if voco_install_deb_package "$DEB_FILE" "$VERSION" "amd64" "$HELPER_DOWNLOAD_READY"; then
   ok "VOCO installed"
 else
   err "Installation failed: ${VOCO_INSTALL_ERROR}"

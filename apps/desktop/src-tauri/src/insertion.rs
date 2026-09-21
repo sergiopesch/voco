@@ -310,6 +310,7 @@ fn desktop_paste_status_with_input(
             "editable" if target.token.is_some() => input.detail.clone(),
             "none" => "Click in a text field, then press your dictation shortcut to start.".into(),
             "protected" => "Dictation is unavailable in password fields. Click in another text field and try again.".into(),
+            _ if matches!(target.reason, DesktopTargetReason::NoFocusedControl) => "This app is not exposing a text cursor. Check its accessibility support, reopen it, and try again.".into(),
             _ => "VOCO cannot verify a text cursor here. Click in an editable text field and try again.".into(),
         },
     }

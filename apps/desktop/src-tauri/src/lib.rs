@@ -38,6 +38,16 @@ pub fn check_desktop_input() -> Result<String, String> {
     }
 }
 
+/// Check the focused destination without recording, changing the clipboard or typing.
+pub fn check_desktop_cursor() -> Result<String, String> {
+    let status = insertion::desktop_paste_status();
+    if status.available {
+        Ok("Text cursor verified. VOCO can start here.".into())
+    } else {
+        Err(status.detail)
+    }
+}
+
 /// Request one toggle from the running application without launching a window.
 pub fn toggle_running_application() -> Result<(), String> {
     trigger_socket::toggle().map_err(|error| {

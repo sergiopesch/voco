@@ -1,8 +1,10 @@
 # Fresh-install investigation — 21 September 2026
 
-Scope: the published Ubuntu/Debian .47 package and a source candidate based on
-`913247757ab32994cf122daba22230e1d0dc57d9`. The candidate is not a new release or an
-installed fix. Raw host traces and screenshots remain private, outside Git.
+Scope: the published Ubuntu/Debian .47 package and the .48 local test candidate
+based on `913247757ab32994cf122daba22230e1d0dc57d9`. The sections below retain the
+original investigation; the final section records subsequent .48 qualification.
+Raw host traces and screenshots remain private, outside Git. This is not a public
+release qualification.
 
 ## Installation and footprint
 
@@ -74,7 +76,7 @@ maps only known categories to fixed events. Text, titles and destination identit
 are not logged. This improves diagnosis and does not claim to fix the unverified
 external-field failure.
 
-## Candidate verification
+## Initial source verification (before .48 assembly)
 
 - Installer/DevOps checks passed, including nine presentation, retry and cleanup cases.
 - Focus/delivery Python suites: 82 passed; native Rust insertion suite: 22 passed.
@@ -162,5 +164,68 @@ Clippy passed for all targets with warnings denied. Formatting and diff checks p
 Initial test-fixture compilation failures are retained in the private evidence.
 They are excluded from the passing checks; no dependency upgrade was needed.
 
-The installed .47 package remains unchanged. This source fix does not qualify
-dictation into Codex or Brave; their actual editor/accessibility trial is still open.
+At this stage the installed .47 package was unchanged. Native notification
+visibility does not qualify dictation into Codex or Brave; their actual
+editor/accessibility trial is still open.
+
+## .48 local candidate
+
+The complete Ubuntu/Debian candidate is **686,868,062 bytes** (655.0 MiB), SHA-256
+`d9c240bec1166a383091b03f47661ffb602b276f933a260bc35fbd5043aff90a`.
+Its application SHA-256 is
+`ffc6a1d5c12040f9e8255fa9e65cb42ad0afa6126a09e7fd2d4c08ecebd34fdd`.
+The package verifier passed, including the pinned model/runtime and companion
+browser host. Bundled documentation retains its assembly snapshot.
+
+The installer now downloads missing Wayland helpers without privilege alongside
+the VOCO package. Only a completed APT download is reused in the final APT
+transaction; failure falls back to normal installation, and cancellation reaps
+the downloader. Five tests cover overlap, fallback, cancellation, X11 and already
+installed helpers. A separate unprivileged APT download retrieved valid helper
+packages without installing them.
+
+The original 31-second helper fetch did not recur: subsequent downloads of the
+same 802 kB Ubuntu archive took 0.114 s normally and 0.164 s with IPv4 forced.
+No IPv4 override was adopted. Overlap removes a serial dependency wait when the
+helper fetch finishes during the main transfer; a faster complete fresh install
+has not yet been measured.
+
+Zstandard level 9 reduces the complete package by 2,654,370 bytes (2.53 MiB,
+0.385%). The English model and runtime settings are unchanged. On an identical
+uncompressed package payload, level 9 encoded in 1.77 s and decoded plus SHA-256
+verification in 0.536 s. An XZ level 6 experiment saved only about another 5.4 MB
+but needed 124.62 s to encode and 25.73 s to decode and hash; it was rejected.
+These are local compression measurements, not network download benchmarks.
+
+The exact candidate binary completed a fresh native onboarding journey under
+private X11, D-Bus and PulseAudio using a public speech fixture. Start test,
+speech, Finish test and Done saved completion with the default **Alt+D** shortcut.
+The read-only cursor check then verified a separate GTK text field, and actual
+Alt+D start/stop inserted all four expected words. Screenshots confirm the single
+recording capsule, group focus outline and original icon in native WebKit.
+This uses real recognition and an external control, but does not qualify a physical
+microphone, Wayland or the user's Codex/Brave editor.
+
+The first native journey attempt completed onboarding but blocked its GTK event
+loop while waiting synchronously for a cursor probe. The driver was corrected to
+pump its event loop while the subprocess ran; the second attempt passed. Both
+attempts are retained. The application did not change between attempts.
+
+Type checking, lint, the complete npm test command (including 444 Vitest passes
+and two skips), 523 native Rust tests (one ignored), release Clippy with warnings
+denied, production build, installer and DevOps checks passed. Renderer checks
+cover dictation, 31 microphone cases, 42 native-capture cases and five
+brand-motion groups. Those renderer checks mock native/media boundaries.
+Chromium exact-field checks, glib backport provenance and seven optimized
+glib iterator regressions also passed.
+The first dictation-renderer attempt hit the host's file-watcher limit; polling
+resolved it without changing host limits. Initial renderer invocations missing
+required exclusive evidence directories and a DevOps attempt with `rg` absent
+from the overridden PATH are retained separately from successful retries.
+
+Per-user Codex and Brave desktop launchers now request the native accessibility
+bridge and renderer while preserving their icons and other metadata. Backups,
+diffs and hashes are private. Existing application processes have not been
+restarted. The user must fully quit and reopen both apps to test those settings.
+No global accessibility preference, browser profile or confinement policy changed.
+The public installer remains pinned to .47 until a separately qualified release.

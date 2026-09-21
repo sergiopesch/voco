@@ -157,7 +157,7 @@ def main():
         (stage / "DEBIAN/md5sums").write_text("".join(
             f"{digest(path, 'md5')}  {path.relative_to(stage)}\n" for path in files))
         temporary_output = Path(directory) / "candidate.deb"
-        subprocess.run(["dpkg-deb", "--root-owner-group", "-Zzstd", "-z3", "--build",
+        subprocess.run(["dpkg-deb", "--root-owner-group", "-Zzstd", "-z9", "--build",
                         str(stage), str(temporary_output)], check=True)
         # Publish only a completely built archive; an existing candidate is never replaced.
         os.link(temporary_output, output)

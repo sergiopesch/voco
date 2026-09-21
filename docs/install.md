@@ -84,6 +84,35 @@ accessible text field and try again. Password fields are excluded. Changing fiel
 during a recording stops delivery; review retained text before copying it.
 Custom controls that do not expose an accessible cursor are not supported.
 
+### Chromium and Electron applications
+
+Some browsers and Electron apps expose their text cursor only when accessibility
+is enabled. If VOCO asks you to check an app's accessibility support, fully quit
+that app and launch it with its native accessibility bridge and renderer enabled:
+
+```bash
+env ACCESSIBILITY_ENABLED=1 brave --force-renderer-accessibility
+```
+
+Use the app's own command in place of `brave` (`chatgpt` for the tested Codex desktop
+installation). Closing a window may leave the app running; the flags take effect
+only on a new application process. For a persistent change, copy the app's desktop
+launcher into `~/.local/share/applications/` and apply the same environment and flag
+to its `Exec` entries, preserving its icon and other metadata. VOCO's installer
+does not change other apps' launchers or global accessibility preferences.
+
+The .48 candidate also provides `voco --check-cursor`, a read-only check of the
+currently focused text field. To allow time to focus a field after starting it:
+
+```bash
+sleep 3; voco --check-cursor
+```
+
+This checks cursor accessibility without recording, copying or typing. It does not
+guarantee that every custom editor accepts dictation. See the [compatibility evidence](testing/fresh-install-2026-09-21.md#codex-and-brave-follow-up).
+
+### Desktop input helpers
+
 On X11, desktop paste uses xclip and xdotool. On Wayland, it uses ydotool plus
 the appropriate clipboard helper; its input service and permissions may require
 setup. The Debian package recommends both ydotool and ydotoold because Ubuntu 24.04

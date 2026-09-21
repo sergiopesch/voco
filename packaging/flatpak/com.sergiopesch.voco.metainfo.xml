@@ -29,7 +29,7 @@
   <url type="vcs-browser">https://github.com/sergiopesch/voco</url>
   <content_rating type="oars-1.1" />
   <releases>
-    <release version="2026.0.47" date="2026-09-21"><description><p>Unified voice setup, compact controls, a dedicated Shortcut section and clearer installation progress.</p></description></release>
+    <release version="2026.0.48" date="2026-09-21"><description><p>Unified voice setup, compact controls, a dedicated Shortcut section and clearer installation progress.</p></description></release>
     <release version="2026.0.44" date="2026-09-20"><description><p>Test live local speech during onboarding and check for an editable cursor before dictation.</p></description></release>
     <release version="2026.0.43" date="2026-09-19"><description><p>Safer capture admission, offline recovery, and public evaluation tools.</p></description></release>
     <release version="2026.0.41" date="2026-09-19"><description><p>Guard incomplete capture and recover dictation with the bundled local model.</p></description></release>

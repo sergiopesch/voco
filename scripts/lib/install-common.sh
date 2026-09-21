@@ -324,6 +324,14 @@ voco_install_deb_package() {
   # Wayland needs both, even when APT recommendations are disabled by the owner.
   if [[ "${XDG_SESSION_TYPE:-x11}" == wayland ]]; then
     packages+=(ydotool ydotoold)
+    # APT downloaded and checked these in parallel with VOCO. Supplying the local
+    # archives lets the final dependency transaction reuse them without root cache writes.
+    if [[ -n "${4:-}" ]]; then
+      local helper_deb
+      for helper_deb in "$4"/ydotool_*.deb "$4"/ydotoold_*.deb; do
+        [[ -f "$helper_deb" && ! -L "$helper_deb" ]] && packages+=("$helper_deb")
+      done
+    fi
   fi
   if ! sudo apt-get install -y -- "${packages[@]}"; then
     VOCO_INSTALL_ERROR="APT could not install VOCO and its desktop dependencies. Resolve the error above, then run the installer again."
