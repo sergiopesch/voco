@@ -12,13 +12,27 @@ if [[ ${1:-} != --inside ]]; then
   if [[ -n ${VOCO_PANEL_APP_BINARY:-} ]]; then
     cp --reflink=auto "$VOCO_PANEL_APP_BINARY" "$run/voco"
   fi
+  if [[ -n ${VOCO_PANEL_PACKAGE_ROOT:-} ]]; then
+    cp --reflink=auto "$VOCO_PANEL_PACKAGE_ROOT/usr/bin/voco" "$run/voco"
+    cp -a "$VOCO_PANEL_PACKAGE_ROOT/usr/share/gnome-shell/extensions/voco-panel@voco.local" "$run/panel-payload"
+    mkdir -p "$run/system-extensions"
+    cp -a /usr/share/gnome-shell/extensions/ubuntu-appindicators@ubuntu.com "$run/system-extensions/"
+  fi
   mkdir -p "$run/data/gnome-shell/extensions"
-  cp -a "$ROOT/integrations/gnome/voco-panel@voco.local" "$run/data/gnome-shell/extensions/"
+  if [[ -z ${VOCO_PANEL_PACKAGE_ROOT:-} ]]; then
+    cp -a "$ROOT/integrations/gnome/voco-panel@voco.local" "$run/data/gnome-shell/extensions/"
+  fi
   cp -a "$ROOT/scripts/fixtures/gnome-panel-probe" "$run/data/gnome-shell/extensions/voco-panel-probe@test.invalid"
   trap 'status=$?; mkdir -p "$VOCO_PANEL_EVIDENCE_DIR"; cp -a "$run/evidence/." "$VOCO_PANEL_EVIDENCE_DIR/"; echo "$status" > "$VOCO_PANEL_EVIDENCE_DIR/exit-code"; rm -rf "$run"; exit "$status"' EXIT
+  package_mounts=()
+  if [[ -n ${VOCO_PANEL_PACKAGE_ROOT:-} ]]; then
+    package_mounts=(--bind "$run/system-extensions" /usr/share/gnome-shell/extensions
+      --ro-bind "$VOCO_PANEL_PACKAGE_ROOT/usr/lib/voco/speech" /usr/lib/voco/speech)
+  fi
   bwrap --die-with-parent --new-session --unshare-ipc --unshare-net --unshare-pid --unshare-uts \
     --ro-bind / / --dev /dev --proc /proc --tmpfs /tmp --tmpfs /run/user --tmpfs /run/dbus \
     --bind "$run" "$run" --ro-bind "$VOCO_NATIVE_DEPS" /tmp/native-deps \
+    "${package_mounts[@]}" \
     --setenv HOME "$run/home" --setenv XDG_RUNTIME_DIR "$run/runtime" \
     --setenv XDG_CONFIG_HOME "$run/config" --setenv XDG_CACHE_HOME "$run/cache" \
     --setenv XDG_DATA_HOME "$run/data" --setenv XDG_STATE_HOME "$run/state" \

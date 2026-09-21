@@ -38,7 +38,7 @@ function harness() {
     setDictationPurpose: vi.fn((purpose: "cursor" | "onboarding") => { state.dictationPurpose = purpose; }),
     setOnboardingTestPassed: vi.fn(),
   };
-  const status = { shortcutEpoch: 7, enabled: true, available: true, streamingEnabled: true, targetToken: "guarded-target" as string | null };
+  const status = { detail: "VOCO cannot verify a text cursor here.", failureReason: "cursor" as "cursor" | "setup", shortcutEpoch: 7, enabled: true, available: true, streamingEnabled: true, targetToken: "guarded-target" as string | null };
   const target = ref<string | null>(null);
   const pasteStatus = vi.fn(async () => status);
   // Deliberately end startup at source selection after shortcut acquisition.
@@ -46,11 +46,13 @@ function harness() {
   const captureSelection = vi.fn(() => ({ backend: "native" as const, selectionToken: "" }));
   const trace = vi.fn(async () => {});
   const setError = vi.fn();
+  const notify = vi.fn(async (_summary: string, _body: string) => {});
   const env = {
     phaseRef: phase,
     sessionRef: current,
     disposedRef: disposed,
     cancelledRef: cancelled,
+    browserDeliveryRef: ref(null),
     desktopShortcutSessionRef: owner,
     desktopShortcutCleanupRef: cleanup,
     desktopPhraseQueueRef: queue,
@@ -117,7 +119,7 @@ function harness() {
     pasteDesktopText: vi.fn(async () => ({ outcome: "dispatched" })),
     traceDictationEvent: trace,
     traceHotkeyEvent: trace,
-    showNotification: asyncNoop,
+    showNotification: notify,
     setCancellationPending: noop,
     setCanCancel: noop,
     setStatus: noop,
@@ -166,7 +168,7 @@ function harness() {
     ...recording,
     unmount: recording.dispose,
     state, phase, current, owner, cleanup, cancelled, queue, begin, end, status,
-    pasteStatus, captureSelection, trace, setError, disposed, target,
+    pasteStatus, captureSelection, trace, setError, disposed, target, notify,
   };
 }
 
@@ -194,11 +196,9 @@ it("a failed begin prevents capture and still ends the uncertain owner", async (
   expect(h.trace).toHaveBeenCalledWith("dictation_desktop_shortcut_acquire_failed");
 });
 
-it.each(["browser", "enhancement", "not-streaming"])("retains the existing %s route without a shortcut lease", async route => {
+it("does not acquire a desktop shortcut for an explicit browser recording", async () => {
   const h = harness();
-  if (route === "enhancement") h.state.config.transcriptEnhancement = "on";
-  if (route === "not-streaming") h.status.streamingEnabled = false;
-  await h.startRecording(route === "browser" ? "browser:test" : undefined);
+  await h.startRecording("browser:test");
   expect(h.captureSelection).toHaveBeenCalledOnce();
   expect(h.begin).not.toHaveBeenCalled(); expect(h.end).not.toHaveBeenCalled();
 });
@@ -328,4 +328,18 @@ it("keeps the first preflight epoch while waiting for old cleanup; stale begin p
   expect(h.captureSelection).not.toHaveBeenCalled();
   expect(h.end).toHaveBeenCalledOnce();
   expect(h.setError).toHaveBeenCalledWith(expect.stringContaining("window changed"));
+});
+
+it.each(["cursor", "setup"] as const)("reports a rejected %s preflight without recording", async reason => {
+  const h = harness();
+  h.status.available = false;
+  h.status.failureReason = reason;
+  await h.startRecording();
+  expect(h.captureSelection).not.toHaveBeenCalled();
+  expect(h.begin).not.toHaveBeenCalled();
+  expect(h.notify).toHaveBeenCalledExactlyOnceWith(
+    reason === "cursor" ? "No text cursor available" : "Dictation setup incomplete",
+    h.status.detail,
+  );
+  expect(h.setError).toHaveBeenCalledWith(h.status.detail);
 });

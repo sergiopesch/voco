@@ -86,3 +86,36 @@ leading-space transition. It never acknowledges that intermediate state: two
 aligned expected text/position samples are still required. Wrong text, unrelated
 caret offsets, focus changes and backwards confirmed progress still fail closed.
 The three-second deadline and prohibition on replay are unchanged.
+
+### Rich editor paragraph confirmation (.49 candidate)
+
+The .48 owner trial inserted only the first word in Codex. A real Chromium
+contenteditable reproduction showed why: its focused editable root exposed one
+U+FFFC embedded-object character before and after the paste, while its linked
+paragraph contained the actual inserted text. Flat-root checks remained pending.
+
+The .49 observer follows only the caret's hypertext links, with an eight-level
+bound. It retains the outer focus token and the linked paragraph route, then
+checks that same route, bounded text region and actual paragraph caret twice.
+It does not walk every paragraph or read an unrelated editor. A final BR and a bounded number
+of trailing noneditable widgets are treated as editor scaffolding outside
+the observed paragraph text region. They cannot confirm a paste or authorize
+reading a protected descendant. User text before that region boundary is retained.
+
+Selections within one paragraph are supported. Selections spanning embedded
+objects, unreadable nested carets and detached/replaced routes reject or pause
+safely; they never downgrade a recognized rich editor to unverified paste. Focus
+changes and incorrect text stop delivery. Delayed count/caret updates remain
+pending under the same three-second deadline, with no replay.
+
+The normal trace now distinguishes observation timeout, changed content/caret,
+unavailable readback and invalid response using four fixed event names beginning
+`dictation_delivery_observation_`. No field text, paths or content hashes are
+added. This improves failure diagnosis; it does not make observations atomic.
+
+Run `npm run test:rich-editor-delivery` with Chromium, Xvfb, xclip, Python GI/AT-SPI
+and Bubblewrap available. `VOCO_NATIVE_DEPS` can select an extracted `root/usr`;
+`VOCO_RICH_EDITOR_EVIDENCE_DIR` retains numeric outcomes. The wrapper isolates the
+display, session bus, clipboard and profile from the user's desktop. The test
+uses real clipboard paste into rich editors and independent DOM assertions.
+See [the dated review](rich-editor-2026-09-21.md) for evidence and limitations.

@@ -1,21 +1,19 @@
 # Architecture
 
-VOCO 2026.0.40 provides local, direct-cursor dictation. Read [the code map](code-map.md)
+VOCO provides local, direct-cursor dictation. Read [the code map](code-map.md)
 and [release status](../release-candidate.md) for navigation and qualification.
 
 ## Startup and recognizer selection
 
-The backend owns eager model preparation. Default desktop dictation with
-paste/streaming enabled warms the existing serialized NVIDIA worker; it
-marks readiness only after the worker's model load and synthetic audio warmup
-succeed. Queue-module import performs no warmup. Failed NVIDIA startup does not
-download Whisper as an implicit fallback. Explicit
-Whisper commands retain their separate model preparation. Browser triggers select
-their route per session, so startup does not infer their future use.
+The backend warms the bundled Nemotron worker before reporting model readiness.
+Desktop dictation, explicit browser dictation and onboarding all send captured
+samples through the same bounded streaming queue. A missing runtime or failed
+warmup reports an error; the app does not download another model.
 
-The existing tray has one model-status slot, not independent status for every
-optional recognizer. A later explicit Whisper failure can still affect that status;
-this round does not redesign per-session readiness.
+Browser delivery uses a separately authorized field lease. Each append requires an
+exact prefix receipt and Stop finalizes the acknowledged text without replaying it.
+Explicit recovery uses a private Nemotron worker and keeps its completed result in
+VOCO for review. No recognition result bypasses destination validation.
 
 Shortcut arbitration separates completed IBus authority from a poll in flight.
 Registration, config synchronization and readiness use only unexpired Armed/Uncertain
@@ -70,10 +68,10 @@ before edits. Password fields, rich editors and unsupported fields are rejected.
 IBus remains shortcut-only; protocol 6 rejects text mutation. Neither integration
 establishes universal desktop or Wayland qualification.
 
-Legacy Whisper preview/final and hybrid recognition remain in `transcribe.rs` and
-the [hybrid planner](hybrid-recognition.md). They are not the streaming NVIDIA
-candidate path. Assistant, OpenClaw, conversation and enhancement capabilities have
-been removed; see the current [security boundaries](../security/README.md).
+Whisper and its downloader, native dependencies and alternate recognition commands
+were removed in the .51 development source. Earlier evaluation documents describe
+historical implementations. Assistant, OpenClaw, conversation and enhancement
+capabilities remain retired; see [security boundaries](../security/README.md).
 
 ## State, UI and lifecycle
 

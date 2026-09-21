@@ -6,6 +6,7 @@ USERNS_POLICY="/proc/sys/kernel/apparmor_restrict_unprivileged_userns"
 ORIGINAL_USERNS_POLICY=""
 case "${1:-}" in
   "") TEST_SCRIPT="test-private-ibus-engine.sh" ;;
+  --rich-editor) TEST_SCRIPT="test-rich-editor-delivery.sh" ;;
   --native-desktop) TEST_SCRIPT="test-native-desktop.sh" ;;
   --native-wayland)
     : "${VOCO_WAYLAND_DEPS:?Set the installed or extracted Weston root/usr}"
@@ -16,13 +17,13 @@ case "${1:-}" in
     : "${VOCO_BROWSER_HOST_BINARY:?Set the packaged native host executable}"
     : "${VOCO_BROWSER_EXTENSION_DIR:?Set the packaged Chromium extension directory}"
     : "${VOCO_NATIVE_APP_BINARY:?Set the built candidate executable}"
-    : "${VOCO_NATIVE_MODEL:?Set the pinned existing model}"
+
     : "${VOCO_BROWSER_EVIDENCE_DIR:?Set a directory for browser application evidence}"
     TEST_SCRIPT="test-browser-full-app.sh"
     ;;
   --full-application)
     : "${VOCO_NATIVE_APP_BINARY:?Set the built candidate executable}"
-    : "${VOCO_NATIVE_MODEL:?Set the pinned existing model}"
+
     : "${VOCO_NATIVE_EVIDENCE_DIR:?Set a directory for native application evidence}"
     TEST_SCRIPT="test-native-desktop.sh"
     ;;

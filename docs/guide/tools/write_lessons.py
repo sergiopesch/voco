@@ -423,6 +423,10 @@ lesson(
             "Known terminal targets use their paste chord. VOCO does not edit the terminal’s shortcut configuration to make that work.",
         ),
         (
+            "Why one word could get stuck",
+            "A September .48 Codex trial inserted the first word, then stopped. Chromium exposed a fixed outer object placeholder while the actual text lived in a nested paragraph. The .49 candidate follows the caret into that paragraph and confirms its text and position, while retaining the original field identity and the no-replay rule. This newer finding does not change the source viewer pinned to .43.",
+        ),
+        (
             "Observation has limits",
             "Accessible-field samples are best-effort local observations, not atomic ownership or compositor paint. Firefox can report newly inserted text before its caret catches up. VOCO waits within the existing three-second limit for exact text and position to agree; an intermediate sample cannot confirm delivery, and an uncertain paste is never replayed. A target can still change between checks.",
         ),
@@ -574,6 +578,14 @@ lesson(
         (
             "Window movement is native work",
             "Dragging/resizing a Tauri window uses native APIs. CSS alone cannot move a Linux desktop window.",
+        ),
+        (
+            "A delivered status needs a visible component",
+            "A .49 owner trial on 21 September found that successful dictation did not make live bars appear: the separate GNOME companion was absent from the normal installer, while the GTK tray tooltip did nothing. The .50 candidate bundles the GNOME 46 component, offers explicit activation and reports a required session restart. Its fallback has a visible label where supported and a status row in its menu. These newer changes do not alter this guide's pinned .43 source viewer.",
+        ),
+        (
+            "Finishing setup is a handoff",
+            "The .51 release cut includes the .50 handoff: Ready stays visible after Done, and a second launch opens the existing idle app. During capture, launcher activation keeps the text destination focused. Microphone selection stays in the same setup canvas and returns to Start test after applying it. Alt+D replaces Ready with measured volume bars from a fixed, retained image set; silence settles the bars and Stop restores Ready. The GNOME companion follows measured levels and system reduced motion. These changes do not alter the pinned .43 source viewer.",
         ),
     ],
     [

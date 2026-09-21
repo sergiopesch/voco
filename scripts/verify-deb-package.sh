@@ -90,6 +90,9 @@ assert_entry /usr/lib/voco/ibus/voco_ibus_engine.py -rw-r--r--
 assert_entry /usr/lib/voco/ibus/voco_ibus_ownership.py -rw-r--r--
 assert_entry /usr/lib/voco/ibus/voco_ibus_protocol.py -rw-r--r--
 assert_entry /usr/bin/voco -rwxr-xr-x
+for file in metadata.json extension.js model.js stylesheet.css voco-symbol.png; do
+  assert_entry "/usr/share/gnome-shell/extensions/voco-panel@voco.local/${file}" -rw-r--r--
+done
 assert_entry /usr/lib/systemd/user/voco-ydotoold.service -rw-r--r--
 assert_entry /usr/share/doc/voco/THIRD-PARTY-NOTICES.txt -rw-r--r--
 assert_entry /usr/libexec/voco-browser-host -rwxr-xr-x

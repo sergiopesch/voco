@@ -1,3 +1,5 @@
+> Historical implementation, retired in .51. The current single-engine stream and explicit recovery contract are described in [Architecture](README.md#startup-and-recognizer-selection). Paths and decoder behavior below refer to earlier commits.
+
 # Native CPU synchronization
 
 The pinned Whisper decoder uses GGML CPU graphs. The owned native patch changes how graph workers synchronize and stop; speech weights, decoder parameters, recovery admission and output boundaries remain unchanged.

@@ -87,13 +87,18 @@ mod linux {
     }
 
     pub fn acquire() -> Result<SingleInstanceGuard, SingleInstanceError> {
+        acquire_at(runtime_directory()?.join(INSTANCE_LOCK_FILENAME), unsafe {
+            libc::geteuid()
+        })
+    }
+
+    pub fn runtime_directory() -> Result<PathBuf, SingleInstanceError> {
         let effective_uid = unsafe { libc::geteuid() };
-        let runtime_dir = resolve_runtime_directory(
+        resolve_runtime_directory(
             env::var_os("XDG_RUNTIME_DIR").as_deref(),
             effective_uid,
             Path::new(FALLBACK_RUNTIME_ROOT),
-        )?;
-        acquire_at(runtime_dir.join(INSTANCE_LOCK_FILENAME), effective_uid)
+        )
     }
 
     fn resolve_runtime_directory(
@@ -397,7 +402,7 @@ mod linux {
 }
 
 #[cfg(target_os = "linux")]
-pub use linux::acquire;
+pub use linux::{acquire, runtime_directory, SingleInstanceError};
 
 #[cfg(not(target_os = "linux"))]
 #[derive(Debug)]

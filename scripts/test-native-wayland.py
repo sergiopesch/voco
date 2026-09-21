@@ -108,7 +108,7 @@ try:
     pulse = None
     if capture_requested:
         assert report['backend'] == 'nested-x11' and report['clipboardProbe']['crossProcessReadbackVerified']
-        assert (root / 'voco').exists() and (root / 'data/voco/models/ggml-base.en.bin').exists()
+        assert (root / 'voco').exists() and (root / 'speech/models/nemotron-speech-streaming-en-0.6b.q8_0.gguf').exists()
         os.environ.update(PULSE_SERVER='unix:' + str(root / 'runtime/pulse.sock'),
                           PULSE_SOURCE='voco_fixture', PULSE_SINK='fixture')
         pulse = subprocess.Popen([os.environ['VOCO_WAYLAND_PULSEAUDIO'], '--daemonize=no', '--use-pid-file=no',
@@ -164,7 +164,7 @@ try:
             assert item is not None, label
             call(name, menu, 'com.canonical.dbusmenu', 'Event', GLib.Variant('(isvu)', (item, 'clicked', GLib.Variant('s', ''), 0)))
         pump(.2)
-        model = root / 'data/voco/models/ggml-base.en.bin'
+        model = root / 'speech/models/nemotron-speech-streaming-en-0.6b.q8_0.gguf'
         report['model'] = {'provided': model.exists(), 'decoderLoaded': False}
         if model.exists():
             report['model']['sha256'] = hashlib.sha256(model.read_bytes()).hexdigest()
@@ -194,10 +194,10 @@ try:
                     assert app.poll() is None and items, 'No tray registration'
                     if model.exists():
                         deadline = time.monotonic() + 15
-                        while time.monotonic() < deadline and 'Cached speech model verified:' not in (root / f'evidence/app-{cycle}.log').read_text():
+                        while time.monotonic() < deadline and 'Bundled Nemotron streaming model ready' not in (root / f'evidence/app-{cycle}.log').read_text():
                             assert app.poll() is None
                             pump(.05)
-                        assert 'Cached speech model verified:' in (root / f'evidence/app-{cycle}.log').read_text(), 'Model cache readiness was not observed'
+                        assert 'Bundled Nemotron streaming model ready' in (root / f'evidence/app-{cycle}.log').read_text(), 'Bundled model readiness was not observed'
                     activate('Open VOCO')
                     deadline = time.monotonic() + 15
                     visible = None

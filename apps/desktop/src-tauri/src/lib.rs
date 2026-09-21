@@ -3,12 +3,15 @@ compile_error!(
     "VOCO production builds require the app's custom-protocol feature; use `cargo tauri build --features custom-protocol` instead of `cargo build --release`"
 );
 
+mod activation;
 mod audio_transport;
 mod benchmark_stream;
 mod browser_broker;
 mod browser_protocol;
 mod browser_socket;
 mod config;
+#[cfg(target_os = "linux")]
+mod desktop_notifications;
 mod desktop_shortcut;
 mod focus_probe;
 #[cfg(target_os = "linux")]
@@ -18,12 +21,13 @@ mod insertion;
 mod native_capture;
 mod native_capture_commands;
 mod owned_preedit;
+pub mod panel_setup;
 mod performance;
 mod process_runner;
 mod shortcut_arbitration;
 mod shortcut_readiness;
 mod single_instance;
-pub mod transcribe;
+mod tray_icons;
 mod trigger_socket;
 
 /// Check input prerequisites without launching a window or sending keys.
@@ -36,29 +40,37 @@ pub fn check_desktop_input() -> Result<String, String> {
     }
 }
 
+/// Check the focused destination without recording, changing the clipboard or typing.
+pub fn check_desktop_cursor() -> Result<String, String> {
+    let status = insertion::desktop_paste_status();
+    if status.available {
+        Ok("Text cursor verified. VOCO can start here.".into())
+    } else {
+        Err(status.detail)
+    }
+}
+
 /// Request one toggle from the running application without launching a window.
 pub fn toggle_running_application() -> Result<(), String> {
     trigger_socket::toggle().map_err(|error| {
         format!("Could not reach VOCO's private control socket: {error}. Open VOCO in this desktop session first.")
     })
 }
-pub use transcribe::{hybrid, numerical_planner, vca2};
 #[cfg(target_os = "linux")]
 mod panel;
 mod tray;
 
 use config::{
     load_cached_update_check, save_cached_update_check, AppConfig, AppConfigPatch,
-    CachedUpdateCheck, TranscriptEnhancement,
+    CachedUpdateCheck,
 };
 use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
-use std::io::{Read, Write};
+use std::io::Write;
 use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
 use std::sync::{LazyLock, Mutex};
 use std::time::Instant;
 use tauri::{Emitter, Manager};
-use transcribe::{WhisperMutex, WhisperState};
 
 // Debounce: ignore duplicate toggle events that arrive almost immediately.
 // This collapses duplicate keyboard backends and duplicate evdev devices
@@ -81,9 +93,6 @@ static PENDING_TOGGLE_BACKEND: LazyLock<Mutex<Option<String>>> = LazyLock::new(|
 static TRACE_START: LazyLock<Instant> = LazyLock::new(Instant::now);
 static TRACE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 static TRACE_FILE_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
-static MODEL_DOWNLOAD_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
-static MODEL_VERIFIED_IDENTITY: LazyLock<Mutex<Option<CachedModelIdentity>>> =
-    LazyLock::new(|| Mutex::new(None));
 static CONFIG_WRITE_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 static CONFIG_REVISION: AtomicU64 = AtomicU64::new(0);
 static DEBUG_CAPTURE_WRITTEN: AtomicBool = AtomicBool::new(false);
@@ -99,10 +108,6 @@ const CONFIG_CHANGED_EVENT: &str = "voco:config-changed";
 const LEGACY_TOGGLE_DICTATION_EVENT: &str = "voice:toggle-dictation";
 const TOGGLE_DEBOUNCE_MS: i64 = 120;
 const MAX_AUDIO_SECONDS: usize = 600;
-const PREVIEW_SAMPLE_RATE: usize = 16_000;
-const MIN_PREVIEW_SAMPLES: usize = PREVIEW_SAMPLE_RATE * 7 / 10;
-const MAX_PREVIEW_SAMPLES: usize = PREVIEW_SAMPLE_RATE * 20;
-const MAX_DESKTOP_PREVIEW_SAMPLES: usize = PREVIEW_SAMPLE_RATE * 30;
 const HIDDEN_WINDOW_POS_X: i32 = -100;
 const HIDDEN_WINDOW_POS_Y: i32 = -100;
 const HIDDEN_WINDOW_SIZE: u32 = 1;
@@ -297,6 +302,10 @@ fn trace_frontend_hotkey_event(
         | "frontend_audio_prepare_started"
         | "frontend_audio_prepare_done"
         | "frontend_init_complete"
+        | "onboarding_handoff_requested"
+        | "onboarding_handoff_visible"
+        | "launcher_activation_presented"
+        | "launcher_activation_preserved_capture"
         | "frontend_hotkey_listener_registered" => {
             trace_hotkey_event_with_fields(&event, None, fields.as_ref());
             Ok(())
@@ -322,7 +331,11 @@ fn trace_frontend_hotkey_event(
 fn is_supported_dictation_trace_event(event: &str) -> bool {
     matches!(
         event,
-        "dictation_trigger_start_rejected"
+        "dictation_delivery_observation_timeout"
+            | "dictation_delivery_observation_changed"
+            | "dictation_delivery_observation_unavailable"
+            | "dictation_delivery_observation_invalid"
+            | "dictation_trigger_start_rejected"
             | "dictation_trigger_stop_rejected"
             | "dictation_trigger_start_admitted"
             | "dictation_trigger_stop_admitted"
@@ -359,6 +372,15 @@ fn is_supported_dictation_trace_event(event: &str) -> bool {
             | "dictation_desktop_stream_failed"
             | "dictation_desktop_paste_session_started"
             | "dictation_desktop_paste_unavailable"
+            | "dictation_desktop_cursor_events_pending"
+            | "dictation_desktop_cursor_no_active_window"
+            | "dictation_desktop_cursor_ambiguous_windows"
+            | "dictation_desktop_cursor_no_focused_control"
+            | "dictation_desktop_cursor_not_editable"
+            | "dictation_desktop_cursor_protected"
+            | "dictation_desktop_cursor_control_unavailable"
+            | "dictation_desktop_cursor_probe_failed"
+            | "dictation_desktop_cursor_unavailable"
             | "dictation_desktop_paste_requested"
             | "dictation_desktop_paste_dispatched"
             | "dictation_desktop_paste_failed"
@@ -718,209 +740,6 @@ fn decode_audio_bytes(bytes: &[u8]) -> Result<Vec<f32>, String> {
     audio_transport::decode_samples(bytes)
 }
 
-#[tauri::command(async)]
-fn transcribe_audio(
-    app: tauri::AppHandle,
-    request: tauri::ipc::Request<'_>,
-    state: tauri::State<'_, WhisperMutex>,
-) -> Result<String, String> {
-    let mut performance = performance::RequestTrace::new("final");
-    let audio = audio_transport::decode_request(request.body(), 16_000 * MAX_AUDIO_SECONDS)?;
-    let samples = audio.samples;
-
-    if samples.is_empty() {
-        return Err("No audio samples provided".to_string());
-    }
-    if samples.len() > 16000 * MAX_AUDIO_SECONDS {
-        return Err(format!(
-            "Audio too long (max {} seconds)",
-            MAX_AUDIO_SECONDS
-        ));
-    }
-
-    performance.audio(samples.len(), None);
-    performance.stage("model_available");
-    ensure_model_downloaded(&app)?;
-
-    let model_path = transcribe::default_model_path()?;
-    if !model_path.exists() {
-        return Err("Model is not available after download attempt.".to_string());
-    }
-
-    performance.stage("decoder_lock_wait");
-    let mut whisper = state
-        .lock()
-        .map_err(|_| "Transcription state is unavailable".to_string())?;
-
-    performance.stage("model_load_or_cached");
-    whisper.load_model(&model_path)?;
-    performance.stage("recognition");
-    let result = whisper.transcribe_hybrid_full(&samples).into_result();
-    performance.outcome(if result.is_ok() { "ok" } else { "error" });
-    result
-}
-
-#[tauri::command(async)]
-fn transcribe_canonical_chunk(
-    app: tauri::AppHandle,
-    request: tauri::ipc::Request<'_>,
-    state: tauri::State<'_, WhisperMutex>,
-) -> Result<transcribe::CanonicalTranscription, String> {
-    let mut performance = performance::RequestTrace::new("canonical");
-    let audio =
-        audio_transport::decode_request(request.body(), transcribe::CANONICAL_CHUNK_MAX_SAMPLES)?;
-    let samples = audio.samples;
-    validate_canonical_sample_count(samples.len())?;
-
-    performance.audio(samples.len(), None);
-    performance.stage("model_available");
-    ensure_model_downloaded(&app)?;
-
-    let model_path = transcribe::default_model_path()?;
-    if !model_path.exists() {
-        return Err("Model is not available after download attempt.".to_string());
-    }
-
-    performance.stage("decoder_lock_wait");
-    let mut whisper = state
-        .lock()
-        .map_err(|_| "Transcription state is unavailable".to_string())?;
-
-    performance.stage("model_load_or_cached");
-    whisper.load_model(&model_path)?;
-    performance.stage("recognition");
-    let result = whisper.transcribe_canonical_chunk(&samples, &audio.previous_canonical_text);
-    performance.outcome(if result.is_ok() { "ok" } else { "error" });
-    result
-}
-
-/// VCA2 restores and plans before any model availability or loading work.
-#[tauri::command(async)]
-fn transcribe_hybrid_chunk(
-    app: tauri::AppHandle,
-    request: tauri::ipc::Request<'_>,
-    state: tauri::State<'_, WhisperMutex>,
-) -> Result<vca2::Response, String> {
-    let mut performance = performance::RequestTrace::new("hybrid");
-    let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
-        return Err("Hybrid audio requires the binary VCA2 transport".into());
-    };
-    let audio = vca2::decode_packet(bytes)?;
-    performance.audio(
-        audio.decode_samples().len(),
-        Some(audio.metadata().session_id),
-    );
-    performance.stage("model_available");
-    ensure_model_downloaded(&app)?;
-    let model_path = transcribe::default_model_path()?;
-    if !model_path.exists() {
-        return Err("Model is not available after download attempt.".into());
-    }
-    performance.stage("decoder_lock_wait");
-    let mut whisper = state
-        .lock()
-        .map_err(|_| "Transcription state is unavailable".to_string())?;
-    performance.stage("model_load_or_cached");
-    whisper.load_model(&model_path)?;
-    performance.stage("recognition");
-    let response = whisper.transcribe_hybrid_request(&audio)?.response;
-    performance.outcome("ok");
-    Ok(response)
-}
-
-fn validate_canonical_sample_count(sample_count: usize) -> Result<(), String> {
-    if sample_count == 0 {
-        return Err("No canonical chunk audio samples provided".to_string());
-    }
-    if sample_count > transcribe::CANONICAL_CHUNK_MAX_SAMPLES {
-        return Err("Canonical chunk audio too long (max 30 seconds)".to_string());
-    }
-    Ok(())
-}
-
-#[tauri::command(async)]
-fn preview_transcribe_audio(
-    app: tauri::AppHandle,
-    request: tauri::ipc::Request<'_>,
-    state: tauri::State<'_, WhisperMutex>,
-) -> Result<Option<transcribe::PreviewTranscription>, String> {
-    preview_audio_with_limit(app, request, state, MAX_PREVIEW_SAMPLES)
-}
-
-#[tauri::command(async)]
-fn preview_desktop_audio(
-    app: tauri::AppHandle,
-    request: tauri::ipc::Request<'_>,
-    state: tauri::State<'_, WhisperMutex>,
-) -> Result<Option<transcribe::PreviewTranscription>, String> {
-    preview_audio_with_limit(app, request, state, MAX_DESKTOP_PREVIEW_SAMPLES)
-}
-
-fn preview_audio_with_limit(
-    app: tauri::AppHandle,
-    request: tauri::ipc::Request<'_>,
-    state: tauri::State<'_, WhisperMutex>,
-    max_samples: usize,
-) -> Result<Option<transcribe::PreviewTranscription>, String> {
-    let mut performance = performance::RequestTrace::new("preview");
-    let audio = audio_transport::decode_request(request.body(), max_samples)?;
-    let samples = audio.samples;
-
-    if !validate_preview_sample_count(samples.len(), max_samples)? {
-        performance.outcome("skipped_short");
-        return Ok(None);
-    }
-
-    performance.audio(samples.len(), None);
-    performance.stage("model_available");
-    ensure_model_downloaded(&app)?;
-
-    let model_path = transcribe::default_model_path()?;
-    if !model_path.exists() {
-        return Err("Model is not available after download attempt.".to_string());
-    }
-
-    performance.stage("decoder_lock_wait");
-    let Ok(mut whisper) = state.try_lock() else {
-        performance.outcome("skipped_busy_or_unavailable");
-        return Ok(None);
-    };
-
-    performance.stage("model_load_or_cached");
-    whisper.load_model(&model_path)?;
-    performance.stage("recognition");
-    let preview = if max_samples == MAX_DESKTOP_PREVIEW_SAMPLES {
-        whisper.transcribe_desktop_preview(&samples)
-    } else {
-        whisper.transcribe_preview(&samples).map(Some)
-    };
-    performance.preview(whisper.preview_diagnostics());
-    let Some(preview) = preview? else {
-        performance.outcome("skipped_budget");
-        return Ok(None);
-    };
-    if preview.text.is_empty() {
-        performance.outcome("empty");
-        Ok(None)
-    } else {
-        performance.outcome("ok");
-        Ok(Some(preview))
-    }
-}
-
-fn validate_preview_sample_count(sample_count: usize, max_samples: usize) -> Result<bool, String> {
-    if sample_count < MIN_PREVIEW_SAMPLES {
-        return Ok(false);
-    }
-    if sample_count > max_samples {
-        return Err(format!(
-            "Preview audio too long (max {} seconds)",
-            max_samples / PREVIEW_SAMPLE_RATE
-        ));
-    }
-    Ok(true)
-}
-
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct DebugDictationCaptureResult {
@@ -1225,26 +1044,13 @@ fn send_notification(summary: &str, body: &str) {
     let summary = summary.to_string();
     let body = body.to_string();
     tauri::async_runtime::spawn_blocking(move || {
-        let child = process_runner::command("notify-send")
-            .args([
-                "--app-name=VOCO",
-                "--icon=audio-input-microphone",
-                "--",
-                &summary,
-                &body,
-            ])
-            .spawn();
-        match child {
-            Ok(child) => {
-                if let Err(error) = process_runner::wait_with_output(
-                    child,
-                    std::time::Duration::from_secs(5),
-                    64 * 1024,
-                ) {
-                    warn!("Desktop notification failed: {error}");
-                }
+        #[cfg(target_os = "linux")]
+        match desktop_notifications::send(&summary, &body) {
+            Ok(()) => trace_hotkey_event("desktop_notification_accepted", None),
+            Err(error) => {
+                trace_hotkey_event(error.event(), None);
+                warn!("Desktop notification failed: {}", error.event());
             }
-            Err(error) => warn!("Could not start desktop notification: {error}"),
         }
     });
 }
@@ -1294,6 +1100,16 @@ fn end_desktop_shortcut_session(session_id: String) -> Result<(), String> {
 #[tauri::command(async)]
 fn get_desktop_input_status() -> insertion::DesktopInputStatus {
     insertion::desktop_input_status()
+}
+
+#[tauri::command(async)]
+fn get_panel_setup_status() -> Result<panel_setup::PanelSetupStatus, String> {
+    panel_setup::check(false)
+}
+
+#[tauri::command(async)]
+fn enable_gnome_panel() -> Result<panel_setup::PanelSetupStatus, String> {
+    panel_setup::check(true)
 }
 
 #[tauri::command(async)]
@@ -1708,341 +1524,6 @@ fn grant_webview_permissions(app: &tauri::App) {
 
 // --- Auto-download model on first launch ---
 
-const MODEL_URL: &str =
-    "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin";
-const MODEL_SHA256: &str = "a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002";
-const MODEL_MAX_BYTES: u64 = 200 * 1024 * 1024;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct CachedModelIdentity {
-    length: u64,
-    #[cfg(target_os = "linux")]
-    device: u64,
-    #[cfg(target_os = "linux")]
-    inode: u64,
-    #[cfg(target_os = "linux")]
-    owner: u32,
-    #[cfg(target_os = "linux")]
-    modified_seconds: i64,
-    #[cfg(target_os = "linux")]
-    modified_nanoseconds: i64,
-    #[cfg(target_os = "linux")]
-    status_changed_seconds: i64,
-    #[cfg(target_os = "linux")]
-    status_changed_nanoseconds: i64,
-}
-
-#[derive(Debug, PartialEq, Eq)]
-enum CachedModelVerification {
-    Missing,
-    Ready {
-        identity: CachedModelIdentity,
-    },
-    OwnedCorrupt {
-        reason: String,
-        identity: CachedModelIdentity,
-    },
-}
-
-fn cached_model_identity(metadata: &std::fs::Metadata) -> CachedModelIdentity {
-    #[cfg(target_os = "linux")]
-    use std::os::unix::fs::MetadataExt;
-
-    CachedModelIdentity {
-        length: metadata.len(),
-        #[cfg(target_os = "linux")]
-        device: metadata.dev(),
-        #[cfg(target_os = "linux")]
-        inode: metadata.ino(),
-        #[cfg(target_os = "linux")]
-        owner: metadata.uid(),
-        #[cfg(target_os = "linux")]
-        modified_seconds: metadata.mtime(),
-        #[cfg(target_os = "linux")]
-        modified_nanoseconds: metadata.mtime_nsec(),
-        #[cfg(target_os = "linux")]
-        status_changed_seconds: metadata.ctime(),
-        #[cfg(target_os = "linux")]
-        status_changed_nanoseconds: metadata.ctime_nsec(),
-    }
-}
-
-fn cached_model_path_matches_identity(
-    path: &std::path::Path,
-    expected_identity: CachedModelIdentity,
-) -> Result<bool, String> {
-    let metadata = match std::fs::symlink_metadata(path) {
-        Ok(metadata) => metadata,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
-        Err(error) => {
-            return Err(format!(
-                "Failed to re-inspect verified cached model {}: {error}",
-                path.display()
-            ));
-        }
-    };
-    Ok(!metadata.file_type().is_symlink()
-        && metadata.is_file()
-        && cached_model_is_owned_by_current_user(&metadata)
-        && cached_model_identity(&metadata) == expected_identity)
-}
-
-fn replace_verified_model_identity(identity: Option<CachedModelIdentity>) -> Result<(), String> {
-    *MODEL_VERIFIED_IDENTITY
-        .lock()
-        .map_err(|_| "Verified model identity lock is poisoned".to_string())? = identity;
-    Ok(())
-}
-
-fn cached_model_is_owned_by_current_user(metadata: &std::fs::Metadata) -> bool {
-    #[cfg(target_os = "linux")]
-    {
-        use std::os::unix::fs::MetadataExt;
-        metadata.uid() == current_effective_uid()
-    }
-
-    #[cfg(not(target_os = "linux"))]
-    {
-        let _ = metadata;
-        true
-    }
-}
-
-fn owned_corrupt_cached_model(
-    path: &std::path::Path,
-    metadata: &std::fs::Metadata,
-    reason: String,
-) -> Result<CachedModelVerification, String> {
-    if !cached_model_is_owned_by_current_user(metadata) {
-        return Err(format!(
-            "Cached model {} is corrupt but is not owned by the current user; it was preserved. Remove or replace it manually.",
-            path.display()
-        ));
-    }
-
-    Ok(CachedModelVerification::OwnedCorrupt {
-        reason,
-        identity: cached_model_identity(metadata),
-    })
-}
-
-fn validate_model_cache_directory(model_path: &std::path::Path) -> Result<(), String> {
-    let directory = model_path.parent().ok_or_else(|| {
-        format!(
-            "Model path {} has no parent directory",
-            model_path.display()
-        )
-    })?;
-    let metadata = std::fs::symlink_metadata(directory).map_err(|error| {
-        format!(
-            "Failed to inspect model directory {}: {error}",
-            directory.display()
-        )
-    })?;
-    if metadata.file_type().is_symlink() || !metadata.is_dir() {
-        return Err(format!(
-            "Model directory {} must be a real directory; refusing to follow or replace it",
-            directory.display()
-        ));
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-        use std::os::unix::fs::MetadataExt;
-
-        if metadata.uid() != current_effective_uid() {
-            return Err(format!(
-                "Model directory {} is not owned by the current user",
-                directory.display()
-            ));
-        }
-        if metadata.mode() & 0o022 != 0 {
-            return Err(format!(
-                "Model directory {} is writable by another user; secure it before VOCO uses cached models",
-                directory.display()
-            ));
-        }
-    }
-
-    Ok(())
-}
-
-fn verify_existing_model_file(
-    path: &std::path::Path,
-    expected_sha256: &str,
-    max_bytes: u64,
-) -> Result<CachedModelVerification, String> {
-    if expected_sha256.len() != 64 || !expected_sha256.as_bytes().iter().all(u8::is_ascii_hexdigit)
-    {
-        return Err("Pinned model SHA-256 is invalid".to_string());
-    }
-
-    let initial_metadata = match std::fs::symlink_metadata(path) {
-        Ok(metadata) => metadata,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-            return Ok(CachedModelVerification::Missing);
-        }
-        Err(error) => {
-            return Err(format!(
-                "Failed to inspect cached model {}: {error}",
-                path.display()
-            ));
-        }
-    };
-
-    if initial_metadata.file_type().is_symlink() || !initial_metadata.is_file() {
-        return Err(format!(
-            "Cached model {} must be a regular file; refusing to follow or replace it",
-            path.display()
-        ));
-    }
-
-    if initial_metadata.len() > max_bytes {
-        return owned_corrupt_cached_model(
-            path,
-            &initial_metadata,
-            format!(
-                "cached model is too large ({} bytes, max {} bytes)",
-                initial_metadata.len(),
-                max_bytes
-            ),
-        );
-    }
-
-    let initial_identity = cached_model_identity(&initial_metadata);
-    let mut options = std::fs::OpenOptions::new();
-    options.read(true);
-    #[cfg(target_os = "linux")]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        options
-            .custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW | libc::O_NONBLOCK | libc::O_NOCTTY);
-    }
-    let mut file = options
-        .open(path)
-        .map_err(|error| format!("Failed to open cached model {}: {error}", path.display()))?;
-    let opened_metadata = file.metadata().map_err(|error| {
-        format!(
-            "Failed to inspect opened cached model {}: {error}",
-            path.display()
-        )
-    })?;
-    if !opened_metadata.is_file() || cached_model_identity(&opened_metadata) != initial_identity {
-        return Err(format!(
-            "Cached model {} changed while it was being opened; it was preserved",
-            path.display()
-        ));
-    }
-
-    use sha2::{Digest, Sha256};
-    let mut hasher = Sha256::new();
-    let mut read_bytes = 0u64;
-    let mut buffer = [0u8; 64 * 1024];
-    loop {
-        let count = file
-            .read(&mut buffer)
-            .map_err(|error| format!("Failed to read cached model {}: {error}", path.display()))?;
-        if count == 0 {
-            break;
-        }
-        read_bytes = read_bytes.saturating_add(count as u64);
-        if read_bytes > max_bytes {
-            return owned_corrupt_cached_model(
-                path,
-                &opened_metadata,
-                format!("cached model grew beyond the {max_bytes}-byte size limit"),
-            );
-        }
-        hasher.update(&buffer[..count]);
-    }
-
-    let final_metadata = file.metadata().map_err(|error| {
-        format!(
-            "Failed to re-inspect cached model {}: {error}",
-            path.display()
-        )
-    })?;
-    if cached_model_identity(&final_metadata) != initial_identity
-        || read_bytes != initial_metadata.len()
-    {
-        return Err(format!(
-            "Cached model {} changed while its integrity was being verified; it was preserved",
-            path.display()
-        ));
-    }
-
-    let actual_sha256 = format!("{:x}", hasher.finalize());
-    if !actual_sha256.eq_ignore_ascii_case(expected_sha256) {
-        return owned_corrupt_cached_model(
-            path,
-            &opened_metadata,
-            format!(
-                "SHA-256 mismatch (expected {}, got {})",
-                &expected_sha256[..16],
-                &actual_sha256[..16]
-            ),
-        );
-    }
-
-    Ok(CachedModelVerification::Ready {
-        identity: initial_identity,
-    })
-}
-
-fn remove_owned_corrupt_cached_model(
-    path: &std::path::Path,
-    expected_identity: CachedModelIdentity,
-) -> Result<(), String> {
-    validate_model_cache_directory(path)?;
-    let metadata = std::fs::symlink_metadata(path).map_err(|error| {
-        format!(
-            "Failed to re-inspect corrupt cached model {}: {error}",
-            path.display()
-        )
-    })?;
-    if metadata.file_type().is_symlink()
-        || !metadata.is_file()
-        || !cached_model_is_owned_by_current_user(&metadata)
-        || cached_model_identity(&metadata) != expected_identity
-    {
-        return Err(format!(
-            "Cached model {} changed after verification; it was preserved",
-            path.display()
-        ));
-    }
-
-    std::fs::remove_file(path).map_err(|error| {
-        format!(
-            "Failed to remove corrupt cached model {}: {error}",
-            path.display()
-        )
-    })
-}
-
-fn remove_stale_model_temp_file(path: &std::path::Path) -> Result<(), String> {
-    let metadata = match std::fs::symlink_metadata(path) {
-        Ok(metadata) => metadata,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
-        Err(error) => {
-            return Err(format!(
-                "Failed to inspect temporary model {}: {error}",
-                path.display()
-            ));
-        }
-    };
-    if metadata.file_type().is_symlink()
-        || !metadata.is_file()
-        || !cached_model_is_owned_by_current_user(&metadata)
-    {
-        return Err(format!(
-            "Temporary model path {} is not a user-owned regular file; refusing to replace it",
-            path.display()
-        ));
-    }
-    std::fs::remove_file(path)
-        .map_err(|error| format!("Failed to remove stale temporary model: {error}"))
-}
-
 fn is_allowed_external_url(url: &str) -> bool {
     url == "https://github.com/sergiopesch/voco/blob/master/docs/platform/README.md#ydotoold-ydotool-daemon"
         || url
@@ -2050,208 +1531,11 @@ fn is_allowed_external_url(url: &str) -> bool {
             .is_some_and(|tag| !tag.is_empty() && !tag.contains(['\r', '\n', '\\']))
 }
 
-fn validate_model_content_length(content_length: Option<u64>) -> Result<(), String> {
-    if let Some(size) = content_length {
-        if size > MODEL_MAX_BYTES {
-            return Err(format!(
-                "Model download is too large ({} bytes, max {} bytes)",
-                size, MODEL_MAX_BYTES
-            ));
-        }
-    }
-
-    Ok(())
-}
-
-fn prepare_selected_startup_model(
-    config: &AppConfig,
-    paste_enabled: bool,
-    stream_enabled: bool,
-    warm_stream: impl FnOnce() -> Result<(), String>,
-    prepare_legacy: impl FnOnce() -> Result<(), String>,
-) -> Result<(), String> {
-    // Match the normal desktop queue's config/env eligibility. Browser triggers
-    // are selected per session; their explicit Whisper commands still ensure the
-    // legacy model lazily. Target focus/helper readiness is checked at recording.
-    if matches!(config.transcript_target, config::TranscriptTarget::Cursor)
-        && matches!(config.transcript_enhancement, TranscriptEnhancement::Off)
-        && paste_enabled
-        && stream_enabled
-    {
-        warm_stream()
-    } else {
-        prepare_legacy()
-    }
-}
-
 fn prepare_model_at_startup(app: &tauri::AppHandle) -> Result<(), String> {
-    let config = AppConfig::load().map_err(|error| error.to_string())?;
-    prepare_selected_startup_model(
-        &config,
-        insertion::desktop_paste_enabled(),
-        insertion::desktop_stream_enabled(),
-        || {
-            info!("Preparing NVIDIA streaming model at startup");
-            benchmark_stream::warmup()?;
-            // Path presence is not readiness: warmup validates the worker's
-            // ready response after its model load and synthetic audio warmup.
-            tray::update_model_download_status(app, tray::ModelDownloadStatus::Ready);
-            Ok(())
-        },
-        || ensure_model_downloaded(app),
-    )
-}
-
-fn ensure_model_downloaded(app_handle: &tauri::AppHandle) -> Result<(), String> {
-    let result = ensure_model_downloaded_inner(app_handle);
-    if result.is_err() {
-        if let Ok(mut identity) = MODEL_VERIFIED_IDENTITY.lock() {
-            *identity = None;
-        }
-        tray::update_model_download_status(app_handle, tray::ModelDownloadStatus::Failed);
-    }
-    result
-}
-
-fn ensure_model_downloaded_inner(app_handle: &tauri::AppHandle) -> Result<(), String> {
-    let _download_guard = MODEL_DOWNLOAD_LOCK
-        .lock()
-        .map_err(|_| "Model download state lock is poisoned".to_string())?;
-
-    let path = transcribe::default_model_path()?;
-    validate_model_cache_directory(&path)?;
-    let verified_identity = *MODEL_VERIFIED_IDENTITY
-        .lock()
-        .map_err(|_| "Verified model identity lock is poisoned".to_string())?;
-    if let Some(identity) = verified_identity {
-        if cached_model_path_matches_identity(&path, identity)? {
-            return Ok(());
-        }
-        replace_verified_model_identity(None)?;
-        info!("Previously verified speech model changed or was removed; checking the cache again");
-    }
-
-    match verify_existing_model_file(&path, MODEL_SHA256, MODEL_MAX_BYTES)? {
-        CachedModelVerification::Ready { identity } => {
-            replace_verified_model_identity(Some(identity))?;
-            tray::update_model_download_status(app_handle, tray::ModelDownloadStatus::Ready);
-            info!("Cached speech model verified: {}", path.display());
-            return Ok(());
-        }
-        CachedModelVerification::OwnedCorrupt { reason, identity } => {
-            warn!(
-                "Cached speech model failed integrity verification ({reason}); removing the user-owned cache entry and downloading a verified copy"
-            );
-            remove_owned_corrupt_cached_model(&path, identity)?;
-        }
-        CachedModelVerification::Missing => {}
-    }
-
-    let tmp_path = path.with_extension("bin.tmp");
-    remove_stale_model_temp_file(&tmp_path)?;
-
-    tray::update_model_download_status(app_handle, tray::ModelDownloadStatus::Downloading(None));
-    info!("Downloading speech model (one-time, ~142 MB)...");
-
-    let client = reqwest::blocking::Client::builder()
-        .timeout(std::time::Duration::from_secs(300))
-        .connect_timeout(std::time::Duration::from_secs(30))
-        .build()
-        .map_err(|e| format!("HTTP client error: {e}"))?;
-
-    let response = client
-        .get(MODEL_URL)
-        .send()
-        .map_err(|e| format!("Download failed: {e}"))?;
-
-    if !response.status().is_success() {
-        return Err(format!(
-            "Download failed with status: {}",
-            response.status()
-        ));
-    }
-
-    let total_size = response.content_length();
-    validate_model_content_length(total_size)?;
-
-    use sha2::{Digest, Sha256};
-    use std::io::{Read, Write};
-    let mut reader = response;
-    let mut temp_options = std::fs::OpenOptions::new();
-    temp_options.write(true).create_new(true);
-    #[cfg(target_os = "linux")]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        temp_options.mode(0o600).custom_flags(libc::O_CLOEXEC);
-    }
-    let mut file = temp_options
-        .open(&tmp_path)
-        .map_err(|e| format!("Failed to save model (tmp): {e}"))?;
-    let mut hasher = Sha256::new();
-    let mut downloaded: u64 = 0;
-    let mut last_pct: u64 = 0;
-    let mut buf = [0u8; 65536];
-
-    loop {
-        let n = reader
-            .read(&mut buf)
-            .map_err(|e| format!("Download read error: {e}"))?;
-        if n == 0 {
-            break;
-        }
-        downloaded += n as u64;
-        if downloaded > MODEL_MAX_BYTES {
-            let _ = std::fs::remove_file(&tmp_path);
-            return Err(format!(
-                "Model download exceeded max size of {} bytes",
-                MODEL_MAX_BYTES
-            ));
-        }
-
-        hasher.update(&buf[..n]);
-        file.write_all(&buf[..n])
-            .map_err(|e| format!("Failed to save model (tmp): {e}"))?;
-
-        if let Some(pct) =
-            total_size.and_then(|size| downloaded.saturating_mul(100).checked_div(size))
-        {
-            if pct != last_pct {
-                last_pct = pct;
-                tray::update_model_download_status(
-                    app_handle,
-                    tray::ModelDownloadStatus::Downloading(Some(pct.min(100) as u8)),
-                );
-            }
-        }
-    }
-
-    file.sync_all()
-        .map_err(|e| format!("Failed to flush model file (tmp): {e}"))?;
-    drop(file);
-
-    let hash = format!("{:x}", hasher.finalize());
-    if hash != MODEL_SHA256 {
-        let _ = std::fs::remove_file(&tmp_path);
-        return Err(format!(
-            "Model integrity check failed (expected {}, got {}). Download may be corrupt.",
-            &MODEL_SHA256[..16],
-            &hash[..16]
-        ));
-    }
-
-    std::fs::rename(&tmp_path, &path).map_err(|e| format!("Failed to finalize model file: {e}"))?;
-
-    let downloaded_metadata = std::fs::symlink_metadata(&path)
-        .map_err(|e| format!("Failed to inspect finalized model file: {e}"))?;
-    if downloaded_metadata.file_type().is_symlink()
-        || !downloaded_metadata.is_file()
-        || !cached_model_is_owned_by_current_user(&downloaded_metadata)
-    {
-        return Err("Finalized model path is not a user-owned regular file".to_string());
-    }
-    replace_verified_model_identity(Some(cached_model_identity(&downloaded_metadata)))?;
-    tray::update_model_download_status(app_handle, tray::ModelDownloadStatus::Ready);
-    info!("Model downloaded and verified: {}", path.display());
+    info!("Preparing bundled Nemotron streaming model at startup");
+    benchmark_stream::warmup()?;
+    info!("Bundled Nemotron streaming model ready");
+    tray::update_model_download_status(app, tray::ModelDownloadStatus::Ready);
     Ok(())
 }
 
@@ -2688,17 +1972,6 @@ pub fn change_hotkey_runtime(app: &tauri::AppHandle, new_hotkey: &str) -> Result
 
 // --- Socket listener ---
 
-#[cfg(target_os = "linux")]
-fn current_effective_uid() -> u32 {
-    // SAFETY: `geteuid` has no preconditions and simply returns the current process euid.
-    unsafe { libc::geteuid() as u32 }
-}
-
-#[cfg(not(target_os = "linux"))]
-fn current_effective_uid() -> u32 {
-    0
-}
-
 fn cleanup_socket_files() {
     if let Err(error) = trigger_socket::shutdown() {
         warn!("Trigger socket cleanup preserved an unsafe or changed entry: {error}");
@@ -3118,7 +2391,14 @@ fn ensure_evdev_hotkey_listener(app_handle: &tauri::AppHandle) {
 }
 
 pub fn run() -> Result<(), String> {
-    let single_instance_guard = single_instance::acquire().map_err(|error| error.to_string())?;
+    let single_instance_guard = match single_instance::acquire() {
+        Ok(guard) => guard,
+        #[cfg(target_os = "linux")]
+        Err(single_instance::SingleInstanceError::AlreadyRunning { .. }) => {
+            return activation::request()
+        }
+        Err(error) => return Err(error.to_string()),
+    };
 
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
         .format_timestamp_millis()
@@ -3132,7 +2412,6 @@ pub fn run() -> Result<(), String> {
     tauri::Builder::default()
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .manage(single_instance_guard)
-        .manage(Mutex::new(WhisperState::new()) as WhisperMutex)
         .manage(owned_preedit::OwnedPreeditService::default())
         .on_page_load(|webview, payload| {
             if matches!(payload.event(), tauri::webview::PageLoadEvent::Started) {
@@ -3174,16 +2453,14 @@ pub fn run() -> Result<(), String> {
             save_config_patch,
             load_cached_update_state,
             save_cached_update_state,
-            transcribe_audio,
-            transcribe_canonical_chunk,
-            transcribe_hybrid_chunk,
-            preview_transcribe_audio,
-            preview_desktop_audio,
             debug_dictation_capture_enabled,
             save_debug_dictation_capture,
             insert_text,
             get_desktop_paste_status,
             get_desktop_input_status,
+            get_panel_setup_status,
+            enable_gnome_panel,
+            activation::take_launcher_activation,
             begin_desktop_shortcut_session,
             end_desktop_shortcut_session,
             paste_desktop_text,
@@ -3283,6 +2560,9 @@ pub fn run() -> Result<(), String> {
             );
 
             start_socket_listener(app_handle.clone());
+            if let Err(error) = activation::start(&app_handle) {
+                warn!("Launcher activation unavailable: {error}");
+            }
 
             #[cfg(target_os = "linux")]
             if use_evdev_hotkey {
@@ -3330,106 +2610,6 @@ pub fn run() -> Result<(), String> {
 mod tests {
     use super::*;
     #[test]
-    fn startup_prepares_only_the_configured_recognizer() {
-        use config::{LiveCursorMode, TranscriptTarget};
-        for target in [
-            TranscriptTarget::Cursor,
-            TranscriptTarget::LocalAgent,
-            TranscriptTarget::OpenclawAgent,
-            TranscriptTarget::OpenclawSpeech,
-        ] {
-            for enhancement in [
-                TranscriptEnhancement::Off,
-                TranscriptEnhancement::Conservative,
-                TranscriptEnhancement::CommandsOnly,
-            ] {
-                for paste_enabled in [false, true] {
-                    for stream_enabled in [false, true] {
-                        for live_cursor_mode in [
-                            LiveCursorMode::StableCursorStreaming,
-                            LiveCursorMode::PreviewOverlayOnly,
-                            LiveCursorMode::FinalTextOnly,
-                        ] {
-                            let config = AppConfig {
-                                transcript_target: target.clone(),
-                                transcript_enhancement: enhancement.clone(),
-                                live_cursor_mode,
-                                ..AppConfig::default()
-                            };
-                            let stream_calls = std::cell::Cell::new(0);
-                            let legacy_calls = std::cell::Cell::new(0);
-                            prepare_selected_startup_model(
-                                &config,
-                                paste_enabled,
-                                stream_enabled,
-                                || {
-                                    stream_calls.set(stream_calls.get() + 1);
-                                    Ok(())
-                                },
-                                || {
-                                    legacy_calls.set(legacy_calls.get() + 1);
-                                    Ok(())
-                                },
-                            )
-                            .unwrap();
-                            let streaming = matches!(target, TranscriptTarget::Cursor)
-                                && matches!(enhancement, TranscriptEnhancement::Off)
-                                && paste_enabled
-                                && stream_enabled;
-                            assert_eq!(stream_calls.get(), usize::from(streaming));
-                            assert_eq!(legacy_calls.get(), usize::from(!streaming));
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn failed_nvidia_startup_does_not_download_or_retry_whisper() {
-        let error = prepare_selected_startup_model(
-            &AppConfig::default(),
-            true,
-            true,
-            || Err("worker did not become ready".into()),
-            || panic!("NVIDIA startup failure must not download Whisper"),
-        )
-        .unwrap_err();
-        assert_eq!(error, "worker did not become ready");
-    }
-
-    #[test]
-    fn failed_legacy_startup_does_not_warm_nvidia() {
-        let error = prepare_selected_startup_model(
-            &AppConfig::default(),
-            false,
-            true,
-            || panic!("legacy startup must not warm NVIDIA"),
-            || Err("legacy model unavailable".into()),
-        )
-        .unwrap_err();
-        assert_eq!(error, "legacy model unavailable");
-    }
-
-    fn model_test_directory(label: &str) -> std::path::PathBuf {
-        let directory = std::env::temp_dir().join(format!(
-            "voco-model-{label}-{}-{}",
-            std::process::id(),
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
-        std::fs::create_dir_all(&directory).unwrap();
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            std::fs::set_permissions(&directory, std::fs::Permissions::from_mode(0o700)).unwrap();
-        }
-        directory
-    }
-
-    #[test]
     fn decode_audio_bytes_valid() {
         let mut bytes = Vec::new();
         bytes.extend_from_slice(&0.5f32.to_le_bytes());
@@ -3450,52 +2630,6 @@ mod tests {
         assert!(decode_audio_bytes(b"abc")
             .unwrap_err()
             .contains("not a multiple of 4"));
-    }
-
-    #[test]
-    fn preview_audio_accepts_the_frontend_point_seven_second_boundary() {
-        assert!(
-            !validate_preview_sample_count(MIN_PREVIEW_SAMPLES - 1, MAX_PREVIEW_SAMPLES).unwrap()
-        );
-        assert!(validate_preview_sample_count(MIN_PREVIEW_SAMPLES, MAX_PREVIEW_SAMPLES).unwrap());
-        assert!(validate_preview_sample_count(MAX_PREVIEW_SAMPLES, MAX_PREVIEW_SAMPLES).unwrap());
-        assert!(
-            validate_preview_sample_count(MAX_PREVIEW_SAMPLES + 1, MAX_PREVIEW_SAMPLES).is_err()
-        );
-    }
-
-    #[test]
-    fn desktop_preview_has_a_separate_bounded_thirty_second_contract() {
-        assert!(!validate_preview_sample_count(
-            MIN_PREVIEW_SAMPLES - 1,
-            MAX_DESKTOP_PREVIEW_SAMPLES
-        )
-        .unwrap());
-        assert!(validate_preview_sample_count(
-            MAX_PREVIEW_SAMPLES + 1,
-            MAX_DESKTOP_PREVIEW_SAMPLES
-        )
-        .unwrap());
-        assert!(validate_preview_sample_count(
-            MAX_DESKTOP_PREVIEW_SAMPLES,
-            MAX_DESKTOP_PREVIEW_SAMPLES
-        )
-        .unwrap());
-        assert!(validate_preview_sample_count(
-            MAX_DESKTOP_PREVIEW_SAMPLES + 1,
-            MAX_DESKTOP_PREVIEW_SAMPLES
-        )
-        .is_err());
-    }
-
-    #[test]
-    fn canonical_audio_accepts_only_nonempty_thirty_second_chunks() {
-        assert!(validate_canonical_sample_count(0).is_err());
-        assert!(validate_canonical_sample_count(1).is_ok());
-        assert!(validate_canonical_sample_count(transcribe::CANONICAL_CHUNK_MAX_SAMPLES).is_ok());
-        assert!(
-            validate_canonical_sample_count(transcribe::CANONICAL_CHUNK_MAX_SAMPLES + 1).is_err()
-        );
     }
 
     #[test]
@@ -3584,135 +2718,6 @@ mod tests {
         assert!(!is_allowed_external_url(
             "http://github.com/sergiopesch/voco/releases/tag/voco.2026.0.16"
         ));
-    }
-
-    #[test]
-    fn model_content_length_rejects_oversized_downloads() {
-        assert!(validate_model_content_length(Some(MODEL_MAX_BYTES)).is_ok());
-        assert!(validate_model_content_length(None).is_ok());
-        assert!(validate_model_content_length(Some(MODEL_MAX_BYTES + 1)).is_err());
-    }
-
-    #[test]
-    fn existing_model_requires_the_pinned_sha256() {
-        const FIXTURE_SHA256: &str =
-            "f707aa7408e39f75df32062808b06429989342eed28fb3c33d3142dbc505fd83";
-        let directory = model_test_directory("digest");
-        let path = directory.join("model.bin");
-        std::fs::write(&path, b"voco-model-fixture").unwrap();
-
-        assert!(matches!(
-            verify_existing_model_file(&path, FIXTURE_SHA256, 1024).unwrap(),
-            CachedModelVerification::Ready { .. }
-        ));
-        let mismatch = verify_existing_model_file(&path, MODEL_SHA256, 1024).unwrap();
-        assert!(matches!(
-            mismatch,
-            CachedModelVerification::OwnedCorrupt { ref reason, .. }
-                if reason.contains("SHA-256 mismatch")
-        ));
-
-        std::fs::remove_dir_all(directory).unwrap();
-    }
-
-    #[test]
-    fn verified_model_identity_fast_path_detects_removal_and_replacement() {
-        let directory = model_test_directory("verified-identity");
-        let path = directory.join("model.bin");
-        let original = directory.join("original.bin");
-        std::fs::write(&path, b"voco-model-fixture").unwrap();
-        let identity = cached_model_identity(&std::fs::symlink_metadata(&path).unwrap());
-
-        assert!(cached_model_path_matches_identity(&path, identity).unwrap());
-        std::fs::rename(&path, &original).unwrap();
-        assert!(!cached_model_path_matches_identity(&path, identity).unwrap());
-
-        std::fs::write(&path, b"voco-model-fixture").unwrap();
-        assert!(!cached_model_path_matches_identity(&path, identity).unwrap());
-
-        std::fs::remove_dir_all(directory).unwrap();
-    }
-
-    #[test]
-    fn oversized_owned_model_is_removed_only_if_its_identity_is_unchanged() {
-        let directory = model_test_directory("oversized");
-        let path = directory.join("model.bin");
-        std::fs::write(&path, [0u8; 17]).unwrap();
-
-        let verification = verify_existing_model_file(&path, MODEL_SHA256, 16).unwrap();
-        let CachedModelVerification::OwnedCorrupt { reason, identity } = verification else {
-            panic!("oversized model should be replaceable corruption");
-        };
-        assert!(reason.contains("too large"));
-        remove_owned_corrupt_cached_model(&path, identity).unwrap();
-        assert!(!path.exists());
-
-        std::fs::remove_dir_all(directory).unwrap();
-    }
-
-    #[test]
-    fn changed_corrupt_model_is_preserved_instead_of_unlinked() {
-        let directory = model_test_directory("changed");
-        let path = directory.join("model.bin");
-        let original = directory.join("original.bin");
-        std::fs::write(&path, b"corrupt-one").unwrap();
-        let verification = verify_existing_model_file(&path, MODEL_SHA256, 1024).unwrap();
-        let CachedModelVerification::OwnedCorrupt { identity, .. } = verification else {
-            panic!("wrong digest should be replaceable corruption");
-        };
-
-        std::fs::rename(&path, &original).unwrap();
-        std::fs::write(&path, b"replacement").unwrap();
-        let error = remove_owned_corrupt_cached_model(&path, identity).unwrap_err();
-        assert!(error.contains("changed after verification"));
-        assert_eq!(std::fs::read(&path).unwrap(), b"replacement");
-
-        std::fs::remove_dir_all(directory).unwrap();
-    }
-
-    #[cfg(target_os = "linux")]
-    #[test]
-    fn model_verification_rejects_symlinks_and_fifos_without_reading_them() {
-        use std::os::unix::ffi::OsStrExt;
-        use std::os::unix::fs::symlink;
-
-        let directory = model_test_directory("special-files");
-        let target = directory.join("target.bin");
-        let linked = directory.join("linked.bin");
-        std::fs::write(&target, b"voco-model-fixture").unwrap();
-        symlink(&target, &linked).unwrap();
-        assert!(verify_existing_model_file(&linked, MODEL_SHA256, 1024)
-            .unwrap_err()
-            .contains("regular file"));
-
-        let fifo = directory.join("model.fifo");
-        let fifo_bytes = std::ffi::CString::new(fifo.as_os_str().as_bytes()).unwrap();
-        assert_eq!(unsafe { libc::mkfifo(fifo_bytes.as_ptr(), 0o600) }, 0);
-        let started = std::time::Instant::now();
-        assert!(verify_existing_model_file(&fifo, MODEL_SHA256, 1024)
-            .unwrap_err()
-            .contains("regular file"));
-        assert!(started.elapsed() < std::time::Duration::from_secs(1));
-
-        let started = std::time::Instant::now();
-        assert!(
-            verify_existing_model_file(std::path::Path::new("/dev/null"), MODEL_SHA256, 1024)
-                .unwrap_err()
-                .contains("regular file")
-        );
-        assert!(started.elapsed() < std::time::Duration::from_secs(1));
-
-        let storage = directory.join("storage");
-        let linked_directory = directory.join("models");
-        std::fs::create_dir(&storage).unwrap();
-        symlink(&storage, &linked_directory).unwrap();
-        assert!(
-            validate_model_cache_directory(&linked_directory.join("model.bin"))
-                .unwrap_err()
-                .contains("real directory")
-        );
-
-        std::fs::remove_dir_all(directory).unwrap();
     }
 
     #[test]

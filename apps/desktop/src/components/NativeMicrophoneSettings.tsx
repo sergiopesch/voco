@@ -3,13 +3,20 @@ import { StatusMark } from "./StatusMark";
 import { useEffect, useState } from "react";
 import type { NativeMicrophoneControls } from "@/hooks/useNativeCaptureSettings";
 
-export function NativeMicrophoneSettings({ controls, disabled, showError = true }: {
+export function NativeMicrophoneSettings({ controls, disabled, showError = true, onSelected }: {
   controls: NativeMicrophoneControls;
   disabled: boolean;
   showError?: boolean;
+  onSelected?: () => void;
 }) {
   const [draft, setDraft] = useState("");
   const [acknowledged, setAcknowledged] = useState(false);
+  const [applying, setApplying] = useState(false);
+  useEffect(() => {
+    if (!applying || controls.busy) return;
+    setApplying(false);
+    if (controls.selected && !controls.error) onSelected?.();
+  }, [applying, controls.busy, controls.selected, controls.error, onSelected]);
   useEffect(() => {
     setDraft(controls.selected?.selectionToken ?? "");
     setAcknowledged(false);
@@ -47,7 +54,7 @@ export function NativeMicrophoneSettings({ controls, disabled, showError = true 
     </label>
     <div className="voco-settings__actions">
       <button type="button" className="voco-button voco-button--primary" disabled={!allowed}
-        onClick={() => { if (allowed && token) void controls.select(token); }}>Use this microphone</button>
+        onClick={() => { if (allowed && token) { void controls.select(token).then(() => setApplying(true)); } }}>Use this microphone</button>
       <button type="button" className="voco-button voco-button--secondary" disabled={disabled || controls.busy}
         onClick={() => void controls.refresh()}>Refresh devices</button>
     </div>

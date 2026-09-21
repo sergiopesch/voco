@@ -13,9 +13,9 @@
     <p>Your voice, typed. Built for Linux. VOCO turns speech into text at your cursor. Press a hotkey, speak, and press it again to finish. Normal dictation is transcribed on your device and needs no account or subscription.</p>
     <p>VOCO stays in the tray, with a compact panel for microphone feedback and dictation status. Text insertion depends on your desktop session and the target field.</p>
     <ul>
-      <li>Local speech transcription with Whisper</li>
+      <li>Local English speech transcription with Nemotron</li>
       <li>Setup for your microphone, hotkey, and Linux text insertion options</li>
-      <li>Transcript preview and final-text-only options</li>
+      <li>Live cursor dictation and explicit transcript recovery</li>
       <li>GitHub Release update checks for manual install channels</li>
       <li>Linux-specific install, upgrade, and troubleshooting guidance</li>
     </ul>
@@ -29,7 +29,7 @@
   <url type="vcs-browser">https://github.com/sergiopesch/voco</url>
   <content_rating type="oars-1.1" />
   <releases>
-    <release version="2026.0.47" date="2026-09-21"><description><p>Unified voice setup, compact controls, a dedicated Shortcut section and clearer installation progress.</p></description></release>
+    <release version="2026.0.51" date="2026-09-21"><description><p>Unified voice setup, compact controls, a dedicated Shortcut section and clearer installation progress.</p></description></release>
     <release version="2026.0.44" date="2026-09-20"><description><p>Test live local speech during onboarding and check for an editable cursor before dictation.</p></description></release>
     <release version="2026.0.43" date="2026-09-19"><description><p>Safer capture admission, offline recovery, and public evaluation tools.</p></description></release>
     <release version="2026.0.41" date="2026-09-19"><description><p>Guard incomplete capture and recover dictation with the bundled local model.</p></description></release>

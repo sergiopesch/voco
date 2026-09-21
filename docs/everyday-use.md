@@ -10,15 +10,34 @@ setup using the [installation guide](install.md), then retry the check.
 Choose **Start test** and speak. The signal moves with microphone input and your
 words appear here. Speech stays on this computer; the test never pastes into
 other apps or changes the clipboard. Choose **Change microphone** to select a
-different input inside setup, then **Back to test**. VOCO uses your selection, or the system
+different input within the same setup canvas. In the next test candidate, applying
+a microphone returns directly to the test; **Back to test** leaves the chooser
+without applying a new choice. VOCO uses your selection, or the system
 default if you have not selected a microphone.
 
 Choose **Finish test** to stop capture and collect the final words. After a
 successful test, VOCO checks desktop input automatically. **Your voice, ready.**
 shows your shortcut and explains that VOCO stays in the tray. **Done** rechecks
-readiness and saves completion. Changing microphones requires a new test. Silence,
+readiness and saves completion. In the .50 test candidate, Done leaves a compact Ready window visible; choose Hide to tray when you are ready. Reopening VOCO from the launcher presents the existing idle app. During capture it keeps your destination focused. Changing microphones requires a new test. Silence,
 recognition failures and incomplete desktop setup keep onboarding open with an
 action to retry.
+
+## Panel setup in the .50 candidate
+
+The complete Debian candidate includes the GNOME 46 panel. The guided installer
+activates it for the user running setup. Manual APT installs can choose **Enable
+live panel** in onboarding or Help, or run `voco --setup-panel`. Package hooks do
+not enable extensions. If setup says to sign out, save your work and sign out and
+back in; installing files alone cannot reload a running Wayland Shell.
+
+The panel shows real microphone bars, Listening and Stop. Other desktops and a
+disabled companion use the native tray, with status labels where supported and a
+status row plus Stop in its menu. `voco --check-panel` changes no preferences.
+
+The next test candidate also replaces the fallback tray's Ready label with
+audio-driven bars while recording. Silence settles the bars; Stop restores the
+normal status. The tray menu keeps a readable status and an explicit Stop action.
+Smooth movement follows the desktop's animation preference.
 
 ## Dictation
 
@@ -62,9 +81,8 @@ destination before pasting: it may already contain some of your words. VOCO neve
 blindly retries uncertain delivery. Copying does not dismiss a transcript.
 
 Where available, Retry transcription uses retained audio without automatically
-inserting it. Normal NVIDIA dictation recovers with the bundled local model,
-including while offline; it does not download Whisper. The result identifies the
-recognizer used. Browser/legacy dictation retains its separate Whisper recovery.
+inserting it. Desktop and browser dictation recover with the same bundled local
+Nemotron model, including while offline. The result identifies the recognizer used.
 Cancel stops waiting immediately and keeps the audio; an outstanding native
 request may finish before its worker is released. Clear or discard recovery before starting another recording.
 Recovery stays in memory only and is lost when VOCO exits.

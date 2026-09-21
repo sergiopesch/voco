@@ -13,6 +13,7 @@ from debian_maintainer import render_postinst
 
 ROOT = Path(__file__).resolve().parents[1]
 VENDORED_NOTICES = {
+    "tray-icon": ("VOCO-PATCH.md", "UPSTREAM-SHA256.json", "LICENSE-APACHE", "LICENSE-MIT", "LICENSE.spdx"),
     "global-hotkey": ("VOCO-PATCH.md", "VOCO-UPSTREAM.json", "LICENSE-APACHE", "LICENSE-MIT", "LICENSE.spdx"),
     "glib": ("VOCO-PATCH.md", "VOCO-UPSTREAM.json", "upstream-fix.patch", "LICENSE", "COPYRIGHT"),
 }
@@ -157,7 +158,7 @@ def main():
         (stage / "DEBIAN/md5sums").write_text("".join(
             f"{digest(path, 'md5')}  {path.relative_to(stage)}\n" for path in files))
         temporary_output = Path(directory) / "candidate.deb"
-        subprocess.run(["dpkg-deb", "--root-owner-group", "-Zzstd", "-z3", "--build",
+        subprocess.run(["dpkg-deb", "--root-owner-group", "-Zzstd", "-z9", "--build",
                         str(stage), str(temporary_output)], check=True)
         # Publish only a completely built archive; an existing candidate is never replaced.
         os.link(temporary_output, output)

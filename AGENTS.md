@@ -20,8 +20,8 @@ The production path is `runtime/speech/` → Rust `benchmark_stream.rs` →
 `benchmarkPhraseQueue.ts` → `insertion.rs`. Despite their historical names,
 these are production modules. The selected runtime is NVIDIA Nemotron English
 0.6B Q8 CPU. Keep the default worker count capped to at most four threads, leaving one CPU
-from process affinity for desktop work (minimum one worker); preserve explicit research overrides and record actual counts. Whisper and Chromium exact-field dictation are separate compatibility
-paths with their own checks. Research model adapters are not selectable products.
+from process affinity for desktop work (minimum one worker); preserve explicit research overrides and record actual counts. Desktop, Chromium exact-field dictation and local recovery all use this one recognizer.
+Browser field ownership is a delivery concern, independent of recognition. Research model adapters are not selectable products.
 
 Rust owns OS integration, files, processes, packaging and validation. React owns
 presentation and recording orchestration. Keep both typed and state-driven.
@@ -47,7 +47,7 @@ glib 0.20 directly leaves the GTK dependency behind. [Backport](vendor/glib/VOCO
   Preserve the three-second backlog bound and verify every retained sample.
 - Unverified ScriptProcessor fallback cannot enter automatic NVIDIA delivery.
 - Explicit NVIDIA recovery uses `recover_stream` and the bundled runtime, with no
-  destination callback or Whisper fallback. Preserve source samples/rate; publish
+  destination callback or alternate recognizer. Preserve source samples/rate; publish
   only a completed result. Cancel keeps audio and stale cleanup is session-bound.
 - Legacy ydotool requires a literal space argument, not `space`. Its paste delay
   is 24 ms; modern numeric arguments and terminal gestures have separate contracts.
@@ -57,6 +57,8 @@ glib 0.20 directly leaves the GTK dependency behind. [Backport](vendor/glib/VOCO
   proceed through debounce; passive evdev retains its duplicate guard.
 - IBus protocol 6 is dictation-shortcut-only; older helpers must reconnect after upgrade. Never restore text mutation there.
 - Bounded accessible-field observations are not atomic ownership or cursor paint.
+  Rich editors require a bounded caret-linked paragraph route, including route identity
+  and trailing noneditable scaffolding. Never acknowledge the outer object placeholder.
   Content and caret can propagate separately. Exact expected content at an earlier
   known caret is pending, never receipt; retain the deadline and no-replay rule.
 - Automatic desktop insertion requires a bound, nonempty destination token. An
@@ -92,6 +94,7 @@ npm run test:dictation-renderer
 npm run test:microphone-renderer
 npm run test:native-capture-renderer
 npm run test:chromium-exact-field
+npm run test:rich-editor-delivery
 python3 scripts/verify-glib-backport.py
 python3 scripts/test-glib-variant.py --output /tmp/voco-glib-check
 cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml
@@ -120,7 +123,7 @@ isolation, not a remote VM or proof of a distribution's default desktop.
 
 ## Release and evidence
 
-Source version: **2026.0.47** (published Ubuntu/Debian release). Verify the current public release on GitHub and
+Source version: **2026.0.51** (unreleased Nemotron-only development; published Ubuntu/Debian release remains .47). Verify the current public release on GitHub and
 installed version from the package manager; do not infer either from source.
 The .43 package and desktop evidence is recorded in
 [the support matrix](docs/linux-support.md); preserve per-artifact receipts and
@@ -129,7 +132,7 @@ a version in source alone is not proof of a published or installed package.
 Frozen .39 and earlier cuts remain immutable. New product bytes need a new version,
 fresh checks and artifact receipts.
 
-Pass all CI gates, including Whisper accuracy. No waiver is authorized. Keep a
+Pass all CI gates, including the pinned Nemotron accuracy and continuity checks. No waiver is authorized. Keep a
 clean commit, exact package/source hashes, licenses, checksums and release notes.
 The hosted Release workflow must not assemble NVIDIA installers. Userspace checks,
 native install/remove, physical audio and compositor/application behavior are
@@ -178,6 +181,7 @@ private raw evidence outside the repository. Historical media does not requalify
 
 The recorded public installer version is `packaging/published-release.json`. Keep
 README pinned to that version until publication is verified, then update both.
-The guided installer checks `/usr/bin/voco`, not an older PATH override. Release
-the optional GNOME 46 panel archive separately; never enable it in a user profile
-as a package-install side effect. Preserve screenshot proof outside build caches.
+The guided installer checks `/usr/bin/voco`, not an older PATH override. Bundle the GNOME 46 panel in the complete Debian candidate. Enable it only through
+the explicit user-run setup flow; never change enabled extensions in package hooks.
+Keep session restart feedback distinct from active presentation. Preserve immutable
+tray PNG paths for the process lifetime and explicit Stop actions. Preserve screenshot proof outside build caches.

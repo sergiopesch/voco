@@ -10,6 +10,11 @@ function bounds(actor) {
     return {x, y, width, height, visible: actor.visible};
 }
 function children(actor) { return [actor, ...actor.get_children().flatMap(children)]; }
+function iconPath(actor) {
+    let icon = actor.gicon;
+    while (icon instanceof Gio.EmblemedIcon) icon = icon.get_icon();
+    return icon instanceof Gio.FileIcon ? icon.get_file().get_path() : null;
+}
 export default class Probe extends Extension {
     enable() {
         this.object = Gio.DBusExportedObject.wrapJSObject(xml, this);
@@ -19,6 +24,10 @@ export default class Probe extends Extension {
         const indicator = Main.panel.statusArea['voco-panel@voco.local'];
         const actors = indicator ? children(indicator) : [];
         return JSON.stringify({animations: St.Settings.get().enable_animations, panel: bounds(Main.panel), indicator: indicator ? bounds(indicator) : null,
+            statusIcons: Object.entries(Main.panel.statusArea).filter(([key, value]) => key.startsWith('appindicator-') && value)
+                .map(([key, value]) => ({key, ...bounds(value), mapped: value.mapped,
+                    actors: children(value).map(actor => ({...bounds(actor), mapped: actor.mapped,
+                        opacity: actor.opacity, hasIcon: Boolean(actor.gicon), icon: iconPath(actor), text: actor.text ?? null}))})),
             windows: global.get_window_actors().length,
             actors: actors.map(actor => ({...bounds(actor), name: actor.accessible_name,
                 text: actor.text ?? null, scale: actor.scale_y, opacity: actor.opacity,

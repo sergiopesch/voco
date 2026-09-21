@@ -22,8 +22,8 @@
 .voco-motion-feedback { animation: voco-feedback-in var(--voco-motion-fast) ease-out; }
 @keyframes voco-feedback-in { from { opacity: 0; } to { opacity: 1; } }
 
-.voco-voice-signal { display: inline-flex; align-items: center; justify-content: center; gap: 3px; width: 58px; height: 26px; flex: 0 0 auto; color: var(--voco-accent-highlight); }
-.voco-voice-signal > span { width: 3px; height: 100%; border-radius: 3px; background: currentColor; transform: scaleY(var(--signal)); transition: transform 75ms linear; }
+.voco-voice-signal { display: inline-flex; align-items: center; justify-content: center; gap: 3px; width: 58px; height: 30px; flex: 0 0 auto; color: var(--voco-accent-highlight); }
+.voco-voice-signal > span { width: 4px; height: 100%; border-radius: 3px; background: currentColor; transform: scaleY(var(--signal)); transition: transform 75ms linear; }
 .voco-voice-signal[data-active="false"] { opacity: .45; }
 .voco-panel .voco-voice-pill { display: inline-flex; align-items: center; gap: 9px; border-radius: 24px; min-height: 44px; }
 .voco-voice-pill > .voco-settings-icon { width: 18px; height: 18px; }
@@ -83,7 +83,7 @@
 .voco-opening > h1, .voco-opening > p { margin: 0; }
 .voco-opening > p { display: flex; align-items: center; gap: 8px; }
 .voco-setup__microphone, .voco-setup__handoff { animation: voco-feedback-in var(--voco-motion-settle) var(--voco-motion-ease); }
-.voco-setup__microphone { padding: 16px; border: 1px solid var(--voco-divider); border-radius: 14px; }
+.voco-setup__microphone { min-width: 0; }
 .voco-setup__details p { overflow-wrap: anywhere; font-size: 13px; line-height: 1.5; }
 .voco-setup__handoff p { margin: 0 0 12px; line-height: 1.7; }
 .voco-setup__handoff p:last-child { color: var(--voco-muted); font-size: 13px; }

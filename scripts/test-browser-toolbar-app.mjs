@@ -11,7 +11,7 @@ assert.ok(!longCapture || process.env.VOCO_BROWSER_DEBUG_CAPTURE === '1', 'Long 
 const root = process.env.VOCO_BROWSER_TEST_ROOT;
 assert.ok(root && process.env.XDG_RUNTIME_DIR === `${root}/runtime` && process.env.DISPLAY === ':0');
 const hash = async p => crypto.createHash('sha256').update(await fs.readFile(p)).digest('hex');
-assert.equal(await hash(`${root}/data/voco/models/ggml-base.en.bin`), 'a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002');
+assert.equal(await hash(`${root}/speech/models/nemotron-speech-streaming-en-0.6b.q8_0.gguf`), 'd9a01898d2a611c8764e23a1c2f45e70bbd5a425dc4de93692ac951dd603812d');
 let longPlan;
 if (longCapture) {
   const manifestBytes = await fs.readFile('tests/fixtures/speech/manifest.json');
@@ -184,7 +184,7 @@ try {
 } finally {
   await fs.writeFile(`${root}/evidence/playback.json`, JSON.stringify(playbacks.map(p=>p.record),null,2));
   if (process.env.VOCO_BROWSER_DEBUG_CAPTURE === '1') await fs.copyFile(`${root}/long.wav`,`${root}/evidence/playback-long.wav`).catch(()=>{});
-  await fs.writeFile(`${root}/evidence/result.json`,JSON.stringify({appSha256:await hash(`${root}/voco`),hostSha256:await hash(`${root}/voco-browser-host`),modelSha256:await hash(`${root}/data/voco/models/ggml-base.en.bin`),extensionHashes, diagnosticSecondCapture: process.env.VOCO_BROWSER_DIAG_SECOND_CAPTURE === '1', outputMode: process.env.VOCO_NATIVE_OUTPUT_MODE || "final-text-only", tests:results, failure, harnessOnlyHostGrant:null, shippedManifestPreserved:await hash(`${extension}/manifest.json`)===extensionHashes['manifest.json']},null,2));
+  await fs.writeFile(`${root}/evidence/result.json`,JSON.stringify({appSha256:await hash(`${root}/voco`),hostSha256:await hash(`${root}/voco-browser-host`),modelSha256:await hash(`${root}/speech/models/nemotron-speech-streaming-en-0.6b.q8_0.gguf`),extensionHashes, diagnosticSecondCapture: process.env.VOCO_BROWSER_DIAG_SECOND_CAPTURE === '1', outputMode: process.env.VOCO_NATIVE_OUTPUT_MODE || "final-text-only", tests:results, failure, harnessOnlyHostGrant:null, shippedManifestPreserved:await hash(`${extension}/manifest.json`)===extensionHashes['manifest.json']},null,2));
   if (worker) await fs.writeFile(`${root}/evidence/native-request-metadata.json`, JSON.stringify(await worker.evaluate(()=>globalThis.nativeRequestMetadata).catch(()=>[]), null, 2));
   await fs.cp(`${root}/state/voco/debug-captures`, `${root}/evidence/debug-captures`, {recursive:true}).catch(()=>{});
   await fs.copyFile(`${root}/state/voco/hotkey-trace.jsonl`,`${root}/evidence/hotkey-trace.jsonl`).catch(()=>{});

@@ -188,11 +188,12 @@ try {
         window.catalog={revision:'r1',sources:[window.source],defaultSelectionToken:'token-1'};
         window.nativeInvoke=async(name,args)=>{
           window.nativeCommands.push({name,args});
-          if(name==='benchmark_stream' && window.onboardingFixture) {
+          if(name==='benchmark_stream' || name==='recover_stream') {
             const r=args.request;
             if(['quality','diagnostic','cancel'].includes(r.op))return {};
-            if(window.recognitionError)throw {message:'Speech engine unavailable for this test.'};
-            return {...r,mode:'append-only',text:r.op==='start'?null:window.silentFixture?'':r.op==='finish'?'This is my voice test.':'This is my voice test'};
+            if(window.recognitionError || window.transcriptionError)throw {message:'Speech engine unavailable for this test.'};
+            const text=window.onboardingFixture ? (window.silentFixture?'':r.op==='finish'?'This is my voice test.':'This is my voice test') : (r.op==='finish'?'Fixture transcript':null);
+            return {...r,mode:'append-only',text:r.op==='start'?null:text};
           }
           if(name==='native_capture_capabilities') {
             if(window.captureScenario==='pending') return new Promise(resolve=>window.resolveCapability=resolve);
@@ -231,12 +232,14 @@ try {
                 window.auditUploads.push(new Uint8Array(args[0]));
                 return '/mock-private-renderer/COMMIT.json';
             }
-            if(name==='transcribeAudio') {if(window.transcriptionError)throw Error('Fixture recognition failure');return 'Fixture transcript';}
             if (name === 'getConfig')
                 return {
                     revision: 1,
                     config: window.config
                 };
+            if (name === 'getPanelSetupStatus') return window.panelSetupStatus ?? {status:'active', detail:'Live panel bars and Stop are active.',canEnable:false};
+            if (name === 'enableGnomePanel') { window.panelSetupStatus={status:'restart',detail:'Panel enabled. Sign out and back in to load it.',canEnable:false}; return window.panelSetupStatus; }
+            if (name === 'takeLauncherActivation') { const pending=window.activationPending;window.activationPending=false;return pending; }
             if (name === 'getDesktopInputStatus') return {available:true,detail:'Desktop input is ready.'};
             if (name === 'getRuntimeDiagnostics')
                 return {
@@ -465,6 +468,12 @@ try {
               window.calls.push([name,...args]);
               return {enabled:true,available:false,targetToken:null,failureReason:'cursor',detail:'Click in a text field, then press your dictation shortcut to start.'};
             }
+            if (name === 'getRuntimeDiagnostics') {
+              const base = await previous(name,args);
+              return {...base, desktopInput:{available:true,detail:'Input helpers are ready.'},
+                desktopPaste:{enabled:true,available:false,detail:'Focus a text field.'},
+                ownedPreedit:{...base.ownedPreedit,setupState:'not-installed',available:false}};
+            }
             return previous(name,args);
           };
         });
@@ -518,6 +527,9 @@ try {
         await page.evaluate(problem => {
           const previous = window.nativeCall;
           window.nativeCall = async (name, args) => {
+            if (name === 'getPanelSetupStatus') return window.panelSetupStatus ?? {status:'active', detail:'Live panel bars and Stop are active.',canEnable:false};
+            if (name === 'enableGnomePanel') { window.panelSetupStatus={status:'restart',detail:'Panel enabled. Sign out and back in to load it.',canEnable:false}; return window.panelSetupStatus; }
+            if (name === 'takeLauncherActivation') { const pending=window.activationPending;window.activationPending=false;return pending; }
             if (name === 'getDesktopInputStatus') {
               window.calls.push([name, ...args]);
               if (window.setupRepaired) return {available:true,detail:'Desktop input is ready.'};
@@ -550,7 +562,7 @@ try {
         await page.getByRole('button',{name:'Done',exact:true}).waitFor();
         if (await page.getByRole('button',{name:'Finish test',exact:true}).count()) { await page.getByRole('button',{name:'Finish test',exact:true}).click(); await page.waitForFunction(()=>window.store.getState().onboardingTestPassed); }
         await page.getByRole('button',{name:'Done',exact:true}).click();
-        await page.waitForFunction(()=>window.config.onboardingCompleted&&window.store.getState().surface==='hidden');
+        await page.waitForFunction(()=>window.config.onboardingCompleted&&window.store.getState().surface==='popover');
         await noOutput();
         results.push({case:'onboarding-blocks-'+problem+'-and-finishes-after-repair-without-external-cursor',passed:true});
       }
@@ -561,12 +573,20 @@ try {
       await page.setViewportSize({width:1100,height:800});
       await chooseNative('token-1');
       await page.getByLabel('Allow microphone access for this session').check();
+      await page.evaluate(()=>window.selectError='Selection expired');
+      await page.getByRole('button',{name:'Use this microphone',exact:true}).click();
+      await page.getByText('Selection expired',{exact:true}).waitFor();
+      assert.equal(await page.getByRole('button',{name:'Back to test',exact:true}).count(),1);
+      assert.equal(await page.evaluate(()=>window.nativeCommands.some(c=>c.name==='native_capture_begin')),false);
+      await page.evaluate(()=>window.selectError=null);
       await page.getByRole('button',{name:'Use this microphone',exact:true}).click();
       await page.waitForFunction(()=>window.store.getState().nativeCaptureSource?.selectionToken==='token-1');
-      await page.getByRole('button',{name:'Back to test',exact:true}).click();
+      await page.getByRole('button',{name:'Start test',exact:true}).waitFor();
+      assert.equal(await page.getByRole('button',{name:'Back to test',exact:true}).count(),0);
+      assert.equal(await page.getByRole('button',{name:'Start test',exact:true}).evaluate(el=>el===document.activeElement),true);
       await page.getByRole('button',{name:'Start test',exact:true}).click();
       await page.getByRole('region',{name:'Test transcript'}).getByText('This is my voice test',{exact:true}).waitFor();
-      assert.equal(await page.evaluate(()=>window.nativeCommands.filter(c=>c.name==='native_capture_select_source').length),1);
+      assert.equal(await page.evaluate(()=>window.nativeCommands.filter(c=>c.name==='native_capture_select_source').length),2);
       await page.getByRole('button',{name:'Finish test',exact:true}).click();
       await page.waitForFunction(()=>window.store.getState().onboardingTestPassed);
       await noOutput();
@@ -597,8 +617,21 @@ try {
       await captureStyledPanel('onboarding-minimum-window',page.getByRole('button',{name:'Done'}),{width:760,height:560});
       if (await page.getByRole('button',{name:'Finish test',exact:true}).count()) { await page.getByRole('button',{name:'Finish test',exact:true}).click(); await page.waitForFunction(()=>window.store.getState().onboardingTestPassed); }
         await page.getByRole('button',{name:'Done',exact:true}).click();
-      await page.waitForFunction(()=>window.config.onboardingCompleted&&window.store.getState().surface==='hidden');
+      await page.waitForFunction(()=>window.config.onboardingCompleted&&window.store.getState().surface==='popover');
       results.push({case:'default-microphone-live-meter-transcript-stop-finish-no-external-output',passed:true});
+      await page.getByRole('button',{name:'Hide to tray',exact:true}).click();
+      await page.waitForFunction(()=>window.store.getState().surface==='hidden');
+      await page.evaluate(()=>{window.activationPending=true;window.listeners['voco:activate']({payload:null});});
+      await page.waitForFunction(()=>window.store.getState().surface==='popover');
+      await page.getByText('Ready',{exact:true}).waitFor();
+      await captureStyledPanel('onboarding-visible-ready-handoff',page.getByRole('button',{name:'Hide to tray',exact:true}),{width:760,height:560});
+      for (const busy of ['starting','recording','processing']) {
+        await page.evaluate(busy=>{window.store.getState().setSurface('hidden');window.store.getState().setStatus(busy);window.activationPending=true;window.listeners['voco:activate']({payload:null});},busy);
+        await page.waitForFunction(()=>window.activationPending===false);
+        assert.equal(await page.evaluate(()=>window.store.getState().surface),'hidden');
+      }
+      await page.evaluate(()=>window.store.getState().setStatus('idle'));
+      results.push({case:'launcher-reopens-idle-and-preserves-capture-focus',passed:true});
       await page.setViewportSize({width:1100,height:800});
       await loadTest();
       await page.evaluate(()=>window.silentFixture=true);
@@ -637,7 +670,7 @@ try {
       await page.getByRole('region',{name:'Test transcript'}).getByText('This is my voice test',{exact:true}).waitFor();
       if (await page.getByRole('button',{name:'Finish test',exact:true}).count()) { await page.getByRole('button',{name:'Finish test',exact:true}).click(); await page.waitForFunction(()=>window.store.getState().onboardingTestPassed); }
         await page.getByRole('button',{name:'Done',exact:true}).click();
-      await page.waitForFunction(()=>window.config.onboardingCompleted&&window.store.getState().surface==='hidden');
+      await page.waitForFunction(()=>window.config.onboardingCompleted&&window.store.getState().surface==='popover');
       assert.equal(await page.evaluate(()=>window.stopped&&window.ack===4),true);
       await noOutput();
       results.push({case:'recognition-error-retry-flush-then-explicit-completion',passed:true});
@@ -679,7 +712,7 @@ try {
       await page.getByRole('region',{name:'Test transcript'}).getByText('This is my voice test',{exact:true}).waitFor();
       if (await page.getByRole('button',{name:'Finish test',exact:true}).count()) { await page.getByRole('button',{name:'Finish test',exact:true}).click(); await page.waitForFunction(()=>window.store.getState().onboardingTestPassed); }
         await page.getByRole('button',{name:'Done',exact:true}).click();
-      await page.waitForFunction(()=>window.config.onboardingCompleted&&window.store.getState().surface==='hidden');
+      await page.waitForFunction(()=>window.config.onboardingCompleted&&window.store.getState().surface==='popover');
       assert.equal(await page.evaluate(()=>window.nativeCommands.some(c=>c.name==='native_capture_begin')),false);
       assert.equal(await page.evaluate(()=>window.tracks.every(t=>t.readyState==='ended')),true);
       await noOutput();
@@ -763,7 +796,7 @@ try {
     await page.waitForFunction(()=>window.store.getState().transcript==='Fixture transcript');
     await activate();await page.evaluate(()=>window.unhealthy=true);
     await page.waitForFunction(()=>window.store.getState().recovery?.audioAvailable===true);
-    assert.equal(await page.evaluate(()=>window.calls.filter(x=>x[0]==='transcribeAudio').length),0);
+    assert.equal(await page.evaluate(()=>window.nativeCommands.filter(x=>x.name==='recover_stream'&&x.args.request.op==='start').length),0);
     assert.equal((await state()).streams,0);assert.equal((await state()).commands.filter(x=>x.name==='native_capture_begin').length,1);
     expected.push('native-tail-failure-retains-prefix-without-auto-transcription');record(expected.at(-1));
     await load('enabled');await page.getByRole('combobox', { name: 'Microphone', exact: true }).waitFor();
@@ -836,7 +869,7 @@ try {
     await page.evaluate(()=>window.listeners['voco:toggle-dictation']({payload:null}));
     await page.waitForFunction(()=>window.nativeCommands.some(x=>x.name==='native_capture_begin')&&window.store.getState().nativeCaptureSource===null);
     assert.equal((await state()).ready,false);assert.equal((await state()).streams,0);assert.equal((await state()).enums,0);
-    assert.equal(await page.evaluate(()=>window.calls.filter(x=>x[0]==='transcribeAudio').length),0);
+    assert.equal(await page.evaluate(()=>window.nativeCommands.filter(x=>x.name==='recover_stream'&&x.args.request.op==='start').length),0);
     expected.push('native-start-failure-revokes-grant-without-fallback');record(expected.at(-1));
     await load('enabled');await chooseNative('token-1');
     await page.getByLabel('Allow microphone access for this session').check();
@@ -895,7 +928,7 @@ try {
     await page.waitForFunction(()=>window.stallInjected===true);
     await page.waitForFunction(()=>window.store.getState().recovery?.audioAvailable===true,{},{timeout:12000});
     await verifyRetainedWitness('interrupted');
-    assert.equal(await page.evaluate(()=>window.calls.filter(x=>x[0]==='transcribeAudio').length),0);
+    assert.equal(await page.evaluate(()=>window.nativeCommands.filter(x=>x.name==='recover_stream'&&x.args.request.op==='start').length),0);
     assert.equal((await state()).source,null);assert.equal((await state()).ready,false);
     await page.evaluate(()=>window.store.getState().setSurface('popover'));
     await page.getByRole('button',{name:'Discard recovery',exact:true}).waitFor();
@@ -918,14 +951,14 @@ try {
     await page.evaluate(()=>new Promise(resolve=>setTimeout(resolve,60)));
     assert.equal((await state()).ready,true);assert.ok((await state()).source);
     assert.equal(await page.evaluate(()=>window.store.getState().recovery),null);
-    assert.equal(await page.evaluate(()=>window.calls.filter(x=>x[0]==='transcribeAudio').length),0);
+    assert.equal(await page.evaluate(()=>window.nativeCommands.filter(x=>x.name==='recover_stream'&&x.args.request.op==='start').length),0);
     await page.evaluate(()=>window.listeners['voco:toggle-dictation']({payload:null}));
     await page.waitForFunction(()=>window.store.getState().transcript==='Fixture transcript'&&window.store.getState().status==='idle');
     const lateProof=await page.evaluate(()=>({released:window.oldDrainReleased,
-      transcriptionSamples:window.calls.filter(x=>x[0]==='transcribeAudio').map(x=>x[1].length),
+      streamSamples:window.nativeCommands.filter(x=>x.name==='benchmark_stream'&&x.args.request.op==='push'&&x.args.request.dictation_session_id===window.captureIdentity.sessionId).reduce((s,x)=>s+x.args.request.audio.length,0),
       starts:window.nativeCommands.filter(x=>x.name==='native_capture_begin').map(x=>x.args.request),
       uploads:window.auditUploads.length,cancels:window.nativeCommands.filter(x=>x.name==='native_capture_cancel').map(x=>x.args.request)}));
-    assert.equal(lateProof.released,true);assert.deepEqual(lateProof.transcriptionSamples,[12800]);
+    assert.equal(lateProof.released,true);assert.equal(lateProof.streamSamples,35280);
     assert.ok(lateProof.starts[1].sessionId>lateProof.starts[0].sessionId);
     assert.ok(lateProof.starts[1].generation>lateProof.starts[0].generation);
     assert.equal(lateProof.uploads,1);assert.equal(lateProof.cancels.length,1);
@@ -940,7 +973,7 @@ try {
     await activate(true);await page.evaluate(()=>window.store.getState().setSurface('popover'));await page.getByRole('button',{name:'Cancel dictation',exact:true}).click();
     await verifyRetainedWitness('cancelled');
     await page.waitForFunction(()=>window.store.getState().recovery?.audioAvailable===true);
-    assert.equal(await page.evaluate(()=>window.calls.filter(x=>x[0]==='transcribeAudio').length),0);
+    assert.equal(await page.evaluate(()=>window.nativeCommands.filter(x=>x.name==='recover_stream'&&x.args.request.op==='start').length),0);
     expected.push('cancelled-audit-keeps-prefix-and-does-not-claim-healthy');record(expected.at(-1));
     await page.evaluate(()=>window.store.getState().setSurface('popover'));
     await page.getByRole('button',{name:'Retry transcription',exact:true}).click();

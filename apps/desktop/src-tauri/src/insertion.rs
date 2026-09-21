@@ -296,6 +296,9 @@ fn desktop_paste_status_with_input(
         target_started.elapsed().as_millis() as u64,
     );
     let available = target.input_state == "editable" && target.token.is_some();
+    if !available {
+        crate::trace_hotkey_event(target.reason.failure_event(), None);
+    }
     DesktopPasteStatus {
         shortcut_epoch,
         target_token: target.token.clone(),
@@ -307,13 +310,50 @@ fn desktop_paste_status_with_input(
             "editable" if target.token.is_some() => input.detail.clone(),
             "none" => "Click in a text field, then press your dictation shortcut to start.".into(),
             "protected" => "Dictation is unavailable in password fields. Click in another text field and try again.".into(),
+            _ if matches!(target.reason, DesktopTargetReason::NoFocusedControl) => "This app is not exposing a text cursor. Check its accessibility support, reopen it, and try again.".into(),
             _ => "VOCO cannot verify a text cursor here. Click in an editable text field and try again.".into(),
         },
     }
 }
 
+// Finite metadata only. Unknown helper output never becomes a log message.
+#[derive(Debug, Default, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum DesktopTargetReason {
+    Ready,
+    EventsPending,
+    NoActiveWindow,
+    AmbiguousWindows,
+    NoFocusedControl,
+    NotEditable,
+    Protected,
+    ControlUnavailable,
+    ProbeFailed,
+    #[default]
+    #[serde(other)]
+    Unknown,
+}
+
+impl DesktopTargetReason {
+    fn failure_event(&self) -> &'static str {
+        match self {
+            Self::EventsPending => "dictation_desktop_cursor_events_pending",
+            Self::NoActiveWindow => "dictation_desktop_cursor_no_active_window",
+            Self::AmbiguousWindows => "dictation_desktop_cursor_ambiguous_windows",
+            Self::NoFocusedControl => "dictation_desktop_cursor_no_focused_control",
+            Self::NotEditable => "dictation_desktop_cursor_not_editable",
+            Self::Protected => "dictation_desktop_cursor_protected",
+            Self::ControlUnavailable => "dictation_desktop_cursor_control_unavailable",
+            Self::ProbeFailed => "dictation_desktop_cursor_probe_failed",
+            Self::Ready | Self::Unknown => "dictation_desktop_cursor_unavailable",
+        }
+    }
+}
+
 #[derive(Debug, serde::Deserialize)]
 struct DesktopTarget {
+    #[serde(default)]
+    reason: DesktopTargetReason,
     #[serde(default = "unknown_focus_scope")]
     input_state: String,
     shortcut: String,
@@ -330,6 +370,7 @@ fn unknown_focus_scope() -> String {
 
 fn desktop_target() -> DesktopTarget {
     let unknown = || DesktopTarget {
+        reason: DesktopTargetReason::ProbeFailed,
         input_state: unknown_focus_scope(),
         shortcut: "ctrl+v".into(),
         token: None,
@@ -413,10 +454,15 @@ fn desktop_paste_for_target(
     })?;
     if !matches!(
         prepared["observation"].as_str(),
-        Some("prepared" | "unavailable" | "changed")
+        Some("prepared" | "unavailable" | "changed" | "unsupported")
     ) {
         return Err(InsertionError::rejected(
             "Invalid destination observation response.",
+        ));
+    }
+    if prepared["observation"] == "unsupported" {
+        return Err(InsertionError::rejected(
+            "This rich text selection cannot be verified. Place the caret inside one paragraph and try again.",
         ));
     }
     if prepared["observation"] == "changed" {
@@ -470,7 +516,11 @@ fn desktop_paste_for_target(
                     Ok(response)
                 },
                 Duration::from_secs(3),
-            )?;
+            )
+            .map_err(|(error, event)| {
+                crate::trace_hotkey_event(event, None);
+                error
+            })?;
             metrics.observation_wait_ms = started.elapsed().as_millis() as u64;
             metrics.field_observed = true;
         }
@@ -490,10 +540,19 @@ fn desktop_paste_for_target(
     })
 }
 
+fn observation_failure_event(response: Option<&serde_json::Value>) -> &'static str {
+    match response.and_then(|value| value["observation"].as_str()) {
+        Some("pending") => "dictation_delivery_observation_timeout",
+        Some("changed") => "dictation_delivery_observation_changed",
+        Some("unavailable") | None => "dictation_delivery_observation_unavailable",
+        _ => "dictation_delivery_observation_invalid",
+    }
+}
+
 fn observe_delivery(
     mut check: impl FnMut(Duration) -> Result<serde_json::Value, ()>,
     timeout: Duration,
-) -> Result<(), InsertionError> {
+) -> Result<(), (InsertionError, &'static str)> {
     let deadline = Instant::now() + timeout;
     loop {
         let remaining = deadline.saturating_duration_since(Instant::now());
@@ -508,9 +567,14 @@ fn observe_delivery(
                 Duration::from_millis(15).min(deadline.saturating_duration_since(Instant::now())),
             ),
             _ => {
+                let event = if remaining.is_zero() {
+                    "dictation_delivery_observation_timeout"
+                } else {
+                    observation_failure_event(response.as_ref())
+                };
                 let mut error = InsertionError::uncertain("The destination did not confirm the expected insertion. Streaming stopped; review retained text before retrying.");
                 error.clipboard_changed = true;
-                return Err(error);
+                return Err((error, event));
             }
         }
     }
@@ -1130,17 +1194,23 @@ mod tests {
             Ok(serde_json::json!({"observation":"unavailable"})),
             Err(()),
         ] {
-            let error =
+            let (error, event) =
                 observe_delivery(|_| result.clone(), Duration::from_millis(100)).unwrap_err();
             assert!(matches!(error.outcome, DeliveryOutcome::Uncertain));
             assert!(error.clipboard_changed);
+            assert!(crate::is_supported_dictation_trace_event(event));
         }
-        let error = observe_delivery(
+        let (error, event) = observe_delivery(
             |_| panic!("Expired budget must not issue another probe"),
             Duration::ZERO,
         )
         .unwrap_err();
         assert!(matches!(error.outcome, DeliveryOutcome::Uncertain));
+        assert_eq!(event, "dictation_delivery_observation_timeout");
+        assert_eq!(
+            observation_failure_event(Some(&serde_json::json!({"observation":"private text"}))),
+            "dictation_delivery_observation_invalid"
+        );
     }
 
     #[test]
@@ -1172,6 +1242,48 @@ mod tests {
         assert_eq!(
             x11_paste_arguments(true, true),
             ["key", "--clearmodifiers", "space", "ctrl+shift+v"]
+        );
+    }
+
+    #[test]
+    fn cursor_failure_diagnostics_accept_only_finite_metadata() {
+        for (reason, expected) in [
+            ("events_pending", "dictation_desktop_cursor_events_pending"),
+            (
+                "no_active_window",
+                "dictation_desktop_cursor_no_active_window",
+            ),
+            (
+                "ambiguous_windows",
+                "dictation_desktop_cursor_ambiguous_windows",
+            ),
+            (
+                "no_focused_control",
+                "dictation_desktop_cursor_no_focused_control",
+            ),
+            ("not_editable", "dictation_desktop_cursor_not_editable"),
+            ("protected", "dictation_desktop_cursor_protected"),
+            (
+                "control_unavailable",
+                "dictation_desktop_cursor_control_unavailable",
+            ),
+            ("probe_failed", "dictation_desktop_cursor_probe_failed"),
+            ("private field text", "dictation_desktop_cursor_unavailable"),
+        ] {
+            let target: DesktopTarget = serde_json::from_value(serde_json::json!({
+                "shortcut": "ctrl+v", "token": null, "reason": reason,
+            }))
+            .unwrap();
+            assert_eq!(target.reason.failure_event(), expected);
+            assert!(crate::is_supported_dictation_trace_event(expected));
+        }
+        let legacy: DesktopTarget = serde_json::from_value(serde_json::json!({
+            "shortcut": "ctrl+v", "token": null,
+        }))
+        .unwrap();
+        assert_eq!(
+            legacy.reason.failure_event(),
+            "dictation_desktop_cursor_unavailable"
         );
     }
 

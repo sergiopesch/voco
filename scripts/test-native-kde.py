@@ -200,10 +200,10 @@ try:
     if (root / 'voco').exists():
         gi.require_version('Atspi', '2.0')
         from gi.repository import Atspi
-        model = root / 'data/voco/models/ggml-base.en.bin'
+        model = root / 'speech/models/nemotron-speech-streaming-en-0.6b.q8_0.gguf'
         assert model.exists(), 'Lifecycle acceptance requires pinned model cache'
         model_hash = hashlib.sha256(model.read_bytes()).hexdigest()
-        assert model_hash == 'a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002'
+        assert model_hash == 'd9a01898d2a611c8764e23a1c2f45e70bbd5a425dc4de93692ac951dd603812d'
         report['modelSha256'] = model_hash
         report['appSha256'] = hashlib.sha256((root / 'voco').read_bytes()).hexdigest()
         report['application'] = []
@@ -290,7 +290,7 @@ try:
                          GLib.Variant('(isvu)', (item, 'clicked', GLib.Variant('s', ''), 0)))
                 def cache_ready():
                     assert app.poll() is None
-                    return 'Cached speech model verified:' in (evidence / f'app-{cycle}.log').read_text()
+                    return 'Bundled Nemotron streaming model ready' in (evidence / f'app-{cycle}.log').read_text()
                 wait_for(cache_ready)
                 def frontend_ready():
                     trace = root / 'state/voco/hotkey-trace.jsonl'

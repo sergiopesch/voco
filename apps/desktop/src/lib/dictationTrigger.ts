@@ -10,6 +10,11 @@ export function admitsDictationTrigger(
   action?: DictationTriggerAction,
 ): boolean {
   if (action === undefined) return true;
+  // The app's own Stop controls apply to its current recording, regardless of
+  // start origin. They never admit Start or turn a delayed Stop into a toggle.
+  if (triggerId === "tray:stop") {
+    return action === "stop" && (phase === "starting" || phase === "recording");
+  }
   if (triggerId !== "onboarding:test" && !triggerId?.startsWith("browser:")) return false;
   if (action === "start") return phase === "idle" || phase === "error";
   return triggerId === activeTriggerId && (phase === "starting" || phase === "recording");

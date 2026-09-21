@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import shutil
 import sys
 import time
 import gi
@@ -45,10 +46,34 @@ try:
     system_address = 'unix:path=' + str(root / 'runtime/system-test-bus')
     system = subprocess.Popen(['dbus-daemon','--session','--nofork','--address='+system_address], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     os.environ['DBUS_SYSTEM_BUS_ADDRESS'] = system_address
-    for schema,key,value in [('org.gnome.shell','enabled-extensions',"['ubuntu-appindicators@ubuntu.com','voco-panel@voco.local','voco-panel-probe@test.invalid']"),('org.gnome.shell','disable-user-extensions','false'),('org.gnome.desktop.interface','enable-animations','true')]:
+    installed_mode = (root / 'panel-payload').exists()
+    enabled = ['ubuntu-appindicators@ubuntu.com', 'voco-panel-probe@test.invalid']
+    if not installed_mode: enabled.append('voco-panel@voco.local')
+    for schema,key,value in [('org.gnome.shell','enabled-extensions',str(enabled)),('org.gnome.shell','disable-user-extensions','false'),('org.gnome.desktop.interface','enable-animations','true')]:
         subprocess.run(['gsettings','set',schema,key,value],check=True)
     log = (evidence / 'shell.log').open('w')
     shell = subprocess.Popen(['gnome-shell','--nested','--wayland','--no-x11','--force-animations','--wayland-display=voco-panel-test','--sm-disable'], env={**os.environ,'DISPLAY':':77'}, stdout=log,stderr=subprocess.STDOUT)
+    if installed_mode:
+        for _ in range(150):
+            pump(.1)
+            try: inspect(); break
+            except GLib.Error: pass
+        else: raise AssertionError('Shell setup probe did not load')
+        missing = subprocess.run([str(root/'voco'), '--check-panel'], capture_output=True, text=True, timeout=6)
+        assert missing.returncode == 2 and 'missing' in missing.stdout, missing
+        before = subprocess.check_output(['gsettings','get','org.gnome.shell','enabled-extensions'],text=True)
+        shutil.copytree(root/'panel-payload', Path('/usr/share/gnome-shell/extensions/voco-panel@voco.local'))
+        checked = subprocess.run([str(root/'voco'), '--check-panel'], capture_output=True, text=True, timeout=6)
+        assert checked.returncode == 2 and 'Enable' in checked.stdout, checked
+        assert subprocess.check_output(['gsettings','get','org.gnome.shell','enabled-extensions'],text=True) == before
+        setup = subprocess.run([str(root/'voco'), '--setup-panel'], capture_output=True, text=True, timeout=6)
+        report['freshPanelSetup'] = {'missing':missing.stdout, 'check':checked.stdout, 'setup':setup.stdout, 'code':setup.returncode}
+        assert setup.returncode == 2 and 'Sign out' in setup.stdout, setup
+        enabled_after = subprocess.check_output(['gsettings','get','org.gnome.shell','enabled-extensions'],text=True)
+        assert all(uuid in enabled_after for uuid in [*enabled, 'voco-panel@voco.local'])
+        # Recreate the isolated shell session only, as the installer instructs.
+        shell.terminate(); shell.wait(timeout=10); pump(.5)
+        shell = subprocess.Popen(['gnome-shell','--nested','--wayland','--no-x11','--force-animations','--wayland-display=voco-panel-test','--sm-disable'], env={**os.environ,'DISPLAY':':77'}, stdout=log,stderr=subprocess.STDOUT)
     for _ in range(150):
         pump(.1)
         try:
@@ -57,6 +82,10 @@ try:
         except GLib.Error: pass
     else: raise AssertionError('Panel did not attach')
     pump(5); call('Overview'); pump(1)
+    if installed_mode:
+        checked = subprocess.run([str(root/'voco'), '--check-panel'], capture_output=True, text=True, timeout=6)
+        assert checked.returncode == 0 and 'active' in checked.stdout, checked
+        report['freshPanelSetup']['afterSessionRestart'] = checked.stdout
     report['compositorAnimationsInitially'] = inspect()['animations']
     report['forceAnimationsForSoftwareRenderer'] = True
     assert inspect()['animations']
@@ -168,6 +197,24 @@ try:
         pump(.4)
         assert tray_status() == 'Active', tray_status()
         report['nativeTrayRestoredOnDisable'] = True
+        def tray_property(name):
+            return bus.call_sync(service,item_path,'org.freedesktop.DBus.Properties','Get',
+                GLib.Variant('(ss)',('org.kde.StatusNotifierItem',name)),None,Gio.DBusCallFlags.NONE,1500,None).unpack()[0]
+        report['fallbackLabel'] = tray_property('XAyatanaLabel')
+        assert report['fallbackLabel'] in ['Starting VOCO', 'Check setup', 'Ready']
+        old_icon = Path(tray_property('IconName'))
+        assert old_icon.exists()
+        pump(2)
+        assert old_icon.exists(), 'Advertised icon deleted while delayed reader still needs it'
+        icon_files = list(old_icon.parent.glob('*.png'))
+        assert len(icon_files) == 69, icon_files  # four states, 64 meter frames, library initial image
+        gi.require_version('GdkPixbuf','2.0')
+        from gi.repository import GdkPixbuf
+        for icon in icon_files: GdkPixbuf.Pixbuf.new_from_file(str(icon))
+        report['retainedIconFiles'] = len(icon_files)
+        second = subprocess.run([str(root/'voco')], capture_output=True, text=True, timeout=5)
+        assert second.returncode == 0, second.stderr
+        report['secondLaunchAccepted'] = True
     report['passed']=True
 finally:
     (evidence/'results.json').write_text(json.dumps(report,indent=2))

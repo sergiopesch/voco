@@ -81,8 +81,8 @@ class FocusTracker:
 TRACKER = FocusTracker()
 
 
-def unavailable(input_state="unavailable"):
-    return {"shortcut": "ctrl+v", "token": None, "scope": "unavailable", "input_state": input_state,
+def unavailable(input_state="unavailable", reason="probe_failed"):
+    return {"shortcut": "ctrl+v", "token": None, "scope": "unavailable", "input_state": input_state, "reason": reason,
             "events_tracked": TRACKER.listener is not None}
 
 
@@ -128,10 +128,10 @@ def probe():
         if not context.pending():
             break
         if time.monotonic() >= drain_deadline:
-            return unavailable()
+            return unavailable(reason="events_pending")
         context.iteration(False)
     if context.pending():
-        return unavailable()  # Do not act on a partially drained event backlog.
+        return unavailable(reason="events_pending")  # Never bind through an event backlog.
     desktop = Atspi.get_desktop(0)
     desktop.clear_cache_single()
     active = []
@@ -152,7 +152,8 @@ def probe():
         except Exception:
             continue
     if len(active) != 1:
-        return unavailable("none" if not active else "unavailable")
+        return unavailable("none" if not active else "unavailable",
+                           "no_active_window" if not active else "ambiguous_windows")
     app, window = active[0]
     pid = app.get_process_id()
     binary = process_binary(pid)
@@ -184,12 +185,15 @@ def probe():
         terminal = terminal or focused.get_role() == Atspi.Role.TERMINAL
     input_state = cursor_state(focused, Atspi)
     if input_state != "editable":
-        return unavailable(input_state)
+        reason = "no_focused_control" if focused is None else {
+            "none": "not_editable", "protected": "protected",
+        }.get(input_state, "control_unavailable")
+        return unavailable(input_state, reason)
     focused_path = focused.path if focused is not None else ''
     identity = f"{TRACKER.nonce}:{TRACKER.generation}:{pid}:{window.path}:{focused_path}"
     return {"shortcut": "ctrl+shift+v" if terminal else "ctrl+v",
             "token": hashlib.sha256(identity.encode()).hexdigest(),
-            "scope": "control", "input_state": input_state,
+            "scope": "control", "input_state": input_state, "reason": "ready",
             "events_tracked": TRACKER.listener is not None}
 
 
@@ -208,6 +212,10 @@ MAX_REQUEST_BYTES = 650_000
 
 class InconsistentPosition(ValueError):
     """Individual accessibility replies did not form a valid position sample."""
+
+
+class UnsupportedRichText(ValueError):
+    """A nested caret cannot be observed within the bounded delivery contract."""
 
 
 class InconsistentText(ValueError):
@@ -250,6 +258,90 @@ def read_slice(text, start, end):
     # Also rejects surrogate values before any content is retained.
     value.encode('utf-8')
     return value
+
+
+def paragraph_position(node, iface, position):
+    """Exclude trailing editor scaffolding from the paragraph's text region.
+
+    Chromium may expose a final BR and noneditable placeholder widgets that
+    disappear on input. They cannot acknowledge a paste. Retain the real caret,
+    selection and all preceding text; inspect at most eight trailing objects.
+    """
+    from gi.repository import Atspi
+    count, caret, start, end, selected = position
+    for _ in range(8):
+        if count <= max(caret, end):
+            break
+        last = read_slice(iface, count - 1, count)
+        if last == '\n':
+            count -= 1
+            break
+        if last != '\ufffc':
+            break
+        hypertext = node.get_hypertext_iface()
+        index = Atspi.Hypertext.get_link_index(hypertext, count - 1)
+        if index < 0:
+            raise UnsupportedRichText('unresolved trailing object')
+        link = Atspi.Hypertext.get_link(hypertext, index)
+        child = link.get_object(0)
+        if (link.get_start_index() != count - 1 or link.get_end_index() != count
+                or child is None or child.get_process_id() != node.get_process_id()
+                or child.get_parent().path != node.path):
+            raise UnsupportedRichText('invalid trailing object')
+        child.clear_cache_single()
+        if child.get_state_set().contains(Atspi.StateType.EDITABLE):
+            break
+        count -= 1
+    else:
+        raise UnsupportedRichText('too many trailing objects')
+    return count, caret, start, end, selected
+
+
+def caret_text(node, route=()):
+    """Follow only the caret's hypertext links, never scan a growing document.
+
+    Chromium exposes an editable root whose text consists of U+FFFC objects;
+    the actual caret and characters belong to a linked paragraph. Bind that
+    route as well as the outer focused control. No descendant can authorize
+    insertion independently of the focused control.
+    """
+    from gi.repository import Atspi
+    if len(route) >= 8:
+        raise UnsupportedRichText('embedded text depth exceeded')
+    node.clear_cache_single()
+    iface, position = text_position(node)
+    count, caret, start, end, selected = position
+    offset = start if selected else min(caret, max(0, count - 1))
+    hypertext = node.get_hypertext_iface() if count else None
+    index = Atspi.Hypertext.get_link_index(hypertext, offset) if hypertext is not None else -1
+    if index < 0:
+        if route and node.get_role_name() == 'paragraph':
+            position = paragraph_position(node, iface, position)
+        return node, iface, position, route
+    try:
+        link = Atspi.Hypertext.get_link(hypertext, index)
+        left, right = link.get_start_index(), link.get_end_index()
+        if (left != offset or right != offset + 1
+                or selected and (start != left or end != right)):
+            raise UnsupportedRichText('selection spans embedded content')
+        child = link.get_object(0)
+        if child is None or child.get_process_id() != node.get_process_id():
+            raise UnsupportedRichText('unavailable embedded text')
+        parent = child.get_parent()
+        if parent is None or parent.path != node.path:
+            raise UnsupportedRichText('detached embedded text')
+        identity = (node.path, offset, child.path)
+        if identity in route:
+            raise UnsupportedRichText('cyclic embedded text')
+        child.clear_cache_single()
+        if (not child.get_state_set().contains(Atspi.StateType.EDITABLE)
+                or child.get_role() in (Atspi.Role.PASSWORD_TEXT, Atspi.Role.TERMINAL)):
+            raise UnsupportedRichText('noneditable embedded caret')
+        return caret_text(child, (*route, identity))
+    except InconsistentPosition:
+        raise  # A torn position stays pending after dispatch, never a receipt.
+    except Exception as error:
+        raise UnsupportedRichText('unavailable embedded caret') from error
 
 
 def eligible_node(result):
@@ -318,7 +410,7 @@ def prepare_delivery(request):
         return observation_result(result, 'changed')
     try:
         node = eligible_node(result)
-        iface, position = text_position(node)
+        _, iface, position, route = caret_text(node)
         count, caret, start, end, selected = position
         before = read_slice(iface, max(0, start - 64), start)
         after = read_slice(iface, end, min(count, end + 32))
@@ -330,14 +422,18 @@ def prepare_delivery(request):
         if again['token'] != result['token'] or again['scope'] != 'control':
             return observation_result(again, 'changed')
         eligible_node(again)
-        iface2, position2 = text_position(node)
-        if (position2 != position or before != read_slice(iface2, max(0, start - 64), start)
+        _, iface2, position2, route2 = caret_text(node)
+        if (route2 != route or position2 != position or before != read_slice(iface2, max(0, start - 64), start)
                 or after != read_slice(iface2, end, min(count, end + 32))):
             return observation_result(again, 'changed')
         receipt = uuid.uuid4().hex
         DELIVERY = dict(receipt=receipt, token=result['token'], position=position,
-                        before=before, after=after, payload=payload, added=added, context=context)
+                        before=before, after=after, payload=payload, added=added, context=context, route=route)
         return observation_result(again, 'prepared', receipt, added, context)
+    except UnsupportedRichText:
+        return observation_result(result, 'unsupported')
+    except InconsistentPosition:
+        return observation_result(result, 'changed')
     except Exception:
         return observation_result(result, 'unavailable')
 
@@ -345,7 +441,9 @@ def prepare_delivery(request):
 def delivery_stage(snapshot, node):
     """Bracket bounded reads; a torn accessibility sample cannot acknowledge delivery."""
     try:
-        iface, current = text_position(node)
+        _, iface, current, route = caret_text(node)
+        if route != snapshot['route']:
+            return -1
     except InconsistentPosition:
         return None
     count, caret, start, end, selected = snapshot['position']
@@ -382,7 +480,10 @@ def delivery_stage(snapshot, node):
                     and current == (count + 1, start, start, start, False)
                     and read_slice(iface, left, start + 1 + len(after)) == before + ' ' + after):
                 stage = None
-        if text_position(node)[1] != current:
+        _, _, final_position, final_route = caret_text(node)
+        if final_route != route:
+            return -1
+        if final_position != current:
             return None
     except (InconsistentPosition, InconsistentText):
         # The next bounded poll starts from fresh state; never replay the paste.

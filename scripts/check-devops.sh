@@ -13,8 +13,6 @@ for command in node npm python3 rg; do
 done
 
 npm run verify:versions
-python3 vendor/verify.py
-python3 vendor/verify.test.py
 
 bash -n \
   install \
@@ -31,7 +29,7 @@ bash -n \
   scripts/test-native-wayland.sh \
   scripts/test-native-gnome.sh \
   scripts/test-native-kde.sh \
-  scripts/test-speech-foundations.sh \
+  scripts/provision-ci-speech.sh \
   scripts/test-browser-full-app.sh \
   scripts/test-browser-toolbar-app.sh \
   scripts/verify-deb-package.sh \
@@ -79,6 +77,7 @@ PY
 
 bash scripts/test-install-common.sh
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-install-presentation.py
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-install-prefetch.py
 
 node --check scripts/comparative-dictation.mjs
 node --check scripts/comparative-dictation.test.mjs
@@ -105,7 +104,6 @@ for path in (
     Path("scripts/test-physical-speech-session.py"),
     Path("scripts/speech_worker.py"),
     Path("scripts/prepare-speech-repetition-generalization.py"),
-    Path("scripts/test-repeated-speech-phase.py"),
     Path("scripts/prepare-speech-boundaries.py"),
     Path("scripts/prepare-speech-qualification.py"),
     Path("scripts/prepare-speech-qualification-next.py"),

@@ -1,6 +1,6 @@
 [package]
 name = "voco"
-version = "2026.0.47"
+version = "2026.0.51"
 description = "Turn speech into text at your cursor with local dictation"
 authors = ["VOCO Contributors"]
 edition = "2021"
@@ -26,17 +26,14 @@ native-capture = []
 native-capture-dev = ["native-capture"]
 
 [dependencies]
-tauri = { version = "2", features = ["tray-icon"] }
+tauri = { version = "=2.11.1", features = ["tray-icon"] }
 tauri-plugin-global-shortcut = "2"
 log = "0.4"
 env_logger = "0.11"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 dirs = "6"
-whisper-rs = "=0.14.4"
 sha2 = "0.10"
-reqwest = { version = "0.12", features = ["blocking", "rustls-tls"], default-features = false }
-walkdir = "2"
 image = { version = "0.25", default-features = false, features = ["png"] }
 
 [profile.release]
@@ -55,6 +52,5 @@ libc = "0.2"
 
 [patch.crates-io]
 global-hotkey = { path = "../../../vendor/global-hotkey" }
-whisper-rs = { path = "../../../vendor/whisper-rs" }
-whisper-rs-sys = { path = "../../../vendor/whisper-rs-sys" }
 glib = { path = "../../../vendor/glib" }
+tray-icon = { path = "../../../vendor/tray-icon" }

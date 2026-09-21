@@ -1,5 +1,7 @@
 # Testing
 
+The [.51 tray, setup and single-engine integration record](tray-setup-2026-09-21.md) describes the next local candidate and its remaining acceptance gates.
+
 [Wayland installation and onboarding readiness](wayland-install-2026-09-20.md) records the .46 regression fix and installed-guest scope.
 
 The [public benchmark gallery](../release-assets/2026.0.43/README.md) presents the
@@ -158,14 +160,17 @@ mount, IPC, PID, and UTS namespaces remain enabled.
 
 The same hosted wrapper's `--native-desktop` selection runs the real GTK/WebKit fixture. Missing
 local dependencies or isolation fail the check; there is no fallback to an active desktop.
-The pinned-model gates `test:speech-baseline`, `test:speech-continuity` and `test:speech-adversarial` require `VOCO_MODEL_PATH`
-and never download or upgrade a model themselves. CI fetches only the existing hash-pinned model.
-The [adversarial gate](speech-adversarial-evaluation.md) retains every response from 58 fixed
-speech/noise cases, 12 complete-utterance boundary cases, six mixed-loudness cases and
-12 additional-voice repetition cases (88 total). Every speech family must meet
-its own WER bound, every speech case must contain words, and noise controls must contain no
-lexical words. The [repeated-speech phase check](speech-continuity.md#repeated-speech-phase-diagnostic)
-also scores accuracy: a short incomplete transcript cannot pass merely by being nonempty.
+`npm run test:speech-baseline` runs the pinned Nemotron streaming worker against
+eight fixed speech fixtures, repeated-speech integrity, silence and capture-boundary
+variants. Original corpus thresholds remain unchanged. `scripts/provision-ci-speech.sh`
+provisions only the checksum-pinned native payload from release .47; it keeps Python
+worker code from this checkout. Local runs can use an already verified runtime.
+`runtime/speech/test_worker_protocol.py` separately checks startup, sequence bounds,
+stale-session rejection, cancellation and cleanup. Reports identify the actual model.
+
+The earlier [adversarial evaluation](speech-adversarial-evaluation.md) and
+[phase diagnostics](speech-continuity.md) are historical Whisper evidence. Their
+retired decoder runners are not current release gates.
 
 Build the frontend before the all-features Clippy gate on a clean checkout. Tauri's production
 `custom-protocol` context validates `apps/desktop/dist` at compile time.
@@ -207,20 +212,13 @@ access retries and preview ownership with mocked microphones. Set
 CI and release jobs enforce this suite too. See [microphone recovery](microphone-recovery.md)
 for the separate installed Linux qualification protocol and evidence boundaries.
 
-`npm run test:speech-baseline` exercises the pinned base.en model against
-[eight attributed LibriSpeech fixtures](../../tests/fixtures/speech/README.md) and synthetic
-silence. Set `VOCO_MODEL_PATH` to that existing model; the test refuses missing or different
-models. CI and release jobs download and checksum only this existing model for the gate.
-This smoke corpus establishes a repeatable regression floor, not product-wide accuracy.
-
-`npm run test:speech-adversarial -- --output-dir /path/to/new/evidence` builds and freezes
-the actual Rust replay worker and its transcription source, prepares the checked-in public
-fixtures and synthetic controls, and runs both prospective suites even if one fails.
-It preserves logs, hashes and per-case results. Existing output directories are refused.
-CI and release jobs run this gate and retain its reports, including failures.
+The current speech baseline is a repeatable regression floor, not a representative
+product-wide accuracy benchmark. Use `--report /path/to/new/report.json` to retain
+complete results; existing report files are refused. It never downloads a model or
+reads personal recordings. CI retains failures as well as successful reports.
 
 The [private Wayland harness](wayland-isolated.md) supplements X11 checks with real
-GTK/WebKit surfaces, tray Open/Quit lifecycle and optional verified model-cache readiness.
+GTK/WebKit surfaces, tray Open/Quit lifecycle and verified bundled-worker warmup.
 It does not qualify physical microphones or an installed GNOME/KDE session.
 
 Long packaged-browser capture requires `VOCO_BROWSER_LONG_CAPTURE=1` and

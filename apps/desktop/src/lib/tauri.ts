@@ -1,19 +1,16 @@
-import type { PasteCorrelation } from "./benchmarkPhraseQueue";
-import { invoke } from "@tauri-apps/api/core";
-import { encodeAudioRequest } from "@/lib/audioTransport";
 import type {
   AppConfig,
   CachedUpdateCheck,
-  CanonicalTranscription,
   ConfigSnapshot,
   DebugDictationCaptureResult,
   DesktopInputStatus,
   InsertionResult,
   OwnedPreeditStatus,
-  PreviewTranscription,
   RuntimeDiagnostics,
-  RuntimeStatusSnapshot,
+  RuntimeStatusSnapshot
 } from "@/types";
+import { invoke } from "@tauri-apps/api/core";
+import type { PasteCorrelation } from "./benchmarkPhraseQueue";
 
 export async function getConfig(): Promise<ConfigSnapshot> {
   return invoke<ConfigSnapshot>("get_config");
@@ -35,29 +32,6 @@ export async function saveConfigPatch(
   patch: Partial<AppConfig>,
 ): Promise<ConfigSnapshot> {
   return invoke<ConfigSnapshot>("save_config_patch", { patch });
-}
-
-export async function transcribeAudio(samples: Float32Array): Promise<string> {
-  return invoke<string>("transcribe_audio", encodeAudioRequest(samples));
-}
-
-export async function transcribeCanonicalChunk(
-  samples: Float32Array,
-  previousCanonicalText: string,
-): Promise<CanonicalTranscription> {
-  return invoke<CanonicalTranscription>("transcribe_canonical_chunk", encodeAudioRequest(samples, previousCanonicalText));
-}
-
-/** The session owner validates this untrusted reply before committing recognition. */
-export async function transcribeHybridChunk(packet: Uint8Array): Promise<unknown> {
-  return invoke<unknown>("transcribe_hybrid_chunk", packet);
-}
-
-export async function previewTranscribeAudio(
-  samples: Float32Array,
-  desktopStream = false,
-): Promise<PreviewTranscription | null> {
-  return invoke<PreviewTranscription | null>(desktopStream ? "preview_desktop_audio" : "preview_transcribe_audio", encodeAudioRequest(samples));
 }
 
 export async function debugDictationCaptureEnabled(): Promise<boolean> {
@@ -93,6 +67,21 @@ export async function insertText(text: string, strategy: string): Promise<Insert
 
 export async function getDesktopInputStatus(): Promise<DesktopInputStatus> {
   return invoke("get_desktop_input_status");
+}
+
+export interface PanelSetupStatus {
+  status: string;
+  detail: string;
+  canEnable: boolean;
+}
+export function getPanelSetupStatus(): Promise<PanelSetupStatus> {
+  return invoke("get_panel_setup_status");
+}
+export function enableGnomePanel(): Promise<PanelSetupStatus> {
+  return invoke("enable_gnome_panel");
+}
+export function takeLauncherActivation(): Promise<boolean> {
+  return invoke("take_launcher_activation");
 }
 
 export async function getDesktopPasteStatus(): Promise<{ enabled: boolean; available: boolean; detail: string; shortcutEpoch: number; streamingEnabled?: boolean; targetToken?: string | null; failureReason?: "setup" | "cursor" | null }> {

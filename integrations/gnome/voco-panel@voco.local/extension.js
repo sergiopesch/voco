@@ -103,7 +103,7 @@ export default class VocoPanel extends Extension {
             this._state = presentation(JSON.parse(result.deep_unpack()[0]));
             this._indicator.show();
             this._render();
-            const delay = this._refreshQueued ? 1 : this._state.active ? 100 : 1500;
+            const delay = this._refreshQueued ? 1 : this._state.active ? 50 : 1500;
             this._refreshQueued = false;
             this._timer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, delay, () => {
                 this._timer = 0;
@@ -129,7 +129,8 @@ export default class VocoPanel extends Extension {
             if (state.status === 'processing' && this._previousStatus === 'processing' && motion === this._previousMotion) return;
             bar.remove_all_transitions();
             const scale = state.status === 'processing' ? 0.35 : scales[index];
-            bar.ease({scale_y: scale, duration: motion ? 80 : 0, mode: Clutter.AnimationMode.EASE_OUT_QUAD});
+            const duration = scale >= bar.scale_y ? 45 : 100;
+            bar.ease({scale_y: scale, duration: motion ? duration : 0, mode: Clutter.AnimationMode.EASE_OUT_QUAD});
             // Processing uses a restrained pulse; listening only reflects real levels.
             bar.opacity = 255;
             if (state.status === 'processing' && motion)

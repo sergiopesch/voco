@@ -28,8 +28,13 @@ The Linux chapter explains why package installation and desktop dictation need
 separate checks, including the Hyprland hidden-start failure and the native-capture candidate that
 addresses it. Before/after results retain their specific test conditions.
 It also records the .45 fresh-install dependency gap and the .46 candidate’s
-separate desktop readiness check. Those later findings do not change the pinned
-source viewer or announce a new release.
+separate desktop readiness check. The delivery chapter records the later .48
+rich-editor confirmation failure and the .49 candidate correction. Those later findings do not change the pinned
+source viewer or announce a new release. The interface chapter also records the
+.50 candidate's packaged GNOME panel, explicit activation and visible setup handoff.
+The .51 release cut combines these changes with measured tray bars, microphone
+selection inside the test canvas and one bundled Nemotron recognizer. These
+current-behavior notes preserve the historical source snapshot and its attribution.
 
 ## Scope and privacy
 

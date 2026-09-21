@@ -84,6 +84,35 @@ accessible text field and try again. Password fields are excluded. Changing fiel
 during a recording stops delivery; review retained text before copying it.
 Custom controls that do not expose an accessible cursor are not supported.
 
+### Chromium and Electron applications
+
+Some browsers and Electron apps expose their text cursor only when accessibility
+is enabled. If VOCO asks you to check an app's accessibility support, fully quit
+that app and launch it with its native accessibility bridge and renderer enabled:
+
+```bash
+env ACCESSIBILITY_ENABLED=1 brave --force-renderer-accessibility
+```
+
+Use the app's own command in place of `brave` (`chatgpt` for the tested Codex desktop
+installation). Closing a window may leave the app running; the flags take effect
+only on a new application process. For a persistent change, copy the app's desktop
+launcher into `~/.local/share/applications/` and apply the same environment and flag
+to its `Exec` entries, preserving its icon and other metadata. VOCO's installer
+does not change other apps' launchers or global accessibility preferences.
+
+The .48 candidate also provides `voco --check-cursor`, a read-only check of the
+currently focused text field. To allow time to focus a field after starting it:
+
+```bash
+sleep 3; voco --check-cursor
+```
+
+This checks cursor accessibility without recording, copying or typing. It does not
+guarantee that every custom editor accepts dictation. See the [compatibility evidence](testing/fresh-install-2026-09-21.md#codex-and-brave-follow-up).
+
+### Desktop input helpers
+
 On X11, desktop paste uses xclip and xdotool. On Wayland, it uses ydotool plus
 the appropriate clipboard helper; its input service and permissions may require
 setup. The Debian package recommends both ydotool and ydotoold because Ubuntu 24.04
@@ -107,6 +136,16 @@ command cannot identify which key your desktop assigned. See the
 
 ### GNOME tray integration
 
+The unpublished .50 Debian candidate bundles the GNOME 46 live panel. Its guided
+installer runs `voco --setup-panel` as the desktop user. After a manual APT install,
+use the same command or **Enable live panel** in onboarding/Help. This adds only
+VOCO to enabled extensions; it preserves other extensions and global policy.
+If a session restart is requested, save your work and sign out and back in.
+`voco --check-panel` checks activation without changing settings. The package
+maintainer scripts never enable a user extension. Other GNOME versions keep the
+native tray fallback; live bars are qualified only on GNOME 46.
+
+
 VOCO keeps its controls in the system tray. Stock Fedora GNOME needs the
 distribution's AppIndicator extension; the .43 Fedora package recommends it when
 GNOME is installed. If it is missing:
@@ -127,9 +166,10 @@ GNOME session and KDE/Omarchy have their own tray integrations. Installing an
 extension does not configure microphone access, a compositor shortcut or ydotoold.
 
 The model lives under `/usr/lib/voco/speech`. Readiness follows worker warmup.
-The default path does not download Whisper; explicit legacy/browser dictation
-uses that separately pinned model. Explicit recovery of normal NVIDIA dictation
-also uses the bundled NVIDIA model and works without a Whisper cache. A failed NVIDIA warmup reports an error.
+In the .51 development source, desktop dictation, browser dictation and explicit
+recovery use the bundled Nemotron model. No separate recognition model is downloaded.
+A failed warmup reports an error. Published older versions retain their documented
+behavior; see [release status](release-candidate.md).
 
 ## Source development
 
@@ -183,10 +223,13 @@ so its audio context uses the new format.
 
 The installer shows measured download bytes and average speed in colour
 terminals, and static lines for redirected output, NO_COLOR or TERM=dumb. The
-progress has no estimated percentage or time remaining. Downloads make at most
-three attempts and continue partial transfers within that run when the server
-supports it. Interrupted runs remove temporary downloads; running the installer
-again starts fresh. Checksums are always verified before APT runs.
+progress has no estimated percentage or time remaining; completion shows elapsed
+download time. Downloads make at most three attempts and continue partial transfers
+within that run when the server supports it.
+Interrupted runs remove temporary downloads; running the installer again starts
+fresh. Checksums are always verified before APT runs. The owned staging directory
+contains public release files and permits APT's unprivileged reader to access the
+package; private diagnostic logs remain restricted to your account.
 
 A failed download prints the path to a private diagnostic log. A missing release
 file points to the versioned release page; connection failures suggest checking

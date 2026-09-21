@@ -16,23 +16,25 @@ covering adjacent indicators. The microphone remains an accessible Stop control.
 
 ## Build and install
 
-The current development target is **GNOME Shell 46**. Other Shell versions are not
-advertised as supported. Use a matching app built from this branch: released VOCO
-versions do not expose this protocol and the extension will stay hidden with them.
+The .50 Debian candidate includes this GNOME Shell 46 extension. The guided
+installer calls `voco --setup-panel` for its current desktop user. A manual APT
+installation can use that command or **Enable live panel** in onboarding/Help.
+Package hooks do not touch user extension settings. A newly installed component
+may require signing out and back in; setup reports this separately from active.
+Run `voco --check-panel` for a read-only check. Other Shell versions use the native
+tray fallback and remain unqualified for this companion.
+
+The separately built archive remains available for development:
 
 ```bash
 python3 scripts/package-gnome-panel.py /tmp/voco-panel@voco.local.shell-extension.zip
-# Install only in the intended desktop/profile:
-gnome-extensions install /tmp/voco-panel@voco.local.shell-extension.zip
-# A newly installed extension may require logging out and back in on Wayland.
-gnome-extensions enable voco-panel@voco.local
 ```
 
 Disable with `gnome-extensions disable voco-panel@voco.local`. The ordinary VOCO
 tray returns on detach, or within approximately six seconds after lost heartbeats.
-The archive builder does not install, enable, replace other extensions or alter the
-running application. The .47 release cut includes this archive as an optional GNOME 46 companion.
-It is never enabled automatically. Other Shell versions remain unqualified.
+Its label reports Starting, Listening or Finishing where the desktop supports
+labels, and its menu always shows status. The .47 published release supplies the
+companion separately; source .50 is not a published release.
 
 ## Bridge
 

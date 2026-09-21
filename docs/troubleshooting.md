@@ -242,3 +242,23 @@ Fedora, openSUSE and Arch/Omarchy use their separately qualified native packages
 Check [release status](release-candidate.md) and the exact artifact's verification
 records for current versions and limits. AppImage, Flatpak, Flathub, Snap and
 Ubuntu App Center are not published VOCO release channels.
+
+## No live bars or Listening in the top panel
+
+In .50, run `voco --check-panel`. If disabled, use **Enable live panel** in Help or
+run `voco --setup-panel`. If enabled but waiting for a new session, save your work,
+sign out and back in. A global Extensions switch or administrator policy is not
+changed by VOCO. GNOME versions other than 46 use the native tray fallback.
+The fallback menu always contains the current status; adjacent labels depend on
+the desktop. Disabling the companion restores the native tray.
+
+## Opening VOCO again does nothing
+
+The .50 launcher asks the existing app to present its current idle window. It does
+not launch another recognizer or interrupt a recording. Finish dictation first if
+VOCO is Listening or Finishing. After upgrading while an older app is still
+running, quit that app through its tray and reopen VOCO once. Do not kill an app
+that has an unfinished recording or recovery you need.
+
+Completing onboarding in .50 leaves Ready visible. The worker from your voice
+test remains warm; completing setup does not start a second model process.

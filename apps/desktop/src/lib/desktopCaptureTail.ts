@@ -26,7 +26,6 @@ export interface DesktopCaptureTailEnv {
   nativeCaptureRef: Ref<NativeCaptureSession | null>;
   cancelledRef: Ref<string | null>;
   recordingSampleRate: () => number;
-  pumpCanonicalCheckpoints: () => void;
   stopRecording: () => void;
   persistNativeRetainedSource: (
     native: NativeCaptureSession,
@@ -79,7 +78,6 @@ export function createDesktopCaptureTail(env: DesktopCaptureTailEnv) {
       samples,
       maxSamples,
     );
-    env.pumpCanonicalCheckpoints();
     // The production worker owns streaming boundaries; queue existence is the
     // only live-delivery gate. Stop-drained samples are forwarded at finalization.
     const queue = env.desktopPhraseQueueRef.current;

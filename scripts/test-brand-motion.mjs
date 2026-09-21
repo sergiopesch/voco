@@ -1,6 +1,6 @@
 import { chromium, webkit } from 'playwright';
 import { createServer } from 'vite';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile, realpath } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
@@ -11,7 +11,8 @@ if (!out) throw new Error('An exclusive VOCO_RENDERER_EVIDENCE_DIR is required')
 await mkdir(out, { recursive: false });
 const server = await createServer({
   configFile: path.join(root, 'apps/desktop/vite.config.ts'), root: path.join(root, 'apps/desktop'),
-  logLevel: 'warn', server: { host: '127.0.0.1', port: Number(process.env.VOCO_RENDERER_PORT ?? 5189), hmr: false, watch: null },
+  logLevel: 'warn', server: { host: '127.0.0.1', port: Number(process.env.VOCO_RENDERER_PORT ?? 5189), hmr: false, watch: null,
+    fs: { allow: [root, await realpath(path.join(root, 'node_modules'))] } },
 });
 const results = [];
 try {
@@ -33,6 +34,9 @@ try {
           window.__fixtureViolations.push('microphone'); throw new Error('Fixture must not capture');
         };
         window.__TAURI_INTERNALS__ = { invoke: async command => {
+          if (command === 'get_panel_setup_status') return window.__panelStatus ?? {status:'active',detail:'Live panel bars and Stop are active.',canEnable:false};
+          if (command === 'enable_gnome_panel') return {status:'restart',detail:'Panel enabled. Sign out and back in to load it; saving your work first is recommended.',canEnable:false};
+          if (command === 'trace_hotkey_event') return;
           if (command === 'get_desktop_input_status') return {available:true,detail:'Fixture desktop prerequisites ready'};
           window.__fixtureViolations.push(command); throw new Error('Fixture must not invoke native commands');
         } };
@@ -62,6 +66,25 @@ try {
         await Promise.all(el.getAnimations().map(animation => animation.finished.catch(() => {})));
       });
       await capture('onboarding-listening');
+      const control = page.locator('.voco-voice-control');
+      const finish = page.getByRole('button', { name: 'Finish test', exact: true });
+      await page.keyboard.press('Tab');
+      await finish.focus();
+      const focus = await control.evaluate(el => {
+        const button = el.querySelector('button');
+        const signal = el.querySelector('[role="meter"]');
+        const group = el.getBoundingClientRect();
+        const wave = signal.getBoundingClientRect();
+        return { groupOutline: getComputedStyle(el).outlineStyle,
+          buttonOutline: getComputedStyle(button).outlineStyle,
+          buttonBorder: getComputedStyle(button).borderTopColor,
+          signalContained: wave.left >= group.left && wave.right <= group.right && wave.top >= group.top && wave.bottom <= group.bottom };
+      });
+      await capture('onboarding-keyboard-focus');
+      assert.equal(focus.signalContained, true, 'Signal stays inside its shared control');
+      assert.equal(focus.groupOutline, 'solid', 'Keyboard focus must surround the complete voice control');
+      assert.equal(focus.buttonOutline, 'none', 'Do not draw a competing inner focus ring');
+      assert.equal(focus.buttonBorder, 'rgba(0, 0, 0, 0)', 'Do not draw a second pill inside the voice control');
       await page.getByRole('button', { name: 'Finish test', exact: true }).click();
       assert.equal(await page.getByRole('meter', { name: 'Microphone signal' }).count(), 0);
       await page.getByRole('button', { name: 'Done', exact: true }).waitFor();
@@ -70,6 +93,22 @@ try {
       assert.equal(await page.getByText('Voice test complete.', { exact: true }).count(), 1);
       await capture('onboarding-success');
       results.push({ engine: name, check: 'onboarding start/stop, level, explicit completion', passed: true });
+      await page.evaluate(()=>window.__panelStatus={status:'disabled',detail:'Enable live bars, Listening and Stop in your top panel.',canEnable:true});
+      // Remount only the ready phase so its panel check uses the disabled fixture.
+      await page.getByRole('button',{name:'Test again',exact:true}).click();
+      await page.getByRole('button',{name:'Finish test',exact:true}).click();
+      await page.getByRole('button',{name:'Enable live panel',exact:true}).click();
+      await page.getByText('Panel enabled. Sign out and back in to load it; saving your work first is recommended.',{exact:true}).waitFor();
+      await page.setViewportSize({width:760,height:560});
+      await capture('panel-restart-required');
+      assert.equal(await page.locator('.voco-setup').evaluate(el => el.scrollHeight <= el.clientHeight + 1), true,
+        'Panel setup and Done must fit the minimum canvas without scrolling');
+      assert.equal(await page.getByRole('button',{name:'Done',exact:true}).isEnabled(),true);
+      await capture('panel-restart-done-reachable');
+      assert.equal(await page.getByRole('button',{name:'Check panel again',exact:true}).count(),1);
+      results.push({engine:name,check:'explicit panel activation and session restart feedback',passed:true});
+      await page.setViewportSize({width:850,height:680});
+
 
       for (const [state, label] of [['starting', 'Preparing…'], ['processing', 'Finishing…']]) {
         await load(`surface=onboarding&state=${state}`);
@@ -80,6 +119,28 @@ try {
       await page.getByRole('button', { name: 'Change microphone', exact: true }).click();
       assert.equal(await page.getByRole('button', { name: 'Back to test', exact: true }).getAttribute('aria-expanded'), 'true');
       await capture('onboarding-microphone');
+      const microphoneCanvas = await page.locator('.voco-setup').evaluate(el => ({
+        height: el.clientHeight, content: el.scrollHeight,
+        bottom: el.getBoundingClientRect().bottom, viewport: innerHeight,
+      }));
+      assert.ok(microphoneCanvas.content <= microphoneCanvas.height + 1,
+        `Microphone setup must fit without page scrolling: ${JSON.stringify(microphoneCanvas)}`);
+      for (const viewport of [{width:760,height:560}, {width:850,height:680}]) {
+        await page.setViewportSize(viewport);
+        await page.getByText('Microphone access details', {exact:true}).click();
+        await capture(`onboarding-microphone-details-${viewport.width}`);
+        assert.equal(await page.locator('.voco-setup').evaluate(el => el.scrollHeight <= el.clientHeight + 1), true,
+          `Expanded microphone details fit ${viewport.width}x${viewport.height}`);
+        await page.getByText('Microphone access details', {exact:true}).click();
+      }
+      const setupCombo = page.getByRole('combobox', {name:'Microphone',exact:true});
+      await setupCombo.press('u'); await setupCombo.press('Enter');
+      await page.getByRole('checkbox').check();
+      await page.getByRole('button',{name:'Use this microphone',exact:true}).click();
+      await page.getByRole('button',{name:'Start test',exact:true}).waitFor();
+      assert.equal(await page.getByRole('combobox',{name:'Microphone',exact:true}).count(),0);
+      await capture('onboarding-microphone-applied');
+      results.push({engine:name,check:'microphone selection and expanded details fit one canvas; apply returns to the test',passed:true});
       await load('surface=settings');
       await capture('settings');
       const combo = page.getByRole('combobox', { name: 'Microphone', exact: true });

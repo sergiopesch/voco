@@ -50,12 +50,16 @@ TRACE
     "${TEST_ROOT}/voco_ibus_engine.py"
   cp /usr/share/ibus/component/simple.xml "${TEST_ROOT}/component/"
   if [[ -n "${VOCO_NATIVE_APP_BINARY:-}" ]]; then
-    : "${VOCO_NATIVE_MODEL:?Set the existing pinned model path}"
+
     cp --reflink=auto "${VOCO_NATIVE_APP_BINARY}" "${TEST_ROOT}/voco"
+
+    source "$(dirname "${BASH_SOURCE[0]}")/lib/test-speech-runtime.sh"
+
+    voco_stage_test_speech "${TEST_ROOT}"
     mkdir -p "${TEST_ROOT}/data/voco/models" "${TEST_ROOT}/config/voco"
-    cp --reflink=auto "${VOCO_NATIVE_MODEL}" "${TEST_ROOT}/data/voco/models/ggml-base.en.bin"
+
     chmod 755 "${TEST_ROOT}/data/voco/models"
-    chmod 644 "${TEST_ROOT}/data/voco/models/ggml-base.en.bin"
+
     output_mode=${VOCO_NATIVE_OUTPUT_MODE:-final-text-only}
     case "$output_mode" in
       final-text-only|stable-cursor-streaming|preview-overlay-only) ;;

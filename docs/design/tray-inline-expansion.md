@@ -31,8 +31,12 @@ Inspection on Ubuntu GNOME Wayland found the enabled Ubuntu AppIndicators
 extension supports an adjacent label. VOCO's current Tauri tray implementation
 can supply it through `TrayIcon::set_title`, backed by AppIndicator `set_label`.
 This provides native horizontal icon-and-text allocation without a new dependency.
-It does not provide React children, a custom waveform, inline buttons, or VOCO
-control over width interpolation. Other tray hosts may omit the title entirely.
+It does not provide React children, inline buttons, or VOCO control over width
+interpolation. Other tray hosts may omit the title entirely. The next candidate
+uses the native icon slot for a measured waveform while recording, removing the
+adjacent Ready text. It selects from 64 immutable images, with bounded updates
+and a short envelope instead of allocating images continuously. Accessible status
+and Stop stay available in the menu. This also covers a companion awaiting login.
 
 The full animated capsule requires a panel integration, such as a GNOME Shell
 extension. That introduces a separately supported desktop component and an IPC

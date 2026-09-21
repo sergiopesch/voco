@@ -46,7 +46,7 @@ pub fn toggle() -> io::Result<()> {
     connect_trigger(&paths()?[0])
 }
 
-fn connect_trigger(path: &Path) -> io::Result<()> {
+pub(crate) fn connect_trigger(path: &Path) -> io::Result<()> {
     private_directory(
         path.parent()
             .ok_or_else(|| rejected("Missing trigger parent"))?,

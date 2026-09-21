@@ -1,6 +1,7 @@
 import { StatusMark } from "./StatusMark";
 import { VoiceSignal } from "./VoiceSignal";
 import { SettingsIcon } from "./SettingsIcon";
+import { PanelSetup } from "./PanelSetup";
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type { DictationStatus } from "@/types";
@@ -23,7 +24,7 @@ interface OnboardingProps {
   saving: boolean;
   blocked: boolean;
   hotkey: string;
-  microphoneControls?: ReactNode;
+  microphoneControls?: (onSelected: () => void) => ReactNode;
   desktopReady?: boolean;
   onStart: () => void;
   onStop: () => void;
@@ -40,7 +41,8 @@ export function Onboarding({ microphone, status, audioLevel, transcript, passed,
   const recording = status === "recording";
   const busy = Boolean(checkingDesktopSetup || preparing || status === "starting" || status === "processing" || saving);
   const ready = passed && desktopReady && !failed && !setupError && !recording && !busy;
-  const phase = ready ? "ready" : busy ? "working" : recording ? "listening" : desktopSetupError ? "desktop" : "test";
+  const choosing = changingMicrophone && !ready;
+  const phase = choosing ? "microphone" : ready ? "ready" : busy ? "working" : recording ? "listening" : desktopSetupError ? "desktop" : "test";
   useEffect(() => {
     if (previousPhase.current && previousPhase.current !== phase && !busy) primaryRef.current?.focus();
     previousPhase.current = phase;
@@ -58,14 +60,14 @@ export function Onboarding({ microphone, status, audioLevel, transcript, passed,
   const state = problem || desktopSetupError ? "attention" : busy ? "working" : recording ? "listening" : passed ? "success" : "idle";
 
   return <section className="voco-panel__content voco-setup" aria-label="Voice setup" data-phase={phase}>
-    <div className="voco-setup__intro"><h2>{ready ? "Your voice, ready." : "Say something. See it here."}</h2></div>
+    <div className="voco-setup__intro"><h2>{choosing ? "Choose your microphone." : ready ? "Your voice, ready." : "Say something. See it here."}</h2></div>
     {!ready ? <div className="voco-setup__devices">
       <div><span className="voco-setup__device-label">Microphone</span><strong>{microphone}</strong></div>
       {microphoneControls ? <button className="voco-button voco-button--ghost" disabled={recording || busy}
         aria-expanded={changingMicrophone} aria-controls="voco-setup-microphone"
         onClick={() => setChangingMicrophone(value => !value)}>{changingMicrophone ? "Back to test" : "Change microphone"}</button> : null}
     </div> : null}
-    {changingMicrophone && !ready ? <div id="voco-setup-microphone" className="voco-setup__microphone">{microphoneControls}</div> : null}
+    {choosing ? <div id="voco-setup-microphone" className="voco-setup__microphone">{microphoneControls?.(() => setChangingMicrophone(false))}</div> : <>
     <div className="voco-setup__status" role={problem || desktopSetupError ? "alert" : "status"}>
       <StatusMark state={state} /><span>{statusText}</span>
     </div>
@@ -76,7 +78,8 @@ export function Onboarding({ microphone, status, audioLevel, transcript, passed,
     </div>
     {ready ? <div className="voco-setup__handoff">
       <p>Click in a text field and press <kbd className="voco-glass voco-shortcut">{hotkey}</kbd>. Press again to finish.</p>
-      <p>VOCO stays in your tray.</p>
+      <p>VOCO stays in your tray. You can reopen it from your app launcher.</p>
+      <PanelSetup disabled={busy || blocked} />
     </div> : <p className="voco-setup__privacy">{!passed && !recording && !busy ? "Start test turns on your microphone. " : ""}Speech stays on this computer; this test only displays words here.</p>}
     <div className="voco-setup__actions">
       {passed && !recording ? <>
@@ -89,5 +92,6 @@ export function Onboarding({ microphone, status, audioLevel, transcript, passed,
         <span className="voco-voice-pill__reveal"><VoiceSignal level={recording ? audioLevel : 0} active={recording} /></span>
       </div>}
     </div>
+    </>}
   </section>;
 }

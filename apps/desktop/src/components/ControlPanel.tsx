@@ -21,8 +21,9 @@ import { openMicrophoneStream } from "@/lib/audioInput";
 import { createAnimationFrameLease } from "@/lib/animationFrameLease";
 import type { DictationRecovery } from "@/lib/dictationRecovery";
 import { microphoneLabel, shortcutPresentation } from "@/lib/shortcutPresentation";
-import { getDesktopInputStatus } from "@/lib/tauri";
+import { getDesktopInputStatus, traceHotkeyEvent } from "@/lib/tauri";
 import { Onboarding } from "@/components/Onboarding";
+import { PanelSetup } from "@/components/PanelSetup";
 import { useStore } from "@/store/useStore";
 import { NativeMicrophoneSettings } from "@/components/NativeMicrophoneSettings";
 import type { NativeMicrophoneControls } from "@/hooks/useNativeCaptureSettings";
@@ -528,17 +529,18 @@ export function ControlPanel({
     }
   }
 
-  async function selectMicrophone(deviceId: string | null): Promise<void> {
+  async function selectMicrophone(deviceId: string | null): Promise<boolean> {
     const requestId = microphoneSaveRequestRef.current + 1;
     microphoneSaveRequestRef.current = requestId;
     setMicrophoneSaveError(null);
     const result = await savePatch({ selectedMic: deviceId });
     if (microphoneSaveRequestRef.current !== requestId) {
-      return;
+      return false;
     }
     if (!result.ok) {
       setMicrophoneSaveError(result.message);
     }
+    return result.ok;
   }
 
   async function retryMicrophonePreview() {
@@ -659,6 +661,7 @@ export function ControlPanel({
     if (saving || finishingTest || testPreparing || checkingInput) return;
     if (dictationBusy && (dictationStatus !== "recording" || !onFinishTest)) return;
     setFinishingTest(true);
+    void traceHotkeyEvent("onboarding_handoff_requested").catch(() => {});
     try {
       const passed = onFinishTest ? await onFinishTest() : testPassed;
       if (!passed || !(await checkDesktopSetup())) return;
@@ -667,8 +670,7 @@ export function ControlPanel({
         useStore.getState().clearTranscript();
         useStore.getState().setDictationPurpose("cursor");
         onDraftStateChange?.(false);
-        if (onPrepareDictation) onPrepareDictation();
-        else hidePanel();
+        onSurfaceChange("popover");
       }
     } finally { setFinishingTest(false); }
   }
@@ -874,10 +876,10 @@ export function ControlPanel({
             saving={saving}
             blocked={Boolean(recovery && testPurpose !== "onboarding") || !onStartTest || nativeMicrophone?.mode === "pending"}
             desktopReady={inputReadiness?.available === true}
-            microphoneControls={nativePreviewDisabled && nativeMicrophone
-              ? <NativeMicrophoneSettings controls={nativeMicrophone} disabled={dictationBusy || testPreparing} showError={false} />
+            microphoneControls={onSelected => nativePreviewDisabled && nativeMicrophone
+              ? <NativeMicrophoneSettings controls={nativeMicrophone} disabled={dictationBusy || testPreparing} onSelected={onSelected} />
               : <div className="voco-preferences__form"><DeviceSelect label="Microphone" value={selectedDeviceId ?? ""} disabled={saving || dictationBusy || testPreparing}
-                  onChange={value => void selectMicrophone(value || null)} options={[{value: "", label: "System default"}, ...availableDevices.map(device => ({value: device.deviceId, label: device.label}))]} />
+                  onChange={value => void selectMicrophone(value || null).then(ok => { if (ok) onSelected(); })} options={[{value: "", label: "System default"}, ...availableDevices.map(device => ({value: device.deviceId, label: device.label}))]} />
                 <button className="voco-button voco-button--ghost" disabled={saving || dictationBusy || testPreparing} onClick={() => void onRefreshDevices()}>Refresh devices</button>
                 {microphoneSaveError ? <p role="alert">{microphoneSaveError}</p> : null}</div>}
             hotkey={config.hotkey}
@@ -1003,6 +1005,7 @@ export function ControlPanel({
               {activeSection === "Advanced" || activeSection === "Output" ? (
                 <section className="voco-preferences__page">
                   <div className="voco-preferences__heading"><h2 tabIndex={-1}>Help</h2></div>
+                  <PanelSetup disabled={saving || dictationBusy} />
                   <details className="voco-preferences__card voco-preferences__disclosure"><summary>How to dictate</summary><p>Focus a text field and press <kbd>{config.hotkey}</kbd>. Wait for Listening, then speak. Press again to finish.</p><p>VOCO replaces clipboard text to paste your words and never presses Enter. Keep the same field focused.</p><p>In an enabled Chromium tab, use <kbd>Alt+Shift+V</kbd> for direct delivery to a plain text field.</p></details>
                   <details className="voco-preferences__card voco-preferences__disclosure"><summary>My microphone is not working</summary><p>Check the selected microphone and allow access for this session.</p><button className="voco-button voco-button--secondary" onClick={() => setActiveSection("Audio")}>Microphone settings</button></details>
                   <details className="voco-preferences__card voco-preferences__disclosure"><summary>My shortcut is not working</summary><p>{shortcut.detail}</p>{shortcut.setup ? <p>{shortcut.setup}</p> : null}<button className="voco-button voco-button--secondary" onClick={() => setActiveSection("Hotkeys")}>Shortcut settings</button></details>

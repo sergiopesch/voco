@@ -23,7 +23,7 @@ function harness(rate = 16000, limitSeconds = 600) {
   const disconnect = vi.fn();
   const fns = createDesktopCaptureTail({
     recordingSampleRate: () => rate, maxAudioSeconds: limitSeconds,
-    captureHealthRef: { current: null }, pumpCanonicalCheckpoints: vi.fn(),
+    captureHealthRef: { current: null },
     phaseRef: phase, audioBufferRef: { current: buffer },
     desktopPhraseQueueRef: { current: queue },
     desktopStreamedSampleCountRef: sent,

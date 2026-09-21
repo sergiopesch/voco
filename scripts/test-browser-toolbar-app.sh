@@ -9,7 +9,7 @@ repo=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$repo"
 if [[ ${1:-} != --inside ]]; then
   : "${VOCO_NATIVE_APP_BINARY:?Set the compiled VOCO GUI binary}"
-  : "${VOCO_NATIVE_MODEL:?Set the pinned base.en model}"
+
   if [[ -n ${VOCO_BROWSER_EVIDENCE_DIR:-} && -e $VOCO_BROWSER_EVIDENCE_DIR ]]; then
     echo "Evidence destination already exists; use a new path for each toolbar attempt" >&2
     exit 1
@@ -33,10 +33,12 @@ MANIFEST
   cp "$repo/scripts/test-browser-toolbar-app.sh" "$repo/scripts/test-browser-toolbar-app.mjs" "$repo/scripts/test-browser-toolbar-action.py" "$repo/scripts/test-browser-clear-recovery.py" "$repo/scripts/browser-long-accuracy.mjs" "$repo/scripts/speech-score.mjs" "$repo/scripts/test-speech-continuity.mjs" "$repo/scripts/speech-integrity.mjs" "$test_root/evidence/runner-snapshots/"
   chmod 700 "$test_root/runtime"
   cp --reflink=auto "$VOCO_NATIVE_APP_BINARY" "$test_root/voco"
+  source "$(dirname "${BASH_SOURCE[0]}")/lib/test-speech-runtime.sh"
+  voco_stage_test_speech "$test_root"
   cp --reflink=auto "${VOCO_BROWSER_HOST_BINARY:-${CARGO_TARGET_DIR:-$repo/apps/desktop/src-tauri/target}/debug/voco-browser-host}" "$test_root/voco-browser-host"
-  cp --reflink=auto "$VOCO_NATIVE_MODEL" "$test_root/data/voco/models/ggml-base.en.bin"
+
   chmod 755 "$test_root/data/voco/models"
-  chmod 644 "$test_root/data/voco/models/ggml-base.en.bin"
+
   output_mode=${VOCO_NATIVE_OUTPUT_MODE:-final-text-only}
   case "$output_mode" in final-text-only|stable-cursor-streaming) ;; *) echo 'Unsupported browser output mode' >&2; exit 1;; esac
   printf '{"onboardingCompleted":true,"liveCursorMode":"%s","transcriptTarget":"cursor","transcriptEnhancement":"off","hotkey":"Alt+D"}\n' "$output_mode" > "$test_root/config/voco/config.json"

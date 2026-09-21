@@ -9,9 +9,9 @@ public downloads only when attached to a published release.
 ## Build and assemble
 
 Use a clean tagged checkout and the repository build wrapper. It builds both the
-application and native browser host, and forces the Whisper AVX2/FMA/F16C CPU
-baseline while disabling host-native and AVX-512/AMX flags. The separately pinned
-NVIDIA payload has its own identity and qualification requirements.
+application and native browser host. Neither links a second recognizer. The pinned
+Nemotron payload has its own AVX2/FMA/F16C baseline, identity and qualification
+requirements; host-native and AVX-512/AMX flags remain disabled in its native build.
 
 ```bash
 npm ci
@@ -28,6 +28,12 @@ isolated runtime before publication. Record source and package SHA-256 identitie
 Do not include personal recordings, transcripts, API credentials or private receipts.
 
 The package requires Python 3, NumPy, psutil and the declared native dependencies.
+The .48 assembler uses Zstandard level 9: a small lossless download-size reduction
+with the same installed model and runtime bytes. It does not reduce model memory.
+The .48 installer downloads missing Wayland helpers as the current user while the
+main package downloads. APT verifies those helper downloads; the final privileged
+transaction reuses completed archives only after VOCO's checksum passes. Failed
+prefetches fall back to the ordinary APT installation. Desktop settings are unchanged.
 The .47 metadata explicitly includes the `pgrep` provider (`procps` on Debian/openSUSE,
 `procps-ng` on Fedora/Arch), used to check the Wayland input daemon.
 The worker defaults to at most four CPU threads, leaving one CPU from its affinity
@@ -189,7 +195,7 @@ Why not strict yet:
 - on Wayland it can rely on direct `evdev` keyboard access
 - text insertion shells out to `ydotool`, `xdotool`, `wl-copy`, `wl-paste`, and `xclip`
 - it opens external URLs with `xdg-open`
-- it uses `notify-send` for desktop notifications
+- desktop notifications use the session D-Bus service
 - its core user promise is typing into arbitrary host applications, which is exactly where strict confinement becomes unnatural
 
 So the honest first Snap is a classic-confinement review candidate, not a pretend-strict package that quietly breaks VOCO's core workflow.
@@ -259,12 +265,10 @@ verifies the fixed model hash, adds a runtime SHA-256 manifest and regenerates t
 Debian file inventory. Install the resulting complete package with apt so declared
 dependencies are resolved. A base Tauri package alone is incomplete for NVIDIA.
 
-Normal dictation and explicit interrupted-audio Retry use the bundled NVIDIA
-model. Recovery never automatically replays text into a destination. Startup warms
-the selected recognizer before readiness; it does not download Whisper for this
-path. The separate legacy/browser compatibility path retains its own Whisper model
-check. Product settings do not expose enhancement, assistant or alternate output
-modes.
+Desktop and browser dictation, onboarding and explicit interrupted-audio Retry
+use the bundled Nemotron model. Recovery never automatically replays text into a
+destination. Startup warms the worker before readiness. Product settings do not
+expose enhancement, assistant or alternate recognition modes.
 
 `VOCO_PERFORMANCE_LOG=1` enables private, rotating local metrics. Worker records
 include model/runtime identity, monotonic and wall clocks, hashed stream identity,
