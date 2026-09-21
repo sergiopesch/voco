@@ -21,8 +21,9 @@ import { openMicrophoneStream } from "@/lib/audioInput";
 import { createAnimationFrameLease } from "@/lib/animationFrameLease";
 import type { DictationRecovery } from "@/lib/dictationRecovery";
 import { microphoneLabel, shortcutPresentation } from "@/lib/shortcutPresentation";
-import { getDesktopInputStatus } from "@/lib/tauri";
+import { getDesktopInputStatus, traceHotkeyEvent } from "@/lib/tauri";
 import { Onboarding } from "@/components/Onboarding";
+import { PanelSetup } from "@/components/PanelSetup";
 import { useStore } from "@/store/useStore";
 import { NativeMicrophoneSettings } from "@/components/NativeMicrophoneSettings";
 import type { NativeMicrophoneControls } from "@/hooks/useNativeCaptureSettings";
@@ -659,6 +660,7 @@ export function ControlPanel({
     if (saving || finishingTest || testPreparing || checkingInput) return;
     if (dictationBusy && (dictationStatus !== "recording" || !onFinishTest)) return;
     setFinishingTest(true);
+    void traceHotkeyEvent("onboarding_handoff_requested").catch(() => {});
     try {
       const passed = onFinishTest ? await onFinishTest() : testPassed;
       if (!passed || !(await checkDesktopSetup())) return;
@@ -667,8 +669,7 @@ export function ControlPanel({
         useStore.getState().clearTranscript();
         useStore.getState().setDictationPurpose("cursor");
         onDraftStateChange?.(false);
-        if (onPrepareDictation) onPrepareDictation();
-        else hidePanel();
+        onSurfaceChange("popover");
       }
     } finally { setFinishingTest(false); }
   }
@@ -1003,6 +1004,7 @@ export function ControlPanel({
               {activeSection === "Advanced" || activeSection === "Output" ? (
                 <section className="voco-preferences__page">
                   <div className="voco-preferences__heading"><h2 tabIndex={-1}>Help</h2></div>
+                  <PanelSetup disabled={saving || dictationBusy} />
                   <details className="voco-preferences__card voco-preferences__disclosure"><summary>How to dictate</summary><p>Focus a text field and press <kbd>{config.hotkey}</kbd>. Wait for Listening, then speak. Press again to finish.</p><p>VOCO replaces clipboard text to paste your words and never presses Enter. Keep the same field focused.</p><p>In an enabled Chromium tab, use <kbd>Alt+Shift+V</kbd> for direct delivery to a plain text field.</p></details>
                   <details className="voco-preferences__card voco-preferences__disclosure"><summary>My microphone is not working</summary><p>Check the selected microphone and allow access for this session.</p><button className="voco-button voco-button--secondary" onClick={() => setActiveSection("Audio")}>Microphone settings</button></details>
                   <details className="voco-preferences__card voco-preferences__disclosure"><summary>My shortcut is not working</summary><p>{shortcut.detail}</p>{shortcut.setup ? <p>{shortcut.setup}</p> : null}<button className="voco-button voco-button--secondary" onClick={() => setActiveSection("Hotkeys")}>Shortcut settings</button></details>

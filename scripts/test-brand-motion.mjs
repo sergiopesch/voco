@@ -33,6 +33,9 @@ try {
           window.__fixtureViolations.push('microphone'); throw new Error('Fixture must not capture');
         };
         window.__TAURI_INTERNALS__ = { invoke: async command => {
+          if (command === 'get_panel_setup_status') return window.__panelStatus ?? {status:'active',detail:'Live panel bars and Stop are active.',canEnable:false};
+          if (command === 'enable_gnome_panel') return {status:'restart',detail:'Panel enabled. Sign out and back in to load it; saving your work first is recommended.',canEnable:false};
+          if (command === 'trace_hotkey_event') return;
           if (command === 'get_desktop_input_status') return {available:true,detail:'Fixture desktop prerequisites ready'};
           window.__fixtureViolations.push(command); throw new Error('Fixture must not invoke native commands');
         } };
@@ -89,6 +92,21 @@ try {
       assert.equal(await page.getByText('Voice test complete.', { exact: true }).count(), 1);
       await capture('onboarding-success');
       results.push({ engine: name, check: 'onboarding start/stop, level, explicit completion', passed: true });
+      await page.evaluate(()=>window.__panelStatus={status:'disabled',detail:'Enable live bars, Listening and Stop in your top panel.',canEnable:true});
+      // Remount only the ready phase so its panel check uses the disabled fixture.
+      await page.getByRole('button',{name:'Test again',exact:true}).click();
+      await page.getByRole('button',{name:'Finish test',exact:true}).click();
+      await page.getByRole('button',{name:'Enable live panel',exact:true}).click();
+      await page.getByText('Panel enabled. Sign out and back in to load it; saving your work first is recommended.',{exact:true}).waitFor();
+      await page.setViewportSize({width:760,height:560});
+      await capture('panel-restart-required');
+      await page.getByRole('button',{name:'Done',exact:true}).scrollIntoViewIfNeeded();
+      assert.equal(await page.getByRole('button',{name:'Done',exact:true}).isEnabled(),true);
+      await capture('panel-restart-done-reachable');
+      assert.equal(await page.getByRole('button',{name:'Check panel again',exact:true}).count(),1);
+      results.push({engine:name,check:'explicit panel activation and session restart feedback',passed:true});
+      await page.setViewportSize({width:850,height:680});
+
 
       for (const [state, label] of [['starting', 'Preparing…'], ['processing', 'Finishing…']]) {
         await load(`surface=onboarding&state=${state}`);

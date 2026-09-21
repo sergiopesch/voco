@@ -93,7 +93,7 @@ gates; a draft file is not evidence that its channel or feature is shipped.
 
 ## GNOME panel presentation
 
-`integrations/gnome/` contains the optional GNOME 46 panel extension.
+`integrations/gnome/` contains the GNOME 46 panel extension, bundled in the .50 Debian candidate.
 `src-tauri/src/panel.rs` owns its leased session-bus connection; `tray.rs` derives
 state from the same authoritative snapshot as the native tray. `App.tsx` forwards
 only the normalized meter level during recording. No transcript or audio samples
@@ -175,3 +175,22 @@ only when diagnostics are enabled and admitted by the existing bounded queue.
 `audioLevel.ts` maps centered RMS into a visual speech range; this never changes
 captured samples, recognition gain or model parameters. The same signal display
 serves onboarding and recording, preserving system motion/contrast preferences.
+
+### Panel setup and launcher handoff (.50)
+
+`panel_setup.rs` supervises the bounded `voco_gnome_panel.py` helper. Read-only
+checks distinguish missing, disabled, blocked, active and pending session restart.
+Only an explicit setup command changes this extension's activation; Debian hooks
+never change a user profile. `PanelSetup.tsx` presents the same result in setup/Help.
+
+`activation.rs` owns a separate private launcher socket; connections cannot toggle
+capture. Pending activation survives renderer initialization, then `App.tsx`
+presents idle UI through the existing guarded window transition. Starting,
+recording and processing refuse activation focus changes. The legacy `--toggle`
+transport retains its single-attempt contract.
+
+`tray_icons.rs` retains four immutable PNGs in a private process directory.
+The additive vendored tray-icon path API selects these without deleting older
+advertised paths. `tray.rs` suppresses equivalent presentation updates and exposes
+both an adjacent status label and a menu status row. State-token publication stays
+independent from native icon deduplication. Native Stop uses an explicit stop action.

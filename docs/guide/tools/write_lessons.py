@@ -579,6 +579,14 @@ lesson(
             "Window movement is native work",
             "Dragging/resizing a Tauri window uses native APIs. CSS alone cannot move a Linux desktop window.",
         ),
+        (
+            "A delivered status needs a visible component",
+            "A .49 owner trial on 21 September found that successful dictation did not make live bars appear: the separate GNOME companion was absent from the normal installer, while the GTK tray tooltip did nothing. The .50 candidate bundles the GNOME 46 component, offers explicit activation and reports a required session restart. Its fallback has a visible label where supported and a status row in its menu. These newer changes do not alter this guide's pinned .43 source viewer.",
+        ),
+        (
+            "Finishing setup is a handoff",
+            "The .50 candidate leaves Ready visible after Done and routes a second launch to the existing idle app. It does not restart the recognizer. During Starting, Listening or Finishing, launcher activation does not move focus away from the text destination. Four immutable tray PNGs stay readable for delayed desktop consumers.",
+        ),
     ],
     [
         (

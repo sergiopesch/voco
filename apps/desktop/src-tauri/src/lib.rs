@@ -3,6 +3,7 @@ compile_error!(
     "VOCO production builds require the app's custom-protocol feature; use `cargo tauri build --features custom-protocol` instead of `cargo build --release`"
 );
 
+mod activation;
 mod audio_transport;
 mod benchmark_stream;
 mod browser_broker;
@@ -20,12 +21,14 @@ mod insertion;
 mod native_capture;
 mod native_capture_commands;
 mod owned_preedit;
+pub mod panel_setup;
 mod performance;
 mod process_runner;
 mod shortcut_arbitration;
 mod shortcut_readiness;
 mod single_instance;
 pub mod transcribe;
+mod tray_icons;
 mod trigger_socket;
 
 /// Check input prerequisites without launching a window or sending keys.
@@ -309,6 +312,10 @@ fn trace_frontend_hotkey_event(
         | "frontend_audio_prepare_started"
         | "frontend_audio_prepare_done"
         | "frontend_init_complete"
+        | "onboarding_handoff_requested"
+        | "onboarding_handoff_visible"
+        | "launcher_activation_presented"
+        | "launcher_activation_preserved_capture"
         | "frontend_hotkey_listener_registered" => {
             trace_hotkey_event_with_fields(&event, None, fields.as_ref());
             Ok(())
@@ -1306,6 +1313,16 @@ fn end_desktop_shortcut_session(session_id: String) -> Result<(), String> {
 #[tauri::command(async)]
 fn get_desktop_input_status() -> insertion::DesktopInputStatus {
     insertion::desktop_input_status()
+}
+
+#[tauri::command(async)]
+fn get_panel_setup_status() -> Result<panel_setup::PanelSetupStatus, String> {
+    panel_setup::check(false)
+}
+
+#[tauri::command(async)]
+fn enable_gnome_panel() -> Result<panel_setup::PanelSetupStatus, String> {
+    panel_setup::check(true)
 }
 
 #[tauri::command(async)]
@@ -3130,7 +3147,14 @@ fn ensure_evdev_hotkey_listener(app_handle: &tauri::AppHandle) {
 }
 
 pub fn run() -> Result<(), String> {
-    let single_instance_guard = single_instance::acquire().map_err(|error| error.to_string())?;
+    let single_instance_guard = match single_instance::acquire() {
+        Ok(guard) => guard,
+        #[cfg(target_os = "linux")]
+        Err(single_instance::SingleInstanceError::AlreadyRunning { .. }) => {
+            return activation::request()
+        }
+        Err(error) => return Err(error.to_string()),
+    };
 
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
         .format_timestamp_millis()
@@ -3196,6 +3220,9 @@ pub fn run() -> Result<(), String> {
             insert_text,
             get_desktop_paste_status,
             get_desktop_input_status,
+            get_panel_setup_status,
+            enable_gnome_panel,
+            activation::take_launcher_activation,
             begin_desktop_shortcut_session,
             end_desktop_shortcut_session,
             paste_desktop_text,
@@ -3295,6 +3322,9 @@ pub fn run() -> Result<(), String> {
             );
 
             start_socket_listener(app_handle.clone());
+            if let Err(error) = activation::start(&app_handle) {
+                warn!("Launcher activation unavailable: {error}");
+            }
 
             #[cfg(target_os = "linux")]
             if use_evdev_hotkey {

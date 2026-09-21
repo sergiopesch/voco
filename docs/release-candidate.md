@@ -4,9 +4,13 @@ The [latest published GitHub release](https://github.com/sergiopesch/voco/releas
 is authoritative for current downloads. A source version, local test receipt or
 private draft does not establish publication or installation.
 
-The current public Ubuntu/Debian release is **2026.0.47**. Source **2026.0.49** is a
-local test candidate for rich-editor confirmation and microphone feedback, not a published download. See the
-[candidate changes](releases/2026.0.49.md) and [verification](testing/rich-editor-2026-09-21.md).
+The current public Ubuntu/Debian release is **2026.0.47**. Source **2026.0.50** is a
+local test candidate for packaged panel setup, visible readiness and launcher handoff,
+including the .49 rich-editor fix. It is not a published download. See the
+[candidate changes](releases/2026.0.50.md) and
+[desktop verification scope](testing/linux-candidate-2026-09-21.md).
+Use the complete local artifact's qualification record for package identity and
+installation results; these source notes do not establish a public download.
 
 The published .47 release includes the approved onboarding, tray, settings and installer improvements,
 plus Wayland desktop readiness checks. The signed release tag and checksum

@@ -237,6 +237,9 @@ try {
                     revision: 1,
                     config: window.config
                 };
+            if (name === 'getPanelSetupStatus') return window.panelSetupStatus ?? {status:'active', detail:'Live panel bars and Stop are active.',canEnable:false};
+            if (name === 'enableGnomePanel') { window.panelSetupStatus={status:'restart',detail:'Panel enabled. Sign out and back in to load it.',canEnable:false}; return window.panelSetupStatus; }
+            if (name === 'takeLauncherActivation') { const pending=window.activationPending;window.activationPending=false;return pending; }
             if (name === 'getDesktopInputStatus') return {available:true,detail:'Desktop input is ready.'};
             if (name === 'getRuntimeDiagnostics')
                 return {
@@ -518,6 +521,9 @@ try {
         await page.evaluate(problem => {
           const previous = window.nativeCall;
           window.nativeCall = async (name, args) => {
+            if (name === 'getPanelSetupStatus') return window.panelSetupStatus ?? {status:'active', detail:'Live panel bars and Stop are active.',canEnable:false};
+            if (name === 'enableGnomePanel') { window.panelSetupStatus={status:'restart',detail:'Panel enabled. Sign out and back in to load it.',canEnable:false}; return window.panelSetupStatus; }
+            if (name === 'takeLauncherActivation') { const pending=window.activationPending;window.activationPending=false;return pending; }
             if (name === 'getDesktopInputStatus') {
               window.calls.push([name, ...args]);
               if (window.setupRepaired) return {available:true,detail:'Desktop input is ready.'};
@@ -550,7 +556,7 @@ try {
         await page.getByRole('button',{name:'Done',exact:true}).waitFor();
         if (await page.getByRole('button',{name:'Finish test',exact:true}).count()) { await page.getByRole('button',{name:'Finish test',exact:true}).click(); await page.waitForFunction(()=>window.store.getState().onboardingTestPassed); }
         await page.getByRole('button',{name:'Done',exact:true}).click();
-        await page.waitForFunction(()=>window.config.onboardingCompleted&&window.store.getState().surface==='hidden');
+        await page.waitForFunction(()=>window.config.onboardingCompleted&&window.store.getState().surface==='popover');
         await noOutput();
         results.push({case:'onboarding-blocks-'+problem+'-and-finishes-after-repair-without-external-cursor',passed:true});
       }
@@ -597,8 +603,20 @@ try {
       await captureStyledPanel('onboarding-minimum-window',page.getByRole('button',{name:'Done'}),{width:760,height:560});
       if (await page.getByRole('button',{name:'Finish test',exact:true}).count()) { await page.getByRole('button',{name:'Finish test',exact:true}).click(); await page.waitForFunction(()=>window.store.getState().onboardingTestPassed); }
         await page.getByRole('button',{name:'Done',exact:true}).click();
-      await page.waitForFunction(()=>window.config.onboardingCompleted&&window.store.getState().surface==='hidden');
+      await page.waitForFunction(()=>window.config.onboardingCompleted&&window.store.getState().surface==='popover');
       results.push({case:'default-microphone-live-meter-transcript-stop-finish-no-external-output',passed:true});
+      await page.getByRole('button',{name:'Hide to tray',exact:true}).click();
+      await page.waitForFunction(()=>window.store.getState().surface==='hidden');
+      await page.evaluate(()=>{window.activationPending=true;window.listeners['voco:activate']({payload:null});});
+      await page.waitForFunction(()=>window.store.getState().surface==='popover');
+      await captureStyledPanel('onboarding-visible-ready-handoff',page.getByRole('button',{name:'Hide to tray',exact:true}),{width:760,height:560});
+      for (const busy of ['starting','recording','processing']) {
+        await page.evaluate(busy=>{window.store.getState().setSurface('hidden');window.store.getState().setStatus(busy);window.activationPending=true;window.listeners['voco:activate']({payload:null});},busy);
+        await page.waitForFunction(()=>window.activationPending===false);
+        assert.equal(await page.evaluate(()=>window.store.getState().surface),'hidden');
+      }
+      await page.evaluate(()=>window.store.getState().setStatus('idle'));
+      results.push({case:'launcher-reopens-idle-and-preserves-capture-focus',passed:true});
       await page.setViewportSize({width:1100,height:800});
       await loadTest();
       await page.evaluate(()=>window.silentFixture=true);
@@ -637,7 +655,7 @@ try {
       await page.getByRole('region',{name:'Test transcript'}).getByText('This is my voice test',{exact:true}).waitFor();
       if (await page.getByRole('button',{name:'Finish test',exact:true}).count()) { await page.getByRole('button',{name:'Finish test',exact:true}).click(); await page.waitForFunction(()=>window.store.getState().onboardingTestPassed); }
         await page.getByRole('button',{name:'Done',exact:true}).click();
-      await page.waitForFunction(()=>window.config.onboardingCompleted&&window.store.getState().surface==='hidden');
+      await page.waitForFunction(()=>window.config.onboardingCompleted&&window.store.getState().surface==='popover');
       assert.equal(await page.evaluate(()=>window.stopped&&window.ack===4),true);
       await noOutput();
       results.push({case:'recognition-error-retry-flush-then-explicit-completion',passed:true});
@@ -679,7 +697,7 @@ try {
       await page.getByRole('region',{name:'Test transcript'}).getByText('This is my voice test',{exact:true}).waitFor();
       if (await page.getByRole('button',{name:'Finish test',exact:true}).count()) { await page.getByRole('button',{name:'Finish test',exact:true}).click(); await page.waitForFunction(()=>window.store.getState().onboardingTestPassed); }
         await page.getByRole('button',{name:'Done',exact:true}).click();
-      await page.waitForFunction(()=>window.config.onboardingCompleted&&window.store.getState().surface==='hidden');
+      await page.waitForFunction(()=>window.config.onboardingCompleted&&window.store.getState().surface==='popover');
       assert.equal(await page.evaluate(()=>window.nativeCommands.some(c=>c.name==='native_capture_begin')),false);
       assert.equal(await page.evaluate(()=>window.tracks.every(t=>t.readyState==='ended')),true);
       await noOutput();

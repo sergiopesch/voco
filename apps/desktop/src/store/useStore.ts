@@ -23,7 +23,7 @@ export function deriveSurfaceForConfig(
   }
 
   if (currentSurface === "onboarding" && nextConfig.onboardingCompleted) {
-    return "hidden";
+    return "popover";
   }
 
   if (currentSurface === "hidden" && !nextConfig.onboardingCompleted) {

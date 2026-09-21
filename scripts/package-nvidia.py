@@ -13,6 +13,7 @@ from debian_maintainer import render_postinst
 
 ROOT = Path(__file__).resolve().parents[1]
 VENDORED_NOTICES = {
+    "tray-icon": ("VOCO-PATCH.md", "UPSTREAM-SHA256.json", "LICENSE-APACHE", "LICENSE-MIT", "LICENSE.spdx"),
     "global-hotkey": ("VOCO-PATCH.md", "VOCO-UPSTREAM.json", "LICENSE-APACHE", "LICENSE-MIT", "LICENSE.spdx"),
     "glib": ("VOCO-PATCH.md", "VOCO-UPSTREAM.json", "upstream-fix.patch", "LICENSE", "COPYRIGHT"),
 }

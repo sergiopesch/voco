@@ -164,7 +164,7 @@ describe("useStore", () => {
     expect(useStore.getState().surface).toBe("settings");
   });
 
-  it("hides the window after onboarding is completed", () => {
+  it("keeps a ready popover visible after onboarding is completed", () => {
     const previousConfig = {
       hotkey: "Alt+D",
       selectedMic: null,
@@ -183,7 +183,7 @@ describe("useStore", () => {
         ...previousConfig,
         onboardingCompleted: true,
       }),
-    ).toBe("hidden");
+    ).toBe("popover");
   });
 
   it("setUpdateState stores the latest release result", () => {

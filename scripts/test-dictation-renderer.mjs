@@ -48,6 +48,9 @@ const state = () => ({ sessionId: 101, setupState: "ready", engineActive: true, 
 export const startOwnedPreedit = async (...args) => { calls.push(['startOwnedPreedit', ...args]); if(window.deferLease) await new Promise(resolve=>window.resolveLease=resolve); if (!window.lease) throw new Error('No eligible original field'); return state(); };
 export const getOwnedPreeditStatus = async () => state();
 export const getDesktopInputStatus = async () => ({available:!window.pasteUnavailable,detail:"Paste helper unavailable"});
+export const getPanelSetupStatus = async () => ({status:'other-desktop',detail:'Use the tray menu.',canEnable:false});
+export const enableGnomePanel = getPanelSetupStatus;
+export const takeLauncherActivation = async () => false;
 export const getDesktopPasteStatus = async () => ({enabled:Boolean(window.desktopPaste),streamingEnabled:Boolean(window.desktopStream),shortcutEpoch:1,targetToken:window.desktopTargetToken === undefined ? 'synthetic-destination' : window.desktopTargetToken,available:!window.pasteUnavailable,detail:'Paste helper unavailable'});
 // Model the native shortcut lease API used by the real hook; no desktop input is touched.
 export const beginDesktopShortcutSession = async (id, epoch) => { if(typeof id !== 'string' || epoch !== 1) throw new Error('Invalid shortcut preflight'); calls.push(['beginDesktopShortcutSession',id,epoch]); };

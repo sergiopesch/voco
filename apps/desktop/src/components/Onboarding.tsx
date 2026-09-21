@@ -1,6 +1,7 @@
 import { StatusMark } from "./StatusMark";
 import { VoiceSignal } from "./VoiceSignal";
 import { SettingsIcon } from "./SettingsIcon";
+import { PanelSetup } from "./PanelSetup";
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type { DictationStatus } from "@/types";
@@ -76,7 +77,8 @@ export function Onboarding({ microphone, status, audioLevel, transcript, passed,
     </div>
     {ready ? <div className="voco-setup__handoff">
       <p>Click in a text field and press <kbd className="voco-glass voco-shortcut">{hotkey}</kbd>. Press again to finish.</p>
-      <p>VOCO stays in your tray.</p>
+      <p>VOCO stays in your tray. You can reopen it from your app launcher.</p>
+      <PanelSetup disabled={busy || blocked} />
     </div> : <p className="voco-setup__privacy">{!passed && !recording && !busy ? "Start test turns on your microphone. " : ""}Speech stays on this computer; this test only displays words here.</p>}
     <div className="voco-setup__actions">
       {passed && !recording ? <>

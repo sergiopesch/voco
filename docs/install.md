@@ -136,6 +136,16 @@ command cannot identify which key your desktop assigned. See the
 
 ### GNOME tray integration
 
+The unpublished .50 Debian candidate bundles the GNOME 46 live panel. Its guided
+installer runs `voco --setup-panel` as the desktop user. After a manual APT install,
+use the same command or **Enable live panel** in onboarding/Help. This adds only
+VOCO to enabled extensions; it preserves other extensions and global policy.
+If a session restart is requested, save your work and sign out and back in.
+`voco --check-panel` checks activation without changing settings. The package
+maintainer scripts never enable a user extension. Other GNOME versions keep the
+native tray fallback; live bars are qualified only on GNOME 46.
+
+
 VOCO keeps its controls in the system tray. Stock Fedora GNOME needs the
 distribution's AppIndicator extension; the .43 Fedora package recommends it when
 GNOME is installed. If it is missing:

@@ -95,6 +95,21 @@ export async function getDesktopInputStatus(): Promise<DesktopInputStatus> {
   return invoke("get_desktop_input_status");
 }
 
+export interface PanelSetupStatus {
+  status: string;
+  detail: string;
+  canEnable: boolean;
+}
+export function getPanelSetupStatus(): Promise<PanelSetupStatus> {
+  return invoke("get_panel_setup_status");
+}
+export function enableGnomePanel(): Promise<PanelSetupStatus> {
+  return invoke("enable_gnome_panel");
+}
+export function takeLauncherActivation(): Promise<boolean> {
+  return invoke("take_launcher_activation");
+}
+
 export async function getDesktopPasteStatus(): Promise<{ enabled: boolean; available: boolean; detail: string; shortcutEpoch: number; streamingEnabled?: boolean; targetToken?: string | null; failureReason?: "setup" | "cursor" | null }> {
   return invoke("get_desktop_paste_status");
 }

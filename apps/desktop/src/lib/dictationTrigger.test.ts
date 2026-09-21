@@ -29,4 +29,15 @@ describe("directed browser recording triggers", () => {
     expect(admitsDictationTrigger("idle", undefined, "ibus:a", "start")).toBe(false);
     expect(admitsDictationTrigger("idle", undefined, undefined, "start")).toBe(false);
   });
+  it("admits explicit native tray Stop only while capture can stop", () => {
+    for (const origin of [undefined, "browser:a", "onboarding:test"]) {
+      for (const phase of ["starting", "recording"] as const) {
+        expect(admitsDictationTrigger(phase, origin, "tray:stop", "stop")).toBe(true);
+      }
+      for (const phase of ["idle", "error", "stopping", "processing", "finalizing"] as const) {
+        expect(admitsDictationTrigger(phase, origin, "tray:stop", "stop")).toBe(false);
+        expect(admitsDictationTrigger(phase, origin, "tray:stop", "start")).toBe(false);
+      }
+    }
+  });
 });

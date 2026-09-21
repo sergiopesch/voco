@@ -6,11 +6,11 @@ set -euo pipefail
 #
 # VOCO — release install helper
 # Usage:
-#   wget https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.49/install -O voco-install
+#   wget https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.50/install -O voco-install
 #   chmod +x voco-install
 #   ./voco-install
 
-VERSION="2026.0.49"
+VERSION="2026.0.50"
 RELEASE_TAG="voco.${VERSION}"
 DEB_URL="https://github.com/sergiopesch/voco/releases/download/${RELEASE_TAG}/voco_${VERSION}_amd64.deb"
 CHECKSUMS_URL="https://github.com/sergiopesch/voco/releases/download/${RELEASE_TAG}/voco_checksums.txt"
@@ -774,6 +774,14 @@ if ! voco_start_wayland_service || ! voco_verify_desktop_input; then
   exit 2
 fi
 ok "Desktop input prerequisites verified"
+
+dim "Setting up VOCO's live panel for this desktop."
+if VOCO_PANEL_DETAIL="$(/usr/bin/voco --setup-panel 2>&1)"; then
+  ok "$VOCO_PANEL_DETAIL"
+else
+  warn "$VOCO_PANEL_DETAIL"
+  dim "You can check again in VOCO's setup or Help. The tray menu remains available."
+fi
 
 # ─── Done ───────────────────────────────────────────────
 echo

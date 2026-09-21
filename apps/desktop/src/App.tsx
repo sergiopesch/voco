@@ -24,6 +24,7 @@ import {
   syncPanelLevel,
   releaseBrowserRecording,
   traceHotkeyEvent,
+  takeLauncherActivation,
 } from "@/lib/tauri";
 import {
   checkForUpdates,
@@ -223,6 +224,8 @@ export function App() {
   } = useDictation({ getCaptureSelection });
   const [testPreparing, setTestPreparing] = useState(false);
   const startRequestRef = useRef<{ cancelled: boolean } | null>(null);
+  const [activationRequest, setActivationRequest] = useState(0);
+  const onboardingHandoffRef = useRef(false);
   const [initComplete, setInitComplete] = useState(false);
   const [runtimeDiagnostics, setRuntimeDiagnostics] = useState<RuntimeDiagnostics | null>(null);
   const [runtimeStatusEpoch, setRuntimeStatusEpoch] = useState<number | null>(null);
@@ -276,6 +279,9 @@ export function App() {
         return false;
       }
       lastConfigRevisionRef.current = snapshot.revision;
+      if (useStore.getState().config?.onboardingCompleted === false && snapshot.config.onboardingCompleted) {
+        onboardingHandoffRef.current = true;
+      }
       setConfig(snapshot.config);
       return true;
     },
@@ -952,6 +958,12 @@ export function App() {
           focus: () => currentWindow.setFocus(),
           isFocused: () => currentWindow.isFocused(),
         });
+        if (isCurrentRequest() && onboardingHandoffRef.current) {
+          onboardingHandoffRef.current = false;
+          requestAnimationFrame(() => {
+            if (isCurrentRequest()) void traceHotkeyEvent("onboarding_handoff_visible").catch(() => {});
+          });
+        }
         return;
       }
 
@@ -980,7 +992,7 @@ export function App() {
 
     const operation = surfaceSyncQueueRef.current.then(syncWindowSurface);
     surfaceSyncQueueRef.current = operation.catch(() => {});
-  }, [popoverSize, surface]);
+  }, [popoverSize, surface, activationRequest]);
 
   useEffect(() => {
     if (surface !== "settings" && surface !== "onboarding") {
@@ -1027,6 +1039,26 @@ export function App() {
       "settings event listener",
     );
   }, [openSettings]);
+
+  useEffect(() => {
+    if (!initComplete) return;
+    let alive = true;
+    const activate = async () => {
+      if (!(await takeLauncherActivation().catch(() => false)) || !alive) return;
+      const state = useStore.getState();
+      if (startRequestRef.current || isDictationActive(state.status)) {
+        void traceHotkeyEvent("launcher_activation_preserved_capture").catch(() => {});
+        return;
+      }
+      if (state.surface === "hidden") setSurface(state.config?.onboardingCompleted ? "popover" : "onboarding");
+      setActivationRequest(value => value + 1);
+      void traceHotkeyEvent("launcher_activation_presented").catch(() => {});
+    };
+    const cleanup = cleanupDeferredListener(getCurrentWindow().listen("voco:activate", () => {
+      void activate();
+    }).then(unlisten => { if (alive) void activate(); return unlisten; }), "launcher activation listener");
+    return () => { alive = false; cleanup(); };
+  }, [initComplete, setSurface]);
 
   useEffect(() => {
     return cleanupDeferredListener(
