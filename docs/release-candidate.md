@@ -4,13 +4,17 @@ The [latest published GitHub release](https://github.com/sergiopesch/voco/releas
 is authoritative for current downloads. A source version, local test receipt or
 private draft does not establish publication or installation.
 
-The current public Ubuntu/Debian release is **2026.0.47**. Source **2026.0.50** is a
-local test candidate for packaged panel setup, visible readiness and launcher handoff,
-including the .49 rich-editor fix. It is not a published download. See the
-[candidate changes](releases/2026.0.50.md) and
+The recorded public Ubuntu/Debian release is **2026.0.47**. Source **2026.0.51**
+is unreleased Nemotron-only development. Whisper has been removed from recognition,
+downloads and native dependencies; see [the retirement record](testing/nemotron-only-2026-09-21.md).
+
+The frozen **2026.0.50** local candidate contains packaged panel setup, visible
+readiness and launcher handoff, including the .49 rich-editor fix. It remains a
+separate artifact: .51 source checks do not qualify or replace that package.
+See the [.50 changes](releases/2026.0.50.md) and
 [desktop verification scope](testing/linux-candidate-2026-09-21.md).
-Use the complete local artifact's qualification record for package identity and
-installation results; these source notes do not establish a public download.
+Use each complete artifact's qualification record for its package identity and
+installation results. These source notes do not establish a public download.
 
 The published .47 release includes the approved onboarding, tray, settings and installer improvements,
 plus Wayland desktop readiness checks. The signed release tag and checksum

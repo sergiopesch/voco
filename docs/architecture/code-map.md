@@ -7,27 +7,23 @@ user-selectable model.
 
 ## Before recording
 
-Backend startup chooses the runtime from the normal desktop route's configuration
-and environment flags. NVIDIA readiness requires a successful serialized worker
-warmup; importing the queue does not start inference. Explicit legacy transcription
-keeps its separate Whisper preparation. See [startup](README.md#startup-and-recognizer-selection).
+Backend startup warms the bundled Nemotron worker. Readiness requires its successful
+model load and warmup; importing the queue does not start inference. The same
+recognizer serves desktop, browser and onboarding sessions. See
+[startup](README.md#startup-and-recognizer-selection).
 
 ## Follow one recording
 
 1. `apps/desktop/src/App.tsx` mounts the thin UI and dictation hook. The store in
    `src/store/useStore.ts` represents preferences and visible state; it does not
    own native input authority.
-2. `src/hooks/useDictation.ts` admits a start/stop and wires capture, preview and
-   recovery. Capture admission prevents automatic NVIDIA delivery when only unverified
-   ScriptProcessor input is available. Start/Stop/Cancel and shortcut-session boundaries live in
-   `src/lib/dictationRecording.ts`; live-preview timer/canonical-pump ownership lives in
-   `src/lib/livePreviewSchedule.ts`; frozen-snapshot decode and cursor update live in
-   `src/lib/livePreviewRunner.ts`; append-only Stop-tail accounting lives in
-   `src/lib/desktopCaptureTail.ts`. Capture descriptors in `src/lib/captureDescriptor.ts`
-   keep sample-rate/provenance facts attached to retained samples.
-   `desktopShortcutSession.ts` owns the UUID-bound native shortcut session with its
-   immutable preflight renderer epoch before capture, through final drain, and cleans up
-   failed/cancelled/stale starts without touching a replacement owner.
+2. `src/hooks/useDictation.ts` wires capture and explicit recovery. Start/Stop/Cancel
+   and shortcut boundaries live in `src/lib/dictationRecording.ts`. Capture admission
+   keeps unverified ScriptProcessor input out of automatic delivery.
+   `desktopCaptureTail.ts` retains each source sample and forwards the Stop tail once.
+   `desktopShortcutSession.ts` owns the UUID-bound native shortcut lease through final
+   delivery. `browserStreamDelivery.ts` separately owns an explicit browser field lease,
+   verifies each append receipt and never retries uncertain output.
 3. `src/lib/benchmarkPhraseQueue.ts` serializes bounded NVIDIA requests. Recording
    capture continues while a paste is in flight. A newer append-only hypothesis
    can supersede pending output; already dispatched text cannot be blindly replayed.
@@ -65,11 +61,8 @@ for measurement and recipient limitations.
 | App orchestration and native IPC | `apps/desktop/src-tauri/src/lib.rs` | Command registration, startup, model readiness, cursor delivery and shared limits. Keep platform authority in Rust. |
 | UI | `apps/desktop/src/components/`, `src/store/` | Tray-associated controls, status, setup and recovery. No model inference or OS simulation in React. |
 | Capture | `apps/desktop/src/lib/audioInput.ts`, `audioCaptureBuffer.ts`, `audioCaptureFlush.ts`, `nativeCapture.ts`; `src-tauri/src/native_capture/` | The .43 candidate selects native capture on Wayland and browser capture on X11. The .44 candidate resolves and grants the default source on an explicit Start Test/recording action; manual selection remains available in settings. Preserve sample ownership and drain ordering. |
-| Live preview schedule | `src/lib/livePreviewSchedule.ts` | Owns the preview timer versus canonical-pump interaction. Sample arrivals without canonical work must not postpone a pending preview. |
-| Live preview decode | `src/lib/livePreviewRunner.ts` | Frozen-snapshot decode, geometry checks and owned-preedit cursor update. Token invalidation must not enqueue stale native work. |
 | Desktop capture tail | `src/lib/desktopCaptureTail.ts` | Append-only sample accounting and Stop-tail forwarding into the NVIDIA queue. Do not recopy an already streamed recording. |
 | Speech runtime | `runtime/speech/` | Selected pinned CPU runtime, bounded local protocol, content-free metrics. Model/native artifacts are provisioned separately from Git. |
-| Legacy/canonical recognition | `src-tauri/src/transcribe.rs`, `transcribe_corroboration.rs`; frontend canonical/checkpoint helpers | Separate Whisper/browser recovery behavior with its own quality gates; not an extra pass on every NVIDIA chunk. |
 | Input/focus | `src-tauri/src/insertion.rs`, `focus_probe.rs`, `resources/voco_desktop_target.py` | Desktop-specific compatibility, fresh preflight checks, bounded observation, no uncertain automatic retry. |
 | Desktop notifications | `src-tauri/src/desktop_notifications.rs` | Retain the session D-Bus sender for VOCO's lifetime so GNOME can display registered-app notifications. Use the VOCO icon, normal desktop notification policy, bounded requests and finite error events; service acceptance does not prove banner visibility. |
 | Shortcuts | `src-tauri/src/hotkey_state.rs`, `shortcut_arbitration.rs`, `shortcut_readiness.rs`, `owned_preedit.rs` and IBus resources | Admit one trigger. The optional IBus component does not authorize generic text mutation or switch the owner's input source. |
@@ -78,11 +71,10 @@ for measurement and recipient limitations.
 | X11 actor wakeup | `vendor/global-hotkey/src/platform_impl/x11/{mod.rs,wake.rs}` | Wait on X fd and queued-command signal; drain buffered events before sleeping. No 50 ms periodic idle wakeup. Preserve original expiry deadline and error health. Paths are repository-relative. |
 | Renderer replacement | `src-tauri/src/lib.rs` PageLoad Started, `desktop_shortcut.rs`, `insertion.rs` preflight/reset | Synchronously invalidate the shortcut epoch; asynchronously release only older owners. Reject stale Begin before/after acquisition. Generic paste IPC remains a separate, non-epoch-bound contract. |
 | Explicit browser field | `integrations/chromium/`, `src-tauri/src/browser_{broker,protocol,socket}.rs`, `src-tauri/src/bin/voco-browser-host.rs` | Explicit tab/field authorization, private same-user transport, ordered bounded receipts. Separate from ordinary desktop paste. |
-| Audio transport | `src-tauri/src/audio_transport.rs`, `vca2.rs`, `native_capture_commands.rs` | Validate binary headers, sample counts and finite values before decoding or retaining. |
+| Audio transport | `src-tauri/src/audio_transport.rs`, `native_capture_commands.rs` | Validate binary headers, sample counts and finite values before decoding or retaining. |
 | Config and process lifecycle | `src-tauri/src/config.rs`, `single_instance.rs`, `trigger_socket.rs`, `process_runner.rs` | Private state, exclusive process ownership, bounded helper execution and reaping. |
 | Diagnostics | `src-tauri/src/performance.rs`, `runtime/speech/streaming.py::Metrics`, `scripts/report-*.py` | Bounded local logs; failures cannot stall dictation. Reports distinguish successful events, failures and unavailable evidence. |
 | Read-only setup checks | `src-tauri/src/main.rs`, `lib.rs` | `--check-desktop-input` verifies input prerequisites; `--check-cursor` verifies the current editable destination. Neither records, changes the clipboard or sends keys. |
-| Legacy recognition planning | `src-tauri/src/hybrid.rs`, `numerical_planner.rs`, corresponding frontend modules | Whisper recovery and numerical recognition checks; separate from the selected NVIDIA streaming path. |
 | Build/package | `scripts/build-desktop.sh`, `package-nvidia.py`, `verify-deb-package.sh`, `verify-speech-payload.py`, `packaging/` | Build matching application/host; require pinned complete payload; validate before publishing an artifact. |
 | Quality evidence | `scripts/test-*`, `scripts/dictation-quality*`, `tests/fixtures/`, `docs/testing/` | Tests/reports, not application features. Keep public fixtures separate from private owner recordings. |
 
@@ -103,7 +95,7 @@ are sent to the panel. See the [integration contract](../../integrations/gnome/R
 
 Keep changes in the component that owns the invariant. Do not add parallel frontend
 state for a fact already owned by the queue or worker. Before deleting apparently
-unused code, check the separate Whisper, explicit browser and gated capture routes.
+unused code, check the browser delivery and gated capture routes.
 Avoid changing model, context, thread count or gate parameters without matched
 accuracy and latency evidence. Do not equate fewer lines with less runtime work.
 

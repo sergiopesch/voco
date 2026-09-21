@@ -17,13 +17,13 @@ case "${1:-}" in
     : "${VOCO_BROWSER_HOST_BINARY:?Set the packaged native host executable}"
     : "${VOCO_BROWSER_EXTENSION_DIR:?Set the packaged Chromium extension directory}"
     : "${VOCO_NATIVE_APP_BINARY:?Set the built candidate executable}"
-    : "${VOCO_NATIVE_MODEL:?Set the pinned existing model}"
+
     : "${VOCO_BROWSER_EVIDENCE_DIR:?Set a directory for browser application evidence}"
     TEST_SCRIPT="test-browser-full-app.sh"
     ;;
   --full-application)
     : "${VOCO_NATIVE_APP_BINARY:?Set the built candidate executable}"
-    : "${VOCO_NATIVE_MODEL:?Set the pinned existing model}"
+
     : "${VOCO_NATIVE_EVIDENCE_DIR:?Set a directory for native application evidence}"
     TEST_SCRIPT="test-native-desktop.sh"
     ;;

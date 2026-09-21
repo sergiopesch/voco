@@ -71,15 +71,15 @@ test("the exact sequence gate counts mistakes inside otherwise intact repetition
   assert.equal(result.passed, false);
 });
 
-test("the actual continuity CLI refuses old reports and malformed arguments before model or inference access", () => {
+test("the Nemotron baseline CLI refuses old reports and malformed arguments before model or inference access", () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "voco-continuity-preflight-"));
   try {
     const report = path.join(directory, "prior.json");
     fs.writeFileSync(report, "retained failed evidence");
-    const env = { ...process.env, VOCO_MODEL_PATH: path.join(directory, "missing-model"), VOCO_SPEECH_WORKER: path.join(directory, "missing-worker") };
-    const runner = new URL("./test-speech-continuity.mjs", import.meta.url);
+    const env = { ...process.env, VOCO_NEMOTRON_MODEL: path.join(directory, "missing-model"), VOCO_SPEECH_WORKER: path.join(directory, "missing-worker") };
+    const runner = new URL("./test-speech-baseline.mjs", import.meta.url);
     for (const [args, expected] of [
-      [["--report", report], /report already exists/],
+      [["--report", report], /Choose a new report path/],
       [["--report"], /Usage:/],
       [["--unknown", report], /Usage:/],
     ]) {

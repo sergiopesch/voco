@@ -43,9 +43,9 @@ test('natural plan uses every fixture through the 37 second cutoff and manifest 
   assert.throws(()=>freezeLongPlayback(manifestBytes,Buffer.from(JSON.stringify({...p,selectedBeforeInference:false})),audio,sources));
 });
 
-test('long CLI refuses missing debug consent before checking sandbox or starting apps',()=>{
-  const result=spawnSync(process.execPath,[fileURLToPath(new URL('./test-browser-full-app.mjs',import.meta.url))],{env:{...process.env,VOCO_BROWSER_LONG_CAPTURE:'1',VOCO_BROWSER_DEBUG_CAPTURE:'0'},encoding:'utf8'});
-  assert.notEqual(result.status,0);assert.match(result.stderr,/Long browser qualification requires VOCO_BROWSER_DEBUG_CAPTURE=1/);
+test('CLI rejects retired Whisper diagnostics before checking sandbox or starting apps',()=>{
+  const result=spawnSync(process.execPath,[fileURLToPath(new URL('./test-browser-full-app.mjs',import.meta.url))],{env:{...process.env,VOCO_BROWSER_DIAG_SECOND_CAPTURE:'1'},encoding:'utf8'});
+  assert.notEqual(result.status,0);assert.match(result.stderr,/The retired Whisper debug-capture mode is unavailable/);
 });
 
 for (const field of ['canonicalText', 'finalTranscript']) {

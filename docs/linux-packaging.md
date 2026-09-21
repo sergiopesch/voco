@@ -9,9 +9,9 @@ public downloads only when attached to a published release.
 ## Build and assemble
 
 Use a clean tagged checkout and the repository build wrapper. It builds both the
-application and native browser host, and forces the Whisper AVX2/FMA/F16C CPU
-baseline while disabling host-native and AVX-512/AMX flags. The separately pinned
-NVIDIA payload has its own identity and qualification requirements.
+application and native browser host. Neither links a second recognizer. The pinned
+Nemotron payload has its own AVX2/FMA/F16C baseline, identity and qualification
+requirements; host-native and AVX-512/AMX flags remain disabled in its native build.
 
 ```bash
 npm ci
@@ -265,12 +265,10 @@ verifies the fixed model hash, adds a runtime SHA-256 manifest and regenerates t
 Debian file inventory. Install the resulting complete package with apt so declared
 dependencies are resolved. A base Tauri package alone is incomplete for NVIDIA.
 
-Normal dictation and explicit interrupted-audio Retry use the bundled NVIDIA
-model. Recovery never automatically replays text into a destination. Startup warms
-the selected recognizer before readiness; it does not download Whisper for this
-path. The separate legacy/browser compatibility path retains its own Whisper model
-check. Product settings do not expose enhancement, assistant or alternate output
-modes.
+Desktop and browser dictation, onboarding and explicit interrupted-audio Retry
+use the bundled Nemotron model. Recovery never automatically replays text into a
+destination. Startup warms the worker before readiness. Product settings do not
+expose enhancement, assistant or alternate recognition modes.
 
 `VOCO_PERFORMANCE_LOG=1` enables private, rotating local metrics. Worker records
 include model/runtime identity, monotonic and wall clocks, hashed stream identity,

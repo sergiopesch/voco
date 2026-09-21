@@ -188,11 +188,12 @@ try {
         window.catalog={revision:'r1',sources:[window.source],defaultSelectionToken:'token-1'};
         window.nativeInvoke=async(name,args)=>{
           window.nativeCommands.push({name,args});
-          if(name==='benchmark_stream' && window.onboardingFixture) {
+          if(name==='benchmark_stream' || name==='recover_stream') {
             const r=args.request;
             if(['quality','diagnostic','cancel'].includes(r.op))return {};
-            if(window.recognitionError)throw {message:'Speech engine unavailable for this test.'};
-            return {...r,mode:'append-only',text:r.op==='start'?null:window.silentFixture?'':r.op==='finish'?'This is my voice test.':'This is my voice test'};
+            if(window.recognitionError || window.transcriptionError)throw {message:'Speech engine unavailable for this test.'};
+            const text=window.onboardingFixture ? (window.silentFixture?'':r.op==='finish'?'This is my voice test.':'This is my voice test') : (r.op==='finish'?'Fixture transcript':null);
+            return {...r,mode:'append-only',text:r.op==='start'?null:text};
           }
           if(name==='native_capture_capabilities') {
             if(window.captureScenario==='pending') return new Promise(resolve=>window.resolveCapability=resolve);
@@ -231,7 +232,6 @@ try {
                 window.auditUploads.push(new Uint8Array(args[0]));
                 return '/mock-private-renderer/COMMIT.json';
             }
-            if(name==='transcribeAudio') {if(window.transcriptionError)throw Error('Fixture recognition failure');return 'Fixture transcript';}
             if (name === 'getConfig')
                 return {
                     revision: 1,
@@ -788,7 +788,7 @@ try {
     await page.waitForFunction(()=>window.store.getState().transcript==='Fixture transcript');
     await activate();await page.evaluate(()=>window.unhealthy=true);
     await page.waitForFunction(()=>window.store.getState().recovery?.audioAvailable===true);
-    assert.equal(await page.evaluate(()=>window.calls.filter(x=>x[0]==='transcribeAudio').length),0);
+    assert.equal(await page.evaluate(()=>window.nativeCommands.filter(x=>x.name==='recover_stream'&&x.args.request.op==='start').length),0);
     assert.equal((await state()).streams,0);assert.equal((await state()).commands.filter(x=>x.name==='native_capture_begin').length,1);
     expected.push('native-tail-failure-retains-prefix-without-auto-transcription');record(expected.at(-1));
     await load('enabled');await page.getByRole('combobox', { name: 'Microphone', exact: true }).waitFor();
@@ -861,7 +861,7 @@ try {
     await page.evaluate(()=>window.listeners['voco:toggle-dictation']({payload:null}));
     await page.waitForFunction(()=>window.nativeCommands.some(x=>x.name==='native_capture_begin')&&window.store.getState().nativeCaptureSource===null);
     assert.equal((await state()).ready,false);assert.equal((await state()).streams,0);assert.equal((await state()).enums,0);
-    assert.equal(await page.evaluate(()=>window.calls.filter(x=>x[0]==='transcribeAudio').length),0);
+    assert.equal(await page.evaluate(()=>window.nativeCommands.filter(x=>x.name==='recover_stream'&&x.args.request.op==='start').length),0);
     expected.push('native-start-failure-revokes-grant-without-fallback');record(expected.at(-1));
     await load('enabled');await chooseNative('token-1');
     await page.getByLabel('Allow microphone access for this session').check();
@@ -920,7 +920,7 @@ try {
     await page.waitForFunction(()=>window.stallInjected===true);
     await page.waitForFunction(()=>window.store.getState().recovery?.audioAvailable===true,{},{timeout:12000});
     await verifyRetainedWitness('interrupted');
-    assert.equal(await page.evaluate(()=>window.calls.filter(x=>x[0]==='transcribeAudio').length),0);
+    assert.equal(await page.evaluate(()=>window.nativeCommands.filter(x=>x.name==='recover_stream'&&x.args.request.op==='start').length),0);
     assert.equal((await state()).source,null);assert.equal((await state()).ready,false);
     await page.evaluate(()=>window.store.getState().setSurface('popover'));
     await page.getByRole('button',{name:'Discard recovery',exact:true}).waitFor();
@@ -943,14 +943,14 @@ try {
     await page.evaluate(()=>new Promise(resolve=>setTimeout(resolve,60)));
     assert.equal((await state()).ready,true);assert.ok((await state()).source);
     assert.equal(await page.evaluate(()=>window.store.getState().recovery),null);
-    assert.equal(await page.evaluate(()=>window.calls.filter(x=>x[0]==='transcribeAudio').length),0);
+    assert.equal(await page.evaluate(()=>window.nativeCommands.filter(x=>x.name==='recover_stream'&&x.args.request.op==='start').length),0);
     await page.evaluate(()=>window.listeners['voco:toggle-dictation']({payload:null}));
     await page.waitForFunction(()=>window.store.getState().transcript==='Fixture transcript'&&window.store.getState().status==='idle');
     const lateProof=await page.evaluate(()=>({released:window.oldDrainReleased,
-      transcriptionSamples:window.calls.filter(x=>x[0]==='transcribeAudio').map(x=>x[1].length),
+      streamSamples:window.nativeCommands.filter(x=>x.name==='benchmark_stream'&&x.args.request.op==='push'&&x.args.request.dictation_session_id===window.captureIdentity.sessionId).reduce((s,x)=>s+x.args.request.audio.length,0),
       starts:window.nativeCommands.filter(x=>x.name==='native_capture_begin').map(x=>x.args.request),
       uploads:window.auditUploads.length,cancels:window.nativeCommands.filter(x=>x.name==='native_capture_cancel').map(x=>x.args.request)}));
-    assert.equal(lateProof.released,true);assert.deepEqual(lateProof.transcriptionSamples,[12800]);
+    assert.equal(lateProof.released,true);assert.equal(lateProof.streamSamples,35280);
     assert.ok(lateProof.starts[1].sessionId>lateProof.starts[0].sessionId);
     assert.ok(lateProof.starts[1].generation>lateProof.starts[0].generation);
     assert.equal(lateProof.uploads,1);assert.equal(lateProof.cancels.length,1);
@@ -965,7 +965,7 @@ try {
     await activate(true);await page.evaluate(()=>window.store.getState().setSurface('popover'));await page.getByRole('button',{name:'Cancel dictation',exact:true}).click();
     await verifyRetainedWitness('cancelled');
     await page.waitForFunction(()=>window.store.getState().recovery?.audioAvailable===true);
-    assert.equal(await page.evaluate(()=>window.calls.filter(x=>x[0]==='transcribeAudio').length),0);
+    assert.equal(await page.evaluate(()=>window.nativeCommands.filter(x=>x.name==='recover_stream'&&x.args.request.op==='start').length),0);
     expected.push('cancelled-audit-keeps-prefix-and-does-not-claim-healthy');record(expected.at(-1));
     await page.evaluate(()=>window.store.getState().setSurface('popover'));
     await page.getByRole('button',{name:'Retry transcription',exact:true}).click();

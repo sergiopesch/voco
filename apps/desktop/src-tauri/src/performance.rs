@@ -1,7 +1,6 @@
 //! Opt-in local metadata only. Producers never wait for the disk writer.
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
-use std::collections::BTreeMap;
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Write};
 use std::os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt};
@@ -13,7 +12,6 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 const FILE_LIMIT: u64 = 8 * 1024 * 1024;
 const QUEUE_LIMIT: usize = 256;
 static RECORDER: OnceLock<Recorder> = OnceLock::new();
-static REQUEST_ID: AtomicU64 = AtomicU64::new(0);
 
 struct Recorder {
     sender: mpsc::SyncSender<Value>,
@@ -406,82 +404,6 @@ pub fn shutdown() {
     emit(json!({"event": "clean_exit_requested"}));
 }
 
-pub struct RequestTrace {
-    data: Option<RequestData>,
-}
-struct RequestData {
-    id: u64,
-    mode: &'static str,
-    start: Instant,
-    stage_start: Instant,
-    stage: &'static str,
-    stages: BTreeMap<&'static str, u64>,
-    samples: Option<usize>,
-    session: Option<u64>,
-    outcome: &'static str,
-    preview: Option<crate::transcribe::PreviewDiagnostics>,
-}
-impl RequestTrace {
-    pub fn new(mode: &'static str) -> Self {
-        let data = RECORDER.get().map(|_| {
-            let id = REQUEST_ID.fetch_add(1, Ordering::Relaxed) + 1;
-            emit(json!({"event":"request_started", "request_id":id, "mode":mode}));
-            RequestData {
-                id,
-                mode,
-                start: Instant::now(),
-                stage_start: Instant::now(),
-                stage: "validate_input",
-                stages: BTreeMap::new(),
-                samples: None,
-                session: None,
-                outcome: "error",
-                preview: None,
-            }
-        });
-        Self { data }
-    }
-    pub fn audio(&mut self, samples: usize, session: Option<u64>) {
-        if let Some(data) = &mut self.data {
-            data.samples = Some(samples);
-            data.session = session;
-        }
-    }
-    pub fn stage(&mut self, next: &'static str) {
-        if let Some(data) = &mut self.data {
-            data.stages
-                .insert(data.stage, data.stage_start.elapsed().as_micros() as u64);
-            data.stage = next;
-            data.stage_start = Instant::now();
-        }
-    }
-    pub fn preview(&mut self, diagnostics: Option<crate::transcribe::PreviewDiagnostics>) {
-        if let Some(data) = &mut self.data {
-            data.preview = diagnostics;
-        }
-    }
-    pub fn outcome(&mut self, value: &'static str) {
-        if let Some(data) = &mut self.data {
-            data.outcome = value;
-        }
-    }
-}
-impl Drop for RequestTrace {
-    fn drop(&mut self) {
-        if let Some(mut data) = self.data.take() {
-            data.stages
-                .insert(data.stage, data.stage_start.elapsed().as_micros() as u64);
-            emit(
-                json!({"event":"request_completed", "request_id":data.id, "mode":data.mode,
-                "outcome":data.outcome, "last_stage":data.stage, "stages_us":data.stages,
-                "total_us":data.start.elapsed().as_micros() as u64,
-                "audio_samples":data.samples, "dictation_session_id":data.session,
-                "preview_diagnostics":data.preview}),
-            );
-        }
-    }
-}
-
 fn write_events(
     mut writer: RotatingWriter,
     receiver: mpsc::Receiver<Value>,
@@ -736,17 +658,7 @@ mod tests {
         ))
     }
     #[test]
-    fn preview_diagnostics_contain_only_bounded_numeric_metadata() {
-        let value = serde_json::to_value(crate::transcribe::PreviewDiagnostics {
-            initial_context_frames: 512,
-            reduced_attempt_us: 123,
-            fallback_us: Some(456),
-        })
-        .unwrap();
-        assert_eq!(
-            value,
-            json!({"initial_context_frames":512, "reduced_attempt_us":123, "fallback_us":456})
-        );
+    fn stop_wait_diagnostics_exclude_content() {
         for name in [
             "dictation_stop_checkpoint_wait_completed",
             "dictation_stop_preview_wait_completed",

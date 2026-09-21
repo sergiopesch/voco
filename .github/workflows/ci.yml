@@ -194,7 +194,7 @@ jobs:
           sudo apt-get install -y \
             pkg-config libglib2.0-dev libsoup-3.0-dev \
             libjavascriptcoregtk-4.1-dev libwebkit2gtk-4.1-dev \
-            libayatana-appindicator3-dev libpulse-dev cmake
+            libayatana-appindicator3-dev libpulse-dev cmake python3-numpy python3-psutil libsentencepiece0
 
       - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de
         with:
@@ -239,18 +239,13 @@ jobs:
         working-directory: apps/desktop/src-tauri
         run: cargo test --locked --lib --features native-capture-dev
 
-      - name: Existing-model speech regression baseline
-        env:
-          VOCO_MODEL_PATH: ${{ runner.temp }}/voco-ggml-base.en.bin
+      - name: Provision checksum-pinned Nemotron runtime
+        run: bash scripts/provision-ci-speech.sh
+
+      - name: Nemotron speech regression baseline
         run: |
-          curl --fail --location --retry 3 --max-time 180 --output "$VOCO_MODEL_PATH" \
-            https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin
-          echo "a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002  $VOCO_MODEL_PATH" | sha256sum --check --strict
-          speech_failed=0
-          npm run test:speech-baseline -- --report "${{ runner.temp }}/voco-speech-baseline.json" || speech_failed=1
-          npm run test:speech-continuity -- --report "${{ runner.temp }}/voco-speech-continuity.json" || speech_failed=1
-          npm run test:speech-adversarial -- --output-dir "${{ runner.temp }}/voco-speech-adversarial" || speech_failed=1
-          exit "$speech_failed"
+          npm run test:speech-baseline -- --report "${{ runner.temp }}/voco-speech-baseline.json"
+          /usr/bin/python3 runtime/speech/test_worker_protocol.py --output-dir "${{ runner.temp }}/voco-worker-protocol"
 
       - name: Retain speech regression results
         if: always()
@@ -259,10 +254,7 @@ jobs:
           name: speech-regression-evidence
           path: |
             ${{ runner.temp }}/voco-glib-regression/result.json
+            ${{ runner.temp }}/voco-worker-protocol/*.json
             ${{ runner.temp }}/voco-speech-*.json
-            ${{ runner.temp }}/voco-speech-adversarial/**/*.json
-            ${{ runner.temp }}/voco-speech-adversarial/**/*.log
-            ${{ runner.temp }}/voco-speech-adversarial/**/*.stderr
-            ${{ runner.temp }}/voco-speech-adversarial/transcribe.rs
           if-no-files-found: ignore
           retention-days: 7

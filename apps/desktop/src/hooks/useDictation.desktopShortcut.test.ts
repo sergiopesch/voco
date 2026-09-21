@@ -52,6 +52,7 @@ function harness() {
     sessionRef: current,
     disposedRef: disposed,
     cancelledRef: cancelled,
+    browserDeliveryRef: ref(null),
     desktopShortcutSessionRef: owner,
     desktopShortcutCleanupRef: cleanup,
     desktopPhraseQueueRef: queue,
@@ -195,11 +196,9 @@ it("a failed begin prevents capture and still ends the uncertain owner", async (
   expect(h.trace).toHaveBeenCalledWith("dictation_desktop_shortcut_acquire_failed");
 });
 
-it.each(["browser", "enhancement", "not-streaming"])("retains the existing %s route without a shortcut lease", async route => {
+it("does not acquire a desktop shortcut for an explicit browser recording", async () => {
   const h = harness();
-  if (route === "enhancement") h.state.config.transcriptEnhancement = "on";
-  if (route === "not-streaming") h.status.streamingEnabled = false;
-  await h.startRecording(route === "browser" ? "browser:test" : undefined);
+  await h.startRecording("browser:test");
   expect(h.captureSelection).toHaveBeenCalledOnce();
   expect(h.begin).not.toHaveBeenCalled(); expect(h.end).not.toHaveBeenCalled();
 });

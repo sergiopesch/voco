@@ -206,7 +206,7 @@ try:
     if (root / 'voco').exists():
         gi.require_version('Atspi', '2.0')
         from gi.repository import Atspi
-        model = root / 'data/voco/models/ggml-base.en.bin'
+        model = root / 'speech/models/nemotron-speech-streaming-en-0.6b.q8_0.gguf'
         assert model.exists(), 'Lifecycle acceptance requires pinned model cache'
         model_hash = hashlib.sha256(model.read_bytes()).hexdigest()
         assert model_hash == 'a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002'
@@ -296,7 +296,7 @@ try:
                          GLib.Variant('(isvu)', (item, 'clicked', GLib.Variant('s', ''), 0)))
                 def cache_ready():
                     assert app.poll() is None
-                    return 'Cached speech model verified:' in (evidence / f'app-{cycle}.log').read_text()
+                    return 'Bundled Nemotron streaming model ready' in (evidence / f'app-{cycle}.log').read_text()
                 wait_for(cache_ready)
                 def frontend_ready():
                     trace = root / 'state/voco/hotkey-trace.jsonl'
@@ -305,7 +305,7 @@ try:
                 activate('Open VOCO')
                 visible = wait_for(visible_app)
                 report.setdefault('nativeWindows', []).append(json.loads(call('org.gnome.Shell', '/org/voco/PrivateShellProbe', 'org.voco.PrivateShellProbe', 'GetWindows')[0]))
-                assert 'Cached speech model verified:' in (evidence / f'app-{cycle}.log').read_text()
+                assert 'Bundled Nemotron streaming model ready' in (evidence / f'app-{cycle}.log').read_text()
                 if os.environ.get('VOCO_GNOME_FOCUS_REOPEN') == '1' and cycle == 0:
                     observations = report.setdefault('focusReopen', [])
                     origin = time.monotonic()

@@ -13,7 +13,7 @@ if [[ ${1:-} != --inside ]]; then
   if [[ ${VOCO_WAYLAND_CAPTURE:-0} == 1 ]]; then
     [[ "$backend" == nested-x11 ]] || { echo "Capture-to-Copy requires the private nested seat" >&2; exit 1; }
     : "${VOCO_WAYLAND_APP_BINARY:?Capture requires an application}"
-    : "${VOCO_WAYLAND_MODEL:?Capture requires the pinned model}"
+
     for helper in pulseaudio pactl paplay wl-copy wl-paste; do command -v "$helper" >/dev/null; done
     export VOCO_WAYLAND_PULSEAUDIO="$(command -v pulseaudio)"
     export VOCO_WAYLAND_PACTL="$(command -v pactl)"
@@ -32,15 +32,8 @@ if [[ ${1:-} != --inside ]]; then
   if [[ -n ${VOCO_WAYLAND_APP_BINARY:-} ]]; then
     [[ -f "$VOCO_WAYLAND_APP_BINARY" && -x "$VOCO_WAYLAND_APP_BINARY" ]] || { echo "App must be an executable file" >&2; exit 1; }
     cp "$VOCO_WAYLAND_APP_BINARY" "$run/voco"
-  fi
-  if [[ -n ${VOCO_WAYLAND_MODEL:-} ]]; then
-    [[ -n ${VOCO_WAYLAND_APP_BINARY:-} ]] || { echo "Model requires application binary" >&2; exit 1; }
-    cp --reflink=auto "$VOCO_WAYLAND_MODEL" "$run/data/voco/models/ggml-base.en.bin"
-    chmod 644 "$run/data/voco/models/ggml-base.en.bin"
-    /usr/bin/python3 - "$run/data/voco/models/ggml-base.en.bin" <<'MODEL'
-import hashlib, pathlib, sys
-assert hashlib.sha256(pathlib.Path(sys.argv[1]).read_bytes()).hexdigest() == 'a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002', 'Pinned model checksum mismatch'
-MODEL
+    source "$(dirname "${BASH_SOURCE[0]}")/lib/test-speech-runtime.sh"
+    voco_stage_test_speech "$run"
   fi
   bwrap --die-with-parent --new-session --unshare-ipc --unshare-net --unshare-pid --unshare-uts \
     --ro-bind / / --dev /dev --proc /proc --tmpfs /tmp --tmpfs /run/user --tmpfs /run/dbus \

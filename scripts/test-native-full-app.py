@@ -22,8 +22,8 @@ assert os.environ['DISPLAY'] == ':0'
 case = os.environ.get('VOCO_NATIVE_APP_CASE', 'delivery')
 assert case in ['delivery', 'focus-switch'], 'Unsupported native application case'
 trace_path = root / 'state/voco/hotkey-trace.jsonl'
-model = root / 'data/voco/models/ggml-base.en.bin'
-assert hashlib.sha256(model.read_bytes()).hexdigest() == 'a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002'
+model = root / 'speech/models/nemotron-speech-streaming-en-0.6b.q8_0.gguf'
+assert hashlib.sha256(model.read_bytes()).hexdigest() == 'd9a01898d2a611c8764e23a1c2f45e70bbd5a425dc4de93692ac951dd603812d'
 
 def pump(duration=.05):
     until = time.monotonic() + duration
@@ -212,7 +212,7 @@ finally:
                   appSha256=app_hash,
                   modelSha256=hashlib.sha256(model.read_bytes()).hexdigest(),
                   text=field.get_text(), otherText=other.get_text(), mutations=mutations,
-                  boundary='real WebKit capture / private PulseAudio fixture / Tauri binary IPC / pinned Whisper / disabled IBus mutation / actual Copy control / private clipboard')
+                  boundary='real WebKit capture / private PulseAudio fixture / Tauri binary IPC / pinned Nemotron / disabled IBus mutation / actual Copy control / private clipboard')
     (root / 'evidence/full-app.json').write_text(json.dumps(report, indent=2) + '\n')
     debug_captures = root / 'state/voco/debug-captures'
     if debug_captures.exists():

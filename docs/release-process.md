@@ -8,7 +8,7 @@ candidate preparation. Never move a cut tag or replace its frozen artifacts.
 1. Start from the current default branch and use a dedicated release branch.
 2. Update all version metadata with the same version. Keep historical records unchanged.
 3. Run the source, renderer, worker, native delivery and package checks in
-   [AGENTS.md](../AGENTS.md). Pass the unchanged Whisper accuracy gate.
+   [AGENTS.md](../AGENTS.md). Pass the pinned Nemotron accuracy, continuity and worker protocol gates.
 4. Update product, install, architecture and security docs. Describe limitations
    without publishing personal audio, transcripts or local machine paths.
 5. Build a complete NVIDIA package using pinned runtime/model artifacts. Verify

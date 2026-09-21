@@ -79,7 +79,6 @@ pub enum MicrophonePermission {
 pub enum ModelDownloadStatus {
     #[default]
     Checking,
-    Downloading(Option<u8>),
     Ready,
     Failed,
 }
@@ -186,14 +185,6 @@ fn derive_tray_presentation(snapshot: &RuntimeStatusSnapshot) -> TrayPresentatio
     let dictation_active = dictation_is_active(snapshot.dictation_status);
     let (visual_state, tooltip) = if !snapshot.runtime_initialized {
         match snapshot.model_download_status {
-            ModelDownloadStatus::Downloading(Some(percent)) => (
-                TrayVisualState::Processing,
-                format!("VOCO — Downloading speech model {percent}%"),
-            ),
-            ModelDownloadStatus::Downloading(None) => (
-                TrayVisualState::Processing,
-                "VOCO — Downloading speech model…".to_string(),
-            ),
             ModelDownloadStatus::Failed => (
                 TrayVisualState::NotReady,
                 "VOCO — Speech model needs attention".to_string(),
@@ -292,20 +283,6 @@ fn derive_tray_presentation(snapshot: &RuntimeStatusSnapshot) -> TrayPresentatio
                     TrayVisualState::NotReady,
                     "VOCO — Speech model needs attention".to_string(),
                 )
-            }
-            DictationStatus::Idle
-                if matches!(
-                    snapshot.model_download_status,
-                    ModelDownloadStatus::Downloading(_)
-                ) =>
-            {
-                let detail = match snapshot.model_download_status {
-                    ModelDownloadStatus::Downloading(Some(percent)) => {
-                        format!("VOCO — Downloading speech model {percent}%")
-                    }
-                    _ => "VOCO — Downloading speech model…".to_string(),
-                };
-                (TrayVisualState::Processing, detail)
             }
             DictationStatus::Idle
                 if matches!(
@@ -1510,7 +1487,7 @@ mod tests {
     }
 
     #[test]
-    fn initializing_and_model_download_states_are_authoritative() {
+    fn initializing_and_model_warmup_states_are_authoritative() {
         let initializing = derive_tray_presentation(&RuntimeStatusSnapshot::default());
         assert_eq!(initializing.visual_state, TrayVisualState::NotReady);
         assert_eq!(initializing.tooltip, "VOCO — Initializing…");
@@ -1518,15 +1495,15 @@ mod tests {
         assert!(!initializing.popover_enabled);
         assert!(!initializing.settings_enabled);
 
-        let mut downloading = ready_snapshot();
-        downloading.model_download_status = ModelDownloadStatus::Downloading(Some(42));
-        let progress = derive_tray_presentation(&downloading);
+        let mut warming = ready_snapshot();
+        warming.model_download_status = ModelDownloadStatus::Checking;
+        let progress = derive_tray_presentation(&warming);
         assert_eq!(progress.visual_state, TrayVisualState::Processing);
-        assert_eq!(progress.tooltip, "VOCO — Downloading speech model 42%");
+        assert_eq!(progress.tooltip, "VOCO — Checking speech model…");
         assert!(progress.dictation_enabled);
 
-        downloading.model_download_status = ModelDownloadStatus::Failed;
-        let failed = derive_tray_presentation(&downloading);
+        warming.model_download_status = ModelDownloadStatus::Failed;
+        let failed = derive_tray_presentation(&warming);
         assert_eq!(failed.visual_state, TrayVisualState::NotReady);
         assert_eq!(failed.tooltip, "VOCO — Speech model needs attention");
         assert!(failed.dictation_enabled);

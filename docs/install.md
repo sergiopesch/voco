@@ -166,9 +166,10 @@ GNOME session and KDE/Omarchy have their own tray integrations. Installing an
 extension does not configure microphone access, a compositor shortcut or ydotoold.
 
 The model lives under `/usr/lib/voco/speech`. Readiness follows worker warmup.
-The default path does not download Whisper; explicit legacy/browser dictation
-uses that separately pinned model. Explicit recovery of normal NVIDIA dictation
-also uses the bundled NVIDIA model and works without a Whisper cache. A failed NVIDIA warmup reports an error.
+In the .51 development source, desktop dictation, browser dictation and explicit
+recovery use the bundled Nemotron model. No separate recognition model is downloaded.
+A failed warmup reports an error. Published older versions retain their documented
+behavior; see [release status](release-candidate.md).
 
 ## Source development
 

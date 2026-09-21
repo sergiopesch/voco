@@ -9,7 +9,7 @@ if [[ ${1:-} != --inside ]]; then
   [[ ! -e "$VOCO_KDE_EVIDENCE_DIR" ]] || { echo 'Evidence directory must be fresh' >&2; exit 1; }
   if [[ ${VOCO_KDE_CAPTURE:-0} == 1 ]]; then
     : "${VOCO_KDE_APP_BINARY:?Capture requires app}"
-    : "${VOCO_KDE_MODEL:?Capture requires model}"
+
     for helper in pulseaudio pactl paplay wl-copy wl-paste; do command -v "$helper" >/dev/null; done
     export VOCO_WAYLAND_PULSEAUDIO="$(command -v pulseaudio)"
     export VOCO_WAYLAND_PACTL="$(command -v pactl)"
@@ -24,15 +24,10 @@ if [[ ${1:-} != --inside ]]; then
   if [[ -n ${VOCO_KDE_APP_BINARY:-} ]]; then
     [[ -f "$VOCO_KDE_APP_BINARY" && -x "$VOCO_KDE_APP_BINARY" ]]
     cp "$VOCO_KDE_APP_BINARY" "$run/voco"
+    source "$(dirname "${BASH_SOURCE[0]}")/lib/test-speech-runtime.sh"
+    voco_stage_test_speech "$run"
     mkdir -p "$run/config/voco"
     printf '%s\n' '{"onboardingCompleted":true,"liveCursorMode":"final-text-only","transcriptTarget":"cursor","transcriptEnhancement":"off","hotkey":"Alt+D"}' > "$run/config/voco/config.json"
-  fi
-  if [[ -n ${VOCO_KDE_MODEL:-} ]]; then
-    [[ -f "$run/voco" ]]
-    mkdir -p "$run/data/voco/models"
-    cp --reflink=auto "$VOCO_KDE_MODEL" "$run/data/voco/models/ggml-base.en.bin"
-    chmod 755 "$run/data/voco" "$run/data/voco/models"
-    chmod 644 "$run/data/voco/models/ggml-base.en.bin"
   fi
   trap 'status=$?; mkdir -p "$VOCO_KDE_EVIDENCE_DIR"; cp -a "$run/evidence/." "$VOCO_KDE_EVIDENCE_DIR/"; printf "%s\n" "$status" > "$VOCO_KDE_EVIDENCE_DIR/exit-code"; rm -rf "$run"; exit "$status"' EXIT
   bwrap --die-with-parent --new-session --unshare-ipc --unshare-net --unshare-pid --unshare-uts \
