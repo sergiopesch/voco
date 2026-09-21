@@ -6,6 +6,7 @@ USERNS_POLICY="/proc/sys/kernel/apparmor_restrict_unprivileged_userns"
 ORIGINAL_USERNS_POLICY=""
 case "${1:-}" in
   "") TEST_SCRIPT="test-private-ibus-engine.sh" ;;
+  --rich-editor) TEST_SCRIPT="test-rich-editor-delivery.sh" ;;
   --native-desktop) TEST_SCRIPT="test-native-desktop.sh" ;;
   --native-wayland)
     : "${VOCO_WAYLAND_DEPS:?Set the installed or extracted Weston root/usr}"

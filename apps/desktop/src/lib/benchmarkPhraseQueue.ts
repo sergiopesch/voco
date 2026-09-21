@@ -22,10 +22,19 @@ export interface PasteCorrelation {
 }
 
 export function textLengths(text: string, prefix: string): Record<string, number> {
+  // Count in one pass without allocating UTF-8 and code-point arrays for each
+  // growing hypothesis. Unpaired surrogates match TextEncoder's replacement.
+  let bytes = 0;
+  let scalars = 0;
+  for (const character of text) {
+    const point = character.codePointAt(0)!;
+    scalars++;
+    bytes += point < 0x80 ? 1 : point < 0x800 ? 2 : point < 0x10000 ? 3 : 4;
+  }
   return {
     [`${prefix}_utf16_units`]: text.length,
-    [`${prefix}_utf8_bytes`]: new TextEncoder().encode(text).length,
-    [`${prefix}_unicode_scalars`]: Array.from(text).length,
+    [`${prefix}_utf8_bytes`]: bytes,
+    [`${prefix}_unicode_scalars`]: scalars,
   };
 }
 
@@ -65,7 +74,7 @@ export class BenchmarkPhraseQueue {
   private qualitySeq = 0;
   private qualityDropped = 0;
 
-  private quality(event: string, fields: Record<string, number | boolean | string | null> = {}) {
+  private quality(event: string, fields: Record<string, number | boolean | string | null> | (() => Record<string, number | boolean | string | null>) = {}) {
     if (!this.recordDeliveryQuality) return;
     // Bound IPC independently of the native recorder's bounded disk queue.
     const qualitySeq = this.qualitySeq++;
@@ -75,14 +84,14 @@ export class BenchmarkPhraseQueue {
     void invoke("benchmark_stream", { request: {
       op: "quality", event, session: this.session,
       dictation_session_id: this.dictationSessionId, quality_seq: qualitySeq,
-      quality_dropped: this.qualityDropped, ...fields,
+      quality_dropped: this.qualityDropped, ...(typeof fields === "function" ? fields() : fields),
     } }).catch(() => { this.qualityDropped++; }).finally(() => { this.qualityInFlight--; });
   }
 
   private terminal() {
     if (this.terminalRecorded) return;
     this.terminalRecorded = true;
-    this.quality("terminal", {
+    this.quality("terminal", () => ({
       outcome: this.failure ? "failed" : this.cancelled ? "cancelled" : this.finishResponded ? "finished" : "incomplete",
       hypothesis_count: this.hypothesisCount, delivery_count: this.deliverySeq,
       dispatched_count: this.completedDeliveries, hypothesis_seq: this.latestSeq,
@@ -96,7 +105,7 @@ export class BenchmarkPhraseQueue {
       accepted_equals_dispatched: this.latest === this.committed,
       ...textLengths(this.latest, "accepted"), ...textLengths(this.committed, "dispatched"),
       destination_content_observation: "unavailable",
-    });
+    }));
   }
 
   constructor(
@@ -155,14 +164,14 @@ export class BenchmarkPhraseQueue {
         this.observed(text);
         const hypothesisRecorded = text !== this.latest || op === "finish";
         if (hypothesisRecorded) {
-          this.quality("hypothesis", {
+          this.quality("hypothesis", () => ({
             hypothesis_seq: seq, previous_hypothesis_seq: this.latestSeq,
             source: op === "finish" ? "finish" : "push",
             append_only: text.startsWith(this.latest), changed: text !== this.latest,
             queue_age_ms: queueAgeMs, sample_start: sampleStart, sample_end: sampleEnd,
             ...textLengths(text, "recognized"), ...textLengths(this.latest, "previous"),
             ...textLengths(this.committed, "committed"),
-          });
+          }));
         }
         phase = "prefix_revision";
         appendOnlySuffix(this.latest, text);
@@ -196,7 +205,7 @@ export class BenchmarkPhraseQueue {
           const deliverySeq = ++this.deliverySeq;
           const started = performance.now();
           this.activeDeliverySeq = deliverySeq;
-          this.quality("delivery_requested", {
+          this.quality("delivery_requested", () => ({
             delivery_seq: deliverySeq, hypothesis_seq: hypothesisSeq,
             committed_hypothesis_seq: this.committedSeq,
             coalesced_hypotheses: Math.max(0, hypothesisCount - this.committedHypothesisCount - 1),
@@ -204,7 +213,7 @@ export class BenchmarkPhraseQueue {
             latest_age_ms: started - this.latestAt,
             ...textLengths(this.committed, "committed"), ...textLengths(target, "target"),
             ...textLengths(suffix, "suffix"),
-          });
+          }));
           this.pendingSince = null;
           await this.paste(suffix, {
             session: this.session, dictationSessionId: this.dictationSessionId,
@@ -214,12 +223,12 @@ export class BenchmarkPhraseQueue {
           this.committedSeq = hypothesisSeq;
           this.committedHypothesisCount = hypothesisCount;
           this.committed = target;
-          this.quality("delivery_dispatched", {
+          this.quality("delivery_dispatched", () => ({
             delivery_seq: deliverySeq, hypothesis_seq: hypothesisSeq,
             duration_ms: performance.now() - started,
             ...textLengths(this.committed, "committed"),
             destination_content_observation: "unavailable",
-          });
+          }));
           this.activeDeliverySeq = null;
           this.onPreview("appended");
         }

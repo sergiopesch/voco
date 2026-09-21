@@ -334,7 +334,11 @@ fn trace_frontend_hotkey_event(
 fn is_supported_dictation_trace_event(event: &str) -> bool {
     matches!(
         event,
-        "dictation_trigger_start_rejected"
+        "dictation_delivery_observation_timeout"
+            | "dictation_delivery_observation_changed"
+            | "dictation_delivery_observation_unavailable"
+            | "dictation_delivery_observation_invalid"
+            | "dictation_trigger_start_rejected"
             | "dictation_trigger_stop_rejected"
             | "dictation_trigger_start_admitted"
             | "dictation_trigger_stop_admitted"

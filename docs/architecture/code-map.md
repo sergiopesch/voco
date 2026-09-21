@@ -43,7 +43,9 @@ keeps its separate Whisper preparation. See [startup](README.md#startup-and-reco
    `adapters.py::Nemotron` owns native recognizer/stream/result handles.
 6. `src-tauri/src/insertion.rs` performs destination checks, clipboard replacement and
    key dispatch. `focus_probe.rs` and `resources/voco_desktop_target.py` supply bounded
-   identity and optional accessible-field observation. A successful key command is
+   identity and optional accessible-field observation. Rich editors resolve the caret
+   through bounded hypertext links and bind the paragraph route, rather than treating
+   the outer container as flat text. A successful key command is
    not proof that a recipient displayed the text.
 7. At Stop, the hook drains capture, forwards only retained samples not yet offered
    to the queue, then finishes recognition and pending delivery. Retained audio
@@ -164,3 +166,12 @@ contents; `insertion.rs` refuses recording preflight without a verified cursor.
 The helper also returns a finite failure category; Rust maps it to a fixed local
 trace event, with unknown values mapped to unavailable. This metadata never alters
 target admission or includes field content, titles, paths or destination tokens.
+
+### Transcript diagnostics and microphone feedback
+
+`benchmarkPhraseQueue.ts::textLengths` counts UTF-16 units, UTF-8 bytes and Unicode
+scalars without temporary full-transcript arrays. Quality fields are evaluated
+only when diagnostics are enabled and admitted by the existing bounded queue.
+`audioLevel.ts` maps centered RMS into a visual speech range; this never changes
+captured samples, recognition gain or model parameters. The same signal display
+serves onboarding and recording, preserving system motion/contrast preferences.

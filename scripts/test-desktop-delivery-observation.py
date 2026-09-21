@@ -21,11 +21,23 @@ class Field:
         self.states = {'focused', 'editable'}
         self.attributes = {}
         self.reads = []
+        self.path = str(id(self))
+        self.children = {}
+        self.parent = None
     def clear_cache_single(self): pass
     def get_state_set(self): return types.SimpleNamespace(contains=self.states.__contains__)
     def get_role(self): return self.role
+    def get_role_name(self): return self.role
     def get_attributes(self): return self.attributes
     def get_text_iface(self): return self
+    def get_hypertext_iface(self): return self
+    def get_parent(self): return self.parent
+    def get_process_id(self): return 1
+    def get_link_index(self, offset): return offset if offset in self.children else -1
+    def get_link(self, offset):
+        child = self.children[offset]
+        child.parent = self
+        return types.SimpleNamespace(get_start_index=lambda: offset, get_end_index=lambda: offset+1, get_object=lambda _: child)
     def get_character_count(self): return len(self.value)
     def get_caret_offset(self): return self.caret
     def get_n_selections(self): return int(self.selection is not None)
@@ -53,6 +65,7 @@ class ObservationTests(unittest.TestCase):
         self.probe.start(); self.addCleanup(self.probe.stop)
         atspi = types.SimpleNamespace(StateType=types.SimpleNamespace(FOCUSED='focused', EDITABLE='editable'),
             Role=types.SimpleNamespace(PASSWORD_TEXT='password', TERMINAL='terminal'),
+            Hypertext=types.SimpleNamespace(get_link_index=lambda obj, offset: obj.get_link_index(offset), get_link=lambda obj, index: obj.get_link(index)),
             Text=types.SimpleNamespace(
                 get_character_count=lambda obj: obj.get_character_count(),
                 get_caret_offset=lambda obj: obj.get_caret_offset(),
@@ -70,6 +83,91 @@ class ObservationTests(unittest.TestCase):
         return helper.handle_request(dict(op='prepare', text=text, expected_token=expected, first_delivery=first))
     def verify(self, receipt):
         return helper.handle_request(dict(op='verify', receipt_id=receipt['receipt_id']))
+    def rich_field(self, value='\n', caret=0, selection=None):
+        self.field_value('\ufffc', 0)
+        paragraph = Field(value, caret, selection)
+        paragraph.role = 'paragraph'
+        self.field.children[0] = paragraph
+        return paragraph
+    def test_rich_editor_first_word_and_following_chunk_are_observed(self):
+        paragraph = self.rich_field()
+        receipt = self.prepare('Hello')
+        self.assertEqual(receipt['observation'], 'prepared')
+        paragraph.value, paragraph.caret = 'Hello', 5
+        self.assertEqual(self.verify(receipt)['observation'], 'observed')
+        receipt = self.prepare(' there', first=False)
+        paragraph.insert(' there')
+        self.assertEqual(self.verify(receipt)['observation'], 'observed')
+    def test_rich_editor_placeholder_removal_does_not_hide_inserted_text(self):
+        paragraph = self.rich_field('\n\ufffc', 0)
+        widget = Field('Placeholder'); widget.states = set()
+        paragraph.children[1] = widget
+        receipt = self.prepare('Hello')
+        self.assertEqual(receipt['observation'], 'prepared')
+        paragraph.value, paragraph.caret = 'Hello\n', 5
+        paragraph.children = {}
+        self.assertEqual(self.verify(receipt)['observation'], 'observed')
+        self.assertEqual(widget.reads, [])
+    def test_rich_editor_unreadable_child_never_downgrades_to_best_effort(self):
+        self.rich_field('', -1)
+        self.assertEqual(self.prepare()['observation'], 'changed')
+    def test_rich_editor_different_paragraph_is_rejected(self):
+        paragraph = self.rich_field('Before', 6)
+        self.field.value += '\ufffc'
+        self.field.children[1] = Field('Elsewhere', 9)
+        receipt = self.prepare(' word')
+        paragraph.insert(' word')
+        self.field.caret = 1
+        self.assertEqual(self.verify(receipt)['observation'], 'changed')
+    def test_rich_editor_wrong_text_and_old_caret_are_not_receipts(self):
+        paragraph = self.rich_field('Before', 6)
+        receipt = self.prepare(' word')
+        paragraph.value = 'Before word'
+        self.assertEqual(self.verify(receipt)['observation'], 'pending')
+        paragraph.caret = 11
+        self.assertEqual(self.verify(receipt)['observation'], 'observed')
+        receipt = self.prepare(' next')
+        paragraph.insert(' oops')
+        self.assertEqual(self.verify(receipt)['observation'], 'changed')
+    def test_rich_editor_replaced_paragraph_is_rejected(self):
+        self.rich_field('Before', 6)
+        receipt = self.prepare(' word')
+        self.field.children[0] = Field('Before word', 11)
+        self.assertEqual(self.verify(receipt)['observation'], 'changed')
+    def test_rich_editor_lookup_does_not_read_other_paragraphs(self):
+        paragraph = self.rich_field('Before', 6)
+        self.field.value = '\ufffc' * 1000
+        for index in range(1, 1000): self.field.children[index] = Field('Unrelated text', -1)
+        receipt = self.prepare(' word')
+        paragraph.insert(' word')
+        self.assertEqual(self.verify(receipt)['observation'], 'observed')
+        self.assertTrue(all(not child.reads for child in list(self.field.children.values())[1:]))
+    def test_rich_editor_cross_paragraph_selection_is_not_best_effort(self):
+        self.rich_field('First', 5)
+        self.field.value = '\ufffc\ufffc'; self.field.selection = (0, 2); self.field.caret = 2
+        self.assertEqual(self.prepare()['observation'], 'unsupported')
+        self.assertIsNone(helper.DELIVERY)
+        self.assertEqual(self.field.reads, [])
+    def test_rich_editor_depth_is_bounded(self):
+        paragraph = self.rich_field('\ufffc', 0)
+        for _ in range(10):
+            nested = Field('\ufffc', 0); paragraph.children[0] = nested; paragraph = nested
+        self.assertEqual(self.prepare()['observation'], 'unsupported')
+    def test_protected_descendant_cannot_be_read(self):
+        child = self.rich_field('Protected', 9); child.role = 'password'
+        self.assertEqual(self.prepare()['observation'], 'unsupported')
+        self.assertEqual(child.reads, [])
+    def test_lost_nested_text_interface_never_downgrades_to_best_effort(self):
+        child = self.rich_field('Before', 6); child.get_text_iface = lambda: None
+        self.assertEqual(self.prepare()['observation'], 'unsupported')
+    def test_nested_text_arriving_before_caret_is_pending(self):
+        child = self.rich_field('Before', 6); receipt = self.prepare(' word')
+        original = child.get_character_count
+        def count():
+            value = original(); child.value = 'Before word'; child.caret = 11; return value
+        child.get_character_count = count
+        self.assertEqual(self.verify(receipt)['observation'], 'pending')
+        self.assertEqual(self.verify(receipt)['observation'], 'observed')
     def test_real_accessible_method_shadowing_uses_text_interface(self):
         with self.assertRaises(TypeError):
             self.field.get_text(0, 0)

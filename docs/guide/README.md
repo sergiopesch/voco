@@ -28,7 +28,8 @@ The Linux chapter explains why package installation and desktop dictation need
 separate checks, including the Hyprland hidden-start failure and the native-capture candidate that
 addresses it. Before/after results retain their specific test conditions.
 It also records the .45 fresh-install dependency gap and the .46 candidate’s
-separate desktop readiness check. Those later findings do not change the pinned
+separate desktop readiness check. The delivery chapter records the later .48
+rich-editor confirmation failure and the .49 candidate correction. Those later findings do not change the pinned
 source viewer or announce a new release.
 
 ## Scope and privacy

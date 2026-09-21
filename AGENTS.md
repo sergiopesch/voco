@@ -57,6 +57,8 @@ glib 0.20 directly leaves the GTK dependency behind. [Backport](vendor/glib/VOCO
   proceed through debounce; passive evdev retains its duplicate guard.
 - IBus protocol 6 is dictation-shortcut-only; older helpers must reconnect after upgrade. Never restore text mutation there.
 - Bounded accessible-field observations are not atomic ownership or cursor paint.
+  Rich editors require a bounded caret-linked paragraph route, including route identity
+  and trailing noneditable scaffolding. Never acknowledge the outer object placeholder.
   Content and caret can propagate separately. Exact expected content at an earlier
   known caret is pending, never receipt; retain the deadline and no-replay rule.
 - Automatic desktop insertion requires a bound, nonempty destination token. An
@@ -92,6 +94,7 @@ npm run test:dictation-renderer
 npm run test:microphone-renderer
 npm run test:native-capture-renderer
 npm run test:chromium-exact-field
+npm run test:rich-editor-delivery
 python3 scripts/verify-glib-backport.py
 python3 scripts/test-glib-variant.py --output /tmp/voco-glib-check
 cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml
@@ -120,7 +123,7 @@ isolation, not a remote VM or proof of a distribution's default desktop.
 
 ## Release and evidence
 
-Source version: **2026.0.48** (local test candidate; published Ubuntu/Debian release remains .47). Verify the current public release on GitHub and
+Source version: **2026.0.49** (local test candidate; published Ubuntu/Debian release remains .47). Verify the current public release on GitHub and
 installed version from the package manager; do not infer either from source.
 The .43 package and desktop evidence is recorded in
 [the support matrix](docs/linux-support.md); preserve per-artifact receipts and

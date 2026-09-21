@@ -213,3 +213,12 @@ it('uses ten ordered audio requests per second and flushes Stop without waiting 
  expect(requests()[requests().length-1]?.op).toBe('finish');
  expect(quality()[quality().length-1]).toMatchObject({captured_samples:44117,enqueued_samples:44117,responded_samples:44117,buffered_samples:0});
 });
+
+it('counts Unicode metrics without changing TextEncoder semantics', () => {
+  const samples = ['', 'ASCII', 'é中😀', '\ud800', '\udc00', '\ud800A\udc00', '👩‍💻'];
+  for (let point = 0; point <= 0x10ffff; point += 997) samples.push(String.fromCodePoint(point));
+  for (const text of samples) expect(textLengths(text, 'text')).toEqual({
+    text_utf16_units: text.length, text_utf8_bytes: new TextEncoder().encode(text).length,
+    text_unicode_scalars: Array.from(text).length,
+  });
+});

@@ -454,10 +454,15 @@ fn desktop_paste_for_target(
     })?;
     if !matches!(
         prepared["observation"].as_str(),
-        Some("prepared" | "unavailable" | "changed")
+        Some("prepared" | "unavailable" | "changed" | "unsupported")
     ) {
         return Err(InsertionError::rejected(
             "Invalid destination observation response.",
+        ));
+    }
+    if prepared["observation"] == "unsupported" {
+        return Err(InsertionError::rejected(
+            "This rich text selection cannot be verified. Place the caret inside one paragraph and try again.",
         ));
     }
     if prepared["observation"] == "changed" {
@@ -511,7 +516,11 @@ fn desktop_paste_for_target(
                     Ok(response)
                 },
                 Duration::from_secs(3),
-            )?;
+            )
+            .map_err(|(error, event)| {
+                crate::trace_hotkey_event(event, None);
+                error
+            })?;
             metrics.observation_wait_ms = started.elapsed().as_millis() as u64;
             metrics.field_observed = true;
         }
@@ -531,10 +540,19 @@ fn desktop_paste_for_target(
     })
 }
 
+fn observation_failure_event(response: Option<&serde_json::Value>) -> &'static str {
+    match response.and_then(|value| value["observation"].as_str()) {
+        Some("pending") => "dictation_delivery_observation_timeout",
+        Some("changed") => "dictation_delivery_observation_changed",
+        Some("unavailable") | None => "dictation_delivery_observation_unavailable",
+        _ => "dictation_delivery_observation_invalid",
+    }
+}
+
 fn observe_delivery(
     mut check: impl FnMut(Duration) -> Result<serde_json::Value, ()>,
     timeout: Duration,
-) -> Result<(), InsertionError> {
+) -> Result<(), (InsertionError, &'static str)> {
     let deadline = Instant::now() + timeout;
     loop {
         let remaining = deadline.saturating_duration_since(Instant::now());
@@ -549,9 +567,14 @@ fn observe_delivery(
                 Duration::from_millis(15).min(deadline.saturating_duration_since(Instant::now())),
             ),
             _ => {
+                let event = if remaining.is_zero() {
+                    "dictation_delivery_observation_timeout"
+                } else {
+                    observation_failure_event(response.as_ref())
+                };
                 let mut error = InsertionError::uncertain("The destination did not confirm the expected insertion. Streaming stopped; review retained text before retrying.");
                 error.clipboard_changed = true;
-                return Err(error);
+                return Err((error, event));
             }
         }
     }
@@ -1171,17 +1194,23 @@ mod tests {
             Ok(serde_json::json!({"observation":"unavailable"})),
             Err(()),
         ] {
-            let error =
+            let (error, event) =
                 observe_delivery(|_| result.clone(), Duration::from_millis(100)).unwrap_err();
             assert!(matches!(error.outcome, DeliveryOutcome::Uncertain));
             assert!(error.clipboard_changed);
+            assert!(crate::is_supported_dictation_trace_event(event));
         }
-        let error = observe_delivery(
+        let (error, event) = observe_delivery(
             |_| panic!("Expired budget must not issue another probe"),
             Duration::ZERO,
         )
         .unwrap_err();
         assert!(matches!(error.outcome, DeliveryOutcome::Uncertain));
+        assert_eq!(event, "dictation_delivery_observation_timeout");
+        assert_eq!(
+            observation_failure_event(Some(&serde_json::json!({"observation":"private text"}))),
+            "dictation_delivery_observation_invalid"
+        );
     }
 
     #[test]

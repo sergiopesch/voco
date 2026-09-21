@@ -910,7 +910,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
           traceDictationEvent("dictation_desktop_stream_failed").catch(() => {});
           retainRecovery(cancelledRef.current ?? (useStore.getState().dictationPurpose === "onboarding"
             ? `Voice test stopped: ${errorMessage(error)}. You can try the test again.`
-            : `Progressive delivery stopped: ${errorMessage(error)}. Review the target before copying retained text.`));
+            : errorMessage(error)));
         }
         return;
       }

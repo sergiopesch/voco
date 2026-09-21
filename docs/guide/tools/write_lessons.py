@@ -423,6 +423,10 @@ lesson(
             "Known terminal targets use their paste chord. VOCO does not edit the terminal’s shortcut configuration to make that work.",
         ),
         (
+            "Why one word could get stuck",
+            "A September .48 Codex trial inserted the first word, then stopped. Chromium exposed a fixed outer object placeholder while the actual text lived in a nested paragraph. The .49 candidate follows the caret into that paragraph and confirms its text and position, while retaining the original field identity and the no-replay rule. This newer finding does not change the source viewer pinned to .43.",
+        ),
+        (
             "Observation has limits",
             "Accessible-field samples are best-effort local observations, not atomic ownership or compositor paint. Firefox can report newly inserted text before its caret catches up. VOCO waits within the existing three-second limit for exact text and position to agree; an intermediate sample cannot confirm delivery, and an uncertain paste is never replayed. A target can still change between checks.",
         ),

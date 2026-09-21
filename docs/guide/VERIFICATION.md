@@ -1,5 +1,13 @@
 # Guide verification history
 
+## Rich-editor follow-up · 21 September 2026
+
+The delivery chapter explains the .48 first-word confirmation failure and the
+.49 candidate correction. The .43 source catalog remains pinned. Lesson
+regeneration and all nine guide tests pass. The updated lesson, source modal,
+journey, quiz, search, glossary and narrow layout are checked locally; this
+qualifies the guide independently of application delivery tests.
+
 ## Wayland installer follow-up · 20 September 2026
 
 The Linux chapter now explains the .45 guided-installer dependency gap and the
