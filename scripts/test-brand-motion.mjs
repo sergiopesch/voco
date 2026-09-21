@@ -1,6 +1,6 @@
 import { chromium, webkit } from 'playwright';
 import { createServer } from 'vite';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile, realpath } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
@@ -11,7 +11,8 @@ if (!out) throw new Error('An exclusive VOCO_RENDERER_EVIDENCE_DIR is required')
 await mkdir(out, { recursive: false });
 const server = await createServer({
   configFile: path.join(root, 'apps/desktop/vite.config.ts'), root: path.join(root, 'apps/desktop'),
-  logLevel: 'warn', server: { host: '127.0.0.1', port: Number(process.env.VOCO_RENDERER_PORT ?? 5189), hmr: false, watch: null },
+  logLevel: 'warn', server: { host: '127.0.0.1', port: Number(process.env.VOCO_RENDERER_PORT ?? 5189), hmr: false, watch: null,
+    fs: { allow: [root, await realpath(path.join(root, 'node_modules'))] } },
 });
 const results = [];
 try {
@@ -100,7 +101,8 @@ try {
       await page.getByText('Panel enabled. Sign out and back in to load it; saving your work first is recommended.',{exact:true}).waitFor();
       await page.setViewportSize({width:760,height:560});
       await capture('panel-restart-required');
-      await page.getByRole('button',{name:'Done',exact:true}).scrollIntoViewIfNeeded();
+      assert.equal(await page.locator('.voco-setup').evaluate(el => el.scrollHeight <= el.clientHeight + 1), true,
+        'Panel setup and Done must fit the minimum canvas without scrolling');
       assert.equal(await page.getByRole('button',{name:'Done',exact:true}).isEnabled(),true);
       await capture('panel-restart-done-reachable');
       assert.equal(await page.getByRole('button',{name:'Check panel again',exact:true}).count(),1);
@@ -117,6 +119,28 @@ try {
       await page.getByRole('button', { name: 'Change microphone', exact: true }).click();
       assert.equal(await page.getByRole('button', { name: 'Back to test', exact: true }).getAttribute('aria-expanded'), 'true');
       await capture('onboarding-microphone');
+      const microphoneCanvas = await page.locator('.voco-setup').evaluate(el => ({
+        height: el.clientHeight, content: el.scrollHeight,
+        bottom: el.getBoundingClientRect().bottom, viewport: innerHeight,
+      }));
+      assert.ok(microphoneCanvas.content <= microphoneCanvas.height + 1,
+        `Microphone setup must fit without page scrolling: ${JSON.stringify(microphoneCanvas)}`);
+      for (const viewport of [{width:760,height:560}, {width:850,height:680}]) {
+        await page.setViewportSize(viewport);
+        await page.getByText('Microphone access details', {exact:true}).click();
+        await capture(`onboarding-microphone-details-${viewport.width}`);
+        assert.equal(await page.locator('.voco-setup').evaluate(el => el.scrollHeight <= el.clientHeight + 1), true,
+          `Expanded microphone details fit ${viewport.width}x${viewport.height}`);
+        await page.getByText('Microphone access details', {exact:true}).click();
+      }
+      const setupCombo = page.getByRole('combobox', {name:'Microphone',exact:true});
+      await setupCombo.press('u'); await setupCombo.press('Enter');
+      await page.getByRole('checkbox').check();
+      await page.getByRole('button',{name:'Use this microphone',exact:true}).click();
+      await page.getByRole('button',{name:'Start test',exact:true}).waitFor();
+      assert.equal(await page.getByRole('combobox',{name:'Microphone',exact:true}).count(),0);
+      await capture('onboarding-microphone-applied');
+      results.push({engine:name,check:'microphone selection and expanded details fit one canvas; apply returns to the test',passed:true});
       await load('surface=settings');
       await capture('settings');
       const combo = page.getByRole('combobox', { name: 'Microphone', exact: true });

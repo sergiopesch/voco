@@ -189,8 +189,17 @@ presents idle UI through the existing guarded window transition. Starting,
 recording and processing refuse activation focus changes. The legacy `--toggle`
 transport retains its single-attempt contract.
 
-`tray_icons.rs` retains four immutable PNGs in a private process directory.
+`tray_icons.rs` retains four state PNGs and 64 pre-rendered audio-meter PNGs in a
+private process directory. A recording-only GLib timer smooths measured volume
+with a fast attack and short release, selects an existing frame, and stops at the
+recording boundary. Stale samples settle to silence; reduced motion uses direct
+level changes. No audio update writes another image or opens a window.
 The additive vendored tray-icon path API selects these without deleting older
 advertised paths. `tray.rs` suppresses equivalent presentation updates and exposes
 both an adjacent status label and a menu status row. State-token publication stays
 independent from native icon deduplication. Native Stop uses an explicit stop action.
+
+Onboarding swaps microphone selection into the existing setup canvas rather than
+stacking the form above the test. A successful explicit selection returns to the
+test; failed grants remain visible. Long device lists scroll only inside their
+selector, while setup controls fit the supported desktop canvas.

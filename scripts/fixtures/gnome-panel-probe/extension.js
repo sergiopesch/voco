@@ -19,6 +19,10 @@ export default class Probe extends Extension {
         const indicator = Main.panel.statusArea['voco-panel@voco.local'];
         const actors = indicator ? children(indicator) : [];
         return JSON.stringify({animations: St.Settings.get().enable_animations, panel: bounds(Main.panel), indicator: indicator ? bounds(indicator) : null,
+            statusIcons: Object.entries(Main.panel.statusArea).filter(([key, value]) => key.startsWith('appindicator-') && value)
+                .map(([key, value]) => ({key, ...bounds(value), mapped: value.mapped,
+                    actors: children(value).map(actor => ({...bounds(actor), mapped: actor.mapped,
+                        opacity: actor.opacity, icon: actor.gicon?.to_string() ?? null, text: actor.text ?? null}))})),
             windows: global.get_window_actors().length,
             actors: actors.map(actor => ({...bounds(actor), name: actor.accessible_name,
                 text: actor.text ?? null, scale: actor.scale_y, opacity: actor.opacity,

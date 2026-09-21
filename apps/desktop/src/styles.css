@@ -1514,16 +1514,27 @@ input[type="checkbox"]:disabled { opacity: 0.5; }
 .voco-setup__devices strong { font-size: 13px; overflow-wrap: anywhere; }
 .voco-setup__device-label { font-size: 12px; opacity: .65; }
 .voco-setup__status { margin: 0; min-height: 22px; font-size: 13px; }
-.voco-setup__transcript { min-height: 112px; max-height: 190px; overflow: auto; border: 1px solid rgba(127,127,127,.4); border-radius: 10px; padding: 20px; font-size: 20px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.voco-setup__transcript { min-height: 80px; max-height: 190px; flex: 0 1 190px; overflow: auto; border: 1px solid rgba(127,127,127,.4); border-radius: 10px; padding: 16px; font-size: 20px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
 .voco-setup__transcript > span { opacity: .5; }
 .voco-setup__privacy, .voco-setup__next { font-size: 12px; }
 .voco-setup__actions { display: flex; gap: 12px; flex-wrap: wrap; }
+.voco-setup__microphone .voco-preferences__disclosure > summary { padding: 10px 0; font-size: 13px; }
 /* Keep the completion action painted while its scroll container is resized. */
 .voco-panel[data-surface="onboarding"] .voco-setup__actions .voco-button--primary { -webkit-backdrop-filter: none; backdrop-filter: none; }
 @media (max-width: 700px) { .voco-setup__devices { grid-template-columns: 1fr; gap: 10px; } }
 
 .voco-panel[data-surface="onboarding"] .voco-setup { padding: 24px 30px; }
 @media (max-width: 700px) { .voco-panel[data-surface="onboarding"] .voco-setup { padding: 18px; } }
+
+@media (max-height: 640px) {
+  .voco-panel[data-surface="onboarding"] .voco-panel__hero { padding-top: 14px; padding-bottom: 12px; }
+  .voco-panel[data-surface="onboarding"] .voco-setup { padding: 12px 24px; gap: 10px; }
+  .voco-setup__intro h2 { margin: 4px 0; font-size: 25px; }
+  .voco-setup__handoff p { margin-bottom: 6px; line-height: 1.4; }
+  .voco-setup .voco-native-microphone { gap: 10px; }
+  .voco-setup .voco-preferences__disclosure { padding: 0; }
+  .voco-setup .voco-preferences__disclosure p { font-size: 12px; }
+}
 
 /* Compact task-focused surfaces retain the existing VOCO material and assets. */
 .voco-lens { height: 76px; }

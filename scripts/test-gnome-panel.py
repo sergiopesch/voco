@@ -207,7 +207,7 @@ try:
         pump(2)
         assert old_icon.exists(), 'Advertised icon deleted while delayed reader still needs it'
         icon_files = list(old_icon.parent.glob('*.png'))
-        assert len(icon_files) == 5, icon_files  # four states plus the library initial image
+        assert len(icon_files) == 69, icon_files  # four states, 64 meter frames, library initial image
         gi.require_version('GdkPixbuf','2.0')
         from gi.repository import GdkPixbuf
         for icon in icon_files: GdkPixbuf.Pixbuf.new_from_file(str(icon))

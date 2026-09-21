@@ -585,7 +585,7 @@ lesson(
         ),
         (
             "Finishing setup is a handoff",
-            "The .50 candidate leaves Ready visible after Done and routes a second launch to the existing idle app. It does not restart the recognizer. During Starting, Listening or Finishing, launcher activation does not move focus away from the text destination. Four immutable tray PNGs stay readable for delayed desktop consumers.",
+            "The .50 candidate leaves Ready visible after Done and routes a second launch to the existing idle app. During capture, launcher activation keeps the text destination focused. The next candidate keeps microphone selection in the same setup canvas and returns to the test after applying it. Its fallback tray selects measured volume frames from a fixed, retained image set; silence settles the bars and Stop restores Ready. These changes do not alter the pinned .43 source viewer.",
         ),
     ],
     [

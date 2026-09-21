@@ -529,17 +529,18 @@ export function ControlPanel({
     }
   }
 
-  async function selectMicrophone(deviceId: string | null): Promise<void> {
+  async function selectMicrophone(deviceId: string | null): Promise<boolean> {
     const requestId = microphoneSaveRequestRef.current + 1;
     microphoneSaveRequestRef.current = requestId;
     setMicrophoneSaveError(null);
     const result = await savePatch({ selectedMic: deviceId });
     if (microphoneSaveRequestRef.current !== requestId) {
-      return;
+      return false;
     }
     if (!result.ok) {
       setMicrophoneSaveError(result.message);
     }
+    return result.ok;
   }
 
   async function retryMicrophonePreview() {
@@ -875,10 +876,10 @@ export function ControlPanel({
             saving={saving}
             blocked={Boolean(recovery && testPurpose !== "onboarding") || !onStartTest || nativeMicrophone?.mode === "pending"}
             desktopReady={inputReadiness?.available === true}
-            microphoneControls={nativePreviewDisabled && nativeMicrophone
-              ? <NativeMicrophoneSettings controls={nativeMicrophone} disabled={dictationBusy || testPreparing} showError={false} />
+            microphoneControls={onSelected => nativePreviewDisabled && nativeMicrophone
+              ? <NativeMicrophoneSettings controls={nativeMicrophone} disabled={dictationBusy || testPreparing} onSelected={onSelected} />
               : <div className="voco-preferences__form"><DeviceSelect label="Microphone" value={selectedDeviceId ?? ""} disabled={saving || dictationBusy || testPreparing}
-                  onChange={value => void selectMicrophone(value || null)} options={[{value: "", label: "System default"}, ...availableDevices.map(device => ({value: device.deviceId, label: device.label}))]} />
+                  onChange={value => void selectMicrophone(value || null).then(ok => { if (ok) onSelected(); })} options={[{value: "", label: "System default"}, ...availableDevices.map(device => ({value: device.deviceId, label: device.label}))]} />
                 <button className="voco-button voco-button--ghost" disabled={saving || dictationBusy || testPreparing} onClick={() => void onRefreshDevices()}>Refresh devices</button>
                 {microphoneSaveError ? <p role="alert">{microphoneSaveError}</p> : null}</div>}
             hotkey={config.hotkey}

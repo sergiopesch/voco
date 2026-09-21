@@ -60,8 +60,14 @@ pub fn level(epoch: u64, status: crate::tray::DictationStatus) -> f64 {
         .lock()
         .ok()
         .and_then(|level| *level)
-        .filter(|(owner, _, at)| *owner == epoch && at.elapsed() < Duration::from_millis(500))
+        .filter(|(owner, _, at)| *owner == epoch && at.elapsed() < Duration::from_millis(250))
         .map_or(0.0, |(_, value, _)| value)
+}
+
+pub fn reset_level() {
+    if let Ok(mut level) = LEVEL.lock() {
+        *level = None;
+    }
 }
 
 #[derive(Default)]

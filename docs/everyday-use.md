@@ -10,7 +10,9 @@ setup using the [installation guide](install.md), then retry the check.
 Choose **Start test** and speak. The signal moves with microphone input and your
 words appear here. Speech stays on this computer; the test never pastes into
 other apps or changes the clipboard. Choose **Change microphone** to select a
-different input inside setup, then **Back to test**. VOCO uses your selection, or the system
+different input within the same setup canvas. In the next test candidate, applying
+a microphone returns directly to the test; **Back to test** leaves the chooser
+without applying a new choice. VOCO uses your selection, or the system
 default if you have not selected a microphone.
 
 Choose **Finish test** to stop capture and collect the final words. After a
@@ -31,6 +33,11 @@ back in; installing files alone cannot reload a running Wayland Shell.
 The panel shows real microphone bars, Listening and Stop. Other desktops and a
 disabled companion use the native tray, with status labels where supported and a
 status row plus Stop in its menu. `voco --check-panel` changes no preferences.
+
+The next test candidate also replaces the fallback tray's Ready label with
+audio-driven bars while recording. Silence settles the bars; Stop restores the
+normal status. The tray menu keeps a readable status and an explicit Stop action.
+Smooth movement follows the desktop's animation preference.
 
 ## Dictation
 

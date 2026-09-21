@@ -38,6 +38,10 @@ pub struct TrayState {
     icons: crate::tray_icons::TrayIcons,
     applied_presentation: Option<TrayPresentation>,
     applied_visual: Option<TrayVisualState>,
+    meter_timer: Option<glib::SourceId>,
+    meter: crate::tray_icons::MeterEnvelope,
+    applied_meter: Option<usize>,
+    fallback_visible: bool,
 }
 
 pub type TrayMutex = Mutex<TrayState>;
@@ -367,7 +371,7 @@ fn derive_tray_presentation(snapshot: &RuntimeStatusSnapshot) -> TrayPresentatio
         }
         _ if !snapshot.runtime_initialized => "Starting VOCO",
         DictationStatus::Starting => "Starting",
-        DictationStatus::Recording => "Listening",
+        DictationStatus::Recording => "",
         DictationStatus::Processing => "Finishing",
         _ if snapshot.manual_transcript_ready
             || snapshot.recovery_available
@@ -643,6 +647,10 @@ pub fn setup_tray(app: &tauri::App, hotkey_label: &str) -> Result<(), Box<dyn st
         icons,
         applied_presentation: None,
         applied_visual: None,
+        meter_timer: None,
+        meter: crate::tray_icons::MeterEnvelope::default(),
+        applied_meter: None,
+        fallback_visible: true,
     }));
     {
         let managed_state = app.state::<TrayMutex>();
@@ -662,15 +670,8 @@ pub fn update_hotkey_display(app: &tauri::AppHandle, new_hotkey: &str) {
     };
 
     tray_state.current_hotkey = new_hotkey.to_string();
-
-    for (preset, item) in &tray_state.hotkey_items {
-        let label = if hotkeys_equivalent(preset, new_hotkey) {
-            format!("✓ {preset}")
-        } else {
-            format!("  {preset}")
-        };
-        let _ = item.set_text(&label);
-    }
+    drop(tray_state);
+    refresh_tray(app);
 }
 
 pub fn current_hotkey(app: &tauri::AppHandle) -> Result<String, String> {
@@ -708,10 +709,34 @@ pub fn update_runtime_status(app: &tauri::AppHandle, snapshot: RuntimeStatusSnap
     tray_state.recovery_available = snapshot.recovery_available;
     tray_state.configuration_error = snapshot.configuration_error;
     tray_state.runtime_initialized = snapshot.runtime_initialized;
-    apply_tray_state(app, &mut tray_state);
+    drop(tray_state);
+    refresh_tray(app);
+}
+
+fn refresh_tray(app: &tauri::AppHandle) {
+    // A worker must release the state lock before dispatching GTK work. Shell
+    // requests and the meter also read this state on the GTK thread.
+    let handle = app.clone();
+    if let Err(error) = app.run_on_main_thread(move || {
+        let managed = handle.state::<TrayMutex>();
+        if let Ok(mut state) = managed.lock() {
+            apply_tray_state(&handle, &mut state);
+        };
+    }) {
+        error!("Failed to refresh tray: {error}");
+    }
 }
 
 fn apply_tray_state(app: &tauri::AppHandle, tray_state: &mut TrayState) {
+    sync_meter_timer(app, tray_state);
+    for (preset, item) in &tray_state.hotkey_items {
+        let label = if hotkeys_equivalent(preset, &tray_state.current_hotkey) {
+            format!("✓ {preset}")
+        } else {
+            format!("  {preset}")
+        };
+        let _ = item.set_text(&label);
+    }
     let snapshot = runtime_snapshot_from_tray_state(tray_state);
     let presentation = derive_tray_presentation(&snapshot);
     // Even equivalent presentation updates carry a new action token to Shell.
@@ -732,7 +757,11 @@ fn apply_tray_state(app: &tauri::AppHandle, tray_state: &mut TrayState) {
 
     if let Some(tray) = app.tray_by_id(&tray_state.tray_id) {
         if tray_state.applied_visual != Some(state) {
-            let path = tray_state.icons.path(tray_state_label(state));
+            let path = if tray_state.dictation_status == DictationStatus::Recording {
+                tray_state.icons.meter_path(0)
+            } else {
+                tray_state.icons.path(tray_state_label(state))
+            };
             match tray.with_inner_tray_icon(move |inner| {
                 inner.set_icon_path(path).map_err(|error| error.to_string())
             }) {
@@ -787,6 +816,71 @@ fn apply_tray_state(app: &tauri::AppHandle, tray_state: &mut TrayState) {
     tray_state.applied_presentation = Some(presentation);
 }
 
+fn sync_meter_timer(app: &tauri::AppHandle, state: &mut TrayState) {
+    if state.dictation_status != DictationStatus::Recording {
+        if let Some(timer) = state.meter_timer.take() {
+            timer.remove();
+            crate::panel::reset_level();
+        }
+        state.applied_meter = None;
+        return;
+    }
+    if state.meter_timer.is_some() {
+        return;
+    }
+    crate::panel::reset_level();
+    state.meter = crate::tray_icons::MeterEnvelope::default();
+    state.applied_meter = None;
+    let app = app.clone();
+    let mut previous = std::time::Instant::now();
+    state.meter_timer = Some(glib::timeout_add(
+        std::time::Duration::from_millis(33),
+        move || {
+            let managed = app.state::<TrayMutex>();
+            let Ok(mut state) = managed.try_lock() else {
+                return glib::ControlFlow::Continue;
+            };
+            let now = std::time::Instant::now();
+            let elapsed = now.duration_since(previous).as_secs_f64();
+            previous = now;
+            if state.dictation_status != DictationStatus::Recording {
+                return glib::ControlFlow::Continue;
+            }
+            let level = crate::panel::level(state.runtime_epoch, state.dictation_status);
+            let frame = state.meter.step(level, elapsed, meter_animations_enabled());
+            if !state.fallback_visible || state.applied_meter == Some(frame) {
+                return glib::ControlFlow::Continue;
+            }
+            if let Some(tray) = app.tray_by_id(&state.tray_id) {
+                let path = state.icons.meter_path(frame);
+                match tray.with_inner_tray_icon(move |inner| {
+                    inner.set_icon_path(path).map_err(|e| e.to_string())
+                }) {
+                    Ok(Ok(())) => state.applied_meter = Some(frame),
+                    error => error!("Failed to update tray meter: {error:?}"),
+                }
+            }
+            glib::ControlFlow::Continue
+        },
+    ));
+}
+
+fn meter_animations_enabled() -> bool {
+    use webkit2gtk::gio::{prelude::SettingsExt, Settings, SettingsSchemaSource};
+    // Construct and retain GObjects only on the GLib callback thread. Other
+    // desktops need not install GNOME's optional preference schema.
+    thread_local! {
+        static SETTINGS: Option<Settings> = SettingsSchemaSource::default()
+            .and_then(|source| source.lookup("org.gnome.desktop.interface", true))
+            .map(|schema| Settings::new_full(&schema, None::<&webkit2gtk::gio::SettingsBackend>, None));
+    }
+    SETTINGS.with(|settings| {
+        settings
+            .as_ref()
+            .is_none_or(|settings| settings.boolean("enable-animations"))
+    })
+}
+
 fn request_stop(app: &tauri::AppHandle) {
     let _ = app.emit_to(
         "main",
@@ -831,7 +925,8 @@ pub fn begin_runtime_status_session(app: &tauri::AppHandle) -> Result<u64, Strin
     tray_state.configuration_error = false;
     tray_state.runtime_initialized = false;
     let epoch = tray_state.runtime_epoch;
-    apply_tray_state(app, &mut tray_state);
+    drop(tray_state);
+    refresh_tray(app);
     Ok(epoch)
 }
 
@@ -842,7 +937,8 @@ pub fn update_model_download_status(app: &tauri::AppHandle, status: ModelDownloa
         return;
     };
     tray_state.model_download_status = status;
-    apply_tray_state(app, &mut tray_state);
+    drop(tray_state);
+    refresh_tray(app);
 }
 
 fn create_mic_icon(size: u32, state: TrayVisualState) -> Vec<u8> {
@@ -914,7 +1010,9 @@ fn panel_presentation(snapshot: &RuntimeStatusSnapshot) -> serde_json::Value {
 #[cfg(target_os = "linux")]
 pub fn panel_visibility(app: &tauri::AppHandle, visible: bool) {
     if let Some(state) = app.try_state::<TrayMutex>() {
-        if let Ok(state) = state.lock() {
+        if let Ok(mut state) = state.lock() {
+            state.fallback_visible = visible;
+            state.applied_meter = None;
             if let Some(tray) = app.tray_by_id(&state.tray_id) {
                 let _ = tray.set_visible(visible);
             }
@@ -1077,7 +1175,7 @@ mod tests {
         assert_eq!(derive_tray_presentation(&snapshot).title, "Ready");
         for (status, title) in [
             (DictationStatus::Starting, "Starting"),
-            (DictationStatus::Recording, "Listening"),
+            (DictationStatus::Recording, ""),
             (DictationStatus::Processing, "Finishing"),
         ] {
             snapshot.dictation_status = status;

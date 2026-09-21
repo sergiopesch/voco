@@ -834,7 +834,7 @@ export function App() {
     let lastSentAt = -Infinity;
     return useStore.subscribe((state) => {
       const now = performance.now();
-      if (state.status !== "recording" || pending || now - lastSentAt < 100) return;
+      if (state.status !== "recording" || pending || now - lastSentAt < 40) return;
       pending = true;
       lastSentAt = now;
       void syncPanelLevel(runtimeStatusEpoch, state.audioLevel)
