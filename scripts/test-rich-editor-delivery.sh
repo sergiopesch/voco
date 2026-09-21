@@ -8,6 +8,7 @@ if [[ ${1:-} != --inside ]]; then
   chmod 700 "$fixture/runtime"
   deps=${VOCO_NATIVE_DEPS:-/usr}
   browsers=${PLAYWRIGHT_BROWSERS_PATH:-$HOME/.cache/ms-playwright}
+  node_binary=$(command -v node)
   status=0
   bwrap --die-with-parent --new-session --unshare-ipc --unshare-net --unshare-pid --unshare-uts \
     --ro-bind / / --dev /dev --proc /proc --tmpfs /tmp --tmpfs /run/user --tmpfs /run/dbus \
@@ -16,6 +17,7 @@ if [[ ${1:-} != --inside ]]; then
     --setenv XDG_CONFIG_HOME "$fixture/config" --setenv XDG_CACHE_HOME "$fixture/cache" \
     --setenv XDG_DATA_HOME "$fixture/data" --setenv XDG_STATE_HOME "$fixture/state" \
     --setenv PLAYWRIGHT_BROWSERS_PATH "$browsers" \
+    --setenv VOCO_RICH_EDITOR_NODE "$node_binary" \
     --unsetenv DISPLAY --unsetenv WAYLAND_DISPLAY --unsetenv DBUS_SESSION_BUS_ADDRESS \
     --unsetenv AT_SPI_BUS_ADDRESS --unsetenv IBUS_ADDRESS --unsetenv XAUTHORITY \
     bash "${BASH_SOURCE[0]}" --inside "$fixture" || status=$?
@@ -33,4 +35,4 @@ export ACCESSIBILITY_ENABLED=1 GTK_MODULES=atk-bridge PYTHONDONTWRITEBYTECODE=1
 Xvfb :0 -screen 0 1280x900x24 -nolisten tcp > "$fixture/evidence/xvfb.log" 2>&1 &
 for _ in {1..100}; do [[ -S /tmp/.X11-unix/X0 ]] && break; sleep .02; done
 [[ -S /tmp/.X11-unix/X0 ]] || { cat "$fixture/evidence/xvfb.log" >&2; exit 1; }
-exec dbus-run-session -- node "$ROOT_DIR/scripts/test-rich-editor-delivery.mjs" "$fixture/evidence"
+exec dbus-run-session -- "$VOCO_RICH_EDITOR_NODE" "$ROOT_DIR/scripts/test-rich-editor-delivery.mjs" "$fixture/evidence"
