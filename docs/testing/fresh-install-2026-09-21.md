@@ -118,8 +118,49 @@ No confinement rules or browser profile were changed.
 The production recording-factory tests now assert that rejected cursor and setup
 preflights request the corresponding notification exactly once and never acquire
 the recording shortcut or microphone. All 18 lifecycle tests passed, as did type
-checking and lint. The desktop notification service accepted manual diagnostic
-notifications with exit status zero; this does not establish that a banner was
-visible. User confirmation remains necessary. The native notification wrapper also
-ignores unsuccessful helper exit codes; this is a diagnostic gap, not an established
-cause of the historical missing banners.
+checking and lint. These tests verify dispatch, not native banner visibility.
+
+## Missing notification banners
+
+The host runs GNOME Shell 46. Global and VOCO-specific banner settings were enabled,
+the desktop was unlocked and available, and Codex was not fullscreen. These settings
+were verified with `/usr/bin/gsettings`; the Homebrew command earlier on PATH read
+schema defaults and was excluded from the diagnosis.
+
+GNOME accepted the short-lived `notify-send --app-name=VOCO` request, then closed
+notification 61 after **34 ms**, with close reason 2. The installed Shell source
+explains this behavior: `FdoNotificationDaemonSource` watches the sender's bus name
+and destroys a registered application's notification source when that sender exits.
+VOCO's installed desktop entry makes this registered-app path applicable.
+
+Repeating the diagnostic with `notify-send --wait` kept the sender alive, and the
+user confirmed the banner was visible. This establishes the notification-lifetime
+failure independently of the rejected cursor preflight. The first lifetime harness
+blocked reading buffered output from `--wait`; after user confirmation its test
+process was terminated. Preserve that harness failure: only the baseline has a
+machine-recorded close time, and the positive result is a human visibility check.
+
+The source fix replaces the helper process with GIO over the existing session bus,
+retaining the connection for VOCO's lifetime. It uses the installed VOCO icon and
+desktop entry, normal urgency and the desktop's default expiry. No dependency or
+desktop preference is added. Notify calls run off the UI thread with a three-second
+reply deadline. Failed or uncertain requests are not retried; the next independent
+request can reconnect after a closed connection. Fixed trace events record acceptance,
+connection failure, request failure or an invalid reply without notification content.
+
+Three native tests use private D-Bus services and exercise retained sender ownership,
+connection reuse/reconnection, request rejection, invalid IDs, the production reply
+deadline and failure recovery without retries. A deliberate sender-drop mutation
+fails at `sender must outlive Notify`; the final candidate passes all three tests.
+The standalone test build uses the application's resolved GIO/WebKit/glib libraries.
+A separate diagnostic compiled from the exact production module was accepted by the
+host service and kept its bus connection alive for 12 seconds. This transport check
+does not by itself prove visibility. After requesting a resend, the user confirmed
+seeing **VOCO notification fix** from that native code, with the VOCO icon. Rust
+Clippy passed for all targets with warnings denied. Formatting and diff checks passed.
+
+Initial test-fixture compilation failures are retained in the private evidence.
+They are excluded from the passing checks; no dependency upgrade was needed.
+
+The installed .47 package remains unchanged. This source fix does not qualify
+dictation into Codex or Brave; their actual editor/accessibility trial is still open.

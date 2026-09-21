@@ -9,6 +9,8 @@ mod browser_broker;
 mod browser_protocol;
 mod browser_socket;
 mod config;
+#[cfg(target_os = "linux")]
+mod desktop_notifications;
 mod desktop_shortcut;
 mod focus_probe;
 #[cfg(target_os = "linux")]
@@ -1234,26 +1236,13 @@ fn send_notification(summary: &str, body: &str) {
     let summary = summary.to_string();
     let body = body.to_string();
     tauri::async_runtime::spawn_blocking(move || {
-        let child = process_runner::command("notify-send")
-            .args([
-                "--app-name=VOCO",
-                "--icon=audio-input-microphone",
-                "--",
-                &summary,
-                &body,
-            ])
-            .spawn();
-        match child {
-            Ok(child) => {
-                if let Err(error) = process_runner::wait_with_output(
-                    child,
-                    std::time::Duration::from_secs(5),
-                    64 * 1024,
-                ) {
-                    warn!("Desktop notification failed: {error}");
-                }
+        #[cfg(target_os = "linux")]
+        match desktop_notifications::send(&summary, &body) {
+            Ok(()) => trace_hotkey_event("desktop_notification_accepted", None),
+            Err(error) => {
+                trace_hotkey_event(error.event(), None);
+                warn!("Desktop notification failed: {}", error.event());
             }
-            Err(error) => warn!("Could not start desktop notification: {error}"),
         }
     });
 }
