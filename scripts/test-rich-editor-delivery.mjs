@@ -1,6 +1,6 @@
 // Real Chromium + AT-SPI + clipboard, exclusively inside the private desktop wrapper.
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -84,6 +84,22 @@ try {
     assert.equal(result.observation, 'observed');
     return { ...result, prepareMs: preparedAt - started, dispatchMs: dispatchedAt - preparedAt, totalMs: performance.now() - started };
   };
+  const waitForAccessiblePosition = async (count, caret) => {
+    // The browser can finish a DOM selection change before AT-SPI publishes it.
+    // Settle the negative-case fixture using a separate read-only client; never
+    // replace the production helper's outstanding delivery receipt.
+    const probe = `import importlib.util,json,sys
+spec=importlib.util.spec_from_file_location('target',sys.argv[1])
+h=importlib.util.module_from_spec(spec);spec.loader.exec_module(h)
+r=h.safe_probe()
+print(json.dumps(h.text_position(h.TRACKER.hint)[1][:2] if r['scope']=='control' else None))`;
+    for (let i = 0; i < 30; i++) {
+      const position = JSON.parse(execFileSync('/usr/bin/python3', ['-c', probe, helperPath], { encoding: 'utf8', timeout: 2000 }));
+      if (position?.[0] === count && position?.[1] === caret) return;
+      await page.waitForTimeout(20);
+    }
+    throw new Error('Accessibility position did not settle before the negative case');
+  };
   const trial = async (name, run) => {
     const result = { name, passed: false }; results.push(result);
     Object.assign(result, await run()); result.passed = true;
@@ -131,12 +147,14 @@ try {
     await setup('<p>First.</p><p>Second.</p>');
     const receipt = await prepare(' More.'); await paste(' More.');
     await page.keyboard.press('Control+Home');
+    await waitForAccessiblePosition(2, 0);
     assert.equal((await verify(receipt)).observation, 'changed');
   });
   await trial('focus departure rejects receipt without replay', async () => {
     await setup('<p><br></p>');
     const receipt = await prepare('Hello'); await paste('Hello');
     await page.locator('#other').focus();
+    await waitForAccessiblePosition(0, 0);
     assert.equal((await verify(receipt)).observation, 'changed');
     assert.equal(await page.locator('#other').inputValue(), '');
     assert.equal(await page.locator('#target').innerText(), 'Hello');
