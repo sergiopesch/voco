@@ -227,7 +227,7 @@ export function App() {
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [startupConfigError, setStartupConfigError] = useState<string | null>(null);
   const [settingsRequest, setSettingsRequest] = useState<{
-    section: "General" | "Audio" | "Hotkeys";
+    section: "General" | "Audio" | "Hotkeys" | "Advanced" | "Output" | "Updates";
     id: number;
   }>({ section: "General", id: 0 });
   const [closeRequestId, setCloseRequestId] = useState(0);
@@ -401,9 +401,8 @@ export function App() {
     setError(null);
     try {
       if (state.dictationPurpose === "onboarding") discardRecovery();
-      await nativeMicrophone.ensureDefault(true);
+      await nativeMicrophone.ensureDefault();
       if (request.cancelled || useStore.getState().surface !== "onboarding") return;
-      if (useStore.getState().captureBackendMode === "webkit") useStore.getState().setSelectedDeviceId(null);
       toggle("onboarding:test", "start");
     } catch (cause) {
       if (!request.cancelled) setError(errorMessage(cause));
@@ -616,7 +615,7 @@ export function App() {
     }
   }, [refreshAuthoritativeConfig, refreshDevices, refreshRuntimeDiagnostics]);
 
-  const openSettings = useCallback(async (section: "General" | "Audio" | "Hotkeys" = "General") => {
+  const openSettings = useCallback(async (section: "General" | "Audio" | "Hotkeys" | "Advanced" | "Output" | "Updates" = "General") => {
     const requestVersion = panelRequestVersionRef.current + 1;
     panelRequestVersionRef.current = requestVersion;
     const currentStatus = useStore.getState().status;

@@ -74,21 +74,12 @@ interface ControlPanelProps {
   onCheckForUpdates: () => Promise<void>;
   onOpenReleasePage: (url: string) => Promise<void>;
   onRefreshRuntimeDiagnostics: () => Promise<void>;
-  onOpenSettings: (section?: "General" | "Audio" | "Hotkeys") => Promise<void>;
+  onOpenSettings: (section?: PanelSection) => Promise<void>;
 }
 
 const DESKTOP_SETUP_GUIDE = "https://github.com/sergiopesch/voco/blob/master/docs/platform/README.md#ydotoold-ydotool-daemon";
 
-const PANEL_SECTIONS = [
-  "General",
-  "Audio",
-  "Output",
-  "Hotkeys",
-  "Updates",
-  "Advanced",
-] as const;
-
-type PanelSection = (typeof PANEL_SECTIONS)[number];
+type PanelSection = "General" | "Audio" | "Output" | "Hotkeys" | "Updates" | "Advanced";
 
 export function shouldOpenMicrophonePreview(
   surface: ControlPanelProps["surface"],
@@ -105,12 +96,12 @@ export function shouldOpenMicrophonePreview(
 }
 
 const PANEL_SECTION_LABELS: Record<PanelSection, string> = {
-  General: "Overview",
+  General: "Settings",
   Audio: "Microphone",
   Output: "Dictation",
   Hotkeys: "Shortcuts",
   Updates: "Updates",
-  Advanced: "Troubleshooting",
+  Advanced: "Help",
 };
 
 export function shortcutFromKeyboardEvent(event: Pick<KeyboardEvent, "key" | "altKey" | "ctrlKey" | "shiftKey" | "metaKey">): string | null {
@@ -150,7 +141,6 @@ export function ControlPanel({
   onDraftStateChange,
   onShortcutCaptureChange,
   closeRequestId = 0,
-  lastDictationResult = null,
   requestedSection,
   requestedSectionRequestId,
   selectedDeviceId,
@@ -195,9 +185,13 @@ export function ControlPanel({
   const [saveOutcome, setSaveOutcome] = useState<"idle" | "success" | "attention">("idle");
   const [confirmHide, setConfirmHide] = useState(false);
   const [microphoneChecked, setMicrophoneChecked] = useState(false);
+  const [editingShortcut, setEditingShortcut] = useState(false);
   const [recordingShortcut, setRecordingShortcut] = useState(false);
+  const shortcutEditButtonRef = useRef<HTMLButtonElement>(null);
+  const wasEditingShortcut = useRef(false);
   const headingContainerRef = useRef<HTMLElement>(null);
   const saving = savingCount > 0;
+  const mainSettings = ["General", "Audio", "Hotkeys"].includes(activeSection);
   const [microphoneSaveError, setMicrophoneSaveError] = useState<string | null>(null);
   const [copyStatus, setCopyStatus] = useState<{ id: string; text: string; outcome: "success" | "attention" } | null>(null);
   const previousCloseRequestRef = useRef(closeRequestId);
@@ -270,7 +264,7 @@ export function ControlPanel({
       case "error":
         return updateState.error ?? "VOCO could not complete the update check.";
       default:
-        return "Update checks run against GitHub Releases for the selected channel.";
+        return "Not checked yet.";
     }
   }, [config.updateChannel, updateState.error, updateState.latestRelease?.version, updateState.status]);
   const upgradePrompt = useMemo(() => {
@@ -373,6 +367,8 @@ export function ControlPanel({
 
   useEffect(() => () => onShortcutCaptureChange?.(false), [onShortcutCaptureChange]);
 
+  useEffect(() => { setSaveFeedback(null); }, [activeSection, surface]);
+
   useEffect(() => {
     headingContainerRef.current?.querySelector<HTMLElement>("h2")?.focus();
   }, [surface, onboardingStep, activeSection]);
@@ -390,6 +386,12 @@ export function ControlPanel({
       void onRefreshDevices();
     }
   }, [onRefreshDevices, surface]);
+
+  useEffect(() => {
+    if (editingShortcut) headingContainerRef.current?.querySelector<HTMLInputElement>('input[aria-describedby="voco-hotkey-feedback"]')?.focus();
+    else if (wasEditingShortcut.current) shortcutEditButtonRef.current?.focus();
+    wasEditingShortcut.current = editingShortcut;
+  }, [editingShortcut]);
 
   useEffect(() => {
     setHotkeyDraft(config.hotkey);
@@ -638,7 +640,7 @@ export function ControlPanel({
     try {
       const passed = onFinishTest ? await onFinishTest() : testPassed;
       if (!passed || !(await checkDesktopSetup())) return;
-      const result = await savePatch({ onboardingCompleted: true, voiceProfile: "default", selectedMic: null });
+      const result = await savePatch({ onboardingCompleted: true, voiceProfile: "default" });
       if (result.ok) {
         useStore.getState().clearTranscript();
         useStore.getState().setDictationPurpose("cursor");
@@ -656,6 +658,7 @@ export function ControlPanel({
     // The native shortcut parser validates supported aliases and reserved shortcuts.
     const result = await savePatch({ hotkey: normalizedHotkey });
     if (result.ok) {
+      setEditingShortcut(false);
       return true;
     }
 
@@ -665,7 +668,7 @@ export function ControlPanel({
 
   function renderSettingsNavigation(section: PanelSection) {
     return <button key={section} className="voco-preferences__nav-item"
-      aria-current={activeSection === section ? "page" : undefined}
+      aria-current={(section === "General" ? mainSettings : section === "Advanced" ? activeSection === "Advanced" || activeSection === "Output" : activeSection === section) ? "page" : undefined}
       onClick={() => setActiveSection(section)}>
       <SettingsIcon name={section} /><span>{PANEL_SECTION_LABELS[section]}</span>
     </button>;
@@ -677,6 +680,7 @@ export function ControlPanel({
     if (surface === "settings") {
       if (hotkeyDirty) {
         setActiveSection("Hotkeys");
+        setEditingShortcut(true);
         selector = 'input[aria-describedby="voco-hotkey-feedback"]';
       }
     }
@@ -731,7 +735,7 @@ export function ControlPanel({
             <button className="voco-button voco-button--ghost" onClick={keepEditing}>Keep editing</button>
           </div>
         </section> : null}
-          {errorMessage ? (
+          {errorMessage && !isOnboarding ? (
             <section className="voco-panel__error" aria-live="polite">
               {errorMessage}
             </section>
@@ -751,7 +755,7 @@ export function ControlPanel({
               </div>
               {dictationBusy ?
                 <p>{dictationStatus === "starting" ? "Wait for Listening before speaking." : dictationStatus === "recording" ? `Press ${config.hotkey} to finish.` : "Finishing your dictation…"}</p> :
-                <p>Hide, then focus a text field.</p>}
+                <p>{desktopSetupError ? "Open Help to finish desktop setup." : shortcut.available ? "Focus a text field, then use your shortcut." : "Check shortcut setup in Help."}</p>}
             </div>
             {captureNotice ? <div className="voco-inline-note" role="status">{captureNotice}</div> : null}
             {(canCancelDictation || cancellationPending) ? (
@@ -800,9 +804,6 @@ export function ControlPanel({
                 {recovery ? <span>{recovery.kind === "manual-copy" ? "Copy your text, then clear this transcript to start another recording." : "Copy any text you need, then discard this recovery to start another recording."}</span> : null}
               </div>
             ) : null}
-            {!dictationBusy ? <div className="voco-inline-note voco-popover__dictation-hint">
-              {shortcut.instruction} In an enabled Chromium tab, focus a plain text field and press <code>Alt+Shift+V</code> for direct delivery.
-            </div> : null}
             {!hasCurrentRecovery && recoveryEntries.length > 0 ? <section className="voco-popover__recovery" aria-label="Saved transcripts" role="region">
               <h2 tabIndex={-1}>Transcript kept safely in VOCO</h2>
               <p>{recoveryEntries.length} transcript{recoveryEntries.length === 1 ? "" : "s"} available to recover. Kept until VOCO exits.</p>
@@ -820,43 +821,29 @@ export function ControlPanel({
             </section> : null}
             <div className="voco-popover__actions">
               <button {...glassPointer} className="voco-button voco-glass voco-glass--primary" disabled={saving || dictationBusy}
-                onClick={prepareDictation}>Hide to dictate</button>
+                onClick={prepareDictation}>Hide to tray</button>
             </div>
             <div className="voco-popover__footer">
               <Tooltip text="Open microphone settings"><button className="voco-device-picker" aria-label={`Microphone: ${selectedDeviceLabel}`} onClick={() => void onOpenSettings("Audio")}>
                 <span>{selectedDeviceLabel}</span><img src="/icons/chevron-right.svg" className="voco-ui-icon" alt="" />
               </button></Tooltip>
-              <details className="voco-more"
-                onKeyDown={(event) => { if (event.key === "Escape" && event.currentTarget.open) { event.preventDefault(); event.stopPropagation(); event.currentTarget.open = false; event.currentTarget.querySelector("summary")?.focus(); } }}>
-                <summary>More<img src="/icons/chevron-right.svg" className="voco-ui-icon" alt="" /></summary>
-                <div className="voco-more__content voco-glass">
-                  <details className="voco-optional-feature">
-                    <summary>How to dictate</summary>
-                    <ol className="voco-dictation-guide">
-                      <li>Hide this panel and focus a text field.</li>
-                      <li>Press <kbd>{config.hotkey}</kbd>. Wait for Listening, then speak.</li>
-                      <li>Press <kbd>{config.hotkey}</kbd> again to finish.</li>
-                    </ol>
-                  </details>
-                  <button className="voco-button voco-button--ghost" onClick={() => void onRefreshDevices()}>Refresh microphones</button>
-                </div>
-              </details>
+              <button className="voco-button voco-button--ghost voco-popover__help" onClick={() => void onOpenSettings("Advanced")}>Help</button>
             </div>
             {microphoneSaveError ? <p className="voco-inline-note voco-inline-note--error" role="alert">{microphoneSaveError}</p> : null}
           </section>
         ) : isOnboarding ? (
           <Onboarding
             microphone={nativeMicrophone?.mode === "native"
-              ? nativeMicrophone.sources?.sources.find(source => source.selectionToken === nativeMicrophone.sources?.defaultSelectionToken)?.label || "System default"
-              : "System default"}
+              ? nativeMicrophone.selected?.label || nativeMicrophone.sources?.sources.find(source => source.selectionToken === nativeMicrophone.sources?.defaultSelectionToken)?.label || "System default"
+              : selectedDeviceLabel}
             status={dictationStatus}
             audioLevel={audioLevel}
             transcript={testPurpose === "onboarding" ? transcript : ""}
             passed={testPassed}
             failed={Boolean(errorMessage)}
             attempted={testPurpose === "onboarding"}
-            setupError={recovery && testPurpose !== "onboarding" ? "Recover or discard your previous dictation before starting the voice test." : nativeMicrophone?.error}
-            onRetrySetup={() => void nativeMicrophone?.initialize().catch(() => {})}
+            setupError={recovery && testPurpose !== "onboarding" ? "Recover or discard your previous dictation before starting the voice test." : nativeMicrophone?.error ?? errorMessage}
+            onRetrySetup={nativeMicrophone?.error ? () => void nativeMicrophone.initialize().catch(() => {}) : undefined}
             desktopSetupError={desktopSetupError}
             onCheckDesktopSetup={() => void checkDesktopSetup()}
             onOpenDesktopSetupGuide={() => void onOpenReleasePage(DESKTOP_SETUP_GUIDE)}
@@ -864,6 +851,7 @@ export function ControlPanel({
             preparing={testPreparing || finishingTest}
             saving={saving}
             blocked={Boolean(recovery && testPurpose !== "onboarding") || !onStartTest || nativeMicrophone?.mode === "pending"}
+            onChangeMicrophone={() => void onOpenSettings("Audio")}
             hotkey={config.hotkey}
             onStart={() => onStartTest?.()}
             onStop={() => onStopTest?.()}
@@ -876,7 +864,7 @@ export function ControlPanel({
                 <img src={vocoBrandImage} alt="" /><h1>VOCO</h1>
               </div>
               <nav className="voco-preferences__nav" aria-label="Settings sections">
-                {PANEL_SECTIONS.filter((section) => section !== "Updates" && section !== "Advanced").map(renderSettingsNavigation)}
+                {renderSettingsNavigation("General")}
               </nav>
               <nav className="voco-preferences__nav-bottom" aria-label="App settings">
                 {(["Updates", "Advanced"] as const).map(renderSettingsNavigation)}
@@ -884,47 +872,20 @@ export function ControlPanel({
             </aside>
 
             <div className="voco-preferences__content">
-              <div className="voco-preferences__window-actions" onPointerDown={(event) => void handleHeaderPointerDown(event)} aria-label="Move VOCO window"><button className="voco-button voco-button--ghost voco-button--compact" onClick={requestHide}>Hide to tray</button></div>
-              {activeSection === "General" ? (
-                <section className="voco-preferences__page">
-                  <div className="voco-preferences__heading"><h2 tabIndex={-1}>Overview</h2><p className="voco-preferences__status" role="status">{desktopSetupError ? "Desktop setup required" : statusLabel}</p></div>
+              <div className="voco-preferences__window-actions" onPointerDown={(event) => void handleHeaderPointerDown(event)} aria-label="Move VOCO window">{!config.onboardingCompleted ? <button className="voco-button voco-button--ghost voco-button--compact" disabled={saving || dictationBusy || hasUnsavedChanges} onClick={() => onSurfaceChange("onboarding")}>Back to setup</button> : null}<button className="voco-button voco-button--ghost voco-button--compact" onClick={requestHide}>Hide to tray</button></div>
+              {mainSettings ? <div className="voco-preferences__heading"><h2 tabIndex={-1}>Settings</h2></div> : null}
+              {mainSettings ? <>
                   {hasRecoverableTranscript ? <div className="voco-preferences__recovery" role="status">
                     <strong>{hasCurrentRecovery ? recovery?.kind === "manual-copy" ? "Transcript ready to copy" : "Recording needs recovery" : recoveryEntries.length === 1 ? "A transcript needs attention" : `${recoveryEntries.length} transcripts need attention`}</strong>
                     <p>Kept in VOCO until you dismiss them or exit the app.</p>
                     <button className="voco-button voco-button--secondary" onClick={() => onSurfaceChange("popover")}>Review saved transcripts</button>
                   </div> : null}
-                  <div className="voco-preferences__group">
-                    <h3 className="voco-preferences__group-title">Your setup</h3>
-                    <div className="voco-preferences__card">
-                      <button className="voco-preferences__row voco-preferences__row--link" onClick={() => setActiveSection("Audio")}>
-                        <span className="voco-preferences__badge"><SettingsIcon name="Audio" /></span>
-                        <span className="voco-preferences__row-copy"><strong>Microphone</strong><small>{selectedDeviceLabel}</small></span>
-                        <span className="voco-preferences__chevron" aria-hidden="true"><SettingsIcon name="chevron" /></span>
-                      </button>
-                      <button className="voco-preferences__row voco-preferences__row--link" onClick={() => setActiveSection("Hotkeys")}>
-                        <span className="voco-preferences__badge"><SettingsIcon name="Hotkeys" /></span>
-                        <span className="voco-preferences__row-copy"><strong>Shortcut</strong></span>
-                        <kbd className="voco-preferences__row-value">{config.hotkey}</kbd><span className="voco-preferences__row-action">Change</span>
-                      </button>
-                      <button className="voco-preferences__row voco-preferences__row--link" onClick={() => setActiveSection("Output")}>
-                        <span className="voco-preferences__badge"><SettingsIcon name="output" /></span>
-                        <span className="voco-preferences__row-copy"><strong>Output</strong><small>{desktopSetupError ? "Desktop setup required" : "Direct to your cursor"}</small></span>
-                        <span className="voco-preferences__chevron" aria-hidden="true"><SettingsIcon name="chevron" /></span>
-                      </button>
-                    </div>
-                  </div>
-                  <div className="voco-preferences__actions">
-                    <button className="voco-button voco-button--primary" disabled={saving || dictationBusy || Boolean(desktopSetupError)} onClick={prepareDictation}><SettingsIcon name="Audio" />Hide to dictate</button>
-                  </div>
-                  <p className="voco-preferences__helper">{shortcut.instruction}</p>
-                  {desktopSetupError ? <button className="voco-button voco-button--secondary" onClick={() => setActiveSection("Advanced")}>Review desktop setup</button> : null}
-                  {!hasRecoverableTranscript && lastDictationResult?.outcome === "delivered" ? <p className="voco-preferences__helper" role="status">A dictation was delivered this session. Check your text field to confirm the result.</p> : null}
-                </section>
-              ) : null}
+                  {desktopSetupError ? <div className="voco-inline-note" role="status">Desktop setup needs attention. <button className="voco-button voco-button--ghost" onClick={() => setActiveSection("Advanced")}>Open Help</button></div> : null}
+              </> : null}
 
-              {activeSection === "Audio" ? (
+              {mainSettings ? (
                 <section className="voco-preferences__page">
-                  <div className="voco-preferences__heading"><h2 tabIndex={-1}>Microphone</h2></div>
+                  <h3 className="voco-preferences__group-title">Microphone</h3>
                   {nativePreviewDisabled && nativeMicrophone ? <NativeMicrophoneSettings controls={nativeMicrophone} disabled={dictationBusy} /> : <>
                   <div className="voco-preferences__group"><h3 className="voco-preferences__group-title">Input</h3>
                     <div className="voco-preferences__card voco-preferences__form">
@@ -937,7 +898,7 @@ export function ControlPanel({
                       <div className="voco-preferences__actions"><button className="voco-button voco-button--ghost" onClick={() => void onRefreshDevices()}>Refresh devices</button></div>
                     </div>
                   </div>
-                  <div className="voco-preferences__group"><h3 className="voco-preferences__group-title">Sound check</h3>
+                  {activeSection !== "Audio" ? <button className="voco-button voco-button--secondary" disabled={dictationBusy} onClick={() => setActiveSection("Audio")}>Test microphone</button> : <div className="voco-preferences__group"><h3 className="voco-preferences__group-title">Sound check</h3>
                     <div className="voco-preferences__card voco-preferences__form">
                       <p className="voco-preferences__status" role="status">{dictationBusy ? "Microphone check paused during dictation." : previewError || microphonePermission === "denied" ? "Microphone access needs attention." : microphoneChecked ? "Audio detected during this check" : "Waiting for sound"}</p>
                       {!dictationBusy && !previewError && microphonePermission !== "denied" ? <p className="voco-preferences__helper">Speak a few words. This checks microphone sound, not transcription.</p> : null}
@@ -947,37 +908,26 @@ export function ControlPanel({
                       {previewError ? <div className="voco-inline-note voco-inline-note--error" role="alert">{previewError}</div> : null}
                       {previewError || microphonePermission === "denied" ? <div className="voco-preferences__actions"><button className="voco-button voco-button--secondary" disabled={dictationBusy} onClick={() => void retryMicrophonePreview()}>Retry microphone access</button></div> : null}
                     </div>
-                  </div>
+                  </div>}
                   </>}
                 </section>
               ) : null}
 
-              {activeSection === "Output" ? (
+              {mainSettings ? (
                 <section className="voco-preferences__page">
-                  <div className="voco-preferences__heading"><h2 tabIndex={-1}>Dictation</h2></div>
-                  <div className="voco-preferences__card voco-preferences__form">
-                    <strong>Direct to your cursor</strong>
-                    <p>Focus a text field and press <kbd>{config.hotkey}</kbd>. Speak naturally; words and punctuation appear as they are recognized. Press the shortcut again to finish.</p>
-                    <p>Keep the same field focused. VOCO pastes your words using the clipboard and never presses Enter.</p>
-                    <p>If delivery is interrupted, your transcript stays available in VOCO for recovery.</p>
-                  </div>
-                </section>
-              ) : null}
-
-              {activeSection === "Hotkeys" ? (
-                <section className="voco-preferences__page">
-                  <div className="voco-preferences__heading"><h2 tabIndex={-1}>Shortcuts</h2></div>
-                  <div className="voco-preferences__group"><h3 className="voco-preferences__group-title">Dictation</h3>
+                  <h3 className="voco-preferences__group-title">Shortcut</h3>
+                  <div className="voco-preferences__group">
                     <div className="voco-preferences__card voco-preferences__form">
-                      <div className="voco-preferences__shortcut-editor">
+                      {!editingShortcut ? <div className="voco-preferences__shortcut-summary"><span>Start and stop dictation</span><kbd className="voco-glass voco-shortcut">{config.hotkey}</kbd><button className="voco-button voco-button--secondary" ref={shortcutEditButtonRef} onClick={() => setEditingShortcut(true)}>Change shortcut</button></div> : <div className="voco-preferences__shortcut-editor">
                         <label className="voco-field"><span>Start and stop listening</span><input disabled={saving} value={recordingShortcut ? "Press your shortcut…" : hotkeyDraft} aria-invalid={Boolean(hotkeyError)} aria-describedby="voco-hotkey-feedback"
                           onBlur={() => { if (recordingShortcut) endShortcutCapture(); }} onChange={(event) => setHotkeyDraft(event.target.value)}
                           onKeyDown={(event) => { if (recordingShortcut) { captureShortcut(event); return; } if (event.key === "Enter") { event.preventDefault(); void saveHotkey(); } }} /></label>
-                        <Tooltip text="Press a modifier and key; Escape cancels."><button className="voco-button voco-button--secondary" disabled={saving} onClick={beginShortcutCapture}>Record shortcut</button></Tooltip>
-                        {hotkeyDirty || hotkeyError ? <button className="voco-button voco-button--primary" onClick={() => void saveHotkey()} disabled={saving}>Save hotkey</button> : null}
-                      </div>
+                        <Tooltip text="Press a modifier and key; Escape cancels."><button className="voco-button voco-button--secondary" disabled={saving} onClick={beginShortcutCapture}>Record keys</button></Tooltip>
+                        {hotkeyDirty || hotkeyError ? <button className="voco-button voco-button--primary" onClick={() => void saveHotkey()} disabled={saving}>Apply shortcut</button> : null}
+                        <button className="voco-button voco-button--ghost" disabled={saving} onClick={() => { endShortcutCapture(); setHotkeyDraft(config.hotkey); setHotkeyError(null); setEditingShortcut(false); }}>Cancel</button>
+                      </div>}
                       <p className="voco-preferences__helper" id="voco-hotkey-feedback" role="status">{hotkeyError ?? (recordingShortcut ? "Press a modifier and key. Escape cancels." : shortcut.instruction)}</p>
-                      <p className="voco-preferences__helper">{shortcut.detail}</p>
+                      <details className="voco-preferences__disclosure"><summary>Shortcut help</summary><p className="voco-preferences__helper">{shortcut.detail}</p>
                       {shortcut.setup ? <p className="voco-preferences__helper">{shortcut.setup}</p> : null}
                       {waylandDesktop ? <div className="voco-inline-note">
                         <strong>Desktop shortcut</strong>
@@ -986,7 +936,7 @@ export function ControlPanel({
                           Use an unused key such as F8. Configure the desktop binding to also work with Ctrl and Ctrl+Shift, which clipboard delivery briefly uses.</p>
                         <p>The shortcut above and its status describe VOCO’s built-in keyboard handling.
                           Your desktop controls external bindings; VOCO cannot verify which keys you assigned.</p>
-                      </div> : null}
+                      </div> : null}</details>
                     </div>
                   </div>
                 </section>
@@ -1003,7 +953,7 @@ export function ControlPanel({
                       {updateState.latestRelease?.url ? <button className="voco-button voco-button--secondary" onClick={() => void onOpenReleasePage(updateState.latestRelease!.url)}>Open latest release</button> : null}
                     </div>
                   </div>
-                  <details className="voco-preferences__card voco-preferences__disclosure"><summary>Update preferences and installation details</summary>
+                  <details className="voco-preferences__card voco-preferences__disclosure"><summary>Update settings</summary>
                     <div className="voco-preferences__form">
                       <label className="voco-field voco-preferences__field-row"><span>Installation method for update instructions</span><select value={config.installChannel} onChange={(event) => void savePatch({ installChannel: event.target.value as AppConfig["installChannel"] })}>
                         <option value="github-release">GitHub Release</option>{config.installChannel === "appimage" ? <option value="appimage" disabled>AppImage (legacy, publication paused)</option> : null}<option value="source">Source build</option>{config.installChannel === "flatpak" ? <option value="flatpak" disabled>Flatpak (legacy, unverified)</option> : null}{config.installChannel === "snap" ? <option value="snap" disabled>Snap (legacy, unverified)</option> : null}
@@ -1011,7 +961,7 @@ export function ControlPanel({
                       <p className="voco-preferences__helper">Choose the Debian, Fedora, openSUSE, or Arch package for your distribution from the published GitHub Release. Omarchy uses the Arch package. AppImage, Flatpak, and Snap are not current published release channels.</p>
                       <label className="voco-field voco-preferences__field-row"><span>Update channel</span><select value={config.updateChannel} onChange={(event) => void savePatch({ updateChannel: event.target.value as AppConfig["updateChannel"] })}><option value="stable">Stable</option><option value="beta">Beta</option></select></label>
                       <p className="voco-preferences__helper">{updateInstallCopy}</p>
-                      <p className="voco-preferences__helper">{config.updateChannel === "beta" ? "Beta updates should be treated as higher-churn builds with faster feedback cycles." : "Stable updates should remain the default for day-to-day use."}</p>
+                      <p className="voco-preferences__helper">{config.updateChannel === "beta" ? "Beta releases change more often." : "Recommended for everyday use."}</p>
                       <p><strong>Last checked:</strong> {lastCheckedLabel}</p>
                       {updateState.latestRelease ? <p><strong>Latest release:</strong> <code>{updateState.latestRelease.version}</code></p> : null}
                       {upgradePrompt ? <p><strong>Upgrade path:</strong> {upgradePrompt}</p> : null}
@@ -1021,14 +971,14 @@ export function ControlPanel({
                 </section>
               ) : null}
 
-              {activeSection === "Advanced" ? (
+              {activeSection === "Advanced" || activeSection === "Output" ? (
                 <section className="voco-preferences__page">
-                  <div className="voco-preferences__heading"><h2 tabIndex={-1}>Troubleshooting</h2></div>
-                  <div className="voco-preferences__group"><h3 className="voco-preferences__group-title">Text delivery</h3>
-                    <div className="voco-preferences__card voco-preferences__form">
-                      <p className="voco-preferences__helper">Keep the intended text field focused while dictating. If delivery cannot continue safely, VOCO keeps your transcript for recovery.</p>
-                    </div>
-                  </div>
+                  <div className="voco-preferences__heading"><h2 tabIndex={-1}>Help</h2></div>
+                  <details className="voco-preferences__card voco-preferences__disclosure"><summary>How to dictate</summary><p>Focus a text field and press <kbd>{config.hotkey}</kbd>. Wait for Listening, then speak. Press again to finish.</p><p>VOCO replaces clipboard text to paste your words and never presses Enter. Keep the same field focused.</p><p>In an enabled Chromium tab, use <kbd>Alt+Shift+V</kbd> for direct delivery to a plain text field.</p></details>
+                  <details className="voco-preferences__card voco-preferences__disclosure"><summary>My microphone is not working</summary><p>Check the selected microphone and allow access for this session.</p><button className="voco-button voco-button--secondary" onClick={() => setActiveSection("Audio")}>Microphone settings</button></details>
+                  <details className="voco-preferences__card voco-preferences__disclosure"><summary>My shortcut is not working</summary><p>{shortcut.detail}</p>{shortcut.setup ? <p>{shortcut.setup}</p> : null}<button className="voco-button voco-button--secondary" onClick={() => setActiveSection("Hotkeys")}>Shortcut settings</button></details>
+                  <details className="voco-preferences__card voco-preferences__disclosure"><summary>My words are not appearing</summary><p>Keep an editable text field focused. If delivery stops, review the field before copying missing text from VOCO.</p>{desktopSetupError ? <p role="status">{desktopSetupError}</p> : null}<button className="voco-button voco-button--secondary" onClick={() => void onOpenReleasePage(DESKTOP_SETUP_GUIDE)}>Open setup instructions</button></details>
+                  <details className="voco-preferences__card voco-preferences__disclosure"><summary>Technical details</summary>
                   <div className="voco-preferences__group"><h3 className="voco-preferences__group-title">Runtime checks</h3>
                     <div className="voco-preferences__card">
                       <div className="voco-preferences__row"><span className="voco-preferences__row-copy"><strong>Session</strong></span><span className="voco-preferences__row-value">{runtimeSessionLabel}</span></div>
@@ -1040,22 +990,23 @@ export function ControlPanel({
                   {runtimeDiagnostics ? <details className="voco-preferences__card voco-preferences__disclosure"><summary>Diagnostic details</summary>
                     <div className="voco-preferences__form"><p><strong>IBus recording integration:</strong> {runtimeDiagnostics.ownedPreedit.detail}</p><p><strong>Type simulation:</strong> {runtimeDiagnostics.typeSimulation.detail}</p><p><strong>Clipboard insertion:</strong> {runtimeDiagnostics.clipboard.detail}</p></div>
                   </details> : null}
+                  </details>
                   <div className="voco-preferences__actions">
                     <button className="voco-button voco-button--secondary" onClick={() => void onRefreshRuntimeDiagnostics()}>Refresh runtime checks</button>
                     {desktopSetupError ? <button className="voco-button voco-button--secondary" onClick={() => void onOpenReleasePage(DESKTOP_SETUP_GUIDE)}>Open setup instructions</button> : null}
                     <button className="voco-button voco-button--ghost" disabled={saving || hasUnsavedChanges} title={hasUnsavedChanges ? "Save text changes before restarting setup." : undefined}
-                      onClick={async () => { const result = await savePatch({ onboardingCompleted: false }); if (result.ok) { onOnboardingStepChange(0); onSurfaceChange("onboarding"); } }}>Re-run onboarding</button>
+                      onClick={async () => { const result = await savePatch({ onboardingCompleted: false }); if (result.ok) { onOnboardingStepChange(0); onSurfaceChange("onboarding"); } }}>Run setup again</button>
                   </div>
                 </section>
               ) : null}
-              {saving || hasUnsavedChanges || saveFeedback ? <p className="voco-preferences__feedback voco-motion-feedback" role="status"><StatusMark state={saving ? "working" : hasUnsavedChanges ? "idle" : saveOutcome} />{saving ? "Saving…" : hasUnsavedChanges ? "Unsaved text changes — use the Save button for the edited group." : saveFeedback}</p> : null}
+              {saving || hasUnsavedChanges || saveFeedback ? <p className="voco-preferences__feedback voco-motion-feedback" role="status"><StatusMark state={saving ? "working" : hasUnsavedChanges ? "idle" : saveOutcome} />{saving ? "Saving…" : hasUnsavedChanges ? "Unsaved text changes — apply or cancel your shortcut." : saveFeedback}</p> : null}
             </div>
           </section>
         )}
 
-        {isOnboarding ? (
+        {isOnboarding && (saving || saveFeedback) ? (
           <footer className="voco-panel__footer">
-            <span className="voco-save-status" role="status">{saving ? "Saving…" : hasUnsavedChanges ? "Unsaved text changes — use the Save button for the edited group." : saveFeedback ?? "Finish your voice test, then choose Finish Onboarding."}</span>
+            <span className="voco-save-status" role="status">{saving ? "Saving…" : hasUnsavedChanges ? "Unsaved text changes — apply or cancel your shortcut." : saveFeedback}</span>
           </footer>
         ) : null}
       </section>

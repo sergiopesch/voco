@@ -35,7 +35,7 @@ try {
         logLevel: 'warn',
         server: {
             host: '127.0.0.1',
-            port: 0,
+            port: Number(process.env.VOCO_RENDERER_PORT ?? 0),
             hmr: false,
             fs: {
                 allow: [
@@ -308,7 +308,7 @@ try {
             window.resumeMode = resumeMode;
         }, {failPreview, resumeMode});
         await page.getByRole('button', {
-            name: 'Microphone',
+            name: 'Test microphone',
             exact: true
         }).click();
         await page.getByRole('combobox', { name: /Input device/ }).waitFor();
@@ -631,8 +631,8 @@ try {
     await page.screenshot({path:path.join(out,'hidden-dictation.png')});
     await load();
     await page.evaluate(() => window.store.setState({surface:'settings',status:'idle'}));
-    await page.getByRole('button', {name:'Overview',exact:true}).click();
-    await page.getByRole('heading', {name:'Overview',exact:true}).waitFor();
+    await page.getByRole('button', {name:'Settings',exact:true}).click();
+    await page.getByRole('heading', {name:'Settings',exact:true}).waitFor();
     assert.equal(await page.title(), 'VOCO isolated settings');
     assert.equal(new URL(page.url()).pathname, '/app-microphone-check');
     for (const label of ['Appearance','Integrations','Realtime conversation']) {
@@ -643,8 +643,8 @@ try {
     assert.equal(await page.evaluate(() => window.dragRequests), 1);
     await bar.click({position:{x:12,y:20},button:'right'});
     assert.equal(await page.evaluate(() => window.dragRequests), 1);
-    await page.getByRole('button', {name:'Dictation',exact:true}).click();
-    await page.getByRole('heading', {name:'Dictation',exact:true}).waitFor();
+    await page.getByRole('button', {name:'Help',exact:true}).click();
+    await page.getByRole('heading', {name:'Help',exact:true}).waitFor();
     assert.equal(await page.getByRole('combobox').count(),0);
     assert.equal(await page.locator('vite-error-overlay').count(),0);
     await page.screenshot({path:path.join(out,'dictation-settings.png')});

@@ -1524,3 +1524,13 @@ input[type="checkbox"]:disabled { opacity: 0.5; }
 
 .voco-panel[data-surface="onboarding"] .voco-setup { padding: 24px 30px; }
 @media (max-width: 700px) { .voco-panel[data-surface="onboarding"] .voco-setup { padding: 18px; } }
+
+/* Compact task-focused surfaces retain the existing VOCO material and assets. */
+.voco-lens { height: 76px; }
+.voco-lens img { width: 72px; height: 72px; }
+.voco-popover__help { display: block; margin-left: auto; min-height: 36px; }
+.voco-setup__devices { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.voco-preferences__content > .voco-preferences__page + .voco-preferences__page { margin-top: 24px; }
+.voco-native-microphone { display: grid; gap: 12px; }
+.voco-native-microphone p { margin: 0; }
+.voco-preferences__disclosure p { line-height: 1.5; }

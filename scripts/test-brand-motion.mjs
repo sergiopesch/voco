@@ -50,24 +50,27 @@ try {
         await page.screenshot({ path: path.join(out, `${name}-${label}.png`) });
         assert.deepEqual(await page.evaluate(() => window.__fixtureViolations), []);
       };
+      await page.setViewportSize({width:850,height:680});
       await load('surface=onboarding');
-      assert.equal(await page.getByRole('button', { name: 'Finish Onboarding', exact: true }).isDisabled(), true);
-      await page.getByRole('button', { name: 'Start Test', exact: true }).click();
+      await capture('onboarding-idle');
+      assert.equal(await page.getByRole('button', { name: 'Done', exact: true }).count(), 0);
+      await page.getByRole('button', { name: 'Start test', exact: true }).click();
       assert.equal(await page.getByRole('meter', { name: 'Microphone signal' }).getAttribute('aria-valuenow'), '65');
       await capture('onboarding-transition', false);
       await page.locator('.voco-voice-pill__reveal').evaluate(async el => {
         await Promise.all(el.getAnimations().map(animation => animation.finished.catch(() => {})));
       });
       await capture('onboarding-listening');
-      await page.getByRole('button', { name: 'Stop Test', exact: true }).click();
-      assert.equal(await page.getByRole('meter', { name: 'Microphone signal' }).getAttribute('aria-valuenow'), '0');
-      assert.equal(await page.getByRole('button', { name: 'Finish Onboarding', exact: true }).isEnabled(), true);
-      assert.equal(await page.getByText('Your voice test worked. Finish onboarding to check desktop setup.', { exact: true }).count(), 1);
+      await page.getByRole('button', { name: 'Finish test', exact: true }).click();
+      assert.equal(await page.getByRole('meter', { name: 'Microphone signal' }).count(), 0);
+      assert.equal(await page.getByRole('button', { name: 'Done', exact: true }).isEnabled(), true);
+      assert.equal(await page.getByText('Voice test complete. Choose Done to check desktop setup.', { exact: true }).count(), 1);
       await capture('onboarding-success');
       results.push({ engine: name, check: 'onboarding start/stop, level, explicit completion', passed: true });
 
       await load('surface=settings');
-      const combo = page.getByRole('combobox', { name: 'Native input device', exact: true });
+      await capture('settings');
+      const combo = page.getByRole('combobox', { name: 'Microphone', exact: true });
       await combo.press('ArrowDown');
       await combo.press('Home');
       await combo.press('ArrowDown'); // Default device
@@ -95,7 +98,7 @@ try {
       assert.equal(await apply.isDisabled(), true);
       await page.getByRole('checkbox').check();
       await apply.click();
-      await page.getByText('Ready for dictation: Studio microphone.', { exact: false }).waitFor();
+      await page.getByText('Selected: Studio microphone.', { exact: false }).waitFor();
       await combo.click();
       await capture('settings-selector');
       await combo.press('End');
@@ -105,6 +108,36 @@ try {
       assert.equal(await combo.getAttribute('aria-expanded'), 'false');
       results.push({ engine: name, check: 'selector navigation, typeahead, disabled option, Escape, Tab, consent reset and explicit apply', passed: true });
 
+      await page.getByRole('button',{name:'Change shortcut',exact:true}).click();
+      const shortcutInput = page.getByLabel('Start and stop listening',{exact:true});
+      assert.equal(await shortcutInput.evaluate(el => document.activeElement === el),true);
+      await shortcutInput.fill('Ctrl+Alt+K');
+      await page.getByRole('button',{name:'Cancel',exact:true}).click();
+      assert.equal(await page.getByRole('button',{name:'Change shortcut',exact:true}).evaluate(el => document.activeElement === el),true);
+      await page.getByRole('button',{name:'Change shortcut',exact:true}).click();
+      await page.getByRole('button',{name:'Record keys',exact:true}).click();
+      await shortcutInput.press('Control+Alt+k');
+      await page.getByRole('button',{name:'Apply shortcut',exact:true}).click();
+      await page.getByRole('button',{name:'Change shortcut',exact:true}).waitFor();
+      assert.equal(await page.locator('.voco-preferences__shortcut-summary kbd').innerText(),'Ctrl+Alt+K');
+      await page.locator('.voco-preferences__content').evaluate(el => el.scrollTop=0);
+      await capture('settings-selected');
+      await page.setViewportSize({width:760,height:560});
+      await page.locator('.voco-preferences__content').evaluate(el => el.scrollTop=0);
+      await capture('settings-minimum');
+      await page.setViewportSize({width:850,height:680});
+      await page.getByRole('button',{name:'Help',exact:true}).click();
+      await capture('help');
+      await page.getByText('My words are not appearing',{exact:true}).click();
+      await page.getByText('Keep an editable text field focused.',{exact:false}).waitFor();
+      await page.getByRole('button',{name:'Updates',exact:true}).click();
+      await capture('updates');
+      results.push({engine:name,check:'shortcut cancel, focus restoration, capture and apply; Help disclosures and Updates',passed:true});
+
+      await page.setViewportSize({width:420,height:380});
+      await load('surface=popover');
+      await capture('popover-ready');
+      assert.equal(await page.evaluate(() => document.documentElement.scrollHeight <= innerHeight),true);
       await load('surface=popover&state=recording');
       await page.setViewportSize({ width: 420, height: 380 });
       await capture('popover-listening');
@@ -121,14 +154,14 @@ try {
       await page.setViewportSize({ width: 760, height: 620 });
       await load('surface=onboarding&state=error');
       await capture('onboarding-error-minimum');
-      assert.equal(await page.getByRole('button', { name: 'Finish Onboarding', exact: true }).isDisabled(), true);
+      assert.equal(await page.getByRole('button', { name: 'Done', exact: true }).count(), 0);
       await page.emulateMedia({ reducedMotion: 'reduce' });
       await load('surface=onboarding&state=starting');
       assert.equal(await page.locator('.voco-status-mark__ring').evaluate(el => getComputedStyle(el).animationName), 'none');
       await capture('reduced-motion');
       await page.emulateMedia({ forcedColors: 'active' });
       await load('surface=settings');
-      await page.getByRole('combobox', { name: 'Native input device', exact: true }).click();
+      await page.getByRole('combobox', { name: 'Microphone', exact: true }).click();
       await capture('high-contrast');
       assert.deepEqual(errors, []);
       results.push({ engine: name, check: 'error completion gate, minimum window, reduced motion, high-contrast rendering, no console errors or capture', passed: true });

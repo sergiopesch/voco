@@ -147,7 +147,8 @@ The control CLI connects once to the owner-only socket; do not add retries or
 launch/focus side effects. It does not prove a compositor keybinding exists.
 The .43 candidate uses native capture on Wayland and WebKit capture on X11.
 The Wayland change is approved and has installed-VM evidence. Keep
-automatic default microphone selection on explicit Start Test/recording actions,
+automatic default microphone selection on explicit Start test/recording actions
+when no approved microphone is selected,
 with no idle recording or silent device switching during capture. Onboarding
 uses the production recognition queue with local-only transcript output. Never
 acquire an external text destination, shortcut lease, clipboard or preedit output

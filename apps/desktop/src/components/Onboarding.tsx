@@ -1,7 +1,6 @@
 import { StatusMark } from "./StatusMark";
 import { VoiceSignal } from "./VoiceSignal";
 import { SettingsIcon } from "./SettingsIcon";
-import { useState } from "react";
 import type { DictationStatus } from "@/types";
 
 interface OnboardingProps {
@@ -22,58 +21,25 @@ interface OnboardingProps {
   saving: boolean;
   blocked: boolean;
   hotkey: string;
+  onChangeMicrophone?: () => void;
   onStart: () => void;
   onStop: () => void;
   onFinish: () => Promise<void>;
 }
 
 export function Onboarding({ microphone, status, audioLevel, transcript, passed,
-  failed, preparing, saving, blocked, hotkey, onStart, onStop, onFinish, attempted, setupError, onRetrySetup, desktopSetupError, checkingDesktopSetup, onCheckDesktopSetup, onOpenDesktopSetupGuide }: OnboardingProps) {
-  const [speakerError, setSpeakerError] = useState<string | null>(null);
-  const [speakerPlaying, setSpeakerPlaying] = useState(false);
+  failed, preparing, saving, blocked, hotkey, onChangeMicrophone, onStart, onStop, onFinish, attempted, setupError, onRetrySetup, desktopSetupError, checkingDesktopSetup, onCheckDesktopSetup, onOpenDesktopSetupGuide }: OnboardingProps) {
   const recording = status === "recording";
   const busy = checkingDesktopSetup || preparing || status === "starting" || status === "processing" || saving;
   const level = recording ? Math.max(0, Math.min(1, audioLevel)) : 0;
 
-  async function testSpeaker() {
-    if (speakerPlaying) return;
-    setSpeakerPlaying(true);
-    setSpeakerError(null);
-    let context: AudioContext | null = null;
-    try {
-      context = new AudioContext();
-      await context.resume();
-      const tone = context.createOscillator();
-      const gain = context.createGain();
-      tone.frequency.value = 440;
-      gain.gain.setValueAtTime(0, context.currentTime);
-      gain.gain.linearRampToValueAtTime(0.08, context.currentTime + 0.02);
-      gain.gain.linearRampToValueAtTime(0, context.currentTime + 0.25);
-      tone.connect(gain).connect(context.destination);
-      const ended = new Promise<void>(resolve => { tone.onended = () => resolve(); });
-      tone.start();
-      tone.stop(context.currentTime + 0.3);
-      await ended;
-    } catch {
-      setSpeakerError("Could not play the test sound. Check your system sound output.");
-    } finally {
-      await context?.close().catch(() => {});
-      setSpeakerPlaying(false);
-    }
-  }
-
   return <section className="voco-panel__content voco-setup" aria-label="Voice setup">
     <div className="voco-setup__intro">
-      <span className="voco-setup__eyebrow">LET’S TRY YOUR VOICE</span>
       <h2>Say something. See it here.</h2>
-      <p>Your system microphone and speaker are selected. Start a short test to check your voice before you dictate in other apps.</p>
     </div>
     <div className="voco-setup__devices">
       <div><span className="voco-setup__device-label">Microphone</span><strong>{microphone}</strong></div>
-      <div><span className="voco-setup__device-label">Speaker</span><strong>System default</strong>
-        <button className="voco-button voco-button--ghost" disabled={recording || busy || speakerPlaying}
-          onClick={() => void testSpeaker()}>{speakerPlaying ? "Playing…" : "Test speaker"}</button>
-      </div>
+      {onChangeMicrophone ? <button className="voco-button voco-button--ghost" disabled={recording || busy} onClick={onChangeMicrophone}>Change microphone</button> : null}
     </div>
     {setupError ? <p role="alert">{setupError} {onRetrySetup ? <button className="voco-button voco-button--ghost" disabled={busy || recording} onClick={onRetrySetup}>Retry microphone setup</button> : null}</p> : null}
     {desktopSetupError ? <div role="alert"><p><strong>Desktop setup needs attention.</strong> {desktopSetupError}</p>
@@ -81,27 +47,30 @@ export function Onboarding({ microphone, status, audioLevel, transcript, passed,
       <button className="voco-button voco-button--secondary" disabled={busy || recording} onClick={onCheckDesktopSetup}>Check desktop setup</button>
       {onOpenDesktopSetupGuide ? <button className="voco-button voco-button--ghost" onClick={onOpenDesktopSetupGuide}>Open setup instructions</button> : null}
     </div> : null}
-    {speakerError ? <p role="alert">{speakerError}</p> : null}
     <p className="voco-setup__status" role="status"><StatusMark state={setupError || desktopSetupError || failed || status === "error" ? "attention" : busy ? "working" : recording ? "listening" : passed ? "success" : "idle"} /><span>{checkingDesktopSetup ? "Checking desktop input…"
       : preparing || status === "starting" ? "Getting your microphone ready…"
-      : recording && failed ? "Test paused. Stop Test, then try again."
-      : recording ? "Listening — speak naturally and watch your words appear."
+      : recording && failed ? "Finish the test, then try again."
+      : recording ? "Listening…"
       : status === "processing" ? "Finishing your test…"
-      : passed && desktopSetupError ? "Your voice test worked. Complete desktop setup before finishing onboarding."
-      : passed ? "Your voice test worked. Finish onboarding to check desktop setup."
-      : status === "error" ? "The test could not finish. Check the message above, then try again."
+      : passed && desktopSetupError ? "Voice test complete. Desktop setup needs attention."
+      : passed ? "Voice test complete. Choose Done to check desktop setup."
+      : status === "error" ? "The test could not finish."
       : attempted ? "No speech was recognized. Try again and speak for a few seconds."
-      : "Click Start Test when you’re ready to speak."}</span></p>
+      : "Ready when you are."}</span></p>
     <div className="voco-setup__transcript" role="region" aria-label="Test transcript" tabIndex={0}>
       {transcript && transcript !== "(no speech detected)" ? transcript : <span>Your words will appear here…</span>}
     </div>
-    <p className="voco-setup__privacy">Start Test turns on your microphone. Your speech stays on this computer; this test only displays words here.</p>
+    <p className="voco-setup__privacy">{!passed && !recording ? "Start test turns on your microphone. " : ""}Speech stays on this computer; this test only displays words here.</p>
     <div className="voco-setup__actions">
-      <div className="voco-voice-control" data-recording={recording}><button className="voco-button voco-button--secondary voco-voice-pill" disabled={busy || blocked || speakerPlaying}
-        onClick={recording ? onStop : onStart}><SettingsIcon name="microphone" /><span>{recording ? "Stop Test" : passed || status === "error" ? "Test again" : "Start Test"}</span></button><span className="voco-voice-pill__reveal"><VoiceSignal level={level} active={recording} /></span></div>
-      <button className="voco-button voco-button--primary" disabled={busy || blocked || failed || !(passed || (recording && transcript.trim() && transcript !== "(no speech detected)"))}
-        onClick={() => void onFinish()}>Finish Onboarding</button>
+      {passed && !recording ? <>
+        <button className="voco-button voco-button--primary" disabled={busy || blocked || failed || Boolean(desktopSetupError)} onClick={() => void onFinish()}>Done</button>
+        <button className="voco-button voco-button--ghost" disabled={busy || blocked} onClick={onStart}>Test again</button>
+      </> : <div className="voco-voice-control" data-recording={recording}>
+        <button className="voco-button voco-button--primary voco-voice-pill" disabled={recording ? busy : busy || blocked}
+          onClick={recording ? onStop : onStart}><SettingsIcon name="microphone" /><span>{recording ? "Finish test" : attempted || status === "error" ? "Test again" : "Start test"}</span></button>
+        <span className="voco-voice-pill__reveal"><VoiceSignal level={level} active={recording} /></span>
+      </div>}
     </div>
-    <p className="voco-setup__next">After setup, click in a text field and press <kbd>{hotkey}</kbd> to start or stop dictation.</p>
+    {passed && !recording ? <p className="voco-setup__next">Next, click in a text field and press <kbd>{hotkey}</kbd> to dictate.</p> : null}
   </section>;
 }

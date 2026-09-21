@@ -1,9 +1,13 @@
 # VOCO branding
 
-VOCO is a local-first Linux dictation app. The lead message is **Your voice,
-typed. Built for Linux.** Describe the core workflow before optional assistant
-integrations. Claims about local transcription apply to normal dictation;
-OpenClaw and Realtime have separate data flows, documented in the store listing.
+VOCO is a local English dictation app for Linux. The lead message is **Your voice,
+typed. Built for Linux.** Speech becomes text at the cursor, without an account,
+subscription or cloud transcription.
+
+Use calm, precise, brief copy and sentence case. Name the action: Start test,
+Finish test, Done, Change shortcut. Keep everyday controls visible and technical
+explanations in Help. Show recording, recovery and permission information when
+it matters; never trade truthful state or safe recovery for shorter copy.
 
 ## Identity
 
@@ -15,7 +19,7 @@ its entire body for status, or add tiny inscriptions that disappear at icon size
 - `assets/voco-logo.png`: square 1024px primary master, a broad simplified grille.
   Use for large launcher icons and promotional material.
 - `assets/voco-symbol.png`: square 1024px optical master, three broad channels and
-  a simpler support. Use for icons through 64px, app headers and realtime visuals.
+  a simpler support. Use for icons through 64px, app headers and status visuals.
 - `assets/voco-symbol-ui.png`: generated 128px derivative of the optical master.
   Frontend components import this lightweight file, not the 1024px source.
 - `assets/voco-readme-banner.svg`: self-contained graphite banner with the primary
@@ -41,7 +45,6 @@ shape and color; color alone is not the status channel:
 | Ready | Green check in a shield |
 | Recording | Red dot in a circle |
 | Processing | Amber hourglass in a diamond |
-| Realtime muted | Silver pause bars in a square |
 
 The native tray and frontend status legend consume the same generated PNGs in
 `apps/desktop/public/tray/`. Existing runtime tooltips and visible labels provide

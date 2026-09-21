@@ -36,7 +36,7 @@ separates published assets from source and qualification work.
 
 ## Dictate anywhere you type
 
-1. Open VOCO, click **Start Test**, speak, then **Finish Onboarding** once your words appear. Your default microphone and speaker are selected.
+1. Open VOCO, choose **Start test**, speak, then **Finish test**. Choose **Done** to check desktop setup and finish.
 2. Focus a text field, press `Alt+D`, and speak.
 3. Press `Alt+D` again to finish. Review your text before sending it.
 

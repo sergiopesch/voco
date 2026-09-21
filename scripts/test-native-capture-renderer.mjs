@@ -35,8 +35,8 @@ await writeFile(path.join(out, 'STYLE-SOURCE.json'), JSON.stringify({ mainSha256
 const results = [], errors = [], consoleWarnings = [];
 let server, browser, page;
 const chooseNative = async value => {
-    await page.getByRole('combobox', { name: 'Native input device', exact: true }).click();
-    await page.getByRole('listbox', { name: 'Native input device', exact: true }).locator(`[data-value="${value}"]`).click();
+    await page.getByRole('combobox', { name: 'Microphone', exact: true }).click();
+    await page.getByRole('listbox', { name: 'Microphone', exact: true }).locator(`[data-value="${value}"]`).click();
 };
 const save = (n, v) => writeFile(path.join(out, n), JSON.stringify(v, null, 2) + '\n', {
     flag: 'wx'
@@ -468,7 +468,7 @@ try {
             return previous(name,args);
           };
         });
-        await page.getByRole('button',{name:'Start Test',exact:true}).waitFor();
+        await page.getByRole('button',{name:'Start test',exact:true}).waitFor();
       };
       const noOutput = async () => {
         const calls = await page.evaluate(() => window.calls.map(c=>c[0]));
@@ -492,7 +492,7 @@ try {
           if (scenario !== 'onboarding-toggle') window.store.getState().setSurface('hidden');
         }, scenario);
         if (scenario === 'onboarding-toggle') {
-          await page.getByRole('button',{name:'Start Test',exact:true}).click();
+          await page.getByRole('button',{name:'Start test',exact:true}).click();
         } else {
           await page.evaluate(scenario => window.listeners['voco:toggle-dictation']({payload:
             scenario === 'browser-stop' ? {triggerId:'browser:pending-test',action:'start'} : null}), scenario);
@@ -530,90 +530,109 @@ try {
             return previous(name,args);
           };
         }, problem);
-        await page.getByRole('button',{name:'Start Test',exact:true}).click();
+        await page.getByRole('button',{name:'Start test',exact:true}).click();
         await page.getByRole('region',{name:'Test transcript'}).getByText('This is my voice test',{exact:true}).waitFor();
-        await page.getByRole('button',{name:'Finish Onboarding'}).click();
+        if (await page.getByRole('button',{name:'Finish test',exact:true}).count()) { await page.getByRole('button',{name:'Finish test',exact:true}).click(); await page.waitForFunction(()=>window.store.getState().onboardingTestPassed); }
+        await page.getByRole('button',{name:'Done',exact:true}).click();
         await page.waitForFunction(()=>window.store.getState().status==='idle');
         assert.equal(await page.evaluate(()=>window.config.onboardingCompleted),false,problem+' must block completion');
         await page.getByRole('button',{name:'Check desktop setup',exact:true}).waitFor();
         await noOutput();
         await page.evaluate(()=>{window.setupRepaired=true;});
-        await page.getByRole('button',{name:'Finish Onboarding'}).click();
+        await page.getByRole('button',{name:'Check desktop setup',exact:true}).click();
+        await page.getByRole('button',{name:'Done',exact:true}).waitFor();
+        if (await page.getByRole('button',{name:'Finish test',exact:true}).count()) { await page.getByRole('button',{name:'Finish test',exact:true}).click(); await page.waitForFunction(()=>window.store.getState().onboardingTestPassed); }
+        await page.getByRole('button',{name:'Done',exact:true}).click();
         await page.waitForFunction(()=>window.config.onboardingCompleted&&window.store.getState().surface==='hidden');
         await noOutput();
         results.push({case:'onboarding-blocks-'+problem+'-and-finishes-after-repair-without-external-cursor',passed:true});
       }
       await loadTest();
+      await page.getByRole('button',{name:'Change microphone',exact:true}).click();
+      await chooseNative('token-1');
+      await page.getByLabel('Allow microphone access for this session').check();
+      await page.getByRole('button',{name:'Use this microphone',exact:true}).click();
+      await page.waitForFunction(()=>window.store.getState().nativeCaptureSource?.selectionToken==='token-1');
+      await page.getByRole('button',{name:'Back to setup',exact:true}).click();
+      await page.getByRole('button',{name:'Start test',exact:true}).click();
+      await page.getByRole('region',{name:'Test transcript'}).getByText('This is my voice test',{exact:true}).waitFor();
+      assert.equal(await page.evaluate(()=>window.nativeCommands.filter(c=>c.name==='native_capture_select_source').length),1);
+      await page.getByRole('button',{name:'Finish test',exact:true}).click();
+      await page.waitForFunction(()=>window.store.getState().onboardingTestPassed);
+      await noOutput();
+      results.push({case:'change-microphone-return-to-setup-preserves-explicit-selection',passed:true});
+      await loadTest();
       assert.equal(await page.evaluate(()=>window.nativeCommands.some(c=>c.name==='native_capture_begin')),false);
-      assert.equal(await page.getByRole('button',{name:'Finish Onboarding'}).isDisabled(),true);
-      await page.getByRole('button',{name:'Test speaker',exact:true}).click();
-      await page.waitForFunction(()=>window.speakerTests===1 && window.contexts.every(c=>c.state==='closed'));
+      assert.equal(await page.getByRole('button',{name:'Done',exact:true}).count(),0);
+      assert.equal(await page.getByRole('button',{name:'Test speaker',exact:true}).count(),0);
       assert.equal(await page.evaluate(()=>window.nativeCommands.some(c=>c.name==='native_capture_begin')),false);
-      await page.evaluate(()=>window.store.getState().setNativeCaptureSource({...window.source,selectionToken:'previous-device'}));
-      await captureStyledPanel('onboarding-idle',page.getByRole('button',{name:'Start Test',exact:true}),{width:1100,height:800});
-      await page.getByRole('button',{name:'Start Test',exact:true}).click();
+      await page.evaluate(()=>{window.source={...window.source,selectionToken:'previous-device'};window.store.getState().setNativeCaptureSource(window.source);});
+      await captureStyledPanel('onboarding-idle',page.getByRole('button',{name:'Start test',exact:true}),{width:1100,height:800});
+      await page.getByRole('button',{name:'Start test',exact:true}).click();
       await page.getByRole('region',{name:'Test transcript'}).getByText('This is my voice test',{exact:true}).waitFor();
       assert.equal(await page.evaluate(()=>window.config.onboardingCompleted),false);
       assert.equal(await page.evaluate(()=>window.store.getState().surface),'onboarding');
-      assert.equal(await page.evaluate(()=>window.nativeCommands.filter(c=>c.name==='native_capture_select_source').length),1);
+      assert.equal(await page.evaluate(()=>window.store.getState().nativeCaptureSource.selectionToken),'previous-device');
       assert.ok(Number(await page.getByRole('meter',{name:'Microphone signal'}).getAttribute('aria-valuenow'))>0);
       await noOutput();
-      await captureStyledPanel('onboarding-listening',page.getByRole('button',{name:'Stop Test',exact:true}),{width:1100,height:800});
-      await page.getByRole('button',{name:'Stop Test',exact:true}).click();
+      await captureStyledPanel('onboarding-listening',page.getByRole('button',{name:'Finish test',exact:true}),{width:1100,height:800});
+      await page.getByRole('button',{name:'Finish test',exact:true}).click();
       await page.waitForFunction(()=>window.store.getState().onboardingTestPassed);
       assert.equal(await page.getByRole('region',{name:'Test transcript'}).innerText(),'This is my voice test.');
       assert.equal(await page.evaluate(()=>window.stopped&&window.ack===4),true);
       assert.equal(await page.evaluate(()=>window.config.onboardingCompleted),false);
       await noOutput();
-      await captureStyledPanel('onboarding-complete-test',page.getByRole('button',{name:'Finish Onboarding'}),{width:1100,height:800});
+      await captureStyledPanel('onboarding-complete-test',page.getByRole('button',{name:'Done'}),{width:1100,height:800});
       await page.setViewportSize({width:760,height:560});
-      await captureStyledPanel('onboarding-minimum-window',page.getByRole('button',{name:'Finish Onboarding'}),{width:760,height:560});
-      await page.getByRole('button',{name:'Finish Onboarding'}).click();
+      await captureStyledPanel('onboarding-minimum-window',page.getByRole('button',{name:'Done'}),{width:760,height:560});
+      if (await page.getByRole('button',{name:'Finish test',exact:true}).count()) { await page.getByRole('button',{name:'Finish test',exact:true}).click(); await page.waitForFunction(()=>window.store.getState().onboardingTestPassed); }
+        await page.getByRole('button',{name:'Done',exact:true}).click();
       await page.waitForFunction(()=>window.config.onboardingCompleted&&window.store.getState().surface==='hidden');
       results.push({case:'default-microphone-live-meter-transcript-stop-finish-no-external-output',passed:true});
       await page.setViewportSize({width:1100,height:800});
       await loadTest();
       await page.evaluate(()=>window.silentFixture=true);
-      await page.getByRole('button',{name:'Start Test',exact:true}).click();
+      await page.getByRole('button',{name:'Start test',exact:true}).click();
       await page.waitForFunction(()=>window.ack===4);
-      await page.getByRole('button',{name:'Stop Test',exact:true}).click();
+      await page.getByRole('button',{name:'Finish test',exact:true}).click();
       await page.waitForFunction(()=>window.store.getState().status==='idle');
-      assert.equal(await page.getByRole('button',{name:'Finish Onboarding'}).isDisabled(),true);
+      assert.equal(await page.getByRole('button',{name:'Done',exact:true}).count(),0);
       await page.getByText('No speech was recognized.',{exact:false}).waitFor();
       await noOutput();
       results.push({case:'silence-does-not-complete-onboarding',passed:true});
       await loadTest();
       await page.evaluate(()=>window.selectError='Microphone permission denied');
-      await page.getByRole('button',{name:'Start Test',exact:true}).click();
+      await page.getByRole('button',{name:'Start test',exact:true}).click();
       await page.getByText('Microphone permission denied',{exact:true}).waitFor();
       assert.equal(await page.evaluate(()=>window.nativeCommands.some(c=>c.name==='native_capture_begin')),false);
-      assert.equal(await page.getByRole('button',{name:'Finish Onboarding'}).isDisabled(),true);
+      assert.equal(await page.getByRole('button',{name:'Done',exact:true}).count(),0);
       results.push({case:'denied-access-does-not-record-or-complete',passed:true});
       await page.evaluate(()=>window.selectError=null);
-      await page.getByRole('button',{name:'Start Test',exact:true}).click();
+      await page.getByRole('button',{name:'Start test',exact:true}).click();
       await page.waitForFunction(()=>window.ack===4);
-      await page.getByRole('button',{name:'Stop Test',exact:true}).click();
+      await page.getByRole('button',{name:'Finish test',exact:true}).click();
       await page.waitForFunction(()=>window.store.getState().onboardingTestPassed);
       results.push({case:'retry-after-access-failure',passed:true});
       await loadTest();
       await page.evaluate(()=>window.recognitionError=true);
-      await page.getByRole('button',{name:'Start Test',exact:true}).click();
-      await page.getByText('Test paused. Stop Test, then try again.',{exact:true}).waitFor();
-      assert.equal(await page.getByRole('button',{name:'Finish Onboarding'}).isDisabled(),true);
+      await page.getByRole('button',{name:'Start test',exact:true}).click();
+      await page.getByText('Finish the test, then try again.',{exact:true}).waitFor();
+      assert.equal(await page.getByRole('button',{name:'Done',exact:true}).count(),0);
       assert.ok(!(await page.locator('body').innerText()).includes('[object Object]'));
-      await page.getByRole('button',{name:'Stop Test',exact:true}).click();
+      await page.getByRole('button',{name:'Finish test',exact:true}).click();
       await page.waitForFunction(()=>window.store.getState().status==='error');
       assert.equal(await page.evaluate(()=>window.config.onboardingCompleted),false);
       await page.evaluate(()=>window.recognitionError=false);
       await page.getByRole('button',{name:'Test again',exact:true}).click();
       await page.getByRole('region',{name:'Test transcript'}).getByText('This is my voice test',{exact:true}).waitFor();
-      await page.getByRole('button',{name:'Finish Onboarding'}).click();
+      if (await page.getByRole('button',{name:'Finish test',exact:true}).count()) { await page.getByRole('button',{name:'Finish test',exact:true}).click(); await page.waitForFunction(()=>window.store.getState().onboardingTestPassed); }
+        await page.getByRole('button',{name:'Done',exact:true}).click();
       await page.waitForFunction(()=>window.config.onboardingCompleted&&window.store.getState().surface==='hidden');
       assert.equal(await page.evaluate(()=>window.stopped&&window.ack===4),true);
       await noOutput();
-      results.push({case:'recognition-error-retry-and-finish-during-recording',passed:true});
+      results.push({case:'recognition-error-retry-flush-then-explicit-completion',passed:true});
       await loadTest();
-      await page.getByRole('button',{name:'Start Test',exact:true}).click();
+      await page.getByRole('button',{name:'Start test',exact:true}).click();
       await page.waitForFunction(()=>window.ack===4);
       await page.evaluate(()=>window.listeners['voco:toggle-dictation']?.({payload:null}));
       await page.waitForFunction(()=>window.store.getState().onboardingTestPassed);
@@ -644,17 +663,18 @@ try {
       await loadTest('off');
       await page.evaluate(()=>{window.config.selectedMic='previous-mic';window.store.getState().setConfig({...window.config});});
       assert.equal(await page.evaluate(()=>window.streamRequests||0),0);
-      await page.getByRole('button',{name:'Start Test',exact:true}).click();
+      await page.getByRole('button',{name:'Start test',exact:true}).click();
       await page.waitForFunction(()=>window.captureWorklet?.port.onmessage && window.store.getState().status==='recording');
       await page.evaluate(()=>window.captureWorklet.port.onmessage({data:{type:'samples',data:Float32Array.from({length:16000},(_,i)=>Math.sin(i/20)*.2)}}));
       await page.getByRole('region',{name:'Test transcript'}).getByText('This is my voice test',{exact:true}).waitFor();
-      await page.getByRole('button',{name:'Finish Onboarding'}).click();
+      if (await page.getByRole('button',{name:'Finish test',exact:true}).count()) { await page.getByRole('button',{name:'Finish test',exact:true}).click(); await page.waitForFunction(()=>window.store.getState().onboardingTestPassed); }
+        await page.getByRole('button',{name:'Done',exact:true}).click();
       await page.waitForFunction(()=>window.config.onboardingCompleted&&window.store.getState().surface==='hidden');
       assert.equal(await page.evaluate(()=>window.nativeCommands.some(c=>c.name==='native_capture_begin')),false);
       assert.equal(await page.evaluate(()=>window.tracks.every(t=>t.readyState==='ended')),true);
       await noOutput();
-      assert.equal(await page.evaluate(()=>window.config.selectedMic),null);
-      assert.equal(await page.evaluate(()=>window.store.getState().selectedDeviceId),null);
+      assert.equal(await page.evaluate(()=>window.config.selectedMic),'previous-mic');
+      assert.equal(await page.evaluate(()=>window.store.getState().selectedDeviceId),'previous-mic');
       results.push({case:'webkit-onboarding-capture-live-text-flush-and-finish',passed:true});
       assert.deepEqual(errors,[]);assert.deepEqual(consoleWarnings,[]);
       await save('RESULTS.json',{passed:true,results,errors,consoleWarnings,mockedCapture:true,mockedRecognition:true,physicalMicrophone:false});
@@ -667,16 +687,16 @@ try {
       await page.goto(origin+'/app-microphone-check?scenario='+scenario);
       await page.waitForFunction(()=>window.store && window.nativeCommands.some(x=>x.name==='native_capture_capabilities'));
       await page.evaluate(()=>window.store.getState().setSurface('settings'));
-      await page.getByRole('button',{name:'Microphone',exact:true}).click();
+      await page.getByRole('button',{name:'Settings',exact:true}).click();
     };
     await load('off');await page.getByRole('combobox', { name: /Input device/ }).waitFor();
     await page.waitForFunction(()=>window.store.getState().captureBackendMode==='webkit');assert.ok((await state()).enums>0);record(expected[0]);
     await load('pending');await page.getByRole('button',{name:'Retry capture setup'}).waitFor();await noCapture();assert.equal((await state()).mode,'pending');record(expected[1]);
     await load('error');await page.getByText('Capability unavailable',{exact:true}).waitFor();await noCapture();assert.equal((await state()).mode,'pending');record(expected[2]);
     await page.evaluate(()=>window.captureScenario='enabled');await page.getByRole('button',{name:'Retry capture setup'}).click();
-    await page.getByRole('combobox', { name: 'Native input device', exact: true }).waitFor();await noCapture();assert.equal((await state()).mode,'native');record(expected[3]);
-    await load('enabled');const select=page.getByRole('combobox', { name: 'Native input device', exact: true });await select.waitFor();await page.evaluate(()=>navigator.mediaDevices.dispatchEvent(new Event('devicechange')));await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));await noCapture();assert.equal(await page.getByRole('button',{name:'Retry microphone access',exact:true}).count(),0);record(expected[4]);
-    const use=page.getByRole('button',{name:'Use this microphone',exact:true});const consent=page.getByLabel('Allow native microphone access for this app session');
+    await page.getByRole('combobox', { name: 'Microphone', exact: true }).waitFor();await noCapture();assert.equal((await state()).mode,'native');record(expected[3]);
+    await load('enabled');const select=page.getByRole('combobox', { name: 'Microphone', exact: true });await select.waitFor();await page.evaluate(()=>navigator.mediaDevices.dispatchEvent(new Event('devicechange')));await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));await noCapture();assert.equal(await page.getByRole('button',{name:'Retry microphone access',exact:true}).count(),0);record(expected[4]);
+    const use=page.getByRole('button',{name:'Use this microphone',exact:true});const consent=page.getByLabel('Allow microphone access for this session');
     assert.equal(await use.isDisabled(),true);assert.equal(await consent.isDisabled(),true);assert.equal((await state()).source,null);record(expected[5]);
     await chooseNative('token-1');assert.equal(await use.isDisabled(),true);await noCapture();record(expected[6]);
     await consent.check();await use.click();await page.waitForFunction(()=>window.store.getState().nativeCaptureSource?.selectionToken==='token-1');await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));await noCapture();
@@ -684,13 +704,13 @@ try {
     await noCapture();
     await page.evaluate(()=>window.selectError='Selection expired');await consent.check();await use.click();await page.getByText('Selection expired',{exact:true}).waitFor();assert.equal((await state()).source,null);await noCapture();assert.equal((await state()).ready,false);record(expected[8]);
     await page.evaluate(()=>window.selectError=null);await chooseNative('system-default');await consent.check();await use.click();await page.waitForFunction(()=>window.store.getState().nativeCaptureSource?.selectionToken==='token-1');await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));assert.equal((await state()).commands.filter(x=>x.name==='native_capture_select_source').at(-1).args.selectionToken,'token-1');await noCapture();record(expected[9]);
-    await page.getByRole('button',{name:'Refresh native devices'}).click();await page.waitForFunction(()=>window.nativeCommands.filter(x=>x.name==='native_capture_list_sources').length>=2);await noCapture();record(expected[10]);
-    await page.evaluate(()=>window.catalog={revision:'r2',sources:[],defaultSelectionToken:null});await page.getByRole('button',{name:'Refresh native devices'}).click();await page.waitForFunction(()=>window.store.getState().nativeCaptureSource===null);await page.getByText('The microphone list changed. Choose and allow a microphone again.',{exact:true}).waitFor();await noCapture();assert.equal((await state()).ready,false);record(expected[11]);
-    await page.evaluate(()=>window.catalogError='Source server unavailable');await page.getByRole('button',{name:'Refresh native devices'}).click();await page.getByText('Source server unavailable',{exact:true}).waitFor();assert.equal((await state()).mode,'native');await noCapture();record(expected[12]);
+    await page.getByRole('button',{name:'Refresh devices'}).click();await page.waitForFunction(()=>window.nativeCommands.filter(x=>x.name==='native_capture_list_sources').length>=2);await noCapture();record(expected[10]);
+    await page.evaluate(()=>window.catalog={revision:'r2',sources:[],defaultSelectionToken:null});await page.getByRole('button',{name:'Refresh devices'}).click();await page.waitForFunction(()=>window.store.getState().nativeCaptureSource===null);await page.getByText('The microphone list changed. Choose and allow a microphone again.',{exact:true}).waitFor();await noCapture();assert.equal((await state()).ready,false);record(expected[11]);
+    await page.evaluate(()=>window.catalogError='Source server unavailable');await page.getByRole('button',{name:'Refresh devices'}).click();await page.getByText('Source server unavailable',{exact:true}).waitFor();assert.equal((await state()).mode,'native');await noCapture();record(expected[12]);
     expected.push('native-settings-without-preview');record('native-settings-without-preview');
     const originalExpected=[...expected];
     const activate=async(auditEnabled=false)=>{
-      await load('enabled');await chooseNative('token-1');await page.getByLabel('Allow native microphone access for this app session').check();await page.getByRole('button',{name:'Use this microphone',exact:true}).click();
+      await load('enabled');await chooseNative('token-1');await page.getByLabel('Allow microphone access for this session').check();await page.getByRole('button',{name:'Use this microphone',exact:true}).click();
       await page.waitForFunction(()=>window.store.getState().nativeCaptureSource!==null);
       await page.evaluate(enabled=>{window.auditEnabled=enabled;window.allowBegin=true;window.store.getState().setSurface('hidden');},auditEnabled);
       await page.waitForFunction(()=>window.listeners['voco:toggle-dictation']);
@@ -720,8 +740,8 @@ try {
     assert.equal((await state()).ready,true);assert.ok((await state()).source);assert.equal((await state()).commands.filter(x=>x.name==='native_capture_cancel').length,0);
     expected.push('native-user-cancel-retains-audio');record(expected.at(-1));
     await activate();await page.evaluate(()=>window.store.getState().setSurface('settings'));
-    await page.getByRole('button',{name:'Microphone',exact:true}).click();
-    await page.getByRole('combobox', { name: 'Native input device', exact: true }).waitFor();assert.equal(await page.getByRole('combobox', { name: 'Native input device', exact: true }).isDisabled(),true);
+    await page.getByRole('button',{name:'Settings',exact:true}).click();
+    await page.getByRole('combobox', { name: 'Microphone', exact: true }).waitFor();assert.equal(await page.getByRole('combobox', { name: 'Microphone', exact: true }).isDisabled(),true);
     assert.equal(await page.getByRole('button',{name:'Use this microphone',exact:true}).isDisabled(),true);
     assert.equal((await state()).commands.filter(x=>x.name==='native_capture_select_source').length,1);
     const listsBefore=(await state()).commands.filter(x=>x.name==='native_capture_list_sources').length;
@@ -736,12 +756,12 @@ try {
     assert.equal(await page.evaluate(()=>window.calls.filter(x=>x[0]==='transcribeAudio').length),0);
     assert.equal((await state()).streams,0);assert.equal((await state()).commands.filter(x=>x.name==='native_capture_begin').length,1);
     expected.push('native-tail-failure-retains-prefix-without-auto-transcription');record(expected.at(-1));
-    await load('enabled');await page.getByRole('combobox', { name: 'Native input device', exact: true }).waitFor();
+    await load('enabled');await page.getByRole('combobox', { name: 'Microphone', exact: true }).waitFor();
     await page.evaluate(()=>{window.source={...window.source,objectSerial:null};window.catalog={revision:'unsupported',sources:[window.source],defaultSelectionToken:'token-1'};});
-    await page.getByRole('button',{name:'Refresh native devices'}).click();
-    await page.getByRole('combobox', { name: 'Native input device', exact: true }).click();
+    await page.getByRole('button',{name:'Refresh devices'}).click();
+    await page.getByRole('combobox', { name: 'Microphone', exact: true }).click();
     await page.waitForFunction(()=>document.querySelector('[role="option"][data-value="system-default"]')?.getAttribute('aria-disabled')==='true');
-    await page.getByRole('combobox', { name: 'Native input device', exact: true }).press('Escape');
+    await page.getByRole('combobox', { name: 'Microphone', exact: true }).press('Escape');
     assert.equal(await page.getByRole('button',{name:'Use this microphone',exact:true}).isDisabled(),true);assert.equal((await state()).source,null);assert.equal((await state()).ready,false);await noCapture();
     expected.push('unsupported-default-source-cannot-be-approved');record(expected.at(-1));
     const beginAgain=async()=>{
@@ -767,10 +787,10 @@ try {
     await page.getByRole('button',{name:'Discard recovery',exact:true}).click();
     assert.equal((await state()).source,null);assert.equal((await state()).ready,false);
     await page.evaluate(()=>window.store.getState().setSurface('settings'));
-    await page.getByRole('button',{name:'Microphone',exact:true}).click();
-    await page.getByRole('button',{name:'Refresh native devices'}).click();
+    await page.getByRole('button',{name:'Settings',exact:true}).click();
+    await page.getByRole('button',{name:'Refresh devices'}).click();
     await chooseNative('token-1');
-    await page.getByLabel('Allow native microphone access for this app session').check();
+    await page.getByLabel('Allow microphone access for this session').check();
     await page.getByRole('button',{name:'Use this microphone',exact:true}).click();
     await page.waitForFunction(()=>window.store.getState().nativeCaptureSource!==null);
     assert.equal((await state()).commands.filter(x=>x.name==='native_capture_select_source').length,2);
@@ -788,7 +808,7 @@ try {
       } else {
         await noCapture();assert.equal(await page.evaluate(()=>window.workletLoads||0),0);
         await chooseNative('token-1');
-        await page.getByLabel('Allow native microphone access for this app session').check();
+        await page.getByLabel('Allow microphone access for this session').check();
         await page.getByRole('button',{name:'Use this microphone',exact:true}).click();
         await page.waitForFunction(()=>window.store.getState().microphoneReady===true);
         await page.evaluate(()=>window.store.getState().setMicrophonePermission('denied'));
@@ -798,7 +818,7 @@ try {
       expected.push('failed-setup-retry-'+recoveredMode+'-completes-initialization');record(expected.at(-1));
     }
     await load('enabled');await chooseNative('token-1');
-    await page.getByLabel('Allow native microphone access for this app session').check();
+    await page.getByLabel('Allow microphone access for this session').check();
     await page.getByRole('button',{name:'Use this microphone',exact:true}).click();
     await page.waitForFunction(()=>window.store.getState().nativeCaptureSource!==null);
     await page.evaluate(()=>window.store.getState().setSurface('hidden'));
@@ -809,7 +829,7 @@ try {
     assert.equal(await page.evaluate(()=>window.calls.filter(x=>x[0]==='transcribeAudio').length),0);
     expected.push('native-start-failure-revokes-grant-without-fallback');record(expected.at(-1));
     await load('enabled');await chooseNative('token-1');
-    await page.getByLabel('Allow native microphone access for this app session').check();
+    await page.getByLabel('Allow microphone access for this session').check();
     await page.getByRole('button',{name:'Use this microphone',exact:true}).click();
     await page.waitForFunction(()=>window.store.getState().nativeCaptureSource!==null);
     await page.evaluate(()=>{window.deferBegin=true;window.store.getState().setSurface('hidden');});
@@ -875,10 +895,10 @@ try {
     expected.push('drain-timeout-retains-exact-prefix-without-automatic-output');record(expected.at(-1));
     await page.getByRole('button',{name:'Discard recovery',exact:true}).click();
     await page.evaluate(()=>window.store.getState().setSurface('settings'));
-    await page.getByRole('button',{name:'Microphone',exact:true}).click();
-    await page.getByRole('button',{name:'Refresh native devices'}).click();
+    await page.getByRole('button',{name:'Settings',exact:true}).click();
+    await page.getByRole('button',{name:'Refresh devices'}).click();
     await chooseNative('token-1');
-    await page.getByLabel('Allow native microphone access for this app session').check();
+    await page.getByLabel('Allow microphone access for this session').check();
     await page.getByRole('button',{name:'Use this microphone',exact:true}).click();
     await page.waitForFunction(()=>window.store.getState().nativeCaptureSource!==null);
     await page.evaluate(()=>window.store.getState().setSurface('hidden'));
@@ -935,7 +955,7 @@ try {
     });
     await page.setViewportSize({ width: 420, height: 520 });
     await page.waitForFunction(() => (window.diagnosticRequests || 0) > 0);
-    await page.getByText('Shortcut configured: Alt+D. Start dictation from the tray.', { exact: false }).waitFor();
+    await page.getByText('Check shortcut setup in Help.', { exact: true }).waitFor();
     const footer = page.getByRole('button', { name: 'Microphone: Remapped voco_test_sink_8dacc27a8e4a4c8f.monitor', exact: true });
     await captureStyledPanel('shortcut-unavailable-popover-420x520', footer, { width: 420, height: 520 });
     await noCapture();
@@ -943,9 +963,10 @@ try {
 
     await page.setViewportSize({ width: 760, height: 560 });
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
-    await page.getByRole('button', { name: 'Shortcuts', exact: true }).click();
+    await page.getByRole('button', { name: 'Change shortcut', exact: true }).click();
+    await page.getByText('Shortcut help',{exact:true}).click();
     await page.getByText('No readable keyboard.', { exact: false }).waitFor();
-    await captureStyledPanel('shortcut-settings-760x560', page.getByRole('button', { name: 'Record shortcut', exact: true }), { width: 760, height: 560 });
+    await captureStyledPanel('shortcut-settings-760x560', page.getByRole('button', { name: 'Record keys', exact: true }), { width: 760, height: 560 });
     await captureStyledPanel('shortcut-settings-instructions-760x560', page.getByText('For IBus recording shortcuts, add VOCO Dictation in your desktop Input Sources settings, select it, then focus a text field. VOCO never switches your input source automatically.', { exact: true }), { width: 760, height: 560 });
     await page.evaluate(() => { window.shortcutObservation = { hotkey: 'Alt+D', route: 'ibus', state: 'focus-required', detail: 'Focus a supported input field.' }; });
     await page.getByText('Focus a text field with VOCO Dictation selected as your input source.', { exact: true }).waitFor();
@@ -959,7 +980,7 @@ try {
       window.deferDiagnostics = false;
     });
     await page.getByText('Shortcut configured: Alt+X. Start dictation from the tray.', { exact: false }).waitFor();
-    assert.equal(await page.getByText('Press Alt+D to dictate at your cursor.', { exact: true }).count(), 0);
+    assert.equal(await page.getByText('Focus a text field, then use your shortcut.', { exact: true }).count(), 0);
     await noCapture();
     expected.push('late-old-key-diagnostic-cannot-advertise-new-configuration'); record(expected.at(-1));
     const prepareDeferredDiagnostics = async () => {
@@ -984,17 +1005,17 @@ try {
         };
         window.store.getState().setSurface('popover');
       });
-      await page.getByText('Press Alt+D to dictate at your cursor.', { exact: false }).waitFor();
+      await page.getByText('Focus a text field, then use your shortcut.', { exact: true }).waitFor();
       await page.evaluate(() => { window.holdObserver = true; });
       await page.waitForFunction(() => typeof window.finishObserver === 'function');
     };
 
     await prepareDeferredDiagnostics();
     const pendingCalls = await page.evaluate(() => window.observerCalls);
-    await page.getByText('Shortcut configured: Alt+D. Start dictation from the tray.', { exact: false }).waitFor({ timeout: 3000 });
+    await page.getByText('Check shortcut setup in Help.', { exact: true }).waitFor({ timeout: 3000 });
     const openStarted = performance.now();
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
-    await page.getByRole('button', { name: 'Shortcuts', exact: true }).waitFor({ timeout: 3000 });
+    await page.getByRole('button', { name: 'Change shortcut', exact: true }).waitFor({ timeout: 3000 });
     assert.ok(performance.now() - openStarted < 3000, 'Pending observer must not block Settings');
     await page.waitForTimeout(2500); // Cross two poll intervals while the same backend call remains pending.
     assert.equal(await page.evaluate(() => window.observerCalls), pendingCalls);
@@ -1004,9 +1025,9 @@ try {
       await prepareDeferredDiagnostics();
       if (transition === 'save') {
         await page.getByRole('button', { name: 'Settings', exact: true }).click();
-        await page.getByRole('button', { name: 'Shortcuts', exact: true }).click();
+        await page.getByRole('button', { name: 'Change shortcut', exact: true }).click();
         await page.getByLabel('Start and stop listening', { exact: true }).fill('Alt+X');
-        await page.getByRole('button', { name: 'Save hotkey', exact: true }).click();
+        await page.getByRole('button', { name: 'Apply shortcut', exact: true }).click();
         await page.waitForFunction(() => window.savePending === true);
       } else if (transition === 'hide') {
         await page.evaluate(() => window.store.getState().setSurface('hidden'));
@@ -1020,7 +1041,7 @@ try {
         await new Promise(resolve => setTimeout(resolve, 50));
       });
       assert.equal(await page.evaluate(() => window.store.getState().ownedPreeditSetupState), setupBefore, 'Rejected late observer must not publish any diagnostics');
-      assert.equal(await page.getByText('Press Alt+D to dictate at your cursor.', { exact: false }).count(), 0);
+      assert.equal(await page.getByText('Focus a text field, then use your shortcut.', { exact: true }).count(), 0);
       if (transition === 'save') await page.evaluate(() => window.finishSave());
       await noCapture();
       expected.push('late-observer-after-' + transition + '-cannot-publish'); record(expected.at(-1));
