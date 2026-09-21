@@ -227,10 +227,17 @@ startup timing. The panel capsule remains horizontal and labels processing
 “Finishing” to match setup.
 
 The guided terminal installer retains the existing VOCO wordmark in wide colour
-terminals and uses a compact VOCO heading in narrow or static output. Only an
-active operation animates. Redirected output, TERM=dumb and NO_COLOR use static
+terminals and uses a compact VOCO heading in narrow or static output. Only
+measured download bytes update while receiving a file; the line settles
+to a check on completion. Average speed uses received bytes and elapsed time,
+with no invented percentage or ETA. Redirected output, TERM=dumb and NO_COLOR use
+static
 text without ANSI escapes. No logo reveal, artificial percentage, simulated
-typing or hidden package-manager prompts. New installs use Alt+D; upgrades keep
-the existing shortcut. Terminal completion hands off to the actual Start test,
+typing or hidden package-manager prompts. Downloads make at most three attempts
+and can continue a partial file during that
+run. Cancelling removes temporary payloads; a new installer run starts fresh.
+Failures retain a private diagnostic log and a short recovery action. Routine
+package details stay out of the main flow; APT and final readiness checks remain
+authoritative. New installs use Alt+D; upgrades keep the existing shortcut. Terminal completion hands off to the actual Start test,
 Finish test and Done controls; installation alone does not claim voice setup is
 complete.

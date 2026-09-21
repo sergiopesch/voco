@@ -71,6 +71,15 @@ try {
       await capture('onboarding-success');
       results.push({ engine: name, check: 'onboarding start/stop, level, explicit completion', passed: true });
 
+      for (const [state, label] of [['starting', 'Preparing…'], ['processing', 'Finishing…']]) {
+        await load(`surface=onboarding&state=${state}`);
+        assert.equal(await page.getByRole('button', { name: label, exact: true }).isDisabled(), true);
+        await capture(`onboarding-${state}`);
+      }
+      await load('surface=onboarding');
+      await page.getByRole('button', { name: 'Change microphone', exact: true }).click();
+      assert.equal(await page.getByRole('button', { name: 'Back to test', exact: true }).getAttribute('aria-expanded'), 'true');
+      await capture('onboarding-microphone');
       await load('surface=settings');
       await capture('settings');
       const combo = page.getByRole('combobox', { name: 'Microphone', exact: true });

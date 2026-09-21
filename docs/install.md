@@ -178,3 +178,16 @@ Microphone capture formats must be between 8 and 96 kHz, matching the bundled
 recognizer and recovery runtime. An unsupported format is rejected before recording
 starts; select a supported format in the system audio settings, then restart VOCO
 so its audio context uses the new format.
+
+### Installer presentation candidate
+
+The design branch shows measured download bytes and average speed in colour
+terminals, and static lines for redirected output, NO_COLOR or TERM=dumb. The
+progress has no estimated percentage or time remaining. Downloads make at most
+three attempts and continue partial transfers within that run when the server
+supports it. Interrupted runs remove temporary downloads; running the installer
+again starts fresh. Checksums are always verified before APT runs.
+
+A failed download prints the path to a private diagnostic log. A missing release
+file points to the versioned release page; connection failures suggest checking
+the connection and rerunning. Successful runs remove the temporary log.
