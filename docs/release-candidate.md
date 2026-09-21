@@ -4,12 +4,15 @@ The [latest published GitHub release](https://github.com/sergiopesch/voco/releas
 is authoritative for current downloads. A source version, local test receipt or
 private draft does not establish publication or installation.
 
-This source snapshot is **2026.0.47**, an unpublished Ubuntu/Debian installer
-and desktop readiness candidate. The current public Ubuntu/Debian release is
-**2026.0.45**, the onboarding and cursor-warning release.
-See [.47 candidate changes](releases/2026.0.47.md) and
-[verification scope](testing/wayland-install-2026-09-20.md). See [release notes](releases/2026.0.45.md) and
-[the review-fix record](testing/onboarding-2026-09-20-fixes.md) for checks and limits.
+The current public Ubuntu/Debian release and source snapshot are **2026.0.47**.
+It includes the approved onboarding, tray, settings and installer improvements,
+plus Wayland desktop readiness checks. The signed release tag and checksum
+manifests bind the complete package and source archive to the publisher key.
+All protected CI gates passed; the uploaded/downloaded assets were verified.
+See [.47 changes](releases/2026.0.47.md) and the attached provenance and validation
+records on [GitHub Releases](https://github.com/sergiopesch/voco/releases/tag/voco.2026.0.47).
+Installed-VM checks used synthetic audio and do not qualify physical microphones
+or every compositor/application.
 Fedora, openSUSE and Arch/Omarchy downloads remain at **2026.0.43**.
 Confirm publication and exact assets on GitHub before installing.
 

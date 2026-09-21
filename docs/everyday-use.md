@@ -1,11 +1,11 @@
 # Using VOCO
 
-In the .47 candidate, a successful voice test is followed by a desktop input check
+In .47, a successful voice test is followed by a desktop input check
 before onboarding completes. **Desktop setup required** means helpers or their
 service need attention; it is different from **No text cursor available**. Repair
 setup using the [installation guide](install.md), then retry the check.
 
-## First-time setup (design candidate)
+## First-time setup
 
 Choose **Start test** and speak. The signal moves with microphone input and your
 words appear here. Speech stays on this computer; the test never pastes into
@@ -18,8 +18,7 @@ successful test, VOCO checks desktop input automatically. **Your voice, ready.**
 shows your shortcut and explains that VOCO stays in the tray. **Done** rechecks
 readiness and saves completion. Changing microphones requires a new test. Silence,
 recognition failures and incomplete desktop setup keep onboarding open with an
-action to retry. These interface changes are on the isolated design branch and
-are not an installed or published release.
+action to retry.
 
 ## Dictation
 

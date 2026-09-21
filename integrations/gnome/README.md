@@ -1,6 +1,6 @@
 # VOCO GNOME panel
 
-This development integration keeps VOCO's microphone and active dictation capsule
+This optional GNOME Shell 46 integration keeps VOCO's microphone and active dictation capsule
 inside the system panel. It expands horizontally for Starting, Listening and
 Finishing, then contracts at idle. Review remains visible for unresolved recovery.
 The microphone and Stop button issue an explicit Stop during capture. At idle the
