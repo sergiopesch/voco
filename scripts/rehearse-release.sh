@@ -30,10 +30,6 @@ echo "  appimage: ${APPIMAGE_NAME}"
     echo "Installer still advertises a reserved hotkey or stale package size"
     exit 1
   fi
-  for installer in install scripts/lib/install-common.sh; do
-    grep -F 'Examples: Ctrl+Shift+V, Super+D, Alt+Shift+T' "${installer}" > /dev/null
-    grep -F 'existing config preserved' "${installer}" > /dev/null
-  done
   if grep -RInE 'raw.githubusercontent.com/.*/master/install|bash <\(curl|curl -s .*install' README.md docs install; then
     echo "Unsafe installer reference found in docs or helper comments"
     exit 1

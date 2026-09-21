@@ -36,6 +36,8 @@ import { useGlobalShortcut } from "@/hooks/useGlobalShortcut";
 import { useDictation } from "@/hooks/useDictation";
 import { useNativeCaptureSettings } from "@/hooks/useNativeCaptureSettings";
 import { ControlPanel } from "@/components/ControlPanel";
+import { StatusMark } from "@/components/StatusMark";
+import vocoBrandImage from "../../../assets/voco-symbol-ui.png";
 import { ConfigRecoveryPanel } from "@/components/ConfigRecoveryPanel";
 import { requiresVerifiedTextTarget } from "@/lib/dictationOutputPlan";
 import { probeMicrophoneAccess } from "@/lib/audioInput";
@@ -1119,7 +1121,9 @@ export function App() {
         </>
       );
     }
-    return null;
+    return <main className="voco-panel" data-surface="onboarding"><section className="voco-panel__shell voco-opening">
+      <img src={vocoBrandImage} alt="" /><h1>VOCO</h1><p role="status"><StatusMark state="working" />Opening VOCO…</p>
+    </section></main>;
   }
 
   if (surface === "hidden") return null;

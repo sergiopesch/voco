@@ -3,7 +3,7 @@ export function presentation(state) {
     if (!state || state.version !== 1 || typeof state.token !== 'string')
         throw new Error('Unsupported VOCO panel state');
     const labels = {idle: '', initializing: 'Starting VOCO', starting: 'Starting', recording: 'Listening',
-        processing: 'Processing', recovery: 'Review', attention: 'Check setup'};
+        processing: 'Finishing', recovery: 'Review', attention: 'Check setup'};
     if (!Object.hasOwn(labels, state.status)) throw new Error('Unknown VOCO state');
     return {
         ...state,

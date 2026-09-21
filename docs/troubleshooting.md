@@ -10,7 +10,7 @@ must run with accessible device and socket permissions for your login. Follow
 
 The .46 candidate installs the helpers explicitly and checks desktop input before
 saving onboarding completion. After repairing setup, click **Check desktop setup**
-and **Finish Onboarding**; the voice test does not need an external text field.
+and **Done** on the design branch; the voice test does not need an external text field.
 With .46 you can also run `voco --check-desktop-input`. It checks prerequisites
 without launching VOCO, recording speech, copying text or sending keystrokes.
 A passing check still requires a real dictation trial in your intended application.

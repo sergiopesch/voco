@@ -33,6 +33,7 @@ try {
           window.__fixtureViolations.push('microphone'); throw new Error('Fixture must not capture');
         };
         window.__TAURI_INTERNALS__ = { invoke: async command => {
+          if (command === 'get_desktop_input_status') return {available:true,detail:'Fixture desktop prerequisites ready'};
           window.__fixtureViolations.push(command); throw new Error('Fixture must not invoke native commands');
         } };
       });
@@ -63,8 +64,10 @@ try {
       await capture('onboarding-listening');
       await page.getByRole('button', { name: 'Finish test', exact: true }).click();
       assert.equal(await page.getByRole('meter', { name: 'Microphone signal' }).count(), 0);
+      await page.getByRole('button', { name: 'Done', exact: true }).waitFor();
       assert.equal(await page.getByRole('button', { name: 'Done', exact: true }).isEnabled(), true);
-      assert.equal(await page.getByText('Voice test complete. Choose Done to check desktop setup.', { exact: true }).count(), 1);
+      assert.equal(await page.getByRole('button', { name: 'Done', exact: true }).evaluate(el=>el===document.activeElement),true);
+      assert.equal(await page.getByText('Voice test complete.', { exact: true }).count(), 1);
       await capture('onboarding-success');
       results.push({ engine: name, check: 'onboarding start/stop, level, explicit completion', passed: true });
 

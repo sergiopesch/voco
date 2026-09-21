@@ -69,13 +69,14 @@ migrate retired output/assistant settings to direct dictation. A purge is unnece
 ## First launch
 
 Open VOCO from the application menu. Your system microphone and speaker
-are selected. Click **Start Test**, speak, and check that the signal band moves
-and your words appear. In the .46 candidate, **Finish Onboarding** also checks desktop input prerequisites.
+are selected. Click **Start test**, speak, and check that the signal band moves
+and your words appear. On the design branch, choose **Finish test**. VOCO then checks desktop input
+prerequisites before showing **Your voice, ready.** and **Done**.
 If setup needs attention, complete the indicated setup and click **Check desktop setup**.
 Your successful voice test remains available; an external cursor is not required
 for this check. Once onboarding finishes, focus a text field.
 Press **Alt+D** to start and again to stop. You can change the shortcut in
-Settings. Known terminal paste shortcuts are selected automatically.
+the **Shortcut** section. Known terminal paste shortcuts are selected automatically.
 
 VOCO requires a verifiable editable cursor before automatic desktop
 dictation. If no cursor is available, VOCO displays a notification; click in an

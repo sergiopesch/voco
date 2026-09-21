@@ -211,3 +211,26 @@ The dev-only `/tests/brand-motion.html` fixture supports `surface=onboarding`,
 this is not a microphone or native desktop trial and is not a production entry.
 Use the full native-capture renderer suite for the mocked App/recording integration,
 and separately qualify installed WebKitGTK and physical audio before release.
+
+### First-run continuity
+
+Setup keeps microphone selection inline and uses real capture levels. Working
+labels distinguish Preparing, Listening, Finishing and Checking setup. A passed
+voice test is retained while desktop prerequisites are repaired. Only verified
+readiness reveals “Your voice, ready.”, the configured shortcut and the tray
+handoff. Phase changes move keyboard focus to the next primary action.
+
+The opening renderer uses the original microphone asset and a working indicator
+while configuration loads. Native window presentation still controls whether
+that state is visible during cold launch; a browser fixture is not proof of native
+startup timing. The panel capsule remains horizontal and labels processing
+“Finishing” to match setup.
+
+The guided terminal installer retains the existing VOCO wordmark in wide colour
+terminals and uses a compact VOCO heading in narrow or static output. Only an
+active operation animates. Redirected output, TERM=dumb and NO_COLOR use static
+text without ANSI escapes. No logo reveal, artificial percentage, simulated
+typing or hidden package-manager prompts. New installs use Alt+D; upgrades keep
+the existing shortcut. Terminal completion hands off to the actual Start test,
+Finish test and Done controls; installation alone does not claim voice setup is
+complete.

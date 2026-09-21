@@ -434,8 +434,6 @@ voco_run_hotkey_setup() {
   local hotkey="${1:-Alt+D}"
   local config_dir="${HOME}/.config/voco"
   local config_file="${config_dir}/config.json"
-  local session_type="${XDG_SESSION_TYPE:-x11}"
-  local alternate_wayland_hotkey="Alt+Shift+D"
   local existing_hotkey=""
   local existing_hotkey_valid=false
   local config_exists=false
@@ -496,61 +494,9 @@ voco_run_hotkey_setup() {
     warn "Legacy Voice config is a symlink, is not a regular user-owned file, or could not be copied; it was preserved without modification."
   fi
 
-  echo
-  echo -e "  ${BOLD}${GRAPHITE}Quick Setup${NC}"
-  echo
-  echo -e "  VOCO uses a global hotkey to start and stop listening."
-  if [[ "${existing_hotkey_valid}" == true ]]; then
-    echo -e "  Your current hotkey is ${BOLD}${hotkey}${NC} — use it with a text field focused."
-  else
-    echo -e "  The default is ${BOLD}${hotkey}${NC} — use it with a text field focused."
-  fi
-  echo
-
-  if [[ -t 0 ]]; then
-    printf "  ${WHITE}${BOLD}▸${NC} Happy with ${BOLD}%s${NC}? [Y/n] " "${hotkey}"
-    read -r ANSWER </dev/tty 2>/dev/null || ANSWER="y"
-    ANSWER="${ANSWER:-y}"
-
-    if [[ "$ANSWER" =~ ^[Nn] ]]; then
-      echo
-      if [[ "$session_type" == "wayland" ]]; then
-        echo -e "  ${DIM}Wayland note: VOCO is currently most reliable with ${BOLD}Alt+D${NC}${DIM} or ${BOLD}${alternate_wayland_hotkey}${NC}${DIM}.${NC}"
-        printf "  ${WHITE}${BOLD}▸${NC} Use ${BOLD}%s${NC} instead? [y/N] " "${alternate_wayland_hotkey}"
-        read -r WAYLAND_ALTERNATE </dev/tty 2>/dev/null || WAYLAND_ALTERNATE="n"
-        WAYLAND_ALTERNATE="${WAYLAND_ALTERNATE:-n}"
-
-        if [[ "$WAYLAND_ALTERNATE" =~ ^[Yy] ]]; then
-          hotkey="$alternate_wayland_hotkey"
-          ok "Hotkey set to ${BOLD}${hotkey}${NC}"
-        else
-          warn "Keeping ${BOLD}${hotkey}${NC}. Change it later from the tray if needed."
-          dim "Custom hotkeys may be less reliable on Wayland right now."
-        fi
-      else
-        echo -e "  ${DIM}Examples: Ctrl+Shift+V, Super+D, Alt+Shift+T${NC}"
-        while true; do
-          printf "  ${WHITE}${BOLD}▸${NC} Enter your preferred hotkey: "
-          read -r CUSTOM_HOTKEY </dev/tty 2>/dev/null || CUSTOM_HOTKEY=""
-          CUSTOM_HOTKEY="$(voco_trim "${CUSTOM_HOTKEY}")"
-          if [[ -z "${CUSTOM_HOTKEY}" ]]; then
-            ok "Keeping ${BOLD}${hotkey}${NC}"
-            break
-          fi
-          if voco_validate_hotkey "${CUSTOM_HOTKEY}"; then
-            hotkey="${CUSTOM_HOTKEY}"
-            ok "Hotkey set to ${BOLD}${hotkey}${NC}"
-            break
-          fi
-          warn "${VOCO_HOTKEY_VALIDATION_ERROR} Try another hotkey."
-        done
-      fi
-    else
-      ok "Hotkey: ${BOLD}${hotkey}${NC}"
-    fi
-  elif [[ "${config_exists}" == true ]]; then
+  if [[ "${config_exists}" == true ]]; then
     if [[ "${existing_hotkey_valid}" == true ]]; then
-      ok "Hotkey: ${BOLD}${hotkey}${NC} (existing config preserved)"
+      ok "Shortcut: ${hotkey} (existing settings kept)"
     else
       warn "Existing config preserved; VOCO will validate its hotkey on launch."
     fi
@@ -558,7 +504,7 @@ voco_run_hotkey_setup() {
     VOCO_CONFIG_FILE="${config_file}"
     return 0
   else
-    ok "Hotkey: ${BOLD}${hotkey}${NC} (default)"
+    ok "Shortcut: ${hotkey}"
   fi
 
   mkdir -p -m 0700 "${config_dir}"
@@ -574,7 +520,6 @@ voco_run_hotkey_setup() {
     fi
   else
     voco_write_default_config "${config_file}" "${hotkey}"
-    dim "Config saved to ${config_file}"
   fi
   chmod 0600 "${config_file}"
 

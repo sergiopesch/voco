@@ -10,11 +10,13 @@ setup using the [installation guide](install.md), then retry the check.
 Choose **Start test** and speak. The signal moves with microphone input and your
 words appear here. Speech stays on this computer; the test never pastes into
 other apps or changes the clipboard. Choose **Change microphone** to select a
-different input, then **Back to setup**. VOCO uses your selection, or the system
+different input inside setup, then **Back to test**. VOCO uses your selection, or the system
 default if you have not selected a microphone.
 
 Choose **Finish test** to stop capture and collect the final words. After a
-successful test, **Done** checks desktop input and saves completion. Silence,
+successful test, VOCO checks desktop input automatically. **Your voice, ready.**
+shows your shortcut and explains that VOCO stays in the tray. **Done** rechecks
+readiness and saves completion. Changing microphones requires a new test. Silence,
 recognition failures and incomplete desktop setup keep onboarding open with an
 action to retry. These interface changes are on the isolated design branch and
 are not an installed or published release.

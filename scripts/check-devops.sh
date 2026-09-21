@@ -43,10 +43,6 @@ bash -n \
 
 bash scripts/test-verify-release.sh
 
-for installer in install scripts/lib/install-common.sh; do
-  rg -q 'local session_type="\$\{XDG_SESSION_TYPE:-x11\}"' "${installer}"
-  rg -q 'local alternate_wayland_hotkey="Alt\+Shift\+D"' "${installer}"
-done
 PYTHONDONTWRITEBYTECODE=1 python3 - <<'PY'
 import re
 from pathlib import Path

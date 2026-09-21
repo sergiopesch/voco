@@ -2,7 +2,7 @@ import { DeviceSelect } from "./DeviceSelect";
 import { StatusMark } from "./StatusMark";
 import { VoiceSignal } from "./VoiceSignal";
 import { Tooltip } from "./Tooltip";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent, PointerEvent } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import type {
@@ -216,6 +216,9 @@ export function ControlPanel({
   const audioLevel = useStore(state => state.audioLevel);
   const [inputReadiness, setInputReadiness] = useState<DesktopInputStatus | null>(null);
   const [checkingInput, setCheckingInput] = useState(false);
+  const inputCheckRequest = useRef(0);
+  const checkedVoiceTest = useRef(false);
+  const previousMicrophone = useRef(nativeMicrophone?.selected?.selectionToken ?? selectedDeviceId);
   const desktopInput = isOnboarding ? inputReadiness ?? runtimeDiagnostics?.desktopInput : runtimeDiagnostics?.desktopInput;
   const desktopSetupError = desktopInput?.available === false ? desktopInput.detail : null;
   const testPassed = useStore(state => state.onboardingTestPassed);
@@ -613,7 +616,8 @@ export function ControlPanel({
     hidePanel();
   }
 
-  async function checkDesktopSetup(): Promise<boolean> {
+  const checkDesktopSetup = useCallback(async (): Promise<boolean> => {
+    const request = ++inputCheckRequest.current;
     setCheckingInput(true);
     let timeout: ReturnType<typeof setTimeout> | undefined;
     try {
@@ -622,16 +626,34 @@ export function ControlPanel({
         new Promise<null>(resolve => { timeout = setTimeout(() => resolve(null), 3500); }),
       ]);
       if (!result || typeof result.available !== "boolean") throw new Error("Missing readiness result");
+      if (request !== inputCheckRequest.current) return false;
       setInputReadiness(result);
       return result.available;
     } catch {
-      setInputReadiness({ available: false, detail: "Could not check desktop input. Check desktop setup again before finishing onboarding." });
+      if (request === inputCheckRequest.current) setInputReadiness({ available: false, detail: "Couldn’t check desktop setup. Check again, or open the setup instructions." });
       return false;
     } finally {
       if (timeout !== undefined) clearTimeout(timeout);
-      setCheckingInput(false);
+      if (request === inputCheckRequest.current) setCheckingInput(false);
     }
-  }
+  }, []);
+
+  useEffect(() => () => { inputCheckRequest.current += 1; checkedVoiceTest.current = false; }, []);
+  useEffect(() => {
+    if (!testPassed) {
+      checkedVoiceTest.current = false;
+      return;
+    }
+    if (isOnboarding && !dictationBusy && !checkedVoiceTest.current) {
+      checkedVoiceTest.current = true;
+      void checkDesktopSetup();
+    }
+  }, [testPassed, isOnboarding, dictationBusy, checkDesktopSetup]);
+  useEffect(() => {
+    const microphone = nativeMicrophone?.selected?.selectionToken ?? selectedDeviceId;
+    if (microphone !== previousMicrophone.current && isOnboarding) useStore.getState().setOnboardingTestPassed(false);
+    previousMicrophone.current = microphone;
+  }, [nativeMicrophone?.selected?.selectionToken, selectedDeviceId, isOnboarding]);
 
   async function prepareFirstDictation() {
     if (saving || finishingTest || testPreparing || checkingInput) return;
@@ -851,7 +873,13 @@ export function ControlPanel({
             preparing={testPreparing || finishingTest}
             saving={saving}
             blocked={Boolean(recovery && testPurpose !== "onboarding") || !onStartTest || nativeMicrophone?.mode === "pending"}
-            onChangeMicrophone={() => void onOpenSettings("Audio")}
+            desktopReady={inputReadiness?.available === true}
+            microphoneControls={nativePreviewDisabled && nativeMicrophone
+              ? <NativeMicrophoneSettings controls={nativeMicrophone} disabled={dictationBusy || testPreparing} showError={false} />
+              : <div className="voco-preferences__form"><DeviceSelect label="Microphone" value={selectedDeviceId ?? ""} disabled={saving || dictationBusy || testPreparing}
+                  onChange={value => void selectMicrophone(value || null)} options={[{value: "", label: "System default"}, ...availableDevices.map(device => ({value: device.deviceId, label: device.label}))]} />
+                <button className="voco-button voco-button--ghost" disabled={saving || dictationBusy || testPreparing} onClick={() => void onRefreshDevices()}>Refresh devices</button>
+                {microphoneSaveError ? <p role="alert">{microphoneSaveError}</p> : null}</div>}
             hotkey={config.hotkey}
             onStart={() => onStartTest?.()}
             onStop={() => onStopTest?.()}
@@ -896,7 +924,7 @@ export function ControlPanel({
                           options={[{ value: "", label: "System default" }, ...availableDevices.map(device => ({ value: device.deviceId, label: device.label }))]} />
                       </div>
                       {microphoneSaveError ? <div className="voco-inline-note voco-inline-note--error" role="alert">{microphoneSaveError}</div> : null}
-                      <div className="voco-preferences__actions"><button className="voco-button voco-button--ghost" onClick={() => void onRefreshDevices()}>Refresh devices</button></div>
+                      <div className="voco-preferences__actions"><button className="voco-button voco-button--ghost" disabled={saving || dictationBusy || testPreparing} onClick={() => void onRefreshDevices()}>Refresh devices</button></div>
                     </div>
                   </div>
                   {activeSection !== "Audio" ? <button className="voco-button voco-button--secondary" disabled={dictationBusy} onClick={() => setActiveSection("Audio")}>Test microphone</button> : <div className="voco-preferences__group"><h3 className="voco-preferences__group-title">Sound check</h3>

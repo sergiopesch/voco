@@ -77,3 +77,16 @@
 .voco-panel .voco-device-select span { text-transform: none; letter-spacing: normal; color: inherit; font-size: inherit; font-weight: inherit; }
 .voco-popover__footer > .voco-tooltip { position: absolute; left: 0; top: 8px; width: calc(100% - 80px); max-width: none; }
 .voco-popover__footer > .voco-tooltip > .voco-device-picker { position: relative; top: auto; max-width: 100%; }
+
+.voco-opening { display: grid; place-content: center; justify-items: center; gap: 12px; min-height: 100%; }
+.voco-opening > img { width: 72px; height: 72px; object-fit: contain; }
+.voco-opening > h1, .voco-opening > p { margin: 0; }
+.voco-opening > p { display: flex; align-items: center; gap: 8px; }
+.voco-setup__microphone, .voco-setup__handoff { animation: voco-feedback-in var(--voco-motion-settle) var(--voco-motion-ease); }
+.voco-setup__microphone { padding: 16px; border: 1px solid var(--voco-divider); border-radius: 14px; }
+.voco-setup__details p { overflow-wrap: anywhere; font-size: 13px; line-height: 1.5; }
+.voco-setup__handoff p { margin: 0 0 12px; line-height: 1.7; }
+.voco-setup__handoff p:last-child { color: var(--voco-muted); font-size: 13px; }
+@media (prefers-reduced-motion: reduce) {
+  .voco-setup__microphone, .voco-setup__handoff { animation: none; }
+}

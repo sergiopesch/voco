@@ -533,10 +533,17 @@ try {
         await page.getByRole('button',{name:'Start test',exact:true}).click();
         await page.getByRole('region',{name:'Test transcript'}).getByText('This is my voice test',{exact:true}).waitFor();
         if (await page.getByRole('button',{name:'Finish test',exact:true}).count()) { await page.getByRole('button',{name:'Finish test',exact:true}).click(); await page.waitForFunction(()=>window.store.getState().onboardingTestPassed); }
-        await page.getByRole('button',{name:'Done',exact:true}).click();
         await page.waitForFunction(()=>window.store.getState().status==='idle');
         assert.equal(await page.evaluate(()=>window.config.onboardingCompleted),false,problem+' must block completion');
         await page.getByRole('button',{name:'Check desktop setup',exact:true}).waitFor();
+        assert.equal(await page.getByRole('button',{name:'Done',exact:true}).count(),0);
+        assert.equal(await page.getByText('VOCO stays in your tray.',{exact:true}).count(),0);
+        assert.equal(await page.evaluate(()=>window.store.getState().onboardingTestPassed),true);
+        if (problem === 'missing-helper') {
+          await page.setViewportSize({width:760,height:560});
+          await captureStyledPanel('onboarding-desktop-repair',page.getByRole('button',{name:'Check desktop setup',exact:true}),{width:760,height:560});
+          await page.setViewportSize({width:1100,height:800});
+        }
         await noOutput();
         await page.evaluate(()=>{window.setupRepaired=true;});
         await page.getByRole('button',{name:'Check desktop setup',exact:true}).click();
@@ -549,11 +556,14 @@ try {
       }
       await loadTest();
       await page.getByRole('button',{name:'Change microphone',exact:true}).click();
+      await page.setViewportSize({width:760,height:560});
+      await captureStyledPanel('onboarding-inline-microphone',page.getByRole('button',{name:'Back to test',exact:true}),{width:760,height:560});
+      await page.setViewportSize({width:1100,height:800});
       await chooseNative('token-1');
       await page.getByLabel('Allow microphone access for this session').check();
       await page.getByRole('button',{name:'Use this microphone',exact:true}).click();
       await page.waitForFunction(()=>window.store.getState().nativeCaptureSource?.selectionToken==='token-1');
-      await page.getByRole('button',{name:'Back to setup',exact:true}).click();
+      await page.getByRole('button',{name:'Back to test',exact:true}).click();
       await page.getByRole('button',{name:'Start test',exact:true}).click();
       await page.getByRole('region',{name:'Test transcript'}).getByText('This is my voice test',{exact:true}).waitFor();
       assert.equal(await page.evaluate(()=>window.nativeCommands.filter(c=>c.name==='native_capture_select_source').length),1);
@@ -597,7 +607,7 @@ try {
       await page.getByRole('button',{name:'Finish test',exact:true}).click();
       await page.waitForFunction(()=>window.store.getState().status==='idle');
       assert.equal(await page.getByRole('button',{name:'Done',exact:true}).count(),0);
-      await page.getByText('No speech was recognized.',{exact:false}).waitFor();
+      await page.getByText('No speech detected.',{exact:false}).waitFor();
       await noOutput();
       results.push({case:'silence-does-not-complete-onboarding',passed:true});
       await loadTest();
@@ -608,7 +618,7 @@ try {
       assert.equal(await page.getByRole('button',{name:'Done',exact:true}).count(),0);
       results.push({case:'denied-access-does-not-record-or-complete',passed:true});
       await page.evaluate(()=>window.selectError=null);
-      await page.getByRole('button',{name:'Start test',exact:true}).click();
+      await page.getByRole('button',{name:'Test again',exact:true}).click();
       await page.waitForFunction(()=>window.ack===4);
       await page.getByRole('button',{name:'Finish test',exact:true}).click();
       await page.waitForFunction(()=>window.store.getState().onboardingTestPassed);
