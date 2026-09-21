@@ -16,8 +16,9 @@ icons, status motion and horizontal GNOME panel capsule remain intact.
 - The compact tray uses one shortcut hint and direct Help access. The ready state
   fits 420 × 380 without document scrolling. Recovery text, partial-delivery
   warnings, explicit copying and discard actions retain their previous behavior.
-- Settings combines Microphone and Shortcut. Updates and symptom-based Help are
-  secondary destinations. Shortcut editing has explicit Apply/Cancel and restores
+- Settings contains microphone controls; Shortcut has its own sidebar section
+  following the user review. The default remains Alt+D. Updates and symptom-based
+  Help are secondary destinations. Shortcut editing has explicit Apply/Cancel and restores
   keyboard focus. Technical microphone and shortcut details use disclosures.
 - General settings does not start the browser microphone preview. Test microphone
   or an explicit microphone-settings entry opens it; active dictation pauses it.
@@ -68,3 +69,11 @@ Local receipts and screenshots are under `brand-motion-evidence/ux-delivery`,
 `ux-onboarding-final-2`, `ux-native-delivery`, and `ux-webkit-fixture-3` alongside
 the isolated checkout. The minimum settings window intentionally scrolls;
 controls remain reachable. The compact ready tray does not need scrolling.
+
+The separate Shortcut section was subsequently checked at 760 × 560 without
+content scrolling. Presentation screenshots restore Alt+D after testing a custom
+binding, so the editing fixture does not imply a different default.
+
+Follow-up receipts: `shortcut-section` (five presentation groups, refreshed
+Alt+D screenshots) and `shortcut-section-native` (42 native renderer cases).
+Type checking, 442 frontend tests, lint and the frontend build passed again.

@@ -38,8 +38,9 @@ not rewrite the entire message after Stop.
 
 ## Settings
 
-Settings brings Microphone and Shortcut together. Updates and Help are separate
-destinations; Help groups troubleshooting by symptom. Drag the top bar or the VOCO brand area to move the window.
+Settings contains microphone controls. Shortcut has its own sidebar section,
+with **Alt+D** as the default. Updates and Help are separate destinations; Help
+groups troubleshooting by symptom. Drag the top bar or the VOCO brand area to move the window.
 Resize using its edges. Hide to tray closes the panel without quitting.
 
 There is one output behavior: direct cursor dictation. Assistant integrations,

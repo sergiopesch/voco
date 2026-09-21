@@ -99,7 +99,7 @@ const PANEL_SECTION_LABELS: Record<PanelSection, string> = {
   General: "Settings",
   Audio: "Microphone",
   Output: "Dictation",
-  Hotkeys: "Shortcuts",
+  Hotkeys: "Shortcut",
   Updates: "Updates",
   Advanced: "Help",
 };
@@ -191,7 +191,7 @@ export function ControlPanel({
   const wasEditingShortcut = useRef(false);
   const headingContainerRef = useRef<HTMLElement>(null);
   const saving = savingCount > 0;
-  const mainSettings = ["General", "Audio", "Hotkeys"].includes(activeSection);
+  const mainSettings = ["General", "Audio"].includes(activeSection);
   const [microphoneSaveError, setMicrophoneSaveError] = useState<string | null>(null);
   const [copyStatus, setCopyStatus] = useState<{ id: string; text: string; outcome: "success" | "attention" } | null>(null);
   const previousCloseRequestRef = useRef(closeRequestId);
@@ -865,6 +865,7 @@ export function ControlPanel({
               </div>
               <nav className="voco-preferences__nav" aria-label="Settings sections">
                 {renderSettingsNavigation("General")}
+                {renderSettingsNavigation("Hotkeys")}
               </nav>
               <nav className="voco-preferences__nav-bottom" aria-label="App settings">
                 {(["Updates", "Advanced"] as const).map(renderSettingsNavigation)}
@@ -913,9 +914,9 @@ export function ControlPanel({
                 </section>
               ) : null}
 
-              {mainSettings ? (
+              {activeSection === "Hotkeys" ? (
                 <section className="voco-preferences__page">
-                  <h3 className="voco-preferences__group-title">Shortcut</h3>
+                  <div className="voco-preferences__heading"><h2 tabIndex={-1}>Shortcut</h2></div>
                   <div className="voco-preferences__group">
                     <div className="voco-preferences__card voco-preferences__form">
                       {!editingShortcut ? <div className="voco-preferences__shortcut-summary"><span>Start and stop dictation</span><kbd className="voco-glass voco-shortcut">{config.hotkey}</kbd><button className="voco-button voco-button--secondary" ref={shortcutEditButtonRef} onClick={() => setEditingShortcut(true)}>Change shortcut</button></div> : <div className="voco-preferences__shortcut-editor">

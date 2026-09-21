@@ -963,7 +963,8 @@ try {
 
     await page.setViewportSize({ width: 760, height: 560 });
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
-    await page.getByRole('button', { name: 'Change shortcut', exact: true }).click();
+    await page.getByRole('button', { name: 'Shortcut', exact: true }).click();
+        await page.getByRole('button', { name: 'Change shortcut', exact: true }).click();
     await page.getByText('Shortcut help',{exact:true}).click();
     await page.getByText('No readable keyboard.', { exact: false }).waitFor();
     await captureStyledPanel('shortcut-settings-760x560', page.getByRole('button', { name: 'Record keys', exact: true }), { width: 760, height: 560 });
@@ -1015,7 +1016,7 @@ try {
     await page.getByText('Check shortcut setup in Help.', { exact: true }).waitFor({ timeout: 3000 });
     const openStarted = performance.now();
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
-    await page.getByRole('button', { name: 'Change shortcut', exact: true }).waitFor({ timeout: 3000 });
+    await page.getByRole('button', { name: 'Shortcut', exact: true }).waitFor({ timeout: 3000 });
     assert.ok(performance.now() - openStarted < 3000, 'Pending observer must not block Settings');
     await page.waitForTimeout(2500); // Cross two poll intervals while the same backend call remains pending.
     assert.equal(await page.evaluate(() => window.observerCalls), pendingCalls);
@@ -1025,6 +1026,7 @@ try {
       await prepareDeferredDiagnostics();
       if (transition === 'save') {
         await page.getByRole('button', { name: 'Settings', exact: true }).click();
+        await page.getByRole('button', { name: 'Shortcut', exact: true }).click();
         await page.getByRole('button', { name: 'Change shortcut', exact: true }).click();
         await page.getByLabel('Start and stop listening', { exact: true }).fill('Alt+X');
         await page.getByRole('button', { name: 'Apply shortcut', exact: true }).click();

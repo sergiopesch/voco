@@ -108,6 +108,9 @@ try {
       assert.equal(await combo.getAttribute('aria-expanded'), 'false');
       results.push({ engine: name, check: 'selector navigation, typeahead, disabled option, Escape, Tab, consent reset and explicit apply', passed: true });
 
+      assert.equal(await page.getByRole('button',{name:'Change shortcut',exact:true}).count(),0);
+      await page.getByRole('button',{name:'Shortcut',exact:true}).click();
+      assert.equal(await page.locator('.voco-preferences__shortcut-summary kbd').innerText(),'Alt+D');
       await page.getByRole('button',{name:'Change shortcut',exact:true}).click();
       const shortcutInput = page.getByLabel('Start and stop listening',{exact:true});
       assert.equal(await shortcutInput.evaluate(el => document.activeElement === el),true);
@@ -121,9 +124,16 @@ try {
       await page.getByRole('button',{name:'Change shortcut',exact:true}).waitFor();
       assert.equal(await page.locator('.voco-preferences__shortcut-summary kbd').innerText(),'Ctrl+Alt+K');
       await page.locator('.voco-preferences__content').evaluate(el => el.scrollTop=0);
-      await capture('settings-selected');
+      await page.getByRole('button',{name:'Change shortcut',exact:true}).click();
+      await shortcutInput.fill('Alt+D');
+      await page.getByRole('button',{name:'Apply shortcut',exact:true}).click();
+      assert.equal(await page.locator('.voco-preferences__shortcut-summary kbd').innerText(),'Alt+D');
+      await capture('shortcut');
       await page.setViewportSize({width:760,height:560});
       await page.locator('.voco-preferences__content').evaluate(el => el.scrollTop=0);
+      await capture('shortcut-minimum');
+      assert.equal(await page.locator('.voco-preferences__content').evaluate(el => el.scrollHeight <= el.clientHeight),true);
+      await page.getByRole('button',{name:'Settings',exact:true}).click();
       await capture('settings-minimum');
       await page.setViewportSize({width:850,height:680});
       await page.getByRole('button',{name:'Help',exact:true}).click();
