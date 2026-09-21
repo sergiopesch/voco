@@ -83,3 +83,43 @@ external-field failure.
 - The first native test attempt lacked PulseAudio development headers. The successful
   retry used an existing extracted header cache, without installing host packages.
 - No new package or release was built, and no destination application was qualified.
+
+## Codex and Brave follow-up
+
+The user identified Codex and Brave as the failed destinations and reported no
+notification. A later read-only inspection of the running Codex accessibility
+window found no exposed editable control. Neither app's command line requested
+renderer accessibility; the desktop accessibility switch was off.
+
+The Chromium 151.0.7922.34 comparison used a disposable profile, private D-Bus and
+runtime directory, and Xvfb with explicit `--ozone-platform=x11`. Both cases enabled
+the native accessibility bridge (`ACCESSIBILITY_ENABLED=1`). The same synthetic
+input was focused; no speech, clipboard or keyboard delivery was attempted.
+
+| Renderer accessibility | Production cursor probe |
+| --- | --- |
+| Default | `no_focused_control`, no destination token |
+| `--force-renderer-accessibility` | `ready`, verified control token |
+
+This is a reproducible compatibility condition, not qualification of the user's
+Codex/Brave editors. It supports an explicit application-accessibility trial while
+preserving the cursor guard. See [Chromium's activation instructions](https://www.chromium.org/developers/accessibility/testing/automated-testing/ax-inspect/)
+and [native bridge activation](https://github.com/chromium/chromium/blob/main/ui/accessibility/platform/atk_util_auralinux.cc).
+An earlier fixture attempt lacked explicit display isolation; its results are
+excluded. A second attempt failed because Chromium selected Wayland in the private
+runtime; the final comparison explicitly selected Xvfb/X11.
+
+The Brave Snap denied the diagnostic process's accessibility query. That process
+has the desktop host application's security label; installed VOCO and its helper
+have the ordinary `unconfined` label accepted by Brave's policy. The denial cannot
+be attributed to installed VOCO without an equivalent production-context check.
+No confinement rules or browser profile were changed.
+
+The production recording-factory tests now assert that rejected cursor and setup
+preflights request the corresponding notification exactly once and never acquire
+the recording shortcut or microphone. All 18 lifecycle tests passed, as did type
+checking and lint. The desktop notification service accepted manual diagnostic
+notifications with exit status zero; this does not establish that a banner was
+visible. User confirmation remains necessary. The native notification wrapper also
+ignores unsuccessful helper exit codes; this is a diagnostic gap, not an established
+cause of the historical missing banners.
