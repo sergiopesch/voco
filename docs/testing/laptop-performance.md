@@ -127,6 +127,15 @@ existing final directory/file entries are refused. Disk errors disable this reco
 without changing dictation behavior. Existing `hotkey-trace.jsonl` is separate and
 its retention policy is unchanged.
 
+Source builds after .47 add finite `dictation_desktop_cursor_*` failure events to
+that trace: pending accessibility events, no active window, ambiguous windows,
+no focused control, non-editable/protected fields, unavailable control metadata,
+or a failed probe. Unknown helper values map to `unavailable`; arbitrary errors,
+field contents and destination identities are never copied into these events.
+These diagnostics explain a rejected start; they do not authorize cursor delivery.
+The published .47 trace has only the generic `dictation_desktop_paste_unavailable`
+event, so it cannot establish which of those conditions caused an earlier failure.
+
 There is no audio-callback instrumentation or new recognition policy. Timers,
 small metadata allocations, hashing the executable once and resource sampling still
 have overhead; zero impact has not been established. Abrupt termination can lose the

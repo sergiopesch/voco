@@ -296,6 +296,9 @@ fn desktop_paste_status_with_input(
         target_started.elapsed().as_millis() as u64,
     );
     let available = target.input_state == "editable" && target.token.is_some();
+    if !available {
+        crate::trace_hotkey_event(target.reason.failure_event(), None);
+    }
     DesktopPasteStatus {
         shortcut_epoch,
         target_token: target.token.clone(),
@@ -312,8 +315,44 @@ fn desktop_paste_status_with_input(
     }
 }
 
+// Finite metadata only. Unknown helper output never becomes a log message.
+#[derive(Debug, Default, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum DesktopTargetReason {
+    Ready,
+    EventsPending,
+    NoActiveWindow,
+    AmbiguousWindows,
+    NoFocusedControl,
+    NotEditable,
+    Protected,
+    ControlUnavailable,
+    ProbeFailed,
+    #[default]
+    #[serde(other)]
+    Unknown,
+}
+
+impl DesktopTargetReason {
+    fn failure_event(&self) -> &'static str {
+        match self {
+            Self::EventsPending => "dictation_desktop_cursor_events_pending",
+            Self::NoActiveWindow => "dictation_desktop_cursor_no_active_window",
+            Self::AmbiguousWindows => "dictation_desktop_cursor_ambiguous_windows",
+            Self::NoFocusedControl => "dictation_desktop_cursor_no_focused_control",
+            Self::NotEditable => "dictation_desktop_cursor_not_editable",
+            Self::Protected => "dictation_desktop_cursor_protected",
+            Self::ControlUnavailable => "dictation_desktop_cursor_control_unavailable",
+            Self::ProbeFailed => "dictation_desktop_cursor_probe_failed",
+            Self::Ready | Self::Unknown => "dictation_desktop_cursor_unavailable",
+        }
+    }
+}
+
 #[derive(Debug, serde::Deserialize)]
 struct DesktopTarget {
+    #[serde(default)]
+    reason: DesktopTargetReason,
     #[serde(default = "unknown_focus_scope")]
     input_state: String,
     shortcut: String,
@@ -330,6 +369,7 @@ fn unknown_focus_scope() -> String {
 
 fn desktop_target() -> DesktopTarget {
     let unknown = || DesktopTarget {
+        reason: DesktopTargetReason::ProbeFailed,
         input_state: unknown_focus_scope(),
         shortcut: "ctrl+v".into(),
         token: None,
@@ -1172,6 +1212,48 @@ mod tests {
         assert_eq!(
             x11_paste_arguments(true, true),
             ["key", "--clearmodifiers", "space", "ctrl+shift+v"]
+        );
+    }
+
+    #[test]
+    fn cursor_failure_diagnostics_accept_only_finite_metadata() {
+        for (reason, expected) in [
+            ("events_pending", "dictation_desktop_cursor_events_pending"),
+            (
+                "no_active_window",
+                "dictation_desktop_cursor_no_active_window",
+            ),
+            (
+                "ambiguous_windows",
+                "dictation_desktop_cursor_ambiguous_windows",
+            ),
+            (
+                "no_focused_control",
+                "dictation_desktop_cursor_no_focused_control",
+            ),
+            ("not_editable", "dictation_desktop_cursor_not_editable"),
+            ("protected", "dictation_desktop_cursor_protected"),
+            (
+                "control_unavailable",
+                "dictation_desktop_cursor_control_unavailable",
+            ),
+            ("probe_failed", "dictation_desktop_cursor_probe_failed"),
+            ("private field text", "dictation_desktop_cursor_unavailable"),
+        ] {
+            let target: DesktopTarget = serde_json::from_value(serde_json::json!({
+                "shortcut": "ctrl+v", "token": null, "reason": reason,
+            }))
+            .unwrap();
+            assert_eq!(target.reason.failure_event(), expected);
+            assert!(crate::is_supported_dictation_trace_event(expected));
+        }
+        let legacy: DesktopTarget = serde_json::from_value(serde_json::json!({
+            "shortcut": "ctrl+v", "token": null,
+        }))
+        .unwrap();
+        assert_eq!(
+            legacy.reason.failure_event(),
+            "dictation_desktop_cursor_unavailable"
         );
     }
 

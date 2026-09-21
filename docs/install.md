@@ -183,10 +183,13 @@ so its audio context uses the new format.
 
 The installer shows measured download bytes and average speed in colour
 terminals, and static lines for redirected output, NO_COLOR or TERM=dumb. The
-progress has no estimated percentage or time remaining. Downloads make at most
-three attempts and continue partial transfers within that run when the server
-supports it. Interrupted runs remove temporary downloads; running the installer
-again starts fresh. Checksums are always verified before APT runs.
+progress has no estimated percentage or time remaining; completion shows elapsed
+download time. Downloads make at most three attempts and continue partial transfers
+within that run when the server supports it.
+Interrupted runs remove temporary downloads; running the installer again starts
+fresh. Checksums are always verified before APT runs. The owned staging directory
+contains public release files and permits APT's unprivileged reader to access the
+package; private diagnostic logs remain restricted to your account.
 
 A failed download prints the path to a private diagnostic log. A missing release
 file points to the versioned release page; connection failures suggest checking

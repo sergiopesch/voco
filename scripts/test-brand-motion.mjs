@@ -62,6 +62,25 @@ try {
         await Promise.all(el.getAnimations().map(animation => animation.finished.catch(() => {})));
       });
       await capture('onboarding-listening');
+      const control = page.locator('.voco-voice-control');
+      const finish = page.getByRole('button', { name: 'Finish test', exact: true });
+      await page.keyboard.press('Tab');
+      await finish.focus();
+      const focus = await control.evaluate(el => {
+        const button = el.querySelector('button');
+        const signal = el.querySelector('[role="meter"]');
+        const group = el.getBoundingClientRect();
+        const wave = signal.getBoundingClientRect();
+        return { groupOutline: getComputedStyle(el).outlineStyle,
+          buttonOutline: getComputedStyle(button).outlineStyle,
+          buttonBorder: getComputedStyle(button).borderTopColor,
+          signalContained: wave.left >= group.left && wave.right <= group.right && wave.top >= group.top && wave.bottom <= group.bottom };
+      });
+      await capture('onboarding-keyboard-focus');
+      assert.equal(focus.signalContained, true, 'Signal stays inside its shared control');
+      assert.equal(focus.groupOutline, 'solid', 'Keyboard focus must surround the complete voice control');
+      assert.equal(focus.buttonOutline, 'none', 'Do not draw a competing inner focus ring');
+      assert.equal(focus.buttonBorder, 'rgba(0, 0, 0, 0)', 'Do not draw a second pill inside the voice control');
       await page.getByRole('button', { name: 'Finish test', exact: true }).click();
       assert.equal(await page.getByRole('meter', { name: 'Microphone signal' }).count(), 0);
       await page.getByRole('button', { name: 'Done', exact: true }).waitFor();

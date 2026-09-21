@@ -81,8 +81,8 @@ class FocusTracker:
 TRACKER = FocusTracker()
 
 
-def unavailable(input_state="unavailable"):
-    return {"shortcut": "ctrl+v", "token": None, "scope": "unavailable", "input_state": input_state,
+def unavailable(input_state="unavailable", reason="probe_failed"):
+    return {"shortcut": "ctrl+v", "token": None, "scope": "unavailable", "input_state": input_state, "reason": reason,
             "events_tracked": TRACKER.listener is not None}
 
 
@@ -128,10 +128,10 @@ def probe():
         if not context.pending():
             break
         if time.monotonic() >= drain_deadline:
-            return unavailable()
+            return unavailable(reason="events_pending")
         context.iteration(False)
     if context.pending():
-        return unavailable()  # Do not act on a partially drained event backlog.
+        return unavailable(reason="events_pending")  # Never bind through an event backlog.
     desktop = Atspi.get_desktop(0)
     desktop.clear_cache_single()
     active = []
@@ -152,7 +152,8 @@ def probe():
         except Exception:
             continue
     if len(active) != 1:
-        return unavailable("none" if not active else "unavailable")
+        return unavailable("none" if not active else "unavailable",
+                           "no_active_window" if not active else "ambiguous_windows")
     app, window = active[0]
     pid = app.get_process_id()
     binary = process_binary(pid)
@@ -184,12 +185,15 @@ def probe():
         terminal = terminal or focused.get_role() == Atspi.Role.TERMINAL
     input_state = cursor_state(focused, Atspi)
     if input_state != "editable":
-        return unavailable(input_state)
+        reason = "no_focused_control" if focused is None else {
+            "none": "not_editable", "protected": "protected",
+        }.get(input_state, "control_unavailable")
+        return unavailable(input_state, reason)
     focused_path = focused.path if focused is not None else ''
     identity = f"{TRACKER.nonce}:{TRACKER.generation}:{pid}:{window.path}:{focused_path}"
     return {"shortcut": "ctrl+shift+v" if terminal else "ctrl+v",
             "token": hashlib.sha256(identity.encode()).hexdigest(),
-            "scope": "control", "input_state": input_state,
+            "scope": "control", "input_state": input_state, "reason": "ready",
             "events_tracked": TRACKER.listener is not None}
 
 

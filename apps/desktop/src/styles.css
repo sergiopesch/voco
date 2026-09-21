@@ -1534,3 +1534,18 @@ input[type="checkbox"]:disabled { opacity: 0.5; }
 .voco-native-microphone { display: grid; gap: 12px; }
 .voco-native-microphone p { margin: 0; }
 .voco-preferences__disclosure p { line-height: 1.5; }
+
+/* Keep the voice button and live meter inside one visual control. */
+.voco-panel[data-surface="onboarding"] .voco-setup__actions .voco-voice-control > .voco-button.voco-voice-pill {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+.voco-panel[data-surface="onboarding"] .voco-voice-control:has(> button:focus-visible) {
+  outline: 2px solid var(--voco-accent-highlight);
+  outline-offset: 4px;
+}
+.voco-panel[data-surface="onboarding"] .voco-voice-control > button:focus-visible {
+  outline: none;
+}

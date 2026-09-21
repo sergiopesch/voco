@@ -614,7 +614,8 @@ voco_download() {
   fi
   bytes=$(stat -c %s "$destination")
   detail=$(awk -v bytes="$bytes" 'BEGIN { if (bytes < 1048576) printf "%.1f KiB", bytes / 1024; else printf "%.1f MiB", bytes / 1048576 }')
-  ok "$label — ${detail} received"
+  elapsed=$((SECONDS - started))
+  ok "${detail} received · ${elapsed}s"
 }
 
 voco_install_cleanup() {
@@ -698,6 +699,10 @@ fi
 echo
 echo -e "  ${BOLD}${GRAPHITE}[3/3]${NC} ${BOLD}Install VOCO${NC}"
 
+# Only this owned staging directory contains public release files. Let APT's
+# unprivileged download user read the verified package without widening user dirs.
+chmod 755 "$VOCO_DOWNLOAD_DIR"
+chmod 644 "$DEB_FILE"
 if voco_install_deb_package "$DEB_FILE" "$VERSION" "amd64"; then
   ok "VOCO installed"
 else

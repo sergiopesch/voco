@@ -113,7 +113,7 @@ try:
             assert code == expected, (case, code, data.decode(errors='replace'))
             if case not in ['failure', 'connection-failure', 'cancel']:
                 assert hashlib.sha256(PAYLOAD).hexdigest().encode() in data, case
-                assert b'2.0 MiB received' in data, case
+                assert re.search(rb'2\.0 MiB received .* \d+s', data), case
             if case in ['redirected', 'no-color', 'dumb']:
                 assert b'\x1b' not in data, case
             if case == 'tty':

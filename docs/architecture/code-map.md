@@ -159,3 +159,6 @@ not misclassify missing dependencies as missing focus.
 and troubleshooting, without launching the GUI.
 `voco_desktop_target.py` classifies focused editable controls without reading
 contents; `insertion.rs` refuses recording preflight without a verified cursor.
+The helper also returns a finite failure category; Rust maps it to a fixed local
+trace event, with unknown values mapped to unavailable. This metadata never alters
+target admission or includes field content, titles, paths or destination tokens.

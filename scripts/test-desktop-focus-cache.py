@@ -203,7 +203,9 @@ class FocusTests(unittest.TestCase):
         from gi.repository import GLib
         calls=[]
         GLib.MainContext.default=lambda:types.SimpleNamespace(pending=lambda:True,iteration=lambda _:calls.append(1))
-        self.assertIsNone(helper.probe()['token'])
+        result = helper.probe()
+        self.assertIsNone(result['token'])
+        self.assertEqual(result['reason'], 'events_pending')
         self.assertLessEqual(len(calls),4096)
         self.assertGreater(len(calls),0)
     def test_window_transition_backlog_is_drained_before_binding(self):
@@ -231,8 +233,34 @@ class FocusTests(unittest.TestCase):
         self.assertLess(len(calls),10)
     def test_output_contains_only_finite_metadata_and_opaque_token(self):
         result=helper.probe()
-        self.assertEqual(set(result),{'shortcut','token','scope','events_tracked','input_state'})
+        self.assertEqual(set(result),{'shortcut','token','scope','events_tracked','input_state','reason'})
         self.assertEqual(len(result['token']),64)
+        self.assertEqual(result['reason'], 'ready')
+
+    def test_rejection_reasons_do_not_expose_destination_content(self):
+        def rejected(reason):
+            result = helper.safe_probe()
+            self.assertIsNone(result['token'])
+            self.assertEqual(result['reason'], reason)
+            self.assertEqual(set(result), {'shortcut', 'token', 'scope', 'events_tracked', 'input_state', 'reason'})
+        self.window.states.clear()
+        rejected('no_active_window')
+        self.window.states.add('active')
+        self.app.children.append(Node('/private-window-name', states=['active']))
+        rejected('ambiguous_windows')
+        self.app.children.pop()
+        self.a.states.discard('focused')
+        rejected('no_focused_control')
+        self.a.states.add('focused')
+        self.a.states.discard('editable')
+        rejected('not_editable')
+        self.a.role = 'password'
+        rejected('protected')
+        self.a.role = 'entry'; self.a.states.add('editable')
+        self.a.get_text_iface = lambda: None
+        rejected('control_unavailable')
+        self.desktop.get_child_count = lambda: (_ for _ in ()).throw(RuntimeError('private diagnostic'))
+        rejected('probe_failed')
 
     def test_undiscovered_control_without_event_is_found_past_30(self):
         self.a.states.clear()
