@@ -70,7 +70,7 @@ migrate retired output/assistant settings to direct dictation. A purge is unnece
 
 Open VOCO from the application menu. Your system microphone and speaker
 are selected. Click **Start test**, speak, and check that the signal band moves
-and your words appear. On the design branch, choose **Finish test**. VOCO then checks desktop input
+and your words appear. Choose **Finish test**. VOCO then checks desktop input
 prerequisites before showing **Your voice, ready.** and **Done**.
 If setup needs attention, complete the indicated setup and click **Check desktop setup**.
 Your successful voice test remains available; an external cursor is not required
