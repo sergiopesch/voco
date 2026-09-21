@@ -135,6 +135,12 @@ impl TrayIcons {
     }
 }
 
+impl Drop for TrayIcons {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.0);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -165,11 +171,5 @@ mod tests {
             assert_eq!(frame.len(), 4096);
             assert_eq!(&frame[..4], &[0; 4]);
         }
-    }
-}
-
-impl Drop for TrayIcons {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
     }
 }

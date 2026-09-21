@@ -54,6 +54,20 @@ that small fixture corpus does not establish general accuracy.
 The nine pinned-guide tests and browser checks for chapters, source viewer,
 search, glossary, simulations and narrow layout passed. No guide source pin changed.
 
+The complete **2026.0.51+local1** Debian package passed metadata and pinned payload
+verification, all 13 packaged-worker protocol cases and a clean Ubuntu 24.04
+Crabbox local-container install/integrity/CLI/removal run (`cbx_63426fed8b2b`).
+The exact packaged application passed the 12-scenario X11 journey; 17 advertised
+meter frames yielded 12 distinct Shell-selected frames in the sampled speech.
+A separate nested Wayland run verified native capture, real levels and repeated
+panel Stop during onboarding. It does not claim Wayland cursor delivery.
+
+CI's all-target clippy check caught declaration ordering after the new test module.
+Moving the module below production declarations fixes that lint without changing
+runtime behavior; the exact all-target/all-feature clippy command passed locally.
+Package production source is `8333732`; subsequent test-ordering and qualification
+documentation changes do not replace its recorded bytes or source archive.
+
 Private logs, artifact hashes, desktop images, harnesses and failed attempts are
 retained in the sibling `tray-setup-evidence-2026-09-21` directory. Earlier desktop
 attempts include socket-path/setup failures, a stale test selector and the lock
