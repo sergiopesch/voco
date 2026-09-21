@@ -468,6 +468,12 @@ try {
               window.calls.push([name,...args]);
               return {enabled:true,available:false,targetToken:null,failureReason:'cursor',detail:'Click in a text field, then press your dictation shortcut to start.'};
             }
+            if (name === 'getRuntimeDiagnostics') {
+              const base = await previous(name,args);
+              return {...base, desktopInput:{available:true,detail:'Input helpers are ready.'},
+                desktopPaste:{enabled:true,available:false,detail:'Focus a text field.'},
+                ownedPreedit:{...base.ownedPreedit,setupState:'not-installed',available:false}};
+            }
             return previous(name,args);
           };
         });
@@ -609,6 +615,7 @@ try {
       await page.waitForFunction(()=>window.store.getState().surface==='hidden');
       await page.evaluate(()=>{window.activationPending=true;window.listeners['voco:activate']({payload:null});});
       await page.waitForFunction(()=>window.store.getState().surface==='popover');
+      await page.getByText('Ready',{exact:true}).waitFor();
       await captureStyledPanel('onboarding-visible-ready-handoff',page.getByRole('button',{name:'Hide to tray',exact:true}),{width:760,height:560});
       for (const busy of ['starting','recording','processing']) {
         await page.evaluate(busy=>{window.store.getState().setSurface('hidden');window.store.getState().setStatus(busy);window.activationPending=true;window.listeners['voco:activate']({payload:null});},busy);

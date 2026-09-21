@@ -318,8 +318,11 @@ export function App() {
     (cursorDeliveryState === "unreconciled" || status === "error"))
       ? POPOVER_RECOVERY_SIZE
       : POPOVER_SIZE;
+  // Presentation uses input prerequisites; an unfocused external field is not
+  // missing setup. Recording still acquires and verifies its own target token.
   const cursorRequired = requiresVerifiedTextTarget(config) &&
-    !(config?.transcriptTarget === "cursor" && runtimeDiagnostics?.desktopPaste?.enabled && runtimeDiagnostics.desktopPaste.available);
+    !(config?.transcriptTarget === "cursor" && runtimeDiagnostics?.desktopPaste?.enabled &&
+      (runtimeDiagnostics.desktopInput?.available ?? runtimeDiagnostics.desktopPaste.available));
   const cursorSetupState =
     ownedPreeditSetupState ||
     runtimeDiagnostics?.ownedPreedit.setupState ||

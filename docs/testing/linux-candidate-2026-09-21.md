@@ -28,6 +28,11 @@ owner-only socket and presents the existing idle app. Starting, recording and
 processing preserve the current recipient and capture. The existing `--toggle`
 control path is unchanged.
 
+Final-package screenshot review also found that a missing focused field was
+misreported as missing input setup. Readiness presentation now uses the existing
+input-prerequisite result; recording admission still requires a fresh verified
+target token. The earlier package is retained as an intermediate attempt.
+
 ## Evidence levels
 
 - Renderer checks cover explicit panel activation, restart feedback, the minimum
