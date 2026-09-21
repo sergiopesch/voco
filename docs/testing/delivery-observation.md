@@ -97,8 +97,8 @@ paragraph contained the actual inserted text. Flat-root checks remained pending.
 The .49 observer follows only the caret's hypertext links, with an eight-level
 bound. It retains the outer focus token and the linked paragraph route, then
 checks that same route, bounded text region and actual paragraph caret twice.
-It does not walk every paragraph or read an unrelated editor. A final BR and up
-to eight trailing noneditable widgets are treated as editor scaffolding outside
+It does not walk every paragraph or read an unrelated editor. A final BR and a bounded number
+of trailing noneditable widgets are treated as editor scaffolding outside
 the observed paragraph text region. They cannot confirm a paste or authorize
 reading a protected descendant. User text before that region boundary is retained.
 

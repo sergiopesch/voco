@@ -59,7 +59,31 @@ glib provenance and seven optimized iterator regressions. Rust all-target tests 
 and features, and 66 native callback cases under ASan/UBSan also passed. The .49
 complete Debian package was assembled with the pinned NVIDIA payload and passed
 the package identity, dependency, desktop/AppStream and payload checks. Native
-package-manager installation/removal remains a separate verification layer.
+package-manager installation/removal passed in a disposable Ubuntu 24.04
+container, including a clean `dpkg --verify` and removal of application, launcher
+and runtime files. Its first attempt used the container's default documentation
+exclusion policy and reported missing docs. A second fixture explicitly retained
+VOCO documentation; both attempts remain recorded.
+
+The exact packaged application was also rerun through the full fresh-profile
+journey: onboarding passed, two sessions delivered all eight words through nine
+confirmed updates (including punctuation), and focus departure retained recovery
+without typing into the other field. The build-tree executable and packaged
+executable differ only at Tauri's three-byte bundle marker, so both identities
+are retained rather than treating their hashes as interchangeable.
+
+Package SHA-256: `a7ae0a6333b3857171f22e4d35b626950b473e3526b5067284d7c51a203eaf51`.
+Packaged executable SHA-256:
+`4896ee2aa68e42e17ad62f0f7301ad26eaedd40fd03bbf3b1df0fa430284d236`.
+The package's bundled docs retain their assembly snapshot before these final
+receipts; the application/runtime bytes are identical to those tested.
+
+The existing low-severity rand 0.7.3 advisory was rechecked against the current
+feature tree. It remains a transitive build-generation dependency without the
+required `log` feature; no exemption or forced major-version substitution was
+added. See [the documented reachability assessment](../security/dependency-assessment-2026-09-04.md).
+The npm audit reported zero vulnerabilities. Hosted RustSec and speech-accuracy
+checks remain mandatory and are tracked on the pull request.
 
 ## Measurement boundaries
 
