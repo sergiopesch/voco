@@ -8,9 +8,9 @@ input setup failure. Installing the binaries alone is insufficient: the daemon
 must run with accessible device and socket permissions for your login. Follow
 [Wayland helper setup](platform/README.md#ydotoold-ydotool-daemon).
 
-The .47 candidate installs the helpers explicitly and checks desktop input before
+The .47 installer installs the helpers explicitly and checks desktop input before
 saving onboarding completion. After repairing setup, click **Check desktop setup**
-and **Done** on the design branch; the voice test does not need an external text field.
+and **Done**; the voice test does not need an external text field.
 With .47 you can also run `voco --check-desktop-input`. It checks prerequisites
 without launching VOCO, recording speech, copying text or sending keystrokes.
 A passing check still requires a real dictation trial in your intended application.
@@ -21,7 +21,7 @@ remain excluded. VOCO must not record and paste blindly when the target is unkno
 
 ## VOCO records but does not type into the active application
 
-The current candidate normally streams NVIDIA recognition through desktop paste.
+VOCO normally streams NVIDIA recognition through desktop paste.
 First verify the complete package and worker identity: a base Tauri package lacks the
 NVIDIA payload. Inspect old launcher overrides, especially `VOCO_STREAM_WORKER`,
 `VOCO_DESKTOP_PASTE=0` and `VOCO_DESKTOP_STREAM=0`. Keep the intended editable field
@@ -236,10 +236,9 @@ npm run report:linux-runtime
 
 ## Supported release channels
 
-The published binary artifact is the GitHub Release `.deb`. Ubuntu is the primary reference
-environment; Debian-derived distributions are best-effort. AppImage publication is paused until its
-complete packaging toolchain is pinned; local experimental AppImages do not install desktop/browser
-registration files. The private NVIDIA candidate is `2026.0.37+local6`; the owner
-still has `+local3` installed. Check [current candidate gates](release-candidate.md)
-and the exact artifact's external receipts before testing; this documentation does
-not authorize installation or publication. Flatpak, Flathub, Snap, and Ubuntu App Center are not published VOCO release channels.
+The published Ubuntu/Debian artifact is the GitHub Release `.deb`. Ubuntu is the
+primary reference environment; Debian-derived distributions are best-effort.
+Fedora, openSUSE and Arch/Omarchy use their separately qualified native packages.
+Check [release status](release-candidate.md) and the exact artifact's verification
+records for current versions and limits. AppImage, Flatpak, Flathub, Snap and
+Ubuntu App Center are not published VOCO release channels.

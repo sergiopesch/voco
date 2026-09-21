@@ -9,11 +9,11 @@ A plain Tauri bundle is incomplete. See [packaging](linux-packaging.md).
 ## Published release
 
 The [README command](../README.md#get-started) runs the guided installer from
-the current published **2026.0.45** tag. It downloads that exact release and
-verifies its package checksum before installation. On Wayland, this older installer
-can omit the input helpers; complete the [Wayland setup](platform/README.md#ydotoold-ydotool-daemon)
-before testing dictation in another app. The .47 candidate repairs dependency
-installation and refuses to finish onboarding while desktop input is unavailable.
+the published **2026.0.47** tag. It downloads that exact release and verifies its
+package checksum before installation. On Wayland it installs the input helpers
+and checks desktop readiness. If setup is incomplete, follow the
+[Wayland setup](platform/README.md#ydotoold-ydotool-daemon) instructions.
+Onboarding completion requires a successful voice test and desktop readiness.
 
 For a manual installation, these links always follow the latest public release:
 
@@ -154,7 +154,7 @@ its outstanding gates. Development recipes are not public installers.
 
 Historical userspace checks cover Ubuntu, Debian, Fedora, Linux Mint and an
 Omarchy-related Arch profile. Consult the [.45 release notes](releases/2026.0.45.md)
-for the recorded checks, and [release status](release-candidate.md) for newer candidates. This is not proof of every distribution’s default compositor, audio stack
+for the recorded checks, and [release status](release-candidate.md) for current downloads. This is not proof of every distribution’s default compositor, audio stack
 or application. RPM/Arch packages require their own native receipts. AppImage,
 Flatpak and Snap are experimental scaffolding, not published support channels.
 See [the compatibility evidence](testing/cross-linux-review-2026-09-15.md).
@@ -179,9 +179,9 @@ recognizer and recovery runtime. An unsupported format is rejected before record
 starts; select a supported format in the system audio settings, then restart VOCO
 so its audio context uses the new format.
 
-### Installer presentation candidate
+### Installer progress
 
-The design branch shows measured download bytes and average speed in colour
+The installer shows measured download bytes and average speed in colour
 terminals, and static lines for redirected output, NO_COLOR or TERM=dumb. The
 progress has no estimated percentage or time remaining. Downloads make at most
 three attempts and continue partial transfers within that run when the server

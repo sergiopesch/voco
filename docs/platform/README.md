@@ -5,9 +5,9 @@
 
 VOCO targets Linux x86-64. The [Linux support matrix](../linux-support.md) records
 package families, runtime floors and qualification limits. The public Ubuntu/Debian release is
-2026.0.45; Fedora, openSUSE and Arch/Omarchy packages remain at 2026.0.43.
-The .47 installer/readiness fix is a source candidate; consult GitHub Releases
-for published assets.
+2026.0.47; Fedora, openSUSE and Arch/Omarchy packages remain at 2026.0.43.
+The .47 release includes installer and desktop readiness checks. Consult GitHub
+Releases for the exact published assets.
 macOS and Windows are outside the current scope.
 
 ## Requirements
@@ -83,7 +83,7 @@ systemctl --user status ydotoold
 voco --check-desktop-input
 ```
 
-The .47 candidate includes `voco-ydotoold.service`, a service for your login.
+The .47 package includes `voco-ydotoold.service`, a service for your login.
 Its guided installer reuses a working daemon. Otherwise, when your login already
 has write access to `/dev/uinput`, it enables and starts this service, then checks
 that the client can use it. The service runs as you, uses a private socket umask,
