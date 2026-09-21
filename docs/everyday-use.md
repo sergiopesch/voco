@@ -1,6 +1,6 @@
 # Using VOCO
 
-In the .46 candidate, a successful voice test is followed by a desktop input check
+In the .47 candidate, a successful voice test is followed by a desktop input check
 before onboarding completes. **Desktop setup required** means helpers or their
 service need attention; it is different from **No text cursor available**. Repair
 setup using the [installation guide](install.md), then retry the check.

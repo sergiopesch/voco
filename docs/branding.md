@@ -121,7 +121,7 @@ requires an on-device check; browser previews are not proof of native dictation.
 Settings carries the silver and graphite identity through one navigation surface
 and grouped, readable controls. Overview brings together microphone, shortcut,
 output and appearance choices; retained transcripts appear before these groups
-and take priority over previous delivery-success copy. Updates and Troubleshooting
+and take priority over previous delivery-success copy. Updates and Help
 remain in a separate app-settings navigation group.
 
 Use semantic buttons, inputs and disclosures inside the material treatment.

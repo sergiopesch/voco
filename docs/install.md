@@ -12,7 +12,7 @@ The [README command](../README.md#get-started) runs the guided installer from
 the current published **2026.0.45** tag. It downloads that exact release and
 verifies its package checksum before installation. On Wayland, this older installer
 can omit the input helpers; complete the [Wayland setup](platform/README.md#ydotoold-ydotool-daemon)
-before testing dictation in another app. The .46 candidate repairs dependency
+before testing dictation in another app. The .47 candidate repairs dependency
 installation and refuses to finish onboarding while desktop input is unavailable.
 
 For a manual installation, these links always follow the latest public release:
@@ -161,7 +161,7 @@ See [the compatibility evidence](testing/cross-linux-review-2026-09-15.md).
 
 ## Remove
 
-Quit VOCO first. If the .46 installer enabled its per-login input service, stop
+Quit VOCO first. If the .47 installer enabled its per-login input service, stop
 and disable that service before removing the package:
 
 ```bash

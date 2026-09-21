@@ -24,7 +24,7 @@ wget -qO voco-install https://raw.githubusercontent.com/sergiopesch/voco/voco.20
 The guided installer downloads **2026.0.45**, verifies the package checksum and
 installs the package. On Wayland, .45 can omit input helpers; complete the
 [desktop input setup](docs/platform/README.md#ydotoold-ydotool-daemon) before dictating.
-The .46 source candidate fixes this installation gap and checks readiness before
+The .47 source candidate fixes this installation gap and checks readiness before
 onboarding finishes; it is not yet a published download.
 [Manual installation and signature verification](docs/install.md#published-release).
 

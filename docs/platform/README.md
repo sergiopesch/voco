@@ -6,7 +6,7 @@
 VOCO targets Linux x86-64. The [Linux support matrix](../linux-support.md) records
 package families, runtime floors and qualification limits. The public Ubuntu/Debian release is
 2026.0.45; Fedora, openSUSE and Arch/Omarchy packages remain at 2026.0.43.
-The .46 installer/readiness fix is a source candidate; consult GitHub Releases
+The .47 installer/readiness fix is a source candidate; consult GitHub Releases
 for published assets.
 macOS and Windows are outside the current scope.
 
@@ -37,7 +37,7 @@ Hotkey backend selection:
 - Wayland + `Alt+D` / `Alt+Shift+D` -> passive evdev fallback, suppressed while IBus is armed
 - Other combinations -> Tauri global-shortcut fallback
 - Runtime hotkey changes update backend preference immediately
-- Settings -> Troubleshooting shows the detected session and whether insertion helpers are currently available. Presence is a prerequisite, not proof of delivery to a target.
+- Settings → Help → Technical details shows the detected session and whether insertion helpers are currently available. Presence is a prerequisite, not proof of delivery to a target.
 - The evdev fallback tracks left/right Alt, Shift, Control, and Super independently for each open keyboard. Extra Control/Super modifiers reject the default matches; repeats do not retrigger. Disconnect clears only that device's state, and reopening revalidates capabilities and the virtual-device exclusion before synchronizing currently held keys. Dropped kernel events suppress activation until the stream has been resynchronized; synthetic recovery never triggers a hotkey.
 - Native IBus, global-shortcut, evdev and external socket triggers use the configured desktop output route.
   Protocol-v6 IBus is shortcut-only; older helpers must reconnect after upgrade.
@@ -79,16 +79,16 @@ injecting keys into the current application:
 command -v ydotool ydotoold
 pgrep -x ydotoold
 systemctl --user status ydotoold
-# In .46 and later:
+# In .47 and later:
 voco --check-desktop-input
 ```
 
-The .46 candidate includes `voco-ydotoold.service`, a service for your login.
+The .47 candidate includes `voco-ydotoold.service`, a service for your login.
 Its guided installer reuses a working daemon. Otherwise, when your login already
 has write access to `/dev/uinput`, it enables and starts this service, then checks
 that the client can use it. The service runs as you, uses a private socket umask,
 and stops with your graphical session. It is not started by package installation
-alone. For a manual .46 package install with existing device access:
+alone. For a manual .47 package install with existing device access:
 
 ```bash
 systemctl --user enable --now voco-ydotoold.service
