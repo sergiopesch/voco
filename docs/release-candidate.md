@@ -32,3 +32,10 @@ Fedora, openSUSE and Arch/Omarchy remain at **2026.0.43**; use their matching
 [native guide](install-native.md) and [support matrix](linux-support.md).
 [2026.0.52](releases/2026.0.52.md) remains available for rollback. Published tags
 and release assets are immutable. The hosted release assembler stays disabled.
+
+## Next candidate
+
+**2026.0.54** reviews the remaining dependency queue and carries VOCO's immutable
+tray icon patch onto Tauri's updated tray library. The [candidate notes](releases/2026.0.54.md)
+record its scope and pending qualification. Continue using the verified public
+.53 installer until the new cut is published and its downloaded assets verify.

@@ -73,3 +73,10 @@ the compatibility alias only after all API consumers support a stable successor.
 multiple `global-hotkey` resolutions. The app's X11 focus lease and the Tauri
 shortcut plugin must use the same patched actor. Run the isolated desktop tests
 after upgrading this dependency; a successful compilation cannot prove that link.
+
+`verify-tray-backport.py` similarly requires Tauri to resolve one patched
+`tray-icon` library. Tauri updates can change that dependency even within a patch
+release. Carry the immutable Linux icon-path API onto the required upstream
+version, preserve its source inventory and archive checksum, and qualify the
+packaged tray in a real isolated GNOME session. The package ships that provenance
+beside the upstream licenses.

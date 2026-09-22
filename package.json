@@ -1,6 +1,6 @@
 {
   "name": "voco",
-  "version": "2026.0.53",
+  "version": "2026.0.54",
   "private": true,
   "workspaces": [
     "apps/*"
