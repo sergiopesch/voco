@@ -6,7 +6,7 @@ set -euo pipefail
 #
 # VOCO — release install helper
 # Usage:
-#   wget https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.54/install -O voco-install
+#   wget https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.55/install -O voco-install
 #   chmod +x voco-install
 #   ./voco-install
 
