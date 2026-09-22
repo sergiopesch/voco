@@ -242,7 +242,7 @@ authoritative. New installs use Alt+D; upgrades keep the existing shortcut. Term
 Finish test and Done controls; installation alone does not claim voice setup is
 complete.
 
-The unreleased installer candidate extends this vocabulary with **Signal + Silver
+The .52 installer extends this vocabulary with **Signal + Silver
 sweep**. Seven bars retain recent measured transfer rates, including quiet samples;
 they do not imitate microphone capture. A single brief silver highlight marks a
 phase entry and stops when the work finishes, even before the highlight completes.
@@ -253,4 +253,5 @@ phase. Questions and unexpected output release the view to ordinary terminal tex
 GNOME reduced motion or `VOCO_INSTALL_NO_MOTION=1` removes moving bars and sweeps;
 `VOCO_INSTALL_PLAIN=1`, redirected output, `NO_COLOR` and `TERM=dumb` use static
 output. The [dated measurements](testing/installer-performance-2026-09-22.md)
-qualify this source candidate separately from the public .51 installer.
+compare the exact .52 installer with the prior .51 download path. Package and
+desktop checks are recorded separately in the [.52 release qualification](testing/installer-release-2026-09-22.md).

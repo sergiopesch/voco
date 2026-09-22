@@ -1,6 +1,7 @@
 # Installer performance candidate · 22 September 2026
 
-Status: **unreleased source candidate**, separate from public 2026.0.51. This work
+Status: **included in public 2026.0.52**; see the separate
+[release qualification](installer-release-2026-09-22.md). This work
 changes the standalone installer and its presentation, not the application, model,
 package compression, desktop permissions or recognition settings. The owner’s
 working installation and recovery archive were not changed.
@@ -136,11 +137,12 @@ unprivileged download group. It never kills a package installation transaction.
 Earlier timing trials and unsuccessful APT attempts remain in local evidence;
 the numeric record above identifies the final measured installer source.
 
-## Remaining qualification
+## Subsequent release qualification
 
-No new signed package, release or public site deployment was made. A complete
-fresh-user run of this installer against the final release assets, including
-native desktop onboarding, remains the next release acceptance check. Actual
+This measurement record itself did not publish a package or deploy a site. The
+subsequent [.52 release record](installer-release-2026-09-22.md) covers signed
+publication, exact-package checks and isolated desktop onboarding. Owner testing
+from the public installer remains a separate hands-on check. Actual
 network/mirror speed, dependency state and disk performance still determine most
 installation time. Keep package verification, input prerequisites and native
 prompts even when they cost time; removing them is not a valid optimization.

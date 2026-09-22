@@ -1,10 +1,11 @@
 # Linux packages and qualification
 
-**2026.0.51** is an Ubuntu/Debian tray, setup and recognition-engine release. Its
-[release notes](releases/2026.0.51.md) and
-[qualification record](testing/tray-setup-2026-09-21.md) describe its verification and limits.
-The .43 desktop results below remain historical .43 evidence, not qualification
-of .51 on those desktops. Other native package channels remain at .43.
+**2026.0.52** is the Ubuntu/Debian installer progress release. Its
+[release notes](releases/2026.0.52.md) and
+[qualification record](testing/installer-release-2026-09-22.md) describe exact-package
+checks and their limits. Dictation behavior and the pinned model are unchanged
+from .51. The .43 desktop results below remain historical evidence; other native
+package channels remain at .43.
 
 This matrix records **2026.0.43** package and desktop qualification. Only assets
 attached to a published [GitHub release](https://github.com/sergiopesch/voco/releases)

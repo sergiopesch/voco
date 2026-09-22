@@ -36,7 +36,7 @@ The .51 release cut combines these changes with measured tray bars, microphone
 selection inside the test canvas and one bundled Nemotron recognizer. These
 current-behavior notes preserve the historical source snapshot and its attribution.
 
-The Linux chapter also records the unreleased installer performance candidate:
+The Linux chapter also records the published .52 installer:
 measured signal bars, bounded silver sweeps and progress that never holds up the
 work. Its local download measurements and APT prompt tests are separate from
 whole-install or dictation performance. The pinned code viewer is unchanged.
