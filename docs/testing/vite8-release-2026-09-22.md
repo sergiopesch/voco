@@ -1,8 +1,8 @@
 # Vite 8 and dependency release qualification — 22 September 2026
 
-This record qualifies the **2026.0.54 candidate**, integrating dependency PRs
-#61–#63. Public downloads remain at .53 until final release signing
-and publication verification finish. Existing release assets remain immutable.
+This record qualifies the published **2026.0.54 release**, integrating dependency
+PRs #61–#63. All 18 draft/public assets, five publisher signatures, latest aliases
+and the tagged installer passed verification. Existing releases remain immutable.
 
 ## Changes and exact identities
 
@@ -40,7 +40,7 @@ initial candidate and its evidence are retained separately.
 
 All four protected checks passed on the application build source in
 [CI run 35732906382](https://github.com/sergiopesch/voco/actions/runs/35732906382).
-Final documentation and merged-source checks remain required before publication.
+The final PR and merged source also passed all four protected checks.
 
 | Layer | Result |
 | --- | --- |
@@ -73,8 +73,12 @@ The final guided installer ran in disposable Ubuntu 24.04 lease
 Installed-file integrity passed, Alt+D was set, and onboarding remained incomplete
 with no microphone selected. Both Wayland helpers installed. Missing container
 `uinput` correctly returned exit 2 after package installation; this is not desktop
-readiness. The full public manifest and real GitHub transport are checked after
-publication.
+readiness. After publication, a second fresh Ubuntu 24.04 environment,
+`cbx_4a475c5b60ba`, ran the anonymously downloaded tagged installer against the
+real GitHub HTTPS release URLs, with no transport substitution. Package integrity,
+first-run defaults and both Wayland helpers passed again; missing `uinput` still
+correctly reported incomplete desktop setup. This completes the public download
+and installation path without claiming a physical-desktop test.
 
 npm reports zero vulnerabilities. Cargo reports no vulnerability-class findings,
 with seven unmaintained and one unsound warnings still visible. The existing
@@ -104,6 +108,25 @@ owner-perceived motion, native Wayland cursor delivery and other desktops/apps
 retain separate acceptance requirements. Local containers are not remote VMs or
 proof of a distribution's default desktop. Other native channels stay at .43.
 
-The full release signatures, downloaded draft/public assets and final branch/PR
-inventory remain delivery gates. The release source archive will
-retain its cut-time record; the public repository can record later verification.
+The signed tag, all five signed manifests and all 18 downloaded draft/public
+assets passed verification. The source archive retains its cut-time record; this
+repository records the subsequent publication verification.
+
+Release commit: `fedcf0f666bb73a5e740fd524d5c9a817670332c`. Protected PR head: `d910a6534a2540ba05f266eca3e9d7326ec54ffb`.
+
+
+## Repository and DevOps cleanup
+
+PRs #61–#63 closed as merged through #65; their exact original tips are retained
+in master. Their remote branches and the integration branch were removed. The
+merge passed all four protected checks, and the resulting Dependabot update jobs
+completed successfully without creating another PR. Branch protection, security
+updates and the weekly grouped schedule remain enabled.
+
+Task containers were removed after installation/removal receipts were retained.
+The temporary build cache was removed (2.56 GB of regular files); immutable release
+assets, candidate evidence and owner recovery remain available. The local guide
+passed nine source/security tests and 25 browser checks after publication updates,
+including all chapters, source search, its .43 source pin and the 390px layout.
+The owner's exact public installer is staged separately; no host installation was
+started by this release work.
