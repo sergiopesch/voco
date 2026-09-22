@@ -47,6 +47,16 @@ Raw output and progress are separate, stdin remains the original terminal, and
 unknown output releases the view. Restricted sudo policies fall back to the ordinary
 APT command. There are no new sudo rules or automatic answers to package questions.
 
+The [first-run follow-up candidate](testing/first-run-follow-up-2026-09-22.md)
+keeps one compact terminal canvas across checks, download, verification and setup.
+Signal bars follow received bytes; phase sweeps never delay completion. Native
+password/package prompts release the canvas before taking input. The final view
+replaces intermediate progress and retains any required panel sign-out action.
+Narrow terminals and `VOCO_INSTALL_PLAIN=1` use sequential text; reduced motion
+keeps measured progress without sweeps. Routine service output joins the private
+installation log, which is retained on failure. This source change is not yet a
+published installer; use the recorded public version for installation instructions.
+
 The .47 metadata explicitly includes the `pgrep` provider (`procps` on Debian/openSUSE,
 `procps-ng` on Fedora/Arch), used to check the Wayland input daemon.
 The worker defaults to at most four CPU threads, leaving one CPU from its affinity

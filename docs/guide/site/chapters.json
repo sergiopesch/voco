@@ -575,6 +575,10 @@
         "text": "A September .48 Codex trial inserted the first word, then stopped. Chromium exposed a fixed outer object placeholder while the actual text lived in a nested paragraph. The .49 candidate follows the caret into that paragraph and confirms its text and position, while retaining the original field identity and the no-replay rule. This newer finding does not change the source viewer pinned to .43."
       },
       {
+        "title": "An empty editor can contain a placeholder",
+        "text": "A .54 first-run report led to an isolated Brave regression: an empty editable HTML block exposed a line break that disappeared when its first character arrived. Counting that placeholder as user text made readback reject the successful paste. The follow-up source candidate applies the existing rich-paragraph handling to editable HTML blocks while retaining field identity, exact text checks and literal newlines in plain text controls. This candidate is not a published release or qualification of every website; the pinned viewer remains unchanged."
+      },
+      {
         "title": "Observation has limits",
         "text": "Accessible-field samples are best-effort local observations, not atomic ownership or compositor paint. Firefox can report newly inserted text before its caret catches up. VOCO waits within the existing three-second limit for exact text and position to agree; an intermediate sample cannot confirm delivery, and an uncertain paste is never replayed. A target can still change between checks."
       }
@@ -1653,6 +1657,10 @@
       {
         "title": "Progress should follow the work",
         "text": "The published .52 installer connects signal bars to measured transfer rates and a brief silver sweep to phase changes. The download runs independently: finishing work cancels animation immediately. Checksums download alongside the package and must pass before installation. Fifty-six local download trials found lower overhead than the .51 installer, but do not measure whole installations over the internet. Real Ubuntu APT tests preserve both package questions and existing configuration choices. The .52 release retains the same model and dictation behavior; its package and desktop checks are separate from these download timings. The pinned code viewer is unchanged."
+      },
+      {
+        "title": "Keep the installation in one place",
+        "text": "The .54 installer could leave old progress frames, separate stage headings and raw service messages in the terminal. The follow-up source candidate uses one compact Signal + Silver canvas through setup and replaces it with the completed state. Password and package prompts remain native and visible; a required desktop sign-out stays in the final view. This is candidate behavior, not a newly published installer. Download observations and isolated prompt tests do not qualify physical dictation."
       },
       {
         "title": "Keep dependency upgrades accountable",

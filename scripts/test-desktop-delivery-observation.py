@@ -89,6 +89,48 @@ class ObservationTests(unittest.TestCase):
         paragraph.role = 'paragraph'
         self.field.children[0] = paragraph
         return paragraph
+    def test_direct_rich_editor_empty_line_break_disappears_on_paste(self):
+        self.field.attributes = {'tag': 'div'}
+        self.field_value('\n', 0)
+        receipt = self.prepare('W')
+        self.assertEqual(receipt['observation'], 'prepared')
+        self.field_value('W')
+        self.assertEqual(self.verify(receipt)['observation'], 'observed')
+        receipt = self.prepare('elcome.', first=False)
+        self.field.insert('elcome.')
+        self.assertEqual(self.verify(receipt)['observation'], 'observed')
+
+    def test_nested_html_block_line_break_disappears_on_paste(self):
+        child = self.rich_field('\n', 0)
+        child.role = 'section'
+        child.attributes = {'tag': 'div'}
+        receipt = self.prepare('W')
+        child.value, child.caret = 'W', 1
+        self.assertEqual(self.verify(receipt)['observation'], 'observed')
+
+    def test_missing_html_metadata_keeps_literal_text_delivery(self):
+        self.field_value('abc', 0)
+        with patch.object(self.field, 'get_attributes', side_effect=RuntimeError('unsupported')):
+            receipt = self.prepare('W')
+            self.assertEqual(receipt['observation'], 'prepared')
+            self.field.insert('W')
+            self.assertEqual(self.verify(receipt)['observation'], 'observed')
+
+    def test_plain_text_newline_is_not_rich_editor_scaffolding(self):
+        for attributes in ({}, {'tag': 'textarea'}, {'tag': 'input'}):
+            self.field.attributes = attributes
+            self.field_value('\n', 0)
+            receipt = self.prepare('W')
+            self.field_value('W')
+            self.assertEqual(self.verify(receipt)['observation'], 'changed')
+
+    def test_direct_rich_editor_still_rejects_wrong_first_character(self):
+        self.field.attributes = {'tag': 'div'}
+        self.field_value('\n', 0)
+        receipt = self.prepare('W')
+        self.field_value('X')
+        self.assertEqual(self.verify(receipt)['observation'], 'changed')
+
     def test_rich_editor_first_word_and_following_chunk_are_observed(self):
         paragraph = self.rich_field()
         receipt = self.prepare('Hello')

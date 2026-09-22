@@ -41,6 +41,10 @@ measured signal bars, bounded silver sweeps and progress that never holds up the
 work. Its local download measurements and APT prompt tests are separate from
 whole-install or dictation performance. The pinned code viewer is unchanged.
 
+The first-run follow-up lessons also explain the .54 Brave empty-block readback
+regression and the candidate's single installer canvas. They keep source fixes,
+isolated tests and published artifacts distinct; the pinned viewer is unchanged.
+
 ## Scope and privacy
 
 The lessons explain the important layers and their contracts. The file catalog covers every tracked entry; its generic group descriptions are navigation aids, **not a hand-written, line-by-line explanation of every upstream library**. Binary files and text over 2 MB have metadata only. Model weights and installed runtime binaries live outside the Git source snapshot.

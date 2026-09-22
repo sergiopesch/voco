@@ -1,5 +1,8 @@
 # Testing
 
+[The first-run follow-up](first-run-follow-up-2026-09-22.md) records the Brave
+readback regression and installer canvas candidate, separately from public .54.
+
 - [2026.0.52 release qualification](installer-release-2026-09-22.md) — exact package, desktop, signing and public-download receipts.
 
 The [.52 installer performance record](installer-performance-2026-09-22.md) records

@@ -93,6 +93,7 @@ bash scripts/test-install-common.sh
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-install-presentation.py
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-install-prefetch.py
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-install-performance.py
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-install-journey.py
 
 node --check scripts/comparative-dictation.mjs
 node --check scripts/comparative-dictation.test.mjs

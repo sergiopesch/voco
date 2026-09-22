@@ -20,9 +20,9 @@ PREFIX = (ROOT / 'install').read_text().split('# ─── Header', 1)[0]
 APT_UI = ROOT / 'scripts/lib/install-apt-ui.py'
 
 
-def terminal(command, env, reply=None, timeout=10):
+def terminal(command, env, reply=None, timeout=10, columns=80, rows=24):
     master, slave = pty.openpty()
-    fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', 24, 80, 0, 0))
+    fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', rows, columns, 0, 0))
     def own_terminal():
         os.setsid()
         fcntl.ioctl(0, termios.TIOCSCTTY, 0)

@@ -62,7 +62,9 @@ glib 0.20 directly leaves the GTK dependency behind. [Backport](vendor/glib/VOCO
 - IBus protocol 6 is dictation-shortcut-only; older helpers must reconnect after upgrade. Never restore text mutation there.
 - Bounded accessible-field observations are not atomic ownership or cursor paint.
   Rich editors require a bounded caret-linked paragraph route, including route identity
-  and trailing noneditable scaffolding. Never acknowledge the outer object placeholder.
+  and trailing noneditable scaffolding. Direct and nested editable HTML div/p blocks
+  can lose their empty BR on first paste; native/plain-text newlines remain literal.
+  Never acknowledge the outer object placeholder.
   Content and caret can propagate separately. Exact expected content at an earlier
   known caret is pending, never receipt; retain the deadline and no-replay rule.
 - Automatic desktop insertion requires a bound, nonempty destination token. An

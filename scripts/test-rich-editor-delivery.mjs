@@ -27,7 +27,7 @@ async function request(body) {
     return result;
   } finally { clearTimeout(timeout); resolveResponse = undefined; }
 }
-const browser = await chromium.launch({ headless: false, args: ['--ozone-platform=x11', '--force-renderer-accessibility'] });
+const browser = await chromium.launch({ executablePath: process.env.VOCO_RICH_EDITOR_BROWSER, headless: false, args: ['--ozone-platform=x11', '--force-renderer-accessibility'] });
 const results = [];
 let clipboard;
 try {
@@ -105,6 +105,14 @@ print(json.dumps(h.text_position(h.TRACKER.hint)[1][:2] if r['scope']=='control'
     Object.assign(result, await run()); result.passed = true;
     console.log(`${name}: passed`);
   };
+  for (const [name, html] of [['bare empty editor', ''], ['bare line break', '<br>'], ['empty block editor', '<div><br></div>']]) {
+    await trial(name, async () => {
+      await setup(html);
+      const timings = [await delivery('W'), await delivery('elcome.', false)];
+      assert.equal(await page.locator('#target').innerText(), 'Welcome.');
+      return { timings };
+    });
+  }
   await trial('empty paragraph, first word, subsequent chunks and second session', async () => {
     await setup('<p><br></p>');
     const timings = [];
@@ -173,6 +181,6 @@ print(json.dumps(h.text_position(h.TRACKER.hint)[1][:2] if r['scope']=='control'
     assert.equal(await page.locator('#target p').count(), 2);
   });
 } finally {
-  writeFileSync(`${output}/results.json`, JSON.stringify({ browser: browser.version(), results }, null, 2) + '\n');
+  writeFileSync(`${output}/results.json`, JSON.stringify({ browser: browser.version(), platform: 'x11', results }, null, 2) + '\n');
   clipboard?.kill(); helper.kill(); await browser.close();
 }

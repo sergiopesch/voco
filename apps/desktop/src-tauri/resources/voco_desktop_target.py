@@ -315,7 +315,18 @@ def caret_text(node, route=()):
     hypertext = node.get_hypertext_iface() if count else None
     index = Atspi.Hypertext.get_link_index(hypertext, offset) if hypertext is not None else -1
     if index < 0:
-        if route and node.get_role_name() == 'paragraph':
+        # An HTML block can expose its text directly (for example <div><br>
+        # </div>) instead of through a paragraph link. Chromium removes that
+        # empty BR on first input in either shape. Textareas and native text
+        # controls retain literal newlines and must not use this normalization.
+        paragraph = bool(route) and node.get_role_name() == 'paragraph'
+        html_block = False
+        if not paragraph and count > max(caret, end):
+            try:
+                html_block = (node.get_attributes() or {}).get('tag') in ('div', 'p')
+            except Exception:
+                pass  # Missing HTML metadata keeps the stricter literal-text readback.
+        if paragraph or html_block:
             position = paragraph_position(node, iface, position)
         return node, iface, position, route
     try:

@@ -365,7 +365,14 @@ voco_start_wayland_service() {
     VOCO_INPUT_ERROR="An existing ydotoold is running but is unavailable to this login. Check its socket permissions; VOCO will not replace that service."
     return 1
   fi
-  if ! systemctl --user enable --now voco-ydotoold.service; then
+  local service_detail service_status=0
+  service_detail="$(systemctl --user enable --now voco-ydotoold.service 2>&1)" || service_status=$?
+  if [[ -n "${VOCO_INSTALL_LOG:-}" ]]; then
+    printf '%s\n' "$service_detail" >> "$VOCO_INSTALL_LOG"
+  elif (( service_status != 0 )); then
+    printf '%s\n' "$service_detail" >&2
+  fi
+  if (( service_status != 0 )); then
     VOCO_INPUT_ERROR="Could not start the VOCO input service. Check: systemctl --user status voco-ydotoold.service"
     return 1
   fi
