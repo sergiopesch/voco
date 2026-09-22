@@ -432,7 +432,7 @@ lesson(
         ),
         (
             "Suggestions are not a new typing destination",
-            "The owner narrowed the .54 report to Brave’s address bar. Its suggestion list announced focus while the entry still owned the keyboard. The .55 candidate resolves a popup to its focused entry only when their accessibility relationships agree; a real field change still stops delivery. WebKit also marks its web-view containers focused, so bounded discovery must reach the actual input. Cold discovery gives visible controls priority over hidden popup contents, within the same search limit. An unfocused terminal pane cannot change an editor’s paste shortcut. Tests cover browsers, native editors and terminal programs, with limits recorded per application. The .43 source viewer remains unchanged.",
+            "The owner narrowed the .54 report to Brave’s address bar. Its suggestion list announced focus while the entry still owned the keyboard. The .55 candidate resolves a popup to its focused entry only when their accessibility relationships agree; a real field change still stops delivery. WebKit also marks its web-view containers focused, so bounded discovery must reach the actual input. Cold discovery gives visible controls priority over hidden popup contents and follows the same verified popup-owner relationship, within bounded searches. An unfocused terminal pane cannot change an editor’s paste shortcut. Tests cover browsers, native editors and terminal programs, with limits recorded per application. The .43 source viewer remains unchanged.",
         ),
         (
             "Observation has limits",

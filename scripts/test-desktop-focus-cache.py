@@ -48,7 +48,7 @@ class FocusTests(unittest.TestCase):
         self.app = Node('/app', [self.window])
         self.desktop = Node('/desktop', [self.app])
         atspi = types.SimpleNamespace(StateType=types.SimpleNamespace(ACTIVE='active', FOCUSED='focused', EDITABLE='editable', SHOWING='showing'),
-            Role=types.SimpleNamespace(TERMINAL='terminal', PASSWORD_TEXT='password'),
+            Role=types.SimpleNamespace(TERMINAL='terminal', PASSWORD_TEXT='password', LIST_BOX='list-box', POPUP_MENU='popup-menu'),
             RelationType=types.SimpleNamespace(POPUP_FOR='popup-for', CONTROLLER_FOR='controller-for'),
             Text=types.SimpleNamespace(get_character_count=lambda _:0, get_caret_offset=lambda _:0, get_n_selections=lambda _:0), set_timeout=lambda *args:None, get_desktop=lambda _:self.desktop)
         context = types.SimpleNamespace(pending=lambda:False)
@@ -124,6 +124,23 @@ class FocusTests(unittest.TestCase):
         popup.relations = [relation('popup-for', [owner])]
         owner.relations = [relation('controller-for', [popup])]
         return item, popup
+
+    def test_cold_popup_relationship_finds_owner_beyond_tree_budget(self):
+        _, popup = self.popup()
+        hidden = Node('/hidden-owner', [self.a], role='panel')
+        self.window.children = [Node('/filler-' + str(i), role='panel') for i in range(125)] + [popup, hidden]
+        for child in self.window.children: child.parent = self.window
+        result = helper.probe()
+        self.assertEqual(result['scope'], 'control')
+        self.assertIs(helper.TRACKER.hint, self.a)
+
+    def test_cold_popup_relationship_cannot_escape_active_window(self):
+        _, popup = self.popup()
+        other = Node('/other-window', [self.a], role='frame')
+        self.window.children = [popup]
+        result = helper.probe()
+        self.assertIsNone(result['token'])
+        self.assertIs(self.a.parent, other)
 
     def test_suggestion_focus_preserves_verified_owner_identity(self):
         before = helper.probe()['token']

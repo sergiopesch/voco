@@ -74,7 +74,9 @@ glib 0.20 directly leaves the GTK dependency behind. [Backport](vendor/glib/VOCO
 - Suggestion focus may resolve to its editable controller only through bounded,
   reciprocal POPUP_FOR/CONTROLLER_FOR relations, fresh focus, same process and
   active-window ancestry. Settle owner loss only within the drained event batch;
-  real field departures and roundtrips must invalidate the destination.
+  real field departures and roundtrips must invalidate the destination. Cold
+  lookup may follow the same verified popup-owner route; never skip its fresh
+  active-window ancestry check.
 - Focused WebKit wrappers are search roots, not editable carets. Continue bounded
   discovery to a freshly focused input; retain password and unfocused-child rejection.
 - Cold discovery prioritizes cached focus/visibility across its bounded queue so

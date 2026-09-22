@@ -178,7 +178,9 @@ when both accessibility relations agree, the process matches and the controller
 still has a valid focused caret. The retained object must also belong to the
 single active window through fresh ancestry. Paired owner-loss/suggestion-gain
 notifications can be one batch; unresolved loss and real field roundtrips advance
-the generation. No application name, title or URL is used to bypass ownership.
+the generation. Cold lookup follows the same verified relationship from list
+boxes and popup menus, including fresh active-window ancestry. No application
+name, title or URL is used to bypass ownership.
 
 WebKit may mark a scroll container and document focused along with their input.
 Those noneditable wrappers are bounded search roots. Only a focused input can

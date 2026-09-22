@@ -64,8 +64,8 @@ class FocusTracker:
         except Exception:
             pass  # Fresh tree discovery still works; diagnostics expose the gap.
 
-    def focused_hint(self, window, pid, atspi):
-        node = self.hint
+    def focused_hint(self, window, pid, atspi, node=None):
+        node = self.hint if node is None else node
         if node is None:
             return None
         try:
@@ -258,6 +258,16 @@ def probe():
                 if (node.get_role() in (Atspi.Role.PASSWORD_TEXT, Atspi.Role.TERMINAL)
                         or state.contains(Atspi.StateType.EDITABLE)):
                     break
+            # A visible suggestion popup can consume the tree budget before its
+            # entry. Follow only the same verified ownership relation used for
+            # focus events, then independently validate the active-window route.
+            if node.get_role() in (Atspi.Role.LIST_BOX, Atspi.Role.POPUP_MENU):
+                owner = popup_focus_owner(node)
+                if owner is not None:
+                    owner = TRACKER.focused_hint(window, pid, Atspi, owner)
+                    if owner is not None:
+                        focused = owner
+                        break
             # Bound total child discovery, rather than truncating every container
             # to 30 children. Some toolkits emit no focus event for a control
             # until an accessibility client has first discovered that object.

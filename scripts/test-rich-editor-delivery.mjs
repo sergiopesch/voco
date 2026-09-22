@@ -215,7 +215,8 @@ print(json.dumps(h.text_position(h.TRACKER.hint)[1][:2] if r['scope']=='control'
   };
   await trial('cold subprocess discovers address bar before and during suggestions', async () => {
     const coldProbeMs = [];
-    for (const value of ['', 'Welcome']) {
+    await page.goto('about:blank');
+    for (const value of ['', 'Welcome', 'Go do you hear?']) {
       await focusAddress(value);
       const started = performance.now();
       const result = JSON.parse(execFileSync('/usr/bin/python3',
@@ -227,6 +228,7 @@ print(json.dumps(h.text_position(h.TRACKER.hint)[1][:2] if r['scope']=='control'
       assert.equal(result.scope, 'control', JSON.stringify({value, ...result}));
       assert.equal(result.input_state, 'editable');
     }
+    await setup('<p><br></p>');
     return { coldProbeMs };
   });
   await trial('address bar suggestions preserve first and subsequent receipts', async () => {

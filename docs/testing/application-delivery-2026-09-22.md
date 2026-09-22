@@ -28,12 +28,12 @@ change and pass afterward.
 Cold-start qualification exposed another failure: a new helper could spend all
 128 discovery slots inside hidden suggestion contents before reaching the address
 bar. Discovery now prioritizes cached focus/visibility across its queue, retaining
-fresh admission checks and the same object/deadline bounds. A regression starts
-the exact stdin subprocess protocol used by Rust, both before and during open
-suggestions. The final browser matrix passes all 17 cases on Brave X11, Brave
-native Wayland and Chromium X11; the eight-application matrix also passes. The
-six cold probes took 76–91 ms on this host, below the unchanged 800 ms deadline;
-this is fixture timing, not a general latency guarantee.
+fresh admission checks and the same object/deadline bounds. In native GNOME,
+visible browser chrome could still consume the bound with suggestions open;
+cold lookup now also follows the same reciprocal popup-owner relation and
+revalidates its active-window ancestry. A regression starts
+the exact stdin subprocess protocol used by Rust, before suggestions, with a first word and after a complete sentence. The final browser matrix passes all 17 cases on Brave X11, Brave
+native Wayland and Chromium X11; the eight-application matrix also passes. The unchanged 800 ms helper deadline remains in force.
 
 The earlier [empty HTML placeholder correction](first-run-follow-up-2026-09-22.md)
 remains necessary for page editors, but did not explain the owner's address bar.
@@ -85,7 +85,7 @@ recorded separately. `VOCO_RICH_EDITOR_EVIDENCE_DIR` retains receipts and logs.
 
 ## Verification in progress
 
-The focus/readback regression gate passes **53 + 63 cases**. Frontend tests pass
+The focus/readback regression gate passes **55 + 63 cases**. Frontend tests pass
 449 cases; typecheck, lint, production build, Rust's 258 application + 19 host + 7
 GLib tests and Clippy pass. One pre-existing fixture-export Rust test is ignored.
 An initial assembled .55 package passes all 12 private GNOME X11 onboarding,
