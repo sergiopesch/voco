@@ -123,7 +123,7 @@ isolation, not a remote VM or proof of a distribution's default desktop.
 
 ## Release and evidence
 
-Source and recorded public Ubuntu/Debian version: **2026.0.51**. Verify the current public release on GitHub and
+Source candidate: **2026.0.52**. Recorded public Ubuntu/Debian version: **2026.0.51**. Verify the current public release on GitHub and
 installed version from the package manager; do not infer either from source.
 The .43 package and desktop evidence is recorded in
 [the support matrix](docs/linux-support.md); preserve per-artifact receipts and
