@@ -81,6 +81,6 @@ The Linux qualification chapter also records the [.53 dependency refresh](../tes
 shared shortcut protection, grouped maintenance updates and exact-package checks.
 The learning site remains local and its source viewer remains pinned to .43.
 
-The [.54 qualification candidate](../testing/vite8-release-2026-09-22.md) adds the
+The [.54 release qualification](../testing/vite8-release-2026-09-22.md) adds the
 paired Vite/React-plugin migration, shared app/test build tools and tray patch
-resolution. Signing and publication remain separate gates; the code viewer stays .43.
+resolution. Publisher signatures and public downloads are verified; the code viewer stays .43.

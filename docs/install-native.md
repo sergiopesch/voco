@@ -1,6 +1,6 @@
 # Native Linux packages
 
-Ubuntu/Debian packages are **2026.0.53**. Fedora, openSUSE and Arch/Omarchy packages
+Ubuntu/Debian packages are **2026.0.54**. Fedora, openSUSE and Arch/Omarchy packages
 remain **2026.0.43**. Use each channel only with assets from its matching published
 [GitHub release](https://github.com/sergiopesch/voco/releases).
 Source files and drafts do not establish availability; check
@@ -11,7 +11,7 @@ model in every format; the native dependency profile is what differs.
 
 | System | Package | Additional package |
 | --- | --- | --- |
-| Ubuntu, Debian, Mint | `voco_2026.0.53_amd64.deb` | Resolved by apt |
+| Ubuntu, Debian, Mint | `voco_2026.0.54_amd64.deb` | Resolved by apt |
 | Fedora 44 | `voco-2026.0.43-1.fedora.x86_64.rpm` | Resolved by dnf |
 | openSUSE Tumbleweed | `voco-2026.0.43-1.opensuse.x86_64.rpm` | `libsentencepiece0-0.2.1-2.x86_64.rpm` |
 | Arch, Omarchy | `voco-2026.0.43-1-x86_64.pkg.tar.zst` | `sentencepiece-0.2.1-2-x86_64.pkg.tar.zst` |
@@ -48,7 +48,7 @@ not install a system microphone service or change your desktop shortcuts.
 Debian family:
 
 ```bash
-sudo apt install ./voco_2026.0.53_amd64.deb
+sudo apt install ./voco_2026.0.54_amd64.deb
 ```
 
 Fedora, after importing the verified public publisher key:

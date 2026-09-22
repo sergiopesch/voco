@@ -1660,7 +1660,7 @@
       },
       {
         "title": "Upgrade the build as one system",
-        "text": "The .54 candidate pairs Vite 8 with React plugin 6 and Node 24 LTS. The app and its renderer tests must use the same Vite version; otherwise a passing test can exercise an older tool. Explicit output targets keep the previous compiler targets, but only the packaged WebKit app can establish how the production build behaves. Tauri also requires an updated tray library, carrying the same immutable icon-path patch. Source tests, fresh installation checks and the private GNOME journey have separate evidence. Signing and publication remain pending; the pinned .43 code viewer is unchanged."
+        "text": "The .54 release pairs Vite 8 with React plugin 6 and Node 24 LTS. The app and its renderer tests must use the same Vite version; otherwise a passing test can exercise an older tool. Explicit output targets keep the previous compiler targets, but only the packaged WebKit app can establish how the production build behaves. Tauri also requires an updated tray library, carrying the same immutable icon-path patch. Source tests, fresh installation checks and the private GNOME journey have separate evidence. The signed release assets and public downloads are verified; the pinned .43 code viewer is unchanged."
       },
       {
         "title": "Safe upgrades",
