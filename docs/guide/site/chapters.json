@@ -1652,7 +1652,7 @@
       },
       {
         "title": "Progress should follow the work",
-        "text": "The unreleased 22 September installer candidate connects signal bars to measured transfer rates and a brief silver sweep to phase changes. The download runs independently: finishing work cancels animation immediately. Checksums download alongside the package and must pass before installation. Fifty-six local download trials found lower overhead than the .51 installer, but do not measure whole installations over the internet. Real Ubuntu APT tests preserve both package questions and existing configuration choices. This source candidate does not change the installed model or the pinned code viewer."
+        "text": "The published .52 installer connects signal bars to measured transfer rates and a brief silver sweep to phase changes. The download runs independently: finishing work cancels animation immediately. Checksums download alongside the package and must pass before installation. Fifty-six local download trials found lower overhead than the .51 installer, but do not measure whole installations over the internet. Real Ubuntu APT tests preserve both package questions and existing configuration choices. The .52 release retains the same model and dictation behavior; its package and desktop checks are separate from these download timings. The pinned code viewer is unchanged."
       },
       {
         "title": "Safe upgrades",

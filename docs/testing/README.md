@@ -1,8 +1,10 @@
 # Testing
 
-The [installer performance candidate](installer-performance-2026-09-22.md) records
+- [2026.0.52 release qualification](installer-release-2026-09-22.md) — exact package, desktop, signing and public-download receipts.
+
+The [.52 installer performance record](installer-performance-2026-09-22.md) records
 download timing, CPU overhead, event-driven presentation and real Ubuntu APT prompt
-tests. It is unreleased and does not change application/model qualification.
+tests. Package and desktop qualification are recorded separately above.
 
 The [.51 public release record](linux-release-2026-09-22.md) identifies the signed
 package, source and verified downloads. The

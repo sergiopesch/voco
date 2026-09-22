@@ -1,5 +1,18 @@
 # Guide verification history
 
+## Published .52 installer · 22 September 2026
+
+The Linux lesson now identifies the published .52 installer and separates its
+download measurements from package/desktop qualification. The .43 source catalog
+is unchanged. Lesson regeneration and all nine guide tests pass. Browser checks
+verified the published lesson, journey next step, correct quiz feedback, pinned
+source modal, 18 installation-file search matches, glossary and narrow chapter
+drawer. At 390 × 844, content and scroll widths were both 375 px. No console
+warnings/errors were observed; the viewport was restored and the test tab closed.
+The initial unit invocation used the repository root and ran zero tests; the
+correct guide-directory invocation passed all nine. This is guide verification,
+not an owner microphone or fresh installation result.
+
 ## Installer performance candidate · 22 September 2026
 
 The Linux chapter now describes the unreleased Signal + Silver sweep installer

@@ -35,7 +35,7 @@ main package downloads. APT verifies those helper downloads; the final privilege
 transaction reuses completed archives only after VOCO's checksum passes. Failed
 prefetches fall back to the ordinary APT installation. Desktop settings are unchanged.
 
-The [unreleased installer performance candidate](testing/installer-performance-2026-09-22.md)
+The [.52 installer](testing/installer-performance-2026-09-22.md)
 overlaps checksum metadata with the package download and waits directly on wget.
 Optional helper prefetches run in an isolated download-only process group; any
 still running after verification are stopped, and APT fetches remaining helpers.
