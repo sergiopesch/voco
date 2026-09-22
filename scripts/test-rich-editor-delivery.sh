@@ -79,6 +79,9 @@ fi
 export PATH="/tmp/native-deps/bin:/usr/bin:/bin"
 export LD_LIBRARY_PATH="/tmp/native-deps/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export DISPLAY=:0 XDG_SESSION_TYPE=x11 GDK_BACKEND=x11 GSETTINGS_BACKEND=memory GIO_USE_VFS=local
+# GTK4's default renderer can stall AT-SPI under load in GPU-free Xvfb.
+# Keep this clipboard fixture on Cairo without changing delivery timeouts or receipts.
+export GSK_RENDERER=cairo
 export ACCESSIBILITY_ENABLED=1 GTK_MODULES=atk-bridge PYTHONDONTWRITEBYTECODE=1
 export LC_ALL=C.UTF-8
 Xvfb :0 -screen 0 1280x900x24 -nolisten tcp > "$fixture/evidence/xvfb.log" 2>&1 &

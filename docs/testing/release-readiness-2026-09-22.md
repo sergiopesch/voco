@@ -111,6 +111,15 @@ reproduction with inherited external paths passes after this correction; the
 negative control without the production latency flag still fails. Namespace,
 waveform and latency requirements are unchanged.
 
+A later hosted GTK4 clipboard check lost accessibility confirmation after paste.
+Cold, CPU-constrained reproductions kept X11 focus on the live GTK4 window, but
+its child-count RPC exceeded the 80 ms accessibility deadline. Three default-GSK
+trials failed; all three Cairo trials passed the same toolkit cases under the
+same load. The device-free Xvfb clipboard fixture now explicitly uses Cairo, as
+other native fixtures already do. Product timeouts, receipt checks and refusal to
+replay uncertain text are unchanged. This controls headless rendering cost; it
+does not promise that arbitrary applications remain responsive under any load.
+
 In the latest X11 fixture sample, a second launcher process reached accessible
 controls in 56 ms. Done-to-visible-status was 993 ms, including an explicit 600 ms
 observation wait. The Wayland onboarding Stop-to-idle trace measured 364 ms.
