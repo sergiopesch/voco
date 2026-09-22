@@ -31,3 +31,11 @@ Fedora, openSUSE and Arch/Omarchy remain at **2026.0.43**; use the matching
 [native guide](install-native.md) and [support matrix](linux-support.md).
 The [.51 release](releases/2026.0.51.md) remains available for rollback. Earlier
 frozen candidates and desktop evidence retain their original identities.
+
+## Next candidate
+
+**2026.0.53** integrates the dependency backlog and preserves the patched X11
+shortcut actor across the shortcut-plugin upgrade. The [candidate notes](releases/2026.0.53.md)
+describe the changes. It requires a new complete package and qualification;
+source version metadata is not publication. Continue using the recorded public
+.52 installer until the new cut is published and verified.

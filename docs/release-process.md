@@ -77,6 +77,23 @@ the recorded commit IDs. Do not delete dirty local worktrees or unresolved PRs.
 Keep security updates separate when their dependency graph fails compilation;
 never waive a gate or ignore an advisory just to clear the PR list.
 
+Version updates run weekly on Monday at 09:00 Europe/London, with at most two
+open version PRs per ecosystem. Compatible minor/patch updates are grouped;
+major upgrades and the pre-1.0 input/hash libraries remain separate. Shortcut
+plugin updates also stay separate because both consumers must resolve to the
+same vendored actor. Security updates keep their independent queue; no advisory
+is suppressed by this policy. Require the same protected checks for every merge.
+
+Automatic deletion of merged PR branches is enabled in GitHub. For a combined
+integration PR, merge the original dependency heads into it, resolve their
+compatibility changes, and use a merge commit after CI passes. Verify those exact
+heads are ancestors of the default branch before deleting any residual branches.
+Do not squash away the ancestry needed to close the constituent PRs accurately.
+
+Housekeeping, workflow and documentation changes alone do not require an app
+release. Dependency or application changes included in shipped binaries do:
+advance the version and qualify a fresh package; never replace published assets.
+
 ## Additional native Linux channels
 
 Follow [the support gates](linux-support.md) for each distribution and desktop.

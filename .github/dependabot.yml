@@ -4,14 +4,37 @@ updates:
     directory: /apps/desktop/src-tauri
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
+      day: monday
+      time: "09:00"
+      timezone: Europe/London
+    open-pull-requests-limit: 2
+    groups:
+      rust-compatible:
+        patterns: ["*"]
+        update-types: [minor, patch]
+        # Pre-1.0 API changes and the shared patched shortcut actor need review.
+        exclude-patterns: [evdev, sha2, global-hotkey, tauri-plugin-global-shortcut]
   - package-ecosystem: npm
     directory: /
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
+      day: monday
+      time: "09:00"
+      timezone: Europe/London
+    open-pull-requests-limit: 2
+    groups:
+      frontend-compatible:
+        patterns: ["*"]
+        update-types: [minor, patch]
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
+      day: monday
+      time: "09:00"
+      timezone: Europe/London
+    open-pull-requests-limit: 2
+    groups:
+      actions-compatible:
+        patterns: ["*"]
+        update-types: [minor, patch]

@@ -482,7 +482,6 @@ function findNormalizedPrefixEnd(text: string, prefix: string): number | null {
   }
 
   let prefixIndex = 0;
-  let lastMatchedEnd = 0;
   for (const match of text.matchAll(/[\s\S]/gu)) {
     const char = match[0];
     const index = match.index ?? 0;
@@ -494,9 +493,8 @@ function findNormalizedPrefixEnd(text: string, prefix: string): number | null {
       return null;
     }
     prefixIndex += 1;
-    lastMatchedEnd = index + 1;
     if (prefixIndex === normalizedPrefix.length) {
-      return lastMatchedEnd;
+      return index + 1;
     }
   }
 

@@ -1,12 +1,17 @@
 # VOCO's scoped X11 shortcut patch
 
-This directory vendors crates.io `global-hotkey` **0.7.0**, upstream commit
-`dc7a755790ccbef1971b6c59eceb90d107df1feb`. The original Apache-2.0 and MIT
+This directory vendors crates.io `global-hotkey` **0.8.0**, upstream commit
+`2a620bf3852008b568f6d36c2baedcc3dd0822f2`. The original Apache-2.0 and MIT
 licenses, normalized/original manifests, platform implementations and examples
 are retained. `VOCO-UPSTREAM.json` records the downloaded crate archive checksum
 and original file hashes. Cache marker `.cargo-ok`, upstream CI/changelog-tool
 configuration and Renovate configuration were omitted; application builds do not
 use the vendored examples or their development dependencies.
+
+The 0.8.0 refresh carries the existing focus lease and event-driven actor patch
+onto the new upstream release, including its F13-F24 X11 mappings and Windows
+release-loop fix. Both VOCO and tauri-plugin-global-shortcut must resolve to this
+single patched copy; `scripts/verify-shortcut-backport.py` rejects a split graph.
 
 The Linux-only public addition is:
 

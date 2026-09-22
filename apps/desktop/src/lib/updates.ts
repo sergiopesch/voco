@@ -143,7 +143,7 @@ export async function checkForUpdates({
     });
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
-      throw new Error("GitHub release lookup timed out.");
+      throw new Error("GitHub release lookup timed out.", { cause: error });
     }
     throw error;
   } finally {

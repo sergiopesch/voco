@@ -55,3 +55,21 @@ clipboard contents, credentials or unredacted diagnostic logs to public issues.
 The [security policy](../SECURITY.md) explains private vulnerability reporting.
 Evaluation contributions should follow the [TypeSafe protocol](testing/typesafe-evaluation.md)
 and distinguish measured results from targets and missing evidence.
+
+## Dependency maintenance
+
+Compatible updates are grouped weekly, with two open version PRs per ecosystem.
+Major upgrades, pre-1.0 keyboard/hash APIs and the shortcut plugin need individual
+review. Security updates remain independent. See [repository hygiene](release-process.md#repository-hygiene).
+
+TypeScript 7 supplies `tsc` through the `@typescript/native` npm alias. The
+`typescript` alias points to Microsoft's `@typescript/typescript6` compatibility
+package because ESLint and compiler-API regression fixtures still need that API.
+This follows [Microsoft's side-by-side guidance](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/#running-side-by-side-with-typescript-60).
+Both are development dependencies; neither ships as a runtime service. Remove
+the compatibility alias only after all API consumers support a stable successor.
+
+`verify-shortcut-backport.py` checks the upstream vendor inventory and rejects
+multiple `global-hotkey` resolutions. The app's X11 focus lease and the Tauri
+shortcut plugin must use the same patched actor. Run the isolated desktop tests
+after upgrading this dependency; a successful compilation cannot prove that link.

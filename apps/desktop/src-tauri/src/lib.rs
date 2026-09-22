@@ -13,6 +13,7 @@ mod config;
 #[cfg(target_os = "linux")]
 mod desktop_notifications;
 mod desktop_shortcut;
+mod digest_hex;
 mod focus_probe;
 #[cfg(target_os = "linux")]
 mod hotkey_state;
@@ -2070,7 +2071,7 @@ fn supports_evdev_hotkey(device: &evdev::Device) -> bool {
 #[cfg(target_os = "linux")]
 fn supports_evdev_hotkey_parts(
     name: Option<&str>,
-    keys: Option<&evdev::AttributeSetRef<evdev::Key>>,
+    keys: Option<&evdev::AttributeSetRef<evdev::KeyCode>>,
 ) -> bool {
     if name.map(is_ignored_evdev_device_name).unwrap_or(false) {
         return false;
@@ -2078,8 +2079,9 @@ fn supports_evdev_hotkey_parts(
     let Some(keys) = keys else {
         return false;
     };
-    let has_alt = keys.contains(evdev::Key::KEY_LEFTALT) || keys.contains(evdev::Key::KEY_RIGHTALT);
-    has_alt && (keys.contains(evdev::Key::KEY_D) || keys.contains(evdev::Key::KEY_R))
+    let has_alt =
+        keys.contains(evdev::KeyCode::KEY_LEFTALT) || keys.contains(evdev::KeyCode::KEY_RIGHTALT);
+    has_alt && (keys.contains(evdev::KeyCode::KEY_D) || keys.contains(evdev::KeyCode::KEY_R))
 }
 
 #[cfg(target_os = "linux")]
@@ -2181,10 +2183,10 @@ fn spawn_evdev_device_worker(
             trace_hotkey_event("evdev_device_worker_started", Some("evdev"));
             let keys = dev.supported_keys();
             let mut readiness = SHORTCUT_OBSERVATIONS.device(
-                keys.is_some_and(|keys| keys.contains(evdev::Key::KEY_D)),
+                keys.is_some_and(|keys| keys.contains(evdev::KeyCode::KEY_D)),
                 keys.is_some_and(|keys| {
-                    keys.contains(evdev::Key::KEY_LEFTSHIFT)
-                        || keys.contains(evdev::Key::KEY_RIGHTSHIFT)
+                    keys.contains(evdev::KeyCode::KEY_LEFTSHIFT)
+                        || keys.contains(evdev::KeyCode::KEY_RIGHTSHIFT)
                 }),
             );
 
@@ -2199,10 +2201,14 @@ fn spawn_evdev_device_worker(
                 match events {
                     Ok(events) => {
                         if events.iter().any(|event| {
-                            event.kind()
-                                == evdev::InputEventKind::Synchronization(
-                                    evdev::Synchronization::SYN_DROPPED,
+                            matches!(
+                                event.destructure(),
+                                evdev::EventSummary::Synchronization(
+                                    _,
+                                    evdev::SynchronizationCode::SYN_DROPPED,
+                                    _
                                 )
+                            )
                         }) {
                             readiness.unsynchronized();
                         }

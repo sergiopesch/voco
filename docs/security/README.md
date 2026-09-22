@@ -236,8 +236,8 @@ Readiness and bounded cleanup must remain correct under event backlogs, full wak
 buffers and actor shutdown. Callback tests scheduled after an XSync acknowledgement
 do not establish atomic focus-switch-plus-shortcut behavior in one server batch.
 
-The existing dependency is pinned as `global-hotkey` 0.7.0, upstream commit
-`dc7a755790ccbef1971b6c59eceb90d107df1feb`, with archive/file checksums and original
+The existing dependency is pinned as `global-hotkey` 0.8.0, upstream commit
+`2a620bf3852008b568f6d36c2baedcc3dd0822f2`, with archive/file checksums and original
 licenses in [vendor provenance](../../vendor/global-hotkey/VOCO-UPSTREAM.json)
 and [patch documentation](../../vendor/global-hotkey/VOCO-PATCH.md). This introduces
 no new engine or user shortcut/fallback configuration. Logical frontend lifecycle

@@ -1,6 +1,6 @@
 [package]
 name = "voco"
-version = "2026.0.52"
+version = "2026.0.53"
 description = "Turn speech into text at your cursor with local dictation"
 authors = ["VOCO Contributors"]
 edition = "2021"
@@ -43,7 +43,7 @@ codegen-units = 1
 strip = true
 
 [target.'cfg(target_os = "linux")'.dependencies]
-global-hotkey = "=0.7.0"
+global-hotkey = "=0.8.0"
 webkit2gtk = { version = "2.0", features = ["v2_40"] }
 glib = "0.18"
 evdev = "0.13"
