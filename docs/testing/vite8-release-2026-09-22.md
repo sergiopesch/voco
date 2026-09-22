@@ -1,7 +1,7 @@
 # Vite 8 and dependency release qualification — 22 September 2026
 
 This record qualifies the **2026.0.54 candidate**, integrating dependency PRs
-#61–#63. Public downloads remain at .53 until signing, signed-installer checks
+#61–#63. Public downloads remain at .53 until final release signing
 and publication verification finish. Existing release assets remain immutable.
 
 ## Changes and exact identities
@@ -19,9 +19,10 @@ Vitest, Tailwind and the app share Vite 8. Node 24 LTS is declared in `.nvmrc`
 and used by CI/setup. Future Vite/plugin updates share a dedicated group.
 Geist, React types, Playwright, env_logger and pkg-config updates are included.
 
-- Application/package assembly source: `558383beae93aca2f82cbabe42e82d3ac831f58e`.
-- Debian package: `voco_2026.0.54_amd64.deb`, 685,510,530 bytes.
-- Package SHA-256: `92c28e77e6998f5ec8267fc50d8e9ffb33cd3e3aaf2e7ab44ac1223662b4037e`.
+- Application build source: `558383beae93aca2f82cbabe42e82d3ac831f58e`.
+- Final package assembly source: `fb17c393b55ae4fc12f8df2d7947be7e015103e1`.
+- Debian package: `voco_2026.0.54_amd64.deb`, 685,512,494 bytes.
+- Package SHA-256: `dd88b4b946f13620a40ed6c544b51e2a448c09a92f441e3cf6cf2e34fc083736`.
 - Packaged application SHA-256: `049b74133a7e7035ec3626c23e59423d3d494f9c160eb224361f27b86dbf504c`.
 - Browser-host SHA-256: `06743eff9775a428cc5f8098da9d935553709861af4fcb9b1799a3505b443945`.
 
@@ -29,11 +30,15 @@ The base Tauri bundle was completed with the unchanged, pinned Nemotron model
 and native runtime. Package verification checked manifests, native ELF identity,
 relative links, metadata URLs, browser-host integration and notices. The packaged
 app identity is authoritative: Tauri's bundling changes executable metadata.
-Bundled documentation retains its assembly snapshot.
+Bundled documentation retains its assembly snapshot. Review corrected the .54
+AppStream release description before the final assembly. A complete extracted-file
+comparison found changes only in that metadata and five documentation files;
+application, browser-host and speech-runtime bytes match the tested build. The
+initial candidate and its evidence are retained separately.
 
 ## Completed checks
 
-All four protected checks passed on the assembly source in
+All four protected checks passed on the application build source in
 [CI run 35732906382](https://github.com/sergiopesch/voco/actions/runs/35732906382).
 Final documentation and merged-source checks remain required before publication.
 
@@ -49,6 +54,7 @@ Final documentation and merged-source checks remain required before publication.
 | Pinned speech corpus | Aggregate WER 0.025; original accuracy, silence, Stop-tail and continuity gates passed |
 | Private desktop | All 12 GNOME 46 X11 cases passed with the exact packaged binary |
 | Ubuntu package | APT installation and all installed-file integrity checks passed in a disposable Ubuntu 24.04 container |
+| Guided installation | Final package installed from a fresh profile using the exact installer and independently verified publisher-signed package checksum |
 | Installer prompts | Both real APT maintainer/conffile prompt cases passed; the owner setting was retained |
 | Download handling | All 56 .53/.54 local transfer trials verified their payloads |
 
@@ -61,6 +67,14 @@ the new field untouched. Renderer fixtures use mocked native/media boundaries
 and repository Playwright. Screenshots were inspected for the microphone canvas,
 selector, packaged setup and tray; their evidence remains separate from the
 real packaged WebKit/GTK journey.
+
+The final guided installer ran in disposable Ubuntu 24.04 lease
+`cbx_34fb99269149` with the versioned download URLs redirected to loopback assets.
+Installed-file integrity passed, Alt+D was set, and onboarding remained incomplete
+with no microphone selected. Both Wayland helpers installed. Missing container
+`uinput` correctly returned exit 2 after package installation; this is not desktop
+readiness. The full public manifest and real GitHub transport are checked after
+publication.
 
 npm reports zero vulnerabilities. Cargo reports no vulnerability-class findings,
 with seven unmaintained and one unsound warnings still visible. The existing
@@ -77,7 +91,12 @@ feature disabled. No advisory was dismissed, suppressed or waived.
 - Ubuntu's minimal container initially excluded installed documentation. Its
   policy and missing-file output were preserved. Repeating installation with
   documentation enabled verified every installed file, including notices.
-- The first signing dialog timed out; no signature from that attempt is accepted.
+- Signing dialogs timed out before the owner unlocked the key; the final package
+  checksum manifest now has a verified publisher signature. Failed attempts remain
+  recorded and no signature from them is accepted.
+- The first local installer transport fixture omitted the requested checksum alias.
+  Installation correctly stopped before any package mutation. The corrected fixture
+  serves the signed package checksum under the installer-requested filename.
 
 Installer source changes only its version and artifact URLs; local transfer
 fixtures do not measure Internet or whole-installation speed. Physical microphones,
@@ -85,6 +104,6 @@ owner-perceived motion, native Wayland cursor delivery and other desktops/apps
 retain separate acceptance requirements. Local containers are not remote VMs or
 proof of a distribution's default desktop. Other native channels stay at .43.
 
-The signed installer, full release signatures, downloaded draft/public assets and
-final branch/PR inventory remain delivery gates. The release source archive will
+The full release signatures, downloaded draft/public assets and final branch/PR
+inventory remain delivery gates. The release source archive will
 retain its cut-time record; the public repository can record later verification.
