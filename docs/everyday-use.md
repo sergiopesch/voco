@@ -1,6 +1,6 @@
 # Using VOCO
 
-In .47, a successful voice test is followed by a desktop input check
+A successful voice test is followed by a desktop input check
 before onboarding completes. **Desktop setup required** means helpers or their
 service need attention; it is different from **No text cursor available**. Repair
 setup using the [installation guide](install.md), then retry the check.
@@ -10,7 +10,7 @@ setup using the [installation guide](install.md), then retry the check.
 Choose **Start test** and speak. The signal moves with microphone input and your
 words appear here. Speech stays on this computer; the test never pastes into
 other apps or changes the clipboard. Choose **Change microphone** to select a
-different input within the same setup canvas. In the next test candidate, applying
+different input within the same setup canvas. Applying
 a microphone returns directly to the test; **Back to test** leaves the chooser
 without applying a new choice. VOCO uses your selection, or the system
 default if you have not selected a microphone.
@@ -18,13 +18,16 @@ default if you have not selected a microphone.
 Choose **Finish test** to stop capture and collect the final words. After a
 successful test, VOCO checks desktop input automatically. **Your voice, ready.**
 shows your shortcut and explains that VOCO stays in the tray. **Done** rechecks
-readiness and saves completion. In the .50 test candidate, Done leaves a compact Ready window visible; choose Hide to tray when you are ready. Reopening VOCO from the launcher presents the existing idle app. During capture it keeps your destination focused. Changing microphones requires a new test. Silence,
+readiness and saves completion. Done leaves a compact Ready window visible;
+choose Hide to tray when you are ready. Reopening VOCO from the launcher presents
+the existing idle app. During capture it keeps your destination focused. Changing
+microphones requires a new test. Silence,
 recognition failures and incomplete desktop setup keep onboarding open with an
 action to retry.
 
-## Panel setup in the .50 candidate
+## Panel setup
 
-The complete Debian candidate includes the GNOME 46 panel. The guided installer
+The Debian package includes the GNOME 46 panel. The guided installer
 activates it for the user running setup. Manual APT installs can choose **Enable
 live panel** in onboarding or Help, or run `voco --setup-panel`. Package hooks do
 not enable extensions. If setup says to sign out, save your work and sign out and
@@ -34,7 +37,7 @@ The panel shows real microphone bars, Listening and Stop. Other desktops and a
 disabled companion use the native tray, with status labels where supported and a
 status row plus Stop in its menu. `voco --check-panel` changes no preferences.
 
-The next test candidate also replaces the fallback tray's Ready label with
+The fallback tray replaces its Ready label with
 audio-driven bars while recording. Silence settles the bars; Stop restores the
 normal status. The tray menu keeps a readable status and an explicit Stop action.
 Smooth movement follows the desktop's animation preference.

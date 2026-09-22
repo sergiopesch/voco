@@ -136,7 +136,7 @@ command cannot identify which key your desktop assigned. See the
 
 ### GNOME tray integration
 
-The unpublished .50 Debian candidate bundles the GNOME 46 live panel. Its guided
+The Debian package bundles the GNOME 46 live panel. The guided
 installer runs `voco --setup-panel` as the desktop user. After a manual APT install,
 use the same command or **Enable live panel** in onboarding/Help. This adds only
 VOCO to enabled extensions; it preserves other extensions and global policy.
@@ -166,10 +166,9 @@ GNOME session and KDE/Omarchy have their own tray integrations. Installing an
 extension does not configure microphone access, a compositor shortcut or ydotoold.
 
 The model lives under `/usr/lib/voco/speech`. Readiness follows worker warmup.
-In the .51 development source, desktop dictation, browser dictation and explicit
-recovery use the bundled Nemotron model. No separate recognition model is downloaded.
-A failed warmup reports an error. Published older versions retain their documented
-behavior; see [release status](release-candidate.md).
+Desktop dictation, browser dictation and explicit recovery use the bundled
+Nemotron model. No separate recognition model is downloaded. A failed warmup
+reports an error. See [release status](release-candidate.md) for current downloads.
 
 ## Source development
 
