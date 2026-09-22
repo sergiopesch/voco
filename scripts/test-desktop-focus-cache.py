@@ -71,6 +71,15 @@ class FocusTests(unittest.TestCase):
         self.assertEqual(result['scope'], 'control')
         self.assertIs(helper.TRACKER.hint, self.a)
 
+    def test_unfocused_terminal_does_not_change_an_editor_paste_shortcut(self):
+        editor = Node('/editor-pane', [self.a], ['showing'], 'panel')
+        terminal = Node('/terminal-pane', states=['showing'], role='terminal')
+        self.window.children = [editor, terminal]
+        editor.parent = terminal.parent = self.window
+        result = helper.probe()
+        self.assertEqual(result['scope'], 'control')
+        self.assertEqual(result['shortcut'], 'ctrl+v')
+
     def test_cached_priority_cannot_admit_stale_focus(self):
         self.a.get_state_set()  # Prime the ordering hint before focus disappears.
         self.a.states.discard('focused')

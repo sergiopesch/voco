@@ -137,7 +137,13 @@ def vscode():
     target=root/'home/fixture.txt';target.write_text('')
     p=launch('vscode',[os.environ['VOCO_VSCODE_BINARY'],'--no-sandbox','--disable-gpu','--password-store=basic','--force-renderer-accessibility','--user-data-dir='+str(profile),'--extensions-dir='+str(profile/'extensions'),'--new-window',str(target)])
     wait_window(pid=p.pid);pump(3);key('Escape','ctrl+1');pump(.3)
-    return {'deliveries':[deliver('Hello',True),deliver(' Linux.',False)]}
+    deliveries=[deliver('Hello',True),deliver(' Linux.',False)]
+    key('ctrl+grave');pump(1);key('ctrl+1');pump(.3)
+    assert focused()['shortcut']=='ctrl+v','An unfocused terminal must not change the editor paste chord'
+    deliveries.extend([deliver(' Editor.',False),deliver(' Still editing.',False)])
+    window=Gdk.get_default_root_window()
+    Gdk.pixbuf_get_from_window(window,0,0,1280,900).savev(str(out/'vscode-terminal-pane.png'),'png',[],[])
+    return {'deliveries':deliveries,'terminalPaneScreenshot':'vscode-terminal-pane.png'}
 try:
     h.safe_probe()
     for kind in ['gtk3','gtk4','webkit']:trial(kind+' native controls',lambda kind=kind:toolkit(kind))

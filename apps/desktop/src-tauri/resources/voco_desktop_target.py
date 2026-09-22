@@ -253,7 +253,6 @@ def probe():
         try:
             node.clear_cache_single()
             state = node.get_state_set()
-            terminal = terminal or node.get_role() == Atspi.Role.TERMINAL
             if node.path != window.path and state.contains(Atspi.StateType.FOCUSED):
                 focused = node
                 if (node.get_role() in (Atspi.Role.PASSWORD_TEXT, Atspi.Role.TERMINAL)
