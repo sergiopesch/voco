@@ -1,4 +1,5 @@
 //! Opt-in local metadata only. Producers never wait for the disk writer.
+use crate::digest_hex::digest_hex;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::fs::{self, File, OpenOptions};
@@ -142,7 +143,7 @@ pub fn speech_queue_failure(request: &Value) -> Result<(), String> {
     let session_hash = request["session"]
         .as_str()
         .filter(|s| s.len() <= 80)
-        .map(|s| format!("{:x}", Sha256::digest(s.as_bytes())));
+        .map(|s| digest_hex(Sha256::digest(s.as_bytes())));
     emit(
         json!({"event":"speech_queue_failed", "reason":reason, "stream_session_hash":session_hash,
         "dictation_session_id":request["dictation_session_id"].as_u64()}),
@@ -214,7 +215,7 @@ fn speech_quality_payload(request: &Value) -> Option<Value> {
         return None;
     }
     let mut safe = json!({"event":"speech_quality", "stage":event,
-        "stream_session_hash":format!("{:x}", Sha256::digest(session.as_bytes())),
+        "stream_session_hash":digest_hex(Sha256::digest(session.as_bytes())),
         "sample_observation_scope":"queue_ingress",
         "clock_domain":if event == "native_dispatch" { "rust_instant_duration_ms" } else { "frontend_performance_duration_ms" }});
     for key in [
@@ -349,7 +350,7 @@ pub fn speech_exchange(request: &Value, result: &Result<Value, String>, elapsed:
     let session_hash = request["session"]
         .as_str()
         .filter(|s| s.len() <= 80)
-        .map(|s| format!("{:x}", Sha256::digest(s.as_bytes())));
+        .map(|s| digest_hex(Sha256::digest(s.as_bytes())));
     emit(
         json!({"event":"speech_exchange", "op":op, "outcome":outcome,
         "stream_session_hash":session_hash, "request_seq":request["seq"].as_u64(),
@@ -418,7 +419,7 @@ fn write_events(
     let executable_hash = std::env::current_exe()
         .ok()
         .and_then(|p| fs::read(p).ok())
-        .map(|bytes| format!("{:x}", Sha256::digest(bytes)));
+        .map(|bytes| digest_hex(Sha256::digest(bytes)));
     let header = json!({"event":"run_metadata", "version":env!("CARGO_PKG_VERSION"),
         "executable_sha256":executable_hash, "model":"nemotron-speech-streaming-en-0.6b-q8-context1",
         "native_capture_compiled":cfg!(feature="native-capture"),

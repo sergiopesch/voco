@@ -1,5 +1,6 @@
 //! Post-terminal private audit bundles. No capture callback calls this module.
 //! A missing COMMIT.json always means incomplete evidence; partial files remain private.
+use crate::digest_hex::digest_hex;
 use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
 use std::ffi::CString;
@@ -230,7 +231,7 @@ impl BundleWriter {
         self.total_bytes += bytes;
         self.files.insert(
             filename.into(),
-            json!({"sha256": format!("{:x}", hash.finalize()), "bytes": bytes}),
+            json!({"sha256": digest_hex(hash.finalize()), "bytes": bytes}),
         );
         self.handles.push((filename.into(), file));
         Ok(())
@@ -438,7 +439,7 @@ mod tests {
         assert_eq!(commit["files"]["source.f32le"]["bytes"], 8);
         assert_eq!(
             commit["files"]["source.f32le"]["sha256"],
-            format!("{:x}", Sha256::digest(b"abcdefgh"))
+            digest_hex(Sha256::digest(b"abcdefgh"))
         );
         assert_eq!(std::fs::metadata(&bundle).unwrap().mode() & 0o777, 0o700);
         for entry in std::fs::read_dir(bundle).unwrap() {

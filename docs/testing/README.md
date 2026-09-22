@@ -268,3 +268,5 @@ without starting a desktop. Add `--debug` for the debug control.
 [19 September native packaging and Hyprland experiments](linux-release-2026-09-19.md)
 records the .43 development work, successful checks and unresolved release gates.
 It is not a publication or universal compatibility claim.
+
+- [22 September dependency refresh and .53 qualification](dependency-release-2026-09-22.md)

@@ -56,10 +56,8 @@ export class UpdateCheckCoordinator {
       return;
     }
 
-    let cachedState: UpdateCheckState | null = null;
-
     try {
-      cachedState = await this.dependencies.readCachedState(channel, currentVersion);
+      const cachedState = await this.dependencies.readCachedState(channel, currentVersion);
       if (!this.isCurrent(request)) {
         return;
       }
