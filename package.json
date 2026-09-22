@@ -1,6 +1,6 @@
 {
   "name": "voco",
-  "version": "2026.0.54",
+  "version": "2026.0.55",
   "private": true,
   "workspaces": [
     "apps/*"
@@ -16,6 +16,7 @@
     "verify:cursor-acceptance": "node scripts/report-cursor-streaming-trace.mjs --strict",
     "test:browser-full-app": "bash scripts/test-browser-full-app.sh",
     "test:chromium-exact-field": "node scripts/chromium-background.test.cjs && node scripts/test-chromium-exact-field.mjs",
+    "test:application-delivery": "VOCO_DELIVERY_SUITE=applications bash scripts/test-rich-editor-delivery.sh",
     "test:rich-editor-delivery": "bash scripts/test-rich-editor-delivery.sh",
     "test:brand-motion": "node scripts/test-brand-motion.mjs",
     "test:dictation-renderer": "node scripts/test-dictation-renderer.mjs",

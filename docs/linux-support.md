@@ -7,6 +7,11 @@ checks and their limits. The matching patched tray library preserves live feedba
 the shortcut protection and pinned Nemotron runtime are retained. The .43 desktop
 results below remain historical evidence; other native package channels stay at .43.
 
+The unreleased **.55 candidate** has a new [application delivery matrix](testing/application-delivery-2026-09-22.md):
+Brave and Chromium address bars/editors, Firefox, VS Code, GTK/WebKit controls,
+GNOME Text Editor, Bash and nano. It separates exact-field confirmation from
+terminal dispatch and records toolkit limitations. It does not certify all Linux apps.
+
 This matrix records **2026.0.43** package and desktop qualification. Only assets
 attached to a published [GitHub release](https://github.com/sergiopesch/voco/releases)
 are public downloads; source metadata and local receipts do not establish availability.

@@ -10,7 +10,7 @@ set -euo pipefail
 #   chmod +x voco-install
 #   ./voco-install
 
-VERSION="2026.0.54"
+VERSION="2026.0.55"
 RELEASE_TAG="voco.${VERSION}"
 DEB_URL="https://github.com/sergiopesch/voco/releases/download/${RELEASE_TAG}/voco_${VERSION}_amd64.deb"
 CHECKSUMS_URL="https://github.com/sergiopesch/voco/releases/download/${RELEASE_TAG}/voco_checksums.txt"

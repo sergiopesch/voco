@@ -71,6 +71,12 @@ glib 0.20 directly leaves the GTK dependency behind. [Backport](vendor/glib/VOCO
   unavailable preflight is never permission to paste unguarded. GNOME X11's
   `mutter-x11-frames` decoration is not a second destination; retain rejection for
   genuinely ambiguous active clients and test focus departure in a real session.
+- Suggestion focus may resolve to its editable controller only through bounded,
+  reciprocal POPUP_FOR/CONTROLLER_FOR relations, fresh focus, same process and
+  active-window ancestry. Settle owner loss only within the drained event batch;
+  real field departures and roundtrips must invalidate the destination.
+- Focused WebKit wrappers are search roots, not editable carets. Continue bounded
+  discovery to a freshly focused input; retain password and unfocused-child rejection.
 - Drain accessibility window-transition events within bounded work and time. Never
   bind through a partially drained queue; cover ordinary GNOME setup backlogs.
 - Logs are optional, private and bounded. No dictated text, audio, clipboard values,
@@ -101,6 +107,7 @@ npm run test:microphone-renderer
 npm run test:native-capture-renderer
 npm run test:chromium-exact-field
 npm run test:rich-editor-delivery
+npm run test:application-delivery
 python3 scripts/verify-glib-backport.py
 python3 scripts/test-glib-variant.py --output /tmp/voco-glib-check
 cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml
@@ -129,7 +136,7 @@ isolation, not a remote VM or proof of a distribution's default desktop.
 
 ## Release and evidence
 
-Source candidate: **2026.0.54**. Recorded public Ubuntu/Debian version: **2026.0.54**. Verify the current public release on GitHub and
+Source candidate: **2026.0.55**. Recorded public Ubuntu/Debian version: **2026.0.54**. Verify the current public release on GitHub and
 installed version from the package manager; do not infer either from source.
 The .43 package and desktop evidence is recorded in
 [the support matrix](docs/linux-support.md); preserve per-artifact receipts and

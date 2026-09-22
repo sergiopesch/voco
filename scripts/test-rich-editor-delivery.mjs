@@ -9,7 +9,9 @@ import { chromium } from 'playwright';
 assert.equal(process.env.DISPLAY, ':0');
 assert.ok(process.env.HOME.startsWith('/tmp/voco-rich-editor-'));
 const output = process.argv[2];
-const helperPath = fileURLToPath(new URL('../apps/desktop/src-tauri/resources/voco_desktop_target.py', import.meta.url));
+const platform = process.env.VOCO_RICH_EDITOR_PLATFORM || 'x11';
+assert.ok(['x11', 'wayland'].includes(platform));
+const helperPath = process.env.VOCO_RICH_EDITOR_HELPER || fileURLToPath(new URL('../apps/desktop/src-tauri/resources/voco_desktop_target.py', import.meta.url));
 const helper = spawn('/usr/bin/python3', ['-u', helperPath, '--serve'], { stdio: ['pipe', 'pipe', 'inherit'] });
 let sequence = 0;
 let resolveResponse;
@@ -27,11 +29,17 @@ async function request(body) {
     return result;
   } finally { clearTimeout(timeout); resolveResponse = undefined; }
 }
-const browser = await chromium.launch({ executablePath: process.env.VOCO_RICH_EDITOR_BROWSER, headless: false, args: ['--ozone-platform=x11', '--force-renderer-accessibility'] });
+const browser = await chromium.launch({ executablePath: process.env.VOCO_RICH_EDITOR_BROWSER, headless: false, args: [`--ozone-platform=${platform}`, '--force-renderer-accessibility'] });
 const results = [];
 let clipboard;
 try {
   const page = await browser.newPage();
+  if (platform === 'wayland') {
+    await page.waitForTimeout(700);
+    const windows = execFileSync('xdotool', ['search', '--pid', process.env.VOCO_RICH_EDITOR_SHELL_PID], { encoding: 'utf8' }).trim().split('\n');
+    execFileSync('xdotool', ['windowfocus', windows[0], 'key', 'Escape'], { timeout: 3000 });
+    await page.waitForTimeout(200);
+  }
   const setup = async html => {
     await page.setContent(`<div role="textbox" aria-label="Message" contenteditable="true" style="white-space:pre-wrap" id="target">${html}</div><input id="other" aria-label="Other field">`);
     await page.locator('#target').click();
@@ -51,18 +59,32 @@ try {
     assert.equal(prepared.observation, 'prepared');
     return prepared;
   };
+  const nativeKey = value => execFileSync('xdotool', ['key', '--clearmodifiers', value], { timeout: 3000 });
+  let browserChrome = false;
   const paste = async text => {
+    // Match insertion.rs: address bars strip a pasted joining space, so the
+    // production gesture sends that single separator before Ctrl+V.
+    const nativeGesture = browserChrome || platform === 'wayland';
+    const leadingSeparator = nativeGesture && /^ \S/u.test(text);
     clipboard?.kill();
-    clipboard = spawn('xclip', ['-selection', 'clipboard', '-in', '-quiet'], { stdio: ['pipe', 'ignore', 'pipe'] });
+    const clipboardEnv = platform === 'wayland' ? { ...process.env,
+      DISPLAY: process.env.VOCO_RICH_EDITOR_CLIPBOARD_DISPLAY,
+      XAUTHORITY: process.env.VOCO_RICH_EDITOR_CLIPBOARD_XAUTHORITY } : process.env;
+    clipboard = spawn('xclip', ['-selection', 'clipboard', '-in', '-quiet'], { stdio: ['pipe', 'ignore', 'pipe'], env: clipboardEnv });
     const owner = clipboard;
     await new Promise((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error('Clipboard fixture deadline exceeded')), 2000);
-      owner.stderr.once('data', () => { clearTimeout(timer); resolve(); });
+      owner.stderr.once('data', data => {
+        clearTimeout(timer);
+        if (data.toString().includes('Waiting for selection requests')) resolve();
+        else reject(new Error(`Clipboard fixture was not ready: ${data}`));
+      });
       owner.once('error', error => { clearTimeout(timer); reject(error); });
       owner.once('exit', code => { if (code) { clearTimeout(timer); reject(new Error(`Clipboard fixture exited ${code}`)); } });
-      owner.stdin.end(text);
+      owner.stdin.end(leadingSeparator ? text.slice(1) : text);
     });
-    await page.keyboard.press('Control+v');
+    if (nativeGesture) execFileSync('xdotool', ['key', '--clearmodifiers', ...(leadingSeparator ? ['space'] : []), 'ctrl+v'], { timeout: 3000 });
+    else await page.keyboard.press('Control+v');
   };
   const verify = async receipt => {
     const started = performance.now();
@@ -180,7 +202,40 @@ print(json.dumps(h.text_position(h.TRACKER.hint)[1][:2] if r['scope']=='control'
     assert.equal(result.observation, 'unsupported');
     assert.equal(await page.locator('#target p').count(), 2);
   });
+  browserChrome = true;
+  const focusAddress = async (value = '') => {
+    nativeKey('Escape'); nativeKey('ctrl+l'); nativeKey('BackSpace');
+    if (value) execFileSync('xdotool', ['type', '--clearmodifiers', value], { timeout: 3000 });
+    await page.waitForTimeout(100);
+    for (let i = 0; i < 30; i++) {
+      if ((await request({ op: 'probe' })).scope === 'control') return;
+      await page.waitForTimeout(20);
+    }
+    throw new Error('Address bar did not expose a focused editable control');
+  };
+  await trial('address bar suggestions preserve first and subsequent receipts', async () => {
+    await focusAddress();
+    const timings = [await delivery('W'), await delivery('elcome', false), await delivery(' home', false)];
+    nativeKey('Escape');
+    timings.push(await delivery(' again', false));
+    return { timings };
+  });
+  await trial('address bar selection replacement and end insertion', async () => {
+    await focusAddress('https://example.com'); nativeKey('ctrl+a');
+    const timings = [await delivery('Search this')];
+    nativeKey('End'); timings.push(await delivery(' next', false));
+    return { timings };
+  });
+  await trial('address bar departure rejects delivery without replay', async () => {
+    await focusAddress();
+    const receipt = await prepare('Hello'); await paste('Hello');
+    nativeKey('Escape');
+    await page.locator('#other').click();
+    await waitForAccessiblePosition(0, 0);
+    assert.equal((await verify(receipt)).observation, 'changed');
+    assert.equal(await page.locator('#other').inputValue(), '');
+  });
 } finally {
-  writeFileSync(`${output}/results.json`, JSON.stringify({ browser: browser.version(), platform: 'x11', results }, null, 2) + '\n');
+  writeFileSync(`${output}/results.json`, JSON.stringify({ browser: browser.version(), platform, results }, null, 2) + '\n');
   clipboard?.kill(); helper.kill(); await browser.close();
 }

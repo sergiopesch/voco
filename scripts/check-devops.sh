@@ -37,6 +37,7 @@ bash -n \
   scripts/test-private-ibus-engine.sh \
   scripts/test-private-ibus-engine-hosted.sh \
   scripts/test-native-desktop.sh \
+  scripts/test-rich-editor-delivery.sh \
   scripts/test-native-wayland.sh \
   scripts/test-native-gnome.sh \
   scripts/test-native-kde.sh \
@@ -106,6 +107,8 @@ from pathlib import Path
 
 for path in (
     Path("scripts/generate-icons.py"),
+    Path("scripts/test-application-delivery.py"),
+    Path("scripts/fixtures/delivery-native.py"),
     Path("scripts/test-private-ibus-engine.py"),
     Path("scripts/test-native-desktop.py"),
     Path("scripts/test-native-wayland.py"),

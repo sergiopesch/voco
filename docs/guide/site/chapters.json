@@ -579,6 +579,10 @@
         "text": "A .54 first-run report led to an isolated Brave regression: an empty editable HTML block exposed a line break that disappeared when its first character arrived. Counting that placeholder as user text made readback reject the successful paste. The follow-up source candidate applies the existing rich-paragraph handling to editable HTML blocks while retaining field identity, exact text checks and literal newlines in plain text controls. This candidate is not a published release or qualification of every website; the pinned viewer remains unchanged."
       },
       {
+        "title": "Suggestions are not a new typing destination",
+        "text": "The owner narrowed the .54 report to Brave\u2019s address bar. Its suggestion list announced focus while the entry still owned the keyboard. The .55 candidate resolves a popup to its focused entry only when their accessibility relationships agree; a real field change still stops delivery. WebKit also marks its web-view containers focused, so bounded discovery must reach the actual input. Tests cover browsers, native editors and terminal programs, with limits recorded per application. The .43 source viewer remains unchanged."
+      },
+      {
         "title": "Observation has limits",
         "text": "Accessible-field samples are best-effort local observations, not atomic ownership or compositor paint. Firefox can report newly inserted text before its caret catches up. VOCO waits within the existing three-second limit for exact text and position to agree; an intermediate sample cannot confirm delivery, and an uncertain paste is never replayed. A target can still change between checks."
       }

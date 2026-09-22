@@ -171,6 +171,21 @@ The helper also returns a finite failure category; Rust maps it to a fixed local
 trace event, with unknown values mapped to unavailable. This metadata never alters
 target admission or includes field content, titles, paths or destination tokens.
 
+### Native field ownership (.55 candidate)
+
+The focus helper resolves a suggestion list back to its editable controller only
+when both accessibility relations agree, the process matches and the controller
+still has a valid focused caret. The retained object must also belong to the
+single active window through fresh ancestry. Paired owner-loss/suggestion-gain
+notifications can be one batch; unresolved loss and real field roundtrips advance
+the generation. No application name, title or URL is used to bypass ownership.
+
+WebKit may mark a scroll container and document focused along with their input.
+Those noneditable wrappers are bounded search roots. Only a focused input can
+qualify; a password role still rejects. Existing discovery limits, deadlines,
+exact text/caret checks and no-replay behavior remain in force. See the
+[application matrix](../testing/application-delivery-2026-09-22.md).
+
 ### Transcript diagnostics and microphone feedback
 
 `benchmarkPhraseQueue.ts::textLengths` counts UTF-16 units, UTF-8 bytes and Unicode

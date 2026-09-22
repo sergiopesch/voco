@@ -19,6 +19,7 @@ class Node:
         for child in self.children: child.parent = self
         self.cache = {}
         self.clears = 0
+        self.relations = []
     def clear_cache(self):
         raise AssertionError('Recursive invalidation traverses unrelated subtrees')
     def clear_cache_single(self):
@@ -32,6 +33,7 @@ class Node:
     def get_text_iface(self): return self
     def get_role(self): return self.value('role', self.role)
     def get_process_id(self): return 42424242
+    def get_relation_set(self): return self.relations
     def get_parent(self): return self.parent
     def get_index_in_parent(self):
         try: return self.parent.children.index(self)
@@ -47,6 +49,7 @@ class FocusTests(unittest.TestCase):
         self.desktop = Node('/desktop', [self.app])
         atspi = types.SimpleNamespace(StateType=types.SimpleNamespace(ACTIVE='active', FOCUSED='focused', EDITABLE='editable'),
             Role=types.SimpleNamespace(TERMINAL='terminal', PASSWORD_TEXT='password'),
+            RelationType=types.SimpleNamespace(POPUP_FOR='popup-for', CONTROLLER_FOR='controller-for'),
             Text=types.SimpleNamespace(get_character_count=lambda _:0, get_caret_offset=lambda _:0, get_n_selections=lambda _:0), set_timeout=lambda *args:None, get_desktop=lambda _:self.desktop)
         context = types.SimpleNamespace(pending=lambda:False)
         glib = types.SimpleNamespace(MainContext=types.SimpleNamespace(default=lambda:context))
@@ -54,6 +57,114 @@ class FocusTests(unittest.TestCase):
         repository = types.ModuleType('gi.repository');repository.Atspi=atspi;repository.GLib=glib
         self.modules = patch.dict(sys.modules, {'gi':gi, 'gi.repository':repository})
         self.modules.start();self.addCleanup(self.modules.stop)
+
+    def wrapper(self, leaf):
+        document = Node('/document', [leaf], ['focused'], 'document-web')
+        wrapper = Node('/scroll', [document], ['focused'], 'scroll-pane')
+        self.window.children = [wrapper]; wrapper.parent = self.window
+        return wrapper
+
+    def test_focused_webkit_wrappers_resolve_the_focused_editable_leaf(self):
+        wrapper = self.wrapper(self.a)
+        helper.TRACKER.observe(wrapper)
+        result = helper.probe()
+        self.assertEqual(result['scope'], 'control')
+        self.assertIs(helper.TRACKER.hint, self.a)
+
+    def test_focused_webkit_wrappers_discover_leaf_without_hint(self):
+        self.wrapper(self.a)
+        self.assertEqual(helper.probe()['scope'], 'control')
+        self.assertIs(helper.TRACKER.hint, self.a)
+
+    def test_focused_wrapper_never_promotes_an_unfocused_child(self):
+        self.a.states.discard('focused')
+        helper.TRACKER.observe(self.wrapper(self.a))
+        self.assertIsNone(helper.probe()['token'])
+
+    def test_focused_wrapper_preserves_password_rejection(self):
+        self.a.role = 'password'
+        helper.TRACKER.observe(self.wrapper(self.a))
+        self.assertEqual(helper.probe()['input_state'], 'protected')
+
+    def popup(self, owner=None):
+        owner = owner or self.a
+        item = Node('/suggestion', role='list-item')
+        popup = Node('/suggestions', [item], role='list-box')
+        self.window.children.append(popup); popup.parent = self.window
+        def relation(kind, targets):
+            return types.SimpleNamespace(get_relation_type=lambda:kind,
+                get_n_targets=lambda:len(targets), get_target=lambda i:targets[i])
+        popup.relations = [relation('popup-for', [owner])]
+        owner.relations = [relation('controller-for', [popup])]
+        return item, popup
+
+    def test_suggestion_focus_preserves_verified_owner_identity(self):
+        before = helper.probe()['token']
+        item, _ = self.popup()
+        self.event(item, True)
+        self.assertIs(helper.TRACKER.hint, self.a)
+        self.assertEqual(before, helper.probe()['token'])
+        self.event(item, False)
+        self.assertEqual(before, helper.probe()['token'])
+
+    def test_owner_loss_followed_by_related_suggestion_is_one_focus_batch(self):
+        before = helper.probe()['token']
+        item, _ = self.popup()
+        self.event(self.a, False)
+        self.event(item, True)
+        self.assertEqual(before, helper.probe()['token'])
+
+    def test_unresolved_owner_loss_invalidates_even_if_state_already_returned(self):
+        before = helper.probe()['token']
+        self.event(self.a, False)
+        self.assertNotEqual(before, helper.probe()['token'])
+
+    def test_owner_loss_and_gain_without_popup_invalidates_identity(self):
+        before = helper.probe()['token']
+        self.event(self.a, False)
+        self.event(self.a, True)
+        self.assertNotEqual(before, helper.probe()['token'])
+
+    def test_popup_cannot_restore_identity_after_real_focus_roundtrip(self):
+        before = helper.probe()['token']
+        item, _ = self.popup()
+        self.event(self.a, False)
+        self.event(self.b, True)
+        self.event(item, True)
+        self.assertNotEqual(before, helper.probe()['token'])
+
+    def test_popup_without_reciprocal_relation_invalidates_identity(self):
+        before = helper.probe()['token']
+        item, _ = self.popup(); self.a.relations = []
+        self.event(item, True)
+        self.assertNotEqual(before, helper.probe()['token'])
+
+    def test_popup_cannot_keep_unfocused_owner(self):
+        helper.probe(); item, _ = self.popup()
+        self.a.states.discard('focused')
+        self.event(item, True)
+        self.assertIsNone(helper.probe()['token'])
+
+    def test_popup_cannot_cross_active_window(self):
+        helper.probe(); item, _ = self.popup()
+        self.window.states.discard('active')
+        self.event(item, True)
+        self.assertIsNone(helper.probe()['token'])
+
+    def test_popup_cannot_claim_foreign_process_owner(self):
+        before = helper.probe()['token']
+        item, _ = self.popup()
+        item.get_process_id = lambda:42424243
+        self.event(item, True)
+        self.assertNotEqual(before, helper.probe()['token'])
+
+    def test_popup_editable_child_is_its_own_destination(self):
+        before = helper.probe()['token']
+        item, _ = self.popup()
+        item.role='entry';item.states.update(['focused','editable'])
+        self.event(item, True)
+        self.assertIs(helper.TRACKER.hint, item)
+        self.assertNotEqual(before, helper.probe()['token'])
     def test_button_is_not_a_text_cursor(self):
         self.a.role = 'button'; self.a.states.discard('editable')
         result = helper.probe()

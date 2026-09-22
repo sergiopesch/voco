@@ -3,6 +3,12 @@
 The [latest published GitHub release](https://github.com/sergiopesch/voco/releases/latest)
 is authoritative for downloads. Source metadata does not establish what is installed.
 
+The **2026.0.55 source candidate** fixes Brave address-bar suggestion focus,
+WebKit focused containers and empty HTML editor readback, and keeps the installer
+inside one terminal canvas. Its [application qualification](testing/application-delivery-2026-09-22.md)
+and [candidate notes](releases/2026.0.55.md) are separate from publication.
+The installed owner application and public downloads remain .54.
+
 The recorded public Ubuntu/Debian release is **2026.0.54**. It integrates the
 remaining dependency PRs #61–#63, including Vite 8, React plugin 6, Node 24 LTS
 build tooling and Tauri's matching patched tray library. The Signal + Silver sweep

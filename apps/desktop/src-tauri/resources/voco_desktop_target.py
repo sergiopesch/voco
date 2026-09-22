@@ -18,6 +18,7 @@ class FocusTracker:
         self.listener = None
         self.attempted = False
         self.nonce = uuid.uuid4().hex
+        self.departure_pending = False
 
     def observe(self, node):
         key = (node.get_process_id(), node.path)
@@ -29,13 +30,27 @@ class FocusTracker:
     def event(self, event, *_):
         try:
             if event.detail1:
-                self.observe(event.source)
+                owner = popup_focus_owner(event.source)
+                if self.departure_pending:
+                    if owner is None or self.key != (owner.get_process_id(), owner.path):
+                        self.invalidate()
+                    self.departure_pending = False
+                self.observe(owner or event.source)
             elif self.key == (event.source.get_process_id(), event.source.path):
-                self.generation += 1
-                self.key = self.hint = None
+                # Chromium-derived controls can emit owner loss then suggestion
+                # gain in one batch while keyboard focus stays in the entry.
+                self.departure_pending = True
         except Exception:
-            self.generation += 1
-            self.key = self.hint = None
+            self.invalidate()
+
+    def invalidate(self):
+        self.generation += 1
+        self.key = self.hint = None
+        self.departure_pending = False
+
+    def settle_events(self):
+        if self.departure_pending:
+            self.invalidate()
 
     def start(self, atspi):
         if self.attempted:
@@ -79,6 +94,65 @@ class FocusTracker:
 
 
 TRACKER = FocusTracker()
+
+
+def relation_targets(node, kind):
+    relations = node.get_relation_set()
+    if len(relations) > 8:
+        raise ValueError('Unbounded accessibility relationships')
+    targets = []
+    for relation in relations:
+        if relation.get_relation_type() != kind:
+            continue
+        count = relation.get_n_targets()
+        if count < 0 or len(targets) + count > 8:
+            raise ValueError('Unbounded accessibility targets')
+        targets.extend(relation.get_target(i) for i in range(count))
+    return targets
+
+
+def popup_focus_owner(source):
+    """Suggestion focus can represent an editable controller, not keyboard departure."""
+    try:
+        import gi
+        gi.require_version('Atspi', '2.0')
+        from gi.repository import Atspi
+        source.clear_cache_single()
+        # A real editable child (such as a popup search box) owns its own focus.
+        if (source.get_role() == Atspi.Role.PASSWORD_TEXT
+                or source.get_state_set().contains(Atspi.StateType.EDITABLE)):
+            return None
+        pid = source.get_process_id()
+        popup = source
+        for _ in range(8):
+            popup.clear_cache_single()
+            if popup.get_process_id() != pid:
+                return None
+            owners = relation_targets(popup, Atspi.RelationType.POPUP_FOR)
+            if owners:
+                if len(owners) != 1:
+                    return None
+                owner = owners[0]
+                owner.clear_cache_single()
+                if owner.get_process_id() != pid or cursor_state(owner, Atspi) != 'editable':
+                    return None
+                controlled = relation_targets(owner, Atspi.RelationType.CONTROLLER_FOR)
+                if any(target.get_process_id() == pid and target.path == popup.path for target in controlled):
+                    # focused_hint still verifies the active window and live ancestry.
+                    # Actual owner loss events continue to advance the generation.
+                    return owner
+                return None
+            index = popup.get_index_in_parent()
+            parent = popup.get_parent()
+            if parent is None or index < 0:
+                return None
+            parent.clear_cache_single()
+            if parent.get_child_at_index(index).path != popup.path:
+                return None
+            popup = parent
+    except Exception:
+        pass
+    return None
 
 
 def unavailable(input_state="unavailable", reason="probe_failed"):
@@ -132,6 +206,7 @@ def probe():
         context.iteration(False)
     if context.pending():
         return unavailable(reason="events_pending")  # Never bind through an event backlog.
+    TRACKER.settle_events()
     desktop = Atspi.get_desktop(0)
     desktop.clear_cache_single()
     active = []
@@ -159,7 +234,13 @@ def probe():
     binary = process_binary(pid)
     terminal = binary in TERMINALS
     focused = TRACKER.focused_hint(window, pid, Atspi)
-    pending = [] if focused is not None else [window]
+    # WebKit reports focused wrappers as well as the actual input. A retained
+    # noneditable wrapper is a search root, never proof of an editable caret.
+    search_root = focused or window
+    hint_is_input = focused is not None and (
+        focused.get_role() in (Atspi.Role.PASSWORD_TEXT, Atspi.Role.TERMINAL)
+        or focused.get_state_set().contains(Atspi.StateType.EDITABLE))
+    pending = [] if hint_is_input else [search_root]
     visited = 0
     discovered = len(pending)
     while pending and visited < 128:
@@ -171,7 +252,9 @@ def probe():
             terminal = terminal or node.get_role() == Atspi.Role.TERMINAL
             if node.path != window.path and state.contains(Atspi.StateType.FOCUSED):
                 focused = node
-                break
+                if (node.get_role() in (Atspi.Role.PASSWORD_TEXT, Atspi.Role.TERMINAL)
+                        or state.contains(Atspi.StateType.EDITABLE)):
+                    break
             # Bound total child discovery, rather than truncating every container
             # to 30 children. Some toolkits emit no focus event for a control
             # until an accessibility client has first discovered that object.

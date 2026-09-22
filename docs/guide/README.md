@@ -44,6 +44,9 @@ whole-install or dictation performance. The pinned code viewer is unchanged.
 The first-run follow-up lessons also explain the .54 Brave empty-block readback
 regression and the candidate's single installer canvas. They keep source fixes,
 isolated tests and published artifacts distinct; the pinned viewer is unchanged.
+The [.55 application follow-up](../testing/application-delivery-2026-09-22.md)
+adds the confirmed Brave address-bar cause, WebKit container focus and the bounded
+browser/editor/terminal matrix.
 
 ## Scope and privacy
 

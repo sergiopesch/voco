@@ -29,6 +29,9 @@
   <url type="vcs-browser">https://github.com/sergiopesch/voco</url>
   <content_rating type="oars-1.1" />
   <releases>
+    <release version="2026.0.55" date="2026-09-22">
+      <description><p>Keep dictation attached to editable fields when suggestions open, and refine the guided installer.</p></description>
+    </release>
     <release version="2026.0.54" date="2026-09-22"><description><p>Updated Vite, React and Tauri build dependencies, preserving live tray feedback with the updated tray library.</p></description></release>
     <release version="2026.0.44" date="2026-09-20"><description><p>Test live local speech during onboarding and check for an editable cursor before dictation.</p></description></release>
     <release version="2026.0.43" date="2026-09-19"><description><p>Safer capture admission, offline recovery, and public evaluation tools.</p></description></release>

@@ -72,7 +72,8 @@ jobs:
             desktop-file-utils appstream cmake ripgrep \
             ibus ibus-gtk3 python3 python3-numpy python3-psutil python3-gi gir1.2-ibus-1.0 bubblewrap \
             xvfb xdotool xclip gir1.2-gtk-3.0 gir1.2-webkit2-4.1 gir1.2-atspi-2.0 at-spi2-core \
-            weston libweston-13-0 wayland-utils gir1.2-gtk-4.0 gir1.2-webkit-6.0
+            weston libweston-13-0 wayland-utils gir1.2-gtk-4.0 gir1.2-webkit-6.0 \
+            gnome-text-editor gnome-terminal nano
 
       - name: Install Node dependencies
         run: npm ci
@@ -130,6 +131,13 @@ jobs:
           VOCO_RICH_EDITOR_EVIDENCE_DIR: ${{ runner.temp }}/voco-rich-editor
         run: bash scripts/test-private-ibus-engine-hosted.sh --rich-editor
 
+      - name: Native application clipboard matrix
+        timeout-minutes: 3
+        env:
+          VOCO_DELIVERY_SUITE: applications
+          VOCO_RICH_EDITOR_EVIDENCE_DIR: ${{ runner.temp }}/voco-application-delivery
+        run: bash scripts/test-private-ibus-engine-hosted.sh --rich-editor
+
       - name: Private headless IBus lifecycle
         run: bash scripts/test-private-ibus-engine-hosted.sh
 
@@ -153,6 +161,7 @@ jobs:
           name: native-desktop-evidence
           path: |
             ${{ runner.temp }}/voco-rich-editor/
+            ${{ runner.temp }}/voco-application-delivery/
             ${{ runner.temp }}/voco-native-desktop/
             ${{ runner.temp }}/voco-native-wayland/
             ${{ runner.temp }}/voco-native-capture-renderer/

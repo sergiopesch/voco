@@ -1,9 +1,11 @@
 # First-run follow-up: Brave readback and installer presentation
 
-This is an **unreleased source candidate**, based on public 2026.0.54. It does
-not replace that release, qualify a new package, or claim that a reported owner
-session is fixed. The exact destination website/editor is still needed to match
-that report. Existing recovery and the installed application remain intact.
+This records the first investigation against public **2026.0.54**. The owner
+subsequently identified **Brave's address/search bar**, not a website editor.
+The empty-block issue below was real but was not that reported destination.
+The [.55 application investigation](application-delivery-2026-09-22.md) records
+the matching reproduction, focus fixes and expanded tests. The installed owner
+application and recovery remain intact; source tests do not replace that package.
 
 ## Reproduced browser failure
 
@@ -68,12 +70,12 @@ plain terminals preserve sequential text; reduced motion removes animation.
 - Candidate terminal bytes were replayed through real GNOME Terminal and captured
   without editing the screenshot. Package/desktop operations in that UI fixture
   are synthetic.
-- Native Wayland investigation remains **unqualified**. A nested GNOME 46/Brave
-  fixture reached the editable control and dispatched the expected key events,
-  but its Xwayland clipboard bridge did not deliver the synthetic text. A one-second
-  timing control did not resolve it. Those experimental harness changes and their
-  failure evidence are retained outside the repository, not added as a passing
-  regression gate. This is a different failure from the owner's `changed` readback.
+- The initial native Wayland fixture was **unqualified**: key events arrived but
+  the Xwayland clipboard bridge did not deliver text. A later investigation found
+  that the fixture omitted the nested compositor's Xauthority file and mistook
+  xclip's authentication error for readiness. The corrected fixture supplies that
+  file and requires the clipboard ownership message. It now passes all 16 Brave
+  native Wayland cases; the old attempts remain retained and are not passes.
 
 The .54 model, recognition queue and recovery behavior were not changed. A new
 qualified package and a matching destination test are required before asking the
