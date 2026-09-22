@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { spawn, execFileSync } from 'node:child_process';
 import { createInterface } from 'node:readline';
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 
@@ -213,6 +213,22 @@ print(json.dumps(h.text_position(h.TRACKER.hint)[1][:2] if r['scope']=='control'
     }
     throw new Error('Address bar did not expose a focused editable control');
   };
+  await trial('cold subprocess discovers address bar before and during suggestions', async () => {
+    const coldProbeMs = [];
+    for (const value of ['', 'Welcome']) {
+      await focusAddress(value);
+      const started = performance.now();
+      const result = JSON.parse(execFileSync('/usr/bin/python3',
+        ['-u', '-c', readFileSync(helperPath, 'utf8'), '--serve'], {
+          input: '{"seq":1,"op":"probe"}\n', encoding: 'utf8', timeout: 1500,
+        }));
+      coldProbeMs.push(performance.now() - started);
+      assert.equal(result.seq, 1);
+      assert.equal(result.scope, 'control', JSON.stringify({value, ...result}));
+      assert.equal(result.input_state, 'editable');
+    }
+    return { coldProbeMs };
+  });
   await trial('address bar suggestions preserve first and subsequent receipts', async () => {
     await focusAddress();
     const timings = [await delivery('W'), await delivery('elcome', false), await delivery(' home', false)];

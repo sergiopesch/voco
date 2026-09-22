@@ -25,6 +25,16 @@ bounded search root; discovery must reach a focused input. Unfocused descendants
 and password roles still reject. Separate regression tests failed before this
 change and pass afterward.
 
+Cold-start qualification exposed another failure: a new helper could spend all
+128 discovery slots inside hidden suggestion contents before reaching the address
+bar. Discovery now prioritizes cached focus/visibility across its queue, retaining
+fresh admission checks and the same object/deadline bounds. A regression starts
+the exact stdin subprocess protocol used by Rust, both before and during open
+suggestions. The final browser matrix passes all 17 cases on Brave X11, Brave
+native Wayland and Chromium X11; the eight-application matrix also passes. The
+six cold probes took 76–91 ms on this host, below the unchanged 800 ms deadline;
+this is fixture timing, not a general latency guarantee.
+
 The earlier [empty HTML placeholder correction](first-run-follow-up-2026-09-22.md)
 remains necessary for page editors, but did not explain the owner's address bar.
 Recognition, audio processing and recovery behavior are unchanged.
@@ -33,9 +43,9 @@ Recognition, audio processing and recovery behavior are unchanged.
 
 | Environment | Checked surface | Result and evidence scope |
 | --- | --- | --- |
-| Brave 153.1.95.104 / Chromium 153.0.8010.53, X11 | Address bar with suggestions, selected URL, repeated chunks; plain and nested HTML editors | 16 cases pass using real accessibility, clipboard and native key gestures |
-| Same Brave binary, nested GNOME 46 native Wayland | Same 16 cases | Pass; real private Xwayland clipboard bridge and nested compositor key delivery |
-| Repository Chromium 153.0.8010.12, X11 | Same browser cases | 16 cases pass |
+| Brave 153.1.95.104 / Chromium 153.0.8010.53, X11 | Address bar with suggestions, selected URL, repeated chunks; plain and nested HTML editors | 17 cases pass using real accessibility, clipboard and native key gestures |
+| Same Brave binary, nested GNOME 46 native Wayland | Same 17 cases | Pass; real private Xwayland clipboard bridge and nested compositor key delivery |
+| Repository Chromium 153.0.8010.12, X11 | Same browser cases | 17 cases pass |
 | Firefox (repository Playwright binary), X11 | Address/search bar, two consecutive chunks | Exact text/caret observations pass |
 | VS Code (installed Snap executable, private direct launch), X11 | Plain-text editor, two chunks | Exact observations pass after dismissing the fresh-profile welcome dialog |
 | GTK 3 controls, X11 | Entry, text view and password entry | Three deliveries pass; password rejected before mutation |
@@ -72,7 +82,7 @@ recorded separately. `VOCO_RICH_EDITOR_EVIDENCE_DIR` retains receipts and logs.
 
 ## Verification in progress
 
-The focus/readback regression gate passes **50 + 63 cases**. Frontend tests pass
+The focus/readback regression gate passes **52 + 63 cases**. Frontend tests pass
 449 cases; typecheck, lint, production build, Rust's 258 application + 19 host + 7
 GLib tests and Clippy pass. One pre-existing fixture-export Rust test is ignored.
 An initial assembled .55 package passes all 12 private GNOME X11 onboarding,
@@ -81,6 +91,10 @@ repeat package qualification before it replaces this initial-build evidence.
 
 ## Preserved failed attempts and limits
 
+- Rejected cold-search experiments are retained: breadth-first traversal found
+  the address bar but failed page-editor discovery; increasing a depth-first
+  bound to 256 still failed with suggestions. Globally prioritizing visibility
+  passes both paths without increasing the production bound.
 - The released .54 helper fails the matching Brave address-bar sequence on X11
   and native Wayland. Earlier page-editor tests could not establish this fix.
 - An early nested Wayland fixture omitted the compositor's Xauthority file.

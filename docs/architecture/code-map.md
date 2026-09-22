@@ -182,7 +182,9 @@ the generation. No application name, title or URL is used to bypass ownership.
 
 WebKit may mark a scroll container and document focused along with their input.
 Those noneditable wrappers are bounded search roots. Only a focused input can
-qualify; a password role still rejects. Existing discovery limits, deadlines,
+qualify; a password role still rejects. Cold lookup orders its bounded queue by cached focus/visibility so hidden popup
+contents do not consume the budget before visible controls. Cached flags only
+order lookup; fresh admission checks remain mandatory. Existing discovery limits, deadlines,
 exact text/caret checks and no-replay behavior remain in force. See the
 [application matrix](../testing/application-delivery-2026-09-22.md).
 

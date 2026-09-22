@@ -77,6 +77,10 @@ glib 0.20 directly leaves the GTK dependency behind. [Backport](vendor/glib/VOCO
   real field departures and roundtrips must invalidate the destination.
 - Focused WebKit wrappers are search roots, not editable carets. Continue bounded
   discovery to a freshly focused input; retain password and unfocused-child rejection.
+- Cold discovery prioritizes cached focus/visibility across its bounded queue so
+  hidden popup subtrees cannot starve a visible field. Those flags only order
+  searches: fresh state, ancestry and caret validation still govern admission.
+  Preserve the 128-object discovery budget and the 800 ms helper deadline.
 - Drain accessibility window-transition events within bounded work and time. Never
   bind through a partially drained queue; cover ordinary GNOME setup backlogs.
 - Logs are optional, private and bounded. No dictated text, audio, clipboard values,

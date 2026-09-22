@@ -1,5 +1,6 @@
 """Read focus metadata and ephemeral, bounded delivery context; never log field text."""
 import hashlib
+import heapq
 import json
 import sys
 import time
@@ -240,11 +241,14 @@ def probe():
     hint_is_input = focused is not None and (
         focused.get_role() in (Atspi.Role.PASSWORD_TEXT, Atspi.Role.TERMINAL)
         or focused.get_state_set().contains(Atspi.StateType.EDITABLE))
-    pending = [] if hint_is_input else [search_root]
+    # Cached focus/visibility only order discovery. Fresh state and caret checks
+    # below still decide admission. Hidden popup contents must not starve the
+    # visible input elsewhere in the window of the same bounded search budget.
+    pending = [] if hint_is_input else [(0, 0, search_root)]
     visited = 0
     discovered = len(pending)
     while pending and visited < 128:
-        node = pending.pop()
+        _, _, node = heapq.heappop(pending)
         visited += 1
         try:
             node.clear_cache_single()
@@ -259,8 +263,15 @@ def probe():
             # to 30 children. Some toolkits emit no focus event for a control
             # until an accessibility client has first discovered that object.
             for j in range(min(max(node.get_child_count(), 0), 128 - discovered)):
-                pending.append(node.get_child_at_index(j))
+                child = node.get_child_at_index(j)
                 discovered += 1
+                try:
+                    hints = child.get_state_set()
+                    priority = (2 if hints.contains(Atspi.StateType.FOCUSED)
+                                else int(hints.contains(Atspi.StateType.SHOWING)))
+                except Exception:
+                    priority = 0
+                heapq.heappush(pending, (-priority, -discovered, child))
         except Exception:
             continue
     if focused is not None:

@@ -47,7 +47,7 @@ class FocusTests(unittest.TestCase):
         self.window = Node('/window', [self.a, self.b], ['active'])
         self.app = Node('/app', [self.window])
         self.desktop = Node('/desktop', [self.app])
-        atspi = types.SimpleNamespace(StateType=types.SimpleNamespace(ACTIVE='active', FOCUSED='focused', EDITABLE='editable'),
+        atspi = types.SimpleNamespace(StateType=types.SimpleNamespace(ACTIVE='active', FOCUSED='focused', EDITABLE='editable', SHOWING='showing'),
             Role=types.SimpleNamespace(TERMINAL='terminal', PASSWORD_TEXT='password'),
             RelationType=types.SimpleNamespace(POPUP_FOR='popup-for', CONTROLLER_FOR='controller-for'),
             Text=types.SimpleNamespace(get_character_count=lambda _:0, get_caret_offset=lambda _:0, get_n_selections=lambda _:0), set_timeout=lambda *args:None, get_desktop=lambda _:self.desktop)
@@ -57,6 +57,24 @@ class FocusTests(unittest.TestCase):
         repository = types.ModuleType('gi.repository');repository.Atspi=atspi;repository.GLib=glib
         self.modules = patch.dict(sys.modules, {'gi':gi, 'gi.repository':repository})
         self.modules.start();self.addCleanup(self.modules.stop)
+
+    def test_cold_discovery_prioritizes_visible_input_over_hidden_popup_contents(self):
+        sidebar = Node('/sidebar', states=['showing'], role='panel')
+        parent = sidebar
+        for index in range(150):
+            child = Node('/side-' + str(index), role='panel')
+            parent.children = [child]; child.parent = parent; parent = child
+        toolbar = Node('/toolbar', [self.a], ['showing'], role='panel')
+        self.window.children = [toolbar, sidebar]
+        toolbar.parent = sidebar.parent = self.window
+        result = helper.probe()
+        self.assertEqual(result['scope'], 'control')
+        self.assertIs(helper.TRACKER.hint, self.a)
+
+    def test_cached_priority_cannot_admit_stale_focus(self):
+        self.a.get_state_set()  # Prime the ordering hint before focus disappears.
+        self.a.states.discard('focused')
+        self.assertIsNone(helper.probe()['token'])
 
     def wrapper(self, leaf):
         document = Node('/document', [leaf], ['focused'], 'document-web')
