@@ -73,7 +73,6 @@ function_names = (
     "voco_wayland_device_access",
     "voco_start_wayland_service",
     "voco_write_default_config",
-    "voco_merge_hotkey_into_existing_config",
     "voco_run_hotkey_setup",
 )
 functions = {name: [] for name in function_names}

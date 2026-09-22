@@ -18,8 +18,19 @@ vm.runInContext(fs.readFileSync('integrations/chromium/background.js','utf8'),co
  assert.equal(vm.runInContext('native !== null', context), true, 'old disconnect cannot clear a new native port');
  vm.runInContext("tabs.set(8,'document'); routes.set('new-token',{documentId:'document',tabId:8});",context);
  chrome.tabs.onUpdated.listeners[0](8,{status:'loading'});
+ assert.equal(ports[1].sent.at(-2).type,'invalidate', 'navigation revokes insertion without waiting for the content script');
+ assert.equal(ports[1].sent.at(-2).token,'new-token');
+ assert.equal(ports[1].sent.at(-2).documentId,'document');
+ assert.equal(ports[1].sent.at(-1).type,'stop', 'navigation stops the tab recording');
+ assert.equal(ports[1].sent.at(-1).token,'new-token');
  assert.equal(badges.at(-1).text,''); assert.equal(titles.at(-1).title,'Enable VOCO in this tab');
  assert.equal(vm.runInContext('tabs.has(8) || routes.has(\'new-token\')',context),false);
+ vm.runInContext("tabs.set(12,'document12'); routes.set('closed-token',{documentId:'document12',tabId:12});",context);
+ chrome.tabs.onRemoved.listeners[0](12);
+ assert.equal(ports[1].sent.at(-2).type,'invalidate', 'tab close revokes insertion without a content reply');
+ assert.equal(ports[1].sent.at(-2).token,'closed-token');
+ assert.equal(ports[1].sent.at(-1).type,'stop', 'tab close stops the tab recording');
+ assert.equal(ports[1].sent.at(-1).token,'closed-token');
  vm.runInContext("tabs.set(9,'doc');",context); ports[1].onDisconnect.listeners[0]();
  assert.equal(badges.at(-1).tabId,9); assert.equal(badges.at(-1).text,'');
  vm.runInContext("connect(); ready=true; tabs.set(10,'doc10'); tabs.set(11,'doc11'); routes.set('token10',{tabId:10,documentId:'doc10'});",context);
@@ -35,4 +46,47 @@ vm.runInContext(fs.readFileSync('integrations/chromium/background.js','utf8'),co
  assert.equal(messages.at(-1)[0],11); assert.equal(messages.at(-1)[1].type,'revoke'); assert.equal(messages.at(-1)[2].documentId,'browser11');
  resolveReply({}); await routedRevoke;
  console.log('Chromium background reconnect regression passed');
+})();
+
+function enableFixture() {
+ const injections=[], arms=[], sent=[], port={sent:[],onDisconnect:listener(),onMessage:listener(),postMessage(m){this.sent.push(m)}};
+ const fixtureChrome={runtime:{connectNative:()=>port,onMessage:listener()},
+  tabs:{sendMessage(tabId,message){sent.push({tabId,message});return message.type==='arm'?new Promise(resolve=>arms.push(resolve)):Promise.resolve({});},onRemoved:listener(),onUpdated:listener()},
+  action:{onClicked:listener(),setTitle:()=>Promise.resolve(),setBadgeText:()=>Promise.resolve()},
+  scripting:{executeScript:()=>new Promise(resolve=>injections.push(resolve))}};
+ const state=vm.createContext({chrome:fixtureChrome,setTimeout,console});
+ vm.runInContext(fs.readFileSync('integrations/chromium/background.js','utf8'),state);
+ vm.runInContext('connect(); ready=true;',state);
+ return {state,port,injections,arms,sent,chrome:fixtureChrome,enable:()=>fixtureChrome.action.onClicked.listeners[0]({id:20})};
+}
+(async()=>{
+ {
+  const f=enableFixture(), pending=f.enable();
+  f.chrome.tabs.onUpdated.listeners[0](20,{status:'loading'});
+  f.injections[0]([]); await pending;
+  assert.equal(f.arms.length,0,'navigation during script injection must not arm the replacement page');
+  assert.equal(vm.runInContext('tabs.has(20) || pendingTabs.has(20)',f.state),false);
+ }
+ {
+  const f=enableFixture(), pending=f.enable();
+  f.injections[0]([]); await new Promise(setImmediate);
+  assert.equal(f.arms.length,1);
+  f.port.onDisconnect.listeners[0]();
+  assert.equal(f.sent.at(-1).message.type,'disarm','disconnect disarms tabs whose authorization is still pending');
+  f.arms[0]({documentId:'a'.repeat(48)}); await pending;
+  assert.equal(vm.runInContext('tabs.has(20) || pendingTabs.has(20)',f.state),false,'late arm must not revive disconnected authorization');
+ }
+ {
+  const f=enableFixture(), first=f.enable();
+  await f.enable();
+  const replacement=f.enable();
+  f.injections[0]([]); await first;
+  assert.equal(f.arms.length,0,'cancelled enable attempt cannot arm a newer attempt');
+  assert.equal(vm.runInContext('pendingTabs.has(20)',f.state),true,'old cleanup preserves a newer attempt');
+  f.injections[1]([]); await new Promise(setImmediate);
+  f.arms[0]({documentId:'b'.repeat(48)}); await replacement;
+  assert.equal(vm.runInContext('tabs.get(20)',f.state),'b'.repeat(48));
+  assert.equal(vm.runInContext('pendingTabs.has(20)',f.state),false);
+ }
+ console.log('Chromium pending enable lifecycle regressions passed');
 })();

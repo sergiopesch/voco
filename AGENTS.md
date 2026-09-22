@@ -86,6 +86,10 @@ glib 0.20 directly leaves the GTK dependency behind. [Backport](vendor/glib/VOCO
 - Revalidate destination and shortcut scope after clipboard preparation and before
   keyboard dispatch. Rejection there records the changed clipboard and sends no
   keys. This is a narrower race window, not atomic ownership during a key gesture.
+- Closing or navigating an enabled browser tab, or losing its native connection,
+  stops that tab's active recording. Ordinary field focus loss revokes delivery
+  but preserves the original session's explicit Stop; stale tokens cannot stop
+  a newer session.
 - Drain accessibility window-transition events within bounded work and time. Never
   bind through a partially drained queue; cover ordinary GNOME setup backlogs.
 - Logs are optional, private and bounded. No dictated text, audio, clipboard values,

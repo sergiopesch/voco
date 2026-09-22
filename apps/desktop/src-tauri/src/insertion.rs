@@ -34,8 +34,6 @@ pub(crate) fn reset_shortcut_renderer(cutoff: u64) -> Result<(), String> {
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum ActiveStrategy {
-    Ydotool,
-    Xdotool,
     Clipboard,
 }
 
@@ -601,13 +599,6 @@ fn terminal_paste_text(text: &str) -> String {
         .collect()
 }
 
-#[derive(Debug)]
-enum RequestedStrategy {
-    Auto,
-    Clipboard,
-    TypeSimulation,
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum SessionKind {
     Wayland,
@@ -630,10 +621,6 @@ fn session_type_label(session: SessionKind) -> &'static str {
         SessionKind::Wayland => "wayland",
         SessionKind::X11OrOther => "x11-or-other",
     }
-}
-
-fn is_wayland() -> bool {
-    matches!(session_kind(), SessionKind::Wayland)
 }
 
 fn is_executable(path: &Path) -> bool {
@@ -862,64 +849,6 @@ pub fn runtime_diagnostics() -> RuntimeDiagnostics {
     input_preflight().diagnostics
 }
 
-fn parse_requested_strategy(preferred: &str) -> Result<RequestedStrategy, InsertionError> {
-    match preferred {
-        "auto" => Ok(RequestedStrategy::Auto),
-        "clipboard" => Ok(RequestedStrategy::Clipboard),
-        "type-simulation" => Ok(RequestedStrategy::TypeSimulation),
-        _ => Err(InsertionError::rejected(format!(
-            "Unknown insertion strategy: {preferred}"
-        ))),
-    }
-}
-
-pub fn insert_text(text: &str, preferred: &str) -> Result<InsertionResult, InsertionError> {
-    let _guard = DELIVERY_LOCK.try_lock().map_err(|_| {
-        InsertionError::rejected(
-            "Another insertion is still finishing; no additional text was sent.",
-        )
-    })?;
-    if text.is_empty() || text.len() > 100_000 {
-        return Err(InsertionError::rejected(
-            "Insertion requires 1 to 100,000 UTF-8 bytes.",
-        ));
-    }
-    deliver_with(
-        parse_requested_strategy(preferred)?,
-        || type_simulation(text),
-        || clipboard_paste(text),
-    )
-}
-
-fn deliver_with(
-    requested: RequestedStrategy,
-    type_text: impl FnOnce() -> Result<ActiveStrategy, InsertionError>,
-    paste_text: impl FnOnce() -> Result<(), InsertionError>,
-) -> Result<InsertionResult, InsertionError> {
-    let strategy = match requested {
-        RequestedStrategy::Auto => match type_text() {
-            Ok(strategy) => strategy,
-            // Only an operation known not to have started can authorize trying
-            // the entire transcript through another route.
-            Err(error) if error.outcome == DeliveryOutcome::NoMutation => {
-                paste_text()?;
-                ActiveStrategy::Clipboard
-            }
-            Err(error) => return Err(error),
-        },
-        RequestedStrategy::Clipboard => {
-            paste_text()?;
-            ActiveStrategy::Clipboard
-        }
-        RequestedStrategy::TypeSimulation => type_text()?,
-    };
-    Ok(InsertionResult {
-        paste_metrics: None,
-        strategy,
-        outcome: "dispatched",
-    })
-}
-
 /// A failed spawn proves the helper did not run. Any later error is uncertain:
 /// the helper may have typed a prefix or sent the paste gesture already.
 fn run_helper(
@@ -947,38 +876,6 @@ fn run_helper(
         )));
     }
     Ok(())
-}
-
-fn typing_timeout(text: &str, wayland: bool) -> Duration {
-    // Account for the configured per-key delay while bounding an unresponsive
-    // helper. Long dictations should use owned input-method delivery.
-    let per_character_ms = if wayland { 8 } else { 32 };
-    Duration::from_millis((5_000 + text.chars().count() as u64 * per_character_ms).min(180_000))
-}
-
-fn type_simulation(text: &str) -> Result<ActiveStrategy, InsertionError> {
-    let wayland = is_wayland();
-    let (program, arguments, strategy) = if wayland {
-        (
-            "ydotool",
-            vec!["type", "--key-delay", "2", "--", text],
-            ActiveStrategy::Ydotool,
-        )
-    } else {
-        (
-            "xdotool",
-            vec!["type", "--clearmodifiers", "--delay", "12", "--", text],
-            ActiveStrategy::Xdotool,
-        )
-    };
-    let mut command = process_runner::command(program);
-    command.args(arguments);
-    run_helper(&mut command, None, typing_timeout(text, wayland))?;
-    Ok(strategy)
-}
-
-fn clipboard_paste(text: &str) -> Result<(), InsertionError> {
-    clipboard_paste_with_shortcut(text, false, || Ok(())).map(|_| ())
 }
 
 fn clipboard_paste_with_shortcut(
@@ -1489,47 +1386,9 @@ mod tests {
         assert_eq!(json["outcome"], "uncertain");
         assert_eq!(json["clipboardChanged"], false);
         assert_eq!(
-            serde_json::to_string(&ActiveStrategy::Ydotool).unwrap(),
-            r#""ydotool""#
+            serde_json::to_string(&ActiveStrategy::Clipboard).unwrap(),
+            r#""clipboard""#
         );
-    }
-
-    #[test]
-    fn uncertain_partial_write_never_retries_full_transcript() {
-        let pasted = Cell::new(false);
-        let result = deliver_with(
-            RequestedStrategy::Auto,
-            || Err(InsertionError::uncertain("helper typed abc before failing")),
-            || {
-                pasted.set(true);
-                Ok(())
-            },
-        );
-        assert_eq!(result.unwrap_err().outcome, DeliveryOutcome::Uncertain);
-        assert!(!pasted.get());
-    }
-
-    #[test]
-    fn only_proven_no_mutation_allows_auto_fallback() {
-        let pasted = Cell::new(false);
-        let result = deliver_with(
-            RequestedStrategy::Auto,
-            || Err(InsertionError::no_mutation("spawn failed")),
-            || {
-                pasted.set(true);
-                Ok(())
-            },
-        )
-        .unwrap();
-        assert!(pasted.get());
-        assert_eq!(result.outcome, "dispatched");
-        assert!(matches!(result.strategy, ActiveStrategy::Clipboard));
-        assert!(deliver_with(
-            RequestedStrategy::Auto,
-            || Err(InsertionError::rejected("invalid target")),
-            || panic!("rejected delivery cannot authorize a retry")
-        )
-        .is_err());
     }
 
     #[test]
@@ -1641,37 +1500,6 @@ mod tests {
             clipboard_transaction("transcript", &mut copy, &mut paste, || Ok(())).unwrap_err();
         assert_eq!(error.outcome, DeliveryOutcome::Uncertain);
         assert!(error.clipboard_changed);
-    }
-
-    #[test]
-    fn typing_deadline_accounts_for_length_but_is_bounded() {
-        assert!(typing_timeout("longer text", false) > typing_timeout("x", false));
-        assert_eq!(
-            typing_timeout(&"x".repeat(100_000), false),
-            Duration::from_secs(180)
-        );
-    }
-
-    #[test]
-    fn parse_requested_strategy_accepts_known_values_and_rejects_unknown() {
-        assert!(matches!(
-            parse_requested_strategy("auto"),
-            Ok(RequestedStrategy::Auto)
-        ));
-        assert!(matches!(
-            parse_requested_strategy("clipboard"),
-            Ok(RequestedStrategy::Clipboard)
-        ));
-        assert!(matches!(
-            parse_requested_strategy("type-simulation"),
-            Ok(RequestedStrategy::TypeSimulation)
-        ));
-        assert_eq!(
-            parse_requested_strategy("surprise-mode")
-                .unwrap_err()
-                .outcome,
-            DeliveryOutcome::Rejected
-        );
     }
 
     #[test]

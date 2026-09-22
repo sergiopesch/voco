@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { admitsDictationTrigger } from "./dictationTrigger";
+import { admitsDictationTrigger, canStopOnboardingTest, cancelsPendingStart } from "./dictationTrigger";
 
 describe("directed browser recording triggers", () => {
   it("never treats a second start as a stop", () => {
@@ -39,5 +39,22 @@ describe("directed browser recording triggers", () => {
         expect(admitsDictationTrigger(phase, origin, "tray:stop", "start")).toBe(false);
       }
     }
+  });
+
+  it("cancels pending admission only for a matching browser Stop", () => {
+    expect(cancelsPendingStart("browser:current", "browser:current", "stop")).toBe(true);
+    expect(cancelsPendingStart("browser:current", "browser:old", "stop")).toBe(false);
+    expect(cancelsPendingStart(undefined, "browser:old", "stop")).toBe(false);
+    expect(cancelsPendingStart("onboarding:test", "browser:old", "stop")).toBe(false);
+    expect(cancelsPendingStart("browser:current", "browser:current", "start")).toBe(false);
+    expect(cancelsPendingStart("onboarding:test", "tray:stop", "stop")).toBe(true);
+    expect(cancelsPendingStart(undefined)).toBe(true);
+  });
+
+  it("keeps browser Start and Stop outside the onboarding test control", () => {
+    expect(canStopOnboardingTest("browser:old")).toBe(false);
+    expect(canStopOnboardingTest("browser:new")).toBe(false);
+    expect(canStopOnboardingTest("tray:stop")).toBe(true);
+    expect(canStopOnboardingTest(undefined)).toBe(true);
   });
 });

@@ -14,13 +14,13 @@ root = Path(sys.argv[1])
 evidence = root / 'evidence'
 report = {'passed': False, 'scope': 'actual GNOME Shell/Mutter, isolated virtual session',
           'physicalMicrophone': False, 'installedSessionQualified': False,
-          'inferenceRequested': os.environ.get('VOCO_GNOME_CAPTURE') == '1', 'toolkits': []}
+          'inferenceRequested': os.environ.get('VOCO_GNOME_ONBOARDING') == '1', 'toolkits': []}
 shell = None
 system_bus = None
 pulse = None
 try:
     assert 'DISPLAY' not in os.environ and 'WAYLAND_DISPLAY' not in os.environ
-    assert not Path('/dev/input').exists() and not Path('/dev/snd').exists()
+    assert not any(Path(path).exists() for path in ('/dev/input', '/dev/snd', '/dev/uinput'))
     assert os.environ['HOME'] == str(root / 'home')
     system_address = 'unix:path=' + str(root / 'runtime/system-test-bus')
     system_bus = subprocess.Popen(['dbus-daemon', '--session', '--nofork', '--address=' + system_address], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -80,13 +80,22 @@ try:
         (evidence / f'gtk-{version}.log').write_text(run.stdout + run.stderr)
         assert run.returncode == 0, run.stderr
         report['toolkits'].append(json.loads(run.stdout.strip().splitlines()[-1]))
-    xenv = {**os.environ, 'DISPLAY': ':77', 'LD_LIBRARY_PATH': '/tmp/native-deps/lib/x86_64-linux-gnu'}
-    outer_ids = subprocess.check_output(['/tmp/native-deps/bin/xdotool', 'search', '--pid', str(shell.pid)], env=xenv, text=True, timeout=5).splitlines()
+    # The optional dependency bundle need only supply Xvfb. Either helper is
+    # mounted read-only; its input operations target only the private X server.
+    bundled_xdotool = Path('/tmp/native-deps/bin/xdotool')
+    xdotool = bundled_xdotool if os.access(bundled_xdotool, os.X_OK) else Path('/usr/bin/xdotool')
+    assert xdotool.is_file() and os.access(xdotool, os.X_OK), 'Install xdotool or include it in VOCO_NATIVE_DEPS'
+    xenv = {**os.environ, 'DISPLAY': ':77'}
+    xenv.pop('LD_LIBRARY_PATH', None)
+    if xdotool == bundled_xdotool:
+        xenv['LD_LIBRARY_PATH'] = '/tmp/native-deps/lib/x86_64-linux-gnu'
+    report['privateXTestHelper'] = {'path': str(xdotool), 'sha256': hashlib.sha256(xdotool.read_bytes()).hexdigest(), 'display': ':77'}
+    outer_ids = subprocess.check_output([str(xdotool), 'search', '--pid', str(shell.pid)], env=xenv, text=True, timeout=5).splitlines()
     for window_id in outer_ids:
-        raw = subprocess.check_output(['/tmp/native-deps/bin/xdotool', 'getwindowgeometry', '--shell', window_id], env=xenv, text=True, timeout=5)
+        raw = subprocess.check_output([str(xdotool), 'getwindowgeometry', '--shell', window_id], env=xenv, text=True, timeout=5)
         values = dict(line.split('=', 1) for line in raw.splitlines())
         if int(values['WIDTH']) >= 600 and int(values['HEIGHT']) >= 400:
-            subprocess.run(['/tmp/native-deps/bin/xdotool', 'windowfocus', window_id, 'key', 'Escape'], env=xenv, check=True, timeout=5)
+            subprocess.run([str(xdotool), 'windowfocus', window_id, 'key', 'Escape'], env=xenv, check=True, timeout=5)
             report['overviewDismissal'] = 'private XTest Escape to nested Shell window'
     if os.environ.get('VOCO_GNOME_WEBKIT_SCROLL_PROBE') == '1':
         os.environ.update(env)
@@ -165,7 +174,7 @@ try:
         assert native, 'Scroll probe not visibly focused'
         before = scroll.get_vadjustment().get_value()
         x, y, width, height = native['frame']
-        subprocess.run(['/tmp/native-deps/bin/xdotool', 'mousemove', '--sync', str(x + width // 2), str(y + height // 2), 'click', '--repeat', '5', '--delay', '40', '5'], env=xenv, check=True, timeout=5)
+        subprocess.run([str(xdotool), 'mousemove', '--sync', str(x + width // 2), str(y + height // 2), 'click', '--repeat', '5', '--delay', '40', '5'], env=xenv, check=True, timeout=5)
         until = time.monotonic() + 3
         while time.monotonic() < until:
             while GLib.MainContext.default().pending():
@@ -174,7 +183,7 @@ try:
                 break
             time.sleep(.02)
         report['scrollProbe'] = {'nativeWindow': native, 'before': before, 'after': scroll.get_vadjustment().get_value()}
-        subprocess.run(['/tmp/native-deps/bin/xdotool', 'key', 'Next'], env=xenv, check=True, timeout=5)
+        subprocess.run([str(xdotool), 'key', 'Next'], env=xenv, check=True, timeout=5)
         until = time.monotonic() + 3
         while time.monotonic() < until:
             while GLib.MainContext.default().pending():
@@ -187,21 +196,22 @@ try:
         assert 65366 in key_events, 'Actual PageDown key event not received'
         assert report['scrollProbe']['afterPageDown'] > before, 'Private XTest PageDown did not scroll actual GTK fixture'
         target.destroy()
-    if os.environ.get('VOCO_GNOME_CAPTURE') == '1':
-        env.update(PULSE_SERVER='unix:' + str(root / 'runtime/pulse.sock'),
+    if os.environ.get('VOCO_GNOME_ONBOARDING') == '1':
+        pulse_socket = Path(f'/run/user/{os.getuid()}/pulse/native')
+        env.update(PULSE_SERVER='unix:' + str(pulse_socket),
                    PULSE_SOURCE='voco_fixture', PULSE_SINK='fixture')
         os.environ.update(env)
         pulse = subprocess.Popen([os.environ['VOCO_WAYLAND_PULSEAUDIO'], '--daemonize=no', '--use-pid-file=no',
                                   '--exit-idle-time=-1', '--disable-shm=true', '-n',
                                   '--log-target=file:' + str(evidence / 'pulse.log'),
-                                  '-L', 'module-native-protocol-unix socket=' + str(root / 'runtime/pulse.sock') + ' auth-anonymous=1',
+                                  '-L', 'module-native-protocol-unix socket=' + str(pulse_socket) + ' auth-anonymous=1',
                                   '-L', 'module-null-sink sink_name=fixture rate=48000',
-                                  '-L', 'module-remap-source master=fixture.monitor source_name=voco_fixture'])
+                                  '-L', 'module-remap-source master=fixture.monitor source_name=voco_fixture source_properties=object.serial=1'])
         until = time.monotonic() + 5
-        while not (root / 'runtime/pulse.sock').exists() and time.monotonic() < until:
+        while not pulse_socket.exists() and time.monotonic() < until:
             assert pulse.poll() is None
             time.sleep(.02)
-        assert (root / 'runtime/pulse.sock').exists()
+        assert pulse_socket.exists()
         subprocess.run([os.environ['VOCO_WAYLAND_PACTL'], 'set-default-source', 'voco_fixture'], check=True, timeout=5)
     if (root / 'voco').exists():
         gi.require_version('Atspi', '2.0')
@@ -209,7 +219,9 @@ try:
         model = root / 'speech/models/nemotron-speech-streaming-en-0.6b.q8_0.gguf'
         assert model.exists(), 'Lifecycle acceptance requires pinned model cache'
         model_hash = hashlib.sha256(model.read_bytes()).hexdigest()
-        assert model_hash == 'a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002'
+        pinned_model = Path(__file__).resolve().parent.parent / 'runtime/speech/MODEL-IDENTITY.json'
+        assert model_hash == json.loads(pinned_model.read_text())['model_sha256'], 'Model differs from pinned runtime identity'
+        (evidence / 'sources/MODEL-IDENTITY.json').write_bytes(pinned_model.read_bytes())
         report['modelSha256'] = model_hash
         report['appSha256'] = hashlib.sha256((root / 'voco').read_bytes()).hexdigest()
         report['application'] = []
@@ -250,7 +262,7 @@ try:
             trace = root / 'state/voco/hotkey-trace.jsonl'
             previous_ready_count = trace.read_text().count('frontend_hotkey_handler_ready') if trace.exists() else 0
             with (evidence / f'app-{cycle}.log').open('w') as log:
-                app = subprocess.Popen([str(root / 'voco')], env=env, stdout=log, stderr=subprocess.STDOUT)
+                app = subprocess.Popen([str(root / 'voco')], env={**env, 'VOCO_HOTKEY_TRACE': '1'}, stdout=log, stderr=subprocess.STDOUT)
             try:
                 def registered():
                     assert app.poll() is None, 'App exited before tray registration'
@@ -302,7 +314,9 @@ try:
                     trace = root / 'state/voco/hotkey-trace.jsonl'
                     return trace.exists() and trace.read_text().count('frontend_hotkey_handler_ready') > previous_ready_count
                 wait_for(frontend_ready)
-                activate('Open VOCO')
+                onboarding_cycle = os.environ.get('VOCO_GNOME_ONBOARDING') == '1' and cycle == 0
+                if not onboarding_cycle:
+                    activate('Open VOCO')
                 visible = wait_for(visible_app)
                 report.setdefault('nativeWindows', []).append(json.loads(call('org.gnome.Shell', '/org/voco/PrivateShellProbe', 'org.voco.PrivateShellProbe', 'GetWindows')[0]))
                 assert 'Bundled Nemotron streaming model ready' in (evidence / f'app-{cycle}.log').read_text()
@@ -332,58 +346,14 @@ try:
                     finally:
                         clipboard.terminate()
                         clipboard.wait(timeout=5)
-                if os.environ.get('VOCO_GNOME_CAPTURE') == '1' and cycle == 0:
-                    # The outer X11 window belongs only to this private Shell.
-                    xenv = {**os.environ, 'DISPLAY': ':77', 'LD_LIBRARY_PATH': '/tmp/native-deps/lib/x86_64-linux-gnu'}
-                    windows = subprocess.check_output(['/tmp/native-deps/bin/xdotool', 'search', '--pid', str(shell.pid)], env=xenv, text=True, timeout=5).splitlines()
-                    parents = []
-                    for window_id in windows:
-                        raw = subprocess.check_output(['/tmp/native-deps/bin/xdotool', 'getwindowgeometry', '--shell', window_id], env=xenv, text=True, timeout=5)
-                        values = dict(line.split('=', 1) for line in raw.splitlines())
-                        if int(values['WIDTH']) >= 600 and int(values['HEIGHT']) >= 400:
-                            parents.append({key: int(values[key]) for key in ['X', 'Y', 'WIDTH', 'HEIGHT']})
-                    assert len(parents) == 1, parents
-                    parent = parents[0]
-                    def geometry(pid):
-                        windows = json.loads(call('org.gnome.Shell', '/org/voco/PrivateShellProbe', 'org.voco.PrivateShellProbe', 'GetWindows')[0])
-                        found = [window for window in windows if window['pid'] == pid and window['visible'] and window['frame'][2] > 4]
-                        if len(found) != 1:
-                            return None
-                        window = found[0]
-                        window['frame'][0] += parent['X']
-                        window['frame'][1] += parent['Y']
-                        return window
-                    def reveal(pid, control):
-                        assert control == 'Settings'
-                        native = wait_for(lambda: geometry(pid))
-                        assert native['focused'], 'Refuse private scroll into an unfocused app'
-                        x, y, width, height = native['frame']
-                        assert x >= 0 and y >= 0 and x + width <= 1280 and y + height <= 900
-                        desktop = Atspi.get_desktop(0)
-                        def find_control():
-                            pending = [desktop.get_child_at_index(i) for i in range(desktop.get_child_count()) if desktop.get_child_at_index(i).get_process_id() == pid]
-                            for _ in range(500):
-                                if not pending:
-                                    break
-                                node = pending.pop()
-                                if node.get_role() == Atspi.Role.PUSH_BUTTON and node.get_name() == control:
-                                    return node
-                                pending.extend(node.get_child_at_index(i) for i in range(min(node.get_child_count(), 100)))
-                            return None
-                        button = wait_for(find_control)
-                        accepted = button.get_component_iface().scroll_to(Atspi.ScrollType.ANYWHERE)
-                        report.setdefault('privateScrollActions', []).append({'control': control, 'nativeWindowBefore': native, 'action': 'actual AT-SPI Component.scroll_to(ANYWHERE)', 'accepted': accepted})
-                        assert accepted, 'Actual WebKit scroll action refused'
-                        # Shared caller now checks contained live bounds, paint and
-                        # matching focused native generation before activating it.
-                    from test_native_wayland_capture import run_capture
-                    report['inferenceRequested'] = True
-                    report['capture'] = run_capture(root, app, pump, activate, geometry_provider=geometry, control_revealer=reveal)
+                if os.environ.get('VOCO_GNOME_ONBOARDING') == '1' and cycle == 0:
+                    from test_native_onboarding_capture import run_onboarding
+                    report['onboarding'] = run_onboarding(root, app, pump, lambda: json.loads(call('org.gnome.Shell', '/org/voco/PrivateShellProbe', 'org.voco.PrivateShellProbe', 'GetWindows')[0]))
                 activate('Quit VOCO')
                 assert app.wait(timeout=10) == 0
                 report['application'].append({'cycle': cycle + 1, 'visibleFrame': visible,
                                              'modelCacheReady': True, 'initialReadinessCheck': 'verified model cache, before optional capture',
-                                             'trayAction': 'real registered DBusMenu Event; not pointer activation'})
+                                             'trayAction': 'startup onboarding; real DBusMenu Quit' if onboarding_cycle else 'real registered DBusMenu Event; not pointer activation'})
             finally:
                 if app.poll() is None:
                     app.terminate()
@@ -412,5 +382,5 @@ finally:
         system_bus.terminate()
         system_bus.wait(timeout=3)
     report['sourceHashes'] = {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
-                              for p in [Path(__file__), Path(__file__).with_suffix('.sh'), Path(__file__).with_name('test_native_wayland_capture.py'), *sorted(Path(__file__).with_name('fixtures').joinpath('gnome-private-probe').glob('*'))]}
+                              for p in [Path(__file__), Path(__file__).with_suffix('.sh'), Path(__file__).with_name('test_native_wayland_capture.py'), Path(__file__).with_name('test_native_onboarding_capture.py'), *sorted(Path(__file__).with_name('fixtures').joinpath('gnome-private-probe').glob('*'))]}
     (evidence / 'results.json').write_text(json.dumps(report, indent=2) + '\n')

@@ -95,7 +95,14 @@ if (!fs.existsSync(tracePath)) {
   process.exit(1);
 }
 
-const lines = fs.readFileSync(tracePath, "utf8").split(/\r?\n/).filter(Boolean);
+const previousTracePath = path.basename(tracePath) === "hotkey-trace.jsonl"
+  ? path.join(path.dirname(tracePath), "hotkey-trace.previous.jsonl")
+  : null;
+const tracePaths = previousTracePath && fs.existsSync(previousTracePath)
+  ? [previousTracePath, tracePath]
+  : [tracePath];
+const lines = tracePaths.flatMap((filePath) =>
+  fs.readFileSync(filePath, "utf8").split(/\r?\n/).filter(Boolean));
 const allParsedEntries = [];
 for (const [index, line] of lines.entries()) {
   let entry;
@@ -193,6 +200,9 @@ if (options.strict && latestRecordingStart > findLastEventIndex(parsedEntries, "
 console.log("VOCO cursor streaming trace report");
 console.log("");
 console.log(`Trace file: ${tracePath}`);
+if (tracePaths.length > 1) {
+  console.log(`Previous trace: ${previousTracePath}`);
+}
 console.log(`Entries read: ${lines.length}`);
 if (latestTraceScopeStartPosition !== -1) {
   console.log(`Entries in latest frontend run: ${parsedEntries.length}`);

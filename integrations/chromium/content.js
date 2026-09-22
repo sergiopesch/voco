@@ -16,6 +16,7 @@
   function invalidate(reason) {
     if (!session || session.invalid) return;
     session.invalid = true;
+    observer.disconnect();
     send({type: 'invalidate', token: session.token, reason});
   }
   function valid() {
@@ -37,10 +38,14 @@
   const observer = new MutationObserver(records => {
     if (changedTarget(records)) invalidate('element-changed');
   });
-  observer.observe(document, {subtree: true, childList: true, attributes: true, attributeFilter: ['type', 'readonly', 'disabled', 'autocomplete', 'data-voco-private', 'inert']});
   document.addEventListener('focusout', () => invalidate('focus-changed'), true);
   window.addEventListener('blur', () => invalidate('focus-changed'), true);
-  window.addEventListener('pagehide', () => { armed = false; invalidate('navigation'); }, true);
+  window.addEventListener('pagehide', () => {
+    armed = false;
+    // A focusout may have already revoked delivery; page departure also ends capture.
+    invalidate('navigation');
+    if (session && !session.finished) send({type: 'stop', token: session.token});
+  }, true);
   for (const name of ['input', 'beforeinput', 'select', 'selectionchange']) document.addEventListener(name, event => {
     if (event === ownEvent) return;
     if (session && !valid()) invalidate('field-changed');
@@ -61,13 +66,15 @@
     for (let ancestor = element; ancestor; ancestor = ancestor.parentNode) ancestors.add(ancestor);
     session = {token: id(), element, ancestors, value: element.value, caret: element.selectionStart, expires: Date.now() + 2000,
       claimed: false, invalid: false, finished: false, committed: 0, bytes: 0, next: 0, journal: new Map()};
+    // Observe before asynchronous claim/start work, and only while this field can receive text.
+    observer.observe(document, {subtree: true, childList: true, attributes: true, attributeFilter: ['type', 'readonly', 'disabled', 'autocomplete', 'data-voco-private', 'inert']});
     send({type: 'trigger', token: session.token, mode: 'dictation'});
   }, true);
   chrome.runtime.onMessage.addListener((message, _sender, respond) => {
     if (message.type === 'arm') { armed = true; respond({documentId}); return; }
     if (message.type === 'disarm') {
       const stopToken = session && !session.finished ? session.token : null;
-      armed = false; invalidate('disconnected'); if (session) session.finished = true;
+      armed = false; invalidate('disconnected'); if (session) session.finished = true; observer.disconnect();
       respond({documentId, stopToken}); return;
     }
     if (message.type === 'query' && message.documentId === documentId && retired.has(message.token)) {
@@ -77,7 +84,7 @@
     if (!session || message.token !== session.token || message.documentId !== documentId) { respond(null); return; }
     // Losing insertion ownership must not release the recording's Stop token.
     if (message.type === 'revoke') { invalidate('cancelled'); respond({}); return; }
-    if (message.type === 'cancel') { invalidate('cancelled'); session.finished = true; respond({}); return; }
+    if (message.type === 'cancel') { invalidate('cancelled'); session.finished = true; observer.disconnect(); respond({}); return; }
     if (message.type === 'query') { respond(session.journal.get(message.sequence)?.receipt || null); return; }
     if (!['claim', 'append'].includes(message.type)) { respond(null); return; }
     const {requestId, token, sequence, expectedCommittedCharacters} = message;
@@ -142,6 +149,7 @@
       } catch (_) { receipt.outcome = 'uncertain'; receipt.committedCharacters = expectedCommittedCharacters; invalidate('mutation-uncertain'); }
       finally { ownEvent = null; }
       if (!valid()) invalidate('field-changed');
+      if (session.finished) observer.disconnect();
     }
     session.journal.set(sequence, {signature, receipt: {...receipt}});
     respond(receipt);

@@ -15,7 +15,7 @@ off by default and contain bounded metadata. See the
 
 Checksums help detect damaged or mismatched downloads. They are not a substitute
 for a signed release or an independent security audit. The current Ubuntu/Debian
-release, `voco.2026.0.51`, has a signed tag and detached checksum signatures.
+release, `voco.2026.0.54`, has a signed tag and detached checksum signatures.
 The historical `voco.2026.0.39` tag is unsigned and must not be moved to add a
 signature. New publishers use `scripts/setup-release-signing.sh` once, then sign
 each new tag and its checksum manifests. Verify a signed cut with

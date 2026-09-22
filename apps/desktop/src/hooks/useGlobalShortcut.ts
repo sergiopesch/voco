@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { refreshShortcutHeartbeat, releaseBrowserRecording, traceHotkeyEvent } from "@/lib/tauri";
-import type { DictationTriggerAction } from "@/lib/dictationTrigger";
+import { ackBrowserStop, refreshShortcutHeartbeat, releaseBrowserRecording, traceHotkeyEvent } from "@/lib/tauri";
+import { isBrowserTrigger, type DictationTriggerAction } from "@/lib/dictationTrigger";
 
 const TOGGLE_EVENT = "voco:toggle-dictation";
 
@@ -17,8 +17,24 @@ export function shouldMarkHotkeyHandlerReady(
   );
 }
 
+export function browserStopReceipt(
+  triggerId: string | undefined,
+  action: DictationTriggerAction | undefined,
+  handled: boolean,
+): string | null {
+  return handled && action === "stop" && isBrowserTrigger(triggerId) ? triggerId : null;
+}
+
+export function shouldProcessHotkeyEvent(
+  canHandleHotkey: boolean,
+  triggerId?: string,
+  action?: DictationTriggerAction,
+): boolean {
+  return canHandleHotkey || (action === "stop" && isBrowserTrigger(triggerId));
+}
+
 export function useGlobalShortcut(
-  toggle: (triggerId?: string, action?: DictationTriggerAction) => void,
+  toggle: (triggerId?: string, action?: DictationTriggerAction) => boolean | Promise<boolean>,
   shouldHandleHotkey: () => boolean,
   canHandleHotkey: boolean,
   appStartMs: number,
@@ -41,13 +57,19 @@ export function useGlobalShortcut(
       .listen<{ triggerId?: string; action?: DictationTriggerAction } | null>(TOGGLE_EVENT, (event) => {
         traceHotkeyEvent("frontend_toggle_received").catch(() => {});
         onHotkeyPressedRef.current();
-        if (!shouldHandleHotkeyRef.current()) {
+        const { triggerId, action } = event.payload ?? {};
+        if (!shouldProcessHotkeyEvent(shouldHandleHotkeyRef.current(), triggerId, action)) {
           if (event.payload?.action === "start" && event.payload.triggerId?.startsWith("browser:")) {
             void releaseBrowserRecording(event.payload.triggerId).catch(() => {});
           }
           return;
         }
-        toggleRef.current(event.payload?.triggerId, event.payload?.action);
+        void Promise.resolve(toggleRef.current(triggerId, action))
+          .then((handled) => {
+            const receipt = browserStopReceipt(triggerId, action, handled);
+            if (receipt) return ackBrowserStop(receipt);
+          })
+          .catch(() => {});
       })
       .then((cleanup) => {
         if (disposed) {

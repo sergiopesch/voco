@@ -20,25 +20,49 @@ cannot qualify a restarted app.
 VOCO_NATIVE_DEPS=/absolute/path/to/extracted-xvfb/usr \
 VOCO_GNOME_EVIDENCE_DIR=/absolute/path/to/fresh-evidence \
 VOCO_GNOME_APP_BINARY=/absolute/path/to/extracted/usr/bin/voco \
-VOCO_GNOME_MODEL=/absolute/path/to/existing/ggml-base.en.bin \
+VOCO_TEST_SPEECH_RUNTIME=/absolute/path/to/extracted/usr/lib/voco/speech \
   env -u PYTHONOPTIMIZE bash scripts/test-native-gnome.sh
 ```
 
-The optional capture journey uses `VOCO_GNOME_CAPTURE=1`,
-`VOCO_WAYLAND_SURFACE_JOURNEY=1`, `VOCO_WAYLAND_DISMISS_TARGET=1`, and
-`VOCO_DEBUG_CAPTURE_AUDIO=1`. Only the checked-in public GO WAV is played into a
-private PulseAudio virtual source. Recording uses the private app control socket;
-this does not qualify the physical/global dictation shortcut.
+The optional current capture journey uses `VOCO_GNOME_ONBOARDING=1` with
+`VOCO_DEV_NATIVE_CAPTURE=1`, `VOCO_DEBUG_CAPTURE_AUDIO=1`, and
+`VOCO_DEBUG_NATIVE_CAPTURE=1`. It starts from an incomplete disposable profile,
+activates the actual app-owned Start test and Finish test controls, and checks the
+public GO WAV through the native Pulse capture backend and pinned recognizer.
+The fixture requires focused native window ownership and contained accessible
+controls; screenshots retain their presentation. Actions use AT-SPI, not pointer
+injection. It verifies one ordered recording/Stop/teardown/idle session, an
+independent Pulse capture client that stops, unchanged private clipboard, exact
+local transcript, complete native and renderer audit receipts, and waveform
+continuity. A failed audio or transcript check remains a failed qualification.
+
+The private Pulse listener is a real same-UID socket at the native backend's
+expected `/run/user/<uid>/pulse/native` inside the already isolated namespace.
+The synthetic source has its own explicit stable identity. No host audio socket or
+device is shared. The fixture uses a private umask so audit files pass the normal
+ownership and ancestor checks; it does not relax production security checks.
+Playback wraps the checked-in public WAV in a fixed 250 ms of digital silence on
+each side to start the private null-sink clock. Both input hashes are retained;
+continuity still scores the complete original WAV at the unchanged thresholds. Complete raw capture receipts remain in
+the external evidence directory, including on a failed trial.
+
+The test stops before Check desktop setup or Done: it does not establish physical
+microphone quality, automatic cursor insertion, a global shortcut, or completion
+of desktop readiness. The separate default two-cycle lifecycle run qualifies real
+tray Open/Quit and fresh renderer/model readiness without capture. The XTest helper
+may come from the extracted dependencies or `/usr/bin/xdotool`; its executable is
+mounted read-only and input is sent only to the private Xvfb display.
+
+`VOCO_GNOME_CAPTURE=1` was the historical manual-Copy journey and now fails early
+with guidance to the onboarding variant. Current cursor-only behavior correctly
+refuses to start without an authorized target, so the old journey is not current
+acceptance evidence. Shared historical Weston/KDE fixtures are unchanged.
 
 A test-only extension in `scripts/fixtures/gnome-private-probe` is copied solely into
 the disposable data directory. It observes native window PID, surface generation,
-frame rectangle, visibility and focus over the private session bus. The capture
-paint check combines those bounds with the private Xvfb parent bounds and verifies
-stable observations around the screenshot. It does not assume Weston's centered
-geometry. Actual WebKit `Atspi.Component.scroll_to(ANYWHERE)` reveals Settings in
-small viewports. Before activation, the harness requires its complete rectangle
-inside the current frame, visible/enabled accessibility state, light text painted
-inside its dark button, and unchanged focused native geometry around the image.
+frame rectangle, visibility and focus over the private session bus.
+
+The following records describe historical manual-Copy qualification only.
 
 Final iteration 5 evidence under
 `foundations-evidence/iteration-5/platform/final-gnome-scrollto` passes the complete

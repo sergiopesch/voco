@@ -131,6 +131,49 @@ class ProtocolTests(unittest.TestCase):
             client.close()
             server.close()
 
+    def test_unstarted_or_failed_server_cannot_unlink_the_active_owner(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "voco" / "ibus-engine.sock"
+            owner = PrivateSocketServer(path)
+            owner.start()
+            self.addCleanup(owner.close)
+            second = PrivateSocketServer(path)
+            second.close()
+            self.assertTrue(path.exists())
+            with self.assertRaisesRegex(ProtocolError, "already running"):
+                second.start()
+            second.close()
+            self.assertTrue(path.exists())
+
+    def test_close_preserves_a_replacement_socket_and_is_idempotent(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "voco" / "ibus-engine.sock"
+            previous = PrivateSocketServer(path)
+            previous.start()
+            path.unlink()
+            replacement = PrivateSocketServer(path)
+            replacement.start()
+            self.addCleanup(replacement.close)
+            previous.close()
+            previous.close()
+            self.assertTrue(path.exists())
+            client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            self.addCleanup(client.close)
+            client.connect(str(path))
+            self.assertIsNotNone(replacement.accept())
+            replacement.close()
+            self.assertFalse(path.exists())
+
+    def test_start_failure_after_binding_removes_only_its_socket(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "voco" / "ibus-engine.sock"
+            server = PrivateSocketServer(path)
+            with patch("voco_ibus_protocol.os.chmod", side_effect=OSError("fixture")):
+                with self.assertRaisesRegex(OSError, "fixture"):
+                    server.start()
+            self.assertFalse(path.exists())
+            server.close()
+
 
 if __name__ == "__main__":
     unittest.main()

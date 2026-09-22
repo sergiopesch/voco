@@ -416,6 +416,7 @@ fn release_token(state: &mut State, trigger_id: &str) {
     };
     let target = if let Some(session) = state.session.as_mut().filter(|s| s.token == token) {
         session.valid = false;
+        session.stop_seen = true;
         Some((session.document.clone(), session.connection))
     } else if let Some((_, document, _)) =
         state.last_trigger.as_ref().filter(|(t, _, _)| t == token)
@@ -525,7 +526,7 @@ fn connection_loop(
     )
     .is_err()
     {
-        disconnect(&shared, id);
+        disconnect(&shared, id, &callback);
         return;
     }
     while let Ok(frame) = protocol::read_frame(&mut stream) {
@@ -554,16 +555,49 @@ fn connection_loop(
         }
     }
     let _ = stream.shutdown(Shutdown::Both);
-    disconnect(&shared, id);
+    disconnect(&shared, id, &callback);
 }
-fn disconnect(shared: &Shared, id: u64) {
-    if let Ok(mut state) = shared.state.lock() {
-        if state.connection.as_ref().is_some_and(|c| c.id == id) {
+fn disconnect(
+    shared: &Shared,
+    id: u64,
+    callback: &Arc<dyn Fn(BrowserTrigger) -> bool + Send + Sync>,
+) {
+    let stops = if let Ok(mut state) = shared.state.lock() {
+        if state.connection.as_ref().is_none_or(|c| c.id != id) {
+            Vec::new()
+        } else {
             state.connection = None;
+            let mut tokens = Vec::with_capacity(2);
+            if let Some(session) = state.session.as_mut().filter(|s| s.connection == id) {
+                if !session.stop_seen {
+                    session.stop_seen = true;
+                    tokens.push(session.token.clone());
+                }
+            }
+            if let Some((token, _, stopped)) = state.last_trigger.as_mut() {
+                if !*stopped {
+                    *stopped = true;
+                    if !tokens.contains(token) {
+                        tokens.push(token.clone());
+                    }
+                }
+            }
             invalidate(&mut state, true);
+            tokens
         }
-    }
+    } else {
+        Vec::new()
+    };
     shared.changed.notify_all();
+    for token in stops {
+        // The connection is gone, but each unreleased token still owns its Stop.
+        let _ = callback(BrowserTrigger {
+            trigger_id: format!("browser:{token}"),
+            mode: "dictation".into(),
+            provider: "chromium".into(),
+            action: "stop".into(),
+        });
+    }
 }
 fn receive(
     state: &mut State,
@@ -628,6 +662,13 @@ fn receive(
                     return Ok(None);
                 }
                 session.stop_seen = true;
+                if let Some((_, _, stopped)) = state
+                    .last_trigger
+                    .as_mut()
+                    .filter(|(t, d, _)| t == &token && d == &document_id)
+                {
+                    *stopped = true;
+                }
             } else if let Some((last_token, last_document, stopped)) = state
                 .last_trigger
                 .as_mut()
@@ -732,10 +773,7 @@ mod tests {
             connection_loop(
                 shared,
                 native,
-                Arc::new(move |t| {
-                    tx.send(t).unwrap();
-                    admitted
-                }),
+                Arc::new(move |t| tx.send(t).is_ok() && admitted),
             )
         });
         send(&mut browser, &json!({"protocol":protocol::PROTOCOL,"type":"hello","client":"chromium","capabilities":["plain-text-atomic-v1"]})).unwrap();
@@ -840,6 +878,91 @@ mod tests {
         assert!(broker.start(8, &id).is_err());
     }
     #[test]
+    fn terminal_tab_loss_revokes_delivery_before_stop_without_content_reply() {
+        let (broker, mut browser, rx) = fixture();
+        let id = trigger(&mut browser, &rx);
+        claim(&broker, &mut browser, id.clone());
+        send(&mut browser, &json!({"protocol":1,"type":"invalidate","token":"a".repeat(48),"documentId":"b".repeat(48),"reason":"disconnected"})).unwrap();
+        send(
+            &mut browser,
+            &json!({"protocol":1,"type":"stop","token":"a".repeat(48),"documentId":"b".repeat(48)}),
+        )
+        .unwrap();
+        let event = rx.recv_timeout(Duration::from_secs(1)).unwrap();
+        assert_eq!(event.trigger_id, id);
+        assert_eq!(event.action, "stop");
+        assert!(!broker.session_status(1).unwrap().ownership_intact);
+        assert!(broker.append(1, "", "no redirect", true).is_err());
+    }
+    #[test]
+    fn native_disconnect_stops_recording_after_focus_loss_once() {
+        let (broker, mut browser, rx) = fixture();
+        let id = trigger(&mut browser, &rx);
+        claim(&broker, &mut browser, id.clone());
+        send(&mut browser, &json!({"protocol":1,"type":"invalidate","token":"a".repeat(48),"documentId":"b".repeat(48),"reason":"focus-changed"})).unwrap();
+        assert!(rx.recv_timeout(Duration::from_millis(20)).is_err());
+        drop(browser);
+        let stop = rx.recv_timeout(Duration::from_secs(1)).unwrap();
+        assert_eq!(stop.trigger_id, id);
+        assert_eq!(stop.action, "stop");
+        assert!(rx.recv_timeout(Duration::from_millis(20)).is_err());
+    }
+    #[test]
+    fn native_disconnect_does_not_repeat_manual_stop() {
+        let (broker, mut browser, rx) = fixture();
+        let id = trigger(&mut browser, &rx);
+        claim(&broker, &mut browser, id.clone());
+        send(
+            &mut browser,
+            &json!({"protocol":1,"type":"stop","token":"a".repeat(48),"documentId":"b".repeat(48)}),
+        )
+        .unwrap();
+        assert_eq!(
+            rx.recv_timeout(Duration::from_secs(1)).unwrap().action,
+            "stop"
+        );
+        drop(browser);
+        assert!(rx.recv_timeout(Duration::from_millis(50)).is_err());
+    }
+    #[test]
+    fn native_disconnect_stops_pending_trigger_before_claim() {
+        let (_broker, mut browser, rx) = fixture();
+        let id = trigger(&mut browser, &rx);
+        drop(browser);
+        let stop = rx.recv_timeout(Duration::from_secs(1)).unwrap();
+        assert_eq!(stop.trigger_id, id);
+        assert_eq!(stop.action, "stop");
+        assert!(rx.recv_timeout(Duration::from_millis(20)).is_err());
+    }
+    #[test]
+    fn native_disconnect_stops_distinct_unreleased_session_and_pending_trigger() {
+        let (broker, mut browser, rx) = fixture();
+        let first = trigger(&mut browser, &rx);
+        claim(&broker, &mut browser, first.clone());
+        send(&mut browser, &json!({"protocol":1,"type":"invalidate","token":"a".repeat(48),"documentId":"b".repeat(48),"reason":"focus-changed"})).unwrap();
+        send(&mut browser, &json!({"protocol":1,"type":"trigger","token":"c".repeat(48),"documentId":"d".repeat(48),"mode":"dictation"})).unwrap();
+        let second = rx.recv_timeout(Duration::from_secs(1)).unwrap().trigger_id;
+        drop(browser);
+        let stops = [
+            rx.recv_timeout(Duration::from_secs(1)).unwrap(),
+            rx.recv_timeout(Duration::from_secs(1)).unwrap(),
+        ];
+        assert_eq!(stops[0].trigger_id, first);
+        assert_eq!(stops[1].trigger_id, second);
+        assert!(stops.iter().all(|event| event.action == "stop"));
+        assert!(rx.recv_timeout(Duration::from_millis(20)).is_err());
+    }
+    #[test]
+    fn released_recording_does_not_stop_again_on_disconnect() {
+        let (broker, mut browser, rx) = fixture();
+        let id = trigger(&mut browser, &rx);
+        claim(&broker, &mut browser, id.clone());
+        broker.release(&id).unwrap();
+        assert_eq!(read(&mut browser)["type"], "cancel");
+        drop(browser);
+        assert!(rx.recv_timeout(Duration::from_millis(50)).is_err());
+    }
+    #[test]
     fn disconnect_after_dispatch_is_uncertain_and_never_replayed() {
         let (broker, mut browser, rx) = fixture();
         let id = trigger(&mut browser, &rx);
@@ -938,6 +1061,13 @@ mod tests {
         send(&mut browser, &receipt(&request, "applied", 0)).unwrap();
         let next = t.join().unwrap().unwrap();
         assert_eq!(next.session_id, Some(2));
+        send(
+            &mut browser,
+            &json!({"protocol":1,"type":"stop","token":"a".repeat(48),"documentId":"b".repeat(48)}),
+        )
+        .unwrap();
+        assert!(rx.recv_timeout(Duration::from_millis(20)).is_err());
+        assert!(broker.session_status(2).unwrap().ownership_intact);
         assert!(broker.cancel(1).is_err());
         assert!(broker.append(1, "", "stale", true).is_err());
         assert!(broker.session_status(1).is_err());

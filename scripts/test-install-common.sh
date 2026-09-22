@@ -81,6 +81,7 @@ NC=""
 ok() { :; }
 warn() { :; }
 dim() { :; }
+unset XDG_CONFIG_HOME
 
 export HOME="${TEST_ROOT}/existing-home"
 mkdir -p "${HOME}/.config/voco"
@@ -242,6 +243,59 @@ cmp "${TEST_ROOT}/expected-config-file-symlink-target.json" "${TEST_ROOT}/config
   fail "installer followed a symlinked modern config file"
 [[ -L "${HOME}/.config/voco/config.json" ]] ||
   fail "installer replaced a symlinked modern config file"
+
+export HOME="${TEST_ROOT}/config-directory-file-home"
+mkdir -p "${HOME}/.config"
+printf sentinel > "${HOME}/.config/voco"
+voco_run_hotkey_setup "Alt+D" </dev/null > "${TEST_ROOT}/config-directory-file-output.txt"
+[[ "$(cat "${HOME}/.config/voco")" == sentinel ]] ||
+  fail "installer modified a regular file at the config directory path"
+
+export HOME="${TEST_ROOT}/xdg-home"
+export XDG_CONFIG_HOME="${TEST_ROOT}/xdg-config"
+mkdir -p "${XDG_CONFIG_HOME}/voice"
+printf '%s\n' '{"hotkey":"Super+F12","selectedMic":"xdg-device"}' > "${XDG_CONFIG_HOME}/voice/config.json"
+voco_run_hotkey_setup "Alt+D" </dev/null > "${TEST_ROOT}/xdg-output.txt"
+cmp "${XDG_CONFIG_HOME}/voice/config.json" "${XDG_CONFIG_HOME}/voco/config.json" >/dev/null ||
+  fail "installer did not migrate legacy settings within XDG_CONFIG_HOME"
+[[ "${VOCO_SELECTED_HOTKEY}" == "Super+F12" && "${VOCO_CONFIG_FILE}" == "${XDG_CONFIG_HOME}/voco/config.json" ]] ||
+  fail "installer did not use the application's XDG config path"
+[[ ! -e "${HOME}/.config/voco" ]] || fail "XDG setup wrote to the default config path"
+export XDG_CONFIG_HOME="${TEST_ROOT}/xdg-fresh-config"
+voco_run_hotkey_setup "Alt+D" </dev/null > "${TEST_ROOT}/xdg-fresh-output.txt"
+[[ -f "${XDG_CONFIG_HOME}/voco/config.json" ]] || fail "fresh XDG setup did not create settings"
+export XDG_CONFIG_HOME="relative-is-not-an-xdg-base"
+voco_run_hotkey_setup "Alt+D" </dev/null > "${TEST_ROOT}/relative-xdg-output.txt"
+[[ "${VOCO_CONFIG_FILE}" == "${HOME}/.config/voco/config.json" ]] ||
+  fail "relative XDG_CONFIG_HOME was not ignored like the application"
+unset XDG_CONFIG_HOME
+
+# Inline Python may run from a download directory containing unrelated Python
+# files. Neither the current directory nor PYTHONPATH can replace its stdlib.
+mkdir "${TEST_ROOT}/python-shadow"
+printf 'raise RuntimeError("untrusted json module loaded")\n' > "${TEST_ROOT}/python-shadow/json.py"
+if ! hotkey="$(cd "${TEST_ROOT}/python-shadow" && PYTHONPATH=. voco_read_configured_hotkey "${HOME}/.config/voco/config.json")"; then
+  fail "config reader imported Python code from the working directory or PYTHONPATH"
+fi
+[[ "$hotkey" == "Alt+D" ]] || fail "isolated config reader returned the wrong hotkey"
+
+# Reproduce publication races at the helper boundary: a config or link appearing
+# after the initial setup check must never be overwritten or chmodded.
+config_file="${TEST_ROOT}/concurrent-config.json"
+printf sentinel > "$config_file"
+chmod 0640 "$config_file"
+if voco_write_default_config "$config_file" "Alt+D"; then fail "fresh defaults replaced a concurrent config"; fi
+[[ "$(cat "$config_file")" == sentinel && "$(stat -c '%a' "$config_file")" == 640 ]] ||
+  fail "fresh defaults changed a concurrent config"
+ln -s "$config_file" "${TEST_ROOT}/concurrent-link.json"
+if voco_write_default_config "${TEST_ROOT}/concurrent-link.json" "Alt+D"; then fail "fresh defaults followed a concurrent symlink"; fi
+[[ "$(cat "$config_file")" == sentinel ]] || fail "fresh defaults modified the symlink target"
+mkdir "${TEST_ROOT}/concurrent-dir"
+if voco_write_default_config "${TEST_ROOT}/concurrent-dir" "Alt+D"; then fail "fresh defaults wrote inside a concurrent directory"; fi
+[[ -z "$(find "${TEST_ROOT}/concurrent-dir" -mindepth 1 -print -quit)" ]] ||
+  fail "fresh defaults created a file inside a concurrent directory"
+[[ -z "$(find "${TEST_ROOT}" -name '*.new.*' -print -quit)" ]] ||
+  fail "default config publication left temporary files"
 
 MOCK_BIN="${TEST_ROOT}/mock-package-bin"
 MOCK_PACKAGE_STATE="${TEST_ROOT}/mock-voco-package-state"

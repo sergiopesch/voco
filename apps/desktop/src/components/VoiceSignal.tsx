@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { useStore } from "@/store/useStore";
 
 const SIGNAL_WEIGHTS = [.45, .65, .85, 1, .85, .65, .45];
 
@@ -12,4 +13,10 @@ export function VoiceSignal({ level, active, label = "Microphone signal" }: {
     {SIGNAL_WEIGHTS.map((weight, index) =>
       <span key={index} aria-hidden="true" style={{ "--signal": .12 + value * weight * .88 } as CSSProperties} />)}
   </span>;
+}
+
+/** Keep capture-frequency updates inside the meter, outside settings and setup. */
+export function RecordingVoiceSignal({ active }: { active: boolean }) {
+  const level = useStore(state => active ? state.audioLevel : 0);
+  return <VoiceSignal level={level} active={active} />;
 }

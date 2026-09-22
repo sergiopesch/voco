@@ -46,7 +46,7 @@ import { MicrophoneRefresh, queryMicrophonePermission, microphoneAccessFailure }
 import {
   deriveStatusLabel,
 } from "@/lib/dictationPresentation";
-import type { DictationTriggerAction } from "@/lib/dictationTrigger";
+import { canStopOnboardingTest, cancelsPendingStart, isBrowserTrigger, type DictationTriggerAction } from "@/lib/dictationTrigger";
 import {
   shouldApplyConfigSnapshot,
   shouldBlockRuntimeForConfigErrors,
@@ -223,7 +223,7 @@ export function App() {
     onHotkeyPressed,
   } = useDictation({ getCaptureSelection });
   const [testPreparing, setTestPreparing] = useState(false);
-  const startRequestRef = useRef<{ cancelled: boolean } | null>(null);
+  const startRequestRef = useRef<{ cancelled: boolean; triggerId?: string } | null>(null);
   const [activationRequest, setActivationRequest] = useState(0);
   const onboardingHandoffRef = useRef(false);
   const [initComplete, setInitComplete] = useState(false);
@@ -335,53 +335,69 @@ export function App() {
     initComplete && config !== null && !runtimeConfigurationError;
   const handleToggleRequest = useCallback(async (triggerId?: string, action?: DictationTriggerAction) => {
     const rejectBrowserStart = () => {
-      if (action === "start" && triggerId?.startsWith("browser:")) {
+      if (action === "start" && isBrowserTrigger(triggerId)) {
         void releaseBrowserRecording(triggerId).catch(() => {});
       }
     };
-    if (shortcutCaptureRef.current || performance.now() - shortcutCaptureReleasedAtRef.current < 350) { rejectBrowserStart(); return; }
+    // A lost tab must be able to end its own capture even while the user edits
+    // shortcuts. The session admission in toggle rejects every stale token.
+    if (action === "stop" && isBrowserTrigger(triggerId)) {
+      if (startRequestRef.current && cancelsPendingStart(startRequestRef.current.triggerId, triggerId, action)) {
+        startRequestRef.current.cancelled = true;
+      } else {
+        toggle(triggerId, action);
+      }
+      return true;
+    }
+    if (shortcutCaptureRef.current || performance.now() - shortcutCaptureReleasedAtRef.current < 350) { rejectBrowserStart(); return false; }
     // Stop (or a second toggle) must cancel admission while device setup awaits.
     // Duplicate explicit starts leave the original request in control.
     if (startRequestRef.current) {
-      if (action !== "start") startRequestRef.current.cancelled = true;
+      if (cancelsPendingStart(startRequestRef.current.triggerId, triggerId, action)) {
+        startRequestRef.current.cancelled = true;
+      }
       rejectBrowserStart();
-      return;
+      return true;
     }
     const currentState = useStore.getState();
     if (currentState.surface === "onboarding" && currentState.dictationPurpose === "onboarding" && isDictationActive(currentState.status)) {
+      if (!canStopOnboardingTest(triggerId)) {
+        rejectBrowserStart();
+        return true;
+      }
       toggle("onboarding:test", "stop");
-      return;
+      return true;
     }
     const currentSurface = currentState.surface;
     if (currentSurface !== "hidden" && action !== "stop") {
       rejectBrowserStart();
-      if (!dismissInteractiveSurface()) return;
+      if (!dismissInteractiveSurface()) return true;
       await hideStatusOverlay().catch(() => {});
       await showNotification(
         "Panel hidden",
         "Focus the target text field, then press the dictation hotkey again.",
       ).catch(() => {});
-      return;
+      return true;
     }
 
     const dictationActive = isDictationActive(dictationStatusRef.current);
-    if (!dictationActive && action === "stop") return;
+    if (!dictationActive && action === "stop") return true;
     const captureState = useStore.getState();
     if (!dictationActive && captureState.captureBackendMode !== "webkit") {
-      const request = { cancelled: false };
+      const request = { cancelled: false, triggerId };
       startRequestRef.current = request;
       try {
         await nativeMicrophone.ensureDefault();
       } catch (cause) {
         rejectBrowserStart();
-        if (request.cancelled) return;
+        if (request.cancelled) return true;
         const message = errorMessage(cause);
         setError(message);
         await showNotification("Microphone setup required", message).catch(() => {});
-        return;
+        return true;
       } finally { startRequestRef.current = null; }
       // Do not start from a stale request after an interactive panel opened.
-      if (request.cancelled || useStore.getState().surface !== "hidden") { rejectBrowserStart(); return; }
+      if (request.cancelled || useStore.getState().surface !== "hidden") { rejectBrowserStart(); return true; }
     }
     if (
       captureState.captureBackendMode === "webkit" &&
@@ -395,9 +411,10 @@ export function App() {
         "Microphone access is blocked",
         "Grant microphone access in VOCO settings before starting dictation.",
       ).catch(() => {});
-      return;
+      return true;
     }
     toggle(triggerId, action);
+    return true;
   }, [dismissInteractiveSurface, nativeMicrophone.ensureDefault, setError, toggle]);
   const handleStartTest = useCallback(async () => {
     const state = useStore.getState();
@@ -406,7 +423,7 @@ export function App() {
       setError("Finish recovering your previous dictation before starting the voice test.");
       return;
     }
-    const request = { cancelled: false };
+    const request = { cancelled: false, triggerId: "onboarding:test" };
     startRequestRef.current = request;
     setTestPreparing(true);
     setError(null);

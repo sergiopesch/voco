@@ -7,6 +7,7 @@ mod activation;
 mod audio_transport;
 mod benchmark_stream;
 mod browser_broker;
+mod browser_event_delivery;
 mod browser_protocol;
 mod browser_socket;
 mod config;
@@ -17,6 +18,7 @@ mod digest_hex;
 mod focus_probe;
 #[cfg(target_os = "linux")]
 mod hotkey_state;
+mod hotkey_trace;
 mod insertion;
 #[cfg(all(target_os = "linux", feature = "native-capture"))]
 mod native_capture;
@@ -90,10 +92,17 @@ static SHORTCUT_RENDERER_HEARTBEAT_MS: AtomicI64 = AtomicI64::new(-1);
 static EVDEV_LISTENER_STARTED: AtomicBool = AtomicBool::new(false);
 static HOTKEY_BINDING_VERSION: AtomicU64 = AtomicU64::new(0);
 static FRONTEND_HOTKEY_HANDLER_READY: AtomicBool = AtomicBool::new(false);
+static BROWSER_EVENT_DELIVERY: LazyLock<browser_event_delivery::BrowserEventDelivery> =
+    LazyLock::new(browser_event_delivery::BrowserEventDelivery::default);
 static PENDING_TOGGLE_BACKEND: LazyLock<Mutex<Option<String>>> = LazyLock::new(|| Mutex::new(None));
 static TRACE_START: LazyLock<Instant> = LazyLock::new(Instant::now);
 static TRACE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
-static TRACE_FILE_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
+static TRACE_MODES: LazyLock<(bool, bool)> = LazyLock::new(|| {
+    trace_modes(
+        std::env::var("VOCO_HOTKEY_TRACE").ok().as_deref(),
+        std::env::var("VOCO_PERFORMANCE_LOG").ok().as_deref(),
+    )
+});
 static CONFIG_WRITE_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 static CONFIG_REVISION: AtomicU64 = AtomicU64::new(0);
 static DEBUG_CAPTURE_WRITTEN: AtomicBool = AtomicBool::new(false);
@@ -115,6 +124,10 @@ const HIDDEN_WINDOW_SIZE: u32 = 1;
 const OVERLAY_CURSOR_OFFSET_X: i32 = 20;
 const OVERLAY_CURSOR_OFFSET_Y: i32 = 24;
 const OVERLAY_MARGIN: i32 = 16;
+
+fn trace_modes(hotkey: Option<&str>, performance: Option<&str>) -> (bool, bool) {
+    (hotkey == Some("1"), performance == Some("1"))
+}
 
 #[derive(Debug, Clone, Copy, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -184,15 +197,8 @@ fn trace_hotkey_event_with_fields(
     backend_used: Option<&str>,
     frontend_fields: Option<&FrontendTraceFields>,
 ) {
-    let path = hotkey_trace_path();
-    let Some(parent) = path.parent() else {
-        return;
-    };
-    if let Err(error) = std::fs::create_dir_all(parent) {
-        warn!(
-            "Failed to create hotkey trace directory {}: {error}",
-            parent.display()
-        );
+    let (hotkey_enabled, performance_enabled) = *TRACE_MODES;
+    if !hotkey_enabled && !performance_enabled {
         return;
     }
 
@@ -247,6 +253,10 @@ fn trace_hotkey_event_with_fields(
 
     performance::lifecycle(&record);
 
+    if !hotkey_enabled {
+        return;
+    }
+
     let line = match serde_json::to_string(&record) {
         Ok(line) => line,
         Err(error) => {
@@ -255,31 +265,12 @@ fn trace_hotkey_event_with_fields(
         }
     };
 
-    use std::io::Write;
-    let _guard = match TRACE_FILE_LOCK.lock() {
-        Ok(guard) => guard,
-        Err(error) => {
-            warn!("Failed to lock hotkey trace writer: {error}");
-            return;
-        }
-    };
-    match std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&path)
-    {
-        Ok(mut file) => {
-            if let Err(error) = writeln!(file, "{line}") {
-                warn!(
-                    "Failed to write hotkey trace event to {}: {error}",
-                    path.display()
-                );
-            }
-        }
-        Err(error) => warn!(
-            "Failed to open hotkey trace file {}: {error}",
+    let path = hotkey_trace_path();
+    if let Err(error) = hotkey_trace::append(&path, line.as_bytes()) {
+        warn!(
+            "Failed to write hotkey trace event to {}: {error}",
             path.display()
-        ),
+        );
     }
 }
 
@@ -314,6 +305,7 @@ fn trace_frontend_hotkey_event(
         "frontend_hotkey_handler_ready" => {
             trace_hotkey_event(&event, None);
             FRONTEND_HOTKEY_HANDLER_READY.store(true, Ordering::SeqCst);
+            replay_pending_browser_stops(&app);
             replay_pending_toggle(&app);
             Ok(())
         }
@@ -1073,22 +1065,6 @@ fn open_external_url(url: String) -> Result<(), String> {
 }
 
 #[tauri::command(async)]
-fn insert_text(
-    text: String,
-    strategy: String,
-) -> Result<insertion::InsertionResult, insertion::InsertionError> {
-    if text.is_empty() {
-        return Err(insertion::InsertionError::rejected("No text to insert"));
-    }
-    if text.len() > 100_000 {
-        return Err(insertion::InsertionError::rejected(
-            "Text too long for insertion (max 100KB)",
-        ));
-    }
-    insertion::insert_text(&text, &strategy)
-}
-
-#[tauri::command(async)]
 fn begin_desktop_shortcut_session(session_id: String, shortcut_epoch: u64) -> Result<(), String> {
     insertion::begin_shortcut_session(&session_id, shortcut_epoch)
 }
@@ -1523,7 +1499,7 @@ fn grant_webview_permissions(app: &tauri::App) {
     }
 }
 
-// --- Auto-download model on first launch ---
+// --- Bundled speech-runtime readiness ---
 
 fn is_allowed_external_url(url: &str) -> bool {
     url == "https://github.com/sergiopesch/voco/blob/master/docs/platform/README.md#ydotoold-ydotool-daemon"
@@ -1549,14 +1525,29 @@ fn shortcut_heartbeat_is_current(last: i64, now: i64) -> bool {
 }
 
 #[tauri::command]
-fn refresh_shortcut_heartbeat(ready: bool) {
+fn refresh_shortcut_heartbeat(app: tauri::AppHandle, ready: bool) {
+    FRONTEND_HOTKEY_HANDLER_READY.store(ready, Ordering::SeqCst);
     SHORTCUT_RENDERER_HEARTBEAT_MS.store(
         if ready { shortcut_monotonic_ms() } else { -1 },
         Ordering::SeqCst,
     );
     if !ready {
         SHORTCUT_OBSERVATIONS.clear_poll();
+    } else {
+        replay_pending_browser_stops(&app);
     }
+}
+
+#[tauri::command]
+fn ack_browser_stop(trigger_id: String) -> Result<(), String> {
+    let token = trigger_id
+        .strip_prefix("browser:")
+        .ok_or("Invalid browser recording token")?;
+    if !browser_protocol::opaque_id(token) {
+        return Err("Invalid browser recording token".into());
+    }
+    BROWSER_EVENT_DELIVERY.acknowledge_stop(&trigger_id);
+    Ok(())
 }
 
 fn refresh_shortcut_config(
@@ -1773,6 +1764,14 @@ fn replay_pending_toggle(app_handle: &tauri::AppHandle) {
         trace_hotkey_event("pending_toggle_replayed", Some(&backend_used));
         emit_toggle_event(app_handle, &backend_used);
     }
+}
+
+fn replay_pending_browser_stops(app_handle: &tauri::AppHandle) {
+    BROWSER_EVENT_DELIVERY.replay(|stop| {
+        app_handle
+            .emit_to("main", TOGGLE_DICTATION_EVENT, stop.clone())
+            .is_ok()
+    });
 }
 
 fn eval_toggle_with_backend(app_handle: &tauri::AppHandle, backend_used: &str) {
@@ -2461,7 +2460,6 @@ pub fn run() -> Result<(), String> {
             save_cached_update_state,
             debug_dictation_capture_enabled,
             save_debug_dictation_capture,
-            insert_text,
             get_desktop_paste_status,
             get_desktop_input_status,
             get_panel_setup_status,
@@ -2474,6 +2472,7 @@ pub fn run() -> Result<(), String> {
             get_owned_preedit_status,
             start_owned_preedit,
             refresh_shortcut_heartbeat,
+            ack_browser_stop,
             update_owned_preedit,
             commit_owned_preedit,
             checkpoint_owned_preedit,
@@ -2494,18 +2493,19 @@ pub fn run() -> Result<(), String> {
         .setup(|app| {
             let browser_app = app.handle().clone();
             let browser = browser_broker::BrowserBroker::bind(move |trigger| {
-                if FRONTEND_HOTKEY_HANDLER_READY.load(Ordering::SeqCst)
-                    && shortcut_heartbeat_is_current(
+                BROWSER_EVENT_DELIVERY.dispatch(
+                    trigger,
+                    FRONTEND_HOTKEY_HANDLER_READY.load(Ordering::SeqCst),
+                    shortcut_heartbeat_is_current(
                         SHORTCUT_RENDERER_HEARTBEAT_MS.load(Ordering::SeqCst),
                         shortcut_monotonic_ms(),
-                    )
-                {
-                    browser_app
-                        .emit_to("main", TOGGLE_DICTATION_EVENT, trigger)
-                        .is_ok()
-                } else {
-                    false
-                }
+                    ),
+                    |event| {
+                        browser_app
+                            .emit_to("main", TOGGLE_DICTATION_EVENT, event.clone())
+                            .is_ok()
+                    },
+                )
             });
             if let Err(error) = &browser {
                 warn!("Browser integration unavailable: {error}");
@@ -2615,6 +2615,15 @@ pub fn run() -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn hotkey_trace_requires_explicit_opt_in() {
+        assert_eq!(trace_modes(None, None), (false, false));
+        assert_eq!(trace_modes(Some("true"), None), (false, false));
+        assert_eq!(trace_modes(Some("1"), None), (true, false));
+        assert_eq!(trace_modes(None, Some("1")), (false, true));
+    }
+
     #[test]
     fn decode_audio_bytes_valid() {
         let mut bytes = Vec::new();
@@ -2865,8 +2874,6 @@ mod tests {
         let sources = [
             include_str!("../../src/hooks/useDictation.ts"),
             include_str!("../../src/lib/dictationRecording.ts"),
-            include_str!("../../src/lib/livePreviewSchedule.ts"),
-            include_str!("../../src/lib/livePreviewRunner.ts"),
             include_str!("../../src/lib/desktopCaptureTail.ts"),
         ];
         let emitted_events: Vec<_> = sources

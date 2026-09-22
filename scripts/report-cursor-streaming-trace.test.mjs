@@ -588,6 +588,16 @@ function runReport(entries, args = []) {
     { event: "dictation_final_output_completed" },
     { event: "dictation_stop_to_idle", duration_ms: 900 },
   ];
+  const rotatedTrace = writeTrace(good.slice(3));
+  fs.writeFileSync(
+    path.join(path.dirname(rotatedTrace), "hotkey-trace.previous.jsonl"),
+    good.slice(0, 3).map((entry) => JSON.stringify(entry)).join("\n") + "\n",
+  );
+  const rotatedResult = spawnSync(process.execPath, [scriptPath, "--strict", rotatedTrace], { encoding: "utf8" });
+  assert.equal(rotatedResult.status, 0, rotatedResult.stdout);
+  assert.match(rotatedResult.stdout, /Previous trace: .+hotkey-trace\.previous\.jsonl/);
+  assert.match(rotatedResult.stdout, /Entries read: 6/);
+  assert.match(rotatedResult.stdout, /status: dictation-session-observed/);
   for (const [entries, expected] of [
     [good, 0],
     [[{ event: "app_start" }], 1],

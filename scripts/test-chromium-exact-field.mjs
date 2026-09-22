@@ -130,6 +130,16 @@ try {
     const stops = await worker.evaluate(() => globalThis.testMessages.filter(m => m.type === 'stop'));
     assert.equal(stops[0].token, t.token); assert.equal(await page.locator('#b').inputValue(), '');
   });
+  await test('focus loss keeps recording Stop explicit; pagehide stops its original token', async () => {
+    const t = await claim(); await page.locator('#b').focus();
+    assert.equal((await worker.evaluate(() => globalThis.testMessages.filter(m => m.type === 'stop'))).length, 0);
+    await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pagehide')));
+    await page.waitForTimeout(30);
+    const stops = await worker.evaluate(() => globalThis.testMessages.filter(m => m.type === 'stop'));
+    assert.deepEqual(stops.map(m => m.token), [t.token]);
+    assert.equal((await append(t, 'unsafe')).outcome, 'rejected');
+    assert.equal(await page.locator('#b').inputValue(), '');
+  });
   await test('same element removed and reinserted invalidates permanently', async () => {
     const t = await claim(); await page.evaluate(() => { const a = document.querySelector('#a'); const parent = a.parentNode; a.remove(); parent.prepend(a); a.focus(); });
     assert.equal((await append(t, 'unsafe')).outcome, 'rejected'); assert.equal(await page.locator('#a').inputValue(), '');

@@ -8,6 +8,10 @@ case "${1:-}" in
   "") TEST_SCRIPT="test-private-ibus-engine.sh" ;;
   --rich-editor) TEST_SCRIPT="test-rich-editor-delivery.sh" ;;
   --native-desktop) TEST_SCRIPT="test-native-desktop.sh" ;;
+  --native-pulse-latency)
+    : "${VOCO_NATIVE_PULSE_EVIDENCE_DIR:?Set a fresh directory for native Pulse evidence}"
+    TEST_SCRIPT="test-native-capture-pulse-latency.py"
+    ;;
   --native-wayland)
     : "${VOCO_WAYLAND_DEPS:?Set the installed or extracted Weston root/usr}"
     : "${VOCO_WAYLAND_EVIDENCE_DIR:?Set a directory for Wayland evidence}"
@@ -68,6 +72,9 @@ if [[ "${1:-}" == --browser-application ]]; then
   VOCO_NATIVE_OUTPUT_MODE=stable-cursor-streaming VOCO_BROWSER_LONG_CAPTURE=1 VOCO_BROWSER_DEBUG_CAPTURE=1 \
     VOCO_BROWSER_EVIDENCE_DIR="${browser_evidence}/canonical-checkpoint" \
     bash "${ROOT_DIR}/scripts/${TEST_SCRIPT}"
+elif [[ "${1:-}" == --native-pulse-latency ]]; then
+  PYTHONDONTWRITEBYTECODE=1 python3 "${ROOT_DIR}/scripts/${TEST_SCRIPT}" \
+    --output "${VOCO_NATIVE_PULSE_EVIDENCE_DIR}"
 elif [[ "${1:-}" == --full-application ]]; then
   application_evidence="${VOCO_NATIVE_EVIDENCE_DIR}"
   for output_mode in final-text-only stable-cursor-streaming; do

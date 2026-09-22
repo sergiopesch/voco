@@ -31,7 +31,7 @@ npm run report:dictation-baseline
 ```
 
 Reset the trace before each focused QA run so old startup or failed-session evidence cannot be
-mixed with the current test:
+mixed with the current test. The reset archives both the current and rotated trace files:
 
 ```bash
 npm run reset:cursor-streaming-trace
@@ -41,9 +41,12 @@ After resetting, restart VOCO through the installed launcher and confirm the tra
 cleanly:
 
 ```bash
-/usr/bin/voco
+VOCO_HOTKEY_TRACE=1 /usr/bin/voco
 npm run report:cursor-streaming
 ```
+
+The report reads the rotated file before the current file when both exist, so a
+long recording that crosses the trace size limit keeps its earlier evidence.
 
 ## Desktop Safety Boundary
 

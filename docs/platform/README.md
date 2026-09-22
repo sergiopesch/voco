@@ -167,16 +167,18 @@ Flatpak and Snap are not published.
 
 ## Helper delivery outcomes
 
-The legacy `insert_text` command returns `outcome: dispatched` only after a helper exits successfully.
-That confirms helper completion, not consumption by the intended application. Errors distinguish
-`no-mutation` (helper did not start), `rejected` (input validation), and `uncertain` (a helper started
-and delivery may have partially happened). Only `no-mutation` allows an automatic alternate route.
-An error after a clipboard write is always uncertain and reports `clipboardChanged`.
+Automatic desktop delivery requires a bound destination token. `paste_desktop_text` returns
+`outcome: dispatched` only after its helper exits successfully; that confirms command completion,
+not consumption by the intended application. Errors distinguish `no-mutation` (a helper did not
+start), `rejected` (a prerequisite or destination check failed), and `uncertain` (a helper started
+and delivery may have happened). A changed destination after clipboard preparation rejects before
+sending paste keys and reports `clipboardChanged`; a paste-helper failure after the clipboard write
+is uncertain. Neither outcome authorizes an automatic retry to another field.
 
-Typing helpers have a length-adjusted deadline capped at three minutes. Clipboard write and paste
-helpers each have a five-second deadline. Stdin writes are nonblocking under the same deadline;
-failed supervision kills and reaps the helper process group. No transcript is written to diagnostic
-output. The transcript stays recoverable in VOCO when the application cannot prove delivery.
+Clipboard write and paste helpers each have a five-second deadline. Stdin writes are nonblocking
+under the same deadline; failed supervision kills and reaps the helper process group. No transcript
+is written to diagnostic output. The transcript stays recoverable in VOCO when the application
+cannot prove delivery.
 
 Clipboard restoration is deliberately unavailable with the current command-line helpers. A fixed
 sleep does not prove the target consumed the clipboard, and reading it before restoring cannot

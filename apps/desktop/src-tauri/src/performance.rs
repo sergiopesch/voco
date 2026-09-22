@@ -3,7 +3,7 @@ use crate::digest_hex::digest_hex;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::fs::{self, File, OpenOptions};
-use std::io::{self, Write};
+use std::io::{self, Read, Write};
 use std::os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -405,6 +405,19 @@ pub fn shutdown() {
     emit(json!({"event": "clean_exit_requested"}));
 }
 
+fn sha256_reader(mut reader: impl Read) -> io::Result<String> {
+    let mut hash = Sha256::new();
+    let mut buffer = [0_u8; 64 * 1024];
+    loop {
+        match reader.read(&mut buffer) {
+            Ok(0) => return Ok(digest_hex(hash.finalize())),
+            Ok(count) => hash.update(&buffer[..count]),
+            Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
+            Err(error) => return Err(error),
+        }
+    }
+}
+
 fn write_events(
     mut writer: RotatingWriter,
     receiver: mpsc::Receiver<Value>,
@@ -418,8 +431,8 @@ fn write_events(
     let run = format!("{epoch}-{}", std::process::id());
     let executable_hash = std::env::current_exe()
         .ok()
-        .and_then(|p| fs::read(p).ok())
-        .map(|bytes| digest_hex(Sha256::digest(bytes)));
+        .and_then(|path| File::open(path).ok())
+        .and_then(|file| sha256_reader(file).ok());
     let header = json!({"event":"run_metadata", "version":env!("CARGO_PKG_VERSION"),
         "executable_sha256":executable_hash, "model":"nemotron-speech-streaming-en-0.6b-q8-context1",
         "native_capture_compiled":cfg!(feature="native-capture"),
@@ -552,6 +565,56 @@ impl RotatingWriter {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn executable_hash_streams_all_bytes_across_buffers() {
+        let bytes: Vec<u8> = (0..200_003).map(|index| (index % 251) as u8).collect();
+        assert_eq!(
+            sha256_reader(bytes.as_slice()).unwrap(),
+            digest_hex(Sha256::digest(&bytes))
+        );
+        assert_eq!(
+            sha256_reader(&b""[..]).unwrap(),
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        );
+    }
+
+    #[test]
+    fn executable_hash_retries_interruption_but_never_accepts_partial_read_failure() {
+        struct InterruptedOnce<R> {
+            interrupted: bool,
+            reader: R,
+        }
+        impl<R: Read> Read for InterruptedOnce<R> {
+            fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+                if !self.interrupted {
+                    self.interrupted = true;
+                    return Err(io::ErrorKind::Interrupted.into());
+                }
+                self.reader.read(buffer)
+            }
+        }
+        let reader = InterruptedOnce {
+            interrupted: false,
+            reader: &b"abc"[..],
+        };
+        assert_eq!(
+            sha256_reader(reader).unwrap(),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+        struct FailedRead;
+        impl Read for FailedRead {
+            fn read(&mut self, _: &mut [u8]) -> io::Result<usize> {
+                Err(io::ErrorKind::UnexpectedEof.into())
+            }
+        }
+        assert_eq!(
+            sha256_reader((&b"partial"[..]).chain(FailedRead))
+                .unwrap_err()
+                .kind(),
+            io::ErrorKind::UnexpectedEof
+        );
+    }
+
     #[test]
     fn idle_worker_exit_metadata_is_finite_and_preserves_observed_status() {
         use std::os::unix::process::ExitStatusExt;

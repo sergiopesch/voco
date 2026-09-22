@@ -14,6 +14,12 @@ VERSION="2026.0.55"
 RELEASE_TAG="voco.${VERSION}"
 DEB_URL="https://github.com/sergiopesch/voco/releases/download/${RELEASE_TAG}/voco_${VERSION}_amd64.deb"
 CHECKSUMS_URL="https://github.com/sergiopesch/voco/releases/download/${RELEASE_TAG}/voco_checksums.txt"
+SIGNATURE_URL="${CHECKSUMS_URL}.asc"
+
+# Binary public key exported from KEYS. The installer is standalone: this key
+# must not be downloaded alongside the package it authenticates.
+VOCO_RELEASE_KEY_FINGERPRINT='B33C7C6AAEC8C20433A7A837540796453D8E3865'
+VOCO_RELEASE_KEY_BASE64='mDMEaq1NqxYJKwYBBAHaRw8BAQdAIcImavoX/+NqEo8iX/ETdvQQ7f0mDfyTqCOm0K4LiT+0N1NlcmdpbyBQZXNjaGllcmEgKFZPQ08gcmVsZWFzZXMpIDxzcGVzY2hpZXJhQGdtYWlsLmNvbT6ImQQTFgoAQRYhBLM8fGquyMIEM6eoN1QHlkU9jjhlBQJqrU2rAhsDBQkDwmcABQsJCAcCAiICBhUKCQgLAgQWAgMBAh4HAheAAAoJEFQHlkU9jjhlCIsBAKoU2eWKTm6mdHLtzT2PKcQSUK1AM11FdLlOw1zpVRsHAP9HIYd/NZgSY+EXy/e+tcN9fD9Oqige9hJtQkhMxgYeDA=='
 
 # ─── Colors ─────────────────────────────────────────────
 BOLD='\033[1m'
@@ -263,7 +269,7 @@ voco_read_configured_hotkey() {
   local config_file="$1"
 
   if command -v python3 >/dev/null 2>&1; then
-    python3 - "${config_file}" <<'PY'
+    python3 -I - "${config_file}" <<'PY'
 import json
 import pathlib
 import sys
@@ -318,7 +324,7 @@ voco_migrate_legacy_config() {
     rm -f -- "${temp_file}"
     return 1
   fi
-  if ! ln -- "${temp_file}" "${config_file}"; then
+  if ! ln -T -- "${temp_file}" "${config_file}"; then
     rm -f -- "${temp_file}"
     return 1
   fi
@@ -443,80 +449,47 @@ voco_write_default_config() {
   local config_file="$1"
   local hotkey="$2"
   local escaped_hotkey
+  local temp_file
 
   escaped_hotkey="$(voco_escape_json_string "${hotkey}")"
-
-  (umask 077; cat > "${config_file}") << EOF
+  temp_file="$(mktemp "${config_file}.new.XXXXXX")" || return 1
+  if ! cat > "${temp_file}" << EOF
 {
   "hotkey": "${escaped_hotkey}",
   "selectedMic": null,
   "insertionStrategy": "auto"
 }
 EOF
-}
-
-voco_merge_hotkey_into_existing_config() {
-  local config_file="$1"
-  local hotkey="$2"
-
-  if command -v python3 >/dev/null 2>&1; then
-    if python3 - "${config_file}" "${hotkey}" <<'PY'
-import json
-import pathlib
-import sys
-
-config_path = pathlib.Path(sys.argv[1])
-hotkey = sys.argv[2]
-
-data = json.loads(config_path.read_text(encoding="utf-8"))
-if not isinstance(data, dict):
-    raise SystemExit(1)
-
-data["hotkey"] = hotkey
-config_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
-PY
-    then
-      return 0
-    fi
+  then
+    rm -f -- "${temp_file}"
+    return 1
   fi
-
-  if grep -Eq '"hotkey"[[:space:]]*:' "${config_file}"; then
-    local escaped_hotkey
-    local sed_hotkey
-    local tmp_file
-
-    escaped_hotkey="$(voco_escape_json_string "${hotkey}")"
-    sed_hotkey="$(printf '%s' "${escaped_hotkey}" | sed 's/[&|]/\\&/g')"
-    tmp_file="$(mktemp)"
-
-    if sed -E \
-      "0,/\"hotkey\"[[:space:]]*:[[:space:]]*\"([^\"\\\\]|\\\\.)*\"/s|\"hotkey\"[[:space:]]*:[[:space:]]*\"([^\"\\\\]|\\\\.)*\"|\"hotkey\": \"${sed_hotkey}\"|" \
-      "${config_file}" > "${tmp_file}"; then
-      mv "${tmp_file}" "${config_file}"
-      return 0
-    fi
-
-    rm -f "${tmp_file}"
-  fi
-
-  return 1
+  # Publish only if the destination is still absent. Never overwrite a config
+  # created by the app, another installer, or a symlink during setup.
+  local result=0
+  ln -T -- "${temp_file}" "${config_file}" 2>/dev/null || result=$?
+  rm -f -- "${temp_file}"
+  return "$result"
 }
 
 voco_run_hotkey_setup() {
   local hotkey="${1:-Alt+D}"
-  local config_dir="${HOME}/.config/voco"
+  local config_base="${HOME}/.config"
+  # Match dirs::config_dir(): an XDG override must be absolute.
+  if [[ "${XDG_CONFIG_HOME:-}" == /* ]]; then config_base="$XDG_CONFIG_HOME"; fi
+  local config_dir="${config_base}/voco"
   local config_file="${config_dir}/config.json"
   local existing_hotkey=""
   local existing_hotkey_valid=false
   local config_exists=false
   local config_path_safe=true
-  local legacy_config_dir="${HOME}/.config/voice"
+  local legacy_config_dir="${config_base}/voice"
   local legacy_config_file="${legacy_config_dir}/config.json"
   local legacy_config_present=false
   local legacy_config_migrated=false
   local legacy_config_skipped=false
 
-  if [[ -L "${config_dir}" || -L "${config_file}" || ( -e "${config_file}" && ! -f "${config_file}" ) ]]; then
+  if [[ -L "${config_dir}" || ( -e "${config_dir}" && ! -d "${config_dir}" ) || -L "${config_file}" || ( -e "${config_file}" && ! -f "${config_file}" ) ]]; then
     config_exists=true
     config_path_safe=false
   else
@@ -581,19 +554,9 @@ voco_run_hotkey_setup() {
 
   mkdir -p -m 0700 "${config_dir}"
   chmod 0700 "${config_dir}"
-  if [[ -f "${config_file}" ]]; then
-    if [[ "${existing_hotkey_valid}" == true && "${hotkey}" == "${existing_hotkey}" ]]; then
-      dim "Existing config preserved at ${config_file}"
-    elif voco_merge_hotkey_into_existing_config "${config_file}" "${hotkey}"; then
-      dim "Updated hotkey in existing config at ${config_file}"
-    else
-      warn "Existing config preserved without overwriting other settings."
-      dim "Update the hotkey later from the tray or by editing ${config_file}"
-    fi
-  else
-    voco_write_default_config "${config_file}" "${hotkey}"
+  if ! voco_write_default_config "${config_file}" "${hotkey}"; then
+    warn "Could not create default settings; existing files were preserved. VOCO will validate its settings on launch."
   fi
-  chmod 0600 "${config_file}"
 
   VOCO_SELECTED_HOTKEY="${hotkey}"
   VOCO_CONFIG_FILE="${config_file}"
@@ -1009,7 +972,7 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         raise SystemExit(130)
 VOCO_APT_PY
-  python3 -c "$code" "$@"
+  python3 -I -c "$code" "$@"
 }
 # END EMBEDDED INSTALLER UI
 
@@ -1018,6 +981,7 @@ DOWNLOAD_PID=""
 HELPER_DOWNLOAD_PID=""
 HELPER_DOWNLOAD_READY=""
 CHECKSUM_DOWNLOAD_PID=""
+SIGNATURE_DOWNLOAD_PID=""
 VOCO_INSTALL_LOG=""
 VOCO_KEEP_LOG=false
 voco_download() {
@@ -1067,23 +1031,45 @@ voco_download() {
   fi
 }
 
-voco_start_checksum_download() {
+voco_start_release_metadata_downloads() {
   [[ -n "$VOCO_INSTALL_LOG" ]] || VOCO_INSTALL_LOG=$(mktemp "${TMPDIR:-/tmp}/voco-install.XXXXXX.log")
   wget --no-verbose --tries=3 --waitretry=2 --timeout=30 -O "$CHECKSUM_FILE" "$CHECKSUMS_URL" >> "$VOCO_INSTALL_LOG" 2>&1 &
   CHECKSUM_DOWNLOAD_PID=$!
+  wget --no-verbose --tries=3 --waitretry=2 --timeout=30 -O "$SIGNATURE_FILE" "$SIGNATURE_URL" >> "$VOCO_INSTALL_LOG" 2>&1 &
+  SIGNATURE_DOWNLOAD_PID=$!
 }
 
-voco_finish_checksum_download() {
-  local result=0
-  wait "$CHECKSUM_DOWNLOAD_PID" || result=$?
+voco_finish_release_metadata_downloads() {
+  local checksum_result=0 signature_result=0
+  wait "$CHECKSUM_DOWNLOAD_PID" || checksum_result=$?
   CHECKSUM_DOWNLOAD_PID=""
-  if (( result != 0 )); then
+  wait "$SIGNATURE_DOWNLOAD_PID" || signature_result=$?
+  SIGNATURE_DOWNLOAD_PID=""
+  if (( checksum_result != 0 || signature_result != 0 )); then
     VOCO_KEEP_LOG=true
     voco_ui_release
-    warn 'Could not download release checksums. Nothing was installed.'
+    warn 'Could not download signed release checksums. Nothing was installed.'
     dim "Details: $VOCO_INSTALL_LOG"
-    return "$result"
+    return 1
   fi
+}
+
+voco_verify_release_signature() {
+  local keyring="${VOCO_DOWNLOAD_DIR}/voco-release-keyring.gpg"
+  local signature_status
+  if ! printf '%s' "$VOCO_RELEASE_KEY_BASE64" | base64 --decode > "$keyring"; then
+    err 'Could not load the trusted release key. Nothing was installed.'
+  fi
+  chmod 600 "$keyring"
+  if ! signature_status="$(gpgv --quiet --status-fd 1 --keyring "$keyring" "$SIGNATURE_FILE" "$CHECKSUM_FILE" 2>> "$VOCO_INSTALL_LOG")"; then
+    VOCO_KEEP_LOG=true
+    err 'The release signature could not be verified. Nothing was installed.'
+  fi
+  if [[ "$signature_status" != *"[GNUPG:] VALIDSIG ${VOCO_RELEASE_KEY_FINGERPRINT} "* ]]; then
+    VOCO_KEEP_LOG=true
+    err 'The release signer does not match VOCO. Nothing was installed.'
+  fi
+  ok 'Publisher signature verified'
 }
 
 # Only the Wayland helpers are prefetched. APT still resolves the complete
@@ -1141,6 +1127,10 @@ voco_install_cleanup() {
     kill "$CHECKSUM_DOWNLOAD_PID" 2>/dev/null || true
     wait "$CHECKSUM_DOWNLOAD_PID" 2>/dev/null || true
   fi
+  if [[ -n "$SIGNATURE_DOWNLOAD_PID" ]]; then
+    kill "$SIGNATURE_DOWNLOAD_PID" 2>/dev/null || true
+    wait "$SIGNATURE_DOWNLOAD_PID" 2>/dev/null || true
+  fi
   if [[ -n "$HELPER_DOWNLOAD_PID" ]]; then
     kill -KILL -- "-$HELPER_DOWNLOAD_PID" "$HELPER_DOWNLOAD_PID" 2>/dev/null || true
     wait "$HELPER_DOWNLOAD_PID" 2>/dev/null || true
@@ -1175,7 +1165,7 @@ if [[ "$(dpkg --print-architecture 2>/dev/null)" != "amd64" ]]; then
   err "Only amd64 (x86_64) is supported. Detected: $(dpkg --print-architecture 2>/dev/null || uname -m)"
 fi
 
-for prerequisite in wget sha256sum stat apt-get sudo dpkg-query; do
+for prerequisite in wget sha256sum base64 gpgv stat apt-get sudo dpkg-query; do
   command -v "$prerequisite" >/dev/null 2>&1 || err "$prerequisite is required before downloading VOCO."
 done
 ok "Linux · x86_64"
@@ -1190,16 +1180,19 @@ voco_ui_stage 1 'Bringing VOCO to your desktop.' 'English speech recognition, on
 VOCO_DOWNLOAD_DIR=$(mktemp -d)
 DEB_FILE="${VOCO_DOWNLOAD_DIR}/voco_${VERSION}_amd64.deb"
 CHECKSUM_FILE="${VOCO_DOWNLOAD_DIR}/voco_checksums.txt"
+SIGNATURE_FILE="${CHECKSUM_FILE}.asc"
 DEB_CHECKSUM_FILE="${VOCO_DOWNLOAD_DIR}/voco_${VERSION}_amd64.deb.sha256"
 
 dim "Includes English speech recognition. Speech stays on this computer."
 voco_start_helper_prefetch
-voco_start_checksum_download
+voco_start_release_metadata_downloads
 voco_download "VOCO v${VERSION}" "$DEB_FILE" "$DEB_URL" || exit 1
-voco_ui_stage 2 'Checking your download.' 'Waiting for release checksums.'
-if ! voco_finish_checksum_download; then
+voco_ui_stage 2 'Checking your download.' 'Waiting for signed release checksums.'
+if ! voco_finish_release_metadata_downloads; then
   exit 1
 fi
+voco_ui_sweep 'Checking your download.' 'Checking the publisher signature.'
+voco_verify_release_signature
 voco_ui_sweep 'Checking your download.' 'Checking the package checksum.'
 
 if ! grep -F "  $(basename "$DEB_FILE")" "$CHECKSUM_FILE" > "$DEB_CHECKSUM_FILE"; then

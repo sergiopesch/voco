@@ -32,7 +32,7 @@ await fs.writeFile(`${profile}/NativeMessagingHosts/com.voco.exact_field.json`, 
 const server = http.createServer((_q,r) => r.end('<!doctype html><title>VOCO exact recipient</title><textarea id="a"></textarea><textarea id="b"></textarea>'));
 await new Promise(r=>server.listen(0,'127.0.0.1',r));
 const log = await fs.open(`${root}/evidence/app.log`, 'w');
-const app = spawn(`${root}/voco`, [], {env: {...process.env, ...(process.env.VOCO_BROWSER_DEBUG_CAPTURE === '1' ? {VOCO_DEBUG_CAPTURE_AUDIO: '1'} : {})}, stdio:['ignore',log.fd,log.fd]});
+const app = spawn(`${root}/voco`, [], {env: {...process.env, VOCO_HOTKEY_TRACE: '1', ...(process.env.VOCO_BROWSER_DEBUG_CAPTURE === '1' ? {VOCO_DEBUG_CAPTURE_AUDIO: '1'} : {})}, stdio:['ignore',log.fd,log.fd]});
 const delay = ms=>new Promise(r=>setTimeout(r,ms));
 const traces = async()=> (await fs.readFile(`${root}/state/voco/hotkey-trace.jsonl`,'utf8').catch(()=>'' )).split('\n').flatMap(line=>{try{return [JSON.parse(line)];}catch{return [];}});
 async function until(fn, label, ms=30_000) {const deadline=Date.now()+ms;while(Date.now()<deadline){if(await fn())return;if(playbacks.some(p=>p.record.error || p.record.timedOut || (p.record.exitCode !== undefined && p.record.exitCode !== 0)))throw Error('Fixture playback failed; see playback.json');if(app.exitCode!==null)throw Error(`App exited: ${label}`);await delay(50);}throw Error(`Timed out: ${label}`);}

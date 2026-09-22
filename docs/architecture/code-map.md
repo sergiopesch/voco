@@ -35,7 +35,9 @@ recognizer serves desktop, browser and onboarding sessions. See
    `desktopCaptureTail.ts` retains each source sample and forwards the Stop tail once.
    `desktopShortcutSession.ts` owns the UUID-bound native shortcut lease through final
    delivery. `browserStreamDelivery.ts` separately owns an explicit browser field lease,
-   verifies each append receipt and never retries uncertain output.
+   verifies each append receipt and never retries uncertain output. Tab departure or
+   native connection loss stops that browser recording; ordinary field focus loss
+   revokes its recipient without discarding the session's Stop control.
 3. `src/lib/benchmarkPhraseQueue.ts` serializes bounded NVIDIA requests. Recording
    capture continues while a paste is in flight. A newer append-only hypothesis
    can supersede pending output; already dispatched text cannot be blindly replayed.

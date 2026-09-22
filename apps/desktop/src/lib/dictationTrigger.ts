@@ -2,6 +2,23 @@ import type { DictationSessionPhase } from "./dictationSession";
 
 export type DictationTriggerAction = "start" | "stop";
 
+export function isBrowserTrigger(triggerId?: string): triggerId is string {
+  return triggerId?.startsWith("browser:") ?? false;
+}
+
+/** A directed browser Stop can only cancel admission for its own Start. */
+export function cancelsPendingStart(
+  pendingTriggerId: string | undefined,
+  triggerId?: string,
+  action?: DictationTriggerAction,
+): boolean {
+  return action !== "start" && (!isBrowserTrigger(triggerId) || triggerId === pendingTriggerId);
+}
+
+export function canStopOnboardingTest(triggerId?: string): boolean {
+  return !isBrowserTrigger(triggerId);
+}
+
 /** Browser stop messages belong to their original recording, even after focus loss. */
 export function admitsDictationTrigger(
   phase: DictationSessionPhase,

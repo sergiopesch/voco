@@ -64,6 +64,7 @@ PYWAV
   fi
   export VOCO_BROWSER_NODE=$(command -v node)
   export VOCO_BROWSER_PULSE=$(command -v pulseaudio) VOCO_BROWSER_PLAY=$(command -v paplay)
+  export VOCO_BROWSER_PACTL=$(command -v pactl)
   browser_binary=${CHROMIUM_PATH:-$(node --input-type=module -e 'import { chromium } from "playwright"; console.log(chromium.executablePath())')}
   browser_dir=$(dirname "$browser_binary")
   bwrap --die-with-parent --new-session --unshare-ipc --unshare-net --unshare-pid --unshare-uts \

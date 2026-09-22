@@ -96,7 +96,7 @@ Gio.bus_own_name_on_connection(tray_bus, 'org.kde.StatusNotifierWatcher', Gio.Bu
 pump(.1)
 log = (root / 'evidence/full-app.log').open('w')
 app_hash = hashlib.sha256((root / 'voco').read_bytes()).hexdigest()
-app = subprocess.Popen([str(root / 'voco')], stdout=log, stderr=subprocess.STDOUT, env={**os.environ, 'RUST_LOG': 'info', 'VOCO_DEBUG_CAPTURE_AUDIO': '1'})
+app = subprocess.Popen([str(root / 'voco')], stdout=log, stderr=subprocess.STDOUT, env={**os.environ, 'RUST_LOG': 'info', 'VOCO_DEBUG_CAPTURE_AUDIO': '1', 'VOCO_HOTKEY_TRACE': '1'})
 passed = False
 try:
     wait_for(lambda: (root / 'runtime/voco.sock').exists(), 'application control socket')

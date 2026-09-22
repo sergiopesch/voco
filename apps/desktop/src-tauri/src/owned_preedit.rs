@@ -6,16 +6,13 @@ use std::os::fd::AsRawFd;
 use std::os::unix::fs::{FileTypeExt, MetadataExt, PermissionsExt};
 use std::os::unix::net::UnixStream;
 use std::path::{Path, PathBuf};
-use std::sync::{
-    atomic::{AtomicU64, Ordering},
-    Mutex,
-};
+use std::sync::Mutex;
 use std::time::Duration;
 
 const PROTOCOL_VERSION: u32 = 6;
 const EXACT_FIELD_REQUIRED: &str = "Automatic IBus delivery is disabled because the original text field cannot be verified. Recording remains available; review and copy the transcript in VOCO.";
 
-fn require_exact_field_delivery() -> Result<(), String> {
+fn require_exact_field_delivery() -> Result<OwnedPreeditStatus, String> {
     Err(EXACT_FIELD_REQUIRED.to_string())
 }
 const COMPONENT_PATH: &str = "/usr/share/ibus/component/voco.xml";
@@ -272,18 +269,9 @@ impl SocketBridge {
     }
 }
 
+#[derive(Default)]
 pub struct OwnedPreeditService {
     bridge: Mutex<Option<SocketBridge>>,
-    next_session_id: AtomicU64,
-}
-
-impl Default for OwnedPreeditService {
-    fn default() -> Self {
-        Self {
-            bridge: Mutex::new(None),
-            next_session_id: AtomicU64::new(1),
-        }
-    }
 }
 
 impl OwnedPreeditService {
@@ -311,35 +299,10 @@ impl OwnedPreeditService {
 
     pub fn start(
         &self,
-        client_session_id: u64,
-        trigger_id: Option<&str>,
+        _client_session_id: u64,
+        _trigger_id: Option<&str>,
     ) -> Result<OwnedPreeditStatus, String> {
-        require_exact_field_delivery()?;
-        let trigger_id = trigger_id.filter(|token| token.len() == 48 && token.bytes().all(|byte| byte.is_ascii_hexdigit()))
-            .ok_or_else(|| "The shortcut's original input context could not be verified. Review and copy the transcript in VOCO.".to_string())?;
-        validate_session_id(client_session_id)?;
-        // Renderer counters can restart after a reload. A backend generation
-        // prevents delayed renderer commands from acting on a later session.
-        let session_id = self.allocate_session_id()?;
-        let status = self.with_bridge(|bridge| {
-            bridge.send_status(json!({
-                "operation": "start",
-                "clientSessionId": session_id,
-                "triggerId": trigger_id,
-            }))
-        })?;
-        if !status_matches_session(&status, session_id) {
-            self.cancel_best_effort(status.session_id);
-            return Err("VOCO input method returned an invalid session lease.".to_string());
-        }
-        if !status.engine_active || status.focus_lost {
-            self.cancel_best_effort(status.session_id);
-            return Err(
-                "Enable VOCO Dictation as the active input source and focus a text field first."
-                    .to_string(),
-            );
-        }
-        Ok(status)
+        require_exact_field_delivery()
     }
 
     pub fn update(
@@ -353,29 +316,13 @@ impl OwnedPreeditService {
         validate_text(&confirmed_text)?;
         validate_text(&preedit_text)?;
         validate_text(&provisional_text)?;
-        require_exact_field_delivery()?;
-        self.with_bridge(|bridge| {
-            bridge.send_status(json!({
-                "operation": "update",
-                "sessionId": session_id,
-                "confirmedText": confirmed_text,
-                "preeditText": preedit_text,
-                "provisionalText": provisional_text,
-            }))
-        })
+        require_exact_field_delivery()
     }
 
     pub fn commit(&self, session_id: u64, text: String) -> Result<OwnedPreeditStatus, String> {
         validate_session_id(session_id)?;
         validate_text(&text)?;
-        require_exact_field_delivery()?;
-        self.with_bridge(|bridge| {
-            bridge.send_status(json!({
-                "operation": "commit",
-                "sessionId": session_id,
-                "text": text,
-            }))
-        })
+        require_exact_field_delivery()
     }
 
     pub fn checkpoint(
@@ -387,15 +334,7 @@ impl OwnedPreeditService {
         validate_session_id(session_id)?;
         validate_text(&expected_committed_text)?;
         validate_text(&append_text)?;
-        require_exact_field_delivery()?;
-        self.with_bridge(|bridge| {
-            bridge.send_status(json!({
-                "operation": "checkpoint",
-                "sessionId": session_id,
-                "expectedCommittedText": expected_committed_text,
-                "appendText": append_text,
-            }))
-        })
+        require_exact_field_delivery()
     }
 
     pub fn finish_canonical(
@@ -407,46 +346,18 @@ impl OwnedPreeditService {
         validate_session_id(session_id)?;
         validate_text(&expected_committed_text)?;
         validate_text(&append_text)?;
-        require_exact_field_delivery()?;
-        self.with_bridge(|bridge| {
-            bridge.send_status(json!({
-                "operation": "finish-canonical",
-                "sessionId": session_id,
-                "expectedCommittedText": expected_committed_text,
-                "appendText": append_text,
-            }))
-        })
+        require_exact_field_delivery()
     }
 
     pub fn cancel(&self, session_id: u64) -> Result<OwnedPreeditStatus, String> {
         validate_session_id(session_id)?;
-        require_exact_field_delivery()?;
-        self.with_bridge(|bridge| {
-            bridge.send_status(json!({
-                "operation": "cancel",
-                "sessionId": session_id,
-            }))
-        })
+        require_exact_field_delivery()
     }
 
     pub fn shutdown(&self) {
         if let Ok(mut guard) = self.bridge.lock() {
             guard.take();
         }
-    }
-
-    fn cancel_best_effort(&self, session_id: Option<u64>) {
-        if let Some(session_id) = session_id {
-            let _ = self.cancel(session_id);
-        }
-    }
-
-    fn allocate_session_id(&self) -> Result<u64, String> {
-        self.next_session_id
-            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |current| {
-                current.checked_add(1)
-            })
-            .map_err(|_| "VOCO input method session counter was exhausted.".to_string())
     }
 
     fn with_bridge<T>(
@@ -560,10 +471,6 @@ fn validate_session_id(session_id: u64) -> Result<(), String> {
     } else {
         Ok(())
     }
-}
-
-fn status_matches_session(status: &OwnedPreeditStatus, session_id: u64) -> bool {
-    status.session_id == Some(session_id)
 }
 
 fn validate_text(text: &str) -> Result<(), String> {
@@ -684,25 +591,6 @@ mod tests {
             .finish_canonical(1, String::new(), "x".repeat(MAX_TEXT_BYTES + 1))
             .unwrap_err()
             .contains("safety limit"));
-    }
-
-    #[test]
-    fn service_issues_unique_session_generations() {
-        let service = OwnedPreeditService::default();
-        let first = service.allocate_session_id().expect("first generation");
-        let second = service.allocate_session_id().expect("second generation");
-        assert_ne!(first, second);
-    }
-
-    #[test]
-    fn status_matching_rejects_a_newer_session_generation() {
-        let status = OwnedPreeditStatus {
-            session_id: Some(2),
-            engine_active: true,
-            ..OwnedPreeditStatus::default()
-        };
-        assert!(!status_matches_session(&status, 1));
-        assert!(status_matches_session(&status, 2));
     }
 
     #[test]
@@ -906,7 +794,6 @@ mod tests {
         let bridge = SocketBridge::connect_to(&socket_path).unwrap();
         let service = OwnedPreeditService {
             bridge: Mutex::new(Some(bridge)),
-            next_session_id: AtomicU64::new(1),
         };
         let token = "a".repeat(48);
         for result in [
@@ -994,7 +881,6 @@ mod tests {
         let bridge = SocketBridge::connect_to(&socket_path).expect("connect fake engine");
         let service = OwnedPreeditService {
             bridge: Mutex::new(Some(bridge)),
-            next_session_id: AtomicU64::new(1),
         };
         service.shutdown();
 
@@ -1054,7 +940,6 @@ mod tests {
         let bridge = SocketBridge::connect_to(&socket_path).expect("connect fake engine");
         let service = OwnedPreeditService {
             bridge: Mutex::new(Some(bridge)),
-            next_session_id: AtomicU64::new(1),
         };
         // Exercise bridge ordering directly; public mutation APIs are disabled.
         let error = service

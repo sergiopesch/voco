@@ -455,7 +455,9 @@ int vc_begin(vc_pulse*p,const vc_source*source,uint64_t revision) {
     pa_buffer_attr attrs= {
         .maxlength=VC_BLOCK_BYTES,.tlength=(uint32_t)-1,.prebuf=(uint32_t)-1,.minreq=(uint32_t)-1,.fragsize=1764
     };
-    if(pa_stream_connect_record(p->stream,source->name,&attrs,PA_STREAM_START_CORKED|PA_STREAM_AUTO_TIMING_UPDATE|PA_STREAM_DONT_MOVE)<0) {
+    /* Apply fragsize to source latency too; server defaults can otherwise retain
+     * seconds of audio beyond the bounded client buffer and the Stop barrier. */
+    if(pa_stream_connect_record(p->stream,source->name,&attrs,PA_STREAM_START_CORKED|PA_STREAM_AUTO_TIMING_UPDATE|PA_STREAM_DONT_MOVE|PA_STREAM_ADJUST_LATENCY)<0) {
         fail(p,"record-connect-failed");
         return -1;
     }

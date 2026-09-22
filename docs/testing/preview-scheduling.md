@@ -1,5 +1,11 @@
 # Preview scheduling and cancellation
 
+Historical record for the retired snapshot-preview decoder. Its unused scheduling
+and runner modules, plus their exclusive tests, were removed during the September
+2026 release-readiness audit. The commands below describe that earlier source and
+must not be used for the current checkout. See the [testing index](README.md) for
+current Nemotron stream and recovery checks.
+
 Audio arriving during a recording must not postpone an existing preview deadline
 when there is no canonical work to perform. Previously, every no-work canonical
 pump still created a promise whose finalizer replaced the preview timer. Frequent
@@ -17,7 +23,7 @@ the token while preparation is pending. Such work must not enqueue a stale nativ
 request. The existing post-inference token check remains necessary for recognition
 that was already running when invalidation occurred.
 
-## Regression checks
+## Historical regression checks
 
 ```bash
 npm run test -w apps/desktop -- src/hooks/useDictation.previewScheduling.test.ts src/hooks/useDictation.previewCancellation.test.ts
