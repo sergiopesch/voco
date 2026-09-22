@@ -27,6 +27,10 @@ Rust owns OS integration, files, processes, packaging and validation. React owns
 presentation and recording orchestration. Keep both typed and state-driven.
 Comment invariants and non-obvious decisions; avoid narrating every line.
 
+Development and CI use Node 24 LTS (`.nvmrc`). Maintain Vite 8 and React plugin 6
+together, preserve explicit output targets, and keep root renderer fixtures on
+the desktop's Vite resolution. Qualify both dev rendering and packaged WebKit.
+
 Configuration deserialization ignores retired output choices and returns cursor,
 stable streaming and enhancement off. Patches reject removed fields. These fixed
 snapshot fields remain for the legacy dictation engine contract; they are not

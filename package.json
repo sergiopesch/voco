@@ -44,9 +44,10 @@
     "test:dictation-evaluation": "PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-typesafe-evaluation.py && node --test scripts/score-dictation-worker.test.mjs"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=24"
   },
   "devDependencies": {
-    "playwright": "1.63.0"
+    "playwright": "1.63.0",
+    "vite": "^8.3.0"
   }
 }

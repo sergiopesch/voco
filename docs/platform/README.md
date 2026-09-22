@@ -14,7 +14,7 @@ macOS and Windows are outside the current scope.
 ## Requirements
 
 - Tauri runtime dependencies: libwebkit2gtk-4.1, libgtk-3, libayatana-appindicator3
-- Node.js 20+ and Rust (for building from source)
+- Node.js 24 LTS (`.nvmrc`) or newer and Rust (for building from source)
 - PulseAudio or PipeWire for microphone access
 - Complete NVIDIA package for local CPU streaming; ordinary desktop output uses clipboard paste with best-effort focus guards
 - Optional exact-field Chromium extension/native host provides a separate supported-field contract

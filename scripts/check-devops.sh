@@ -14,6 +14,17 @@ done
 
 npm run verify:versions
 
+node --input-type=module - <<'JS'
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+import path from 'node:path';
+const root = createRequire(path.resolve('package.json'));
+const desktop = createRequire(path.resolve('apps/desktop/package.json'));
+assert.equal(root.resolve('vite'), desktop.resolve('vite'),
+  'Root renderer fixtures and the desktop must resolve the same Vite build');
+console.log('Renderer fixtures and desktop share the Vite build tool.');
+JS
+
 bash -n \
   install \
   scripts/install.sh \

@@ -4,12 +4,18 @@ import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 
 const host = process.env.TAURI_DEV_HOST;
+// Retain Vite 6's output targets when changing the compiler and bundler.
+const browserTargets = ["edge88", "firefox78", "chrome87", "safari14"];
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  build: {
+    target: ["es2020", ...browserTargets],
+    cssTarget: browserTargets,
+  },
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
+      "@": path.resolve(import.meta.dirname, "./src"),
     },
   },
   clearScreen: false,

@@ -107,10 +107,10 @@ step "Prerequisites"
 
 if command -v node &>/dev/null; then
   NODE_VER=$(node -v | sed 's/v//' | cut -d. -f1)
-  if (( NODE_VER >= 20 )); then
+  if (( NODE_VER >= 24 )); then
     ok "Node.js $(node -v)"
   else
-    err "Node.js 20+ required (found $(node -v))"
+    err "Node.js 24+ required (found $(node -v)); use the LTS version in .nvmrc"
     exit 1
   fi
 else
