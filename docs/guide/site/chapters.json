@@ -1655,6 +1655,10 @@
         "text": "The published .52 installer connects signal bars to measured transfer rates and a brief silver sweep to phase changes. The download runs independently: finishing work cancels animation immediately. Checksums download alongside the package and must pass before installation. Fifty-six local download trials found lower overhead than the .51 installer, but do not measure whole installations over the internet. Real Ubuntu APT tests preserve both package questions and existing configuration choices. The .52 release retains the same model and dictation behavior; its package and desktop checks are separate from these download timings. The pinned code viewer is unchanged."
       },
       {
+        "title": "Keep dependency upgrades accountable",
+        "text": "The .53 maintenance release integrates the 12 dependency PRs queued at the start of its cleanup. One shortcut update compiled successfully but would have loaded a second keyboard actor, bypassing VOCO's focus protection. The release carries the patch onto the new library and checks that both consumers share it. Compatible updates now arrive in small weekly groups; major upgrades and input dependencies remain separate. Exact-package installation and desktop tests qualify each new cut. The pinned .43 code viewer remains unchanged."
+      },
+      {
         "title": "Safe upgrades",
         "text": "Debian preserves existing directory modes during upgrades. A real legacy-install test exposed inherited group-write permissions. A narrowly checked migration repairs only the known package-owned mode, preserving custom permissions and personal settings."
       },

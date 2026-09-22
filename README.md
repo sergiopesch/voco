@@ -18,10 +18,10 @@ recognition runs on your computer. No account, subscription or cloud transcripti
 Install the current public Ubuntu/Debian x86_64 release with one command:
 
 ```bash
-wget -qO voco-install https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.52/install && bash voco-install
+wget -qO voco-install https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.53/install && bash voco-install
 ```
 
-The guided installer downloads **2026.0.52**, verifies the package checksum and
+The guided installer downloads **2026.0.53**, verifies the package checksum and
 installs the package and required Wayland input helpers. Desktop readiness is
 checked before onboarding finishes. If setup is incomplete, follow the
 [desktop input setup](docs/platform/README.md#ydotoold-ydotool-daemon) instructions.
@@ -55,16 +55,16 @@ with full-resolution release graphics, exact values and methods.
 
 ## Native Linux packages
 
-**2026.0.52** adds measured Signal + Silver sweep installer progress with lower
-download overhead. Live tray bars, microphone setup in one canvas and one bundled
-recognizer are retained.
+**2026.0.53** refreshes application dependencies while retaining the Signal +
+Silver sweep installer, live tray bars, microphone setup in one canvas and the
+same bundled recognizer.
 Fedora, openSUSE and Arch/Omarchy packages remain at **2026.0.43**; download those
 from their matching release. Install only assets attached to a published release.
 Wayland uses native microphone capture so dictation can start with its panel
 hidden; X11 keeps browser capture.
 See the [support matrix](docs/linux-support.md),
 [native package installation](docs/install-native.md) and
-[.52 changes and qualification](docs/releases/2026.0.52.md).
+[.53 changes and qualification](docs/releases/2026.0.53.md).
 
 ## Contribute
 

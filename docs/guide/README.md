@@ -76,3 +76,7 @@ See [VERIFICATION.md](VERIFICATION.md) for checks and limitations. VOCO source a
 For the release-polish refresh, see [the dated verification record](../testing/linux-release-2026-09-20.md).
 It separates the earlier long/recovery evidence from fresh checks after an Updates
 help-text change; the code tour remains pinned to the reviewed product source.
+
+The Linux qualification chapter also records the [.53 dependency refresh](../testing/dependency-release-2026-09-22.md):
+shared shortcut protection, grouped maintenance updates and exact-package checks.
+The learning site remains local and its source viewer remains pinned to .43.

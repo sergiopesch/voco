@@ -1,41 +1,32 @@
 # Release status
 
 The [latest published GitHub release](https://github.com/sergiopesch/voco/releases/latest)
-is authoritative for current downloads. Source metadata does not establish what
-is installed on a particular computer.
+is authoritative for downloads. Source metadata does not establish what is installed.
 
-The recorded public Ubuntu/Debian release is **2026.0.52**. It adds measured
-Signal + Silver sweep installer progress, overlapping checksum retrieval and
-lower download overhead. Native prompts and reduced-motion/plain fallbacks are
-retained. The rebuilt app keeps .51 dictation behavior, live tray bars, microphone
-setup in one canvas and the same pinned Nemotron model/runtime.
+The recorded public Ubuntu/Debian release is **2026.0.53**. It integrates the
+12 dependency updates queued at the start of the maintenance pass, preserving
+VOCO's X11 shortcut protection and the pinned Nemotron model/runtime. The
+Signal + Silver sweep installer, live tray bars and compact microphone setup are retained.
 
-- [.52 changes and installation](releases/2026.0.52.md)
-- [Signed assets, source, provenance and validation](https://github.com/sergiopesch/voco/releases/tag/voco.2026.0.52)
-- [Exact-package checks and publication verification](testing/installer-release-2026-09-22.md)
-- [Exact-installer download measurements](testing/installer-performance-2026-09-22.md)
+- [.53 changes and installation](releases/2026.0.53.md)
+- [Signed assets and provenance](https://github.com/sergiopesch/voco/releases/tag/voco.2026.0.53)
+- [Exact-package qualification and cleanup audit](testing/dependency-release-2026-09-22.md)
+- [Installer performance method and .52 measurements](testing/installer-performance-2026-09-22.md)
 
-All four protected CI checks passed before the normal merge; the merged source
-also passed CI. Publisher signatures and every draft/public asset hash were
-verified. The complete package passed payload/metadata verification, Ubuntu
-container install/removal, 13 packaged worker checks and 12 isolated GNOME X11
-desktop checks. Bundled docs retain their assembly snapshot, as recorded in
-provenance; final source and public docs include the exact-installer benchmark rerun.
+All four protected checks passed on the final PR and merged source. The complete
+package passed payload/metadata verification, Ubuntu container installation/removal,
+13 packaged worker checks and 12 isolated GNOME X11 desktop cases. Publisher
+signatures and every draft/public asset were downloaded and verified. The source
+archive includes the final qualification record; bundled docs retain their assembly snapshot.
 
-Virtual audio and nested desktop checks do not qualify physical microphones,
-owner-perceived smoothness or every compositor/application. The .52 checks do
-not requalify native Wayland cursor delivery. Local download measurements are
-not whole-install or Internet speed claims.
+The new grouped dependency queue is the next review batch, separate from this
+frozen release. New application bytes require another qualified version.
 
-Fedora, openSUSE and Arch/Omarchy remain at **2026.0.43**; use the matching
+Physical microphones, owner-perceived motion, native Wayland cursor delivery and
+other desktop/application combinations remain separate checks. Local download
+fixtures do not establish Internet or whole-installation speed.
+
+Fedora, openSUSE and Arch/Omarchy remain at **2026.0.43**; use their matching
 [native guide](install-native.md) and [support matrix](linux-support.md).
-The [.51 release](releases/2026.0.51.md) remains available for rollback. Earlier
-frozen candidates and desktop evidence retain their original identities.
-
-## Next candidate
-
-**2026.0.53** integrates the dependency backlog and preserves the patched X11
-shortcut actor across the shortcut-plugin upgrade. The [candidate notes](releases/2026.0.53.md)
-describe the changes. It requires a new complete package and qualification;
-source version metadata is not publication. Continue using the recorded public
-.52 installer until the new cut is published and verified.
+[2026.0.52](releases/2026.0.52.md) remains available for rollback. Published tags
+and release assets are immutable. The hosted release assembler stays disabled.
