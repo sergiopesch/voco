@@ -74,7 +74,7 @@ plain terminals preserve sequential text; reduced motion removes animation.
   the Xwayland clipboard bridge did not deliver text. A later investigation found
   that the fixture omitted the nested compositor's Xauthority file and mistook
   xclip's authentication error for readiness. The corrected fixture supplies that
-  file and requires the clipboard ownership message. It now passes all 16 Brave
+  file and requires the clipboard ownership message. It now passes all 17 Brave
   native Wayland cases; the old attempts remain retained and are not passes.
 
 The .54 model, recognition queue and recovery behavior were not changed. A new

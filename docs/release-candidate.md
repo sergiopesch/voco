@@ -7,6 +7,10 @@ The **2026.0.55 source candidate** fixes Brave address-bar suggestion focus,
 WebKit focused containers and empty HTML editor readback, and keeps the installer
 inside one terminal canvas. Its [application qualification](testing/application-delivery-2026-09-22.md)
 and [candidate notes](releases/2026.0.55.md) are separate from publication.
+The exact local .55 package passes 16 private GNOME application checks, the
+expanded browser/native-app matrix, payload verification and clean Ubuntu
+container installation/removal. It remains unsigned and unpublished. Stop before
+switching fields: desktop paste cannot make focus changes atomic with key delivery.
 The installed owner application and public downloads remain .54.
 
 The recorded public Ubuntu/Debian release is **2026.0.54**. It integrates the

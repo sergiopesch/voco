@@ -95,17 +95,60 @@ suite additionally needs GNOME Shell and Xwayland. CI exercises the six native
 application/toolkit cases and Chromium; local Brave/Firefox/VS Code runs are
 recorded separately. `VOCO_RICH_EDITOR_EVIDENCE_DIR` retains receipts and logs.
 
-## Verification in progress
+## Qualified candidate
 
-The focus/readback regression gate passes **55 + 63 cases**. Frontend tests pass
-449 cases; typecheck, lint, production build, Rust's 258 application + 19 host + 7
-GLib tests and Clippy pass. One pre-existing fixture-export Rust test is ignored.
-An initial assembled .55 package passes all 12 private GNOME X11 onboarding,
-rich-editor, tray, Stop and recovery cases. The final combined candidate must
-repeat package qualification before it replaces this initial-build evidence.
+Source implementation: `6a0f3fe3d1655b5193efc437177e429f296b07e6`. Subsequent
+qualification documentation does not change the application bytes; bundled docs
+retain their assembly snapshot. This is an **unsigned local candidate**, not a
+published release or an upgrade of the owner's installed .54 app.
+
+| Exact artifact | SHA-256 |
+| --- | --- |
+| `voco_2026.0.55_amd64.deb` (685,500,220 bytes) | `c9ae526d859f968a6fa11f985428bba911aae63f648fb06cf2f11b1c1e7a820c` |
+| Packaged `/usr/bin/voco` | `f0308426ab02603ca134f6c59fdc4bb479ec6cfd11955bd60e9c1604f5f04179` |
+| Packaged browser host | `1e8522c51023dc933db37f7c89660fb8648be1083a1e29eb5c9c1aa3bd1c35b3` |
+
+- **55 focus + 63 readback** regression cases pass; the cold popup and inactive
+  terminal regressions fail against their preceding implementations.
+- **51 browser cases** pass across Brave X11, Brave native Wayland and Chromium
+  X11. The nine cold subprocess probes took 68–91 ms on this host, below the
+  unchanged 800 ms deadline; these fixture samples are not a latency guarantee.
+- **Eight application/toolkit cases** pass with 22 deliveries and three dedicated
+  password-control rejections. A screenshot confirms VS Code's integrated
+  terminal was open while its editor received the correct paste chord.
+- **16 packaged application checks** pass in private GNOME 46 X11 with real
+  recognition of public fixture audio: fresh onboarding, launcher handoff,
+  Chromium rich-editor sessions, measured panel/fallback bars, silence, repeated
+  Stop, reconnect, two Brave address-bar sessions, Bash, nano and recovery after
+  a focus change during paused clipboard preparation. This last assertion tests
+  the new guard before keyboard dispatch, not atomic mid-gesture ownership.
+- Package metadata, dependencies, payload hashes, ELF files and bundled notices
+  pass validation. **13 exact packaged speech-worker checks** pass.
+- A clean Ubuntu 24.04 local container (`cbx_776d13874968`) installs the exact
+  package through APT, verifies every installed file, reports .55, has no pre-existing
+  VOCO profile and successfully purges the package. This is userspace/package
+  evidence, not a VM, physical desktop or fresh-owner acceptance test.
+- Typecheck, lint, production build, **449 frontend tests**, **259 application +
+  19 browser-host + 7 GLib Rust tests**, Clippy and the DevOps gate pass. One
+  pre-existing fixture-export Rust test remains ignored. The before-keyboard
+  transaction regression fails before the guard and passes afterward.
+- The guide passes **nine unit tests and 27 browser checks**, including all
+  chapters, search, source viewer, glossary, simulations and narrow layout.
+
+The final review head must pass all protected [PR #67 checks](https://github.com/sergiopesch/voco/pull/67/checks).
+Public signatures, downloaded-asset verification and owner-session acceptance are
+separate from these candidate receipts. The public installer remains pinned to .54.
 
 ## Preserved failed attempts and limits
 
+- Native GNOME fixture attempts first used unreliable X11 activation, then an
+  incorrect browser class selector. Native compositor activation and a unique
+  fixture title correct those setup errors; their partial runs are not complete
+  passes. A real cold lookup failure and the focus race described above were
+  separately reproduced after activation was corrected.
+- An assembly started before its build completed and failed the exact embedded
+  source check. It was set aside before qualification; the artifact above contains
+  the final helper and before-keyboard guard.
 - Rejected cold-search experiments are retained: breadth-first traversal found
   the address bar but failed page-editor discovery; increasing a depth-first
   bound to 256 still failed with suggestions. Globally prioritizing visibility
