@@ -36,7 +36,12 @@ Baseline source commit: `2882c9365b0cb8ffa6b7bf914cd43a45fcfb1297` (public maste
 at the start of this work). Exact installer SHA-256 identities:
 
 - Baseline: `9976e1e7ee3fa3b5865ab6bb2765a48e00600c4b40bd60626603527ebcb44158`
-- Candidate: `3e24ad36b2d8c09c07c2f478752cada378dfb94c1617606c8811abb36318f0c3`
+- Candidate: `0d9d34b8b2defe6c95fc65c960284310883e4f67c0cb20e051cf621cb94ad097`
+
+These measurements were rerun after the .52 version bump against the exact
+release installer. The earlier 56-trial pre-version run remains in a separate
+[historical numeric record](installer-performance-pre-version-2026-09-22.json);
+it does not supply the release measurements below.
 
 The benchmark ran on the existing Ubuntu host (x86_64, Linux 6.17.0-1032-oem,
 glibc 2.39). It exercises each installer’s actual download function through an
@@ -52,14 +57,14 @@ owner password delay, microphone or desktop launch is timed here.
 
 | Mode | Transfer | Source | Median wall (s) | Wall range (s) | Median CPU (s) |
 |---|---|---|---:|---:|---:|
-| plain | fast | baseline | 0.2650 | 0.2638–0.2661 | 0.0178 |
-| plain | fast | candidate | 0.0152 | 0.0144–0.0156 | 0.0150 |
-| plain | paced | baseline | 1.0253 | 1.0247–1.0270 | 0.0484 |
-| plain | paced | candidate | 0.7923 | 0.7899–0.7958 | 0.0305 |
-| animated | fast | baseline | 0.2684 | 0.2669–0.2698 | 0.0209 |
-| animated | fast | candidate | 0.0166 | 0.0161–0.0173 | 0.0200 |
-| animated | paced | baseline | 1.0385 | 1.0373–1.0397 | 0.0618 |
-| animated | paced | candidate | 0.7900 | 0.7878–0.7929 | 0.0457 |
+| plain | fast | baseline | 0.2649 | 0.2636–0.2654 | 0.0175 |
+| plain | fast | candidate | 0.0151 | 0.0144–0.0155 | 0.0148 |
+| plain | paced | baseline | 1.0256 | 1.0251–1.0266 | 0.0484 |
+| plain | paced | candidate | 0.7893 | 0.7879–0.7922 | 0.0312 |
+| animated | fast | baseline | 0.2674 | 0.2666–0.2694 | 0.0206 |
+| animated | fast | candidate | 0.0158 | 0.0152–0.0174 | 0.0190 |
+| animated | paced | baseline | 1.0389 | 1.0374–1.0403 | 0.0621 |
+| animated | paced | candidate | 0.7908 | 0.7888–0.7924 | 0.0457 |
 
 The animated paced fixture is about **24% shorter** and uses about **26% less
 CPU time** than this baseline download path. Its median wall time is comparable

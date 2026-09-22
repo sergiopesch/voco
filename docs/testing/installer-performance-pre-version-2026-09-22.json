@@ -2,12 +2,12 @@
   "scope": "local HTTP download fixtures; no APT, Internet or desktop timing",
   "source_sha256": {
     "baseline": "9976e1e7ee3fa3b5865ab6bb2765a48e00600c4b40bd60626603527ebcb44158",
-    "candidate": "0d9d34b8b2defe6c95fc65c960284310883e4f67c0cb20e051cf621cb94ad097"
+    "candidate": "3e24ad36b2d8c09c07c2f478752cada378dfb94c1617606c8811abb36318f0c3"
   },
   "trials": [
     {
-      "wall_seconds": 0.2648878629988758,
-      "cpu_seconds": 0.0175,
+      "wall_seconds": 0.26498490999802016,
+      "cpu_seconds": 0.017762,
       "exit_code": 0,
       "payload_sha256_verified": true,
       "output_bytes": 162,
@@ -18,8 +18,8 @@
       "repeat": 0
     },
     {
-      "wall_seconds": 0.015141363997827284,
-      "cpu_seconds": 0.014965999999999993,
+      "wall_seconds": 0.015579476006678306,
+      "cpu_seconds": 0.015296000000000006,
       "exit_code": 0,
       "payload_sha256_verified": true,
       "output_bytes": 162,
@@ -30,8 +30,8 @@
       "repeat": 0
     },
     {
-      "wall_seconds": 0.015533179001067765,
-      "cpu_seconds": 0.015323,
+      "wall_seconds": 0.015198014996713027,
+      "cpu_seconds": 0.014878000000000002,
       "exit_code": 0,
       "payload_sha256_verified": true,
       "output_bytes": 162,
@@ -42,8 +42,8 @@
       "repeat": 1
     },
     {
-      "wall_seconds": 0.2648863709910074,
-      "cpu_seconds": 0.017869999999999997,
+      "wall_seconds": 0.265596627999912,
+      "cpu_seconds": 0.018207000000000008,
       "exit_code": 0,
       "payload_sha256_verified": true,
       "output_bytes": 162,
@@ -54,8 +54,8 @@
       "repeat": 1
     },
     {
-      "wall_seconds": 0.2654316749976715,
-      "cpu_seconds": 0.01860599999999999,
+      "wall_seconds": 0.26614701899234205,
+      "cpu_seconds": 0.019898999999999993,
       "exit_code": 0,
       "payload_sha256_verified": true,
       "output_bytes": 162,
@@ -66,8 +66,8 @@
       "repeat": 2
     },
     {
-      "wall_seconds": 0.015056203003041446,
-      "cpu_seconds": 0.014812000000000006,
+      "wall_seconds": 0.014404304994968697,
+      "cpu_seconds": 0.01434400000000001,
       "exit_code": 0,
       "payload_sha256_verified": true,
       "output_bytes": 162,
@@ -78,8 +78,8 @@
       "repeat": 2
     },
     {
-      "wall_seconds": 0.014933814003597945,
-      "cpu_seconds": 0.014738000000000001,
+      "wall_seconds": 0.01503898500232026,
+      "cpu_seconds": 0.014973999999999987,
       "exit_code": 0,
       "payload_sha256_verified": true,
       "output_bytes": 162,
@@ -90,8 +90,8 @@
       "repeat": 3
     },
     {
-      "wall_seconds": 0.26362166699254885,
-      "cpu_seconds": 0.016197000000000003,
+      "wall_seconds": 0.26380005398823414,
+      "cpu_seconds": 0.016457,
       "exit_code": 0,
       "payload_sha256_verified": true,
       "output_bytes": 162,
@@ -102,8 +102,8 @@
       "repeat": 3
     },
     {
-      "wall_seconds": 0.2652513250068296,
-      "cpu_seconds": 0.017804999999999988,
+      "wall_seconds": 0.2641630290017929,
+      "cpu_seconds": 0.016465000000000007,
       "exit_code": 0,
       "payload_sha256_verified": true,
       "output_bytes": 162,
@@ -114,8 +114,8 @@
       "repeat": 4
     },
     {
-      "wall_seconds": 0.015050103000248782,
-      "cpu_seconds": 0.014811999999999992,
+      "wall_seconds": 0.015522528003202751,
+      "cpu_seconds": 0.01533799999999999,
       "exit_code": 0,
       "payload_sha256_verified": true,
       "output_bytes": 162,
@@ -126,8 +126,8 @@
       "repeat": 4
     },
     {
-      "wall_seconds": 0.014444625994656235,
-      "cpu_seconds": 0.014284000000000005,
+      "wall_seconds": 0.015234584003337659,
+      "cpu_seconds": 0.015008000000000007,
       "exit_code": 0,
       "payload_sha256_verified": true,
       "output_bytes": 162,
@@ -138,8 +138,8 @@
       "repeat": 5
     },
     {
-      "wall_seconds": 0.2646875869977521,
-      "cpu_seconds": 0.017541000000000015,
+      "wall_seconds": 0.26430650100519415,
+      "cpu_seconds": 0.01705699999999999,
       "exit_code": 0,
       "payload_sha256_verified": true,
       "output_bytes": 162,
@@ -150,8 +150,8 @@
       "repeat": 5
     },
     {
-      "wall_seconds": 0.2645211740018567,
-      "cpu_seconds": 0.017087999999999964,
+      "wall_seconds": 0.2656162440107437,
+      "cpu_seconds": 0.01848299999999997,
       "exit_code": 0,
       "payload_sha256_verified": true,
       "output_bytes": 162,
@@ -162,8 +162,8 @@
       "repeat": 6
     },
     {
-      "wall_seconds": 0.015518280997639522,
-      "cpu_seconds": 0.015333000000000013,
+      "wall_seconds": 0.015140606003114954,
+      "cpu_seconds": 0.015033999999999992,
       "exit_code": 0,
       "payload_sha256_verified": true,
       "output_bytes": 162,
@@ -174,8 +174,8 @@
       "repeat": 6
     },
     {
-      "wall_seconds": 0.2666418049921049,
-      "cpu_seconds": 0.019285000000000024,
+      "wall_seconds": 0.26867090399900917,
+      "cpu_seconds": 0.021929000000000004,
       "exit_code": 0,
       "payload_sha256_verified": true,
       "output_bytes": 232,
@@ -186,8 +186,8 @@
       "repeat": 0
     },
     {
-      "wall_seconds": 0.016659814995364286,
-      "cpu_seconds": 0.01996600000000001,
+      "wall_seconds": 0.016756209995946847,
+      "cpu_seconds": 0.02010400000000001,
       "exit_code": 0,
       "payload_sha256_verified": true,
       "output_bytes": 338,
@@ -198,8 +198,8 @@
       "repeat": 0
     },
     {
-      "wall_seconds": 0.016496227006427944,
-      "cpu_seconds": 0.019913999999999987,
+      "wall_seconds": 0.01612485700752586,
+      "cpu_seconds": 0.018899000000000027,
       "exit_code": 0,
       "payload_sha256_verified": true,
       "output_bytes": 338,
@@ -210,8 +210,8 @@
       "repeat": 1
     },
     {
-      "wall_seconds": 0.2667590350029059,
-      "cpu_seconds": 0.01982600000000001,
+      "wall_seconds": 0.26691578701138496,
+      "cpu_seconds": 0.019287000000000026,
       "exit_code": 0,
       "payload_sha256_verified": true,
       "output_bytes": 232,
@@ -222,8 +222,8 @@
       "repeat": 1
     },
     {
-      "wall_seconds": 0.26720044401008636,
-      "cpu_seconds": 0.020614999999999967,
+      "wall_seconds": 0.26830196799710393,
+      "cpu_seconds": 0.020919999999999994,
       "exit_code": 0,
       "payload_sha256_verified": true,
       "output_bytes": 232,
@@ -234,8 +234,8 @@
       "repeat": 2
     },
     {
-      "wall_seconds": 0.015819878011825494,
-      "cpu_seconds": 0.018970999999999988,
+      "wall_seconds": 0.017302813997957855,
+      "cpu_seconds": 0.020313000000000025,
       "exit_code": 0,
       "payload_sha256_verified": true,
       "output_bytes": 338,
@@ -246,8 +246,8 @@
       "repeat": 2
     },
     {
-      "wall_seconds": 0.015454181004315615,
-      "cpu_seconds": 0.018573000000000006,
+      "wall_seconds": 0.01658525700622704,
+      "cpu_seconds": 0.019470000000000015,
       "exit_code": 0,
       "payload_sha256_verified": true,
       "output_bytes": 338,
@@ -258,8 +258,8 @@
       "repeat": 3
     },
     {
-      "wall_seconds": 0.26843726499646436,
-      "cpu_seconds": 0.021631999999999957,
+      "wall_seconds": 0.2698021969990805,
+      "cpu_seconds": 0.021352999999999955,
       "exit_code": 0,
       "payload_sha256_verified": true,
       "output_bytes": 232,
@@ -270,8 +270,8 @@
       "repeat": 3
     },
     {
-      "wall_seconds": 0.2674248440016527,
-      "cpu_seconds": 0.020291000000000003,
+      "wall_seconds": 0.2678344050073065,
+      "cpu_seconds": 0.020583000000000018,
       "exit_code": 0,
       "payload_sha256_verified": true,
       "output_bytes": 232,
@@ -282,8 +282,8 @@
       "repeat": 4
     },
     {
-      "wall_seconds": 0.015231172001222149,
-      "cpu_seconds": 0.01812299999999989,
+      "wall_seconds": 0.01646370699745603,
+      "cpu_seconds": 0.019629000000000008,
       "exit_code": 0,
       "payload_sha256_verified": true,
       "output_bytes": 338,
@@ -294,8 +294,8 @@
       "repeat": 4
     },
     {
-      "wall_seconds": 0.015314618998672813,
-      "cpu_seconds": 0.018396999999999997,
+      "wall_seconds": 0.01688099600141868,
+      "cpu_seconds": 0.020298999999999956,
       "exit_code": 0,
       "payload_sha256_verified": true,
       "output_bytes": 338,
@@ -306,8 +306,8 @@
       "repeat": 5
     },
     {
-      "wall_seconds": 0.2691994149936363,
-      "cpu_seconds": 0.022106000000000015,
+      "wall_seconds": 0.2684015279955929,
+      "cpu_seconds": 0.020916000000000046,
       "exit_code": 0,
       "payload_sha256_verified": true,
       "output_bytes": 232,
@@ -318,8 +318,8 @@
       "repeat": 5
     },
     {
-      "wall_seconds": 0.26944398500199895,
-      "cpu_seconds": 0.022972999999999966,
+      "wall_seconds": 0.26855215900286566,
+      "cpu_seconds": 0.022683000000000064,
       "exit_code": 0,
       "payload_sha256_verified": true,
       "output_bytes": 232,
@@ -330,8 +330,8 @@
       "repeat": 6
     },
     {
-      "wall_seconds": 0.01744650100590661,
-      "cpu_seconds": 0.020405000000000062,
+      "wall_seconds": 0.0166411620011786,
+      "cpu_seconds": 0.020016000000000034,
       "exit_code": 0,
       "payload_sha256_verified": true,
       "output_bytes": 338,
@@ -342,8 +342,8 @@
       "repeat": 6
     },
     {
-      "wall_seconds": 1.0253263280028477,
-      "cpu_seconds": 0.04819199999999996,
+      "wall_seconds": 1.0247188610082958,
+      "cpu_seconds": 0.047707,
       "exit_code": 0,
       "payload_sha256_verified": true,
       "output_bytes": 161,
@@ -354,8 +354,8 @@
       "repeat": 0
     },
     {
-      "wall_seconds": 0.7880136999883689,
-      "cpu_seconds": 0.02941200000000005,
+      "wall_seconds": 0.7923291560000507,
+      "cpu_seconds": 0.031136000000000053,
       "exit_code": 0,
       "payload_sha256_verified": true,
       "output_bytes": 161,
@@ -366,8 +366,8 @@
       "repeat": 0
     },
     {
-      "wall_seconds": 0.7915638139966177,
-      "cpu_seconds": 0.031416000000000055,
+      "wall_seconds": 0.7952855750045273,
+      "cpu_seconds": 0.03370999999999996,
       "exit_code": 0,
       "payload_sha256_verified": true,
       "output_bytes": 161,
@@ -378,8 +378,8 @@
       "repeat": 1
     },
     {
-      "wall_seconds": 1.026626724997186,
-      "cpu_seconds": 0.04822199999999993,
+      "wall_seconds": 1.025906570997904,
+      "cpu_seconds": 0.04872499999999996,
       "exit_code": 0,
       "payload_sha256_verified": true,
       "output_bytes": 161,
@@ -390,8 +390,8 @@
       "repeat": 1
     },
     {
-      "wall_seconds": 1.0251166570087662,
-      "cpu_seconds": 0.047353000000000034,
+      "wall_seconds": 1.0250507629971253,
+      "cpu_seconds": 0.047629999999999895,
       "exit_code": 0,
       "payload_sha256_verified": true,
       "output_bytes": 161,
@@ -402,8 +402,8 @@
       "repeat": 2
     },
     {
-      "wall_seconds": 0.7917496180016315,
-      "cpu_seconds": 0.03203499999999987,
+      "wall_seconds": 0.7926934720017016,
+      "cpu_seconds": 0.031262999999999985,
       "exit_code": 0,
       "payload_sha256_verified": true,
       "output_bytes": 161,
@@ -414,8 +414,8 @@
       "repeat": 2
     },
     {
-      "wall_seconds": 0.7921982889965875,
-      "cpu_seconds": 0.032062000000000035,
+      "wall_seconds": 0.7957901280024089,
+      "cpu_seconds": 0.030542999999999987,
       "exit_code": 0,
       "payload_sha256_verified": true,
       "output_bytes": 161,
@@ -426,8 +426,8 @@
       "repeat": 3
     },
     {
-      "wall_seconds": 1.0253118190012174,
-      "cpu_seconds": 0.04864400000000002,
+      "wall_seconds": 1.02671387999726,
+      "cpu_seconds": 0.04972299999999996,
       "exit_code": 0,
       "payload_sha256_verified": true,
       "output_bytes": 161,
@@ -438,8 +438,8 @@
       "repeat": 3
     },
     {
-      "wall_seconds": 1.0259434640029212,
-      "cpu_seconds": 0.04849000000000003,
+      "wall_seconds": 1.024879944001441,
+      "cpu_seconds": 0.047746999999999984,
       "exit_code": 0,
       "payload_sha256_verified": true,
       "output_bytes": 161,
@@ -450,8 +450,8 @@
       "repeat": 4
     },
     {
-      "wall_seconds": 0.7893402400077321,
-      "cpu_seconds": 0.03121599999999991,
+      "wall_seconds": 0.7904744859988568,
+      "cpu_seconds": 0.03022899999999995,
       "exit_code": 0,
       "payload_sha256_verified": true,
       "output_bytes": 161,
@@ -462,8 +462,8 @@
       "repeat": 4
     },
     {
-      "wall_seconds": 0.7879206750076264,
-      "cpu_seconds": 0.03044200000000008,
+      "wall_seconds": 0.7914559159980854,
+      "cpu_seconds": 0.029482000000000008,
       "exit_code": 0,
       "payload_sha256_verified": true,
       "output_bytes": 161,
@@ -474,8 +474,8 @@
       "repeat": 5
     },
     {
-      "wall_seconds": 1.0261274549993686,
-      "cpu_seconds": 0.04838799999999999,
+      "wall_seconds": 1.026957786991261,
+      "cpu_seconds": 0.04896999999999996,
       "exit_code": 0,
       "payload_sha256_verified": true,
       "output_bytes": 161,
@@ -486,8 +486,8 @@
       "repeat": 5
     },
     {
-      "wall_seconds": 1.0255904249934247,
-      "cpu_seconds": 0.049192000000000013,
+      "wall_seconds": 1.0252942119986983,
+      "cpu_seconds": 0.048420999999999936,
       "exit_code": 0,
       "payload_sha256_verified": true,
       "output_bytes": 161,
@@ -498,8 +498,8 @@
       "repeat": 6
     },
     {
-      "wall_seconds": 0.7881501219962956,
-      "cpu_seconds": 0.029185999999999934,
+      "wall_seconds": 0.7899003909988096,
+      "cpu_seconds": 0.030098999999999876,
       "exit_code": 0,
       "payload_sha256_verified": true,
       "output_bytes": 161,
@@ -510,8 +510,8 @@
       "repeat": 6
     },
     {
-      "wall_seconds": 1.0382336850016145,
-      "cpu_seconds": 0.06134200000000001,
+      "wall_seconds": 1.0384713990060845,
+      "cpu_seconds": 0.061840000000000006,
       "exit_code": 0,
       "payload_sha256_verified": true,
       "output_bytes": 429,
@@ -522,8 +522,8 @@
       "repeat": 0
     },
     {
-      "wall_seconds": 0.7919391219911631,
-      "cpu_seconds": 0.04529899999999998,
+      "wall_seconds": 0.792924794004648,
+      "cpu_seconds": 0.04574999999999996,
       "exit_code": 0,
       "payload_sha256_verified": true,
       "output_bytes": 1452,
@@ -534,8 +534,8 @@
       "repeat": 0
     },
     {
-      "wall_seconds": 0.791868637999869,
-      "cpu_seconds": 0.044998000000000093,
+      "wall_seconds": 0.7900001810048707,
+      "cpu_seconds": 0.04582100000000011,
       "exit_code": 0,
       "payload_sha256_verified": true,
       "output_bytes": 1418,
@@ -546,11 +546,11 @@
       "repeat": 1
     },
     {
-      "wall_seconds": 1.0397374640015187,
-      "cpu_seconds": 0.06268799999999997,
+      "wall_seconds": 1.0372894699976314,
+      "cpu_seconds": 0.06053499999999978,
       "exit_code": 0,
       "payload_sha256_verified": true,
-      "output_bytes": 395,
+      "output_bytes": 412,
       "trace_exec_count": null,
       "source": "baseline",
       "transfer": "paced",
@@ -558,8 +558,56 @@
       "repeat": 1
     },
     {
-      "wall_seconds": 1.0378744750050828,
-      "cpu_seconds": 0.06140800000000002,
+      "wall_seconds": 1.0389703569962876,
+      "cpu_seconds": 0.06242599999999998,
+      "exit_code": 0,
+      "payload_sha256_verified": true,
+      "output_bytes": 412,
+      "trace_exec_count": null,
+      "source": "baseline",
+      "transfer": "paced",
+      "mode": "animated",
+      "repeat": 2
+    },
+    {
+      "wall_seconds": 0.7897534119983902,
+      "cpu_seconds": 0.045017000000000085,
+      "exit_code": 0,
+      "payload_sha256_verified": true,
+      "output_bytes": 1418,
+      "trace_exec_count": null,
+      "source": "candidate",
+      "transfer": "paced",
+      "mode": "animated",
+      "repeat": 2
+    },
+    {
+      "wall_seconds": 0.7877798970002914,
+      "cpu_seconds": 0.0438409999999998,
+      "exit_code": 0,
+      "payload_sha256_verified": true,
+      "output_bytes": 1384,
+      "trace_exec_count": null,
+      "source": "candidate",
+      "transfer": "paced",
+      "mode": "animated",
+      "repeat": 3
+    },
+    {
+      "wall_seconds": 1.0377123029902577,
+      "cpu_seconds": 0.0606270000000001,
+      "exit_code": 0,
+      "payload_sha256_verified": true,
+      "output_bytes": 378,
+      "trace_exec_count": null,
+      "source": "baseline",
+      "transfer": "paced",
+      "mode": "animated",
+      "repeat": 3
+    },
+    {
+      "wall_seconds": 1.0396516199980397,
+      "cpu_seconds": 0.06264500000000006,
       "exit_code": 0,
       "payload_sha256_verified": true,
       "output_bytes": 395,
@@ -567,59 +615,23 @@
       "source": "baseline",
       "transfer": "paced",
       "mode": "animated",
-      "repeat": 2
+      "repeat": 4
     },
     {
-      "wall_seconds": 0.790017839986831,
-      "cpu_seconds": 0.04658200000000001,
+      "wall_seconds": 0.7891664850030793,
+      "cpu_seconds": 0.0461309999999997,
       "exit_code": 0,
       "payload_sha256_verified": true,
       "output_bytes": 1384,
       "trace_exec_count": null,
       "source": "candidate",
-      "transfer": "paced",
-      "mode": "animated",
-      "repeat": 2
-    },
-    {
-      "wall_seconds": 0.7888448979938403,
-      "cpu_seconds": 0.04618399999999989,
-      "exit_code": 0,
-      "payload_sha256_verified": true,
-      "output_bytes": 1384,
-      "trace_exec_count": null,
-      "source": "candidate",
-      "transfer": "paced",
-      "mode": "animated",
-      "repeat": 3
-    },
-    {
-      "wall_seconds": 1.0401340020034695,
-      "cpu_seconds": 0.06316199999999983,
-      "exit_code": 0,
-      "payload_sha256_verified": true,
-      "output_bytes": 378,
-      "trace_exec_count": null,
-      "source": "baseline",
-      "transfer": "paced",
-      "mode": "animated",
-      "repeat": 3
-    },
-    {
-      "wall_seconds": 1.0389245690021198,
-      "cpu_seconds": 0.06208799999999992,
-      "exit_code": 0,
-      "payload_sha256_verified": true,
-      "output_bytes": 378,
-      "trace_exec_count": null,
-      "source": "baseline",
       "transfer": "paced",
       "mode": "animated",
       "repeat": 4
     },
     {
-      "wall_seconds": 0.792383106003399,
-      "cpu_seconds": 0.04572699999999985,
+      "wall_seconds": 0.7915020490036113,
+      "cpu_seconds": 0.045587000000000266,
       "exit_code": 0,
       "payload_sha256_verified": true,
       "output_bytes": 1367,
@@ -627,23 +639,11 @@
       "source": "candidate",
       "transfer": "paced",
       "mode": "animated",
-      "repeat": 4
-    },
-    {
-      "wall_seconds": 0.7894975469971541,
-      "cpu_seconds": 0.04361400000000004,
-      "exit_code": 0,
-      "payload_sha256_verified": true,
-      "output_bytes": 1452,
-      "trace_exec_count": null,
-      "source": "candidate",
-      "transfer": "paced",
-      "mode": "animated",
       "repeat": 5
     },
     {
-      "wall_seconds": 1.0403097160015022,
-      "cpu_seconds": 0.06228100000000003,
+      "wall_seconds": 1.0392659359931713,
+      "cpu_seconds": 0.06264199999999986,
       "exit_code": 0,
       "payload_sha256_verified": true,
       "output_bytes": 429,
@@ -654,8 +654,8 @@
       "repeat": 5
     },
     {
-      "wall_seconds": 1.0373768580029719,
-      "cpu_seconds": 0.06082399999999999,
+      "wall_seconds": 1.0379732239962323,
+      "cpu_seconds": 0.06116900000000003,
       "exit_code": 0,
       "payload_sha256_verified": true,
       "output_bytes": 429,
@@ -666,8 +666,8 @@
       "repeat": 6
     },
     {
-      "wall_seconds": 0.7908028349920642,
-      "cpu_seconds": 0.04735299999999998,
+      "wall_seconds": 0.792591203993652,
+      "cpu_seconds": 0.047228999999999965,
       "exit_code": 0,
       "payload_sha256_verified": true,
       "output_bytes": 1452,
@@ -680,17 +680,17 @@
   ],
   "traces": [
     {
-      "wall_seconds": 0.8453426740015857,
-      "cpu_seconds": 0.2788579999999996,
+      "wall_seconds": 0.8454713660030393,
+      "cpu_seconds": 0.2780689999999999,
       "exit_code": 0,
       "payload_sha256_verified": true,
-      "output_bytes": 346,
+      "output_bytes": 363,
       "trace_exec_count": 19,
       "source": "baseline"
     },
     {
-      "wall_seconds": 0.8247142799955327,
-      "cpu_seconds": 0.11207500000000015,
+      "wall_seconds": 0.8237716580042616,
+      "cpu_seconds": 0.10845599999999989,
       "exit_code": 0,
       "payload_sha256_verified": true,
       "output_bytes": 1267,
