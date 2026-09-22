@@ -188,20 +188,22 @@ or assembling a complete package. Source checks alone do not qualify an installe
 
 ## Other Linux systems
 
-See the [Linux support plan](linux-support.md) for .43 native package work and
-its outstanding gates. Development recipes are not public installers.
+See the [Linux support matrix](linux-support.md) for the .43 native channels and
+their recorded scope. Development recipes are not public installers.
 
 
 Historical userspace checks cover Ubuntu, Debian, Fedora, Linux Mint and an
-Omarchy-related Arch profile. Consult the [.45 release notes](releases/2026.0.45.md)
-for the recorded checks, and [release status](release-candidate.md) for current downloads. This is not proof of every distribution’s default compositor, audio stack
+Omarchy-related Arch profile. Consult the [support matrix](linux-support.md)
+for those recorded checks, the [.51 release notes](releases/2026.0.51.md) for the
+new Ubuntu/Debian cut, and [release status](release-candidate.md) for current downloads.
+This is not proof of every distribution’s default compositor, audio stack
 or application. RPM/Arch packages require their own native receipts. AppImage,
 Flatpak and Snap are experimental scaffolding, not published support channels.
 See [the compatibility evidence](testing/cross-linux-review-2026-09-15.md).
 
 ## Remove
 
-Quit VOCO first. If the .47 installer enabled its per-login input service, stop
+Quit VOCO first. If the guided installer enabled its per-login input service, stop
 and disable that service before removing the package:
 
 ```bash

@@ -5,8 +5,9 @@
 
 VOCO targets Linux x86-64. The [Linux support matrix](../linux-support.md) records
 package families, runtime floors and qualification limits. The public Ubuntu/Debian release is
-2026.0.47; Fedora, openSUSE and Arch/Omarchy packages remain at 2026.0.43.
-The .47 release includes installer and desktop readiness checks. Consult GitHub
+2026.0.51; Fedora, openSUSE and Arch/Omarchy packages remain at 2026.0.43.
+The .51 release includes installer and desktop readiness checks, measured tray
+bars and the bundled Nemotron recognizer. Consult GitHub
 Releases for the exact published assets.
 macOS and Windows are outside the current scope.
 
