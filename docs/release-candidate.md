@@ -24,7 +24,8 @@ snapshot.
 qualification.** The prepared leak fix is not integrated; the user's dependency
 choice remains pending. Final protected CI, applicable owner and
 physical acceptance, signing and downloaded-asset verification also remain release
-gates. This package is unsigned and unpublished; the owner's installed application
+gates; current CI verdicts are on [PR #67](https://github.com/sergiopesch/voco/pull/67).
+This package is unsigned and unpublished; the owner's installed application
 and recorded public downloads remain .54. Stop before switching fields: desktop
 paste cannot make focus changes atomic with key delivery.
 

@@ -2,8 +2,9 @@
 
 The .55 candidate combines the first-run delivery corrections with the subsequent
 security review, cleanup and native Pulse latency fix. Source, renderer and native
-runtime and isolated package checks pass on the identities recorded below; final
-protected CI remains pending. **Release remains held for the legacy
+runtime and isolated package checks pass on the identities recorded below. The
+four protected CI verdicts for the current source are recorded on
+[PR #67](https://github.com/sergiopesch/voco/pull/67). **Release remains held for the legacy
 Wayland daemon decision and final release gates.** The public and installed app
 remain .54; the tested .55 package is unsigned and unpublished.
 
@@ -101,6 +102,14 @@ and native-host loss. It terminates only its staged native host in a private PID
 namespace. The latest exact-package trial passes all nine cases; Stop-to-teardown
 observations are 58, 59 and 61 ms for those three departures. Earlier failed
 fixture assumptions remain preserved separately.
+
+The first hosted native-Pulse regression failed before capture: the runner
+exported `XDG_CONFIG_HOME` outside the fixture's writable HOME. PulseAudio refused
+to create its configuration directory on the read-only host mount. The fixture
+now gives both the server and native client private XDG and Pulse settings. A
+reproduction with inherited external paths passes after this correction; the
+negative control without the production latency flag still fails. Namespace,
+waveform and latency requirements are unchanged.
 
 In the latest X11 fixture sample, a second launcher process reached accessible
 controls in 56 ms. Done-to-visible-status was 993 ms, including an explicit 600 ms

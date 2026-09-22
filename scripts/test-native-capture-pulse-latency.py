@@ -49,13 +49,21 @@ def private_trial(output, tools):
     assert not any(Path(p).exists() for p in ('/dev/snd', '/dev/input', '/dev/uinput'))
     private = Path('/tmp/voco-pulse-regression')
     private.mkdir(mode=0o700)
-    for name in ('home', 'runtime'):
+    directories = {'HOME': 'home', 'XDG_RUNTIME_DIR': 'runtime', 'XDG_CONFIG_HOME': 'config',
+                   'XDG_CACHE_HOME': 'cache', 'XDG_DATA_HOME': 'data', 'XDG_STATE_HOME': 'state'}
+    for name in directories.values():
         (private / name).mkdir(mode=0o700)
     socket = private / 'pulse.sock'
-    env = {**os.environ, 'HOME': str(private / 'home'),
-           'XDG_RUNTIME_DIR': str(private / 'runtime'), 'PULSE_SERVER': 'unix:' + str(socket)}
-    for key in ('DISPLAY', 'WAYLAND_DISPLAY', 'DBUS_SESSION_BUS_ADDRESS', 'PULSE_COOKIE'):
+    # CI runners can export XDG roots outside HOME. Every writable location and
+    # Pulse client setting must belong to this fixture, including the ctypes client.
+    env = {key: value for key, value in os.environ.items() if not key.startswith('PULSE_')}
+    env.update({key: str(private / name) for key, name in directories.items()})
+    env.update({'XDG_CONFIG_DIRS': str(private / 'config'), 'XDG_DATA_DIRS': str(private / 'data'),
+                'PULSE_SERVER': 'unix:' + str(socket)})
+    for key in ('DISPLAY', 'WAYLAND_DISPLAY', 'DBUS_SESSION_BUS_ADDRESS'):
         env.pop(key, None)
+    os.environ.clear()
+    os.environ.update(env)
     report = {'passed': False, 'lifecyclePassed': False, 'waveformPassed': False,
               'physicalDevicesAvailable': False, 'sourceSha256': digest(output / 'source.c'),
               'fixtureSha256': digest(FIXTURE), 'maximumBufferLatencyUs': MAX_BUFFER_LATENCY_US}
