@@ -1,11 +1,11 @@
 # Linux packages and qualification
 
-**2026.0.52** is the Ubuntu/Debian installer progress release. Its
-[release notes](releases/2026.0.52.md) and
-[qualification record](testing/installer-release-2026-09-22.md) describe exact-package
-checks and their limits. Dictation behavior and the pinned model are unchanged
-from .51. The .43 desktop results below remain historical evidence; other native
-package channels remain at .43.
+**2026.0.53** is the Ubuntu/Debian dependency maintenance release. Its
+[release notes](releases/2026.0.53.md) and
+[qualification record](testing/dependency-release-2026-09-22.md) describe exact-package
+checks and their limits. The patched shortcut actor and pinned Nemotron runtime
+are retained. The .43 desktop results below remain historical evidence; other
+native package channels remain at .43.
 
 This matrix records **2026.0.43** package and desktop qualification. Only assets
 attached to a published [GitHub release](https://github.com/sergiopesch/voco/releases)

@@ -1,7 +1,8 @@
 # VOCO 2026.0.53 dependency qualification · 22 September 2026
 
-The .53 candidate integrates dependency PRs #46–#57 and updates the maintenance
-policy. Publication remains pending. The prior [.52 release](../releases/2026.0.52.md)
+The .53 release integrates dependency PRs #46–#57 and updates the maintenance
+policy. The [signed release](https://github.com/sergiopesch/voco/releases/tag/voco.2026.0.53)
+is published and its anonymous downloads are verified. The prior [.52 release](../releases/2026.0.52.md)
 remains immutable and available for rollback.
 
 ## Identity and scope
@@ -15,8 +16,9 @@ remains immutable and available for rollback.
 The Tauri bundler patches the executable's bundle metadata; provenance records
 the pre-bundle target and the executable extracted from the complete package
 separately. Only the latter is the desktop-test identity. Bundled documentation
-retains its assembly snapshot; final qualification documentation is included in
-the source archive and GitHub repository.
+retains its assembly snapshot. The source archive records qualification at the
+release cut, before signing and publication; the GitHub repository adds completed
+publication verification afterward. Neither frozen artifact is replaced.
 
 ## Dependency regressions
 
@@ -80,8 +82,9 @@ output. Prompt and warning visibility are intentional fallbacks.
 
 Physical microphones, owner-perceived animation, native Wayland cursor delivery,
 and other desktop/application combinations are not requalified by this X11 test.
-Signing, exact draft/public download verification and the final protected merge
-remain publication gates. The hosted release assembler stays disabled.
+The final protected merge, signed tag, five signed checksum manifests and all
+18 draft/public assets passed verification. Latest aliases and the tagged installer
+match the signed bytes. The hosted release assembler stays disabled.
 
 ## Repository hygiene
 
@@ -95,9 +98,17 @@ removed with compare-and-delete leases:
 | codex/tray-meter-setup | `5c2ea1e376ecbf87c263eec35b2b63868d0995cc` |
 | codex/wayland-install-readiness | `13074f3cf4a9a9be7bfe2221d52bec525618a4c2` |
 
-The merged local installer branch was removed at `203e4e0`. All 12 dependency
-heads are retained as ancestors of the integration branch; delete residual remote
-heads only after verifying the protected merge. Automatic branch deletion is
-enabled. Weekly compatible groups, two version PRs per ecosystem and separate
+The merged local installer branch was removed at `203e4e0`. All 12 original
+dependency PRs closed as merged, with their exact tips retained in master.
+Their branches were deleted automatically. Weekly compatible groups, two version
+PRs per ecosystem and separate
 major/input reviews replace the former ungrouped queue of up to 15 version PRs.
 Branch protection and the independent security-update queue are retained.
+
+Published release commit: `75cfd671fdc2b90707b504856c81c288c4755286`.
+Final protected PR head: `154cd99ce3f17f2e2bba96ff8a7f9864aff73d98`.
+All four checks passed on the [final PR](https://github.com/sergiopesch/voco/actions/runs/35720398379)
+and [merged release source](https://github.com/sergiopesch/voco/actions/runs/35720893445).
+
+Dependabot then opened a new, smaller grouped review batch; it is separate from
+the frozen .53 cut.

@@ -9,7 +9,7 @@ A plain Tauri bundle is incomplete. See [packaging](linux-packaging.md).
 ## Published release
 
 The [README command](../README.md#get-started) runs the guided installer from
-the published **2026.0.52** tag. It downloads that exact release and verifies its
+the published **2026.0.53** tag. It downloads that exact release and verifies its
 package checksum before installation. On Wayland it installs the input helpers
 and checks desktop readiness. If setup is incomplete, follow the
 [Wayland setup](platform/README.md#ydotoold-ydotool-daemon) instructions.
@@ -193,7 +193,7 @@ their recorded scope. Development recipes are not public installers.
 
 Historical userspace checks cover Ubuntu, Debian, Fedora, Linux Mint and an
 Omarchy-related Arch profile. Consult the [support matrix](linux-support.md)
-for those recorded checks, the [.52 release notes](releases/2026.0.52.md) for the
+for those recorded checks, the [.53 release notes](releases/2026.0.53.md) for the
 new Ubuntu/Debian cut, and [release status](release-candidate.md) for current downloads.
 This is not proof of every distribution’s default compositor, audio stack
 or application. RPM/Arch packages require their own native receipts. AppImage,
