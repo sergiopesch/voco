@@ -499,8 +499,22 @@ fn desktop_paste_for_target(
         payload.to_owned()
     };
     let result = (|| {
-        let mut metrics = clipboard_paste_with_shortcut(&adjusted, terminal)?;
-        metrics.target_probe_ms = target_probe_ms;
+        let mut guard_probe_ms = 0;
+        let mut metrics = clipboard_paste_with_shortcut(&adjusted, terminal, || {
+            let started = Instant::now();
+            let current = desktop_target();
+            guard_probe_ms = started.elapsed().as_millis() as u64;
+            if current.token.as_deref() != Some(expected_target)
+                || current.shortcut != target.shortcut
+                || !crate::desktop_shortcut::delivery_ready()
+            {
+                return Err(InsertionError::rejected(
+                    "The dictation destination changed before text could be pasted. Review retained text before copying.",
+                ));
+            }
+            Ok(())
+        })?;
+        metrics.target_probe_ms = target_probe_ms.saturating_add(guard_probe_ms);
         metrics.context_separator = separator;
         if let Some(receipt) = &receipt {
             let started = Instant::now();
@@ -964,12 +978,13 @@ fn type_simulation(text: &str) -> Result<ActiveStrategy, InsertionError> {
 }
 
 fn clipboard_paste(text: &str) -> Result<(), InsertionError> {
-    clipboard_paste_with_shortcut(text, false).map(|_| ())
+    clipboard_paste_with_shortcut(text, false, || Ok(())).map(|_| ())
 }
 
 fn clipboard_paste_with_shortcut(
     text: &str,
     terminal: bool,
+    before_paste: impl FnOnce() -> Result<(), InsertionError>,
 ) -> Result<PasteMetrics, InsertionError> {
     let started = Instant::now();
     let preflight = input_preflight();
@@ -1012,7 +1027,8 @@ fn clipboard_paste_with_shortcut(
     let mut paste = process_runner::command(paste_program);
     paste.args(paste_args);
     let preflight_ms = started.elapsed().as_millis() as u64;
-    let (clipboard_ms, keyboard_ms) = clipboard_transaction(payload, &mut copy, &mut paste)?;
+    let (clipboard_ms, keyboard_ms) =
+        clipboard_transaction(payload, &mut copy, &mut paste, before_paste)?;
     Ok(PasteMetrics {
         terminal,
         target_probe_ms: 0,
@@ -1133,6 +1149,7 @@ fn clipboard_transaction(
     text: &str,
     copy: &mut Command,
     paste: &mut Command,
+    before_paste: impl FnOnce() -> Result<(), InsertionError>,
 ) -> Result<(u64, u64), InsertionError> {
     let copy_started = Instant::now();
     run_helper(copy, Some(text.as_bytes()), Duration::from_secs(5)).map_err(|mut error| {
@@ -1141,6 +1158,13 @@ fn clipboard_transaction(
     })?;
 
     let clipboard_ms = copy_started.elapsed().as_millis() as u64;
+    // Clipboard helpers may block. Revalidate the bound destination after they
+    // finish, immediately before sending keys. This narrows the focus race;
+    // it cannot make a desktop keyboard gesture atomic with another app.
+    before_paste().map_err(|mut error| {
+        error.clipboard_changed = true;
+        error
+    })?;
     let paste_started = Instant::now();
     run_helper(paste, None, Duration::from_secs(5)).map_err(|mut error| {
         // Clipboard mutation already happened, even if the paste helper could
@@ -1567,7 +1591,7 @@ mod tests {
             ])
             .arg(&clipboard)
             .arg(&consumed);
-        clipboard_transaction("intended transcript\n", &mut copy, &mut paste).unwrap();
+        clipboard_transaction("intended transcript\n", &mut copy, &mut paste, || Ok(())).unwrap();
         assert_eq!(std::fs::read(&consumed).unwrap(), b"intended transcript\n");
         assert_eq!(std::fs::read(&clipboard).unwrap(), b"new user copy");
         std::fs::remove_file(clipboard).unwrap();
@@ -1576,10 +1600,45 @@ mod tests {
     }
 
     #[test]
+    fn destination_change_after_copy_blocks_keyboard_dispatch() {
+        let directory = std::env::temp_dir().join(format!(
+            "voco-before-paste-test-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir(&directory).unwrap();
+        let clipboard = directory.join("selection");
+        let consumed = directory.join("wrong-recipient");
+        let mut copy = process_runner::command("/bin/sh");
+        copy.args(["-c", "cat > \"$1\"", "copy"]).arg(&clipboard);
+        let mut paste = process_runner::command("/bin/sh");
+        paste
+            .args(["-c", "cp \"$1\" \"$2\"", "paste"])
+            .arg(&clipboard)
+            .arg(&consumed);
+        let result = clipboard_transaction("Synthetic phrase.", &mut copy, &mut paste, || {
+            assert_eq!(std::fs::read(&clipboard).unwrap(), b"Synthetic phrase.");
+            Err(InsertionError::rejected(
+                "Destination changed during clipboard preparation.",
+            ))
+        });
+        let keyboard_was_dispatched = consumed.exists();
+        std::fs::remove_dir_all(directory).unwrap();
+        let error = result.unwrap_err();
+        assert_eq!(error.outcome, DeliveryOutcome::Rejected);
+        assert!(error.clipboard_changed);
+        assert!(!keyboard_was_dispatched);
+    }
+
+    #[test]
     fn failed_paste_after_copy_is_uncertain_even_if_paste_never_spawned() {
         let mut copy = process_runner::command("/bin/cat");
         let mut paste = process_runner::command("/definitely-missing-voco-test-helper");
-        let error = clipboard_transaction("transcript", &mut copy, &mut paste).unwrap_err();
+        let error =
+            clipboard_transaction("transcript", &mut copy, &mut paste, || Ok(())).unwrap_err();
         assert_eq!(error.outcome, DeliveryOutcome::Uncertain);
         assert!(error.clipboard_changed);
     }

@@ -188,8 +188,11 @@ qualify; a password role still rejects. Cold lookup orders its bounded queue by
 cached focus/visibility so hidden popup contents do not consume the budget before
 visible controls. Cached flags only order lookup; fresh admission checks remain
 mandatory. Unfocused terminal panes cannot change an editor's paste chord.
-Existing discovery limits, deadlines,
-exact text/caret checks and no-replay behavior remain in force. See the
+After clipboard preparation, Rust revalidates the bound target and shortcut
+scope immediately before keyboard dispatch. A rejection records that the clipboard
+changed but sends no keys; the destination is never rebound to the new field.
+This narrows, rather than eliminates, the race during a desktop key gesture.
+Existing discovery limits, deadlines, exact text/caret checks and no-replay behavior remain in force. See the
 [application matrix](../testing/application-delivery-2026-09-22.md).
 
 ### Transcript diagnostics and microphone feedback

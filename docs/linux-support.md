@@ -11,6 +11,9 @@ The unreleased **.55 candidate** has a new [application delivery matrix](testing
 Brave and Chromium address bars/editors, Firefox, VS Code, GTK/WebKit controls,
 GNOME Text Editor, Bash and nano. It separates exact-field confirmation from
 terminal dispatch and records toolkit limitations. It does not certify all Linux apps.
+Stop dictation before switching fields. Destination checks run before keyboard
+insertion, but a focus change during a key gesture can still redirect a fragment;
+recovery cannot retract text from another application.
 
 This matrix records **2026.0.43** package and desktop qualification. Only assets
 attached to a published [GitHub release](https://github.com/sergiopesch/voco/releases)

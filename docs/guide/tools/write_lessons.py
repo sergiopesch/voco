@@ -436,7 +436,7 @@ lesson(
         ),
         (
             "Observation has limits",
-            "Accessible-field samples are best-effort local observations, not atomic ownership or compositor paint. Firefox can report newly inserted text before its caret catches up. VOCO waits within the existing three-second limit for exact text and position to agree; an intermediate sample cannot confirm delivery, and an uncertain paste is never replayed. A target can still change between checks.",
+            "Accessible-field samples are best-effort local observations, not atomic ownership or compositor paint. Firefox can report newly inserted text before its caret catches up. VOCO waits within the existing three-second limit for exact text and position to agree; an intermediate sample cannot confirm delivery, and an uncertain paste is never replayed. A final destination check runs after clipboard preparation and before paste keys. A target can still change during the keyboard gesture itself, so stop dictation before switching fields; recovery cannot retract text from another app.",
         ),
     ],
     [

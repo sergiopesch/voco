@@ -40,7 +40,19 @@ remains necessary for page editors, but did not explain the owner's address bar.
 An additional regression checks that visiting an unfocused terminal pane cannot
 change a normal editor's paste shortcut. Terminal classification now uses the
 focused destination (or known terminal process), rather than unrelated nodes.
-Recognition, audio processing and recovery behavior are unchanged.
+A full-app focus stress test also moved the caret while paste preparation was in
+flight and a short fragment reached the new field before readback rejected it.
+Rust now revalidates the bound target and shortcut scope after the clipboard helper
+returns, before starting the keyboard helper. The transaction regression failed
+before this guard; a native fixture holds the clipboard helper, moves focus, then
+releases it to test that exact boundary. The earlier unguarded package demonstrably
+pasted into the second field at this seam.
+
+**A keyboard gesture is still not atomic with another application's focus.** A
+move during the gesture itself can redirect a fragment; readback and recovery
+cannot retract it. Stop dictation before changing fields. Controlled pre-dispatch
+rejection must not be presented as universal prevention of mid-gesture delivery.
+Recognition and audio processing are unchanged; uncertain text is never replayed.
 
 ## Application matrix
 

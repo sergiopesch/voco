@@ -83,6 +83,9 @@ glib 0.20 directly leaves the GTK dependency behind. [Backport](vendor/glib/VOCO
   hidden popup subtrees cannot starve a visible field. Those flags only order
   searches: fresh state, ancestry and caret validation still govern admission.
   Preserve the 128-object discovery budget and the 800 ms helper deadline.
+- Revalidate destination and shortcut scope after clipboard preparation and before
+  keyboard dispatch. Rejection there records the changed clipboard and sends no
+  keys. This is a narrower race window, not atomic ownership during a key gesture.
 - Drain accessibility window-transition events within bounded work and time. Never
   bind through a partially drained queue; cover ordinary GNOME setup backlogs.
 - Logs are optional, private and bounded. No dictated text, audio, clipboard values,
