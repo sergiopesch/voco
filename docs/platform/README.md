@@ -5,8 +5,9 @@
 
 VOCO targets Linux x86-64. The [Linux support matrix](../linux-support.md) records
 package families, runtime floors and qualification limits. The public Ubuntu/Debian release is
-2026.0.47; Fedora, openSUSE and Arch/Omarchy packages remain at 2026.0.43.
-The .47 release includes installer and desktop readiness checks. Consult GitHub
+2026.0.51; Fedora, openSUSE and Arch/Omarchy packages remain at 2026.0.43.
+The .51 release includes installer and desktop readiness checks, measured tray
+bars and the bundled Nemotron recognizer. Consult GitHub
 Releases for the exact published assets.
 macOS and Windows are outside the current scope.
 
@@ -15,7 +16,7 @@ macOS and Windows are outside the current scope.
 - Tauri runtime dependencies: libwebkit2gtk-4.1, libgtk-3, libayatana-appindicator3
 - Node.js 20+ and Rust (for building from source)
 - PulseAudio or PipeWire for microphone access
-- Complete NVIDIA candidate for local CPU streaming; ordinary desktop output uses clipboard paste with best-effort focus guards
+- Complete NVIDIA package for local CPU streaming; ordinary desktop output uses clipboard paste with best-effort focus guards
 - Optional exact-field Chromium extension/native host provides a separate supported-field contract
 - xdotool + xclip (X11); ydotool plus xclip on the GNOME XWayland bridge or wl-copy elsewhere (Wayland) for native desktop delivery
 - No root privileges needed for normal operation
@@ -185,7 +186,7 @@ an earlier snapshot over a newer selection.
 
 ## Browser integration packaging
 
-The Debian candidate includes the native host, static Chrome/Chromium registration manifests,
+The Debian package includes the native host, static Chrome/Chromium registration manifests,
 and unpacked extension sources. It does not install or activate a browser extension in a profile.
 See [installation](../install.md) for explicit setup. Native messaging uses a private same-user
 Unix socket and no network service. The bounded protocol and acceptance limits are documented in

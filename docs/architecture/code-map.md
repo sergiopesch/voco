@@ -1,7 +1,7 @@
 # VOCO code map
 
 This is the reading path for humans and agents working on the Linux dictation
-candidate. Names containing `benchmark` are historical: the files below run in the
+application. Names containing `benchmark` are historical: the files below run in the
 production NVIDIA path. A research adapter's presence does not make it a supported
 user-selectable model.
 
@@ -85,7 +85,7 @@ gates; a draft file is not evidence that its channel or feature is shipped.
 
 ## GNOME panel presentation
 
-`integrations/gnome/` contains the GNOME 46 panel extension, bundled in the .50 Debian candidate.
+`integrations/gnome/` contains the GNOME 46 panel extension, bundled in the Debian package.
 `src-tauri/src/panel.rs` owns its leased session-bus connection; `tray.rs` derives
 state from the same authoritative snapshot as the native tray. `App.tsx` forwards
 only the normalized meter level during recording. No transcript or audio samples

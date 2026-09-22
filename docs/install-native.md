@@ -1,6 +1,6 @@
 # Native Linux packages
 
-This guide describes the **2026.0.51** Ubuntu/Debian release cut. Fedora, openSUSE and Arch/Omarchy packages
+Ubuntu/Debian packages are **2026.0.51**. Fedora, openSUSE and Arch/Omarchy packages
 remain **2026.0.43**. Use each channel only with assets from its matching published
 [GitHub release](https://github.com/sergiopesch/voco/releases).
 Source files and drafts do not establish availability; check

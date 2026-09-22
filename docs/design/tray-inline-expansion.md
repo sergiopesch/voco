@@ -32,7 +32,7 @@ extension supports an adjacent label. VOCO's current Tauri tray implementation
 can supply it through `TrayIcon::set_title`, backed by AppIndicator `set_label`.
 This provides native horizontal icon-and-text allocation without a new dependency.
 It does not provide React children, inline buttons, or VOCO control over width
-interpolation. Other tray hosts may omit the title entirely. The next candidate
+interpolation. Other tray hosts may omit the title entirely. The .51 release
 uses the native icon slot for a measured waveform while recording, removing the
 adjacent Ready text. It selects from 64 immutable images, with bounded updates
 and a short envelope instead of allocating images continuously. Accessible status

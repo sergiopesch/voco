@@ -16,7 +16,7 @@ covering adjacent indicators. The microphone remains an accessible Stop control.
 
 ## Build and install
 
-The .50 Debian candidate includes this GNOME Shell 46 extension. The guided
+The Debian package includes this GNOME Shell 46 extension. The guided
 installer calls `voco --setup-panel` for its current desktop user. A manual APT
 installation can use that command or **Enable live panel** in onboarding/Help.
 Package hooks do not touch user extension settings. A newly installed component
@@ -32,9 +32,10 @@ python3 scripts/package-gnome-panel.py /tmp/voco-panel@voco.local.shell-extensio
 
 Disable with `gnome-extensions disable voco-panel@voco.local`. The ordinary VOCO
 tray returns on detach, or within approximately six seconds after lost heartbeats.
-Its label reports Starting, Listening or Finishing where the desktop supports
-labels, and its menu always shows status. The .47 published release supplies the
-companion separately; source .50 is not a published release.
+Its label reports Starting or Finishing where the desktop supports labels.
+During recording it replaces Ready with measured-volume bars; Stop restores
+Ready. Its menu always shows status and an explicit Stop action. See
+[release status](../../docs/release-candidate.md) for current downloads.
 
 ## Bridge
 
@@ -44,12 +45,12 @@ interface `org.voco.Panel1`. `Attach` accepts only the current unique owner of
 `GetState` returns protocol version 1 with status, fixed descriptive text, a
 renderer epoch/revision token, action availability and a finite level in [0,1].
 No speech, samples, target-window titles, clipboard contents or device names cross
-this interface. Meter values expire after 500 ms. The renderer supplies at most
-one meter update per 100 ms with at most one call in flight, only while recording.
+this interface. Meter values expire after 250 ms. The renderer supplies at most
+one meter update per 40 ms with at most one call in flight, only while recording.
 Capture-store events drive updates without an additional hidden-window timer.
 
 A directed `Changed` signal updates transitions immediately. The extension also
-polls at 100 ms while active and 1500 ms while idle for meter updates and leases. Calls have a
+polls at 50 ms while active and 1500 ms while idle for meter updates and leases. Calls have a
 1500 ms deadline and target the app's unique bus owner without auto-start. A
 transient error hides the extension and schedules a bounded-rate reconnect.
 `Action(action, token)` rejects stale tokens. Stop is explicit rather than toggle,

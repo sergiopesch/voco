@@ -11,17 +11,17 @@ recognition runs on your computer. No account, subscription or cloud transcripti
 - **Live dictation:** words and punctuation appear as you speak.
 - **One shortcut:** press `Alt+D` to start, then again to stop.
 - **Local English model:** NVIDIA Nemotron runs on the CPU; no GPU needed.
-- **Tray-first:** VOCO stays out of the way while you work.
+- **Live tray feedback:** volume bars follow your voice; Stop returns to Ready.
 
 ## Get started
 
 Install the current public Ubuntu/Debian x86_64 release with one command:
 
 ```bash
-wget -qO voco-install https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.47/install && bash voco-install
+wget -qO voco-install https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.51/install && bash voco-install
 ```
 
-The guided installer downloads **2026.0.47**, verifies the package checksum and
+The guided installer downloads **2026.0.51**, verifies the package checksum and
 installs the package and required Wayland input helpers. Desktop readiness is
 checked before onboarding finishes. If setup is incomplete, follow the
 [desktop input setup](docs/platform/README.md#ydotoold-ydotool-daemon) instructions.
@@ -55,14 +55,15 @@ with full-resolution release graphics, exact values and methods.
 
 ## Native Linux packages
 
-**2026.0.47** brings clearer onboarding, refined tray controls and installer progress to Ubuntu/Debian.
+**2026.0.51** brings live tray bars, microphone setup in one canvas and a single
+bundled recognizer to Ubuntu/Debian.
 Fedora, openSUSE and Arch/Omarchy packages remain at **2026.0.43**; download those
 from their matching release. Install only assets attached to a published release.
 Wayland uses native microphone capture so dictation can start with its panel
 hidden; X11 keeps browser capture.
 See the [support matrix](docs/linux-support.md),
 [native package installation](docs/install-native.md) and
-[.47 changes and qualification](docs/releases/2026.0.47.md).
+[.51 changes and qualification](docs/releases/2026.0.51.md).
 
 ## Contribute
 

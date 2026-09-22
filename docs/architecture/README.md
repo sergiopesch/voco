@@ -69,7 +69,7 @@ IBus remains shortcut-only; protocol 6 rejects text mutation. Neither integratio
 establishes universal desktop or Wayland qualification.
 
 Whisper and its downloader, native dependencies and alternate recognition commands
-were removed in the .51 development source. Earlier evaluation documents describe
+were removed in the .51 release. Earlier evaluation documents describe
 historical implementations. Assistant, OpenClaw, conversation and enhancement
 capabilities remain retired; see [security boundaries](../security/README.md).
 

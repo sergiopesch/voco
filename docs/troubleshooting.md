@@ -41,8 +41,7 @@ testing. Do not remap S or change recipient-app shortcuts to work around this bu
 
 ## Final words or punctuation need review
 
-Stop must drain the captured tail before the worker finishes. The final candidate
-regressions cover this ordering. Normal dictation remains append-only: it does not
+Stop must drain the captured tail before the worker finishes. Regression tests cover this ordering. Normal dictation remains append-only: it does not
 rewrite previously inserted sentences after Stop. A good transcript in one test
 does not establish punctuation quality across voices and speaking styles. Keep
 recognition accuracy, exact delivery and whole-message refinement separate.
@@ -65,7 +64,7 @@ query from an older event cannot dismiss a panel after a newer focus observation
 
 ## Set up exact-field Chromium dictation
 
-The development Debian candidate includes a native host and unpacked extension files. Follow
+The Debian package includes a native host and unpacked extension files. Follow
 [installation](install.md) for explicit browser setup; building the package does not activate an
 extension in the current profile. Once enabled, click the extension action to authorize the tab,
 focus an eligible plain-text input or textarea, and use `Alt+Shift+V` to start and stop. The ordinary
@@ -245,7 +244,7 @@ Ubuntu App Center are not published VOCO release channels.
 
 ## No live bars or Listening in the top panel
 
-In .50, run `voco --check-panel`. If disabled, use **Enable live panel** in Help or
+Run `voco --check-panel`. If disabled, use **Enable live panel** in Help or
 run `voco --setup-panel`. If enabled but waiting for a new session, save your work,
 sign out and back in. A global Extensions switch or administrator policy is not
 changed by VOCO. GNOME versions other than 46 use the native tray fallback.
@@ -254,11 +253,11 @@ the desktop. Disabling the companion restores the native tray.
 
 ## Opening VOCO again does nothing
 
-The .50 launcher asks the existing app to present its current idle window. It does
+The launcher asks the existing app to present its current idle window. It does
 not launch another recognizer or interrupt a recording. Finish dictation first if
 VOCO is Listening or Finishing. After upgrading while an older app is still
 running, quit that app through its tray and reopen VOCO once. Do not kill an app
 that has an unfinished recording or recovery you need.
 
-Completing onboarding in .50 leaves Ready visible. The worker from your voice
+Completing onboarding leaves Ready visible. The worker from your voice
 test remains warm; completing setup does not start a second model process.

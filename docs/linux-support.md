@@ -1,6 +1,6 @@
 # Linux packages and qualification
 
-**2026.0.51** is an Ubuntu/Debian tray, setup and recognition-engine release cut. Its
+**2026.0.51** is an Ubuntu/Debian tray, setup and recognition-engine release. Its
 [release notes](releases/2026.0.51.md) and
 [qualification record](testing/tray-setup-2026-09-21.md) describe its verification and limits.
 The .43 desktop results below remain historical .43 evidence, not qualification

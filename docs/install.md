@@ -9,7 +9,7 @@ A plain Tauri bundle is incomplete. See [packaging](linux-packaging.md).
 ## Published release
 
 The [README command](../README.md#get-started) runs the guided installer from
-the published **2026.0.47** tag. It downloads that exact release and verifies its
+the published **2026.0.51** tag. It downloads that exact release and verifies its
 package checksum before installation. On Wayland it installs the input helpers
 and checks desktop readiness. If setup is incomplete, follow the
 [Wayland setup](platform/README.md#ydotoold-ydotool-daemon) instructions.
@@ -136,7 +136,7 @@ command cannot identify which key your desktop assigned. See the
 
 ### GNOME tray integration
 
-The unpublished .50 Debian candidate bundles the GNOME 46 live panel. Its guided
+The Debian package bundles the GNOME 46 live panel. The guided
 installer runs `voco --setup-panel` as the desktop user. After a manual APT install,
 use the same command or **Enable live panel** in onboarding/Help. This adds only
 VOCO to enabled extensions; it preserves other extensions and global policy.
@@ -166,10 +166,9 @@ GNOME session and KDE/Omarchy have their own tray integrations. Installing an
 extension does not configure microphone access, a compositor shortcut or ydotoold.
 
 The model lives under `/usr/lib/voco/speech`. Readiness follows worker warmup.
-In the .51 development source, desktop dictation, browser dictation and explicit
-recovery use the bundled Nemotron model. No separate recognition model is downloaded.
-A failed warmup reports an error. Published older versions retain their documented
-behavior; see [release status](release-candidate.md).
+Desktop dictation, browser dictation and explicit recovery use the bundled
+Nemotron model. No separate recognition model is downloaded. A failed warmup
+reports an error. See [release status](release-candidate.md) for current downloads.
 
 ## Source development
 
@@ -188,20 +187,22 @@ or assembling a complete package. Source checks alone do not qualify an installe
 
 ## Other Linux systems
 
-See the [Linux support plan](linux-support.md) for .43 native package work and
-its outstanding gates. Development recipes are not public installers.
+See the [Linux support matrix](linux-support.md) for the .43 native channels and
+their recorded scope. Development recipes are not public installers.
 
 
 Historical userspace checks cover Ubuntu, Debian, Fedora, Linux Mint and an
-Omarchy-related Arch profile. Consult the [.45 release notes](releases/2026.0.45.md)
-for the recorded checks, and [release status](release-candidate.md) for current downloads. This is not proof of every distribution’s default compositor, audio stack
+Omarchy-related Arch profile. Consult the [support matrix](linux-support.md)
+for those recorded checks, the [.51 release notes](releases/2026.0.51.md) for the
+new Ubuntu/Debian cut, and [release status](release-candidate.md) for current downloads.
+This is not proof of every distribution’s default compositor, audio stack
 or application. RPM/Arch packages require their own native receipts. AppImage,
 Flatpak and Snap are experimental scaffolding, not published support channels.
 See [the compatibility evidence](testing/cross-linux-review-2026-09-15.md).
 
 ## Remove
 
-Quit VOCO first. If the .47 installer enabled its per-login input service, stop
+Quit VOCO first. If the guided installer enabled its per-login input service, stop
 and disable that service before removing the package:
 
 ```bash
