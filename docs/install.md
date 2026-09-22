@@ -9,7 +9,7 @@ A plain Tauri bundle is incomplete. See [packaging](linux-packaging.md).
 ## Published release
 
 The [README command](../README.md#get-started) runs the guided installer from
-the published **2026.0.47** tag. It downloads that exact release and verifies its
+the published **2026.0.51** tag. It downloads that exact release and verifies its
 package checksum before installation. On Wayland it installs the input helpers
 and checks desktop readiness. If setup is incomplete, follow the
 [Wayland setup](platform/README.md#ydotoold-ydotool-daemon) instructions.

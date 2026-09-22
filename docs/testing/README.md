@@ -1,6 +1,9 @@
 # Testing
 
-The [.51 tray, setup and single-engine integration record](tray-setup-2026-09-21.md) describes the next local candidate and its remaining acceptance gates.
+The [.51 public release record](linux-release-2026-09-22.md) identifies the signed
+package, source and verified downloads. The
+[tray, setup and single-engine integration record](tray-setup-2026-09-21.md)
+retains the candidate's desktop/audio evidence and remaining coverage limits.
 
 [Wayland installation and onboarding readiness](wayland-install-2026-09-20.md) records the .46 regression fix and installed-guest scope.
 
