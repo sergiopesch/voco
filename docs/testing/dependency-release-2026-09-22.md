@@ -16,8 +16,9 @@ remains immutable and available for rollback.
 The Tauri bundler patches the executable's bundle metadata; provenance records
 the pre-bundle target and the executable extracted from the complete package
 separately. Only the latter is the desktop-test identity. Bundled documentation
-retains its assembly snapshot; final qualification documentation is included in
-the source archive and GitHub repository.
+retains its assembly snapshot. The source archive records qualification at the
+release cut, before signing and publication; the GitHub repository adds completed
+publication verification afterward. Neither frozen artifact is replaced.
 
 ## Dependency regressions
 

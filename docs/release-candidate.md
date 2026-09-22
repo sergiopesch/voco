@@ -17,7 +17,9 @@ All four protected checks passed on the final PR and merged source. The complete
 package passed payload/metadata verification, Ubuntu container installation/removal,
 13 packaged worker checks and 12 isolated GNOME X11 desktop cases. Publisher
 signatures and every draft/public asset were downloaded and verified. The source
-archive includes the final qualification record; bundled docs retain their assembly snapshot.
+archive retains the qualification snapshot from the release cut. Publication
+verification was added afterward to the repository's qualification record;
+bundled docs retain their earlier assembly snapshot.
 
 The new grouped dependency queue is the next review batch, separate from this
 frozen release. New application bytes require another qualified version.
