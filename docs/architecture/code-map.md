@@ -5,6 +5,18 @@ application. Names containing `benchmark` are historical: the files below run in
 production NVIDIA path. A research adapter's presence does not make it a supported
 user-selectable model.
 
+## Installer presentation
+
+`install` remains a standalone Bash download. `scripts/lib/install-ui.sh` owns
+bounded terminal rendering and the optional APT wrapper;
+`scripts/lib/install-apt-ui.py` observes separate status/output streams using only
+Python's standard library. `scripts/sync-installer-ui.py` embeds both into `install`;
+run it after editing either source. `--check` is part of the DevOps gate. Shared
+installation/readiness behavior stays in `scripts/lib/install-common.sh`, with
+its existing exact-copy check. Presentation never owns package success or readiness.
+See the [performance report](../testing/installer-performance-2026-09-22.md) for
+the bounded tests, benchmark and disposable-container APT prompt check.
+
 ## Before recording
 
 Backend startup warms the bundled Nemotron worker. Readiness requires its successful

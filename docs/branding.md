@@ -241,3 +241,16 @@ package details stay out of the main flow; APT and final readiness checks remain
 authoritative. New installs use Alt+D; upgrades keep the existing shortcut. Terminal completion hands off to the actual Start test,
 Finish test and Done controls; installation alone does not claim voice setup is
 complete.
+
+The unreleased installer candidate extends this vocabulary with **Signal + Silver
+sweep**. Seven bars retain recent measured transfer rates, including quiet samples;
+they do not imitate microphone capture. A single brief silver highlight marks a
+phase entry and stops when the work finishes, even before the highlight completes.
+Downloads repaint at four samples per second; APT updates are event driven and
+paint at most ten times per second. Neither rendering nor a cosmetic completion
+pause may delay installation. Package percentages belong only to APT's current
+phase. Questions and unexpected output release the view to ordinary terminal text.
+GNOME reduced motion or `VOCO_INSTALL_NO_MOTION=1` removes moving bars and sweeps;
+`VOCO_INSTALL_PLAIN=1`, redirected output, `NO_COLOR` and `TERM=dumb` use static
+output. The [dated measurements](testing/installer-performance-2026-09-22.md)
+qualify this source candidate separately from the public .51 installer.

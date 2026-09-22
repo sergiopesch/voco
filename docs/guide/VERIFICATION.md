@@ -1,5 +1,17 @@
 # Guide verification history
 
+## Installer performance candidate · 22 September 2026
+
+The Linux chapter now describes the unreleased Signal + Silver sweep installer
+candidate, distinguishes local download timings from whole-install performance,
+and keeps the historical .43 code catalog unchanged. All nine guide tests and
+authored lesson regeneration pass. Local browser checks verified the new lesson,
+journey next step, quiz feedback, pinned source modal, installation-file search,
+glossary and narrow chapter drawer. At a 390 × 844 viewport, content and scroll
+widths both measured 375 px; no horizontal overflow or console warnings/errors
+were observed. The viewport was restored and the test tab closed. These checks
+qualify the guide, not a public release or physical desktop installation.
+
 ## Rich-editor follow-up · 21 September 2026
 
 The delivery chapter explains the .48 first-word confirmation failure and the

@@ -235,3 +235,18 @@ package; private diagnostic logs remain restricted to your account.
 A failed download prints the path to a private diagnostic log. A missing release
 file points to the versioned release page; connection failures suggest checking
 the connection and rerunning. Successful runs remove the temporary log.
+
+The **unreleased installer candidate** adds Signal + Silver sweep presentation.
+Signal bars show recent measured download rates; a brief silver highlight marks
+entry into a phase. Animation never introduces a minimum stage duration. Release
+checksums download alongside the package, but verification still completes before
+installation. Unfinished optional helper prefetches defer to the final APT transaction.
+
+On an interactive terminal with Python already available, APT reports its own
+package progress inside the VOCO view. Passwords, package questions and unexpected
+output remain visible. APT percentages describe its current phase, not the whole
+installation. Minimal systems and restricted sudo policies retain ordinary APT
+output; no presentation dependency is installed. Set `VOCO_INSTALL_NO_MOTION=1`
+to keep measured updates without animation, or `VOCO_INSTALL_PLAIN=1` for static
+output. GNOME's disabled-animation setting is also respected. See the
+[measured comparison and qualification limits](testing/installer-performance-2026-09-22.md).
