@@ -6,11 +6,11 @@ set -euo pipefail
 #
 # VOCO — release install helper
 # Usage:
-#   wget https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.51/install -O voco-install
+#   wget https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.52/install -O voco-install
 #   chmod +x voco-install
 #   ./voco-install
 
-VERSION="2026.0.51"
+VERSION="2026.0.52"
 RELEASE_TAG="voco.${VERSION}"
 DEB_URL="https://github.com/sergiopesch/voco/releases/download/${RELEASE_TAG}/voco_${VERSION}_amd64.deb"
 CHECKSUMS_URL="https://github.com/sergiopesch/voco/releases/download/${RELEASE_TAG}/voco_checksums.txt"
@@ -27,7 +27,7 @@ WHITE='\033[37m'
 NC='\033[0m'
 
 VOCO_TERMINAL_MOTION=false
-if [[ -t 1 && "${TERM:-dumb}" != dumb && -z "${NO_COLOR+x}" ]]; then
+if [[ -t 1 && "${TERM:-dumb}" != dumb && -z "${NO_COLOR+x}" && "${VOCO_INSTALL_PLAIN:-0}" != 1 && "${BASH_VERSINFO[0]}" -ge 5 ]]; then
   VOCO_TERMINAL_MOTION=true
 else
   BOLD='' DIM='' GRAPHITE='' GRAPHITE_SOFT='' GREEN='' YELLOW='' RED='' WHITE='' NC=''
@@ -35,7 +35,15 @@ fi
 
 ok()   { printf "  ${GREEN}✓${NC} %s\n" "$*"; }
 warn() { printf "  ${YELLOW}⚠${NC} %s\n" "$*"; }
-err()  { printf "  ${RED}✗${NC} %s\n" "$*"; exit 1; }
+err()  {
+  if declare -F voco_ui_release >/dev/null; then voco_ui_release; fi
+  printf "  ${RED}✗${NC} %s\n" "$*"
+  if [[ -n "${VOCO_INSTALL_LOG:-}" ]]; then
+    VOCO_KEEP_LOG=true
+    dim "Details: $VOCO_INSTALL_LOG"
+  fi
+  exit 1
+}
 dim()  { printf "  ${DIM}%s${NC}\n" "$*"; }
 
 voco_escape_json_string() {
@@ -371,7 +379,9 @@ voco_install_deb_package() {
       done
     fi
   fi
-  if ! sudo apt-get install -y -- "${packages[@]}"; then
+  local -a install_command=(sudo apt-get install -y --)
+  if declare -F voco_run_apt >/dev/null; then install_command=(voco_run_apt); fi
+  if ! "${install_command[@]}" "${packages[@]}"; then
     VOCO_INSTALL_ERROR="APT could not install VOCO and its desktop dependencies. Resolve the error above, then run the installer again."
     return 1
   fi
@@ -573,44 +583,389 @@ voco_run_hotkey_setup() {
   VOCO_CONFIG_FILE="${config_file}"
 }
 
+# BEGIN EMBEDDED INSTALLER UI
+#!/usr/bin/env bash
+# Embedded into the standalone installer by sync-installer-ui.py.
+# Presentation never owns the download: the foreground waits on wget itself.
+VOCO_UI_PID=""
+VOCO_UI_TIMER_FD=""
+VOCO_UI_OPEN=false
+VOCO_UI_NO_MOTION=false
+VOCO_UI_LAST_BYTES=0
+VOCO_UI_LAST_TIME=0
+VOCO_UI_RATES=(0 0 0 0 0 0 0)
+
+voco_ui_init() {
+  if [[ "${VOCO_INSTALL_PLAIN:-0}" == 1 ]]; then VOCO_TERMINAL_MOTION=false; fi
+  if [[ "${VOCO_INSTALL_NO_MOTION:-0}" == 1 ]]; then
+    VOCO_UI_NO_MOTION=true
+  elif [[ "${XDG_CURRENT_DESKTOP:-}" == *GNOME* ]] && command -v gsettings >/dev/null 2>&1; then
+    if [[ "$(gsettings get org.gnome.desktop.interface enable-animations 2>/dev/null)" == false ]]; then
+      VOCO_UI_NO_MOTION=true
+    fi
+  fi
+  [[ "$VOCO_TERMINAL_MOTION" == true ]] || return 0
+  # An owned, unlinked FIFO gives read -t a timer without a sleep subprocess.
+  local fifo="$VOCO_DOWNLOAD_DIR/ui-timer"
+  mkfifo -m 600 "$fifo"
+  exec {VOCO_UI_TIMER_FD}<>"$fifo"
+  rm -f -- "$fifo"
+}
+
+voco_ui_size() {
+  local bytes="$1" unit=KiB divisor=1024
+  if (( bytes >= 1048576 )); then unit=MiB; divisor=1048576; fi
+  printf -v VOCO_UI_SIZE '%d.%d %s' "$((bytes/divisor))" "$((bytes%divisor*10/divisor))" "$unit"
+}
+
+voco_ui_frame() {
+  [[ "$VOCO_TERMINAL_MOTION" == true ]] || return 0
+  local title="$1" detail="$2" mark="${3:-—}" shine="${4:--1}" width wordmark='V O C O' i letter
+  width="${VOCO_TERMINAL_COLUMNS:-80}"
+  [[ "$width" =~ ^[0-9]+$ ]] || width=80
+  (( width >= 20 )) || return 0
+  width=$((width-5))
+  title="${title:0:width}"; detail="${detail:0:width}"
+  if (( shine >= 0 )) && [[ "$VOCO_UI_NO_MOTION" != true ]]; then
+    wordmark=''
+    for ((i=0;i<4;i++)); do
+      letter="${VOCO_UI_LETTERS:i:1}"
+      if (( i == shine )); then wordmark+="${WHITE}${letter}${GRAPHITE}"; else wordmark+="$letter"; fi
+      wordmark+=' '
+    done
+  fi
+  printf '\033[4A\r\033[K  %b%b%b\n\033[K  %s\n\033[K  %s\n\033[K  %s\n' \
+    "$GRAPHITE" "$wordmark" "$NC" "$mark" "$title" "$detail"
+}
+VOCO_UI_LETTERS=VOCO
+
+voco_ui_begin() {
+  [[ "$VOCO_TERMINAL_MOTION" == true ]] || return 0
+  voco_ui_pause
+  if [[ "$VOCO_UI_OPEN" != true ]]; then printf '\n\n\n\n'; VOCO_UI_OPEN=true; fi
+  voco_ui_frame "$1" "${2:-}" "${3:-—}"
+}
+
+voco_ui_sweep() {
+  voco_ui_begin "$1" "$2"
+  [[ "$VOCO_TERMINAL_MOTION" == true && "$VOCO_UI_NO_MOTION" != true ]] || return 0
+  (
+    trap - EXIT
+    trap 'exit 0' TERM INT
+    local shine
+    for shine in 0 1 2 3; do
+      voco_ui_frame "$1" "$2" '—' "$shine"
+      IFS= read -r -t .125 -u "$VOCO_UI_TIMER_FD" _ || true
+    done
+    voco_ui_frame "$1" "$2" '—'
+  ) &
+  VOCO_UI_PID=$!
+}
+
+voco_ui_pause() {
+  if [[ -n "$VOCO_UI_PID" ]]; then
+    kill "$VOCO_UI_PID" 2>/dev/null || true
+    wait "$VOCO_UI_PID" 2>/dev/null || true
+    VOCO_UI_PID=""
+  fi
+}
+
+voco_ui_release() {
+  voco_ui_pause
+  VOCO_UI_OPEN=false
+}
+
+voco_ui_download_observer() {
+  trap - EXIT
+  trap 'exit 0' TERM INT
+  local destination="$1" initial="$2" start="$3" bytes="$2" now delta rate elapsed tick=0 mark detail shine
+  local glyphs=(▁ ▂ ▃ ▄ ▅ ▆ ▇ █) value
+  VOCO_UI_LAST_BYTES=$initial
+  VOCO_UI_LAST_TIME=${EPOCHREALTIME/./}
+  while :; do
+    # Sample at 4 Hz; the short entry sweep uses only shell builtins between samples.
+    if (( tick % 2 == 0 )); then
+      bytes=$(stat -c %s -- "$destination" 2>/dev/null || printf '0')
+      now=${EPOCHREALTIME/./}
+      delta=$((now-VOCO_UI_LAST_TIME))
+      rate=0
+      if (( delta > 0 && bytes >= VOCO_UI_LAST_BYTES )); then rate=$(((bytes-VOCO_UI_LAST_BYTES)*1000000/delta)); fi
+      VOCO_UI_LAST_BYTES=$bytes; VOCO_UI_LAST_TIME=$now
+      VOCO_UI_RATES=("${VOCO_UI_RATES[@]:1}" "$rate")
+      elapsed=$((SECONDS-start))
+      voco_ui_size "$bytes"; detail="$VOCO_UI_SIZE received"
+      if (( elapsed > 0 )); then
+        voco_ui_size "$(((bytes>initial?bytes-initial:0)/elapsed))"; detail+=" · $VOCO_UI_SIZE/s avg"
+      fi
+      mark=''
+      if [[ "$VOCO_UI_NO_MOTION" == true ]]; then mark='↓'; else
+        # A fixed logarithmic scale keeps rates comparable without needing a known total.
+        for value in "${VOCO_UI_RATES[@]}"; do
+          if (( value == 0 )); then mark+='· '; else
+            value=$((value/131072)); local level=0
+            while (( value > 1 && level < 7 )); do value=$((value/2)); level=$((level+1)); done
+            mark+="${glyphs[level]} "
+          fi
+        done
+      fi
+    fi
+    shine=-1
+    if (( tick < 4 )); then shine=$tick; fi
+    if (( tick < 6 || tick % 2 == 0 )); then voco_ui_frame 'Bringing VOCO to your desktop.' "$detail" "$mark" "$shine"; fi
+    IFS= read -r -t .125 -u "$VOCO_UI_TIMER_FD" _ || true
+    tick=$((tick+1))
+  done
+}
+
+voco_ui_close() {
+  voco_ui_pause
+  if [[ -n "$VOCO_UI_TIMER_FD" ]]; then exec {VOCO_UI_TIMER_FD}>&-; VOCO_UI_TIMER_FD=""; fi
+}
+
+voco_run_apt() {
+  local result=0
+  local wrapper='exec 3>&1 1>&2; exec apt-get -q=2 -o APT::Status-Fd=3 -o Dpkg::Use-Pty=0 install -y -- "$@"'
+  local output_fd fifo="$VOCO_DOWNLOAD_DIR/apt-output"
+  local -a statuses
+  # Minimal systems use APT's own presentation until Python is installed. There
+  # is never a download/install of a framework just to display progress.
+  if [[ "$VOCO_TERMINAL_MOTION" != true || ! -t 0 ]] || ! command -v python3 >/dev/null 2>&1; then
+    sudo apt-get install -y -- "$@"
+    return $?
+  fi
+  voco_ui_release
+  dim 'Ubuntu needs your permission to install VOCO.'
+  sudo -v || return $?
+  # Respect sudo policies that permit apt-get but not an exec wrapper. Do not ask
+  # owners to broaden permissions just for presentation.
+  if ! sudo -n -l -- sh -c "$wrapper" voco-apt "$@" >/dev/null 2>&1; then
+    sudo apt-get install -y -- "$@"
+    return $?
+  fi
+  voco_ui_begin 'Setting up VOCO.' 'Resolving package dependencies.'
+  [[ -n "$VOCO_INSTALL_LOG" ]] || VOCO_INSTALL_LOG=$(mktemp "${TMPDIR:-/tmp}/voco-install.XXXXXX.log")
+  mkfifo -m 600 "$fifo"
+  exec {output_fd}<>"$fifo"
+  rm -f -- "$fifo"
+  # APT marks its status descriptor close-on-exec before dpkg starts. A dedicated
+  # fd is essential: using stdout would close maintainer-script output. Create fd
+  # 3 AFTER sudo, with a fixed wrapper and separate arguments (never interpolation).
+  if sudo sh -c "$wrapper" voco-apt "$@" 2>&"$output_fd" |
+      voco_apt_display "$VOCO_INSTALL_LOG" "$VOCO_UI_NO_MOTION" separate 4<&"$output_fd"; then
+    result=0
+  else
+    statuses=("${PIPESTATUS[@]}")
+    result=${statuses[0]}
+    (( result != 0 )) || result=${statuses[1]}
+  fi
+  exec {output_fd}>&-
+  voco_ui_release
+  if (( result != 0 )); then
+    VOCO_KEEP_LOG=true
+    dim "Installation details: $VOCO_INSTALL_LOG"
+  fi
+  return "$result"
+}
+
+voco_apt_display() {
+  local code
+  IFS= read -r -d '' code <<'VOCO_APT_PY' || true
+#!/usr/bin/env python3
+"""Observe separate APT status/output streams without changing terminal input.
+
+APT closes its progress descriptor before invoking dpkg. The caller creates that
+separate descriptor after sudo; package-script stdout/stderr stay intact. Unknown
+output and non-newline prompts suspend presentation and remain visible.
+"""
+import contextlib
+import os
+import re
+import select
+import shutil
+import sys
+import time
+
+ROUTINE = re.compile(
+    r'^(?:Reading package lists|Building dependency tree|Reading state information|'
+    r'Note, selecting |The following (?:additional packages|NEW packages|packages will be upgraded)|'
+    r'Suggested packages:|Recommended packages:|'
+    r'\d+ upgraded, \d+ newly installed,|Need to get |After this operation, |'
+    r'Get:\d+ |Fetched |Selecting previously unselected package |'
+    r'\(Reading database|Preparing to unpack |Unpacking |Setting up |Processing triggers for |'
+    r'debconf: delaying package configuration, since apt-utils is not installed$)'
+)
+STATUS = re.compile(r'^(pmstatus|dlstatus):([^:]*):([0-9]+(?:\.[0-9]+)?):(.*)$')
+
+
+def main():
+    path, no_motion = sys.argv[1:3]
+    separate = len(sys.argv) > 3 and sys.argv[3] == 'separate'
+    output_fd = 4 if separate else 0
+    streams = [0, 4] if separate else [0]
+    pending = {fd: b'' for fd in streams}
+    passthrough = False
+    detail = 'Resolving package dependencies.'
+    mark = '—'
+    start = time.monotonic()
+    last_frame = 0.0
+    dirty = True
+    partial_since = None
+    finished = False
+
+    def write(data):
+        sys.stdout.buffer.write(data)
+        sys.stdout.buffer.flush()
+
+    def frame(now):
+        nonlocal last_frame, dirty
+        width = max(10, shutil.get_terminal_size((80, 24)).columns - 5)
+        age = now - start
+        wordmark = 'V O C O'
+        if no_motion != 'true' and age < .5:
+            position = min(3, int(age * 8))
+            wordmark = ' '.join(('\033[37m' if i == position else '\033[38;2;122;128;138m') + c for i, c in enumerate('VOCO')) + '\033[0m'
+        write(('\033[4A\r\033[K  ' + wordmark + '\n\033[K  ' + mark +
+               '\n\033[K  Setting up VOCO.\n\033[K  ' + detail[:width] + '\n').encode())
+        last_frame = now
+        dirty = False
+
+    def status(raw):
+        nonlocal passthrough, detail, mark, dirty
+        text = raw.decode('utf-8', 'replace').rstrip('\r\n')
+        match = STATUS.fullmatch(text)
+        if match:
+            kind, package, percent, description = match.groups()
+            amount = float(percent)
+            if not 0 <= amount <= 100:
+                passthrough = True
+            elif not passthrough:
+                # APT's phase progress is never whole-installer progress.
+                detail = ('Desktop dependencies' if kind == 'dlstatus' else 'Package setup') + f' · {int(amount)}%'
+                mark = '↓' if kind == 'dlstatus' else ' '.join('●' if amount >= step else '○' for step in (25, 50, 75, 100))
+                dirty = True
+            return True
+        if text.startswith(('pmconffile:', 'media-change:', 'pmerror:')):
+            passthrough = True
+            if text.startswith(('pmerror:', 'media-change:')):
+                write(('\n' + text.split(':', 3)[-1] + '\n').encode())
+            return True
+        return False
+
+    def line(fd, raw):
+        nonlocal passthrough
+        if (fd == 0 or not separate) and status(raw):
+            return
+        if separate and fd == 0:
+            # Unknown protocol data belongs in the log; raw output remains visible.
+            passthrough = True
+            return
+        text = raw.decode('utf-8', 'replace').rstrip('\r\n')
+        if not passthrough and (not text.strip() or ROUTINE.match(text)):
+            return
+        passthrough = True
+        write(raw)
+
+    try:
+        descriptor = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_NOFOLLOW)
+        log_file = os.fdopen(descriptor, 'ab', buffering=0)
+    except OSError:
+        log_file = None
+        passthrough = True
+        write(b'Could not save installation details; continuing with terminal output.\n')
+    with log_file if log_file is not None else contextlib.nullcontext() as log:
+        while True:
+            now = time.monotonic()
+            if not passthrough and (dirty or (no_motion != 'true' and now - start < .5)) and now - last_frame >= .1:
+                frame(now)
+            timeout = None
+            if not passthrough and (dirty or (no_motion != 'true' and now - start < .5)):
+                timeout = max(0, .1 - (now - last_frame))
+            if partial_since is not None:
+                remaining = max(0, .05 - (now - partial_since))
+                timeout = remaining if timeout is None else min(timeout, remaining)
+            readable, _, _ = select.select(streams, [], [], 0 if finished else timeout)
+            if finished and not readable:
+                for fd, rest in pending.items():
+                    if rest:
+                        line(fd, rest)
+                return
+            for fd in readable:
+                chunk = os.read(fd, 65536)
+                if not chunk:
+                    streams.remove(fd)
+                    if fd == 0:
+                        finished = True
+                    continue
+                if log is not None:
+                    try:
+                        log.write(chunk)
+                    except OSError:
+                        log = None
+                        passthrough = True
+                        write(b'Could not save installation details; continuing with terminal output.\n')
+                pending[fd] += chunk
+                while b'\n' in pending[fd]:
+                    raw, pending[fd] = pending[fd].split(b'\n', 1)
+                    line(fd, raw + b'\n')
+                if fd == output_fd:
+                    if not pending[fd]:
+                        partial_since = None
+                    elif partial_since is None:
+                        partial_since = time.monotonic()
+                elif len(pending[fd]) > 8192:
+                    passthrough = True
+                    pending[fd] = b''
+            rest = pending[output_fd]
+            if rest and (len(rest) > 8192 or (partial_since is not None and time.monotonic() - partial_since >= .05)):
+                passthrough = True
+                write(rest)
+                pending[output_fd] = b''
+                partial_since = None
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except KeyboardInterrupt:
+        raise SystemExit(130)
+VOCO_APT_PY
+  python3 -c "$code" "$@"
+}
+# END EMBEDDED INSTALLER UI
+
 # Download output is measured from bytes received, never simulated percentages.
 DOWNLOAD_PID=""
 HELPER_DOWNLOAD_PID=""
 HELPER_DOWNLOAD_READY=""
+CHECKSUM_DOWNLOAD_PID=""
 VOCO_INSTALL_LOG=""
 VOCO_KEEP_LOG=false
 voco_download() {
   local label="$1" destination="$2" url="$3"
-  local started=$SECONDS bytes elapsed detail width initial_bytes
+  local started=$SECONDS bytes elapsed detail initial_bytes result=0
   initial_bytes=$(stat -c %s "$destination" 2>/dev/null || printf '0')
   if [[ -z "$VOCO_INSTALL_LOG" ]]; then
     VOCO_INSTALL_LOG=$(mktemp "${TMPDIR:-/tmp}/voco-install.XXXXXX.log")
   fi
-  dim "$label"
-  wget --continue --tries=3 --waitretry=2 --timeout=30 -O "$destination" "$url" >> "$VOCO_INSTALL_LOG" 2>&1 &
+  # Suppress wget's per-chunk dot log; retain its response summary and errors.
+  wget --no-verbose --continue --tries=3 --waitretry=2 --timeout=30 -O "$destination" "$url" >> "$VOCO_INSTALL_LOG" 2>&1 &
   DOWNLOAD_PID=$!
-  while kill -0 "$DOWNLOAD_PID" 2>/dev/null; do
+  if [[ "$VOCO_TERMINAL_MOTION" == true ]]; then
+    if [[ -z "$VOCO_UI_TIMER_FD" ]]; then voco_ui_init; fi
+    voco_ui_begin 'Bringing VOCO to your desktop.' "$label" '↓'
     if [[ "$VOCO_TERMINAL_MOTION" == true ]]; then
-      bytes=$(stat -c %s "$destination" 2>/dev/null || printf '0')
-      elapsed=$((SECONDS - started))
-      detail=$(awk -v bytes="$bytes" -v initial="$initial_bytes" -v elapsed="$elapsed" 'BEGIN {
-        if (bytes < 1048576) printf "%.1f KiB received", bytes / 1024;
-        else printf "%.1f MiB received", bytes / 1048576;
-        if (elapsed > 0) printf " · %.1f MiB/s avg", (bytes > initial ? bytes - initial : 0) / 1048576 / elapsed;
-      }')
-      width="${VOCO_TERMINAL_COLUMNS:-80}"
-      [[ "$width" =~ ^[0-9]+$ ]] || width=80
-      width=$((width > 10 ? width - 6 : 4))
-      if (( ${#detail} > width )); then detail="${detail:0:width-1}…"; fi
-      printf "\r\033[K  ${GRAPHITE_SOFT}↓${NC} %s" "$detail"
+      voco_ui_download_observer "$destination" "$initial_bytes" "$started" &
+      VOCO_UI_PID=$!
     fi
-    sleep 0.25
-  done
-  local result=0
+  else
+    dim "$label"
+  fi
+  # No polling interval or animation duration is on the completion path.
   wait "$DOWNLOAD_PID" || result=$?
   DOWNLOAD_PID=""
-  if [[ "$VOCO_TERMINAL_MOTION" == true ]]; then printf '\r\033[K'; fi
+  voco_ui_pause
   if (( result != 0 )); then
+    voco_ui_release
     VOCO_KEEP_LOG=true
     warn "The download stopped."
     if (( result == 8 )); then
@@ -623,15 +978,39 @@ voco_download() {
     return "$result"
   fi
   bytes=$(stat -c %s "$destination")
-  detail=$(awk -v bytes="$bytes" 'BEGIN { if (bytes < 1048576) printf "%.1f KiB", bytes / 1024; else printf "%.1f MiB", bytes / 1048576 }')
+  voco_ui_size "$bytes"; detail=$VOCO_UI_SIZE
   elapsed=$((SECONDS - started))
-  ok "${detail} received · ${elapsed}s"
+  if [[ "$VOCO_TERMINAL_MOTION" == true ]]; then
+    voco_ui_frame 'Download complete.' "${detail} received · ${elapsed}s" '✓'
+  else
+    ok "${detail} received · ${elapsed}s"
+  fi
+}
+
+voco_start_checksum_download() {
+  [[ -n "$VOCO_INSTALL_LOG" ]] || VOCO_INSTALL_LOG=$(mktemp "${TMPDIR:-/tmp}/voco-install.XXXXXX.log")
+  wget --no-verbose --tries=3 --waitretry=2 --timeout=30 -O "$CHECKSUM_FILE" "$CHECKSUMS_URL" >> "$VOCO_INSTALL_LOG" 2>&1 &
+  CHECKSUM_DOWNLOAD_PID=$!
+}
+
+voco_finish_checksum_download() {
+  local result=0
+  wait "$CHECKSUM_DOWNLOAD_PID" || result=$?
+  CHECKSUM_DOWNLOAD_PID=""
+  if (( result != 0 )); then
+    VOCO_KEEP_LOG=true
+    voco_ui_release
+    warn 'Could not download release checksums. Nothing was installed.'
+    dim "Details: $VOCO_INSTALL_LOG"
+    return "$result"
+  fi
 }
 
 # Only the Wayland helpers are prefetched. APT still resolves the complete
 # application transaction after VOCO's checksum has passed. No sudo or install here.
 voco_start_helper_prefetch() {
   [[ "${XDG_SESSION_TYPE:-x11}" == wayland ]] || return 0
+  command -v setsid >/dev/null 2>&1 || return 0
   local helper status
   local -a missing=()
   for helper in ydotool ydotoold; do
@@ -647,7 +1026,7 @@ voco_start_helper_prefetch() {
   (
     cd "$VOCO_DOWNLOAD_DIR/helpers"
     umask 022
-    exec apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=20 \
+    exec setsid apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=20 \
       -o Acquire::https::Timeout=20 download "${missing[@]}"
   ) >> "$VOCO_INSTALL_LOG" 2>&1 &
   HELPER_DOWNLOAD_PID=$!
@@ -655,6 +1034,17 @@ voco_start_helper_prefetch() {
 
 voco_finish_helper_prefetch() {
   [[ -n "$HELPER_DOWNLOAD_PID" ]] || return 0
+  # This is speculative work, not a prerequisite. Do not wait for a slow mirror
+  # after the verified VOCO payload is ready; the real APT transaction can retry.
+  if kill -0 "$HELPER_DOWNLOAD_PID" 2>/dev/null; then
+    # This child only downloads into disposable staging. Stop the complete
+    # isolated group, including APT acquire workers; no package DB is being changed.
+    kill -KILL -- "-$HELPER_DOWNLOAD_PID" "$HELPER_DOWNLOAD_PID" 2>/dev/null || true
+    wait "$HELPER_DOWNLOAD_PID" 2>/dev/null || true
+    HELPER_DOWNLOAD_PID=""
+    dim 'APT will fetch any remaining desktop helpers during installation.'
+    return 0
+  fi
   if wait "$HELPER_DOWNLOAD_PID"; then
     HELPER_DOWNLOAD_READY="$VOCO_DOWNLOAD_DIR/helpers"
     ok "Desktop helpers downloaded"
@@ -666,8 +1056,13 @@ voco_finish_helper_prefetch() {
 }
 
 voco_install_cleanup() {
+  voco_ui_close
+  if [[ -n "$CHECKSUM_DOWNLOAD_PID" ]]; then
+    kill "$CHECKSUM_DOWNLOAD_PID" 2>/dev/null || true
+    wait "$CHECKSUM_DOWNLOAD_PID" 2>/dev/null || true
+  fi
   if [[ -n "$HELPER_DOWNLOAD_PID" ]]; then
-    kill "$HELPER_DOWNLOAD_PID" 2>/dev/null || true
+    kill -KILL -- "-$HELPER_DOWNLOAD_PID" "$HELPER_DOWNLOAD_PID" 2>/dev/null || true
     wait "$HELPER_DOWNLOAD_PID" 2>/dev/null || true
   fi
   if [[ -n "$DOWNLOAD_PID" ]]; then
@@ -711,6 +1106,9 @@ if [[ "$(dpkg --print-architecture 2>/dev/null)" != "amd64" ]]; then
   err "Only amd64 (x86_64) is supported. Detected: $(dpkg --print-architecture 2>/dev/null || uname -m)"
 fi
 
+for prerequisite in wget sha256sum stat apt-get sudo dpkg-query; do
+  command -v "$prerequisite" >/dev/null 2>&1 || err "$prerequisite is required before downloading VOCO."
+done
 ok "Linux · x86_64"
 
 # APT resolves package dependencies in the install stage. Readiness is checked
@@ -728,26 +1126,28 @@ DEB_CHECKSUM_FILE="${VOCO_DOWNLOAD_DIR}/voco_${VERSION}_amd64.deb.sha256"
 
 dim "Includes English speech recognition. Speech stays on this computer."
 voco_start_helper_prefetch
+voco_start_checksum_download
 voco_download "VOCO v${VERSION}" "$DEB_FILE" "$DEB_URL" || exit 1
-if ! voco_download "Release checksums" "$CHECKSUM_FILE" "$CHECKSUMS_URL"; then
+voco_ui_sweep 'Checking your download.' 'Waiting for release checksums.'
+if ! voco_finish_checksum_download; then
   exit 1
 fi
-
-if ! command -v sha256sum >/dev/null 2>&1; then
-  err "sha256sum is required to verify the downloaded package"
-fi
+voco_ui_sweep 'Checking your download.' 'Checking the package checksum.'
 
 if ! grep -F "  $(basename "$DEB_FILE")" "$CHECKSUM_FILE" > "$DEB_CHECKSUM_FILE"; then
   err "Could not find a checksum entry for $(basename "$DEB_FILE")"
 fi
 
 if (cd "$VOCO_DOWNLOAD_DIR" && sha256sum --check "$(basename "$DEB_CHECKSUM_FILE")" >/dev/null 2>&1); then
-  ok "Package checksum verified"
+  voco_ui_pause
+  if [[ "$VOCO_TERMINAL_MOTION" == true ]]; then voco_ui_frame 'Your download checks out.' 'Package checksum verified.' '✓'; else ok "Package checksum verified"; fi
 else
+  voco_ui_release
   err "The download could not be verified. Run the installer again; nothing was installed."
 fi
 
 # ─── Install ────────────────────────────────────────────
+voco_ui_release
 echo
 echo -e "  ${BOLD}${GRAPHITE}[3/3]${NC} ${BOLD}Install VOCO${NC}"
 

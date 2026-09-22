@@ -4,6 +4,12 @@ The [latest published GitHub release](https://github.com/sergiopesch/voco/releas
 is authoritative for current downloads. A source version or local receipt does
 not establish installation on a particular computer.
 
+**2026.0.52 release candidate:** the [installer performance candidate](testing/installer-performance-2026-09-22.md)
+adds measured Signal + Silver sweep progress and removes avoidable download waits.
+It has local fixture and Ubuntu APT evidence. Final .52 package, CI and signed
+publication gates are in progress; see [release notes](releases/2026.0.52.md). Public .51
+assets and installed applications retain their original bytes.
+
 The recorded public Ubuntu/Debian release is **2026.0.51**. It combines live tray
 volume bars, microphone setup in one canvas, packaged GNOME panel activation,
 rich-editor delivery fixes and one bundled Nemotron recognizer. The retired

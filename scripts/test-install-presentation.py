@@ -61,13 +61,15 @@ try:
         root = Path(folder)
         payload = root / 'payload'
         payload.write_bytes(PAYLOAD)
-        for case in ['tty', 'narrow', 'redirected', 'no-color', 'dumb', 'failure', 'connection-failure', 'resume', 'cancel']:
+        for case in ['tty', 'narrow', 'redirected', 'no-color', 'plain', 'dumb', 'failure', 'connection-failure', 'resume', 'cancel']:
             case_dir = root / case
             case_dir.mkdir()
             env = {**os.environ, 'TMPDIR': str(case_dir), 'TERM': 'xterm-256color'}
             env.pop('NO_COLOR', None)
             if case == 'no-color':
                 env['NO_COLOR'] = ''
+            if case == 'plain':
+                env['VOCO_INSTALL_PLAIN'] = '1'
             if case == 'dumb':
                 env['TERM'] = 'dumb'
             url = f'http://127.0.0.1:{server.server_port}/' + ('missing' if case == 'failure' else 'package')
@@ -114,7 +116,7 @@ try:
             if case not in ['failure', 'connection-failure', 'cancel']:
                 assert hashlib.sha256(PAYLOAD).hexdigest().encode() in data, case
                 assert re.search(rb'2\.0 MiB received .* \d+s', data), case
-            if case in ['redirected', 'no-color', 'dumb']:
+            if case in ['redirected', 'no-color', 'plain', 'dumb']:
                 assert b'\x1b' not in data, case
             if case == 'tty':
                 assert b'MiB/s avg' in data and data.count(b'received') > 2, case

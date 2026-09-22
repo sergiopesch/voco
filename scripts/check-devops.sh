@@ -39,6 +39,9 @@ bash -n \
   scripts/test-verify-release.sh \
   scripts/lib/install-common.sh
 
+python3 scripts/sync-installer-ui.py --check
+bash -n scripts/lib/install-ui.sh
+
 bash scripts/test-verify-release.sh
 
 PYTHONDONTWRITEBYTECODE=1 python3 - <<'PY'
@@ -78,6 +81,7 @@ PY
 bash scripts/test-install-common.sh
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-install-presentation.py
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-install-prefetch.py
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-install-performance.py
 
 node --check scripts/comparative-dictation.mjs
 node --check scripts/comparative-dictation.test.mjs

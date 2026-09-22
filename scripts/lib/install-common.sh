@@ -333,7 +333,9 @@ voco_install_deb_package() {
       done
     fi
   fi
-  if ! sudo apt-get install -y -- "${packages[@]}"; then
+  local -a install_command=(sudo apt-get install -y --)
+  if declare -F voco_run_apt >/dev/null; then install_command=(voco_run_apt); fi
+  if ! "${install_command[@]}" "${packages[@]}"; then
     VOCO_INSTALL_ERROR="APT could not install VOCO and its desktop dependencies. Resolve the error above, then run the installer again."
     return 1
   fi

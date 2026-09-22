@@ -1651,6 +1651,10 @@
         "text": "A fresh .45 Ubuntu Wayland installation on 20 September passed its local voice test, then rejected all 11 dictation attempts before recording. The short installer used dpkg and dependency repair, which skipped the recommended ydotool client and daemon. Earlier package tests used APT directly on X11, so they did not cover that journey. The .46 source candidate installs Wayland helpers explicitly and checks desktop input before onboarding completes. A voice test, helper readiness and verified cursor delivery are three separate checks. These follow-up findings describe newer work; the code viewer remains pinned to its recorded .43 snapshot."
       },
       {
+        "title": "Progress should follow the work",
+        "text": "The unreleased 22 September installer candidate connects signal bars to measured transfer rates and a brief silver sweep to phase changes. The download runs independently: finishing work cancels animation immediately. Checksums download alongside the package and must pass before installation. Fifty-six local download trials found lower overhead than the .51 installer, but do not measure whole installations over the internet. Real Ubuntu APT tests preserve both package questions and existing configuration choices. This source candidate does not change the installed model or the pinned code viewer."
+      },
+      {
         "title": "Safe upgrades",
         "text": "Debian preserves existing directory modes during upgrades. A real legacy-install test exposed inherited group-write permissions. A narrowly checked migration repairs only the known package-owned mode, preserving custom permissions and personal settings."
       },

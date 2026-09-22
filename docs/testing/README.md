@@ -1,5 +1,9 @@
 # Testing
 
+The [installer performance candidate](installer-performance-2026-09-22.md) records
+download timing, CPU overhead, event-driven presentation and real Ubuntu APT prompt
+tests. It is unreleased and does not change application/model qualification.
+
 The [.51 public release record](linux-release-2026-09-22.md) identifies the signed
 package, source and verified downloads. The
 [tray, setup and single-engine integration record](tray-setup-2026-09-21.md)

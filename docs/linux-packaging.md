@@ -34,6 +34,19 @@ The .48 installer downloads missing Wayland helpers as the current user while th
 main package downloads. APT verifies those helper downloads; the final privileged
 transaction reuses completed archives only after VOCO's checksum passes. Failed
 prefetches fall back to the ordinary APT installation. Desktop settings are unchanged.
+
+The [unreleased installer performance candidate](testing/installer-performance-2026-09-22.md)
+overlaps checksum metadata with the package download and waits directly on wget.
+Optional helper prefetches run in an isolated download-only process group; any
+still running after verification are stopped, and APT fetches remaining helpers.
+Package compression, payload, verification and runtime settings are unchanged.
+The optional APT view uses Python's standard library only when Python is already
+installed. Its fixed sudo wrapper opens a dedicated status descriptor **after**
+sudo; using stdout as APT's status descriptor would close package-script output.
+Raw output and progress are separate, stdin remains the original terminal, and
+unknown output releases the view. Restricted sudo policies fall back to the ordinary
+APT command. There are no new sudo rules or automatic answers to package questions.
+
 The .47 metadata explicitly includes the `pgrep` provider (`procps` on Debian/openSUSE,
 `procps-ng` on Fedora/Arch), used to check the Wayland input daemon.
 The worker defaults to at most four CPU threads, leaving one CPU from its affinity
