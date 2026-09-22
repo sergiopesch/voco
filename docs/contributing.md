@@ -2,6 +2,10 @@
 
 ## Development Setup
 
+Use Node.js 24 LTS (`.nvmrc`) or newer, Rust and the Linux development packages
+checked by the setup script. CI reads the same Node LTS file. With nvm installed,
+run `nvm install` and `nvm use` from the clone before setup.
+
 ```bash
 git clone https://github.com/sergiopesch/voco.git
 cd voco
@@ -58,9 +62,19 @@ and distinguish measured results from targets and missing evidence.
 
 ## Dependency maintenance
 
+Vite 8 and React plugin 6 are a matched build-tool pair. Upgrade them together
+and check their peer requirements. Vite uses Rolldown/Oxc for JavaScript and
+Lightning CSS for CSS minification. The explicit JavaScript/CSS output targets
+retain the previous compiler targets; they do not establish support for every
+browser or WebKit version. Keep both development-renderer and production-package
+checks when updating these tools. React Compiler is not enabled.
+Root renderer fixtures declare Vite directly; the DevOps gate requires them to
+resolve the same build tool as the desktop workspace.
+
 Compatible updates are grouped weekly, with two open version PRs per ecosystem.
-Major upgrades, pre-1.0 keyboard/hash APIs and the shortcut plugin need individual
-review. Security updates remain independent. See [repository hygiene](release-process.md#repository-hygiene).
+Vite and its React plugin share a dedicated group, including major updates.
+Other major upgrades, pre-1.0 keyboard/hash APIs and the shortcut plugin need
+individual review. Security updates remain independent. See [repository hygiene](release-process.md#repository-hygiene).
 
 TypeScript 7 supplies `tsc` through the `@typescript/native` npm alias. The
 `typescript` alias points to Microsoft's `@typescript/typescript6` compatibility
@@ -73,3 +87,10 @@ the compatibility alias only after all API consumers support a stable successor.
 multiple `global-hotkey` resolutions. The app's X11 focus lease and the Tauri
 shortcut plugin must use the same patched actor. Run the isolated desktop tests
 after upgrading this dependency; a successful compilation cannot prove that link.
+
+`verify-tray-backport.py` similarly requires Tauri to resolve one patched
+`tray-icon` library. Tauri updates can change that dependency even within a patch
+release. Carry the immutable Linux icon-path API onto the required upstream
+version, preserve its source inventory and archive checksum, and qualify the
+packaged tray in a real isolated GNOME session. The package ships that provenance
+beside the upstream licenses.

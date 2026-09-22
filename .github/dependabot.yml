@@ -23,6 +23,9 @@ updates:
       timezone: Europe/London
     open-pull-requests-limit: 2
     groups:
+      frontend-build-tools:
+        # Plugin majors can require a matching Vite major; review the pair.
+        patterns: [vite, "@vitejs/plugin-react"]
       frontend-compatible:
         patterns: ["*"]
         update-types: [minor, patch]

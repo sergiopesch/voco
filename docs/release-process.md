@@ -78,8 +78,10 @@ Keep security updates separate when their dependency graph fails compilation;
 never waive a gate or ignore an advisory just to clear the PR list.
 
 Version updates run weekly on Monday at 09:00 Europe/London, with at most two
-open version PRs per ecosystem. Compatible minor/patch updates are grouped;
-major upgrades and the pre-1.0 input/hash libraries remain separate. Shortcut
+open version PRs per ecosystem. Compatible minor/patch updates are grouped.
+Vite and its React plugin form a dedicated build-tools group, including majors,
+so their peer requirements can be reviewed together. Other major upgrades and
+the pre-1.0 input/hash libraries remain separate. Shortcut
 plugin updates also stay separate because both consumers must resolve to the
 same vendored actor. Security updates keep their independent queue; no advisory
 is suppressed by this policy. Require the same protected checks for every merge.

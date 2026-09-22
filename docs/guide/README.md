@@ -80,3 +80,7 @@ help-text change; the code tour remains pinned to the reviewed product source.
 The Linux qualification chapter also records the [.53 dependency refresh](../testing/dependency-release-2026-09-22.md):
 shared shortcut protection, grouped maintenance updates and exact-package checks.
 The learning site remains local and its source viewer remains pinned to .43.
+
+The [.54 qualification candidate](../testing/vite8-release-2026-09-22.md) adds the
+paired Vite/React-plugin migration, shared app/test build tools and tray patch
+resolution. Signing and publication remain separate gates; the code viewer stays .43.

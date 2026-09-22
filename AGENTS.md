@@ -27,6 +27,10 @@ Rust owns OS integration, files, processes, packaging and validation. React owns
 presentation and recording orchestration. Keep both typed and state-driven.
 Comment invariants and non-obvious decisions; avoid narrating every line.
 
+Development and CI use Node 24 LTS (`.nvmrc`). Maintain Vite 8 and React plugin 6
+together, preserve explicit output targets, and keep root renderer fixtures on
+the desktop's Vite resolution. Qualify both dev rendering and packaged WebKit.
+
 Configuration deserialization ignores retired output choices and returns cursor,
 stable streaming and enhancement off. Patches reject removed fields. These fixed
 snapshot fields remain for the legacy dictation engine contract; they are not
@@ -123,7 +127,7 @@ isolation, not a remote VM or proof of a distribution's default desktop.
 
 ## Release and evidence
 
-Source candidate: **2026.0.53**. Recorded public Ubuntu/Debian version: **2026.0.53**. Verify the current public release on GitHub and
+Source candidate: **2026.0.54**. Recorded public Ubuntu/Debian version: **2026.0.53**. Verify the current public release on GitHub and
 installed version from the package manager; do not infer either from source.
 The .43 package and desktop evidence is recorded in
 [the support matrix](docs/linux-support.md); preserve per-artifact receipts and

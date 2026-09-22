@@ -1659,6 +1659,10 @@
         "text": "The .53 maintenance release integrates the 12 dependency PRs queued at the start of its cleanup. One shortcut update compiled successfully but would have loaded a second keyboard actor, bypassing VOCO's focus protection. The release carries the patch onto the new library and checks that both consumers share it. Compatible updates now arrive in small weekly groups; major upgrades and input dependencies remain separate. Exact-package installation and desktop tests qualify each new cut. The pinned .43 code viewer remains unchanged."
       },
       {
+        "title": "Upgrade the build as one system",
+        "text": "The .54 candidate pairs Vite 8 with React plugin 6 and Node 24 LTS. The app and its renderer tests must use the same Vite version; otherwise a passing test can exercise an older tool. Explicit output targets keep the previous compiler targets, but only the packaged WebKit app can establish how the production build behaves. Tauri also requires an updated tray library, carrying the same immutable icon-path patch. Source tests, fresh installation checks and the private GNOME journey have separate evidence. Signing and publication remain pending; the pinned .43 code viewer is unchanged."
+      },
+      {
         "title": "Safe upgrades",
         "text": "Debian preserves existing directory modes during upgrades. A real legacy-install test exposed inherited group-write permissions. A narrowly checked migration repairs only the known package-owned mode, preserving custom permissions and personal settings."
       },
