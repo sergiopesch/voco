@@ -3,41 +3,37 @@
 The [latest published GitHub release](https://github.com/sergiopesch/voco/releases/latest)
 is authoritative for downloads. Source metadata does not establish what is installed.
 
-Source **2026.0.56** is an unpublished follow-up candidate. It adds automatic
-opening after guided installation, a focused-pane destination for Ghostty's GTK
-terminal, and a fix that preserves microphone readiness after destination rejection.
-The [.56 notes](releases/2026.0.56.md) and [qualification record](testing/installer-ghostty-2026-09-23.md)
-describe the fixes and scoped evidence; final release verification is in progress. The public installer and downloads below remain .55 until a new cut is verified.
+The recorded public Ubuntu/Debian release is **2026.0.56**. It opens VOCO after
+guided installation, supports Ghostty's focused terminal pane, preserves microphone
+readiness after destination rejection and fixes repeated X11 starts by waiting for
+the matched shortcut release. The pinned local recognizer, model, input permissions
+and recovery contract are unchanged.
 
-The recorded public Ubuntu/Debian release is **2026.0.55**. It integrates the
-security, delivery, installation, performance and code cleanup review, including
-the native Pulse latency fix and private legacy input daemon. The helper fixes
-descriptor exhaustion without replacing the system daemon or changing input
-permissions. Migration is limited to VOCO's unmodified service at an idle application
-boundary. The pinned Nemotron recognizer and recovery contract are unchanged.
+- [.56 changes and installation behavior](releases/2026.0.56.md)
+- [Signed assets and provenance](https://github.com/sergiopesch/voco/releases/tag/voco.2026.0.56)
+- [Exact-package qualification and publication record](testing/installer-ghostty-2026-09-23.md)
+- [Previous .55 security, performance and helper qualification](testing/release-qualification-2026-09-23.md)
 
-- [.55 changes and upgrade instructions](releases/2026.0.55.md)
-- [Signed assets and provenance](https://github.com/sergiopesch/voco/releases/tag/voco.2026.0.55)
-- [Exact-package qualification and publication record](testing/release-qualification-2026-09-23.md)
-- [Earlier review and retained failed attempts](testing/release-readiness-2026-09-22.md)
-- [Installer performance method and .52 measurements](testing/installer-performance-2026-09-22.md)
+The exact package passes fresh Ubuntu installation/removal, 13 installed worker
+checks, ten private GNOME X11/Ghostty application cases, nine browser cases,
+native Wayland onboarding and installer opening on private X11 and Wayland.
+The final helper also passes separate 22-stage X11 and native Wayland checks.
+Earlier .55 VM input and service-migration evidence remains historical; unchanged
+runtime/helper bytes do not turn those checks into new runs.
 
-The exact package passes Ubuntu installation/removal, 13 installed worker checks,
-16 GNOME X11 application cases, nine browser lifecycle cases, native Wayland
-onboarding, and real VM helper protocol and migration checks. The publication
-record binds final protected and merged CI, the signed tag, five signed manifests,
-and verification of all 18 draft/public assets, latest aliases and tagged installer.
-Bundled docs retain their assembly snapshot; the source archive retains its cut-time
-record. Subsequent publication documentation does not replace those frozen artifacts.
+The publication record binds final protected and merged CI, the signed tag,
+five signed manifests and all 18 anonymous public assets, latest aliases and the
+tagged installer. Bundled docs retain their assembly snapshot; publication
+documentation does not replace the signed package, source archive or assets.
 
-Physical microphones, default PipeWire capture, owner-perceived motion, global
-shortcut configuration and untested desktop/application combinations remain
-separate acceptance checks. Containers and download fixtures do not establish
-default-desktop behavior or Internet installation speed.
+A focused Ghostty pane does not establish caret position, writable mode, password
+state or text readback. Terminal delivery confirms dispatch and sends no Enter or
+control characters. Physical microphones, default PipeWire, owner-perceived motion
+and untested desktops/applications remain separate acceptance checks.
 
 Fedora, openSUSE and Arch/Omarchy remain at **2026.0.43**; use the matching
 [native guide](install-native.md) and [support matrix](linux-support.md).
-[2026.0.54](releases/2026.0.54.md) remains available for rollback. Published tags
-and assets remain immutable; new shipped application bytes require another
-qualified release. Weekly maintenance, protected checks and the separate security
-update queue remain enabled. The hosted release assembler stays disabled.
+[2026.0.55](releases/2026.0.55.md) remains available for rollback. Published tags
+and assets remain immutable; new application bytes require another qualified
+release. Weekly maintenance, protected checks and the separate security update
+queue remain enabled. The hosted release assembler stays disabled.

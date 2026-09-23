@@ -24,7 +24,7 @@ remain excluded. VOCO must not record and paste blindly when the target is unkno
 Ghostty 1.3.1 on Linux exposes a focused graphical terminal pane without an accessible
 text caret. VOCO .55 rejects that pane before recording; repeating onboarding or
 granting microphone access again does not repair this compatibility issue.
-The [.56 candidate](releases/2026.0.56.md) adds a distinct focused-pane route and
+The [.56 release](releases/2026.0.56.md) adds a distinct focused-pane route and
 preserves microphone readiness after a destination rejection. It retains pane
 identity and focus-change checks without requiring Ghostty to expose a text caret.
 Terminal delivery remains dispatch-only: read-only terminal mode can reject paste,

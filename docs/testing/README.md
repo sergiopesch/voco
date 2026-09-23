@@ -1,5 +1,10 @@
 # Testing
 
+[The .56 installer and Ghostty qualification](installer-ghostty-2026-09-23.md)
+records the exact released package, repeated X11 Start/Stop, separate native
+Wayland checks, installer opening, installed worker and package removal checks,
+and signed public-download verification.
+
 [The .55 qualification and publication record](release-qualification-2026-09-23.md)
 binds the final package to installation/removal, worker, 16 private GNOME X11,
 nine browser lifecycle, native Wayland onboarding and real VM helper migration
@@ -28,7 +33,7 @@ The [public benchmark gallery](../release-assets/2026.0.43/README.md) presents t
 matched seven-model comparison and separate historical cohorts, with 8K graphics,
 numeric data and measurement boundaries.
 
-Current public release and private candidate: [release gates](../release-candidate.md).
+Current publication and qualification status: [release gates](../release-candidate.md).
 Dated reports below are historical evidence, not qualification of a later binary.
 The [.43 Linux qualification report](linux-release-2026-09-19.md) tracks native
 packages and the Wayland hidden-capture change. See the [native capture contract](native-capture-development.md)

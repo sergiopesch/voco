@@ -1,9 +1,9 @@
 # Linux packages and qualification
 
-**2026.0.55** is the current Ubuntu/Debian release. Its
-[release notes](releases/2026.0.55.md) and
-[qualification record](testing/release-qualification-2026-09-23.md) describe security,
-native capture and helper fixes, exact-package checks and their limits. Input
+**2026.0.56** is the current Ubuntu/Debian release. Its
+[release notes](releases/2026.0.56.md) and
+[qualification record](testing/installer-ghostty-2026-09-23.md) describe installer
+opening, Ghostty pane support, repeated X11 starts and exact-package checks. Input
 permissions, shortcut protection and the pinned Nemotron runtime are retained.
 The .43 desktop results below remain historical evidence; other native package
 channels stay at .43.
