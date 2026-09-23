@@ -65,7 +65,7 @@ time.sleep(15)
                 env.pop(key, None)
             mode = case if case.startswith('exit-') else ''
             env['FIXTURE_APP_MODE'] = mode
-            if case == 'root':
+            if case == 'root' and os.getuid() != 0:
                 helper = helper.replace('owner = os.getuid()', 'owner = 0', 1)
             if case == 'ssh':
                 env['SSH_CONNECTION'] = '192.0.2.1 123 192.0.2.2 22'
@@ -91,11 +91,21 @@ time.sleep(15)
                 sockets.append(channel)
             if case == 'missing-display':
                 (runtime / 'wayland-fixture').unlink()
+            launch_uid, launch_euid = os.getuid(), os.geteuid()
+            identity = {}
+            if launch_uid == launch_euid == 0 and case != 'root':
+                # Root CI runners still exercise a real non-root desktop owner.
+                # Keep getuid/geteuid and filesystem ownership checks unchanged;
+                # only this disposable tree and child use the unprivileged IDs.
+                launch_uid = launch_euid = 65534
+                for path in (root, *root.rglob('*')):
+                    os.chown(path, launch_uid, 65534)
+                identity = {'user': launch_uid, 'group': 65534, 'extra_groups': []}
             started = time.monotonic()
             record = None
             try:
                 result = subprocess.run(['bash', '-c', helper + '\nvoco_launch_installed_app\n'],
-                                        env=env, capture_output=True, text=True, timeout=4)
+                                        env=env, capture_output=True, text=True, timeout=4, **identity)
                 elapsed = time.monotonic() - started
                 expected = 2 if case in ('root', 'ssh', 'headless', 'remote-x11', 'runtime-permissions',
                                          'tty-session', 'missing-display') else 1 if case in (
@@ -116,8 +126,8 @@ time.sleep(15)
                     self.assertIn('desktop', result.stdout.lower())
                 else:
                     self.assertIsNotNone(record)
-                    self.assertEqual(record['uid'], os.getuid())
-                    self.assertEqual(record['euid'], os.geteuid())
+                    self.assertEqual(record['uid'], launch_uid)
+                    self.assertEqual(record['euid'], launch_euid)
                     self.assertEqual(record['sid'], record['pid'])
                     self.assertEqual(record['argv'], [str(app)])
                     self.assertEqual(record['stdin'], '')

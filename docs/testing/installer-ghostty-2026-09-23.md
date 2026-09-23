@@ -24,31 +24,34 @@ It rejects stale, orphan and duplicate events without delays or target retries.
 Wayland native, browser and IBus shortcut semantics are unchanged.
 
 Destination/setup rejection also cleared microphone readiness before capture was
-attempted. The renderer now invalidates WebKit readiness only after attempting
-WebKit capture; generation-bound native invalidation remains separate.
+attempted. Browser destination admission now completes before either microphone backend
+starts. Rejected ownership or a missing field lease preserves microphone readiness
+and opens no stream; genuine capture failures still invalidate readiness. Native
+generation-bound invalidation remains separate.
+
+Installer fixtures exercise real non-root launch identities even when the test
+runner is root, while retaining an explicit root-launch rejection case.
 
 The guided installer requests one detached launch after verified installation and
 desktop setup. It retains the installing desktop user's environment, rejects root,
 remote and headless launch contexts, and never opens a GUI from a package hook.
 Opening onboarding does not start microphone capture.
 
-## Frozen candidate
+## Artifact identity
 
-Application and complete-package assembly use clean source
-`19fbfc2c2f9f8dd49930951aeb4c2cb0c3bf9cf7` with Node 24.21.0, Rust 1.94.0,
-GCC 13.3.0 and four Cargo jobs. Subsequent changes to this qualification record
-are documentation only; package docs retain the assembly snapshot.
+The signed release provenance and validation manifests bind the final build commit,
+reviewed source tree, package hash, executable hashes and individual qualification
+receipts. These are the authoritative final identities. Package documentation
+retains its assembly snapshot; later qualification documentation does not rebuild
+or replace the application. Builds use Node 24.21.0, Rust 1.94.0, GCC 13.3.0 and
+four Cargo jobs.
 
-| Artifact | SHA-256 |
-| --- | --- |
-| Complete Debian package, 685,704,410 bytes | `7bfe1f0df7384a9eb77e078f2261f2894f2e50373ca7655cfffa64cc8e7c8ade` |
-| Packaged app | `293395879e9d5c97521cad22239ed5021a1b1b6627d59d977737c4a8fed24060` |
-| Browser host | `d7878c268e0af099ac8e52ab91e8483d5188cdf53268c84dd17fef06f9f88d4d` |
-| Desktop destination helper | `1a607c8746da796ab34d2d4de9eaff7b6f7093268eb6f9967a39a56ec8256369` |
-| Pinned speech model | `d9a01898d2a611c8764e23a1c2f45e70bbd5a425dc4de93692ac951dd603812d` |
-
+The desktop helper is frozen at
+`1a607c8746da796ab34d2d4de9eaff7b6f7093268eb6f9967a39a56ec8256369` and the
+pinned model at
+`d9a01898d2a611c8764e23a1c2f45e70bbd5a425dc4de93692ac951dd603812d`.
 Tauri replaces the executable's bundle marker with `DEB`; raw Cargo and packaged
-executable hashes differ. Application acceptance uses the packaged hash above.
+executable hashes differ. Application acceptance uses the packaged executable.
 
 ## Verification
 
@@ -96,6 +99,7 @@ warnings remain visible; this is not a security certification.
 
 Retained failures include the original .55 rejection, the first candidate's real
 warm shortcut race, invalid fixture accessibility configuration, missing explicit
-fixture focus, a strict punctuation expectation and an initial isolated-test mount
-setup error. Final runs correct the relevant source or fixture cause; failed
+fixture focus, a strict punctuation expectation an initial isolated-test mount
+setup error, browser admission before microphone startup, and a root-runner fixture
+assumption. Final runs correct the relevant source or fixture cause; failed
 artifacts are not replaced or reported as passes.
