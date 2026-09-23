@@ -65,7 +65,9 @@ through Starting, Listening and Finishing. A held Stop belongs to the capture
 session, so presentation updates cannot cancel it; a replacement session cannot
 inherit it. Stop is sent after modifier release with the current action token.
 Only the authenticated Shell can renew the short native reservation suppressing
-passive duplicates. Idle, disconnect, disable and state timeout release the grab.
+passive duplicates. A rejected latest reservation, idle, disconnect, disable and
+state timeout release the grab. Each renewal has a generation: older replies
+cannot release a newer reservation, including renewals of the same grab.
 Without an active companion, selected continuation text is rejected and retained
 for recovery rather than replacing the existing words.
 
