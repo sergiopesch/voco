@@ -171,7 +171,7 @@ isolation, not a remote VM or proof of a distribution's default desktop.
 
 ## Release and evidence
 
-Source version: **2026.0.58**. Recorded public Ubuntu/Debian version: **2026.0.57**. Verify the current public release on GitHub and
+Source version: **2026.0.58**. Recorded public Ubuntu/Debian version: **2026.0.58**. Verify the current public release on GitHub and
 installed version from the package manager; do not infer either from source.
 The .43 package and desktop evidence is recorded in
 [the support matrix](docs/linux-support.md); preserve per-artifact receipts and
@@ -240,5 +240,7 @@ The recorded public installer version is `packaging/published-release.json`. Kee
 README pinned to that version until publication is verified, then update both.
 The guided installer checks `/usr/bin/voco`, not an older PATH override. Bundle the GNOME 46 panel in the complete Debian candidate. Enable it only through
 the explicit user-run setup flow; never change enabled extensions in package hooks.
-Keep session restart feedback distinct from active presentation. Preserve immutable
+Keep session restart feedback distinct from active presentation. Bump the companion
+metadata and setup contract together when loaded code must change; compare GNOME
+loaded metadata so an in-place upgrade cannot report old code as current. Preserve immutable
 tray PNG paths for the process lifetime and explicit Stop actions. Preserve screenshot proof outside build caches.
