@@ -12,9 +12,10 @@ limited to VOCO's unmodified service at an idle application boundary.
 The [candidate notes](releases/2026.0.55.md) describe the changes;
 [23 September qualification](testing/release-qualification-2026-09-23.md) tracks
 exact artifacts and release gates. The [22 September assessment](testing/release-readiness-2026-09-22.md)
-retains earlier artifacts and failed attempts. Final protected CI, signing,
-package/desktop qualification and downloaded-asset verification are required
-before publication. The source version alone is not a published release.
+retains earlier artifacts and failed attempts. The exact package passes installation/removal, desktop/browser, native capture
+and real VM helper migration checks. Build-source CI passes all four protected
+gates; final reviewed/merged CI, signing and downloaded-asset verification are
+required before publication. The source version alone is not a published release.
 
 The recorded public Ubuntu/Debian release is **2026.0.54**. It integrates the
 remaining dependency PRs #61–#63, including Vite 8, React plugin 6, Node 24 LTS

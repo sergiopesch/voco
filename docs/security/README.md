@@ -194,9 +194,9 @@ names and URLs are not exported to the broker. Dictated append text necessarily
 passes to the explicitly authorized extension. A malicious process already running
 as the desktop user remains inside the local-user trust boundary.
 
-## Unreleased 2026.0.55 source hardening
+## 2026.0.55 source hardening
 
-These source changes are not present in the installed or public 2026.0.54 package:
+The 2026.0.55 release adds the following hardening over 2026.0.54:
 
 - The guided installer verifies the publisher's detached checksum signature with
   its pinned release key before accepting a package for privileged APT installation.
