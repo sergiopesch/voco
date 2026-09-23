@@ -15,7 +15,16 @@ class PanelSetupTests(unittest.TestCase):
 
     def test_saved_activation_is_not_claimed_as_active_until_shell_loads_it(self):
         self.assertEqual(panel.classify('46.0', True, {}, True, False)['status'], 'restart')
-        self.assertEqual(panel.classify('46.0', True, {'state': 1}, True, False)['status'], 'active')
+        self.assertEqual(panel.classify('46.0', True, {'state': 1, 'version': 2}, True, False)['status'], 'active')
+
+    def test_loaded_old_or_unknown_companion_requires_session_restart(self):
+        for version in [None, 1, 3, '2']:
+            status = panel.classify('46.0', True, {'state': 1, 'version': version}, True, False)
+            self.assertEqual(status['status'], 'restart')
+            self.assertFalse(status['canEnable'])
+        import json
+        metadata = json.loads((ROOT / 'integrations/gnome' / panel.UUID / 'metadata.json').read_text())
+        self.assertEqual(metadata['version'], panel.COMPANION_VERSION)
 
     def test_missing_package_and_shell_errors_do_not_offer_false_activation(self):
         for installed, state, expected in [(False, 1, 'missing'), (True, 3, 'error'), (True, 4, 'error')]:

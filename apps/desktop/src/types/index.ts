@@ -185,6 +185,7 @@ export interface RuntimeStatusSnapshot {
   microphonePermission: MicrophonePermission;
   nativeMicrophoneReady?: boolean | null;
   dictationStatus: DictationStatus;
+  dictationSessionId?: number;
   cursorDelivery: CursorDeliveryState;
   cursorRequired: boolean;
   cursorSetupState: OwnedPreeditStatus["setupState"];

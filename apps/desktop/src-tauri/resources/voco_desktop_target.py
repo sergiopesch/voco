@@ -684,6 +684,11 @@ def prepare_delivery(request):
         node = eligible_node(result)
         _, iface, position, route = caret_text(node)
         count, caret, start, end, selected = position
+        # Only the start of a new dictation authorizes replacing selected text.
+        # A passive Stop chord (for example Alt+D in a browser address bar) or
+        # manual selection must never let a later suffix erase earlier text.
+        if selected and not request['first_delivery']:
+            return observation_result(result, 'changed')
         before = read_slice(iface, max(0, start - 64), start)
         after = read_slice(iface, end, min(count, end + 32))
         context = separator_context(node, before, position)
@@ -763,7 +768,7 @@ def delivery_stage(snapshot, node):
     return stage
 
 
-def verify_delivery(request):
+def verify_delivery(request, before_dispatch=False):
     global DELIVERY
     snapshot = DELIVERY
     result = safe_probe()
@@ -784,7 +789,11 @@ def verify_delivery(request):
                 result, outcome = again, 'changed'
             else:
                 second = delivery_stage(snapshot, eligible_node(again))
-                if first == -1 or second == -1:
+                if before_dispatch:
+                    # Before keys, only two unchanged samples authorize mutation.
+                    # Pending/partial delivery is not permission to send another paste.
+                    outcome = 'prepared' if first == second == 0 else 'changed'
+                elif first == -1 or second == -1:
                     outcome = 'changed'
                 elif first is None or second is None:
                     # Separate AT-SPI RPCs may straddle a legitimate insertion.
@@ -801,7 +810,7 @@ def verify_delivery(request):
                     outcome = 'pending'
     except Exception:
         outcome = 'unavailable'
-    if outcome != 'pending':
+    if outcome not in ('pending', 'prepared'):
         DELIVERY = None
     return observation_result(result, outcome, receipt, added, context)
 
@@ -815,6 +824,8 @@ def handle_request(request):
         return prepare_delivery(request)
     if operation == 'verify':
         return verify_delivery(request)
+    if operation == 'validate':
+        return verify_delivery(request, before_dispatch=True)
     if operation == 'discard':
         DELIVERY = None
         return observation_result(unavailable(), 'discarded')

@@ -777,6 +777,7 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
   }, []);
 
   return {
+    dictationSessionId: sessionRef.current.sessionId,
     initializeMicrophone,
     prepareAudioEngine,
     primeRecordingStream,

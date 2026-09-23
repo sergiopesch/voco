@@ -10,12 +10,42 @@ const INTERFACE: &str = "org.voco.Panel1";
 const XML: &str = r#"<node><interface name="org.voco.Panel1">
 <method name="Attach"><arg type="b" direction="out"/></method>
 <method name="GetState"><arg type="s" direction="out"/></method>
+<method name="ReserveStopShortcut"><arg type="s" direction="in"/><arg type="b" direction="out"/></method>
 <method name="Action"><arg type="s" direction="in"/><arg type="s" direction="in"/><arg type="b" direction="out"/></method>
 <method name="Detach"/><signal name="Changed"/>
 </interface></node>"#;
 static BUS: Mutex<Option<gio::DBusConnection>> = Mutex::new(None);
 static OWNER: Mutex<Option<String>> = Mutex::new(None);
 static LEVEL: Mutex<Option<(u64, f64, Instant)>> = Mutex::new(None);
+static SHORTCUT_UNTIL: Mutex<Option<Instant>> = Mutex::new(None);
+
+// Refreshed only by the authenticated Shell after it owns a compositor grab.
+// A lost extension cannot permanently suppress the passive keyboard fallback.
+pub fn reserves_stop_shortcut() -> bool {
+    SHORTCUT_UNTIL
+        .lock()
+        .ok()
+        .and_then(|until| *until)
+        .is_some_and(|until| Instant::now() < until)
+}
+
+pub fn clear_shortcut() {
+    if let Ok(mut until) = SHORTCUT_UNTIL.lock() {
+        *until = None;
+    }
+}
+
+fn valid_shortcut_reservation(state: &serde_json::Value, token: &str) -> bool {
+    state["token"].as_str() == Some(token)
+        && matches!(
+            state["status"].as_str(),
+            Some("starting" | "recording" | "processing")
+        )
+        && matches!(
+            state["stopAccelerator"].as_str(),
+            Some("<Alt>d" | "<Alt><Shift>d")
+        )
+}
 
 /// Wake only the attached shell when authoritative state changes; meter frames
 /// remain bounded polling and no state is broadcast to unrelated bus clients.
@@ -89,6 +119,7 @@ pub fn setup(app: &tauri::AppHandle) {
                 .is_some_and(|seen| seen.elapsed() > Duration::from_secs(5))
             {
                 *lease = Lease::default();
+                clear_shortcut();
                 if let Ok(mut owner) = OWNER.lock() {
                     *owner = None;
                 }
@@ -155,6 +186,17 @@ pub fn setup(app: &tauri::AppHandle) {
                         return;
                     }
                     match method {
+                        "ReserveStopShortcut" => {
+                            let (token,) = parameters.get::<(String,)>().unwrap_or_default();
+                            let accepted = crate::tray::panel_snapshot(&app)
+                                .is_some_and(|state| valid_shortcut_reservation(&state, &token));
+                            if accepted {
+                                if let Ok(mut until) = SHORTCUT_UNTIL.lock() {
+                                    *until = Some(Instant::now() + Duration::from_millis(250));
+                                }
+                            }
+                            invocation.return_value(Some(&(accepted,).to_variant()));
+                        }
                         "GetState" => {
                             lease.seen = Some(Instant::now());
                             let state = crate::tray::panel_snapshot(&app)
@@ -169,11 +211,18 @@ pub fn setup(app: &tauri::AppHandle) {
                                 !repeated && crate::tray::panel_action(&app, &action, &token);
                             if accepted && action == "stop" {
                                 lease.last_stop = token;
+                                // An already queued evdev observation must not
+                                // turn this consumed Stop into a fresh Start.
+                                crate::LAST_TOGGLE_MS.store(
+                                    crate::shortcut_monotonic_ms(),
+                                    std::sync::atomic::Ordering::SeqCst,
+                                );
                             }
                             invocation.return_value(Some(&(accepted,).to_variant()));
                         }
                         "Detach" => {
                             *lease = Lease::default();
+                            clear_shortcut();
                             if let Ok(mut owner) = OWNER.lock() {
                                 *owner = None;
                             }
@@ -194,4 +243,45 @@ pub fn setup(app: &tauri::AppHandle) {
         |_, _| {},
         move |_, _| crate::tray::panel_visibility(&lost_app, true),
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn released_or_expired_reservation_does_not_suppress_passive_start() {
+        *SHORTCUT_UNTIL.lock().unwrap() = Some(Instant::now() + Duration::from_secs(1));
+        assert!(reserves_stop_shortcut());
+        clear_shortcut();
+        assert!(!reserves_stop_shortcut());
+        *SHORTCUT_UNTIL.lock().unwrap() = Some(Instant::now() - Duration::from_millis(1));
+        assert!(!reserves_stop_shortcut());
+        clear_shortcut();
+    }
+
+    #[test]
+    fn stop_shortcut_requires_current_active_state_and_supported_accelerator() {
+        for status in [
+            "starting",
+            "recording",
+            "processing",
+            "idle",
+            "recovery",
+            "attention",
+        ] {
+            let state =
+                serde_json::json!({"token":"3:7", "status":status, "stopAccelerator":"<Alt>d"});
+            assert_eq!(
+                valid_shortcut_reservation(&state, "3:7"),
+                matches!(status, "starting" | "recording" | "processing")
+            );
+            assert!(!valid_shortcut_reservation(&state, "3:6"));
+            assert!(!valid_shortcut_reservation(&state, "2:7"));
+        }
+        for accelerator in [None, Some("<Control>v"), Some("")] {
+            let state = serde_json::json!({"token":"3:7", "status":"recording", "stopAccelerator":accelerator});
+            assert!(!valid_shortcut_reservation(&state, "3:7"));
+        }
+    }
 }

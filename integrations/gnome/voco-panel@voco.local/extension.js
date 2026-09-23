@@ -1,6 +1,8 @@
 import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
+import Meta from 'gi://Meta';
+import Shell from 'gi://Shell';
 import St from 'gi://St';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
@@ -23,6 +25,16 @@ export default class VocoPanel extends Extension {
         this._signal = 0;
         this._attached = false;
         this._timer = 0;
+        this._shortcut = 0;
+        this._accelerator = null;
+        this._shortcutDeadline = 0;
+        this._stopPending = null;
+        this._shortcutTimer = 0;
+        this._shortcutGeneration = 0;
+        this._shortcutSignal = global.display.connect('accelerator-activated', (_display, action) => {
+            if (action === this._shortcut && this._state?.canStop)
+                this._stopPending ??= this._state.stopSession;
+        });
         this._cancellable = new Gio.Cancellable();
         // The dummy menu satisfies GNOME's status-area contract without a popup.
         this._indicator = new PanelMenu.Button(0, 'VOCO', true);
@@ -101,6 +113,7 @@ export default class VocoPanel extends Extension {
             if (generation !== this._generation || !this._attached) return;
             this._polling = false;
             this._state = presentation(JSON.parse(result.deep_unpack()[0]));
+            this._syncShortcut();
             this._indicator.show();
             this._render();
             const delay = this._refreshQueued ? 1 : this._state.active ? 50 : 1500;
@@ -158,6 +171,56 @@ export default class VocoPanel extends Extension {
         }
     }
 
+    _syncShortcut() {
+        const state = this._state;
+        const accelerator = state?.active && ['<Alt>d', '<Alt><Shift>d'].includes(state.stopAccelerator)
+            ? state.stopAccelerator : null;
+        if (accelerator !== this._accelerator) {
+            this._releaseShortcut();
+            if (!accelerator) return;
+            const action = global.display.grab_accelerator(accelerator, Meta.KeyBindingFlags.IGNORE_AUTOREPEAT);
+            if (action === Meta.KeyBindingAction.NONE) return;
+            this._shortcut = action;
+            this._accelerator = accelerator;
+            Main.wm.allowKeybinding(Meta.external_binding_name_for_action(action), Shell.ActionMode.NORMAL);
+            this._shortcutTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 16, () => {
+                if (GLib.get_monotonic_time() > this._shortcutDeadline) {
+                    this._releaseShortcut();
+                    return GLib.SOURCE_REMOVE;
+                }
+                // Wait for modifiers to be released before final text can paste.
+                // Only an explicit Stop is emitted, never a delayed toggle/start.
+                if (this._stopPending && !(global.get_pointer()[2] &
+                    (Clutter.ModifierType.MOD1_MASK | Clutter.ModifierType.SHIFT_MASK))) {
+                    const session = this._stopPending;
+                    this._stopPending = null;
+                    if (this._state?.canStop && this._state.stopSession === session)
+                        this._action('stop');
+                }
+                return GLib.SOURCE_CONTINUE;
+            });
+        }
+        if (!this._shortcut) return;
+        // A hung/disconnected app must not leave a key swallowed in the shell.
+        this._shortcutDeadline = GLib.get_monotonic_time() + 2_000_000;
+        const generation = this._shortcutGeneration;
+        this._call('ReserveStopShortcut', new GLib.Variant('(s)', [state.token]), () => {}, () => {
+            if (generation === this._shortcutGeneration) this._releaseShortcut();
+        });
+    }
+
+    _releaseShortcut() {
+        this._shortcutGeneration++;
+        if (this._shortcutTimer) { GLib.source_remove(this._shortcutTimer); this._shortcutTimer = 0; }
+        if (this._shortcut) {
+            Main.wm.allowKeybinding(Meta.external_binding_name_for_action(this._shortcut), Shell.ActionMode.NONE);
+            global.display.ungrab_accelerator(this._shortcut);
+        }
+        this._shortcut = 0;
+        this._accelerator = null;
+        this._stopPending = null;
+    }
+
     _action(action) {
         const state = this._state;
         if (!state || (action === 'stop' ? !state.canStop : !state.canOpen)) return;
@@ -182,6 +245,7 @@ export default class VocoPanel extends Extension {
     }
 
     _disconnect() {
+        this._releaseShortcut();
         this._generation++;
         this._attached = false;
         this._polling = false;
@@ -206,6 +270,7 @@ export default class VocoPanel extends Extension {
         this._detach();
         this._alive = false;
         this._disconnect();
+        if (this._shortcutSignal) { global.display.disconnect(this._shortcutSignal); this._shortcutSignal = 0; }
         this._cancellable?.cancel();
         if (this._watch) Gio.bus_unwatch_name(this._watch);
         if (this._sizeId) Main.panel.disconnect(this._sizeId);

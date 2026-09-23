@@ -3,6 +3,6 @@
   "name": "VOCO",
   "description": "VOCO dictation status and Stop control inside the panel.",
   "shell-version": ["46"],
-  "version": 1,
+  "version": 2,
   "url": "https://github.com/sergiopesch/voco"
 }

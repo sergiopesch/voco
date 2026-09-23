@@ -210,6 +210,7 @@ export function App() {
       }),
   );
   const {
+    dictationSessionId,
     prepareAudioEngine,
     primeRecordingStream,
     cursorDeliveryState,
@@ -875,6 +876,7 @@ export function App() {
       microphonePermission,
       nativeMicrophoneReady,
       dictationStatus: status,
+      dictationSessionId,
       cursorDelivery: cursorDeliveryState,
       cursorRequired,
       cursorSetupState,
@@ -884,6 +886,7 @@ export function App() {
       console.warn("Failed to synchronize VOCO runtime status:", error);
     });
   }, [
+    dictationSessionId,
     cursorRequired,
     cursorDeliveryState,
     cursorSetupState,

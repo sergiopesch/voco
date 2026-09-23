@@ -73,7 +73,7 @@ jobs:
             ibus ibus-gtk3 python3 python3-numpy python3-psutil python3-gi gir1.2-ibus-1.0 bubblewrap \
             xvfb xdotool xclip gir1.2-gtk-3.0 gir1.2-webkit2-4.1 gir1.2-atspi-2.0 at-spi2-core \
             weston libweston-13-0 wayland-utils gir1.2-gtk-4.0 gir1.2-webkit-6.0 \
-            gnome-text-editor gnome-terminal nano
+            gnome-text-editor gnome-terminal nano gnome-shell gnome-shell-extension-appindicator
 
       - name: Install Node dependencies
         run: npm ci
@@ -100,6 +100,13 @@ jobs:
         run: npm run test:brand-motion && node --test scripts/test-panel-model.mjs
         env:
           VOCO_RENDERER_EVIDENCE_DIR: ${{ runner.temp }}/voco-brand-motion
+
+      - name: GNOME consuming Stop and lifecycle regression
+        timeout-minutes: 3
+        env:
+          VOCO_NATIVE_DEPS: /usr
+          VOCO_PANEL_EVIDENCE_DIR: ${{ runner.temp }}/voco-panel
+        run: bash scripts/test-private-ibus-engine-hosted.sh --gnome-panel
 
       - name: Dictation renderer lifecycle regression
         run: npm run test:dictation-renderer
@@ -167,6 +174,7 @@ jobs:
             ${{ runner.temp }}/voco-native-capture-renderer/
             ${{ runner.temp }}/voco-onboarding-renderer/
             ${{ runner.temp }}/voco-brand-motion/
+            ${{ runner.temp }}/voco-panel/
           if-no-files-found: ignore
           retention-days: 7
 

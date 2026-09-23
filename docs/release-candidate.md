@@ -1,5 +1,8 @@
 # Release status
 
+Source **2026.0.58** is under qualification for the Brave Stop correction.
+See [.58 changes](releases/2026.0.58.md). Public downloads remain as recorded below.
+
 The recorded public Ubuntu/Debian release is **2026.0.57**. The
 [latest GitHub release](https://github.com/sergiopesch/voco/releases/latest) is
 authoritative for available downloads; source metadata does not establish what

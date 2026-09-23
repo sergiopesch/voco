@@ -1733,6 +1733,11 @@ pub fn eval_toggle(app_handle: &tauri::AppHandle) {
 // X11 owner-events=false grabs consume their key; a pending IBus poll is not a
 // reason to discard that callback or to change its normal debounce behavior.
 fn suppress_passive_shortcut(backend: &str) -> bool {
+    #[cfg(target_os = "linux")]
+    if backend == "evdev" && panel::reserves_stop_shortcut() {
+        trace_hotkey_event("eval_toggle_suppressed_panel", Some(backend));
+        return true;
+    }
     if IBUS_SHORTCUT_LEASE.suppresses_backend(backend, shortcut_monotonic_ms()) {
         let event = "eval_toggle_suppressed_ibus";
         trace_hotkey_event(event, Some(backend));

@@ -515,7 +515,6 @@ fn desktop_paste_for_target(
         let mut metrics = clipboard_paste_with_shortcut(&adjusted, terminal, || {
             let started = Instant::now();
             let current = desktop_target();
-            guard_probe_ms = started.elapsed().as_millis() as u64;
             if !current.available()
                 || current.token.as_deref() != Some(expected_target)
                 || current.shortcut != target.shortcut
@@ -525,6 +524,23 @@ fn desktop_paste_for_target(
                     "The dictation destination changed before text could be pasted. Review retained text before copying.",
                 ));
             }
+            if let Some(receipt_id) = &receipt {
+                let validation = crate::focus_probe::probe_with(serde_json::json!({
+                    "op":"validate", "receipt_id":receipt_id,
+                }))
+                .map_err(|_| {
+                    InsertionError::rejected(
+                        "The dictation caret could not be verified before insertion.",
+                    )
+                })?;
+                if validation["observation"] != "prepared"
+                    || validation["receipt_id"].as_str() != Some(receipt_id)
+                    || validation["token"].as_str() != Some(expected_target)
+                {
+                    return Err(InsertionError::rejected("The dictation selection or caret changed before insertion. Review retained text before copying."));
+                }
+            }
+            guard_probe_ms = started.elapsed().as_millis() as u64;
             Ok(())
         })?;
         metrics.target_probe_ms = target_probe_ms.saturating_add(guard_probe_ms);

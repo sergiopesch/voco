@@ -243,6 +243,48 @@ class ObservationTests(unittest.TestCase):
         self.assertTrue(b['added_separator'])
         self.field.insert(' Another sentence.')
         self.assertEqual(self.verify(b)['observation'], 'observed')
+    def test_continuation_cannot_replace_selection_created_by_stop_shortcut(self):
+        self.field_value('Go do you hear')
+        self.field.selection, self.field.caret = (0, 14), 0
+        receipt = self.prepare('?', first=False)
+        self.assertEqual(receipt['observation'], 'changed')
+        self.assertIsNone(helper.DELIVERY)
+        self.assertEqual(self.field.value, 'Go do you hear')
+
+    def test_continuation_cannot_replace_partial_or_nested_selection(self):
+        for nested in (False, True):
+            with self.subTest(nested=nested):
+                field = self.rich_field('Earlier text', 7, (0, 7)) if nested else self.field
+                if not nested:
+                    self.field_value('Earlier text', 7, (0, 7))
+                self.assertEqual(self.prepare(' next', first=False)['observation'], 'changed')
+                self.assertEqual(field.value, 'Earlier text')
+
+    def test_selection_after_prepare_is_rejected_before_keyboard_dispatch(self):
+        self.field_value('Go do you hear')
+        receipt = self.prepare('?', first=False)
+        self.assertEqual(receipt['observation'], 'prepared')
+        self.field.selection, self.field.caret = (0, 14), 0
+        result = helper.handle_request(dict(op='validate', receipt_id=receipt['receipt_id']))
+        self.assertEqual(result['observation'], 'changed')
+        self.assertIsNone(helper.DELIVERY)
+
+    def test_pre_dispatch_validation_keeps_receipt_for_observed_paste(self):
+        self.field_value('Before REPLACE after.', 14, (7, 14))
+        receipt = self.prepare('new')
+        result = helper.handle_request(dict(op='validate', receipt_id=receipt['receipt_id']))
+        self.assertEqual(result['observation'], 'prepared')
+        self.field.insert('new')
+        self.assertEqual(self.verify(receipt)['observation'], 'observed')
+
+    def test_pre_dispatch_validation_never_accepts_partial_or_completed_paste(self):
+        for inserted in (' ', ' next'):
+            with self.subTest(inserted=inserted):
+                self.field_value('Earlier')
+                receipt = self.prepare(' next', first=False)
+                self.field.insert(inserted)
+                self.assertEqual(helper.handle_request(dict(op='validate', receipt_id=receipt['receipt_id']))['observation'], 'changed')
+
     def test_selection_replacement_count_and_caret(self):
         self.field_value('Before REPLACE after.', 14, (7,14))
         receipt = self.prepare('Café 👩\u200d💻')

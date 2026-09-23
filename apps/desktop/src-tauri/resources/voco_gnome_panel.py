@@ -6,6 +6,8 @@ import sys
 import time
 
 UUID = 'voco-panel@voco.local'
+# Bump with behavior changes that require reloading the running Shell companion.
+COMPANION_VERSION = 2
 PACKAGE = Path('/usr/share/gnome-shell/extensions') / UUID
 
 
@@ -21,6 +23,8 @@ def classify(version, installed, info, enabled, globally_disabled):
     if globally_disabled:
         return result('blocked', 'GNOME extensions are turned off. Turn them on in Extensions, then check again.')
     if info.get('state') == 1:
+        if info.get('version') != COMPANION_VERSION:
+            return result('restart', 'Panel update installed. Save your work, then sign out and back in to load the current bars and Stop controls.')
         return result('active', 'Live panel bars and Stop are active.')
     if info.get('state') in (3, 4):
         return result('error', 'GNOME could not load the VOCO panel. Sign out and back in, then check Extensions.')
@@ -68,7 +72,7 @@ def check(enable=False):
                         break
                     context.iteration(False)
                 current = check(False)
-                if current['status'] in ('active', 'error', 'blocked'):
+                if current['status'] in ('active', 'error', 'blocked', 'restart'):
                     return current
             return result('pending', 'Panel activation requested. Check again in a moment.')
         # Only this extension is added. A newly installed system extension is
