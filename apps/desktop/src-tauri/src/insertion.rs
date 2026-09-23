@@ -1238,7 +1238,10 @@ mod tests {
             "events_tracked": true,
         });
         let target: DesktopTarget = serde_json::from_value(valid.clone()).unwrap();
-        assert!(target.available(), "A verified terminal pane does not need an accessible text caret");
+        assert!(
+            target.available(),
+            "A verified terminal pane does not need an accessible text caret"
+        );
         for (field, value) in [
             ("token", serde_json::Value::Null),
             ("token", serde_json::json!("")),
@@ -1252,13 +1255,20 @@ mod tests {
             let mut rejected = valid.clone();
             rejected[field] = value;
             let target: DesktopTarget = serde_json::from_value(rejected).unwrap();
-            assert!(!target.available(), "Invalid destination admitted after changing {field}");
+            assert!(
+                !target.available(),
+                "Invalid destination admitted after changing {field}"
+            );
         }
         let target: DesktopTarget = serde_json::from_value(serde_json::json!({
             "input_state": "editable", "scope": "control", "token": "bound-field",
             "shortcut": "ctrl+v", "events_tracked": false,
-        })).unwrap();
-        assert!(target.available(), "Ordinary editable controls retain their existing admission");
+        }))
+        .unwrap();
+        assert!(
+            target.available(),
+            "Ordinary editable controls retain their existing admission"
+        );
     }
 
     #[test]
