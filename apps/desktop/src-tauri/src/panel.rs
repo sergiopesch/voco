@@ -17,16 +17,46 @@ const XML: &str = r#"<node><interface name="org.voco.Panel1">
 static BUS: Mutex<Option<gio::DBusConnection>> = Mutex::new(None);
 static OWNER: Mutex<Option<String>> = Mutex::new(None);
 static LEVEL: Mutex<Option<(u64, f64, Instant)>> = Mutex::new(None);
-static SHORTCUT_UNTIL: Mutex<Option<Instant>> = Mutex::new(None);
+static SHORTCUT_UNTIL: Mutex<Option<(String, Instant)>> = Mutex::new(None);
 
 // Refreshed only by the authenticated Shell after it owns a compositor grab.
 // A lost extension cannot permanently suppress the passive keyboard fallback.
-pub fn reserves_stop_shortcut() -> bool {
+pub fn reserves_stop_shortcut(app: &tauri::AppHandle, session_id: u64) -> bool {
+    let Some(token) = panel_snapshot_shortcut_token(app, session_id) else {
+        return false;
+    };
+    lease_matches(&token)
+}
+
+pub fn reserves_current_stop_shortcut(app: &tauri::AppHandle) -> bool {
+    crate::tray::panel_snapshot(app)
+        .and_then(|state| stop_shortcut_token(&state))
+        .is_some_and(|token| lease_matches(&token))
+}
+
+fn lease_matches(token: &str) -> bool {
     SHORTCUT_UNTIL
         .lock()
         .ok()
-        .and_then(|until| *until)
-        .is_some_and(|until| Instant::now() < until)
+        .and_then(|until| until.clone())
+        .is_some_and(|(reserved, until)| reserved == token && Instant::now() < until)
+}
+
+fn panel_snapshot_shortcut_token(app: &tauri::AppHandle, session_id: u64) -> Option<String> {
+    let state = crate::tray::panel_snapshot(app)?;
+    shortcut_token_for_session(&state, session_id)
+}
+
+fn shortcut_token_for_session(state: &serde_json::Value, session_id: u64) -> Option<String> {
+    let stop_session = state["stopSession"].as_str()?;
+    if stop_session.rsplit(':').next()?.parse::<u64>().ok()? != session_id {
+        return None;
+    }
+    stop_shortcut_token(state)
+}
+
+pub fn is_attached() -> bool {
+    OWNER.lock().is_ok_and(|owner| owner.is_some())
 }
 
 pub fn clear_shortcut() {
@@ -201,7 +231,8 @@ pub fn setup(app: &tauri::AppHandle) {
                                 .is_some_and(|state| valid_shortcut_reservation(&state, &token));
                             if accepted {
                                 if let Ok(mut until) = SHORTCUT_UNTIL.lock() {
-                                    *until = Some(Instant::now() + Duration::from_millis(250));
+                                    *until =
+                                        Some((token, Instant::now() + Duration::from_millis(250)));
                                 }
                             }
                             invocation.return_value(Some(&(accepted,).to_variant()));
@@ -260,12 +291,17 @@ mod tests {
 
     #[test]
     fn released_or_expired_reservation_does_not_suppress_passive_start() {
-        *SHORTCUT_UNTIL.lock().unwrap() = Some(Instant::now() + Duration::from_secs(1));
-        assert!(reserves_stop_shortcut());
+        *SHORTCUT_UNTIL.lock().unwrap() =
+            Some(("3:1/<Alt>d".into(), Instant::now() + Duration::from_secs(1)));
+        assert!(lease_matches("3:1/<Alt>d"));
+        assert!(!lease_matches("3:2/<Alt>d"));
         clear_shortcut();
-        assert!(!reserves_stop_shortcut());
-        *SHORTCUT_UNTIL.lock().unwrap() = Some(Instant::now() - Duration::from_millis(1));
-        assert!(!reserves_stop_shortcut());
+        assert!(!lease_matches("3:1/<Alt>d"));
+        *SHORTCUT_UNTIL.lock().unwrap() = Some((
+            "3:1/<Alt>d".into(),
+            Instant::now() - Duration::from_millis(1),
+        ));
+        assert!(!lease_matches("3:1/<Alt>d"));
         clear_shortcut();
     }
 
@@ -312,5 +348,15 @@ mod tests {
         }
         state.as_object_mut().unwrap().remove("stopSession");
         assert!(!valid_shortcut_reservation(&state, &token));
+    }
+
+    #[test]
+    fn reservation_wait_cannot_accept_an_older_dictation_session() {
+        let state = serde_json::json!({"stopSession":"3:7", "status":"starting", "stopAccelerator":"<Alt>d"});
+        assert_eq!(
+            shortcut_token_for_session(&state, 7).as_deref(),
+            Some("3:7/<Alt>d")
+        );
+        assert!(shortcut_token_for_session(&state, 8).is_none());
     }
 }

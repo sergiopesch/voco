@@ -100,6 +100,7 @@ export interface DictationRecordingEnv {
   useStore: Pick<typeof appStore, "getState">;
   beginDesktopShortcutSession: (id: string, epoch: number) => Promise<void>;
   endDesktopShortcutSession: (id: string) => Promise<void>;
+  awaitStopShortcutReservation: (sessionId: number) => Promise<void>;
   getDesktopPasteStatus: () => Promise<{
     enabled?: boolean;
     available?: boolean;
@@ -185,6 +186,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     useStore,
     beginDesktopShortcutSession,
     endDesktopShortcutSession,
+    awaitStopShortcutReservation,
     getDesktopPasteStatus,
     pasteDesktopText,
     traceDictationEvent,
@@ -371,6 +373,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     traceDictationEvent("recording_state_requested").catch(() => {});
     let nativeAttempt: { generation: number; selectionToken: string } | null = null;
     let webkitCaptureAttempted = false;
+    let destinationSetupFailure = false;
     let ownedShortcut: DesktopShortcutSession | null = null;
     let shortcutEpoch: number | null = null;
     const invalidateNativeSelection = () => {
@@ -391,6 +394,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
         if (paste?.enabled) {
           if (!paste.available) {
             startFailureTitle = paste.failureReason === "cursor" ? "No text cursor available" : "Dictation setup incomplete";
+            destinationSetupFailure = true;
             traceDictationEvent("dictation_desktop_paste_unavailable").catch(() => {});
             throw new Error(paste.detail);
           }
@@ -444,15 +448,25 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       if (desktopPasteSessionRef.current && !desktopTargetTokenRef.current) {
         throw new Error("VOCO could not verify the dictation destination. Focus an accessible text field and try again.");
       }
+      clearTranscript();
+      setInterimTranscript("Starting microphone. Wait for Listening before speaking.");
+      setStatus("starting");
+      if (desktopPasteSessionRef.current) {
+        try {
+          await awaitStopShortcutReservation(startingSessionId);
+          assertOutputAllowed(startingSessionId);
+        } catch (error) {
+          startFailureTitle = "Dictation setup incomplete";
+          destinationSetupFailure = true;
+          throw error;
+        }
+      }
       startFailureTitle = "Microphone could not start";
       const captureSelection = captureSelectionRef.current?.() ?? { backend: "webkit" as const };
       let captureAdmission: CaptureAdmission = "pending";
       if (captureSelection.backend === "native" && !captureSelection.selectionToken) {
         throw new Error("Choose and allow a native microphone in Audio settings.");
       }
-      clearTranscript();
-      setInterimTranscript("Starting microphone. Wait for Listening before speaking.");
-      setStatus("starting");
       resetAudioLevel();
       clearCapturedAudio();
       recordingStartedAtMsRef.current = null;
@@ -669,6 +683,13 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       if (cancelledRef.current) {
         finalizeIdleState();
         useStore.getState().setCaptureNotice(cancelledRef.current);
+        return;
+      }
+      if (destinationSetupFailure) {
+        finalizeIdleState();
+        setError(null);
+        useStore.getState().setCaptureNotice(errorMessage(err));
+        void showNotification(startFailureTitle, errorMessage(err)).catch(() => {});
         return;
       }
       resetAudioLevel();
