@@ -1,11 +1,11 @@
 # Linux packages and qualification
 
-**2026.0.58** is the current Ubuntu/Debian release. Its
-[release notes](releases/2026.0.58.md) and
-[qualification record](testing/brave-release-2026-09-23.md) cover native Brave Stop,
-held shortcuts, companion upgrades, five-minute browser dictation, onboarding,
-Ghostty, recovery and exact-package installation/removal. Input permissions and
-the pinned Nemotron runtime are retained.
+**2026.0.59** is the current Ubuntu/Debian release. Its
+[release notes](releases/2026.0.59.md) and
+[qualification record](testing/stop-reservation-release-2026-09-23.md) cover GNOME
+Stop reservations, installer cleanup, native Brave/Ghostty, five-minute browser
+speech, onboarding, recovery and exact-package installation/removal. The pinned
+recognizer and input permissions are retained.
 The .43 desktop results below remain historical evidence; other native package
 channels stay at .43.
 
