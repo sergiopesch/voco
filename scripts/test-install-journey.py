@@ -117,6 +117,7 @@ class InstallerJourneyTests(unittest.TestCase):
               esac
             }
             voco_verify_installed_package() { return 0; }
+            /usr/bin/voco() { [[ "$*" == --setup-desktop-input ]]; }
             voco_start_helper_prefetch() { :; }
             voco_verify_desktop_input() { (( fixture_checks++ > 0 )); }
             fixture_checks=0

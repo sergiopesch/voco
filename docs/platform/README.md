@@ -84,14 +84,20 @@ systemctl --user status ydotoold
 voco --check-desktop-input
 ```
 
-The .47 package includes `voco-ydotoold.service`, a service for your login.
-Its guided installer reuses a working daemon. Otherwise, when your login already
+The package includes `voco-ydotoold.service`, a service for your login.
+From .55, this unit uses a private corrected daemon for the exact qualified
+Ubuntu 24.04 legacy client, avoiding descriptor exhaustion after repeated use.
+Other client generations retain the distribution daemon. The installer and
+installed app can migrate only an unmodified VOCO unit while VOCO is closed.
+A custom service or another daemon remains under its owner's control.
+The guided installer reuses a working daemon. Otherwise, when your login already
 has write access to `/dev/uinput`, it enables and starts this service, then checks
 that the client can use it. The service runs as you, uses a private socket umask,
 and stops with your graphical session. It is not started by package installation
-alone. For a manual .47 package install with existing device access:
+alone. For a manual package install with existing device access, quit VOCO first:
 
 ```bash
+voco --setup-desktop-input
 systemctl --user enable --now voco-ydotoold.service
 voco --check-desktop-input
 ```

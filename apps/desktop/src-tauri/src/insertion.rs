@@ -641,6 +641,11 @@ fn is_executable(path: &Path) -> bool {
 }
 
 fn command_available(command: &str) -> bool {
+    // Daemon selection qualifies this same distro client. A PATH override may
+    // use an incompatible protocol and must not talk to the private helper.
+    if command == "ydotool" {
+        return is_executable(Path::new(SYSTEM_YDOTOOL));
+    }
     let candidate = Path::new(command);
     if candidate.components().count() > 1 {
         return is_executable(candidate);
@@ -655,6 +660,8 @@ fn command_available(command: &str) -> bool {
         })
         .unwrap_or(false)
 }
+
+const SYSTEM_YDOTOOL: &str = "/usr/bin/ydotool";
 
 fn process_running(process_name: &str) -> bool {
     let mut command = process_runner::command("pgrep");
@@ -913,7 +920,7 @@ fn clipboard_paste_with_shortcut(
     let x11_args = x11_paste_arguments(terminal, leading_separator);
     let (paste_program, paste_args): (&str, &[&str]) = if wayland {
         (
-            "ydotool",
+            SYSTEM_YDOTOOL,
             wayland_args
                 .as_deref()
                 .expect("Wayland arguments checked above"),
@@ -1007,7 +1014,7 @@ fn wayland_paste_arguments(daemon_running: bool) -> Result<Vec<&'static str>, In
             "Start the ydotoold desktop input service before dictating.",
         ));
     }
-    let child = process_runner::command("ydotool")
+    let child = process_runner::command(SYSTEM_YDOTOOL)
         .args(["key", "--help"])
         .stdin(Stdio::null())
         .stdout(Stdio::piped())

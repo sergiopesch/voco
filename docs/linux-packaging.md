@@ -84,8 +84,13 @@ the input service must also be configured and running. The .47 guided installer
 uses APT for the local package and explicitly requests both Wayland packages when
 running on Wayland; dependency repair after `dpkg -i` is insufficient. The package
 includes an opt-in per-login `voco-ydotoold.service`. The installer starts it only
-with existing device access, preserves a working daemon and verifies readiness
-without sending keys. It does not change device permissions or group membership.
+with existing device access and verifies readiness without sending keys. Starting
+with .55, its launcher selects a private source-built daemon only for the exact
+qualified Ubuntu 24.04 legacy client. The system client and daemon are preserved.
+On upgrade, the installed app holds its instance lock before migrating only an
+unmodified VOCO service; another running app, custom unit or unrelated daemon
+prevents migration. `voco --setup-desktop-input` performs this step explicitly
+while VOCO is closed. See [helper provenance](../vendor/ydotool-legacy/README.md). It does not change device permissions or group membership.
 Debian 13
 repositories may not provide it, so the recommendation must not block X11 installs. `at-spi2-core` and
 `gir1.2-atspi-2.0` provide the accessibility bus and bindings. Package installation

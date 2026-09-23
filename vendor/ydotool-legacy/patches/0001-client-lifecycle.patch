@@ -1,0 +1,50 @@
+--- a/Daemon/ydotoold.cpp
++++ b/Daemon/ydotoold.cpp
+@@ -35,11 +35,15 @@
+ 
+ 		if (rc == sizeof(buf)) {
+ 			instance.uInputContext->Emit(buf.type, buf.code, buf.value);
++		} else if (rc < 0 && errno == EINTR) {
++			continue;
+ 		} else {
+-			return 0;
++			break;
+ 		}
+ 	}
+ 
++	close(fd);
++	return 0;
+ }
+ 
+ int main(int argc, char **argv) {
+@@ -75,12 +79,24 @@
+ 
+ 	instance.Init("ydotoold virtual device");
+ 
+-	while (int fd_client = accept(fd_listener, nullptr, nullptr)) {
+-		std::cerr << "ydotoold: accepted client\n";
+-
+-		std::thread thd(client_handler, fd_client);
+-		thd.detach();
++	while (true) {
++		int fd_client = accept(fd_listener, nullptr, nullptr);
++		if (fd_client < 0) {
++			if (errno == EINTR) continue;
++			std::cerr << "ydotoold: failed to accept client: " << strerror(errno) << "\n";
++			close(fd_listener);
++			return 1;
++		}
+ 
++		try {
++			std::thread thd(client_handler, fd_client);
++			thd.detach();
++		} catch (const std::system_error &error) {
++			close(fd_client);
++			close(fd_listener);
++			std::cerr << "ydotoold: failed to start client handler: " << error.what() << "\n";
++			return 1;
++		}
+ 	}
+ 
+ }
+\ No newline at end of file

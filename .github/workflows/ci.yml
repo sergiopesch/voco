@@ -204,7 +204,7 @@ jobs:
             pkg-config libglib2.0-dev libsoup-3.0-dev \
             libjavascriptcoregtk-4.1-dev libwebkit2gtk-4.1-dev \
             libayatana-appindicator3-dev libpulse-dev cmake python3-numpy python3-psutil libsentencepiece0 \
-            pulseaudio pulseaudio-utils bubblewrap
+            pulseaudio pulseaudio-utils bubblewrap g++-13 patch binutils ydotool
 
       - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de
         with:
@@ -245,6 +245,13 @@ jobs:
       - name: Native capture C callback lifecycle (no audio server)
         run: npm run test:native-capture-callbacks
 
+      - name: Private legacy input lifecycle and resource regression
+        timeout-minutes: 3
+        env:
+          CXX: g++-13
+          VOCO_LEGACY_INPUT_EVIDENCE_DIR: ${{ runner.temp }}/voco-legacy-input
+        run: bash scripts/test-private-ibus-engine-hosted.sh --legacy-ydotool
+
       - name: Native capture source latency and complete audio
         timeout-minutes: 3
         env:
@@ -271,6 +278,7 @@ jobs:
           path: |
             ${{ runner.temp }}/voco-glib-regression/result.json
             ${{ runner.temp }}/voco-native-pulse-latency/
+            ${{ runner.temp }}/voco-legacy-input/
             ${{ runner.temp }}/voco-worker-protocol/*.json
             ${{ runner.temp }}/voco-speech-*.json
           if-no-files-found: ignore

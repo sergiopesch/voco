@@ -1,0 +1,85 @@
+{
+  "format_version": 1,
+  "source_date_epoch": 1695127353,
+  "scope": "Private legacy daemon only; no upstream client, Boost or evdevPlus compilation",
+  "packages": [
+    {
+      "name": "ydotool",
+      "version": "0.1.8",
+      "archive": "ydotool_0.1.8.orig.tar.gz",
+      "archive_sha256": "6ebc4ede0a11aa7ced6b52637a4a59cc1528b4c5ed54478d38f0248a40b40a07",
+      "archive_bytes": 13362,
+      "archive_url": "https://archive.ubuntu.com/ubuntu/pool/universe/y/ydotool/ydotool_0.1.8.orig.tar.gz",
+      "members": {
+        "ydotool-0.1.8/CommonIncludes.hpp": "360a290eb3d9cad87424348b4aaefe45d48809fd5ab253bc050f592ce9ae909f",
+        "ydotool-0.1.8/Daemon/ydotoold.cpp": "b7b935c96a33d26db976255ade880e7ba17f5371cf87df8f5378aeabdb23f8f6",
+        "ydotool-0.1.8/Daemon/ydotoold.hpp": "d97d4bdaa4d4657cf20d208ade8be655534ebf5e029b33e0d4be54cc2fba47c2",
+        "ydotool-0.1.8/Library/Instance.cpp": "e737c69574f0c93b16db3892ba72dcb02c9f0fe61b478d62dfd1968825bf51f4",
+        "ydotool-0.1.8/Library/Instance.hpp": "cf05af0d0bad0b1133a9545b62adebe90149d150f30e13bbcf6f03eb47d9273d",
+        "ydotool-0.1.8/LICENSE": "eb4518281250574a698aca7c5a9ba375bc59461818ab22c9ef4148c8f6788e63"
+      }
+    },
+    {
+      "name": "libuinputplus",
+      "version": "0.1.4",
+      "archive": "libuinputplus_0.1.4.orig.tar.gz",
+      "archive_sha256": "a537e156d11ad00c643b93cbd9b712d3ec9d0ae8e40731ff763fe9a6ffe97458",
+      "archive_bytes": 8239,
+      "archive_url": "https://archive.ubuntu.com/ubuntu/pool/universe/libu/libuinputplus/libuinputplus_0.1.4.orig.tar.gz",
+      "members": {
+        "libuInputPlus-0.1.4/CommonIncludes.hpp": "d655d737b3cada31d704abb22fcb79c8a82bd212084a739d785e156d0fdc538e",
+        "libuInputPlus-0.1.4/uInput.hpp": "d44f83f007c2e20385f1f5db2b8997017dc55a8224f1b39ef47d83ce3a28ecc7",
+        "libuInputPlus-0.1.4/uInputSetup.hpp": "1627fb62220f429d23c1f9f4f5f96f5af650a3c5fa82a53cc994b6075e4a165d",
+        "libuInputPlus-0.1.4/uInput.cpp": "3035cfb71a5bdd067e580902e3636eea015532f55610a8092b67add97af8605f",
+        "libuInputPlus-0.1.4/uInputSetup.cpp": "b3bfb186bfcc43c4009273bb6f575ab5798ab5371845a1483bf3b6e9b747ed72",
+        "libuInputPlus-0.1.4/uInputResource.cpp": "064d23d481fa136d9a1d988e2513ac2eb93205d39556a85305a7ea20d43c7b39",
+        "libuInputPlus-0.1.4/LICENSE": "44357e4d2b16c164aa902a2842cfd30618e1bdb3f628822e06de1d5635bab410"
+      }
+    }
+  ],
+  "authentication": {
+    "origin": "Ubuntu noble universe source index",
+    "verified_on": "2026-09-22",
+    "signing_key_fingerprint": "F6ECB3762474EDA9D21B7022871920D1991BC93C",
+    "inrelease": "provenance/ubuntu-noble-InRelease",
+    "inrelease_sha256": "cdb2f31d809f589719a53c6ad15f255b27569c4059542ada282aaa21b8e164b0",
+    "sources_index_url": "https://archive.ubuntu.com/ubuntu/dists/noble/universe/source/Sources.xz",
+    "sources_index_sha256": "796c4253df46fe9d0b468c5b18259f8d5172bf6c8b3b17451ba98ffc1781f682",
+    "sources_index_bytes": 19839948,
+    "individual_dsc_uploader_signature_verified": false
+  },
+  "patches": [
+    "patches/0001-client-lifecycle.patch",
+    "patches/0002-daemon-only-headers.patch"
+  ],
+  "files": {
+    "upstream/ydotool-0.1.8/CommonIncludes.hpp": "360a290eb3d9cad87424348b4aaefe45d48809fd5ab253bc050f592ce9ae909f",
+    "upstream/ydotool-0.1.8/Daemon/ydotoold.cpp": "b7b935c96a33d26db976255ade880e7ba17f5371cf87df8f5378aeabdb23f8f6",
+    "upstream/ydotool-0.1.8/Daemon/ydotoold.hpp": "d97d4bdaa4d4657cf20d208ade8be655534ebf5e029b33e0d4be54cc2fba47c2",
+    "upstream/ydotool-0.1.8/Library/Instance.cpp": "e737c69574f0c93b16db3892ba72dcb02c9f0fe61b478d62dfd1968825bf51f4",
+    "upstream/ydotool-0.1.8/Library/Instance.hpp": "cf05af0d0bad0b1133a9545b62adebe90149d150f30e13bbcf6f03eb47d9273d",
+    "upstream/ydotool-0.1.8/LICENSE": "eb4518281250574a698aca7c5a9ba375bc59461818ab22c9ef4148c8f6788e63",
+    "upstream/libuInputPlus-0.1.4/CommonIncludes.hpp": "d655d737b3cada31d704abb22fcb79c8a82bd212084a739d785e156d0fdc538e",
+    "upstream/libuInputPlus-0.1.4/uInput.hpp": "d44f83f007c2e20385f1f5db2b8997017dc55a8224f1b39ef47d83ce3a28ecc7",
+    "upstream/libuInputPlus-0.1.4/uInputSetup.hpp": "1627fb62220f429d23c1f9f4f5f96f5af650a3c5fa82a53cc994b6075e4a165d",
+    "upstream/libuInputPlus-0.1.4/uInput.cpp": "3035cfb71a5bdd067e580902e3636eea015532f55610a8092b67add97af8605f",
+    "upstream/libuInputPlus-0.1.4/uInputSetup.cpp": "b3bfb186bfcc43c4009273bb6f575ab5798ab5371845a1483bf3b6e9b747ed72",
+    "upstream/libuInputPlus-0.1.4/uInputResource.cpp": "064d23d481fa136d9a1d988e2513ac2eb93205d39556a85305a7ea20d43c7b39",
+    "upstream/libuInputPlus-0.1.4/LICENSE": "44357e4d2b16c164aa902a2842cfd30618e1bdb3f628822e06de1d5635bab410",
+    "notices/GPL-2": "8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643",
+    "notices/GPL-3": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+    "notices/LGPL-2.1": "dc626520dcd53a22f727af3ee42c770e56c97a64fe3adb063799d8ab032fe551",
+    "notices/gcc-runtime-copyright": "08c6f3dee4c19aa1e57eb7d4ad45829b2e99656313bd07fa0922e2553f500be5",
+    "notices/glibc-copyright": "d3c95b56fa33e28b57860580f0baf4e4f4de2a268a2b80f1d031a5191bade265",
+    "notices/libuInputPlus-LICENSE": "44357e4d2b16c164aa902a2842cfd30618e1bdb3f628822e06de1d5635bab410",
+    "notices/linux-uapi-copyright": "4ab34baa23c94237ffef144c80348b982d2d8e814c46b3a6a3538a706ef26114",
+    "notices/system-header-notices.txt": "5ecf34ab87d9315d9a05a5137a59a22c540d5960050427193be9a2d224b69b27",
+    "notices/ydotool-LICENSE": "eb4518281250574a698aca7c5a9ba375bc59461818ab22c9ef4148c8f6788e63",
+    "patches/0001-client-lifecycle.patch": "76c7ef7170d55f9477bdb0afda6652ae3054faa49fd3a2b81b7c0dd1ee901219",
+    "patches/0002-daemon-only-headers.patch": "173aa6aa28a6a2e638b72da6d8e27863cae92a2a8cb3dbc91f6ac84347613201",
+    "provenance/libuinputplus-source-stanza.txt": "889699067cc45d54398786eb56db259096577b7e75a86d273314767178ad5ff1",
+    "provenance/signature-verification.txt": "42d571772f24b8485e3ad777db3ddd8c6f81a346db9bc212293525f6ecca5c82",
+    "provenance/ubuntu-noble-InRelease": "cdb2f31d809f589719a53c6ad15f255b27569c4059542ada282aaa21b8e164b0",
+    "provenance/ydotool-source-stanza.txt": "1ba3a7d380f3a644104ee964c1744d68e455e8af9fec39981d657c3c93c55620"
+  }
+}

@@ -12,6 +12,8 @@ mod browser_protocol;
 mod browser_socket;
 mod config;
 #[cfg(target_os = "linux")]
+mod desktop_input_setup;
+#[cfg(target_os = "linux")]
 mod desktop_notifications;
 mod desktop_shortcut;
 mod digest_hex;
@@ -41,6 +43,19 @@ pub fn check_desktop_input() -> Result<String, String> {
     } else {
         Err(status.detail)
     }
+}
+
+/// Set up the packaged helper only while this process owns the app's idle boundary.
+pub fn setup_desktop_input() -> Result<String, String> {
+    #[cfg(target_os = "linux")]
+    {
+        let guard = single_instance::acquire().map_err(|error| {
+            format!("Close VOCO before updating its desktop input service: {error}")
+        })?;
+        desktop_input_setup::migrate(&guard).map_err(|error| error.detail)
+    }
+    #[cfg(not(target_os = "linux"))]
+    Ok("Desktop input setup is only needed on Linux.".into())
 }
 
 /// Check the focused destination without recording, changing the clipboard or typing.
@@ -2408,6 +2423,16 @@ pub fn run() -> Result<(), String> {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
         .format_timestamp_millis()
         .init();
+
+    #[cfg(target_os = "linux")]
+    if let Err(error) = desktop_input_setup::migrate(&single_instance_guard) {
+        if error.service_may_change {
+            return Err(error.detail);
+        }
+        // A desktop setup failure must remain visible, but browser dictation and
+        // explicit local recovery can still work without this optional helper.
+        warn!("{}", error.detail);
+    }
 
     #[cfg(target_os = "linux")]
     install_socket_cleanup_signal_handler();

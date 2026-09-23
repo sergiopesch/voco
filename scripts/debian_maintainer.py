@@ -4,7 +4,7 @@ import stat
 import sys
 
 TEMPLATE = Path(__file__).resolve().parents[1] / 'packaging/debian/postinst.py.in'
-OWNED_ROOTS = ('usr/lib/voco', 'usr/share/voco', 'usr/share/doc/voco')
+OWNED_ROOTS = ('usr/lib/voco', 'usr/libexec/voco', 'usr/share/voco', 'usr/share/doc/voco')
 
 
 def render_postinst(payload):

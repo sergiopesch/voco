@@ -276,24 +276,34 @@ reconstruction and regression evidence establish the fix, not the audit's zero
 count. Application-level exploit reachability was not established. See
 [patch provenance and maintenance](../../vendor/glib/VOCO-PATCH.md).
 
-### External dependency release blocker: legacy ydotoold
+### Private legacy input daemon
 
-The installed Ubuntu `ydotoold` 0.1.8-3build1 leaks accepted client descriptors,
-including compatibility probes and ordinary paste clients. At descriptor exhaustion
-its accept loop spins and the socket backlog fills, causing input readiness/paste
-failures and high CPU use. This concrete availability defect is outside npm/Cargo
-audit coverage. Restarting the daemon while idle restored the reviewed host's
-readiness, but does not prevent recurrence.
+Ubuntu's `ydotoold` 0.1.8-3build1 leaks accepted client descriptors, including
+compatibility probes and ordinary paste clients. At exhaustion, its accept loop
+spins and input readiness fails. This availability defect is outside npm/Cargo
+audit coverage; periodically restarting it does not prevent recurrence.
 
-A minimal client-close/accept-error patch passed isolated source fixtures, including
-2,000 empty clients and 2,000 event clients with no descriptor growth or busy loop.
-Those tests stubbed input devices; they do not qualify a shipped helper. The exact
-Ubuntu source archives and helper dependencies were authenticated through Ubuntu's
-signed `InRelease`/Sources index chain. Patch, fixture results and provenance
-receipts are retained under `audit-2026-09-22/ydotool-0.1.8-review/`. Integrating a
-private patched daemon remains a release blocker awaiting the owner's dependency
-choice, then package/licensing and application qualification. The current source
-does not ship that patch.
+The .55 package includes a minimal source-built daemon under
+`/usr/libexec/voco/ydotool-legacy/`, with authenticated upstream provenance,
+reviewed lifecycle patches, license notices and a checked build manifest.
+The launcher selects it only for the exact qualified Ubuntu system client;
+`/usr/bin/ydotool` is also used for application probing and dispatch. Other client
+generations use the distribution daemon. No distro executable, device permission
+or group membership is replaced. See [source and maintenance](../../vendor/ydotool-legacy/README.md).
+
+The installed Wayland app holds its exclusive instance guard before migration.
+Only its root-owned, unmodified vendor user unit is eligible. Overrides, custom
+arguments, other logins and competing daemons prevent automatic replacement.
+Pending or unconfirmed service transitions prevent app startup until resolved;
+ordinary safe refusals preserve existing routes. No package hook starts or stops
+a session service. The explicit setup CLI requires the app to be closed.
+
+The original daemon fails the retained connection regression; the production ELF
+passes lifecycle and forced-failure checks in a namespace with input syscalls
+intercepted. This is separate from [isolated VM input qualification](../testing/release-qualification-2026-09-23.md).
+The legacy owner-only fixed socket and uinput privilege boundary are unchanged.
+Input writes still do not acknowledge recipient consumption; bounded destination
+readback and no automatic replay remain necessary.
 
 ## Known Limits and Verification
 

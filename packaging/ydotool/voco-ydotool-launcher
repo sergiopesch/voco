@@ -1,0 +1,233 @@
+#!/usr/bin/python3 -I
+"""Select the qualified compatibility daemon without connecting to input sockets."""
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import stat
+import subprocess
+import sys
+import time
+
+CLIENT = Path('/usr/bin/ydotool')
+SYSTEM_DAEMON = Path('/usr/bin/ydotoold')
+PRIVATE = Path('/usr/libexec/voco/ydotool-legacy')
+LAUNCHER = PRIVATE.parent / 'ydotool-launcher'
+UNIT = Path('/usr/lib/systemd/user/voco-ydotoold.service')
+UNIT_SHA256 = '41e11f02b50d56b517b16d3a51123c6e9904dba247ed7191dad74971ace3bea3'
+UNIT_NAME = 'voco-ydotoold.service'
+
+
+class MigrationInFlight(ValueError):
+    """Startup must remain stopped until the service transition is resolved."""
+
+
+def trusted_file(path, executable=False):
+    """Reject writable or linked code/identity files, including their parents."""
+    for item in reversed((path, *path.parents)):
+        info = item.lstat()
+        expected = stat.S_ISREG if item == path else stat.S_ISDIR
+        if (not expected(info.st_mode) or info.st_uid != 0 or info.st_gid != 0
+                or info.st_mode & 0o6022):
+            raise ValueError('Untrusted system input helper path: ' + str(item))
+    if executable and path.stat().st_mode & 0o111 != 0o111:
+        raise ValueError('Input helper is not executable: ' + str(path))
+    return path
+
+
+def digest(path):
+    with path.open('rb') as stream:
+        return hashlib.file_digest(stream, 'sha256').hexdigest()
+
+
+def qualified_client():
+    identity = json.loads(trusted_file(PRIVATE / 'qualified-client.json').read_text())
+    try:
+        trusted_file(CLIENT, executable=True)
+        if identity['path'] != str(CLIENT) or digest(CLIENT) != identity['sha256']:
+            return False
+        query = subprocess.run(
+            ['/usr/bin/dpkg-query', '-W', '-f=${Package}\t${Version}\t${Architecture}\t${db:Status-Status}', 'ydotool'],
+            check=False, capture_output=True, text=True, timeout=0.5)
+        expected = '\t'.join((identity['package'], identity['version'],
+                              identity['architecture'], 'installed'))
+        owner = subprocess.run(['/usr/bin/dpkg-query', '-S', str(CLIENT)],
+                               check=False, capture_output=True, text=True, timeout=0.5)
+        return (query.returncode == 0 and query.stdout == expected
+                and owner.returncode == 0 and owner.stdout.strip() == 'ydotool: ' + str(CLIENT))
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return False
+
+
+def select_daemon():
+    if not qualified_client():
+        return trusted_file(SYSTEM_DAEMON, executable=True)
+    daemon = trusted_file(PRIVATE / 'ydotoold', executable=True)
+    manifest = json.loads(trusted_file(PRIVATE / 'MANIFEST.json').read_text())
+    if digest(daemon) != manifest['binary_sha256']:
+        raise ValueError('Private input daemon does not match its build manifest')
+    return daemon
+
+
+def systemctl(arguments, deadline):
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise ValueError('Timed out updating the VOCO input service; retry desktop setup')
+    return subprocess.run(['/usr/bin/systemctl', '--user', *arguments], check=True,
+                          capture_output=True, text=True, timeout=min(remaining, 2)).stdout
+
+
+def unit_state(deadline):
+    output = systemctl(['show', UNIT_NAME, '--no-pager',
+                        '--property=LoadState,ActiveState,FragmentPath,DropInPaths,MainPID,ExecStart,ControlGroup,Transient,Job'], deadline)
+    return dict(line.split('=', 1) for line in output.splitlines() if '=' in line)
+
+
+def require_settled(state):
+    if state.get('Job') != '' or state.get('ActiveState') in ('activating', 'deactivating', 'reloading'):
+        raise MigrationInFlight('VOCO input service has a pending transition; wait for it to finish before launching VOCO')
+
+
+def process_identity(pid, group):
+    process = Path('/proc') / str(pid)
+    status = process.joinpath('status').read_text()
+    uids = next(line.split()[1:] for line in status.splitlines() if line.startswith('Uid:'))
+    if any(int(uid) != os.getuid() for uid in uids):
+        raise ValueError('VOCO input service belongs to a different login')
+    groups = [line.split(':', 2)[2] for line in process.joinpath('cgroup').read_text().splitlines()]
+    if group not in groups or not group.endswith('/' + UNIT_NAME):
+        raise ValueError('Input process is not owned by the VOCO service')
+    executable = os.readlink(process / 'exe').removesuffix(' (deleted)')
+    arguments = process.joinpath('cmdline').read_bytes().rstrip(b'\0').split(b'\0')
+    if executable not in (str(SYSTEM_DAEMON), str(PRIVATE / 'ydotoold')) or arguments != [os.fsencode(executable)]:
+        raise ValueError('VOCO input service uses a custom executable or arguments; preserve administrator setup')
+    # /proc/stat comm can contain spaces; starttime follows its final parenthesis.
+    started = process.joinpath('stat').read_text().rsplit(')', 1)[1].split()[19]
+    return pid, executable, started
+
+
+def other_daemons(main_pid):
+    for process in Path('/proc').iterdir():
+        if process.name.isdecimal() and int(process.name) != main_pid:
+            try:
+                if process.joinpath('comm').read_text().strip() == 'ydotoold':
+                    return True
+            except (FileNotFoundError, ProcessLookupError):
+                continue
+    return False
+
+
+def device_access():
+    return stat.S_ISCHR(Path('/dev/uinput').stat().st_mode) and os.access('/dev/uinput', os.W_OK)
+
+
+def migrate():
+    """Called only while the app holds its instance lock, before capture exists.
+
+    Installation hooks never call this. The guarded app startup/explicit setup
+    CLI owns the idle boundary; only this login's unmodified VOCO unit can change.
+    """
+    deadline = time.monotonic() + 4
+    state = unit_state(deadline)
+    require_settled(state)
+    if state.get('LoadState') == 'not-found':
+        return
+    if (state.get('LoadState') != 'loaded' or state.get('ActiveState') not in ('active', 'inactive', 'failed')
+            or state.get('FragmentPath') != str(UNIT) or state.get('DropInPaths')
+            or state.get('Transient') != 'no'):
+        raise ValueError('VOCO input unit is overridden or changing; preserve administrator setup')
+    trusted_file(LAUNCHER, executable=True)
+    if digest(trusted_file(UNIT)) != UNIT_SHA256:
+        raise ValueError('VOCO input unit has administrator changes; automatic migration is unavailable')
+    command = re.search(r'path=([^;]+) ; argv\[\]=([^;]+) ;', state.get('ExecStart', ''))
+    if not command or command[1].strip() not in (str(SYSTEM_DAEMON), str(LAUNCHER)) or command[2].strip() != command[1].strip():
+        raise ValueError('VOCO input unit has custom startup arguments; preserve administrator setup')
+    launcher_command = r'path=' + re.escape(str(LAUNCHER)) + r' ; argv\[\]=' + re.escape(str(LAUNCHER)) + r' ;'
+    if state.get('ActiveState') in ('inactive', 'failed'):
+        # Reload even a stopped unit: systemd may retain the previous ExecStart
+        # after the package file changed. Explicit setup owns later activation.
+        systemctl(['daemon-reload'], deadline)
+        fresh = unit_state(deadline)
+        require_settled(fresh)
+        if (fresh.get('ActiveState') not in ('inactive', 'failed') or fresh.get('DropInPaths')
+                or fresh.get('MainPID') != '0' or fresh.get('FragmentPath') != str(UNIT)
+                or fresh.get('Transient') != 'no' or not re.search(launcher_command, fresh.get('ExecStart', ''))
+                or digest(trusted_file(UNIT)) != UNIT_SHA256):
+            raise ValueError('Input service changed during setup; retry at idle')
+        return
+    pid = int(state.get('MainPID', '0'))
+    if pid <= 0:
+        raise ValueError('VOCO input service has no stable owner process')
+    identity = process_identity(pid, state.get('ControlGroup', ''))
+    target = select_daemon()
+    if identity[1] == str(target) and digest(Path('/proc') / str(pid) / 'exe') == digest(target):
+        if command[1].strip() != str(LAUNCHER):
+            # A supported distribution daemon can already be correct while the
+            # manager still caches the old unit. Refresh future starts only.
+            systemctl(['daemon-reload'], deadline)
+            fresh = unit_state(deadline)
+            require_settled(fresh)
+            if (fresh.get('MainPID') != str(pid) or fresh.get('DropInPaths')
+                    or fresh.get('FragmentPath') != str(UNIT) or fresh.get('Transient') != 'no'
+                    or not re.search(launcher_command, fresh.get('ExecStart', ''))
+                    or process_identity(pid, fresh.get('ControlGroup', '')) != identity):
+                raise ValueError('Input service ownership changed during setup; retry at idle')
+        return
+    if other_daemons(pid):
+        raise ValueError('Another input daemon is running; VOCO will not replace its socket')
+    if not device_access():
+        raise ValueError('This login cannot access /dev/uinput; complete existing device-permission setup first')
+    systemctl(['daemon-reload'], deadline)
+    fresh = unit_state(deadline)
+    require_settled(fresh)
+    if (fresh.get('MainPID') != str(pid) or fresh.get('DropInPaths')
+            or fresh.get('FragmentPath') != str(UNIT)
+            or fresh.get('ActiveState') != 'active' or fresh.get('Transient') != 'no'
+            or digest(trusted_file(UNIT)) != UNIT_SHA256
+            or not re.search(launcher_command, fresh.get('ExecStart', ''))
+            or process_identity(pid, fresh.get('ControlGroup', '')) != identity
+            or other_daemons(pid)):
+        raise ValueError('Input service ownership changed during setup; retry at idle')
+    try:
+        # A timed-out systemctl client does not cancel a queued manager job.
+        # Any failure after dispatch is distinct from a safe preflight refusal.
+        systemctl(['restart', UNIT_NAME], deadline)
+        while time.monotonic() < deadline:
+            fresh = unit_state(deadline)
+            new_pid = int(fresh.get('MainPID', '0'))
+            if new_pid > 0 and fresh.get('Job') == '' and fresh.get('ActiveState') == 'active':
+                try:
+                    current = process_identity(new_pid, fresh.get('ControlGroup', ''))
+                    if current[1] == str(target) and digest(Path('/proc') / str(new_pid) / 'exe') == digest(target):
+                        return
+                except (OSError, ValueError):
+                    pass  # Type=simple can briefly report the trusted launcher PID.
+            time.sleep(0.05)
+        raise ValueError('Input helper migration did not reach the selected daemon')
+    except (OSError, ValueError, subprocess.SubprocessError) as error:
+        raise MigrationInFlight('Input service restart needs attention before VOCO can launch: ' + str(error)) from error
+
+
+def main():
+    if sys.argv[1:] == ['--migrate']:
+        migrate()
+        return
+    if sys.argv[1:] not in ([], ['--select']):
+        raise ValueError('Usage: voco-ydotool-launcher [--select | --migrate]')
+    daemon = select_daemon()
+    if sys.argv[1:]:
+        print(daemon)
+    else:
+        os.execv(daemon, [str(daemon)])
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except MigrationInFlight as error:
+        print('VOCO input helper: ' + str(error), file=sys.stderr)
+        sys.exit(70)
+    except (OSError, ValueError, KeyError, subprocess.SubprocessError) as error:
+        print('VOCO input helper: ' + str(error), file=sys.stderr)
+        sys.exit(1)

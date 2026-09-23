@@ -94,6 +94,10 @@ for file in metadata.json extension.js model.js stylesheet.css voco-symbol.png; 
   assert_entry "/usr/share/gnome-shell/extensions/voco-panel@voco.local/${file}" -rw-r--r--
 done
 assert_entry /usr/lib/systemd/user/voco-ydotoold.service -rw-r--r--
+assert_entry /usr/libexec/voco/ydotool-launcher -rwxr-xr-x
+assert_entry /usr/libexec/voco/ydotool-legacy/ydotoold -rwxr-xr-x
+assert_entry /usr/libexec/voco/ydotool-legacy/MANIFEST.json -rw-r--r--
+assert_entry /usr/libexec/voco/ydotool-legacy/qualified-client.json -rw-r--r--
 assert_entry /usr/share/doc/voco/THIRD-PARTY-NOTICES.txt -rw-r--r--
 assert_entry /usr/libexec/voco-browser-host -rwxr-xr-x
 assert_entry /etc/opt/chrome/native-messaging-hosts/com.voco.exact_field.json -rw-r--r--
@@ -133,6 +137,9 @@ done
 
 cmp "${ROOT_DIR}/vendor/THIRD-PARTY-NOTICES.txt" "${EXTRACT_ROOT}/usr/share/doc/voco/THIRD-PARTY-NOTICES.txt"
 cmp "${ROOT_DIR}/packaging/systemd/voco-ydotoold.service" "${EXTRACT_ROOT}/usr/lib/systemd/user/voco-ydotoold.service"
+cmp "${ROOT_DIR}/packaging/ydotool/voco-ydotool-launcher" "${EXTRACT_ROOT}/usr/libexec/voco/ydotool-launcher"
+cmp "${ROOT_DIR}/packaging/ydotool/qualified-client.json" "${EXTRACT_ROOT}/usr/libexec/voco/ydotool-legacy/qualified-client.json"
+python3 "${ROOT_DIR}/scripts/verify-legacy-input-package.py" "${EXTRACT_ROOT}"
 
 mapfile -t packaged_desktop_files < <(
   find "${EXTRACT_ROOT}/usr/share/applications" -maxdepth 1 -type f -name '*.desktop' -print

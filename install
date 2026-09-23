@@ -416,6 +416,11 @@ voco_wayland_device_access() {
 
 voco_start_wayland_service() {
   [[ "${XDG_SESSION_TYPE:-x11}" == wayland ]] || return 0
+  # The application holds its instance lock across the owned-service migration.
+  # An open app must be closed explicitly; package hooks never restart a session.
+  if ! VOCO_INPUT_ERROR="$(/usr/bin/voco --setup-desktop-input 2>&1)"; then
+    return 1
+  fi
   # Reuse a working service, including a distribution/admin-managed daemon.
   voco_verify_desktop_input && return 0
   if ! voco_wayland_device_access; then

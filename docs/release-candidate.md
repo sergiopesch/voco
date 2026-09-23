@@ -3,31 +3,18 @@
 The [latest published GitHub release](https://github.com/sergiopesch/voco/releases/latest)
 is authoritative for downloads. Source metadata does not establish what is installed.
 
-The **2026.0.55 candidate has been built, packaged and tested**, including the
-delivery/installer corrections, security hardening, code cleanup and native Pulse
-latency fix. The latest Debian package with SHA-256
-`652c50e97f41836f87891b813fc2173a891ea6622a01b97b3fd9b7ac743c5ac2` passed 16
-private GNOME 46 X11 application checks, nine packaged browser cases and strict
-native Wayland onboarding with complete audio, expected transcription and capture
-release after Stop. A fresh APT app installation in reused disposable Ubuntu 24.04
-userspace passes complete inventory and `dpkg --verify`; removal leaves none of
-its 287 non-directory payload paths. The earlier candidate is superseded after
-failing complete native speech.
-Read the [candidate notes](releases/2026.0.55.md) and
-[release-readiness review](testing/release-readiness-2026-09-22.md) for exact
-identities, source snapshot, failed attempts and limits. These are private synthetic
-fixtures and local-container evidence, not physical-microphone, default PipeWire
-or owner-session Wayland acceptance. Bundled documentation retains its assembly-time
-snapshot.
+The **2026.0.55 candidate** integrates the security, delivery, installation,
+performance and code cleanup review, including the native Pulse latency fix and
+the approved private legacy input daemon. The helper fixes descriptor exhaustion
+without replacing the system daemon or changing input permissions. Migration is
+limited to VOCO's unmodified service at an idle application boundary.
 
-**Release is held for the permanent legacy `ydotoold` dependency decision and its
-qualification.** The prepared leak fix is not integrated; the user's dependency
-choice remains pending. Final protected CI, applicable owner and
-physical acceptance, signing and downloaded-asset verification also remain release
-gates; current CI verdicts are on [PR #67](https://github.com/sergiopesch/voco/pull/67).
-This package is unsigned and unpublished; the owner's installed application
-and recorded public downloads remain .54. Stop before switching fields: desktop
-paste cannot make focus changes atomic with key delivery.
+The [candidate notes](releases/2026.0.55.md) describe the changes;
+[23 September qualification](testing/release-qualification-2026-09-23.md) tracks
+exact artifacts and release gates. The [22 September assessment](testing/release-readiness-2026-09-22.md)
+retains earlier artifacts and failed attempts. Final protected CI, signing,
+package/desktop qualification and downloaded-asset verification are required
+before publication. The source version alone is not a published release.
 
 The recorded public Ubuntu/Debian release is **2026.0.54**. It integrates the
 remaining dependency PRs #61–#63, including Vite 8, React plugin 6, Node 24 LTS

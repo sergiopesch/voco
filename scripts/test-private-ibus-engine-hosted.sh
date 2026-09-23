@@ -12,6 +12,10 @@ case "${1:-}" in
     : "${VOCO_NATIVE_PULSE_EVIDENCE_DIR:?Set a fresh directory for native Pulse evidence}"
     TEST_SCRIPT="test-native-capture-pulse-latency.py"
     ;;
+  --legacy-ydotool)
+    : "${VOCO_LEGACY_INPUT_EVIDENCE_DIR:?Set a fresh directory for legacy input evidence}"
+    TEST_SCRIPT="test-legacy-ydotool-daemon.py"
+    ;;
   --native-wayland)
     : "${VOCO_WAYLAND_DEPS:?Set the installed or extracted Weston root/usr}"
     : "${VOCO_WAYLAND_EVIDENCE_DIR:?Set a directory for Wayland evidence}"
@@ -75,6 +79,9 @@ if [[ "${1:-}" == --browser-application ]]; then
 elif [[ "${1:-}" == --native-pulse-latency ]]; then
   PYTHONDONTWRITEBYTECODE=1 python3 "${ROOT_DIR}/scripts/${TEST_SCRIPT}" \
     --output "${VOCO_NATIVE_PULSE_EVIDENCE_DIR}"
+elif [[ "${1:-}" == --legacy-ydotool ]]; then
+  PYTHONDONTWRITEBYTECODE=1 python3 "${ROOT_DIR}/scripts/${TEST_SCRIPT}" \
+    --output "${VOCO_LEGACY_INPUT_EVIDENCE_DIR}"
 elif [[ "${1:-}" == --full-application ]]; then
   application_evidence="${VOCO_NATIVE_EVIDENCE_DIR}"
   for output_mode in final-text-only stable-cursor-streaming; do

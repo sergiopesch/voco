@@ -90,6 +90,8 @@ print("Standalone and source installer helpers are in sync.")
 PY
 
 bash scripts/test-install-common.sh
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/build-legacy-ydotool.py --verify-only
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-ydotool-service.py
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-install-presentation.py
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-install-prefetch.py
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-install-performance.py

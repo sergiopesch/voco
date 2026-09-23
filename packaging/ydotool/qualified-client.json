@@ -1,0 +1,20 @@
+{
+  "package": "ydotool",
+  "version": "0.1.8-3build1",
+  "architecture": "amd64",
+  "path": "/usr/bin/ydotool",
+  "sha256": "8b7dde4c037445a72710ac92f7a45b9521f267256b493429900211a62623213a",
+  "archive": {
+    "url": "https://archive.ubuntu.com/ubuntu/pool/universe/y/ydotool/ydotool_0.1.8-3build1_amd64.deb",
+    "sha256": "1ad45bc89111cc8e078c5cad133da7ce058689749b537cd6654d5fa5b57e6f40",
+    "bytes": 801954
+  },
+  "authentication": {
+    "inrelease_url": "https://archive.ubuntu.com/ubuntu/dists/noble/InRelease",
+    "inrelease_sha256": "cdb2f31d809f589719a53c6ad15f255b27569c4059542ada282aaa21b8e164b0",
+    "index_path": "universe/binary-amd64/Packages",
+    "index_sha256": "687ffc969e7700137677b9cfe2f614ee2d638052a91a7c9bf31f3f6a3040a99a",
+    "index_bytes": 73379142,
+    "signing_fingerprint": "F6ECB3762474EDA9D21B7022871920D1991BC93C"
+  }
+}

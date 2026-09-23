@@ -53,6 +53,10 @@ glib 0.20 directly leaves the GTK dependency behind. [Backport](vendor/glib/VOCO
 - Explicit NVIDIA recovery uses `recover_stream` and the bundled runtime, with no
   destination callback or alternate recognizer. Preserve source samples/rate; publish
   only a completed result. Cancel keeps audio and stale cleanup is session-bound.
+- The private legacy input daemon is selected only for the qualified system client.
+  Keep `/usr/bin/ydotool` consistent between probing and dispatch. Migrate only
+  VOCO's unmodified user unit while holding its single-instance guard, before
+  recording can start. Package hooks must not restart desktop session services.
 - Legacy ydotool requires a literal space argument, not `space`. Its paste delay
   is 24 ms; modern numeric arguments and terminal gestures have separate contracts.
 - X11 shortcut scope belongs to the exact focus window, UUID and renderer epoch

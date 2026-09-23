@@ -417,6 +417,10 @@ fi
 [[ "$VOCO_INSTALL_ERROR" == *APT* ]] || fail "APT failure returned an unclear error"
 cat > "${MOCK_BIN}/voco" <<'SH'
 #!/usr/bin/env bash
+if [[ "$*" == --setup-desktop-input ]]; then
+  if [[ "${MOCK_APP_RUNNING:-false}" == true ]]; then echo 'Close VOCO before updating desktop input.' >&2; exit 1; fi
+  exit 0
+fi
 [[ "$*" == --check-desktop-input ]] || exit 64
 if [[ "${MOCK_INPUT_READY}" != true && ! -f "${MOCK_INPUT_READY_FILE:-/nonexistent}" ]]; then echo "Start ydotoold for this login." >&2; exit 1; fi
 echo "Desktop input is ready."
@@ -445,6 +449,11 @@ chmod 0700 "${MOCK_BIN}/systemctl" "${MOCK_BIN}/pgrep"
 voco_wayland_device_access() { [[ "${MOCK_DEVICE_ACCESS:-false}" == true ]]; }
 export XDG_SESSION_TYPE=wayland MOCK_INPUT_READY=false MOCK_DEVICE_ACCESS=false MOCK_DAEMON_RUNNING=false
 : > "$MOCK_PACKAGE_LOG"
+export MOCK_APP_RUNNING=true
+if voco_start_wayland_service; then fail "Setup bypassed the running application guard"; fi
+[[ "$VOCO_INPUT_ERROR" == *'Close VOCO'* ]] || fail "Lost running application guidance"
+[[ ! -s "$MOCK_PACKAGE_LOG" ]] || fail "Running application setup changed services"
+export MOCK_APP_RUNNING=false
 if voco_start_wayland_service; then fail "Service started without device access"; fi
 [[ "$VOCO_INPUT_ERROR" == *'/dev/uinput'* ]] || fail "Missing device guidance"
 [[ ! -s "$MOCK_PACKAGE_LOG" ]] || fail "Missing access changed services"
