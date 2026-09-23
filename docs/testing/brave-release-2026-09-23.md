@@ -26,7 +26,8 @@ Release review found two more issues. Setup now distinguishes old loaded
 companion metadata from newly installed files and requests a session restart.
 Native reservations clear immediately when capture becomes inactive, the hotkey
 changes or the renderer resets. Focused regressions and a real private GNOME
-upgrade test cover the corrections. No confirmed review findings remain open.
+upgrade test cover the corrections. A later final review-thread sweep found a remaining rejected-reservation race;
+[2026.0.59 qualification](stop-reservation-release-2026-09-23.md) records its correction.
 
 ## Final-package checks
 

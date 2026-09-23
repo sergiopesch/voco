@@ -1,6 +1,6 @@
 # Using VOCO
 
-These instructions describe public **2026.0.58**, including direct tray handoff
+These instructions describe public **2026.0.59**, including direct tray handoff
 after onboarding and saved dictation opened only when requested.
 
 A successful voice test is followed by a desktop input check
