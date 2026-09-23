@@ -1,7 +1,7 @@
 # Using VOCO
 
-The onboarding handoff and quiet recovery described here are source changes awaiting
-release. Public **2026.0.56** still opens the Ready/recovery panel automatically.
+These instructions describe public **2026.0.57**, including direct tray handoff
+after onboarding and saved dictation opened only when requested.
 
 A successful voice test is followed by a desktop input check
 before onboarding completes. **Desktop setup required** means helpers or their

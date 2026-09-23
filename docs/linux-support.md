@@ -1,10 +1,11 @@
 # Linux packages and qualification
 
-**2026.0.56** is the current Ubuntu/Debian release. Its
-[release notes](releases/2026.0.56.md) and
-[qualification record](testing/installer-ghostty-2026-09-23.md) describe installer
-opening, Ghostty pane support, repeated X11 starts and exact-package checks. Input
-permissions, shortcut protection and the pinned Nemotron runtime are retained.
+**2026.0.57** is the current Ubuntu/Debian release. Its
+[release notes](releases/2026.0.57.md) and
+[qualification record](testing/tray-brand-release-2026-09-23.md) cover tray
+onboarding, recovery on request, installer branding and exact-package checks.
+Ghostty pane support, input permissions, shortcut protection and the pinned
+Nemotron runtime are retained.
 The .43 desktop results below remain historical evidence; other native package
 channels stay at .43.
 

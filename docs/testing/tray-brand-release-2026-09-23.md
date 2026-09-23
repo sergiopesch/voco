@@ -81,3 +81,16 @@ desktop compatibility. The private browser desktop has no notification daemon;
 notification presentation there is covered by renderer request checks, not a
 claim of a painted notification. The existing low-severity Rand advisory remains
 visible and assessed separately. Frozen earlier releases and evidence are kept.
+
+## Verified publication
+
+Public release [voco.2026.0.57](https://github.com/sergiopesch/voco/releases/tag/voco.2026.0.57)
+is verified. All four required protected jobs and merged-source CI passed before
+the signed cut. The signed validation asset binds their exact heads and job URLs.
+
+- Release commit: `1da787aaafd025ad2b1b6b311d0c23dc6a83a38a`.
+- Signed tag object: `3067395e324f40f0db20ebe927eb1ca357af2747`.
+- Anonymous verification: `2026-09-23T16:03:29.440521+00:00`; all 18 assets and five signatures passed, including latest aliases and the raw tagged installer.
+- Verification receipt SHA-256: `c4dc7e1db4c10e2de5b29e3ce4681dc6c0174843d02a44335214b0adc480d7f8`.
+
+Publication documentation does not change the frozen package or source archive.

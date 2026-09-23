@@ -229,7 +229,7 @@ startup timing. The panel capsule remains horizontal and labels processing
 The current source installer uses a five-row VOCO block wordmark in colour terminals
 at least 64 columns wide and 16 rows tall. Short colour terminals keep a one-line
 wordmark; narrow or static output keeps a compact VOCO heading. This larger treatment
-is unreleased; the public .56 installer still uses the earlier small heading.
+ships in public .57; .56 retains the earlier small heading.
 
 The letters stay satin silver, with one brief brighter-silver sweep on stage entry.
 Completed steps use soft green and a check; the active step uses amber and a chevron.
