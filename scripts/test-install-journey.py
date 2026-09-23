@@ -165,7 +165,12 @@ class InstallerJourneyTests(unittest.TestCase):
                 Path(directory).mkdir(parents=True, exist_ok=True)
                 (Path(directory) / 'journey.ansi').write_bytes(raw)
                 (Path(directory) / 'journey.txt').write_text(screen)
-            self.assertEqual(screen.count('V O C O' if mode not in ('plain', 'narrow', 'short') else 'VOCO · v'), 1, screen)
+            if mode in ('plain', 'narrow', 'short'):
+                self.assertEqual(screen.count('VOCO · v'), 1, screen)
+                self.assertNotIn('██', screen)
+            else:
+                self.assertEqual(sum('█' in line for line in screen.splitlines()), 5, screen)
+                self.assertEqual(screen.count('Your voice, typed.'), 1, screen)
             if mode == 'password':
                 self.assertIn('Fixture password: fixture', screen)
             if mode == 'prompt':
@@ -174,7 +179,6 @@ class InstallerJourneyTests(unittest.TestCase):
             self.assertNotIn('Created symlink', screen)
             self.assertNotIn('80%', screen)
             self.assertNotIn('[1/3]', screen)
-            self.assertNotIn('██', screen)
             self.assertIn("Installed. Let's try your voice.", screen)
             self.assertIn('sign out', screen.lower())
             self.assertIn('Alt+D', screen)

@@ -581,6 +581,21 @@ VOCO_UI_NO_MOTION=false
 VOCO_UI_LAST_BYTES=0
 VOCO_UI_LAST_TIME=0
 VOCO_UI_RATES=(0 0 0 0 0 0 0)
+VOCO_UI_LINES=10
+# BEGIN GENERATED INSTALLER BRAND
+VOCO_UI_GLYPHS=(
+  '██    ██' ' ██████ ' ' ██████ ' ' ██████ '
+  '██    ██' '██    ██' '██      ' '██    ██'
+  ' ██  ██ ' '██    ██' '██      ' '██    ██'
+  '  ████  ' '██    ██' '██      ' '██    ██'
+  '   ██   ' ' ██████ ' ' ██████ ' ' ██████ '
+)
+VOCO_UI_SILVER='\033[38;2;199;204;212m'
+VOCO_UI_SHINE='\033[38;2;241;243;246m'
+VOCO_UI_MUTED='\033[38;2;122;128;138m'
+VOCO_UI_COMPLETE='\033[38;2;165;217;178m'
+VOCO_UI_ACTIVE='\033[38;2;239;206;131m'
+# END GENERATED INSTALLER BRAND
 
 voco_ui_configure() {
   local columns="${VOCO_TERMINAL_COLUMNS:-80}" rows="${VOCO_TERMINAL_ROWS:-24}"
@@ -595,6 +610,8 @@ voco_ui_configure() {
       VOCO_UI_NO_MOTION=true
     fi
   fi
+  VOCO_UI_LINES=10
+  if [[ "$VOCO_TERMINAL_MOTION" == true && "$rows" -ge 16 ]]; then VOCO_UI_LINES=14; fi
   [[ "$VOCO_TERMINAL_MOTION" == true ]] || return 0
 }
 
@@ -614,10 +631,10 @@ voco_ui_size() {
   printf -v VOCO_UI_SIZE '%d.%d %s' "$((bytes/divisor))" "$((bytes%divisor*10/divisor))" "$unit"
 }
 
-# One ten-line canvas is shared by every normal installation stage.
+# One bounded canvas is shared by every normal installation stage.
 voco_ui_frame() {
   [[ "$VOCO_TERMINAL_MOTION" == true ]] || return 0
-  local title="$1" detail="$2" mark="${3:-—}" shine="${4:--1}" width wordmark='V O C O' i letter
+  local title="$1" detail="$2" mark="${3:-—}" shine="${4:--1}" width wordmark='V O C O' i row color
   local stages='' symbol line2='' rule='────────────────────────────────────────────────────────'
   local -a labels=(Check Download Verify Install)
   width=$((${VOCO_TERMINAL_COLUMNS:-80}-5))
@@ -626,29 +643,41 @@ voco_ui_frame() {
     if [[ "$first" == *' '* ]]; then first="${first% *}"; fi
     line2="${detail:${#first}}"; line2="${line2# }"; detail="$first"
   fi
-  if (( shine >= 0 )) && [[ "$VOCO_UI_NO_MOTION" != true ]]; then
-    wordmark=''
-    for ((i=0;i<4;i++)); do
-      letter="${VOCO_UI_LETTERS:i:1}"
-      if (( i == shine )); then wordmark+="${WHITE}${letter}${GRAPHITE}"; else wordmark+="$letter"; fi
-      wordmark+=' '
-    done
-  fi
   for i in 0 1 2 3; do
-    symbol='○'
-    if (( i < VOCO_UI_STAGE )); then symbol='✓'; elif (( i == VOCO_UI_STAGE )); then symbol='›'; fi
-    stages+="${symbol} ${labels[i]}   "
+    symbol='○'; color="$VOCO_UI_MUTED"
+    if (( i < VOCO_UI_STAGE )); then symbol='✓'; color="$VOCO_UI_COMPLETE"
+    elif (( i == VOCO_UI_STAGE )); then symbol='›'; color="$VOCO_UI_ACTIVE"; fi
+    stages+="${color}${symbol} ${labels[i]}${NC}   "
   done
-  printf '\033[10A\r\033[K  %b%b%b  v%s\n\r\033[K  %s\n\r\033[K  %s\n\r\033[K  %s\n\r\033[K  %s\n\r\033[K  %s\n\r\033[K  %s\n\r\033[K  %s\n\r\033[K  %s\n\r\033[K  %s\n' \
-    "$GRAPHITE_SOFT" "$wordmark" "$NC" "${VERSION:-}" 'Your voice, typed.' '' "$mark" \
-    "${title:0:width}" "$detail" "${line2:0:width}" "${rule:0:width}" "$stages" "${VOCO_UI_NOTE:0:width}"
+  printf '\033[%dA' "$VOCO_UI_LINES"
+  if (( VOCO_UI_LINES == 14 )); then
+    for row in 0 1 2 3 4; do
+      wordmark=''
+      for i in 0 1 2 3; do
+        color="$VOCO_UI_SILVER"
+        if (( i == shine )) && [[ "$VOCO_UI_NO_MOTION" != true ]]; then color="$VOCO_UI_SHINE"; fi
+        wordmark+="${color}${VOCO_UI_GLYPHS[row*4+i]} "
+      done
+      printf '\r\033[K  %b%b\n' "$wordmark" "$NC"
+    done
+    printf '\r\033[K  Your voice, typed.  ·  v%s\n' "${VERSION:-}"
+  else
+    printf '\r\033[K  %bV O C O%b  v%s\n\r\033[K  Your voice, typed.\n' "$VOCO_UI_SILVER" "$NC" "${VERSION:-}"
+  fi
+  color="$VOCO_UI_SILVER"
+  [[ "$mark" != '✓' ]] || color="$VOCO_UI_COMPLETE"
+  printf '\r\033[K\n\r\033[K  %b%s%b\n\r\033[K  %s\n\r\033[K  %s\n\r\033[K  %s\n\r\033[K  %s\n\r\033[K  %b\n\r\033[K  %s\n' \
+    "$color" "$mark" "$NC" "${title:0:width}" "$detail" "${line2:0:width}" "${rule:0:width}" "$stages" "${VOCO_UI_NOTE:0:width}"
 }
-VOCO_UI_LETTERS=VOCO
 
 voco_ui_begin() {
   [[ "$VOCO_TERMINAL_MOTION" == true ]] || return 0
   voco_ui_pause
-  if [[ "$VOCO_UI_OPEN" != true ]]; then printf '\n\n\n\n\n\n\n\n\n\n'; VOCO_UI_OPEN=true; fi
+  if [[ "$VOCO_UI_OPEN" != true ]]; then
+    local line
+    for ((line=0;line<VOCO_UI_LINES;line++)); do printf '\n'; done
+    VOCO_UI_OPEN=true
+  fi
   VOCO_UI_TITLE="$1"
   voco_ui_frame "$1" "${2:-}" "${3:-—}"
 }
@@ -690,10 +719,10 @@ voco_ui_pause() {
 voco_ui_release() {
   voco_ui_pause
   if [[ "$VOCO_UI_OPEN" == true ]]; then
-    printf '\033[10A'
+    printf '\033[%dA' "$VOCO_UI_LINES"
     local line
-    for line in {1..10}; do printf '\r\033[K\n'; done
-    printf '\033[10A\r'
+    for ((line=0;line<VOCO_UI_LINES;line++)); do printf '\r\033[K\n'; done
+    printf '\033[%dA\r' "$VOCO_UI_LINES"
   fi
   VOCO_UI_OPEN=false
 }
@@ -813,6 +842,11 @@ import shutil
 import sys
 import time
 
+# BEGIN GENERATED INSTALLER BRAND
+BRAND_ROWS = [['██    ██', ' ██████ ', ' ██████ ', ' ██████ '], ['██    ██', '██    ██', '██      ', '██    ██'], [' ██  ██ ', '██    ██', '██      ', '██    ██'], ['  ████  ', '██    ██', '██      ', '██    ██'], ['   ██   ', ' ██████ ', ' ██████ ', ' ██████ ']]
+BRAND_COLORS = {'silver': '\x1b[38;2;199;204;212m', 'shine': '\x1b[38;2;241;243;246m', 'muted': '\x1b[38;2;122;128;138m', 'complete': '\x1b[38;2;165;217;178m', 'active': '\x1b[38;2;239;206;131m'}
+# END GENERATED INSTALLER BRAND
+
 ROUTINE = re.compile(
     r'^(?:Reading package lists|Building dependency tree|Reading state information|'
     r'Note, selecting |The following (?:additional packages|NEW packages|packages will be upgraded)|'
@@ -841,6 +875,8 @@ def main():
     partial_since = None
     finished = False
     canvas_open = False
+    size = shutil.get_terminal_size((80, 24))
+    canvas_lines = 14 if size.columns >= 64 and size.lines >= 16 else 10
 
     def write(data):
         sys.stdout.buffer.write(data)
@@ -849,7 +885,8 @@ def main():
     def release():
         nonlocal canvas_open
         if canvas_open:
-            write(b'\033[10A' + b'\r\033[K\n' * 10 + b'\033[10A\r')
+            up = f'\033[{canvas_lines}A'.encode()
+            write(up + b'\r\033[K\n' * canvas_lines + up + b'\r')
             canvas_open = False
 
     def pass_output():
@@ -861,18 +898,22 @@ def main():
         nonlocal last_frame, dirty, canvas_open
         width = max(10, shutil.get_terminal_size((80, 24)).columns - 5)
         age = now - start
-        wordmark = 'V O C O'
-        if no_motion != 'true' and age < .5:
-            position = min(3, int(age * 8))
-            wordmark = ' '.join(('\033[37m' if i == position else '\033[38;2;122;128;138m') + c for i, c in enumerate('VOCO')) + '\033[0m'
+        position = min(3, int(age * 8)) if no_motion != 'true' and age < .5 else -1
+        reset = '\033[0m'
+        if canvas_lines == 14:
+            heading = [' '.join(BRAND_COLORS['shine' if i == position else 'silver'] + letter for i, letter in enumerate(row)) + reset for row in BRAND_ROWS]
+            heading.append('Your voice, typed.  ·  v' + version)
+        else:
+            heading = [BRAND_COLORS['silver'] + 'V O C O' + reset + '  v' + version, 'Your voice, typed.']
         if not canvas_open:
-            write(b'\n' * 10)
+            write(b'\n' * canvas_lines)
             canvas_open = True
-        lines = [wordmark + '  v' + version, 'Your voice, typed.', '', mark,
+        stages = BRAND_COLORS['complete'] + '✓ Check   ✓ Download   ✓ Verify   ' + BRAND_COLORS['active'] + '› Install' + reset
+        lines = heading + ['', BRAND_COLORS['silver'] + mark + reset,
                  'Setting up VOCO.', detail[:width], '',
                  '────────────────────────────────────────────────────────'[:width],
-                 '✓ Check   ✓ Download   ✓ Verify   › Install', '']
-        write(('\033[10A' + ''.join('\r\033[K  ' + line + '\n' for line in lines)).encode())
+                 stages, '']
+        write((f'\033[{canvas_lines}A' + ''.join('\r\033[K  ' + line + '\n' for line in lines)).encode())
         last_frame = now
         dirty = False
 

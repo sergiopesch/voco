@@ -13,6 +13,11 @@ import shutil
 import sys
 import time
 
+# BEGIN GENERATED INSTALLER BRAND
+BRAND_ROWS = [['██    ██', ' ██████ ', ' ██████ ', ' ██████ '], ['██    ██', '██    ██', '██      ', '██    ██'], [' ██  ██ ', '██    ██', '██      ', '██    ██'], ['  ████  ', '██    ██', '██      ', '██    ██'], ['   ██   ', ' ██████ ', ' ██████ ', ' ██████ ']]
+BRAND_COLORS = {'silver': '\x1b[38;2;199;204;212m', 'shine': '\x1b[38;2;241;243;246m', 'muted': '\x1b[38;2;122;128;138m', 'complete': '\x1b[38;2;165;217;178m', 'active': '\x1b[38;2;239;206;131m'}
+# END GENERATED INSTALLER BRAND
+
 ROUTINE = re.compile(
     r'^(?:Reading package lists|Building dependency tree|Reading state information|'
     r'Note, selecting |The following (?:additional packages|NEW packages|packages will be upgraded)|'
@@ -41,6 +46,8 @@ def main():
     partial_since = None
     finished = False
     canvas_open = False
+    size = shutil.get_terminal_size((80, 24))
+    canvas_lines = 14 if size.columns >= 64 and size.lines >= 16 else 10
 
     def write(data):
         sys.stdout.buffer.write(data)
@@ -49,7 +56,8 @@ def main():
     def release():
         nonlocal canvas_open
         if canvas_open:
-            write(b'\033[10A' + b'\r\033[K\n' * 10 + b'\033[10A\r')
+            up = f'\033[{canvas_lines}A'.encode()
+            write(up + b'\r\033[K\n' * canvas_lines + up + b'\r')
             canvas_open = False
 
     def pass_output():
@@ -61,18 +69,22 @@ def main():
         nonlocal last_frame, dirty, canvas_open
         width = max(10, shutil.get_terminal_size((80, 24)).columns - 5)
         age = now - start
-        wordmark = 'V O C O'
-        if no_motion != 'true' and age < .5:
-            position = min(3, int(age * 8))
-            wordmark = ' '.join(('\033[37m' if i == position else '\033[38;2;122;128;138m') + c for i, c in enumerate('VOCO')) + '\033[0m'
+        position = min(3, int(age * 8)) if no_motion != 'true' and age < .5 else -1
+        reset = '\033[0m'
+        if canvas_lines == 14:
+            heading = [' '.join(BRAND_COLORS['shine' if i == position else 'silver'] + letter for i, letter in enumerate(row)) + reset for row in BRAND_ROWS]
+            heading.append('Your voice, typed.  ·  v' + version)
+        else:
+            heading = [BRAND_COLORS['silver'] + 'V O C O' + reset + '  v' + version, 'Your voice, typed.']
         if not canvas_open:
-            write(b'\n' * 10)
+            write(b'\n' * canvas_lines)
             canvas_open = True
-        lines = [wordmark + '  v' + version, 'Your voice, typed.', '', mark,
+        stages = BRAND_COLORS['complete'] + '✓ Check   ✓ Download   ✓ Verify   ' + BRAND_COLORS['active'] + '› Install' + reset
+        lines = heading + ['', BRAND_COLORS['silver'] + mark + reset,
                  'Setting up VOCO.', detail[:width], '',
                  '────────────────────────────────────────────────────────'[:width],
-                 '✓ Check   ✓ Download   ✓ Verify   › Install', '']
-        write(('\033[10A' + ''.join('\r\033[K  ' + line + '\n' for line in lines)).encode())
+                 stages, '']
+        write((f'\033[{canvas_lines}A' + ''.join('\r\033[K  ' + line + '\n' for line in lines)).encode())
         last_frame = now
         dirty = False
 

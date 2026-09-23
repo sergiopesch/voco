@@ -1,5 +1,8 @@
 # Testing
 
+[The unreleased installer brand refresh](installer-brand-2026-09-23.md) records the
+larger shared wordmark, terminal fallbacks, prompt handoff and rendering cost.
+
 [The unreleased onboarding and recovery review](onboarding-recovery-2026-09-23.md)
 records direct-to-tray completion, continued recognition after delivery interruption,
 quiet recovery, multi-minute trials and the remaining qualification limits.
