@@ -361,6 +361,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     phaseRef.current = "starting";
     traceDictationEvent("recording_state_requested").catch(() => {});
     let nativeAttempt: { generation: number; selectionToken: string } | null = null;
+    let webkitCaptureAttempted = false;
     let ownedShortcut: DesktopShortcutSession | null = null;
     let shortcutEpoch: number | null = null;
     const invalidateNativeSelection = () => {
@@ -452,6 +453,15 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       const generation = captureGenerationRef.current;
       let audioContext: AudioContext | null = null;
       debugNativeCaptureEnabledRef.current = false;
+      // Field admission must not start capture or revoke an approved microphone.
+      if (triggerId?.startsWith("browser:")) {
+        const delivery = new BrowserStreamDelivery(() => isCurrentSession(startingSessionId) && !cancelledRef.current);
+        browserDeliveryRef.current = delivery;
+        await delivery.start(startingSessionId, triggerId);
+        assertOutputAllowed(startingSessionId);
+        manualCopyRequestedRef.current = false;
+        transitionCursorDelivery("ownership-established");
+      }
       if (captureSelection.backend === "native") {
         nativeAttempt = { generation, selectionToken: captureSelection.selectionToken! };
         debugNativeCaptureEnabledRef.current = await debugNativeCaptureEnabled().catch(() => false);
@@ -480,6 +490,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
         captureDescriptorRef.current = native.descriptor;
         captureAdmission = "automatic";
       } else {
+        webkitCaptureAttempted = true;
         nativeCaptureRef.current = null;
         audioContext = await ensureAudioContext();
         assertOutputAllowed(startingSessionId);
@@ -489,16 +500,6 @@ export function createDictationRecording(env: DictationRecordingEnv) {
           sourceIdentity: null, conversion: "webaudio-mono",
         });
       }
-      assertOutputAllowed(startingSessionId);
-      if (triggerId?.startsWith("browser:")) {
-        const delivery = new BrowserStreamDelivery(() => isCurrentSession(startingSessionId) && !cancelledRef.current);
-        browserDeliveryRef.current = delivery;
-        await delivery.start(startingSessionId, triggerId);
-        assertOutputAllowed(startingSessionId);
-        manualCopyRequestedRef.current = false;
-        transitionCursorDelivery("ownership-established");
-      }
-
       assertOutputAllowed(startingSessionId);
       if (captureSelection.backend === "webkit") {
         const deviceId = useStore.getState().selectedDeviceId;
@@ -656,8 +657,9 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       resetAudioLevel();
       setStatus("error");
       // Native readiness belongs to the guarded selection invalidation above.
-      // A late failure must not revoke a newer source's readiness.
-      if (!nativeAttempt) setMicrophoneReadyState(false);
+      // Destination/shortcut rejection happens before capture and says nothing
+      // about microphone readiness. A late native failure must not revoke a newer source.
+      if (webkitCaptureAttempted) setMicrophoneReadyState(false);
       setInterimTranscript("");
       sessionRef.current = failSession(sessionRef.current);
       phaseRef.current = "error";

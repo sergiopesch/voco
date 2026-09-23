@@ -7,6 +7,35 @@ use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 // when a response/error arrives, conservatively later than engine processing.
 const ENGINE_ARM_MS: i64 = 1_000;
 
+/// A plugin callback owns one registration; a release cannot borrow another press.
+pub struct PluginGesture {
+    pressed: AtomicBool,
+}
+
+impl PluginGesture {
+    pub const fn new() -> Self {
+        Self {
+            pressed: AtomicBool::new(false),
+        }
+    }
+
+    pub fn admit(&self, pressed: bool, complete_on_release: bool, eligible: bool) -> bool {
+        if !eligible {
+            self.pressed.store(false, Ordering::SeqCst);
+            return false;
+        }
+        if !complete_on_release {
+            return pressed;
+        }
+        if pressed {
+            self.pressed.store(true, Ordering::SeqCst);
+            false
+        } else {
+            self.pressed.swap(false, Ordering::SeqCst)
+        }
+    }
+}
+
 pub enum PollOutcome {
     Armed,
     Disarmed,
@@ -84,6 +113,82 @@ pub fn admit_toggle(last: &AtomicI64, now: i64, debounce_ms: i64) -> bool {
 mod tests {
     use super::*;
     use std::sync::{Arc, Barrier};
+
+    #[test]
+    fn plugin_x11_waits_for_one_completed_gesture_without_a_timer() {
+        let gesture = PluginGesture::new();
+        assert!(!gesture.admit(false, true, true), "orphan release");
+        for _ in 0..10 {
+            assert!(
+                !gesture.admit(true, true, true),
+                "held/repeated press must not start or stop"
+            );
+        }
+        assert!(gesture.admit(false, true, true));
+        assert!(!gesture.admit(false, true, true), "duplicate release");
+        assert!(!gesture.admit(true, true, true));
+        assert!(
+            gesture.admit(false, true, true),
+            "next completed gesture can stop"
+        );
+    }
+
+    #[test]
+    fn plugin_stale_binding_or_backend_change_cancels_the_pending_gesture() {
+        let old = PluginGesture::new();
+        assert!(!old.admit(true, true, true));
+        assert!(!old.admit(false, true, false));
+        assert!(
+            !old.admit(false, true, true),
+            "canceled press cannot return later"
+        );
+        let replacement = PluginGesture::new();
+        assert!(
+            !replacement.admit(false, true, true),
+            "new registration cannot inherit a press"
+        );
+        assert!(
+            !replacement.admit(true, true, false),
+            "evdev owns the chord"
+        );
+        assert!(
+            !replacement.admit(false, true, true),
+            "ignored press cannot become a release toggle"
+        );
+    }
+
+    #[test]
+    fn plugin_other_sessions_keep_pressed_semantics() {
+        let gesture = PluginGesture::new();
+        assert!(gesture.admit(true, false, true));
+        assert!(!gesture.admit(false, false, true));
+        assert!(!gesture.admit(true, false, false));
+    }
+
+    #[test]
+    fn plugin_concurrent_release_callbacks_consume_one_press_once() {
+        let gesture = Arc::new(PluginGesture::new());
+        assert!(!gesture.admit(true, true, true));
+        let barrier = Arc::new(Barrier::new(16));
+        let workers: Vec<_> = (0..16)
+            .map(|_| {
+                let gesture = Arc::clone(&gesture);
+                let barrier = Arc::clone(&barrier);
+                std::thread::spawn(move || {
+                    barrier.wait();
+                    gesture.admit(false, true, true)
+                })
+            })
+            .collect();
+        assert_eq!(
+            workers
+                .into_iter()
+                .filter_map(|w| w.join().ok())
+                .filter(|v| *v)
+                .count(),
+            1
+        );
+    }
 
     #[test]
     fn simultaneous_backends_admit_only_one_toggle() {

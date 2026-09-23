@@ -61,6 +61,15 @@ signature for the release checksums before verifying the package checksum and
 installing it. An unsigned candidate cannot be installed by the guided flow.
 Never execute an unreviewed network response through a shell pipe.
 
+The development installer now requests one automatic VOCO launch after package
+verification and desktop setup succeed. It uses the invoking desktop user's
+existing environment and detaches from the installer terminal. Root, remote and
+headless invocations keep manual opening instructions; a launch failure leaves
+the successful installation intact and explains how to open VOCO manually.
+The immutable public .55 installer retains its original manual-opening step until
+a later qualified release ships this change. Automatic opening does not start
+microphone capture or complete onboarding.
+
 ## Local candidate
 
 Use the complete package and checksum file provided with that candidate, rather

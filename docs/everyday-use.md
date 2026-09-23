@@ -45,13 +45,16 @@ Smooth movement follows the desktop's animation preference.
 ## Dictation
 
 Check your microphone during setup, then hide VOCO and focus an editable field.
-Press the recording shortcut (default **Alt+D**), wait for Listening, and speak.
-Words appear progressively. Press the shortcut again to finish; the final words
+Press and release the recording shortcut (default **Alt+D**), wait for Listening,
+and speak.
+Words appear progressively. Press and release the shortcut again to finish; the final words
 and punctuation are delivered before VOCO returns to Ready.
 
-If no editable cursor can be verified, VOCO shows a desktop notification and does
-not record. Click in a text field and press the shortcut again. Fields identified as passwords
-are excluded. Some custom controls do not expose an accessible caret.
+VOCO binds dictation to a text field or supported terminal pane. If it cannot
+identify the typing destination, it shows a desktop notification and does not
+record. Focus the intended destination and press the shortcut again. Fields
+identified as passwords are excluded. The [.56 candidate](releases/2026.0.56.md)
+supports Ghostty's focused terminal canvas even though it exposes no text caret.
 
 Stop dictation before switching fields. VOCO uses clipboard paste, replaces
 clipboard text, leaves it there and never presses Enter. A focus change during
@@ -60,6 +63,10 @@ retract text from another app. Recognized terminals use their
 paste chord without changing terminal settings. Protected, custom, remote and rich
 editors need individual testing. The generic desktop route appends text; it does
 not rewrite the entire message after Stop.
+
+Terminal delivery cannot confirm that pasted text appeared or identify every
+password prompt. Read-only terminal mode can reject input. Review terminal text
+before submitting it; VOCO never submits commands for you.
 
 ## Settings
 

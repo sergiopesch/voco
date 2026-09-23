@@ -1860,29 +1860,28 @@ fn register_global_shortcut_listener(app: &tauri::AppHandle, hotkey: &str) -> Re
     let handle = app.clone();
     let label = hotkey.to_string();
     let binding_version = HOTKEY_BINDING_VERSION.fetch_add(1, Ordering::SeqCst) + 1;
+    let gesture = shortcut_arbitration::PluginGesture::new();
+    // A root X11 passive grab temporarily removes GTK focus while the chord is
+    // held. Observe its completion before querying the destination; no delay or
+    // retry may substitute for the unchanged focus and delivery checks.
+    let complete_on_release = cfg!(target_os = "linux") && !is_wayland_session();
 
     app.global_shortcut()
         .on_shortcut(shortcut, move |_app, _shortcut, event| {
-            if event.state != tauri_plugin_global_shortcut::ShortcutState::Pressed {
-                return;
-            }
-
             let current_version = HOTKEY_BINDING_VERSION.load(Ordering::SeqCst);
-            if current_version != binding_version {
-                debug!(
-                    "Ignoring stale global shortcut callback for {label} (binding version {}, latest {})",
-                    binding_version, current_version
-                );
-                return;
-            }
-
-            if USE_EVDEV_HOTKEY.load(Ordering::SeqCst) {
-                debug!("{label} detected via global shortcut plugin but evdev is preferred");
+            if !gesture.admit(
+                event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed,
+                complete_on_release,
+                current_version == binding_version && !USE_EVDEV_HOTKEY.load(Ordering::SeqCst),
+            ) {
                 return;
             }
 
             debug!("{label} detected via global shortcut plugin");
-            trace_hotkey_event("hotkey_event_received_global_shortcut", Some("global_shortcut"));
+            trace_hotkey_event(
+                "hotkey_event_received_global_shortcut",
+                Some("global_shortcut"),
+            );
             eval_toggle_with_backend(&handle, "global_shortcut");
         })
         .map_err(|e| format!("Failed to register global shortcut {hotkey}: {e}"))?;

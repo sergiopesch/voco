@@ -31,6 +31,8 @@ class Node:
     def get_child_at_index(self, i): return self.value('children', self.children[:])[i]
     def get_state_set(self): return types.SimpleNamespace(contains=self.value('states', self.states.copy()).__contains__)
     def get_text_iface(self): return self
+    def get_interfaces(self):
+        return ['Accessible', 'Action', 'Component'] + ([] if self.get_text_iface() is None else ['Text'])
     def get_role(self): return self.value('role', self.role)
     def get_process_id(self): return 42424242
     def get_relation_set(self): return self.relations
@@ -47,8 +49,8 @@ class FocusTests(unittest.TestCase):
         self.window = Node('/window', [self.a, self.b], ['active'])
         self.app = Node('/app', [self.window])
         self.desktop = Node('/desktop', [self.app])
-        atspi = types.SimpleNamespace(StateType=types.SimpleNamespace(ACTIVE='active', FOCUSED='focused', EDITABLE='editable', SHOWING='showing'),
-            Role=types.SimpleNamespace(TERMINAL='terminal', PASSWORD_TEXT='password', LIST_BOX='list-box', POPUP_MENU='popup-menu'),
+        atspi = types.SimpleNamespace(StateType=types.SimpleNamespace(ACTIVE='active', FOCUSED='focused', EDITABLE='editable', SHOWING='showing', VISIBLE='visible', SENSITIVE='sensitive', ENABLED='enabled', DEFUNCT='defunct'),
+            Role=types.SimpleNamespace(TERMINAL='terminal', PASSWORD_TEXT='password', LIST_BOX='list-box', POPUP_MENU='popup-menu', PANEL='panel', FRAME='frame', DIALOG='dialog', ALERT='alert', MENU='menu', MENU_ITEM='menu-item', CHECK_MENU_ITEM='check-menu-item', RADIO_MENU_ITEM='radio-menu-item'),
             RelationType=types.SimpleNamespace(POPUP_FOR='popup-for', CONTROLLER_FOR='controller-for'),
             Text=types.SimpleNamespace(get_character_count=lambda _:0, get_caret_offset=lambda _:0, get_n_selections=lambda _:0), set_timeout=lambda *args:None, get_desktop=lambda _:self.desktop)
         context = types.SimpleNamespace(pending=lambda:False)
@@ -432,5 +434,250 @@ class FocusTests(unittest.TestCase):
         self.window.get_child_at_index=lambda i:(calls.append(i),original(i))[1]
         self.assertIsNone(helper.probe()['token'])
         self.assertLessEqual(len(calls),127)
+
+    def ghostty(self):
+        from gi.repository import Atspi
+        executable = patch.object(helper, 'process_binary', return_value='ghostty')
+        executable.start(); self.addCleanup(executable.stop)
+        Atspi.EventListener = types.SimpleNamespace(new=lambda callback:
+            types.SimpleNamespace(register=lambda event: True))
+        self.window.role = 'frame'; self.window.states.discard('editable')
+        self.a.role = 'panel'
+        self.a.states = {'focused', 'visible', 'showing', 'sensitive'}
+        self.a.get_text_iface = lambda: None
+        self.window.children = [self.a]
+        return Atspi
+
+    def test_ghostty_surface_is_typed_and_has_no_fake_caret_or_receipt(self):
+        self.ghostty()
+        result = helper.probe()
+        self.assertEqual(result['input_state'], 'terminal_surface')
+        self.assertEqual(result['scope'], 'control')
+        self.assertEqual(result['shortcut'], 'ctrl+shift+v')
+        self.assertEqual(len(result['token']), 64)
+        self.assertTrue(result['events_tracked'])
+        prepared = helper.prepare_delivery({'text': 'Private fixture', 'expected_token': result['token'], 'first_delivery': True})
+        self.assertEqual(prepared['observation'], 'unavailable')
+        self.assertIsNone(prepared['receipt_id'])
+        self.assertFalse(prepared['added_separator'])
+
+    def test_ghostty_aliases_are_one_identity_and_use_downward_route(self):
+        self.ghostty()
+        left = Node('/left', [self.a], role='panel')
+        right = Node('/right', [self.a], role='panel')
+        self.window.children = [left, right]
+        # GTK's upward parent can skip an exported synthetic tab container.
+        self.a.parent = self.window
+        result = helper.probe()
+        self.assertEqual(result['input_state'], 'terminal_surface')
+        self.assertEqual(result['token'], helper.probe()['token'])
+
+    def test_ghostty_search_field_uses_normal_chord_and_caret(self):
+        self.ghostty()
+        self.a.role = 'entry'; self.a.states.add('editable'); self.a.get_text_iface = lambda: self.a
+        result = helper.probe()
+        self.assertEqual(result['input_state'], 'editable')
+        self.assertEqual(result['shortcut'], 'ctrl+v')
+        self.a.role = 'password'
+        self.assertEqual(helper.probe()['input_state'], 'protected')
+
+    def test_ghostty_true_caret_does_not_require_complete_canvas_scan(self):
+        self.ghostty()
+        self.a.role = 'entry'; self.a.states.add('editable'); self.a.get_text_iface = lambda: self.a
+        hidden = Node('/hidden', role='panel')
+        hidden.get_child_count = lambda: 999
+        self.window.children.append(hidden)
+        self.assertEqual(helper.probe()['shortcut'], 'ctrl+v')
+        self.assertEqual(helper.probe()['input_state'], 'editable')
+
+    def test_ghostty_surface_requires_each_event_registration(self):
+        atspi = self.ghostty()
+        for missing in ('object:state-changed:focused', 'window:deactivate', 'object:state-changed:active'):
+            with self.subTest(missing=missing):
+                helper.TRACKER = helper.FocusTracker()
+                atspi.EventListener = types.SimpleNamespace(new=lambda callback:
+                    types.SimpleNamespace(register=lambda event: event != missing))
+                self.assertIsNone(helper.probe()['token'])
+
+    def test_ghostty_window_departure_revokes_even_if_canvas_stays_focused(self):
+        self.ghostty()
+        for event_type in ('window:deactivate', 'object:state-changed:active'):
+            with self.subTest(event_type=event_type):
+                before = helper.probe()['token']
+                self.assertIsNotNone(before)
+                helper.TRACKER.window_event(types.SimpleNamespace(type=event_type, source=self.window, detail1=0))
+                self.assertNotEqual(before, helper.probe()['token'])
+
+    def test_ghostty_unrelated_window_event_preserves_identity(self):
+        self.ghostty(); before = helper.probe()['token']
+        helper.TRACKER.window_event(types.SimpleNamespace(type='window:deactivate', source=self.b, detail1=0))
+        self.assertEqual(before, helper.probe()['token'])
+        helper.TRACKER.window_event(types.SimpleNamespace(type='object:state-changed:active', source=self.window, detail1=1))
+        self.assertEqual(before, helper.probe()['token'])
+
+    def test_window_events_do_not_query_or_invalidate_an_unbound_generic_target(self):
+        before = helper.probe()['token']
+        source = types.SimpleNamespace(get_process_id=lambda: (_ for _ in ()).throw(AssertionError('unrelated RPC')))
+        helper.TRACKER.window_event(types.SimpleNamespace(type='window:deactivate', source=source, detail1=0))
+        self.assertEqual(before, helper.probe()['token'])
+
+    def test_leaving_ghostty_does_not_bind_its_window_to_another_field(self):
+        self.ghostty(); self.assertIsNotNone(helper.probe()['token'])
+        self.b.states.add('focused')
+        other = Node('/other-window', [self.b], ['active'], role='frame')
+        self.app.children = [other]
+        with patch.object(helper, 'process_binary', return_value='text-editor'):
+            before = helper.probe()['token']; self.assertIsNotNone(before)
+            self.assertIsNone(helper.TRACKER.window_key)
+            helper.TRACKER.window_event(types.SimpleNamespace(type='window:deactivate', source=self.window, detail1=0))
+            self.assertEqual(before, helper.probe()['token'])
+
+    def test_ghostty_ordinary_field_does_not_retain_canvas_window_binding(self):
+        self.ghostty(); helper.probe()
+        self.a.role = 'entry'; self.a.states.add('editable'); self.a.get_text_iface = lambda: self.a
+        self.assertEqual(helper.probe()['input_state'], 'editable')
+        self.assertIsNone(helper.TRACKER.window_key)
+
+    def test_ghostty_canvas_rejects_observed_loss_even_if_focus_returns_before_next_query(self):
+        self.ghostty()
+        for loss_at in range(1, 4):
+            for returns in (False, True):
+                with self.subTest(loss_at=loss_at, returns=returns):
+                    helper.TRACKER = helper.FocusTracker()
+                    self.a.states.add('focused')
+                    before = helper.probe()['token']; self.assertIsNotNone(before)
+                    calls = []; original = self.a.get_state_set
+                    def lose_focus():
+                        calls.append(True)
+                        if len(calls) == loss_at:
+                            self.a.states.discard('focused')
+                            self.a.clear_cache_single()
+                        sampled = original()
+                        if returns:
+                            self.a.states.add('focused')
+                        return sampled
+                    with patch.object(self.a, 'get_state_set', side_effect=lose_focus):
+                        self.assertIsNone(helper.probe()['token'])
+                    self.a.states.add('focused')
+                    self.assertNotEqual(before, helper.probe()['token'])
+
+    def test_ghostty_stale_cached_focus_loss_is_only_a_discovery_hint(self):
+        self.ghostty(); before = helper.probe()['token']
+        self.a.states.discard('focused'); self.a.clear_cache_single(); self.a.get_state_set()
+        self.a.states.add('focused')
+        self.assertEqual(before, helper.probe()['token'])
+
+    def test_ghostty_observed_window_loss_rejects_even_if_active_returns(self):
+        self.ghostty()
+        for loss_at in range(1, 5):
+            for returns in (False, True):
+                with self.subTest(loss_at=loss_at, returns=returns):
+                    helper.TRACKER = helper.FocusTracker()
+                    self.window.states.add('active')
+                    before = helper.probe()['token']; self.assertIsNotNone(before)
+                    calls = []; original = self.window.get_state_set
+                    def lose_active():
+                        calls.append(True)
+                        if len(calls) == loss_at:
+                            self.window.states.discard('active')
+                        sampled = original()
+                        if returns:
+                            self.window.states.add('active')
+                        return sampled
+                    with patch.object(self.window, 'get_state_set', side_effect=lose_active):
+                        self.assertIsNone(helper.probe()['token'])
+                    self.window.states.add('active')
+                    self.assertNotEqual(before, helper.probe()['token'])
+
+    def test_ghostty_surface_focus_departure_and_return_revokes(self):
+        self.ghostty(); before = helper.probe()['token']
+        self.event(self.a, False); self.event(self.b, True)
+        self.event(self.b, False); self.event(self.a, True)
+        self.assertNotEqual(before, helper.probe()['token'])
+
+    def test_ghostty_surface_requires_live_visible_sensitive_leaf(self):
+        self.ghostty()
+        for state in ('focused', 'visible', 'showing', 'sensitive'):
+            with self.subTest(missing=state):
+                self.a.states.remove(state)
+                self.assertIsNone(helper.probe()['token'])
+                self.a.states.add(state)
+        self.a.states.add('defunct'); self.assertIsNone(helper.probe()['token']); self.a.states.remove('defunct')
+        self.a.children = [self.b]; self.assertIsNone(helper.probe()['token']); self.a.children = []
+        self.a.get_text_iface = lambda: self.a
+        self.assertIsNone(helper.probe()['token'])
+
+    def test_ghostty_surface_rejects_dialog_menu_and_ambiguous_focus(self):
+        self.ghostty()
+        self.window.role = 'dialog'; self.assertIsNone(helper.probe()['token']); self.window.role = 'frame'
+        self.window.children.append(Node('/menu', states=['visible', 'showing'], role='popup-menu'))
+        self.assertIsNone(helper.probe()['token']); self.window.children.pop()
+        self.window.children.append(Node('/second', states=['focused'], role='button'))
+        self.assertIsNone(helper.probe()['token'])
+
+    def test_ghostty_observed_menu_or_inactive_window_revokes_token(self):
+        self.ghostty()
+        before = helper.probe()['token']
+        self.window.children.append(Node('/menu', states=['showing'], role='popup-menu'))
+        self.assertIsNone(helper.probe()['token']); self.window.children.pop()
+        after = helper.probe()['token']
+        self.assertNotEqual(before, after)
+        self.window.states.discard('active'); self.assertIsNone(helper.probe()['token'])
+        self.window.states.add('active'); self.assertNotEqual(after, helper.probe()['token'])
+
+    def test_ghostty_elapsed_deadline_rejects_surface(self):
+        atspi = self.ghostty()
+        with patch.object(helper.time, 'monotonic', return_value=10):
+            self.assertEqual(helper.ghostty_focus(self.window, 42424242, atspi, 9), (None, 'unavailable'))
+
+    def test_ghostty_alias_edges_have_separate_work_bound(self):
+        self.ghostty()
+        self.window.children = [Node('/alias-' + str(i), [self.a], role='panel') for i in range(65)]
+        self.assertIsNone(helper.probe()['token'])
+
+    def test_non_ghostty_panel_is_never_a_terminal_surface(self):
+        self.ghostty()
+        with patch.object(helper, 'process_binary', return_value='another-app'):
+            self.assertIsNone(helper.probe()['token'])
+
+    def test_ghostty_incomplete_catalog_or_tree_rejects_surface(self):
+        self.ghostty()
+        for node in (self.desktop, self.app, self.window):
+            with self.subTest(path=node.path):
+                with patch.object(node, 'get_child_count', return_value=-1):
+                    self.assertIsNone(helper.probe()['token'])
+        hidden = Node('/unreadable', role='panel'); self.window.children.append(hidden)
+        hidden.get_child_count = lambda: -1
+        self.assertIsNone(helper.probe()['token'])
+        hidden.get_child_count = lambda: (_ for _ in ()).throw(RuntimeError('unavailable'))
+        self.assertIsNone(helper.probe()['token'])
+
+    def test_ghostty_surface_scan_cannot_accept_before_budget_exhaustion(self):
+        self.ghostty()
+        self.window.children += [Node('/filler-' + str(i), role='panel') for i in range(128)]
+        self.assertIsNone(helper.probe()['token'])
+        self.window.children = [self.a, self.window]
+        self.assertIsNone(helper.probe()['token'])
+
+    def test_ghostty_route_is_revalidated_after_complete_scan(self):
+        self.ghostty()
+        original = self.window.get_child_at_index; calls = []
+        def child(index):
+            calls.append(index)
+            return original(index) if len(calls) == 1 else self.b
+        self.window.get_child_at_index = child
+        self.assertIsNone(helper.probe()['token'])
+
+    def test_ghostty_foreign_child_and_changed_window_reject(self):
+        self.ghostty()
+        self.a.get_process_id = lambda: 999
+        self.assertIsNone(helper.probe()['token'])
+        self.a.get_process_id = lambda: 42424242
+        original = self.a.get_state_set
+        def state():
+            self.window.states.discard('active')
+            return original()
+        self.a.get_state_set = state
+        self.assertIsNone(helper.probe()['token'])
 
 if __name__=='__main__':unittest.main()

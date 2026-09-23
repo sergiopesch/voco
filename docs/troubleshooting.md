@@ -19,6 +19,17 @@ A passing check still requires a real dictation trial in your intended applicati
 field before pressing your shortcut. Password fields and unsupported custom editors
 remain excluded. VOCO must not record and paste blindly when the target is unknown.
 
+### Ghostty stops before listening
+
+Ghostty 1.3.1 on Linux exposes a focused graphical terminal pane without an accessible
+text caret. VOCO .55 rejects that pane before recording; repeating onboarding or
+granting microphone access again does not repair this compatibility issue.
+The [.56 candidate](releases/2026.0.56.md) adds a distinct focused-pane route and
+preserves microphone readiness after a destination rejection. It retains pane
+identity and focus-change checks without requiring Ghostty to expose a text caret.
+Terminal delivery remains dispatch-only: read-only terminal mode can reject paste,
+and VOCO cannot identify every shell password prompt or terminal application mode.
+
 ## VOCO records but does not type into the active application
 
 VOCO normally streams NVIDIA recognition through desktop paste.

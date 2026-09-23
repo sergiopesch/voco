@@ -293,7 +293,7 @@ fn desktop_paste_status_with_input(
         "observed",
         target_started.elapsed().as_millis() as u64,
     );
-    let available = target.input_state == "editable" && target.token.is_some();
+    let available = target.available();
     if !available {
         crate::trace_hotkey_event(target.reason.failure_event(), None);
     }
@@ -305,7 +305,7 @@ fn desktop_paste_status_with_input(
         available,
         failure_reason: if available { None } else { Some(DesktopPasteFailure::Cursor) },
         detail: match target.input_state.as_str() {
-            "editable" if target.token.is_some() => input.detail.clone(),
+            _ if available => input.detail.clone(),
             "none" => "Click in a text field, then press your dictation shortcut to start.".into(),
             "protected" => "Dictation is unavailable in password fields. Click in another text field and try again.".into(),
             _ if matches!(target.reason, DesktopTargetReason::NoFocusedControl) => "This app is not exposing a text cursor. Check its accessibility support, reopen it, and try again.".into(),
@@ -362,6 +362,20 @@ struct DesktopTarget {
     events_tracked: bool,
 }
 
+impl DesktopTarget {
+    fn available(&self) -> bool {
+        self.scope == "control"
+            && self.token.as_deref().is_some_and(|token| !token.is_empty())
+            && match self.input_state.as_str() {
+                "editable" => true,
+                // A canvas proves focused pane identity, not a readable caret.
+                // Losing event tracking must revoke this dispatch-only route.
+                "terminal_surface" => self.events_tracked && self.shortcut == "ctrl+shift+v",
+                _ => false,
+            }
+    }
+}
+
 fn unknown_focus_scope() -> String {
     "unavailable".into()
 }
@@ -416,7 +430,7 @@ fn desktop_paste_for_target(
     let target_started = Instant::now();
     let target = desktop_target();
     let target_probe_ms = target_started.elapsed().as_millis() as u64;
-    if Some(expected_target) != target.token.as_deref() {
+    if !target.available() || Some(expected_target) != target.token.as_deref() {
         crate::performance::destination_check(
             &target.scope,
             target.events_tracked,
@@ -502,7 +516,8 @@ fn desktop_paste_for_target(
             let started = Instant::now();
             let current = desktop_target();
             guard_probe_ms = started.elapsed().as_millis() as u64;
-            if current.token.as_deref() != Some(expected_target)
+            if !current.available()
+                || current.token.as_deref() != Some(expected_target)
                 || current.shortcut != target.shortcut
                 || !crate::desktop_shortcut::delivery_ready()
             {
@@ -1212,6 +1227,47 @@ mod tests {
         assert_eq!(
             legacy.reason.failure_event(),
             "dictation_desktop_cursor_unavailable"
+        );
+    }
+
+    #[test]
+    fn terminal_surface_admission_requires_control_identity_and_focus_tracking() {
+        let valid = serde_json::json!({
+            "input_state": "terminal_surface", "reason": "ready",
+            "scope": "control", "token": "bound-pane", "shortcut": "ctrl+shift+v",
+            "events_tracked": true,
+        });
+        let target: DesktopTarget = serde_json::from_value(valid.clone()).unwrap();
+        assert!(
+            target.available(),
+            "A verified terminal pane does not need an accessible text caret"
+        );
+        for (field, value) in [
+            ("token", serde_json::Value::Null),
+            ("token", serde_json::json!("")),
+            ("scope", serde_json::json!("window")),
+            ("shortcut", serde_json::json!("ctrl+v")),
+            ("events_tracked", serde_json::json!(false)),
+            ("input_state", serde_json::json!("protected")),
+            ("input_state", serde_json::json!("none")),
+            ("input_state", serde_json::json!("unknown")),
+        ] {
+            let mut rejected = valid.clone();
+            rejected[field] = value;
+            let target: DesktopTarget = serde_json::from_value(rejected).unwrap();
+            assert!(
+                !target.available(),
+                "Invalid destination admitted after changing {field}"
+            );
+        }
+        let target: DesktopTarget = serde_json::from_value(serde_json::json!({
+            "input_state": "editable", "scope": "control", "token": "bound-field",
+            "shortcut": "ctrl+v", "events_tracked": false,
+        }))
+        .unwrap();
+        assert!(
+            target.available(),
+            "Ordinary editable controls retain their existing admission"
         );
     }
 

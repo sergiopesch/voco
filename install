@@ -6,11 +6,11 @@ set -euo pipefail
 #
 # VOCO — release install helper
 # Usage:
-#   wget https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.55/install -O voco-install
+#   wget https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.56/install -O voco-install
 #   chmod +x voco-install
 #   ./voco-install
 
-VERSION="2026.0.55"
+VERSION="2026.0.56"
 RELEASE_TAG="voco.${VERSION}"
 DEB_URL="https://github.com/sergiopesch/voco/releases/download/${RELEASE_TAG}/voco_${VERSION}_amd64.deb"
 CHECKSUMS_URL="https://github.com/sergiopesch/voco/releases/download/${RELEASE_TAG}/voco_checksums.txt"
@@ -1126,6 +1126,80 @@ voco_finish_helper_prefetch() {
   HELPER_DOWNLOAD_PID=""
 }
 
+voco_launch_installed_app() {
+  # Keep the caller's desktop environment. Do not guess another login/display,
+  # activate through a stale service-manager environment, or launch a root GUI.
+  /usr/bin/python3 -I - <<'PY_LAUNCH'
+import os
+from pathlib import Path
+import re
+import stat
+import subprocess
+import sys
+
+
+def skip(message):
+    print(message)
+    sys.exit(2)
+
+
+owner = os.getuid()
+if owner == 0 or owner != os.geteuid():
+    skip("Open VOCO as your regular desktop user.")
+if any(os.environ.get(key) for key in ("SSH_CONNECTION", "SSH_CLIENT", "SSH_TTY")):
+    skip("Open VOCO in your local desktop session.")
+
+try:
+    runtime = Path(os.environ.get("XDG_RUNTIME_DIR", ""))
+    info = runtime.lstat()
+    if (not runtime.is_absolute() or not stat.S_ISDIR(info.st_mode)
+            or info.st_uid != owner or stat.S_IMODE(info.st_mode) & 0o077):
+        skip("Open VOCO from your desktop session.")
+    session = os.environ.get("XDG_SESSION_TYPE", "")
+    wayland = os.environ.get("WAYLAND_DISPLAY", "")
+    display = os.environ.get("DISPLAY", "")
+    if session == "wayland" or (not session and wayland):
+        if not wayland:
+            skip("Open VOCO from your Wayland desktop.")
+        address = Path(wayland)
+        if not address.is_absolute():
+            if address.name != wayland:
+                skip("Open VOCO from your Wayland desktop.")
+            address = runtime / address
+        info = address.lstat()
+        if not stat.S_ISSOCK(info.st_mode) or info.st_uid != owner:
+            skip("Open VOCO from your Wayland desktop.")
+    elif session == "x11" or (not session and display):
+        local = re.fullmatch(r"(?:unix)?:([0-9]+)(?:\.[0-9]+)?", display)
+        if not local:
+            skip("Open VOCO from your local X11 desktop.")
+        x11_root = Path("/tmp/.X11-unix")
+        info = (x11_root / ("X" + local[1])).lstat()
+        if not stat.S_ISSOCK(info.st_mode) or info.st_uid not in (0, owner):
+            skip("Open VOCO from your local X11 desktop.")
+    else:
+        skip("Open VOCO from your desktop session.")
+except OSError:
+    skip("The desktop display is unavailable. Open VOCO from your desktop.")
+
+app = "/usr/bin/voco"
+try:
+    process = subprocess.Popen([app], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                               stderr=subprocess.DEVNULL, start_new_session=True, close_fds=True)
+    try:
+        result = process.wait(timeout=0.35)
+    except subprocess.TimeoutExpired:
+        result = 0  # Launch requested; this is not a claim of application readiness.
+    if result != 0:
+        raise OSError("Application exited during launch")
+except OSError:
+    print("VOCO did not open automatically. Run /usr/bin/voco from your desktop.")
+    sys.exit(1)
+# A successful early exit can mean an existing instance accepted presentation.
+# Never retry an uncertain launch or create a second activation route.
+PY_LAUNCH
+}
+
 voco_install_cleanup() {
   voco_ui_close
   if [[ -n "$CHECKSUM_DOWNLOAD_PID" ]]; then
@@ -1252,11 +1326,16 @@ fi
 
 # ─── Done ───────────────────────────────────────────────
 voco_ui_pause
+if VOCO_LAUNCH_DETAIL="$(voco_launch_installed_app)"; then
+  VOCO_NEXT_STEP="Opening VOCO → Start test → Finish test → Done."
+else
+  VOCO_NEXT_STEP="${VOCO_LAUNCH_DETAIL:-Open VOCO from your desktop.} Start test → Finish test → Done."
+fi
 VOCO_UI_STAGE=4
 if [[ "$VOCO_TERMINAL_MOTION" == true ]]; then
-  voco_ui_begin "Installed. Let's try your voice." "Open VOCO → Start test → Finish test → Done. Shortcut: ${HOTKEY}." '✓'
+  voco_ui_begin "Installed. Let's try your voice." "${VOCO_NEXT_STEP} Shortcut: ${HOTKEY}." '✓'
 else
   ok "Installed. Let's try your voice."
-  dim "Open VOCO → Start test → Finish test → Done."
+  dim "$VOCO_NEXT_STEP"
   dim "Your shortcut is ${HOTKEY}. Change it in Shortcut."
 fi

@@ -75,6 +75,13 @@ glib 0.20 directly leaves the GTK dependency behind. [Backport](vendor/glib/VOCO
   unavailable preflight is never permission to paste unguarded. GNOME X11's
   `mutter-x11-frames` decoration is not a second destination; retain rejection for
   genuinely ambiguous active clients and test focus departure in a real session.
+- Ghostty's GTK terminal canvas is an explicit `terminal_surface` destination,
+  distinct from an accessible editable caret. Bind its unique focused pane through
+  a bounded, fresh downward accessibility route; GTK can omit synthetic parents
+  from reverse ancestry. Require focus/window-loss event tracking and retain
+  departure/return invalidation. Ordinary Ghostty text fields use Ctrl+V. A canvas
+  only supports terminal paste dispatch: never invent caret, protected-input,
+  read-only-mode or content-receipt assurance, and never use an app/window-only fallback.
 - Suggestion focus may resolve to its editable controller only through bounded,
   reciprocal POPUP_FOR/CONTROLLER_FOR relations, fresh focus, same process and
   active-window ancestry. Settle owner loss only within the drained event batch;
@@ -153,7 +160,7 @@ isolation, not a remote VM or proof of a distribution's default desktop.
 
 ## Release and evidence
 
-Source version: **2026.0.55**. Recorded public Ubuntu/Debian version: **2026.0.55**. Verify the current public release on GitHub and
+Source version: **2026.0.56** (unpublished candidate). Recorded public Ubuntu/Debian version: **2026.0.55**. Verify the current public release on GitHub and
 installed version from the package manager; do not infer either from source.
 The .43 package and desktop evidence is recorded in
 [the support matrix](docs/linux-support.md); preserve per-artifact receipts and
@@ -190,7 +197,12 @@ before saving completion. Then check desktop input prerequisites without binding
 an external target or sending keys; a missing cursor inside onboarding is expected.
 The guided installer must use APT to install the local package and explicitly require
 the Wayland client and daemon on Wayland. Successful package installation alone is
-not desktop readiness. Require a verified editable caret before cursor dictation. Native capture permits real window hiding. Preserve the
+not desktop readiness. After successful setup, request one detached launch as the
+invoking desktop user; never launch a GUI from root or package hooks. Distinguish
+launch request from readiness and retain manual guidance when launching fails.
+Require a verified editable caret or the qualified Ghostty terminal-surface route
+before cursor dictation. A destination rejection must preserve microphone readiness;
+only a capture-stage failure may invalidate it. Native capture permits real window hiding. Preserve the
 failed WebKit hidden-start experiment and independently verify audio retention.
 The debug audit needs all three explicit flags and completed private bundles;
 wait for their COMMIT receipts before terminating an audited test process.

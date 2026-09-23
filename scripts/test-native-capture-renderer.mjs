@@ -752,6 +752,127 @@ try {
     await page.evaluate(()=>window.catalogError='Source server unavailable');await page.getByRole('button',{name:'Refresh devices'}).click();await page.getByText('Source server unavailable',{exact:true}).waitFor();assert.equal((await state()).mode,'native');await noCapture();record(expected[12]);
     expected.push('native-settings-without-preview');record('native-settings-without-preview');
     const originalExpected=[...expected];
+    const readinessCases = [];
+    for (const backend of ['native', 'webkit']) {
+      for (const failure of ['cursor', 'setup', 'microphone']) {
+        await page.goto(origin + '/app-microphone-check?scenario=' + (backend === 'native' ? 'enabled' : 'off'));
+        await page.waitForFunction(mode => window.store?.getState().captureBackendMode === mode &&
+          window.calls.some(call => call[0] === 'syncRuntimeStatus' && call[1].runtimeInitialized) &&
+          window.listeners['voco:toggle-dictation'], backend);
+        // Seed previously established readiness. The scenario under test starts
+        // at the next dictation request, with every device boundary still mocked.
+        await page.evaluate(({ backend, failure }) => {
+          const state = window.store.getState();
+          if (backend === 'native') state.setNativeCaptureSource(window.source);
+          else state.setMicrophoneReady(true);
+          state.setSurface('hidden');
+          const original = window.nativeCall;
+          window.nativeCall = async (name, args) => {
+            if (name !== 'getDesktopPasteStatus') return original(name, args);
+            window.calls.push([name, ...args]);
+            return failure === 'microphone' ? { enabled: false } : {
+              enabled: true, available: false, targetToken: null,
+              failureReason: failure, detail: 'Fixture ' + failure + ' unavailable',
+            };
+          };
+          if (failure === 'microphone' && backend === 'webkit') window.failNextStream = true;
+        }, { backend, failure });
+        assert.equal(await page.evaluate(() => window.store.getState().microphoneReady), true);
+        const streamsBefore = await page.evaluate(() => window.streamRequests || 0);
+        await page.evaluate(() => window.listeners['voco:toggle-dictation']({ payload: null }));
+        await page.waitForFunction(() => window.store.getState().status === 'error' &&
+          window.calls.filter(call => call[0] === 'syncRuntimeStatus').at(-1)?.[1].dictationStatus === 'error');
+        const proof = await page.evaluate(() => {
+          const state = window.store.getState();
+          return {
+            ready: state.microphoneReady, selected: state.nativeCaptureSource?.selectionToken ?? null,
+            error: state.error, nativeBegins: window.nativeCommands.filter(call => call.name === 'native_capture_begin').length,
+            streamRequests: window.streamRequests || 0,
+            snapshot: window.calls.filter(call => call[0] === 'syncRuntimeStatus').at(-1)[1],
+          };
+        });
+        const microphoneFailure = failure === 'microphone';
+        assert.equal(proof.nativeBegins, microphoneFailure && backend === 'native' ? 1 : 0);
+        assert.equal(proof.streamRequests - streamsBefore, microphoneFailure && backend === 'webkit' ? 1 : 0);
+        assert.equal(proof.selected, backend === 'native' && !microphoneFailure ? 'token-1' : null);
+        assert.ok(proof.error.includes(microphoneFailure ? backend === 'native' ? 'Native source unavailable' : 'Initial preview failure' : 'Fixture ' + failure + ' unavailable'));
+        const name = backend + '-' + failure + '-failure-' + (microphoneFailure ? 'invalidates' : 'preserves') + '-microphone-readiness';
+        expected.push(name);
+        const passed = proof.ready === !microphoneFailure && proof.snapshot.microphoneReady === !microphoneFailure &&
+          proof.snapshot.nativeMicrophoneReady === (backend === 'native' ? !microphoneFailure : null);
+        results.push({ case: name, passed });
+        readinessCases.push({ case: name, passed, ...proof });
+      }
+    }
+    await save('microphone-readiness-cases.json', readinessCases);
+    assert.ok(readinessCases.every(test => test.passed), 'Only microphone acquisition failures may invalidate microphone readiness');
+    const browserReadinessCases = [];
+    for (const backend of ['webkit', 'native']) {
+    for (const failure of ['ownership', 'lease', 'broker', 'microphone', ...(backend === 'webkit' ? ['audio-context'] : [])]) {
+      await page.goto(origin + '/app-microphone-check?scenario=' + (backend === 'native' ? 'enabled' : 'off'));
+      await page.waitForFunction(backend => window.store?.getState().captureBackendMode === backend &&
+        window.calls.some(call => call[0] === 'syncRuntimeStatus' && call[1].runtimeInitialized) &&
+        window.listeners['voco:toggle-dictation'], backend);
+      await page.evaluate(({ backend, failure }) => {
+        if (backend === 'native') {
+          window.store.getState().setNativeCaptureSource(window.source);
+          window.allowBegin = failure !== 'microphone';
+        } else window.store.getState().setMicrophoneReady(true);
+        window.store.getState().setSurface('hidden');
+        const original = window.nativeCall;
+        window.nativeCall = async (name, args) => {
+          if (name !== 'startOwnedPreedit') return original(name, args);
+          window.calls.push([name, ...args]);
+          if (failure === 'broker') throw Error('Fixture browser connection unavailable');
+          return { sessionId: failure === 'lease' ? null : 901,
+            engineActive: true, focusLost: failure === 'ownership', ownershipIntact: failure !== 'ownership' };
+        };
+        if (failure === 'microphone' && backend === 'webkit') window.failNextStream = true;
+        if (failure === 'audio-context') {
+          window.contexts.forEach(context => context.close());
+          window.AudioContext = class { constructor() { throw Error('Fixture capture context unavailable'); } };
+        }
+      }, { backend, failure });
+      assert.equal(await page.evaluate(() => window.store.getState().microphoneReady), true);
+      const streamsBefore = await page.evaluate(() => window.streamRequests || 0);
+      await page.evaluate(() => window.listeners['voco:toggle-dictation']({
+        payload: { triggerId: 'browser:readiness-fixture', action: 'start' },
+      }));
+      await page.waitForFunction(() => window.store.getState().status === 'error' &&
+        window.calls.filter(call => call[0] === 'syncRuntimeStatus').at(-1)?.[1].dictationStatus === 'error');
+      const proof = await page.evaluate(() => ({
+        ready: window.store.getState().microphoneReady,
+        selected: window.store.getState().nativeCaptureSource?.selectionToken ?? null,
+        error: window.store.getState().error,
+        streamRequests: window.streamRequests || 0,
+        nativeBegins: window.nativeCommands.filter(call => call.name === 'native_capture_begin').length,
+        starts: window.calls.filter(call => call[0] === 'startOwnedPreedit'),
+        cancels: window.calls.filter(call => call[0] === 'cancelOwnedPreedit'),
+        releases: window.calls.filter(call => call[0] === 'releaseBrowserRecording'),
+        snapshot: window.calls.filter(call => call[0] === 'syncRuntimeStatus').at(-1)[1],
+      }));
+      const captureFailure = failure === 'microphone' || failure === 'audio-context';
+      const expectedError = { ownership: 'Browser field could not be verified', lease: 'Browser did not issue a field lease',
+        broker: 'Fixture browser connection unavailable', microphone: backend === 'native' ? 'Native source unavailable' : 'Initial preview failure',
+        'audio-context': 'Fixture capture context unavailable' }[failure];
+      assert.equal(proof.nativeBegins, failure === 'microphone' && backend === 'native' ? 1 : 0);
+      assert.equal(proof.streamRequests - streamsBefore, failure === 'microphone' && backend === 'webkit' ? 1 : 0);
+      assert.equal(proof.selected, backend === 'native' && !captureFailure ? 'token-1' : null);
+      assert.ok(proof.error.includes(expectedError));
+      assert.equal(proof.starts.length, 1);
+      assert.ok(proof.starts.every(call => call[2] === 'browser:readiness-fixture'));
+      assert.ok(proof.releases.some(call => call[1] === 'browser:readiness-fixture'));
+      assert.deepEqual(proof.cancels, failure === 'ownership' || captureFailure ? [['cancelOwnedPreedit', 901]] : []);
+      const name = backend + '-browser-' + failure + '-failure-' + (captureFailure ? 'invalidates' : 'preserves') + '-microphone-readiness';
+      expected.push(name);
+      const passed = proof.ready === !captureFailure && proof.snapshot.microphoneReady === !captureFailure &&
+        proof.snapshot.nativeMicrophoneReady === (backend === 'native' ? !captureFailure : null);
+      results.push({ case: name, passed });
+      browserReadinessCases.push({ case: name, passed, ...proof });
+    }
+    }
+    await save('browser-microphone-readiness-cases.json', browserReadinessCases);
+    assert.ok(browserReadinessCases.every(test => test.passed), 'Browser destination failures must preserve approved microphone readiness');
     const activate=async(auditEnabled=false)=>{
       await load('enabled');await chooseNative('token-1');await page.getByLabel('Allow microphone access for this session').check();await page.getByRole('button',{name:'Use this microphone',exact:true}).click();
       await page.waitForFunction(()=>window.store.getState().nativeCaptureSource!==null);

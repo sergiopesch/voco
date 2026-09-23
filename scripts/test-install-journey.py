@@ -63,7 +63,7 @@ def visible_terminal(data, width=80):
 
 
 class InstallerJourneyTests(unittest.TestCase):
-    def run_journey(self, mode, signature_case='valid'):
+    def run_journey(self, mode, signature_case='valid', install_case='ready', launch_case='started'):
         source = (ROOT / 'install').read_text()
         prefix, body = source.split('# ─── Header', 1)
         # The signed .54 manifest includes KEYS. Use that small real release asset
@@ -74,7 +74,7 @@ class InstallerJourneyTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix='voco-journey-') as folder:
             root = Path(folder)
             (root / 'sudo').write_text('#!/bin/bash\n[[ "$1" == -v || "$1" == -n ]] && exit 0\nexec "$@"\n')
-            (root / 'apt-get').write_text('#!/bin/bash\nprintf called > "$FIXTURE_APT_CALL"\nprintf "pmstatus:voco:80:Setting up\\n" >&3\nprintf "Setting up voco (fixture) ...\\n"\nsleep .15\n')
+            (root / 'apt-get').write_text('#!/bin/bash\nprintf called > "$FIXTURE_APT_CALL"\n[[ "$FIXTURE_INSTALL_CASE" == package-failure ]] && exit 42\nprintf "pmstatus:voco:80:Setting up\\n" >&3\nprintf "Setting up voco (fixture) ...\\n"\nsleep .15\n')
             if mode == 'password':
                 (root / 'sudo').write_text('#!/bin/bash\nif [[ "$1" == -n && "$2" == -v ]]; then exit 1; fi\nif [[ "$1" == -v ]]; then printf "Fixture password: "; read -r answer; [[ "$answer" == fixture ]]; exit $?; fi\n[[ "$1" == -n ]] && exit 0\nexec "$@"\n')
             if mode == 'prompt':
@@ -119,29 +119,45 @@ class InstallerJourneyTests(unittest.TestCase):
             voco_verify_installed_package() { return 0; }
             /usr/bin/voco() { [[ "$*" == --setup-desktop-input ]]; }
             voco_start_helper_prefetch() { :; }
-            voco_verify_desktop_input() { (( fixture_checks++ > 0 )); }
+            voco_verify_desktop_input() {
+              [[ "$FIXTURE_INSTALL_CASE" != readiness-failure ]] && (( fixture_checks++ > 0 ))
+            }
             fixture_checks=0
             voco_wayland_device_access() { return 0; }
             pgrep() { return 1; }
             systemctl() { printf 'Created symlink /synthetic/voco-ydotoold.service\n'; }
             fixture_panel() { printf 'Panel enabled. Sign out and back in to load it; saving your work first is recommended.\n'; return 1; }
+            voco_launch_installed_app() {
+              printf 'launch\n' >> "$FIXTURE_LAUNCH_CALL"
+              case "$FIXTURE_LAUNCH_CASE" in
+                skipped) printf 'Open VOCO from your desktop session.\n'; return 2 ;;
+                failed) printf 'VOCO did not open automatically. Run /usr/bin/voco from your desktop.\n'; return 1 ;;
+              esac
+            }
             '''
-            # All package, input and panel mutations terminate at synthetic seams.
+            # Package, input, panel and app activation terminate at synthetic seams.
             body = body.replace('/usr/bin/voco --setup-panel', 'fixture_panel')
             env = {**os.environ, 'TERM': 'xterm-256color', 'PATH': folder + ':' + os.environ['PATH'],
                    'TMPDIR': folder, 'HOME': str(root / 'home'), 'XDG_CONFIG_HOME': str(root / 'config'),
                    'XDG_SESSION_TYPE': 'wayland', 'XDG_CURRENT_DESKTOP': '', 'VOCO_INSTALL_NO_MOTION': '0' if mode == 'animated' else '1',
                    'FIXTURE_SIGNATURE_CASE': signature_case, 'FIXTURE_SIGNATURE': str(SIGNED_SIGNATURE),
+                   'FIXTURE_INSTALL_CASE': install_case, 'FIXTURE_LAUNCH_CASE': launch_case,
                    'FIXTURE_MANIFEST': str(SIGNED_MANIFEST), 'FIXTURE_PACKAGE': str(ROOT / 'KEYS'),
-                   'FIXTURE_APT_CALL': str(root / 'apt-called')}
+                   'FIXTURE_APT_CALL': str(root / 'apt-called'), 'FIXTURE_LAUNCH_CALL': str(root / 'launch-called')}
             env.pop('NO_COLOR', None)
             if mode == 'plain':
                 env['VOCO_INSTALL_PLAIN'] = '1'
             code, raw = fixture.terminal(['bash', '-c', prefix + stubs + '# ─── Header' + body], env, columns=40 if mode == 'narrow' else 80, rows=8 if mode == 'short' else 24, reply={'prompt': (b'Fixture choice [y/N]: ', b'yes\n'), 'password': (b'Fixture password: ', b'fixture\n')}.get(mode))
-            self.assertEqual(code, 0 if signature_case == 'valid' else 1, raw.decode(errors='replace'))
+            expected_code = 1 if signature_case != 'valid' or install_case == 'package-failure' else 2 if install_case == 'readiness-failure' else 0
+            self.assertEqual(code, expected_code, raw.decode(errors='replace'))
             self.assertEqual((root / 'apt-called').exists(), signature_case == 'valid')
+            launched = root / 'launch-called'
+            self.assertEqual(launched.read_text() if launched.exists() else '', 'launch\n' if expected_code == 0 else '')
             if signature_case != 'valid':
                 self.assertIn('nothing was installed', raw.decode(errors='replace').lower())
+                return
+            if install_case != 'ready':
+                self.assertNotIn('Opening VOCO', raw.decode(errors='replace'))
                 return
             screen = visible_terminal(raw, width=40 if mode == 'narrow' else 80)
             if directory := os.environ.get('VOCO_JOURNEY_EVIDENCE_DIR'):
@@ -162,6 +178,23 @@ class InstallerJourneyTests(unittest.TestCase):
             self.assertIn("Installed. Let's try your voice.", screen)
             self.assertIn('sign out', screen.lower())
             self.assertIn('Alt+D', screen)
+            if launch_case == 'started':
+                self.assertIn('Opening VOCO', screen)
+                self.assertNotIn('Open VOCO →', screen)
+            else:
+                self.assertNotIn('Opening VOCO', screen)
+                self.assertIn('desktop', screen)
+
+    def test_package_and_readiness_failures_never_launch(self):
+        for case in ('package-failure', 'readiness-failure'):
+            with self.subTest(case=case):
+                self.run_journey('plain', install_case=case)
+
+    def test_skipped_or_failed_launch_keeps_successful_installation(self):
+        for mode in ('animated', 'plain'):
+            for case in ('skipped', 'failed'):
+                with self.subTest(mode=mode, case=case):
+                    self.run_journey(mode, launch_case=case)
 
     def test_pinned_key_verifies_published_release_manifest(self):
         source = (ROOT / 'install').read_text()

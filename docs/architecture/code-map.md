@@ -81,7 +81,7 @@ for measurement and recipient limitations.
 | Desktop input service | `src-tauri/src/desktop_input_setup.rs`, `packaging/ydotool/`, `vendor/ydotool-legacy/` | One installed system client; exact legacy identity selects the private daemon. Only the installed Wayland app can migrate its unmodified service while holding the single-instance guard. No package-hook session mutation. |
 | Desktop notifications | `src-tauri/src/desktop_notifications.rs` | Retain the session D-Bus sender for VOCO's lifetime so GNOME can display registered-app notifications. Use the VOCO icon, normal desktop notification policy, bounded requests and finite error events; service acceptance does not prove banner visibility. |
 | Shortcuts | `src-tauri/src/hotkey_state.rs`, `shortcut_arbitration.rs`, `shortcut_readiness.rs`, `owned_preedit.rs` and IBus resources | Admit one trigger. The optional IBus component does not authorize generic text mutation or switch the owner's input source. |
-| Shortcut arbitration | `src-tauri/src/shortcut_arbitration.rs`; registration/readiness and `suppress_passive_shortcut` in `lib.rs` | Completed IBus authority controls registration. Passive evdev also guards pending polls; an already-consuming X11 callback keeps shared debounce without that passive suppression. |
+| Shortcut arbitration | `src-tauri/src/shortcut_arbitration.rs`; registration/readiness and `suppress_passive_shortcut` in `lib.rs` | Completed IBus authority controls registration. Passive evdev also guards pending polls; an already-consuming X11 callback keeps shared debounce without that passive suppression. X11 global callbacks admit a matched press/release pair on release, after the temporary root keyboard grab; stale bindings and backend changes cancel the pending pair. |
 | X11 recording scope | `src/lib/desktopShortcutSession.ts`, `src-tauri/src/desktop_shortcut.rs`, `vendor/global-hotkey/src/platform_impl/x11/focus_lease.rs` | Same registered shortcut, exact input-focus window, one recording UUID, fixed 650-second expiry. Preserve delivery guards and surface failed root restoration. Vendor path is repository-relative. |
 | X11 actor wakeup | `vendor/global-hotkey/src/platform_impl/x11/{mod.rs,wake.rs}` | Wait on X fd and queued-command signal; drain buffered events before sleeping. No 50 ms periodic idle wakeup. Preserve original expiry deadline and error health. Paths are repository-relative. |
 | Renderer replacement | `src-tauri/src/lib.rs` PageLoad Started, `desktop_shortcut.rs`, `insertion.rs` preflight/reset | Synchronously invalidate the shortcut epoch; asynchronously release only older owners. Reject stale Begin before/after acquisition. The retired unguarded insertion IPC is removed; normal delivery requires a bound destination. |
@@ -169,10 +169,19 @@ not misclassify missing dependencies as missing focus.
 `voco --check-desktop-input` exposes the same prerequisite check for installation
 and troubleshooting, without launching the GUI.
 `voco_desktop_target.py` classifies focused editable controls without reading
-contents; `insertion.rs` refuses recording preflight without a verified cursor.
+contents; `insertion.rs` refuses recording preflight without a verified destination.
+Ghostty's GTK canvas uses a separate `terminal_surface` classification: a unique
+focused pane, fresh downward child route and focus/window-loss tracking bind the
+destination without pretending that a text caret is exposed. Terminal delivery
+remains dispatch-only. GTK's synthetic containers can be absent from reverse parent
+links, so this route does not reuse or weaken the generic editable-field hint check.
 The helper also returns a finite failure category; Rust maps it to a fixed local
 trace event, with unknown values mapped to unavailable. This metadata never alters
 target admission or includes field content, titles, paths or destination tokens.
+
+Destination and shortcut failures happen before capture. They preserve the approved
+microphone's readiness; only an attempted capture startup can invalidate it, with
+the existing native generation/selection ownership checks.
 
 ### Native field ownership (.55 candidate)
 
