@@ -97,6 +97,15 @@ glib 0.20 directly leaves the GTK dependency behind. [Backport](vendor/glib/VOCO
 - Revalidate destination and shortcut scope after clipboard preparation and before
   keyboard dispatch. Rejection there records the changed clipboard and sends no
   keys. This is a narrower race window, not atomic ownership during a key gesture.
+- Only the first delivery of a new dictation may replace selected text. Later
+  chunks reject selections, including browser select-all caused by passive Alt+D.
+  Revalidate prepared position/context immediately before keys; an intermediate
+  or uncertain readback cannot authorize another paste.
+- On GNOME Wayland the companion consumes supported Stop shortcuts during
+  starting/recording/processing and sends explicit Stop after modifier release.
+  Only the authenticated Shell can renew the native passive-event suppression;
+  stale tokens, idle states and unsupported accelerators cannot reserve it.
+  Release the compositor grab on idle, disconnect, disable or state timeout.
 - Closing or navigating an enabled browser tab, or losing its native connection,
   stops that tab's active recording. Ordinary field focus loss revokes delivery
   but preserves the original session's explicit Stop; stale tokens cannot stop

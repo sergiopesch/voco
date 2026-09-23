@@ -525,6 +525,22 @@ fn desktop_paste_for_target(
                     "The dictation destination changed before text could be pasted. Review retained text before copying.",
                 ));
             }
+            if let Some(receipt_id) = &receipt {
+                let validation = crate::focus_probe::probe_with(serde_json::json!({
+                    "op":"validate", "receipt_id":receipt_id,
+                }))
+                .map_err(|_| {
+                    InsertionError::rejected(
+                        "The dictation caret could not be verified before insertion.",
+                    )
+                })?;
+                if validation["observation"] != "prepared"
+                    || validation["receipt_id"].as_str() != Some(receipt_id)
+                    || validation["token"].as_str() != Some(expected_target)
+                {
+                    return Err(InsertionError::rejected("The dictation selection or caret changed before insertion. Review retained text before copying."));
+                }
+            }
             Ok(())
         })?;
         metrics.target_probe_ms = target_probe_ms.saturating_add(guard_probe_ms);

@@ -13,16 +13,22 @@ from gi.repository import Gio, GLib
 root = Path(sys.argv[1]); evidence = root / 'evidence'
 report = {'passed': False, 'scope': 'GNOME 46 nested Wayland, synthetic app service', 'states': {}}
 state = dict(version=1, token='1:1', status='idle', description='Ready', canStop=False, canOpen=True, level=0)
-actions = []; attached = []; fail_next = []
+actions = []; attached = []; fail_next = []; stalled = []; stall_state = []; delayed_reservations = []; delay_reservation = []
 bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
-xml = '''<node><interface name="org.voco.Panel1"><method name="Attach"><arg type="b" direction="out"/></method><method name="GetState"><arg type="s" direction="out"/></method><method name="Action"><arg type="s" direction="in"/><arg type="s" direction="in"/><arg type="b" direction="out"/></method><method name="Detach"/><signal name="Changed"/></interface></node>'''
+xml = '''<node><interface name="org.voco.Panel1"><method name="Attach"><arg type="b" direction="out"/></method><method name="GetState"><arg type="s" direction="out"/></method><method name="ReserveStopShortcut"><arg type="s" direction="in"/><arg type="b" direction="out"/></method><method name="Action"><arg type="s" direction="in"/><arg type="s" direction="in"/><arg type="b" direction="out"/></method><method name="Detach"/><signal name="Changed"/></interface></node>'''
 def method(connection, sender, path, interface, name, params, invocation):
     if name == 'Attach':
         attached.append(sender); invocation.return_value(GLib.Variant('(b)', (True,)))
     elif name == 'GetState':
+        if stall_state:
+            stalled.append(invocation); return
         if fail_next:
             fail_next.pop(); invocation.return_dbus_error('org.voco.TestUnavailable', 'Synthetic transient failure')
         else: invocation.return_value(GLib.Variant('(s)', (json.dumps(state),)))
+    elif name == 'ReserveStopShortcut':
+        if delay_reservation:
+            delayed_reservations.append(invocation); return
+        invocation.return_value(GLib.Variant('(b)', (params.unpack()[0] == state['token'],)))
     elif name == 'Action':
         actions.append(params.unpack()); invocation.return_value(GLib.Variant('(b)', (True,)))
     elif name == 'Detach': invocation.return_value(None)
@@ -155,6 +161,67 @@ try:
     assert inspect()['indicator']['visible']
     assert inspect()['indicator']['width'] > report['states']['0-idle']['indicator']['width'] + 50
     report['reenableVisible'] = True
+    # Real compositor key delivery to a disposable GTK input. No host devices.
+    gi.require_version('Gtk', '3.0'); gi.require_version('Gdk', '3.0')
+    os.environ.update(WAYLAND_DISPLAY='voco-panel-test', GDK_BACKEND='wayland')
+    from gi.repository import Gtk, Gdk
+    Gtk.init([])
+    window=Gtk.Window(title='VOCO shortcut fixture'); entry=Gtk.Entry(); window.add(entry)
+    leaked=[]
+    def on_key(_widget, event):
+        if event.keyval in (Gdk.KEY_d, Gdk.KEY_D) and event.state & Gdk.ModifierType.MOD1_MASK:
+            leaked.append(True); entry.select_region(0, -1)
+        return False
+    entry.connect('key-press-event', on_key)
+    window.show_all(); entry.grab_focus(); window.present(); pump(.6)
+    xenv={**os.environ, 'DISPLAY':':77', 'GDK_BACKEND':'x11'}
+    ids=subprocess.check_output(['xdotool','search','--pid',str(shell.pid)],env=xenv,text=True).splitlines()
+    subprocess.run(['xdotool','windowfocus',ids[0]],env=xenv,check=True)
+    def keys(*args): subprocess.run(['xdotool',*args],env=xenv,check=True,timeout=3)
+    def shortcut_state(status, accelerator='<Alt>d'):
+        state.update(token='2:'+str(time.monotonic_ns()),status=status,canStop=status=='recording',
+                     canOpen=status=='idle',stopAccelerator=accelerator)
+        bus.emit_signal(attached[-1], '/org/voco/Panel', 'org.voco.Panel1', 'Changed', None);pump(.3)
+    shortcut_state('idle'); entry.set_text('Keep my dictated words');entry.set_position(-1)
+    keys('key','alt+d');pump(.2)
+    assert leaked and entry.get_selection_bounds(), 'fixture must reproduce browser-style select-all'
+    leaked.clear();entry.select_region(-1,-1);shortcut_state('recording')
+    before=len(actions);keys('keydown','Alt_L','keydown','d');pump(.3)
+    assert not leaked and not entry.get_selection_bounds(), 'reserved Stop leaked into input'
+    assert len(actions)==before, 'held modifiers must not initiate final paste'
+    keys('keyup','d','keyup','Alt_L');pump(.3)
+    assert len(actions)==before+1 and actions[-1]==('stop',state['token']), actions
+    shortcut_state('processing');keys('key','alt+d');pump(.2)
+    assert not leaked and len(actions)==before+1, 'processing must consume without another action'
+    shortcut_state('idle');keys('key','alt+d');pump(.2)
+    assert leaked, 'idle must return the shortcut to the application'
+    leaked.clear();entry.select_region(-1,-1);shortcut_state('recording','<Alt><Shift>d')
+    keys('key','alt+shift+d');pump(.2)
+    assert not leaked and actions[-1]==('stop',state['token'])
+    delay_reservation.append(True);pump(.12)
+    assert delayed_reservations, 'fixture must hold an old reservation response'
+    shortcut_state('idle');delay_reservation.clear()
+    shortcut_state('recording','<Alt><Shift>d')
+    for pending in delayed_reservations: pending.return_dbus_error('org.voco.TestExpired','Old recording expired')
+    delayed_reservations.clear();pump(.01)
+    keys('key','alt+shift+d');pump(.2)
+    assert not leaked and actions[-1]==('stop',state['token']), 'late old failure must not release a new grab'
+    stall_state.append(True)
+    bus.emit_signal(attached[-1], '/org/voco/Panel', 'org.voco.Panel1', 'Changed', None);pump(2.2)
+    keys('key','alt+shift+d');pump(.2)
+    assert leaked, 'an unresponsive app must not leave the shortcut swallowed'
+    stall_state.clear()
+    for pending in stalled: pending.return_dbus_error('org.voco.TestExpired', 'Synthetic expired request')
+    stalled.clear();pump(2.5)
+    leaked.clear();entry.select_region(-1,-1);shortcut_state('recording','<Alt><Shift>d')
+    Gio.bus_unown_name(owner);owner=None;pump(.2)
+    keys('key','alt+shift+d');pump(.2)
+    assert leaked, 'disconnect must release the compositor shortcut'
+    window.destroy();pump(.2)
+    owner=Gio.bus_own_name_on_connection(bus,'org.voco.Panel',Gio.BusNameOwnerFlags.NONE,None,None)
+    state.pop('stopAccelerator',None);pump(.4)
+    report['shortcutProtection']={'realCompositorKeys':True,'heldModifierWait':True,'processingConsumed':True,
+        'idleReleased':True,'disconnectReleased':True,'unresponsiveAppReleased':True,'staleReservationIsolated':True,'alternateHotkey':True,'textPreserved':True}
     report['actions']=actions
     if (root / 'voco').exists():
         Gio.bus_unown_name(owner); owner=None; pump(.3)
@@ -176,6 +243,12 @@ try:
         except GLib.Error as error:
             assert 'NotAttached' in str(error), error
         report['unattachedClientRejected'] = True
+        try:
+            bus.call_sync('org.voco.Panel','/org/voco/Panel','org.voco.Panel1','ReserveStopShortcut',GLib.Variant('(s)',(native['token'],)),None,Gio.DBusCallFlags.NONE,1500,None)
+            raise AssertionError('Unattached client reserved the shortcut')
+        except GLib.Error as error:
+            assert 'NotAttached' in str(error), error
+        report['unattachedShortcutReservationRejected'] = True
         attach = bus.call_sync('org.voco.Panel','/org/voco/Panel','org.voco.Panel1','Attach',None,None,Gio.DBusCallFlags.NONE,1500,None).unpack()[0]
         assert attach is False
         report['nonShellAttachRejected'] = True

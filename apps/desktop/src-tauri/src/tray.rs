@@ -950,7 +950,19 @@ pub fn panel_snapshot(app: &tauri::AppHandle) -> Option<serde_json::Value> {
     let state = app.try_state::<TrayMutex>()?;
     let state = state.lock().ok()?;
     let snapshot = runtime_snapshot_from_tray_state(&state);
-    Some(panel_presentation(&snapshot))
+    let mut presentation = panel_presentation(&snapshot);
+    // X11 already consumes its chord. GNOME only needs this reservation for
+    // the supported passive Wayland shortcuts, through final queue drain.
+    presentation["stopAccelerator"] = serde_json::json!(if crate::is_wayland_session() {
+        match crate::hotkey_to_evdev_mode(&state.current_hotkey) {
+            0 => Some("<Alt>d"),
+            1 => Some("<Alt><Shift>d"),
+            _ => None,
+        }
+    } else {
+        None
+    });
+    Some(presentation)
 }
 
 #[cfg(target_os = "linux")]

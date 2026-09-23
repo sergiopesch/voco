@@ -12,7 +12,16 @@ const output = process.argv[2];
 const platform = process.env.VOCO_RICH_EDITOR_PLATFORM || 'x11';
 assert.ok(['x11', 'wayland'].includes(platform));
 const helperPath = process.env.VOCO_RICH_EDITOR_HELPER || fileURLToPath(new URL('../apps/desktop/src-tauri/resources/voco_desktop_target.py', import.meta.url));
-const helper = spawn('/usr/bin/python3', ['-u', helperPath, '--serve'], { stdio: ['pipe', 'pipe', 'inherit'] });
+const probeDriver = `import importlib.util,sys
+spec=importlib.util.spec_from_file_location('target',sys.argv[1]);h=importlib.util.module_from_spec(spec);spec.loader.exec_module(h)
+original=h.handle_request
+def handle(r):
+ if r.get('op')!='fixture-snapshot':return original(r)
+ from gi.repository import Atspi
+ result=h.safe_probe();node=h.eligible_node(result);_,text,position,_=h.caret_text(node)
+ return {'value':Atspi.Text.get_text(text,0,Atspi.Text.get_character_count(text)),'position':position}
+h.handle_request=handle;h.serve()`;
+const helper = spawn('/usr/bin/python3', ['-u', '-c', probeDriver, helperPath], { stdio: ['pipe', 'pipe', 'inherit'] });
 let sequence = 0;
 let resolveResponse;
 createInterface({ input: helper.stdout }).on('line', line => resolveResponse?.(JSON.parse(line)));
@@ -243,6 +252,36 @@ print(json.dumps(h.text_position(h.TRACKER.hint)[1][:2] if r['scope']=='control'
     const timings = [await delivery('Search this')];
     nativeKey('End'); timings.push(await delivery(' next', false));
     return { timings };
+  });
+  await trial('passive Stop chord cannot replace the dictated address bar prefix', async () => {
+    const readAddress = () => request({op:'fixture-snapshot'});
+    await focusAddress();
+    await delivery('Go do you hear');
+    const before = await readAddress();
+    assert.equal(before.value,'Go do you hear','actual address text before Stop');
+    nativeKey('alt+d');
+    await page.waitForTimeout(100);
+    const afterChord = await readAddress();
+    const target = await request({ op: 'probe' });
+    const receipt = await request({ op: 'prepare', text: '?', first_delivery: false, expected_token: target.token });
+    if (receipt.observation === 'prepared') {
+      await paste('?');
+      await verify(receipt);
+    }
+    const after = await readAddress();
+    writeFileSync(`${output}/stop-snapshots.json`, JSON.stringify({before,afterChord,after,receipt},null,2));
+    assert.ok(after.value.startsWith('Go do you hear'), 'Stop erased the existing transcript: '+JSON.stringify(after));
+    return {before,afterChord,after,observation:receipt.observation};
+  });
+  await trial('Stop selection after clipboard preparation rejects keyboard dispatch', async () => {
+    await focusAddress();
+    await delivery('Keep this dictation');
+    const receipt = await prepare('?', false);
+    nativeKey('alt+d');
+    await page.waitForTimeout(100);
+    const validation = await request({op: 'validate', receipt_id: receipt.receipt_id});
+    assert.equal(validation.observation, 'changed');
+    assert.equal((await request({op:'fixture-snapshot'})).value, 'Keep this dictation');
   });
   await trial('address bar departure rejects delivery without replay', async () => {
     await focusAddress();

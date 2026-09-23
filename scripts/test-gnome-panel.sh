@@ -20,7 +20,7 @@ if [[ ${1:-} != --inside ]]; then
   fi
   mkdir -p "$run/data/gnome-shell/extensions"
   if [[ -z ${VOCO_PANEL_PACKAGE_ROOT:-} ]]; then
-    cp -a "$ROOT/integrations/gnome/voco-panel@voco.local" "$run/data/gnome-shell/extensions/"
+    cp -a "${VOCO_PANEL_SOURCE_DIR:-$ROOT/integrations/gnome/voco-panel@voco.local}" "$run/data/gnome-shell/extensions/voco-panel@voco.local"
   fi
   cp -a "$ROOT/scripts/fixtures/gnome-panel-probe" "$run/data/gnome-shell/extensions/voco-panel-probe@test.invalid"
   trap 'status=$?; mkdir -p "$VOCO_PANEL_EVIDENCE_DIR"; cp -a "$run/evidence/." "$VOCO_PANEL_EVIDENCE_DIR/"; echo "$status" > "$VOCO_PANEL_EVIDENCE_DIR/exit-code"; rm -rf "$run"; exit "$status"' EXIT

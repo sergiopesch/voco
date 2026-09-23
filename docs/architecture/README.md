@@ -62,6 +62,12 @@ paste chord. VOCO does not submit Enter or rewrite arbitrary editor text after S
 Focus metadata is a best-effort guard, not exact per-widget ownership or protection
 from every sensitive field. See [delivery policy](../testing/desktop-paste.md).
 
+Only a new dictation's first delivery can replace a selection. Later chunks reject
+selected text; prepared position and bounded surrounding context are sampled again
+after clipboard preparation, immediately before keys. These checks prevent a Stop
+shortcut's select-all from replacing earlier text. They cannot make a native key
+gesture atomic with another application's focus or selection changes.
+
 The explicitly enabled Chromium adapter is a separate, stronger exact-element
 contract: element/document identity, caret and acknowledged prefix are checked
 before edits. Password fields, rich editors and unsupported fields are rejected.
@@ -90,8 +96,19 @@ registration change or fixed 650-second expiry (600 seconds of capture plus
 restoration ends session authority; degraded restoration blocks further delivery
 and cannot be advertised as shortcut-ready. Begin/end serialize with recipient
 observation. The frontend cleans uncertain begin replies and prevents stale
-completion from releasing a newer UUID. Unsupported/Wayland routes retain their
-existing behavior, with no configuration changes or renewal timer.
+completion from releasing a newer UUID. Unsupported routes retain their existing
+delivery checks.
+
+On GNOME Wayland, the panel companion reserves the configured Alt+D or
+Alt+Shift+D while the authoritative app state is starting, recording or processing.
+The compositor consumes the chord before a browser can select its address bar.
+The companion waits for modifier release and sends an explicit, token-checked Stop,
+never a delayed toggle. During processing it consumes repeated chords without an
+action. Only the authenticated Shell can renew a 250 ms native reservation that
+suppresses duplicate passive evdev observations. Existing active-state polling
+renews it; idle, disconnect and extension disable release the grab, and missing app
+state expires it after two seconds. A failed grab leaves the guarded delivery and
+saved-text fallback available. This is GNOME-specific, not a general Wayland grab.
 
 The main renderer's PageLoad Started event synchronously increments a native epoch
 before scheduling old-scope cleanup off the UI thread. Preflight captures that
