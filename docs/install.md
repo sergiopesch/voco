@@ -9,7 +9,7 @@ A plain Tauri bundle is incomplete. See [packaging](linux-packaging.md).
 ## Published release
 
 The [README command](../README.md#get-started) runs the guided installer from
-the published **2026.0.55** tag. That immutable installer verifies the publisher
+the published **2026.0.56** tag. That immutable installer verifies the publisher
 signature on the checksum manifest, then verifies the package checksum. The signed
 manual procedure below applies the same authentication boundary. On Wayland the
 guided installer installs the input helpers and checks desktop readiness. If setup is incomplete, follow the
@@ -26,7 +26,7 @@ For a manual installation, these links always follow the latest public release:
   curl -fLO https://github.com/sergiopesch/voco/releases/latest/download/voco_latest_amd64.deb
   curl -fLO https://github.com/sergiopesch/voco/releases/latest/download/voco_latest_checksums.txt
   curl -fLO https://github.com/sergiopesch/voco/releases/latest/download/voco_latest_checksums.txt.asc
-  curl -fLo KEYS https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.55/KEYS
+  curl -fLo KEYS https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.56/KEYS
   fingerprints="$(gpg --show-keys --with-colons KEYS | awk -F: '$1 == "fpr" { print $10 }')"
   test "$fingerprints" = B33C7C6AAEC8C20433A7A837540796453D8E3865
   gpg --dearmor < KEYS > voco-release-keyring.gpg
@@ -61,14 +61,13 @@ signature for the release checksums before verifying the package checksum and
 installing it. An unsigned candidate cannot be installed by the guided flow.
 Never execute an unreviewed network response through a shell pipe.
 
-The development installer now requests one automatic VOCO launch after package
+The .56 guided installer requests one automatic VOCO launch after package
 verification and desktop setup succeed. It uses the invoking desktop user's
 existing environment and detaches from the installer terminal. Root, remote and
 headless invocations keep manual opening instructions; a launch failure leaves
 the successful installation intact and explains how to open VOCO manually.
-The immutable public .55 installer retains its original manual-opening step until
-a later qualified release ships this change. Automatic opening does not start
-microphone capture or complete onboarding.
+Automatic opening does not start microphone capture or complete onboarding.
+Older immutable installers retain their original opening instructions.
 
 ## Local candidate
 
@@ -214,8 +213,8 @@ their recorded scope. Development recipes are not public installers.
 
 Historical userspace checks cover Ubuntu, Debian, Fedora, Linux Mint and an
 Omarchy-related Arch profile. Consult the [support matrix](linux-support.md)
-for those recorded checks, the [.55 release notes](releases/2026.0.55.md) for the
-new Ubuntu/Debian cut, and [release status](release-candidate.md) for current downloads.
+for those recorded checks, the [.56 release notes](releases/2026.0.56.md) for the
+current Ubuntu/Debian cut, and [release status](release-candidate.md) for current downloads.
 This is not proof of every distribution’s default compositor, audio stack
 or application. RPM/Arch packages require their own native receipts. AppImage,
 Flatpak and Snap are experimental scaffolding, not published support channels.

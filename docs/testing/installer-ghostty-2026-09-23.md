@@ -46,6 +46,18 @@ retains its assembly snapshot; later qualification documentation does not rebuil
 or replace the application. Builds use Node 24.21.0, Rust 1.94.0, GCC 13.3.0 and
 four Cargo jobs.
 
+The released application and package were built from
+`da91b81d86ba7a764c61532e7290a4ca02f03fe2`. The complete Debian package is
+685,706,734 bytes with SHA-256
+`ba159862a8bf042d8facd9414141dabdaa56becf831454cf8f778146aa33a53c`;
+the packaged app is
+`35b6d6cb19fd09fa93c241005fe02a7be807f87d7ce382a625253d8891510e22`.
+The final package passes all 407 installed inventory entries, 10 ELF dependency
+checks and 13 installed worker checks; removal leaves none of its 328 files/links.
+Adding `docs/testing/installer-ghostty-2026-09-23.md` to the package accounts
+for the increase from the preceding candidate: 406 inventory entries and
+327 files/links became 407 and 328, respectively.
+
 The desktop helper is frozen at
 `1a607c8746da796ab34d2d4de9eaff7b6f7093268eb6f9967a39a56ec8256369` and the
 pinned model at
@@ -55,7 +67,7 @@ executable hashes differ. Application acceptance uses the packaged executable.
 
 ## Verification
 
-- All four [build-source CI jobs](https://github.com/sergiopesch/voco/actions/runs/35863245085)
+- All four [final protected CI jobs](https://github.com/sergiopesch/voco/actions/runs/35865909630)
   pass, including pinned speech accuracy/continuity/protocol, native toolkit,
   renderer, security and DevOps gates. The local full frontend chain passes 439
   Python, 78 Node and 390 desktop tests; focused destination tests pass 79 + 63.
@@ -82,6 +94,26 @@ private input helper, service and associated source/license notices have identic
 bytes apart from the speech manifest's version fields. No new kernel-input or
 physical-microphone claim follows from that parity.
 
+## Publication
+
+Anonymous verification completed at `2026-09-23T13:40:04.173402+00:00` for the
+[immutable .56 release](https://github.com/sergiopesch/voco/releases/tag/voco.2026.0.56).
+The [signed provenance](https://github.com/sergiopesch/voco/releases/download/voco.2026.0.56/voco_2026.0.56_provenance.json)
+and [validation record](https://github.com/sergiopesch/voco/releases/download/voco.2026.0.56/voco_2026.0.56_validation.json)
+bind the exact package above to its build and reviewed gates.
+
+- Final protected source: `da91b81d86ba7a764c61532e7290a4ca02f03fe2` ([CI](https://github.com/sergiopesch/voco/actions/runs/35865909630)).
+- Merged release commit: `cf109178a013e1cffa7096f80201bc35ac6556f3` ([CI](https://github.com/sergiopesch/voco/actions/runs/35867058173)).
+- Signed tag object: `00d5f593eee0d0f399a3de6a614e440971f4f01c` (`voco.2026.0.56`).
+- Anonymous public verification receipt SHA-256: `023e2494917e63b5b27ea90cdd8320e657d6a40f64f0d1e436fe1fc76c182d75`.
+
+The signed tag and five publisher signatures verify against fingerprint
+`B33C7C6AAEC8C20433A7A837540796453D8E3865`. All 18 anonymous public assets,
+latest aliases and the raw tagged installer match the frozen bytes. The Debian
+package remains `ba159862a8bf042d8facd9414141dabdaa56becf831454cf8f778146aa33a53c`.
+This documentation update does not replace the signed artifacts or upgrade the
+owner's installed application. The .55 release remains available for rollback.
+
 ## Limits and retained failures
 
 The focused Ghostty canvas proves pane identity, not caret position, writable mode,
@@ -99,7 +131,7 @@ warnings remain visible; this is not a security certification.
 
 Retained failures include the original .55 rejection, the first candidate's real
 warm shortcut race, invalid fixture accessibility configuration, missing explicit
-fixture focus, a strict punctuation expectation an initial isolated-test mount
-setup error, browser admission before microphone startup, and a root-runner fixture
-assumption. Final runs correct the relevant source or fixture cause; failed
+fixture focus, a strict punctuation expectation, an initial isolated-test mount
+setup error, browser ownership rejection clearing microphone readiness, and a
+root-runner fixture assumption. Final runs correct the relevant source or fixture cause; failed
 artifacts are not replaced or reported as passes.

@@ -53,7 +53,7 @@ and punctuation are delivered before VOCO returns to Ready.
 VOCO binds dictation to a text field or supported terminal pane. If it cannot
 identify the typing destination, it shows a desktop notification and does not
 record. Focus the intended destination and press the shortcut again. Fields
-identified as passwords are excluded. The [.56 candidate](releases/2026.0.56.md)
+identified as passwords are excluded. The [.56 release](releases/2026.0.56.md)
 supports Ghostty's focused terminal canvas even though it exposes no text caret.
 
 Stop dictation before switching fields. VOCO uses clipboard paste, replaces

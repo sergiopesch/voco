@@ -18,11 +18,12 @@ recognition runs on your computer. No account, subscription or cloud transcripti
 Install the current public Ubuntu/Debian x86_64 release with one command:
 
 ```bash
-wget -qO voco-install https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.55/install && bash voco-install
+wget -qO voco-install https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.56/install && bash voco-install
 ```
 
-The guided installer downloads **2026.0.55**, verifies the publisher signature
-and package checksum, then installs the package and required Wayland input helpers.
+The guided installer downloads **2026.0.56**, verifies the publisher signature
+and package checksum, installs the package and required Wayland input helpers,
+then requests VOCO to open in your local desktop session.
 Desktop readiness is checked before onboarding finishes. If setup is incomplete, follow the
 [desktop input setup](docs/platform/README.md#ydotoold-ydotool-daemon) instructions.
 [Manual installation and signature verification](docs/install.md#published-release).
@@ -55,9 +56,8 @@ with full-resolution release graphics, exact values and methods.
 
 ## Native Linux packages
 
-**2026.0.55** strengthens delivery and installer security, fixes short native
-microphone captures and legacy input-daemon exhaustion, and keeps microphone-level
-updates local to the meter.
+**2026.0.56** opens VOCO after guided installation, supports focused Ghostty
+terminal panes and fixes repeated X11 starts after shortcut grabs.
 The local recognizer, input permissions and recovery behavior are unchanged.
 Fedora, openSUSE and Arch/Omarchy packages remain at **2026.0.43**; download those
 from their matching release. Install only assets attached to a published release.
@@ -65,7 +65,7 @@ Wayland uses native microphone capture so dictation can start with its panel
 hidden; X11 keeps browser capture.
 See the [support matrix](docs/linux-support.md),
 [native package installation](docs/install-native.md) and
-[.55 changes and qualification](docs/releases/2026.0.55.md).
+[.56 changes and qualification](docs/releases/2026.0.56.md).
 
 ## Contribute
 
