@@ -202,7 +202,7 @@ fn derive_tray_presentation(snapshot: &RuntimeStatusSnapshot) -> TrayPresentatio
     } else if snapshot.recovery_available && !dictation_active {
         (
             TrayVisualState::Processing,
-            "VOCO — Recording needs recovery".to_string(),
+            "VOCO — Dictation saved".to_string(),
         )
     } else if (snapshot.has_recoverable_transcript
         || matches!(snapshot.cursor_delivery, CursorDeliveryState::Unreconciled))
@@ -1249,7 +1249,7 @@ mod tests {
             snapshot.dictation_status = status;
             let presentation = derive_tray_presentation(&snapshot);
             assert_eq!(presentation.dictation_label, "Review Recording");
-            assert_eq!(presentation.tooltip, "VOCO — Recording needs recovery");
+            assert_eq!(presentation.tooltip, "VOCO — Dictation saved");
             assert_eq!(
                 presentation.dictation_action,
                 TrayDictationAction::ReviewRecovery

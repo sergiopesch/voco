@@ -116,7 +116,7 @@ try {
                 if (window.deferFocusRead) return new Promise(resolve => window.focusReads.push(resolve));
                 return window.focused;
               };
-              return async () => {};
+              return async () => { window.calls.push(['window:' + name]); };
             }
           });
           export const getCurrentWindow = () => windowHandle;
@@ -461,7 +461,7 @@ try {
           window.nativeCall = async (name,args) => {
             if (name === 'saveConfigPatch') {
               window.calls.push([name,...args]);
-              Object.assign(window.config,args[0]);
+              window.config = {...window.config,...args[0]};
               return {revision:2,config:window.config};
             }
             if (name === 'getDesktopPasteStatus') {
@@ -478,6 +478,15 @@ try {
           };
         });
         await page.getByRole('button',{name:'Start test',exact:true}).waitFor();
+      };
+      const assertOnboardingHidden = async () => {
+        await page.waitForFunction(()=>window.config.onboardingCompleted);
+        assert.equal(await page.evaluate(()=>window.store.getState().surface),'hidden','Done must go directly to the tray');
+        await page.waitForFunction(()=>window.calls.some(c=>c[0]==='traceHotkeyEvent'&&c[1]==='onboarding_handoff_hidden'));
+        assert.deepEqual(await page.evaluate(()=>{
+          const calls=window.calls.slice(window.calls.findLastIndex(c=>c[0]==='traceHotkeyEvent'&&c[1]==='onboarding_handoff_requested'));
+          return calls.filter(c=>c[0]==='window:show'||c[0]==='window:setFocus');
+        }),[],'Done must not present or focus an extra window');
       };
       const noOutput = async () => {
         const calls = await page.evaluate(() => window.calls.map(c=>c[0]));
@@ -562,7 +571,7 @@ try {
         await page.getByRole('button',{name:'Done',exact:true}).waitFor();
         if (await page.getByRole('button',{name:'Finish test',exact:true}).count()) { await page.getByRole('button',{name:'Finish test',exact:true}).click(); await page.waitForFunction(()=>window.store.getState().onboardingTestPassed); }
         await page.getByRole('button',{name:'Done',exact:true}).click();
-        await page.waitForFunction(()=>window.config.onboardingCompleted&&window.store.getState().surface==='popover');
+        await assertOnboardingHidden();
         await noOutput();
         results.push({case:'onboarding-blocks-'+problem+'-and-finishes-after-repair-without-external-cursor',passed:true});
       }
@@ -617,14 +626,12 @@ try {
       await captureStyledPanel('onboarding-minimum-window',page.getByRole('button',{name:'Done'}),{width:760,height:560});
       if (await page.getByRole('button',{name:'Finish test',exact:true}).count()) { await page.getByRole('button',{name:'Finish test',exact:true}).click(); await page.waitForFunction(()=>window.store.getState().onboardingTestPassed); }
         await page.getByRole('button',{name:'Done',exact:true}).click();
-      await page.waitForFunction(()=>window.config.onboardingCompleted&&window.store.getState().surface==='popover');
+      await assertOnboardingHidden();
       results.push({case:'default-microphone-live-meter-transcript-stop-finish-no-external-output',passed:true});
-      await page.getByRole('button',{name:'Hide to tray',exact:true}).click();
-      await page.waitForFunction(()=>window.store.getState().surface==='hidden');
       await page.evaluate(()=>{window.activationPending=true;window.listeners['voco:activate']({payload:null});});
       await page.waitForFunction(()=>window.store.getState().surface==='popover');
       await page.getByText('Ready',{exact:true}).waitFor();
-      await captureStyledPanel('onboarding-visible-ready-handoff',page.getByRole('button',{name:'Hide to tray',exact:true}),{width:760,height:560});
+      await captureStyledPanel('launcher-requested-ready-panel',page.getByRole('button',{name:'Hide to tray',exact:true}),{width:760,height:560});
       for (const busy of ['starting','recording','processing']) {
         await page.evaluate(busy=>{window.store.getState().setSurface('hidden');window.store.getState().setStatus(busy);window.activationPending=true;window.listeners['voco:activate']({payload:null});},busy);
         await page.waitForFunction(()=>window.activationPending===false);
@@ -670,7 +677,7 @@ try {
       await page.getByRole('region',{name:'Test transcript'}).getByText('This is my voice test',{exact:true}).waitFor();
       if (await page.getByRole('button',{name:'Finish test',exact:true}).count()) { await page.getByRole('button',{name:'Finish test',exact:true}).click(); await page.waitForFunction(()=>window.store.getState().onboardingTestPassed); }
         await page.getByRole('button',{name:'Done',exact:true}).click();
-      await page.waitForFunction(()=>window.config.onboardingCompleted&&window.store.getState().surface==='popover');
+      await assertOnboardingHidden();
       assert.equal(await page.evaluate(()=>window.stopped&&window.ack===4),true);
       await noOutput();
       results.push({case:'recognition-error-retry-flush-then-explicit-completion',passed:true});
@@ -712,7 +719,7 @@ try {
       await page.getByRole('region',{name:'Test transcript'}).getByText('This is my voice test',{exact:true}).waitFor();
       if (await page.getByRole('button',{name:'Finish test',exact:true}).count()) { await page.getByRole('button',{name:'Finish test',exact:true}).click(); await page.waitForFunction(()=>window.store.getState().onboardingTestPassed); }
         await page.getByRole('button',{name:'Done',exact:true}).click();
-      await page.waitForFunction(()=>window.config.onboardingCompleted&&window.store.getState().surface==='popover');
+      await assertOnboardingHidden();
       assert.equal(await page.evaluate(()=>window.nativeCommands.some(c=>c.name==='native_capture_begin')),false);
       assert.equal(await page.evaluate(()=>window.tracks.every(t=>t.readyState==='ended')),true);
       await noOutput();

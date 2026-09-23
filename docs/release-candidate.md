@@ -37,3 +37,10 @@ Fedora, openSUSE and Arch/Omarchy remain at **2026.0.43**; use the matching
 and assets remain immutable; new application bytes require another qualified
 release. Weekly maintenance, protected checks and the separate security update
 queue remain enabled. The hosted release assembler stays disabled.
+
+## Unreleased onboarding and recovery review
+
+Current source returns directly to the tray after onboarding, separates delivery
+interruptions from recognition, and presents retained dictation on demand after a
+notification. These changes are not in the published or installed **2026.0.56**.
+See the [review and evidence boundaries](testing/onboarding-recovery-2026-09-23.md).

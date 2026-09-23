@@ -16,7 +16,7 @@ import {
 import { monitorCaptureHealth } from "@/lib/captureHealth";
 import { DesktopShortcutSession } from "@/lib/desktopShortcutSession";
 import type { CursorDeliveryEvent } from "@/lib/dictationDelivery";
-import { errorMessage,LIVE_DELIVERY_PAUSED } from "@/lib/dictationRecovery";
+import { errorMessage,LIVE_DELIVERY_PAUSED,LIVE_LOCAL_TRANSCRIPTION } from "@/lib/dictationRecovery";
 import {
   consumeQueuedStop,
   disableLivePreview,
@@ -258,6 +258,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     if (!keepAudio) {
       clearCapturedAudio();
     }
+    const reviewingRecovery = Boolean(useStore.getState().recovery);
     useStore.getState().setRecovery({
       reason,
       audioAvailable: keepAudio && audioBufferRef.current.sampleCount > 0,
@@ -271,7 +272,16 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     setStatus("error");
     setError(reason);
     setInterimTranscript("");
-    useStore.getState().setSurface(useStore.getState().dictationPurpose === "onboarding" ? "onboarding" : "popover");
+    const state = useStore.getState();
+    if (state.captureNotice === LIVE_DELIVERY_PAUSED || state.captureNotice === LIVE_LOCAL_TRANSCRIPTION) {
+      state.setCaptureNotice(null);
+    }
+    if (state.dictationPurpose === "onboarding") {
+      state.setSurface("onboarding");
+    } else if (!reviewingRecovery) {
+      state.setSurface("hidden");
+      void showNotification("Dictation saved in VOCO", "Open VOCO from the tray to review or copy your dictation. It stays available until VOCO closes.").catch(() => {});
+    }
   }
 
   function retainManualTranscript() {
@@ -330,8 +340,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
 
     if (useStore.getState().recovery) {
       releaseRecordingOrigin(triggerId);
-      useStore.getState().setSurface("popover");
-      void showNotification("Previous transcript available", "Copy any text you need, then clear the previous transcript before starting another.").catch(() => {});
+      void showNotification("Previous transcript available", "Open VOCO from the tray to copy or clear the previous transcript before starting another.").catch(() => {});
       return;
     }
     const onboardingTest = triggerId === "onboarding:test";
@@ -604,11 +613,19 @@ export function createDictationRecording(env: DictationRecordingEnv) {
           if (!isCurrentSession(startingSessionId)) return;
           setTranscript(text);
           useStore.getState().setRawTranscript(text);
-        }, (error) => {
+        }, (error, kind) => {
           if (!isCurrentSession(startingSessionId) || cancelledRef.current) return;
           traceDictationEvent("dictation_desktop_stream_failed").catch(() => {});
           if (onboardingTest) setError(`Voice test paused: ${error.message} Stop Test, then try again.`);
-          else useStore.getState().setCaptureNotice(LIVE_DELIVERY_PAUSED);
+          else {
+            const notice = kind === "delivery"
+              ? LIVE_LOCAL_TRANSCRIPTION
+              : LIVE_DELIVERY_PAUSED;
+            useStore.getState().setCaptureNotice(notice);
+            if (phaseRef.current === "recording") {
+              void showNotification(kind === "delivery" ? "Text delivery paused" : "Dictation needs attention", notice).catch(() => {});
+            }
+          }
         }, (event, durationMs) => {
           if (!isCurrentSession(startingSessionId) || cancelledRef.current || onboardingTest) return;
           const name = event === "appended" ? "dictation_desktop_live_prefix_dispatched"

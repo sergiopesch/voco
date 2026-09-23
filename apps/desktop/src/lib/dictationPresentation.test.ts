@@ -56,6 +56,10 @@ describe("status label presentation", () => {
   });
 
 
+  it("presents a retained interruption calmly", () => {
+    expect(deriveStatusLabel({ ...ready, hasRecovery: true, dictationStatus: "error" })).toBe("Dictation saved");
+  });
+
   it("treats completed manual dictation as a usable result", () => {
     expect(deriveStatusLabel({ ...ready, hasRecovery: true, manualTranscriptReady: true })).toBe("Transcript ready to copy");
     expect(deriveStatusLabel({ ...ready, cursorRequired: true, cursorSetupState: "safety-disabled" })).toBe("Ready — manual copy");

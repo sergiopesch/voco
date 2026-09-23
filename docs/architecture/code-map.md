@@ -41,6 +41,10 @@ recognizer serves desktop, browser and onboarding sessions. See
 3. `src/lib/benchmarkPhraseQueue.ts` serializes bounded NVIDIA requests. Recording
    capture continues while a paste is in flight. A newer append-only hypothesis
    can supersede pending output; already dispatched text cannot be blindly replayed.
+   Delivery rejection disables insertion while recognition continues through Stop.
+   Recognition/transport failure still stops queue admission. Either failure retains
+   recovery; the first recovery transition notifies and hides, while explicit retry
+   preserves the review panel. No target retry follows a delivery rejection.
    The worker owns acoustic boundaries, so this path needs no second phrase segmenter.
 4. `src-tauri/src/benchmark_stream.rs` supervises one local Python process, frames
    bounded JSON, checks session/sequence responses and reaps failures. Start/warmup

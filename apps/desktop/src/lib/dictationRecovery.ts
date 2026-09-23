@@ -9,6 +9,8 @@ export interface DictationRecovery {
   targetMayContainText: boolean;
 }
 
+export const LIVE_LOCAL_TRANSCRIPTION = "Text delivery paused. VOCO is still transcribing. Finish recording, then open VOCO to copy your text.";
+
 export const LIVE_DELIVERY_PAUSED = "Live delivery paused. Stop recording to recover your transcript; review the target before pasting again.";
 
 // Cap source capture independently of device rate, including unusually high-rate devices.

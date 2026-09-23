@@ -1,5 +1,9 @@
 # Testing
 
+[The unreleased onboarding and recovery review](onboarding-recovery-2026-09-23.md)
+records direct-to-tray completion, continued recognition after delivery interruption,
+quiet recovery, multi-minute trials and the remaining qualification limits.
+
 [The .56 installer and Ghostty qualification](installer-ghostty-2026-09-23.md)
 records the exact released package, repeated X11 Start/Stop, separate native
 Wayland checks, installer opening, installed worker and package removal checks,
@@ -231,7 +235,9 @@ panel in headless Chromium with explicit microphone/Tauri mocks. Install the dev
 browser once using `npx playwright install chromium`. CI and release jobs enforce this
 suite. It starts and closes its own loopback Vite server/browser and does not capture the
 host microphone or inject input. Set `VOCO_RENDERER_EVIDENCE_DIR` to an external directory
-for screenshots/results. These are renderer checks, not native Wayland or WebKit proof.
+for screenshots/results. Coverage includes five minutes of simulated audio and a
+delivery rejection at two minutes with continued recognition through Stop. These
+are renderer checks, not native Wayland or WebKit proof.
 
 `npm run test:microphone-renderer` checks the real App's asynchronous device discovery,
 access retries and preview ownership with mocked microphones. Set

@@ -47,7 +47,7 @@ export function deriveStatusLabel({
     return "Processing";
   }
   if (hasRecovery) {
-    return manualTranscriptReady ? "Transcript ready to copy" : "Recording needs recovery";
+    return manualTranscriptReady ? "Transcript ready to copy" : "Dictation saved";
   }
   if (cursorDeliveryState === "unreconciled") {
     return "Transcript needs attention";

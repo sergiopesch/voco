@@ -192,9 +192,13 @@ when no approved microphone is selected,
 with no idle recording or silent device switching during capture. Onboarding
 uses the production recognition queue with local-only transcript output. Never
 acquire an external text destination, shortcut lease, clipboard or preedit output
-for the onboarding test. Finish must flush capture and recognition successfully
-before saving completion. Then check desktop input prerequisites without binding
-an external target or sending keys; a missing cursor inside onboarding is expected.
+for the onboarding test. Finish must flush capture and recognition successfully.
+Check desktop input prerequisites without binding an external target or sending
+keys; a missing cursor inside onboarding is expected. Only then save completion.
+Done returns directly to the hidden tray surface without presenting or focusing a
+Ready window. A delivery interruption disables insertion but leaves healthy
+recognition running through Stop. Retained recovery notifies without presenting a
+window; explicit review/retry remains in the requested panel.
 The guided installer must use APT to install the local package and explicitly require
 the Wayland client and daemon on Wayland. Successful package installation alone is
 not desktop readiness. After successful setup, request one detached launch as the

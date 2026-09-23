@@ -97,7 +97,7 @@ function Harness() {
  useGlobalShortcut(hook.toggle,()=>true,Boolean(window.shortcutReady),0,()=>{});
  return React.createElement(React.Fragment,null,
 
- React.createElement(ControlPanel,{surface:'popover',onboardingStep:0,config:state.config,errorMessage:state.error,statusLabel:deriveStatusLabel({configurationError:false,hasRecovery:Boolean(state.recovery),manualTranscriptReady:state.recovery?.kind==='manual-copy',cursorDeliveryState:hook.cursorDeliveryState,cursorRequired:true,cursorSetupState:'ready',dictationStatus:state.status,microphonePermission:'granted',microphoneReady:true,}),updateState:state.updateState,runtimeDiagnostics:null,dictationStatus:state.status,cursorDeliveryState:hook.cursorDeliveryState,transcript:state.transcript,rawTranscript:state.rawTranscript,recovery:state.recovery,captureNotice:state.captureNotice,canCancelDictation:hook.canCancel,cancellationPending:hook.cancellationPending,onCancelDictation:()=>void hook.cancelRecording(),onRetryRecovery:()=>void hook.retryRecovery(),onDiscardRecovery:hook.discardRecovery,requestedSection:'General',requestedSectionRequestId:0,selectedDeviceId:null,availableDevices:[],microphonePermission:'granted',onSurfaceChange:()=>{},onOnboardingStepChange:()=>{},onConfigChange:noop,onRefreshDevices:noop,onRequestMicrophoneAccess:noop,onCheckForUpdates:noop,onOpenReleasePage:noop,onRefreshRuntimeDiagnostics:noop,onOpenSettings:noop}));
+ React.createElement(ControlPanel,{surface:state.surface,onboardingStep:0,config:state.config,errorMessage:state.error,statusLabel:deriveStatusLabel({configurationError:false,hasRecovery:Boolean(state.recovery),manualTranscriptReady:state.recovery?.kind==='manual-copy',cursorDeliveryState:hook.cursorDeliveryState,cursorRequired:true,cursorSetupState:'ready',dictationStatus:state.status,microphonePermission:'granted',microphoneReady:true,}),updateState:state.updateState,runtimeDiagnostics:null,dictationStatus:state.status,cursorDeliveryState:hook.cursorDeliveryState,transcript:state.transcript,rawTranscript:state.rawTranscript,recovery:state.recovery,captureNotice:state.captureNotice,canCancelDictation:hook.canCancel,cancellationPending:hook.cancellationPending,onCancelDictation:()=>void hook.cancelRecording(),onRetryRecovery:()=>void hook.retryRecovery(),onDiscardRecovery:hook.discardRecovery,requestedSection:'General',requestedSectionRequestId:0,selectedDeviceId:null,availableDevices:[],microphonePermission:'granted',onSurfaceChange:surface=>state.setSurface(surface),onOnboardingStepChange:()=>{},onConfigChange:noop,onRefreshDevices:noop,onRequestMicrophoneAccess:noop,onCheckForUpdates:noop,onOpenReleasePage:noop,onRefreshRuntimeDiagnostics:noop,onOpenSettings:noop}));
 }
 window.reactRoot = createRoot(document.getElementById('root')); window.reactRoot.render(React.createElement(React.StrictMode,null,React.createElement(Harness)));
 window.remountHarness = () => { window.reactRoot = createRoot(document.getElementById('root')); window.reactRoot.render(React.createElement(React.StrictMode,null,React.createElement(Harness))); };
@@ -200,6 +200,7 @@ await page.waitForFunction(()=>window.nativeCalls.some(c=>c[0]==='checkpointOwne
 await page.evaluate(()=>window.hook.toggle('browser:fixture','stop'));await recovered();
 assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='checkpointOwnedPreedit').length),1);
 assert.equal(await page.evaluate(()=>window.store.getState().recovery.targetMayContainText),true);
+await page.evaluate(()=>window.store.getState().setSurface('popover'));
 await page.getByRole('button',{name:'Retry transcription',exact:true}).click();
 await page.waitForFunction(()=>window.store.getState().recovery?.audioAvailable===false);
 assert.equal(await page.evaluate(()=>window.store.getState().transcript),'Recovered with bundled NVIDIA.');
@@ -237,6 +238,7 @@ for (const failure of ['module', 'construction']) {
   await stop();await recovered();
   assert.equal(await page.evaluate(()=>window.store.getState().recovery.audioAvailable),true);
   assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>['transcribeAudio','pasteDesktopText'].includes(c[0]))),false);
+  await page.evaluate(()=>window.store.getState().setSurface('popover'));
   await page.getByRole('button',{name:'Retry transcription',exact:true}).click();
   await page.waitForFunction(()=>window.store.getState().recovery?.audioAvailable===false);
   assert.equal(await page.evaluate(()=>window.store.getState().transcript),'Recovered with bundled NVIDIA.');
@@ -250,12 +252,14 @@ for (const failure of ['module', 'construction']) {
 await load();await page.evaluate(()=>{window.desktopPaste=true;window.desktopStream=true;window.failWorkletModule=true;});
 await start(1);await stop();await recovered();
 await page.evaluate(()=>{window.deferRecovery=true;});
+await page.evaluate(()=>window.store.getState().setSurface('popover'));
 await page.getByRole('button',{name:'Retry transcription',exact:true}).click();
 await page.waitForFunction(()=>Boolean(window.resolveRecovery));
 await page.getByRole('button',{name:'Cancel dictation',exact:true}).click();
 await page.waitForFunction(()=>window.store.getState().status==='error' && !window.store.getState().recovery.retrying);
 assert.equal(await page.evaluate(()=>window.store.getState().recovery.audioAvailable),true);
 const firstRecovery=await page.evaluate(()=>window.recoveryRequests[0].session);
+await page.evaluate(()=>window.store.getState().setSurface('popover'));
 await page.getByRole('button',{name:'Retry transcription',exact:true}).click();
 assert.equal(await page.evaluate(()=>window.recoveryRequests.filter(r=>r.op==='start').length),1);
 await page.evaluate(()=>{window.deferRecovery=false;window.failRecovery=true;window.resolveRecovery();});
@@ -263,6 +267,7 @@ await page.waitForFunction(()=>window.recoveryRequests.filter(r=>r.op==='start')
 assert.equal(await page.evaluate(()=>window.store.getState().recovery.audioAvailable),true);
 assert.equal(await page.evaluate(()=>window.store.getState().transcript),'');
 await page.evaluate(()=>{window.failRecovery=false;});
+await page.evaluate(()=>window.store.getState().setSurface('popover'));
 await page.getByRole('button',{name:'Retry transcription',exact:true}).click();
 await page.waitForFunction(()=>window.store.getState().recovery?.audioAvailable===false);
 assert.notEqual(await page.evaluate(()=>window.recoveryRequests.filter(r=>r.op==='start').at(-1).session),firstRecovery);
@@ -273,6 +278,7 @@ results.push('NVIDIA recovery cancels promptly, waits for old cleanup, preserves
 await load();await page.evaluate(()=>{window.desktopPaste=true;window.desktopStream=true;window.failWorkletModule=true;});
 await start(1);await stop();await recovered();
 await page.evaluate(()=>{window.deferRecovery=true;});
+await page.evaluate(()=>window.store.getState().setSurface('popover'));
 await page.getByRole('button',{name:'Retry transcription',exact:true}).click();
 await page.waitForFunction(()=>Boolean(window.resolveRecovery));
 await page.evaluate(()=>{window.reactRoot.unmount();window.store.getState().setTranscript('Replacement state');window.deferRecovery=false;window.resolveRecovery();});
@@ -306,7 +312,19 @@ await page.waitForFunction(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktop
 await page.evaluate(()=>window.samples(1));await stop();await page.waitForFunction(()=>window.store.getState().status==='error');
 assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length),1);
 assert.equal(await page.evaluate(()=>window.store.getState().recovery.targetMayContainText),true);
-results.push('Uncertain progressive paste retains text/audio and never sends queued phrases or a final duplicate.');
+assert.equal(await page.evaluate(()=>window.store.getState().transcript),'Recovered words for manual review.','Stop retains recognition after delivery was interrupted');
+assert.equal(await page.evaluate(()=>window.benchmarkAudioSamples),48000);
+assert.equal(await page.evaluate(()=>window.store.getState().surface),'hidden','Recovery must not open a window');
+assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='showNotification'&&c[1]==='Dictation saved in VOCO').length),1);
+assert.equal(await page.getByRole('button',{name:'Copy transcript',exact:true}).count(),0);
+assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='showNotification'&&c[1]==='Text delivery paused').length),1);
+results.push('Uncertain progressive paste keeps recognition and Stop flushing, retains text/audio, notifies without opening a window and never retries insertion.');
+await page.evaluate(()=>window.store.getState().setSurface('popover'));
+await page.getByText('Saved dictation',{exact:true}).waitFor();
+assert.equal(await page.locator('.voco-panel__error').count(),0);
+assert.equal(await page.locator('details').evaluate(el=>el.open),false);
+await screenshot('saved-dictation-on-request.png');
+await page.evaluate(()=>window.store.getState().setSurface('popover'));
 await page.getByRole('button',{name:'Retry transcription',exact:true}).click();
 await page.waitForFunction(()=>window.store.getState().recovery?.audioAvailable===false);
 assert.equal(await page.evaluate(()=>window.store.getState().transcript),'Recovered with bundled NVIDIA.');
@@ -367,18 +385,44 @@ results.push('Uninterrupted input appends partial words exactly as the worker re
 await load(); await page.evaluate(()=>{window.desktopPaste=true;window.desktopStream=true;window.streamTextAt=[];window.streamFinalText='Long stream completed.';});
 await start(0);
 // Yield between capture callbacks so this models an ongoing stream, not a
-// 21-second backlog intentionally rejected by the three-second queue bound.
-for(let second=1;second<=21;second++) {
+// multi-minute backlog intentionally rejected by the three-second queue bound.
+for(let second=1;second<=300;second++) {
  await page.evaluate(()=>window.samples(1));
  await page.waitForFunction(samples=>window.benchmarkAudioSamples===samples,second*16000);
 }
-assert.equal(await page.evaluate(()=>window.benchmarkRequests.filter(r=>r.op==='push').length),210);
+assert.equal(await page.evaluate(()=>window.benchmarkRequests.filter(r=>r.op==='push').length),3000);
 assert.equal(await page.evaluate(()=>window.benchmarkRequests.some(r=>r.op==='diagnostic')),false);
 assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>['previewTranscribeAudio','transcribeAudio'].includes(c[0]))),false);
 await stop(); await page.waitForFunction(()=>window.store.getState().status==='idle');
 assert.equal(await page.evaluate(()=>window.benchmarkRequests.filter(r=>r.op==='finish').length),1);
 assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').map(c=>c[1])),['Long stream completed.']);
-results.push('A stream exceeding 20 seconds maintains sequenced 100 ms IPC packets, avoids whole-history decoding and finishes once after all captured audio.');
+results.push('Five minutes of simulated captured audio maintains sequenced 100 ms IPC packets, avoids whole-history decoding and finishes once after all captured audio.');
+
+
+await load(); await page.evaluate(()=>{
+ window.desktopPaste=true;window.desktopStream=true;
+ window.streamTextAt=[{samples:16000,text:'First phrase.'},{samples:120*16000,text:'First phrase. Later speech'},{samples:300*16000,text:'First phrase. Later speech remains available'}];
+ window.streamFinalText='First phrase. Later speech remains available through Stop.';
+});
+await start(0);
+for(let second=1;second<=300;second++) {
+ if(second===120) await page.evaluate(()=>window.failPaste=true);
+ await page.evaluate(()=>window.samples(1));
+ await page.waitForFunction(samples=>window.benchmarkAudioSamples===samples,second*16000);
+}
+await page.evaluate(()=>window.samples(701/16000));
+await stop();await recovered();
+assert.equal(await page.evaluate(()=>window.benchmarkAudioSamples),4800701);
+assert.equal(await page.evaluate(()=>window.benchmarkRequests.filter(r=>r.op==='finish').length),1);
+assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length),2,'One successful paste and one rejection; no retry');
+assert.equal(await page.evaluate(()=>window.store.getState().transcript),'First phrase. Later speech remains available through Stop.');
+assert.equal(await page.evaluate(()=>window.store.getState().surface),'hidden');
+assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='showNotification'&&c[1]==='Dictation saved in VOCO').length),1);
+await page.evaluate(()=>window.hook.toggle());
+assert.equal(await page.evaluate(()=>window.store.getState().surface),'hidden','A blocked restart only notifies; reviewing text is explicit');
+assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='showNotification'&&c[1]==='Previous transcript available').length),1);
+assert.equal(await page.evaluate(()=>window.benchmarkRequests.filter(r=>r.op==='start').length),1);
+results.push('Delivery interrupted at two minutes still recognizes five minutes plus a partial Stop tail, with no retry or automatic recovery window.');
 
 
 if (evidence) await writeFile(path.join(evidence,'results.json'),JSON.stringify({passed:errors.length===0,results,errors,consoleMessages,browser:'Headless Chromium; real React hook/store/components with explicit capture and native IPC doubles'},null,2));

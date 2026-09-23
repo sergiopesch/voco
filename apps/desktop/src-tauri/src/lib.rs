@@ -310,7 +310,7 @@ fn trace_frontend_hotkey_event(
         | "frontend_audio_prepare_done"
         | "frontend_init_complete"
         | "onboarding_handoff_requested"
-        | "onboarding_handoff_visible"
+        | "onboarding_handoff_hidden"
         | "launcher_activation_presented"
         | "launcher_activation_preserved_capture"
         | "frontend_hotkey_listener_registered" => {
