@@ -63,6 +63,10 @@ restarted until any in-memory recovery the owner needs has been reviewed.
 - Private native application and rich-editor delivery suites passed. The real
   Chromium address-bar selection case still rejects unsafe continuation, while
   normal contenteditable cases preserve observed text.
+- The app renderer dictation suite passed, including a rejected and a delayed
+  Stop-reservation ACK before microphone capture. Its five-minute audio cases
+  use synthetic capture and a worker double, so they do not establish the
+  owner's Codex result or sustained physical-device performance.
 - The production source build succeeded. The raw Tauri Debian bundle is not a
   complete distributable package because it omits the speech model. It was not
   installed or published. The mocked native-capture renderer suite and nested
