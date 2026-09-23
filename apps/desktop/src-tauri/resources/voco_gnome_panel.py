@@ -7,7 +7,7 @@ import time
 
 UUID = 'voco-panel@voco.local'
 # Bump with behavior changes that require reloading the running Shell companion.
-COMPANION_VERSION = 3
+COMPANION_VERSION = 4
 PACKAGE = Path('/usr/share/gnome-shell/extensions') / UUID
 
 

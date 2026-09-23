@@ -18,6 +18,9 @@ describe("global shortcut readiness", () => {
     expect(shouldProcessHotkeyEvent(false, "browser:current", "stop")).toBe(true);
     expect(shouldProcessHotkeyEvent(false, "browser:current", "start")).toBe(false);
     expect(shouldProcessHotkeyEvent(false, "tray:stop", "stop")).toBe(false);
+    expect(shouldProcessHotkeyEvent(false, "tray:stop", "stop", "1:2")).toBe(true);
+    expect(shouldProcessHotkeyEvent(false, "tray:stop", "start", "1:2")).toBe(false);
+    expect(shouldProcessHotkeyEvent(false, "tray:stop", "stop", "")).toBe(false);
     expect(shouldProcessHotkeyEvent(false)).toBe(false);
     expect(shouldProcessHotkeyEvent(true)).toBe(true);
   });

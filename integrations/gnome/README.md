@@ -45,7 +45,7 @@ The application owns session-bus name `org.voco.Panel`, object `/org/voco/Panel`
 interface `org.voco.Panel1`. `Attach` accepts only the current unique owner of
 `org.gnome.Shell`; subsequent calls must come from that attached connection.
 `GetState` returns protocol version 1 with status, fixed descriptive text, a
-renderer epoch/revision token, epoch/capture-session identity, action availability and a finite level in [0,1].
+renderer epoch/revision token, epoch/capture-session identity, capture/accelerator reservation identity, action availability and a finite level in [0,1].
 No speech, samples, target-window titles, clipboard contents or device names cross
 this interface. Meter values expire after 250 ms. The renderer supplies at most
 one meter update per 40 ms with at most one call in flight, only while recording.
@@ -55,7 +55,8 @@ A directed `Changed` signal updates transitions immediately. The extension also
 polls at 50 ms while active and 1500 ms while idle for meter updates and leases. Calls have a
 1500 ms deadline and target the app's unique bus owner without auto-start. A
 transient error hides the extension and schedules a bounded-rate reconnect.
-`Action(action, token)` rejects stale tokens. Stop is explicit rather than toggle,
+`Action(action, token)` uses the capture identity for Stop and the presentation
+revision for Open. It rejects stale ownership. Stop is explicit rather than toggle,
 so an already-finished session cannot accidentally start another recording. Repeated
 Stop requests for the same token are rejected. Existing renderer admission and
 cursor-delivery guards remain authoritative. `Detach` restores the native tray.
@@ -63,9 +64,10 @@ cursor-delivery guards remain authoritative. `Detach` restores the native tray.
 On Wayland, the companion consumes Alt+D (or Alt+Shift+D when configured)
 through Starting, Listening and Finishing. A held Stop belongs to the capture
 session, so presentation updates cannot cancel it; a replacement session cannot
-inherit it. Stop is sent after modifier release with the current action token.
+inherit it. Stop is sent after modifier release with the capture identity, which is revalidated at native dispatch and renderer admission.
 Only the authenticated Shell can renew the short native reservation suppressing
-passive duplicates. A rejected latest reservation, idle, disconnect, disable and
+passive duplicates. The reservation token binds the renderer epoch, capture session
+and exact configured accelerator; presentation revisions cannot revoke it. A rejected latest reservation, idle, disconnect, disable and
 state timeout release the grab. Each renewal has a generation: older replies
 cannot release a newer reservation, including renewals of the same grab.
 Without an active companion, selected continuation text is rejected and retained

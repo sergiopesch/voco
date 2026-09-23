@@ -334,7 +334,13 @@ export function App() {
   );
   const canHandleHotkey =
     initComplete && config !== null && !runtimeConfigurationError;
-  const handleToggleRequest = useCallback(async (triggerId?: string, action?: DictationTriggerAction) => {
+  const handleToggleRequest = useCallback(async (triggerId?: string, action?: DictationTriggerAction, stopSession?: string) => {
+    // A queued panel Stop must not cross into another capture or renderer.
+    if (stopSession !== undefined) {
+      if (triggerId !== "tray:stop" || action !== "stop" || runtimeStatusEpoch === null ||
+          stopSession !== `${runtimeStatusEpoch}:${dictationSessionId}`) return false;
+      return toggle(triggerId, action, dictationSessionId);
+    }
     const rejectBrowserStart = () => {
       if (action === "start" && isBrowserTrigger(triggerId)) {
         void releaseBrowserRecording(triggerId).catch(() => {});
@@ -416,7 +422,7 @@ export function App() {
     }
     toggle(triggerId, action);
     return true;
-  }, [dismissInteractiveSurface, nativeMicrophone.ensureDefault, setError, toggle]);
+  }, [dictationSessionId, dismissInteractiveSurface, nativeMicrophone.ensureDefault, runtimeStatusEpoch, setError, toggle]);
   const handleStartTest = useCallback(async () => {
     const state = useStore.getState();
     if (startRequestRef.current || isDictationActive(state.status) || state.surface !== "onboarding") return;
