@@ -22,7 +22,8 @@ before/after comparison uses the same public audio and disposable browser profil
   remains available for the first delivery of a new dictation.
 - After clipboard preparation, Rust validates the prepared position and bounded
   context again before sending keys. Only unchanged samples authorize dispatch;
-  partial, completed, inconsistent or unavailable observations do not.
+  partial, completed, inconsistent or unavailable observations do not. The added
+  validation is included in target-probe timing.
 - The GNOME companion consumes supported Stop chords during starting, recording
   and processing. It sends an explicit Stop after modifier release. Repeated
   processing chords cannot start another recording.
@@ -50,13 +51,13 @@ No dependency, hotkey preference or installed profile was changed.
 | Maintenance | DevOps checks, panel model tests and whitespace checks pass |
 
 The compiled candidate app has SHA-256
-`e7e99b38ae9ffd538d2a9f6458b34975be88a2b38e809954720f0fcc0a9f9a35`;
+`76ead5e373729af51b481e74e8e3a3153fbb9d0577d911dc745779eee99f97b5`;
 the reviewed companion `extension.js` has SHA-256
 `760ba0041c993dca9a02a6049eec99738eaf4892a5299d4f9740e128dadbb4da`.
 Local receipts and frozen failed attempts are under the workspace's
 `follow-up-2026-09-23-brave-stop/` directory. The main receipts are
-`baseline-wayland-full/`, `candidate-wayland-reviewed/`,
-`candidate-x11-final/`, `panel-shortcut-reviewed/` and
+`baseline-wayland-full/`, `candidate-wayland-accepted/`,
+`candidate-x11-accepted/`, `panel-shortcut-reviewed/` and
 `helper-green-wayland-final/`.
 
 Reproduce the committed regression checks with:

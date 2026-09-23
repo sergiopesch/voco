@@ -515,7 +515,6 @@ fn desktop_paste_for_target(
         let mut metrics = clipboard_paste_with_shortcut(&adjusted, terminal, || {
             let started = Instant::now();
             let current = desktop_target();
-            guard_probe_ms = started.elapsed().as_millis() as u64;
             if !current.available()
                 || current.token.as_deref() != Some(expected_target)
                 || current.shortcut != target.shortcut
@@ -541,6 +540,7 @@ fn desktop_paste_for_target(
                     return Err(InsertionError::rejected("The dictation selection or caret changed before insertion. Review retained text before copying."));
                 }
             }
+            guard_probe_ms = started.elapsed().as_millis() as u64;
             Ok(())
         })?;
         metrics.target_probe_ms = target_probe_ms.saturating_add(guard_probe_ms);
