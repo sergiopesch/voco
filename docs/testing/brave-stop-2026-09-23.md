@@ -89,3 +89,13 @@ Without a working consuming companion, selected continuations fail safely and
 remain available through saved-text recovery. Native gestures still cannot be
 atomic with a focus/selection change during the gesture itself. No uncertain text
 is replayed, and no live profile or public release was replaced by these tests.
+
+## Release review follow-up
+
+An independent review found that a held Stop could be discarded when Starting
+changed to Listening before Alt was released. The GNOME regression reproduced
+this failure. The panel now carries the existing capture session ID, qualified
+by the renderer epoch, separately from presentation revisions. The same-session
+transition passes; replacement sessions reject the old gesture. The native
+compositor lifecycle suite is also a protected frontend CI step. Original
+qualification above describes the earlier candidate, not the new release bytes.

@@ -106,6 +106,8 @@ glib 0.20 directly leaves the GTK dependency behind. [Backport](vendor/glib/VOCO
   Only the authenticated Shell can renew the native passive-event suppression;
   stale tokens, idle states and unsupported accelerators cannot reserve it.
   Release the compositor grab on idle, disconnect, disable or state timeout.
+  Bind held Stop intent to the renderer epoch and existing capture session ID,
+  not its changing presentation revision; dispatch with the current action token.
 - Closing or navigating an enabled browser tab, or losing its native connection,
   stops that tab's active recording. Ordinary field focus loss revokes delivery
   but preserves the original session's explicit Stop; stale tokens cannot stop

@@ -179,18 +179,26 @@ try:
     subprocess.run(['xdotool','windowfocus',ids[0]],env=xenv,check=True)
     def keys(*args): subprocess.run(['xdotool',*args],env=xenv,check=True,timeout=3)
     def shortcut_state(status, accelerator='<Alt>d'):
-        state.update(token='2:'+str(time.monotonic_ns()),status=status,canStop=status=='recording',
+        state.update(token='2:'+str(time.monotonic_ns()),status=status,canStop=status in ('starting','recording'),
+                     stopSession='2:1',
                      canOpen=status=='idle',stopAccelerator=accelerator)
         bus.emit_signal(attached[-1], '/org/voco/Panel', 'org.voco.Panel1', 'Changed', None);pump(.3)
     shortcut_state('idle'); entry.set_text('Keep my dictated words');entry.set_position(-1)
     keys('key','alt+d');pump(.2)
     assert leaked and entry.get_selection_bounds(), 'fixture must reproduce browser-style select-all'
     leaked.clear();entry.select_region(-1,-1);shortcut_state('recording')
+    shortcut_state('starting')
     before=len(actions);keys('keydown','Alt_L','keydown','d');pump(.3)
     assert not leaked and not entry.get_selection_bounds(), 'reserved Stop leaked into input'
     assert len(actions)==before, 'held modifiers must not initiate final paste'
+    shortcut_state('recording')  # Same capture, new presentation revision while held.
     keys('keyup','d','keyup','Alt_L');pump(.3)
     assert len(actions)==before+1 and actions[-1]==('stop',state['token']), actions
+    before_replacement=len(actions);keys('keydown','Alt_L','keydown','d');pump(.1)
+    state.update(token='2:replacement',stopSession='2:2')
+    bus.emit_signal(attached[-1], '/org/voco/Panel', 'org.voco.Panel1', 'Changed', None);pump(.15)
+    keys('keyup','d','keyup','Alt_L');pump(.2)
+    assert len(actions)==before_replacement, 'held Stop must not affect a replacement recording'
     shortcut_state('processing');keys('key','alt+d');pump(.2)
     assert not leaked and len(actions)==before+1, 'processing must consume without another action'
     shortcut_state('idle');keys('key','alt+d');pump(.2)
@@ -220,7 +228,7 @@ try:
     window.destroy();pump(.2)
     owner=Gio.bus_own_name_on_connection(bus,'org.voco.Panel',Gio.BusNameOwnerFlags.NONE,None,None)
     state.pop('stopAccelerator',None);pump(.4)
-    report['shortcutProtection']={'realCompositorKeys':True,'heldModifierWait':True,'processingConsumed':True,
+    report['shortcutProtection']={'realCompositorKeys':True,'heldModifierWait':True,'sameSessionRevisionPreserved':True,'replacementSessionRejected':True,'processingConsumed':True,
         'idleReleased':True,'disconnectReleased':True,'unresponsiveAppReleased':True,'staleReservationIsolated':True,'alternateHotkey':True,'textPreserved':True}
     report['actions']=actions
     if (root / 'voco').exists():

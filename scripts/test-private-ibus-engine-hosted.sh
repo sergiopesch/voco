@@ -7,6 +7,11 @@ ORIGINAL_USERNS_POLICY=""
 case "${1:-}" in
   "") TEST_SCRIPT="test-private-ibus-engine.sh" ;;
   --rich-editor) TEST_SCRIPT="test-rich-editor-delivery.sh" ;;
+  --gnome-panel)
+    : "${VOCO_NATIVE_DEPS:?Set the installed or extracted Xvfb root/usr}"
+    : "${VOCO_PANEL_EVIDENCE_DIR:?Set a fresh directory for GNOME evidence}"
+    TEST_SCRIPT="test-gnome-panel.sh"
+    ;;
   --native-desktop) TEST_SCRIPT="test-native-desktop.sh" ;;
   --native-pulse-latency)
     : "${VOCO_NATIVE_PULSE_EVIDENCE_DIR:?Set a fresh directory for native Pulse evidence}"

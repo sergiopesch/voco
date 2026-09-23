@@ -33,7 +33,7 @@ export default class VocoPanel extends Extension {
         this._shortcutGeneration = 0;
         this._shortcutSignal = global.display.connect('accelerator-activated', (_display, action) => {
             if (action === this._shortcut && this._state?.canStop)
-                this._stopPending ??= this._state.token;
+                this._stopPending ??= this._state.stopSession;
         });
         this._cancellable = new Gio.Cancellable();
         // The dummy menu satisfies GNOME's status-area contract without a popup.
@@ -192,9 +192,9 @@ export default class VocoPanel extends Extension {
                 // Only an explicit Stop is emitted, never a delayed toggle/start.
                 if (this._stopPending && !(global.get_pointer()[2] &
                     (Clutter.ModifierType.MOD1_MASK | Clutter.ModifierType.SHIFT_MASK))) {
-                    const token = this._stopPending;
+                    const session = this._stopPending;
                     this._stopPending = null;
-                    if (this._state?.canStop && this._state.token === token)
+                    if (this._state?.canStop && this._state.stopSession === session)
                         this._action('stop');
                 }
                 return GLib.SOURCE_CONTINUE;

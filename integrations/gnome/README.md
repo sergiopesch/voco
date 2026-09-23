@@ -43,7 +43,7 @@ The application owns session-bus name `org.voco.Panel`, object `/org/voco/Panel`
 interface `org.voco.Panel1`. `Attach` accepts only the current unique owner of
 `org.gnome.Shell`; subsequent calls must come from that attached connection.
 `GetState` returns protocol version 1 with status, fixed descriptive text, a
-renderer epoch/revision token, action availability and a finite level in [0,1].
+renderer epoch/revision token, epoch/capture-session identity, action availability and a finite level in [0,1].
 No speech, samples, target-window titles, clipboard contents or device names cross
 this interface. Meter values expire after 250 ms. The renderer supplies at most
 one meter update per 40 ms with at most one call in flight, only while recording.
@@ -57,6 +57,15 @@ transient error hides the extension and schedules a bounded-rate reconnect.
 so an already-finished session cannot accidentally start another recording. Repeated
 Stop requests for the same token are rejected. Existing renderer admission and
 cursor-delivery guards remain authoritative. `Detach` restores the native tray.
+
+On Wayland, the companion consumes Alt+D (or Alt+Shift+D when configured)
+through Starting, Listening and Finishing. A held Stop belongs to the capture
+session, so presentation updates cannot cancel it; a replacement session cannot
+inherit it. Stop is sent after modifier release with the current action token.
+Only the authenticated Shell can renew the short native reservation suppressing
+passive duplicates. Idle, disconnect, disable and state timeout release the grab.
+Without an active companion, selected continuation text is rejected and retained
+for recovery rather than replacing the existing words.
 
 ## Verification
 

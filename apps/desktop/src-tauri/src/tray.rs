@@ -21,6 +21,7 @@ pub struct TrayState {
     pub current_hotkey: String,
     pub hotkey_items: Vec<(String, MenuItem<tauri::Wry>)>,
     pub dictation_status: DictationStatus,
+    pub dictation_session_id: u64,
     pub has_recoverable_transcript: bool,
     pub microphone_ready: bool,
     pub microphone_permission: MicrophonePermission,
@@ -96,6 +97,8 @@ pub struct RuntimeStatusSnapshot {
     pub native_microphone_ready: Option<bool>,
     pub dictation_status: DictationStatus,
     #[serde(default)]
+    pub dictation_session_id: u64,
+    #[serde(default)]
     pub has_recoverable_transcript: bool,
     pub cursor_delivery: CursorDeliveryState,
     pub cursor_required: bool,
@@ -118,6 +121,7 @@ impl Default for RuntimeStatusSnapshot {
             microphone_permission: MicrophonePermission::Unknown,
             native_microphone_ready: None,
             dictation_status: DictationStatus::Idle,
+            dictation_session_id: 0,
             has_recoverable_transcript: false,
             cursor_delivery: CursorDeliveryState::Inactive,
             cursor_required: false,
@@ -423,6 +427,7 @@ fn runtime_snapshot_from_tray_state(tray_state: &TrayState) -> RuntimeStatusSnap
         microphone_permission: tray_state.microphone_permission,
         native_microphone_ready: tray_state.native_microphone_ready,
         dictation_status: tray_state.dictation_status,
+        dictation_session_id: tray_state.dictation_session_id,
         has_recoverable_transcript: tray_state.has_recoverable_transcript,
         cursor_delivery: tray_state.cursor_delivery,
         cursor_required: tray_state.cursor_required,
@@ -607,6 +612,7 @@ pub fn setup_tray(app: &tauri::App, hotkey_label: &str) -> Result<(), Box<dyn st
         current_hotkey: hotkey_label.to_string(),
         hotkey_items,
         dictation_status: DictationStatus::Idle,
+        dictation_session_id: 0,
         has_recoverable_transcript: false,
         microphone_ready: false,
         microphone_permission: MicrophonePermission::Unknown,
@@ -678,6 +684,7 @@ pub fn update_runtime_status(app: &tauri::AppHandle, snapshot: RuntimeStatusSnap
     tray_state.microphone_permission = snapshot.microphone_permission;
     tray_state.native_microphone_ready = snapshot.native_microphone_ready;
     tray_state.dictation_status = snapshot.dictation_status;
+    tray_state.dictation_session_id = snapshot.dictation_session_id;
     tray_state.has_recoverable_transcript = snapshot.has_recoverable_transcript;
     tray_state.cursor_delivery = snapshot.cursor_delivery;
     tray_state.cursor_required = snapshot.cursor_required;
@@ -893,6 +900,7 @@ pub fn begin_runtime_status_session(app: &tauri::AppHandle) -> Result<u64, Strin
     tray_state.microphone_permission = MicrophonePermission::Unknown;
     tray_state.native_microphone_ready = None;
     tray_state.dictation_status = DictationStatus::Idle;
+    tray_state.dictation_session_id = 0;
     tray_state.has_recoverable_transcript = false;
     tray_state.cursor_delivery = CursorDeliveryState::Inactive;
     tray_state.cursor_required = false;
@@ -990,6 +998,9 @@ fn panel_presentation(snapshot: &RuntimeStatusSnapshot) -> serde_json::Value {
     serde_json::json!({
         "version": 1, "status": status, "description": presentation.tooltip,
         "token": format!("{}:{}", snapshot.epoch, snapshot.revision),
+        // Presentation revisions can change while a Stop chord is held.
+        "stopSession": (snapshot.dictation_session_id > 0).then(||
+            format!("{}:{}", snapshot.epoch, snapshot.dictation_session_id)),
         "canStop": matches!(snapshot.dictation_status, DictationStatus::Starting | DictationStatus::Recording),
         "canOpen": presentation.settings_enabled,
         "level": crate::panel::level(snapshot.epoch, snapshot.dictation_status),
@@ -1088,10 +1099,39 @@ mod tests {
                 "description",
                 "level",
                 "status",
+                "stopSession",
                 "token",
                 "version"
             ]
         );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn panel_stop_identity_tracks_capture_not_presentation() {
+        let mut snapshot = ready_snapshot();
+        snapshot.epoch = 3;
+        snapshot.revision = 7;
+        snapshot.dictation_session_id = 1;
+        snapshot.dictation_status = DictationStatus::Starting;
+        let starting = panel_presentation(&snapshot);
+        snapshot.revision += 1;
+        snapshot.dictation_status = DictationStatus::Recording;
+        let recording = panel_presentation(&snapshot);
+        assert_ne!(starting["token"], recording["token"]);
+        assert_eq!(starting["stopSession"], recording["stopSession"]);
+        snapshot.dictation_session_id += 1;
+        assert_ne!(
+            recording["stopSession"],
+            panel_presentation(&snapshot)["stopSession"]
+        );
+        snapshot.epoch += 1;
+        assert_ne!(
+            recording["stopSession"],
+            panel_presentation(&snapshot)["stopSession"]
+        );
+        snapshot.dictation_session_id = 0;
+        assert!(panel_presentation(&snapshot)["stopSession"].is_null());
     }
 
     #[test]
