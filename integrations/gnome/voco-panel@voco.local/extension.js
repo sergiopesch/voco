@@ -173,7 +173,7 @@ export default class VocoPanel extends Extension {
 
     _syncShortcut() {
         const state = this._state;
-        const accelerator = state?.active && ['<Alt>d', '<Alt><Shift>d'].includes(state.stopAccelerator)
+        const accelerator = state?.active && typeof state.stopShortcutToken === 'string' && state.stopShortcutToken.length > 0 && ['<Alt>d', '<Alt><Shift>d'].includes(state.stopAccelerator)
             ? state.stopAccelerator : null;
         if (accelerator !== this._accelerator) {
             this._releaseShortcut();
@@ -208,7 +208,7 @@ export default class VocoPanel extends Extension {
         const release = () => {
             if (generation === this._shortcutGeneration) this._releaseShortcut();
         };
-        this._call('ReserveStopShortcut', new GLib.Variant('(s)', [state.token]), result => {
+        this._call('ReserveStopShortcut', new GLib.Variant('(s)', [state.stopShortcutToken]), result => {
             if (result.deep_unpack()[0] !== true) release();
         }, release);
     }
@@ -229,7 +229,7 @@ export default class VocoPanel extends Extension {
         const state = this._state;
         if (!state || (action === 'stop' ? !state.canStop : !state.canOpen)) return;
         this._stop.reactive = false;
-        this._call('Action', new GLib.Variant('(ss)', [action, state.token]), () => {});
+        this._call('Action', new GLib.Variant('(ss)', [action, action === 'stop' ? state.stopSession : state.token]), () => {});
     }
 
     _retry() {

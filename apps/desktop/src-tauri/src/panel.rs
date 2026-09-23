@@ -35,16 +35,25 @@ pub fn clear_shortcut() {
     }
 }
 
+/// Lease ownership follows a capture and its configured chord, not UI revisions.
+pub(crate) fn stop_shortcut_token(state: &serde_json::Value) -> Option<String> {
+    if !matches!(
+        state["status"].as_str(),
+        Some("starting" | "recording" | "processing")
+    ) {
+        return None;
+    }
+    let session = state["stopSession"]
+        .as_str()
+        .filter(|value| !value.is_empty())?;
+    let accelerator = state["stopAccelerator"]
+        .as_str()
+        .filter(|value| matches!(*value, "<Alt>d" | "<Alt><Shift>d"))?;
+    Some(format!("{session}/{accelerator}"))
+}
+
 fn valid_shortcut_reservation(state: &serde_json::Value, token: &str) -> bool {
-    state["token"].as_str() == Some(token)
-        && matches!(
-            state["status"].as_str(),
-            Some("starting" | "recording" | "processing")
-        )
-        && matches!(
-            state["stopAccelerator"].as_str(),
-            Some("<Alt>d" | "<Alt><Shift>d")
-        )
+    stop_shortcut_token(state).as_deref() == Some(token)
 }
 
 /// Wake only the attached shell when authoritative state changes; meter frames
@@ -270,18 +279,38 @@ mod tests {
             "recovery",
             "attention",
         ] {
-            let state =
-                serde_json::json!({"token":"3:7", "status":status, "stopAccelerator":"<Alt>d"});
+            let state = serde_json::json!({"token":"3:7", "stopSession":"3:1", "status":status, "stopAccelerator":"<Alt>d"});
             assert_eq!(
-                valid_shortcut_reservation(&state, "3:7"),
+                valid_shortcut_reservation(&state, "3:1/<Alt>d"),
                 matches!(status, "starting" | "recording" | "processing")
             );
             assert!(!valid_shortcut_reservation(&state, "3:6"));
             assert!(!valid_shortcut_reservation(&state, "2:7"));
         }
         for accelerator in [None, Some("<Control>v"), Some("")] {
-            let state = serde_json::json!({"token":"3:7", "status":"recording", "stopAccelerator":accelerator});
-            assert!(!valid_shortcut_reservation(&state, "3:7"));
+            let state = serde_json::json!({"token":"3:7", "stopSession":"3:1", "status":"recording", "stopAccelerator":accelerator});
+            assert!(!valid_shortcut_reservation(&state, "3:1/<Alt>d"));
         }
+    }
+    #[test]
+    fn reservation_survives_presentation_changes_but_not_authority_changes() {
+        let mut state = serde_json::json!({"token":"3:7", "stopSession":"3:1", "status":"starting", "stopAccelerator":"<Alt>d"});
+        let token = stop_shortcut_token(&state).unwrap();
+        state["token"] = "3:8".into();
+        state["status"] = "recording".into();
+        assert!(valid_shortcut_reservation(&state, &token));
+        for (field, value) in [
+            ("stopSession", "3:2"),
+            ("stopSession", "4:1"),
+            ("stopSession", ""),
+            ("stopAccelerator", "<Alt><Shift>d"),
+            ("status", "idle"),
+        ] {
+            let mut changed = state.clone();
+            changed[field] = value.into();
+            assert!(!valid_shortcut_reservation(&changed, &token));
+        }
+        state.as_object_mut().unwrap().remove("stopSession");
+        assert!(!valid_shortcut_reservation(&state, &token));
     }
 }

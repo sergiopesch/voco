@@ -108,7 +108,9 @@ glib 0.20 directly leaves the GTK dependency behind. [Backport](vendor/glib/VOCO
   Release the compositor grab on a rejected latest reservation, idle, disconnect,
   disable or state timeout. Older renewal replies must not revoke a newer grab.
   Bind held Stop intent to the renderer epoch and existing capture session ID,
-  not its changing presentation revision; dispatch with the current action token.
+  not its changing presentation revision. Bind reservations to that identity and
+  the exact accelerator. Validate explicit Stop against the capture identity at
+  both native dispatch and renderer admission.
 - Closing or navigating an enabled browser tab, or losing its native connection,
   stops that tab's active recording. Ordinary field focus loss revokes delivery
   but preserves the original session's explicit Stop; stale tokens cannot stop

@@ -29,12 +29,14 @@ export function shouldProcessHotkeyEvent(
   canHandleHotkey: boolean,
   triggerId?: string,
   action?: DictationTriggerAction,
+  stopSession?: string,
 ): boolean {
-  return canHandleHotkey || (action === "stop" && isBrowserTrigger(triggerId));
+  return canHandleHotkey || (action === "stop" && (isBrowserTrigger(triggerId) ||
+    (triggerId === "tray:stop" && typeof stopSession === "string" && stopSession.length > 0)));
 }
 
 export function useGlobalShortcut(
-  toggle: (triggerId?: string, action?: DictationTriggerAction) => boolean | Promise<boolean>,
+  toggle: (triggerId?: string, action?: DictationTriggerAction, stopSession?: string) => boolean | Promise<boolean>,
   shouldHandleHotkey: () => boolean,
   canHandleHotkey: boolean,
   appStartMs: number,
@@ -54,17 +56,17 @@ export function useGlobalShortcut(
     let disposed = false;
 
     void getCurrentWindow()
-      .listen<{ triggerId?: string; action?: DictationTriggerAction } | null>(TOGGLE_EVENT, (event) => {
+      .listen<{ triggerId?: string; action?: DictationTriggerAction; stopSession?: string } | null>(TOGGLE_EVENT, (event) => {
         traceHotkeyEvent("frontend_toggle_received").catch(() => {});
         onHotkeyPressedRef.current();
-        const { triggerId, action } = event.payload ?? {};
-        if (!shouldProcessHotkeyEvent(shouldHandleHotkeyRef.current(), triggerId, action)) {
+        const { triggerId, action, stopSession } = event.payload ?? {};
+        if (!shouldProcessHotkeyEvent(shouldHandleHotkeyRef.current(), triggerId, action, stopSession)) {
           if (event.payload?.action === "start" && event.payload.triggerId?.startsWith("browser:")) {
             void releaseBrowserRecording(event.payload.triggerId).catch(() => {});
           }
           return;
         }
-        void Promise.resolve(toggleRef.current(triggerId, action))
+        void Promise.resolve(toggleRef.current(triggerId, action, stopSession))
           .then((handled) => {
             const receipt = browserStopReceipt(triggerId, action, handled);
             if (receipt) return ackBrowserStop(receipt);

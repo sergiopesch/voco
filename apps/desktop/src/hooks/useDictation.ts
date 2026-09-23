@@ -731,7 +731,8 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
     };
   }, []);
 
-  const toggle = useCallback((triggerId?: string, action?: DictationTriggerAction) => {
+  const toggle = useCallback((triggerId?: string, action?: DictationTriggerAction, expectedSessionId?: number) => {
+    if (expectedSessionId !== undefined && expectedSessionId !== sessionRef.current.sessionId) return false;
     if (!admitsDictationTrigger(sessionRef.current.phase, activeTriggerIdRef.current, triggerId, action)) {
       void traceDictationEvent(action === "start" ? "dictation_trigger_start_rejected" : "dictation_trigger_stop_rejected").catch(() => {});
       if (action === "start" && triggerId !== activeTriggerIdRef.current) releaseRecordingOrigin(triggerId);

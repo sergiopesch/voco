@@ -982,6 +982,8 @@ pub fn panel_snapshot(app: &tauri::AppHandle) -> Option<serde_json::Value> {
     } else {
         None
     });
+    presentation["stopShortcutToken"] =
+        serde_json::json!(crate::panel::stop_shortcut_token(&presentation));
     Some(presentation)
 }
 
@@ -1033,11 +1035,23 @@ pub fn panel_visibility(app: &tauri::AppHandle, visible: bool) {
 }
 
 #[cfg(target_os = "linux")]
+fn valid_panel_action(snapshot: &serde_json::Value, action: &str, token: &str) -> bool {
+    !token.is_empty()
+        && match action {
+            "stop" => {
+                snapshot["canStop"] == true && snapshot["stopSession"].as_str() == Some(token)
+            }
+            "open" => snapshot["canOpen"] == true && snapshot["token"].as_str() == Some(token),
+            _ => false,
+        }
+}
+
+#[cfg(target_os = "linux")]
 pub fn panel_action(app: &tauri::AppHandle, action: &str, token: &str) -> bool {
     let Some(snapshot) = panel_snapshot(app) else {
         return false;
     };
-    if snapshot["token"].as_str() != Some(token) {
+    if !valid_panel_action(&snapshot, action, token) {
         return false;
     }
     match action {
@@ -1047,7 +1061,7 @@ pub fn panel_action(app: &tauri::AppHandle, action: &str, token: &str) -> bool {
             app.emit_to(
                 "main",
                 "voco:toggle-dictation",
-                serde_json::json!({"triggerId":"tray:stop", "action":"stop"}),
+                serde_json::json!({"triggerId":"tray:stop", "action":"stop", "stopSession":token}),
             )
             .is_ok()
         }
@@ -1070,6 +1084,23 @@ pub fn panel_action(app: &tauri::AppHandle, action: &str, token: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn panel_stop_uses_capture_identity_while_open_uses_presentation_revision() {
+        let mut state = serde_json::json!({"token":"4:9", "stopSession":"4:2", "canStop":true, "canOpen":false});
+        assert!(valid_panel_action(&state, "stop", "4:2"));
+        state["token"] = "4:10".into();
+        assert!(valid_panel_action(&state, "stop", "4:2"));
+        for token in ["", "4:1", "3:2", "4:9"] {
+            assert!(!valid_panel_action(&state, "stop", token));
+        }
+        state["canStop"] = false.into();
+        assert!(!valid_panel_action(&state, "stop", "4:2"));
+        state["canOpen"] = true.into();
+        assert!(valid_panel_action(&state, "open", "4:10"));
+        assert!(!valid_panel_action(&state, "open", "4:9"));
+    }
 
     #[cfg(target_os = "linux")]
     #[test]

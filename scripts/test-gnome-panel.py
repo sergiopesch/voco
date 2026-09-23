@@ -12,10 +12,16 @@ gi.require_version('Gio', '2.0')
 from gi.repository import Gio, GLib
 root = Path(sys.argv[1]); evidence = root / 'evidence'
 report = {'passed': False, 'scope': 'GNOME 46 nested Wayland, synthetic app service', 'states': {}}
-state = dict(version=1, token='1:1', status='idle', description='Ready', canStop=False, canOpen=True, level=0)
-actions = []; attached = []; fail_next = []; stalled = []; stall_state = []; delayed_reservations = []; delay_reservation = []
+state = dict(version=1, token='1:1', stopSession='1:1', status='idle', description='Ready', canStop=False, canOpen=True, level=0)
+actions = []; attached = []; fail_next = []; stalled = []; stall_state = []; delayed_reservations = []; delay_reservation = []; advance_reservation = []; reservation_revisions = []; advance_action = []; action_revisions = []
 bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
 xml = '''<node><interface name="org.voco.Panel1"><method name="Attach"><arg type="b" direction="out"/></method><method name="GetState"><arg type="s" direction="out"/></method><method name="ReserveStopShortcut"><arg type="s" direction="in"/><arg type="b" direction="out"/></method><method name="Action"><arg type="s" direction="in"/><arg type="s" direction="in"/><arg type="b" direction="out"/></method><method name="Detach"/><signal name="Changed"/></interface></node>'''
+def shortcut_token():
+    if state['status'] in ('starting','recording','processing') and state.get('stopSession') and state.get('stopAccelerator') in ('<Alt>d','<Alt><Shift>d'):
+        return state['stopSession'] + '/' + state['stopAccelerator']
+    return None
+def snapshot():
+    return json.dumps({**state, 'stopShortcutToken': shortcut_token()})
 def method(connection, sender, path, interface, name, params, invocation):
     if name == 'Attach':
         attached.append(sender); invocation.return_value(GLib.Variant('(b)', (True,)))
@@ -24,13 +30,24 @@ def method(connection, sender, path, interface, name, params, invocation):
             stalled.append(invocation); return
         if fail_next:
             fail_next.pop(); invocation.return_dbus_error('org.voco.TestUnavailable', 'Synthetic transient failure')
-        else: invocation.return_value(GLib.Variant('(s)', (json.dumps(state),)))
+        else: invocation.return_value(GLib.Variant('(s)', (snapshot(),)))
     elif name == 'ReserveStopShortcut':
         if delay_reservation:
             delayed_reservations.append(invocation); return
-        invocation.return_value(GLib.Variant('(b)', (params.unpack()[0] == state['token'],)))
+        if advance_reservation:
+            advance_reservation.pop()
+            previous = state['token']; state['token'] += ':renewed'
+            reservation_revisions.append([previous, state['token']])
+        invocation.return_value(GLib.Variant('(b)', (params.unpack()[0] == shortcut_token(),)))
     elif name == 'Action':
-        actions.append(params.unpack()); invocation.return_value(GLib.Variant('(b)', (True,)))
+        if advance_action:
+            advance_action.pop()
+            previous = state['token']; state['token'] += ':action'
+            action_revisions.append([previous, state['token']])
+        action, token = params.unpack()
+        accepted = (action == 'stop' and state['canStop'] and token == state['stopSession']) or (action == 'open' and state['canOpen'] and token == state['token'])
+        if accepted: actions.append((action, token))
+        invocation.return_value(GLib.Variant('(b)', (accepted,)))
     elif name == 'Detach': invocation.return_value(None)
 registration = bus.register_object('/org/voco/Panel', Gio.DBusNodeInfo.new_for_xml(xml).interfaces[0], method, None, None)
 owner = Gio.bus_own_name_on_connection(bus, 'org.voco.Panel', Gio.BusNameOwnerFlags.NONE, None, None)
@@ -143,7 +160,7 @@ try:
             assert max(bars(quiet)) < max(bars(loud))
             report['meterResponds'] = True
             call('Stop'); pump(.2)
-            assert actions[-1] == ('stop', state['token']), actions
+            assert actions[-1] == ('stop', state['stopSession']), actions
     assert report['states']['2-recording']['indicator']['width'] > report['states']['0-idle']['indicator']['width'] + 50
     assert abs(report['states']['5-idle']['indicator']['width'] - report['states']['0-idle']['indicator']['width']) < 2
     subprocess.run(['gsettings','set','org.gnome.desktop.interface','enable-animations','false'],check=True)
@@ -209,9 +226,15 @@ try:
     before=len(actions);keys('keydown','Alt_L','keydown','d');pump(.3)
     assert not leaked and not entry.get_selection_bounds(), 'reserved Stop leaked into input'
     assert len(actions)==before, 'held modifiers must not initiate final paste'
+    # Force the native presentation to advance after Shell has read it, while
+    # the chord remains held. This must not revoke ownership of this capture.
+    advance_reservation.append(True);pump(.15)
+    assert len(reservation_revisions) == 1, 'revision race was not exercised'
     shortcut_state('recording')  # Same capture, new presentation revision while held.
+    advance_action.append(True)
     keys('keyup','d','keyup','Alt_L');pump(.3)
-    assert len(actions)==before+1 and actions[-1]==('stop',state['token']), actions
+    assert len(action_revisions) == 1, 'action revision race was not exercised'
+    assert len(actions)==before+1 and actions[-1]==('stop',state['stopSession']), actions
     before_replacement=len(actions);keys('keydown','Alt_L','keydown','d');pump(.1)
     state.update(token='2:replacement',stopSession='2:2')
     bus.emit_signal(attached[-1], '/org/voco/Panel', 'org.voco.Panel1', 'Changed', None);pump(.15)
@@ -223,7 +246,7 @@ try:
     assert leaked, 'idle must return the shortcut to the application'
     leaked.clear();entry.select_region(-1,-1);shortcut_state('recording','<Alt><Shift>d')
     keys('key','alt+shift+d');pump(.2)
-    assert not leaked and actions[-1]==('stop',state['token'])
+    assert not leaked and actions[-1]==('stop',state['stopSession'])
     delay_reservation.append(True);pump(.12)
     assert delayed_reservations, 'fixture must hold an old reservation response'
     shortcut_state('idle');delay_reservation.clear()
@@ -231,7 +254,7 @@ try:
     for pending in delayed_reservations: pending.return_dbus_error('org.voco.TestExpired','Old recording expired')
     delayed_reservations.clear();pump(.01)
     keys('key','alt+shift+d');pump(.2)
-    assert not leaked and actions[-1]==('stop',state['token']), 'late old failure must not release a new grab'
+    assert not leaked and actions[-1]==('stop',state['stopSession']), 'late old failure must not release a new grab'
     # A newer accepted renewal must survive an older false reply on the same grab.
     delay_reservation.append(True);pump(.12)
     assert delayed_reservations
@@ -251,7 +274,7 @@ try:
     keys('key','alt+shift+d');pump(.05)
     assert leaked and len(actions)==before_rejected, 'rejected reservation must release the shortcut immediately'
     stall_state.clear()
-    for pending in stalled: pending.return_value(GLib.Variant('(s)', (json.dumps(state),)))
+    for pending in stalled: pending.return_value(GLib.Variant('(s)', (snapshot(),)))
     stalled.clear();pump(.2)
     leaked.clear();entry.select_region(-1,-1)
     stall_state.append(True)
@@ -268,7 +291,7 @@ try:
     window.destroy();pump(.2)
     owner=Gio.bus_own_name_on_connection(bus,'org.voco.Panel',Gio.BusNameOwnerFlags.NONE,None,None)
     state.pop('stopAccelerator',None);pump(.4)
-    report['shortcutProtection']={'realCompositorKeys':True,'heldModifierWait':True,'sameSessionRevisionPreserved':True,'replacementSessionRejected':True,'processingConsumed':True,
+    report['shortcutProtection']={'realCompositorKeys':True,'heldModifierWait':True,'sameSessionRevisionPreserved':True,'reservationRevisionRaces':reservation_revisions,'actionRevisionRaces':action_revisions,'replacementSessionRejected':True,'processingConsumed':True,
         'idleReleased':True,'disconnectReleased':True,'unresponsiveAppReleased':True,'staleReservationIsolated':True,
         'rejectedReservationReleased':True,'olderRejectedRenewalIsolated':True,'alternateHotkey':True,'textPreserved':True}
     report['actions']=actions

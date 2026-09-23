@@ -888,6 +888,33 @@ try {
       await page.evaluate(()=>window.listeners['voco:toggle-dictation']({payload:null}));
       await page.waitForFunction(()=>window.nativeCommands.some(x=>x.name==='native_capture_drain'&&x.args.request.ackThroughSequence===4));
     };
+    await activate();
+    const panelSession = await page.evaluate(()=>window.captureIdentity.sessionId);
+    for (const stopSession of [`2:${panelSession}`, `1:${panelSession+1}`, '', 'malformed']) {
+      await page.evaluate(stopSession=>window.listeners['voco:toggle-dictation']({payload:{triggerId:'tray:stop',action:'stop',stopSession}}),stopSession);
+      await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+      assert.equal(await page.evaluate(()=>window.store.getState().status),'recording');
+      assert.equal((await state()).commands.filter(x=>x.name==='native_capture_stop').length,0);
+    }
+    const panelConfig = await page.evaluate(()=>window.store.getState().config);
+    await page.evaluate(()=>window.store.setState({config:null}));
+    await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+    await page.evaluate(stopSession=>window.listeners['voco:toggle-dictation']({payload:{triggerId:'tray:stop',action:'stop',stopSession}}),`1:${panelSession}`);
+    await page.waitForFunction(()=>window.store.getState().status==='idle');
+    await page.evaluate(config=>window.store.getState().setConfig(config),panelConfig);
+    assert.equal((await state()).commands.filter(x=>x.name==='native_capture_stop').length,1);
+    await page.evaluate(()=>window.store.getState().setSurface('popover'));
+    await page.getByRole('button',{name:/Clear transcript|Discard recovery/}).click();
+    await page.evaluate(()=>window.store.getState().setSurface('hidden'));
+    await page.evaluate(()=>window.listeners['voco:toggle-dictation']({payload:null}));
+    await page.waitForFunction(()=>window.store.getState().status==='recording');
+    await page.evaluate(stopSession=>window.listeners['voco:toggle-dictation']({payload:{triggerId:'tray:stop',action:'stop',stopSession}}),`1:${panelSession}`);
+    await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+    assert.equal(await page.evaluate(()=>window.store.getState().status),'recording');
+    assert.equal((await state()).commands.filter(x=>x.name==='native_capture_stop').length,1);
+    await page.evaluate(()=>window.listeners['voco:toggle-dictation']({payload:{triggerId:'tray:stop',action:'stop',stopSession:`1:${window.captureIdentity.sessionId}`}}));
+    await page.waitForFunction(()=>window.store.getState().status==='idle');
+    expected.push('panel-stop-validates-renderer-and-capture-through-event-delivery');record(expected.at(-1));
     await activate();assert.equal((await state()).streams,0);assert.equal((await state()).enums,0);
     await page.evaluate(()=>window.listeners['voco:toggle-dictation']({payload:null}));
     await page.waitForFunction(()=>window.store.getState().status==='idle'||window.store.getState().recovery);

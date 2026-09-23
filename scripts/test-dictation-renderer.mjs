@@ -175,6 +175,13 @@ async function start(seconds=1) { await page.evaluate(()=>window.hook.toggle());
 async function stop() {await page.evaluate(()=>window.hook.toggle());}
 async function recovered() {try {await page.waitForFunction(()=>Boolean(window.store.getState().recovery),null,{timeout:6000});} catch(e) {console.log('DEBUG_STATE', await page.evaluate(()=>({state:window.store.getState(),calls:window.nativeCalls,processor:!!window.processor?.onaudioprocess}))); throw e;} }
 
+await load();await start();
+assert.equal(await page.evaluate(()=>window.hook.toggle('tray:stop','stop',window.hook.dictationSessionId+1)),false);
+assert.equal(await page.evaluate(()=>window.store.getState().status),'recording');
+assert.equal(await page.evaluate(()=>window.hook.toggle('tray:stop','stop',window.hook.dictationSessionId)),true);
+await recovered();
+results.push('A session-bound Stop rejects a different capture and finishes only its own live capture.');
+
 await load();await start();await stop();await recovered();
 assert.equal(await page.evaluate(()=>window.store.getState().recovery.kind),'manual-copy');
 assert.equal(await page.evaluate(()=>window.store.getState().transcript),'Recovered words for manual review.');
