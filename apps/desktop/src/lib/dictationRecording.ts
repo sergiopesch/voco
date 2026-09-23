@@ -453,6 +453,15 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       const generation = captureGenerationRef.current;
       let audioContext: AudioContext | null = null;
       debugNativeCaptureEnabledRef.current = false;
+      // Field admission must not start capture or revoke an approved microphone.
+      if (triggerId?.startsWith("browser:")) {
+        const delivery = new BrowserStreamDelivery(() => isCurrentSession(startingSessionId) && !cancelledRef.current);
+        browserDeliveryRef.current = delivery;
+        await delivery.start(startingSessionId, triggerId);
+        assertOutputAllowed(startingSessionId);
+        manualCopyRequestedRef.current = false;
+        transitionCursorDelivery("ownership-established");
+      }
       if (captureSelection.backend === "native") {
         nativeAttempt = { generation, selectionToken: captureSelection.selectionToken! };
         debugNativeCaptureEnabledRef.current = await debugNativeCaptureEnabled().catch(() => false);
@@ -491,16 +500,6 @@ export function createDictationRecording(env: DictationRecordingEnv) {
           sourceIdentity: null, conversion: "webaudio-mono",
         });
       }
-      assertOutputAllowed(startingSessionId);
-      if (triggerId?.startsWith("browser:")) {
-        const delivery = new BrowserStreamDelivery(() => isCurrentSession(startingSessionId) && !cancelledRef.current);
-        browserDeliveryRef.current = delivery;
-        await delivery.start(startingSessionId, triggerId);
-        assertOutputAllowed(startingSessionId);
-        manualCopyRequestedRef.current = false;
-        transitionCursorDelivery("ownership-established");
-      }
-
       assertOutputAllowed(startingSessionId);
       if (captureSelection.backend === "webkit") {
         const deviceId = useStore.getState().selectedDeviceId;
