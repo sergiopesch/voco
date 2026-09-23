@@ -1,15 +1,15 @@
 # Testing
 
-[The 22 September release-readiness review](release-readiness-2026-09-22.md)
-records the combined .55 security/performance cleanup, exact built package,
-16 private GNOME checks, nine packaged browser cases and fresh Ubuntu
-local-container installation, payload, worker and removal checks. The candidate
-is unsigned and unpublished; the permanent `ydotoold` choice and final release
-gates remain open. Physical microphone and owner-session Wayland acceptance are
-separate from those fixtures.
+[The .55 qualification and publication record](release-qualification-2026-09-23.md)
+binds the final package to installation/removal, worker, 16 private GNOME X11,
+nine browser lifecycle, native Wayland onboarding and real VM helper migration
+checks. It also records signing and anonymous release-download verification.
+Physical microphone and owner-session acceptance remain separate from those fixtures.
 
+[The 22 September review](release-readiness-2026-09-22.md) retains the earlier
+security/performance assessment, superseded candidates and failed attempts.
 [The first-run follow-up](first-run-follow-up-2026-09-22.md) records the Brave
-readback regression and installer canvas candidate, separately from public .54.
+readback regression and installer canvas work against the then-public .54 baseline.
 
 - [2026.0.52 release qualification](installer-release-2026-09-22.md) — exact package, desktop, signing and public-download receipts.
 

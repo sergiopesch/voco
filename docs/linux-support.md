@@ -1,13 +1,14 @@
 # Linux packages and qualification
 
-**2026.0.54** is the Ubuntu/Debian Vite 8 and dependency maintenance release. Its
-[release notes](releases/2026.0.54.md) and
-[qualification record](testing/vite8-release-2026-09-22.md) describe exact-package
-checks and their limits. The matching patched tray library preserves live feedback;
-the shortcut protection and pinned Nemotron runtime are retained. The .43 desktop
-results below remain historical evidence; other native package channels stay at .43.
+**2026.0.55** is the current Ubuntu/Debian release. Its
+[release notes](releases/2026.0.55.md) and
+[qualification record](testing/release-qualification-2026-09-23.md) describe security,
+native capture and helper fixes, exact-package checks and their limits. Input
+permissions, shortcut protection and the pinned Nemotron runtime are retained.
+The .43 desktop results below remain historical evidence; other native package
+channels stay at .43.
 
-The unreleased **.55 candidate** has a new [application delivery matrix](testing/application-delivery-2026-09-22.md):
+The [historical 22 September candidate delivery matrix](testing/application-delivery-2026-09-22.md) covers:
 Brave and Chromium address bars/editors, Firefox, VS Code, GTK/WebKit controls,
 GNOME Text Editor, Bash and nano. It separates exact-field confirmation from
 terminal dispatch and records toolkit limitations. It does not certify all Linux apps.

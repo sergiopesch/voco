@@ -9,10 +9,10 @@ A plain Tauri bundle is incomplete. See [packaging](linux-packaging.md).
 ## Published release
 
 The [README command](../README.md#get-started) runs the guided installer from
-the published **2026.0.54** tag. That immutable installer verifies the package
-checksum but not the publisher signature. Use the signed manual procedure below
-when publisher authentication is required. On Wayland the guided installer installs
-the input helpers and checks desktop readiness. If setup is incomplete, follow the
+the published **2026.0.55** tag. That immutable installer verifies the publisher
+signature on the checksum manifest, then verifies the package checksum. The signed
+manual procedure below applies the same authentication boundary. On Wayland the
+guided installer installs the input helpers and checks desktop readiness. If setup is incomplete, follow the
 [Wayland setup](platform/README.md#ydotoold-ydotool-daemon) instructions.
 Onboarding completion requires a successful voice test and desktop readiness.
 
@@ -26,7 +26,7 @@ For a manual installation, these links always follow the latest public release:
   curl -fLO https://github.com/sergiopesch/voco/releases/latest/download/voco_latest_amd64.deb
   curl -fLO https://github.com/sergiopesch/voco/releases/latest/download/voco_latest_checksums.txt
   curl -fLO https://github.com/sergiopesch/voco/releases/latest/download/voco_latest_checksums.txt.asc
-  curl -fLo KEYS https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.54/KEYS
+  curl -fLo KEYS https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.55/KEYS
   fingerprints="$(gpg --show-keys --with-colons KEYS | awk -F: '$1 == "fpr" { print $10 }')"
   test "$fingerprints" = B33C7C6AAEC8C20433A7A837540796453D8E3865
   gpg --dearmor < KEYS > voco-release-keyring.gpg
@@ -56,7 +56,7 @@ less voco-install
 bash voco-install
 ```
 
-Starting with this source candidate, the installer requires a detached publisher
+Starting with 2026.0.55, the installer requires a detached publisher
 signature for the release checksums before verifying the package checksum and
 installing it. An unsigned candidate cannot be installed by the guided flow.
 Never execute an unreviewed network response through a shell pipe.
@@ -205,7 +205,7 @@ their recorded scope. Development recipes are not public installers.
 
 Historical userspace checks cover Ubuntu, Debian, Fedora, Linux Mint and an
 Omarchy-related Arch profile. Consult the [support matrix](linux-support.md)
-for those recorded checks, the [.54 release notes](releases/2026.0.54.md) for the
+for those recorded checks, the [.55 release notes](releases/2026.0.55.md) for the
 new Ubuntu/Debian cut, and [release status](release-candidate.md) for current downloads.
 This is not proof of every distribution’s default compositor, audio stack
 or application. RPM/Arch packages require their own native receipts. AppImage,
