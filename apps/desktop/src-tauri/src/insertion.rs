@@ -217,6 +217,8 @@ pub fn desktop_stream_enabled() -> bool {
 pub struct DesktopInputStatus {
     pub available: bool,
     pub detail: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub setup_area: Option<&'static str>,
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -233,6 +235,7 @@ pub fn desktop_input_status() -> DesktopInputStatus {
         return DesktopInputStatus {
             available: false,
             detail: "Desktop paste is not enabled.".into(),
+            setup_area: None,
         };
     }
     let preflight = input_preflight();
@@ -247,11 +250,13 @@ pub fn desktop_input_status() -> DesktopInputStatus {
     match compatibility {
         Ok(()) => DesktopInputStatus {
             available: true,
-            detail: "Desktop input is ready. Focus a text field to dictate.".into(),
+            detail: "Desktop input helpers are ready. VOCO checks the shortcut and text field when dictation starts.".into(),
+            setup_area: None,
         },
         Err(error) => DesktopInputStatus {
             available: false,
             detail: error.message,
+            setup_area: None,
         },
     }
 }

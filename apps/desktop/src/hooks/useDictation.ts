@@ -35,6 +35,7 @@ import { encodeNativeRetainedSource,type NativeCaptureTerminalOutcome } from "@/
 import { NvidiaRecovery } from "@/lib/nvidiaRecovery";
 import type { HotkeyTraceFields } from "@/lib/tauri";
 import {
+  awaitStopShortcutReservation,
   beginDesktopShortcutSession,
   debugNativeCaptureEnabled,
   endDesktopShortcutSession,
@@ -594,6 +595,7 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
       useStore,
       beginDesktopShortcutSession,
       endDesktopShortcutSession,
+      awaitStopShortcutReservation,
       getDesktopPasteStatus,
       pasteDesktopText,
       traceDictationEvent,

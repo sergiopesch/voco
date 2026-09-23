@@ -787,13 +787,18 @@ try {
         assert.equal(await page.evaluate(() => window.store.getState().microphoneReady), true);
         const streamsBefore = await page.evaluate(() => window.streamRequests || 0);
         await page.evaluate(() => window.listeners['voco:toggle-dictation']({ payload: null }));
-        await page.waitForFunction(() => window.store.getState().status === 'error' &&
-          window.calls.filter(call => call[0] === 'syncRuntimeStatus').at(-1)?.[1].dictationStatus === 'error');
+        await page.waitForFunction(microphoneFailure => {
+          const expected = microphoneFailure ? 'error' : 'idle';
+          return window.store.getState().status === expected &&
+            window.calls.filter(call => call[0] === 'syncRuntimeStatus').at(-1)?.[1].dictationStatus === expected &&
+            (microphoneFailure || window.store.getState().captureNotice?.startsWith('Fixture '));
+        }, failure === 'microphone');
         const proof = await page.evaluate(() => {
           const state = window.store.getState();
           return {
             ready: state.microphoneReady, selected: state.nativeCaptureSource?.selectionToken ?? null,
-            error: state.error, nativeBegins: window.nativeCommands.filter(call => call.name === 'native_capture_begin').length,
+            error: state.error, notice: state.captureNotice,
+            nativeBegins: window.nativeCommands.filter(call => call.name === 'native_capture_begin').length,
             streamRequests: window.streamRequests || 0,
             snapshot: window.calls.filter(call => call[0] === 'syncRuntimeStatus').at(-1)[1],
           };
@@ -802,7 +807,12 @@ try {
         assert.equal(proof.nativeBegins, microphoneFailure && backend === 'native' ? 1 : 0);
         assert.equal(proof.streamRequests - streamsBefore, microphoneFailure && backend === 'webkit' ? 1 : 0);
         assert.equal(proof.selected, backend === 'native' && !microphoneFailure ? 'token-1' : null);
-        assert.ok(proof.error.includes(microphoneFailure ? backend === 'native' ? 'Native source unavailable' : 'Initial preview failure' : 'Fixture ' + failure + ' unavailable'));
+        if (microphoneFailure) {
+          assert.ok(proof.error.includes(backend === 'native' ? 'Native source unavailable' : 'Initial preview failure'));
+        } else {
+          assert.equal(proof.error, null);
+          assert.equal(proof.notice, 'Fixture ' + failure + ' unavailable');
+        }
         const name = backend + '-' + failure + '-failure-' + (microphoneFailure ? 'invalidates' : 'preserves') + '-microphone-readiness';
         expected.push(name);
         const passed = proof.ready === !microphoneFailure && proof.snapshot.microphoneReady === !microphoneFailure &&

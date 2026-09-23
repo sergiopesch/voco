@@ -584,7 +584,7 @@ export function App() {
       });
       const diagnostics = await Promise.race([
         request,
-        new Promise<null>((resolve) => { timeout = setTimeout(() => resolve(null), 2000); }),
+        new Promise<null>((resolve) => { timeout = setTimeout(() => resolve(null), 7500); }),
       ]);
       if (!isCurrent()) return;
       if (!diagnostics || revision !== lastConfigRevisionRef.current ||

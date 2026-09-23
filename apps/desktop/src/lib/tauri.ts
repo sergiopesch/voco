@@ -91,6 +91,10 @@ export async function endDesktopShortcutSession(sessionId: string): Promise<void
   return invoke("end_desktop_shortcut_session", { sessionId });
 }
 
+export async function awaitStopShortcutReservation(sessionId: number): Promise<void> {
+  return invoke("await_stop_shortcut_reservation", { sessionId });
+}
+
 export async function pasteDesktopText(text: string, expectedTargetToken?: string | null, correlation?: PasteCorrelation): Promise<{ strategy: "clipboard"; outcome: "dispatched"; pasteMetrics?: { terminal: boolean; targetProbeMs: number; preflightMs: number; clipboardMs: number; keyboardMs: number } }> {
   return invoke("paste_desktop_text", { text, expectedTargetToken: expectedTargetToken ?? null, correlation: correlation ?? null });
 }

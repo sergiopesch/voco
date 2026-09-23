@@ -1090,8 +1090,49 @@ fn end_desktop_shortcut_session(session_id: String) -> Result<(), String> {
 }
 
 #[tauri::command(async)]
-fn get_desktop_input_status() -> insertion::DesktopInputStatus {
-    insertion::desktop_input_status()
+async fn await_stop_shortcut_reservation(
+    app: tauri::AppHandle,
+    session_id: u64,
+) -> Result<(), String> {
+    let hotkey = tray::current_hotkey(&app)
+        .map_err(|_| "Shortcut configuration is unavailable.".to_string())?;
+    if !prefers_evdev_hotkey(is_wayland_session(), &hotkey) {
+        return Ok(());
+    }
+    let panel_status = panel_setup::check(false)
+        .map_err(|_| "VOCO cannot verify the GNOME Stop shortcut.".to_string())?;
+    if !panel_setup::stop_reservation_required(&panel_status)? {
+        return Ok(());
+    }
+    tauri::async_runtime::spawn_blocking(move || {
+        let started = Instant::now();
+        while started.elapsed() < std::time::Duration::from_millis(1800) {
+            if panel::reserves_stop_shortcut(&app, session_id) {
+                return Ok(());
+            }
+            std::thread::sleep(std::time::Duration::from_millis(25));
+        }
+        Err("GNOME did not reserve VOCO's Stop shortcut. Reopen VOCO or sign out and back in before dictating.".to_string())
+    })
+    .await
+    .map_err(|_| "VOCO could not verify the Stop shortcut.".to_string())?
+}
+
+#[tauri::command(async)]
+fn get_desktop_input_status(app: tauri::AppHandle) -> insertion::DesktopInputStatus {
+    effective_desktop_input_status(&app)
+}
+
+fn effective_desktop_input_status(app: &tauri::AppHandle) -> insertion::DesktopInputStatus {
+    let mut input = insertion::desktop_input_status();
+    if input.available {
+        if let Some(detail) = stop_shortcut_setup_issue(app) {
+            input.available = false;
+            input.detail = detail;
+            input.setup_area = Some("panel");
+        }
+    }
+    input
 }
 
 #[tauri::command(async)]
@@ -1105,8 +1146,48 @@ fn enable_gnome_panel() -> Result<panel_setup::PanelSetupStatus, String> {
 }
 
 #[tauri::command(async)]
-fn get_desktop_paste_status() -> insertion::DesktopPasteStatus {
-    insertion::desktop_paste_status()
+fn get_desktop_paste_status(app: tauri::AppHandle) -> insertion::DesktopPasteStatus {
+    effective_desktop_paste_status(&app)
+}
+
+fn effective_desktop_paste_status(app: &tauri::AppHandle) -> insertion::DesktopPasteStatus {
+    effective_desktop_paste_diagnostics(app).1
+}
+
+fn effective_desktop_paste_diagnostics(
+    app: &tauri::AppHandle,
+) -> (insertion::DesktopInputStatus, insertion::DesktopPasteStatus) {
+    let (mut input, mut paste) = insertion::desktop_paste_diagnostics();
+    if let Some(detail) = stop_shortcut_setup_issue(app) {
+        input.available = false;
+        input.detail = detail.clone();
+        input.setup_area = Some("panel");
+        paste.available = false;
+        paste.streaming_enabled = false;
+        paste.target_token = None;
+        paste.failure_reason = Some(insertion::DesktopPasteFailure::Setup);
+        paste.detail = detail;
+    }
+    (input, paste)
+}
+
+fn stop_shortcut_setup_issue(app: &tauri::AppHandle) -> Option<String> {
+    let hotkey = tray::current_hotkey(app).unwrap_or_else(|_| "Alt+D".into());
+    let session_type = std::env::var("XDG_SESSION_TYPE").unwrap_or_default();
+    if prefers_evdev_hotkey(session_type.eq_ignore_ascii_case("wayland"), &hotkey) {
+        let chord = if hotkey_to_evdev_mode(&hotkey) == 0 {
+            "Alt+D"
+        } else {
+            "Alt+Shift+D"
+        };
+        return panel_setup::stop_shortcut_setup_detail(
+            &session_type,
+            chord,
+            panel_setup::check(false),
+            panel::is_attached(),
+        );
+    }
+    None
 }
 
 #[tauri::command(async)]
@@ -1174,10 +1255,11 @@ impl BrowserIntegration {
 
 #[tauri::command(async)]
 fn get_runtime_diagnostics(
+    app: tauri::AppHandle,
     state: tauri::State<'_, owned_preedit::OwnedPreeditService>,
 ) -> RuntimeDiagnostics {
     let owned_preedit = state.status();
-    let (desktop_input, desktop_paste) = insertion::desktop_paste_diagnostics();
+    let (desktop_input, desktop_paste) = effective_desktop_paste_diagnostics(&app);
     RuntimeDiagnostics {
         insertion: insertion::runtime_diagnostics(),
         shortcut: shortcut_runtime_status(owned_preedit.available),
@@ -1732,9 +1814,9 @@ pub fn eval_toggle(app_handle: &tauri::AppHandle) {
 // Keep passive duplicate suppression in one place so a rejected chord is visible.
 // X11 owner-events=false grabs consume their key; a pending IBus poll is not a
 // reason to discard that callback or to change its normal debounce behavior.
-fn suppress_passive_shortcut(backend: &str) -> bool {
+fn suppress_passive_shortcut(app_handle: &tauri::AppHandle, backend: &str) -> bool {
     #[cfg(target_os = "linux")]
-    if backend == "evdev" && panel::reserves_stop_shortcut() {
+    if backend == "evdev" && panel::reserves_current_stop_shortcut(app_handle) {
         trace_hotkey_event("eval_toggle_suppressed_panel", Some(backend));
         return true;
     }
@@ -1797,7 +1879,7 @@ fn replay_pending_browser_stops(app_handle: &tauri::AppHandle) {
 fn eval_toggle_with_backend(app_handle: &tauri::AppHandle, backend_used: &str) {
     trace_hotkey_event("eval_toggle_entered", Some(backend_used));
 
-    if suppress_passive_shortcut(backend_used) {
+    if suppress_passive_shortcut(app_handle, backend_used) {
         return;
     }
     if !shortcut_arbitration::admit_toggle(
@@ -2496,6 +2578,7 @@ pub fn run() -> Result<(), String> {
             activation::take_launcher_activation,
             begin_desktop_shortcut_session,
             end_desktop_shortcut_session,
+            await_stop_shortcut_reservation,
             paste_desktop_text,
             get_runtime_diagnostics,
             get_owned_preedit_status,
