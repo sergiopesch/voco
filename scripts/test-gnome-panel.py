@@ -232,6 +232,28 @@ try:
     delayed_reservations.clear();pump(.01)
     keys('key','alt+shift+d');pump(.2)
     assert not leaked and actions[-1]==('stop',state['token']), 'late old failure must not release a new grab'
+    # A newer accepted renewal must survive an older false reply on the same grab.
+    delay_reservation.append(True);pump(.12)
+    assert delayed_reservations
+    delay_reservation.clear();pump(.15)
+    for pending in delayed_reservations: pending.return_value(GLib.Variant('(b)', (False,)))
+    delayed_reservations.clear();pump(.01)
+    keys('key','alt+shift+d');pump(.1)
+    assert not leaked, 'old rejection must not release a newer accepted renewal'
+    # Freeze the next state read so this proves immediate rejection cleanup,
+    # rather than eventual idle polling or the two-second state timeout.
+    delay_reservation.append(True);pump(.12)
+    assert delayed_reservations
+    stall_state.append(True);pump(.08)
+    for pending in delayed_reservations: pending.return_value(GLib.Variant('(b)', (False,)))
+    delayed_reservations.clear();delay_reservation.clear();pump(.03)
+    before_rejected=len(actions)
+    keys('key','alt+shift+d');pump(.05)
+    assert leaked and len(actions)==before_rejected, 'rejected reservation must release the shortcut immediately'
+    stall_state.clear()
+    for pending in stalled: pending.return_value(GLib.Variant('(s)', (json.dumps(state),)))
+    stalled.clear();pump(.2)
+    leaked.clear();entry.select_region(-1,-1)
     stall_state.append(True)
     bus.emit_signal(attached[-1], '/org/voco/Panel', 'org.voco.Panel1', 'Changed', None);pump(2.2)
     keys('key','alt+shift+d');pump(.2)
@@ -247,7 +269,8 @@ try:
     owner=Gio.bus_own_name_on_connection(bus,'org.voco.Panel',Gio.BusNameOwnerFlags.NONE,None,None)
     state.pop('stopAccelerator',None);pump(.4)
     report['shortcutProtection']={'realCompositorKeys':True,'heldModifierWait':True,'sameSessionRevisionPreserved':True,'replacementSessionRejected':True,'processingConsumed':True,
-        'idleReleased':True,'disconnectReleased':True,'unresponsiveAppReleased':True,'staleReservationIsolated':True,'alternateHotkey':True,'textPreserved':True}
+        'idleReleased':True,'disconnectReleased':True,'unresponsiveAppReleased':True,'staleReservationIsolated':True,
+        'rejectedReservationReleased':True,'olderRejectedRenewalIsolated':True,'alternateHotkey':True,'textPreserved':True}
     report['actions']=actions
     if (root / 'voco').exists():
         Gio.bus_unown_name(owner); owner=None; pump(.3)

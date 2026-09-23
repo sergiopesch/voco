@@ -15,10 +15,10 @@ class PanelSetupTests(unittest.TestCase):
 
     def test_saved_activation_is_not_claimed_as_active_until_shell_loads_it(self):
         self.assertEqual(panel.classify('46.0', True, {}, True, False)['status'], 'restart')
-        self.assertEqual(panel.classify('46.0', True, {'state': 1, 'version': 2}, True, False)['status'], 'active')
+        self.assertEqual(panel.classify('46.0', True, {'state': 1, 'version': panel.COMPANION_VERSION}, True, False)['status'], 'active')
 
     def test_loaded_old_or_unknown_companion_requires_session_restart(self):
-        for version in [None, 1, 3, '2']:
+        for version in [None, panel.COMPANION_VERSION - 1, panel.COMPANION_VERSION + 1, str(panel.COMPANION_VERSION)]:
             status = panel.classify('46.0', True, {'state': 1, 'version': version}, True, False)
             self.assertEqual(status['status'], 'restart')
             self.assertFalse(status['canEnable'])

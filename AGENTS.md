@@ -105,7 +105,8 @@ glib 0.20 directly leaves the GTK dependency behind. [Backport](vendor/glib/VOCO
   starting/recording/processing and sends explicit Stop after modifier release.
   Only the authenticated Shell can renew the native passive-event suppression;
   stale tokens, idle states and unsupported accelerators cannot reserve it.
-  Release the compositor grab on idle, disconnect, disable or state timeout.
+  Release the compositor grab on a rejected latest reservation, idle, disconnect,
+  disable or state timeout. Older renewal replies must not revoke a newer grab.
   Bind held Stop intent to the renderer epoch and existing capture session ID,
   not its changing presentation revision; dispatch with the current action token.
 - Closing or navigating an enabled browser tab, or losing its native connection,
@@ -171,7 +172,7 @@ isolation, not a remote VM or proof of a distribution's default desktop.
 
 ## Release and evidence
 
-Source version: **2026.0.58**. Recorded public Ubuntu/Debian version: **2026.0.58**. Verify the current public release on GitHub and
+Source version: **2026.0.59**. Recorded public Ubuntu/Debian version: **2026.0.58**. Verify the current public release on GitHub and
 installed version from the package manager; do not infer either from source.
 The .43 package and desktop evidence is recorded in
 [the support matrix](docs/linux-support.md); preserve per-artifact receipts and

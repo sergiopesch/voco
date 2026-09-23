@@ -203,10 +203,14 @@ export default class VocoPanel extends Extension {
         if (!this._shortcut) return;
         // A hung/disconnected app must not leave a key swallowed in the shell.
         this._shortcutDeadline = GLib.get_monotonic_time() + 2_000_000;
-        const generation = this._shortcutGeneration;
-        this._call('ReserveStopShortcut', new GLib.Variant('(s)', [state.token]), () => {}, () => {
+        // Only the latest renewal owns this grab; late replies must not revoke it.
+        const generation = ++this._shortcutGeneration;
+        const release = () => {
             if (generation === this._shortcutGeneration) this._releaseShortcut();
-        });
+        };
+        this._call('ReserveStopShortcut', new GLib.Variant('(s)', [state.token]), result => {
+            if (result.deep_unpack()[0] !== true) release();
+        }, release);
     }
 
     _releaseShortcut() {
