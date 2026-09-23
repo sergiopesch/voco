@@ -29,7 +29,7 @@ pub fn reserves_stop_shortcut() -> bool {
         .is_some_and(|until| Instant::now() < until)
 }
 
-fn clear_shortcut() {
+pub fn clear_shortcut() {
     if let Ok(mut until) = SHORTCUT_UNTIL.lock() {
         *until = None;
     }
@@ -248,6 +248,17 @@ pub fn setup(app: &tauri::AppHandle) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn released_or_expired_reservation_does_not_suppress_passive_start() {
+        *SHORTCUT_UNTIL.lock().unwrap() = Some(Instant::now() + Duration::from_secs(1));
+        assert!(reserves_stop_shortcut());
+        clear_shortcut();
+        assert!(!reserves_stop_shortcut());
+        *SHORTCUT_UNTIL.lock().unwrap() = Some(Instant::now() - Duration::from_millis(1));
+        assert!(!reserves_stop_shortcut());
+        clear_shortcut();
+    }
 
     #[test]
     fn stop_shortcut_requires_current_active_state_and_supported_accelerator() {

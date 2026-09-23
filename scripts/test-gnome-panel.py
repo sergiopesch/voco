@@ -77,6 +77,24 @@ try:
         assert setup.returncode == 2 and 'Sign out' in setup.stdout, setup
         enabled_after = subprocess.check_output(['gsettings','get','org.gnome.shell','enabled-extensions'],text=True)
         assert all(uuid in enabled_after for uuid in [*enabled, 'voco-panel@voco.local'])
+        # Load the previous metadata version, then replace files as an in-place
+        # package upgrade would. GetExtensionInfo must describe loaded code.
+        metadata_path = Path('/usr/share/gnome-shell/extensions/voco-panel@voco.local/metadata.json')
+        current_metadata = json.loads(metadata_path.read_text())
+        previous_metadata = {**current_metadata, 'version': current_metadata['version'] - 1}
+        metadata_path.write_text(json.dumps(previous_metadata))
+        shell.terminate(); shell.wait(timeout=10); pump(.5)
+        shell = subprocess.Popen(['gnome-shell','--nested','--wayland','--no-x11','--force-animations','--wayland-display=voco-panel-test','--sm-disable'], env={**os.environ,'DISPLAY':':77'}, stdout=log,stderr=subprocess.STDOUT)
+        for _ in range(150):
+            pump(.1)
+            try:
+                if inspect()['indicator']['visible']: break
+            except (GLib.Error, TypeError): pass
+        else: raise AssertionError('Previous-version companion did not load')
+        metadata_path.write_text(json.dumps(current_metadata))
+        upgraded = subprocess.run([str(root/'voco'), '--check-panel'], capture_output=True, text=True, timeout=6)
+        assert upgraded.returncode == 2 and 'sign out' in upgraded.stdout.lower(), upgraded
+        report['freshPanelSetup']['loadedOldVersionAfterUpgrade'] = upgraded.stdout
         # Recreate the isolated shell session only, as the installer instructs.
         shell.terminate(); shell.wait(timeout=10); pump(.5)
         shell = subprocess.Popen(['gnome-shell','--nested','--wayland','--no-x11','--force-animations','--wayland-display=voco-panel-test','--sm-disable'], env={**os.environ,'DISPLAY':':77'}, stdout=log,stderr=subprocess.STDOUT)

@@ -21,7 +21,9 @@ installer calls `voco --setup-panel` for its current desktop user. A manual APT
 installation can use that command or **Enable live panel** in onboarding/Help.
 Package hooks do not touch user extension settings. A newly installed component
 may require signing out and back in; setup reports this separately from active.
-Run `voco --check-panel` for a read-only check. Other Shell versions use the native
+Run `voco --check-panel` for a read-only check. Setup compares the loaded companion
+version with the application contract, so an upgrade cannot report stale loaded
+code as current; follow its sign-out guidance. Other Shell versions use the native
 tray fallback and remain unqualified for this companion.
 
 The separately built archive remains available for development:

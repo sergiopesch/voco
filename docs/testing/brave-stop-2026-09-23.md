@@ -99,3 +99,11 @@ by the renderer epoch, separately from presentation revisions. The same-session
 transition passes; replacement sessions reject the old gesture. The native
 compositor lifecycle suite is also a protected frontend CI step. Original
 qualification above describes the earlier candidate, not the new release bytes.
+
+The release review also found stale loaded-companion detection and a residual
+250 ms passive reservation after returning idle. Companion metadata now has a
+checked version; setup reports a required sign-out for older loaded code. The
+packaged GNOME test stages an in-place metadata upgrade and checks both the stale
+loaded state and the following fresh Shell session. Authoritative idle, hotkey
+changes and renderer reset clear the native reservation immediately. The first
+.58 candidate remains retained separately from the rebuilt package.

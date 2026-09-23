@@ -653,6 +653,8 @@ pub fn update_hotkey_display(app: &tauri::AppHandle, new_hotkey: &str) {
     };
 
     tray_state.current_hotkey = new_hotkey.to_string();
+    #[cfg(target_os = "linux")]
+    crate::panel::clear_shortcut();
     drop(tray_state);
     refresh_tray(app);
 }
@@ -685,6 +687,14 @@ pub fn update_runtime_status(app: &tauri::AppHandle, snapshot: RuntimeStatusSnap
     tray_state.native_microphone_ready = snapshot.native_microphone_ready;
     tray_state.dictation_status = snapshot.dictation_status;
     tray_state.dictation_session_id = snapshot.dictation_session_id;
+    #[cfg(target_os = "linux")]
+    if !matches!(
+        snapshot.dictation_status,
+        DictationStatus::Starting | DictationStatus::Recording | DictationStatus::Processing
+    ) {
+        // The compositor releases at idle; passive Start must be available then.
+        crate::panel::clear_shortcut();
+    }
     tray_state.has_recoverable_transcript = snapshot.has_recoverable_transcript;
     tray_state.cursor_delivery = snapshot.cursor_delivery;
     tray_state.cursor_required = snapshot.cursor_required;
@@ -896,6 +906,8 @@ pub fn begin_runtime_status_session(app: &tauri::AppHandle) -> Result<u64, Strin
         .map_err(|_| "Failed to lock tray state".to_string())?;
     tray_state.runtime_epoch = tray_state.runtime_epoch.saturating_add(1).max(1);
     tray_state.runtime_revision = 0;
+    #[cfg(target_os = "linux")]
+    crate::panel::clear_shortcut();
     tray_state.microphone_ready = false;
     tray_state.microphone_permission = MicrophonePermission::Unknown;
     tray_state.native_microphone_ready = None;
