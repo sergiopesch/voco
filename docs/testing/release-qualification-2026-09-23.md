@@ -5,7 +5,7 @@ Earlier candidate packages and failed trials remain retained. Publication is
 established by GitHub Releases and its signed validation manifest, not by source
 version metadata. Bundled documentation retains its assembly snapshot.
 
-## Exact release candidate
+## Exact released package
 
 Application build and package assembly used clean source
 `7b2cdfc725cad7ee256f6f8b2fb6b6f708e85edf`, with Node 24.21.0, Rust 1.94.0,
@@ -24,7 +24,8 @@ are recorded separately in release provenance; they do not rebuild the applicati
 
 All four [protected build-source checks](https://github.com/sergiopesch/voco/actions/runs/35830103532)
 passed: Code Guide, Frontend Checks, Rust Check & Test and RustSec Audit. The
-release also requires the same gates on the final reviewed and merged source.
+same gates passed on the [final reviewed source](https://github.com/sergiopesch/voco/actions/runs/35831752921)
+and [merged release source](https://github.com/sergiopesch/voco/actions/runs/35832321225).
 
 The complete npm chain includes 390 frontend tests. Rust passes 276 library,
 25 browser-host, seven dependency and 25 replay tests; development-feature tests,
@@ -107,6 +108,32 @@ recovery artifacts. Temporary desktops, VM/containers and build caches are scope
 separately from the owner's installed app and profile. Release signing, draft
 asset downloads, anonymous public downloads and latest/tagged aliases are recorded
 in the release's final validation and publication receipts.
+
+## Publication
+
+Publication verification completed at `2026-09-23T07:45:41.045699+00:00` for the
+[immutable .55 release](https://github.com/sergiopesch/voco/releases/tag/voco.2026.0.55).
+The [public provenance](https://github.com/sergiopesch/voco/releases/download/voco.2026.0.55/voco_2026.0.55_provenance.json)
+and [validation record](https://github.com/sergiopesch/voco/releases/download/voco.2026.0.55/voco_2026.0.55_validation.json)
+bind the qualified package above to its build, source tree and reviewed gates.
+
+- Final protected head: `4e20704355770afb391292d2feb77351773ee219`.
+- Merged release commit: `00399661b3bb070d097d34759e0f98766e56c2ac`.
+- Signed tag object: `84a95508813eea6ca2f08bfbab1ba807a8855d43` (`voco.2026.0.55`).
+- Local signed-cut verification receipt SHA-256: `061b40ad9a9aac31e40d43bf17b2ec3c2c33628ddf78c19f2ff49d40c8d8b0c9`.
+- Authenticated draft-download receipt SHA-256: `74179b6e21537153c4510df71312e14efa2480155ef1e5e93a1068457630e096`.
+- Anonymous public-download receipt SHA-256: `d659c077ba572a2cc6dcf719a5e3b96ebfeb62485a1c0cc86fd10e2fa7b6f05a`.
+
+The signed tag and five publisher signatures verify against fingerprint
+`B33C7C6AAEC8C20433A7A837540796453D8E3865`. All 18 draft assets and all 18
+anonymous public assets match the frozen bytes. The public latest aliases and
+raw tagged installer match as well. Draft verification uses authenticated reads;
+only the public check establishes anonymous access. The complete package remains
+`1db963e2db1969978484829faacb908389b3e4d6659c537d4aa97823ccfab3b0`.
+
+The later documentation commit records publication without rebuilding or replacing
+the signed package, source archive, tag or release assets. The .54 release remains
+available for rollback. Publication does not upgrade the owner's installed app.
 
 ## Limits
 

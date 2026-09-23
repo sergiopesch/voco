@@ -13,7 +13,7 @@ Local English dictation for Linux. Speak and your words appear at the cursor.
 - Local NVIDIA CPU recognition; no account or cloud transcription.
 - Live words and punctuation, with explicit recovery after interrupted dictation.
 - A live voice test with microphone selection inside the same setup canvas.
-- Volume-responsive tray bars while listening; Ready returns after Stop.
+- Volume-responsive tray bars while listening; Ready returns after successful completion.
 - One bundled Nemotron recognizer for desktop, browser delivery and recovery.
 - Clear feedback when no editable text cursor is available.
 - Microphone and shortcut preferences preserved on upgrade.
