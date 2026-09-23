@@ -33,6 +33,34 @@ describe('pinned append-only candidate',()=>{
   queue.pushAudio(new Float32Array(1600),16000);
   await expect(queue.finish()).rejects.toThrow(failure.message);
  });
+ it('continues recognition and Stop tail after delivery fails without retrying insertion',async()=>{
+  worker.mockImplementation(async(_c,{request:r})=>({...r,mode:'append-only',text:r.op==='start'?null:r.op==='finish'?'First and later words.':r.sample_end<=1600?'First':'First and later words'}));
+  const paste=vi.fn(async()=>{throw new Error('Destination changed');}),observed=vi.fn(),failure=vi.fn();
+  const queue=new BenchmarkPhraseQueue(paste,observed,failure,vi.fn());
+  queue.pushAudio(new Float32Array(1600),16000);
+  await vi.waitFor(()=>expect(failure).toHaveBeenCalledOnce());
+  queue.pushAudio(new Float32Array(1701),16000);queue.enqueue();
+  await expect(queue.finish()).rejects.toThrow('Destination changed');
+  expect(observed).toHaveBeenLastCalledWith('First and later words.');
+  expect(paste).toHaveBeenCalledOnce();
+  expect(requests().filter(r=>r.op==='push').reduce((n,r)=>n+r.audio.length,0)).toBe(3301);
+  expect(requests().filter(r=>r.op==='finish')).toHaveLength(1);
+  expect(failure).toHaveBeenCalledOnce();
+  expect(quality().filter(e=>e.event==='terminal').pop()).toMatchObject({outcome:'failed',finish_responded:true,responded_samples:3301,failed_delivery_seq:1});
+ });
+ it('still bounds recognition failure after a delivery interruption',async()=>{
+  worker.mockImplementation(async(_c,{request:r})=>({...r,mode:'append-only',text:r.op==='push'?'First':null}));
+  const paste=vi.fn(async()=>{throw new Error('Destination changed');}),failure=vi.fn();
+  const queue=new BenchmarkPhraseQueue(paste,vi.fn(),failure,vi.fn());
+  queue.pushAudio(new Float32Array(1600),16000);
+  await vi.waitFor(()=>expect(failure).toHaveBeenCalledOnce());
+  worker.mockRejectedValue(new Error('Worker unavailable'));
+  queue.pushAudio(new Float32Array(3200),16000);queue.enqueue();
+  await expect(queue.finish()).rejects.toThrow('Worker unavailable');
+  expect(failure.mock.calls.map(call=>call[1])).toEqual(['delivery','recognition']);
+  expect(paste).toHaveBeenCalledOnce();
+  expect(requests().filter(r=>r.op==='push')).toHaveLength(2);
+ });
  it('bounds queued audio and retains recovery without sending a partial backlog',async()=>{
   const {queue,failure}=make();queue.pushAudio(new Float32Array(16000*4),16000);
   await expect(queue.finish()).rejects.toThrow('three seconds');expect(failure).toHaveBeenCalledOnce();expect(transport).toHaveBeenCalledWith('benchmark_stream',{request:expect.objectContaining({op:'diagnostic',reason:'backlog_limit'})});

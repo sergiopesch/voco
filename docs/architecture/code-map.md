@@ -10,8 +10,9 @@ user-selectable model.
 `install` remains a standalone Bash download. `scripts/lib/install-ui.sh` owns
 bounded terminal rendering and the optional APT wrapper;
 `scripts/lib/install-apt-ui.py` observes separate status/output streams using only
-Python's standard library. `scripts/sync-installer-ui.py` embeds both into `install`;
-run it after editing either source. `--check` is part of the DevOps gate. Shared
+Python's standard library. `scripts/lib/install-brand.json` owns the shared terminal glyphs and palette.
+`scripts/sync-installer-ui.py` generates the brand constants in both renderers and
+embeds them into `install`; run it after editing the brand or either source. `--check` is part of the DevOps gate. Shared
 installation/readiness behavior stays in `scripts/lib/install-common.sh`, with
 its existing exact-copy check. Presentation never owns package success or readiness.
 See the [performance report](../testing/installer-performance-2026-09-22.md) for
@@ -41,6 +42,10 @@ recognizer serves desktop, browser and onboarding sessions. See
 3. `src/lib/benchmarkPhraseQueue.ts` serializes bounded NVIDIA requests. Recording
    capture continues while a paste is in flight. A newer append-only hypothesis
    can supersede pending output; already dispatched text cannot be blindly replayed.
+   Delivery rejection disables insertion while recognition continues through Stop.
+   Recognition/transport failure still stops queue admission. Either failure retains
+   recovery; the first recovery transition notifies and hides, while explicit retry
+   preserves the review panel. No target retry follows a delivery rejection.
    The worker owns acoustic boundaries, so this path needs no second phrase segmenter.
 4. `src-tauri/src/benchmark_stream.rs` supervises one local Python process, frames
    bounded JSON, checks session/sequence responses and reaps failures. Start/warmup

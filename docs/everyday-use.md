@@ -1,5 +1,8 @@
 # Using VOCO
 
+The onboarding handoff and quiet recovery described here are source changes awaiting
+release. Public **2026.0.56** still opens the Ready/recovery panel automatically.
+
 A successful voice test is followed by a desktop input check
 before onboarding completes. **Desktop setup required** means helpers or their
 service need attention; it is different from **No text cursor available**. Repair
@@ -18,8 +21,8 @@ default if you have not selected a microphone.
 Choose **Finish test** to stop capture and collect the final words. After a
 successful test, VOCO checks desktop input automatically. **Your voice, ready.**
 shows your shortcut and explains that VOCO stays in the tray. **Done** rechecks
-readiness and saves completion. Done leaves a compact Ready window visible;
-choose Hide to tray when you are ready. Reopening VOCO from the launcher presents
+readiness, saves completion and returns directly to the tray. There is no second
+window to dismiss. Reopening VOCO from the launcher presents
 the existing idle app. During capture it keeps your destination focused. Changing
 microphones requires a new test. Silence,
 recognition failures and incomplete desktop setup keep onboarding open with an
@@ -44,7 +47,7 @@ Smooth movement follows the desktop's animation preference.
 
 ## Dictation
 
-Check your microphone during setup, then hide VOCO and focus an editable field.
+Check your microphone during setup, then focus an editable field.
 Press and release the recording shortcut (default **Alt+D**), wait for Listening,
 and speak.
 Words appear progressively. Press and release the shortcut again to finish; the final words
@@ -68,6 +71,10 @@ Terminal delivery cannot confirm that pasted text appeared or identify every
 password prompt. Read-only terminal mode can reject input. Review terminal text
 before submitting it; VOCO never submits commands for you.
 
+A recording is currently bounded to ten minutes, with an additional source-audio
+memory limit for high sample rates. Stop and start a new recording for longer work.
+This is not an unlimited continuous-session guarantee.
+
 ## Settings
 
 Settings contains microphone controls. Shortcut has its own sidebar section,
@@ -88,9 +95,17 @@ Keep editing. Recording is paused while capturing a new shortcut.
 
 ## Recovery
 
-If delivery is interrupted, open VOCO to review the retained transcript. Check the
-destination before pasting: it may already contain some of your words. VOCO never
-blindly retries uncertain delivery. Copying does not dismiss a transcript.
+If delivery is interrupted, a notification tells you immediately. When recognition
+is still healthy, VOCO continues transcribing locally through Stop, without sending
+more text to the destination. A recognition or capture failure instead retains the
+received audio for recovery; it cannot promise a complete transcript.
+
+After Stop, VOCO notifies you and stays in the tray. Open VOCO when you want to review
+or copy the saved dictation. **What happened** contains the interruption details.
+Check the destination before pasting: it may already contain some of your words or
+manual edits. VOCO never blindly retries uncertain delivery. Copying does not dismiss
+a transcript. If desktop notifications are disabled, recovery remains accessible
+through the VOCO tray or launcher.
 
 Where available, Retry transcription uses retained audio without automatically
 inserting it. Desktop and browser dictation recover with the same bundled local

@@ -6,6 +6,7 @@ if not __debug__ or os.environ.get("PYTHONOPTIMIZE", "") not in ("", "0"):
 import json
 from pathlib import Path
 import time
+import subprocess
 import gi
 
 gi.require_version('Atspi', '2.0')
@@ -47,6 +48,11 @@ def find_clear_button():
     return fallback
 
 
+# Recovery stays in the tray until the user explicitly opens the existing app.
+assert (root / 'runtime/voco.sock').is_socket(), 'Private app must already be running'
+assert find_clear_button() is None, 'Recovery must not present itself automatically'
+subprocess.run([str(root / 'voco')], check=True, timeout=10)
+
 for attempt in range(50):
     button = find_clear_button()
     if button is not None:
@@ -57,7 +63,7 @@ for attempt in range(50):
         if index is None:
             raise SystemExit('Recovery control exposes no activation action: ' + repr(actions))
         activated = Atspi.Action.do_action(button, index)
-        result = dict(button=name, action=actions[index], activated=activated,
+        result = dict(button=name, action=actions[index], activated=activated, explicitReview=True,
                       boundary='actual VOCO accessibility action in private browser-test desktop')
         (root / 'evidence/browser-clear-recovery.json').write_text(json.dumps(result, indent=2) + '\n')
         print(json.dumps(result))

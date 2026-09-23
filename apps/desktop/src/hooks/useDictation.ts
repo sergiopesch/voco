@@ -24,7 +24,7 @@ import {
   type CursorDeliveryEvent,
 } from "@/lib/dictationDelivery";
 import { createDictationRecording } from "@/lib/dictationRecording";
-import { errorMessage,LIVE_DELIVERY_PAUSED } from "@/lib/dictationRecovery";
+import { errorMessage } from "@/lib/dictationRecovery";
 import {
   createDictationSessionState,
   requestToggle as requestSessionToggle,
@@ -695,10 +695,6 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
       assertOutputAllowed(recoverySessionId);
       useStore.getState().setRawTranscript(transcript);
       setTranscript(transcript || "(no speech detected)");
-      // Remove the completed action prompt, preserving capture/tail uncertainty.
-      if (useStore.getState().captureNotice === LIVE_DELIVERY_PAUSED) {
-        useStore.getState().setCaptureNotice(null);
-      }
       retainRecovery("Recovered locally with the bundled NVIDIA model. Review any text already in the target, then copy the text you need. Nothing was inserted automatically.", false);
       finalizeIdleState();
     } catch (error) {

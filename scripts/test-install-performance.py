@@ -5,6 +5,7 @@ import http.server
 import os
 from pathlib import Path
 import pty
+import re
 import select
 import signal
 import struct
@@ -57,6 +58,44 @@ def terminal(command, env, reply=None, timeout=10, columns=80, rows=24):
 
 
 class InstallerPerformanceTests(unittest.TestCase):
+    def test_wordmark_fits_and_canvas_release_matches_its_height(self):
+        for columns, rows, height in ((80, 24, 14), (64, 16, 14), (80, 12, 10)):
+            with self.subTest(columns=columns, rows=rows), tempfile.TemporaryDirectory() as folder:
+                env = {**os.environ, 'TERM': 'xterm-256color', 'TMPDIR': folder, 'VOCO_INSTALL_NO_MOTION': '1'}
+                env.pop('NO_COLOR', None)
+                body = f'''
+VOCO_DOWNLOAD_DIR=$(mktemp -d)
+VOCO_TERMINAL_COLUMNS={columns}
+VOCO_TERMINAL_ROWS={rows}
+voco_ui_init
+voco_ui_begin 'Checking your download.' 'Verifying the publisher signature.'
+voco_ui_release
+printf 'PROMPT REMAINS VISIBLE\\n'
+'''
+                code, output = terminal(['bash', '-c', PREFIX + body], env, columns=columns, rows=rows)
+                self.assertEqual(code, 0, output)
+                self.assertIn(f'\033[{height}A'.encode(), output)
+                plain = re.sub(r'\x1b\[[0-9;]*[A-Za-z]', '', output.decode())
+                self.assertEqual(sum('█' in line for line in plain.splitlines()), 5 if height == 14 else 0)
+                self.assertTrue(all(len(line) < columns for line in plain.splitlines()))
+                self.assertIn(b'PROMPT REMAINS VISIBLE', output)
+                self.assertNotIn(b'\x1b[38;2;241;243;246m', output, 'Reduced motion must not highlight letters')
+
+    def test_apt_uses_the_same_large_static_wordmark_and_releases_for_prompt(self):
+        with tempfile.TemporaryDirectory() as folder:
+            env = {**os.environ, 'TERM': 'xterm-256color'}
+            (Path(folder) / 'apt.log').touch(mode=0o600)
+            # Feed status separately from a delayed prompt, allowing the real
+            # renderer to paint before it gives terminal output back.
+            command = ['bash', '-c', '({ printf "pmstatus:voco:20:Unpacking\\n"; sleep .2; printf "Confirm package option: "; }) | /usr/bin/python3 "$1" "$2" true',
+                       'fixture', str(APT_UI), str(Path(folder) / 'apt.log')]
+            code, output = terminal(command, env, columns=64, rows=16)
+            self.assertEqual(code, 0, output)
+            self.assertIn('██    ██'.encode(), output)
+            self.assertIn(b'\x1b[14A', output)
+            self.assertIn(b'Confirm package option: ', output)
+            self.assertNotIn(b'\x1b[38;2;241;243;246m', output)
+
     def test_embedded_apt_ui_ignores_untrusted_python_import_paths(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)

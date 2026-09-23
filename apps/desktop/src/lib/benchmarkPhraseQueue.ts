@@ -42,6 +42,7 @@ export class BenchmarkPhraseQueue {
   private pending: Promise<void> = Promise.resolve();
   private cancelled = false;
   private failure: Error | null = null;
+  private deliveryFailure: Error | null = null;
   private committed = "";
   private buffered: number[] = [];
   private rate = 16000;
@@ -92,7 +93,7 @@ export class BenchmarkPhraseQueue {
     if (this.terminalRecorded) return;
     this.terminalRecorded = true;
     this.quality("terminal", () => ({
-      outcome: this.failure ? "failed" : this.cancelled ? "cancelled" : this.finishResponded ? "finished" : "incomplete",
+      outcome: this.failure || this.deliveryFailure ? "failed" : this.cancelled ? "cancelled" : this.finishResponded ? "finished" : "incomplete",
       hypothesis_count: this.hypothesisCount, delivery_count: this.deliverySeq,
       dispatched_count: this.completedDeliveries, hypothesis_seq: this.latestSeq,
       committed_hypothesis_seq: this.committedSeq,
@@ -111,7 +112,7 @@ export class BenchmarkPhraseQueue {
   constructor(
     private paste: (text: string, correlation: PasteCorrelation) => Promise<void>,
     private observed: (text: string) => void,
-    private onFailure: (error: Error) => void,
+    private onFailure: (error: Error, kind: "recognition" | "delivery") => void,
     private onPreview: (event: DesktopStreamEvent, durationMs?: number) => void,
     private dictationSessionId?: number,
     private recordDeliveryQuality = true,
@@ -119,14 +120,21 @@ export class BenchmarkPhraseQueue {
     this.schedule("start");
   }
 
-  private fail(error: unknown, reason = "transport_failed") {
-    if (this.failure) return;
-    this.failure = error instanceof Error ? error : new Error(errorMessage(error));
-    this.buffered = [];
+  private fail(error: unknown, reason = "transport_failed", kind: "recognition" | "delivery" = "recognition") {
+    if (kind === "delivery" ? this.deliveryFailure : this.failure) return;
+    const failure = error instanceof Error ? error : new Error(errorMessage(error));
+    if (kind === "delivery") {
+      // An uncertain destination disables all subsequent insertion, but local
+      // recognition must still receive capture and the final Stop tail.
+      this.deliveryFailure = failure;
+    } else {
+      this.failure = failure;
+      this.buffered = [];
+    }
     void invoke("benchmark_stream", {
       request: { op: "diagnostic", reason, session: this.session, dictation_session_id: this.dictationSessionId },
     }).catch(() => {});
-    this.onFailure(this.failure);
+    this.onFailure(failure, kind);
   }
 
   private schedule(op: string, audio?: number[]) {
@@ -193,11 +201,11 @@ export class BenchmarkPhraseQueue {
   }
 
   private deliver() {
-    if (this.delivering || this.cancelled || this.failure) return;
+    if (this.delivering || this.cancelled || this.failure || this.deliveryFailure) return;
     this.delivering = true;
     this.delivery = (async () => {
       try {
-        while (!this.cancelled && !this.failure && this.latest !== this.committed) {
+        while (!this.cancelled && !this.failure && !this.deliveryFailure && this.latest !== this.committed) {
           const target = this.latest;
           const suffix = appendOnlySuffix(this.committed, target);
           const hypothesisSeq = this.latestSeq;
@@ -237,7 +245,7 @@ export class BenchmarkPhraseQueue {
         this.quality("delivery_failed", { delivery_seq: this.activeDeliverySeq,
           destination_content_observation: "unavailable" });
         this.activeDeliverySeq = null;
-        this.fail(error, "insertion_failed");
+        this.fail(error, "insertion_failed", "delivery");
       } finally {
         this.delivering = false;
       }
@@ -306,5 +314,6 @@ export class BenchmarkPhraseQueue {
     await this.delivery;
     this.terminal();
     if (this.failure) throw this.failure;
+    if (this.deliveryFailure) throw this.deliveryFailure;
   }
 }

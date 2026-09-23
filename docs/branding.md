@@ -226,8 +226,21 @@ that state is visible during cold launch; a browser fixture is not proof of nati
 startup timing. The panel capsule remains horizontal and labels processing
 “Finishing” to match setup.
 
-The guided terminal installer retains the existing VOCO wordmark in wide colour
-terminals and uses a compact VOCO heading in narrow or static output. Only
+The current source installer uses a five-row VOCO block wordmark in colour terminals
+at least 64 columns wide and 16 rows tall. Short colour terminals keep a one-line
+wordmark; narrow or static output keeps a compact VOCO heading. This larger treatment
+is unreleased; the public .56 installer still uses the earlier small heading.
+
+The letters stay satin silver, with one brief brighter-silver sweep on stage entry.
+Completed steps use soft green and a check; the active step uses amber and a chevron.
+Pending steps remain muted with an open circle. Red is reserved for actual errors.
+The wordmark appears immediately and never delays installation to finish a reveal.
+`scripts/lib/install-brand.json` defines the glyphs and palette once for both the
+Bash download canvas and Python APT canvas. Run `python3 scripts/sync-installer-ui.py`
+after editing it; that updates their generated constants and the standalone installer.
+
+The larger canvas uses 14 lines, with the existing ten-line compact layout on short
+terminals. Both release their entire canvas before password or package questions. Only
 measured download bytes update while receiving a file; the line settles
 to a check on completion. Average speed uses received bytes and elapsed time,
 with no invented percentage or ETA. Redirected output, TERM=dumb and NO_COLOR use

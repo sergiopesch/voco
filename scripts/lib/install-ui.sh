@@ -11,6 +11,21 @@ VOCO_UI_NO_MOTION=false
 VOCO_UI_LAST_BYTES=0
 VOCO_UI_LAST_TIME=0
 VOCO_UI_RATES=(0 0 0 0 0 0 0)
+VOCO_UI_LINES=10
+# BEGIN GENERATED INSTALLER BRAND
+VOCO_UI_GLYPHS=(
+  '██    ██' ' ██████ ' ' ██████ ' ' ██████ '
+  '██    ██' '██    ██' '██      ' '██    ██'
+  ' ██  ██ ' '██    ██' '██      ' '██    ██'
+  '  ████  ' '██    ██' '██      ' '██    ██'
+  '   ██   ' ' ██████ ' ' ██████ ' ' ██████ '
+)
+VOCO_UI_SILVER='\033[38;2;199;204;212m'
+VOCO_UI_SHINE='\033[38;2;241;243;246m'
+VOCO_UI_MUTED='\033[38;2;122;128;138m'
+VOCO_UI_COMPLETE='\033[38;2;165;217;178m'
+VOCO_UI_ACTIVE='\033[38;2;239;206;131m'
+# END GENERATED INSTALLER BRAND
 
 voco_ui_configure() {
   local columns="${VOCO_TERMINAL_COLUMNS:-80}" rows="${VOCO_TERMINAL_ROWS:-24}"
@@ -25,6 +40,8 @@ voco_ui_configure() {
       VOCO_UI_NO_MOTION=true
     fi
   fi
+  VOCO_UI_LINES=10
+  if [[ "$VOCO_TERMINAL_MOTION" == true && "$rows" -ge 16 ]]; then VOCO_UI_LINES=14; fi
   [[ "$VOCO_TERMINAL_MOTION" == true ]] || return 0
 }
 
@@ -44,11 +61,11 @@ voco_ui_size() {
   printf -v VOCO_UI_SIZE '%d.%d %s' "$((bytes/divisor))" "$((bytes%divisor*10/divisor))" "$unit"
 }
 
-# One ten-line canvas is shared by every normal installation stage.
+# One bounded canvas is shared by every normal installation stage.
 voco_ui_frame() {
   [[ "$VOCO_TERMINAL_MOTION" == true ]] || return 0
-  local title="$1" detail="$2" mark="${3:-—}" shine="${4:--1}" width wordmark='V O C O' i letter
-  local stages='' symbol line2='' rule='────────────────────────────────────────────────────────'
+  local title="$1" detail="$2" mark="${3:-—}" shine="${4:--1}" width wordmark='V O C O' i row color
+  local stages='' frame='' part='' symbol line2='' rule='────────────────────────────────────────────────────────'
   local -a labels=(Check Download Verify Install)
   width=$((${VOCO_TERMINAL_COLUMNS:-80}-5))
   if (( ${#detail} > width )); then
@@ -56,29 +73,47 @@ voco_ui_frame() {
     if [[ "$first" == *' '* ]]; then first="${first% *}"; fi
     line2="${detail:${#first}}"; line2="${line2# }"; detail="$first"
   fi
-  if (( shine >= 0 )) && [[ "$VOCO_UI_NO_MOTION" != true ]]; then
-    wordmark=''
-    for ((i=0;i<4;i++)); do
-      letter="${VOCO_UI_LETTERS:i:1}"
-      if (( i == shine )); then wordmark+="${WHITE}${letter}${GRAPHITE}"; else wordmark+="$letter"; fi
-      wordmark+=' '
-    done
-  fi
   for i in 0 1 2 3; do
-    symbol='○'
-    if (( i < VOCO_UI_STAGE )); then symbol='✓'; elif (( i == VOCO_UI_STAGE )); then symbol='›'; fi
-    stages+="${symbol} ${labels[i]}   "
+    symbol='○'; color="$VOCO_UI_MUTED"
+    if (( i < VOCO_UI_STAGE )); then symbol='✓'; color="$VOCO_UI_COMPLETE"
+    elif (( i == VOCO_UI_STAGE )); then symbol='›'; color="$VOCO_UI_ACTIVE"; fi
+    stages+="${color}${symbol} ${labels[i]}${NC}   "
   done
-  printf '\033[10A\r\033[K  %b%b%b  v%s\n\r\033[K  %s\n\r\033[K  %s\n\r\033[K  %s\n\r\033[K  %s\n\r\033[K  %s\n\r\033[K  %s\n\r\033[K  %s\n\r\033[K  %s\n\r\033[K  %s\n' \
-    "$GRAPHITE_SOFT" "$wordmark" "$NC" "${VERSION:-}" 'Your voice, typed.' '' "$mark" \
-    "${title:0:width}" "$detail" "${line2:0:width}" "${rule:0:width}" "$stages" "${VOCO_UI_NOTE:0:width}"
+  printf -v frame '\033[%dA' "$VOCO_UI_LINES"
+  if (( VOCO_UI_LINES == 14 )); then
+    for row in 0 1 2 3 4; do
+      wordmark=''
+      for i in 0 1 2 3; do
+        color="$VOCO_UI_SILVER"
+        if (( i == shine )) && [[ "$VOCO_UI_NO_MOTION" != true ]]; then color="$VOCO_UI_SHINE"; fi
+        wordmark+="${color}${VOCO_UI_GLYPHS[row*4+i]} "
+      done
+      printf -v part '\r\033[K  %b%b\n' "$wordmark" "$NC"
+      frame+="$part"
+    done
+    printf -v part '\r\033[K  Your voice, typed.  ·  v%s\n' "${VERSION:-}"
+  else
+    printf -v part '\r\033[K  %bV O C O%b  v%s\n\r\033[K  Your voice, typed.\n' "$VOCO_UI_SILVER" "$NC" "${VERSION:-}"
+  fi
+  frame+="$part"
+  color="$VOCO_UI_SILVER"
+  [[ "$mark" != '✓' ]] || color="$VOCO_UI_COMPLETE"
+  printf -v part '\r\033[K\n\r\033[K  %b%s%b\n\r\033[K  %s\n\r\033[K  %s\n\r\033[K  %s\n\r\033[K  %s\n\r\033[K  %b\n\r\033[K  %s\n' \
+    "$color" "$mark" "$NC" "${title:0:width}" "$detail" "${line2:0:width}" "${rule:0:width}" "$stages" "${VOCO_UI_NOTE:0:width}"
+  frame+="$part"
+  # A terminating sweep may stop while building the frame, but must never leave
+  # the cursor between rows. Bash runs the termination trap after this builtin.
+  printf '%s' "$frame"
 }
-VOCO_UI_LETTERS=VOCO
 
 voco_ui_begin() {
   [[ "$VOCO_TERMINAL_MOTION" == true ]] || return 0
   voco_ui_pause
-  if [[ "$VOCO_UI_OPEN" != true ]]; then printf '\n\n\n\n\n\n\n\n\n\n'; VOCO_UI_OPEN=true; fi
+  if [[ "$VOCO_UI_OPEN" != true ]]; then
+    local line
+    for ((line=0;line<VOCO_UI_LINES;line++)); do printf '\n'; done
+    VOCO_UI_OPEN=true
+  fi
   VOCO_UI_TITLE="$1"
   voco_ui_frame "$1" "${2:-}" "${3:-—}"
 }
@@ -120,10 +155,10 @@ voco_ui_pause() {
 voco_ui_release() {
   voco_ui_pause
   if [[ "$VOCO_UI_OPEN" == true ]]; then
-    printf '\033[10A'
+    printf '\033[%dA' "$VOCO_UI_LINES"
     local line
-    for line in {1..10}; do printf '\r\033[K\n'; done
-    printf '\033[10A\r'
+    for ((line=0;line<VOCO_UI_LINES;line++)); do printf '\r\033[K\n'; done
+    printf '\033[%dA\r' "$VOCO_UI_LINES"
   fi
   VOCO_UI_OPEN=false
 }

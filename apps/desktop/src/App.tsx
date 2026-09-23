@@ -924,7 +924,11 @@ export function App() {
         if (!isCurrentRequest()) {
           return;
         }
-        await hideStatusOverlay().catch(() => {});
+        const hidden = await hideStatusOverlay().then(() => true, () => false);
+        if (hidden && isCurrentRequest() && onboardingHandoffRef.current) {
+          onboardingHandoffRef.current = false;
+          void traceHotkeyEvent("onboarding_handoff_hidden").catch(() => {});
+        }
         return;
       }
 
@@ -978,12 +982,6 @@ export function App() {
           focus: () => currentWindow.setFocus(),
           isFocused: () => currentWindow.isFocused(),
         });
-        if (isCurrentRequest() && onboardingHandoffRef.current) {
-          onboardingHandoffRef.current = false;
-          requestAnimationFrame(() => {
-            if (isCurrentRequest()) void traceHotkeyEvent("onboarding_handoff_visible").catch(() => {});
-          });
-        }
         return;
       }
 

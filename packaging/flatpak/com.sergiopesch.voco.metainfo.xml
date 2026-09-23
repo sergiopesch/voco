@@ -29,6 +29,9 @@
   <url type="vcs-browser">https://github.com/sergiopesch/voco</url>
   <content_rating type="oars-1.1" />
   <releases>
+    <release version="2026.0.57" date="2026-09-23">
+      <description><p>Return directly to the tray after onboarding, retain local transcription after delivery interruptions with recovery on request, and introduce a prominent silver installer wordmark with branded progress accents.</p></description>
+    </release>
     <release version="2026.0.56" date="2026-09-23">
       <description><p>Open VOCO after guided installation, support focused Ghostty terminal panes, and preserve microphone readiness when a destination is unavailable.</p></description>
     </release>

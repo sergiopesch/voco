@@ -669,7 +669,7 @@ export function ControlPanel({
         useStore.getState().clearTranscript();
         useStore.getState().setDictationPurpose("cursor");
         onDraftStateChange?.(false);
-        onSurfaceChange("popover");
+        onSurfaceChange("hidden");
       }
     } finally { setFinishingTest(false); }
   }
@@ -758,7 +758,7 @@ export function ControlPanel({
             <button className="voco-button voco-button--ghost" onClick={keepEditing}>Keep editing</button>
           </div>
         </section> : null}
-          {errorMessage && !isOnboarding ? (
+          {errorMessage && !isOnboarding && !recovery ? (
             <section className="voco-panel__error" aria-live="polite">
               {errorMessage}
             </section>
@@ -778,7 +778,7 @@ export function ControlPanel({
               </div>
               {dictationBusy ?
                 <p>{dictationStatus === "starting" ? "Wait for Listening before speaking." : dictationStatus === "recording" ? `Press ${config.hotkey} to finish.` : "Finishing your dictation…"}</p> :
-                <p>{desktopSetupError ? "Open Help to finish desktop setup." : shortcut.available ? "Focus a text field, then use your shortcut." : "Check shortcut setup in Help."}</p>}
+                <p>{desktopSetupError ? "Open Help to finish desktop setup." : hasCurrentRecovery ? "Review your saved dictation when you’re ready." : shortcut.available ? "Focus a text field, then use your shortcut." : "Check shortcut setup in Help."}</p>}
             </div>
             {captureNotice ? <div className="voco-inline-note" role="status">{captureNotice}</div> : null}
             {(canCancelDictation || cancellationPending) ? (
@@ -791,16 +791,18 @@ export function ControlPanel({
                 <strong>
                   {transcript
                     ? recovery?.kind === "manual-copy" ? "Transcript ready to copy"
-                      : cursorDeliveryState === "unreconciled" ? "Transcript kept safely in VOCO"
-                        : "Latest transcript available to recover"
+                      : recovery ? "Saved dictation" : "Transcript kept safely in VOCO"
                     : recovery?.audioAvailable ? "Recording available to recover"
                       : "Recording needs attention"}
                 </strong>
-                <span>
+                {recovery && recovery.kind !== "manual-copy" ? <details>
+                  <summary>What happened</summary>
+                  <p>{recovery.reason}</p>
+                </details> : <span>
                   {recovery?.reason ?? (cursorDeliveryState === "unreconciled"
                     ? "Cursor delivery could not be verified. Review the target before copying any missing text."
                     : "The selected output did not complete. Confirm this is your latest dictation, then copy it before trying again.")}
-                </span>
+                </span>}
                 {transcript ? <p>{transcript}</p> : <span>No completed transcript is available yet.</span>}
                 {recovery?.targetMayContainText ? <span>The original field may already contain part of this transcript. Recovery never inserts automatically.</span> : null}
                 {recovery?.audioAvailable ? <span>Audio stays only in memory until recovery is completed, discarded, or VOCO closes.</span> : null}

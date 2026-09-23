@@ -37,3 +37,12 @@ Fedora, openSUSE and Arch/Omarchy remain at **2026.0.43**; use the matching
 and assets remain immutable; new application bytes require another qualified
 release. Weekly maintenance, protected checks and the separate security update
 queue remain enabled. The hosted release assembler stays disabled.
+
+## 2026.0.57 candidate
+
+Current source returns directly to the tray after onboarding, separates delivery
+interruptions from recognition, and presents retained dictation on demand after a
+notification. The installer also adds a larger silver VOCO wordmark and shared brand-colour
+progress accents. These changes are not in published **2026.0.56**.
+Publication is pending exact-package qualification, protected CI and signed-asset verification.
+See the [review and evidence boundaries](testing/onboarding-recovery-2026-09-23.md).
