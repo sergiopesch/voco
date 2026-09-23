@@ -6,8 +6,8 @@ is authoritative for downloads. Source metadata does not establish what is insta
 Source **2026.0.56** is an unpublished follow-up candidate. It adds automatic
 opening after guided installation, a focused-pane destination for Ghostty's GTK
 terminal, and a fix that preserves microphone readiness after destination rejection.
-Qualification is in progress; the [.56 notes](releases/2026.0.56.md) describe its
-scope. The public installer and downloads below remain .55 until a new cut is verified.
+The [.56 notes](releases/2026.0.56.md) and [qualification record](testing/installer-ghostty-2026-09-23.md)
+describe the fixes and scoped evidence; final release verification is in progress. The public installer and downloads below remain .55 until a new cut is verified.
 
 The recorded public Ubuntu/Debian release is **2026.0.55**. It integrates the
 security, delivery, installation, performance and code cleanup review, including
