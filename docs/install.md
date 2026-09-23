@@ -9,9 +9,10 @@ A plain Tauri bundle is incomplete. See [packaging](linux-packaging.md).
 ## Published release
 
 The [README command](../README.md#get-started) runs the guided installer from
-the published **2026.0.54** tag. It downloads that exact release and verifies its
-package checksum before installation. On Wayland it installs the input helpers
-and checks desktop readiness. If setup is incomplete, follow the
+the published **2026.0.54** tag. That immutable installer verifies the package
+checksum but not the publisher signature. Use the signed manual procedure below
+when publisher authentication is required. On Wayland the guided installer installs
+the input helpers and checks desktop readiness. If setup is incomplete, follow the
 [Wayland setup](platform/README.md#ydotoold-ydotool-daemon) instructions.
 Onboarding completion requires a successful voice test and desktop readiness.
 
@@ -24,16 +25,23 @@ For a manual installation, these links always follow the latest public release:
   cd ~/Downloads/voco-install
   curl -fLO https://github.com/sergiopesch/voco/releases/latest/download/voco_latest_amd64.deb
   curl -fLO https://github.com/sergiopesch/voco/releases/latest/download/voco_latest_checksums.txt
+  curl -fLO https://github.com/sergiopesch/voco/releases/latest/download/voco_latest_checksums.txt.asc
+  curl -fLo KEYS https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.54/KEYS
+  fingerprints="$(gpg --show-keys --with-colons KEYS | awk -F: '$1 == "fpr" { print $10 }')"
+  test "$fingerprints" = B33C7C6AAEC8C20433A7A837540796453D8E3865
+  gpg --dearmor < KEYS > voco-release-keyring.gpg
+  gpgv --keyring ./voco-release-keyring.gpg voco_latest_checksums.txt.asc voco_latest_checksums.txt
   sha256sum -c voco_latest_checksums.txt
   sudo apt install ./voco_latest_amd64.deb
 )
 ```
 
-Continue only if verification succeeds. These files refer to the latest public
-release, which may differ from the development candidate. Checksums are integrity
-checks. Releases also ship signed checksums (`*.asc`); verify
-those with `scripts/verify-release.sh` and the `KEYS` file from git, after checking
-the fingerprint out of band.
+Continue only if every verification command succeeds. These files refer to the
+latest public release, which may differ from the development candidate. The
+fingerprint above is pinned to the current publisher key; check it independently
+before relying on a newly downloaded installer or release. A key rotation requires
+an updated, independently verified fingerprint. The repository's
+`scripts/verify-release.sh` also verifies signed release manifests offline.
 
 ### Guided installer
 
@@ -48,13 +56,17 @@ less voco-install
 bash voco-install
 ```
 
-The installer downloads the matching package and verifies its checksum before
-installation. Never execute an unreviewed network response through a shell pipe.
+Starting with this source candidate, the installer requires a detached publisher
+signature for the release checksums before verifying the package checksum and
+installing it. An unsigned candidate cannot be installed by the guided flow.
+Never execute an unreviewed network response through a shell pipe.
 
 ## Local candidate
 
 Use the complete package and checksum file provided with that candidate, rather
-than a latest-release link. Check the artifact identity before installing:
+than a latest-release link. Use candidate files from a trusted build; their
+checksum alone does not authenticate a publisher. Check the artifact identity
+before installing:
 
 ```bash
 sha256sum -c SHA256SUMS

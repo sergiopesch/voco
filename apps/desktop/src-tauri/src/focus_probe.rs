@@ -2,7 +2,7 @@
 use serde_json::{json, Value};
 use std::{
     io::{BufRead, BufReader, Read, Write},
-    process::{Child, Stdio},
+    process::{Child, Command, Stdio},
     sync::{mpsc, LazyLock, Mutex},
     thread::{self, JoinHandle},
     time::Duration,
@@ -49,8 +49,7 @@ fn response(output: &mut impl BufRead, sequence: u64) -> Result<Value, ()> {
 }
 impl Probe {
     fn start(script: &str) -> Result<Self, ()> {
-        let mut child = crate::process_runner::command("/usr/bin/python3")
-            .args(["-u", "-c", script, "--serve"])
+        let mut child = python_command(script)
             .stdin(Stdio::piped())
             .stderr(Stdio::null())
             .spawn()
@@ -101,6 +100,14 @@ impl Probe {
         self.responses.recv_timeout(timeout).map_err(|_| ())?
     }
 }
+
+fn python_command(script: &str) -> Command {
+    let mut command = crate::process_runner::command("/usr/bin/python3");
+    // `-c` otherwise imports modules from the directory that launched VOCO.
+    command.args(["-I", "-u", "-c", script, "--serve"]);
+    command
+}
+
 static PROBE: LazyLock<Mutex<Option<Probe>>> = LazyLock::new(|| Mutex::new(None));
 pub(crate) fn probe() -> Result<Value, ()> {
     probe_with(json!({"op":"probe"}))
@@ -129,6 +136,33 @@ pub(crate) fn probe_with_timeout(request: Value, timeout: Duration) -> Result<Va
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn helper_does_not_import_modules_from_launch_directory() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let directory = std::env::temp_dir().join(format!(
+            "voco-focus-isolation-{}-{unique}",
+            std::process::id()
+        ));
+        std::fs::create_dir(&directory).unwrap();
+        std::fs::write(directory.join("hashlib.py"), "raise SystemExit(86)\n").unwrap();
+        let output = python_command("import hashlib; print(hashlib.sha256(b'voco').hexdigest())")
+            .current_dir(&directory)
+            .env("PYTHONPATH", &directory)
+            .output()
+            .unwrap();
+        std::fs::remove_dir_all(&directory).unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert_eq!(String::from_utf8(output.stdout).unwrap().trim().len(), 64);
+    }
     #[test]
     fn stale_truncated_and_oversized_results_reject() {
         assert!(response(

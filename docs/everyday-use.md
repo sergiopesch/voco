@@ -50,11 +50,13 @@ Words appear progressively. Press the shortcut again to finish; the final words
 and punctuation are delivered before VOCO returns to Ready.
 
 If no editable cursor can be verified, VOCO shows a desktop notification and does
-not record. Click in a text field and press the shortcut again. Password fields
+not record. Click in a text field and press the shortcut again. Fields identified as passwords
 are excluded. Some custom controls do not expose an accessible caret.
 
-Keep the intended field focused. VOCO uses clipboard paste, replaces clipboard
-text, leaves it there and never presses Enter. Recognized terminals use their
+Stop dictation before switching fields. VOCO uses clipboard paste, replaces
+clipboard text, leaves it there and never presses Enter. A focus change during
+a paste gesture can redirect a fragment before VOCO detects it; recovery cannot
+retract text from another app. Recognized terminals use their
 paste chord without changing terminal settings. Protected, custom, remote and rich
 editors need individual testing. The generic desktop route appends text; it does
 not rewrite the entire message after Stop.

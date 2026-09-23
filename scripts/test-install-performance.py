@@ -20,9 +20,9 @@ PREFIX = (ROOT / 'install').read_text().split('# ─── Header', 1)[0]
 APT_UI = ROOT / 'scripts/lib/install-apt-ui.py'
 
 
-def terminal(command, env, reply=None, timeout=10):
+def terminal(command, env, reply=None, timeout=10, columns=80, rows=24):
     master, slave = pty.openpty()
-    fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', 24, 80, 0, 0))
+    fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', rows, columns, 0, 0))
     def own_terminal():
         os.setsid()
         fcntl.ioctl(0, termios.TIOCSCTTY, 0)
@@ -57,6 +57,21 @@ def terminal(command, env, reply=None, timeout=10):
 
 
 class InstallerPerformanceTests(unittest.TestCase):
+    def test_embedded_apt_ui_ignores_untrusted_python_import_paths(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / 'shutil.py').write_text('raise RuntimeError("untrusted shutil module loaded")\n')
+            log = root / 'apt.log'
+            log.touch(mode=0o600)
+            run = subprocess.run(
+                ['bash', '-c', PREFIX + '\nvoco_apt_display "$1" true\n', 'test', str(log)],
+                cwd=root, env={**os.environ, 'PYTHONPATH': folder},
+                input=b'Unfamiliar package message\n', capture_output=True, timeout=3,
+            )
+            self.assertEqual(run.returncode, 0, run.stderr)
+            self.assertIn(b'Unfamiliar package message', run.stdout)
+            self.assertNotIn(b'untrusted', run.stderr)
+
     def test_real_verification_gate_rejects_missing_or_corrupt_checksum(self):
         source = (ROOT / 'install').read_text()
         start = source.index('if ! grep -F "  $(basename "$DEB_FILE")"')
@@ -105,22 +120,25 @@ DEB_CHECKSUM_FILE="$1/selected.sha256"
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
         try:
-            for suffix in ('checksums', 'bad'):
-                with self.subTest(suffix=suffix), tempfile.TemporaryDirectory() as folder:
+            for checksum_path, signature_path in (('checksums', 'signature'), ('bad', 'signature'), ('checksums', 'bad')):
+                with self.subTest(checksum=checksum_path, signature=signature_path), tempfile.TemporaryDirectory() as folder:
                     env = {**os.environ, 'NO_COLOR': '1', 'TMPDIR': folder}
                     url = f'http://127.0.0.1:{server.server_port}'
                     body = '''
 VOCO_DOWNLOAD_DIR=$(mktemp -d)
 CHECKSUM_FILE="$VOCO_DOWNLOAD_DIR/checksums"
+SIGNATURE_FILE="$VOCO_DOWNLOAD_DIR/checksums.asc"
 CHECKSUMS_URL="$1/$2"
-voco_start_checksum_download
+SIGNATURE_URL="$1/$3"
+voco_start_release_metadata_downloads
 voco_download payload "$VOCO_DOWNLOAD_DIR/payload" "$1/payload"
-voco_finish_checksum_download
+voco_finish_release_metadata_downloads
 '''
-                    run = subprocess.run(['bash', '-c', PREFIX + body, 'test', url, suffix], env=env, capture_output=True, timeout=5)
-                    self.assertEqual(run.returncode, 0 if suffix == 'checksums' else 8, run.stdout + run.stderr)
-                    self.assertLess(abs(arrivals['/'+suffix] - arrivals['/payload']), .12)
-                    if suffix == 'bad':
+                    run = subprocess.run(['bash', '-c', PREFIX + body, 'test', url, checksum_path, signature_path], env=env, capture_output=True, timeout=5)
+                    self.assertEqual(run.returncode, 0 if checksum_path == 'checksums' and signature_path == 'signature' else 1, run.stdout + run.stderr)
+                    self.assertLess(abs(arrivals['/'+checksum_path] - arrivals['/payload']), .12)
+                    self.assertLess(abs(arrivals['/'+signature_path] - arrivals['/payload']), .12)
+                    if 'bad' in (checksum_path, signature_path):
                         self.assertIn(b'Nothing was installed', run.stdout)
                         logs = list(Path(folder).glob('*.log'))
                         self.assertEqual(len(logs), 1)

@@ -16,8 +16,9 @@ requirements; host-native and AVX-512/AMX flags remain disabled in its native bu
 ```bash
 npm ci
 npm run build
-python3 scripts/package-nvidia.py /path/to/tauri-base.deb /path/to/voco_2026.0.43_amd64.deb --debian-version 2026.0.43
-bash scripts/verify-deb-package.sh /path/to/voco_2026.0.43_amd64.deb
+version=$(node -p 'require("./package.json").version')
+python3 scripts/package-nvidia.py /path/to/tauri-base.deb "/path/to/voco_${version}_amd64.deb" --debian-version "$version"
+bash scripts/verify-deb-package.sh "/path/to/voco_${version}_amd64.deb" "$version"
 ```
 
 A base Tauri bundle is incomplete and must never be published as VOCO. The assembler
@@ -27,12 +28,20 @@ complete artifact, dependency resolution, install/upgrade/remove behavior and
 isolated runtime before publication. Record source and package SHA-256 identities.
 Do not include personal recordings, transcripts, API credentials or private receipts.
 
+The independent speech-payload verifier rejects special files, linked manifest or
+parent directories, escaping library links, and writable or set-ID runtime payloads
+before hashing. These checks do not rely only on the assembler normalizing modes.
+Minimal container images can exclude documentation through their dpkg policy;
+record that policy explicitly and verify the complete installed payload separately.
+`dpkg --verify` can print missing files without a failing exit status, so use the
+native inventory verifier when qualifying installation and removal.
+
 The package requires Python 3, NumPy, psutil and the declared native dependencies.
 The .48 assembler uses Zstandard level 9: a small lossless download-size reduction
 with the same installed model and runtime bytes. It does not reduce model memory.
 The .48 installer downloads missing Wayland helpers as the current user while the
 main package downloads. APT verifies those helper downloads; the final privileged
-transaction reuses completed archives only after VOCO's checksum passes. Failed
+transaction reuses completed archives only after VOCO's signed manifest and package checksum pass. Failed
 prefetches fall back to the ordinary APT installation. Desktop settings are unchanged.
 
 The [.52 installer](testing/installer-performance-2026-09-22.md)
@@ -47,6 +56,21 @@ Raw output and progress are separate, stdin remains the original terminal, and
 unknown output releases the view. Restricted sudo policies fall back to the ordinary
 APT command. There are no new sudo rules or automatic answers to package questions.
 
+The [first-run follow-up candidate](testing/first-run-follow-up-2026-09-22.md)
+keeps one compact terminal canvas across checks, download, verification and setup.
+Signal bars follow received bytes; phase sweeps never delay completion. Native
+password/package prompts release the canvas before taking input. The final view
+replaces intermediate progress and retains any required panel sign-out action.
+Narrow terminals and `VOCO_INSTALL_PLAIN=1` use sequential text; reduced motion
+keeps measured progress without sweeps. Routine service output joins the private
+installation log, which is retained on failure. This source change is not yet a
+published installer; use the recorded public version for installation instructions.
+
+Setup resolves an absolute `XDG_CONFIG_HOME` exactly as the app does. It preserves
+existing settings and publishes fresh defaults without overwriting a file that
+appears concurrently. Inline Python runs in isolated mode, including the optional
+APT renderer, so the launch directory cannot supply its imports.
+
 The .47 metadata explicitly includes the `pgrep` provider (`procps` on Debian/openSUSE,
 `procps-ng` on Fedora/Arch), used to check the Wayland input daemon.
 The worker defaults to at most four CPU threads, leaving one CPU from its affinity
@@ -60,8 +84,13 @@ the input service must also be configured and running. The .47 guided installer
 uses APT for the local package and explicitly requests both Wayland packages when
 running on Wayland; dependency repair after `dpkg -i` is insufficient. The package
 includes an opt-in per-login `voco-ydotoold.service`. The installer starts it only
-with existing device access, preserves a working daemon and verifies readiness
-without sending keys. It does not change device permissions or group membership.
+with existing device access and verifies readiness without sending keys. Starting
+with .55, its launcher selects a private source-built daemon only for the exact
+qualified Ubuntu 24.04 legacy client. The system client and daemon are preserved.
+On upgrade, the installed app holds its instance lock before migrating only an
+unmodified VOCO service; another running app, custom unit or unrelated daemon
+prevents migration. `voco --setup-desktop-input` performs this step explicitly
+while VOCO is closed. See [helper provenance](../vendor/ydotool-legacy/README.md). It does not change device permissions or group membership.
 Debian 13
 repositories may not provide it, so the recommendation must not block X11 installs. `at-spi2-core` and
 `gir1.2-atspi-2.0` provide the accessibility bus and bindings. Package installation

@@ -28,6 +28,7 @@ STATUS = re.compile(r'^(pmstatus|dlstatus):([^:]*):([0-9]+(?:\.[0-9]+)?):(.*)$')
 def main():
     path, no_motion = sys.argv[1:3]
     separate = len(sys.argv) > 3 and sys.argv[3] == 'separate'
+    version = sys.argv[4] if len(sys.argv) > 4 else ''
     output_fd = 4 if separate else 0
     streams = [0, 4] if separate else [0]
     pending = {fd: b'' for fd in streams}
@@ -39,21 +40,39 @@ def main():
     dirty = True
     partial_since = None
     finished = False
+    canvas_open = False
 
     def write(data):
         sys.stdout.buffer.write(data)
         sys.stdout.buffer.flush()
 
+    def release():
+        nonlocal canvas_open
+        if canvas_open:
+            write(b'\033[10A' + b'\r\033[K\n' * 10 + b'\033[10A\r')
+            canvas_open = False
+
+    def pass_output():
+        nonlocal passthrough
+        release()
+        passthrough = True
+
     def frame(now):
-        nonlocal last_frame, dirty
+        nonlocal last_frame, dirty, canvas_open
         width = max(10, shutil.get_terminal_size((80, 24)).columns - 5)
         age = now - start
         wordmark = 'V O C O'
         if no_motion != 'true' and age < .5:
             position = min(3, int(age * 8))
             wordmark = ' '.join(('\033[37m' if i == position else '\033[38;2;122;128;138m') + c for i, c in enumerate('VOCO')) + '\033[0m'
-        write(('\033[4A\r\033[K  ' + wordmark + '\n\033[K  ' + mark +
-               '\n\033[K  Setting up VOCO.\n\033[K  ' + detail[:width] + '\n').encode())
+        if not canvas_open:
+            write(b'\n' * 10)
+            canvas_open = True
+        lines = [wordmark + '  v' + version, 'Your voice, typed.', '', mark,
+                 'Setting up VOCO.', detail[:width], '',
+                 '────────────────────────────────────────────────────────'[:width],
+                 '✓ Check   ✓ Download   ✓ Verify   › Install', '']
+        write(('\033[10A' + ''.join('\r\033[K  ' + line + '\n' for line in lines)).encode())
         last_frame = now
         dirty = False
 
@@ -65,7 +84,7 @@ def main():
             kind, package, percent, description = match.groups()
             amount = float(percent)
             if not 0 <= amount <= 100:
-                passthrough = True
+                pass_output()
             elif not passthrough:
                 # APT's phase progress is never whole-installer progress.
                 detail = ('Desktop dependencies' if kind == 'dlstatus' else 'Package setup') + f' · {int(amount)}%'
@@ -73,7 +92,7 @@ def main():
                 dirty = True
             return True
         if text.startswith(('pmconffile:', 'media-change:', 'pmerror:')):
-            passthrough = True
+            pass_output()
             if text.startswith(('pmerror:', 'media-change:')):
                 write(('\n' + text.split(':', 3)[-1] + '\n').encode())
             return True
@@ -85,12 +104,12 @@ def main():
             return
         if separate and fd == 0:
             # Unknown protocol data belongs in the log; raw output remains visible.
-            passthrough = True
+            pass_output()
             return
         text = raw.decode('utf-8', 'replace').rstrip('\r\n')
         if not passthrough and (not text.strip() or ROUTINE.match(text)):
             return
-        passthrough = True
+        pass_output()
         write(raw)
 
     try:
@@ -98,7 +117,7 @@ def main():
         log_file = os.fdopen(descriptor, 'ab', buffering=0)
     except OSError:
         log_file = None
-        passthrough = True
+        pass_output()
         write(b'Could not save installation details; continuing with terminal output.\n')
     with log_file if log_file is not None else contextlib.nullcontext() as log:
         while True:
@@ -116,6 +135,7 @@ def main():
                 for fd, rest in pending.items():
                     if rest:
                         line(fd, rest)
+                release()
                 return
             for fd in readable:
                 chunk = os.read(fd, 65536)
@@ -129,7 +149,7 @@ def main():
                         log.write(chunk)
                     except OSError:
                         log = None
-                        passthrough = True
+                        pass_output()
                         write(b'Could not save installation details; continuing with terminal output.\n')
                 pending[fd] += chunk
                 while b'\n' in pending[fd]:
@@ -141,11 +161,11 @@ def main():
                     elif partial_since is None:
                         partial_since = time.monotonic()
                 elif len(pending[fd]) > 8192:
-                    passthrough = True
+                    pass_output()
                     pending[fd] = b''
             rest = pending[output_fd]
             if rest and (len(rest) > 8192 or (partial_since is not None and time.monotonic() - partial_since >= .05)):
-                passthrough = True
+                pass_output()
                 write(rest)
                 pending[output_fd] = b''
                 partial_since = None

@@ -1,0 +1,32 @@
+Package: libuinputplus
+Format: 3.0 (quilt)
+Binary: libuinputplus-dev
+Architecture: any
+Version: 0.1.4-2
+Priority: optional
+Section: universe/misc
+Maintainer: Alexandre Viau <aviau@debian.org>
+Standards-Version: 4.5.0
+Build-Depends: debhelper (>= 12), cmake, pkg-config
+Homepage: https://github.com/YukiWorkshop/libuInputPlus
+Vcs-Browser: https://salsa.debian.org/debian/libuinputplus
+Vcs-Git: https://salsa.debian.org/debian/libuinputplus.git
+Directory: pool/universe/libu/libuinputplus
+Package-List:
+ libuinputplus-dev deb libdevel optional arch=any
+Files:
+ 34609b054835d895a3929c40b4e2b1ce 1906 libuinputplus_0.1.4-2.dsc
+ a00053090316d38fcbc7727d11b888b9 8239 libuinputplus_0.1.4.orig.tar.gz
+ a938f104882f6d1f5f45781c179fe490 1992 libuinputplus_0.1.4-2.debian.tar.xz
+Checksums-Sha1:
+ 118b3297c095777a77fbc16e7c5e0e5a5d072f70 1906 libuinputplus_0.1.4-2.dsc
+ b997d11da58323c7b7d50dcb59752e813a4564f5 8239 libuinputplus_0.1.4.orig.tar.gz
+ 40c10d4d3f744e48668cfdcb6a6021276edf5e41 1992 libuinputplus_0.1.4-2.debian.tar.xz
+Checksums-Sha256:
+ e77db1ef5f99596914409da8af99af7fba8a9ef30a466585a9f21fc435e9a3d0 1906 libuinputplus_0.1.4-2.dsc
+ a537e156d11ad00c643b93cbd9b712d3ec9d0ae8e40731ff763fe9a6ffe97458 8239 libuinputplus_0.1.4.orig.tar.gz
+ fd34a725f3d3292df9d650c315296847290b9bdae164365584c7c8f01834c831 1992 libuinputplus_0.1.4-2.debian.tar.xz
+Checksums-Sha512:
+ 14d7517725208349b13a21f04cae84a6a074be6aed93494e1529f18dfad2bf4b8430dd0180466b6729c38baf6d8892e2a89bbc408ff22c7818223b2f6e019a33 1906 libuinputplus_0.1.4-2.dsc
+ 3b2c1bad3127fd6badd92e2d2ec528f68d0b9f3fdf22f1df81c3491533dcf95867a3e3b1919ad9cbcaf2e85ed3a209171b09bd709f2d71064facf344529ffdc4 8239 libuinputplus_0.1.4.orig.tar.gz
+ 09dd5572146515dec7c48252e711fa1cb081ef2a8c0b29ff9d20b5b0bf02924a24b49c4c50ba2cbb6ec90b54bf18075560aea7869d2675e0732423ffd03a9acf 1992 libuinputplus_0.1.4-2.debian.tar.xz

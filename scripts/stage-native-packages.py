@@ -15,6 +15,8 @@ import subprocess
 import tarfile
 import tempfile
 
+OWNED_ROOTS = ('/usr/lib/voco', '/usr/libexec/voco', '/usr/share/voco', '/usr/share/doc/voco')
+
 
 def digest(path):
     with path.open('rb') as stream:
@@ -68,7 +70,8 @@ def rpm_file_entry(path):
                      'NVIDIA-OPEN-MODEL-LICENSE.html', 'NVIDIA-MODEL-CARD.md',
                      'GGML-LICENSE'}
     is_license = path.startswith('/usr/share/doc/voco/') and (
-        name.startswith('LICENSE') or name in license_names)
+        name.startswith('LICENSE') or name in license_names
+        or path.startswith('/usr/share/doc/voco/vendor/ydotool-legacy/notices/'))
     return ('%license ' if is_license else '') + path
 
 
@@ -193,10 +196,9 @@ tar -xf %{{SOURCE0}} -C %{{buildroot}} --no-same-owner --same-permissions
 '''
     # Files, not shared system directories, belong to this package. Dedicated
     # VOCO subdirectories are owned so an uninstall can remove them cleanly.
-    owned = ('/usr/lib/voco', '/usr/share/voco', '/usr/share/doc/voco')
     for row in entries:
         if row['kind'] == 'directory':
-            if any(row['path'] == prefix or row['path'].startswith(prefix + '/') for prefix in owned):
+            if any(row['path'] == prefix or row['path'].startswith(prefix + '/') for prefix in OWNED_ROOTS):
                 spec += '%dir ' + row['path'] + '\n'
         else:
             spec += rpm_file_entry(row['path']) + '\n'

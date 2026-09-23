@@ -1121,32 +1121,6 @@ def dispatch_command(
         raise RuntimeError(EXACT_FIELD_REQUIRED)
     if operation == "poll-trigger":
         return coordinator.poll_trigger(command.get("hotkey"))
-    if operation == "start":
-        coordinator.claim_trigger(command.get("triggerId"))
-        return coordinator.start(command.get("clientSessionId"))
-    if operation == "update":
-        return coordinator.update(
-            command.get("sessionId"),
-            command.get("confirmedText"),
-            command.get("preeditText"),
-            command.get("provisionalText"),
-        )
-    if operation == "commit":
-        return coordinator.commit(command.get("sessionId"), command.get("text"))
-    if operation == "checkpoint":
-        return coordinator.checkpoint(
-            command.get("sessionId"),
-            command.get("expectedCommittedText"),
-            command.get("appendText"),
-        )
-    if operation == "finish-canonical":
-        return coordinator.finish_canonical(
-            command.get("sessionId"),
-            command.get("expectedCommittedText"),
-            command.get("appendText"),
-        )
-    if operation == "cancel":
-        return coordinator.cancel(command.get("sessionId"))
     if operation in {"hello", "status"}:
         status = coordinator.status()
         status.update(ready=False, setupState="safety-disabled", ownershipIntact=False,

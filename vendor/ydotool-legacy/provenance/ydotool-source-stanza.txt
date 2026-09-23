@@ -1,0 +1,33 @@
+Package: ydotool
+Format: 3.0 (quilt)
+Binary: ydotool, ydotoold
+Architecture: any
+Version: 0.1.8-3build1
+Priority: optional
+Section: universe/misc
+Maintainer: Alexandre Viau <aviau@debian.org>
+Standards-Version: 4.5.0
+Build-Depends: debhelper (>= 12), cmake, dh-exec, pkg-config, libevdevplus-dev (>= 0.1.1-2), libuinputplus-dev, libboost-program-options-dev
+Homepage: https://github.com/ReimuNotMoe/ydotool
+Vcs-Browser: https://salsa.debian.org/debian/ydotool
+Vcs-Git: https://salsa.debian.org/debian/ydotool.git
+Directory: pool/universe/y/ydotool
+Package-List:
+ ydotool deb utils optional arch=any
+ ydotoold deb utils optional arch=any
+Files:
+ 86e1e98e74af6a1ae0641d6766880d26 1986 ydotool_0.1.8-3build1.dsc
+ b40892a8cb05649275bd57cae09c31cb 13362 ydotool_0.1.8.orig.tar.gz
+ aea2db2dfef6756c981f210a45a09fd9 2840 ydotool_0.1.8-3build1.debian.tar.xz
+Checksums-Sha1:
+ 3dcafcd44d0efbda1a6e3dd80197e0f8e8e37e46 1986 ydotool_0.1.8-3build1.dsc
+ 24b7ac08e771cd498922643e565aa3ac5efa3138 13362 ydotool_0.1.8.orig.tar.gz
+ 4845c02f60c626f1a9dfe979e344997157eb136f 2840 ydotool_0.1.8-3build1.debian.tar.xz
+Checksums-Sha256:
+ 6cbc15c414cdeedd25b2e65d0364171e46ee63fc658e9e5d5022bb9950a7b38e 1986 ydotool_0.1.8-3build1.dsc
+ 6ebc4ede0a11aa7ced6b52637a4a59cc1528b4c5ed54478d38f0248a40b40a07 13362 ydotool_0.1.8.orig.tar.gz
+ 63f18ee36fc11f14ccfc79040d5712ab5d78da035f89cfdaec79dc7246871564 2840 ydotool_0.1.8-3build1.debian.tar.xz
+Checksums-Sha512:
+ 267e6fcdd1f95829ce515f9a64553bb5317bd642dd4882b2369d0086e59e165c118a3b90a846ce7413407278d82151aebd1655cfd82c6241748ca0be41551e04 1986 ydotool_0.1.8-3build1.dsc
+ 90eb1db5e030ed6f402a88b0dc58804abe0ef45deb4ea22da44ef19b06bdb482732afb3275ef6ac586ccd455978c1212dff3646a6e11107ef980957a6b312b74 13362 ydotool_0.1.8.orig.tar.gz
+ b668e421c79734aee63e7f42ee1d95ca82353af2d0f9a0d7439cb9e50770d3b0f3139a0731e025a77b5e87ca5e72afa06fac77f0fd2bcbfe7bf4cf583f960a1a 2840 ydotool_0.1.8-3build1.debian.tar.xz

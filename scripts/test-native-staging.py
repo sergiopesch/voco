@@ -62,10 +62,17 @@ class DependencyTests(unittest.TestCase):
     def test_rpm_licenses_survive_nodocs_policy(self):
         for path in ['/usr/share/doc/voco/nvidia/NVIDIA-OPEN-MODEL-LICENSE.html',
                      '/usr/share/doc/voco/vendor/glib/COPYRIGHT',
-                     '/usr/share/doc/voco/vendor/global-hotkey/LICENSE-MIT']:
+                     '/usr/share/doc/voco/vendor/global-hotkey/LICENSE-MIT',
+                     '/usr/share/doc/voco/vendor/ydotool-legacy/notices/gcc-runtime-copyright',
+                     '/usr/share/doc/voco/vendor/ydotool-legacy/notices/GPL-3',
+                     '/usr/share/doc/voco/vendor/ydotool-legacy/notices/ydotool-LICENSE']:
             self.assertEqual(staging.rpm_file_entry(path), '%license ' + path)
         path = '/usr/share/doc/voco/README.md'
         self.assertEqual(staging.rpm_file_entry(path), path)
+
+    def test_private_daemon_directories_are_owned_for_removal(self):
+        self.assertIn('/usr/libexec/voco', staging.OWNED_ROOTS)
+        self.assertNotIn('/usr/libexec', staging.OWNED_ROOTS)
 
     def test_rpm_profiles_preserve_native_names_and_abi_floors(self):
         fedora = staging.rpm_dependencies('fedora')

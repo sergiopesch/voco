@@ -34,8 +34,6 @@ pub(crate) fn reset_shortcut_renderer(cutoff: u64) -> Result<(), String> {
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum ActiveStrategy {
-    Ydotool,
-    Xdotool,
     Clipboard,
 }
 
@@ -499,8 +497,22 @@ fn desktop_paste_for_target(
         payload.to_owned()
     };
     let result = (|| {
-        let mut metrics = clipboard_paste_with_shortcut(&adjusted, terminal)?;
-        metrics.target_probe_ms = target_probe_ms;
+        let mut guard_probe_ms = 0;
+        let mut metrics = clipboard_paste_with_shortcut(&adjusted, terminal, || {
+            let started = Instant::now();
+            let current = desktop_target();
+            guard_probe_ms = started.elapsed().as_millis() as u64;
+            if current.token.as_deref() != Some(expected_target)
+                || current.shortcut != target.shortcut
+                || !crate::desktop_shortcut::delivery_ready()
+            {
+                return Err(InsertionError::rejected(
+                    "The dictation destination changed before text could be pasted. Review retained text before copying.",
+                ));
+            }
+            Ok(())
+        })?;
+        metrics.target_probe_ms = target_probe_ms.saturating_add(guard_probe_ms);
         metrics.context_separator = separator;
         if let Some(receipt) = &receipt {
             let started = Instant::now();
@@ -587,13 +599,6 @@ fn terminal_paste_text(text: &str) -> String {
         .collect()
 }
 
-#[derive(Debug)]
-enum RequestedStrategy {
-    Auto,
-    Clipboard,
-    TypeSimulation,
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum SessionKind {
     Wayland,
@@ -618,10 +623,6 @@ fn session_type_label(session: SessionKind) -> &'static str {
     }
 }
 
-fn is_wayland() -> bool {
-    matches!(session_kind(), SessionKind::Wayland)
-}
-
 fn is_executable(path: &Path) -> bool {
     #[cfg(target_family = "unix")]
     {
@@ -640,6 +641,11 @@ fn is_executable(path: &Path) -> bool {
 }
 
 fn command_available(command: &str) -> bool {
+    // Daemon selection qualifies this same distro client. A PATH override may
+    // use an incompatible protocol and must not talk to the private helper.
+    if command == "ydotool" {
+        return is_executable(Path::new(SYSTEM_YDOTOOL));
+    }
     let candidate = Path::new(command);
     if candidate.components().count() > 1 {
         return is_executable(candidate);
@@ -654,6 +660,8 @@ fn command_available(command: &str) -> bool {
         })
         .unwrap_or(false)
 }
+
+const SYSTEM_YDOTOOL: &str = "/usr/bin/ydotool";
 
 fn process_running(process_name: &str) -> bool {
     let mut command = process_runner::command("pgrep");
@@ -848,64 +856,6 @@ pub fn runtime_diagnostics() -> RuntimeDiagnostics {
     input_preflight().diagnostics
 }
 
-fn parse_requested_strategy(preferred: &str) -> Result<RequestedStrategy, InsertionError> {
-    match preferred {
-        "auto" => Ok(RequestedStrategy::Auto),
-        "clipboard" => Ok(RequestedStrategy::Clipboard),
-        "type-simulation" => Ok(RequestedStrategy::TypeSimulation),
-        _ => Err(InsertionError::rejected(format!(
-            "Unknown insertion strategy: {preferred}"
-        ))),
-    }
-}
-
-pub fn insert_text(text: &str, preferred: &str) -> Result<InsertionResult, InsertionError> {
-    let _guard = DELIVERY_LOCK.try_lock().map_err(|_| {
-        InsertionError::rejected(
-            "Another insertion is still finishing; no additional text was sent.",
-        )
-    })?;
-    if text.is_empty() || text.len() > 100_000 {
-        return Err(InsertionError::rejected(
-            "Insertion requires 1 to 100,000 UTF-8 bytes.",
-        ));
-    }
-    deliver_with(
-        parse_requested_strategy(preferred)?,
-        || type_simulation(text),
-        || clipboard_paste(text),
-    )
-}
-
-fn deliver_with(
-    requested: RequestedStrategy,
-    type_text: impl FnOnce() -> Result<ActiveStrategy, InsertionError>,
-    paste_text: impl FnOnce() -> Result<(), InsertionError>,
-) -> Result<InsertionResult, InsertionError> {
-    let strategy = match requested {
-        RequestedStrategy::Auto => match type_text() {
-            Ok(strategy) => strategy,
-            // Only an operation known not to have started can authorize trying
-            // the entire transcript through another route.
-            Err(error) if error.outcome == DeliveryOutcome::NoMutation => {
-                paste_text()?;
-                ActiveStrategy::Clipboard
-            }
-            Err(error) => return Err(error),
-        },
-        RequestedStrategy::Clipboard => {
-            paste_text()?;
-            ActiveStrategy::Clipboard
-        }
-        RequestedStrategy::TypeSimulation => type_text()?,
-    };
-    Ok(InsertionResult {
-        paste_metrics: None,
-        strategy,
-        outcome: "dispatched",
-    })
-}
-
 /// A failed spawn proves the helper did not run. Any later error is uncertain:
 /// the helper may have typed a prefix or sent the paste gesture already.
 fn run_helper(
@@ -935,41 +885,10 @@ fn run_helper(
     Ok(())
 }
 
-fn typing_timeout(text: &str, wayland: bool) -> Duration {
-    // Account for the configured per-key delay while bounding an unresponsive
-    // helper. Long dictations should use owned input-method delivery.
-    let per_character_ms = if wayland { 8 } else { 32 };
-    Duration::from_millis((5_000 + text.chars().count() as u64 * per_character_ms).min(180_000))
-}
-
-fn type_simulation(text: &str) -> Result<ActiveStrategy, InsertionError> {
-    let wayland = is_wayland();
-    let (program, arguments, strategy) = if wayland {
-        (
-            "ydotool",
-            vec!["type", "--key-delay", "2", "--", text],
-            ActiveStrategy::Ydotool,
-        )
-    } else {
-        (
-            "xdotool",
-            vec!["type", "--clearmodifiers", "--delay", "12", "--", text],
-            ActiveStrategy::Xdotool,
-        )
-    };
-    let mut command = process_runner::command(program);
-    command.args(arguments);
-    run_helper(&mut command, None, typing_timeout(text, wayland))?;
-    Ok(strategy)
-}
-
-fn clipboard_paste(text: &str) -> Result<(), InsertionError> {
-    clipboard_paste_with_shortcut(text, false).map(|_| ())
-}
-
 fn clipboard_paste_with_shortcut(
     text: &str,
     terminal: bool,
+    before_paste: impl FnOnce() -> Result<(), InsertionError>,
 ) -> Result<PasteMetrics, InsertionError> {
     let started = Instant::now();
     let preflight = input_preflight();
@@ -1001,7 +920,7 @@ fn clipboard_paste_with_shortcut(
     let x11_args = x11_paste_arguments(terminal, leading_separator);
     let (paste_program, paste_args): (&str, &[&str]) = if wayland {
         (
-            "ydotool",
+            SYSTEM_YDOTOOL,
             wayland_args
                 .as_deref()
                 .expect("Wayland arguments checked above"),
@@ -1012,7 +931,8 @@ fn clipboard_paste_with_shortcut(
     let mut paste = process_runner::command(paste_program);
     paste.args(paste_args);
     let preflight_ms = started.elapsed().as_millis() as u64;
-    let (clipboard_ms, keyboard_ms) = clipboard_transaction(payload, &mut copy, &mut paste)?;
+    let (clipboard_ms, keyboard_ms) =
+        clipboard_transaction(payload, &mut copy, &mut paste, before_paste)?;
     Ok(PasteMetrics {
         terminal,
         target_probe_ms: 0,
@@ -1094,7 +1014,7 @@ fn wayland_paste_arguments(daemon_running: bool) -> Result<Vec<&'static str>, In
             "Start the ydotoold desktop input service before dictating.",
         ));
     }
-    let child = process_runner::command("ydotool")
+    let child = process_runner::command(SYSTEM_YDOTOOL)
         .args(["key", "--help"])
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -1133,6 +1053,7 @@ fn clipboard_transaction(
     text: &str,
     copy: &mut Command,
     paste: &mut Command,
+    before_paste: impl FnOnce() -> Result<(), InsertionError>,
 ) -> Result<(u64, u64), InsertionError> {
     let copy_started = Instant::now();
     run_helper(copy, Some(text.as_bytes()), Duration::from_secs(5)).map_err(|mut error| {
@@ -1141,6 +1062,13 @@ fn clipboard_transaction(
     })?;
 
     let clipboard_ms = copy_started.elapsed().as_millis() as u64;
+    // Clipboard helpers may block. Revalidate the bound destination after they
+    // finish, immediately before sending keys. This narrows the focus race;
+    // it cannot make a desktop keyboard gesture atomic with another app.
+    before_paste().map_err(|mut error| {
+        error.clipboard_changed = true;
+        error
+    })?;
     let paste_started = Instant::now();
     run_helper(paste, None, Duration::from_secs(5)).map_err(|mut error| {
         // Clipboard mutation already happened, even if the paste helper could
@@ -1465,47 +1393,9 @@ mod tests {
         assert_eq!(json["outcome"], "uncertain");
         assert_eq!(json["clipboardChanged"], false);
         assert_eq!(
-            serde_json::to_string(&ActiveStrategy::Ydotool).unwrap(),
-            r#""ydotool""#
+            serde_json::to_string(&ActiveStrategy::Clipboard).unwrap(),
+            r#""clipboard""#
         );
-    }
-
-    #[test]
-    fn uncertain_partial_write_never_retries_full_transcript() {
-        let pasted = Cell::new(false);
-        let result = deliver_with(
-            RequestedStrategy::Auto,
-            || Err(InsertionError::uncertain("helper typed abc before failing")),
-            || {
-                pasted.set(true);
-                Ok(())
-            },
-        );
-        assert_eq!(result.unwrap_err().outcome, DeliveryOutcome::Uncertain);
-        assert!(!pasted.get());
-    }
-
-    #[test]
-    fn only_proven_no_mutation_allows_auto_fallback() {
-        let pasted = Cell::new(false);
-        let result = deliver_with(
-            RequestedStrategy::Auto,
-            || Err(InsertionError::no_mutation("spawn failed")),
-            || {
-                pasted.set(true);
-                Ok(())
-            },
-        )
-        .unwrap();
-        assert!(pasted.get());
-        assert_eq!(result.outcome, "dispatched");
-        assert!(matches!(result.strategy, ActiveStrategy::Clipboard));
-        assert!(deliver_with(
-            RequestedStrategy::Auto,
-            || Err(InsertionError::rejected("invalid target")),
-            || panic!("rejected delivery cannot authorize a retry")
-        )
-        .is_err());
     }
 
     #[test]
@@ -1567,7 +1457,7 @@ mod tests {
             ])
             .arg(&clipboard)
             .arg(&consumed);
-        clipboard_transaction("intended transcript\n", &mut copy, &mut paste).unwrap();
+        clipboard_transaction("intended transcript\n", &mut copy, &mut paste, || Ok(())).unwrap();
         assert_eq!(std::fs::read(&consumed).unwrap(), b"intended transcript\n");
         assert_eq!(std::fs::read(&clipboard).unwrap(), b"new user copy");
         std::fs::remove_file(clipboard).unwrap();
@@ -1576,43 +1466,47 @@ mod tests {
     }
 
     #[test]
+    fn destination_change_after_copy_blocks_keyboard_dispatch() {
+        let directory = std::env::temp_dir().join(format!(
+            "voco-before-paste-test-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir(&directory).unwrap();
+        let clipboard = directory.join("selection");
+        let consumed = directory.join("wrong-recipient");
+        let mut copy = process_runner::command("/bin/sh");
+        copy.args(["-c", "cat > \"$1\"", "copy"]).arg(&clipboard);
+        let mut paste = process_runner::command("/bin/sh");
+        paste
+            .args(["-c", "cp \"$1\" \"$2\"", "paste"])
+            .arg(&clipboard)
+            .arg(&consumed);
+        let result = clipboard_transaction("Synthetic phrase.", &mut copy, &mut paste, || {
+            assert_eq!(std::fs::read(&clipboard).unwrap(), b"Synthetic phrase.");
+            Err(InsertionError::rejected(
+                "Destination changed during clipboard preparation.",
+            ))
+        });
+        let keyboard_was_dispatched = consumed.exists();
+        std::fs::remove_dir_all(directory).unwrap();
+        let error = result.unwrap_err();
+        assert_eq!(error.outcome, DeliveryOutcome::Rejected);
+        assert!(error.clipboard_changed);
+        assert!(!keyboard_was_dispatched);
+    }
+
+    #[test]
     fn failed_paste_after_copy_is_uncertain_even_if_paste_never_spawned() {
         let mut copy = process_runner::command("/bin/cat");
         let mut paste = process_runner::command("/definitely-missing-voco-test-helper");
-        let error = clipboard_transaction("transcript", &mut copy, &mut paste).unwrap_err();
+        let error =
+            clipboard_transaction("transcript", &mut copy, &mut paste, || Ok(())).unwrap_err();
         assert_eq!(error.outcome, DeliveryOutcome::Uncertain);
         assert!(error.clipboard_changed);
-    }
-
-    #[test]
-    fn typing_deadline_accounts_for_length_but_is_bounded() {
-        assert!(typing_timeout("longer text", false) > typing_timeout("x", false));
-        assert_eq!(
-            typing_timeout(&"x".repeat(100_000), false),
-            Duration::from_secs(180)
-        );
-    }
-
-    #[test]
-    fn parse_requested_strategy_accepts_known_values_and_rejects_unknown() {
-        assert!(matches!(
-            parse_requested_strategy("auto"),
-            Ok(RequestedStrategy::Auto)
-        ));
-        assert!(matches!(
-            parse_requested_strategy("clipboard"),
-            Ok(RequestedStrategy::Clipboard)
-        ));
-        assert!(matches!(
-            parse_requested_strategy("type-simulation"),
-            Ok(RequestedStrategy::TypeSimulation)
-        ));
-        assert_eq!(
-            parse_requested_strategy("surprise-mode")
-                .unwrap_err()
-                .outcome,
-            DeliveryOutcome::Rejected
-        );
     }
 
     #[test]

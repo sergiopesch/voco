@@ -1,17 +1,17 @@
 const HOST = 'com.voco.exact_field';
 let native = null, ready = false;
-const tabs = new Map(), routes = new Map();
+const tabs = new Map(), routes = new Map(), pendingTabs = new Map();
 function clearBadge(tabId) {
   chrome.action.setBadgeText({tabId, text: ''}).catch(() => {});
   chrome.action.setTitle({tabId, title: 'Enable VOCO in this tab'}).catch(() => {});
 }
 function disconnect() {
   ready = false; native = null;
-  for (const tabId of tabs.keys()) {
+  for (const tabId of new Set([...tabs.keys(), ...pendingTabs.keys()])) {
     chrome.tabs.sendMessage(tabId, {type: 'disarm'}).catch(() => {});
     clearBadge(tabId);
   }
-  tabs.clear(); routes.clear();
+  tabs.clear(); routes.clear(); pendingTabs.clear();
 }
 function connect() {
   if (native) return;
@@ -34,27 +34,39 @@ function connect() {
 }
 async function enableTab(tab) {
   if (!tab.id || tab.incognito) return;
-  if (tabs.has(tab.id)) {
-    const port = native;
-    try {
-      const response = await chrome.tabs.sendMessage(tab.id, {type: 'disarm'});
-      const route = routes.get(response?.stopToken);
-      if (port && native === port && ready && route?.tabId === tab.id && route.documentId === response.documentId) {
-        port.postMessage({protocol: 1, type: 'stop', token: response.stopToken, documentId: route.documentId});
-      }
-    } catch (_) { /* A navigated document is already unavailable. */ }
-    invalidateTab(tab.id); return;
+  if (tabs.has(tab.id) || pendingTabs.has(tab.id)) {
+    // Revoke synchronously: a late disarm reply must not clear a newer authorization.
+    invalidateTab(tab.id);
+    await chrome.tabs.sendMessage(tab.id, {type: 'disarm'}).catch(() => {});
+    return;
   }
-  connect();
-  for (let attempts = 0; attempts < 20 && native && !ready; attempts++) await new Promise(resolve => setTimeout(resolve, 50));
-  if (!ready) { chrome.action.setTitle({tabId: tab.id, title: 'Open VOCO and enable its browser integration first'}); return; }
+  const attempt = {};
+  pendingTabs.set(tab.id, attempt);
+  const current = () => pendingTabs.get(tab.id) === attempt;
   try {
+    connect();
+    const port = native;
+    for (let attempts = 0; attempts < 20 && current() && native === port && !ready; attempts++) await new Promise(resolve => setTimeout(resolve, 50));
+    if (!current()) return;
+    if (!ready || native !== port) {
+      await chrome.action.setTitle({tabId: tab.id, title: 'Open VOCO and enable its browser integration first'}).catch(() => {});
+      return;
+    }
     await chrome.scripting.executeScript({target: {tabId: tab.id}, files: ['content.js']});
+    if (!current() || native !== port || !ready) return;
     const response = await chrome.tabs.sendMessage(tab.id, {type: 'arm'});
+    if (!current() || native !== port || !ready) return;
+    if (!/^[a-f0-9]{48}$/.test(response?.documentId || '')) throw new Error('Invalid document identity');
     tabs.set(tab.id, response.documentId);
-    chrome.action.setTitle({tabId: tab.id, title: 'VOCO enabled: Alt+Shift+V to dictate; click to disable this tab'});
-    chrome.action.setBadgeText({tabId: tab.id, text: 'ON'});
-  } catch (_) { chrome.action.setTitle({tabId: tab.id, title: 'VOCO cannot access this page'}); }
+    await Promise.all([
+      chrome.action.setTitle({tabId: tab.id, title: 'VOCO enabled: Alt+Shift+V to dictate; click to disable this tab'}),
+      chrome.action.setBadgeText({tabId: tab.id, text: 'ON'}),
+    ]).catch(() => {});
+  } catch (_) {
+    if (current()) await chrome.action.setTitle({tabId: tab.id, title: 'VOCO cannot access this page'}).catch(() => {});
+  } finally {
+    if (current()) pendingTabs.delete(tab.id);
+  }
 }
 chrome.action.onClicked.addListener(enableTab);
 chrome.runtime.onMessage.addListener((message, sender) => {
@@ -73,16 +85,21 @@ chrome.runtime.onMessage.addListener((message, sender) => {
   }
 });
 function invalidateTab(tabId) {
+  pendingTabs.delete(tabId);
   tabs.delete(tabId);
   clearBadge(tabId);
   for (const [token, route] of routes) if (route.tabId === tabId) {
-    if (ready && native) native.postMessage({protocol: 1, type: 'invalidate', token, documentId: route.documentId, reason: 'disconnected'});
+    // Revoke insertion before Stop; pagehide may never reach a closing tab.
+    if (ready && native) {
+      native.postMessage({protocol: 1, type: 'invalidate', token, documentId: route.documentId, reason: 'disconnected'});
+      native.postMessage({protocol: 1, type: 'stop', token, documentId: route.documentId});
+    }
     routes.delete(token);
   }
 }
 chrome.tabs.onRemoved.addListener(invalidateTab);
 chrome.tabs.onUpdated.addListener((tabId, change) => {
-  if (tabs.has(tabId) && (change.status === 'loading' || typeof change.url === 'string')) {
+  if ((tabs.has(tabId) || pendingTabs.has(tabId)) && (change.status === 'loading' || typeof change.url === 'string')) {
     chrome.tabs.sendMessage(tabId, {type: 'disarm'}).catch(() => {});
     invalidateTab(tabId);
   }

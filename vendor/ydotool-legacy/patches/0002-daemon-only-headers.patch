@@ -1,0 +1,30 @@
+--- a/CommonIncludes.hpp
++++ b/CommonIncludes.hpp
+@@ -21,6 +21,7 @@
+ #include <stdexcept>
+ #include <thread>
+ #include <deque>
++#include <memory>
+ 
+ #include <cstdio>
+ #include <cstdlib>
+@@ -41,9 +42,6 @@
+ #include <sys/epoll.h>
+ 
+ #include <uInputPlus/uInput.hpp>
+-#include <evdevPlus/evdevPlus.hpp>
+ 
+-#include <boost/program_options.hpp>
+-#include <boost/crc.hpp>
+ 
+ #endif //YDOTOOL_COMMONINCLUDES_HPP
+--- a/Daemon/ydotoold.hpp
++++ b/Daemon/ydotoold.hpp
+@@ -15,6 +15,6 @@
+ #define YDOTOOL_DAEMON_HPP
+ 
+ #include "../CommonIncludes.hpp"
+-#include "../Library/Tool.hpp"
++#include "../Library/Instance.hpp"
+ 
+ #endif //YDOTOOL_DAEMON_HPP

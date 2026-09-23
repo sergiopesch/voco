@@ -107,7 +107,7 @@ playback. Frontend guards and tray action state make realtime and dictation mutu
 | `enhance_transcript` | Frontend -> Rust | Apply optional formatting/local transcript polish |
 | `test_local_llm` | Frontend -> Rust | Check an OpenAI-compatible localhost model endpoint |
 | `ask_local_llm_agent` | Frontend -> Rust | Send transcript to a localhost model and return its answer |
-| `insert_text` | Frontend -> Rust | Legacy compatibility helper; not automatic dictation |
+| `insert_text` | Frontend -> Rust | Historical compatibility helper; removed from the active IPC in the 2026.0.55 source candidate |
 | `ask_openclaw_agent` | Frontend -> Rust | Send a transcript to the configured OpenClaw CLI agent |
 | `create_realtime_client_secret` | Frontend -> Rust | Mint a short-lived OpenAI Realtime client token |
 | `set_dictation_status` | Frontend -> Rust | Update tray icon state |
@@ -182,11 +182,11 @@ Automatic browser text output requires an extension-origin token, broker-allocat
 exact-element recipient receipt. A native input-context lease alone never authorizes a write.
 The default and unsupported targets retain text in VOCO for an explicit Copy action.
 
-The legacy `insert_text` API remains for compatibility but is not called by automatic dictation.
-It selects ydotool on Wayland or xdotool on X11. `auto` may fall back to clipboard only when the
-first helper never started; any post-spawn failure is uncertain and stops automatic retry. The
-success outcome is `dispatched`, because helper completion cannot prove target consumption.
-Clipboard insertion leaves the transcript in the clipboard. It never restores an old text-only
+At this historical stage, the legacy `insert_text` API selected ydotool on Wayland or xdotool on
+X11. Its `auto` strategy fell back to clipboard only when the first helper never started. The
+2026.0.55 source candidate removes this unguarded IPC; current automatic desktop delivery uses a
+bound destination token and clipboard paste. A successful helper exit still cannot prove target
+consumption. Clipboard insertion leaves the transcript in the clipboard and never restores an old
 snapshot over newer clipboard ownership or pretends to preserve all MIME formats.
 
 ## Persistent IBus Input Source

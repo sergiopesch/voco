@@ -244,7 +244,7 @@ try:
             trace = root / 'state/voco/hotkey-trace.jsonl'
             previous_ready_count = trace.read_text().count('frontend_hotkey_handler_ready') if trace.exists() else 0
             with (evidence / f'app-{cycle}.log').open('w') as log:
-                app = subprocess.Popen([str(root / 'voco')], env=env, stdout=log, stderr=subprocess.STDOUT)
+                app = subprocess.Popen([str(root / 'voco')], env={**env, 'VOCO_HOTKEY_TRACE': '1'}, stdout=log, stderr=subprocess.STDOUT)
             try:
                 def registered():
                     assert app.poll() is None, 'App exited before tray registration'

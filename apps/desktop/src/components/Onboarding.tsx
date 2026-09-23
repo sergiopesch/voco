@@ -1,5 +1,5 @@
 import { StatusMark } from "./StatusMark";
-import { VoiceSignal } from "./VoiceSignal";
+import { RecordingVoiceSignal } from "./VoiceSignal";
 import { SettingsIcon } from "./SettingsIcon";
 import { PanelSetup } from "./PanelSetup";
 import { useEffect, useRef, useState } from "react";
@@ -9,7 +9,6 @@ import type { DictationStatus } from "@/types";
 interface OnboardingProps {
   microphone: string;
   status: DictationStatus;
-  audioLevel: number;
   transcript: string;
   passed: boolean;
   failed: boolean;
@@ -31,7 +30,7 @@ interface OnboardingProps {
   onFinish: () => Promise<void>;
 }
 
-export function Onboarding({ microphone, status, audioLevel, transcript, passed,
+export function Onboarding({ microphone, status, transcript, passed,
   failed, preparing, saving, blocked, hotkey, microphoneControls, desktopReady = false,
   onStart, onStop, onFinish, attempted, setupError, onRetrySetup, desktopSetupError,
   checkingDesktopSetup, onCheckDesktopSetup, onOpenDesktopSetupGuide }: OnboardingProps) {
@@ -89,7 +88,7 @@ export function Onboarding({ microphone, status, audioLevel, transcript, passed,
       </> : <div className="voco-voice-control" data-recording={recording}>
         <button ref={primaryRef} className="voco-button voco-button--primary voco-voice-pill" disabled={recording ? busy : busy || blocked}
           onClick={recording ? onStop : problem && onRetrySetup ? onRetrySetup : onStart}><SettingsIcon name="microphone" /><span>{status === "processing" ? "Finishing…" : busy ? "Preparing…" : recording ? "Finish test" : problem && onRetrySetup ? "Retry microphone setup" : attempted || problem ? "Test again" : "Start test"}</span></button>
-        <span className="voco-voice-pill__reveal"><VoiceSignal level={recording ? audioLevel : 0} active={recording} /></span>
+        <span className="voco-voice-pill__reveal"><RecordingVoiceSignal active={recording} /></span>
       </div>}
     </div>
     </>}

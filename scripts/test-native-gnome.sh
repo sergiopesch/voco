@@ -1,13 +1,21 @@
 #!/usr/bin/env bash
 # Actual GNOME Shell on a private Xvfb seat; never attach to the host session.
 set -euo pipefail
+umask 077
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 if [[ ${1:-} != --inside ]]; then
+  if [[ ${VOCO_GNOME_CAPTURE:-0} == 1 ]]; then
+    echo "The historical manual-Copy capture fixture is retired. Use VOCO_GNOME_ONBOARDING=1 with all three documented audio audit flags." >&2
+    exit 2
+  fi
   : "${VOCO_NATIVE_DEPS:?Set extracted Xvfb root/usr}"
   : "${VOCO_GNOME_EVIDENCE_DIR:?Set fresh evidence directory}"
   [[ ! -e "$VOCO_GNOME_EVIDENCE_DIR" ]] || { echo 'Evidence directory must be fresh' >&2; exit 1; }
-  if [[ ${VOCO_GNOME_CAPTURE:-0} == 1 ]]; then
+  if [[ ${VOCO_GNOME_ONBOARDING:-0} == 1 ]]; then
     : "${VOCO_GNOME_APP_BINARY:?Capture requires app}"
+    for audit_flag in VOCO_DEV_NATIVE_CAPTURE VOCO_DEBUG_CAPTURE_AUDIO VOCO_DEBUG_NATIVE_CAPTURE; do
+      [[ ${!audit_flag:-0} == 1 ]] || { echo "$audit_flag=1 is required for complete private native audio evidence" >&2; exit 2; }
+    done
 
     for helper in pulseaudio pactl paplay wl-copy wl-paste; do command -v "$helper" >/dev/null; done
     export VOCO_WAYLAND_PULSEAUDIO="$(command -v pulseaudio)"
@@ -15,10 +23,10 @@ if [[ ${1:-} != --inside ]]; then
     export VOCO_WAYLAND_PAPLAY="$(command -v paplay)"
   fi
   run=$(mktemp -d)
-  mkdir -p "$run"/{home,runtime,config,cache,data,state,evidence}
-  chmod 700 "$run/runtime"
+  mkdir -p "$run"/{home,runtime,config,cache,data,state,evidence,pulse}
+  chmod 700 "$run/runtime" "$run/pulse"
   mkdir -p "$run/evidence/sources"
-  cp "$ROOT/scripts/test-native-gnome.sh" "$ROOT/scripts/test-native-gnome.py" "$ROOT/scripts/test-native-wayland.py" "$ROOT/scripts/test_native_wayland_capture.py" "$run/evidence/sources/"
+  cp "$ROOT/scripts/test-native-gnome.sh" "$ROOT/scripts/test-native-gnome.py" "$ROOT/scripts/test-native-wayland.py" "$ROOT/scripts/test_native_wayland_capture.py" "$ROOT/scripts/test_native_onboarding_capture.py" "$run/evidence/sources/"
   mkdir -p "$run/data/gnome-shell/extensions/voco-private-probe@test.invalid"
   cp "$ROOT/scripts/fixtures/gnome-private-probe/"* "$run/data/gnome-shell/extensions/voco-private-probe@test.invalid/"
   cp -a "$ROOT/scripts/fixtures/gnome-private-probe" "$run/evidence/sources/"
@@ -28,12 +36,15 @@ if [[ ${1:-} != --inside ]]; then
     source "$(dirname "${BASH_SOURCE[0]}")/lib/test-speech-runtime.sh"
     voco_stage_test_speech "$run"
     mkdir -p "$run/config/voco"
-    printf '%s\n' '{"onboardingCompleted":true,"liveCursorMode":"final-text-only","transcriptTarget":"cursor","transcriptEnhancement":"off","hotkey":"Alt+D"}' > "$run/config/voco/config.json"
+    onboarding_completed=true
+    [[ ${VOCO_GNOME_ONBOARDING:-0} != 1 ]] || onboarding_completed=false
+    printf '{"onboardingCompleted":%s,"hotkey":"Alt+D"}\n' "$onboarding_completed" > "$run/config/voco/config.json"
   fi
   trap 'status=$?; mkdir -p "$VOCO_GNOME_EVIDENCE_DIR"; cp -a "$run/evidence/." "$VOCO_GNOME_EVIDENCE_DIR/"; printf "%s\n" "$status" > "$VOCO_GNOME_EVIDENCE_DIR/exit-code"; rm -rf "$run"; exit "$status"' EXIT
   bwrap --die-with-parent --new-session --unshare-ipc --unshare-net --unshare-pid --unshare-uts \
     --ro-bind / / --dev /dev --proc /proc --tmpfs /tmp --tmpfs /run/user --tmpfs /run/dbus \
     --bind "$run" "$run" --ro-bind "$VOCO_NATIVE_DEPS" /tmp/native-deps \
+    --dir "/run/user/$(id -u)" --bind "$run/pulse" "/run/user/$(id -u)/pulse" \
     --setenv HOME "$run/home" --setenv XDG_RUNTIME_DIR "$run/runtime" \
     --setenv XDG_CONFIG_HOME "$run/config" --setenv XDG_CACHE_HOME "$run/cache" \
     --setenv XDG_DATA_HOME "$run/data" --setenv XDG_STATE_HOME "$run/state" \

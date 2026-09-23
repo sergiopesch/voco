@@ -42,4 +42,22 @@ const scriptPath = path.resolve("scripts/reset-cursor-streaming-trace.mjs");
   assert.equal(fs.readFileSync(tracePath, "utf8"), "");
 }
 
+{
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "voco-trace-reset-rotated-test-"));
+  const tracePath = path.join(dir, "hotkey-trace.jsonl");
+  const previousPath = path.join(dir, "hotkey-trace.previous.jsonl");
+  fs.writeFileSync(previousPath, '{"event":"app_start"}\n');
+  fs.writeFileSync(tracePath, '{"event":"dictation_stop_to_idle"}\n');
+
+  const output = execFileSync(process.execPath, [scriptPath, tracePath], { encoding: "utf8" });
+
+  assert.match(output, /Archived rotated trace: .+hotkey-trace\.previous\..+\.jsonl/);
+  assert.equal(fs.existsSync(previousPath), false);
+  assert.equal(fs.readFileSync(tracePath, "utf8"), "");
+  const archives = fs.readdirSync(dir).filter((name) => name !== "hotkey-trace.jsonl");
+  assert.equal(archives.length, 2);
+  assert.equal(archives.some((name) => fs.readFileSync(path.join(dir, name), "utf8").includes("app_start")), true);
+  assert.equal(archives.some((name) => fs.readFileSync(path.join(dir, name), "utf8").includes("dictation_stop_to_idle")), true);
+}
+
 console.log("reset-cursor-streaming-trace tests passed");

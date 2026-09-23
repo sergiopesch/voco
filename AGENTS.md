@@ -53,6 +53,10 @@ glib 0.20 directly leaves the GTK dependency behind. [Backport](vendor/glib/VOCO
 - Explicit NVIDIA recovery uses `recover_stream` and the bundled runtime, with no
   destination callback or alternate recognizer. Preserve source samples/rate; publish
   only a completed result. Cancel keeps audio and stale cleanup is session-bound.
+- The private legacy input daemon is selected only for the qualified system client.
+  Keep `/usr/bin/ydotool` consistent between probing and dispatch. Migrate only
+  VOCO's unmodified user unit while holding its single-instance guard, before
+  recording can start. Package hooks must not restart desktop session services.
 - Legacy ydotool requires a literal space argument, not `space`. Its paste delay
   is 24 ms; modern numeric arguments and terminal gestures have separate contracts.
 - X11 shortcut scope belongs to the exact focus window, UUID and renderer epoch
@@ -62,13 +66,34 @@ glib 0.20 directly leaves the GTK dependency behind. [Backport](vendor/glib/VOCO
 - IBus protocol 6 is dictation-shortcut-only; older helpers must reconnect after upgrade. Never restore text mutation there.
 - Bounded accessible-field observations are not atomic ownership or cursor paint.
   Rich editors require a bounded caret-linked paragraph route, including route identity
-  and trailing noneditable scaffolding. Never acknowledge the outer object placeholder.
+  and trailing noneditable scaffolding. Direct and nested editable HTML div/p blocks
+  can lose their empty BR on first paste; native/plain-text newlines remain literal.
+  Never acknowledge the outer object placeholder.
   Content and caret can propagate separately. Exact expected content at an earlier
   known caret is pending, never receipt; retain the deadline and no-replay rule.
 - Automatic desktop insertion requires a bound, nonempty destination token. An
   unavailable preflight is never permission to paste unguarded. GNOME X11's
   `mutter-x11-frames` decoration is not a second destination; retain rejection for
   genuinely ambiguous active clients and test focus departure in a real session.
+- Suggestion focus may resolve to its editable controller only through bounded,
+  reciprocal POPUP_FOR/CONTROLLER_FOR relations, fresh focus, same process and
+  active-window ancestry. Settle owner loss only within the drained event batch;
+  real field departures and roundtrips must invalidate the destination. Cold
+  lookup may follow the same verified popup-owner route; never skip its fresh
+  active-window ancestry check.
+- Focused WebKit wrappers are search roots, not editable carets. Continue bounded
+  discovery to a freshly focused input; retain password and unfocused-child rejection.
+- Cold discovery prioritizes cached focus/visibility across its bounded queue so
+  hidden popup subtrees cannot starve a visible field. Those flags only order
+  searches: fresh state, ancestry and caret validation still govern admission.
+  Preserve the 128-object discovery budget and the 800 ms helper deadline.
+- Revalidate destination and shortcut scope after clipboard preparation and before
+  keyboard dispatch. Rejection there records the changed clipboard and sends no
+  keys. This is a narrower race window, not atomic ownership during a key gesture.
+- Closing or navigating an enabled browser tab, or losing its native connection,
+  stops that tab's active recording. Ordinary field focus loss revokes delivery
+  but preserves the original session's explicit Stop; stale tokens cannot stop
+  a newer session.
 - Drain accessibility window-transition events within bounded work and time. Never
   bind through a partially drained queue; cover ordinary GNOME setup backlogs.
 - Logs are optional, private and bounded. No dictated text, audio, clipboard values,
@@ -99,6 +124,7 @@ npm run test:microphone-renderer
 npm run test:native-capture-renderer
 npm run test:chromium-exact-field
 npm run test:rich-editor-delivery
+npm run test:application-delivery
 python3 scripts/verify-glib-backport.py
 python3 scripts/test-glib-variant.py --output /tmp/voco-glib-check
 cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml
@@ -127,7 +153,7 @@ isolation, not a remote VM or proof of a distribution's default desktop.
 
 ## Release and evidence
 
-Source candidate: **2026.0.54**. Recorded public Ubuntu/Debian version: **2026.0.54**. Verify the current public release on GitHub and
+Source candidate: **2026.0.55**. Recorded public Ubuntu/Debian version: **2026.0.54**. Verify the current public release on GitHub and
 installed version from the package manager; do not infer either from source.
 The .43 package and desktop evidence is recorded in
 [the support matrix](docs/linux-support.md); preserve per-artifact receipts and

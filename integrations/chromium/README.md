@@ -3,10 +3,17 @@
 This Manifest V3 extension is an explicitly enabled, local-only recipient adapter.
 Click its toolbar action on the desired tab, then focus a plain text field and use
 **Alt+Shift+V** to start or stop. The separate browser chord avoids VOCO's native
-Alt+D shortcut. Opening a new document requires enabling that document again.
+Alt+D shortcut. Opening a new document requires enabling that document again. Navigation,
+connection loss or a second toolbar click also cancels an enable request still
+waiting for script injection or its reply; a late reply cannot enable another document.
 Click the toolbar action again to disable the current tab. An active browser
 recording receives a stop request and its recipient authorization is revoked;
 any undelivered text remains available for manual recovery.
+Closing or navigating the enabled tab, or losing the native host connection,
+also requests Stop for that recording. VOCO retains that request across a
+temporary renderer reload until its listener confirms receipt. Moving focus
+away from its field only revokes text delivery; use the shortcut or VOCO's Stop
+control to end recording while the tab remains open.
 The application and `com.voco.exact_field` native messaging host must be running
 and registered. This directory is an unpacked development extension, not a
 published store listing. Its fixed ID is `dohnphckdenppjhdafmhefhomomodgcc`.
@@ -28,7 +35,9 @@ semantic detection of every potentially private field: enable only a tab where
 you intend to dictate. Incognito tabs are rejected by the worker. Iframes and
 closed shadow editors are not supported.
 
-A consumed shortcut captures an exact element and document nonce. A native claim
+A consumed shortcut captures an exact element and document nonce. Document mutation
+observation starts before its asynchronous claim and ends on revocation, completion
+or disable; an idle enabled tab does not observe unrelated page mutations. A native claim
 must arrive within two seconds while its focus, value, and caret still match.
 Every append checks these again synchronously, dispatches a cancelable
 `beforeinput` veto, checks again, and calls the captured element's native
@@ -76,14 +85,17 @@ localhost host grant** replaces a physical toolbar click, so this harness proves
 recipient logic and native messaging, not the visual toolbar permission prompt.
 No installed browser profile is changed. Tests cover Unicode checkpoints/final
 receipts, replay, field switching, reentrant page handlers, navigation, selection,
-password/rich rejection, repeated shortcuts, expiry, and disconnect/re-arm.
+password/rich rejection, repeated shortcuts, expiry, and disconnect/re-arm. The
+local lifecycle tests also check tab close/navigation Stop after focus loss,
+interrupted enable requests, and mutation-observer cleanup and reactivation.
 
 `npm run test:browser-full-app` additionally runs the actual VOCO GUI, WebKit
-microphone capture, pinned base.en model, and Chromium recipient inside private
-Bubblewrap/Xvfb/PulseAudio namespaces. Set `VOCO_NATIVE_APP_BINARY`,
-`VOCO_NATIVE_MODEL`, `VOCO_BROWSER_HOST_BINARY`, `VOCO_BROWSER_EXTENSION_DIR`, and
+microphone capture, pinned Nemotron 0.6B Q8 runtime, and Chromium recipient inside
+private Bubblewrap/Xvfb/PulseAudio namespaces. Set `VOCO_NATIVE_APP_BINARY`,
+`VOCO_BROWSER_HOST_BINARY`, `VOCO_BROWSER_EXTENSION_DIR`, and
 `VOCO_BROWSER_EVIDENCE_DIR` to the candidate artifacts and evidence destination.
-`VOCO_NATIVE_OUTPUT_MODE=stable-cursor-streaming` tests canonical output;
+Provision the pinned runtime using [runtime provisioning](../../docs/linux-packaging.md#runtime-provisioning);
+the fixture stages and checks the selected runtime identity. Streaming delivery is the production path;
 `VOCO_BROWSER_LONG_CAPTURE=1` concatenates existing speech fixtures in manifest order until at least 37 seconds
 (250ms gaps), waits for a real checkpoint receipt, changes focus, and verifies
 that finalization preserves the committed prefix and retains recovery without
@@ -92,7 +104,7 @@ representative speech-quality benchmark. Hosted Ubuntu CI can use
 `scripts/test-private-ibus-engine-hosted.sh --browser-application`; its temporary
 user-namespace policy adjustment is restricted to ephemeral GitHub runners.
 
-The original repeated-phrase stress remains a separate failed existing-model
-quality probe: certain 30-second phase offsets produce empty results in the
-unchanged decoder. `VOCO_BROWSER_LONG_FIXTURE=repeated` reproduces that synthetic
-source; it is not substituted silently into the natural-sequence delivery gate.
+The original repeated-phrase stress is historical evidence from the retired
+recognizer. `VOCO_BROWSER_LONG_FIXTURE=repeated` still reproduces that synthetic
+source for separate comparisons; it is not substituted silently into the
+natural-sequence delivery gate or treated as a result for the selected Nemotron runtime.

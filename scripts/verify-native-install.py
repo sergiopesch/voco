@@ -53,7 +53,7 @@ for row in rows:
             errors.append({'path': row['path'], 'issue': 'content_or_type_mismatch'})
         shared_directory = row['kind'] == 'directory' and not any(
             str(path) == prefix or str(path).startswith(prefix + '/')
-            for prefix in ('/usr/lib/voco', '/usr/share/voco', '/usr/share/doc/voco'))
+            for prefix in ('/usr/lib/voco', '/usr/libexec/voco', '/usr/share/voco', '/usr/share/doc/voco'))
         if shared_directory:
             # Native packages must not change Fedora's existing /usr/bin and
             # /usr/lib modes just because Debian uses different system modes.

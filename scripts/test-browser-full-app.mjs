@@ -6,6 +6,7 @@ import crypto from 'node:crypto';
 import http from 'node:http';
 import assert from 'node:assert/strict';
 import {freezeLongPlayback} from './browser-long-accuracy.mjs';
+import {browserCaptureStopEvidence} from './browser-capture-lifecycle.mjs';
 import {scoreTranscript} from './speech-score.mjs';
 import {scoreSpeechIntegrity} from './speech-integrity.mjs';
 const longCapture = process.env.VOCO_BROWSER_LONG_CAPTURE === '1';
@@ -32,11 +33,24 @@ await fs.writeFile(`${profile}/NativeMessagingHosts/com.voco.exact_field.json`, 
 const server = http.createServer((_q,r) => r.end('<!doctype html><title>VOCO exact recipient</title><textarea id="a"></textarea><textarea id="b"></textarea>'));
 await new Promise(r=>server.listen(0,'127.0.0.1',r));
 const log = await fs.open(`${root}/evidence/app.log`, 'w');
-const app = spawn(`${root}/voco`, [], {env: process.env, stdio:['ignore',log.fd,log.fd]});
+const app = spawn(`${root}/voco`, [], {env: {...process.env, VOCO_HOTKEY_TRACE: '1'}, stdio:['ignore',log.fd,log.fd]});
 const delay = ms=>new Promise(r=>setTimeout(r,ms));
 const traces = async()=> (await fs.readFile(`${root}/state/voco/hotkey-trace.jsonl`,'utf8').catch(()=>'' )).split('\n').flatMap(line=>{try{return [JSON.parse(line)];}catch{return [];}});
 async function until(fn, label, ms=30_000) {const deadline=Date.now()+ms;while(Date.now()<deadline){if(await fn())return;if(playbacks.some(p=>p.record.error || p.record.timedOut || (p.record.exitCode !== undefined && p.record.exitCode !== 0)))throw Error('Fixture playback failed; see playback.json');if(app.exitCode!==null)throw Error(`App exited: ${label}`);await delay(50);}throw Error(`Timed out: ${label}`);}
 let browser, page, worker, failure; const results=[], playbacks=[];
+async function disconnectStagedNativeHost() {
+  // Closing the extension-side Port does not fire its own onDisconnect event.
+  // Terminate the remote native host to exercise the real reconnect boundary.
+  const executable = `${root}/voco-browser-host`;
+  const candidates = (await Promise.all((await fs.readdir('/proc'))
+    .filter(entry => /^\d+$/.test(entry))
+    .map(async entry => (await fs.readlink(`/proc/${entry}/exe`).catch(() => null)) === executable
+      ? Number(entry) : null))).filter(pid => pid !== null);
+  assert.equal(candidates.length, 1, 'exactly one staged native host in the private PID namespace');
+  process.kill(candidates[0], 'SIGTERM');
+  await until(() => worker.evaluate(() => native === null && ready === false),
+    'native host loss reaches the production disconnect handler');
+}
 async function playFixture(file) {
   const record = {file:path.basename(file), sha256:await hash(file), startedAt:new Date().toISOString(), startedMonotonicMs:performance.now(), stderr:''};
   const child = spawn(process.env.VOCO_BROWSER_PLAY,['--device=fixture',file],{stdio:['ignore','ignore','pipe']});
@@ -116,6 +130,66 @@ try {
   const clear = spawn('/usr/bin/python3', ['scripts/test-browser-clear-recovery.py'], {stdio: ['ignore', log.fd, log.fd]});
   assert.equal(await new Promise(resolve => clear.on('exit', resolve)), 0, 'actual recovery clear button');
   await shortCase(false, true);
+
+  // Exercise terminal browser lifetime with real capture and native receipts.
+  // Unit tests cannot prove that the packaged renderer actually stops its mic.
+  for (const departure of ['navigation', 'tab-close', 'native-disconnect']) {
+    const recipient = await browser.newPage();
+    const url = `http://127.0.0.1:${server.address().port}/?lifetime=${departure}`;
+    await recipient.goto(url); await recipient.bringToFront();
+    const recipientId = await worker.evaluate(async url =>
+      (await chrome.tabs.query({})).find(tab => tab.url === url).id, url);
+    await worker.evaluate(async id => enableTab(await chrome.tabs.get(id)), recipientId);
+    await recipient.locator('#a').focus();
+    const sourceOutputs = () => JSON.parse(execFileSync(process.env.VOCO_BROWSER_PACTL || 'pactl',
+      ['--format=json', 'list', 'source-outputs'], {encoding: 'utf8'}));
+    const activeSources = () => sourceOutputs().filter(output => output.corked === false).map(output => output.index);
+    const baselineSources = activeSources();
+    const traceStart = (await traces()).length;
+    await recipient.keyboard.press('Alt+Shift+v');
+    await until(async () => (await traces()).slice(traceStart).some(row =>
+      row.event === 'recording_state_active'), `${departure}: recording starts`);
+    const recording = (await traces()).slice(traceStart).find(row => row.event === 'recording_state_active');
+    assert.ok(Number.isSafeInteger(recording.dictation_session_id));
+    let recordingSources;
+    await until(() => {
+      recordingSources = activeSources().filter(index => !baselineSources.includes(index));
+      return recordingSources.length > 0;
+    }, `${departure}: private Pulse observes active capture`);
+    const playback = await playFixture('tests/fixtures/speech/84-121123-0000.wav');
+    await until(async () => (await recipient.locator('#a').inputValue()).length > 0,
+      `${departure}: live prefix arrives`);
+    if (departure === 'navigation') await recipient.goto(url + '&departed=1');
+    else if (departure === 'tab-close') await recipient.close();
+    else await disconnectStagedNativeHost();
+    let captureStop;
+    await until(async () => {
+      captureStop = browserCaptureStopEvidence((await traces()).slice(traceStart), recording.dictation_session_id);
+      return captureStop !== null;
+    }, `${departure}: capture tears down and recording reaches recovery or idle`, 15_000);
+    let afterSources;
+    await until(() => {
+      afterSources = activeSources();
+      return recordingSources.every(index => !afterSources.includes(index)) &&
+        afterSources.every(index => baselineSources.includes(index));
+    }, `${departure}: private Pulse confirms capture release`, 5_000);
+    assert.equal(await playback.done, 0);
+    if (departure === 'navigation') assert.equal(await recipient.locator('#a').inputValue(), '');
+    if (!recipient.isClosed()) assert.equal(await recipient.locator('#b').inputValue(), '');
+    const stopped = (await traces()).slice(traceStart);
+    assert.equal(stopped.filter(row => row.event === 'recording_state_active').length, 1);
+    if (captureStop.terminal === 'dictation_recovery_retained') {
+      const clear = spawn('/usr/bin/python3', ['scripts/test-browser-clear-recovery.py'],
+        {stdio: ['ignore', log.fd, log.fd]});
+      assert.equal(await new Promise(resolve => clear.on('exit', resolve)), 0);
+    }
+    if (!recipient.isClosed()) await recipient.close();
+    results.push({case: `${departure}-stops-active-capture`, passed: true, captureStop,
+      pulseCapture: {baselineSources, recordingSources, activeAfterStop: afterSources},
+      events: stopped.map(row => row.event)});
+    // A fresh successful recording proves the pending Stop receipt was retired.
+    await shortCase(false, true);
+  }
 
 } catch (error) {
   failure = error.message;

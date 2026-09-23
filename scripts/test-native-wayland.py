@@ -184,7 +184,8 @@ try:
         for cycle in range(2):
             items.clear()
             with (root / f'evidence/app-{cycle}.log').open('w') as log:
-                app = subprocess.Popen([str(root / 'voco')], stdout=log, stderr=subprocess.STDOUT, env={**os.environ, 'RUST_LOG': 'info'})
+                app = subprocess.Popen([str(root / 'voco')], stdout=log, stderr=subprocess.STDOUT,
+                                       env={**os.environ, 'RUST_LOG': 'info', **({'VOCO_HOTKEY_TRACE': '1'} if capture_requested else {})})
                 try:
                     deadline = time.monotonic() + 15
                     while time.monotonic() < deadline and app.poll() is None and not (root / 'runtime/voco.sock').exists():

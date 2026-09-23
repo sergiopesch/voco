@@ -14,10 +14,15 @@ const tracePath =
 const traceDir = path.dirname(tracePath);
 fs.mkdirSync(traceDir, { recursive: true });
 
+const previousTracePath = path.basename(tracePath) === "hotkey-trace.jsonl"
+  ? path.join(traceDir, "hotkey-trace.previous.jsonl")
+  : null;
+const rotatedArchivePath = previousTracePath && fs.existsSync(previousTracePath)
+  ? archiveTrace(previousTracePath)
+  : null;
 let archivedPath = null;
 if (fs.existsSync(tracePath) && fs.statSync(tracePath).size > 0) {
-  archivedPath = nextArchivePath(tracePath);
-  fs.renameSync(tracePath, archivedPath);
+  archivedPath = archiveTrace(tracePath);
 }
 
 fs.closeSync(fs.openSync(tracePath, "w"));
@@ -30,7 +35,16 @@ if (archivedPath) {
 } else {
   console.log("Archived previous trace: none");
 }
+if (rotatedArchivePath) {
+  console.log(`Archived rotated trace: ${rotatedArchivePath}`);
+}
 console.log("status: reset-ready");
+
+function archiveTrace(filePath) {
+  const archivedPath = nextArchivePath(filePath);
+  fs.renameSync(filePath, archivedPath);
+  return archivedPath;
+}
 
 function nextArchivePath(filePath) {
   const dir = path.dirname(filePath);

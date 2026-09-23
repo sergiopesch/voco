@@ -6,12 +6,13 @@ ConditionPathExists=/dev/uinput
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/ydotoold
+ExecStart=/usr/libexec/voco/ydotool-launcher
 UMask=0077
 NoNewPrivileges=yes
 RestrictAddressFamilies=AF_UNIX
 Restart=on-failure
 RestartSec=3
+TimeoutStopSec=1s
 
 [Install]
 WantedBy=graphical-session.target

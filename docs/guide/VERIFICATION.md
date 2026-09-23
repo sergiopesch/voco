@@ -1,5 +1,13 @@
 # Guide verification history
 
+## Unreleased first-run follow-up · 22 September 2026
+
+The delivery and Linux lessons explain the Brave empty-block regression and the
+compact installer canvas as candidate changes. The source viewer remains pinned
+to .43. Nine guide tests and 26 browser checks passed, including every chapter,
+pinned source, search, glossary, simulations and a 390px layout. See the
+[bounded verification record](../testing/first-run-follow-up-2026-09-22.md).
+
 ## Published .52 installer · 22 September 2026
 
 The Linux lesson now identifies the published .52 installer and separates its

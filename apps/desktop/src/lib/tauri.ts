@@ -4,7 +4,6 @@ import type {
   ConfigSnapshot,
   DebugDictationCaptureResult,
   DesktopInputStatus,
-  InsertionResult,
   OwnedPreeditStatus,
   RuntimeDiagnostics,
   RuntimeStatusSnapshot
@@ -59,10 +58,6 @@ export async function saveDebugDictationCapture(
     "save_debug_dictation_capture",
     { audioBytes: bytes, timeline },
   );
-}
-
-export async function insertText(text: string, strategy: string): Promise<InsertionResult> {
-  return invoke<InsertionResult>("insert_text", { text, strategy });
 }
 
 export async function getDesktopInputStatus(): Promise<DesktopInputStatus> {
@@ -163,6 +158,10 @@ export async function cancelOwnedPreedit(sessionId: number): Promise<OwnedPreedi
 
 export async function releaseBrowserRecording(triggerId: string): Promise<void> {
   return invoke("release_browser_recording", { triggerId });
+}
+
+export async function ackBrowserStop(triggerId: string): Promise<void> {
+  return invoke("ack_browser_stop", { triggerId });
 }
 
 export async function syncRuntimeStatus(snapshot: RuntimeStatusSnapshot): Promise<void> {

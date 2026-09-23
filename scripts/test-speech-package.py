@@ -45,6 +45,7 @@ class SpeechPackageTests(unittest.TestCase):
             "symlinks": validator.NATIVE_LINKS,
         }))
         self.save_manifest()
+        package.normalize_payload_modes(self.speech)
 
     def save_manifest(self):
         (self.speech / "MANIFEST.json").write_text(json.dumps(
@@ -73,6 +74,44 @@ class SpeechPackageTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "changed"):
             self.verify()
 
+    def test_unexpected_fifo_is_rejected_without_opening_it(self):
+        os.mkfifo(self.speech / "unexpected-pipe")
+        with self.assertRaisesRegex(ValueError, "Unsupported speech payload object"):
+            self.verify()
+
+    def test_fifo_manifest_is_rejected_without_opening_it(self):
+        manifest = self.speech / "MANIFEST.json"
+        manifest.unlink()
+        os.mkfifo(manifest)
+        with self.assertRaisesRegex(ValueError, "Unsupported speech payload object"):
+            self.verify()
+
+    def test_group_world_write_and_set_id_are_rejected(self):
+        for name in ("worker_main.py", "MANIFEST.json", "models"):
+            path = self.speech / name
+            original = path.stat().st_mode & 0o7777
+            for mode in (0o664, 0o666, 0o4755, 0o2755):
+                with self.subTest(name=name, mode=mode):
+                    path.chmod(mode)
+                    with self.assertRaisesRegex(ValueError, "Unsafe speech payload permissions"):
+                        self.verify()
+            path.chmod(original)
+
+    def test_linked_payload_root_cannot_validate_external_bytes(self):
+        original = self.root / "external-payload"
+        self.speech.rename(original)
+        self.speech.symlink_to(original, target_is_directory=True)
+        with self.assertRaisesRegex(ValueError, "regular parent directories"):
+            self.verify()
+
+    def test_linked_manifest_is_rejected(self):
+        manifest = self.speech / "MANIFEST.json"
+        external = self.root / "external-manifest.json"
+        manifest.rename(external)
+        manifest.symlink_to(external)
+        with self.assertRaisesRegex(ValueError, "manifest must be a regular file"):
+            self.verify()
+
     def test_missing_model(self):
         (self.speech / "models/nemotron-speech-streaming-en-0.6b.q8_0.gguf").unlink()
         with self.assertRaisesRegex(ValueError, "inventory"):
@@ -80,6 +119,7 @@ class SpeechPackageTests(unittest.TestCase):
 
     def test_extra_file(self):
         (self.speech / "extra.py").write_text("unexpected")
+        (self.speech / "extra.py").chmod(0o644)
         with self.assertRaisesRegex(ValueError, "manifest"):
             self.verify()
 

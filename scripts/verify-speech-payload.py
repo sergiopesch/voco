@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import stat
 import sys
 
 NATIVE_FILES = {"lib/libggml-base.so.0.12.0", "lib/libggml-cpu.so.0.12.0",
@@ -23,7 +24,23 @@ def digest(path):
 
 def verify(root, version):
     speech = root / "usr/lib/voco/speech"
-    manifest = json.loads((speech / "MANIFEST.json").read_text())
+    # Inspect the extracted tree itself. Resolving a linked parent could validate
+    # bytes outside the package, and following a FIFO could block verification.
+    for directory in (root, root / "usr", root / "usr/lib", root / "usr/lib/voco", speech):
+        if directory.is_symlink() or not directory.is_dir():
+            raise ValueError("Speech payload requires regular parent directories")
+    for path in (speech, *speech.rglob("*")):
+        mode = path.lstat().st_mode
+        if stat.S_ISLNK(mode):
+            continue
+        if not (stat.S_ISREG(mode) or stat.S_ISDIR(mode)):
+            raise ValueError(f"Unsupported speech payload object: {path.relative_to(speech)}")
+        if mode & 0o6022:
+            raise ValueError(f"Unsafe speech payload permissions: {path.relative_to(speech)}")
+    manifest_path = speech / "MANIFEST.json"
+    if manifest_path.is_symlink():
+        raise ValueError("Speech manifest must be a regular file")
+    manifest = json.loads(manifest_path.read_text())
     if manifest["version"] != version:
         raise ValueError("Speech manifest version differs from package")
     required = {"stream_worker.py", "worker_main.py", "streaming.py", "adapters.py",

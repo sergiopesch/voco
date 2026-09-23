@@ -100,12 +100,6 @@ export interface InsertionSupport {
   detail: string;
 }
 
-export type ActiveInsertionStrategy = "ydotool" | "xdotool" | "clipboard";
-
-export interface InsertionResult {
-  strategy: ActiveInsertionStrategy;
-}
-
 export interface TranscriptionSegment {
   text: string;
   startMs: number;

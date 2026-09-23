@@ -1,5 +1,10 @@
 # Live Dictation Architecture Audit
 
+Historical audit of the retired Whisper/IBus preview architecture. The data flow,
+module names and recommendations below describe that earlier source; they are not
+current implementation guidance. See the [code map](../architecture/code-map.md)
+for the selected Nemotron stream and current delivery boundaries.
+
 ## Core Finding
 
 The pre-v3 live cursor design was built on repeated local Whisper preview transcriptions over a

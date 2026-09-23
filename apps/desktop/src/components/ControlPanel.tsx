@@ -1,6 +1,6 @@
 import { DeviceSelect } from "./DeviceSelect";
 import { StatusMark } from "./StatusMark";
-import { VoiceSignal } from "./VoiceSignal";
+import { RecordingVoiceSignal } from "./VoiceSignal";
 import { Tooltip } from "./Tooltip";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent, PointerEvent } from "react";
@@ -214,7 +214,6 @@ export function ControlPanel({
   const [hotkeyError, setHotkeyError] = useState<string | null>(null);
   const nativePreviewDisabled = Boolean(nativeMicrophone && nativeMicrophone.mode !== "webkit");
   const waylandDesktop = runtimeDiagnostics?.sessionType.toLowerCase() === "wayland";
-  const audioLevel = useStore(state => state.audioLevel);
   const [inputReadiness, setInputReadiness] = useState<DesktopInputStatus | null>(null);
   const [checkingInput, setCheckingInput] = useState(false);
   const inputCheckRequest = useRef(0);
@@ -770,7 +769,7 @@ export function ControlPanel({
           <section className="voco-popover" data-priority={hasRecoverableTranscript || dictationBusy || statusLabel.length > 30 ? "status" : undefined}>
             <div className="voco-lens" data-recording={dictationStatus === "recording"}>
               <img src={vocoBrandImage} alt="" />
-              <span className="voco-lens__signal"><VoiceSignal level={audioLevel} active={dictationStatus === "recording"} /></span>
+              <span className="voco-lens__signal"><RecordingVoiceSignal active={dictationStatus === "recording"} /></span>
             </div>
             <div className="voco-popover__state">
               <div className="voco-popover__state-main">
@@ -861,7 +860,6 @@ export function ControlPanel({
               ? nativeMicrophone.selected?.label || nativeMicrophone.sources?.sources.find(source => source.selectionToken === nativeMicrophone.sources?.defaultSelectionToken)?.label || "System default"
               : selectedDeviceLabel}
             status={dictationStatus}
-            audioLevel={audioLevel}
             transcript={testPurpose === "onboarding" ? transcript : ""}
             passed={testPassed}
             failed={Boolean(errorMessage)}

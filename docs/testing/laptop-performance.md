@@ -124,8 +124,11 @@ Each file is capped at 8 MiB with one previous file, so the new logs retain at m
 16 MiB. A full queue drops diagnostics and increments a counter rather than delaying
 recognition. Directories are private (0700), files are private (0600), and unsafe
 existing final directory/file entries are refused. Disk errors disable this recorder
-without changing dictation behavior. Existing `hotkey-trace.jsonl` is separate and
-its retention policy is unchanged.
+without changing dictation behavior. The separate timing trace requires
+`VOCO_HOTKEY_TRACE=1` in the 2026.0.55 source candidate. Its current and previous
+files accept at most 8 MiB each of new writes; oversized legacy files are preserved
+and must be archived or removed, then VOCO restarted, before tracing resumes.
+Enabling the performance recorder alone does not create it.
 
 Source builds after .47 add finite `dictation_desktop_cursor_*` failure events to
 that trace: pending accessibility events, no active window, ambiguous windows,

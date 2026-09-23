@@ -84,14 +84,20 @@ systemctl --user status ydotoold
 voco --check-desktop-input
 ```
 
-The .47 package includes `voco-ydotoold.service`, a service for your login.
-Its guided installer reuses a working daemon. Otherwise, when your login already
+The package includes `voco-ydotoold.service`, a service for your login.
+From .55, this unit uses a private corrected daemon for the exact qualified
+Ubuntu 24.04 legacy client, avoiding descriptor exhaustion after repeated use.
+Other client generations retain the distribution daemon. The installer and
+installed app can migrate only an unmodified VOCO unit while VOCO is closed.
+A custom service or another daemon remains under its owner's control.
+The guided installer reuses a working daemon. Otherwise, when your login already
 has write access to `/dev/uinput`, it enables and starts this service, then checks
 that the client can use it. The service runs as you, uses a private socket umask,
 and stops with your graphical session. It is not started by package installation
-alone. For a manual .47 package install with existing device access:
+alone. For a manual package install with existing device access, quit VOCO first:
 
 ```bash
+voco --setup-desktop-input
 systemctl --user enable --now voco-ydotoold.service
 voco --check-desktop-input
 ```
@@ -167,16 +173,18 @@ Flatpak and Snap are not published.
 
 ## Helper delivery outcomes
 
-The legacy `insert_text` command returns `outcome: dispatched` only after a helper exits successfully.
-That confirms helper completion, not consumption by the intended application. Errors distinguish
-`no-mutation` (helper did not start), `rejected` (input validation), and `uncertain` (a helper started
-and delivery may have partially happened). Only `no-mutation` allows an automatic alternate route.
-An error after a clipboard write is always uncertain and reports `clipboardChanged`.
+Automatic desktop delivery requires a bound destination token. `paste_desktop_text` returns
+`outcome: dispatched` only after its helper exits successfully; that confirms command completion,
+not consumption by the intended application. Errors distinguish `no-mutation` (a helper did not
+start), `rejected` (a prerequisite or destination check failed), and `uncertain` (a helper started
+and delivery may have happened). A changed destination after clipboard preparation rejects before
+sending paste keys and reports `clipboardChanged`; a paste-helper failure after the clipboard write
+is uncertain. Neither outcome authorizes an automatic retry to another field.
 
-Typing helpers have a length-adjusted deadline capped at three minutes. Clipboard write and paste
-helpers each have a five-second deadline. Stdin writes are nonblocking under the same deadline;
-failed supervision kills and reaps the helper process group. No transcript is written to diagnostic
-output. The transcript stays recoverable in VOCO when the application cannot prove delivery.
+Clipboard write and paste helpers each have a five-second deadline. Stdin writes are nonblocking
+under the same deadline; failed supervision kills and reaps the helper process group. No transcript
+is written to diagnostic output. The transcript stays recoverable in VOCO when the application
+cannot prove delivery.
 
 Clipboard restoration is deliberately unavailable with the current command-line helpers. A fixed
 sleep does not prove the target consumed the clipboard, and reading it before restoring cannot

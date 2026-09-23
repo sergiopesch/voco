@@ -35,7 +35,9 @@ recognizer serves desktop, browser and onboarding sessions. See
    `desktopCaptureTail.ts` retains each source sample and forwards the Stop tail once.
    `desktopShortcutSession.ts` owns the UUID-bound native shortcut lease through final
    delivery. `browserStreamDelivery.ts` separately owns an explicit browser field lease,
-   verifies each append receipt and never retries uncertain output.
+   verifies each append receipt and never retries uncertain output. Tab departure or
+   native connection loss stops that browser recording; ordinary field focus loss
+   revokes its recipient without discarding the session's Stop control.
 3. `src/lib/benchmarkPhraseQueue.ts` serializes bounded NVIDIA requests. Recording
    capture continues while a paste is in flight. A newer append-only hypothesis
    can supersede pending output; already dispatched text cannot be blindly replayed.
@@ -76,12 +78,13 @@ for measurement and recipient limitations.
 | Desktop capture tail | `src/lib/desktopCaptureTail.ts` | Append-only sample accounting and Stop-tail forwarding into the NVIDIA queue. Do not recopy an already streamed recording. |
 | Speech runtime | `runtime/speech/` | Selected pinned CPU runtime, bounded local protocol, content-free metrics. Model/native artifacts are provisioned separately from Git. |
 | Input/focus | `src-tauri/src/insertion.rs`, `focus_probe.rs`, `resources/voco_desktop_target.py` | Desktop-specific compatibility, fresh preflight checks, bounded observation, no uncertain automatic retry. |
+| Desktop input service | `src-tauri/src/desktop_input_setup.rs`, `packaging/ydotool/`, `vendor/ydotool-legacy/` | One installed system client; exact legacy identity selects the private daemon. Only the installed Wayland app can migrate its unmodified service while holding the single-instance guard. No package-hook session mutation. |
 | Desktop notifications | `src-tauri/src/desktop_notifications.rs` | Retain the session D-Bus sender for VOCO's lifetime so GNOME can display registered-app notifications. Use the VOCO icon, normal desktop notification policy, bounded requests and finite error events; service acceptance does not prove banner visibility. |
 | Shortcuts | `src-tauri/src/hotkey_state.rs`, `shortcut_arbitration.rs`, `shortcut_readiness.rs`, `owned_preedit.rs` and IBus resources | Admit one trigger. The optional IBus component does not authorize generic text mutation or switch the owner's input source. |
 | Shortcut arbitration | `src-tauri/src/shortcut_arbitration.rs`; registration/readiness and `suppress_passive_shortcut` in `lib.rs` | Completed IBus authority controls registration. Passive evdev also guards pending polls; an already-consuming X11 callback keeps shared debounce without that passive suppression. |
 | X11 recording scope | `src/lib/desktopShortcutSession.ts`, `src-tauri/src/desktop_shortcut.rs`, `vendor/global-hotkey/src/platform_impl/x11/focus_lease.rs` | Same registered shortcut, exact input-focus window, one recording UUID, fixed 650-second expiry. Preserve delivery guards and surface failed root restoration. Vendor path is repository-relative. |
 | X11 actor wakeup | `vendor/global-hotkey/src/platform_impl/x11/{mod.rs,wake.rs}` | Wait on X fd and queued-command signal; drain buffered events before sleeping. No 50 ms periodic idle wakeup. Preserve original expiry deadline and error health. Paths are repository-relative. |
-| Renderer replacement | `src-tauri/src/lib.rs` PageLoad Started, `desktop_shortcut.rs`, `insertion.rs` preflight/reset | Synchronously invalidate the shortcut epoch; asynchronously release only older owners. Reject stale Begin before/after acquisition. Generic paste IPC remains a separate, non-epoch-bound contract. |
+| Renderer replacement | `src-tauri/src/lib.rs` PageLoad Started, `desktop_shortcut.rs`, `insertion.rs` preflight/reset | Synchronously invalidate the shortcut epoch; asynchronously release only older owners. Reject stale Begin before/after acquisition. The retired unguarded insertion IPC is removed; normal delivery requires a bound destination. |
 | Explicit browser field | `integrations/chromium/`, `src-tauri/src/browser_{broker,protocol,socket}.rs`, `src-tauri/src/bin/voco-browser-host.rs` | Explicit tab/field authorization, private same-user transport, ordered bounded receipts. Separate from ordinary desktop paste. |
 | Audio transport | `src-tauri/src/audio_transport.rs`, `native_capture_commands.rs` | Validate binary headers, sample counts and finite values before decoding or retaining. |
 | Config and process lifecycle | `src-tauri/src/config.rs`, `single_instance.rs`, `trigger_socket.rs`, `process_runner.rs` | Private state, exclusive process ownership, bounded helper execution and reaping. |
@@ -170,6 +173,30 @@ contents; `insertion.rs` refuses recording preflight without a verified cursor.
 The helper also returns a finite failure category; Rust maps it to a fixed local
 trace event, with unknown values mapped to unavailable. This metadata never alters
 target admission or includes field content, titles, paths or destination tokens.
+
+### Native field ownership (.55 candidate)
+
+The focus helper resolves a suggestion list back to its editable controller only
+when both accessibility relations agree, the process matches and the controller
+still has a valid focused caret. The retained object must also belong to the
+single active window through fresh ancestry. Paired owner-loss/suggestion-gain
+notifications can be one batch; unresolved loss and real field roundtrips advance
+the generation. Cold lookup follows the same verified relationship from list
+boxes and popup menus, including fresh active-window ancestry. No application
+name, title or URL is used to bypass ownership.
+
+WebKit may mark a scroll container and document focused along with their input.
+Those noneditable wrappers are bounded search roots. Only a focused input can
+qualify; a password role still rejects. Cold lookup orders its bounded queue by
+cached focus/visibility so hidden popup contents do not consume the budget before
+visible controls. Cached flags only order lookup; fresh admission checks remain
+mandatory. Unfocused terminal panes cannot change an editor's paste chord.
+After clipboard preparation, Rust revalidates the bound target and shortcut
+scope immediately before keyboard dispatch. A rejection records that the clipboard
+changed but sends no keys; the destination is never rebound to the new field.
+This narrows, rather than eliminates, the race during a desktop key gesture.
+Existing discovery limits, deadlines, exact text/caret checks and no-replay behavior remain in force. See the
+[application matrix](../testing/application-delivery-2026-09-22.md).
 
 ### Transcript diagnostics and microphone feedback
 

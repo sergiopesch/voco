@@ -3,6 +3,20 @@
 The [latest published GitHub release](https://github.com/sergiopesch/voco/releases/latest)
 is authoritative for downloads. Source metadata does not establish what is installed.
 
+The **2026.0.55 candidate** integrates the security, delivery, installation,
+performance and code cleanup review, including the native Pulse latency fix and
+the approved private legacy input daemon. The helper fixes descriptor exhaustion
+without replacing the system daemon or changing input permissions. Migration is
+limited to VOCO's unmodified service at an idle application boundary.
+
+The [candidate notes](releases/2026.0.55.md) describe the changes;
+[23 September qualification](testing/release-qualification-2026-09-23.md) tracks
+exact artifacts and release gates. The [22 September assessment](testing/release-readiness-2026-09-22.md)
+retains earlier artifacts and failed attempts. The exact package passes installation/removal, desktop/browser, native capture
+and real VM helper migration checks. Build-source CI passes all four protected
+gates; final reviewed/merged CI, signing and downloaded-asset verification are
+required before publication. The source version alone is not a published release.
+
 The recorded public Ubuntu/Debian release is **2026.0.54**. It integrates the
 remaining dependency PRs #61–#63, including Vite 8, React plugin 6, Node 24 LTS
 build tooling and Tauri's matching patched tray library. The Signal + Silver sweep
@@ -13,7 +27,7 @@ installer, microphone setup, shortcut protection and Nemotron recognizer are ret
 - [Exact-package qualification](testing/vite8-release-2026-09-22.md)
 - [Installer performance method and .52 measurements](testing/installer-performance-2026-09-22.md)
 
-All four protected checks passed on the final PR and merged source. The package
+For .54, all four protected checks passed on the final PR and merged source. The package
 passed verification, fresh Ubuntu installation/removal, 13 real-model worker checks
 and 12 private GNOME X11 cases. Five publisher signatures and all 18 draft/public
 assets were downloaded and verified, including latest aliases and the tagged installer.

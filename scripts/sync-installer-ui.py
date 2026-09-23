@@ -16,7 +16,7 @@ def main():
     content = path.read_text()
     ui = (ROOT / 'scripts/lib/install-ui.sh').read_text()
     apt_ui = (ROOT / 'scripts/lib/install-apt-ui.py').read_text()
-    ui += "\nvoco_apt_display() {\n  local code\n  IFS= read -r -d '' code <<'VOCO_APT_PY' || true\n" + apt_ui + "VOCO_APT_PY\n  python3 -c \"$code\" \"$@\"\n}\n"
+    ui += "\nvoco_apt_display() {\n  local code\n  IFS= read -r -d '' code <<'VOCO_APT_PY' || true\n" + apt_ui + "VOCO_APT_PY\n  python3 -I -c \"$code\" \"$@\"\n}\n"
     block = START + ui + END
     if START in content:
         start = content.index(START)

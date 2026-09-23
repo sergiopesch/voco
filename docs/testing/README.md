@@ -1,5 +1,16 @@
 # Testing
 
+[The 22 September release-readiness review](release-readiness-2026-09-22.md)
+records the combined .55 security/performance cleanup, exact built package,
+16 private GNOME checks, nine packaged browser cases and fresh Ubuntu
+local-container installation, payload, worker and removal checks. The candidate
+is unsigned and unpublished; the permanent `ydotoold` choice and final release
+gates remain open. Physical microphone and owner-session Wayland acceptance are
+separate from those fixtures.
+
+[The first-run follow-up](first-run-follow-up-2026-09-22.md) records the Brave
+readback regression and installer canvas candidate, separately from public .54.
+
 - [2026.0.52 release qualification](installer-release-2026-09-22.md) — exact package, desktop, signing and public-download receipts.
 
 The [.52 installer performance record](installer-performance-2026-09-22.md) records
@@ -39,7 +50,7 @@ shortcut begin/end traces also occur on native no-op routes; they do not prove
 physical X11 scope. Match candidate/fixture hashes and preserve all attempted
 trial denominators. Default GNOME, KDE, Cinnamon and Omarchy/Hyprland desktops,
 physical audio and owner applications still require their own acceptance.
-The current review includes paired event-driven versus polling-actor callback and
+The 15 September review includes paired event-driven versus polling-actor callback and
 idle tests. A planned zero-delay shortcut was scheduled by a helper after XSync;
 it is not an atomic same-server-batch test. Zero sampled CPU ticks means below the
 10 ms accounting resolution, not zero cost or measured app energy savings.
@@ -52,7 +63,7 @@ Normal userspace/shortcut continuation passed five selected cases from eight att
 Three original fixtures incorrectly assumed root-X11 ownership when IBus owned the
 shortcut; corrected real Start/Stop checks passed and failed receipts are retained.
 Use each supplied artifact's external native install/parity/remove receipts; see
-the [current review](stop-delivery-review-2026-09-15.md).
+the [dated review](stop-delivery-review-2026-09-15.md).
 The packaged-UI reload attempt found no supported action; Ctrl+R did not initialize
 a second renderer. Epoch race tests pass, but active-owner full-app reload remains
 unqualified; no debugger/backdoor or child-process kill substituted for that test.
@@ -64,8 +75,10 @@ arbitration tests; preserve actual attempted denominators for the native matrix.
 See the [historical foundational acceptance record](foundations-iteration-13-2026-09-06.md)
 for implemented changes, reproduced regressions, verification and open coverage.
 
-See [preview timestamp geometry](preview-geometry.md) for decoded-snapshot bounds,
-provisional text preservation, and the model-free regression tests.
+See the historical [preview timestamp geometry](preview-geometry.md) record for
+the retired snapshot decoder's bounds and provisional-text design. Its unused
+modules and exclusive tests have been removed; current speech gates exercise the
+production Nemotron stream.
 
 See [laptop performance diagnostics](laptop-performance.md) for opt-in local backend
 timings, resource samples, privacy boundaries and a report for manual laptop trials.
@@ -143,9 +156,9 @@ public fixtures or JSON sidecars, with no recording or model inference.
 
 ## Automated checks
 
-The [preview scheduling and cancellation regressions](preview-scheduling.md) cover
-continuous capture arrivals, canonical-work ownership and invalidation during
-asynchronous audio preparation. They run in the normal frontend test suite.
+The [preview scheduling and cancellation record](preview-scheduling.md) documents
+the retired snapshot decoder. Its exclusive tests are historical; current speech
+gates exercise the production Nemotron stream and recovery path.
 
 ```bash
 npm run verify:versions

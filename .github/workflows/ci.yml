@@ -72,7 +72,8 @@ jobs:
             desktop-file-utils appstream cmake ripgrep \
             ibus ibus-gtk3 python3 python3-numpy python3-psutil python3-gi gir1.2-ibus-1.0 bubblewrap \
             xvfb xdotool xclip gir1.2-gtk-3.0 gir1.2-webkit2-4.1 gir1.2-atspi-2.0 at-spi2-core \
-            weston libweston-13-0 wayland-utils gir1.2-gtk-4.0 gir1.2-webkit-6.0
+            weston libweston-13-0 wayland-utils gir1.2-gtk-4.0 gir1.2-webkit-6.0 \
+            gnome-text-editor gnome-terminal nano
 
       - name: Install Node dependencies
         run: npm ci
@@ -130,6 +131,13 @@ jobs:
           VOCO_RICH_EDITOR_EVIDENCE_DIR: ${{ runner.temp }}/voco-rich-editor
         run: bash scripts/test-private-ibus-engine-hosted.sh --rich-editor
 
+      - name: Native application clipboard matrix
+        timeout-minutes: 3
+        env:
+          VOCO_DELIVERY_SUITE: applications
+          VOCO_RICH_EDITOR_EVIDENCE_DIR: ${{ runner.temp }}/voco-application-delivery
+        run: bash scripts/test-private-ibus-engine-hosted.sh --rich-editor
+
       - name: Private headless IBus lifecycle
         run: bash scripts/test-private-ibus-engine-hosted.sh
 
@@ -153,6 +161,7 @@ jobs:
           name: native-desktop-evidence
           path: |
             ${{ runner.temp }}/voco-rich-editor/
+            ${{ runner.temp }}/voco-application-delivery/
             ${{ runner.temp }}/voco-native-desktop/
             ${{ runner.temp }}/voco-native-wayland/
             ${{ runner.temp }}/voco-native-capture-renderer/
@@ -194,7 +203,8 @@ jobs:
           sudo apt-get install -y \
             pkg-config libglib2.0-dev libsoup-3.0-dev \
             libjavascriptcoregtk-4.1-dev libwebkit2gtk-4.1-dev \
-            libayatana-appindicator3-dev libpulse-dev cmake python3-numpy python3-psutil libsentencepiece0
+            libayatana-appindicator3-dev libpulse-dev cmake python3-numpy python3-psutil libsentencepiece0 \
+            pulseaudio pulseaudio-utils bubblewrap g++-13 patch binutils ydotool
 
       - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de
         with:
@@ -235,6 +245,19 @@ jobs:
       - name: Native capture C callback lifecycle (no audio server)
         run: npm run test:native-capture-callbacks
 
+      - name: Private legacy input lifecycle and resource regression
+        timeout-minutes: 3
+        env:
+          CXX: g++-13
+          VOCO_LEGACY_INPUT_EVIDENCE_DIR: ${{ runner.temp }}/voco-legacy-input
+        run: bash scripts/test-private-ibus-engine-hosted.sh --legacy-ydotool
+
+      - name: Native capture source latency and complete audio
+        timeout-minutes: 3
+        env:
+          VOCO_NATIVE_PULSE_EVIDENCE_DIR: ${{ runner.temp }}/voco-native-pulse-latency
+        run: bash scripts/test-private-ibus-engine-hosted.sh --native-pulse-latency
+
       - name: Native capture development contracts
         working-directory: apps/desktop/src-tauri
         run: cargo test --locked --lib --features native-capture-dev
@@ -254,6 +277,8 @@ jobs:
           name: speech-regression-evidence
           path: |
             ${{ runner.temp }}/voco-glib-regression/result.json
+            ${{ runner.temp }}/voco-native-pulse-latency/
+            ${{ runner.temp }}/voco-legacy-input/
             ${{ runner.temp }}/voco-worker-protocol/*.json
             ${{ runner.temp }}/voco-speech-*.json
           if-no-files-found: ignore

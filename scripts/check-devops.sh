@@ -37,6 +37,7 @@ bash -n \
   scripts/test-private-ibus-engine.sh \
   scripts/test-private-ibus-engine-hosted.sh \
   scripts/test-native-desktop.sh \
+  scripts/test-rich-editor-delivery.sh \
   scripts/test-native-wayland.sh \
   scripts/test-native-gnome.sh \
   scripts/test-native-kde.sh \
@@ -72,7 +73,6 @@ function_names = (
     "voco_wayland_device_access",
     "voco_start_wayland_service",
     "voco_write_default_config",
-    "voco_merge_hotkey_into_existing_config",
     "voco_run_hotkey_setup",
 )
 functions = {name: [] for name in function_names}
@@ -90,9 +90,12 @@ print("Standalone and source installer helpers are in sync.")
 PY
 
 bash scripts/test-install-common.sh
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/build-legacy-ydotool.py --verify-only
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-ydotool-service.py
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-install-presentation.py
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-install-prefetch.py
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-install-performance.py
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-install-journey.py
 
 node --check scripts/comparative-dictation.mjs
 node --check scripts/comparative-dictation.test.mjs
@@ -105,6 +108,8 @@ from pathlib import Path
 
 for path in (
     Path("scripts/generate-icons.py"),
+    Path("scripts/test-application-delivery.py"),
+    Path("scripts/fixtures/delivery-native.py"),
     Path("scripts/test-private-ibus-engine.py"),
     Path("scripts/test-native-desktop.py"),
     Path("scripts/test-native-wayland.py"),

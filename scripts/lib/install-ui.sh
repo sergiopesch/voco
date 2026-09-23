@@ -4,13 +4,20 @@
 VOCO_UI_PID=""
 VOCO_UI_TIMER_FD=""
 VOCO_UI_OPEN=false
+VOCO_UI_STAGE=0
+VOCO_UI_TITLE="Getting your desktop ready."
+VOCO_UI_NOTE=""
 VOCO_UI_NO_MOTION=false
 VOCO_UI_LAST_BYTES=0
 VOCO_UI_LAST_TIME=0
 VOCO_UI_RATES=(0 0 0 0 0 0 0)
 
-voco_ui_init() {
-  if [[ "${VOCO_INSTALL_PLAIN:-0}" == 1 ]]; then VOCO_TERMINAL_MOTION=false; fi
+voco_ui_configure() {
+  local columns="${VOCO_TERMINAL_COLUMNS:-80}" rows="${VOCO_TERMINAL_ROWS:-24}"
+  if [[ "${VOCO_INSTALL_PLAIN:-0}" == 1 || ! "$columns" =~ ^[0-9]+$ || "$columns" -lt 64 || ! "$rows" =~ ^[0-9]+$ || "$rows" -lt 12 ]]; then
+    VOCO_TERMINAL_MOTION=false
+    BOLD='' DIM='' GRAPHITE='' GRAPHITE_SOFT='' GREEN='' YELLOW='' RED='' WHITE='' NC=''
+  fi
   if [[ "${VOCO_INSTALL_NO_MOTION:-0}" == 1 ]]; then
     VOCO_UI_NO_MOTION=true
   elif [[ "${XDG_CURRENT_DESKTOP:-}" == *GNOME* ]] && command -v gsettings >/dev/null 2>&1; then
@@ -18,6 +25,11 @@ voco_ui_init() {
       VOCO_UI_NO_MOTION=true
     fi
   fi
+  [[ "$VOCO_TERMINAL_MOTION" == true ]] || return 0
+}
+
+voco_ui_init() {
+  voco_ui_configure
   [[ "$VOCO_TERMINAL_MOTION" == true ]] || return 0
   # An owned, unlinked FIFO gives read -t a timer without a sleep subprocess.
   local fifo="$VOCO_DOWNLOAD_DIR/ui-timer"
@@ -32,14 +44,18 @@ voco_ui_size() {
   printf -v VOCO_UI_SIZE '%d.%d %s' "$((bytes/divisor))" "$((bytes%divisor*10/divisor))" "$unit"
 }
 
+# One ten-line canvas is shared by every normal installation stage.
 voco_ui_frame() {
   [[ "$VOCO_TERMINAL_MOTION" == true ]] || return 0
   local title="$1" detail="$2" mark="${3:-—}" shine="${4:--1}" width wordmark='V O C O' i letter
-  width="${VOCO_TERMINAL_COLUMNS:-80}"
-  [[ "$width" =~ ^[0-9]+$ ]] || width=80
-  (( width >= 20 )) || return 0
-  width=$((width-5))
-  title="${title:0:width}"; detail="${detail:0:width}"
+  local stages='' symbol line2='' rule='────────────────────────────────────────────────────────'
+  local -a labels=(Check Download Verify Install)
+  width=$((${VOCO_TERMINAL_COLUMNS:-80}-5))
+  if (( ${#detail} > width )); then
+    local first="${detail:0:width}"
+    if [[ "$first" == *' '* ]]; then first="${first% *}"; fi
+    line2="${detail:${#first}}"; line2="${line2# }"; detail="$first"
+  fi
   if (( shine >= 0 )) && [[ "$VOCO_UI_NO_MOTION" != true ]]; then
     wordmark=''
     for ((i=0;i<4;i++)); do
@@ -48,16 +64,33 @@ voco_ui_frame() {
       wordmark+=' '
     done
   fi
-  printf '\033[4A\r\033[K  %b%b%b\n\033[K  %s\n\033[K  %s\n\033[K  %s\n' \
-    "$GRAPHITE" "$wordmark" "$NC" "$mark" "$title" "$detail"
+  for i in 0 1 2 3; do
+    symbol='○'
+    if (( i < VOCO_UI_STAGE )); then symbol='✓'; elif (( i == VOCO_UI_STAGE )); then symbol='›'; fi
+    stages+="${symbol} ${labels[i]}   "
+  done
+  printf '\033[10A\r\033[K  %b%b%b  v%s\n\r\033[K  %s\n\r\033[K  %s\n\r\033[K  %s\n\r\033[K  %s\n\r\033[K  %s\n\r\033[K  %s\n\r\033[K  %s\n\r\033[K  %s\n\r\033[K  %s\n' \
+    "$GRAPHITE_SOFT" "$wordmark" "$NC" "${VERSION:-}" 'Your voice, typed.' '' "$mark" \
+    "${title:0:width}" "$detail" "${line2:0:width}" "${rule:0:width}" "$stages" "${VOCO_UI_NOTE:0:width}"
 }
 VOCO_UI_LETTERS=VOCO
 
 voco_ui_begin() {
   [[ "$VOCO_TERMINAL_MOTION" == true ]] || return 0
   voco_ui_pause
-  if [[ "$VOCO_UI_OPEN" != true ]]; then printf '\n\n\n\n'; VOCO_UI_OPEN=true; fi
+  if [[ "$VOCO_UI_OPEN" != true ]]; then printf '\n\n\n\n\n\n\n\n\n\n'; VOCO_UI_OPEN=true; fi
+  VOCO_UI_TITLE="$1"
   voco_ui_frame "$1" "${2:-}" "${3:-—}"
+}
+
+voco_ui_stage() {
+  VOCO_UI_STAGE="$1"
+  if [[ "$VOCO_TERMINAL_MOTION" == true ]]; then
+    if [[ -n "$VOCO_UI_TIMER_FD" ]]; then voco_ui_sweep "$2" "${3:-}"; else voco_ui_begin "$2" "${3:-}"; fi
+  else
+    dim "$2"
+    [[ -z "${3:-}" ]] || dim "$3"
+  fi
 }
 
 voco_ui_sweep() {
@@ -86,6 +119,12 @@ voco_ui_pause() {
 
 voco_ui_release() {
   voco_ui_pause
+  if [[ "$VOCO_UI_OPEN" == true ]]; then
+    printf '\033[10A'
+    local line
+    for line in {1..10}; do printf '\r\033[K\n'; done
+    printf '\033[10A\r'
+  fi
   VOCO_UI_OPEN=false
 }
 
@@ -144,19 +183,24 @@ voco_run_apt() {
   # Minimal systems use APT's own presentation until Python is installed. There
   # is never a download/install of a framework just to display progress.
   if [[ "$VOCO_TERMINAL_MOTION" != true || ! -t 0 ]] || ! command -v python3 >/dev/null 2>&1; then
+    voco_ui_release
+    sudo apt-get install -y -- "$@"
+    return $?
+  fi
+  if ! sudo -n -v >/dev/null 2>&1; then
+    voco_ui_release
+    dim 'VOCO · Ubuntu needs your permission to install.'
+    sudo -v || return $?
+  fi
+  # Respect sudo policies that permit apt-get but not an exec wrapper. Do not ask
+  # owners to broaden permissions just for presentation.
+  if ! sudo -n -l -- sh -c "$wrapper" voco-apt "$@" >/dev/null 2>&1; then
+    voco_ui_release
     sudo apt-get install -y -- "$@"
     return $?
   fi
   voco_ui_release
-  dim 'Ubuntu needs your permission to install VOCO.'
-  sudo -v || return $?
-  # Respect sudo policies that permit apt-get but not an exec wrapper. Do not ask
-  # owners to broaden permissions just for presentation.
-  if ! sudo -n -l -- sh -c "$wrapper" voco-apt "$@" >/dev/null 2>&1; then
-    sudo apt-get install -y -- "$@"
-    return $?
-  fi
-  voco_ui_begin 'Setting up VOCO.' 'Resolving package dependencies.'
+  # The APT renderer owns and clears its canvas, including prompt handoffs.
   [[ -n "$VOCO_INSTALL_LOG" ]] || VOCO_INSTALL_LOG=$(mktemp "${TMPDIR:-/tmp}/voco-install.XXXXXX.log")
   mkfifo -m 600 "$fifo"
   exec {output_fd}<>"$fifo"
@@ -165,7 +209,7 @@ voco_run_apt() {
   # fd is essential: using stdout would close maintainer-script output. Create fd
   # 3 AFTER sudo, with a fixed wrapper and separate arguments (never interpolation).
   if sudo sh -c "$wrapper" voco-apt "$@" 2>&"$output_fd" |
-      voco_apt_display "$VOCO_INSTALL_LOG" "$VOCO_UI_NO_MOTION" separate 4<&"$output_fd"; then
+      voco_apt_display "$VOCO_INSTALL_LOG" "$VOCO_UI_NO_MOTION" separate "${VERSION:-}" 4<&"$output_fd"; then
     result=0
   else
     statuses=("${PIPESTATUS[@]}")

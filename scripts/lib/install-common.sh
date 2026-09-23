@@ -208,7 +208,7 @@ voco_read_configured_hotkey() {
   local config_file="$1"
 
   if command -v python3 >/dev/null 2>&1; then
-    python3 - "${config_file}" <<'PY'
+    python3 -I - "${config_file}" <<'PY'
 import json
 import pathlib
 import sys
@@ -263,7 +263,7 @@ voco_migrate_legacy_config() {
     rm -f -- "${temp_file}"
     return 1
   fi
-  if ! ln -- "${temp_file}" "${config_file}"; then
+  if ! ln -T -- "${temp_file}" "${config_file}"; then
     rm -f -- "${temp_file}"
     return 1
   fi
@@ -355,6 +355,11 @@ voco_wayland_device_access() {
 
 voco_start_wayland_service() {
   [[ "${XDG_SESSION_TYPE:-x11}" == wayland ]] || return 0
+  # The application holds its instance lock across the owned-service migration.
+  # An open app must be closed explicitly; package hooks never restart a session.
+  if ! VOCO_INPUT_ERROR="$(/usr/bin/voco --setup-desktop-input 2>&1)"; then
+    return 1
+  fi
   # Reuse a working service, including a distribution/admin-managed daemon.
   voco_verify_desktop_input && return 0
   if ! voco_wayland_device_access; then
@@ -365,7 +370,14 @@ voco_start_wayland_service() {
     VOCO_INPUT_ERROR="An existing ydotoold is running but is unavailable to this login. Check its socket permissions; VOCO will not replace that service."
     return 1
   fi
-  if ! systemctl --user enable --now voco-ydotoold.service; then
+  local service_detail service_status=0
+  service_detail="$(systemctl --user enable --now voco-ydotoold.service 2>&1)" || service_status=$?
+  if [[ -n "${VOCO_INSTALL_LOG:-}" ]]; then
+    printf '%s\n' "$service_detail" >> "$VOCO_INSTALL_LOG"
+  elif (( service_status != 0 )); then
+    printf '%s\n' "$service_detail" >&2
+  fi
+  if (( service_status != 0 )); then
     VOCO_INPUT_ERROR="Could not start the VOCO input service. Check: systemctl --user status voco-ydotoold.service"
     return 1
   fi
@@ -381,80 +393,47 @@ voco_write_default_config() {
   local config_file="$1"
   local hotkey="$2"
   local escaped_hotkey
+  local temp_file
 
   escaped_hotkey="$(voco_escape_json_string "${hotkey}")"
-
-  (umask 077; cat > "${config_file}") << EOF
+  temp_file="$(mktemp "${config_file}.new.XXXXXX")" || return 1
+  if ! cat > "${temp_file}" << EOF
 {
   "hotkey": "${escaped_hotkey}",
   "selectedMic": null,
   "insertionStrategy": "auto"
 }
 EOF
-}
-
-voco_merge_hotkey_into_existing_config() {
-  local config_file="$1"
-  local hotkey="$2"
-
-  if command -v python3 >/dev/null 2>&1; then
-    if python3 - "${config_file}" "${hotkey}" <<'PY'
-import json
-import pathlib
-import sys
-
-config_path = pathlib.Path(sys.argv[1])
-hotkey = sys.argv[2]
-
-data = json.loads(config_path.read_text(encoding="utf-8"))
-if not isinstance(data, dict):
-    raise SystemExit(1)
-
-data["hotkey"] = hotkey
-config_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
-PY
-    then
-      return 0
-    fi
+  then
+    rm -f -- "${temp_file}"
+    return 1
   fi
-
-  if grep -Eq '"hotkey"[[:space:]]*:' "${config_file}"; then
-    local escaped_hotkey
-    local sed_hotkey
-    local tmp_file
-
-    escaped_hotkey="$(voco_escape_json_string "${hotkey}")"
-    sed_hotkey="$(printf '%s' "${escaped_hotkey}" | sed 's/[&|]/\\&/g')"
-    tmp_file="$(mktemp)"
-
-    if sed -E \
-      "0,/\"hotkey\"[[:space:]]*:[[:space:]]*\"([^\"\\\\]|\\\\.)*\"/s|\"hotkey\"[[:space:]]*:[[:space:]]*\"([^\"\\\\]|\\\\.)*\"|\"hotkey\": \"${sed_hotkey}\"|" \
-      "${config_file}" > "${tmp_file}"; then
-      mv "${tmp_file}" "${config_file}"
-      return 0
-    fi
-
-    rm -f "${tmp_file}"
-  fi
-
-  return 1
+  # Publish only if the destination is still absent. Never overwrite a config
+  # created by the app, another installer, or a symlink during setup.
+  local result=0
+  ln -T -- "${temp_file}" "${config_file}" 2>/dev/null || result=$?
+  rm -f -- "${temp_file}"
+  return "$result"
 }
 
 voco_run_hotkey_setup() {
   local hotkey="${1:-Alt+D}"
-  local config_dir="${HOME}/.config/voco"
+  local config_base="${HOME}/.config"
+  # Match dirs::config_dir(): an XDG override must be absolute.
+  if [[ "${XDG_CONFIG_HOME:-}" == /* ]]; then config_base="$XDG_CONFIG_HOME"; fi
+  local config_dir="${config_base}/voco"
   local config_file="${config_dir}/config.json"
   local existing_hotkey=""
   local existing_hotkey_valid=false
   local config_exists=false
   local config_path_safe=true
-  local legacy_config_dir="${HOME}/.config/voice"
+  local legacy_config_dir="${config_base}/voice"
   local legacy_config_file="${legacy_config_dir}/config.json"
   local legacy_config_present=false
   local legacy_config_migrated=false
   local legacy_config_skipped=false
 
-  if [[ -L "${config_dir}" || -L "${config_file}" || ( -e "${config_file}" && ! -f "${config_file}" ) ]]; then
+  if [[ -L "${config_dir}" || ( -e "${config_dir}" && ! -d "${config_dir}" ) || -L "${config_file}" || ( -e "${config_file}" && ! -f "${config_file}" ) ]]; then
     config_exists=true
     config_path_safe=false
   else
@@ -519,19 +498,9 @@ voco_run_hotkey_setup() {
 
   mkdir -p -m 0700 "${config_dir}"
   chmod 0700 "${config_dir}"
-  if [[ -f "${config_file}" ]]; then
-    if [[ "${existing_hotkey_valid}" == true && "${hotkey}" == "${existing_hotkey}" ]]; then
-      dim "Existing config preserved at ${config_file}"
-    elif voco_merge_hotkey_into_existing_config "${config_file}" "${hotkey}"; then
-      dim "Updated hotkey in existing config at ${config_file}"
-    else
-      warn "Existing config preserved without overwriting other settings."
-      dim "Update the hotkey later from the tray or by editing ${config_file}"
-    fi
-  else
-    voco_write_default_config "${config_file}" "${hotkey}"
+  if ! voco_write_default_config "${config_file}" "${hotkey}"; then
+    warn "Could not create default settings; existing files were preserved. VOCO will validate its settings on launch."
   fi
-  chmod 0600 "${config_file}"
 
   VOCO_SELECTED_HOTKEY="${hotkey}"
   VOCO_CONFIG_FILE="${config_file}"

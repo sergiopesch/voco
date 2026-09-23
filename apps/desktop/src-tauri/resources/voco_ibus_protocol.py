@@ -1,8 +1,7 @@
-"""Private, same-user IPC for VOCO's persistent IBus engine.
+"""Private, same-user shortcut IPC for VOCO's persistent IBus engine.
 
-The socket carries dictated text, so it is deliberately kept outside the
-session bus.  This module has no GI dependency and can be tested without
-attaching to a desktop input session.
+Protocol 6 rejects text mutations. This module has no GI dependency and can be
+tested without attaching to a desktop input session.
 """
 
 from __future__ import annotations
@@ -130,18 +129,24 @@ class PrivateSocketServer:
         self.client: Optional[socket.socket] = None
         self.client_buffer = JsonLineBuffer()
         self.negotiated = False
+        self._socket_identity: Optional[tuple[int, int]] = None
 
     def start(self) -> socket.socket:
+        if self.listener is not None:
+            raise ProtocolError("protocol listener is already running")
         secure_socket_directory(self.socket_path)
         self._remove_stale_socket()
         listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         try:
             listener.bind(str(self.socket_path))
+            status = self.socket_path.stat(follow_symlinks=False)
+            self._socket_identity = (status.st_dev, status.st_ino)
             os.chmod(self.socket_path, 0o600)
             listener.listen(2)
             listener.setblocking(False)
         except Exception:
             listener.close()
+            self._unlink_owned_socket()
             raise
         self.listener = listener
         return listener
@@ -227,16 +232,25 @@ class PrivateSocketServer:
             probe.settimeout(0.1)
             probe.connect(str(self.socket_path))
         except (ConnectionRefusedError, FileNotFoundError):
-            self.socket_path.unlink(missing_ok=True)
+            self._unlink_matching_socket((status.st_dev, status.st_ino))
         else:
             raise ProtocolError("another VOCO input method is already running")
         finally:
             probe.close()
 
     def _unlink_owned_socket(self) -> None:
+        identity, self._socket_identity = self._socket_identity, None
+        self._unlink_matching_socket(identity)
+
+    def _unlink_matching_socket(self, identity: Optional[tuple[int, int]]) -> None:
+        if identity is None:
+            return
         try:
             status = self.socket_path.stat(follow_symlinks=False)
         except FileNotFoundError:
             return
-        if stat.S_ISSOCK(status.st_mode) and status.st_uid == os.geteuid():
+        # A failed start or delayed shutdown must never remove another instance's
+        # socket. UID/type alone do not establish ownership of this directory entry.
+        if (stat.S_ISSOCK(status.st_mode) and status.st_uid == os.geteuid()
+                and (status.st_dev, status.st_ino) == identity):
             self.socket_path.unlink(missing_ok=True)

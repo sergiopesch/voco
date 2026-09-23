@@ -94,6 +94,26 @@ def copy_vendored_notices(source_root, doc):
             shutil.copy2(source_root / "vendor" / crate / name, destination / name)
 
 
+def stage_legacy_input(stage, build):
+    """Build the private helper; never replace the distribution's input daemon."""
+    subprocess.run(["python3", str(ROOT / "scripts/build-legacy-ydotool.py"),
+                    "--output", str(build)], check=True)
+    manifest = json.loads((build / "manifest.json").read_text())
+    if digest(build / "ydotoold") != manifest["binary_sha256"]:
+        raise ValueError("Legacy helper does not match its build manifest")
+    private = stage / "usr/libexec/voco/ydotool-legacy"
+    private.mkdir(parents=True)
+    shutil.copy2(build / "ydotoold", private / "ydotoold")
+    shutil.copy2(build / "manifest.json", private / "MANIFEST.json")
+    shutil.copy2(ROOT / "packaging/ydotool/qualified-client.json", private / "qualified-client.json")
+    shutil.copy2(ROOT / "packaging/ydotool/voco-ydotool-launcher",
+                 private.parent / "ydotool-launcher")
+    (private / "ydotoold").chmod(0o755)
+    (private.parent / "ydotool-launcher").chmod(0o755)
+    shutil.copytree(build / "notices", stage / "usr/share/doc/voco/vendor/ydotool-legacy")
+    normalize_payload_modes(private.parent)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("base", type=Path)
@@ -138,6 +158,7 @@ def main():
         shutil.copytree(ROOT / "docs", doc / "docs", dirs_exist_ok=True,
                         ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
         copy_vendored_notices(ROOT, doc)
+        stage_legacy_input(stage, Path(directory) / "legacy-input-build")
         identity = {"version": package_version, "application_version": version,
                     "backend": "CPU native pool", "context": 1, "cpu_threads": 4,
                     "cpu_thread_policy": "At most four, reserving one CPU from process affinity for desktop work (minimum one); explicit research overrides preserved",
