@@ -58,6 +58,35 @@ def terminal(command, env, reply=None, timeout=10, columns=80, rows=24):
 
 
 class InstallerPerformanceTests(unittest.TestCase):
+    def test_early_background_exit_cannot_clean_up_the_parent_installer(self):
+        with tempfile.TemporaryDirectory() as folder:
+            env = {**os.environ, 'TERM': 'xterm-256color', 'TMPDIR': folder}
+            body = r'''
+VOCO_DOWNLOAD_DIR="$TMPDIR/download"
+VOCO_INSTALL_LOG="$TMPDIR/install.log"
+mkdir "$VOCO_DOWNLOAD_DIR"
+printf payload > "$VOCO_DOWNLOAD_DIR/data"
+printf diagnostic > "$VOCO_INSTALL_LOG"
+sleep 30 &
+DOWNLOAD_PID=$!
+printf '%s' "$DOWNLOAD_PID" > "$TMPDIR/tracked.pid"
+# A fast download can terminate its observer before the observer clears EXIT.
+( trap 'printf attempted > "$TMPDIR/child-cleanup"; voco_install_cleanup' EXIT
+  trap 'exit 143' TERM; kill -TERM "$BASHPID" ) &
+child=$!
+wait "$child" || true
+[[ "$(cat "$VOCO_DOWNLOAD_DIR/data")" == payload ]]
+[[ "$(cat "$VOCO_INSTALL_LOG")" == diagnostic ]]
+kill -0 "$DOWNLOAD_PID"
+'''
+            code, output = terminal(['bash', '-c', PREFIX + body], env)
+            self.assertEqual(code, 0, output)
+            self.assertEqual((Path(folder) / 'child-cleanup').read_text(), 'attempted')
+            self.assertFalse((Path(folder) / 'download').exists(), 'Parent EXIT must still clean its files')
+            self.assertFalse((Path(folder) / 'install.log').exists(), 'Parent EXIT must still clean its log')
+            with self.assertRaises(ProcessLookupError):
+                os.kill(int((Path(folder) / 'tracked.pid').read_text()), 0)
+
     def test_wordmark_fits_and_canvas_release_matches_its_height(self):
         for columns, rows, height in ((80, 24, 14), (64, 16, 14), (80, 12, 10)):
             with self.subTest(columns=columns, rows=rows), tempfile.TemporaryDirectory() as folder:

@@ -1050,8 +1050,11 @@ voco_download() {
     if [[ -z "$VOCO_UI_TIMER_FD" ]]; then voco_ui_init; fi
     voco_ui_begin 'Bringing VOCO to your desktop.' "$label" '↓'
     if [[ "$VOCO_TERMINAL_MOTION" == true ]]; then
-      voco_ui_download_observer "$destination" "$initial_bytes" "$started" &
-      VOCO_UI_PID=$!
+      # Inherit the log descriptor at fork, including the pre-trap shutdown window.
+      {
+        voco_ui_download_observer "$destination" "$initial_bytes" "$started" &
+        VOCO_UI_PID=$!
+      } 2>> "$VOCO_INSTALL_LOG"
     fi
   else
     dim "$label"
@@ -1248,6 +1251,9 @@ PY_LAUNCH
 }
 
 voco_install_cleanup() {
+  # A background child can receive TERM before resetting its inherited traps.
+  # Only the original installer owns these paths and tracked process IDs.
+  [[ "$BASHPID" == "$VOCO_INSTALL_OWNER_BASHPID" ]] || return 0
   voco_ui_close
   if [[ -n "$CHECKSUM_DOWNLOAD_PID" ]]; then
     kill "$CHECKSUM_DOWNLOAD_PID" 2>/dev/null || true
@@ -1268,6 +1274,7 @@ voco_install_cleanup() {
   if [[ -n "${VOCO_DOWNLOAD_DIR:-}" ]]; then rm -rf -- "${VOCO_DOWNLOAD_DIR}"; fi
   if [[ -n "$VOCO_INSTALL_LOG" && "$VOCO_KEEP_LOG" != true ]]; then rm -f -- "$VOCO_INSTALL_LOG"; fi
 }
+VOCO_INSTALL_OWNER_BASHPID=$BASHPID
 trap voco_install_cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
