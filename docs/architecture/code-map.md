@@ -169,10 +169,19 @@ not misclassify missing dependencies as missing focus.
 `voco --check-desktop-input` exposes the same prerequisite check for installation
 and troubleshooting, without launching the GUI.
 `voco_desktop_target.py` classifies focused editable controls without reading
-contents; `insertion.rs` refuses recording preflight without a verified cursor.
+contents; `insertion.rs` refuses recording preflight without a verified destination.
+Ghostty's GTK canvas uses a separate `terminal_surface` classification: a unique
+focused pane, fresh downward child route and focus/window-loss tracking bind the
+destination without pretending that a text caret is exposed. Terminal delivery
+remains dispatch-only. GTK's synthetic containers can be absent from reverse parent
+links, so this route does not reuse or weaken the generic editable-field hint check.
 The helper also returns a finite failure category; Rust maps it to a fixed local
 trace event, with unknown values mapped to unavailable. This metadata never alters
 target admission or includes field content, titles, paths or destination tokens.
+
+Destination and shortcut failures happen before capture. They preserve the approved
+microphone's readiness; only an attempted capture startup can invalidate it, with
+the existing native generation/selection ownership checks.
 
 ### Native field ownership (.55 candidate)
 

@@ -20,12 +20,16 @@ class FocusTracker:
         self.attempted = False
         self.nonce = uuid.uuid4().hex
         self.departure_pending = False
+        self.window_key = None
+        self.window_listener = None
+        self.window_events_tracked = False
 
     def observe(self, node):
         key = (node.get_process_id(), node.path)
         if key != self.key:
             self.generation += 1
             self.key = key
+            self.window_key = None
         self.hint = node
 
     def event(self, event, *_):
@@ -48,6 +52,18 @@ class FocusTracker:
         self.generation += 1
         self.key = self.hint = None
         self.departure_pending = False
+        self.window_key = None
+
+    def window_event(self, event, *_):
+        if self.window_key is None:
+            return
+        try:
+            if (self.window_key == (event.source.get_process_id(), event.source.path)
+                    and (event.type == 'window:deactivate'
+                         or (event.type == 'object:state-changed:active' and not event.detail1))):
+                self.invalidate()
+        except Exception:
+            self.invalidate()
 
     def settle_events(self):
         if self.departure_pending:
@@ -63,6 +79,15 @@ class FocusTracker:
                 self.listener = listener
         except Exception:
             pass  # Fresh tree discovery still works; diagnostics expose the gap.
+        try:
+            # GTK4 emits active-state loss even when window:deactivate is absent.
+            listener = atspi.EventListener.new(self.window_event)
+            self.window_listener = listener  # Retain even a partially registered listener.
+            deactivate = listener.register('window:deactivate')
+            active = listener.register('object:state-changed:active')
+            self.window_events_tracked = bool(deactivate and active)
+        except Exception:
+            pass
 
     def focused_hint(self, window, pid, atspi, node=None):
         node = self.hint if node is None else node
@@ -157,6 +182,9 @@ def popup_focus_owner(source):
 
 
 def unavailable(input_state="unavailable", reason="probe_failed"):
+    if TRACKER.window_key is not None:
+        # An observed rejection must not restore an earlier pane token on return.
+        TRACKER.invalidate()
     return {"shortcut": "ctrl+v", "token": None, "scope": "unavailable", "input_state": input_state, "reason": reason,
             "events_tracked": TRACKER.listener is not None}
 
@@ -189,10 +217,120 @@ def process_binary(pid):
         return ""
 
 
+def ghostty_focus(window, pid, atspi, deadline):
+    """Qualify a unique GTK pane without pretending it exposes a text caret."""
+    def key(node):
+        identity = (node.get_process_id(), node.path)
+        if identity[0] != pid or not identity[1] or time.monotonic() >= deadline:
+            raise ValueError('Unsettled terminal tree')
+        return identity
+
+    def validate_route(node, route):
+        # Reverse GTK ancestry can skip synthetic containers. Re-read the
+        # downward route, including child counts, before admitting the target.
+        parent = window
+        parent.clear_cache_single()
+        if key(parent) != window_key or not parent.get_state_set().contains(atspi.StateType.ACTIVE):
+            raise ValueError('Inactive terminal window')
+        for parent_key, count, index, child_key in route:
+            parent.clear_cache_single()
+            if key(parent) != parent_key or parent.get_child_count() != count:
+                raise ValueError('Terminal ancestry changed')
+            parent = parent.get_child_at_index(index)
+            if key(parent) != child_key:
+                raise ValueError('Terminal ancestry changed')
+        parent.clear_cache_single()
+        state = parent.get_state_set()
+        if (key(parent) != key(node) or not state.contains(atspi.StateType.FOCUSED)
+                or state.contains(atspi.StateType.DEFUNCT)):
+            raise ValueError('Terminal focus changed')
+        return parent
+
+    try:
+        window_key = key(window)
+        pending = [(0, 0, window, (), (window_key,))]
+        seen, focused = set(), []
+        edges = 0
+        obscured = False
+        while pending:
+            _, _, node, route, ancestors = heapq.heappop(pending)
+            node.clear_cache_single()
+            identity = key(node)
+            if identity in seen:
+                continue  # GTK can export the same pane beneath two tab containers.
+            seen.add(identity)
+            if len(seen) > 128:
+                raise ValueError('Unbounded terminal tree')
+            state, role = node.get_state_set(), node.get_role()
+            if identity == window_key and not state.contains(atspi.StateType.ACTIVE):
+                raise ValueError('Terminal window departed')
+            if identity != window_key and state.contains(atspi.StateType.FOCUSED):
+                if (role in (atspi.Role.PASSWORD_TEXT, atspi.Role.TERMINAL)
+                        or state.contains(atspi.StateType.EDITABLE)):
+                    # Search/palette entries retain the ordinary caret contract;
+                    # only canvas admission needs a complete unique-focus scan.
+                    target = validate_route(node, route)
+                    return target, cursor_state(target, atspi)
+                focused.append((node, route))
+            count = node.get_child_count()
+            if count < 0 or edges + count > 128:
+                raise ValueError('Incomplete terminal tree')
+            if (role in (atspi.Role.DIALOG, atspi.Role.ALERT, atspi.Role.MENU,
+                         atspi.Role.POPUP_MENU, atspi.Role.MENU_ITEM,
+                         atspi.Role.CHECK_MENU_ITEM, atspi.Role.RADIO_MENU_ITEM)
+                    and state.contains(atspi.StateType.SHOWING)):
+                obscured = True
+            for index in range(count):
+                child = node.get_child_at_index(index)
+                child_key = key(child)
+                if child_key in ancestors:
+                    raise ValueError('Cyclic terminal tree')
+                edges += 1
+                if child_key == TRACKER.key:
+                    priority = 2  # Retained identity only orders the fresh scan.
+                else:
+                    hints = child.get_state_set()
+                    priority = 2 if hints.contains(atspi.StateType.FOCUSED) else int(hints.contains(atspi.StateType.SHOWING))
+                heapq.heappush(pending, (-priority, -edges, child,
+                    route + ((identity, count, index, child_key),), ancestors + (child_key,)))
+        if len(focused) != 1:
+            return None, 'none'
+        node, route = focused[0]
+        parent = validate_route(node, route)
+        # Unlike cursor_state's generic 'none', canvas classification must keep
+        # observed focus loss distinct from an ordinary focused non-text pane.
+        # Reject that loss even if focus returns before another state query.
+        parent.clear_cache_single()
+        state, role = parent.get_state_set(), parent.get_role()
+        if (not state.contains(atspi.StateType.FOCUSED)
+                or state.contains(atspi.StateType.DEFUNCT)):
+            raise ValueError('Terminal focus changed')
+        if (role in (atspi.Role.PASSWORD_TEXT, atspi.Role.TERMINAL)
+                or state.contains(atspi.StateType.EDITABLE)):
+            return parent, cursor_state(parent, atspi)
+        window.clear_cache_single()
+        if (not obscured and key(window) == window_key
+                and window.get_state_set().contains(atspi.StateType.ACTIVE)
+                and window.get_role() == atspi.Role.FRAME
+                and role == atspi.Role.PANEL and parent.get_child_count() == 0
+                and not state.contains(atspi.StateType.DEFUNCT)
+                and all(state.contains(flag) for flag in (atspi.StateType.FOCUSED, atspi.StateType.VISIBLE,
+                        atspi.StateType.SHOWING, atspi.StateType.SENSITIVE))
+                and 'Text' not in parent.get_interfaces()
+                and TRACKER.listener is not None and TRACKER.window_events_tracked):
+            # Ghostty 1.3.1's writable GLArea omits ENABLED. These metadata prove
+            # pane identity, not caret, password state, read-only mode or delivery.
+            return parent, 'terminal_surface'
+        return parent, 'none'
+    except Exception:
+        return None, 'unavailable'
+
+
 def probe():
     import gi
     gi.require_version("Atspi", "2.0")
     from gi.repository import Atspi, GLib
+    deadline = time.monotonic() + .65
     Atspi.set_timeout(80, 80)
     TRACKER.start(Atspi)
     context = GLib.MainContext.default()
@@ -211,11 +349,15 @@ def probe():
     desktop = Atspi.get_desktop(0)
     desktop.clear_cache_single()
     active = []
-    for i in range(min(desktop.get_child_count(), 128)):
+    app_count = desktop.get_child_count()
+    complete = 0 <= app_count <= 128
+    for i in range(min(app_count, 128)):
         app = desktop.get_child_at_index(i)
         try:
             app.clear_cache_single()
-            for j in range(min(max(app.get_child_count(), 0), 20)):
+            window_count = app.get_child_count()
+            complete = complete and 0 <= window_count <= 20
+            for j in range(min(max(window_count, 0), 20)):
                 window = app.get_child_at_index(j)
                 window.clear_cache_single()
                 if window.get_state_set().contains(Atspi.StateType.ACTIVE):
@@ -226,6 +368,7 @@ def probe():
                     if process_binary(app.get_process_id()) != "mutter-x11-frames":
                         active.append((app, window))
         except Exception:
+            complete = False
             continue
     if len(active) != 1:
         return unavailable("none" if not active else "unavailable",
@@ -233,6 +376,21 @@ def probe():
     app, window = active[0]
     pid = app.get_process_id()
     binary = process_binary(pid)
+    if binary == 'ghostty':
+        if not complete:
+            return unavailable(reason='incomplete_terminal_tree')
+        focused, input_state = ghostty_focus(window, pid, Atspi, deadline)
+        if focused is not None:
+            TRACKER.observe(focused)
+        if input_state not in ('editable', 'terminal_surface'):
+            return unavailable(input_state, 'protected' if input_state == 'protected' else 'not_editable')
+        TRACKER.window_key = (pid, window.path) if input_state == 'terminal_surface' else None
+        identity = f"{TRACKER.nonce}:{TRACKER.generation}:{pid}:{window.path}:{focused.path}:{input_state}"
+        return {'shortcut': 'ctrl+shift+v' if input_state == 'terminal_surface'
+                or focused.get_role() == Atspi.Role.TERMINAL else 'ctrl+v',
+                'token': hashlib.sha256(identity.encode()).hexdigest(),
+                'scope': 'control', 'input_state': input_state, 'reason': 'ready',
+                'events_tracked': TRACKER.listener is not None}
     terminal = binary in TERMINALS
     focused = TRACKER.focused_hint(window, pid, Atspi)
     # WebKit reports focused wrappers as well as the actual input. A retained
