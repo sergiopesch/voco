@@ -45,8 +45,9 @@ Smooth movement follows the desktop's animation preference.
 ## Dictation
 
 Check your microphone during setup, then hide VOCO and focus an editable field.
-Press the recording shortcut (default **Alt+D**), wait for Listening, and speak.
-Words appear progressively. Press the shortcut again to finish; the final words
+Press and release the recording shortcut (default **Alt+D**), wait for Listening,
+and speak.
+Words appear progressively. Press and release the shortcut again to finish; the final words
 and punctuation are delivered before VOCO returns to Ready.
 
 VOCO binds dictation to a text field or supported terminal pane. If it cannot
