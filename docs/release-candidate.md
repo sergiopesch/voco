@@ -1,48 +1,38 @@
 # Release status
 
-The [latest published GitHub release](https://github.com/sergiopesch/voco/releases/latest)
-is authoritative for downloads. Source metadata does not establish what is installed.
+The recorded public Ubuntu/Debian release is **2026.0.57**. The
+[latest GitHub release](https://github.com/sergiopesch/voco/releases/latest) is
+authoritative for available downloads; source metadata does not establish what
+is installed on a particular computer.
 
-The recorded public Ubuntu/Debian release is **2026.0.56**. It opens VOCO after
-guided installation, supports Ghostty's focused terminal pane, preserves microphone
-readiness after destination rejection and fixes repeated X11 starts by waiting for
-the matched shortcut release. The pinned local recognizer, model, input permissions
-and recovery contract are unchanged.
+This release adds a prominent silver installer wordmark and branded progress
+accents, returns directly to the tray after onboarding, and preserves healthy
+local transcription when delivery is interrupted. Recovery sends a notification;
+saved text opens only when requested. It never retries uncertain insertion.
 
-- [.56 changes and installation behavior](releases/2026.0.56.md)
-- [Signed assets and provenance](https://github.com/sergiopesch/voco/releases/tag/voco.2026.0.56)
-- [Exact-package qualification and publication record](testing/installer-ghostty-2026-09-23.md)
-- [Previous .55 security, performance and helper qualification](testing/release-qualification-2026-09-23.md)
+- [.57 changes](releases/2026.0.57.md)
+- [Signed assets and provenance](https://github.com/sergiopesch/voco/releases/tag/voco.2026.0.57)
+- [Exact-package qualification and publication](testing/tray-brand-release-2026-09-23.md)
+- [Previous Ghostty and input qualification](testing/installer-ghostty-2026-09-23.md)
 
-The exact package passes fresh Ubuntu installation/removal, 13 installed worker
-checks, ten private GNOME X11/Ghostty application cases, nine browser cases,
-native Wayland onboarding and installer opening on private X11 and Wayland.
-The final helper also passes separate 22-stage X11 and native Wayland checks.
-Earlier .55 VM input and service-migration evidence remains historical; unchanged
-runtime/helper bytes do not turn those checks into new runs.
+The exact application passes ten private Ghostty cases, ten browser cases and
+native Wayland onboarding. The final package passes fresh Ubuntu installation,
+13 installed-worker checks and removal; the guided launch helper passes on private
+X11 and Wayland. Four protected CI jobs, merged-source CI, the signed tag, five
+signed manifests and all 18 anonymous public assets are verified, including
+latest aliases and the tagged installer.
 
-The publication record binds final protected and merged CI, the signed tag,
-five signed manifests and all 18 anonymous public assets, latest aliases and the
-tagged installer. Bundled docs retain their assembly snapshot; publication
-documentation does not replace the signed package, source archive or assets.
+The ten-minute session bound remains. Saved recovery is held in memory until
+copied, discarded or VOCO closes. Physical microphones, default PipeWire,
+owner-perceived motion and untested desktop/application combinations remain
+separate acceptance checks. Terminal dispatch does not establish caret, writable
+mode, password state or text readback. The existing low-severity Rand advisory
+remains visible and assessed separately.
 
-A focused Ghostty pane does not establish caret position, writable mode, password
-state or text readback. Terminal delivery confirms dispatch and sends no Enter or
-control characters. Physical microphones, default PipeWire, owner-perceived motion
-and untested desktops/applications remain separate acceptance checks.
-
-Fedora, openSUSE and Arch/Omarchy remain at **2026.0.43**; use the matching
+Fedora, openSUSE and Arch/Omarchy remain at **2026.0.43**; use their matching
 [native guide](install-native.md) and [support matrix](linux-support.md).
-[2026.0.55](releases/2026.0.55.md) remains available for rollback. Published tags
-and assets remain immutable; new application bytes require another qualified
-release. Weekly maintenance, protected checks and the separate security update
-queue remain enabled. The hosted release assembler stays disabled.
-
-## 2026.0.57 candidate
-
-Current source returns directly to the tray after onboarding, separates delivery
-interruptions from recognition, and presents retained dictation on demand after a
-notification. The installer also adds a larger silver VOCO wordmark and shared brand-colour
-progress accents. These changes are not in published **2026.0.56**.
-Publication is pending exact-package qualification, protected CI and signed-asset verification.
-See the [review and evidence boundaries](testing/onboarding-recovery-2026-09-23.md).
+[2026.0.56](releases/2026.0.56.md) remains available for rollback. Published tags
+and artifacts are immutable. Bundled docs retain the package-assembly snapshot;
+publication documentation does not replace the signed source or package.
+Protected checks and weekly dependency maintenance remain enabled. The hosted
+release assembler stays disabled; publisher signing stays local.

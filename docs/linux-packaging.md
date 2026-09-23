@@ -63,7 +63,7 @@ password/package prompts release the canvas before taking input. The final view
 replaces intermediate progress and retains any required panel sign-out action.
 Narrow terminals and `VOCO_INSTALL_PLAIN=1` use sequential text; reduced motion
 keeps measured progress without sweeps. Routine service output joins the private
-installation log, which is retained on failure. This behavior shipped before .56. The .57 candidate enlarges the silver wordmark
+installation log, which is retained on failure. This behavior shipped before .56. The .57 release enlarges the silver wordmark
 and uses shared green/amber progress accents while preserving plain and reduced-motion modes.
 
 Setup resolves an absolute `XDG_CONFIG_HOME` exactly as the app does. It preserves
