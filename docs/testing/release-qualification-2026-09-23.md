@@ -72,8 +72,8 @@ libraries and input helpers are outside npm/Cargo scanner coverage.
 - **Real Ubuntu GNOME Wayland VM:** the authenticated legacy client and exact
   private daemon complete 4,003 connections. Four thousand key press/release
   pairs and final target text match exactly, with five descriptors, one idle
-  thread and 4,008 KiB RSS. The client cannot directly open guest uinput; the
-  daemon owns that route. QEMU uses a disposable overlay with read-only archived
+  thread and 4,008 KiB RSS. The client lacked write permission to guest uinput; the daemon had already
+  opened that route. This permission check did not attempt a client open syscall. QEMU uses a disposable overlay with read-only archived
   backing and no host input/audio passthrough.
 - **Real installed upgrade:** the signed .54 package upgrades to the exact .55
   package while the old app and service remain running. Settings and the old
@@ -81,7 +81,8 @@ libraries and input helpers are outside npm/Cargo scanner coverage.
   after it closes, CLI and normal app startup migrate the owned service to the
   private daemon. Poisoned PATH helpers are unused, repeat setup preserves the
   current daemon, custom overrides are preserved, and a genuine queued manager
-  restart prevents app startup before capture. The installed service delivers
+  restart prevents app startup before capture initialization, established by the actual exit and reviewed
+  startup order. The installed service delivers
   native Wayland keys, literal space and clipboard paste with independent receipts.
 
 ## Final review and retained failed attempts
