@@ -1,15 +1,15 @@
 # 2026.0.57 release qualification
 
 The complete Debian package was built and assembled from clean commit
-`ee71778`, incorporating `ec67c7a` (onboarding/recovery) and `9c1a28a`
-(installer branding). Subsequent changes update qualification documentation and
-make the private browser recovery fixture explicitly open the saved transcript;
-they do not change the packaged product sources.
+`ecca9b7`, incorporating `ec67c7a` (onboarding/recovery) and `9c1a28a`
+(installer branding). This includes the deterministic animation interruption regression and the private
+browser recovery fixture that explicitly opens saved text. Later documentation
+changes do not change packaged product sources.
 
 ## Exact artifact
 
-- Debian package: 685,719,774 bytes; SHA-256
-  `1df7d1f6ea186db10af309bfdbb133e63aedc7444264d5e6ef6268e36f37fe3c`.
+- Debian package: 685,721,046 bytes; SHA-256
+  `1f5f62559f53d034584705c135a6be66a54f8a266e5596b4768a095aeafcb111`.
 - Packaged application: SHA-256
   `9cfd14cb4aee5c563b75397d6dd8f717ab88e59b916ca912f44104154ef9aa2a`.
 - The pinned model, recognition libraries and private input helper match .56.
@@ -23,7 +23,7 @@ they do not change the packaged product sources.
   APT function. All 410 installed inventory entries and ten ELF dependencies
   checked; `dpkg --verify` was empty. All 13 installed-worker checks passed.
   Removal left none of the 332 package-owned files/links. The owned Crabbox
-  lease `cbx_cfd8186399d2` was stopped and removed.
+  lease `cbx_f105bcdd5374` was stopped and removed.
 - Ten private GNOME X11/Ghostty application cases passed against the packaged
   executable, including fresh onboarding directly to the tray, repeated Start
   and Stop, held-key handling, and tab departure with recovery and no replay.
@@ -40,7 +40,24 @@ they do not change the packaged product sources.
   auditing, remains a publication gate. The signed validation asset records its
   final protected and merged commit receipts.
 
+The first package is retained as superseded. Reassembly corrected AppStream's
+release description; the application, helpers and speech payload are byte-identical
+to the completed desktop/browser checks. Final installation/removal and installer
+launch checks were rerun against the rebuilt package.
+
+The final installer passes 56/56 alternating benchmark trials with verified
+payload hashes and the new deterministic mid-redraw interruption test. In the
+paced animated fixture, median baseline/candidate wall time was 0.7911/0.7914 s
+and CPU time 0.0478/0.0515 s. These local transfer fixtures do not measure real
+network, APT or owner-perceived motion.
+
 ## Retained failures and limits
+
+Automated review caught a redraw race despite passing CI. Terminating a sweep
+between row writes could corrupt earlier terminal output. The deterministic
+regression first failed, then passed after buffering the complete canvas and
+emitting it with one builtin. Both AppStream entries now describe .57 while
+retaining .56 as history. Both review threads were resolved after verification.
 
 The first browser run passed delivery and long speech, then correctly found no
 visible recovery controls. Its fixture still expected automatic presentation.
