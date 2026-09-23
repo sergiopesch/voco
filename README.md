@@ -18,10 +18,10 @@ recognition runs on your computer. No account, subscription or cloud transcripti
 Install the current public Ubuntu/Debian x86_64 release with one command:
 
 ```bash
-wget -qO voco-install https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.57/install && bash voco-install
+wget -qO voco-install https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.58/install && bash voco-install
 ```
 
-The guided installer downloads **2026.0.57**, verifies the publisher signature
+The guided installer downloads **2026.0.58**, verifies the publisher signature
 and package checksum, installs the package and required Wayland input helpers,
 then requests VOCO to open in your local desktop session.
 Desktop readiness is checked before onboarding finishes. If setup is incomplete, follow the
@@ -56,17 +56,16 @@ with full-resolution release graphics, exact values and methods.
 
 ## Native Linux packages
 
-**2026.0.57** adds a prominent silver installer wordmark, returns directly to the
-tray after onboarding, and keeps local transcription running when delivery is
-interrupted. Saved text opens only when requested. The recognizer and input
-permissions are unchanged.
+**2026.0.58** preserves Brave address-bar dictation when Alt+D stops recording.
+The GNOME companion consumes Stop, keeps held gestures attached to their recording,
+and reports when an upgraded companion needs a new desktop session.
 Fedora, openSUSE and Arch/Omarchy packages remain at **2026.0.43**; download those
 from their matching release. Install only assets attached to a published release.
 Wayland uses native microphone capture so dictation can start with its panel
 hidden; X11 keeps browser capture.
 See the [support matrix](docs/linux-support.md),
 [native package installation](docs/install-native.md) and
-[.57 changes and qualification](docs/releases/2026.0.57.md).
+[.58 changes and qualification](docs/releases/2026.0.58.md).
 
 ## Contribute
 
