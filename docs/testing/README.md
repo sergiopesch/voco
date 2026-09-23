@@ -1,5 +1,7 @@
 # Testing
 
+
+- [2026.0.57 tray and installer release qualification](tray-brand-release-2026-09-23.md): exact-package installation, recovery and desktop checks.
 [The unreleased installer brand refresh](installer-brand-2026-09-23.md) records the
 larger shared wordmark, terminal fallbacks, prompt handoff and rendering cost.
 
