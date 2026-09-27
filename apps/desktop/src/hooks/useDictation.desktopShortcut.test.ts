@@ -28,6 +28,7 @@ function harness() {
   const disposed = ref(false);
   const begin = vi.fn<(id: string, epoch: number) => Promise<void>>(async () => {});
   const end = vi.fn<(id: string) => Promise<void>>(async () => {});
+  const reservation = vi.fn<(sessionId: number) => Promise<void>>(async () => {});
   const state = {
     config: { transcriptTarget: "cursor", transcriptEnhancement: "off" },
     recovery: null as unknown, transcript: "", setCaptureNotice: vi.fn(),
@@ -115,6 +116,7 @@ function harness() {
     useStore: { getState: () => state },
     beginDesktopShortcutSession: begin,
     endDesktopShortcutSession: end,
+    awaitStopShortcutReservation: reservation,
     getDesktopPasteStatus: pasteStatus,
     pasteDesktopText: vi.fn(async () => ({ outcome: "dispatched" })),
     traceDictationEvent: trace,
@@ -168,7 +170,7 @@ function harness() {
     ...recording,
     unmount: recording.dispose,
     state, phase, current, owner, cleanup, cancelled, queue, begin, end, status,
-    pasteStatus, captureSelection, trace, setError, disposed, target, notify,
+    pasteStatus, captureSelection, trace, setError, disposed, target, notify, reservation,
   };
 }
 
@@ -194,6 +196,41 @@ it("a failed begin prevents capture and still ends the uncertain owner", async (
   expect(h.captureSelection).not.toHaveBeenCalled();
   expect(h.end).toHaveBeenCalledExactlyOnceWith(h.begin.mock.calls[0]![0]);
   expect(h.trace).toHaveBeenCalledWith("dictation_desktop_shortcut_acquire_failed");
+});
+
+it("does not open a microphone if GNOME cannot reserve Stop for this session", async () => {
+  const h = harness();
+  h.reservation.mockRejectedValue(new Error("GNOME did not reserve VOCO's Stop shortcut."));
+  await h.startRecording();
+  expect(h.reservation).toHaveBeenCalledWith(1);
+  expect(h.captureSelection).not.toHaveBeenCalled();
+  expect(h.phase.current).toBe("idle");
+  expect(h.notify).toHaveBeenCalledWith("Dictation setup incomplete", expect.stringContaining("GNOME did not reserve"));
+  expect(h.setError).toHaveBeenCalledWith(null);
+});
+
+it("keeps microphone selection behind the current Stop reservation ACK", async () => {
+  const h = harness(), reserved = deferred();
+  h.reservation.mockImplementation(() => reserved.promise);
+  const starting = h.startRecording();
+  await vi.waitFor(() => expect(h.reservation).toHaveBeenCalledOnce());
+  expect(h.captureSelection).not.toHaveBeenCalled();
+  reserved.resolve();
+  await starting;
+  expect(h.captureSelection).toHaveBeenCalledOnce();
+});
+
+it("explains an unloaded Stop companion before capture without showing an error screen", async () => {
+  const h = harness();
+  const detail = "VOCO cannot safely use Alt+D in this GNOME session. Sign out and back in to load Stop.";
+  h.pasteStatus.mockResolvedValueOnce({ ...h.status, available: false, failureReason: "setup", detail });
+  await h.startRecording();
+  expect(h.begin).not.toHaveBeenCalled();
+  expect(h.captureSelection).not.toHaveBeenCalled();
+  expect(h.phase.current).toBe("idle");
+  expect(h.state.setCaptureNotice).toHaveBeenCalledWith(detail);
+  expect(h.notify).toHaveBeenCalledWith("Dictation setup incomplete", detail);
+  expect(h.setError).toHaveBeenCalledWith(null);
 });
 
 it("does not acquire a desktop shortcut for an explicit browser recording", async () => {
@@ -341,5 +378,7 @@ it.each(["cursor", "setup"] as const)("reports a rejected %s preflight without r
     reason === "cursor" ? "No text cursor available" : "Dictation setup incomplete",
     h.status.detail,
   );
-  expect(h.setError).toHaveBeenCalledWith(h.status.detail);
+  expect(h.phase.current).toBe("idle");
+  expect(h.state.setCaptureNotice).toHaveBeenCalledWith(h.status.detail);
+  expect(h.setError).toHaveBeenCalledWith(null);
 });

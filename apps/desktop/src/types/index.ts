@@ -132,6 +132,7 @@ export interface ShortcutDiagnostics {
 export interface DesktopInputStatus {
   available: boolean;
   detail: string;
+  setupArea?: "panel";
 }
 
 export interface RuntimeDiagnostics {

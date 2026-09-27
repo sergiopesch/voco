@@ -55,6 +55,7 @@ export const getDesktopPasteStatus = async () => ({enabled:Boolean(window.deskto
 // Model the native shortcut lease API used by the real hook; no desktop input is touched.
 export const beginDesktopShortcutSession = async (id, epoch) => { if(typeof id !== 'string' || epoch !== 1) throw new Error('Invalid shortcut preflight'); calls.push(['beginDesktopShortcutSession',id,epoch]); };
 export const endDesktopShortcutSession = async (id) => { calls.push(['endDesktopShortcutSession',id]); };
+export const awaitStopShortcutReservation = async (sessionId) => { calls.push(['awaitStopShortcutReservation',sessionId]); if(window.deferStopReservation) await new Promise(resolve=>window.resolveStopReservation=resolve); if(window.failStopReservation) throw new Error('GNOME did not reserve Stop'); };
 export const pasteDesktopText = async (text) => { calls.push(['pasteDesktopText',text]); if(window.failPaste) throw new Error('Uncertain paste dispatch'); return {strategy:'clipboard',outcome:'dispatched',pasteMetrics:window.pasteMetrics?{terminal:true,targetProbeMs:60,preflightMs:5,clipboardMs:8,keyboardMs:350}:undefined}; };
 export const cancelOwnedPreedit = async (...args) => { calls.push(['cancelOwnedPreedit',...args]); return state(); };
 export const releaseBrowserRecording = async (triggerId) => { calls.push(['releaseBrowserRecording',triggerId]); };
@@ -174,6 +175,24 @@ async function load() {
 async function start(seconds=1) { await page.evaluate(()=>window.hook.toggle()); await page.waitForFunction(()=>window.captureReady()); await page.evaluate(seconds => window.samples(seconds),seconds); }
 async function stop() {await page.evaluate(()=>window.hook.toggle());}
 async function recovered() {try {await page.waitForFunction(()=>Boolean(window.store.getState().recovery),null,{timeout:6000});} catch(e) {console.log('DEBUG_STATE', await page.evaluate(()=>({state:window.store.getState(),calls:window.nativeCalls,processor:!!window.processor?.onaudioprocess}))); throw e;} }
+
+await load();await page.evaluate(()=>{window.desktopPaste=true;window.desktopStream=true;window.failStopReservation=true;});
+await page.evaluate(()=>window.hook.toggle());
+await page.waitForFunction(()=>window.nativeCalls.some(c=>c[0]==='awaitStopShortcutReservation'));
+assert.equal(await page.evaluate(()=>window.store.getState().status),'idle');
+assert.equal(await page.evaluate(()=>window.tracks.length),0);
+assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>c[0]==='showNotification'&&c[1]==='Dictation setup incomplete')),true);
+results.push('A rejected GNOME Stop reservation returns to idle without opening the microphone.');
+
+await load();await page.evaluate(()=>{window.desktopPaste=true;window.desktopStream=true;window.deferStopReservation=true;});
+await page.evaluate(()=>{void window.hook.toggle();});
+await page.waitForFunction(()=>typeof window.resolveStopReservation==='function');
+assert.equal(await page.evaluate(()=>window.tracks.length),0);
+assert.equal(await page.evaluate(()=>window.captureReady()),false);
+await page.evaluate(()=>window.resolveStopReservation());
+await page.waitForFunction(()=>window.captureReady());
+await page.evaluate(()=>window.hook.cancelRecording());
+results.push('An unconfirmed GNOME Stop reservation holds capture until the session ACK.');
 
 await load();await start();
 assert.equal(await page.evaluate(()=>window.hook.toggle('tray:stop','stop',window.hook.dictationSessionId+1)),false);

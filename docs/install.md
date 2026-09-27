@@ -12,7 +12,8 @@ The [README command](../README.md#get-started) runs the guided installer from
 the published **2026.0.59** tag. That version-pinned installer verifies the publisher
 signature on the checksum manifest, then verifies the package checksum. The signed
 manual procedure below applies the same authentication boundary. On Wayland the
-guided installer installs the input helpers and checks desktop readiness. If setup is incomplete, follow the
+guided installer installs and checks the input helpers. Onboarding checks the
+live GNOME Stop shortcut after login. If setup is incomplete, follow the
 [Wayland setup](platform/README.md#ydotoold-ydotool-daemon) instructions.
 Onboarding completion requires a successful voice test and desktop readiness.
 
@@ -164,6 +165,15 @@ If a session restart is requested, save your work and sign out and back in.
 `voco --check-panel` checks activation without changing settings. The package
 maintainer scripts never enable a user extension. Other GNOME versions keep the
 native tray fallback; live bars are qualified only on GNOME 46.
+
+On GNOME Wayland, **Alt+D** and **Alt+Shift+D** need the live companion to
+consume Stop. A package installed after this login may be enabled but not yet
+loaded. VOCO checks this during onboarding and before starting cursor dictation;
+it shows setup guidance or sends a tray notification if a new login is needed.
+This prevents the Stop shortcut from
+selecting a browser address or changing another app's focus while final text
+is being delivered. After signing back in, use `voco --check-panel` to confirm
+that it reports active before testing those shortcuts.
 
 
 VOCO keeps its controls in the system tray. Stock Fedora GNOME needs the

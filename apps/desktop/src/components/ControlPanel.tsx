@@ -624,7 +624,7 @@ export function ControlPanel({
     try {
       const result = await Promise.race([
         getDesktopInputStatus(),
-        new Promise<null>(resolve => { timeout = setTimeout(() => resolve(null), 3500); }),
+        new Promise<null>(resolve => { timeout = setTimeout(() => resolve(null), 7500); }),
       ]);
       if (!result || typeof result.available !== "boolean") throw new Error("Missing readiness result");
       if (request !== inputCheckRequest.current) return false;
@@ -869,6 +869,7 @@ export function ControlPanel({
             setupError={recovery && testPurpose !== "onboarding" ? "Recover or discard your previous dictation before starting the voice test." : nativeMicrophone?.error ?? errorMessage}
             onRetrySetup={nativeMicrophone?.error ? () => void nativeMicrophone.initialize().catch(() => {}) : undefined}
             desktopSetupError={desktopSetupError}
+            showPanelSetup={desktopInput?.setupArea === "panel"}
             onCheckDesktopSetup={() => void checkDesktopSetup()}
             onOpenDesktopSetupGuide={() => void onOpenReleasePage(DESKTOP_SETUP_GUIDE)}
             checkingDesktopSetup={checkingInput}

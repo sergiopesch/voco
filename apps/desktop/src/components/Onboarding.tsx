@@ -15,6 +15,7 @@ interface OnboardingProps {
   attempted: boolean;
   setupError?: string | null;
   desktopSetupError?: string | null;
+  showPanelSetup?: boolean;
   checkingDesktopSetup?: boolean;
   onCheckDesktopSetup?: () => void;
   onOpenDesktopSetupGuide?: () => void;
@@ -33,7 +34,7 @@ interface OnboardingProps {
 export function Onboarding({ microphone, status, transcript, passed,
   failed, preparing, saving, blocked, hotkey, microphoneControls, desktopReady = false,
   onStart, onStop, onFinish, attempted, setupError, onRetrySetup, desktopSetupError,
-  checkingDesktopSetup, onCheckDesktopSetup, onOpenDesktopSetupGuide }: OnboardingProps) {
+  showPanelSetup, checkingDesktopSetup, onCheckDesktopSetup, onOpenDesktopSetupGuide }: OnboardingProps) {
   const [changingMicrophone, setChangingMicrophone] = useState(false);
   const primaryRef = useRef<HTMLButtonElement>(null);
   const previousPhase = useRef("");
@@ -72,6 +73,7 @@ export function Onboarding({ microphone, status, transcript, passed,
     </div>
     {desktopSetupError ? <details className="voco-setup__details"><summary>Details</summary><p>{desktopSetupError}</p></details> : null}
     {desktopSetupError && onOpenDesktopSetupGuide ? <button className="voco-button voco-button--ghost" onClick={onOpenDesktopSetupGuide}>Open setup instructions</button> : null}
+    {passed && desktopSetupError && showPanelSetup ? <PanelSetup disabled={busy || blocked} /> : null}
     <div className="voco-setup__transcript" role="region" aria-label="Test transcript" tabIndex={0}>
       {transcript && transcript !== "(no speech detected)" ? transcript : <span>Try saying “This is my voice, typed.”</span>}
     </div>
