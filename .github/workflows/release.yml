@@ -101,6 +101,8 @@ jobs:
 
       - name: Dictation renderer lifecycle regression
         run: npm run test:dictation-renderer
+        env:
+          VOCO_RENDERER_EVIDENCE_DIR: ${{ runner.temp }}/voco-dictation-renderer
 
       - name: Microphone refresh and retry regression
         run: npm run test:microphone-renderer
@@ -197,6 +199,8 @@ jobs:
         with:
           name: native-application-evidence
           path: |
+            ${{ runner.temp }}/voco-dictation-renderer/
+            ${{ runner.temp }}/voco-microphone-${{ github.run_id }}-${{ github.run_attempt }}/
             ${{ runner.temp }}/voco-native-desktop/
             ${{ runner.temp }}/voco-native-application/
             ${{ runner.temp }}/voco-native-wayland/

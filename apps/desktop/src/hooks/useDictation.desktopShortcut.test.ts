@@ -1,6 +1,11 @@
 // Execute the production lifecycle factory with deterministic IPC. This proves
 // ownership ordering, not physical shortcut delivery or microphone capture.
 import { expect, it, vi } from "vitest";
+import {
+  appendAudioSamples,
+  clearAudioCaptureBuffer,
+  createAudioCaptureBuffer,
+} from "@/lib/audioCaptureBuffer";
 import { DesktopShortcutSession } from "@/lib/desktopShortcutSession";
 import * as session from "@/lib/dictationSession";
 import {
@@ -48,6 +53,7 @@ function harness() {
   const trace = vi.fn(async () => {});
   const setError = vi.fn();
   const notify = vi.fn(async (_summary: string, _body: string) => {});
+  const audioBuffer = createAudioCaptureBuffer();
   const env = {
     phaseRef: phase,
     sessionRef: current,
@@ -95,7 +101,7 @@ function harness() {
     debugCanonicalChunksRef: ref([]),
     debugCaptureEnabledRef: ref(false),
     debugNativeCaptureEnabledRef: ref(false),
-    audioBufferRef: ref({ sampleCount: 0, chunks: [] }),
+    audioBufferRef: ref(audioBuffer),
     cursorDeliveryStateRef: ref("idle"),
     lifecycleEpochRef: ref(0),
     audioContextRef: ref(null),
@@ -132,7 +138,7 @@ function harness() {
     clearTranscript: noop,
     resetAudioLevel: noop,
     updateAudioLevel: noop,
-    clearCapturedAudio: noop,
+    clearCapturedAudio: vi.fn(() => clearAudioCaptureBuffer(audioBuffer)),
     clearCanonicalAudioCache: noop,
     transitionCursorDelivery: noop,
     retainCurrentTranscript: noop,
@@ -168,6 +174,7 @@ function harness() {
   const recording = createDictationRecording(env);
   return {
     ...recording,
+    env,
     unmount: recording.dispose,
     state, phase, current, owner, cleanup, cancelled, queue, begin, end, status,
     pasteStatus, captureSelection, trace, setError, disposed, target, notify, reservation,
@@ -381,4 +388,53 @@ it.each(["cursor", "setup"] as const)("reports a rejected %s preflight without r
   expect(h.phase.current).toBe("idle");
   expect(h.state.setCaptureNotice).toHaveBeenCalledWith(h.status.detail);
   expect(h.setError).toHaveBeenCalledWith(null);
+});
+
+it.each([
+  { kind: "cancellation", frames: 3 },
+  { kind: "failure", frames: 3 },
+  { kind: "cancellation", frames: 0 },
+])("$kind during WebKit startup preserves $frames received samples", async ({ kind, frames }) => {
+  const h = harness(), connecting = deferred();
+  h.env.captureSelectionRef.current = () => ({ backend: "webkit" });
+  vi.mocked(h.env.ensureAudioContext).mockResolvedValue({
+    sampleRate: 16000, createMediaStreamSource: vi.fn(() => ({})),
+  } as unknown as AudioContext);
+  vi.mocked(h.env.connectWorklet).mockImplementation(async () => {
+    await connecting.promise;
+    return true;
+  });
+  const retained = new Float32Array([0.125, -0.25, 0.5]).subarray(0, frames);
+  vi.mocked(h.env.teardownAudioGraph).mockImplementation(async () => {
+    // A connected worklet can flush its first retained prefix during teardown,
+    // even though cancellation arrived before Listening was published.
+    appendAudioSamples(h.env.audioBufferRef.current, retained);
+    return 16000;
+  });
+  const starting = h.startRecording();
+  await vi.waitFor(() => expect(h.env.connectWorklet).toHaveBeenCalledOnce());
+  if (kind === "cancellation") {
+    await h.cancelRecording();
+    connecting.resolve();
+  } else {
+    connecting.reject(new Error("Audio graph initialization failed"));
+  }
+  await starting;
+  if (frames) {
+    expect(h.state.recovery).toMatchObject({
+      audioAvailable: true,
+      retrying: false,
+      reason: expect.stringContaining(kind === "cancellation"
+        ? "Recording cancelled" : "Audio graph initialization failed"),
+    });
+    expect(h.env.audioBufferRef.current.chunks).toEqual([retained]);
+    expect(h.phase.current).toBe("error");
+  } else {
+    expect(h.state.recovery).toBeNull();
+    expect(h.env.audioBufferRef.current.chunks).toEqual([]);
+    expect(h.phase.current).toBe("idle");
+  }
+  expect(h.env.audioBufferRef.current.sampleCount).toBe(frames);
+  expect(h.queue.current).toBeNull();
+  expect(h.env.pasteDesktopText).not.toHaveBeenCalled();
 });

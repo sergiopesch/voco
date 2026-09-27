@@ -1,7 +1,10 @@
 # VOCO GNOME panel
 
-This optional GNOME Shell 46 integration keeps VOCO's microphone and active dictation capsule
-inside the system panel. It expands horizontally for Starting, Listening and
+This GNOME Shell 46 integration keeps VOCO's microphone and active dictation capsule
+inside the system panel. On GNOME Wayland, the current source requires it for
+**Alt+D** and **Alt+Shift+D** so Shell consumes Stop before the focused application
+can act on the same shortcut. On X11 its panel presentation is optional.
+It expands horizontally for Starting, Listening and
 Finishing, then contracts at idle. Review remains visible for unresolved recovery.
 The microphone and Stop button issue an explicit Stop during capture. At idle the
 microphone opens settings; Review opens the existing recovery interface on request.
@@ -70,8 +73,14 @@ passive duplicates. The reservation token binds the renderer epoch, capture sess
 and exact configured accelerator; presentation revisions cannot revoke it. A rejected latest reservation, idle, disconnect, disable and
 state timeout release the grab. Each renewal has a generation: older replies
 cannot release a newer reservation, including renewals of the same grab.
-Without an active companion, selected continuation text is rejected and retained
-for recovery rather than replacing the existing words.
+Without a loaded and attached companion, the current source blocks cursor
+dictation with these GNOME Wayland shortcuts and explains the setup requirement.
+Start also waits for the live reservation for that capture before opening the
+microphone. Other desktops and shortcuts retain their existing input checks.
+If a reservation is lost after capture starts and the application changes its
+selection, continuation text is rejected and retained for recovery rather than
+replacing existing words. This does not establish atomic ownership during a
+desktop paste gesture.
 
 ## Verification
 

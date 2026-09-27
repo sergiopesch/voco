@@ -2,10 +2,7 @@ import {
   collectAudioSamplesRange,
   type AudioCaptureBuffer,
 } from "@/lib/audioCaptureBuffer";
-import {
-  AudioCaptureFlushError,
-  CAPTURE_INPUT_INTERRUPTED,
-} from "@/lib/audioCaptureFlush";
+import { AudioCaptureFlushError } from "@/lib/audioCaptureFlush";
 import { calculateVisualAudioLevelFromSamples } from "@/lib/audioLevel";
 import { BenchmarkPhraseQueue } from "@/lib/benchmarkPhraseQueue";
 import {
@@ -673,11 +670,11 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       releaseRecordingOrigin(triggerId);
       setCanCancel(false);
       setCancellationPending(false);
-      if (
-        audioBufferRef.current.sampleCount > 0 &&
-        (captureDescriptorRef.current?.backend === "native" || cancelledRef.current === CAPTURE_INPUT_INTERRUPTED)
-      ) {
-        retainRecovery(cancelledRef.current ?? `Native microphone startup failed: ${errorMessage(err)}`);
+      // Teardown can flush a WebKit prefix even when cancellation or failure
+      // happened before Listening. Retention belongs to the received samples,
+      // not the backend or interruption reason.
+      if (audioBufferRef.current.sampleCount > 0) {
+        retainRecovery(cancelledRef.current ?? `Microphone startup failed: ${errorMessage(err)}`);
         return;
       }
       if (cancelledRef.current) {

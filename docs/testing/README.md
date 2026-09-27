@@ -1,5 +1,6 @@
 # Testing
 
+- [27 September end-to-end assessment](end-to-end-assessment-2026-09-27.md): merged GNOME Start gate, startup audio recovery fix, CI evidence hygiene and remaining desktop acceptance gaps.
 
 - [2026.0.59 Stop reservation and installer qualification](stop-reservation-release-2026-09-23.md): rejected renewals, parent-owned cleanup and exact-package release evidence.
 - [2026.0.58 Brave Stop release qualification](brave-release-2026-09-23.md): exact-package upgrade, five-minute dictation and signed public assets.
