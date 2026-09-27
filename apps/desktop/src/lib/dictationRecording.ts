@@ -2,10 +2,7 @@ import {
   collectAudioSamplesRange,
   type AudioCaptureBuffer,
 } from "@/lib/audioCaptureBuffer";
-import {
-  AudioCaptureFlushError,
-  CAPTURE_INPUT_INTERRUPTED,
-} from "@/lib/audioCaptureFlush";
+import { AudioCaptureFlushError } from "@/lib/audioCaptureFlush";
 import { calculateVisualAudioLevelFromSamples } from "@/lib/audioLevel";
 import { BenchmarkPhraseQueue } from "@/lib/benchmarkPhraseQueue";
 import {
@@ -673,11 +670,16 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       releaseRecordingOrigin(triggerId);
       setCanCancel(false);
       setCancellationPending(false);
-      if (
-        audioBufferRef.current.sampleCount > 0 &&
-        (captureDescriptorRef.current?.backend === "native" || cancelledRef.current === CAPTURE_INPUT_INTERRUPTED)
-      ) {
-        retainRecovery(cancelledRef.current ?? `Native microphone startup failed: ${errorMessage(err)}`);
+      // Invalidate a failed WebKit capture before retained audio takes the
+      // recovery path. Cancellation and pre-capture destination rejection do
+      // not revoke readiness; native selection invalidation is guarded above.
+      if (webkitCaptureAttempted && !cancelledRef.current) setMicrophoneReadyState(false);
+      resetAudioLevel();
+      // Teardown can flush a WebKit prefix even when cancellation or failure
+      // happened before Listening. Retention belongs to the received samples,
+      // not the backend or interruption reason.
+      if (audioBufferRef.current.sampleCount > 0) {
+        retainRecovery(cancelledRef.current ?? `Microphone startup failed: ${errorMessage(err)}`);
         return;
       }
       if (cancelledRef.current) {
@@ -692,12 +694,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
         void showNotification(startFailureTitle, errorMessage(err)).catch(() => {});
         return;
       }
-      resetAudioLevel();
       setStatus("error");
-      // Native readiness belongs to the guarded selection invalidation above.
-      // Destination/shortcut rejection happens before capture and says nothing
-      // about microphone readiness. A late native failure must not revoke a newer source.
-      if (webkitCaptureAttempted) setMicrophoneReadyState(false);
       setInterimTranscript("");
       sessionRef.current = failSession(sessionRef.current);
       phaseRef.current = "error";

@@ -166,13 +166,19 @@ when RPM excludes ordinary documentation. See [Linux support](../linux-support.m
 The `onboarding:test` trigger reuses `dictationRecording.ts` and
 `BenchmarkPhraseQueue` with an output callback that never touches another app.
 Capture and final recognition must complete before onboarding is saved.
-VOCO then calls `get_desktop_input_status`: a fresh, bounded helper
-check with no target lookup, key injection or clipboard mutation. This is separate
-from `get_desktop_paste_status`, which also requires a verified cursor when normal
-dictation begins. The latter returns a typed setup/cursor failure so the UI does
-not misclassify missing dependencies as missing focus.
-`voco --check-desktop-input` exposes the same prerequisite check for installation
-and troubleshooting, without launching the GUI.
+VOCO then calls `get_desktop_input_status`: a fresh, bounded input-helper
+check with no target lookup, key injection or clipboard mutation. For Alt+D and
+Alt+Shift+D on GNOME Wayland, the running app also requires the current loaded
+companion to be attached. This is separate from `get_desktop_paste_status`, which
+requires the same setup readiness plus a verified cursor when normal dictation
+begins. The latter returns a typed setup/cursor failure so the UI does not
+misclassify missing dependencies as missing focus. After publishing Starting,
+desktop dictation waits for the authenticated companion's Stop reservation for
+that capture session before opening the microphone.
+`voco --check-desktop-input` checks input helpers only, without launching the GUI
+or requiring the running app's companion attachment. This lets installation
+finish before a newly installed GNOME companion can load on the next login;
+onboarding and Start enforce the live shortcut checks afterward.
 `voco_desktop_target.py` classifies focused editable controls without reading
 contents; `insertion.rs` refuses recording preflight without a verified destination.
 Ghostty's GTK canvas uses a separate `terminal_surface` classification: a unique

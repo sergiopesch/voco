@@ -17,7 +17,7 @@ def result(status, detail, can_enable=False):
 
 def classify(version, installed, info, enabled, globally_disabled):
     if version.split('.')[0] != '46':
-        return result('unsupported', 'Live panel bars require GNOME 46. Use the VOCO tray menu for status and Stop.')
+        return result('unsupported', 'The VOCO panel requires GNOME 46. On GNOME Wayland, Alt+D and Alt+Shift+D cannot start cursor dictation without its Stop reservation. Choose another shortcut in VOCO and configure it in your desktop, or use a supported GNOME 46 session.')
     if not installed:
         return result('missing', 'The VOCO panel files are missing. Reinstall the complete VOCO package.')
     if globally_disabled:

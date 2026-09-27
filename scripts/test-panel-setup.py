@@ -35,7 +35,11 @@ class PanelSetupTests(unittest.TestCase):
     def test_global_policy_and_unsupported_shell_are_preserved(self):
         self.assertEqual(panel.classify('46.0', True, {'state': 1}, True, True)['status'], 'blocked')
         for version in ['45.9', '47.0', '50.0']:
-            self.assertEqual(panel.classify(version, True, {}, False, False)['status'], 'unsupported')
+            status = panel.classify(version, True, {}, False, False)
+            self.assertEqual(status['status'], 'unsupported')
+            self.assertFalse(status['canEnable'])
+            self.assertIn('cannot start cursor dictation', status['detail'])
+            self.assertIn('configure it in your desktop', status['detail'])
 
     def test_debian_maps_every_runtime_extension_file(self):
         import json

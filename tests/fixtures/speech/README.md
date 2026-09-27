@@ -14,28 +14,41 @@ dictation benchmark, demographic assessment, or evidence of category leadership.
 The reference comes from the corpus, never VOCO's output. Normalized WER ignores
 case/punctuation, retains lexical negation and digits, and reports S/D/I counts.
 
-Predeclared smoke bounds: aggregate final-mode WER <=25%; each utterance <=50% in final
-and canonical modes, and in preview mode when the complete clip fits the native
-0.7–20 second preview range; no empty speech results. The 20.22-second clip
-`422-122949-0000` therefore has no preview score. Silence checks cover final and
-canonical output at 10, 20, and 30 seconds, and preview output at 10 and 20 seconds.
+Predeclared smoke bounds: aggregate WER <=25%; each utterance <=50%; no empty
+speech results. The current gate uses the production Nemotron streaming worker
+with 100 ms packets and a final Stop flush. It also checks 18 repeated utterances
+for continuity, empty output for 10, 20 and 30 seconds of digital silence, and
+quiet speech, leading/trailing silence and a partial Stop packet. Retained
+canonical and preview settings in the manifest belong to historical decoder tests;
+the current runner does not exercise those retired modes.
 These deliberately broad bounds detect major regressions;
 they are not the desired accuracy target for the product. Extend the independent
 corpus with consented conversational speech, accents, quiet/noisy microphones,
 technical vocabulary, numbers, long pauses, and chunk boundaries before choosing
 any stronger model. Do not tune recognition to these eight clips.
 
-Run `npm run test:speech-baseline` with `VOCO_MODEL_PATH` pointing to the existing
-SHA-256-pinned `ggml-base.en.bin`. No model is changed/downloaded by the test.
-The runner accepts `--report /path/to/report.json`. CI fetches only the existing
-model with checksum verification and runs this gate; ordinary `npm test` covers
-the scorer, transport, signal gate (Rust suite), and session policies separately.
+Provision the [pinned Nemotron model and native payload](../../../docs/linux-packaging.md#runtime-provisioning),
+then run `npm run test:speech-baseline`. The default model path is
+`runtime/speech/models/nemotron-speech-streaming-en-0.6b.q8_0.gguf`;
+`VOCO_NEMOTRON_MODEL` may point to another absolute path containing the same
+SHA-256-pinned bytes. No model is changed or downloaded by the test. The runner
+uses `/usr/bin/python3` by default (`VOCO_PYTHON` can select another interpreter)
+and requires NumPy and psutil as well as the native runtime dependencies.
+
+The runner accepts `--report /path/to/new-report.json` and refuses to overwrite
+existing evidence. CI uses `scripts/provision-ci-speech.sh` to extract the exact
+checksum-verified versioned release payload, then runs this gate and
+`runtime/speech/test_worker_protocol.py`. Ordinary `npm test` runs the source-level
+scorer, signal-gate, diagnostics and session-policy tests; Python unittest discovery
+does not execute the real-model protocol script. Rust tests are a separate gate.
 
 The gate rejects unknown manifest schemas, empty/duplicate fixture sets, unsafe
 paths, malformed checksums, invalid/missing limits, and references without words.
-Reports include the model, manifest, and actual worker SHA-256; checkout HEAD and
-dirty state at report time; Node/Rust/kernel/architecture details; and the modes
-tested for each clip. A checkout identity does not prove an independently supplied
-worker was built from that checkout: the executable hash records what actually ran.
+Reports include the model, fixture manifest, worker entry script and native-build
+manifest SHA-256; checkout HEAD and dirty state at report time; per-clip transcripts,
+WER, sample and hypothesis counts, elapsed times; and continuity, silence and
+variant results. The entry-script hash does not cover its imported Python modules,
+and the native-build manifest hash does not independently verify native binaries;
+payload verification and the recorded source identity provide that context.
 These are direct recognition-engine checks. Native Tauri IPC, microphone capture,
 and target delivery require separate integration evidence.

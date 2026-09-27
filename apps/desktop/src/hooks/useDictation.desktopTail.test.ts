@@ -5,6 +5,7 @@ import * as buffers from "@/lib/audioCaptureBuffer";
 const transport = vi.hoisted(() => vi.fn().mockResolvedValue({}));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: transport }));
 import { BenchmarkPhraseQueue } from "@/lib/benchmarkPhraseQueue";
+import { NvidiaRecovery } from "@/lib/nvidiaRecovery";
 import {
   createDesktopCaptureTail,
   type DesktopCaptureTailEnv,
@@ -131,5 +132,117 @@ describe("NVIDIA capture drain and Stop-tail accounting", () => {
     h.enqueueDesktopPhrase(h.buffer.sampleCount);await h.queue.finish();
     expect(received()).toEqual(Array.from(fixture(363)));expect(h.collect).toHaveBeenCalledOnce();
     expect(transport.mock.calls.filter(c=>c[1].request.op==='finish')).toHaveLength(1);
+  });
+});
+
+// Hold a real worker push across Stop, rather than substituting queue.finish.
+// Only IPC is mocked: packet admission, capture retention and recovery are real.
+describe("Stop while the recognizer is behind capture", () => {
+  it.each([16000, 44100])("waits for the unresolved push and sends the Stop tail once at %i Hz", async rate => {
+    let release!: () => void;
+    let pushing = false;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    transport.mockImplementation(async (_command, { request }) => {
+      if (request.op === "push" && request.seq === 1) {
+        pushing = true;
+        await gate;
+      }
+      return { ...request, mode: "append-only", text: request.op === "finish"
+        ? "First tail." : request.op === "push" ? "First" : null };
+    });
+    const h = harness(rate), packetSize = Math.round(rate * .1);
+    const live = fixture(packetSize * 2 + 17), tail = fixture(53, live.length);
+    h.appendRecordingSamples(live.subarray(0, packetSize));
+    await vi.waitFor(() => expect(pushing).toBe(true));
+    h.appendRecordingSamples(live.subarray(packetSize));
+    h.flush.mockImplementation(async () => { h.appendRecordingSamples(tail); });
+    let settled = false;
+    const stopped = h.stop().then(() => { settled = true; });
+    await vi.waitFor(() => expect(h.collect).toHaveBeenCalledOnce());
+    expect(h.disconnect).toHaveBeenCalledOnce();
+    expect(settled).toBe(false);
+    expect(packets()).toHaveLength(1);
+    expect(transport.mock.calls.some(([, { request }]) => request.op === "finish")).toBe(false);
+    expect(h.paste).not.toHaveBeenCalled();
+    release();
+    await stopped;
+    expect(settled).toBe(true);
+    expect(h.failure).not.toHaveBeenCalled();
+    expect(h.paste).toHaveBeenNthCalledWith(1, "First", expect.any(Object));
+    expect(h.paste).toHaveBeenNthCalledWith(2, " tail.", expect.any(Object));
+    expect(h.paste).toHaveBeenCalledTimes(2);
+    expect(packets().map(request => request.audio.length)).toEqual([packetSize, packetSize, 70]);
+    expect(received()).toEqual([...live, ...tail]);
+    expect(h.collect).toHaveBeenCalledExactlyOnceWith(h.buffer, live.length, tail.length);
+    const operations = transport.mock.calls.map(([, { request }]) => request)
+      .filter(request => ["start", "push", "finish"].includes(request.op));
+    expect(operations.map(request => request.op)).toEqual(["start", "push", "push", "push", "finish"]);
+    expect(operations.map(request => request.seq)).toEqual([0, 1, 2, 3, 4]);
+    expect(new Set(operations.map(request => request.session)).size).toBe(1);
+    expect(packets().every(request => request.rate === rate)).toBe(true);
+  });
+
+  it.each([16000, 44100])("retains gradual overload and the Stop tail for explicit source recovery at %i Hz", async rate => {
+    let release!: () => void;
+    let pushing = false;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    transport.mockImplementation(async (command, { request }) => {
+      if (command === "recover_stream") {
+        return { ...request, mode: "append-only", text: request.op === "finish" ? "Recovered entire source." : null };
+      }
+      if (request.op === "push" && request.seq === 1) {
+        pushing = true;
+        await gate;
+      }
+      return { ...request, mode: "append-only", text: request.op === "push" ? "Late prefix" : null };
+    });
+    const h = harness(rate), packetSize = Math.round(rate * .1);
+    const live = fixture(packetSize * 32 + 19), tail = fixture(53, live.length);
+    h.appendRecordingSamples(live.subarray(0, packetSize));
+    await vi.waitFor(() => expect(pushing).toBe(true));
+    // Separate capture callbacks accumulate behind the in-flight request. Keep
+    // capturing after admission fails so recovery must include unqueued audio.
+    for (let offset = packetSize; offset < live.length; offset += packetSize) {
+      h.appendRecordingSamples(live.subarray(offset, offset + packetSize));
+      await Promise.resolve();
+    }
+    expect(h.failure).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+      message: expect.stringContaining("three seconds"),
+    }), "recognition");
+    h.flush.mockImplementation(async () => { h.appendRecordingSamples(tail); });
+    let settled = false;
+    const stopped = h.stop().then(
+      () => { settled = true; return null; },
+      error => { settled = true; return error as Error; },
+    );
+    await vi.waitFor(() => expect(h.collect).toHaveBeenCalledOnce());
+    expect(settled).toBe(false);
+    expect(h.buffer.sampleCount).toBe(live.length + tail.length);
+    release();
+    expect(await stopped).toMatchObject({ message: expect.stringContaining("three seconds") });
+    expect(h.paste).not.toHaveBeenCalled();
+    expect(packets()).toHaveLength(1);
+    expect(transport.mock.calls.some(([command, { request }]) =>
+      command === "benchmark_stream" && request.op === "finish")).toBe(false);
+    expect(transport.mock.calls.some(([command]) => command === "recover_stream")).toBe(false);
+    const source = buffers.collectAudioSamplesRange(h.buffer, 0, h.buffer.sampleCount);
+    expect(Array.from(source)).toEqual([...live, ...tail]);
+    // Match failed-session cleanup before an explicit retry. No live stream is
+    // restarted and the private recovery recognizer has no insertion callback.
+    h.queue.cancel();
+    await expect(h.queue.finish()).rejects.toThrow("three seconds");
+    const recovery = new NvidiaRecovery();
+    await expect(recovery.transcribe(source, rate)).resolves.toBe("Recovered entire source.");
+    const recovered = transport.mock.calls.filter(([command]) => command === "recover_stream")
+      .map(([, { request }]) => request);
+    expect(recovered.filter(request => request.op === "push").flatMap(request => request.audio)).toEqual(Array.from(source));
+    expect(recovered.filter(request => request.op === "push").every(request => request.rate === rate)).toBe(true);
+    expect(recovered.filter(request => request.op === "start")).toHaveLength(1);
+    expect(recovered.filter(request => request.op === "finish")).toHaveLength(1);
+    expect(recovered[recovered.length - 1].op).toBe("cancel");
+    expect(new Set(recovered.map(request => request.session)).size).toBe(1);
+    expect(recovered[0].session).not.toBe(packets()[0].session);
+    expect(h.buffer.sampleCount).toBe(source.length);
+    expect(h.paste).not.toHaveBeenCalled();
   });
 });
