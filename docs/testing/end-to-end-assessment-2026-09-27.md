@@ -28,7 +28,8 @@ runtime, package qualification, signatures and public-asset verification.
 | --- | --- |
 | GNOME can leave Alt+D visible to the recipient without a loaded companion | Merged #79 gates Start on live, capture-bound Stop ownership. Existing selection/focus guards remain. |
 | WebKit startup cancellation or failure can discard already received audio | Reproduced with a failing lifecycle test. Startup teardown now retains every received sample for explicit recovery, regardless of capture backend. |
-| Empty cancellation must not create empty recovery | Regression verifies zero samples return to idle; no target paste occurs in any new regression. |
+| Empty cancellation must not create empty recovery | Regression verifies zero samples return to idle; no target paste occurs in the startup regressions. |
+| Slow inference at Stop lacked combined queue/tail/recovery coverage | Added four cases at 16 kHz and 44.1 kHz: delayed completion flushes the exact tail once; gradual overload preserves all received source for explicit recovery without automatic paste. Production bounds are unchanged. |
 | CI omitted microphone evidence and did not request dictation renderer JSON receipts | Both paths are now retained by CI. The disabled release workflow has matching evidence configuration and remains disabled. |
 | Setup documentation described the newly required GNOME companion as optional | Updated the integration contract and unsupported-version guidance. |
 | Code map equated app readiness with the installer CLI | Documented the app's companion checks and the CLI's intentionally helper-only check. |
@@ -60,7 +61,8 @@ namespaces, Unix sockets and process introspection are restricted here.
 | Check | Outcome |
 | --- | --- |
 | New startup regression before fix | Failed: recovery was null after retained WebKit audio. |
-| Desktop frontend after fix | 401/401 tests, 47 files passed; three new regression rows. |
+| Desktop frontend after startup fix | 401/401 tests, 47 files passed; three new startup regression rows. |
+| Slow-worker Stop follow-up | Four additional queue/tail/recovery regressions; combined suite 405/405 passed locally, plus typecheck and lint. Native IPC is mocked, so this is not physical-device or real-model endurance evidence. |
 | TypeScript, ESLint, production frontend build | Passed. |
 | Independent focused lifecycle review | 22/22 tests passed. |
 | Focus cache / delivery observation | 79/79 and 68/68 passed. |
@@ -100,6 +102,15 @@ audio is not a real-model endurance measurement.
 RustSec passed with eight visible warnings: seven unmaintained transitive
 dependencies and the existing rand 0.7.3 advisory. The graph is not warning-free;
 no advisory was hidden or gate waived by this review.
+
+The native evidence archive was downloaded and matched its recorded SHA-256
+`2980d5fa1ec06a111ab39a9f1739b5d122bbad4884597f8cd92b99a8bed3e582`.
+Visual inspection of its onboarding, restart guidance, stalled-capture recovery
+and minimum-size shortcut screenshots found readable controls without visible
+clipping in those states. The archive also records seven branded-interface
+checks and six application groups (GTK3, GTK4, WebKit, GNOME Text Editor,
+GNOME Terminal/Bash and GNOME Terminal/nano). These are dated fixtures, not a
+new observation of the owner's installed desktop.
 
 ## Remaining acceptance work
 
