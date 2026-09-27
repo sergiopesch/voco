@@ -670,6 +670,11 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       releaseRecordingOrigin(triggerId);
       setCanCancel(false);
       setCancellationPending(false);
+      // Invalidate a failed WebKit capture before retained audio takes the
+      // recovery path. Cancellation and pre-capture destination rejection do
+      // not revoke readiness; native selection invalidation is guarded above.
+      if (webkitCaptureAttempted && !cancelledRef.current) setMicrophoneReadyState(false);
+      resetAudioLevel();
       // Teardown can flush a WebKit prefix even when cancellation or failure
       // happened before Listening. Retention belongs to the received samples,
       // not the backend or interruption reason.
@@ -689,12 +694,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
         void showNotification(startFailureTitle, errorMessage(err)).catch(() => {});
         return;
       }
-      resetAudioLevel();
       setStatus("error");
-      // Native readiness belongs to the guarded selection invalidation above.
-      // Destination/shortcut rejection happens before capture and says nothing
-      // about microphone readiness. A late native failure must not revoke a newer source.
-      if (webkitCaptureAttempted) setMicrophoneReadyState(false);
       setInterimTranscript("");
       sessionRef.current = failSession(sessionRef.current);
       phaseRef.current = "error";

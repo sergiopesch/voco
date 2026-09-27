@@ -134,9 +134,9 @@ function harness() {
     setInterimTranscript: noop,
     setTranscript: noop,
     setError,
-    setMicrophoneReadyState: noop,
+    setMicrophoneReadyState: vi.fn(),
     clearTranscript: noop,
-    resetAudioLevel: noop,
+    resetAudioLevel: vi.fn(),
     updateAudioLevel: noop,
     clearCapturedAudio: vi.fn(() => clearAudioCaptureBuffer(audioBuffer)),
     clearCanonicalAudioCache: noop,
@@ -388,6 +388,7 @@ it.each(["cursor", "setup"] as const)("reports a rejected %s preflight without r
   expect(h.phase.current).toBe("idle");
   expect(h.state.setCaptureNotice).toHaveBeenCalledWith(h.status.detail);
   expect(h.setError).toHaveBeenCalledWith(null);
+  expect(h.env.setMicrophoneReadyState).not.toHaveBeenCalled();
 });
 
 it.each([
@@ -413,6 +414,8 @@ it.each([
   });
   const starting = h.startRecording();
   await vi.waitFor(() => expect(h.env.connectWorklet).toHaveBeenCalledOnce());
+  expect(h.env.setMicrophoneReadyState).toHaveBeenCalledExactlyOnceWith(true);
+  vi.mocked(h.env.resetAudioLevel).mockClear();
   if (kind === "cancellation") {
     await h.cancelRecording();
     connecting.resolve();
@@ -420,6 +423,10 @@ it.each([
     connecting.reject(new Error("Audio graph initialization failed"));
   }
   await starting;
+  expect(h.env.resetAudioLevel).toHaveBeenCalledOnce();
+  expect(vi.mocked(h.env.setMicrophoneReadyState).mock.calls).toEqual(
+    kind === "failure" ? [[true], [false]] : [[true]],
+  );
   if (frames) {
     expect(h.state.recovery).toMatchObject({
       audioAvailable: true,

@@ -28,6 +28,7 @@ runtime, package qualification, signatures and public-asset verification.
 | --- | --- |
 | GNOME can leave Alt+D visible to the recipient without a loaded companion | Merged #79 gates Start on live, capture-bound Stop ownership. Existing selection/focus guards remain. |
 | WebKit startup cancellation or failure can discard already received audio | Reproduced with a failing lifecycle test. Startup teardown now retains every received sample for explicit recovery, regardless of capture backend. |
+| Retained startup failures bypassed readiness and meter cleanup | PR review reproduced stale WebKit readiness; an additional regression reproduced stale level state. Failed capture now invalidates readiness before recovery, while cancellation preserves it; all startup exits reset the meter after teardown. |
 | Empty cancellation must not create empty recovery | Regression verifies zero samples return to idle; no target paste occurs in the startup regressions. |
 | Slow inference at Stop lacked combined queue/tail/recovery coverage | Added four cases at 16 kHz and 44.1 kHz: delayed completion flushes the exact tail once; gradual overload preserves all received source for explicit recovery without automatic paste. Production bounds are unchanged. |
 | CI omitted microphone evidence and did not request dictation renderer JSON receipts | Both paths are now retained by CI. The disabled release workflow has matching evidence configuration and remains disabled. |
