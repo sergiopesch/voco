@@ -1,8 +1,9 @@
 name: Release
 
-# Hosted installer publication is disabled. GitHub runners cannot provision
-# the pinned NVIDIA runtime from a fresh clone. Public 2026.0.39 attached the
-# verified local package. Do not re-enable these jobs until that path is proven.
+# Hosted installer assembly/publication remains disabled. CI can provision the
+# checksum-pinned NVIDIA runtime, but that alone does not qualify a release
+# package or supply maintainer signatures. Keep the qualified packaging/signing
+# path until a replacement has complete package and downloaded-asset receipts.
 
 on:
   push:
