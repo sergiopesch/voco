@@ -12,8 +12,10 @@ warmup reports an error; the app does not download another model.
 
 Browser delivery uses a separately authorized field lease. Each append requires an
 exact prefix receipt and Stop finalizes the acknowledged text without replaying it.
-Explicit recovery uses a private Nemotron worker and keeps its completed result in
-VOCO for review. No recognition result bypasses destination validation.
+Crash-only Review exposes the last text checkpoint from an unexpected process or
+renderer exit, with explicit Copy and Discard. Normal Stop and handled failures
+clear text/audio and remove the active checkpoint. No recognition result bypasses
+destination validation; Review has no delivery or retranscription action.
 
 Shortcut arbitration separates completed IBus authority from a poll in flight.
 Registration, config synchronization and readiness use only unexpired Armed/Uncertain
@@ -25,8 +27,9 @@ registration. The one-second IBus bound and plugin-generation checks are unchang
 
 ## Current dictation path
 
-1. The Tauri/React frontend owns microphone capture and dictation state. AudioWorklet
-   capture supplies ordered audio; interruption and recovery are explicit states.
+1. The Tauri/React frontend orchestrates microphone capture and dictation state.
+   Native Pulse capture on Wayland and AudioWorklet capture on X11 supply ordered
+   audio; interruption and crash Review are explicit states.
 2. `apps/desktop/src/lib/benchmarkPhraseQueue.ts` transports bounded streaming audio
    and session/sequence metadata to the Rust `benchmark_stream` command.
 3. `apps/desktop/src-tauri/src/benchmark_stream.rs` serializes worker access, starts
@@ -44,8 +47,9 @@ registration. The one-second IBus bound and plugin-generation checks are unchang
    confirmation; unsupported controls have dispatch evidence only. Neither is
    compositor paint or atomic ownership. See [observation](../testing/delivery-observation.md).
 6. Stop drains capture into the live stream before finishing and flushing the
-   remaining suffix. Focus loss, revised already-delivered
-   text or uncertain delivery preserves recovery instead of blindly replaying text.
+   remaining suffix. Focus loss, revised already-delivered text or uncertain delivery
+   stops insertion without replay. Healthy recognition continues through Stop, then
+   the handled session is cleared and the user is notified to check their field.
 
 The candidate batches released silence-preroll frames into at most one second per
 native call, preserving every released sample and its order. This reduces call
@@ -107,8 +111,9 @@ never a delayed toggle. During processing it consumes repeated chords without an
 action. Only the authenticated Shell can renew a 250 ms native reservation that
 suppresses duplicate passive evdev observations. Existing active-state polling
 renews it; idle, disconnect and extension disable release the grab, and missing app
-state expires it after two seconds. A failed grab leaves the guarded delivery and
-saved-text fallback available. This is GNOME-specific, not a general Wayland grab.
+state expires it after two seconds. A failed required reservation rejects Start
+before capture; it does not authorize an unguarded delivery or saved-text fallback.
+This is GNOME-specific, not a general Wayland grab.
 
 The main renderer's PageLoad Started event synchronously increments a native epoch
 before scheduling old-scope cleanup off the UI thread. Preflight captures that

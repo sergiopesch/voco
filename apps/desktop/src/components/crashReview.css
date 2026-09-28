@@ -1,0 +1,33 @@
+.voco-review { height: 100%; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; background: #111416; border: 1px solid #454b50; border-radius: var(--voco-radius-window); overflow: hidden; letter-spacing: 0; }
+.voco-review__header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 24px; border-bottom: 1px solid #30373a; }
+.voco-review__brand { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.voco-review__brand img { width: 28px; height: 36px; object-fit: contain; }
+.voco-review__brand span { font-size: 20px; font-weight: 600; }
+.voco-review h1 { font-size: 20px; margin: 0; padding-left: 14px; border-left: 1px solid #454b50; color: #bbc4c7; }
+.voco-review__body { display: flex; min-height: 0; min-width: 0; }
+.voco-review__list { flex: 0 0 200px; min-height: 0; overflow: auto; padding: 16px 12px; border-right: 1px solid #30373a; }
+.voco-review__item { display: grid; gap: 6px; text-align: left; width: 100%; padding: 12px; border: 0; border-radius: 6px; background: transparent; color: #c6ccce; }
+.voco-review__item[aria-current] { background: #283337; color: white; }
+.voco-review__item time { font-size: 12px; font-weight: 400; overflow-wrap: anywhere; }
+.voco-review__document { flex: 1; display: grid; grid-template-rows: auto minmax(0, 1fr); min-height: 0; min-width: 0; padding: 24px; gap: 16px; }
+.voco-review h2 { font-size: 18px; font-weight: 500; margin: 0 0 8px; }
+.voco-review__document-heading p { font-size: 13px; color: #aeb8bc; margin: 0; }
+.voco-review textarea { width: 100%; height: 100%; min-height: 0; resize: none; border: 1px solid #485357; border-radius: 6px; padding: 18px; background: #171b1d; color: #edf1ef; font: inherit; font-size: 16px; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
+.voco-review__footer { border-top: 1px solid #30373a; padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.voco-review__feedback { min-width: 0; }
+.voco-review__feedback p { font-size: 13px; color: #aeb8bc; margin: 0; overflow-wrap: anywhere; }
+.voco-review__feedback [role="alert"] { color: #ff9baa; }
+.voco-review__actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.voco-review__actions span { font-size: 13px; }
+.voco-review__empty { align-self: center; text-align: center; padding: 24px; color: #b8c2c5; }
+@media (max-width: 620px) {
+  .voco-review__header { padding: 14px; flex-wrap: wrap; }
+  .voco-review__body { flex-direction: column; }
+  .voco-review__list { flex: 0 0 auto; display: flex; max-height: 90px; padding: 8px; border-right: 0; border-bottom: 1px solid #30373a; }
+  .voco-review__item { min-width: 140px; }
+  .voco-review__document { padding: 14px; }
+  .voco-review__footer { padding: 14px; flex-wrap: wrap; }
+}
+@media (forced-colors: active) {
+  .voco-review, .voco-review textarea, .voco-review__item[aria-current] { background: Canvas; color: CanvasText; border-color: ButtonText; }
+}

@@ -74,7 +74,7 @@ try {
     }));
     await page.route('**/@tauri-apps_api_core.js*', r => r.fulfill({
         contentType: 'application/javascript',
-        body: 'export async function invoke(name) { if (name === "native_capture_capabilities") return {enabled:false}; throw new Error("Unexpected native command: " + name); }'
+        body: 'export async function invoke(name) { if (name === "native_capture_capabilities") return {enabled:false}; if(name === "get_crash_journal_epoch") return 1; if(name.endsWith("_crash_journal")) return; throw new Error("Unexpected native command: " + name); }'
     }));
     await page.route('**/@tauri-apps_api_app.js*', r => r.fulfill({
         contentType: 'application/javascript',

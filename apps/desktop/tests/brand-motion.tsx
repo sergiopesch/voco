@@ -4,6 +4,7 @@ import { useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { ComponentProps } from "react";
 import { ControlPanel } from "../src/components/ControlPanel";
+import { CrashReview } from "../src/components/CrashReview";
 import { useStore } from "../src/store/useStore";
 import type { DictationStatus } from "../src/types";
 import type { NativeCaptureSource } from "../src/lib/nativeCaptureSettings";
@@ -39,7 +40,7 @@ function Fixture() {
     runtimeDiagnostics={null} requestedSection={section} requestedSectionRequestId={0}
     selectedDeviceId={null} availableDevices={[]} microphonePermission="unknown"
     nativeMicrophone={{ mode: "native", sources: { revision: "1", defaultSelectionToken: "desk", sources }, selected, busy: false, error: null,
-      initialize: noop, refresh: noop, ensureDefault: noop, select: async token => { setSelected(sources.find(source => source.selectionToken === token) ?? null); } }}
+      initialize: noop, refresh: noop, ensureDefault: noop, select: async token => { const source = sources.find(source => source.selectionToken === token); setSelected(source ?? null); return Boolean(source); } }}
     onSurfaceChange={next => { if (next !== "hidden") setSurface(next); }} onOnboardingStepChange={() => {}}
     onConfigChange={async patch => { setConfig(previous => ({ ...previous, ...patch })); }}
     onRefreshDevices={noop} onRequestMicrophoneAccess={async () => true} onCheckForUpdates={noop}
@@ -51,5 +52,5 @@ function Fixture() {
   />;
 }
 const root = createRoot(document.getElementById("root")!);
-root.render(<Fixture />);
+root.render(params.get("surface") === "review" ? <CrashReview onClose={() => { document.documentElement.dataset.closed = "true"; }} onOpenSettings={() => { document.documentElement.dataset.settings = "true"; }} /> : <Fixture />);
 if (import.meta.hot) import.meta.hot.dispose(() => root.unmount());

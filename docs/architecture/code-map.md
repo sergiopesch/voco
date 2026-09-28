@@ -43,9 +43,9 @@ recognizer serves desktop, browser and onboarding sessions. See
    capture continues while a paste is in flight. A newer append-only hypothesis
    can supersede pending output; already dispatched text cannot be blindly replayed.
    Delivery rejection disables insertion while recognition continues through Stop.
-   Recognition/transport failure still stops queue admission. Either failure retains
-   recovery; the first recovery transition notifies and hides, while explicit retry
-   preserves the review panel. No target retry follows a delivery rejection.
+   Recognition/transport failure still stops queue admission. Handled cursor failures
+   notify, clear text/audio at Stop and return to a nonblocking idle state. No target
+   retry follows a delivery rejection. Onboarding retains its local test retry path.
    The worker owns acoustic boundaries, so this path needs no second phrase segmenter.
 4. `src-tauri/src/benchmark_stream.rs` supervises one local Python process, frames
    bounded JSON, checks session/sequence responses and reaps failures. Start/warmup
@@ -63,11 +63,14 @@ recognizer serves desktop, browser and onboarding sessions. See
    the outer container as flat text. A successful key command is
    not proof that a recipient displayed the text.
 7. At Stop, the hook drains capture, forwards only retained samples not yet offered
-   to the queue, then finishes recognition and pending delivery. Retained audio
-   supports recovery. `nvidiaRecovery.ts` submits explicit NVIDIA retries through
-   `recover_stream`, a private worker lifetime with no delivery callback. It keeps
-   the source rate/samples, publishes only the final result, and releases the worker
-   on finish, failure or cancellation; late cancellation cannot release a replacement. Cancelled or old callbacks cannot update a replacement session.
+   to the queue, then finishes recognition and pending delivery. Successful cursor
+   dictation clears all transcript/audio state. `crashRecovery.ts` serializes text-only
+   checkpoints to `src-tauri/src/crash_recovery.rs`, which owns private atomic files
+   under the user's state directory. Clean completion removes the active checkpoint;
+   startup promotes an unfinished prior checkpoint into crash-only Review. No audio
+   is persisted. `CrashReview.tsx` opens only on explicit `voco:open-review`, with
+   copy and discard but no delivery/retranscription action. Cancelled or old callbacks
+   cannot update a replacement session.
 
 Paths in steps 2–7 are relative to `apps/desktop` unless prefixed with `runtime/`.
 See [architecture](README.md) and [delivery observation](../testing/delivery-observation.md)
@@ -232,6 +235,10 @@ mandatory. Unfocused terminal panes cannot change an editor's paste chord.
 After clipboard preparation, Rust revalidates the bound target and shortcut
 scope immediately before keyboard dispatch. A rejection records that the clipboard
 changed but sends no keys; the destination is never rebound to the new field.
+On GNOME Wayland, companion 10 supplies an authenticated fresh modifier sample.
+Paste waits at most 1.5 seconds for physical modifiers to clear, validates the bound
+target, then samples modifiers again. A chord beginning during validation restarts
+that sequence. Missing compositor authority or a timeout sends no keys.
 After dispatch only, inconsistent accessibility count/caret replies for the same
 freshly verified control may remain pending within the existing receipt deadline.
 They never authorize a new paste or count as a receipt. A definitive content/route

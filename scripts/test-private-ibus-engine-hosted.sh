@@ -82,8 +82,18 @@ if [[ "${1:-}" == --browser-application ]]; then
     VOCO_BROWSER_EVIDENCE_DIR="${browser_evidence}/canonical-checkpoint" \
     bash "${ROOT_DIR}/scripts/${TEST_SCRIPT}"
 elif [[ "${1:-}" == --native-pulse-latency ]]; then
-  PYTHONDONTWRITEBYTECODE=1 python3 "${ROOT_DIR}/scripts/${TEST_SCRIPT}" \
-    --output "${VOCO_NATIVE_PULSE_EVIDENCE_DIR}"
+  mkdir -m 700 "${VOCO_NATIVE_PULSE_EVIDENCE_DIR}"
+  for fixture in short long; do
+    PYTHONDONTWRITEBYTECODE=1 python3 "${ROOT_DIR}/scripts/${TEST_SCRIPT}" \
+      --fixture "${fixture}" --output "${VOCO_NATIVE_PULSE_EVIDENCE_DIR}/${fixture}"
+  done
+  if PYTHONDONTWRITEBYTECODE=1 python3 "${ROOT_DIR}/scripts/${TEST_SCRIPT}" \
+    --fixture long --tick-ms 500 --output "${VOCO_NATIVE_PULSE_EVIDENCE_DIR}/starved"; then
+    echo "Starved capture unexpectedly reported healthy completion." >&2
+    exit 1
+  fi
+  python3 -c 'import json,sys; result=json.load(open(sys.argv[1])); assert result.get("error") == "capture-duration-deficit" and result["passed"] is False; print("PASS: starved capture rejected missing audio")' \
+    "${VOCO_NATIVE_PULSE_EVIDENCE_DIR}/starved/result.json"
 elif [[ "${1:-}" == --legacy-ydotool ]]; then
   PYTHONDONTWRITEBYTECODE=1 python3 "${ROOT_DIR}/scripts/${TEST_SCRIPT}" \
     --output "${VOCO_LEGACY_INPUT_EVIDENCE_DIR}"

@@ -7,7 +7,7 @@ import time
 
 UUID = 'voco-panel@voco.local'
 # Bump with behavior changes that require reloading the running Shell companion.
-COMPANION_VERSION = 4
+COMPANION_VERSION = 10
 PACKAGE = Path('/usr/share/gnome-shell/extensions') / UUID
 
 
@@ -30,7 +30,7 @@ def classify(version, installed, info, enabled, globally_disabled):
         return result('error', 'GNOME could not load the VOCO panel. Sign out and back in, then check Extensions.')
     if enabled:
         return result('restart', 'Panel enabled. Sign out and back in to load it; saving your work first is recommended.')
-    return result('disabled', 'Enable live bars, Listening and Stop in your top panel.', True)
+    return result('disabled', 'Enable live microphone bars and the VOCO menu in your top panel.', True)
 
 
 def check(enable=False):

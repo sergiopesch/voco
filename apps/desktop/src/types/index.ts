@@ -57,7 +57,7 @@ export type CursorDeliveryState =
   | "preview-only"
   | "unreconciled";
 
-export type AppSurface = "hidden" | "onboarding" | "settings" | "popover";
+export type AppSurface = "hidden" | "onboarding" | "settings" | "popover" | "review";
 
 export interface AudioDeviceOption {
   deviceId: string;

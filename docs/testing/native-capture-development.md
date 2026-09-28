@@ -10,7 +10,7 @@ The first version requires PipeWire's `object.serial` source identity metadata t
 
 ## Selection and privacy
 
-In Microphone settings, choose a native input, acknowledge direct microphone access for the current app session, and select **Use this microphone**. This is separate from browser microphone permission. **System default (current device)** resolves to a concrete current source; it never follows later default changes silently. Opening settings, refreshing devices and retrying setup do not record audio or open WebKit microphone preview in native mode.
+In Microphone settings, choosing a native input immediately selects it and allows direct microphone access for the current app session. No checkbox or Apply action is required. This is separate from browser microphone permission. **System default (current device)** resolves to a concrete current source; it never follows later default changes silently. Opening settings, selecting a device, refreshing devices and retrying setup do not record audio or open WebKit microphone preview in native mode.
 
 A healthy recording Stop, Cancel or retained-audio discard does not revoke that app-session choice. Approval is bound to the audio-server connection and exact source name, index and object serial. Device-list revisions, labels, idle-state changes and a changed system default do not transfer or revoke an unchanged approved source. Renderer reload, app shutdown or an unhealthy capture invalidates the relevant state. After an interruption, refresh devices and explicitly choose and allow the source again. No failure falls back to WebKit or reconnects during recording.
 
@@ -20,11 +20,24 @@ The worker owns one explicitly selected stream. Before uncorking it rechecks sou
 
 The stream requests 10 ms capture fragments with `PA_STREAM_ADJUST_LATENCY`, retaining the 35,280-byte server buffer maximum. PulseAudio only applies the fragment request to overall source latency when this flag is set; device constraints can still prevent the requested latency. See the [PulseAudio buffer contract](https://www.freedesktop.org/software/pulseaudio/doxygen/structpa__buffer__attr.html). Without the flag, the September review reproduced approximately two seconds of buffering and missing speech despite healthy local Stop receipts. The separate waveform test checks complete source audio; a healthy protocol receipt alone cannot establish that.
 
+Recording transport needs multiple mainloop dispatches when the server fragments
+audio. Each worker tick drains ready events within bounded work/time before its
+normal wait. One dispatch per 5 ms lost intervals in a long private Pulse fixture,
+even while the local sequence/ACK receipts remained healthy. Pulse's
+[overflow callback](https://github.com/pulseaudio/pulseaudio/blob/v16.1/src/pulse/stream.h)
+covers playback, not recording, and server queue indices can omit dropped
+input. A monotonic duration guard therefore rejects material capture deficits:
+after the first PCM batch it allows one second of scheduling jitter, one negotiated
+fragment (capped at 200 ms), and 1% clock drift. First audio has a five-second
+deadline after uncork; final checking excludes time spent waiting after Stop.
+This guard does not prove every physical sample or detect loss below its tolerance.
+Complete-reference waveform checks remain a separate qualification requirement.
+
 Audio arrives in bounded binary batches, each with capture/session/generation identity, contiguous sequence and source-frame extents. ACKs cover exactly the complete issued batch. Unacknowledged replay is byte-identical; the renderer never acknowledges samples it did not retain. The callback copies into 64 preallocated slots; it does not allocate, serialize JSON, call IPC or write files. A slot holds at most 35,280 bytes. Small callbacks append to the newest block only until its first peek. Peek immediately exposes a partial block and seals its bytes and extent through ACK/cancel. Frame and block counters advance during enqueue, so the worker's receipt remains coherent before peeking.
 
 The callback reserves capacity for its entire accepted extent before copying; overflow cannot append a partial callback. The 600-second capture ceiling still permits its exact final prefix. Packing uses the existing 2,257,920-byte PCM storage, with one additional capture-local exposure counter. Already exposed partial blocks consume whole slots, so remaining capacity depends on prior delivery. The five-second drain lease and independent server/IPC limits still apply; densely packed storage is not an end-to-end stall-duration promise. Overflow remains an explicit unhealthy result.
 
-Stop requires acknowledged cork and timing-barrier receipts plus delivery and ACK of every produced frame before healthy finalization. This bounds the locally delivered stream; it does not independently prove physical microphone frames through the user's click. Missing frames, holes, overflow, source movement/removal, suspension and server loss invalidate automatic inference/delivery. Received audio remains available for manual recovery. A 600-second source-frame ceiling seals capture explicitly. Startup, stop, command and renderer-lease deadlines bound failures; renderer reset cancels the stream and outstanding callback operations before reuse.
+Stop requires acknowledged cork and timing-barrier receipts plus delivery and ACK of every produced frame before healthy finalization. This bounds the locally delivered stream; it does not independently prove physical microphone frames through the user's click. Missing frames, holes, overflow, source movement/removal, suspension and server loss invalidate automatic inference/delivery. Current cursor dictation clears received audio and temporary text after handled termination; only text surviving an unexpected exit appears in explicit Review. Onboarding keeps its separate local test retry path. A 600-second source-frame ceiling seals capture explicitly. Startup, stop, command and renderer-lease deadlines bound failures; renderer reset cancels the stream and outstanding callback operations before reuse.
 
 ## Verification
 

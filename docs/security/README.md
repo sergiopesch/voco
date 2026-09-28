@@ -8,9 +8,10 @@ qualified packages, the installed application and public releases.
 
 Dictation runs locally and requires no VOCO account, sign-in, subscription or
 third-party credential. The package bundles the NVIDIA Nemotron model and CPU
-runtime, which are warmed at startup. Explicit recovery uses the same model in a
-separate bounded worker, retains audio on failure, and never automatically delivers
-the recovered transcript. The compiled application has no Whisper model downloader
+runtime, which are warmed at startup. The private .60 follow-up uses a temporary,
+owner-only text checkpoint for unexpected process/renderer exits, never stored
+audio or automatic recovery delivery. Public .59 has the earlier in-memory recovery
+flow. The compiled application has no Whisper model downloader
 or alternate transcription service.
 
 Automatic and manual GitHub Releases metadata checks are the application's network
@@ -23,7 +24,8 @@ or crash-reporting service.
 
 ### Assets
 
-- User audio and recovery data (normally held in memory; explicit diagnostics can persist audio)
+- User audio (held in memory; explicit diagnostics can persist audio)
+- Temporary local text checkpoints and crash-only recovered text
 - User configuration (stored locally)
 - ASR model files (stored locally)
 - Dictated text retained in VOCO, delivered through default desktop paste, or sent to an explicitly authorized browser element
@@ -134,10 +136,21 @@ untrusted Python or native libraries.
 
 ## Diagnostics and audio persistence
 
-Normal dictation does not write audio or transcripts to diagnostic files. Recovery
-retains audio/text in memory; copying or delivering text also exposes it to the
-clipboard and recipient application. Clipboard managers and recipients have their
-own retention rules.
+Normal dictation does not write audio or transcripts to diagnostic files. The
+approved crash journal temporarily checkpoints text in `0600` regular, single-link
+files under anchored `0700` directories. Symlinks, unsafe ownership/permissions and
+oversized files are rejected. Atomic replacement plus file/directory syncing keeps
+the last completed checkpoint; no audio is journaled. Text is bounded to 256 KiB per
+capture and five recovered entries. A sixth crash evicts the oldest entry.
+
+Clean Stop, handled errors, cancellation and normal process exit remove the active
+checkpoint; previous crash entries remain until explicit discard. A failed deletion
+is reported and retried before another capture. Storage failures can prevent cleanup;
+deletion is not secure erasure and does not remove filesystem snapshots or backups.
+Renderer epochs and session/sequence identity reject stale checkpoint commands.
+Review never opens automatically and Copy never pastes or discards text. Clipboard
+managers and recipients have their own retention rules, independent of the journal.
+These controls do not isolate another compromised process running as the same user.
 
 - `VOCO_PERFORMANCE_LOG=1` enables bounded asynchronous metadata logs in the app and
   worker. Allowlisted stages, counts, timing and resource metrics omit audio, text,
@@ -175,6 +188,7 @@ microphone or publish personal transcripts. See [diagnostic retention](../testin
 | Data | Location |
 |------|----------|
 | Config | `${XDG_CONFIG_HOME:-$HOME/.config}/voco/config.json` |
+| Temporary text checkpoint and crash Review | `${XDG_STATE_HOME:-$HOME/.local/state}/voco/crash-recovery/` |
 | Packaged NVIDIA model/runtime | `/usr/lib/voco/speech/` |
 | Opt-in application metrics | `${XDG_STATE_HOME:-$HOME/.local/state}/voco/performance/` |
 | Opt-in worker metrics | `${XDG_STATE_HOME:-$HOME/.local/state}/voco/stream-performance/` |

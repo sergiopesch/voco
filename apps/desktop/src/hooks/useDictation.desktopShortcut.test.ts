@@ -1,6 +1,8 @@
 // Execute the production lifecycle factory with deterministic IPC. This proves
 // ownership ordering, not physical shortcut delivery or microphone capture.
 import { expect, it, vi } from "vitest";
+import { invoke } from "@tauri-apps/api/core";
+vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(async command => command === "get_crash_journal_epoch" ? 1 : undefined) }));
 import {
   appendAudioSamples,
   clearAudioCaptureBuffer,
@@ -68,7 +70,6 @@ function harness() {
     desktopStreamEnabledRef: ref(false),
     desktopStreamedSampleCountRef: ref(0),
     desktopPhrasePasteCountRef: ref(0),
-    manualCopyRequestedRef: ref(false),
     activeTriggerIdRef: ref<string | undefined>(undefined),
     recoveryAudioRef: ref<Float32Array | null>(null),
     recoverySessionIdRef: ref<string | null>(null),
@@ -135,13 +136,12 @@ function harness() {
     setTranscript: noop,
     setError,
     setMicrophoneReadyState: vi.fn(),
-    clearTranscript: noop,
+    clearTranscript: vi.fn(() => { state.transcript = ""; }),
     resetAudioLevel: vi.fn(),
     updateAudioLevel: noop,
     clearCapturedAudio: vi.fn(() => clearAudioCaptureBuffer(audioBuffer)),
     clearCanonicalAudioCache: noop,
     transitionCursorDelivery: noop,
-    retainCurrentTranscript: noop,
     resetOwnedPreeditState: noop,
     beginOwnedPreedit: noop,
     shouldUseOwnedPreedit: () => false,
@@ -329,7 +329,7 @@ it.each(["success", "failure"])("retains shortcut through delayed queue.finish a
   if (outcome === "success") finished.resolve(); else finished.reject(new Error("delivery unconfirmed"));
   await stopping; await h.cleanup.current;
   expect(h.end).toHaveBeenCalledOnce();
-  expect(h.phase.current).toBe(outcome === "success" ? "idle" : "error");
+  expect(h.phase.current).toBe("idle");
 });
 
 it.each(["cancel", "unmount"])("cleans up after %s while begin is pending", async action => {
@@ -395,7 +395,7 @@ it.each([
   { kind: "cancellation", frames: 3 },
   { kind: "failure", frames: 3 },
   { kind: "cancellation", frames: 0 },
-])("$kind during WebKit startup preserves $frames received samples", async ({ kind, frames }) => {
+])("$kind during WebKit startup clears $frames received samples on controlled exit", async ({ kind, frames }) => {
   const h = harness(), connecting = deferred();
   h.env.captureSelectionRef.current = () => ({ backend: "webkit" });
   vi.mocked(h.env.ensureAudioContext).mockResolvedValue({
@@ -427,21 +427,107 @@ it.each([
   expect(vi.mocked(h.env.setMicrophoneReadyState).mock.calls).toEqual(
     kind === "failure" ? [[true], [false]] : [[true]],
   );
-  if (frames) {
-    expect(h.state.recovery).toMatchObject({
-      audioAvailable: true,
-      retrying: false,
-      reason: expect.stringContaining(kind === "cancellation"
-        ? "Recording cancelled" : "Audio graph initialization failed"),
-    });
-    expect(h.env.audioBufferRef.current.chunks).toEqual([retained]);
-    expect(h.phase.current).toBe("error");
-  } else {
-    expect(h.state.recovery).toBeNull();
-    expect(h.env.audioBufferRef.current.chunks).toEqual([]);
-    expect(h.phase.current).toBe("idle");
-  }
-  expect(h.env.audioBufferRef.current.sampleCount).toBe(frames);
+  expect(h.state.recovery).toBeNull();
+  expect(h.env.audioBufferRef.current.chunks).toEqual([]);
+  expect(h.phase.current).toBe("idle");
+  expect(h.env.audioBufferRef.current.sampleCount).toBe(0);
   expect(h.queue.current).toBeNull();
   expect(h.env.pasteDesktopText).not.toHaveBeenCalled();
+});
+
+it("successful cursor Stop clears text and audio without opening Review or retaining a transcript", async () => {
+  const h = harness();
+  h.phase.current = "recording";
+  h.current.current = session.startSession(h.current.current);
+  h.state.transcript = "Completed fixture dictation.";
+  appendAudioSamples(h.env.audioBufferRef.current, new Float32Array([0.1, 0.2]));
+  h.queue.current = { finish: vi.fn(async () => {}), cancel: vi.fn() };
+  await h.stopRecording();
+  expect(h.state.transcript).toBe("");
+  expect(h.env.audioBufferRef.current.sampleCount).toBe(0);
+  expect(h.state.setSurface).not.toHaveBeenCalled();
+  expect(h.notify).not.toHaveBeenCalled();
+});
+
+it("controlled cursor failure clears private content and permits the next recording without Review", async () => {
+  const h = harness();
+  h.phase.current = "recording";
+  h.current.current = session.startSession(h.current.current);
+  h.state.transcript = "Partly delivered fixture.";
+  appendAudioSamples(h.env.audioBufferRef.current, new Float32Array([0.1]));
+  h.queue.current = { finish: vi.fn(async () => { throw new Error("delivery unconfirmed"); }), cancel: vi.fn() };
+  await h.stopRecording();
+  expect(h.state.transcript).toBe("");
+  expect(h.state.recovery).toBeNull();
+  expect(h.env.audioBufferRef.current.sampleCount).toBe(0);
+  expect(h.notify).toHaveBeenCalledWith("Dictation interrupted", expect.stringContaining("Some words may be missing"));
+  await h.startRecording();
+  expect(h.captureSelection).toHaveBeenCalledOnce();
+});
+
+it("onboarding retains its successful test text and does not create a cursor result", async () => {
+  const h = harness();
+  h.state.dictationPurpose = "onboarding";
+  h.state.transcript = "Voice test fixture.";
+  h.finalizeIdleState();
+  expect(h.state.transcript).toBe("Voice test fixture.");
+  expect(h.state.setOnboardingTestPassed).toHaveBeenCalledWith(true);
+  expect(h.state.setLastDictationResult).not.toHaveBeenCalled();
+});
+
+it("handled unmount resets cursor store content and state", () => {
+  const h = harness();
+  h.state.transcript = "Synthetic in-flight text.";
+  h.state.recovery = { audioAvailable: true };
+  h.phase.current = "recording";
+  h.unmount();
+  expect(h.state.transcript).toBe("");
+  expect(h.state.recovery).toBeNull();
+  expect(h.phase.current).toBe("idle");
+  expect(h.env.setStatus).toHaveBeenCalledWith("idle");
+});
+
+it("retries failed journal deletion before allowing another capture", async () => {
+  const h = harness();
+  let failDelete = true;
+  vi.mocked(invoke).mockImplementation(async command => {
+    if (command === "get_crash_journal_epoch") return 1;
+    if (command === "finish_crash_journal" && failDelete) throw new Error("read-only filesystem");
+  });
+  h.env.captureSelectionRef.current = () => ({ backend: "webkit" });
+  vi.mocked(h.env.ensureAudioContext).mockRejectedValue(new Error("fixture capture fails"));
+  await h.startRecording();
+  expect(h.env.ensureAudioContext).toHaveBeenCalledOnce();
+  expect(h.setError).toHaveBeenLastCalledWith(expect.stringContaining("could not be deleted"));
+  await h.startRecording();
+  expect(h.env.ensureAudioContext).toHaveBeenCalledOnce();
+  expect(h.setError).toHaveBeenCalledWith(expect.stringContaining("could not be deleted"));
+  failDelete = false;
+  await h.startRecording();
+  expect(h.env.ensureAudioContext).toHaveBeenCalledTimes(2);
+  vi.mocked(invoke).mockImplementation(async command => command === "get_crash_journal_epoch" ? 1 : undefined);
+});
+
+it.each(["capture-error", "captured-prefix", "cancelled"])("prioritizes journal cleanup failure during startup: %s", async scenario => {
+  const h = harness();
+  vi.mocked(invoke).mockImplementation(async command => {
+    if (command === "get_crash_journal_epoch") return 1;
+    if (command === "finish_crash_journal") throw new Error("read-only filesystem");
+  });
+  h.env.captureSelectionRef.current = () => ({ backend: "webkit" });
+  vi.mocked(h.env.ensureAudioContext).mockImplementation(async () => {
+    if (scenario === "captured-prefix") appendAudioSamples(h.env.audioBufferRef.current, new Float32Array([0.1]));
+    if (scenario === "cancelled") h.cancelled.current = "Fixture startup cancelled.";
+    throw new Error("Fixture microphone failed.");
+  });
+  try {
+    await h.startRecording();
+    expect(h.setError).toHaveBeenLastCalledWith(expect.stringContaining("could not be deleted"));
+    expect(h.notify).toHaveBeenLastCalledWith("Dictation interrupted", expect.stringContaining("could not be deleted"));
+    expect(h.phase.current).toBe("idle");
+    expect(h.state.recovery).toBeNull();
+    expect(h.env.audioBufferRef.current.sampleCount).toBe(0);
+  } finally {
+    vi.mocked(invoke).mockImplementation(async command => command === "get_crash_journal_epoch" ? 1 : undefined);
+  }
 });

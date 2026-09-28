@@ -30,6 +30,8 @@ static unsigned nops, cork_calls, timing_calls, drops;
 static const void *incoming;
 static size_t incoming_bytes;
 static bool reject_operation;
+static unsigned iterate_calls, iterate_ready, iterate_clock_step;
+static bool iterate_error;
 
 pa_operation_state_t pa_operation_get_state(const pa_operation *o) { return o->state; }
 void pa_operation_cancel(pa_operation *o) { assert(!o->cancelled); o->cancelled++; o->state=PA_OPERATION_CANCELLED; }
@@ -58,7 +60,12 @@ CLEAR_CALLBACK(pa_stream_set_read_callback,pa_stream_request_cb_t)
 CLEAR_CALLBACK(pa_stream_set_moved_callback,pa_stream_notify_cb_t)
 CLEAR_CALLBACK(pa_stream_set_suspended_callback,pa_stream_notify_cb_t)
 CLEAR_CALLBACK(pa_stream_set_overflow_callback,pa_stream_notify_cb_t)
-int pa_mainloop_iterate(pa_mainloop *m,int block,int *retval) { (void)m; assert(!block); *retval=0; return 0; }
+int pa_mainloop_iterate(pa_mainloop *m,int block,int *retval) {
+    (void)m; assert(!block); *retval=0; iterate_calls++; fake_ms+=iterate_clock_step;
+    if(iterate_error)return -1;
+    if(iterate_ready) { iterate_ready--; return 1; }
+    return 0;
+}
 pa_context_state_t pa_context_get_state(const pa_context *c) { assert(c==&context); return c->state; }
 pa_operation *pa_context_get_source_info_by_index(pa_context *c,uint32_t index,pa_source_info_cb_t cb,void *data) {
     (void)c;(void)index;(void)cb;(void)data; assert(!"unexpected source recheck"); return NULL;
@@ -73,9 +80,10 @@ pa_operation *pa_context_subscribe(pa_context *c,pa_subscription_mask_t mask,pa_
 static vc_pulse *fresh(void) {
     memset(&stream,0,sizeof stream); memset(ops,0,sizeof ops);
     nops=cork_calls=timing_calls=drops=0; incoming=NULL; incoming_bytes=0; reject_operation=false; fake_ms=10000;
+    iterate_calls=iterate_ready=iterate_clock_step=0;iterate_error=false;
     context.state=PA_CONTEXT_READY;
     vc_pulse *p=calloc(1,sizeof *p); assert(p);
-    p->stream=&stream; p->context=&context; p->active=true; p->status.ready=1; p->selected.index=62; p->cookie=42;
+    p->stream=&stream; p->context=&context; p->active=true; p->status.ready=1; p->ready_ms=fake_ms; p->selected.index=62; p->cookie=42;
     return p;
 }
 static void deliver(vc_pulse *p,unsigned value) {
@@ -302,10 +310,57 @@ static void occupancy_profile(unsigned sealed) {
            sealed,capacity,retained_following,retained,retained/4,(unsigned long long)blocks,following>capacity?"true":"false");
     free(data);free(p);
 }
+static void duration_integrity(void) {
+    vc_pulse *p=fresh();deliver(p,1);fake_ms+=16000;p->status.frames+=44100*16;
+    check_duration_integrity(p,fake_ms);assert(!p->status.error[0]);free(p);
+
+    p=fresh();deliver(p,1);fake_ms+=600000;p->status.frames+=44100*594;
+    check_duration_integrity(p,fake_ms);assert(!p->status.error[0]);free(p);
+
+    p=fresh();deliver(p,1);fake_ms+=17000;p->status.frames+=44100*6;
+    check_duration_integrity(p,fake_ms);assert(!strcmp(p->status.error,"capture-duration-deficit"));free(p);
+
+    p=fresh();deliver(p,1);p->source_fragment_ms=10;fake_ms+=1020;
+    check_duration_integrity(p,fake_ms);assert(!p->status.error[0]);fake_ms++;
+    check_duration_integrity(p,fake_ms);assert(!strcmp(p->status.error,"capture-duration-deficit"));free(p);
+
+    p=fresh();fake_ms+=5000;check_duration_integrity(p,fake_ms);assert(!p->status.error[0]);fake_ms++;
+    check_duration_integrity(p,fake_ms);assert(!strcmp(p->status.error,"capture-first-audio-timeout"));free(p);
+
+    p=fresh();fake_ms+=2000;check_duration_integrity(p,fake_ms);assert(!p->status.error[0]);deliver(p,1);
+    assert(p->first_pcm_ms==12000&&p->first_pcm_frames==441);check_duration_integrity(p,fake_ms);assert(!p->status.error[0]);free(p);
+
+    p=fresh();deliver(p,1);fake_ms+=5000;deliver(p,2);
+    assert(p->first_pcm_ms==10000&&p->first_pcm_frames==441);
+    check_duration_integrity(p,fake_ms);assert(!strcmp(p->status.error,"capture-duration-deficit"));free(p);
+
+    p=fresh();deliver(p,1);fake_ms+=500;p->status.frames+=22050;vc_stop(p);fake_ms+=2500;
+    check_duration_integrity(p,fake_ms);assert(!p->status.error[0]);free(p);
+
+    p=fresh();deliver(p,1);p->source_fragment_ms=10;vc_cancel(p);
+    assert(!p->first_pcm_received&&!p->first_pcm_ms&&!p->first_pcm_frames&&!p->ready_ms&&!p->source_fragment_ms);
+    p->stream=&stream;p->active=true;p->status.stopped=0;p->status.ready=1;p->ready_ms=fake_ms;deliver(p,2);
+    assert(p->first_pcm_received&&p->first_pcm_frames==441);free(p);
+
+    p=fresh();deliver(p,1);fake_ms+=5000;vc_stop(p);complete(0,1);complete(1,1);
+    assert(p->status.stopped&&p->status.cork_ack&&p->status.barrier_ack);
+    assert(!strcmp(p->status.error,"capture-duration-deficit"));free(p);
+    puts("{\"case\":\"duration-integrity\",\"cases\":10,\"materialLossGuard\":true,\"clockDriftAllowancePercent\":1}");
+}
+static void bounded_pump(void) {
+    vc_pulse*p=fresh();vc_tick(p);assert(iterate_calls==1);free(p);
+    p=fresh();iterate_ready=7;vc_tick(p);assert(iterate_calls==8&&!iterate_ready);free(p);
+    p=fresh();iterate_ready=1000;vc_tick(p);assert(iterate_calls==64&&iterate_ready==936);free(p);
+    p=fresh();iterate_ready=1000;iterate_clock_step=1;vc_tick(p);assert(iterate_calls==2&&iterate_ready==998);free(p);
+    p=fresh();iterate_error=true;vc_tick(p);assert(iterate_calls==1&&!strcmp(p->status.error,"mainloop-failed")&&p->stopping);free(p);
+    puts("{\"case\":\"bounded-pump\",\"cases\":5,\"maximumDispatches\":64,\"maximumPumpMs\":2}");
+}
 int main(void) {
     overflow();for(unsigned i=0;i<3;i++)stop_case(i);for(unsigned i=0;i<4;i++)fault(i);cancel_case();
     const unsigned durations[]={200,500,1000,2000};
     for(unsigned d=0;d<4;d++)for(unsigned pattern=0;pattern<4;pattern++)for(unsigned publication=0;publication<3;publication++)profile(durations[d],pattern,publication);
     split_edge();capacity_edge();highwater_edge();wrap_edge();reuse_edge();ceiling_edge();terminal_tail_edge();occupancy_profile(56);occupancy_profile(63);
-    puts("{\"passed\":true,\"cases\":66,\"actualProductionCallbacks\":true,\"pulseTransportMocked\":true,\"deviceConnections\":0}");return 0;
+    duration_integrity();
+    bounded_pump();
+    puts("{\"passed\":true,\"cases\":81,\"actualProductionCallbacks\":true,\"pulseTransportMocked\":true,\"deviceConnections\":0}");return 0;
 }

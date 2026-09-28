@@ -120,7 +120,6 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
   const stopRequestedAtMsRef = useRef<number | null>(null);
   const browserDeliveryRef = useRef<BrowserStreamDelivery | null>(null);
   const activeTriggerIdRef = useRef<string | undefined>(undefined);
-  const manualCopyRequestedRef = useRef(false);
   const desktopPasteSessionRef = useRef(false);
   const desktopTargetTokenRef = useRef<string | null>(null);
   const desktopPhraseQueueRef = useRef<BenchmarkPhraseQueue | null>(null);
@@ -539,17 +538,6 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
     stream?.getTracks().forEach((track) => track.stop());
   }
 
-  function retainCurrentTranscript(reason: "delivery-unconfirmed" | "output-failed") {
-    const id = recoverySessionIdRef.current;
-    if (!id) return;
-    const state = useStore.getState();
-    const finalText = state.transcript.trim();
-    const text = finalText;
-    if (!text || text === "(no speech detected)") return;
-    state.retainRecoverableTranscript({ id, text, reason, isPartial: !finalText });
-    state.setLastDictationResult({ completedAt: Date.now(), outcome: "needs-recovery" });
-  }
-
   if (recordingRef.current === null) {
     recordingRef.current = createDictationRecording({
       phaseRef,
@@ -564,7 +552,6 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
       desktopPasteSessionRef,
       desktopStreamedSampleCountRef,
       desktopPhrasePasteCountRef,
-      manualCopyRequestedRef,
       activeTriggerIdRef,
       recoverySessionIdRef,
       recoveryWaitRef,
@@ -613,7 +600,6 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
       updateAudioLevel,
       clearCapturedAudio,
       transitionCursorDelivery,
-      retainCurrentTranscript,
       recordingSampleRate,
       appendRecordingSamples,
       enqueueDesktopPhrase,

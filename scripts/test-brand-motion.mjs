@@ -30,10 +30,20 @@ try {
       // Fail closed if the presentation fixture ever attempts capture or a native command.
       await page.addInitScript(() => {
         window.__fixtureViolations = [];
+        window.__reviewEntries = [{id:'crash-one',createdAt:1790630000000,text:('A public fixture sentence for crash recovery.\n').repeat(500)+'Final visible sentence.'}, {id:'crash-two',createdAt:1790631000000,text:'Second interrupted dictation.'}];
+        Object.defineProperty(navigator, 'clipboard', { configurable: true, value: {writeText: async text => {
+          if (window.__copyFails) throw new Error('Fixture copy failure');
+          window.__copiedText = text;
+        }} });
         if (navigator.mediaDevices) navigator.mediaDevices.getUserMedia = async () => {
           window.__fixtureViolations.push('microphone'); throw new Error('Fixture must not capture');
         };
-        window.__TAURI_INTERNALS__ = { invoke: async command => {
+        window.__TAURI_INTERNALS__ = { invoke: async (command, args) => {
+          if (command === 'list_crash_recovery') return window.__reviewEntries;
+          if (command === 'dismiss_crash_recovery') {
+            if(window.__discardFails) throw new Error('Fixture discard failure');
+            window.__reviewEntries = window.__reviewEntries.filter(entry => entry.id !== args.id); return;
+          }
           if (command === 'get_panel_setup_status') return window.__panelStatus ?? {status:'active',detail:'Live panel bars and Stop are active.',canEnable:false};
           if (command === 'enable_gnome_panel') return {status:'restart',detail:'Panel enabled. Sign out and back in to load it; saving your work first is recommended.',canEnable:false};
           if (command === 'trace_hotkey_event') return;
@@ -135,8 +145,6 @@ try {
       }
       const setupCombo = page.getByRole('combobox', {name:'Microphone',exact:true});
       await setupCombo.press('u'); await setupCombo.press('Enter');
-      await page.getByRole('checkbox').check();
-      await page.getByRole('button',{name:'Use this microphone',exact:true}).click();
       await page.getByRole('button',{name:'Start test',exact:true}).waitFor();
       assert.equal(await page.getByRole('combobox',{name:'Microphone',exact:true}).count(),0);
       await capture('onboarding-microphone-applied');
@@ -146,7 +154,6 @@ try {
       const combo = page.getByRole('combobox', { name: 'Microphone', exact: true });
       await combo.press('ArrowDown');
       await combo.press('Home');
-      await combo.press('ArrowDown'); // Default device
       await combo.press('ArrowDown'); // Studio
       await combo.press('ArrowDown'); // Must skip disconnected device
       assert.equal(await page.locator(`[id="${await combo.getAttribute('aria-activedescendant')}"]`).getAttribute('data-value'), 'usb');
@@ -156,10 +163,9 @@ try {
       await combo.press('u');
       await combo.press('Enter');
       assert.equal(await combo.innerText(), 'USB microphone');
-      const apply = page.getByRole('button', { name: 'Use this microphone', exact: true });
-      assert.equal(await apply.isDisabled(), true);
-      await page.getByRole('checkbox').check();
-      assert.equal(await apply.isEnabled(), true);
+      await page.getByText('Selected: USB microphone.', { exact: false }).waitFor();
+      assert.equal(await page.getByRole('checkbox').count(), 0);
+      assert.equal(await page.getByRole('button', { name: 'Use this microphone', exact: true }).count(), 0);
       await combo.click();
       // Deliberately deliver a pointer click to verify the component also rejects it.
       await page.getByRole('option', { name: /Disconnected microphone/ }).click({ force: true });
@@ -167,10 +173,6 @@ try {
       await combo.press('Home');
       await combo.press('ArrowDown');
       await combo.press('Enter');
-      assert.equal(await page.getByRole('checkbox').isChecked(), false);
-      assert.equal(await apply.isDisabled(), true);
-      await page.getByRole('checkbox').check();
-      await apply.click();
       await page.getByText('Selected: Studio microphone.', { exact: false }).waitFor();
       await combo.click();
       await capture('settings-selector');
@@ -179,7 +181,7 @@ try {
       await capture('settings-long-list');
       await combo.press('Tab');
       assert.equal(await combo.getAttribute('aria-expanded'), 'false');
-      results.push({ engine: name, check: 'selector navigation, typeahead, disabled option, Escape, Tab, consent reset and explicit apply', passed: true });
+      results.push({ engine: name, check: 'selector navigation, typeahead, disabled option, Escape, Tab and immediate explicit selection', passed: true });
 
       assert.equal(await page.getByRole('button',{name:'Change shortcut',exact:true}).count(),0);
       await page.getByRole('button',{name:'Shortcut',exact:true}).click();
@@ -233,6 +235,54 @@ try {
       await settings.press('Escape');
       assert.equal(await page.getByRole('tooltip').count(), 0);
       results.push({ engine: name, check: 'compact popover, microphone target, focus tooltip and Escape', passed: true });
+
+      await page.goto(`${origin}tests/brand-motion.html?surface=review`);
+      const recovered = page.getByRole('textbox', {name:'Recovered transcript'});
+      await recovered.waitFor();
+      const originalText = await recovered.inputValue();
+      for (const viewport of [{width:1040,height:760},{width:760,height:560},{width:390,height:600}]) {
+        await page.setViewportSize(viewport);
+        await capture(`review-${viewport.width}`);
+        const geometry = await page.locator('.voco-review').evaluate(el => {
+          const textarea = el.querySelector('textarea');
+          const footer = el.querySelector('footer').getBoundingClientRect();
+          return {pageFits:document.documentElement.scrollWidth <= innerWidth && document.documentElement.scrollHeight <= innerHeight,
+            footerFits:footer.bottom <= innerHeight && footer.top >= textarea.getBoundingClientRect().bottom,
+            textScrolls:textarea.scrollHeight > textarea.clientHeight};
+        });
+        assert.deepEqual(geometry,{pageFits:true,footerFits:true,textScrolls:true});
+      }
+      await page.setViewportSize({width:760,height:560});
+      await recovered.evaluate(el => {el.scrollTop=el.scrollHeight;});
+      await capture('review-end-of-transcript');
+      await page.evaluate(()=>window.__copyFails=true);
+      await page.getByRole('button',{name:'Copy transcript',exact:true}).click();
+      await page.getByRole('alert').filter({hasText:'Copy failed'}).waitFor();
+      assert.equal(await recovered.inputValue(), originalText);
+      await page.evaluate(()=>window.__copyFails=false);
+      await page.getByRole('button',{name:'Copy transcript',exact:true}).click();
+      await page.getByRole('status').filter({hasText:'Copied.'}).waitFor();
+      assert.equal(await page.evaluate(()=>window.__copiedText), originalText);
+      assert.equal(await page.evaluate(()=>window.__reviewEntries.length),2,'Copy does not discard or paste');
+      await page.getByRole('button',{name:'Discard',exact:true}).click();
+      await page.getByRole('button',{name:'Keep',exact:true}).click();
+      await page.getByRole('button',{name:'Discard',exact:true}).click();
+      await page.evaluate(()=>window.__discardFails=true);
+      await page.getByRole('button',{name:'Discard transcript',exact:true}).click();
+      await page.getByRole('alert').filter({hasText:'It has been kept.'}).waitFor();
+      assert.equal(await recovered.inputValue(),originalText);
+      await page.evaluate(()=>window.__discardFails=false);
+      await page.getByRole('button',{name:'Discard transcript',exact:true}).click();
+      await page.waitForFunction(()=>document.querySelector('textarea')?.value==='Second interrupted dictation.');
+      await page.getByRole('button',{name:'Discard',exact:true}).click();
+      await page.getByRole('button',{name:'Discard transcript',exact:true}).click();
+      await page.getByRole('status').filter({hasText:'No interrupted dictation.'}).waitFor();
+      await capture('review-empty');
+      await page.getByRole('button',{name:'Settings',exact:true}).click();
+      assert.equal(await page.locator('html').getAttribute('data-settings'),'true');
+      await page.getByRole('button',{name:'Hide to tray',exact:true}).click();
+      assert.equal(await page.locator('html').getAttribute('data-closed'),'true');
+      results.push({engine:name,check:'crash review long text, compact geometry, copy failure/success, discard confirmation/failure/success, empty state and explicit navigation',passed:true});
 
       await page.setViewportSize({ width: 760, height: 620 });
       await load('surface=onboarding&state=error');

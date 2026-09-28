@@ -18,7 +18,7 @@ export interface NativeMicrophoneControls {
   error: string | null;
   initialize: () => Promise<void>;
   refresh: () => Promise<void>;
-  select: (token: string) => Promise<void>;
+  select: (token: string) => Promise<boolean>;
   ensureDefault: (replaceSelection?: boolean) => Promise<void>;
 }
 
@@ -47,7 +47,7 @@ export function useNativeCaptureSettings(): NativeMicrophoneControls {
       const previous = useStore.getState().nativeCaptureSource;
       if (previous && !next.sources.some((source) => source.selectionToken === previous.selectionToken)) {
         useStore.getState().setNativeCaptureSource(null);
-        setError("The microphone list changed. Choose and allow a microphone again.");
+        setError("The microphone list changed. Choose a microphone again.");
       } else setError(null);
     } catch (cause) {
       if (!mounted.current || request.current !== id) return;
@@ -80,18 +80,20 @@ export function useNativeCaptureSettings(): NativeMicrophoneControls {
 
   const select = useCallback(async (token: string) => {
     const state = useStore.getState();
-    if (state.captureBackendMode !== "native" || ["recording", "processing"].includes(state.status)) return;
+    if (state.captureBackendMode !== "native" || ["starting", "recording", "processing"].includes(state.status)) return false;
     const id = ++request.current;
     setBusy(true);
     // A change must never leave the previous grant looking like the new choice.
     state.setNativeCaptureSource(null);
     try {
       const source = await selectNativeCaptureSource(token);
-      if (!mounted.current || request.current !== id) return;
+      if (!mounted.current || request.current !== id) return false;
       useStore.getState().setNativeCaptureSource(source);
       setError(null);
+      return true;
     } catch (cause) {
       if (mounted.current && request.current === id) setError(errorMessage(cause));
+      return false;
     } finally {
       if (mounted.current && request.current === id) setBusy(false);
     }

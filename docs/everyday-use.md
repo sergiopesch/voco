@@ -1,7 +1,7 @@
 # Using VOCO
 
-These instructions describe public **2026.0.59**, including direct tray handoff
-after onboarding and saved dictation opened only when requested.
+These instructions describe the private **2026.0.60** candidate. Public **2026.0.59**
+has the earlier in-memory recovery flow; these changes are not published yet.
 
 A successful voice test is followed by a desktop input check
 before onboarding completes. **Desktop setup required** means helpers or their
@@ -36,9 +36,12 @@ live panel** in onboarding or Help, or run `voco --setup-panel`. Package hooks d
 not enable extensions. If setup says to sign out, save your work and sign out and
 back in; installing files alone cannot reload a running Wayland Shell.
 
-The panel shows real microphone bars, Listening and Stop. Other desktops and a
-disabled companion use the native tray, with status labels where supported and a
-status row plus Stop in its menu. `voco --check-panel` changes no preferences.
+While recording, the panel shows the microphone and real input bars, without a
+Listening label or Stop button. Click the icon or use your shortcut to stop.
+Right-click for **Settings**, **Review**, and **Stop** during capture.
+Other desktops use the native tray menu. `voco --check-panel` changes no preferences.
+Companion version 10 is required for the new GNOME modifier safety check; after an
+upgrade, follow setup's sign-out/sign-in guidance before dictating.
 
 The fallback tray replaces its Ready label with
 audio-driven bars while recording. Silence settles the bars; Stop restores the
@@ -48,7 +51,7 @@ Smooth movement follows the desktop's animation preference.
 ## Dictation
 
 Check your microphone during setup, then focus an editable field.
-Press and release the recording shortcut (default **Alt+D**), wait for Listening,
+Press and release the recording shortcut (default **Alt+D**), wait for the input bars,
 and speak.
 Words appear progressively. Press and release the shortcut again to finish; the final words
 and punctuation are delivered before VOCO returns to Ready.
@@ -77,7 +80,7 @@ This is not an unlimited continuous-session guarantee.
 
 ## Settings
 
-Settings contains microphone controls. Shortcut has its own sidebar section,
+Right-click the tray icon and choose **Settings** for microphone controls. Shortcut has its own sidebar section,
 with **Alt+D** as the default. Updates and Help are separate destinations; Help
 groups troubleshooting by symptom. Drag the top bar or the VOCO brand area to move the window.
 Resize using its edges. Hide to tray closes the panel without quitting.
@@ -87,32 +90,30 @@ conversation, enhancement and output-mode selectors are removed. Upgrades ignore
 retired settings and preserve your microphone and shortcut. The interface follows
 system motion, contrast and transparency preferences without an Appearance page.
 
-Browser microphone choices save immediately. Native capture requires session
-consent and **Use this microphone**. Selecting a device does not start capture.
+Microphone choices apply immediately. Choosing a native microphone allows access
+for this app session; no extra checkbox is required. Selecting a device does not start capture.
 Choose **Change shortcut**, edit or record keys, then **Apply shortcut** or **Cancel**. If you
 hide the window with unsaved edits, choose Save and hide, Discard and hide, or
 Keep editing. Recording is paused while capturing a new shortcut.
 
-## Recovery
+## Crash Recovery
 
-If delivery is interrupted, a notification tells you immediately. When recognition
-is still healthy, VOCO continues transcribing locally through Stop, without sending
-more text to the destination. A recognition or capture failure instead retains the
-received audio for recovery; it cannot promise a complete transcript.
+Normal dictation is not saved. A temporary owner-only local text checkpoint is
+deleted after Stop, a handled failure, cancellation or a clean app exit. Audio is
+never written by crash recovery. This does not clear the destination or clipboard.
 
-After Stop, VOCO notifies you and stays in the tray. Open VOCO when you want to review
-or copy the saved dictation. **What happened** contains the interruption details.
-Check the destination before pasting: it may already contain some of your words or
-manual edits. VOCO never blindly retries uncertain delivery. Copying does not dismiss
-a transcript. If desktop notifications are disabled, recovery remains accessible
-through the VOCO tray or launcher.
+After an unexpected app exit, right-click the tray icon and choose **Review**.
+The resizable window keeps long text scrollable and Copy and Discard reachable.
+Check the destination first: some words may already be there. Copy never pastes,
+retries delivery or removes the entry; Discard asks for confirmation.
+Up to five interrupted transcripts are retained, each limited to 256 KiB. A sixth
+crash replaces the oldest. Recovery includes only the last completed checkpoint,
+not speech still awaiting recognition. Prior crash entries remain until discarded.
 
-Where available, Retry transcription uses retained audio without automatically
-inserting it. Desktop and browser dictation recover with the same bundled local
-Nemotron model, including while offline. The result identifies the recognizer used.
-Cancel stops waiting immediately and keeps the audio; an outstanding native
-request may finish before its worker is released. Clear or discard recovery before starting another recording.
-Recovery stays in memory only and is lost when VOCO exits.
+If delivery is interrupted without an app crash, VOCO notifies you, stops sending
+text and keeps healthy recognition running through Stop. After Stop it clears the
+temporary text and audio and allows another recording. Check your field for missing
+words. VOCO never opens Review automatically or blindly replays uncertain output.
 
 ## Optional browser integration
 

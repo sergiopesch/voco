@@ -13,6 +13,7 @@ test('active states block opening settings and processing blocks Stop', () => {
         const p = presentation({...state, status});
         assert.equal(p.canOpen, false);
         assert.equal(p.canStop, status !== 'processing');
+        assert.equal(p.label, '');
     }
 });
 test('meter is finite and bounded even for malformed inputs', () => {
@@ -22,8 +23,8 @@ test('meter is finite and bounded even for malformed inputs', () => {
         assert.ok(barScales(p.level).every(value => value >= 0.15 && value <= 1));
     }
 });
-test('unknown protocol fails closed and recovery remains visible', () => {
+test('unknown protocol fails closed and recovery never adds panel text', () => {
     assert.throws(() => presentation({...state, version: 2}));
     assert.throws(() => presentation({...state, status: 'unknown'}));
-    assert.equal(presentation({...state, status: 'recovery'}).label, 'Review');
+    assert.equal(presentation({...state, status: 'recovery'}).label, '');
 });

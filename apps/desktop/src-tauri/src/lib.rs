@@ -11,6 +11,7 @@ mod browser_event_delivery;
 mod browser_protocol;
 mod browser_socket;
 mod config;
+mod crash_recovery;
 #[cfg(target_os = "linux")]
 mod desktop_input_setup;
 #[cfg(target_os = "linux")]
@@ -2105,6 +2106,7 @@ fn install_socket_cleanup_signal_handler() {
             }
 
             native_capture_commands::shutdown();
+            crash_recovery::clean_exit();
             cleanup_socket_files();
             std::process::exit(128 + received_signal);
         });
@@ -2523,6 +2525,7 @@ pub fn run() -> Result<(), String> {
     #[cfg(target_os = "linux")]
     install_socket_cleanup_signal_handler();
     performance::initialize();
+    crash_recovery::initialize(&xdg_state_home())?;
     native_capture_commands::initialize();
 
     tauri::Builder::default()
@@ -2533,6 +2536,9 @@ pub fn run() -> Result<(), String> {
             if matches!(payload.event(), tauri::webview::PageLoadEvent::Started) {
                 if webview.label() == "main" {
                     let shortcut_epoch = desktop_shortcut::invalidate_renderer();
+                    if let Err(error) = crash_recovery::renderer_restarted(shortcut_epoch) {
+                        log::warn!("Renderer crash recovery could not be prepared: {error}");
+                    }
                     // Revoke authorization immediately; wait for bounded pending
                     // delivery/X11 cleanup off the UI thread. A late job cannot
                     // release a replacement renderer's newer ownership.
@@ -2552,6 +2558,12 @@ pub fn run() -> Result<(), String> {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            crash_recovery::list_crash_recovery,
+            crash_recovery::get_crash_journal_epoch,
+            crash_recovery::dismiss_crash_recovery,
+            crash_recovery::begin_crash_journal,
+            crash_recovery::update_crash_journal,
+            crash_recovery::finish_crash_journal,
             benchmark_stream::benchmark_stream,
             benchmark_stream::recover_stream,
             native_capture_commands::native_capture_capabilities,
@@ -2714,6 +2726,7 @@ pub fn run() -> Result<(), String> {
         .expect("error while building tauri application")
         .run(|app, event| {
             if let tauri::RunEvent::Exit = event {
+                crash_recovery::clean_exit();
                 performance::shutdown();
                 native_capture_commands::shutdown();
                 app.state::<owned_preedit::OwnedPreeditService>().shutdown();

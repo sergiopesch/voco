@@ -17,6 +17,7 @@ pub struct TrayState {
     pub status_item: MenuItem<tauri::Wry>,
     pub open_panel_item: MenuItem<tauri::Wry>,
     pub settings_item: MenuItem<tauri::Wry>,
+    pub review_item: MenuItem<tauri::Wry>,
     pub hotkey_menu: Submenu<tauri::Wry>,
     pub current_hotkey: String,
     pub hotkey_items: Vec<(String, MenuItem<tauri::Wry>)>,
@@ -158,7 +159,6 @@ struct TrayPresentation {
 enum TrayDictationAction {
     Toggle,
     Stop,
-    ReviewRecovery,
     Ignore,
 }
 
@@ -198,25 +198,6 @@ fn derive_tray_presentation(snapshot: &RuntimeStatusSnapshot) -> TrayPresentatio
                 "VOCO — Initializing…".to_string(),
             ),
         }
-    } else if snapshot.manual_transcript_ready && !dictation_active {
-        (
-            TrayVisualState::Ready,
-            "VOCO — Transcript ready to copy".to_string(),
-        )
-    } else if snapshot.recovery_available && !dictation_active {
-        (
-            TrayVisualState::Processing,
-            "VOCO — Dictation saved".to_string(),
-        )
-    } else if (snapshot.has_recoverable_transcript
-        || matches!(snapshot.cursor_delivery, CursorDeliveryState::Unreconciled))
-        && !snapshot.configuration_error
-        && !dictation_active
-    {
-        (
-            TrayVisualState::NotReady,
-            "VOCO — Transcript needs attention".to_string(),
-        )
     } else {
         match snapshot.dictation_status {
             DictationStatus::Starting => (
@@ -241,7 +222,7 @@ fn derive_tray_presentation(snapshot: &RuntimeStatusSnapshot) -> TrayPresentatio
                 } else {
                     (
                         TrayVisualState::Recording,
-                        "VOCO — Listening · manual copy".to_string(),
+                        "VOCO — Listening · text delivery stopped".to_string(),
                     )
                 }
             }
@@ -277,7 +258,7 @@ fn derive_tray_presentation(snapshot: &RuntimeStatusSnapshot) -> TrayPresentatio
             {
                 (
                     TrayVisualState::NotReady,
-                    "VOCO — Text delivery needs setup · manual copy available".to_string(),
+                    "VOCO — Text delivery needs setup".to_string(),
                 )
             }
             DictationStatus::Idle
@@ -316,19 +297,6 @@ fn derive_tray_presentation(snapshot: &RuntimeStatusSnapshot) -> TrayPresentatio
         DictationStatus::Starting => ("Stop after microphone starts", TrayDictationAction::Stop),
         DictationStatus::Recording => ("Stop Dictation", TrayDictationAction::Stop),
         DictationStatus::Processing => ("Transcribing…", TrayDictationAction::Ignore),
-        DictationStatus::Idle | DictationStatus::Error
-            if snapshot.runtime_initialized
-                && (snapshot.manual_transcript_ready || snapshot.recovery_available) =>
-        {
-            (
-                if snapshot.manual_transcript_ready {
-                    "Review Transcript"
-                } else {
-                    "Review Recording"
-                },
-                TrayDictationAction::ReviewRecovery,
-            )
-        }
         DictationStatus::Idle | DictationStatus::Error => (
             "Start Dictation",
             if dictation_allowed {
@@ -338,11 +306,8 @@ fn derive_tray_presentation(snapshot: &RuntimeStatusSnapshot) -> TrayPresentatio
             },
         ),
     };
-    let popover_enabled = snapshot.runtime_initialized
-        && !dictation_active
-        && (!snapshot.configuration_error
-            || snapshot.manual_transcript_ready
-            || snapshot.recovery_available);
+    let popover_enabled =
+        snapshot.runtime_initialized && !dictation_active && !snapshot.configuration_error;
 
     let title = match snapshot.dictation_status {
         _ if !snapshot.runtime_initialized
@@ -351,16 +316,7 @@ fn derive_tray_presentation(snapshot: &RuntimeStatusSnapshot) -> TrayPresentatio
             "Check setup"
         }
         _ if !snapshot.runtime_initialized => "Starting VOCO",
-        DictationStatus::Starting => "Starting",
-        DictationStatus::Recording => "",
-        DictationStatus::Processing => "Finishing",
-        _ if snapshot.manual_transcript_ready
-            || snapshot.recovery_available
-            || snapshot.has_recoverable_transcript
-            || snapshot.cursor_delivery == CursorDeliveryState::Unreconciled =>
-        {
-            "Review"
-        }
+        DictationStatus::Starting | DictationStatus::Recording | DictationStatus::Processing => "",
         _ if visual_state == TrayVisualState::NotReady => "Check setup",
         _ if snapshot.model_download_status != ModelDownloadStatus::Ready => "Starting VOCO",
         _ => "Ready",
@@ -373,7 +329,8 @@ fn derive_tray_presentation(snapshot: &RuntimeStatusSnapshot) -> TrayPresentatio
         dictation_enabled: dictation_action != TrayDictationAction::Ignore,
         dictation_action,
         popover_enabled,
-        settings_enabled: snapshot.runtime_initialized && !dictation_active,
+        settings_enabled: (snapshot.runtime_initialized || snapshot.configuration_error)
+            && !dictation_active,
         hotkey_menu_enabled: snapshot.runtime_initialized
             && !snapshot.configuration_error
             && !dictation_active,
@@ -475,6 +432,7 @@ pub fn setup_tray(app: &tauri::App, hotkey_label: &str) -> Result<(), Box<dyn st
         .enabled(false)
         .build(app)?;
     let settings = MenuItemBuilder::with_id("settings", "Settings").build(app)?;
+    let review = MenuItemBuilder::with_id("review", "Review").build(app)?;
 
     // Build hotkey submenu with presets
     let mut hotkey_submenu = SubmenuBuilder::with_id(app, "hotkey_menu", "Change Hotkey");
@@ -504,6 +462,7 @@ pub fn setup_tray(app: &tauri::App, hotkey_label: &str) -> Result<(), Box<dyn st
         .item(&toggle)
         .item(&stop)
         .item(&settings)
+        .item(&review)
         .item(&PredefinedMenuItem::separator(app)?)
         .item(&hotkey_menu)
         .item(&PredefinedMenuItem::separator(app)?)
@@ -573,18 +532,14 @@ pub fn setup_tray(app: &tauri::App, hotkey_label: &str) -> Result<(), Box<dyn st
                 }
                 "toggle" => match current_tray_presentation(app).map(|p| p.dictation_action) {
                     Some(TrayDictationAction::Toggle) => crate::eval_toggle(app),
-                    Some(TrayDictationAction::ReviewRecovery) => {
-                        let _ = app.emit_to(
-                            "main",
-                            "voco:show-popover",
-                            crate::TrayPopoverAnchor::default(),
-                        );
-                    }
                     Some(TrayDictationAction::Stop | TrayDictationAction::Ignore) | None => {}
                 },
                 "stop" => request_stop(app),
                 "settings" if tray_settings_allowed(app) => {
                     let _ = app.emit_to("main", "voco:open-settings", ());
+                }
+                "review" if tray_settings_allowed(app) => {
+                    let _ = app.emit_to("main", "voco:open-review", ());
                 }
                 "edit_config" if tray_configuration_allowed(app) => {
                     let _ = app.emit_to("main", "voco:open-hotkey-settings", ());
@@ -608,6 +563,7 @@ pub fn setup_tray(app: &tauri::App, hotkey_label: &str) -> Result<(), Box<dyn st
         status_item,
         open_panel_item: open_panel,
         settings_item: settings,
+        review_item: review,
         hotkey_menu,
         current_hotkey: hotkey_label.to_string(),
         hotkey_items,
@@ -805,6 +761,9 @@ fn apply_tray_state(app: &tauri::AppHandle, tray_state: &mut TrayState) {
         .settings_item
         .set_enabled(presentation.settings_enabled);
     let _ = tray_state
+        .review_item
+        .set_enabled(presentation.settings_enabled);
+    let _ = tray_state
         .hotkey_menu
         .set_enabled(presentation.hotkey_menu_enabled);
     tray_state.applied_presentation = Some(presentation);
@@ -999,13 +958,6 @@ fn panel_presentation(snapshot: &RuntimeStatusSnapshot) -> serde_json::Value {
         DictationStatus::Starting => "starting",
         DictationStatus::Recording => "recording",
         DictationStatus::Processing => "processing",
-        _ if snapshot.manual_transcript_ready
-            || snapshot.recovery_available
-            || snapshot.has_recoverable_transcript
-            || snapshot.cursor_delivery == CursorDeliveryState::Unreconciled =>
-        {
-            "recovery"
-        }
         _ if presentation.visual_state == TrayVisualState::NotReady => "attention",
         _ => "idle",
     };
@@ -1041,7 +993,9 @@ fn valid_panel_action(snapshot: &serde_json::Value, action: &str, token: &str) -
             "stop" => {
                 snapshot["canStop"] == true && snapshot["stopSession"].as_str() == Some(token)
             }
-            "open" => snapshot["canOpen"] == true && snapshot["token"].as_str() == Some(token),
+            "open" | "settings" | "review" => {
+                snapshot["canOpen"] == true && snapshot["token"].as_str() == Some(token)
+            }
             _ => false,
         }
 }
@@ -1065,17 +1019,11 @@ pub fn panel_action(app: &tauri::AppHandle, action: &str, token: &str) -> bool {
             )
             .is_ok()
         }
-        "open" if snapshot["canOpen"] == true => {
-            if snapshot["status"] == "recovery" {
-                app.emit_to(
-                    "main",
-                    "voco:show-popover",
-                    crate::TrayPopoverAnchor::default(),
-                )
-                .is_ok()
-            } else {
-                app.emit_to("main", "voco:open-settings", ()).is_ok()
-            }
+        "open" | "settings" if snapshot["canOpen"] == true => {
+            app.emit_to("main", "voco:open-settings", ()).is_ok()
+        }
+        "review" if snapshot["canOpen"] == true => {
+            app.emit_to("main", "voco:open-review", ()).is_ok()
         }
         _ => false,
     }
@@ -1100,6 +1048,13 @@ mod tests {
         state["canOpen"] = true.into();
         assert!(valid_panel_action(&state, "open", "4:10"));
         assert!(!valid_panel_action(&state, "open", "4:9"));
+        for action in ["settings", "review"] {
+            assert!(valid_panel_action(&state, action, "4:10"));
+            assert!(!valid_panel_action(&state, action, "4:9"));
+            state["canOpen"] = false.into();
+            assert!(!valid_panel_action(&state, action, "4:10"));
+            state["canOpen"] = true.into();
+        }
     }
 
     #[cfg(target_os = "linux")]
@@ -1123,7 +1078,7 @@ mod tests {
         snapshot.recovery_available = true;
         snapshot.native_microphone_ready = Some(false);
         let panel = panel_presentation(&snapshot);
-        assert_eq!(panel["status"], "recovery");
+        assert_eq!(panel["status"], "attention");
         assert_eq!(panel["canOpen"], true);
         assert_eq!(panel["canStop"], false);
         assert_eq!(panel["level"], 0.0);
@@ -1246,9 +1201,9 @@ mod tests {
         let mut snapshot = ready_snapshot();
         assert_eq!(derive_tray_presentation(&snapshot).title, "Ready");
         for (status, title) in [
-            (DictationStatus::Starting, "Starting"),
+            (DictationStatus::Starting, ""),
             (DictationStatus::Recording, ""),
-            (DictationStatus::Processing, "Finishing"),
+            (DictationStatus::Processing, ""),
         ] {
             snapshot.dictation_status = status;
             let presentation = derive_tray_presentation(&snapshot);
@@ -1269,7 +1224,7 @@ mod tests {
     }
 
     #[test]
-    fn pending_manual_transcript_offers_review_without_starting_capture() {
+    fn retained_transcript_does_not_replace_dictation_with_review() {
         let mut snapshot = ready_snapshot();
         snapshot.manual_transcript_ready = true;
         for status in [DictationStatus::Idle, DictationStatus::Error] {
@@ -1283,13 +1238,18 @@ mod tests {
                     MicrophonePermission::Granted
                 };
                 let presentation = derive_tray_presentation(&snapshot);
-                assert_eq!(presentation.dictation_label, "Review Transcript");
+                assert_eq!(presentation.dictation_label, "Start Dictation");
                 assert_eq!(
                     presentation.dictation_action,
-                    TrayDictationAction::ReviewRecovery
+                    if unavailable {
+                        TrayDictationAction::Ignore
+                    } else {
+                        TrayDictationAction::Toggle
+                    }
                 );
-                assert!(presentation.dictation_enabled);
-                assert!(presentation.popover_enabled);
+                assert_eq!(presentation.dictation_enabled, !unavailable);
+                assert_eq!(presentation.popover_enabled, !unavailable);
+                assert!(presentation.settings_enabled);
             }
         }
         snapshot.manual_transcript_ready = false;
@@ -1324,7 +1284,7 @@ mod tests {
         snapshot.dictation_status = DictationStatus::Idle;
         assert_eq!(
             derive_tray_presentation(&snapshot).dictation_action,
-            TrayDictationAction::ReviewRecovery
+            TrayDictationAction::Toggle
         );
         snapshot.runtime_initialized = false;
         assert_eq!(
@@ -1334,7 +1294,7 @@ mod tests {
     }
 
     #[test]
-    fn retained_audio_offers_review_even_without_microphone_or_valid_settings() {
+    fn review_menu_remains_available_without_microphone_or_valid_settings() {
         let mut snapshot = ready_snapshot();
         snapshot.recovery_available = true;
         snapshot.configuration_error = true;
@@ -1343,16 +1303,17 @@ mod tests {
         for status in [DictationStatus::Idle, DictationStatus::Error] {
             snapshot.dictation_status = status;
             let presentation = derive_tray_presentation(&snapshot);
-            assert_eq!(presentation.dictation_label, "Review Recording");
-            assert_eq!(presentation.tooltip, "VOCO — Dictation saved");
-            assert_eq!(
-                presentation.dictation_action,
-                TrayDictationAction::ReviewRecovery
-            );
-            assert!(presentation.popover_enabled);
-            assert!(presentation.dictation_enabled);
+            assert_eq!(presentation.dictation_label, "Start Dictation");
+            assert_eq!(presentation.tooltip, "VOCO — Settings need attention");
+            assert_eq!(presentation.dictation_action, TrayDictationAction::Ignore);
+            assert!(presentation.settings_enabled);
+            assert!(!presentation.popover_enabled);
+            assert!(!presentation.dictation_enabled);
         }
         snapshot.recovery_available = false;
+        snapshot.runtime_initialized = false;
+        assert!(derive_tray_presentation(&snapshot).settings_enabled);
+        assert_eq!(panel_presentation(&snapshot)["canOpen"], true);
         assert_eq!(
             derive_tray_presentation(&snapshot).dictation_action,
             TrayDictationAction::Ignore
@@ -1378,16 +1339,16 @@ mod tests {
     }
 
     #[test]
-    fn pending_recovery_survives_new_sessions_and_clears_on_explicit_dismissal() {
+    fn review_availability_does_not_replace_ready_presentation() {
         let mut snapshot = ready_snapshot();
         snapshot.has_recoverable_transcript = true;
         assert_eq!(
             derive_tray_presentation(&snapshot).visual_state,
-            TrayVisualState::NotReady
+            TrayVisualState::Ready
         );
         assert_eq!(
             derive_tray_presentation(&snapshot).tooltip,
-            "VOCO — Transcript needs attention"
+            "VOCO — Ready to listen"
         );
         snapshot.dictation_status = DictationStatus::Recording;
         assert_eq!(
@@ -1397,7 +1358,7 @@ mod tests {
         snapshot.dictation_status = DictationStatus::Idle;
         assert_eq!(
             derive_tray_presentation(&snapshot).visual_state,
-            TrayVisualState::NotReady
+            TrayVisualState::Ready
         );
         snapshot.has_recoverable_transcript = false;
         snapshot.cursor_delivery = CursorDeliveryState::Inactive;
@@ -1422,7 +1383,7 @@ mod tests {
 
         snapshot.cursor_delivery = CursorDeliveryState::PreviewOnly;
         let preview = derive_tray_presentation(&snapshot);
-        assert_eq!(preview.tooltip, "VOCO — Listening · manual copy");
+        assert_eq!(preview.tooltip, "VOCO — Listening · text delivery stopped");
 
         snapshot.cursor_delivery = CursorDeliveryState::Pending;
         let pending = derive_tray_presentation(&snapshot);
@@ -1482,7 +1443,7 @@ mod tests {
         snapshot.has_recoverable_transcript = true;
         let unreconciled = derive_tray_presentation(&snapshot);
         assert_eq!(unreconciled.visual_state, TrayVisualState::NotReady);
-        assert_eq!(unreconciled.tooltip, "VOCO — Transcript needs attention");
+        assert!(unreconciled.tooltip.contains("Text delivery needs setup"));
     }
 
     #[test]
@@ -1564,7 +1525,7 @@ mod tests {
         assert!(recovery.recovery_available);
         assert_eq!(
             derive_tray_presentation(&recovery).dictation_action,
-            TrayDictationAction::ReviewRecovery
+            TrayDictationAction::Ignore
         );
     }
 
@@ -1643,7 +1604,7 @@ mod tests {
         config_error.recovery_available = true;
         assert_eq!(
             derive_tray_left_click_action(&config_error),
-            TrayLeftClickAction::ShowPopover
+            TrayLeftClickAction::Ignore
         );
 
         let mut recording = ready_snapshot();

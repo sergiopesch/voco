@@ -4,11 +4,18 @@ Source candidate: **2026.0.60**. [Candidate changes](releases/2026.0.60.md)
 and [remaining package/signing gates](testing/release-2026.0.60.md) are recorded
 separately. This candidate is not yet a published installer.
 
+The private 28 September follow-up changes the tray to microphone/bars with a
+right-click Settings/Review menu, adds crash-only local text checkpoints, and guards
+GNOME paste against held keyboard modifiers. It also fixes native Pulse transport
+starvation and rejects material capture-duration deficits. It requires companion 10. Its new
+bytes need fresh package qualification; the historical results below do not qualify
+these changes. See [current usage](everyday-use.md) for the revised privacy contract.
+
 The recorded public Ubuntu/Debian release is **2026.0.59**. The
 [latest GitHub release](https://github.com/sergiopesch/voco/releases/latest) is
 authoritative for downloads; installed versions must be checked separately.
 
-This cut includes Brave text preservation, immediate release of rejected GNOME
+The recorded public .59 cut includes Brave text preservation, immediate release of rejected GNOME
 Stop reservations, capture-bound Stop through status changes, and isolation from older replies. Installer cleanup belongs to
 its original process, protecting parent files/jobs when progress tasks stop early.
 Follow setup's sign-out/sign-in guidance so GNOME loads companion version 4.

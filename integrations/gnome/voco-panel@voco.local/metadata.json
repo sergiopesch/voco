@@ -1,10 +1,10 @@
 {
   "uuid": "voco-panel@voco.local",
   "name": "VOCO",
-  "description": "VOCO dictation status and Stop control inside the panel.",
+  "description": "VOCO live dictation meter with Settings, Review and Stop in its menu.",
   "shell-version": [
     "46"
   ],
-  "version": 4,
+  "version": 10,
   "url": "https://github.com/sergiopesch/voco"
 }

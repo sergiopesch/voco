@@ -106,8 +106,8 @@ window off screen. Unmapping that window removed the tile but blocked a fresh
 WebKit microphone request. The .43 candidate now selects the native audio backend
 on Wayland and actually hides its window. X11 retains WebKit capture.
 
-In Microphone settings, select a source, allow direct access for this app session,
-and choose **Use this microphone**. This does not start recording. The current
+In Microphone settings, choose a source from the dropdown to select it and allow
+direct access for this app session. This does not start recording. The current
 system default resolves to one specific source; later default changes do not
 silently switch it. Native capture requires PipeWire's Pulse compatibility server
 and its stable source identity metadata. A lost or changed source requires explicit

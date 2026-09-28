@@ -126,18 +126,12 @@ export function ControlPanel({
   updateState,
   runtimeDiagnostics,
   dictationStatus,
-  cursorDeliveryState,
   transcript,
-  rawTranscript,
   recovery,
   captureNotice,
   canCancelDictation,
   cancellationPending,
   onCancelDictation,
-  onRetryRecovery,
-  onDiscardRecovery,
-  recoverableTranscripts,
-  onDismissRecoverableTranscript,
   onPrepareDictation,
   onDraftStateChange,
   onShortcutCaptureChange,
@@ -194,22 +188,8 @@ export function ControlPanel({
   const saving = savingCount > 0;
   const mainSettings = ["General", "Audio"].includes(activeSection);
   const [microphoneSaveError, setMicrophoneSaveError] = useState<string | null>(null);
-  const [copyStatus, setCopyStatus] = useState<{ id: string; text: string; outcome: "success" | "attention" } | null>(null);
   const previousCloseRequestRef = useRef(closeRequestId);
   const microphoneSaveRequestRef = useRef(0);
-  const copyRequestRef = useRef(0);
-  const latestTranscriptRef = useRef(transcript);
-  latestTranscriptRef.current = transcript;
-  const latestRawTranscriptRef = useRef(rawTranscript);
-  latestRawTranscriptRef.current = rawTranscript;
-  const hasCurrentRecovery = Boolean(recovery) || (recoverableTranscripts === undefined &&
-    transcript.trim().length > 0 &&
-    (cursorDeliveryState === "unreconciled" || dictationStatus === "error"));
-  const recoveryEntries: RecoverableTranscript[] = recoverableTranscripts !== undefined ? recoverableTranscripts :
-    transcript.trim().length > 0 && (cursorDeliveryState === "unreconciled" || dictationStatus === "error")
-      ? [{ id: "current", text: transcript, createdAt: 0, isPartial: false, reason: cursorDeliveryState === "unreconciled" ? "delivery-unconfirmed" as const : "output-failed" as const }]
-      : [];
-  const hasRecoverableTranscript = hasCurrentRecovery || recoveryEntries.length > 0;
   const [hotkeyDraft, setHotkeyDraft] = useState(config.hotkey);
   const [hotkeyError, setHotkeyError] = useState<string | null>(null);
   const nativePreviewDisabled = Boolean(nativeMicrophone && nativeMicrophone.mode !== "webkit");
@@ -499,11 +479,6 @@ export function ControlPanel({
     };
   }, [activeSection, dictationBusy, onboardingStep, selectedDeviceId, surface, microphoneRetryRevision, nativePreviewDisabled]);
 
-  useEffect(() => {
-    copyRequestRef.current += 1;
-    setCopyStatus(null);
-  }, [cursorDeliveryState, dictationStatus, transcript]);
-
   async function savePatch(
     patch: Partial<AppConfig>,
   ): Promise<{ ok: true } | { ok: false; message: string }> {
@@ -545,31 +520,6 @@ export function ControlPanel({
   async function retryMicrophonePreview() {
     try { await retryMicrophone(); }
     catch (error) { setPreviewError(error instanceof Error ? error.message : "Microphone access failed."); }
-  }
-
-  async function copyRecoveredTranscript(entry: RecoverableTranscript | string = transcript): Promise<void> {
-    const copiedTranscript = typeof entry === "string" ? entry : entry.text;
-    const entryId = typeof entry === "string" ? "current" : entry.id;
-    const requestId = copyRequestRef.current + 1;
-    copyRequestRef.current = requestId;
-    try {
-      await navigator.clipboard.writeText(copiedTranscript);
-      if (
-        copyRequestRef.current !== requestId ||
-        (typeof entry === "string" && latestTranscriptRef.current !== copiedTranscript && latestRawTranscriptRef.current !== copiedTranscript)
-      ) {
-        return;
-      }
-      setCopyStatus({ id: entryId, outcome: "success", text: "Copied to clipboard. The transcript stays here until you dismiss it." });
-    } catch (error) {
-      if (
-        copyRequestRef.current !== requestId ||
-        (typeof entry === "string" && latestTranscriptRef.current !== copiedTranscript && latestRawTranscriptRef.current !== copiedTranscript)
-      ) {
-        return;
-      }
-      setCopyStatus({ id: entryId, outcome: "attention", text: `Copy failed: ${error instanceof Error ? error.message : String(error)}` });
-    }
   }
 
   function endShortcutCapture() {
@@ -766,19 +716,19 @@ export function ControlPanel({
         </div>
 
         {isPopover ? (
-          <section className="voco-popover" data-priority={hasRecoverableTranscript || dictationBusy || statusLabel.length > 30 ? "status" : undefined}>
+          <section className="voco-popover" data-priority={dictationBusy || statusLabel.length > 30 ? "status" : undefined}>
             <div className="voco-lens" data-recording={dictationStatus === "recording"}>
               <img src={vocoBrandImage} alt="" />
               <span className="voco-lens__signal"><RecordingVoiceSignal active={dictationStatus === "recording"} /></span>
             </div>
             <div className="voco-popover__state">
               <div className="voco-popover__state-main">
-                <strong role="status" aria-live="polite"><StatusMark state={desktopSetupError || hasRecoverableTranscript || dictationStatus === "error" ? "attention" : dictationStatus === "recording" ? "listening" : dictationBusy ? "working" : "idle"} />{desktopSetupError ? "Setup needed" : statusLabel === "Ready to listen" ? "Ready" : statusLabel}</strong>
+                <strong role="status" aria-live="polite"><StatusMark state={desktopSetupError || dictationStatus === "error" ? "attention" : dictationStatus === "recording" ? "listening" : dictationBusy ? "working" : "idle"} />{desktopSetupError ? "Setup needed" : statusLabel === "Ready to listen" ? "Ready" : statusLabel}</strong>
                 <kbd className="voco-glass voco-shortcut">{config.hotkey}</kbd>
               </div>
               {dictationBusy ?
                 <p>{dictationStatus === "starting" ? "Wait for Listening before speaking." : dictationStatus === "recording" ? `Press ${config.hotkey} to finish.` : "Finishing your dictation…"}</p> :
-                <p>{desktopSetupError ? "Open Help to finish desktop setup." : hasCurrentRecovery ? "Review your saved dictation when you’re ready." : shortcut.available ? "Focus a text field, then use your shortcut." : "Check shortcut setup in Help."}</p>}
+                <p>{desktopSetupError ? "Open Help to finish desktop setup." : shortcut.available ? "Focus a text field, then use your shortcut." : "Check shortcut setup in Help."}</p>}
             </div>
             {captureNotice ? <div className="voco-inline-note" role="status">{captureNotice}</div> : null}
             {(canCancelDictation || cancellationPending) ? (
@@ -786,64 +736,6 @@ export function ControlPanel({
                 {cancellationPending ? "Cancelling output…" : "Cancel dictation"}
               </button>
             ) : null}
-            {hasCurrentRecovery ? (
-              <div className="voco-popover__recovery" data-kind={recovery?.kind ?? "failure"} role="status">
-                <strong>
-                  {transcript
-                    ? recovery?.kind === "manual-copy" ? "Transcript ready to copy"
-                      : recovery ? "Saved dictation" : "Transcript kept safely in VOCO"
-                    : recovery?.audioAvailable ? "Recording available to recover"
-                      : "Recording needs attention"}
-                </strong>
-                {recovery && recovery.kind !== "manual-copy" ? <details>
-                  <summary>What happened</summary>
-                  <p>{recovery.reason}</p>
-                </details> : <span>
-                  {recovery?.reason ?? (cursorDeliveryState === "unreconciled"
-                    ? "Cursor delivery could not be verified. Review the target before copying any missing text."
-                    : "The selected output did not complete. Confirm this is your latest dictation, then copy it before trying again.")}
-                </span>}
-                {transcript ? <p>{transcript}</p> : <span>No completed transcript is available yet.</span>}
-                {recovery?.targetMayContainText ? <span>The original field may already contain part of this transcript. Recovery never inserts automatically.</span> : null}
-                {recovery?.audioAvailable ? <span>Audio stays only in memory until recovery is completed, discarded, or VOCO closes.</span> : null}
-                <div className="voco-popover__recovery-actions">
-                {transcript ? <button
-                  className="voco-button voco-button--primary"
-                  type="button"
-                  onClick={() => void copyRecoveredTranscript()}
-                  disabled={recovery?.retrying}
-                >
-                  Copy transcript
-                </button> : null}
-                {rawTranscript && rawTranscript !== transcript ? <button className="voco-button voco-button--secondary" type="button" onClick={() => void copyRecoveredTranscript(rawTranscript)} disabled={recovery?.retrying}>
-                  Copy original recognition
-                </button> : null}
-                {recovery?.audioAvailable ? <button className="voco-button voco-button--secondary" type="button" onClick={onRetryRecovery} disabled={recovery.retrying}>
-                  {recovery.retrying ? "Recovering…" : "Retry transcription"}
-                </button> : null}
-                {recovery ? <button className="voco-button voco-button--ghost" type="button" onClick={onDiscardRecovery} disabled={recovery.retrying}>
-                  {recovery.kind === "manual-copy" ? "Clear transcript" : "Discard recovery"}
-                </button> : null}
-                </div>
-                {copyStatus?.id === "current" ? <span className="voco-motion-feedback" role="status"><StatusMark state={copyStatus.outcome} />{copyStatus.text}</span> : null}
-                {recovery ? <span>{recovery.kind === "manual-copy" ? "Copy your text, then clear this transcript to start another recording." : "Copy any text you need, then discard this recovery to start another recording."}</span> : null}
-              </div>
-            ) : null}
-            {!hasCurrentRecovery && recoveryEntries.length > 0 ? <section className="voco-popover__recovery" aria-label="Saved transcripts" role="region">
-              <h2 tabIndex={-1}>Transcript kept safely in VOCO</h2>
-              <p>{recoveryEntries.length} transcript{recoveryEntries.length === 1 ? "" : "s"} available to recover. Kept until VOCO exits.</p>
-              {recoveryEntries.map((entry, index) => <article key={entry.id} className="voco-recovery-entry">
-                <strong>Transcript {index + 1}{entry.createdAt > 0 ? ` · ${new Date(entry.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : ""}</strong>
-                {entry.isPartial ? <strong>Partial transcript — final transcription did not finish.</strong> : null}
-                <p>{entry.reason === "delivery-unconfirmed" ? "Some words may already be in your text field. Review it before pasting to avoid duplicates." : "The selected output did not complete. Check your text field before pasting; some words may already be there."}</p>
-                <p className="voco-recovery-entry__text" tabIndex={0}>{entry.text}</p>
-                <div className="voco-settings__actions">
-                  <button className="voco-button voco-button--primary" onClick={() => void copyRecoveredTranscript(entry)}>Copy transcript</button>
-                  {onDismissRecoverableTranscript && entry.id !== "current" ? <button className="voco-button voco-button--ghost" onClick={() => onDismissRecoverableTranscript(entry.id)}>Dismiss transcript</button> : null}
-                </div>
-                {copyStatus?.id === entry.id ? <span className="voco-motion-feedback" role="status"><StatusMark state={copyStatus.outcome} />{copyStatus.text}</span> : null}
-              </article>)}
-            </section> : null}
             <div className="voco-popover__actions">
               <button {...glassPointer} className="voco-button voco-glass voco-glass--primary" disabled={saving || dictationBusy}
                 onClick={prepareDictation}>Hide to tray</button>
@@ -907,11 +799,6 @@ export function ControlPanel({
               <div className="voco-preferences__window-actions" onPointerDown={(event) => void handleHeaderPointerDown(event)} aria-label="Move VOCO window">{!config.onboardingCompleted ? <button className="voco-button voco-button--ghost voco-button--compact" disabled={saving || dictationBusy || hasUnsavedChanges} onClick={() => onSurfaceChange("onboarding")}>Back to setup</button> : null}<button className="voco-button voco-button--ghost voco-button--compact" onClick={requestHide}>Hide to tray</button></div>
               {mainSettings ? <div className="voco-preferences__heading"><h2 tabIndex={-1}>Settings</h2></div> : null}
               {mainSettings ? <>
-                  {hasRecoverableTranscript ? <div className="voco-preferences__recovery" role="status">
-                    <strong>{hasCurrentRecovery ? recovery?.kind === "manual-copy" ? "Transcript ready to copy" : "Recording needs recovery" : recoveryEntries.length === 1 ? "A transcript needs attention" : `${recoveryEntries.length} transcripts need attention`}</strong>
-                    <p>Kept in VOCO until you dismiss them or exit the app.</p>
-                    <button className="voco-button voco-button--secondary" onClick={() => onSurfaceChange("popover")}>Review saved transcripts</button>
-                  </div> : null}
                   {desktopSetupError ? <div className="voco-inline-note" role="status">Desktop setup needs attention. <button className="voco-button voco-button--ghost" onClick={() => setActiveSection("Advanced")}>Open Help</button></div> : null}
               </> : null}
 
@@ -1007,10 +894,10 @@ export function ControlPanel({
                 <section className="voco-preferences__page">
                   <div className="voco-preferences__heading"><h2 tabIndex={-1}>Help</h2></div>
                   <PanelSetup disabled={saving || dictationBusy} />
-                  <details className="voco-preferences__card voco-preferences__disclosure"><summary>How to dictate</summary><p>Focus a text field and press <kbd>{config.hotkey}</kbd>. Wait for Listening, then speak. Press again to finish.</p><p>VOCO replaces clipboard text to paste your words and never presses Enter. Keep the same field focused.</p><p>In an enabled Chromium tab, use <kbd>Alt+Shift+V</kbd> for direct delivery to a plain text field.</p></details>
+                  <details className="voco-preferences__card voco-preferences__disclosure"><summary>How to dictate</summary><p>Focus a text field and press <kbd>{config.hotkey}</kbd>. The tray bars respond when the microphone is ready. Press again to finish.</p><p>VOCO replaces clipboard text to paste your words and never presses Enter. Keep the same field focused.</p><p>In an enabled Chromium tab, use <kbd>Alt+Shift+V</kbd> for direct delivery to a plain text field.</p></details>
                   <details className="voco-preferences__card voco-preferences__disclosure"><summary>My microphone is not working</summary><p>Check the selected microphone and allow access for this session.</p><button className="voco-button voco-button--secondary" onClick={() => setActiveSection("Audio")}>Microphone settings</button></details>
                   <details className="voco-preferences__card voco-preferences__disclosure"><summary>My shortcut is not working</summary><p>{shortcut.detail}</p>{shortcut.setup ? <p>{shortcut.setup}</p> : null}<button className="voco-button voco-button--secondary" onClick={() => setActiveSection("Hotkeys")}>Shortcut settings</button></details>
-                  <details className="voco-preferences__card voco-preferences__disclosure"><summary>My words are not appearing</summary><p>Keep an editable text field focused. If delivery stops, review the field before copying missing text from VOCO.</p>{desktopSetupError ? <p role="status">{desktopSetupError}</p> : null}<button className="voco-button voco-button--secondary" onClick={() => void onOpenReleasePage(DESKTOP_SETUP_GUIDE)}>Open setup instructions</button></details>
+                  <details className="voco-preferences__card voco-preferences__disclosure"><summary>My words are not appearing</summary><p>Keep an editable text field focused. If delivery stops, check your field for missing words. Review is available from the tray after an unexpected app exit.</p>{desktopSetupError ? <p role="status">{desktopSetupError}</p> : null}<button className="voco-button voco-button--secondary" onClick={() => void onOpenReleasePage(DESKTOP_SETUP_GUIDE)}>Open setup instructions</button></details>
                   <details className="voco-preferences__card voco-preferences__disclosure"><summary>Technical details</summary>
                   <div className="voco-preferences__group"><h3 className="voco-preferences__group-title">Runtime checks</h3>
                     <div className="voco-preferences__card">

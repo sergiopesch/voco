@@ -31,8 +31,11 @@ try:
     assert (root / 'runtime/system-test-bus').exists()
     os.environ['DBUS_SYSTEM_BUS_ADDRESS'] = system_address
     report['systemServices'] = 'private bus only; no host system bus or logind'
+    enabled_extensions = ['ubuntu-appindicators@ubuntu.com', 'voco-private-probe@test.invalid']
+    if os.environ.get('VOCO_GNOME_CURSOR') == '1':
+        enabled_extensions.append('voco-panel@voco.local')
     for schema, key, value in [
-        ('org.gnome.shell', 'enabled-extensions', "['ubuntu-appindicators@ubuntu.com', 'voco-private-probe@test.invalid']"),
+        ('org.gnome.shell', 'enabled-extensions', str(enabled_extensions)),
         ('org.gnome.shell', 'disable-user-extensions', 'false'),
         ('org.gnome.desktop.interface', 'enable-animations', 'false'),
         ('org.gnome.desktop.session', 'idle-delay', 'uint32 0'),
@@ -40,9 +43,11 @@ try:
         subprocess.run(['gsettings', 'set', schema, key, value], check=True, timeout=10)
     report['gnomeVersion'] = subprocess.check_output(['gnome-shell', '--version'], text=True).strip()
     with (evidence / 'gnome-shell.log').open('w') as log:
+        shell_accessibility = {'NO_AT_BRIDGE': '1'} if os.environ.get('VOCO_GNOME_CURSOR') == '1' else {}
+        report['nestedShellAccessibilityDisabled'] = bool(shell_accessibility)
         shell = subprocess.Popen(['gnome-shell', '--nested', '--wayland', '--no-x11',
                                   '--wayland-display=voco-gnome', '--sm-disable'],
-                                 env={**os.environ, 'DISPLAY': ':77'}, stdout=log, stderr=subprocess.STDOUT)
+                                 env={**os.environ, 'DISPLAY': ':77', **shell_accessibility}, stdout=log, stderr=subprocess.STDOUT)
     import gi
     gi.require_version('Gio', '2.0')
     from gi.repository import Gio
@@ -196,7 +201,7 @@ try:
         assert 65366 in key_events, 'Actual PageDown key event not received'
         assert report['scrollProbe']['afterPageDown'] > before, 'Private XTest PageDown did not scroll actual GTK fixture'
         target.destroy()
-    if os.environ.get('VOCO_GNOME_ONBOARDING') == '1':
+    if os.environ.get('VOCO_GNOME_ONBOARDING') == '1' or os.environ.get('VOCO_GNOME_CURSOR') == '1':
         pulse_socket = Path(f'/run/user/{os.getuid()}/pulse/native')
         env.update(PULSE_SERVER='unix:' + str(pulse_socket),
                    PULSE_SOURCE='voco_fixture', PULSE_SINK='fixture')
@@ -258,6 +263,11 @@ try:
                             if rect.width >= 300 and rect.height >= 300:
                                 return {'name': frame.get_name(), 'bounds': [rect.x, rect.y, rect.width, rect.height]}
             return None
+        review_mode = os.environ.get('VOCO_GNOME_CRASH_REVIEW') == '1'
+        if review_mode:
+            assert os.environ.get('VOCO_GNOME_ONBOARDING') != '1', 'Crash review needs completed onboarding'
+            from test_native_crash_review import seed_crash, run_review
+            seed_crash(root)
         for cycle in range(2):
             trace = root / 'state/voco/hotkey-trace.jsonl'
             previous_ready_count = trace.read_text().count('frontend_hotkey_handler_ready') if trace.exists() else 0
@@ -314,6 +324,13 @@ try:
                     trace = root / 'state/voco/hotkey-trace.jsonl'
                     return trace.exists() and trace.read_text().count('frontend_hotkey_handler_ready') > previous_ready_count
                 wait_for(frontend_ready)
+                if review_mode:
+                    report.setdefault('crashReview', []).append(run_review(root, app, pump, activate,
+                        lambda: json.loads(call('org.gnome.Shell', '/org/voco/PrivateShellProbe', 'org.voco.PrivateShellProbe', 'GetWindows')[0]), env, cycle))
+                if os.environ.get('VOCO_GNOME_CURSOR') == '1' and cycle == 0:
+                    from test_native_cursor_capture import run_cursor
+                    report['cursorCapture'] = run_cursor(root, app, pump,
+                        lambda: json.loads(call('org.gnome.Shell', '/org/voco/PrivateShellProbe', 'org.voco.PrivateShellProbe', 'GetWindows')[0]), activate)
                 onboarding_cycle = os.environ.get('VOCO_GNOME_ONBOARDING') == '1' and cycle == 0
                 if not onboarding_cycle:
                     activate('Open VOCO')
@@ -381,6 +398,7 @@ finally:
     if system_bus is not None:
         system_bus.terminate()
         system_bus.wait(timeout=3)
-    report['sourceHashes'] = {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
-                              for p in [Path(__file__), Path(__file__).with_suffix('.sh'), Path(__file__).with_name('test_native_wayland_capture.py'), Path(__file__).with_name('test_native_onboarding_capture.py'), *sorted(Path(__file__).with_name('fixtures').joinpath('gnome-private-probe').glob('*'))]}
+    sources = evidence / 'sources'
+    report['sourceHashes'] = {str(path.relative_to(sources)): hashlib.sha256(path.read_bytes()).hexdigest()
+                              for path in sorted(sources.rglob('*')) if path.is_file()}
     (evidence / 'results.json').write_text(json.dumps(report, indent=2) + '\n')

@@ -190,8 +190,8 @@ Contrast and transparency fallbacks remain authoritative.
 `DeviceSelect` uses a labelled combobox and listbox with arrow keys, Home/End,
 typeahead, Enter/Space, Escape and Tab. Disabled devices cannot be selected, long
 names wrap in a bounded scrolling menu, and Escape dismisses without applying a
-choice. Native microphone access still requires acknowledgement and the explicit
-Use this microphone action; changing the draft resets acknowledgement. Tooltips
+choice. An explicit native microphone choice applies session access immediately;
+no checkbox or Apply action is required, and selection never starts capture. Tooltips
 support focus and Escape, keep essential instructions in the page, and warm up
 between adjacent controls without an idle loop.
 

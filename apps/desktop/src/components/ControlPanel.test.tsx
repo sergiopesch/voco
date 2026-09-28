@@ -94,18 +94,18 @@ describe("ControlPanel", () => {
     expect(markup).not.toContain("Start listening");
   });
 
-  it("offers explicit recovery for an unreconciled transcript", () => {
+  it("never exposes handled delivery text in the status popover", () => {
     const markup = renderPanel({
       cursorDeliveryState: "unreconciled",
       transcript: "A transcript that stayed safely inside VOCO.",
       statusLabel: "Transcript needs attention",
     });
-    expect(markup).toContain("Transcript kept safely in VOCO");
-    expect(markup).toContain("A transcript that stayed safely inside VOCO.");
-    expect(markup).toContain("Copy transcript");
+    expect(markup).not.toContain("Transcript kept safely in VOCO");
+    expect(markup).not.toContain("A transcript that stayed safely inside VOCO.");
+    expect(markup).not.toContain("Copy transcript");
   });
 
-  it("keeps a failed one-shot transcript recoverable and preserves the body row", () => {
+  it("shows errors without retaining a normal dictation transcript", () => {
     const markup = renderPanel({
       dictationStatus: "error",
       transcript: "A final transcript whose selected output failed.",
@@ -114,9 +114,9 @@ describe("ControlPanel", () => {
     });
     expect(markup).toContain("voco-panel__error-slot");
     expect(markup).toContain("Local agent request failed.");
-    expect(markup).toContain("The selected output did not complete");
-    expect(markup).toContain("A final transcript whose selected output failed.");
-    expect(markup).toContain("Copy transcript");
+    expect(markup).not.toContain("The selected output did not complete");
+    expect(markup).not.toContain("A final transcript whose selected output failed.");
+    expect(markup).not.toContain("Copy transcript");
   });
 
   it("renders a compact, actionable settings navigation", () => {
@@ -134,7 +134,7 @@ describe("ControlPanel", () => {
     });
     expect(settingsMarkup).toContain("Keep the same field focused");
     expect(settingsMarkup).toContain("If delivery stops");
-    expect(settingsMarkup).toContain("copying missing text from VOCO");
+    expect(settingsMarkup).toContain("Review is available from the tray after an unexpected app exit.");
 
     const onboardingMarkup = renderPanel({
       surface: "onboarding",
@@ -150,15 +150,14 @@ describe("ControlPanel", () => {
 });
 
 describe("Crystal Sidebar settings", () => {
-  it("prioritizes retained recovery over an earlier delivered result", () => {
+  it("keeps crash review separate from settings", () => {
     const markup = renderPanel({
       surface: "settings",
       lastDictationResult: { outcome: "delivered", completedAt: 2 },
       recoverableTranscripts: [{ id: "earlier", text: "Keep this text", createdAt: 1, reason: "delivery-unconfirmed", isPartial: false }],
     });
-    expect(markup).toContain("A transcript needs attention");
-    expect(markup).toContain("Review saved transcripts");
-    expect(markup.indexOf("A transcript needs attention")).toBeLessThan(markup.indexOf("voco-preferences__group-title"));
+    expect(markup).not.toContain("A transcript needs attention");
+    expect(markup).not.toContain("Review saved transcripts");
     expect(markup).not.toContain("A dictation was delivered this session");
     expect(markup).not.toContain("Keep this text");
   });
@@ -254,7 +253,7 @@ describe("guided dictation and settings journeys", () => {
     expect(markup).not.toContain("Copy transcript");
   });
 
-  it("keeps multiple retained transcripts reachable and marks incomplete text", () => {
+  it("does not expose legacy retained transcripts in the normal popover", () => {
     const markup = renderPanel({
       recoverableTranscripts: [
         { id: "one", text: "Earlier unreconciled text.", createdAt: 1, reason: "delivery-unconfirmed", isPartial: false },
@@ -262,12 +261,10 @@ describe("guided dictation and settings journeys", () => {
       ],
       onDismissRecoverableTranscript: vi.fn(),
     });
-    expect(markup).toContain("Earlier unreconciled text.");
-    expect(markup).toContain("Only the preserved prefix.");
-    expect(markup).toContain("Partial transcript");
-    expect(markup).toContain("avoid duplicates");
-    expect(markup).toContain("Kept until VOCO exits");
-    expect(markup.match(/>Dismiss transcript</g)).toHaveLength(2);
+    expect(markup).not.toContain("Earlier unreconciled text.");
+    expect(markup).not.toContain("Only the preserved prefix.");
+    expect(markup).not.toContain("Partial transcript");
+    expect(markup).not.toContain("Dismiss transcript");
   });
 
   it("puts update status and action before optional preferences", () => {

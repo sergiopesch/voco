@@ -1,6 +1,6 @@
 import { DeviceSelect } from "./DeviceSelect";
 import { StatusMark } from "./StatusMark";
-import { useEffect, useState } from "react";
+import { useEffect, useRef } from "react";
 import type { NativeMicrophoneControls } from "@/hooks/useNativeCaptureSettings";
 
 export function NativeMicrophoneSettings({ controls, disabled, showError = true, onSelected }: {
@@ -9,22 +9,23 @@ export function NativeMicrophoneSettings({ controls, disabled, showError = true,
   showError?: boolean;
   onSelected?: () => void;
 }) {
-  const [draft, setDraft] = useState("");
-  const [acknowledged, setAcknowledged] = useState(false);
-  const [applying, setApplying] = useState(false);
+  const pending = useRef(false);
+  const mounted = useRef(false);
   useEffect(() => {
-    if (!applying || controls.busy) return;
-    setApplying(false);
-    if (controls.selected && !controls.error) onSelected?.();
-  }, [applying, controls.busy, controls.selected, controls.error, onSelected]);
-  useEffect(() => {
-    setDraft(controls.selected?.selectionToken ?? "");
-    setAcknowledged(false);
-  }, [controls.selected?.selectionToken, controls.sources?.revision]);
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
   const defaultToken = controls.sources?.defaultSelectionToken ?? null;
-  const token = draft === "system-default" ? defaultToken : draft;
-  const sourceSupported = controls.sources?.sources.some((source) => source.selectionToken === token && source.objectSerial);
-  const allowed = Boolean(token && sourceSupported && acknowledged && !disabled && !controls.busy);
+
+  async function select(value: string) {
+    const token = value === "system-default" ? defaultToken : value;
+    if (disabled || controls.busy || pending.current || !token ||
+        !controls.sources?.sources.some(source => source.selectionToken === token && source.objectSerial)) return;
+    pending.current = true;
+    try {
+      if (await controls.select(token) && mounted.current) onSelected?.();
+    } finally { pending.current = false; }
+  }
 
   if (controls.mode === "pending") {
     return <div className="voco-inline-note" role="status">
@@ -34,32 +35,24 @@ export function NativeMicrophoneSettings({ controls, disabled, showError = true,
     </div>;
   }
   return <div className="voco-native-microphone">
-    <p>Choose a microphone and allow access for this session. Selecting it does not start recording.</p>
     <div className="voco-field">
       <span>Microphone</span>
-      <DeviceSelect label="Microphone" value={draft} disabled={disabled || controls.busy}
-        onChange={value => { setDraft(value); setAcknowledged(false); }}
+      <DeviceSelect label="Microphone" value={controls.selected?.selectionToken ?? ""} disabled={disabled || controls.busy}
+        onChange={value => void select(value)}
         options={[
-          { value: "", label: "Choose a microphone" },
+          { value: "", label: "Choose a microphone", disabled: true },
           ...(defaultToken ? [{ value: "system-default", label: "System default (current device)", disabled: !controls.sources?.sources.some(source => source.selectionToken === defaultToken && source.objectSerial) }] : []),
           ...(controls.sources?.sources.map(source => ({ value: source.selectionToken,
             label: `${source.label || source.name}${source.isMonitor ? " (output monitor)" : ""}${!source.objectSerial ? " — identity unavailable" : ""}`,
             disabled: !source.objectSerial })) ?? []),
         ]} />
     </div>
-    <label className="voco-toggle">
-      <input type="checkbox" checked={acknowledged} disabled={disabled || controls.busy || !token}
-        onChange={(event) => setAcknowledged(event.target.checked)} />
-      <span>Allow microphone access for this session</span>
-    </label>
     <div className="voco-settings__actions">
-      <button type="button" className="voco-button voco-button--primary" disabled={!allowed}
-        onClick={() => { if (allowed && token) { void controls.select(token).then(() => setApplying(true)); } }}>Use this microphone</button>
       <button type="button" className="voco-button voco-button--secondary" disabled={disabled || controls.busy}
         onClick={() => void controls.refresh()}>Refresh devices</button>
     </div>
     {controls.selected ? <p className="voco-motion-feedback" role="status"><StatusMark state="success" />Selected: {controls.selected.label || controls.selected.name}.</p> : null}
-    <details className="voco-preferences__disclosure"><summary>Microphone access details</summary><p>VOCO uses PipeWire directly, outside the browser permission prompt. Access lasts until VOCO closes or the device identity changes.</p><p>No audio is captured by this setup panel. Use Stop or Cancel during dictation.
+    <details className="voco-preferences__disclosure"><summary>Microphone access details</summary><p>Selecting a microphone allows access for this app session. VOCO uses PipeWire directly, outside the browser permission prompt. Access lasts until VOCO closes or the device identity changes.</p><p>No audio is captured by this setup panel. Use Stop or Cancel during dictation.
       If the source changes or disconnects, VOCO stops and retains received audio for review.</p>
     </details>
     {showError && controls.error ? <div role="alert" className="voco-inline-note voco-inline-note--error">{controls.error}</div> : null}

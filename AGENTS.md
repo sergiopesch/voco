@@ -49,6 +49,10 @@ glib 0.20 directly leaves the GTK dependency behind. [Backport](vendor/glib/VOCO
 - Keep bounded queues, deadlines, sequence/sample accounting and recovery.
   Production worker IPC groups 100 ms of audio; Stop flushes the partial packet.
   Preserve the three-second backlog bound and verify every retained sample.
+- Native Pulse ticks must drain ready transport events within bounded work/time.
+  Recording drops are not covered by Pulse's playback overflow callback. Preserve
+  the bounded duration-deficit guard and separate complete-reference waveform
+  tests; healthy local ACKs alone do not prove source continuity.
 - Unverified ScriptProcessor fallback cannot enter automatic NVIDIA delivery.
 - Explicit NVIDIA recovery uses `recover_stream` and the bundled runtime, with no
   destination callback or alternate recognizer. Preserve source samples/rate; publish
@@ -215,8 +219,16 @@ Check desktop input prerequisites without binding an external target or sending
 keys; a missing cursor inside onboarding is expected. Only then save completion.
 Done returns directly to the hidden tray surface without presenting or focusing a
 Ready window. A delivery interruption disables insertion but leaves healthy
-recognition running through Stop. Retained recovery notifies without presenting a
-window; explicit review/retry remains in the requested panel.
+recognition running through Stop. Normal cursor completion and handled failures clear
+text/audio and delete the active crash checkpoint; they never expose a saved transcript.
+Only a previous unexpected process exit promotes text into explicit tray Review.
+The approved journal is owner-only, bounded, local text only, never audio; retain
+prior crash entries until explicit discard (maximum five, oldest evicted by a sixth crash).
+Review must never auto-open, paste or retry output. Onboarding keeps its local test retry.
+Active tray presentation is microphone plus waves only; keep Stop in the context
+menu and icon/shortcut actions. Settings and Review are explicit menu destinations.
+GNOME Wayland paste requires fresh authenticated companion modifier clearance,
+then destination validation and a second modifier sample before sending keys.
 The guided installer must use APT to install the local package and explicitly require
 the Wayland client and daemon on Wayland. Successful package installation alone is
 not desktop readiness. After successful setup, request one detached launch as the

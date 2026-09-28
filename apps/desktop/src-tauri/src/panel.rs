@@ -59,6 +59,46 @@ pub fn is_attached() -> bool {
     OWNER.lock().is_ok_and(|owner| owner.is_some())
 }
 
+/// Sample the authenticated compositor, not an asynchronously polled shortcut
+/// flag. An ordinary streaming paste may race the physical Stop chord.
+pub(crate) fn paste_modifiers_clear() -> Result<bool, String> {
+    let owner = OWNER
+        .lock()
+        .ok()
+        .and_then(|owner| owner.clone())
+        .ok_or("The GNOME panel is unavailable; no paste keys were sent.")?;
+    let bus = BUS
+        .lock()
+        .ok()
+        .and_then(|bus| bus.clone())
+        .ok_or("The GNOME panel connection is unavailable; no paste keys were sent.")?;
+    let clear = bus
+        .call_sync(
+            Some(&owner),
+            "/org/voco/PanelInput",
+            "org.voco.PanelInput1",
+            "ModifiersClear",
+            None,
+            None,
+            gio::DBusCallFlags::NO_AUTO_START,
+            150,
+            gio::Cancellable::NONE,
+        )
+        .ok()
+        .and_then(|value| value.get::<(bool,)>())
+        .map(|(clear,)| clear)
+        .ok_or_else(|| {
+            "Could not verify released keyboard modifiers; no paste keys were sent.".to_string()
+        })?;
+    if !OWNER
+        .lock()
+        .is_ok_and(|current| current.as_ref() == Some(&owner))
+    {
+        return Err("The GNOME panel changed; no paste keys were sent.".into());
+    }
+    Ok(clear)
+}
+
 pub fn clear_shortcut() {
     if let Ok(mut until) = SHORTCUT_UNTIL.lock() {
         *until = None;

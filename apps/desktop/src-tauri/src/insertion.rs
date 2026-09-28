@@ -429,7 +429,7 @@ fn desktop_paste_for_target(
     })?;
     if !crate::desktop_shortcut::delivery_ready() {
         return Err(InsertionError::rejected(
-            "The recording shortcut scope changed. Review retained text and the destination before retrying.",
+            "The recording shortcut scope changed. Check your text field; some words may be missing.",
         ));
     }
     let target_started = Instant::now();
@@ -443,7 +443,7 @@ fn desktop_paste_for_target(
             "rejected",
             target_probe_ms,
         );
-        return Err(InsertionError::rejected("The dictation destination changed or could not be verified. Review retained text before copying."));
+        return Err(InsertionError::rejected("The dictation destination changed or could not be verified. Check your text field; some words may be missing."));
     }
     crate::performance::destination_check(
         &target.scope,
@@ -516,7 +516,7 @@ fn desktop_paste_for_target(
         payload.to_owned()
     };
     let result = (|| {
-        let mut guard_probe_ms = 0;
+        let mut guard_probe_ms = 0u64;
         let mut metrics = clipboard_paste_with_shortcut(&adjusted, terminal, || {
             let started = Instant::now();
             let current = desktop_target();
@@ -526,7 +526,7 @@ fn desktop_paste_for_target(
                 || !crate::desktop_shortcut::delivery_ready()
             {
                 return Err(InsertionError::rejected(
-                    "The dictation destination changed before text could be pasted. Review retained text before copying.",
+                    "The dictation destination changed before text could be pasted. Check your text field; some words may be missing.",
                 ));
             }
             if let Some(receipt_id) = &receipt {
@@ -542,10 +542,10 @@ fn desktop_paste_for_target(
                     || validation["receipt_id"].as_str() != Some(receipt_id)
                     || validation["token"].as_str() != Some(expected_target)
                 {
-                    return Err(InsertionError::rejected("The dictation selection or caret changed before insertion. Review retained text before copying."));
+                    return Err(InsertionError::rejected("The dictation selection or caret changed before insertion. Check your text field; some words may be missing."));
                 }
             }
-            guard_probe_ms = started.elapsed().as_millis() as u64;
+            guard_probe_ms = guard_probe_ms.saturating_add(started.elapsed().as_millis() as u64);
             Ok(())
         })?;
         metrics.target_probe_ms = target_probe_ms.saturating_add(guard_probe_ms);
@@ -620,7 +620,7 @@ fn observe_delivery(
                 } else {
                     observation_failure_event(response.as_ref())
                 };
-                let mut error = InsertionError::uncertain("The destination did not confirm the expected insertion. Streaming stopped; review retained text before retrying.");
+                let mut error = InsertionError::uncertain("The destination did not confirm the expected insertion. Streaming stopped. Check your text field before dictating again.");
                 error.clipboard_changed = true;
                 return Err((error, event));
             }
@@ -924,7 +924,7 @@ fn run_helper(
 fn clipboard_paste_with_shortcut(
     text: &str,
     terminal: bool,
-    before_paste: impl FnOnce() -> Result<(), InsertionError>,
+    mut before_paste: impl FnMut() -> Result<(), InsertionError>,
 ) -> Result<PasteMetrics, InsertionError> {
     let started = Instant::now();
     let preflight = input_preflight();
@@ -968,7 +968,21 @@ fn clipboard_paste_with_shortcut(
     paste.args(paste_args);
     let preflight_ms = started.elapsed().as_millis() as u64;
     let (clipboard_ms, keyboard_ms) =
-        clipboard_transaction(payload, &mut copy, &mut paste, before_paste)?;
+        clipboard_transaction(payload, &mut copy, &mut paste, || {
+            if wayland
+                && std::env::var("XDG_CURRENT_DESKTOP")
+                    .unwrap_or_default()
+                    .split(':')
+                    .any(|name| name.eq_ignore_ascii_case("gnome"))
+            {
+                return prepare_paste_with_modifiers(
+                    Duration::from_millis(1500),
+                    || crate::panel::paste_modifiers_clear().map_err(InsertionError::rejected),
+                    &mut before_paste,
+                );
+            }
+            before_paste()
+        })?;
     Ok(PasteMetrics {
         terminal,
         target_probe_ms: 0,
@@ -984,6 +998,31 @@ fn clipboard_paste_with_shortcut(
         payload_unicode_scalars: payload.chars().count(),
         payload_utf16_units: payload.encode_utf16().count(),
     })
+}
+
+fn prepare_paste_with_modifiers(
+    timeout: Duration,
+    mut clear: impl FnMut() -> Result<bool, InsertionError>,
+    mut validate: impl FnMut() -> Result<(), InsertionError>,
+) -> Result<(), InsertionError> {
+    let started = Instant::now();
+    loop {
+        if clear()? {
+            // Waiting may let focus change; never reuse the earlier target check.
+            validate()?;
+            // A physical chord may begin during the destination probe. Waiting
+            // again requires another fresh destination check before any keys.
+            if clear()? && started.elapsed() < timeout {
+                return Ok(());
+            }
+        }
+        if started.elapsed() >= timeout {
+            return Err(InsertionError::rejected(
+                "Release the keyboard modifiers before dictating; no paste keys were sent.",
+            ));
+        }
+        std::thread::sleep(Duration::from_millis(8));
+    }
 }
 
 fn desktop_paste_payload(text: &str) -> (&str, bool) {
@@ -1113,7 +1152,7 @@ fn clipboard_transaction(
         error.clipboard_changed = true;
         error
             .message
-            .push_str(" The clipboard was set to the transcript; copy it from VOCO if needed.");
+            .push_str(" The clipboard was changed. Check your text field before pasting to avoid duplicates.");
         error
     })?;
 
@@ -1128,6 +1167,53 @@ fn clipboard_transaction(
 mod tests {
     use super::*;
     use std::cell::Cell;
+
+    #[test]
+    fn paste_waits_for_release_and_revalidates_after_a_chord_during_target_check() {
+        let mut samples = [false, false, true, false, false, true, true].into_iter();
+        let validations = Cell::new(0);
+        prepare_paste_with_modifiers(
+            Duration::from_secs(1),
+            || Ok(samples.next().unwrap()),
+            || {
+                validations.set(validations.get() + 1);
+                Ok(())
+            },
+        )
+        .unwrap();
+        assert_eq!(validations.get(), 2);
+        assert!(samples.next().is_none());
+    }
+
+    #[test]
+    fn held_or_unavailable_modifiers_never_validate_or_dispatch() {
+        for unavailable in [false, true] {
+            let result = prepare_paste_with_modifiers(
+                Duration::ZERO,
+                || {
+                    if unavailable {
+                        Err(InsertionError::rejected("Compositor unavailable"))
+                    } else {
+                        Ok(false)
+                    }
+                },
+                || panic!("Held or unknown modifiers cannot admit a paste"),
+            );
+            assert_eq!(result.unwrap_err().outcome, DeliveryOutcome::Rejected);
+        }
+    }
+
+    #[test]
+    fn target_change_while_waiting_rejects_without_rebinding() {
+        let mut samples = [false, true].into_iter();
+        let result = prepare_paste_with_modifiers(
+            Duration::from_secs(1),
+            || Ok(samples.next().unwrap()),
+            || Err(InsertionError::rejected("Destination changed")),
+        );
+        assert_eq!(result.unwrap_err().message, "Destination changed");
+        assert!(samples.next().is_none());
+    }
 
     #[test]
     fn missing_destination_rejects_before_any_desktop_operation() {

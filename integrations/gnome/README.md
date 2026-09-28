@@ -4,11 +4,11 @@ This GNOME Shell 46 integration keeps VOCO's microphone and active dictation cap
 inside the system panel. On GNOME Wayland, the current source requires it for
 **Alt+D** and **Alt+Shift+D** so Shell consumes Stop before the focused application
 can act on the same shortcut. On X11 its panel presentation is optional.
-It expands horizontally for Starting, Listening and
-Finishing, then contracts at idle. Review remains visible for unresolved recovery.
-The microphone and Stop button issue an explicit Stop during capture. At idle the
-microphone opens settings; Review opens the existing recovery interface on request.
-No recording window is opened by the extension.
+It expands to show only the microphone and waveform during capture and finishing,
+then contracts at idle. Right-click the microphone for Settings and Review; Stop
+dictation is available in that menu during capture. Left-clicking the microphone
+also stops capture; at idle it opens Settings. Review opens only on explicit menu
+selection. No recording or review window is opened automatically by the extension.
 
 The packaged image is byte-identical to `assets/voco-symbol-ui.png`. The waveform
 uses VOCO's real normalized capture level; it does not capture audio itself. GNOME
@@ -37,9 +37,9 @@ python3 scripts/package-gnome-panel.py /tmp/voco-panel@voco.local.shell-extensio
 
 Disable with `gnome-extensions disable voco-panel@voco.local`. The ordinary VOCO
 tray returns on detach, or within approximately six seconds after lost heartbeats.
-Its label reports Starting or Finishing where the desktop supports labels.
-During recording it replaces Ready with measured-volume bars; Stop restores
-Ready. Its menu always shows status and an explicit Stop action. See
+During recording it replaces Ready with measured-volume bars; active states have
+no text label. Stop restores Ready. Its menu includes Settings, Review and an
+explicit Stop action. See
 [release status](../../docs/release-candidate.md) for current downloads.
 
 ## Bridge
@@ -59,7 +59,7 @@ polls at 50 ms while active and 1500 ms while idle for meter updates and leases.
 1500 ms deadline and target the app's unique bus owner without auto-start. A
 transient error hides the extension and schedules a bounded-rate reconnect.
 `Action(action, token)` uses the capture identity for Stop and the presentation
-revision for Open. It rejects stale ownership. Stop is explicit rather than toggle,
+revision for Open, Settings and Review. It rejects stale ownership. Stop is explicit rather than toggle,
 so an already-finished session cannot accidentally start another recording. Repeated
 Stop requests for the same token are rejected. Existing renderer admission and
 cursor-delivery guards remain authoritative. `Detach` restores the native tray.
@@ -78,9 +78,22 @@ dictation with these GNOME Wayland shortcuts and explains the setup requirement.
 Start also waits for the live reservation for that capture before opening the
 microphone. Other desktops and shortcuts retain their existing input checks.
 If a reservation is lost after capture starts and the application changes its
-selection, continuation text is rejected and retained for recovery rather than
-replacing existing words. This does not establish atomic ownership during a
-desktop paste gesture.
+selection, continuation delivery is rejected rather than replacing existing
+words. Recognition continues until Stop, but a handled interruption does not
+retain a transcript or open Review. The user must check the original field for
+missing words. This does not establish atomic ownership during a desktop paste
+gesture.
+
+Streaming pastes can overlap a held Stop before its explicit action is sent.
+The companion exports `/org/voco/PanelInput`, interface `org.voco.PanelInput1`,
+with `ModifiersClear`. Only the attached application may query this boolean;
+key identities and input events never cross the bridge. Native GNOME Wayland
+delivery waits at most 1.5 seconds for released modifiers, revalidates the original
+destination, and checks modifiers again immediately before dispatch. A chord
+pressed during validation requires a new wait and destination check. Unavailable
+compositor state or a timeout sends no keys. VOCO never forces modifier release,
+restores another application's focus, or retries uncertain delivery. This reduces
+the collision window but does not make compositor key delivery atomic.
 
 ## Verification
 

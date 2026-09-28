@@ -44,7 +44,7 @@ def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def private_trial(output, tools):
+def private_trial(output, tools, args):
     assert sys.byteorder == 'little', 'This PCM fixture requires a little-endian host'
     assert not any(Path(p).exists() for p in ('/dev/snd', '/dev/input', '/dev/uinput'))
     private = Path('/tmp/voco-pulse-regression')
@@ -66,7 +66,15 @@ def private_trial(output, tools):
     os.environ.update(env)
     report = {'passed': False, 'lifecyclePassed': False, 'waveformPassed': False,
               'physicalDevicesAvailable': False, 'sourceSha256': digest(output / 'source.c'),
-              'fixtureSha256': digest(FIXTURE), 'maximumBufferLatencyUs': MAX_BUFFER_LATENCY_US}
+              'maximumBufferLatencyUs': MAX_BUFFER_LATENCY_US,
+              'tickIntervalMs': args.tick_ms, 'iterationsPerTick': args.iterations,
+              'captureProgress': []}
+    fixture = FIXTURE if args.fixture == 'short' else ROOT / 'tests/fixtures/speech/1462-170138-0000.wav'
+    expected_hash = FIXTURE_SHA256 if args.fixture == 'short' else 'ba4ee8747cef66c2b7c4dd24ca07fba1a1fa0b2303719084f94345b5defb4861'
+    report['fixtureSha256'] = digest(fixture)
+    report['fixture'] = fixture.name
+    tick_started = time.monotonic()
+    last_progress = tick_started
     pulse = player = snapshot = None
     handle = None
     raw = bytearray()
@@ -84,8 +92,9 @@ def private_trial(output, tools):
                            C.POINTER(C.c_size_t), C.POINTER(C.c_uint64), C.POINTER(C.c_uint64)]
 
     def tick():
-        nonlocal next_sequence
-        lib.vc_tick(handle)
+        nonlocal next_sequence, last_progress
+        for _ in range(args.iterations):
+            lib.vc_tick(handle)
         status = Status()
         lib.vc_get_status(handle, C.byref(status))
         assert not status.error, status.error.decode()
@@ -99,19 +108,23 @@ def private_trial(output, tools):
             raw.extend(C.string_at(data, size.value))
             assert lib.vc_ack(handle, 1) == 0
             next_sequence += 1
+        if time.monotonic() - last_progress >= 1:
+            last_progress = time.monotonic()
+            report['captureProgress'].append({'elapsedSeconds': last_progress - tick_started,
+                                             'frames': status.frames, 'blocks': status.blocks})
         return status
 
     def pump(seconds):
         deadline = time.monotonic() + seconds
         while time.monotonic() < deadline:
             tick()
-            time.sleep(.005)
+            time.sleep(args.tick_ms / 1000)
 
     try:
-        assert report['fixtureSha256'] == FIXTURE_SHA256
+        assert report['fixtureSha256'] == expected_hash
         # A fresh virtual source begins clocking on playback. Neutral padding
         # protects reference silence without altering or trimming any reference PCM.
-        reference = pcm16(FIXTURE)
+        reference = pcm16(fixture)
         playback = output / 'playback.wav'
         with wave.open(str(playback), 'wb') as wav:
             wav.setnchannels(1)
@@ -120,10 +133,12 @@ def private_trial(output, tools):
             wav.writeframes(bytes(8000) + reference.tobytes() + bytes(8000))
         report['playback'] = {'sha256': digest(playback), 'paddingEachSideSamples': 4000,
                               'referenceSamples': len(reference), 'sampleRate': 16000}
-        assert report['playback']['sha256'] == PADDED_SHA256
+        if args.fixture == 'short':
+            assert report['playback']['sha256'] == PADDED_SHA256
         with (output / 'pulse-stderr.log').open('w') as log:
             pulse = subprocess.Popen([tools['pulseaudio'], '--daemonize=no', '--use-pid-file=no',
                 '--exit-idle-time=-1', '--disable-shm=true', '-n',
+                '--log-level=debug',
                 '--log-target=file:' + str(output / 'pulse.log'), '-L',
                 'module-native-protocol-unix socket=' + str(socket) + ' auth-anonymous=1',
                 '-L', 'module-null-sink sink_name=fixture rate=48000', '-L',
@@ -168,7 +183,7 @@ def private_trial(output, tools):
         assert len(native) == 1 and native[0]['sample_specification'] == 's16le 2ch 44100Hz'
         report['bufferLatencyUs'] = native[0]['buffer_latency_usec']
         report['sourceLatencyUs'] = native[0]['source_latency_usec']
-        deadline = time.monotonic() + 8
+        deadline = time.monotonic() + len(reference) / 16000 + 8
         while player.poll() is None:
             assert time.monotonic() < deadline, 'Fixture playback timed out'
             pump(.005)
@@ -225,6 +240,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', required=True, type=Path, help='New evidence directory, never overwritten')
     parser.add_argument('--source', type=Path, default=SOURCE, help='C source override for a negative control')
+    parser.add_argument('--fixture', choices=('short', 'long'), default='short')
+    parser.add_argument('--tick-ms', type=int, choices=(1, 5, 10, 500), default=5,
+                        help='500 is an intentionally starved negative control, not production cadence')
+    parser.add_argument('--iterations', type=int, choices=(1, 4, 16), default=1)
     parser.add_argument('--inside', action='store_true', help=argparse.SUPPRESS)
     args = parser.parse_args()
     os.umask(0o077)
@@ -232,7 +251,7 @@ def main():
     tools = {name: shutil.which(name) for name in ('pulseaudio', 'pactl', 'paplay')}
     assert all(tools.values()), 'Install pulseaudio and pulseaudio-utils for this optional Linux fixture'
     if args.inside:
-        return private_trial(output, tools)
+        return private_trial(output, tools, args)
     output.mkdir(mode=0o700)
     source = args.source.resolve()
     shutil.copyfile(source, output / 'source.c')
@@ -251,7 +270,8 @@ def main():
         '--dev', '/dev', '--proc', '/proc', '--tmpfs', '/tmp', '--tmpfs', '/run/user',
         '--ro-bind', str(ROOT), str(ROOT), '--bind', str(output), str(output),
         '--', sys.executable, str(Path(__file__).resolve()),
-        '--inside', '--output', str(output)], timeout=45)
+        '--inside', '--output', str(output), '--fixture', args.fixture,
+        '--tick-ms', str(args.tick_ms), '--iterations', str(args.iterations)], timeout=75)
     return result.returncode
 
 

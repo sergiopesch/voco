@@ -7,15 +7,20 @@ import St from 'gi://St';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
+import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 import {presentation, barScales} from './model.js';
 
 const NAME = 'org.voco.Panel';
 const PATH = '/org/voco/Panel';
 const INTERFACE = 'org.voco.Panel1';
+const INPUT_PATH = '/org/voco/PanelInput';
+const INPUT_XML = '<node><interface name="org.voco.PanelInput1"><method name="ModifiersClear"><arg type="b" direction="out"/></method></interface></node>';
 
 export default class VocoPanel extends Extension {
     enable() {
         this._alive = true;
+        this._inputGuard = Gio.DBusExportedObject.wrapJSObject(INPUT_XML, this);
+        this._inputGuard.export(Gio.DBus.session, INPUT_PATH);
         this._generation = 0;
         this._target = null;
         this._previousStatus = null;
@@ -36,8 +41,7 @@ export default class VocoPanel extends Extension {
                 this._stopPending ??= this._state.stopSession;
         });
         this._cancellable = new Gio.Cancellable();
-        // The dummy menu satisfies GNOME's status-area contract without a popup.
-        this._indicator = new PanelMenu.Button(0, 'VOCO', true);
+        this._indicator = new PanelMenu.Button(0, 'VOCO');
         this._indicator.can_focus = false;
         this._indicator.add_style_class_name('voco-panel');
         this._indicator.hide();
@@ -49,6 +53,22 @@ export default class VocoPanel extends Extension {
             gicon: Gio.FileIcon.new(Gio.File.new_for_path(`${this.path}/voco-symbol.png`)),
             icon_size: 20, style_class: 'system-status-icon'}));
         this._iconButton.connect('clicked', () => this._action(this._state?.canStop ? 'stop' : 'open'));
+        this._iconButton.connect('key-press-event', (_actor, event) => {
+            if (event.get_key_symbol() !== Clutter.KEY_Menu &&
+                !(event.get_key_symbol() === Clutter.KEY_F10 && event.get_state() & Clutter.ModifierType.SHIFT_MASK))
+                return Clutter.EVENT_PROPAGATE;
+            this._indicator.menu.toggle();
+            return Clutter.EVENT_STOP;
+        });
+        this._settingsItem = new PopupMenu.PopupMenuItem('Settings');
+        this._settingsItem.connect('activate', () => this._action('settings'));
+        this._indicator.menu.addMenuItem(this._settingsItem);
+        this._reviewItem = new PopupMenu.PopupMenuItem('Review');
+        this._reviewItem.connect('activate', () => this._action('review'));
+        this._indicator.menu.addMenuItem(this._reviewItem);
+        this._stopItem = new PopupMenu.PopupMenuItem('Stop dictation');
+        this._stopItem.connect('activate', () => this._action('stop'));
+        this._indicator.menu.addMenuItem(this._stopItem);
         this._box.add_child(this._iconButton);
         this._clip = new St.Widget({layout_manager: new Clutter.BinLayout(), clip_to_allocation: true, width: 0});
         this._detail = new St.BoxLayout({style_class: 'voco-panel-detail'});
@@ -64,10 +84,6 @@ export default class VocoPanel extends Extension {
         this._detail.add_child(this._wave);
         this._label = new St.Label({style_class: 'voco-panel-status', y_align: Clutter.ActorAlign.CENTER});
         this._detail.add_child(this._label);
-        this._stop = new St.Button({style_class: 'voco-panel-stop', label: 'Stop',
-            can_focus: true, accessible_name: 'Stop dictation', y_align: Clutter.ActorAlign.CENTER});
-        this._stop.connect('clicked', () => this._action('stop'));
-        this._detail.add_child(this._stop);
         Main.panel.addToStatusArea(this.uuid, this._indicator, 0, 'right');
         this._settings = new Gio.Settings({schema_id: 'org.gnome.desktop.interface'});
         this._motionId = this._settings.connect('changed::enable-animations', () => this._render());
@@ -82,6 +98,20 @@ export default class VocoPanel extends Extension {
                     if (this._attached) this._beginPolling();
                 });
             }, () => { this._owner = null; this._disconnect(); });
+    }
+
+    ModifiersClearAsync(_parameters, invocation) {
+        if (!this._alive || !this._attached || invocation.get_sender() !== this._owner) {
+            invocation.return_dbus_error('org.voco.NotAttached', 'Only the attached application can check input readiness');
+            return;
+        }
+        // Streaming pastes can overlap a held Stop, before the Stop action fires.
+        // Observe compositor state; never synthesize releases of the user's keys.
+        const modifiers = Clutter.ModifierType.SHIFT_MASK | Clutter.ModifierType.CONTROL_MASK |
+            Clutter.ModifierType.MOD1_MASK | Clutter.ModifierType.SUPER_MASK |
+            Clutter.ModifierType.META_MASK | Clutter.ModifierType.HYPER_MASK |
+            Clutter.ModifierType.MOD4_MASK | Clutter.ModifierType.MOD5_MASK;
+        invocation.return_value(new GLib.Variant('(b)', [(global.get_pointer()[2] & modifiers) === 0]));
     }
 
     _call(method, parameters, done, failed = () => this._retry()) {
@@ -131,12 +161,14 @@ export default class VocoPanel extends Extension {
         const state = this._state;
         const motion = this._settings.get_boolean('enable-animations');
         this._iconButton.accessible_name = `VOCO: ${state.description}. ${state.canStop ? 'Stop dictation' : 'Open VOCO'}`;
-        this._iconButton.reactive = state.canStop || state.canOpen;
+        this._iconButton.reactive = true;
         this._label.text = state.label;
-        this._wave.visible = state.status === 'recording' || state.status === 'processing';
-        this._stop.visible = state.canStop;
-        this._stop.can_focus = state.canStop;
-        this._stop.reactive = state.canStop;
+        this._label.visible = !state.active && state.label.length > 0;
+        this._wave.visible = state.active;
+        this._settingsItem.setSensitive(state.canOpen);
+        this._reviewItem.setSensitive(state.canOpen);
+        this._stopItem.visible = state.canStop;
+        this._stopItem.setSensitive(state.canStop);
         const scales = barScales(state.level);
         this._bars.forEach((bar, index) => {
             if (state.status === 'processing' && this._previousStatus === 'processing' && motion === this._previousMotion) return;
@@ -157,13 +189,12 @@ export default class VocoPanel extends Extension {
         else this._box.remove_style_class_name('voco-panel-active');
         const [, natural] = this._detail.get_preferred_width(-1);
         // Leave centre and other panel items their space. On a crowded panel,
-        // retain the actionable icon instead of clipping an unusable Stop button.
+        // retain the actionable icon instead of clipping its meter.
         const right = Main.panel._rightBox;
         const other = right.get_children().filter(child => child !== this._indicator.container && child !== this._indicator)
             .reduce((sum, child) => sum + child.get_width(), 0);
         const budget = Math.max(0, Main.panel.width / 2 - Main.panel._centerBox.width / 2 - other - 48);
         const target = expanded && natural <= budget ? natural : 0;
-        this._stop.can_focus = state.canStop && target > 0;
         if (this._target !== target) {
             this._target = target;
             this._clip.remove_all_transitions();
@@ -228,7 +259,7 @@ export default class VocoPanel extends Extension {
     _action(action) {
         const state = this._state;
         if (!state || (action === 'stop' ? !state.canStop : !state.canOpen)) return;
-        this._stop.reactive = false;
+        this._indicator.menu.close();
         this._call('Action', new GLib.Variant('(ss)', [action, action === 'stop' ? state.stopSession : state.token]), () => {});
     }
 
@@ -271,6 +302,8 @@ export default class VocoPanel extends Extension {
     }
 
     disable() {
+        this._inputGuard?.unexport();
+        this._inputGuard = null;
         this._detach();
         this._alive = false;
         this._disconnect();

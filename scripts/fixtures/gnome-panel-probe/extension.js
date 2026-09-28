@@ -3,7 +3,7 @@ import Gio from 'gi://Gio';
 import St from 'gi://St';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
-const xml = '<node><interface name="org.voco.PanelProbe"><method name="Inspect"><arg type="s" direction="out"/></method><method name="Stop"/><method name="Overview"/><method name="NativeState"><arg type="s" direction="out"/></method><method name="Crowd"><arg type="b" direction="in"/></method></interface></node>';
+const xml = '<node><interface name="org.voco.PanelProbe"><method name="Inspect"><arg type="s" direction="out"/></method><method name="Stop"/><method name="Menu"/><method name="MenuAction"><arg type="s" direction="in"/></method><method name="Overview"/><method name="NativeState"><arg type="s" direction="out"/></method><method name="Crowd"><arg type="b" direction="in"/></method></interface></node>';
 function bounds(actor) {
     const [x, y] = actor.get_transformed_position();
     const [width, height] = actor.get_transformed_size();
@@ -29,13 +29,25 @@ export default class Probe extends Extension {
                     actors: children(value).map(actor => ({...bounds(actor), mapped: actor.mapped,
                         opacity: actor.opacity, hasIcon: Boolean(actor.gicon), icon: iconPath(actor), text: actor.text ?? null}))})),
             windows: global.get_window_actors().length,
+            menu: indicator ? {open: indicator.menu.isOpen, ...bounds(indicator.menu.actor),
+                items: indicator.menu._getMenuItems().map(item => ({text: item.label?.text,
+                    sensitive: item.sensitive, ...bounds(item)}))} : null,
+            windowMenuOpen: children(global.stage).some(actor => actor.mapped && actor.text === 'Take Screenshot'),
             actors: actors.map(actor => ({...bounds(actor), name: actor.accessible_name,
                 text: actor.text ?? null, scale: actor.scale_y, opacity: actor.opacity,
                 style: actor.style_class, transitions: actor.get_transition('width') !== null}))});
     }
     Stop() {
         const indicator = Main.panel.statusArea['voco-panel@voco.local'];
-        children(indicator).find(actor => actor.accessible_name === 'Stop dictation').emit('clicked', 1);
+        children(indicator).find(actor => actor.accessible_name?.endsWith('Stop dictation')).emit('clicked', 1);
+    }
+    Menu() {
+        Main.panel.statusArea['voco-panel@voco.local'].menu.toggle();
+    }
+    MenuAction(label) {
+        const item = Main.panel.statusArea['voco-panel@voco.local'].menu._getMenuItems()
+            .find(item => item.label?.text === label);
+        if (item?.sensitive && item.visible) item.activate(null);
     }
     Crowd(enabled) {
         this.spacer?.destroy(); this.spacer = null;

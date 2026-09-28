@@ -37,6 +37,7 @@ import { useGlobalShortcut } from "@/hooks/useGlobalShortcut";
 import { useDictation } from "@/hooks/useDictation";
 import { useNativeCaptureSettings } from "@/hooks/useNativeCaptureSettings";
 import { ControlPanel } from "@/components/ControlPanel";
+import { CrashReview } from "@/components/CrashReview";
 import { StatusMark } from "@/components/StatusMark";
 import vocoBrandImage from "../../../assets/voco-symbol-ui.png";
 import { ConfigRecoveryPanel } from "@/components/ConfigRecoveryPanel";
@@ -75,7 +76,6 @@ function getCaptureSelection() {
 }
 const PANEL_MIN_SIZE = new LogicalSize(760, 560);
 const POPOVER_SIZE = new LogicalSize(420, 380);
-const POPOVER_RECOVERY_SIZE = new LogicalSize(420, 660);
 
 type ResizeDirection =
   | "East"
@@ -303,7 +303,7 @@ export function App() {
     return true;
   }, [setSurface]);
   const handleSurfaceChange = useCallback(
-    (nextSurface: "hidden" | "onboarding" | "settings" | "popover") => {
+    (nextSurface: "hidden" | "onboarding" | "settings" | "popover" | "review") => {
       if (nextSurface === "hidden") {
         dismissInteractiveSurface();
       } else {
@@ -314,11 +314,7 @@ export function App() {
   );
   // Dictation never maps a transcript window over the destination.
   const recoveryAvailable = Boolean(recovery);
-  const popoverSize =
-    recovery || hasRecoverableTranscript || (transcript.trim().length > 0 &&
-    (cursorDeliveryState === "unreconciled" || status === "error"))
-      ? POPOVER_RECOVERY_SIZE
-      : POPOVER_SIZE;
+  const popoverSize = POPOVER_SIZE;
   // Presentation uses input prerequisites; an unfocused external field is not
   // missing setup. Recording still acquires and verifies its own target token.
   const cursorRequired = requiresVerifiedTextTarget(config) &&
@@ -453,7 +449,7 @@ export function App() {
     await hideStatusOverlay().catch(() => {});
     await showNotification(
       "Ready to try dictation",
-      `Focus a text field, then press ${useStore.getState().config?.hotkey ?? "Alt+D"}. Wait for Listening before speaking.`,
+      `Focus a text field, then press ${useStore.getState().config?.hotkey ?? "Alt+D"}. The tray bars respond when the microphone is ready.`,
     ).catch(() => {});
   }, [dismissInteractiveSurface]);
 
@@ -1022,7 +1018,7 @@ export function App() {
   }, [popoverSize, surface, activationRequest]);
 
   useEffect(() => {
-    if (surface !== "settings" && surface !== "onboarding") {
+    if (surface !== "settings" && surface !== "onboarding" && surface !== "review") {
       return;
     }
 
@@ -1066,6 +1062,19 @@ export function App() {
       "settings event listener",
     );
   }, [openSettings]);
+
+  useEffect(() => {
+    return cleanupDeferredListener(
+      getCurrentWindow().listen("voco:open-review", () => {
+        const state = useStore.getState();
+        if (startRequestRef.current || isDictationActive(state.status)) return;
+        if (!dismissInteractiveSurface()) return;
+        setSurface("review");
+        setActivationRequest(value => value + 1);
+      }),
+      "review event listener",
+    );
+  }, [dismissInteractiveSurface, setSurface]);
 
   useEffect(() => {
     if (!initComplete) return;
@@ -1165,6 +1174,11 @@ export function App() {
     microphoneReady,
     nativeMicrophoneReady,
   });
+
+  if (surface === "review") return <>
+    <CrashReview onClose={dismissInteractiveSurface} onOpenSettings={() => void openSettings()} />
+    <ResizeHandles />
+  </>;
 
   if (!config) {
     if (startupConfigError) {
