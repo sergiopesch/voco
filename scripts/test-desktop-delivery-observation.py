@@ -61,7 +61,7 @@ class ObservationTests(unittest.TestCase):
         self.field = Field()
         helper.TRACKER.hint = self.field
         self.result = dict(shortcut='ctrl+v', token='a'*64, scope='control', events_tracked=True)
-        self.probe = patch.object(helper, 'safe_probe', side_effect=lambda: self.result.copy())
+        self.probe = patch.object(helper, 'safe_probe', side_effect=lambda **_: self.result.copy())
         self.probe.start(); self.addCleanup(self.probe.stop)
         atspi = types.SimpleNamespace(StateType=types.SimpleNamespace(FOCUSED='focused', EDITABLE='editable'),
             Role=types.SimpleNamespace(PASSWORD_TEXT='password', TERMINAL='terminal'),
@@ -348,7 +348,7 @@ class ObservationTests(unittest.TestCase):
         self.assertEqual(self.verify(receipt)['observation'], 'changed')
     def test_stale_focus_during_prepare(self):
         count = 0
-        def probe():
+        def probe(**_):
             nonlocal count
             count += 1
             return {**self.result, 'token': ('a' if count == 1 else 'b')*64}
@@ -392,7 +392,7 @@ class ObservationTests(unittest.TestCase):
         receipt = self.prepare('word')
         self.field.insert('word')
         calls = 0
-        def probe():
+        def probe(**_):
             nonlocal calls
             calls += 1
             if calls == 2:
@@ -402,7 +402,7 @@ class ObservationTests(unittest.TestCase):
             self.assertEqual(self.verify(receipt)['observation'], 'changed')
     def transition_during_second_probe(self, receipt, action):
         calls = 0
-        def probe():
+        def probe(**_):
             nonlocal calls
             calls += 1
             if calls == 2:
@@ -448,6 +448,42 @@ class ObservationTests(unittest.TestCase):
         self.assertEqual(self.verify(receipt)['observation'], 'pending')
         self.field_value('Hello.')
         self.assertEqual(self.verify(receipt)['observation'], 'changed')
+
+    def test_torn_text_position_retains_definite_progress_between_polls(self):
+        original = self.field.get_character_count
+        for torn_call in (1, 3):
+            with self.subTest(torn_sample='first' if torn_call == 1 else 'second'):
+                self.field.get_character_count = original
+                self.field_value('')
+                receipt = self.prepare('word')
+                self.field.insert('word')
+                calls = 0
+                def count():
+                    nonlocal calls
+                    calls += 1
+                    return 0 if calls == torn_call else original()
+                self.field.get_character_count = count
+                self.assertEqual(self.verify(receipt)['observation'], 'pending')
+                self.field_value('')
+                self.assertEqual(self.verify(receipt)['observation'], 'changed')
+                self.assertIsNone(helper.DELIVERY)
+
+    def test_torn_first_position_cannot_mask_second_sample_regression(self):
+        self.field_value('Hello.')
+        receipt = self.prepare('World.')
+        self.field.insert(' ')
+        self.assertEqual(self.verify(receipt)['observation'], 'pending')
+        self.field_value('Hello.')
+        original = self.field.get_character_count
+        calls = 0
+        def count():
+            nonlocal calls
+            calls += 1
+            return 0 if calls == 1 else original()
+        self.field.get_character_count = count
+        self.assertEqual(self.verify(receipt)['observation'], 'changed')
+        self.assertIsNone(helper.DELIVERY)
+
     def test_incompatible_first_sample_cannot_be_repaired_by_second(self):
         receipt = self.prepare('word')
         self.field.insert('oops')

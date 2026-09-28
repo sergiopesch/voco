@@ -25,7 +25,9 @@ assert.equal(root.resolve('vite'), desktop.resolve('vite'),
 console.log('Renderer fixtures and desktop share the Vite build tool.');
 JS
 
-bash -n \
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-check-shell-syntax.py
+
+bash scripts/check-shell-syntax.sh \
   install \
   scripts/install.sh \
   scripts/setup.sh \

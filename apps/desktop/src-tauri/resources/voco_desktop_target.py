@@ -189,7 +189,7 @@ def unavailable(input_state="unavailable", reason="probe_failed"):
             "events_tracked": TRACKER.listener is not None}
 
 
-def cursor_state(node, atspi):
+def cursor_state(node, atspi, allow_pending_position=False):
     """Classify the actual focused control without reading any field contents."""
     if node is None:
         return "unavailable"
@@ -206,6 +206,10 @@ def cursor_state(node, atspi):
             text_position(node)
             return "editable"
         return "none"
+    except InconsistentPosition:
+        # Only an existing post-dispatch receipt can wait for separate caret
+        # and count replies to settle. Admission still requires a valid caret.
+        return "position_pending" if allow_pending_position else "unavailable"
     except Exception:
         return "unavailable"
 
@@ -326,7 +330,7 @@ def ghostty_focus(window, pid, atspi, deadline):
         return None, 'unavailable'
 
 
-def probe():
+def probe(allow_pending_position=False):
     import gi
     gi.require_version("Atspi", "2.0")
     from gi.repository import Atspi, GLib
@@ -444,8 +448,8 @@ def probe():
     if focused is not None:
         TRACKER.observe(focused)
         terminal = terminal or focused.get_role() == Atspi.Role.TERMINAL
-    input_state = cursor_state(focused, Atspi)
-    if input_state != "editable":
+    input_state = cursor_state(focused, Atspi, allow_pending_position)
+    if input_state not in ("editable", "position_pending"):
         reason = "no_focused_control" if focused is None else {
             "none": "not_editable", "protected": "protected",
         }.get(input_state, "control_unavailable")
@@ -458,9 +462,9 @@ def probe():
             "events_tracked": TRACKER.listener is not None}
 
 
-def safe_probe():
+def safe_probe(allow_pending_position=False):
     try:
-        return probe()
+        return probe(allow_pending_position)
     except Exception:
         return unavailable()
 
@@ -768,10 +772,25 @@ def delivery_stage(snapshot, node):
     return stage
 
 
+def observation_progress(snapshot, first, second):
+    """Retain definite progress across torn reads; only two exact reads acknowledge."""
+    stage = snapshot.get('stage', 0)
+    for current in (first, second):
+        if current is None:
+            continue
+        if current < stage:
+            return 'changed'
+        stage = current
+    if first == second == 2:
+        return 'observed'
+    snapshot['stage'] = stage
+    return 'pending'
+
+
 def verify_delivery(request, before_dispatch=False):
     global DELIVERY
     snapshot = DELIVERY
-    result = safe_probe()
+    result = safe_probe(allow_pending_position=not before_dispatch)
     if snapshot is None or request.get('receipt_id') != snapshot['receipt']:
         DELIVERY = None
         return observation_result(result, 'unavailable')
@@ -780,34 +799,24 @@ def verify_delivery(request, before_dispatch=False):
     try:
         if result['token'] != snapshot['token'] or result['scope'] != 'control':
             outcome = 'changed'
+        elif result.get('input_state') == 'position_pending':
+            outcome = 'pending'
         else:
             first = delivery_stage(snapshot, eligible_node(result))
             # Readback is sampled, not an atomic write receipt. A delayed paste
             # can legitimately advance between these two fresh observations.
-            again = safe_probe()
+            again = safe_probe(allow_pending_position=not before_dispatch)
             if again['token'] != snapshot['token'] or again['scope'] != 'control':
                 result, outcome = again, 'changed'
             else:
-                second = delivery_stage(snapshot, eligible_node(again))
+                second = (None if again.get('input_state') == 'position_pending'
+                          else delivery_stage(snapshot, eligible_node(again)))
                 if before_dispatch:
                     # Before keys, only two unchanged samples authorize mutation.
                     # Pending/partial delivery is not permission to send another paste.
                     outcome = 'prepared' if first == second == 0 else 'changed'
-                elif first == -1 or second == -1:
-                    outcome = 'changed'
-                elif first is None or second is None:
-                    # Separate AT-SPI RPCs may straddle a legitimate insertion.
-                    # An indeterminate sample is never evidence of receipt.
-                    outcome = 'pending'
-                elif first < snapshot.get('stage', 0) or second < first:
-                    outcome = 'changed'
-                elif first == second == 2:
-                    outcome = 'observed'
                 else:
-                    # Exact forward transitions need another stable readback;
-                    # unrelated changes and backwards transitions never qualify.
-                    snapshot['stage'] = second
-                    outcome = 'pending'
+                    outcome = observation_progress(snapshot, first, second)
     except Exception:
         outcome = 'unavailable'
     if outcome not in ('pending', 'prepared'):

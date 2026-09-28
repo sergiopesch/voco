@@ -75,6 +75,24 @@ for measurement and recipient limitations.
 
 ## Component ownership
 
+There is one production recognition queue, `BenchmarkPhraseQueue`. Its latest
+accepted hypothesis and successfully dispatched prefix are different facts: a
+slow or rejected paste must not stop healthy recognition or cause a replay.
+`DesktopPhraseQueue`, its preview/segmentation helpers and `liveCommitPolicy` were
+unused legacy implementations and have been removed. The pinned historical code
+guide retains its original source snapshot.
+
+| Transcript fact | Owner |
+| --- | --- |
+| Completed native phrases and current recognizer output | `runtime/speech/adapters.py::Nemotron` |
+| Accepted append-only hypothesis and dispatched prefix | `benchmarkPhraseQueue.ts` |
+| Destination identity, paste admission and sampled receipt | Native insertion or explicit browser delivery |
+| Visible transcript and retained recovery | Dictation hook/store, mirroring recognition |
+
+Do not merge these facts into one success flag. IBus owns shortcut authority,
+not text delivery. Future personalisation is a [separate gated plan](personalisation-plan.md),
+not another live recognizer or queue.
+
 | Area | Implementation | Responsibility / constraint |
 | --- | --- | --- |
 | App orchestration and native IPC | `apps/desktop/src-tauri/src/lib.rs` | Command registration, startup, model readiness, cursor delivery and shared limits. Keep platform authority in Rust. |
@@ -214,6 +232,10 @@ mandatory. Unfocused terminal panes cannot change an editor's paste chord.
 After clipboard preparation, Rust revalidates the bound target and shortcut
 scope immediately before keyboard dispatch. A rejection records that the clipboard
 changed but sends no keys; the destination is never rebound to the new field.
+After dispatch only, inconsistent accessibility count/caret replies for the same
+freshly verified control may remain pending within the existing receipt deadline.
+They never authorize a new paste or count as a receipt. A definitive content/route
+mismatch, focus departure or lost identity still rejects delivery.
 This narrows, rather than eliminates, the race during a desktop key gesture.
 Existing discovery limits, deadlines, exact text/caret checks and no-replay behavior remain in force. See the
 [application matrix](../testing/application-delivery-2026-09-22.md).

@@ -24,7 +24,7 @@ echo "  appimage: ${APPIMAGE_NAME}"
 (
   cd "${ROOT_DIR}"
   npm run verify:versions
-  bash -n install scripts/install.sh scripts/setup.sh scripts/build-desktop.sh scripts/package-appimage.sh scripts/render-release-body.sh scripts/lib/install-common.sh scripts/test-install-common.sh
+  bash scripts/check-shell-syntax.sh install scripts/install.sh scripts/setup.sh scripts/build-desktop.sh scripts/package-appimage.sh scripts/render-release-body.sh scripts/lib/install-common.sh scripts/test-install-common.sh
   bash scripts/test-install-common.sh
   if rg -n 'Examples:.*Alt\+Shift\+R|Downloading VOCO.*~5 MB' install scripts/lib/install-common.sh; then
     echo "Installer still advertises a reserved hotkey or stale package size"
