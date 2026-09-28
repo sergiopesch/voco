@@ -4,8 +4,7 @@ import ts from "typescript";
 import source from "@/lib/dictationRecording.ts?raw";
 const transport = vi.hoisted(() => vi.fn().mockResolvedValue({}));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: transport }));
-import { BenchmarkPhraseQueue, type PasteCorrelation } from "@/lib/benchmarkPhraseQueue";
-import type { DesktopStreamEvent } from "@/lib/desktopPhraseStream";
+import { BenchmarkPhraseQueue, type DesktopStreamEvent, type PasteCorrelation } from "@/lib/benchmarkPhraseQueue";
 
 function callbacks(scope: Record<string, unknown>) {
   const ast = ts.createSourceFile("useDictation.ts", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);

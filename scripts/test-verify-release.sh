@@ -30,5 +30,5 @@ if [[ "$status" -ne 1 ]]; then
   exit 1
 fi
 
-bash -n "$VERIFY" "$SIGN" "$SETUP"
+bash "$ROOT/scripts/check-shell-syntax.sh" "$VERIFY" "$SIGN" "$SETUP"
 echo "verify-release tests passed"

@@ -2,8 +2,8 @@
 // Capture/recovery belong to the hook; target checks and key dispatch remain native.
 import { invoke } from "@tauri-apps/api/core";
 import { errorMessage } from "./dictationRecovery";
-import { type DesktopStreamEvent } from "./desktopPhraseStream";
 
+export type DesktopStreamEvent = "appended" | "revised";
 
 export function appendOnlySuffix(committed: string, text: string): string {
   if (!text.startsWith(committed)) {
