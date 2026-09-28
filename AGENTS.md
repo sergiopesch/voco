@@ -175,6 +175,9 @@ assemble and verify the NVIDIA payload before calling it installable.
 
 For Crabbox, run `crabbox doctor` first. `local-container` provides local userspace
 isolation, not a remote VM or proof of a distribution's default desktop.
+The dispatched [Sandbox workflow](docs/contributing.md#hosted-sandbox-runs) runs
+one command against any ref on a fresh hosted Ubuntu 24.04 x86_64 runner with CI's
+fixtures. Its public logs and artifacts are diagnostics, not qualification.
 
 ## Release and evidence
 

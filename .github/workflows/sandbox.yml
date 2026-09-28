@@ -1,0 +1,136 @@
+name: Sandbox
+
+# Maintainer-dispatched diagnostics: one command on a fresh hosted Ubuntu 24.04
+# x86_64 runner with CI's packages, toolchains and fixtures. Runs never substitute
+# for required CI, installed-desktop or release qualification and must not
+# assemble NVIDIA installers. Logs and artifacts are public.
+run-name: "Sandbox: ${{ inputs.label || inputs.ref || github.head_ref || github.ref_name }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch, tag, full commit SHA or refs/pull/<number>/head (empty = dispatched branch)
+        type: string
+        default: ""
+      command:
+        description: Bash command run from the repository root; write retained files to $VOCO_SANDBOX_EVIDENCE
+        type: string
+        required: true
+      speech:
+        description: Provision the checksum-pinned Nemotron runtime first
+        type: boolean
+        default: false
+      minutes:
+        description: Command time limit in minutes
+        type: number
+        default: 60
+      label:
+        description: Short label for the run list
+        type: string
+        default: ""
+  pull_request:
+    branches: [master]
+    paths: [.github/workflows/sandbox.yml] # Self-test changes to this workflow.
+
+permissions:
+  contents: read
+
+jobs:
+  sandbox:
+    name: Sandbox
+    timeout-minutes: 180
+    runs-on: ubuntu-24.04
+    env:
+      SANDBOX_REF: ${{ inputs.ref }}
+      SANDBOX_COMMAND: ${{ inputs.command || 'npm run verify:versions && cargo check --locked --all-targets --all-features --manifest-path apps/desktop/src-tauri/Cargo.toml' }}
+      SANDBOX_SPEECH: ${{ inputs.speech || github.event_name == 'pull_request' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.ref }}
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install CI system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            pkg-config libglib2.0-dev libsoup-3.0-dev \
+            libjavascriptcoregtk-4.1-dev libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev libpulse-dev \
+            desktop-file-utils appstream cmake ripgrep \
+            ibus ibus-gtk3 python3 python3-numpy python3-psutil python3-gi gir1.2-ibus-1.0 bubblewrap \
+            xvfb xdotool xclip gir1.2-gtk-3.0 gir1.2-webkit2-4.1 gir1.2-atspi-2.0 at-spi2-core \
+            weston libweston-13-0 wayland-utils gir1.2-gtk-4.0 gir1.2-webkit-6.0 \
+            gnome-text-editor gnome-terminal nano gnome-shell gnome-shell-extension-appindicator \
+            libsentencepiece0 pulseaudio pulseaudio-utils g++-13 patch binutils ydotool
+
+      - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de
+        with:
+          toolchain: 1.94.0
+          components: clippy,rustfmt
+
+      # The shared key matches the CI "rust" job's cache. Never save from here:
+      # sandbox builds must not evict CI caches.
+      - uses: Swatinem/rust-cache@f0d9c3887740aee45f6153b24b3a6b815192ec16 # v2
+        with:
+          workspaces: apps/desktop/src-tauri
+          shared-key: rust
+          save-if: false
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Install renderer test browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Build production frontend for Tauri checks
+        run: npm --workspace @voco/desktop run build:frontend
+
+      - name: Provision checksum-pinned Nemotron runtime
+        if: env.SANDBOX_SPEECH == 'true'
+        run: bash scripts/provision-ci-speech.sh
+
+      - name: Record sandbox identity
+        env:
+          VOCO_SANDBOX_EVIDENCE: ${{ runner.temp }}/voco-sandbox
+        run: |
+          mkdir -p "$VOCO_SANDBOX_EVIDENCE"
+          printf '%s\n' "$SANDBOX_COMMAND" > "$VOCO_SANDBOX_EVIDENCE/command.sh"
+          {
+            echo "ref: ${SANDBOX_REF:-$GITHUB_REF}"
+            echo "commit: $(git rev-parse HEAD)"
+            echo "event: $GITHUB_EVENT_NAME"
+            echo "runner image: $ImageOS $ImageVersion ($(uname -srm))"
+            echo "node: $(node --version), npm: $(npm --version)"
+            echo "rustc: $(rustc --version)"
+            echo "python: $(/usr/bin/python3 --version)"
+            echo "speech runtime provisioned: $SANDBOX_SPEECH"
+          } > "$VOCO_SANDBOX_EVIDENCE/identity.txt"
+          {
+            echo '~~~'
+            cat "$VOCO_SANDBOX_EVIDENCE/identity.txt"
+            echo
+            cat "$VOCO_SANDBOX_EVIDENCE/command.sh"
+            echo '~~~'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Run sandbox command
+        timeout-minutes: ${{ inputs.minutes || 60 }}
+        env:
+          VOCO_SANDBOX_EVIDENCE: ${{ runner.temp }}/voco-sandbox
+        run: bash -eo pipefail -c "$SANDBOX_COMMAND"
+
+      - name: Retain sandbox evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sandbox-evidence
+          path: ${{ runner.temp }}/voco-sandbox/
+          if-no-files-found: ignore
+          retention-days: 7
