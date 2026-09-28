@@ -1,5 +1,9 @@
 # Release status
 
+Source candidate: **2026.0.60**. [Candidate changes](releases/2026.0.60.md)
+and [remaining package/signing gates](testing/release-2026.0.60.md) are recorded
+separately. This candidate is not yet a published installer.
+
 The recorded public Ubuntu/Debian release is **2026.0.59**. The
 [latest GitHub release](https://github.com/sergiopesch/voco/releases/latest) is
 authoritative for downloads; installed versions must be checked separately.
