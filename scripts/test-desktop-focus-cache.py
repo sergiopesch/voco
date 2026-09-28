@@ -233,6 +233,128 @@ class FocusTests(unittest.TestCase):
         result = helper.probe()
         self.assertIsNone(result['token'])
         self.assertEqual(result['input_state'], 'unavailable')
+
+    def prepare_observed_delivery(self):
+        # Keep the real probe/cursor classifier in this fixture. The isolated
+        # readback tests substitute it and cannot cover this admission seam.
+        from gi.repository import Atspi
+        self.a.text, self.a.caret = '', 0
+        self.a.get_hypertext_iface = lambda: None
+        self.a.get_attributes = lambda: {}
+        Atspi.Text.get_character_count = lambda node: len(node.text)
+        Atspi.Text.get_caret_offset = lambda node: node.caret
+        Atspi.Text.get_text = lambda node, start, end: node.text[start:end]
+        token = helper.probe()['token']
+        receipt = helper.handle_request(dict(op='prepare', text='word',
+            expected_token=token, first_delivery=True))
+        self.assertEqual(receipt['observation'], 'prepared')
+        return receipt
+
+    def verify_observed_delivery(self, receipt, operation='verify'):
+        return helper.handle_request(dict(op=operation, receipt_id=receipt['receipt_id']))
+
+    def test_real_probe_torn_caret_waits_without_acknowledging_delivery(self):
+        receipt = self.prepare_observed_delivery()
+        self.a.caret = 4  # Count and caret propagate in separate replies.
+        for _ in range(2):
+            result = self.verify_observed_delivery(receipt)
+            self.assertEqual(result['observation'], 'pending')
+            self.assertEqual(result['token'], receipt['token'])
+            self.assertIsNotNone(helper.DELIVERY)
+        self.a.text = 'word'
+        self.assertEqual(self.verify_observed_delivery(receipt)['observation'], 'observed')
+
+    def test_real_second_probe_torn_caret_waits(self):
+        from gi.repository import Atspi
+        receipt = self.prepare_observed_delivery()
+        self.a.text, self.a.caret = 'word', 4
+        calls = 0
+        def count(node):
+            nonlocal calls
+            calls += 1
+            # First focus probe, two bracketed position reads, second probe.
+            return 0 if calls == 4 else len(node.text)
+        Atspi.Text.get_character_count = count
+        self.assertEqual(self.verify_observed_delivery(receipt)['observation'], 'pending')
+        self.assertEqual(self.verify_observed_delivery(receipt)['observation'], 'observed')
+
+    def test_real_probe_torn_caret_cannot_prepare_or_validate(self):
+        receipt = self.prepare_observed_delivery()
+        self.a.caret = 4
+        self.assertEqual(self.verify_observed_delivery(receipt, 'validate')['observation'], 'changed')
+        self.assertIsNone(helper.DELIVERY)
+        result = helper.handle_request(dict(op='prepare', text='word',
+            expected_token=receipt['token'], first_delivery=True))
+        self.assertEqual(result['observation'], 'changed')
+        self.assertIsNone(helper.DELIVERY)
+        self.assertIsNone(helper.handle_request(dict(op='probe', allow_pending_position=True))['token'])
+
+    def test_real_second_probe_torn_caret_retains_progress_between_polls(self):
+        from gi.repository import Atspi
+        receipt = self.prepare_observed_delivery()
+        self.a.text, self.a.caret = 'word', 4
+        calls = 0
+        def count(node):
+            nonlocal calls
+            calls += 1
+            return 0 if calls == 4 else len(node.text)
+        Atspi.Text.get_character_count = count
+        self.assertEqual(self.verify_observed_delivery(receipt)['observation'], 'pending')
+        self.a.text, self.a.caret = '', 0
+        self.assertEqual(self.verify_observed_delivery(receipt)['observation'], 'changed')
+        self.assertIsNone(helper.DELIVERY)
+
+    def test_real_second_probe_torn_caret_cannot_erase_known_mismatch(self):
+        from gi.repository import Atspi
+        receipt = self.prepare_observed_delivery()
+        self.a.text, self.a.caret = 'oops', 4
+        calls = 0
+        def count(node):
+            nonlocal calls
+            calls += 1
+            return 0 if calls == 4 else len(node.text)
+        Atspi.Text.get_character_count = count
+        self.assertEqual(self.verify_observed_delivery(receipt)['observation'], 'changed')
+        self.assertIsNone(helper.DELIVERY)
+
+    def test_real_probe_pending_position_cannot_mask_protection_or_readonly(self):
+        for protected in (True, False):
+            with self.subTest(protected=protected):
+                self.a.role, self.a.states = 'entry', {'focused', 'editable'}
+                receipt = self.prepare_observed_delivery()
+                self.a.caret = 4
+                if protected:
+                    self.a.role = 'password'
+                else:
+                    self.a.states.discard('editable')
+                self.assertEqual(self.verify_observed_delivery(receipt)['observation'], 'changed')
+                self.assertIsNone(helper.DELIVERY)
+
+    def test_real_probe_pending_position_cannot_mask_focus_roundtrip(self):
+        receipt = self.prepare_observed_delivery()
+        self.a.caret = 4
+        self.assertEqual(self.verify_observed_delivery(receipt)['observation'], 'pending')
+        self.event(self.a, False)
+        self.event(self.b, True)
+        self.event(self.a, True)
+        self.assertEqual(self.verify_observed_delivery(receipt)['observation'], 'changed')
+        self.assertIsNone(helper.DELIVERY)
+
+    def test_real_probe_pending_position_cannot_mask_window_departure(self):
+        receipt = self.prepare_observed_delivery()
+        self.a.caret = 4
+        self.window.states.discard('active')
+        self.assertEqual(self.verify_observed_delivery(receipt)['observation'], 'changed')
+        self.assertIsNone(helper.DELIVERY)
+
+    def test_real_probe_pending_position_does_not_accept_wrong_text(self):
+        receipt = self.prepare_observed_delivery()
+        self.a.caret = 4
+        self.assertEqual(self.verify_observed_delivery(receipt)['observation'], 'pending')
+        self.a.text = 'oops'
+        self.assertEqual(self.verify_observed_delivery(receipt)['observation'], 'changed')
+        self.assertIsNone(helper.DELIVERY)
+
     def test_focus_changes_are_not_cached(self):
         a=helper.probe()['token']
         self.a.states.clear();self.b.states.update(['focused','editable'])

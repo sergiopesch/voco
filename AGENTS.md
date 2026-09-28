@@ -71,6 +71,10 @@ glib 0.20 directly leaves the GTK dependency behind. [Backport](vendor/glib/VOCO
   Never acknowledge the outer object placeholder.
   Content and caret can propagate separately. Exact expected content at an earlier
   known caret is pending, never receipt; retain the deadline and no-replay rule.
+  Post-dispatch focus probing may retain a torn count/caret observation only for
+  the same freshly verified control. Admission and pre-dispatch validation stay
+  strict. Preserve definite progress across uncertain samples; a later regression
+  rejects even when the intervening read was pending.
 - Automatic desktop insertion requires a bound, nonempty destination token. An
   unavailable preflight is never permission to paste unguarded. GNOME X11's
   `mutter-x11-frames` decoration is not a second destination; retain rejection for
