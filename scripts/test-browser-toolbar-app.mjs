@@ -134,8 +134,10 @@ try {
     const player=await playFixture(`${root}/long.wav`);
     const played=player.done;
     await until(async()=> (await traces()).slice(traceStart).some(t=>t.event==='dictation_desktop_live_prefix_dispatched'),'live browser prefix receipt',55_000);
-    const prefix=await page.locator('#a').inputValue(); assert.ok(prefix.length>0);
+    // Focus leaves first: its focusout revokes #a's lease synchronously, so
+    // no later append can land between this sample and the final check.
     await page.locator('#b').focus();
+    const prefix=await page.locator('#a').inputValue(); assert.ok(prefix.length>0);
     assert.equal(await played,0); await delay(600); await page.keyboard.press('Alt+Shift+v');
     await until(async()=> (await traces()).slice(traceStart).some(t=>t.event==='dictation_desktop_remainder_copied'),'canonical focus-loss remainder copied',45_000);
     await until(async()=> (await traces()).slice(traceStart).some(t=>t.event==='dictation_stop_to_idle'),'canonical finalization returns idle');
