@@ -206,8 +206,9 @@ The crash journal never blocks dictation: without a checkpoint, dictation contin
 and notifies. Review must never auto-open, paste or retry output. Onboarding keeps its local test retry.
 Active tray presentation is microphone plus waves only; keep Stop in the context
 menu and icon/shortcut actions. Settings and Review are explicit menu destinations.
-VOCO's own layout never moves the microphone when dictation starts or stops: the
-companion's meter opens on its left, and the fallback tray has no idle label.
+From Ready, VOCO's own layout never moves the microphone when dictation starts or
+stops: the companion's meter opens on its left, and the fallback tray shows no label
+at Ready or while dictating. Only its startup and setup labels add width.
 GNOME's privacy microphone indicator appears in Quick Settings while the capture
 stream exists and shifts the indicators on its left, VOCO included; never hide it
 or hold a stream open to avoid that.

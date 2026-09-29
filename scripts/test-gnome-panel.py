@@ -477,7 +477,7 @@ try:
             return bus.call_sync(service,item_path,'org.freedesktop.DBus.Properties','Get',
                 GLib.Variant('(ss)',('org.kde.StatusNotifierItem',name)),None,Gio.DBusCallFlags.NONE,1500,None).unpack()[0]
         report['fallbackLabel'] = tray_property('XAyatanaLabel')
-        # Ready has no label, so starting or stopping never resizes the icon.
+        # Only startup and setup problems carry a label; Ready and dictating share the bare icon.
         assert report['fallbackLabel'] in ['', 'Starting VOCO', 'Check setup']
         old_icon = Path(tray_property('IconName'))
         assert old_icon.exists()
