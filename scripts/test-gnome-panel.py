@@ -157,7 +157,7 @@ try:
             for _ in range(400):
                 pump(.01)
                 frame = inspect(); frames.append((animated, anchors(frame)))
-                moving = any(actor['transitions'] for actor in frame['actors'])
+                moving = frame['revealing']
                 if animated not in report and moving and abs(frame['indicator']['width'] - settled) > 2:
                     report[animated] = frame
                     screenshot(animated)
@@ -232,7 +232,7 @@ try:
     subprocess.run(['gsettings','set','org.gnome.desktop.interface','enable-animations','false'],check=True)
     state.update(status='recording',canStop=True,canOpen=False,level=.4); pump(1.8)
     report['reducedMotion']=inspect(); screenshot('reduced-motion')
-    assert not any(a['transitions'] for a in report['reducedMotion']['actors'])
+    assert not report['reducedMotion']['revealing']
     call('Crowd', GLib.Variant('(b)', (True,))); pump(.3)
     report['crowded'] = inspect(); screenshot('crowded')
     assert report['crowded']['indicator']['width'] <= report['states']['0-idle']['indicator']['width'] + 2

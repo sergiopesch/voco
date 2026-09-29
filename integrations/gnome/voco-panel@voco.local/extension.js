@@ -72,6 +72,10 @@ export default class VocoPanel extends Extension {
         // The top bar's right side grows leftward, so the microphone comes last
         // and never moves: the meter opens and closes on its left.
         this._clip = new St.Widget({layout_manager: new Clutter.BinLayout(), clip_to_allocation: true, width: 0});
+        // The panel packs fractional widths unevenly, which jolts every indicator
+        // on this side; the meter eases through whole pixels only.
+        this._reveal = new St.Adjustment({actor: this._clip, upper: 1000});
+        this._reveal.connect('notify::value', () => { this._clip.width = Math.round(this._reveal.value); });
         this._detail = new St.BoxLayout({style_class: 'voco-panel-detail', visible: false});
         this._clip.add_child(this._detail);
         this._box.add_child(this._clip);
@@ -204,13 +208,13 @@ export default class VocoPanel extends Extension {
         const center = Main.panel._centerBox;
         const space = Main.panel.get_text_direction() === Clutter.TextDirection.RTL
             ? center.x : Main.panel.width - center.x - center.width;
-        const target = (wave || label) && row - this._clip.width + natural <= space ? natural : 0;
+        const target = (wave || label) && row - this._clip.width + natural <= space ? Math.ceil(natural) : 0;
         if (this._target !== target) {
             this._target = target;
-            this._clip.remove_all_transitions();
             // Closed content leaves the accessibility tree as well as the view.
             if (target) this._detail.show();
-            this._clip.ease({width: target, duration: motion ? 220 : 0, mode: Clutter.AnimationMode.EASE_OUT_CUBIC,
+            this._reveal.ease(target, {duration: motion && this._clip.mapped ? 220 : 0,
+                mode: Clutter.AnimationMode.EASE_OUT_CUBIC,
                 onComplete: () => { if (!target) this._detail.hide(); }});
         }
     }
@@ -300,8 +304,8 @@ export default class VocoPanel extends Extension {
         this._target = null;
         this._bars?.forEach(bar => bar.remove_all_transitions());
         // Reappear collapsed; a reconnect must not replay a stale expansion.
-        this._clip?.remove_all_transitions();
-        if (this._clip) { this._clip.width = 0; this._detail.hide(); }
+        this._reveal?.remove_transition('value');
+        if (this._reveal) { this._reveal.value = 0; this._detail.hide(); }
         this._box?.remove_style_class_name('voco-panel-active');
         if (this._timer) { GLib.source_remove(this._timer); this._timer = 0; }
         this._indicator?.hide();

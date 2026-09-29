@@ -23,7 +23,10 @@ export default class Probe extends Extension {
     Inspect() {
         const indicator = Main.panel.statusArea['voco-panel@voco.local'];
         const actors = indicator ? children(indicator) : [];
+        // The companion eases its meter through an adjustment, not an actor property.
+        const reveal = Main.extensionManager.lookup('voco-panel@voco.local')?.stateObj?._reveal;
         return JSON.stringify({animations: St.Settings.get().enable_animations, panel: bounds(Main.panel), indicator: indicator ? bounds(indicator) : null,
+            revealing: Boolean(reveal?.get_transition('value')),
             statusIcons: Object.entries(Main.panel.statusArea).filter(([key, value]) => key.startsWith('appindicator-') && value)
                 .map(([key, value]) => ({key, ...bounds(value), mapped: value.mapped,
                     actors: children(value).map(actor => ({...bounds(actor), mapped: actor.mapped,
@@ -36,7 +39,7 @@ export default class Probe extends Extension {
             rightBox: Main.panel._rightBox.get_children().map(child => ({...bounds(child), voco: child === indicator?.container})),
             actors: actors.map(actor => ({...bounds(actor), name: actor.accessible_name,
                 text: actor.text ?? null, scale: actor.scale_y, opacity: actor.opacity,
-                style: actor.style_class, transitions: actor.get_transition('width') !== null}))});
+                style: actor.style_class}))});
     }
     Stop() {
         const indicator = Main.panel.statusArea['voco-panel@voco.local'];
