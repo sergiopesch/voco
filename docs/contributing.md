@@ -47,6 +47,30 @@ Keep synthetic audio/input tests in private fixtures and retain exact evidence
 separately from source. The [release process](release-process.md) and [release status](release-candidate.md)
 explain qualification boundaries.
 
+## Hosted sandbox runs
+
+The [Sandbox workflow](../.github/workflows/sandbox.yml) runs one command on a
+fresh GitHub-hosted Ubuntu 24.04 x86_64 runner with CI's packages, Rust cache,
+renderer browser and built frontend. Dispatch it from the Actions tab or `gh` for
+any branch, tag, full commit SHA or `refs/pull/<number>/head`. `speech=true` first
+provisions the checksum-pinned Nemotron runtime; `minutes` limits the command
+(default 60). The workflow definition comes from the dispatched branch, normally
+`master`, so install packages a branch newly needs in its command.
+
+```bash
+gh workflow run sandbox.yml -f ref=my-branch -f speech=true -f label=speech \
+  -f command='npm run test:speech-baseline -- --report "$VOCO_SANDBOX_EVIDENCE/speech.json"'
+gh run watch
+gh run download <run-id> --name sandbox-evidence
+```
+
+Files written under `$VOCO_SANDBOX_EVIDENCE` are kept for seven days beside the
+run's `identity.txt` and `command.sh`. Run private IBus and desktop fixtures
+through `scripts/test-private-ibus-engine-hosted.sh`, as CI does. A sandbox run
+is diagnostic, not a substitute for required CI, installed-desktop or release
+qualification. Its logs and artifacts are public, so use public or synthetic
+fixtures. Dispatch only code you trust: it runs with this repository's cache access.
+
 ## Sending a change
 
 Open a focused pull request against `master`. Include the user-visible behavior,
