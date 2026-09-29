@@ -619,7 +619,7 @@ try {
     for (const status of ['starting','recording','processing','error','idle']) {
         await page.evaluate(status => {
             window.calls = [];
-            window.store.setState({surface:'hidden',status,interimTranscript:'This transcript must not appear in a popup.',captureNotice:'Capture notice'});
+            window.store.setState({surface:'hidden',status,transcript:'This transcript must not appear in a popup.',captureNotice:'Capture notice'});
         },status);
         await page.waitForTimeout(60);
         assert.equal(await page.locator('.voco-status-overlay').count(),0);

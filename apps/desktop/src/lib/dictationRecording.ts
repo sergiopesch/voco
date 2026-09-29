@@ -85,9 +85,6 @@ export interface DictationRecordingEnv {
   workletFlushRef: Ref<{ cancel(): void } | null>;
   streamRef: Ref<MediaStream | null>;
   sourceRef: Ref<MediaStreamAudioSourceNode | null>;
-  workletRef: Ref<AudioWorkletNode | null>;
-  processorRef: Ref<ScriptProcessorNode | null>;
-  silentSinkRef: Ref<GainNode | null>;
   primedDeviceIdRef: Ref<string | null>;
   // Store and native helpers are injected so tests can substitute them.
   useStore: Pick<typeof appStore, "getState">;
@@ -99,7 +96,6 @@ export interface DictationRecordingEnv {
   setCancellationPending: (value: boolean) => void;
   setCanCancel: (value: boolean) => void;
   setStatus: (status: DictationStatus) => void;
-  setInterimTranscript: (text: string) => void;
   setTranscript: (text: string) => void;
   setError: (error: string | null) => void;
   setMicrophoneReadyState: (ready: boolean) => void;
@@ -113,7 +109,6 @@ export interface DictationRecordingEnv {
   enqueueDesktopPhrase: (end: number) => void;
   teardownAudioGraph: () => Promise<number>;
   disconnectAudioGraph: () => void;
-  flushCaptureSamples?: () => Promise<void>;
   ensureAudioContext: () => Promise<AudioContext>;
   openTracedMicrophoneStream: (deviceId: string | null) => Promise<MediaStream>;
   connectWorklet: (audioContext: AudioContext, source: MediaStreamAudioSourceNode) => Promise<boolean>;
@@ -122,7 +117,6 @@ export interface DictationRecordingEnv {
   debugNativeCaptureEnabled: () => Promise<boolean>;
   beginNativeCapture: typeof beginNativeCapture;
   releaseBrowserRecording: (triggerId: string) => Promise<void>;
-  console?: Pick<Console, "info" | "warn">;
 }
 
 export function createDictationRecording(env: DictationRecordingEnv) {
@@ -167,7 +161,6 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     setCancellationPending,
     setCanCancel,
     setStatus,
-    setInterimTranscript,
     setTranscript,
     setError,
     setMicrophoneReadyState,
@@ -252,7 +245,6 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       setCancellationPending(false);
       setStatus("idle");
       setError(reason);
-      setInterimTranscript("");
       transitionCursorDelivery("session-idle");
       traceDictationEvent("dictation_interrupted").catch(() => {});
       const body = reason === new CrashJournalCleanupError().message ? reason
@@ -275,7 +267,6 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     setCancellationPending(false);
     setStatus("error");
     setError(reason);
-    setInterimTranscript("");
     useStore.getState().setSurface("onboarding");
   }
 
@@ -301,7 +292,6 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       stopRequestedAtMsRef.current = null;
     }
 
-    setInterimTranscript("");
     sessionRef.current = finishSessionIdle(sessionRef.current);
     activeTriggerIdRef.current = undefined;
     phaseRef.current = "idle";
@@ -388,7 +378,6 @@ export function createDictationRecording(env: DictationRecordingEnv) {
         throw new Error("Desktop dictation is unavailable. Complete desktop input setup before recording.");
       }
       clearTranscript();
-      setInterimTranscript("Starting microphone. Wait for Listening before speaking.");
       setStatus("starting");
       startFailureTitle = "Microphone could not start";
       const captureSelection = captureSelectionRef.current?.() ?? { backend: "webkit" as const };
@@ -571,7 +560,6 @@ export function createDictationRecording(env: DictationRecordingEnv) {
         }, (text) => {
           if (!isCurrentSession(startingSessionId)) return;
           setTranscript(text);
-          useStore.getState().setRawTranscript(text);
           journal?.update(text);
         }, (error, kind) => {
           if (!isCurrentSession(startingSessionId) || cancelledRef.current) return;
@@ -599,7 +587,6 @@ export function createDictationRecording(env: DictationRecordingEnv) {
         traceDictationEvent("dictation_desktop_stream_started").catch(() => {});
       }
       nativeCaptureRef.current?.startDelivery();
-      setInterimTranscript("Listening...");
       setStatus("recording");
       traceDictationEvent("recording_state_active").catch(() => {});
 
@@ -648,7 +635,6 @@ export function createDictationRecording(env: DictationRecordingEnv) {
         return;
       }
       setStatus("error");
-      setInterimTranscript("");
       sessionRef.current = failSession(sessionRef.current);
       phaseRef.current = "error";
       showNotification(
@@ -685,7 +671,6 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     }
     sessionRef.current = requestSessionStop(sessionRef.current);
     setStatus("processing");
-    setInterimTranscript("Wrapping up...");
     try {
       try {
         const sampleRate = await teardownAudioGraph();
@@ -781,8 +766,6 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     captureHealthRef.current = null;
     if (phaseRef.current === "recording") {
       await stopRecording();
-    } else {
-      setInterimTranscript("Cancelling output. Waiting for the current local operation to finish...");
     }
   }
 

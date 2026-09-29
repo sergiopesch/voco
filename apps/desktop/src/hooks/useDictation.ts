@@ -57,7 +57,6 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
   captureSelectionRef.current = options.getCaptureSelection;
   const setStatus = useStore((state) => state.setStatus);
   const setTranscript = useStore((state) => state.setTranscript);
-  const setInterimTranscript = useStore((state) => state.setInterimTranscript);
   const setError = useStore((state) => state.setError);
   const setAudioLevel = useStore((state) => state.setAudioLevel);
   const setMicrophoneReadyState = useStore((state) => state.setMicrophoneReady);
@@ -488,9 +487,6 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
       workletFlushRef,
       streamRef,
       sourceRef,
-      workletRef,
-      processorRef,
-      silentSinkRef,
       primedDeviceIdRef,
       useStore,
       getDesktopPasteStatus,
@@ -501,7 +497,6 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
       setCancellationPending,
       setCanCancel,
       setStatus,
-      setInterimTranscript,
       setTranscript,
       setError,
       setMicrophoneReadyState,
@@ -581,9 +576,6 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
         void stopRecording();
         return true;
       case "none":
-        if (sessionRef.current.phase === "starting" && sessionRef.current.queuedAction === "stop") {
-          setInterimTranscript("Stop requested. Waiting for microphone initialization to finish.");
-        }
         return false;
     }
   }, []);

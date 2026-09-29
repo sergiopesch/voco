@@ -6,7 +6,6 @@ describe("useStore", () => {
     useStore.setState({
       status: "idle",
       transcript: "",
-      interimTranscript: "",
       error: null,
       selectedDeviceId: null,
       audioLevel: 0,
@@ -16,7 +15,6 @@ describe("useStore", () => {
       availableDevices: [],
       microphonePermission: "unknown",
       microphoneReady: false,
-      ownedPreeditSetupState: "",
       updateState: {
         status: "idle",
         currentVersion: null,
@@ -64,25 +62,15 @@ describe("useStore", () => {
     expect(useStore.getState().transcript).toBe("hello world");
   });
 
-  it("clearTranscript resets both transcript fields", () => {
+  it("clearTranscript resets the transcript", () => {
     useStore.getState().setTranscript("hello");
-    useStore.getState().setInterimTranscript("typing...");
     useStore.getState().clearTranscript();
     expect(useStore.getState().transcript).toBe("");
-    expect(useStore.getState().interimTranscript).toBe("");
   });
 
   it("setAudioLevel updates level", () => {
     useStore.getState().setAudioLevel(0.75);
     expect(useStore.getState().audioLevel).toBe(0.75);
-  });
-
-  it("tracks the current owned-preedit setup state independently of panel diagnostics", () => {
-    useStore.getState().setOwnedPreeditSetupState("not-enabled");
-    expect(useStore.getState().ownedPreeditSetupState).toBe("not-enabled");
-
-    useStore.getState().setOwnedPreeditSetupState("ready");
-    expect(useStore.getState().ownedPreeditSetupState).toBe("ready");
   });
 
   it("setConfig stores config", () => {

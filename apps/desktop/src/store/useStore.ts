@@ -7,7 +7,6 @@ import type {
   AudioDeviceOption,
   DictationStatus,
   MicrophonePermission,
-  OwnedPreeditStatus,
   UpdateCheckState,
 } from "@/types";
 
@@ -42,8 +41,6 @@ interface AppState {
   setOnboardingTestPassed: (passed: boolean) => void;
   status: DictationStatus;
   transcript: string;
-  rawTranscript: string;
-  interimTranscript: string;
   error: string | null;
   recovery: DictationRecovery | null;
   captureNotice: string | null;
@@ -55,15 +52,12 @@ interface AppState {
   availableDevices: AudioDeviceOption[];
   microphonePermission: MicrophonePermission;
   microphoneReady: boolean;
-  ownedPreeditSetupState: OwnedPreeditStatus["setupState"];
   updateState: UpdateCheckState;
 
   setRecovery: (recovery: DictationRecovery | null) => void;
   setCaptureNotice: (notice: string | null) => void;
   setStatus: (status: DictationStatus) => void;
   setTranscript: (transcript: string) => void;
-  setRawTranscript: (transcript: string) => void;
-  setInterimTranscript: (interim: string) => void;
   setError: (error: string | null) => void;
   setAudioLevel: (level: number) => void;
   setConfig: (config: AppConfig) => void;
@@ -73,9 +67,6 @@ interface AppState {
   setSelectedDeviceId: (deviceId: string | null) => void;
   setMicrophonePermission: (state: MicrophonePermission) => void;
   setMicrophoneReady: (ready: boolean) => void;
-  setOwnedPreeditSetupState: (
-    setupState: OwnedPreeditStatus["setupState"],
-  ) => void;
   setUpdateState: (updateState: UpdateCheckState) => void;
   clearTranscript: () => void;
 }
@@ -98,8 +89,6 @@ export const useStore = create<AppState>((set) => ({
   setOnboardingTestPassed: (onboardingTestPassed) => set({ onboardingTestPassed }),
   status: "idle",
   transcript: "",
-  rawTranscript: "",
-  interimTranscript: "",
   error: null,
   recovery: null,
   captureNotice: null,
@@ -111,7 +100,6 @@ export const useStore = create<AppState>((set) => ({
   availableDevices: [],
   microphonePermission: "unknown",
   microphoneReady: false,
-  ownedPreeditSetupState: "",
   updateState: {
     status: "idle",
     currentVersion: null,
@@ -124,8 +112,6 @@ export const useStore = create<AppState>((set) => ({
   setCaptureNotice: (captureNotice) => set({ captureNotice }),
   setStatus: (status) => set({ status, error: null }),
   setTranscript: (transcript) => set({ transcript }),
-  setRawTranscript: (rawTranscript) => set({ rawTranscript }),
-  setInterimTranscript: (interim) => set({ interimTranscript: interim }),
   setError: (error) => set({ error }),
   setAudioLevel: (level) => set({ audioLevel: level }),
   setConfig: (config) =>
@@ -141,8 +127,6 @@ export const useStore = create<AppState>((set) => ({
   setSelectedDeviceId: (selectedDeviceId) => set({ selectedDeviceId }),
   setMicrophonePermission: (microphonePermission) => set({ microphonePermission }),
   setMicrophoneReady: (microphoneReady) => set({ microphoneReady }),
-  setOwnedPreeditSetupState: (ownedPreeditSetupState) =>
-    set({ ownedPreeditSetupState }),
   setUpdateState: (updateState) => set({ updateState }),
-  clearTranscript: () => set({ transcript: "", rawTranscript: "", interimTranscript: "" }),
+  clearTranscript: () => set({ transcript: "" }),
 }));

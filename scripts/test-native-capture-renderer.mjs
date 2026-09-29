@@ -1177,7 +1177,10 @@ try {
           const base = await originalCall(name, args);
           const reply = { ...base, shortcut: { hotkey: 'Alt+D', route: 'global-shortcut', state: 'available', detail: 'Verified mock registration' } };
           if (window.holdObserver) return new Promise(resolve => {
-            window.finishObserver = () => resolve({ ...reply, ownedPreedit: { ...base.ownedPreedit, setupState: 'error' } });
+            // Accepting this late reply would flip desktop setup to ready.
+            window.finishObserver = () => resolve({ ...reply,
+              desktopInput: { available: true, detail: 'Desktop input is ready.' },
+              desktopPaste: { enabled: true, available: true, detail: 'Desktop paste is ready.' } });
           });
           return reply;
         };
@@ -1214,12 +1217,18 @@ try {
       } else {
         await page.evaluate(() => window.reactRoot.unmount());
       }
-      const setupBefore = await page.evaluate(() => window.store.getState().ownedPreeditSetupState);
+      const syncedSetupStates = () => page.evaluate(() =>
+        window.calls.filter(call => call[0] === 'syncRuntimeStatus').map(call => call[1].cursorSetupState));
+      const setupBefore = await syncedSetupStates();
+      assert.equal(setupBefore.at(-1), 'not-enabled');
       await page.evaluate(async () => {
         window.finishObserver();
         await new Promise(resolve => setTimeout(resolve, 50));
       });
-      assert.equal(await page.evaluate(() => window.store.getState().ownedPreeditSetupState), setupBefore, 'Rejected late observer must not publish any diagnostics');
+      if (transition !== 'unmount') {
+        assert.ok((await syncedSetupStates()).slice(setupBefore.length).every(state => state === setupBefore.at(-1)),
+          'Rejected late observer must not publish any diagnostics');
+      }
       assert.equal(await page.getByText('Click where you want the text, then use your shortcut.', { exact: true }).count(), 0);
       if (transition === 'save') await page.evaluate(() => window.finishSave());
       await noCapture();

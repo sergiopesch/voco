@@ -184,9 +184,6 @@ export function App() {
   const setAvailableDevices = useStore((state) => state.setAvailableDevices);
   const setMicrophonePermission = useStore((state) => state.setMicrophonePermission);
   const setMicrophoneReadyState = useStore((state) => state.setMicrophoneReady);
-  const setOwnedPreeditSetupState = useStore(
-    (state) => state.setOwnedPreeditSetupState,
-  );
   const updateState = useStore((state) => state.updateState);
   const setUpdateState = useStore((state) => state.setUpdateState);
   const [updateCheckCoordinator] = useState(
@@ -597,7 +594,6 @@ export function App() {
         setRuntimeDiagnosticsFailed(false);
       }
       setRuntimeDiagnostics(diagnostics);
-      setOwnedPreeditSetupState(diagnostics.ownedPreedit.setupState);
       if (diagnosticsExpiryRef.current !== null) clearTimeout(diagnosticsExpiryRef.current);
       diagnosticsExpiryRef.current = setTimeout(invalidateShortcutDiagnostics, 2000);
     } catch (error) {
@@ -606,7 +602,7 @@ export function App() {
     } finally {
       if (timeout !== undefined) clearTimeout(timeout);
     }
-  }, [invalidateShortcutDiagnostics, setOwnedPreeditSetupState]);
+  }, [invalidateShortcutDiagnostics]);
 
   const refreshRuntimeDiagnostics = useCallback((): Promise<void> => {
     if (diagnosticsInFlightRef.current || configSavePendingCountRef.current > 0) return Promise.resolve();
