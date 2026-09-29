@@ -225,23 +225,26 @@ try:
             report['meterResponds'] = True
             call('Stop'); pump(.2)
             assert actions[-1] == ('stop', state['stopSession']), actions
-    # Opening and closing the meter never moves the microphone or its neighbours.
-    reference = frames[0][1]
-    moved = [frame for frame in frames if len(frame[1]) != len(reference) or
-             any(abs(value - fixed) > .5 for value, fixed in zip(frame[1], reference))]
-    assert not moved, {'reference': reference, 'moved': moved[:5]}
-    report['fixedMicrophone'] = {'frames': len(frames), 'anchors': reference}
     assert report['states']['2-recording']['indicator']['width'] > report['states']['0-idle']['indicator']['width'] + 20
     assert abs(report['states']['5-idle']['indicator']['width'] - report['states']['0-idle']['indicator']['width']) < 2
     subprocess.run(['gsettings','set','org.gnome.desktop.interface','enable-animations','false'],check=True)
     state.update(status='recording',canStop=True,canOpen=False,level=.4); pump(1.8)
     report['reducedMotion']=inspect(); screenshot('reduced-motion')
     assert not report['reducedMotion']['revealing']
+    frames.append(('reduced-motion', anchors(report['reducedMotion'])))
     call('Crowd', GLib.Variant('(b)', (True,))); pump(.3)
     report['crowded'] = inspect(); screenshot('crowded')
     assert report['crowded']['indicator']['width'] <= report['states']['0-idle']['indicator']['width'] + 2
     call('Crowd', GLib.Variant('(b)', (False,))); pump(.3)
-    assert inspect()['indicator']['width'] > report['crowded']['indicator']['width'] + 20
+    uncrowded = inspect()
+    assert uncrowded['indicator']['width'] > report['crowded']['indicator']['width'] + 20, uncrowded['indicator']
+    frames.append(('uncrowded', anchors(uncrowded)))
+    # Opening and closing the meter never moves the microphone or its neighbours.
+    reference = frames[0][1]
+    moved = [frame for frame in frames if len(frame[1]) != len(reference) or
+             any(abs(value - fixed) > .5 for value, fixed in zip(frame[1], reference))]
+    assert not moved, {'reference': reference, 'moved': moved[:5]}
+    report['fixedMicrophone'] = {'frames': len(frames), 'anchors': reference}
     subprocess.run(['gsettings','set','org.gnome.desktop.interface','gtk-theme','HighContrast'],check=True)
     pump(.5); screenshot('high-contrast')
     fail_next.append(True)

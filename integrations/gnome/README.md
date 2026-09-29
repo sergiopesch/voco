@@ -56,7 +56,7 @@ one meter update per 40 ms with at most one call in flight, only while recording
 Capture-store events drive updates without an additional hidden-window timer.
 
 A directed `Changed` signal updates transitions immediately. The extension also
-polls at 50 ms while active and 1500 ms while idle for meter updates and leases. Calls have a
+polls at 50 ms while recording, for meter levels, and at 1500 ms otherwise. Calls have a
 1500 ms deadline and target the app's unique bus owner without auto-start. A
 transient error hides the extension and schedules a bounded-rate reconnect.
 `Action(action, token)` uses the capture identity for Stop and the presentation

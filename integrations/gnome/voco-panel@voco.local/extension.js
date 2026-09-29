@@ -75,7 +75,12 @@ export default class VocoPanel extends Extension {
         // The panel packs fractional widths unevenly, which jolts every indicator
         // on this side; the meter eases through whole pixels only.
         this._reveal = new St.Adjustment({actor: this._clip, upper: 1000});
-        this._reveal.connect('notify::value', () => { this._clip.width = Math.round(this._reveal.value); });
+        this._reveal.connect('notify::value', () => {
+            this._clip.width = Math.round(this._reveal.value);
+            // A fixed-width actor already awaiting layout passes no relayout up,
+            // so widths the panel measured this frame would stay cached.
+            this._box.queue_relayout();
+        });
         this._detail = new St.BoxLayout({style_class: 'voco-panel-detail', visible: false});
         this._clip.add_child(this._detail);
         this._box.add_child(this._clip);
@@ -152,7 +157,8 @@ export default class VocoPanel extends Extension {
             this._syncShortcut();
             this._indicator.show();
             this._render();
-            const delay = this._refreshQueued ? 1 : this._state.active ? 50 : 1500;
+            // Only recording streams levels; statuses arrive through Changed.
+            const delay = this._refreshQueued ? 1 : this._state.status === 'recording' ? 50 : 1500;
             this._refreshQueued = false;
             this._timer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, delay, () => {
                 this._timer = 0;
@@ -166,7 +172,7 @@ export default class VocoPanel extends Extension {
         if (!this._state || !this._alive) return;
         const state = this._state;
         const motion = this._settings.get_boolean('enable-animations');
-        const action = state.canStop ? 'Stop dictation' : state.canOpen ? 'Open VOCO' : '';
+        const action = state.canStop ? 'Stop dictation' : state.canOpen ? 'Open settings' : '';
         this._iconButton.accessible_name = [state.description, action].filter(Boolean).join('. ');
         const wave = state.active;
         const label = !state.active && state.label.length > 0;
@@ -175,8 +181,6 @@ export default class VocoPanel extends Extension {
             this._wave.visible = wave;
             this._label.visible = label;
             if (label) this._label.text = state.label;
-            // St styles only mapped actors; measure the content as it will look.
-            this._detail.show();
         }
         this._settingsItem.setSensitive(state.canOpen);
         this._reviewItem.setSensitive(state.canOpen);
@@ -205,20 +209,26 @@ export default class VocoPanel extends Extension {
         else this._box.remove_style_class_name('voco-panel-active');
         // Open the meter only if the whole right side, meter included, still
         // fits beside the clock. A crowded panel keeps just the actionable icon.
+        // St styles hidden actors only on request; measure content as it will look.
+        [this._detail, this._wave, this._label].forEach(widget => widget.ensure_style());
         const [, natural] = this._detail.get_preferred_width(-1);
         const [, row] = Main.panel._rightBox.get_preferred_width(-1);
         const center = Main.panel._centerBox;
         const space = Main.panel.get_text_direction() === Clutter.TextDirection.RTL
             ? center.x : Main.panel.width - center.x - center.width;
-        const target = (wave || label) && row - this._clip.width + natural <= space ? Math.ceil(natural) : 0;
+        // Capture adds GNOME's privacy microphone to this side; a closed meter
+        // keeps an icon's room for it, so it never opens only to close again.
+        const reserve = wave && !this._target ? this._iconButton.get_preferred_width(-1)[1] : 0;
+        const target = (wave || label) && row - this._clip.width + natural + reserve <= space
+            ? Math.ceil(natural) : 0;
         if (this._target !== target) {
             this._target = target;
+            // Closed content leaves the accessibility tree as well as the view.
+            if (target) this._detail.show();
             this._reveal.ease(target, {duration: motion && this._clip.mapped ? 220 : 0,
                 mode: Clutter.AnimationMode.EASE_OUT_CUBIC,
                 onComplete: () => { if (!target) this._detail.hide(); }});
         }
-        // Closed content leaves the accessibility tree as well as the view.
-        if (!target && !this._reveal.get_transition('value')) this._detail.hide();
     }
 
     _syncShortcut() {
