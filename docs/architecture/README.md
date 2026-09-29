@@ -107,8 +107,7 @@ journal writes from the previous renderer become stale.
 VOCO pins a patched `global-hotkey` 0.8.0; see
 [upstream provenance and patch boundaries](../../vendor/global-hotkey/VOCO-PATCH.md).
 Its X11 actor waits on the X11 fd and a nonblocking command signal with
-`libc::poll`, with no periodic idle wakeup. The application no longer uses the
-patch's focus-lease API.
+`libc::poll`, with no periodic idle wakeup.
 
 `useDictation.ts` coordinates capture, delivery and recovery; `config.rs` serializes
 field-level settings updates and writes private atomic configuration. Single-instance

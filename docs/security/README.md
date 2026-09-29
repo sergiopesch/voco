@@ -250,7 +250,7 @@ and package receipts are not qualification of every later source change.
 
 Desktop delivery no longer uses destination tokens, focus generations or
 recipient-context checks; each paste goes to whatever has keyboard focus. The X11
-shortcut uses a root grab, and the vendored actor's focus-lease API is unused.
+shortcut uses a root grab; the vendored actor no longer offers focus-scoped grabs.
 Generic paste IPC has no universal renderer-epoch cancellation guarantee.
 Wayland/no-op and competing-client behavior must not be inferred from isolated X11
 tests. See [vendored shortcut provenance](../../vendor/global-hotkey/VOCO-UPSTREAM.json)
