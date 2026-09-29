@@ -43,7 +43,6 @@ interface ControlPanelProps {
   updateState: UpdateCheckState;
   runtimeDiagnostics: RuntimeDiagnostics | null;
   dictationStatus: DictationStatus;
-  transcript: string;
   recovery?: DictationRecovery | null;
   captureNotice?: string | null;
   canCancelDictation?: boolean;
@@ -117,7 +116,6 @@ export function ControlPanel({
   updateState,
   runtimeDiagnostics,
   dictationStatus,
-  transcript,
   recovery,
   captureNotice,
   canCancelDictation,
@@ -197,7 +195,12 @@ export function ControlPanel({
   const hotkeyDirty = hotkeyDraft !== config.hotkey;
   const hasUnsavedChanges = hotkeyDirty;
   const dictationBusy = dictationStatus === "starting" || dictationStatus === "recording" || dictationStatus === "processing";
-  const [previewLevel, setPreviewLevel] = useState(0);
+  // The live level goes straight to the meter; a state update per animation
+  // frame would re-render the whole panel.
+  const meterFillRef = useRef<HTMLDivElement>(null);
+  const setPreviewLevel = useCallback((level: number) => {
+    if (meterFillRef.current) meterFillRef.current.style.transform = `scaleX(${level})`;
+  }, []);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [microphoneRetryRevision, setMicrophoneRetryRevision] = useState(0);
   const previewRetryRequest = useRef(0);
@@ -464,7 +467,7 @@ export function ControlPanel({
       cancelled = true;
       releasePreview();
     };
-  }, [activeSection, dictationBusy, onboardingStep, selectedDeviceId, surface, microphoneRetryRevision, nativePreviewDisabled]);
+  }, [activeSection, dictationBusy, onboardingStep, selectedDeviceId, surface, microphoneRetryRevision, nativePreviewDisabled, setPreviewLevel]);
 
   async function savePatch(
     patch: Partial<AppConfig>,
@@ -741,7 +744,6 @@ export function ControlPanel({
               ? nativeMicrophone.selected?.label || nativeMicrophone.sources?.sources.find(source => source.selectionToken === nativeMicrophone.sources?.defaultSelectionToken)?.label || "System default"
               : selectedDeviceLabel}
             status={dictationStatus}
-            transcript={testPurpose === "onboarding" ? transcript : ""}
             passed={testPassed}
             failed={Boolean(errorMessage)}
             attempted={testPurpose === "onboarding"}
@@ -809,7 +811,7 @@ export function ControlPanel({
                       <p className="voco-preferences__status" role="status">{dictationBusy ? "Microphone check paused during dictation." : previewError || microphonePermission === "denied" ? "Microphone access needs attention." : microphoneChecked ? "Audio detected during this check" : "Waiting for sound"}</p>
                       {!dictationBusy && !previewError && microphonePermission !== "denied" ? <p className="voco-preferences__helper">Speak a few words. This checks microphone sound, not transcription.</p> : null}
                       <div className="voco-meter"><span className="voco-meter__label">Live level</span>
-                        <div className="voco-meter__track" aria-hidden="true"><div className="voco-meter__fill" style={{ transform: `scaleX(${previewLevel})` }} /></div>
+                        <div className="voco-meter__track" aria-hidden="true"><div ref={meterFillRef} className="voco-meter__fill" style={{ transform: "scaleX(0)" }} /></div>
                       </div>
                       {previewError ? <div className="voco-inline-note voco-inline-note--error" role="alert">{previewError}</div> : null}
                       {previewError || microphonePermission === "denied" ? <div className="voco-preferences__actions"><button className="voco-button voco-button--secondary" disabled={dictationBusy} onClick={() => void retryMicrophonePreview()}>Retry microphone access</button></div> : null}

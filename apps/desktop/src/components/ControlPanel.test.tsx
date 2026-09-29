@@ -5,7 +5,16 @@ import {
   shouldOpenMicrophonePreview,
   shortcutFromKeyboardEvent,
 } from "@/components/ControlPanel";
+import { useStore } from "@/store/useStore";
 import type { AppConfig } from "@/types";
+
+// Static rendering reads zustand's initial state, so read the live store instead.
+vi.mock("@/store/useStore", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/store/useStore")>();
+  type State = ReturnType<typeof actual.useStore.getState>;
+  const useLiveStore = <T,>(selector: (state: State) => T) => selector(actual.useStore.getState());
+  return { ...actual, useStore: Object.assign(useLiveStore, actual.useStore) };
+});
 
 const config: AppConfig = {
   hotkey: "Alt+D",
@@ -20,7 +29,10 @@ const config: AppConfig = {
   voiceProfile: "default",
 };
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  useStore.setState({ transcript: "", dictationPurpose: "cursor" });
+});
 
 function renderPanel(
   overrides: Partial<React.ComponentProps<typeof ControlPanel>> = {},
@@ -42,7 +54,6 @@ function renderPanel(
       }}
       runtimeDiagnostics={null}
       dictationStatus="idle"
-      transcript=""
       requestedSection="General"
       requestedSectionRequestId={0}
       selectedDeviceId={null}
@@ -125,19 +136,17 @@ describe("ControlPanel", () => {
   });
 
   it("never exposes handled delivery text in the status popover", () => {
-    const markup = renderPanel({
-      transcript: "A transcript that stayed safely inside VOCO.",
-      statusLabel: "Needs attention",
-    });
+    useStore.setState({ transcript: "A transcript that stayed safely inside VOCO." });
+    const markup = renderPanel({ statusLabel: "Needs attention" });
     expect(markup).not.toContain("Transcript kept safely in VOCO");
     expect(markup).not.toContain("A transcript that stayed safely inside VOCO.");
     expect(markup).not.toContain("Copy transcript");
   });
 
   it("shows errors without retaining a normal dictation transcript", () => {
+    useStore.setState({ transcript: "A final transcript whose selected output failed." });
     const markup = renderPanel({
       dictationStatus: "error",
-      transcript: "A final transcript whose selected output failed.",
       errorMessage: "Local agent request failed.",
       statusLabel: "Needs attention",
     });

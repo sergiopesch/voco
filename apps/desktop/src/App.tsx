@@ -166,7 +166,6 @@ export function App() {
   const error = useStore((state) => state.error);
   const recovery = useStore((state) => state.recovery);
   const captureNotice = useStore((state) => state.captureNotice);
-  const transcript = useStore((state) => state.transcript);
   const surface = useStore((state) => state.surface);
   const onboardingStep = useStore((state) => state.onboardingStep);
   const selectedDeviceId = useStore((state) => state.selectedDeviceId);
@@ -1239,7 +1238,6 @@ export function App() {
         updateState={updateState}
         runtimeDiagnostics={runtimeDiagnostics}
         dictationStatus={status}
-        transcript={transcript}
         recovery={recovery}
         captureNotice={captureNotice}
         canCancelDictation={canCancel}
