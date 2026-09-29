@@ -234,7 +234,7 @@ Why not strict yet:
 
 - VOCO registers global hotkeys
 - on Wayland it can rely on direct `evdev` keyboard access
-- text insertion shells out to `ydotool`, `xdotool`, `wl-copy`, `wl-paste`, and `xclip`
+- text insertion shells out to `ydotool`, `xdotool`, `wl-copy`, and `xclip`
 - it opens external URLs with `xdg-open`
 - desktop notifications use the session D-Bus service
 - its core user promise is typing into arbitrary host applications, which is exactly where strict confinement becomes unnatural
@@ -282,11 +282,8 @@ focus-surface timeout. Other Wayland desktops retain `wl-copy`. No fallback is
 attempted after a clipboard mutation or uncertain dispatch. See
 [desktop paste verification](testing/desktop-paste.md).
 
-
 Desktop paste sends one Shift+Insert gesture to whatever has keyboard focus. It
-uses no accessibility service and reads no field text or focus metadata. The
-package list still names `gir1.2-atspi-2.0` and `at-spi2-core`, which the removed
-focus helper needed; no application code uses them.
+uses no accessibility service and reads no field text or focus metadata.
 
 ## Bundled NVIDIA runtime
 
@@ -294,17 +291,15 @@ The complete package bundles Nemotron Speech Streaming English 0.6B Q8_0, its
 modified CPU runtime, Python worker and model notices under `/usr/lib/voco/speech`
 and `/usr/share/doc/voco/nvidia`. Ubuntu supplies `python3`, `python3-numpy`,
 `python3-psutil` and `libsentencepiece0`. No Homebrew, virtual environment, network
-access or checkout path is needed at runtime. This is a host-native CPU build for
-the tested laptop, not a portability-qualified public release.
+access or checkout path is needed at runtime. It is a CPU build with the pinned
+AVX2/FMA/F16C baseline; portability limits are in the [support matrix](linux-support.md).
 
-Run the normal Tauri Debian build, then `python3 scripts/package-nvidia.py BASE_DEB
-OUTPUT_DEB` to assemble the complete package with zstd compression. The script
-verifies the fixed model hash, adds a runtime SHA-256 manifest and regenerates the
-Debian file inventory. Install the resulting complete package with apt so declared
-dependencies are resolved. A base Tauri package alone is incomplete for NVIDIA.
+Build, assemble and verify as in [Build and assemble](#build-and-assemble), then
+install the complete package with APT so declared dependencies resolve. A base
+Tauri package alone is incomplete for NVIDIA.
 
-Desktop and browser dictation, onboarding and explicit interrupted-audio Retry
-use the bundled Nemotron model. Recovery never automatically replays text into a
+Desktop and browser dictation, onboarding and its local test retry use the
+bundled Nemotron model. Recovery never automatically replays text into a
 destination. Startup warms the worker before readiness. Product settings do not
 expose enhancement, assistant or alternate recognition modes.
 

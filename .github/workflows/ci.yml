@@ -11,7 +11,8 @@ permissions:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Master runs finish so their Rust cache save is not lost.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   code-guide:
@@ -101,7 +102,7 @@ jobs:
         env:
           VOCO_RENDERER_EVIDENCE_DIR: ${{ runner.temp }}/voco-brand-motion
 
-      - name: GNOME consuming Stop and lifecycle regression
+      - name: GNOME companion shortcut and lifecycle regression
         timeout-minutes: 3
         env:
           VOCO_NATIVE_DEPS: /usr
@@ -241,6 +242,11 @@ jobs:
       - uses: Swatinem/rust-cache@f0d9c3887740aee45f6153b24b3a6b815192ec16 # v2
         with:
           workspaces: apps/desktop/src-tauri
+          save-if: ${{ github.ref == 'refs/heads/master' }}
+
+      - name: Cargo fmt
+        working-directory: apps/desktop/src-tauri
+        run: cargo fmt --check
 
       - name: Install Node dependencies
         run: npm ci
@@ -248,22 +254,15 @@ jobs:
       - name: Build production frontend for Tauri checks
         run: npm --workspace @voco/desktop run build:frontend
 
-      - name: Cargo check
+      # Clippy fetches the locked crates that the offline glib checks read.
+      - name: Cargo clippy
         working-directory: apps/desktop/src-tauri
-        run: cargo check --locked --all-targets --all-features
+        run: cargo clippy --locked --all-targets --all-features -- -D warnings
 
       - name: Verify glib source backport and optimized iterator regression
         run: |
           python3 scripts/verify-glib-backport.py
           python3 scripts/test-glib-variant.py --output "${{ runner.temp }}/voco-glib-regression"
-
-      - name: Cargo fmt
-        working-directory: apps/desktop/src-tauri
-        run: cargo fmt --check
-
-      - name: Cargo clippy
-        working-directory: apps/desktop/src-tauri
-        run: cargo clippy --locked --all-targets --all-features -- -D warnings
 
       - name: Cargo test
         working-directory: apps/desktop/src-tauri

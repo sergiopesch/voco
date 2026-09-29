@@ -60,8 +60,6 @@
           "gir1.2-ibus-1.0",
           "python3-gi",
           "xclip",
-          "gir1.2-atspi-2.0",
-          "at-spi2-core",
           "python3-numpy",
           "python3-psutil",
           "procps",

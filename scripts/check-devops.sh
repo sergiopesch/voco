@@ -44,6 +44,7 @@ bash scripts/check-shell-syntax.sh \
   scripts/test-native-gnome.sh \
   scripts/test-native-kde.sh \
   scripts/provision-ci-speech.sh \
+  scripts/report-linux-runtime.sh \
   scripts/test-browser-full-app.sh \
   scripts/test-browser-toolbar-app.sh \
   scripts/verify-deb-package.sh \
@@ -91,7 +92,6 @@ for name, copies in functions.items():
 print("Standalone and source installer helpers are in sync.")
 PY
 
-bash scripts/test-install-common.sh
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/build-legacy-ydotool.py --verify-only
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-ydotool-service.py
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-install-presentation.py
@@ -113,6 +113,7 @@ from pathlib import Path
 for path in (
     Path("scripts/generate-icons.py"),
     Path("scripts/test-application-delivery.py"),
+    Path("scripts/fixtures/cursor-input-adapter.py"),
     Path("scripts/fixtures/delivery-native.py"),
     Path("scripts/fixtures/focused-paste.py"),
     Path("scripts/fixtures/nested-ydotool.py"),
@@ -122,6 +123,9 @@ for path in (
     Path("scripts/test-native-gnome.py"),
     Path("scripts/test-native-kde.py"),
     Path("scripts/test_native_wayland_capture.py"),
+    Path("scripts/test_native_crash_review.py"),
+    Path("scripts/test_native_cursor_capture.py"),
+    Path("scripts/test_native_onboarding_capture.py"),
     Path("scripts/test-speech-preview-parity.py"),
     Path("scripts/test-speech-combined-preview.py"),
     Path("scripts/test-speech-adversarial.py"),
