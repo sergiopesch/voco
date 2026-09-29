@@ -14,7 +14,6 @@ from voco_ibus_engine import (
     SENSITIVE_INPUT_HINT_MASK,
     VocoCoordinator,
     VocoEngine,
-    is_session_control_key,
     session_control_hotkey_specs,
 )
 
@@ -63,17 +62,6 @@ class FocusEngineDouble:
 
 
 class EngineContextTransitionTests(unittest.TestCase):
-    def test_changed_safe_metadata_revokes_unclaimed_trigger(self):
-        engine = FocusEngineDouble()
-        engine._voco_input_hints = int(IBus.InputHints.SPELLCHECK)
-        engine.coordinator.poll_trigger('Alt+D')
-        self.assertTrue(engine.coordinator.consume_shortcut(engine, ord('d'), int(IBus.ModifierType.MOD1_MASK)))
-        token = engine.coordinator.poll_trigger('Alt+D')['trigger']['triggerId']
-        VocoEngine.do_set_content_type(engine, int(IBus.InputPurpose.FREE_FORM), int(IBus.InputHints.WORD_COMPLETION))
-        with self.assertRaises(RuntimeError):
-            engine.coordinator.claim_trigger(token)
-
-
     def test_equal_transport_capabilities_survive_context_switch_but_metadata_does_not(self):
         engine = FocusEngineDouble()
         VocoEngine._leave_focus(engine)
@@ -486,15 +474,6 @@ class SessionControlHotkeyTests(unittest.TestCase):
         ):
             self.assertEqual(controls[name], frozenset({"control"}))
 
-    def test_release_and_bare_modifier_events_are_non_mutating(self) -> None:
-        self.assertTrue(
-            is_session_control_key(
-                IBus.keyval_from_name("x"),
-                int(IBus.ModifierType.RELEASE_MASK),
-            )
-        )
-        self.assertTrue(is_session_control_key(IBus.keyval_from_name("Alt_L"), 0))
-
 
 
 class ConsumingShortcutTests(unittest.TestCase):
@@ -517,11 +496,8 @@ class ConsumingShortcutTests(unittest.TestCase):
         self.assertFalse(self.coordinator.consume_shortcut(self.engine, self.key, self.alt))
 
     def test_verified_trigger_is_one_shot_and_poll_delivery_is_once(self):
-        token = self.trigger()
+        self.trigger()
         self.assertIsNone(self.coordinator.poll_trigger('Alt+D')['trigger'])
-        self.coordinator.claim_trigger(token)
-        with self.assertRaises(RuntimeError):
-            self.coordinator.claim_trigger(token)
 
     def test_negative_poll_disarms_until_next_eligible_poll(self):
         self.engine.can_accept_preedit = False
@@ -535,49 +511,6 @@ class ConsumingShortcutTests(unittest.TestCase):
         self.coordinator.poll_trigger('Alt+D')
         self.engine.can_accept_preedit = False
         self.assertFalse(self.coordinator.consume_shortcut(self.engine, self.key, self.alt))
-
-    def test_focus_switch_before_start_cannot_redirect(self):
-        token = self.trigger()
-        self.coordinator.activate_engine(FakeEngine())
-        with self.assertRaises(RuntimeError):
-            self.coordinator.claim_trigger(token)
-
-    def test_focus_away_and_back_invalidates_even_same_engine(self):
-        token = self.trigger()
-        self.coordinator.deactivate_engine(self.engine)
-        self.coordinator.activate_engine(self.engine)
-        with self.assertRaises(RuntimeError):
-            self.coordinator.claim_trigger(token)
-
-    def test_context_revision_change_invalidates(self):
-        token = self.trigger()
-        self.engine.context_revision += 1
-        with self.assertRaises(RuntimeError):
-            self.coordinator.claim_trigger(token)
-
-    def test_typing_before_start_invalidates(self):
-        token = self.trigger()
-        self.coordinator.register_key_event(IBus.keyval_from_name('x'), 0)
-        with self.assertRaises(RuntimeError):
-            self.coordinator.claim_trigger(token)
-
-    def test_reset_before_start_invalidates(self):
-        token = self.trigger()
-        self.coordinator.register_context_reset(self.engine)
-        with self.assertRaises(RuntimeError):
-            self.coordinator.claim_trigger(token)
-
-    def test_expired_or_forged_token_fails_closed(self):
-        token = self.trigger()
-        with self.assertRaises(RuntimeError):
-            self.coordinator.claim_trigger('forged')
-        with self.assertRaises(RuntimeError):
-            self.coordinator.claim_trigger(token)
-        self.coordinator.consumed_shortcut_keys.clear()
-        token = self.trigger()
-        with patch('voco_ibus_engine.time.monotonic', return_value=10**20):
-            with self.assertRaises(RuntimeError):
-                self.coordinator.claim_trigger(token)
 
     def test_repeat_and_release_are_consumed_without_duplicate_trigger(self):
         self.trigger()
@@ -602,12 +535,6 @@ class ConsumingShortcutTests(unittest.TestCase):
         self.coordinator.shortcut_armed_until = 0
         self.assertFalse(self.coordinator.consume_shortcut(self.engine, self.key, self.alt))
 
-    def test_disconnect_disarms_and_revokes_trigger(self):
-        token = self.trigger()
-        self.coordinator.disconnect_client()
-        with self.assertRaises(RuntimeError):
-            self.coordinator.claim_trigger(token)
-
     def test_protocol_rejects_passive_start_without_token(self):
         from voco_ibus_engine import dispatch_command
         with self.assertRaisesRegex(RuntimeError, 'original text field'):
@@ -630,11 +557,9 @@ class ConsumingShortcutTests(unittest.TestCase):
         self.assertIsNone(status['sessionId'])
 
     def test_registration_change_discards_old_trigger_and_uses_new_chord(self):
-        token = self.trigger()
+        self.trigger()
         self.coordinator.consumed_shortcut_keys.clear()
         self.coordinator.poll_trigger('Ctrl+Shift+V')
-        with self.assertRaises(RuntimeError):
-            self.coordinator.claim_trigger(token)
         self.assertFalse(self.coordinator.consume_shortcut(self.engine, self.key, self.alt))
         self.assertTrue(self.coordinator.consume_shortcut(self.engine, IBus.keyval_from_name('v'), int(IBus.ModifierType.CONTROL_MASK | IBus.ModifierType.SHIFT_MASK)))
 

@@ -29,16 +29,6 @@ from voco_ibus_protocol import (  # noqa: E402
 ENGINE_NAME = "voco"
 ENGINE_BUS_NAME = "org.freedesktop.IBus.Voco"
 ENGINE_PATH_PREFIX = "/org/freedesktop/IBus/Voco/Engine/"
-SESSION_CONTROL_KEYVALS = {
-    IBus.keyval_from_name("Alt_L"),
-    IBus.keyval_from_name("Alt_R"),
-    IBus.keyval_from_name("Control_L"),
-    IBus.keyval_from_name("Control_R"),
-    IBus.keyval_from_name("Shift_L"),
-    IBus.keyval_from_name("Shift_R"),
-    IBus.keyval_from_name("Super_L"),
-    IBus.keyval_from_name("Super_R"),
-}
 SHORTCUT_MODIFIER_NAMES = {
     "ALT": "alt",
     "OPTION": "alt",
@@ -183,7 +173,6 @@ class VocoCoordinator:
         self.shortcut_armed_until = 0.0
         self.shortcut_specs = ()
         self.shortcut_config = None
-        self.pending_trigger = None
         self.trigger_to_deliver = None
         self.consumed_shortcut_keys: set[int] = set()
 
@@ -193,7 +182,6 @@ class VocoCoordinator:
         if hotkey != self.shortcut_config:
             self.shortcut_specs = session_control_hotkey_specs(hotkey)
             self.shortcut_config = hotkey
-            self.pending_trigger = None
             self.trigger_to_deliver = None
         engine = self.focused_engine
         armed = bool(engine and engine.focus_active and engine.can_accept_preedit)
@@ -226,26 +214,11 @@ class VocoCoordinator:
         for hotkey in self.shortcut_specs:
             if _matches_session_hotkey(keyval, state, hotkey):
                 token = secrets.token_hex(24)
-                self.pending_trigger = (token, engine, engine.context_revision,
-                                        time.monotonic() + 2.0)
                 self.trigger_to_deliver = {"triggerId": token,
                                            "mode": "dictation"}
                 self.consumed_shortcut_keys.add(key)
                 return True
         return False
-
-    def claim_trigger(self, trigger_id: Any) -> None:
-        pending = self.pending_trigger
-        self.pending_trigger = None
-        self.trigger_to_deliver = None
-        if (not isinstance(trigger_id, str) or pending is None
-                or not secrets.compare_digest(trigger_id, pending[0])
-                or time.monotonic() >= pending[3]
-                or self.focused_engine is not pending[1]
-                or not pending[1].focus_active
-                or pending[1].context_revision != pending[2]
-                or not pending[1].can_accept_preedit):
-            raise RuntimeError("The shortcut's original input context could not be verified. Review and copy the transcript in VOCO.")
 
     def activate_engine(self, engine: "VocoEngine") -> None:
         if self.focused_engine is not None and self.focused_engine is not engine:
@@ -254,7 +227,6 @@ class VocoCoordinator:
         self.focused_engine = engine
 
     def deactivate_engine(self, engine: "VocoEngine") -> None:
-        self.pending_trigger = None
         if self.focused_engine is engine:
             self.consumed_shortcut_keys.clear()
             self.focused_engine = None
@@ -262,16 +234,8 @@ class VocoCoordinator:
     def disable_engine(self, engine: "VocoEngine") -> None:
         self.deactivate_engine(engine)
 
-    def register_key_event(self, keyval: int, state: int) -> None:
-        if not is_session_control_key(keyval, state):
-            self.pending_trigger = None
-
-    def register_context_reset(self, engine: "VocoEngine") -> None:
-        self.pending_trigger = None
-
     def disconnect_client(self) -> None:
         self.shortcut_armed_until = 0.0
-        self.pending_trigger = None
         self.trigger_to_deliver = None
 
     def status(self) -> dict[str, Any]:
@@ -328,10 +292,7 @@ class VocoEngine(IBus.Engine):
         self._voco_destroyed = False
 
     def do_process_key_event(self, keyval: int, _keycode: int, state: int) -> bool:
-        if self.coordinator.consume_shortcut(self, keyval, state):
-            return True
-        self.coordinator.register_key_event(keyval, state)
-        return False
+        return self.coordinator.consume_shortcut(self, keyval, state)
 
     def do_focus_in(self) -> None:
         self._enter_focus(("legacy",))
@@ -413,9 +374,6 @@ class VocoEngine(IBus.Engine):
         self.focus_identity = None
         self._clear_content_type_observation()
 
-    def do_reset(self) -> None:
-        self.coordinator.register_context_reset(self)
-
     def do_enable(self) -> None:
         pass
 
@@ -459,17 +417,10 @@ class VocoEngine(IBus.Engine):
         )
 
     def do_set_capabilities(self, capabilities: int) -> None:
-        if int(capabilities) != self._voco_target_capabilities:
-            self.coordinator.pending_trigger = None
         if not self._is_fake_focus(self.focus_identity):
             self._voco_target_capabilities = int(capabilities)
 
     def do_set_content_type(self, purpose: int, hints: int) -> None:
-        if (self._voco_content_type_observed and
-                (self._voco_input_purpose != purpose or self._voco_input_hints != int(hints))):
-            # A changed metadata tuple may be the only observable field change
-            # inside a toolkit input context. Never renew an existing proof.
-            self.coordinator.register_context_reset(self)
         raw_hints = int(hints)
         self._voco_content_type_observed = True
         raw_purpose = int(purpose)
@@ -663,12 +614,6 @@ def _matches_session_hotkey(
     return (
         actual_modifiers == expected_modifiers
         and _event_shortcut_keyval(keyval) == expected_keyval
-    )
-
-
-def is_session_control_key(keyval: int, state: int) -> bool:
-    return bool(int(state) & int(IBus.ModifierType.RELEASE_MASK)) or (
-        keyval in SESSION_CONTROL_KEYVALS
     )
 
 
