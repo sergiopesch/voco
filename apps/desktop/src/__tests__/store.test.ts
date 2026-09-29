@@ -11,7 +11,6 @@ describe("useStore", () => {
       audioLevel: 0,
       config: null,
       surface: "hidden",
-      onboardingStep: 0,
       availableDevices: [],
       microphonePermission: "unknown",
       microphoneReady: false,

@@ -33,7 +33,7 @@ function Fixture() {
   const [selected, setSelected] = useState<NativeCaptureSource | null>(params.get("surface") === "popover" ? sources[0] ?? null : null);
   const [section, setSection] = useState<ComponentProps<typeof ControlPanel>["requestedSection"]>("Audio");
   const [config, setConfig] = useState<ComponentProps<typeof ControlPanel>["config"]>({ hotkey: "Alt+D", selectedMic: null, insertionStrategy: "auto", transcriptTarget: "cursor", liveCursorMode: "stable-cursor-streaming", transcriptEnhancement: "off", onboardingCompleted: false, updateChannel: "stable", installChannel: "github-release", voiceProfile: "default" });
-  return <ControlPanel surface={surface} onboardingStep={0} config={config} dictationStatus={status}
+  return <ControlPanel surface={surface} config={config} dictationStatus={status}
     statusLabel={status === "recording" ? "Listening" : status === "starting" ? "Getting ready" : status === "processing" ? "Finishing" : status === "error" ? "Needs attention" : "Ready to listen"}
     errorMessage={initial === "error" ? "The test could not finish. Try again when your microphone is ready." : null}
     updateState={{ status: "idle", currentVersion: desktopPackage.version, latestRelease: null, lastCheckedAt: null, error: null }}
@@ -41,7 +41,7 @@ function Fixture() {
     selectedDeviceId={null} availableDevices={[]} microphonePermission="unknown"
     nativeMicrophone={{ mode: "native", sources: { revision: "1", defaultSelectionToken: "desk", sources }, selected, busy: false, error: null,
       initialize: noop, refresh: noop, ensureDefault: noop, select: async token => { const source = sources.find(source => source.selectionToken === token); setSelected(source ?? null); return Boolean(source); } }}
-    onSurfaceChange={next => { if (next !== "hidden") setSurface(next); }} onOnboardingStepChange={() => {}}
+    onSurfaceChange={next => { if (next !== "hidden") setSurface(next); }}
     onConfigChange={async patch => { setConfig(previous => ({ ...previous, ...patch })); }}
     onRefreshDevices={noop} onRequestMicrophoneAccess={async () => true} onCheckForUpdates={noop}
     onOpenReleasePage={noop} onRefreshRuntimeDiagnostics={noop}

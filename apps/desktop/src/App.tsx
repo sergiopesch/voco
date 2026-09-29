@@ -31,13 +31,13 @@ import {
   readCachedUpdateState,
   writeCachedUpdateState,
 } from "@/lib/updates";
-import { DiagnosticsRequestGate, sameJsonValue, shortcutPresentation, startLaunchDiagnostics, unknownShortcut } from "@/lib/shortcutPresentation";
+import { DIAGNOSTICS_TIMEOUT_MS, DiagnosticsRequestGate, sameJsonValue, shortcutPresentation, startLaunchDiagnostics, unknownShortcut, withTimeout } from "@/lib/shortcutPresentation";
 import { UpdateCheckCoordinator } from "@/lib/updateCheckCoordinator";
 import { createPanelLevelSender } from "@/lib/audioLevel";
 import { useGlobalShortcut } from "@/hooks/useGlobalShortcut";
 import { useDictation } from "@/hooks/useDictation";
 import { useNativeCaptureSettings } from "@/hooks/useNativeCaptureSettings";
-import { ControlPanel } from "@/components/ControlPanel";
+import { ControlPanel, type PanelSection } from "@/components/ControlPanel";
 import { CrashReview } from "@/components/CrashReview";
 import { StatusMark } from "@/components/StatusMark";
 import vocoBrandImage from "../../../assets/voco-symbol-ui.png";
@@ -77,6 +77,7 @@ function getCaptureSelection() {
     : { backend: "webkit" as const };
 }
 const PANEL_MIN_SIZE = new LogicalSize(760, 560);
+// Dictation never maps a transcript window over the destination.
 const POPOVER_SIZE = new LogicalSize(420, 380);
 
 type ResizeDirection =
@@ -167,7 +168,6 @@ export function App() {
   const error = useStore((state) => state.error);
   const captureNotice = useStore((state) => state.captureNotice);
   const surface = useStore((state) => state.surface);
-  const onboardingStep = useStore((state) => state.onboardingStep);
   const selectedDeviceId = useStore((state) => state.selectedDeviceId);
   const availableDevices = useStore((state) => state.availableDevices);
   const microphonePermission = useStore((state) => state.microphonePermission);
@@ -179,7 +179,6 @@ export function App() {
   const setError = useStore((state) => state.setError);
   const setStatus = useStore((state) => state.setStatus);
   const setSurface = useStore((state) => state.setSurface);
-  const setOnboardingStep = useStore((state) => state.setOnboardingStep);
   const setAvailableDevices = useStore((state) => state.setAvailableDevices);
   const setMicrophonePermission = useStore((state) => state.setMicrophonePermission);
   const setMicrophoneReadyState = useStore((state) => state.setMicrophoneReady);
@@ -222,7 +221,7 @@ export function App() {
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [startupConfigError, setStartupConfigError] = useState<string | null>(null);
   const [settingsRequest, setSettingsRequest] = useState<{
-    section: "General" | "Audio" | "Hotkeys" | "Advanced" | "Output" | "Updates";
+    section: PanelSection;
     id: number;
   }>({ section: "General", id: 0 });
   const [closeRequestId, setCloseRequestId] = useState(0);
@@ -303,8 +302,6 @@ export function App() {
     },
     [dismissInteractiveSurface, setSurface],
   );
-  // Dictation never maps a transcript window over the destination.
-  const popoverSize = POPOVER_SIZE;
   // Text goes to whichever app has focus, so the desktop input helpers are the
   // only delivery setup. IBus and the GNOME panel companion never gate it.
   const desktopInputReady = config?.transcriptTarget === "cursor" &&
@@ -567,16 +564,12 @@ export function App() {
     const revision = lastConfigRevisionRef.current;
     const saveVersion = configSaveRequestVersionRef.current;
     diagnosticsInFlightRef.current = true;
-    let timeout: ReturnType<typeof setTimeout> | undefined;
     try {
       // A stalled observer must neither block opening Settings nor accumulate requests.
       const request = Promise.resolve().then(getRuntimeDiagnostics).finally(() => {
         diagnosticsInFlightRef.current = false;
       });
-      const diagnostics = await Promise.race([
-        request,
-        new Promise<null>((resolve) => { timeout = setTimeout(() => resolve(null), 7500); }),
-      ]);
+      const diagnostics = await withTimeout(request, DIAGNOSTICS_TIMEOUT_MS);
       if (!isCurrent()) return;
       if (!diagnostics || revision !== lastConfigRevisionRef.current ||
           saveVersion !== configSaveRequestVersionRef.current ||
@@ -597,8 +590,6 @@ export function App() {
     } catch (error) {
       if (isCurrent()) invalidateShortcutDiagnostics();
       console.warn("Failed to load runtime diagnostics:", error);
-    } finally {
-      if (timeout !== undefined) clearTimeout(timeout);
     }
   }, [invalidateShortcutDiagnostics]);
 
@@ -675,7 +666,7 @@ export function App() {
     }
   }, [refreshAuthoritativeConfig, refreshDevices, refreshRuntimeDiagnostics]);
 
-  const openSettings = useCallback(async (section: "General" | "Audio" | "Hotkeys" | "Advanced" | "Output" | "Updates" = "General") => {
+  const openSettings = useCallback(async (section: PanelSection = "General") => {
     const requestVersion = panelRequestVersionRef.current + 1;
     panelRequestVersionRef.current = requestVersion;
     const currentStatus = useStore.getState().status;
@@ -847,7 +838,6 @@ export function App() {
           ? loadedSnapshot.config
           : useStore.getState().config ?? loadedSnapshot.config;
         setStartupConfigError(null);
-        setOnboardingStep(0);
         await retryCaptureSetup();
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -862,7 +852,7 @@ export function App() {
       }
     }
     void init();
-  }, [applyAuthoritativeConfig, retryCaptureSetup, setError, setOnboardingStep, setStatus, setSurface]);
+  }, [applyAuthoritativeConfig, retryCaptureSetup, setError, setStatus, setSurface]);
 
   useEffect(() => {
     if (!initComplete || !config?.updateChannel) {
@@ -988,7 +978,7 @@ export function App() {
             height: workArea?.size.height ?? targetMonitor?.size.height ?? window.screen.availHeight * scaleFactor,
             scaleFactor,
           },
-          { width: popoverSize.width, height: popoverSize.height },
+          { width: POPOVER_SIZE.width, height: POPOVER_SIZE.height },
         );
         if (!isCurrentRequest()) return;
         await showInteractiveWindow({
@@ -1031,7 +1021,7 @@ export function App() {
 
     const operation = surfaceSyncQueueRef.current.then(syncWindowSurface);
     surfaceSyncQueueRef.current = operation.catch(() => {});
-  }, [popoverSize, surface, activationRequest]);
+  }, [surface, activationRequest]);
 
   useEffect(() => {
     if (surface !== "settings" && surface !== "onboarding" && surface !== "review") {
@@ -1222,7 +1212,6 @@ export function App() {
         onFinishTest={finishOnboardingTest}
         testPreparing={testPreparing || !initComplete}
         surface={surface}
-        onboardingStep={onboardingStep}
         config={config}
         errorMessage={error ?? settingsError}
         statusLabel={statusLabel}
@@ -1243,7 +1232,6 @@ export function App() {
         availableDevices={availableDevices}
         microphonePermission={microphonePermission}
         onSurfaceChange={handleSurfaceChange}
-        onOnboardingStepChange={setOnboardingStep}
         onConfigChange={applyConfigPatch}
         onRefreshDevices={refreshDevices}
         onRequestMicrophoneAccess={requestMicrophoneAccess}

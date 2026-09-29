@@ -48,7 +48,6 @@ interface AppState {
   audioLevel: number;
   config: AppConfig | null;
   surface: AppSurface;
-  onboardingStep: number;
   availableDevices: AudioDeviceOption[];
   microphonePermission: MicrophonePermission;
   microphoneReady: boolean;
@@ -62,7 +61,6 @@ interface AppState {
   setAudioLevel: (level: number) => void;
   setConfig: (config: AppConfig) => void;
   setSurface: (surface: AppSurface) => void;
-  setOnboardingStep: (step: number) => void;
   setAvailableDevices: (devices: AudioDeviceOption[]) => void;
   setSelectedDeviceId: (deviceId: string | null) => void;
   setMicrophonePermission: (state: MicrophonePermission) => void;
@@ -96,7 +94,6 @@ export const useStore = create<AppState>((set) => ({
   audioLevel: 0,
   config: null,
   surface: "hidden",
-  onboardingStep: 0,
   availableDevices: [],
   microphonePermission: "unknown",
   microphoneReady: false,
@@ -122,7 +119,6 @@ export const useStore = create<AppState>((set) => ({
       surface: deriveSurfaceForConfig(state.surface, state.config, config),
     })),
   setSurface: (surface) => set({ surface }),
-  setOnboardingStep: (step) => set({ onboardingStep: step }),
   setAvailableDevices: (devices) => set({ availableDevices: devices }),
   setSelectedDeviceId: (selectedDeviceId) => set({ selectedDeviceId }),
   setMicrophonePermission: (microphonePermission) => set({ microphonePermission }),

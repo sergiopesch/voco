@@ -792,7 +792,6 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     primedStreamRef.current?.getTracks().forEach((track) => track.stop());
     primedStreamRef.current = null;
     primedStreamPromiseRef.current = null;
-    void browserDeliveryRef.current?.cancel();
     void audioContextRef.current?.close().catch(() => {});
     audioContextRef.current = null;
     clearCapturedAudio();

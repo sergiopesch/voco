@@ -17,7 +17,7 @@ import type {
 import { calculateVisualAudioLevelFromSamples } from "@/lib/audioLevel";
 import { openMicrophoneStream } from "@/lib/audioInput";
 import { createAnimationFrameLease } from "@/lib/animationFrameLease";
-import { microphoneLabel, shortcutPresentation } from "@/lib/shortcutPresentation";
+import { DIAGNOSTICS_TIMEOUT_MS, microphoneLabel, shortcutPresentation, withTimeout } from "@/lib/shortcutPresentation";
 import { getDesktopInputStatus, traceHotkeyEvent } from "@/lib/tauri";
 import { Onboarding } from "@/components/Onboarding";
 import { PanelSetup } from "@/components/PanelSetup";
@@ -35,7 +35,6 @@ interface ControlPanelProps {
   onFinishTest?: () => Promise<boolean>;
   testPreparing?: boolean;
   surface: "onboarding" | "settings" | "popover";
-  onboardingStep: number;
   config: AppConfig;
   errorMessage: string | null;
   statusLabel: string;
@@ -56,7 +55,6 @@ interface ControlPanelProps {
   availableDevices: AudioDeviceOption[];
   microphonePermission: MicrophonePermission;
   onSurfaceChange: (surface: "hidden" | "onboarding" | "settings" | "popover") => void;
-  onOnboardingStepChange: (step: number) => void;
   onConfigChange: (patch: Partial<AppConfig>) => Promise<void>;
   onRefreshDevices: () => Promise<void>;
   onRequestMicrophoneAccess: () => Promise<boolean>;
@@ -68,26 +66,22 @@ interface ControlPanelProps {
 
 const DESKTOP_SETUP_GUIDE = "https://github.com/sergiopesch/voco/blob/master/docs/platform/README.md#ydotoold-ydotool-daemon";
 
-type PanelSection = "General" | "Audio" | "Output" | "Hotkeys" | "Updates" | "Advanced";
+export type PanelSection = "General" | "Audio" | "Hotkeys" | "Updates" | "Advanced";
 
 export function shouldOpenMicrophonePreview(
   surface: ControlPanelProps["surface"],
-  _onboardingStep: number,
   activeSection: PanelSection,
   dictationStatus: DictationStatus = "idle",
 ): boolean {
   if (dictationStatus === "starting" || dictationStatus === "recording" || dictationStatus === "processing") {
     return false;
   }
-  return (
-    (surface === "settings" && activeSection === "Audio")
-  );
+  return surface === "settings" && activeSection === "Audio";
 }
 
 const PANEL_SECTION_LABELS: Record<PanelSection, string> = {
   General: "Settings",
   Audio: "Microphone",
-  Output: "Dictation",
   Hotkeys: "Shortcut",
   Updates: "Updates",
   Advanced: "Help",
@@ -107,7 +101,6 @@ export function ControlPanel({
   onFinishTest,
   testPreparing = false,
   surface,
-  onboardingStep,
   config,
   errorMessage,
   statusLabel,
@@ -128,7 +121,6 @@ export function ControlPanel({
   availableDevices,
   microphonePermission,
   onSurfaceChange,
-  onOnboardingStepChange,
   onConfigChange,
   onRefreshDevices,
   onRequestMicrophoneAccess,
@@ -190,7 +182,6 @@ export function ControlPanel({
   const testPassed = useStore(state => state.onboardingTestPassed);
   const testPurpose = useStore(state => state.dictationPurpose);
   const hotkeyDirty = hotkeyDraft !== config.hotkey;
-  const hasUnsavedChanges = hotkeyDirty;
   const dictationBusy = dictationStatus === "starting" || dictationStatus === "recording" || dictationStatus === "processing";
   // The live level goes straight to the meter; a state update per animation
   // frame would re-render the whole panel.
@@ -204,7 +195,7 @@ export function ControlPanel({
   useEffect(() => {
     previewRetryRequest.current += 1;
     return () => { previewRetryRequest.current += 1; };
-  }, [selectedDeviceId, surface, onboardingStep, activeSection]);
+  }, [selectedDeviceId, surface, activeSection]);
   const retryMicrophone = async () => {
     const request = ++previewRetryRequest.current;
     if (await onRequestMicrophoneAccess() === true && request === previewRetryRequest.current) {
@@ -212,6 +203,10 @@ export function ControlPanel({
     }
   };
   const selectedDeviceLabel = microphoneLabel(nativeMicrophone?.mode, nativeMicrophone?.selected, selectedDeviceId, availableDevices);
+  const deviceOptions = useMemo(() => [
+    { value: "", label: "System default" },
+    ...availableDevices.map((device) => ({ value: device.deviceId, label: device.label })),
+  ], [availableDevices]);
   const shortcut = shortcutPresentation(config.hotkey, runtimeDiagnostics?.shortcut, desktopInput);
   // The tray tooltip keeps any readiness detail; the popover heading stays short.
   const statusHeading = desktopSetupError ? "Setup needed" : statusLabel.startsWith("Ready") ? "Ready" : statusLabel;
@@ -267,12 +262,6 @@ export function ControlPanel({
     }
     return new Date(updateState.lastCheckedAt).toLocaleString();
   }, [updateState.lastCheckedAt]);
-  const panelTitle = isOnboarding
-    ? "VOCO"
-    : isPopover
-      ? "VOCO"
-      : "VOCO settings";
-  const panelEyebrow = isOnboarding ? "Setup" : isPopover ? "Command panel" : "VOCO";
   const runtimeSessionLabel = useMemo(() => {
     switch (runtimeDiagnostics?.sessionType) {
       case "wayland":
@@ -326,14 +315,14 @@ export function ControlPanel({
   }, [confirmHide]);
 
   useEffect(() => {
-    onDraftStateChange?.(hasUnsavedChanges);
+    onDraftStateChange?.(hotkeyDirty);
     return () => onDraftStateChange?.(false);
-  }, [hasUnsavedChanges, onDraftStateChange]);
+  }, [hotkeyDirty, onDraftStateChange]);
 
   useEffect(() => {
-    if (previousCloseRequestRef.current !== closeRequestId && hasUnsavedChanges) setConfirmHide(true);
+    if (previousCloseRequestRef.current !== closeRequestId && hotkeyDirty) setConfirmHide(true);
     previousCloseRequestRef.current = closeRequestId;
-  }, [closeRequestId, hasUnsavedChanges]);
+  }, [closeRequestId, hotkeyDirty]);
 
   useEffect(() => () => onShortcutCaptureChange?.(false), [onShortcutCaptureChange]);
 
@@ -341,7 +330,7 @@ export function ControlPanel({
 
   useEffect(() => {
     headingContainerRef.current?.querySelector<HTMLElement>("h2")?.focus();
-  }, [surface, onboardingStep, activeSection]);
+  }, [surface, activeSection]);
 
   useEffect(() => { setMicrophoneChecked(false); }, [selectedDeviceId]);
 
@@ -371,7 +360,6 @@ export function ControlPanel({
   useEffect(() => {
     const shouldPreview = shouldOpenMicrophonePreview(
       surface,
-      onboardingStep,
       activeSection,
       dictationBusy ? "recording" : "idle",
     );
@@ -464,7 +452,7 @@ export function ControlPanel({
       cancelled = true;
       releasePreview();
     };
-  }, [activeSection, dictationBusy, onboardingStep, selectedDeviceId, surface, microphoneRetryRevision, nativePreviewDisabled, setPreviewLevel]);
+  }, [activeSection, dictationBusy, selectedDeviceId, surface, microphoneRetryRevision, nativePreviewDisabled, setPreviewLevel]);
 
   async function savePatch(
     patch: Partial<AppConfig>,
@@ -526,7 +514,7 @@ export function ControlPanel({
   }
 
   function prepareDictation() {
-    if (hasUnsavedChanges) { setConfirmHide(true); return; }
+    if (hotkeyDirty) { setConfirmHide(true); return; }
     onDraftStateChange?.(false);
     if (onPrepareDictation) onPrepareDictation();
     else onSurfaceChange("hidden");
@@ -545,7 +533,7 @@ export function ControlPanel({
 
   function requestHide() {
     if (isOnboarding && (dictationBusy || testPreparing)) return;
-    if (hasUnsavedChanges) setConfirmHide(true);
+    if (hotkeyDirty) setConfirmHide(true);
     else hidePanel();
   }
 
@@ -557,12 +545,8 @@ export function ControlPanel({
   const checkDesktopSetup = useCallback(async (): Promise<boolean> => {
     const request = ++inputCheckRequest.current;
     setCheckingInput(true);
-    let timeout: ReturnType<typeof setTimeout> | undefined;
     try {
-      const result = await Promise.race([
-        getDesktopInputStatus(),
-        new Promise<null>(resolve => { timeout = setTimeout(() => resolve(null), 7500); }),
-      ]);
+      const result = await withTimeout(getDesktopInputStatus(), DIAGNOSTICS_TIMEOUT_MS);
       if (!result || typeof result.available !== "boolean") throw new Error("Missing readiness result");
       if (request !== inputCheckRequest.current) return false;
       setInputReadiness(result);
@@ -571,7 +555,6 @@ export function ControlPanel({
       if (request === inputCheckRequest.current) setInputReadiness({ available: false, detail: "Couldn’t check desktop setup. Check again, or open the setup instructions." });
       return false;
     } finally {
-      if (timeout !== undefined) clearTimeout(timeout);
       if (request === inputCheckRequest.current) setCheckingInput(false);
     }
   }, []);
@@ -628,7 +611,7 @@ export function ControlPanel({
 
   function renderSettingsNavigation(section: PanelSection) {
     return <button key={section} className="voco-preferences__nav-item"
-      aria-current={(section === "General" ? mainSettings : section === "Advanced" ? activeSection === "Advanced" || activeSection === "Output" : activeSection === section) ? "page" : undefined}
+      aria-current={(section === "General" ? mainSettings : activeSection === section) ? "page" : undefined}
       onClick={() => setActiveSection(section)}>
       <SettingsIcon name={section} /><span>{PANEL_SECTION_LABELS[section]}</span>
     </button>;
@@ -668,8 +651,8 @@ export function ControlPanel({
               />
             </div> : null}
             <div>
-              {isOnboarding ? <p className="voco-panel__eyebrow">{panelEyebrow}</p> : null}
-              <h1 className="voco-panel__title">{panelTitle}</h1>
+              {isOnboarding ? <p className="voco-panel__eyebrow">Setup</p> : null}
+              <h1 className="voco-panel__title">VOCO</h1>
             </div>
           </div>
           <div className="voco-panel__hero-actions">
@@ -757,7 +740,7 @@ export function ControlPanel({
             microphoneControls={onSelected => nativePreviewDisabled && nativeMicrophone
               ? <NativeMicrophoneSettings controls={nativeMicrophone} disabled={dictationBusy || testPreparing} onSelected={onSelected} />
               : <div className="voco-preferences__form"><DeviceSelect label="Microphone" value={selectedDeviceId ?? ""} disabled={saving || dictationBusy || testPreparing}
-                  onChange={value => void selectMicrophone(value || null).then(ok => { if (ok) onSelected(); })} options={[{value: "", label: "System default"}, ...availableDevices.map(device => ({value: device.deviceId, label: device.label}))]} />
+                  onChange={value => void selectMicrophone(value || null).then(ok => { if (ok) onSelected(); })} options={deviceOptions} />
                 <button className="voco-button voco-button--ghost" disabled={saving || dictationBusy || testPreparing} onClick={() => void onRefreshDevices()}>Refresh devices</button>
                 {microphoneSaveError ? <p role="alert">{microphoneSaveError}</p> : null}</div>}
             hotkey={config.hotkey}
@@ -781,7 +764,7 @@ export function ControlPanel({
             </aside>
 
             <div className="voco-preferences__content">
-              <div className="voco-preferences__window-actions" onPointerDown={(event) => void handleHeaderPointerDown(event)} aria-label="Move VOCO window">{!config.onboardingCompleted ? <button className="voco-button voco-button--ghost voco-button--compact" disabled={saving || dictationBusy || hasUnsavedChanges} onClick={() => onSurfaceChange("onboarding")}>Back to setup</button> : null}<button className="voco-button voco-button--ghost voco-button--compact" onClick={requestHide}>Hide to tray</button></div>
+              <div className="voco-preferences__window-actions" onPointerDown={(event) => void handleHeaderPointerDown(event)} aria-label="Move VOCO window">{!config.onboardingCompleted ? <button className="voco-button voco-button--ghost voco-button--compact" disabled={saving || dictationBusy || hotkeyDirty} onClick={() => onSurfaceChange("onboarding")}>Back to setup</button> : null}<button className="voco-button voco-button--ghost voco-button--compact" onClick={requestHide}>Hide to tray</button></div>
               {mainSettings ? <div className="voco-preferences__heading"><h2 tabIndex={-1}>Settings</h2></div> : null}
               {mainSettings ? <>
                   {desktopSetupError ? <div className="voco-inline-note" role="status">Desktop setup needed. <button className="voco-button voco-button--ghost" onClick={() => setActiveSection("Advanced")}>Open Help</button></div>
@@ -797,7 +780,7 @@ export function ControlPanel({
                       <div className="voco-field voco-preferences__field-row"><span>Input device</span>
                         <DeviceSelect label="Input device" value={selectedDeviceId ?? ""} disabled={saving || dictationBusy}
                           onChange={value => void selectMicrophone(value || null)}
-                          options={[{ value: "", label: "System default" }, ...availableDevices.map(device => ({ value: device.deviceId, label: device.label }))]} />
+                          options={deviceOptions} />
                       </div>
                       {microphoneSaveError ? <div className="voco-inline-note voco-inline-note--error" role="alert">{microphoneSaveError}</div> : null}
                       <div className="voco-preferences__actions"><button className="voco-button voco-button--ghost" disabled={saving || dictationBusy || testPreparing} onClick={() => void onRefreshDevices()}>Refresh devices</button></div>
@@ -876,7 +859,7 @@ export function ControlPanel({
                 </section>
               ) : null}
 
-              {activeSection === "Advanced" || activeSection === "Output" ? (
+              {activeSection === "Advanced" ? (
                 <section className="voco-preferences__page">
                   <div className="voco-preferences__heading"><h2 tabIndex={-1}>Help</h2></div>
                   <PanelSetup disabled={saving || dictationBusy} />
@@ -900,19 +883,19 @@ export function ControlPanel({
                   <div className="voco-preferences__actions">
                     <button className="voco-button voco-button--secondary" onClick={() => void onRefreshRuntimeDiagnostics()}>Refresh runtime checks</button>
                     {desktopSetupError ? <button className="voco-button voco-button--secondary" onClick={() => void onOpenReleasePage(DESKTOP_SETUP_GUIDE)}>Open setup instructions</button> : null}
-                    <button className="voco-button voco-button--ghost" disabled={saving || hasUnsavedChanges} title={hasUnsavedChanges ? "Apply or cancel your shortcut before restarting setup." : undefined}
-                      onClick={async () => { const result = await savePatch({ onboardingCompleted: false }); if (result.ok) { onOnboardingStepChange(0); onSurfaceChange("onboarding"); } }}>Run setup again</button>
+                    <button className="voco-button voco-button--ghost" disabled={saving || hotkeyDirty} title={hotkeyDirty ? "Apply or cancel your shortcut before restarting setup." : undefined}
+                      onClick={async () => { const result = await savePatch({ onboardingCompleted: false }); if (result.ok) onSurfaceChange("onboarding"); }}>Run setup again</button>
                   </div>
                 </section>
               ) : null}
-              {saving || hasUnsavedChanges || saveFeedback ? <p className="voco-preferences__feedback voco-motion-feedback" role="status"><StatusMark state={saving ? "working" : hasUnsavedChanges ? "idle" : saveOutcome} />{saving ? "Saving…" : hasUnsavedChanges ? "Unsaved shortcut — apply or cancel it." : saveFeedback}</p> : null}
+              {saving || hotkeyDirty || saveFeedback ? <p className="voco-preferences__feedback voco-motion-feedback" role="status"><StatusMark state={saving ? "working" : hotkeyDirty ? "idle" : saveOutcome} />{saving ? "Saving…" : hotkeyDirty ? "Unsaved shortcut — apply or cancel it." : saveFeedback}</p> : null}
             </div>
           </section>
         )}
 
         {isOnboarding && (saving || saveFeedback) ? (
           <footer className="voco-panel__footer">
-            <span className="voco-save-status" role="status">{saving ? "Saving…" : hasUnsavedChanges ? "Unsaved shortcut — apply or cancel it." : saveFeedback}</span>
+            <span className="voco-save-status" role="status">{saving ? "Saving…" : hotkeyDirty ? "Unsaved shortcut — apply or cancel it." : saveFeedback}</span>
           </footer>
         ) : null}
       </section>

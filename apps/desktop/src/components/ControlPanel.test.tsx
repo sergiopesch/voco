@@ -42,7 +42,6 @@ function renderPanel(
   return renderToStaticMarkup(
     <ControlPanel
       surface="popover"
-      onboardingStep={0}
       config={config}
       errorMessage={null}
       statusLabel="Ready to listen"
@@ -61,7 +60,6 @@ function renderPanel(
       availableDevices={[]}
       microphonePermission="unknown"
       onSurfaceChange={vi.fn()}
-      onOnboardingStepChange={vi.fn()}
       onConfigChange={asyncNoop}
       onRefreshDevices={asyncNoop}
       onRequestMicrophoneAccess={async () => true}
@@ -188,24 +186,17 @@ describe("ControlPanel", () => {
   it("explains that words go to the focused app and the clipboard fallback", () => {
     const settingsMarkup = renderPanel({
       surface: "settings",
-      requestedSection: "Output",
+      requestedSection: "Advanced",
     });
     expect(settingsMarkup).toContain("VOCO pastes into whichever app has keyboard focus, including terminals and browsers.");
     expect(settingsMarkup).toContain("copies the rest of your words to the clipboard when you stop");
     expect(settingsMarkup).toContain("If the copy fails too, or VOCO exits unexpectedly, choose Review in the tray to get your words back.");
     expect(settingsMarkup).toContain("IBus shortcut (optional)");
 
-    const onboardingMarkup = renderPanel({
-      surface: "onboarding",
-      onboardingStep: 2,
-    });
+    const onboardingMarkup = renderPanel({ surface: "onboarding" });
     expect(onboardingMarkup).not.toContain(">Done</button>");
     expect(onboardingMarkup).toContain("this test only displays words here");
   });
-
-
-
-
 });
 
 describe("Crystal Sidebar settings", () => {
@@ -224,7 +215,6 @@ describe("Crystal Sidebar settings", () => {
     expect(markup).not.toContain("Waiting for sound");
     expect(markup).not.toContain("Speak a few words");
   });
-
 
   it.each(["starting", "recording", "processing"] as const)("pauses the sound check during %s", (dictationStatus) => {
     const markup = renderPanel({ surface: "settings", requestedSection: "Audio", dictationStatus });
@@ -247,24 +237,20 @@ describe("Crystal Sidebar settings", () => {
     expect(renderPanel({ surface: "popover" })).not.toContain("Reduce visual effects");
   });
 
-
-
-  it.each(["General", "Audio", "Output", "Hotkeys", "Updates", "Advanced"] as const)("keeps Hide to tray available in %s", (requestedSection) => {
+  it.each(["General", "Audio", "Hotkeys", "Updates", "Advanced"] as const)("keeps Hide to tray available in %s", (requestedSection) => {
     const markup = renderPanel({ surface: "settings", requestedSection });
     expect(markup.match(/>Hide to tray</g)).toHaveLength(1);
   });
 });
 
 describe("microphone preview gating", () => {
-
-  it("opens only on the inactive onboarding or Audio surfaces", () => {
-    expect(shouldOpenMicrophonePreview("onboarding", 1, "General")).toBe(false);
-    expect(shouldOpenMicrophonePreview("settings", 0, "Audio")).toBe(true);
-    expect(shouldOpenMicrophonePreview("settings", 0, "General")).toBe(false);
-    expect(shouldOpenMicrophonePreview("popover", 0, "Audio")).toBe(false);
+  it("opens only on the Audio settings page", () => {
+    expect(shouldOpenMicrophonePreview("onboarding", "General")).toBe(false);
+    expect(shouldOpenMicrophonePreview("settings", "Audio")).toBe(true);
+    expect(shouldOpenMicrophonePreview("settings", "General")).toBe(false);
+    expect(shouldOpenMicrophonePreview("popover", "Audio")).toBe(false);
   });
 });
-
 
 describe("guided dictation and settings journeys", () => {
   it("requires a successful voice test before completing onboarding", () => {
@@ -287,7 +273,7 @@ describe("guided dictation and settings journeys", () => {
   it("keeps configured shortcuts in the core guide and output instructions", () => {
     const custom = { ...config, hotkey: "Ctrl+Shift+V" };
     expect(renderPanel({ config: custom })).toContain("Ctrl+Shift+V");
-    const output = renderPanel({ surface: "settings", requestedSection: "Output", config: custom });
+    const output = renderPanel({ surface: "settings", requestedSection: "Advanced", config: custom });
     expect(output).toContain("Ctrl+Shift+V");
     expect(output).not.toContain("Alt+D");
   });
@@ -300,8 +286,8 @@ describe("guided dictation and settings journeys", () => {
 
   it("never opens audio preview while dictation is starting or running", () => {
     for (const status of ["starting", "recording", "processing"] as const) {
-      expect(shouldOpenMicrophonePreview("onboarding", 1, "General", status)).toBe(false);
-      expect(shouldOpenMicrophonePreview("settings", 0, "Audio", status)).toBe(false);
+      expect(shouldOpenMicrophonePreview("onboarding", "General", status)).toBe(false);
+      expect(shouldOpenMicrophonePreview("settings", "Audio", status)).toBe(false);
     }
   });
 });
@@ -319,14 +305,13 @@ describe("shortcut recording", () => {
   });
 });
 
-
 describe("dictation-only product", () => {
   it("offers one cursor path and no assistant, enhancement or appearance controls", () => {
-    for (const requestedSection of ["General", "Audio", "Output", "Hotkeys", "Updates", "Advanced"] as const) {
+    for (const requestedSection of ["General", "Audio", "Hotkeys", "Updates", "Advanced"] as const) {
       const markup = renderPanel({ surface: "settings", requestedSection });
       for (const retired of ["OpenClaw", "Ask local", "Realtime", "Live cursor mode", "Transcript enhancement", "Appearance", "Integrations"]) expect(markup).not.toContain(retired);
     }
-    const output = renderPanel({ surface: "settings", requestedSection: "Output" });
+    const output = renderPanel({ surface: "settings", requestedSection: "Advanced" });
     expect(output).toContain("How to dictate");
     expect(output).toContain("never presses Enter");
     expect(output).not.toContain("<select");

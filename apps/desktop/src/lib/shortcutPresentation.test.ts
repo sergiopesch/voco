@@ -1,11 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  DIAGNOSTICS_TIMEOUT_MS,
   DiagnosticsRequestGate,
   microphoneLabel,
   sameJsonValue,
   shortcutPresentation,
   startLaunchDiagnostics,
   unknownShortcut,
+  withTimeout,
 } from "./shortcutPresentation";
 import type { ShortcutDiagnostics } from "@/types";
 
@@ -20,6 +22,28 @@ describe("sameJsonValue", () => {
     expect(sameJsonValue({ a: 1 }, { a: 1, b: undefined })).toBe(false);
     expect(sameJsonValue([1], { 0: 1 })).toBe(false);
     expect(sameJsonValue({ a: null }, { a: {} })).toBe(false);
+  });
+});
+
+describe("withTimeout", () => {
+  afterEach(() => { vi.useRealTimers(); });
+
+  it("settles with the operation and leaves no timer behind", async () => {
+    vi.useFakeTimers();
+    await expect(withTimeout(Promise.resolve("ready"), DIAGNOSTICS_TIMEOUT_MS)).resolves.toBe("ready");
+    await expect(withTimeout(Promise.reject(new Error("failed")), DIAGNOSTICS_TIMEOUT_MS)).rejects.toThrow("failed");
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("resolves null once a stalled operation runs out of time", async () => {
+    vi.useFakeTimers();
+    let result: string | null | undefined;
+    void withTimeout(new Promise<string>(() => {}), DIAGNOSTICS_TIMEOUT_MS).then((value) => { result = value; });
+    await vi.advanceTimersByTimeAsync(DIAGNOSTICS_TIMEOUT_MS - 1);
+    expect(result).toBeUndefined();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(result).toBeNull();
+    expect(vi.getTimerCount()).toBe(0);
   });
 });
 

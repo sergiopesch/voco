@@ -64,6 +64,22 @@ export function sameJsonValue(a: unknown, b: unknown): boolean {
     Object.prototype.hasOwnProperty.call(right, key) && sameJsonValue(left[key], right[key]));
 }
 
+/** How long a desktop check may take before VOCO treats it as unanswered. */
+export const DIAGNOSTICS_TIMEOUT_MS = 7500;
+
+/** Settles with the operation, or resolves null if `timeoutMs` passes first. */
+export async function withTimeout<T>(operation: Promise<T>, timeoutMs: number): Promise<T | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      operation,
+      new Promise<null>((resolve) => { timer = setTimeout(() => resolve(null), timeoutMs); }),
+    ]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}
+
 /**
  * Runs the launch diagnostics check. If it leaves diagnostics unloaded (timeout,
  * failure or a stale result), setup is reported conservatively and the check is
