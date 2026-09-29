@@ -57,8 +57,13 @@ def launch(name, args, stdout=None, env=None):
     return process
 
 
-def focus_window(pid=None, title=None):
-    search = ['xdotool', 'search', '--onlyvisible', *(['--pid', str(pid)] if pid else ['--name', title])]
+def window_names():
+    ids = subprocess.run(['xdotool', 'search', '--onlyvisible', '--name', '.*'], capture_output=True, text=True, timeout=5).stdout.split()
+    return [subprocess.run(['xdotool', 'getwindowname', id], capture_output=True, text=True, timeout=5).stdout.strip() for id in ids]
+
+
+def focus_window(process, title=None):
+    search = ['xdotool', 'search', '--onlyvisible', *(['--name', title] if title else ['--pid', str(process.pid)])]
     deadline = time.monotonic() + 20
     while time.monotonic() < deadline:
         ids = subprocess.run(search, capture_output=True, text=True, timeout=5).stdout.split()
@@ -68,7 +73,9 @@ def focus_window(pid=None, title=None):
             windows.append(ids[-1])
             return ids[-1]
         time.sleep(.05)
-    raise AssertionError('Application window unavailable')
+    if process.poll() is not None:
+        raise AssertionError(f'Application window unavailable: the application exited with status {process.returncode}')
+    raise AssertionError(f'Application window unavailable; visible windows: {window_names()}')
 
 
 def toolkit(kind):
@@ -77,7 +84,7 @@ def toolkit(kind):
         fixture.stdin.write(command.encode() + b'\n')
         assert select.select([fixture.stdout], [], [], 5)[0], 'Fixture did not answer'
         return json.loads(fixture.stdout.readline())
-    focus_window(pid=fixture.pid)
+    focus_window(fixture)
     wait_for(ask, {'focus': 'entry', 'entry': '', 'document': ''}, 'Entry focus')
     paste('Hello')
     wait_for(ask, {'focus': 'entry', 'entry': 'Hello', 'document': ''}, 'First chunk')
@@ -92,7 +99,7 @@ def toolkit(kind):
 def text_editor():
     document = home/'text-editor.txt'; document.write_text('')
     editor = launch('text-editor', ['gnome-text-editor', '--standalone', str(document)])
-    focus_window(pid=editor.pid)
+    focus_window(editor)
     time.sleep(1)  # GNOME Text Editor has no readiness signal for its opened document.
     for text, expected in (('Hello', 'Hello'), (' Linux.', 'Hello Linux.')):
         paste(text)
@@ -108,8 +115,8 @@ def bash(name, terminal):
 PROMPT_COMMAND='echo >> {prompts}'
 bind -x '"\\C-t": printf %s "$READLINE_LINE" > {line}'
 """)
-    launch(name, [*terminal, '/bin/bash', '--noprofile', '--rcfile', str(work/'bashrc')])
-    focus_window(title=name)
+    shell = launch(name, [*terminal, '/bin/bash', '--noprofile', '--rcfile', str(work/'bashrc')])
+    focus_window(shell, title=name)
     wait_for(prompt_count, 1, 'Bash prompt')
     def typed():
         key('ctrl+t'); time.sleep(.1)
@@ -124,8 +131,8 @@ bind -x '"\\C-t": printf %s "$READLINE_LINE" > {line}'
 
 def nano(name, terminal):
     document = home/'nano.txt'; document.write_text('')
-    launch(name, [*terminal, '/usr/bin/nano', '--ignorerc', '--locking', str(document)])
-    focus_window(title=name)
+    editor = launch(name, [*terminal, '/usr/bin/nano', '--ignorerc', '--locking', str(document)])
+    focus_window(editor, title=name)
     # nano writes its lock file after it takes over terminal input.
     wait_for(home.joinpath('.nano.txt.swp').exists, True, 'nano startup')
     for text, expected in (('hello', 'hello'), (' linux', 'hello linux')):
@@ -142,13 +149,16 @@ def firefox():
     (profile/'user.js').write_text('user_pref("browser.shell.checkDefaultBrowser", false);\n'
                                    'user_pref("browser.startup.homepage_override.mstone", "ignore");\n'
                                    'user_pref("browser.aboutwelcome.enabled", false);\n'
-                                   'user_pref("toolkit.telemetry.reportingpolicy.firstRun", false);\n')
+                                   'user_pref("toolkit.telemetry.reportingpolicy.firstRun", false);\n'
+                                   'user_pref("datareporting.policy.dataSubmissionEnabled", false);\n'
+                                   'user_pref("datareporting.policy.firstRunURL", "");\n')
     # The page mirrors its field into the window title for readback. Firefox
     # blocks top-level data: URLs, so it loads a local file.
     page = home/'firefox.html'
     page.write_text('<title>[]</title><textarea autofocus oninput="document.title=\'[\'+this.value+\']\'"></textarea>')
-    launch('firefox', [os.environ['VOCO_FIREFOX_BINARY'], '--no-remote', '--profile', str(profile), page.as_uri()])
-    window = focus_window(title=r'^\[\]')
+    browser = launch('firefox', [os.environ['VOCO_FIREFOX_BINARY'], '--no-remote', '--profile', str(profile), page.as_uri()],
+                     env={**os.environ, 'MOZ_CRASHREPORTER_DISABLE': '1'})
+    window = focus_window(browser, title=r'^\[\]')
     def title():
         name = subprocess.run(['xdotool', 'getwindowname', window], capture_output=True, text=True, timeout=5).stdout
         match = re.match(r'\[(.*)\]', name)
@@ -167,10 +177,10 @@ def vscode():
     stubs = home/'vscode-bin'; stubs.mkdir()
     (stubs/'xdg-open').write_text('#!/bin/sh\nexit 0\n'); (stubs/'xdg-open').chmod(0o755)
     document = home/'vscode.txt'; document.write_text('')
-    launch('vscode', [os.environ['VOCO_VSCODE_BINARY'], '--no-sandbox', '--disable-gpu', '--password-store=basic',
-                      f'--user-data-dir={profile}', f'--extensions-dir={profile/"extensions"}', '--new-window', str(document)],
-           env={**os.environ, 'PATH': f'{stubs}:{os.environ["PATH"]}'})
-    focus_window(title=r'vscode\.txt')
+    editor = launch('vscode', [os.environ['VOCO_VSCODE_BINARY'], '--no-sandbox', '--disable-gpu', '--password-store=basic',
+                               f'--user-data-dir={profile}', f'--extensions-dir={profile/"extensions"}', '--new-window', str(document)],
+                    env={**os.environ, 'PATH': f'{stubs}:{os.environ["PATH"]}'})
+    focus_window(editor, title=r'vscode\.txt')
     time.sleep(2)  # The window title appears before the editor accepts input.
     for text, expected in (('Hello', 'Hello'), (' Linux.', 'Hello Linux.')):
         paste(text)
