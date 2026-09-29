@@ -21,8 +21,8 @@ if [[ ${1:-} != --inside ]]; then
   fi
   run=$(mktemp -d)
   trap 'status=$?; /usr/bin/python3 "$ROOT/scripts/test-native-wayland.py" "$run" --manifest "$status"; mkdir -p "$VOCO_WAYLAND_EVIDENCE_DIR"; cp -a "$run/evidence/." "$VOCO_WAYLAND_EVIDENCE_DIR/"; rm -rf "$run"; exit "$status"' EXIT
-  mkdir -p "$run"/{home,runtime,config,cache,data,state,evidence}
-  chmod 700 "$run/runtime"
+  mkdir -p "$run"/{home,runtime,config,cache,data,state,evidence,pulse}
+  chmod 700 "$run/runtime" "$run/pulse"
   mkdir -p "$run/data/voco/models"
   chmod 755 "$run/data/voco" "$run/data/voco/models"
   if [[ ${VOCO_WAYLAND_CAPTURE:-0} == 1 ]]; then
@@ -39,6 +39,7 @@ if [[ ${1:-} != --inside ]]; then
     --ro-bind / / --dev /dev --proc /proc --tmpfs /tmp --tmpfs /run/user --tmpfs /run/dbus \
     --bind "$run" "$run" --ro-bind "$VOCO_WAYLAND_DEPS" /tmp/wayland-deps \
     --ro-bind "${VOCO_NATIVE_DEPS:-/usr}" /tmp/native-deps \
+    --dir "/run/user/$(id -u)" --bind "$run/pulse" "/run/user/$(id -u)/pulse" \
     --setenv HOME "$run/home" --setenv XDG_RUNTIME_DIR "$run/runtime" \
     --setenv XDG_CONFIG_HOME "$run/config" --setenv XDG_CACHE_HOME "$run/cache" \
     --setenv XDG_DATA_HOME "$run/data" --setenv XDG_STATE_HOME "$run/state" \
@@ -62,7 +63,13 @@ if [[ ${VOCO_WAYLAND_BACKEND:-headless} == nested-x11 ]]; then
 else
   weston --backend=headless-backend.so --renderer=pixman --shell=kiosk-shell.so --socket="$WAYLAND_DISPLAY" --idle-time=0 --no-config >"$run/evidence/weston.log" 2>&1 &
 fi
-for _ in $(seq 1 100); do [[ -S $XDG_RUNTIME_DIR/$WAYLAND_DISPLAY ]] && break; sleep .05; done
+weston_pid=$!
+# The nested backend can take several seconds to load on a busy runner.
+for _ in $(seq 1 600); do
+  [[ -S $XDG_RUNTIME_DIR/$WAYLAND_DISPLAY ]] && break
+  kill -0 "$weston_pid" 2>/dev/null || break
+  sleep .05
+done
 [[ -S $XDG_RUNTIME_DIR/$WAYLAND_DISPLAY ]] || { cat "$run/evidence/weston.log"; exit 1; }
 wayland-info >"$run/evidence/wayland-info.txt"
 exec dbus-run-session -- /usr/bin/python3 "$ROOT/scripts/test-native-wayland.py" "$run"

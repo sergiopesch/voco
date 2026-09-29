@@ -181,21 +181,24 @@ try:
     env['RUST_LOG'] = 'info'
 
     if capture_requested:
-        env.update(PULSE_SERVER='unix:' + str(root / 'runtime/pulse.sock'),
+        # Native capture connects only to the per-user socket and requires a
+        # PipeWire source serial, so the synthetic source declares one.
+        pulse_socket = Path(f'/run/user/{os.getuid()}/pulse/native')
+        env.update(PULSE_SERVER='unix:' + str(pulse_socket),
                    PULSE_SOURCE='voco_fixture', PULSE_SINK='fixture')
         os.environ.update(env)
         pulse = subprocess.Popen([os.environ['VOCO_WAYLAND_PULSEAUDIO'], '--daemonize=no', '--use-pid-file=no',
                                   '--exit-idle-time=-1', '--disable-shm=true', '-n',
                                   '--log-target=file:' + str(evidence / 'pulse.log'),
-                                  '-L', 'module-native-protocol-unix socket=' + str(root / 'runtime/pulse.sock') + ' auth-anonymous=1',
+                                  '-L', 'module-native-protocol-unix socket=' + str(pulse_socket) + ' auth-anonymous=1',
                                   '-L', 'module-null-sink sink_name=fixture rate=48000',
-                                  '-L', 'module-remap-source master=fixture.monitor source_name=voco_fixture'])
+                                  '-L', 'module-remap-source master=fixture.monitor source_name=voco_fixture source_properties=object.serial=1'])
         children.append(pulse)
         until = time.monotonic() + 5
-        while not (root / 'runtime/pulse.sock').exists() and time.monotonic() < until:
+        while not pulse_socket.exists() and time.monotonic() < until:
             assert pulse.poll() is None
             time.sleep(.02)
-        assert (root / 'runtime/pulse.sock').exists()
+        assert pulse_socket.exists()
         subprocess.run([os.environ['VOCO_WAYLAND_PACTL'], 'set-default-source', 'voco_fixture'], check=True, timeout=5)
     if (root / 'voco').exists():
         gi.require_version('Atspi', '2.0')

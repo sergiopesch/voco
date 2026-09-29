@@ -109,19 +109,22 @@ try:
     if capture_requested:
         assert report['backend'] == 'nested-x11' and report['clipboardProbe']['crossProcessReadbackVerified']
         assert (root / 'voco').exists() and (root / 'speech/models/nemotron-speech-streaming-en-0.6b.q8_0.gguf').exists()
-        os.environ.update(PULSE_SERVER='unix:' + str(root / 'runtime/pulse.sock'),
+        # Native capture connects only to the per-user socket and requires a
+        # PipeWire source serial, so the synthetic source declares one.
+        pulse_socket = Path(f'/run/user/{os.getuid()}/pulse/native')
+        os.environ.update(PULSE_SERVER='unix:' + str(pulse_socket),
                           PULSE_SOURCE='voco_fixture', PULSE_SINK='fixture')
         pulse = subprocess.Popen([os.environ['VOCO_WAYLAND_PULSEAUDIO'], '--daemonize=no', '--use-pid-file=no',
                                   '--exit-idle-time=-1', '--disable-shm=true', '-n',
                                   '--log-target=file:' + str(root / 'evidence/pulse.log'),
-                                  '-L', 'module-native-protocol-unix socket=' + str(root / 'runtime/pulse.sock') + ' auth-anonymous=1',
+                                  '-L', 'module-native-protocol-unix socket=' + str(pulse_socket) + ' auth-anonymous=1',
                                   '-L', 'module-null-sink sink_name=fixture rate=48000',
-                                  '-L', 'module-remap-source master=fixture.monitor source_name=voco_fixture'])
+                                  '-L', 'module-remap-source master=fixture.monitor source_name=voco_fixture source_properties=object.serial=1'])
         deadline = time.monotonic() + 5
-        while not (root / 'runtime/pulse.sock').exists() and time.monotonic() < deadline:
+        while not pulse_socket.exists() and time.monotonic() < deadline:
             assert pulse.poll() is None, 'Private PulseAudio exited'
             time.sleep(.02)
-        assert (root / 'runtime/pulse.sock').exists(), 'Private audio socket missing'
+        assert pulse_socket.exists(), 'Private audio socket missing'
         subprocess.run([os.environ['VOCO_WAYLAND_PACTL'], 'set-default-source', 'voco_fixture'], check=True, timeout=5)
         (root / 'evidence/pulse-sources.txt').write_text(subprocess.check_output([os.environ['VOCO_WAYLAND_PACTL'], 'list', 'short', 'sources'], text=True, timeout=5))
     if (root / 'voco').exists():

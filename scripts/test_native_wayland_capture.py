@@ -96,7 +96,7 @@ def run_capture(root, app, pump, activate, geometry_provider=None, control_revea
     Gtk.init([])
 
     assert 'DISPLAY' not in os.environ
-    assert os.environ['PULSE_SERVER'] == 'unix:' + str(root / 'runtime/pulse.sock')
+    assert os.environ['PULSE_SERVER'] == f'unix:/run/user/{os.getuid()}/pulse/native'
     assert not Path('/dev/snd').exists() and not Path('/dev/input').exists()
     assert Gdk.Display.get_default().__gtype__.name == 'GdkWaylandDisplay'
     remap_capture = os.environ.get('VOCO_WAYLAND_SURFACE_JOURNEY') == '1'

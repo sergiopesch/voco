@@ -16,8 +16,8 @@ if [[ ${1:-} != --inside ]]; then
     export VOCO_WAYLAND_PAPLAY="$(command -v paplay)"
   fi
   run=$(mktemp -d)
-  mkdir -p "$run"/{home,runtime,config,cache,data,state,evidence}
-  chmod 700 "$run/runtime"
+  mkdir -p "$run"/{home,runtime,config,cache,data,state,evidence,pulse}
+  chmod 700 "$run/runtime" "$run/pulse"
   cp -a "$VOCO_KDE_DEPS/../etc/xdg/." "$run/config/"
   mkdir -p "$run/evidence/sources"
   cp "$ROOT/scripts/test-native-kde.sh" "$ROOT/scripts/test-native-kde.py" "$ROOT/scripts/test-native-wayland.py" "$ROOT/scripts/test_native_wayland_capture.py" "$run/evidence/sources/"
@@ -33,6 +33,7 @@ if [[ ${1:-} != --inside ]]; then
   bwrap --die-with-parent --new-session --unshare-ipc --unshare-net --unshare-pid --unshare-uts \
     --ro-bind / / --dev /dev --proc /proc --tmpfs /tmp --tmpfs /run/user --tmpfs /run/dbus \
     --bind "$run" "$run" --ro-bind "$VOCO_NATIVE_DEPS" /tmp/native-deps --ro-bind "$VOCO_KDE_DEPS" /tmp/kde-deps \
+    --dir "/run/user/$(id -u)" --bind "$run/pulse" "/run/user/$(id -u)/pulse" \
     --setenv HOME "$run/home" --setenv XDG_RUNTIME_DIR "$run/runtime" \
     --setenv XDG_CONFIG_HOME "$run/config" --setenv XDG_CACHE_HOME "$run/cache" \
     --setenv XDG_DATA_HOME "$run/data" --setenv XDG_STATE_HOME "$run/state" \
