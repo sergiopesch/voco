@@ -260,8 +260,10 @@ for (const failure of ['module', 'construction']) {
   assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>c[0]==='pasteDesktopText')),false);
   await stop();await interrupted();
   assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>['transcribeAudio','pasteDesktopText'].includes(c[0]))),false);
+  // Start already said this recording won't be typed, so Stop only sets the error.
   const fallbackNotes = await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='showNotification'));
-  assert.ok(fallbackNotes.some(c=>c[1]==='Dictation interrupted'&&c[2].includes("didn't type this recording")), JSON.stringify(fallbackNotes));
+  assert.deepEqual(fallbackNotes.map(c=>c[1]), ["Dictation won't be typed"], JSON.stringify(fallbackNotes));
+  assert.match(await page.evaluate(()=>window.store.getState().error), /didn't type this recording/);
   assert.equal(await page.getByRole('button',{name:'Retry transcription',exact:true}).count(),0);
   assert.equal(await page.evaluate(()=>window.journalCalls.at(-1)[0]),'finish_crash_journal');
   results.push(`NVIDIA ${failure} fallback never inserts unverified audio and clears controlled-failure content.`);

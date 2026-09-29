@@ -196,7 +196,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
 
   // One controller lives for the whole launch, so these limit repeat notifications.
   let crashRecoveryUnavailableNotified = false;
-  let recognitionFailureNotifiedSession: number | null = null;
+  let interruptionNotifiedSession: number | null = null;
   let journal: CrashJournal | null = null;
   let journalCleanup: Promise<void> = Promise.resolve();
   async function finishJournal() {
@@ -237,9 +237,9 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     releaseRecordingOrigin();
     const current = useStore.getState();
     if (current.dictationPurpose !== "onboarding") {
-      // A live recognition failure already notified; the error slot keeps the reason.
-      const failureNotified = recognitionFailureNotifiedSession === sessionRef.current.sessionId;
-      recognitionFailureNotifiedSession = null;
+      // A live notification already covered this session; the error slot keeps the reason.
+      const alreadyNotified = interruptionNotifiedSession === sessionRef.current.sessionId;
+      interruptionNotifiedSession = null;
       const native = nativeCaptureRef.current;
       nativeCaptureRef.current = null;
       void native?.cancel().catch(() => {});
@@ -258,8 +258,10 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       setInterimTranscript("");
       transitionCursorDelivery("session-idle");
       traceDictationEvent("dictation_interrupted").catch(() => {});
-      const body = reason === new CrashJournalCleanupError().message || reason === UNVERIFIED_CAPTURE_REASON
-        ? reason : failureNotified ? null : "Some words may be missing. Check your text field before starting again.";
+      const body = reason === new CrashJournalCleanupError().message ? reason
+        : alreadyNotified ? null
+        : reason === UNVERIFIED_CAPTURE_REASON ? reason
+        : "Some words may be missing. Check your text field before starting again.";
       if (body) void showNotification("Dictation interrupted", body).catch(() => {});
       return;
     }
@@ -525,6 +527,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
           sessionRef.current = disableLivePreview(sessionRef.current);
           // The popover cannot open during dictation, so notify instead.
           if (!onboardingTest) {
+            interruptionNotifiedSession = startingSessionId;
             void showNotification("Dictation won't be typed", "VOCO can't confirm it is receiving all of your audio, so it won't type this recording. Stop and try again.").catch(() => {});
           }
           connectScriptProcessor(audioContext!, source);
@@ -586,7 +589,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
           if (onboardingTest) setError(`Voice test paused: ${sentence(error.message)} Finish test, then try again.`);
           else if (phaseRef.current === "recording") {
             // A delivery failure stops typing; healthy recognition runs through Stop.
-            if (kind === "recognition") recognitionFailureNotifiedSession = startingSessionId;
+            if (kind === "recognition") interruptionNotifiedSession = startingSessionId;
             void (kind === "delivery"
               ? showNotification("VOCO stopped typing", "It's still listening. When you stop, VOCO copies the rest of your words to the clipboard.")
               : showNotification("Dictation interrupted", "Some words may be missing. Stop dictation and check your text field.")).catch(() => {});

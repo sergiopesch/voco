@@ -210,6 +210,27 @@ it("notifies a live recognition failure once, not again at Stop", async () => {
   expect(h.state.setCaptureNotice.mock.calls.every(([notice]) => notice === null)).toBe(true);
 });
 
+it("notifies an unverified desktop recording once, at start", async () => {
+  const h = harness();
+  h.env.captureSelectionRef.current = () => ({ backend: "webkit" });
+  vi.mocked(h.env.ensureAudioContext).mockResolvedValue({
+    sampleRate: 16000, createMediaStreamSource: vi.fn(() => ({})),
+  } as unknown as AudioContext);
+  vi.mocked(h.env.openTracedMicrophoneStream).mockResolvedValue({
+    getTracks: () => [], getAudioTracks: () => [],
+  } as unknown as MediaStream);
+  vi.mocked(h.env.connectWorklet).mockResolvedValue(false);
+  await h.startRecording();
+  expect(h.phase.current).toBe("recording");
+  expect(h.notify).toHaveBeenCalledExactlyOnceWith("Dictation won't be typed",
+    "VOCO can't confirm it is receiving all of your audio, so it won't type this recording. Stop and try again.");
+  appendAudioSamples(h.env.audioBufferRef.current, new Float32Array([0.125, -0.25]));
+  await h.stopRecording();
+  expect(h.phase.current).toBe("idle");
+  expect(h.setError).toHaveBeenLastCalledWith("VOCO couldn't confirm it received all of your audio, so it didn't type this recording. Try again.");
+  expect(h.notify).toHaveBeenCalledOnce();
+});
+
 it("does not query desktop input for an explicit browser recording", async () => {
   const h = harness();
   await h.startRecording("browser:test");
