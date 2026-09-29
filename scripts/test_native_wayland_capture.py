@@ -250,6 +250,8 @@ def run_capture(root, app, pump, activate, geometry_provider=None, control_revea
             wait(lambda: copy_button('Settings') is None, 'popover hidden by Start')
             assert 'recording_state_requested' not in events(), 'Start with the popover open began recording'
             result['startWithPopoverOpenOnlyHidIt'] = True
+            # The app ignores a toggle within 120 ms of the last one.
+            pump(.5)
         toggle()
         wait(lambda: 'recording_state_active' in events(), 'real native capture')
         source_outputs = subprocess.check_output([os.environ['VOCO_WAYLAND_PACTL'], 'list', 'source-outputs'], text=True, timeout=5)
