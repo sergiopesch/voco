@@ -1343,7 +1343,7 @@ fn repair_invalid_configured_hotkey(config: &mut AppConfig) -> Option<String> {
     let error = validate_dictation_hotkey(&config.hotkey).err()?;
     let invalid_hotkey = std::mem::replace(&mut config.hotkey, "Alt+D".to_string());
     Some(format!(
-        "Configured hotkey '{invalid_hotkey}' was reset: {error}"
+        "Your shortcut '{invalid_hotkey}' was reset to Alt+D: {error}"
     ))
 }
 
@@ -1352,14 +1352,14 @@ fn configured_hotkey() -> ConfiguredHotkey {
         return ConfiguredHotkey {
             hotkey: "Alt+D".to_string(),
             repair_notice: Some(
-                "VOCO could not load the configured hotkey and is using Alt+D.".to_string(),
+                "VOCO could not load your shortcut and is using Alt+D.".to_string(),
             ),
         };
     };
     let repair_notice = repair_invalid_configured_hotkey(&mut config).map(|notice| {
         if let Err(error) = config.save() {
             return format!(
-                "{notice} VOCO could not persist the repair ({error}); update the hotkey in Settings."
+                "{notice} VOCO could not persist the repair ({error}); change the shortcut in Settings."
             );
         }
         notice
@@ -2143,7 +2143,7 @@ pub fn run() -> Result<(), String> {
             panel::setup(app.handle());
             if let Some(notice) = configured_hotkey.repair_notice {
                 warn!("{notice}");
-                send_notification("Hotkey repaired", &notice);
+                send_notification("Shortcut reset", &notice);
             }
 
             let model_handle = app.handle().clone();
