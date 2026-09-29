@@ -162,6 +162,16 @@ fn dictation_is_active(status: DictationStatus) -> bool {
     )
 }
 
+/// Desktop-input diagnostics arrive after the runtime initializes. Until then an
+/// empty setup state is unknown, not missing setup, so the launch presentation
+/// holds instead of flashing a setup warning. It never gates Start.
+fn desktop_setup_pending(snapshot: &RuntimeStatusSnapshot) -> bool {
+    snapshot.runtime_initialized
+        && snapshot.dictation_status == DictationStatus::Idle
+        && snapshot.cursor_required
+        && snapshot.cursor_setup_state.is_empty()
+}
+
 fn hotkeys_equivalent(left: &str, right: &str) -> bool {
     use tauri_plugin_global_shortcut::Shortcut;
 
@@ -179,8 +189,9 @@ fn derive_tray_presentation(snapshot: &RuntimeStatusSnapshot) -> TrayPresentatio
                 TrayVisualState::NotReady,
                 "VOCO — Speech model needs attention".to_string(),
             ),
+            // Every launch passes through here: busy, not a warning.
             ModelDownloadStatus::Checking | ModelDownloadStatus::Ready => (
-                TrayVisualState::NotReady,
+                TrayVisualState::Processing,
                 "VOCO — Initializing…".to_string(),
             ),
         }
@@ -227,12 +238,16 @@ fn derive_tray_presentation(snapshot: &RuntimeStatusSnapshot) -> TrayPresentatio
                     "VOCO — Microphone needs permission".to_string(),
                 )
             }
+            DictationStatus::Idle if desktop_setup_pending(snapshot) => (
+                TrayVisualState::Processing,
+                "VOCO — Initializing…".to_string(),
+            ),
             DictationStatus::Idle
                 if snapshot.cursor_required && snapshot.cursor_setup_state != "ready" =>
             {
                 (
                     TrayVisualState::NotReady,
-                    "VOCO — Text delivery needs setup".to_string(),
+                    "VOCO — Desktop setup needed".to_string(),
                 )
             }
             DictationStatus::Idle
@@ -294,7 +309,11 @@ fn derive_tray_presentation(snapshot: &RuntimeStatusSnapshot) -> TrayPresentatio
         _ if !snapshot.runtime_initialized => "Starting VOCO",
         DictationStatus::Starting | DictationStatus::Recording | DictationStatus::Processing => "",
         _ if visual_state == TrayVisualState::NotReady => "Check setup",
-        _ if snapshot.model_download_status != ModelDownloadStatus::Ready => "Starting VOCO",
+        _ if desktop_setup_pending(snapshot)
+            || snapshot.model_download_status != ModelDownloadStatus::Ready =>
+        {
+            "Starting VOCO"
+        }
         _ => "",
     };
     TrayPresentation {
@@ -442,7 +461,7 @@ pub fn setup_tray(app: &tauri::App, hotkey_label: &str) -> Result<(), Box<dyn st
         .item(&quit)
         .build()?;
 
-    let icon_rgba = create_mic_icon(32, TrayVisualState::NotReady);
+    let icon_rgba = create_mic_icon(32, TrayVisualState::Processing);
     let icon = tauri::image::Image::new_owned(icon_rgba, 32, 32);
 
     let icons = crate::tray_icons::TrayIcons::new()?;
@@ -923,6 +942,7 @@ fn panel_presentation(snapshot: &RuntimeStatusSnapshot) -> serde_json::Value {
         DictationStatus::Recording => "recording",
         DictationStatus::Processing => "processing",
         _ if presentation.visual_state == TrayVisualState::NotReady => "attention",
+        _ if desktop_setup_pending(snapshot) => "initializing",
         _ => "idle",
     };
     serde_json::json!({
@@ -1395,10 +1415,83 @@ mod tests {
     fn cursor_setup_is_visible_at_idle() {
         let mut snapshot = ready_snapshot();
         snapshot.cursor_required = true;
-        snapshot.cursor_setup_state = "incompatible".to_string();
+        snapshot.cursor_setup_state = "not-enabled".to_string();
         let setup = derive_tray_presentation(&snapshot);
         assert_eq!(setup.visual_state, TrayVisualState::NotReady);
-        assert!(setup.tooltip.contains("Text delivery needs setup"));
+        assert_eq!(setup.tooltip, "VOCO — Desktop setup needed");
+        assert_eq!(setup.title, "Check setup");
+        assert!(setup.dictation_enabled);
+    }
+
+    #[test]
+    fn pending_desktop_setup_holds_the_launch_presentation() {
+        let mut snapshot = ready_snapshot();
+        snapshot.cursor_required = true;
+        snapshot.cursor_setup_state = String::new();
+        let pending = derive_tray_presentation(&snapshot);
+        assert_eq!(pending.visual_state, TrayVisualState::Processing);
+        assert_eq!(pending.tooltip, "VOCO — Initializing…");
+        assert_eq!(pending.title, "Starting VOCO");
+
+        // Waiting for diagnostics never changes what the menu allows.
+        for status in [
+            DictationStatus::Idle,
+            DictationStatus::Starting,
+            DictationStatus::Recording,
+            DictationStatus::Processing,
+            DictationStatus::Error,
+        ] {
+            let known = RuntimeStatusSnapshot {
+                dictation_status: status,
+                cursor_setup_state: "ready".to_string(),
+                ..snapshot.clone()
+            };
+            let unknown = RuntimeStatusSnapshot {
+                cursor_setup_state: String::new(),
+                ..known.clone()
+            };
+            let (known, unknown) = (
+                derive_tray_presentation(&known),
+                derive_tray_presentation(&unknown),
+            );
+            assert_eq!(unknown.dictation_label, known.dictation_label);
+            assert_eq!(unknown.dictation_action, known.dictation_action);
+            assert_eq!(unknown.dictation_enabled, known.dictation_enabled);
+            assert_eq!(unknown.popover_enabled, known.popover_enabled);
+            assert_eq!(unknown.settings_enabled, known.settings_enabled);
+            assert_eq!(unknown.hotkey_menu_enabled, known.hotkey_menu_enabled);
+        }
+
+        // Problems that are already known are not hidden behind the wait.
+        snapshot.native_microphone_ready = Some(false);
+        assert_eq!(
+            derive_tray_presentation(&snapshot).tooltip,
+            "VOCO — Microphone setup required"
+        );
+        snapshot.native_microphone_ready = None;
+        snapshot.cursor_required = false;
+        assert_eq!(
+            derive_tray_presentation(&snapshot).visual_state,
+            TrayVisualState::Ready
+        );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn panel_waits_for_desktop_setup_before_reporting_it() {
+        let mut snapshot = ready_snapshot();
+        snapshot.cursor_required = true;
+        snapshot.cursor_setup_state = String::new();
+        let pending = panel_presentation(&snapshot);
+        assert_eq!(pending["status"], "initializing");
+        assert_eq!(pending["canOpen"], true);
+        for (setup, status) in [("not-enabled", "attention"), ("ready", "idle")] {
+            snapshot.cursor_setup_state = setup.to_string();
+            assert_eq!(panel_presentation(&snapshot)["status"], status);
+        }
+        snapshot.cursor_setup_state = String::new();
+        snapshot.native_microphone_ready = Some(false);
+        assert_eq!(panel_presentation(&snapshot)["status"], "attention");
     }
 
     #[test]
@@ -1518,11 +1611,21 @@ mod tests {
     #[test]
     fn initializing_and_model_warmup_states_are_authoritative() {
         let initializing = derive_tray_presentation(&RuntimeStatusSnapshot::default());
-        assert_eq!(initializing.visual_state, TrayVisualState::NotReady);
+        assert_eq!(initializing.visual_state, TrayVisualState::Processing);
         assert_eq!(initializing.tooltip, "VOCO — Initializing…");
+        assert_eq!(initializing.title, "Starting VOCO");
         assert!(!initializing.dictation_enabled);
         assert!(!initializing.popover_enabled);
         assert!(!initializing.settings_enabled);
+
+        let failed_launch = derive_tray_presentation(&RuntimeStatusSnapshot {
+            model_download_status: ModelDownloadStatus::Failed,
+            ..RuntimeStatusSnapshot::default()
+        });
+        assert_eq!(failed_launch.visual_state, TrayVisualState::NotReady);
+        assert_eq!(failed_launch.tooltip, "VOCO — Speech model needs attention");
+        assert_eq!(failed_launch.title, "Check setup");
+        assert!(!failed_launch.dictation_enabled);
 
         let mut warming = ready_snapshot();
         warming.model_download_status = ModelDownloadStatus::Checking;
