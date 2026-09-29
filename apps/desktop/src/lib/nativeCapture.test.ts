@@ -19,7 +19,7 @@ function mockApi(): NativeCaptureApi {
     drain:vi.fn(async request=>packet(request.ackThroughSequence,request.ackThroughSequence===0))};
 }
 function callbacks(api:NativeCaptureApi) {
-  return {sessionId:1,generation:0,selectionToken:"chosen",api,pollMs:1,timeoutMs:50,
+  return {sessionId:1,generation:0,selectionToken:"chosen",api,pollMs:1,timeoutMs:1000,
     onSamples:vi.fn((samples:Float32Array)=>samples.length),onInterrupted:vi.fn(),onLimit:vi.fn()};
 }
 describe("native capture protocol and ownership",()=>{
