@@ -20,6 +20,8 @@
 .voco-review__actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .voco-review__actions span { font-size: 13px; }
 .voco-review__empty { align-self: center; text-align: center; padding: 24px; color: #b8c2c5; }
+/* Focus lands on the empty-state text so keyboard users start inside Review; it is not a control. */
+.voco-review__empty p:focus { outline: none; }
 @media (max-width: 620px) {
   .voco-review__header { padding: 14px; flex-wrap: wrap; }
   .voco-review__body { flex-direction: column; }

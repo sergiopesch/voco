@@ -233,6 +233,11 @@ try {
             if(name==='debugNativeCaptureEnabled')return window.auditEnabled===true&&window.auditUploads.length===0;
             if(name==='getDesktopPasteStatus')return {enabled:true,available:true,streamingEnabled:true,detail:'Desktop input is ready.'};
             if(name==='pasteDesktopText')return {outcome:'dispatched',strategy:'clipboard'};
+            if(name==='copyDesktopText'){
+                if(window.failClipboard)throw {outcome:'no-mutation',message:'Fixture clipboard unavailable',clipboardChanged:false};
+                window.copiedText=args[0];
+                return;
+            }
             if(name==='saveDebugNativeRetainedSource'){
                 if(!window.stopped||window.ack!==4)throw Error('Retained-source export preceded terminal ACK');
                 window.auditUploads.push(new Uint8Array(args[0]));
@@ -1246,6 +1251,8 @@ try {
     await page.getByRole('button',{name:'Copy transcript',exact:true}).click();
     await page.getByText('Copied.',{exact:true}).waitFor();
     assert.equal(await page.evaluate(()=>window.copiedText),'Synthetic interrupted dictation.');
+    // The desktop command sets CLIPBOARD and PRIMARY.
+    assert.equal(await page.evaluate(()=>window.calls.filter(call=>call[0]==='copyDesktopText').at(-1)?.[1]),'Synthetic interrupted dictation.');
     await page.getByRole('button',{name:'Hide to tray',exact:true}).click();
     await page.waitForFunction(()=>window.store.getState().surface==='hidden');
     assert.equal(await page.evaluate(()=>window.crashEntries.length),1);

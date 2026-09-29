@@ -129,6 +129,10 @@ def run_review(root, app, pump, activate, native_windows, env, cycle):
         copied = subprocess.run(['wl-paste', '--no-newline'], env=env, capture_output=True, text=True, timeout=5)
         assert copied.returncode == 0 and copied.stdout == SYNTHETIC_TEXT
         result['explicitCopyExact'] = True
+        # Terminals paste PRIMARY with Shift+Insert, so Copy must set it too.
+        primary = subprocess.run(['wl-paste', '--primary', '--no-newline'], env=env, capture_output=True, text=True, timeout=5)
+        assert primary.returncode == 0 and primary.stdout == SYNTHETIC_TEXT, 'Copy did not set PRIMARY'
+        result['explicitCopyPrimary'] = True
     else:
         wait(lambda: named('No interrupted dictation.'), 'empty review after explicit discard')
         screenshot('empty')
