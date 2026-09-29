@@ -16,7 +16,6 @@ import type { CursorDeliveryEvent } from "@/lib/dictationDelivery";
 import { errorMessage,sentence } from "@/lib/dictationRecovery";
 import {
   consumeQueuedStop,
-  disableLivePreview,
   failSession,
   finishSessionIdle,
   markRecording,
@@ -524,7 +523,6 @@ export function createDictationRecording(env: DictationRecordingEnv) {
         assertOutputAllowed(startingSessionId);
         captureAdmission = workletOk ? "automatic" : "manual-review";
         if (!workletOk) {
-          sessionRef.current = disableLivePreview(sessionRef.current);
           // The popover cannot open during dictation, so notify instead.
           if (!onboardingTest) {
             interruptionNotifiedSession = startingSessionId;
@@ -794,7 +792,6 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     void browserDeliveryRef.current?.cancel();
     setCancellationPending(true);
     setCanCancel(false);
-    sessionRef.current = disableLivePreview(sessionRef.current);
     captureHealthRef.current?.dispose();
     captureHealthRef.current = null;
     if (phaseRef.current === "recording") {
@@ -817,7 +814,6 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     sessionRef.current = {
       ...finishSessionIdle(sessionRef.current),
       sessionId: sessionRef.current.sessionId + 1,
-      previewGeneration: sessionRef.current.previewGeneration + 1,
     };
     captureHealthRef.current?.dispose();
     captureHealthRef.current = null;

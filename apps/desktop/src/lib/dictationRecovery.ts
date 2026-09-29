@@ -1,5 +1,3 @@
-import type { CanonicalCursorSession } from "@/lib/canonicalCursorSession";
-
 /** A single recovery slot; audio itself stays in the recording hook's memory. */
 export interface DictationRecovery {
   reason: string;
@@ -7,7 +5,6 @@ export interface DictationRecovery {
   retrying: boolean;
   targetMayContainText: boolean;
 }
-
 
 // Cap source capture independently of device rate, including unusually high-rate devices.
 export const MAX_CAPTURE_SAMPLES = 32 * 1024 * 1024; // 128 MiB of Float32 source audio.
@@ -28,17 +25,4 @@ export function sentence(message: string): string {
   const text = message.trim().replace(/\.+$/, "");
   if (!text) return "";
   return /[!?…]$/.test(text) ? text : `${text}.`;
-}
-
-/** Preserve pending/active recognition: wait for an active attempt, then retry owned bytes.
- * Recovery continues the exact prefix and never reactivates target delivery. */
-export function resumeCanonicalForRecovery(
-  state: CanonicalCursorSession,
-): CanonicalCursorSession {
-  return {
-    ...state,
-    phase: state.cacheReleased && state.phase === "complete" ? "complete" : "stopping",
-    delivery: "uncertain",
-    previewGeneration: state.previewGeneration + 1,
-  };
 }

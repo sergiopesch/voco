@@ -86,23 +86,6 @@ export interface InsertionSupport {
   detail: string;
 }
 
-export interface TranscriptionSegment {
-  text: string;
-  startMs: number;
-  endMs: number;
-}
-
-export interface PreviewTranscription {
-  text: string;
-  segments: TranscriptionSegment[];
-}
-
-export interface CanonicalTranscription {
-  canonicalText: string;
-  appendText: string;
-  chunkText: string;
-}
-
 export interface DebugDictationCaptureResult {
   audioPath: string;
   timelinePath: string;
