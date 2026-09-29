@@ -20,7 +20,6 @@ import {
   type CursorDeliveryEvent,
 } from "@/lib/dictationDelivery";
 import { createDictationRecording } from "@/lib/dictationRecording";
-import { errorMessage } from "@/lib/dictationRecovery";
 import {
   createDictationSessionState,
   requestToggle as requestSessionToggle,
@@ -28,7 +27,6 @@ import {
 import { admitsDictationTrigger,type DictationTriggerAction } from "@/lib/dictationTrigger";
 import { beginNativeCapture,type NativeCaptureSession } from "@/lib/nativeCapture";
 import { encodeNativeRetainedSource,type NativeCaptureTerminalOutcome } from "@/lib/nativeCaptureAudit";
-import { NvidiaRecovery } from "@/lib/nvidiaRecovery";
 import type { HotkeyTraceFields } from "@/lib/tauri";
 import {
   copyDesktopText,
@@ -69,8 +67,6 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
   const disposedRef = useRef(false);
   const lifecycleEpochRef = useRef(0);
   const cancelledRef = useRef<string | null>(null);
-  const recoveryWaitRef = useRef<{ cancel: () => void } | null>(null);
-  const nvidiaRecoveryRef = useRef<NvidiaRecovery | null>(null);
   const captureHealthRef = useRef<ReturnType<typeof monitorCaptureHealth> | null>(null);
   const recoverySessionIdRef = useRef<string | null>(null);
   const [cursorDeliveryState, setCursorDeliveryState] =
@@ -473,7 +469,6 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
       desktopPhrasePasteCountRef,
       activeTriggerIdRef,
       recoverySessionIdRef,
-      recoveryWaitRef,
       sessionConfigRef,
       nativeCaptureRef,
       captureDescriptorRef,
@@ -537,76 +532,11 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
   function finalizeIdleState() {
     recording.finalizeIdleState();
   }
-  function retainRecovery(reason: string, keepAudio = true) {
-    recording.retainRecovery(reason, keepAudio);
-  }
   function releaseRecordingOrigin(triggerId = activeTriggerIdRef.current) {
     recording.releaseRecordingOrigin(triggerId);
   }
   function isCurrentSession(sessionId: number): boolean {
     return recording.isCurrentSession(sessionId);
-  }
-  function assertOutputAllowed(sessionId = sessionRef.current.sessionId) {
-    recording.assertOutputAllowed(sessionId);
-  }
-
-  async function retryRecovery() {
-    const recovery = useStore.getState().recovery;
-    if (!recovery?.audioAvailable || recovery.retrying || (phaseRef.current !== "idle" && phaseRef.current !== "error")) return;
-    const recoverySessionId = sessionRef.current.sessionId;
-    useStore.getState().setRecovery({ ...recovery, retrying: true,
-      reason: "Waiting for the previous local operation to finish. Cancel dictation stops this wait and keeps your audio; it does not interrupt that operation.",
-    });
-    phaseRef.current = "processing";
-    setStatus("processing");
-    setCanCancel(true);
-    setCancellationPending(false);
-    setInterimTranscript("Waiting for the previous local operation to finish...");
-    // Cancellation cannot interrupt an outstanding native request. A subsequent
-    // Retry waits for that request and its private recovery worker cleanup.
-    let nativeRecovery: NvidiaRecovery | null = null;
-    let cancelWait: () => void = () => {};
-    const cancelled = new Promise<false>((resolve) => {
-      cancelWait = () => { nativeRecovery?.cancel(); resolve(false); };
-    });
-    const attempt = { cancel: cancelWait };
-    recoveryWaitRef.current = attempt;
-    const settled = Promise.all([
-      nvidiaRecoveryRef.current?.settled(),
-    ]).then(() => true);
-    const ready = await Promise.race([settled, cancelled]);
-    if (!ready || recoveryWaitRef.current !== attempt || !isCurrentSession(recoverySessionId)) return;
-    useStore.getState().setRecovery({ ...recovery, retrying: true,
-      reason: "Recovering the audio received locally. The result will stay in VOCO.",
-    });
-    cancelledRef.current = null;
-    setCancellationPending(false);
-    setCanCancel(true);
-    phaseRef.current = "processing";
-    setStatus("processing");
-    setInterimTranscript("Recovering transcription locally. The result will stay in VOCO.");
-    try {
-      nativeRecovery = new NvidiaRecovery();
-      nvidiaRecoveryRef.current = nativeRecovery;
-      const audio = collectAudioSamplesRange(audioBufferRef.current, 0, audioBufferRef.current.sampleCount);
-      const result = await Promise.race([
-        nativeRecovery.transcribe(audio, recordingSampleRate()).then(text => ({ text })),
-        cancelled,
-      ]);
-      if (result === false || recoveryWaitRef.current !== attempt || !isCurrentSession(recoverySessionId)) return;
-      const transcript = result.text;
-      assertOutputAllowed(recoverySessionId);
-      useStore.getState().setRawTranscript(transcript);
-      setTranscript(transcript || "(no speech detected)");
-      retainRecovery("Recovered locally with the bundled NVIDIA model. Review any text already in the target, then copy the text you need. Nothing was inserted automatically.", false);
-      finalizeIdleState();
-    } catch (error) {
-      if (!isCurrentSession(recoverySessionId)) return;
-      if (recoveryWaitRef.current !== attempt) return;
-      retainRecovery(cancelledRef.current ?? `Recovery transcription failed: ${errorMessage(error)}`);
-    } finally {
-      if (recoveryWaitRef.current === attempt) recoveryWaitRef.current = null;
-    }
   }
 
   function discardRecovery() {
@@ -614,8 +544,6 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
     const native = nativeCaptureRef.current;
     nativeCaptureRef.current = null;
     void native?.cancel().catch(() => {});
-    recoveryWaitRef.current?.cancel();
-    recoveryWaitRef.current = null;
     clearCapturedAudio();
     useStore.getState().setRecovery(null);
     useStore.getState().setCaptureNotice(null);
@@ -687,7 +615,6 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
     canCancel,
     cancellationPending,
     cancelRecording,
-    retryRecovery,
     discardRecovery,
     finishOnboardingTest,
     toggle,

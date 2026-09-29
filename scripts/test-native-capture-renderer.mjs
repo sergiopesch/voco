@@ -192,7 +192,7 @@ try {
           if(name.endsWith('_crash_journal')) return null;
           if(name==='list_crash_recovery') return window.crashEntries??[];
           if(name==='dismiss_crash_recovery') { window.crashEntries=(window.crashEntries??[]).filter(entry=>entry.id!==args.id); return null; }
-          if(name==='benchmark_stream' || name==='recover_stream') {
+          if(name==='benchmark_stream') {
             const r=args.request;
             if(['quality','diagnostic','cancel'].includes(r.op))return {};
             if(window.recognitionError || window.transcriptionError)throw {message:'Speech engine unavailable for this test.'};
@@ -952,7 +952,6 @@ try {
     await page.waitForFunction(()=>window.store.getState().status==='idle'&&window.store.getState().transcript==='');
     await activate();await page.evaluate(()=>window.unhealthy=true);
     await page.waitForFunction(()=>window.store.getState().status==='idle'&&window.store.getState().error);
-    assert.equal(await page.evaluate(()=>window.nativeCommands.filter(x=>x.name==='recover_stream'&&x.args.request.op==='start').length),0);
     assert.equal((await state()).streams,0);assert.equal((await state()).commands.filter(x=>x.name==='native_capture_begin').length,1);
     expected.push('native-tail-failure-clears-prefix-without-auto-transcription');record(expected.at(-1));
     await load('enabled');await page.getByRole('combobox', { name: 'Microphone', exact: true }).waitFor();
@@ -1015,7 +1014,6 @@ try {
     await page.evaluate(()=>window.listeners['voco:toggle-dictation']({payload:null}));
     await page.waitForFunction(()=>window.nativeCommands.some(x=>x.name==='native_capture_begin')&&window.store.getState().nativeCaptureSource===null);
     assert.equal((await state()).ready,false);assert.equal((await state()).streams,0);assert.equal((await state()).enums,0);
-    assert.equal(await page.evaluate(()=>window.nativeCommands.filter(x=>x.name==='recover_stream'&&x.args.request.op==='start').length),0);
     expected.push('native-start-failure-revokes-grant-without-fallback');record(expected.at(-1));
     await load('enabled');await chooseNative('token-1');
     await page.waitForFunction(()=>window.store.getState().nativeCaptureSource!==null);
@@ -1072,7 +1070,6 @@ try {
     await page.waitForFunction(()=>window.stallInjected===true);
     await page.waitForFunction(()=>window.store.getState().status==='idle'&&window.store.getState().error,{},{timeout:12000});
     await verifyRetainedWitness('interrupted');
-    assert.equal(await page.evaluate(()=>window.nativeCommands.filter(x=>x.name==='recover_stream'&&x.args.request.op==='start').length),0);
     assert.equal((await state()).source,null);assert.equal((await state()).ready,false);
     await page.evaluate(()=>window.store.getState().setSurface('popover'));
     assert.equal(await page.getByRole('button',{name:'Discard recovery',exact:true}).count(),0);
@@ -1092,7 +1089,6 @@ try {
     await page.evaluate(()=>new Promise(resolve=>setTimeout(resolve,60)));
     assert.equal((await state()).ready,true);assert.ok((await state()).source);
     assert.equal(await page.evaluate(()=>window.store.getState().recovery),null);
-    assert.equal(await page.evaluate(()=>window.nativeCommands.filter(x=>x.name==='recover_stream'&&x.args.request.op==='start').length),0);
     await page.evaluate(()=>window.listeners['voco:toggle-dictation']({payload:null}));
     await page.waitForFunction(()=>window.store.getState().transcript===''&&window.store.getState().status==='idle');
     const lateProof=await page.evaluate(()=>({released:window.oldDrainReleased,
@@ -1114,7 +1110,6 @@ try {
     await activate(true);await page.evaluate(()=>window.store.getState().setSurface('popover'));await page.getByRole('button',{name:'Cancel dictation',exact:true}).click();
     await verifyRetainedWitness('cancelled');
     await page.waitForFunction(()=>window.store.getState().status==='idle'&&window.store.getState().error);
-    assert.equal(await page.evaluate(()=>window.nativeCommands.filter(x=>x.name==='recover_stream'&&x.args.request.op==='start').length),0);
     expected.push('cancelled-audit-keeps-prefix-and-does-not-claim-healthy');record(expected.at(-1));
     assert.equal(await page.evaluate(()=>window.store.getState().recovery),null);
     assert.equal(await page.evaluate(()=>window.auditUploads.length),1);

@@ -73,7 +73,6 @@ function harness() {
     desktopPhrasePasteCountRef: ref(0),
     activeTriggerIdRef: ref<string | undefined>(undefined),
     recoverySessionIdRef: ref<string | null>(null),
-    recoveryWaitRef: ref<{ cancel: () => void } | null>(null),
     sessionConfigRef: ref(null),
     nativeCaptureRef: ref(null),
     captureDescriptorRef: ref(null),
@@ -491,7 +490,7 @@ it("onboarding retains its successful test text and does not create a cursor res
 it("handled unmount resets cursor store content and state", () => {
   const h = harness();
   h.state.transcript = "Synthetic in-flight text.";
-  h.state.recovery = { audioAvailable: true };
+  h.state.recovery = { reason: "Voice test stopped." };
   h.phase.current = "recording";
   h.unmount();
   expect(h.state.transcript).toBe("");

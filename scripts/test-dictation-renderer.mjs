@@ -118,14 +118,6 @@ await page.addInitScript(() => {
    if(command === 'get_crash_journal_epoch') return 1;
    if(command.endsWith('_crash_journal')) { (window.journalCalls??=[]).push([command,args]); if(command === 'keep_crash_journal' && window.failKeep) throw new Error('Synthetic Review failure'); return; }
    const {request}=args;
-   if(command === 'recover_stream') {
-     (window.recoveryRequests ??= []).push(request);
-     if(request.op === 'push' && window.deferRecovery) {
-       await new Promise(resolve => window.resolveRecovery = resolve);
-     }
-     if(window.failRecovery && request.op === 'push') throw new Error('Synthetic recovery worker failure');
-     return {session:request.session,seq:request.seq,mode:'append-only',text:request.op==='finish'?'Recovered with bundled NVIDIA.':null};
-   }
    if(command !== 'benchmark_stream') throw new Error('Unexpected native command: ' + command);
    window.benchmarkRequests.push(request);
    if(request.op === 'warmup' || request.op === 'diagnostic' || request.op === 'quality') return {};

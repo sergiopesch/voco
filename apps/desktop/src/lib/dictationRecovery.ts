@@ -1,9 +1,6 @@
-/** A single recovery slot; audio itself stays in the recording hook's memory. */
+/** Why the voice test failed; its audio is not kept. */
 export interface DictationRecovery {
   reason: string;
-  audioAvailable: boolean;
-  retrying: boolean;
-  targetMayContainText: boolean;
 }
 
 // Cap source capture independently of device rate, including unusually high-rate devices.

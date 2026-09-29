@@ -66,7 +66,6 @@ export interface DictationRecordingEnv {
   desktopPhrasePasteCountRef: Ref<number>;
   activeTriggerIdRef: Ref<string | undefined>;
   recoverySessionIdRef: Ref<string | null>;
-  recoveryWaitRef: Ref<{ cancel: () => void } | null>;
   sessionConfigRef: Ref<AppConfig | null>;
   nativeCaptureRef: Ref<NativeCaptureSession | null>;
   captureDescriptorRef: Ref<CaptureDescriptor | null>;
@@ -139,7 +138,6 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     desktopPhrasePasteCountRef,
     activeTriggerIdRef,
     recoverySessionIdRef,
-    recoveryWaitRef,
     sessionConfigRef,
     nativeCaptureRef,
     captureDescriptorRef,
@@ -230,7 +228,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     void releaseBrowserRecording(triggerId).catch(() => {});
   }
 
-  function retainRecovery(reason: string, keepAudio = true) {
+  function retainRecovery(reason: string) {
     if (disposedRef.current) return;
     void browserDeliveryRef.current?.cancel();
     releaseRecordingOrigin();
@@ -268,15 +266,9 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       trackSampleRate: recordingSampleRate(),
       durationMs: Math.round(audioBufferRef.current.sampleCount / (recordingSampleRate()) * 1000),
     }).catch(() => {});
-    if (!keepAudio) {
-      clearCapturedAudio();
-    }
-    useStore.getState().setRecovery({
-      reason,
-      audioAvailable: keepAudio && audioBufferRef.current.sampleCount > 0,
-      retrying: false,
-      targetMayContainText: desktopPhrasePasteCountRef.current > 0,
-    });
+    // Nothing retries a failed voice test's audio; Test again records anew.
+    clearCapturedAudio();
+    useStore.getState().setRecovery({ reason });
     phaseRef.current = "error";
     sessionRef.current = failSession(sessionRef.current);
     setCanCancel(false);
@@ -779,13 +771,6 @@ export function createDictationRecording(env: DictationRecordingEnv) {
   }
 
   async function cancelRecording(reason = "Recording cancelled.") {
-    const recoveryWait = recoveryWaitRef.current;
-    if (recoveryWait) {
-      recoveryWaitRef.current = null;
-      recoveryWait.cancel();
-      retainRecovery("Recovery cancelled. Audio remains available to retry or discard. The previous local operation may still be finishing.");
-      return;
-    }
     if (phaseRef.current === "idle" || phaseRef.current === "error" || phaseRef.current === "finalizing" || cancelledRef.current) return;
     cancelledRef.current = reason;
     desktopPhraseQueueRef.current?.cancel();
@@ -806,8 +791,6 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     disposedRef.current = true;
     desktopPhraseQueueRef.current?.cancel();
     void browserDeliveryRef.current?.cancel();
-    recoveryWaitRef.current?.cancel();
-    recoveryWaitRef.current = null;
     releaseRecordingOrigin();
     lifecycleEpochRef.current += 1;
     phaseRef.current = "idle";
@@ -846,9 +829,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     stopRecording,
     cancelRecording,
     finalizeIdleState,
-    retainRecovery,
     isCurrentSession,
-    assertOutputAllowed,
     releaseRecordingOrigin,
     dispose,
   };
