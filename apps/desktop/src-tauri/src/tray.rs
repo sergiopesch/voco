@@ -284,10 +284,11 @@ fn derive_tray_presentation(snapshot: &RuntimeStatusSnapshot) -> TrayPresentatio
 
     let (dictation_label, dictation_action) = match snapshot.dictation_status {
         DictationStatus::Starting => ("Stop after microphone starts", TrayDictationAction::Stop),
-        DictationStatus::Recording => ("Stop Dictation", TrayDictationAction::Stop),
-        DictationStatus::Processing => ("Transcribing…", TrayDictationAction::Ignore),
+        DictationStatus::Recording => ("Stop dictation", TrayDictationAction::Stop),
+        // The status row reports transcription; the toggle keeps its name, disabled.
+        DictationStatus::Processing => ("Start dictation", TrayDictationAction::Ignore),
         DictationStatus::Idle | DictationStatus::Error => (
-            "Start Dictation",
+            "Start dictation",
             if dictation_allowed {
                 TrayDictationAction::Toggle
             } else {
@@ -414,20 +415,20 @@ fn tray_settings_allowed(app: &tauri::AppHandle) -> bool {
 }
 
 pub fn setup_tray(app: &tauri::App, hotkey_label: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let status_item = MenuItemBuilder::with_id("status", "VOCO — Starting")
+    let status_item = MenuItemBuilder::with_id("status", "VOCO — Initializing…")
         .enabled(false)
         .build(app)?;
     let quit = MenuItemBuilder::with_id("quit", "Quit VOCO").build(app)?;
     let open_panel = MenuItemBuilder::with_id("open_panel", "Open VOCO").build(app)?;
-    let toggle = MenuItemBuilder::with_id("toggle", "Start Dictation").build(app)?;
-    let stop = MenuItemBuilder::with_id("stop", "Stop Dictation")
+    let toggle = MenuItemBuilder::with_id("toggle", "Start dictation").build(app)?;
+    let stop = MenuItemBuilder::with_id("stop", "Stop dictation")
         .enabled(false)
         .build(app)?;
     let settings = MenuItemBuilder::with_id("settings", "Settings").build(app)?;
     let review = MenuItemBuilder::with_id("review", "Review").build(app)?;
 
     // Build hotkey submenu with presets
-    let mut hotkey_submenu = SubmenuBuilder::with_id(app, "hotkey_menu", "Change Hotkey");
+    let mut hotkey_submenu = SubmenuBuilder::with_id(app, "hotkey_menu", "Change shortcut");
     let mut hotkey_items: Vec<(String, MenuItem<tauri::Wry>)> = Vec::new();
 
     for &preset in HOTKEY_PRESETS {
@@ -443,7 +444,7 @@ pub fn setup_tray(app: &tauri::App, hotkey_label: &str) -> Result<(), Box<dyn st
     }
 
     hotkey_submenu = hotkey_submenu.separator();
-    let edit_config = MenuItemBuilder::with_id("edit_config", "Custom hotkey…").build(app)?;
+    let edit_config = MenuItemBuilder::with_id("edit_config", "Custom shortcut…").build(app)?;
     hotkey_submenu = hotkey_submenu.item(&edit_config);
 
     let hotkey_menu = hotkey_submenu.build()?;
@@ -470,7 +471,7 @@ pub fn setup_tray(app: &tauri::App, hotkey_label: &str) -> Result<(), Box<dyn st
         .title("Starting VOCO")
         .icon(icon)
         .menu(&menu)
-        .tooltip("VOCO — Initializing microphone...")
+        .tooltip("VOCO — Initializing…")
         .on_tray_icon_event(|tray, event| {
             if let TrayIconEvent::Click {
                 button: MouseButton::Left,
@@ -719,7 +720,7 @@ fn apply_tray_state(app: &tauri::AppHandle, tray_state: &mut TrayState) {
     let _ = tray_state.status_item.set_text(&presentation.tooltip);
     let stopping = presentation.dictation_action == TrayDictationAction::Stop;
     let _ = tray_state.toggle_item.set_text(if stopping {
-        "Start Dictation"
+        "Start dictation"
     } else {
         presentation.dictation_label
     });
@@ -729,7 +730,7 @@ fn apply_tray_state(app: &tauri::AppHandle, tray_state: &mut TrayState) {
     let _ = tray_state.stop_item.set_text(if stopping {
         presentation.dictation_label
     } else {
-        "Stop Dictation"
+        "Stop dictation"
     });
     let _ = tray_state.stop_item.set_enabled(stopping);
     let _ = tray_state
@@ -1187,7 +1188,7 @@ mod tests {
         let presentation = derive_tray_presentation(&ready_snapshot());
         assert_eq!(presentation.visual_state, TrayVisualState::Ready);
         assert_eq!(presentation.tooltip, "VOCO — Ready to listen");
-        assert_eq!(presentation.dictation_label, "Start Dictation");
+        assert_eq!(presentation.dictation_label, "Start dictation");
         assert!(presentation.dictation_enabled);
         assert!(presentation.popover_enabled);
         assert!(presentation.settings_enabled);
@@ -1236,7 +1237,7 @@ mod tests {
                     MicrophonePermission::Granted
                 };
                 let presentation = derive_tray_presentation(&snapshot);
-                assert_eq!(presentation.dictation_label, "Start Dictation");
+                assert_eq!(presentation.dictation_label, "Start dictation");
                 assert_eq!(
                     presentation.dictation_action,
                     if unavailable {
@@ -1257,7 +1258,7 @@ mod tests {
         );
         assert_eq!(
             derive_tray_presentation(&snapshot).dictation_label,
-            "Start Dictation"
+            "Start dictation"
         );
     }
 
@@ -1266,7 +1267,7 @@ mod tests {
         let mut snapshot = ready_snapshot();
         snapshot.dictation_status = DictationStatus::Recording;
         let recording = derive_tray_presentation(&snapshot);
-        assert_eq!(recording.dictation_label, "Stop Dictation");
+        assert_eq!(recording.dictation_label, "Stop dictation");
         assert_eq!(recording.dictation_action, TrayDictationAction::Stop);
         snapshot.dictation_status = DictationStatus::Processing;
         assert_eq!(
@@ -1294,7 +1295,7 @@ mod tests {
         for status in [DictationStatus::Idle, DictationStatus::Error] {
             snapshot.dictation_status = status;
             let presentation = derive_tray_presentation(&snapshot);
-            assert_eq!(presentation.dictation_label, "Start Dictation");
+            assert_eq!(presentation.dictation_label, "Start dictation");
             assert_eq!(presentation.tooltip, "VOCO — Settings need attention");
             assert_eq!(presentation.dictation_action, TrayDictationAction::Ignore);
             assert!(presentation.settings_enabled);
@@ -1359,7 +1360,7 @@ mod tests {
         snapshot.cursor_delivery = CursorDeliveryState::Owned;
         let owned = derive_tray_presentation(&snapshot);
         assert_eq!(owned.tooltip, "VOCO — Listening · target verified");
-        assert_eq!(owned.dictation_label, "Stop Dictation");
+        assert_eq!(owned.dictation_label, "Stop dictation");
         assert!(!owned.popover_enabled);
         assert!(!owned.settings_enabled);
         assert!(!owned.hotkey_menu_enabled);
@@ -1380,7 +1381,7 @@ mod tests {
         let presentation = derive_tray_presentation(&snapshot);
 
         assert_eq!(presentation.tooltip, "VOCO — Listening");
-        assert_eq!(presentation.dictation_label, "Stop Dictation");
+        assert_eq!(presentation.dictation_label, "Stop dictation");
         assert!(!presentation.hotkey_menu_enabled);
 
         snapshot.cursor_required = true;
@@ -1396,7 +1397,8 @@ mod tests {
         snapshot.dictation_status = DictationStatus::Processing;
         let presentation = derive_tray_presentation(&snapshot);
         assert_eq!(presentation.visual_state, TrayVisualState::Processing);
-        assert_eq!(presentation.dictation_label, "Transcribing…");
+        assert_eq!(presentation.tooltip, "VOCO — Transcribing");
+        assert_eq!(presentation.dictation_label, "Start dictation");
         assert!(!presentation.dictation_enabled);
         assert!(!presentation.popover_enabled);
         assert!(!presentation.settings_enabled);
