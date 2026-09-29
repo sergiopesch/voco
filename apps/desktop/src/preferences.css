@@ -103,16 +103,11 @@
 }
 .voco-preferences__row { display: flex; align-items: center; gap: 18px; min-width: 0; min-height: 74px; padding: 14px 18px; color: var(--preferences-text); }
 .voco-preferences__row + .voco-preferences__row { border-top: 1px solid var(--preferences-line); }
-.voco-preferences__row--link { width: calc(100% - 8px); margin: 4px; text-align: left; border: 0; border-radius: var(--voco-radius-control); background: none; cursor: pointer; }
-.voco-preferences__row--link:hover { background: #ffffff09; }
-.voco-preferences__badge { width: 44px; height: 44px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 13px; border: 1px solid #ccd9ed24; background: linear-gradient(140deg,#e8effa16,#9eacc608); }
-.voco-preferences__badge .voco-settings-icon { width: 26px; height: 26px; }
 .voco-preferences__row-copy { min-width: 0; display: grid; gap: 5px; font-size: 16px; }
 .voco-preferences__row-copy strong { font-weight: 500; }
 .voco-preferences__row-copy small { color: var(--preferences-muted); font-size: 14px; line-height: 1.4; overflow-wrap: anywhere; }
 .voco-preferences__row-value { margin-left: auto; color: var(--preferences-muted); font-size: 14px; text-align: right; }
 .voco-preferences__row-value kbd, .voco-preferences__row kbd { display: inline-block; padding: 7px 11px; border-radius: 9px; border: 1px solid #dae4f568; background: linear-gradient(#d5e1f425,#c4d1e30a); box-shadow: inset 0 1px 0 #ffffff40; color: #ecf0f5; font: inherit; overflow-wrap: anywhere; }
-.voco-preferences__chevron { margin-left: auto; flex: 0 0 auto; opacity: 0.8; display: inline-flex; align-items: center; gap: 10px; color: #cbd4df; font-size: 14px; }
 .voco-preferences__actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
 .voco-preferences__actions .voco-button { border-radius: 13px; }
 .voco-panel[data-surface="settings"] .voco-preferences .voco-button--primary { background: linear-gradient(125deg,#e6eefa2e,#abbcd211 58%,#d9e7ff38),#252c37; box-shadow: inset 0 1px 1px #ffffff61, 0 5px 12px #00000032; -webkit-backdrop-filter: none; backdrop-filter: none; }
@@ -129,20 +124,12 @@
 .voco-preferences__field-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .voco-preferences__field-row .voco-field { flex: 1 1 280px; }
 .voco-preferences__helper, .voco-preferences .voco-inline-note { font-size: 14px; line-height: 1.5; color: var(--preferences-muted); }
-.voco-preferences__form .voco-inline-note--error, .voco-preferences__helper--error { color: #ffb5c3; }
-.voco-preferences .voco-settings__group { padding: 16px 20px; border-radius: 16px; border: 1px solid var(--preferences-line); background: #1e2530d9; display: block; }
-.voco-preferences .voco-settings__group > summary { font-size: 14px; padding: 0; line-height: 1.5; }
-.voco-preferences .voco-settings__group > :not(summary) { margin-top: 14px; }
-.voco-preferences .voco-settings__group .voco-settings__group { border: 0; border-top: 1px solid var(--preferences-line); border-radius: var(--voco-radius-control); background: none; padding: 14px 0 0; }
-.voco-preferences .voco-settings__group p { font-size: 14px; line-height: 1.55; }
+.voco-preferences__form .voco-inline-note--error { color: #ffb5c3; }
 .voco-preferences .voco-meter { padding: 4px 0; }
 .voco-preferences .voco-meter__label { text-transform: none; letter-spacing: 0; font-size: 14px; color: #d2dbe6; }
 .voco-preferences .voco-meter__track { height: 10px; }
 .voco-preferences__feedback { font-size: 13px; color: #c9d3e0; padding: 8px 12px; border-left: 2px solid #a1b5cf; }
-.voco-preferences__recovery { padding: 18px 20px; background: #352c21f5; border: 1px solid #e9b86b8c; border-radius: 16px; display: grid; gap: 10px; }
-.voco-preferences__recovery p { margin: 0; }
 .voco-preferences :is(button,summary,input,select,textarea):focus-visible { outline: 2px solid #edf3ff; outline-offset: 3px; }
-.voco-preferences__row--link:focus-visible { outline-offset: -3px; }
 .voco-preferences :is(h2,h3):focus-visible { outline: none; }
 
 @media (max-width: 900px), (max-height: 650px) {
@@ -158,7 +145,6 @@
   .voco-preferences .voco-preferences__page { gap: 20px; }
   .voco-preferences__heading { margin-bottom: 0; }
   .voco-preferences__row { padding: 12px 14px; gap: 12px; min-height: 66px; }
-  .voco-preferences__badge { width: 40px; height: 40px; }
   .voco-preferences__row-copy { font-size: 15px; }
   .voco-preferences .voco-field { grid-template-columns: minmax(100px,1fr) minmax(150px,1.2fr); gap: 12px; }
 }
@@ -174,26 +160,25 @@
   .voco-preferences__content { padding: 12px 4px; }
   .voco-preferences__heading h2 { font-size: 23px; }
   .voco-preferences__row { padding: 12px; gap: 10px; }
-  .voco-preferences__badge { width: 32px; height: 36px; border: 0; background: none; }
   .voco-preferences__row-value { font-size: 12px; }
   .voco-preferences .voco-field { grid-template-columns: minmax(0,1fr); }
   .voco-preferences__form { padding: 16px; }
 }
 /* Accessible materials keep selection, boundaries and native control semantics. */
 .voco-panel[data-surface="settings"][data-visual-effects="reduced"] .voco-panel__shell::before { display: none; }
-.voco-panel[data-surface="settings"][data-visual-effects="reduced"] :is(.voco-preferences__sidebar,.voco-preferences__card,.voco-preferences__badge) { background: #242c38; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+.voco-panel[data-surface="settings"][data-visual-effects="reduced"] :is(.voco-preferences__sidebar,.voco-preferences__card) { background: #242c38; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
 .voco-panel[data-surface="settings"][data-visual-effects="reduced"] .voco-preferences__nav-item[aria-current="page"] { background: #3c495b; box-shadow: none; }
 .voco-panel[data-surface="settings"][data-visual-effects="reduced"] .voco-preferences .voco-button--primary { background: #3c495b; box-shadow: none; transform: none; }
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
   .voco-panel[data-surface="settings"] .voco-panel__shell::before { display: none; }
-  .voco-preferences :is(.voco-preferences__sidebar,.voco-preferences__card,.voco-preferences__badge) { background: #242c38; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .voco-preferences :is(.voco-preferences__sidebar,.voco-preferences__card) { background: #242c38; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
   .voco-preferences .voco-preferences__nav-item[aria-current="page"] { background: #3c495b; box-shadow: none; border-color: #e1e8f3; }
   .voco-panel[data-surface="settings"] .voco-preferences .voco-button--primary { background: #3c495b; box-shadow: none; transform: none; }
 }
 @media (forced-colors: active) {
   .voco-panel[data-surface="settings"] .voco-panel__shell::before { display: none; }
   .voco-panel[data-surface="settings"] .voco-panel__shell,
-  .voco-panel[data-surface="settings"]:is([data-visual-effects], .voco-panel) .voco-preferences :is(.voco-preferences__sidebar,.voco-preferences__card,.voco-preferences__badge,.voco-button) { background: Canvas; color: CanvasText; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; border-color: ButtonText; }
+  .voco-panel[data-surface="settings"]:is([data-visual-effects], .voco-panel) .voco-preferences :is(.voco-preferences__sidebar,.voco-preferences__card,.voco-button) { background: Canvas; color: CanvasText; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; border-color: ButtonText; }
   .voco-panel[data-surface="settings"]:is([data-visual-effects], .voco-panel) .voco-preferences .voco-preferences__nav-item[aria-current="page"] { border: 2px solid Highlight; background: Canvas; color: CanvasText; box-shadow: none; }
   .voco-preferences .voco-settings-icon { filter: none; background: white; border-radius: 2px; }
   .voco-preferences :is(button,summary,input,select,textarea):focus-visible { outline-color: Highlight; }
@@ -201,7 +186,6 @@
 
 .voco-preferences__brand h1 { margin: 0; font-size: 25px; font-weight: 600; letter-spacing: -0.04em; }
 .voco-preferences__row > kbd.voco-preferences__row-value { margin-left: 0; }
-.voco-preferences__row-action { margin-left: auto; padding: 6px 12px; border: 1px solid #dbe6f454; border-radius: 9px; color: #dce4ed; background: #d1dff011; font-size: 14px; }
 .voco-preferences__shortcut-editor { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; }
 .voco-preferences__shortcut-editor .voco-field { display: grid; grid-template-columns: 1fr; flex: 1 1 200px; }
 .voco-preferences__shortcut-editor .voco-button { flex: 0 0 auto; min-height: 42px; }
