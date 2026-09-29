@@ -235,6 +235,7 @@ try {
             if(name==='pasteDesktopText')return {outcome:'dispatched',strategy:'clipboard'};
             if(name==='copyDesktopText'){
                 if(window.failClipboard)throw {outcome:'no-mutation',message:'Fixture clipboard unavailable',clipboardChanged:false};
+                if(window.holdCopy)await window.holdCopy;
                 window.copiedText=args[0];
                 return;
             }
@@ -1263,9 +1264,17 @@ try {
     await page.getByRole('button',{name:'Copy transcript',exact:true}).click();
     await page.getByText('Copy failed. Your text is still available.',{exact:true}).waitFor();
     assert.equal(await page.evaluate(()=>window.crashEntries.length),1);
-    await page.evaluate(()=>{window.failClipboard=false;});
-    await page.getByRole('button',{name:'Copy transcript',exact:true}).click();
+    // A control disabled while focused can drop keyboard focus, so a keyboard
+    // copy keeps Copy focused and enabled while it runs and after it finishes.
+    await page.evaluate(()=>{window.failClipboard=false;window.holdCopy=new Promise(resolve=>{window.releaseCopy=resolve;});});
+    const focused=()=>page.evaluate(()=>({label:document.activeElement?.textContent,disabled:document.activeElement?.disabled}));
+    await page.getByRole('button',{name:'Copy transcript',exact:true}).focus();
+    await page.keyboard.press('Enter');
+    await page.waitForFunction(()=>[...document.querySelectorAll('button')].some(button=>button.textContent==='Discard'&&button.disabled));
+    assert.deepEqual(await focused(),{label:'Copy transcript',disabled:false});
+    await page.evaluate(()=>{window.holdCopy=null;window.releaseCopy();});
     await page.getByText('Copied.',{exact:true}).waitFor();
+    assert.deepEqual(await focused(),{label:'Copy transcript',disabled:false});
     assert.equal(await page.evaluate(()=>window.copiedText),'Synthetic interrupted dictation.');
     // The desktop command sets CLIPBOARD and PRIMARY.
     assert.equal(await page.evaluate(()=>window.calls.filter(call=>call[0]==='copyDesktopText').at(-1)?.[1]),'Synthetic interrupted dictation.');
