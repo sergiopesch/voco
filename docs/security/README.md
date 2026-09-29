@@ -43,7 +43,7 @@ or crash-reporting service.
 - Local Python speech worker, bounded IPC, native CPU libraries and packaged model
 - ASR model loading (local files)
 - Automatic and manual GitHub Release checks (HTTPS to api.github.com)
-- Explicit debug audio, native source metadata and retained diagnostic WAV/timeline persistence
+- Explicit debug audio and native source metadata persistence
 
 ## Current Protections
 
@@ -168,12 +168,6 @@ These controls do not isolate another compromised process running as the same us
   exclusive `0600` single-link files, and descriptor-relative traversal refuses
   symlinks. `COMMIT.json` is published last with payload lengths/hashes; incomplete
   private payloads can remain after a failure.
-- Retained diagnostic IPC commands can save a 16 kHz WAV and caller-supplied JSON
-  timeline under `debug-captures` only when `VOCO_DEBUG_CAPTURE_AUDIO=1`. The normal
-  dictation path does not call these commands. They allow at most one successful
-  pair per app process, reject empty/over-ten-minute audio and timelines above
-  16 MiB, use an owned `0700` directory and exclusive `0600` files, and attempt to
-  remove partial pairs after failure. Any supplied timeline may contain transcripts.
 
 Metadata writers check private owner-controlled paths and regular, single-link
 files with no-follow/nonblocking opens. These checks do not isolate an already
@@ -193,7 +187,6 @@ microphone or publish personal transcripts. See [diagnostic retention](../testin
 | Opt-in worker metrics | `${XDG_STATE_HOME:-$HOME/.local/state}/voco/stream-performance/` |
 | Update result cache | `${XDG_CONFIG_HOME:-$HOME/.config}/voco/update-cache.json` |
 | Opt-in timing trace (`VOCO_HOTKEY_TRACE=1`) | `${XDG_STATE_HOME:-$HOME/.local/state}/voco/hotkey-trace.jsonl` |
-| Retained diagnostic WAV/timeline IPC | `${XDG_STATE_HOME:-$HOME/.local/state}/voco/debug-captures/` |
 | Opt-in native/renderer audio evidence | `${XDG_STATE_HOME:-$HOME/.local/state}/voco/debug-native-captures/` |
 | IBus app control | `$XDG_RUNTIME_DIR/voco/ibus-engine.sock` (transient socket only) |
 | Browser broker | `$XDG_RUNTIME_DIR/voco-browser/exact-field.sock` (transient socket only) |
@@ -226,8 +219,8 @@ The 2026.0.55 release adds the following hardening over 2026.0.54:
 
 ## Retention and Deletion
 
-VOCO does not automatically delete completed debug captures or incomplete native
-audit bundles. Treat both debug directories as sensitive voice/diagnostic data;
+VOCO does not automatically delete completed or incomplete native debug bundles.
+Treat the debug directory as sensitive voice/diagnostic data;
 retain only evidence you need and remove it deliberately. Removing the package
 does not remove per-user XDG data. See [Install](../install.md) for uninstall and
 per-user cleanup commands.

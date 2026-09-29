@@ -6,30 +6,6 @@ import hashlib
 import time
 import numpy as np
 ROOT=Path(__file__).resolve().parent
-class Moonshine:
-    def __init__(self,size,interval=.2,fast=False):
-        from moonshine_voice import Transcriber, ModelArch
-        self.transcriber=Transcriber(ROOT/f'models/moonshine/download.moonshine.ai/model/{size}-streaming-en/quantized_26_08_21', getattr(ModelArch,f'{size.upper()}_STREAMING'),update_interval=999999,options={"transcription_interval":.2,"vad_window_duration":.2} if fast else None)
-        self.interval=interval
-    def start(self):
-        if getattr(self,"stream",None) is not None:self.stream.close()
-        self.stream=self.transcriber.create_stream(update_interval=999999)
-        self.stream.start(); self.lines={}; self.seconds=0.; self.updated=0.
-    def transcript(self, result):
-        for line in result.lines: self.lines[line.line_id]=line.text
-        return ' '.join(self.lines.values()).strip()
-    def push(self,audio,rate):
-        self.stream.add_audio(audio.tolist(),rate); self.seconds+=len(audio)/rate
-        if self.seconds-self.updated+1e-8<self.interval:return None
-        self.updated=self.seconds
-        result=self.stream.update_transcription()
-        text=self.transcript(result)
-        return text if any(line.is_updated for line in result.lines) else None
-    def finish(self):
-        result=self.stream.stop()
-        if result is None: raise RuntimeError('Moonshine stop returned no transcript')
-        text=self.transcript(result); self.stream.close(); self.stream=None; return text
-
 class Nemotron:
     def __init__(self,context=1):
         backend=os.environ.get('VOCO_NEMO_BACKEND','pool')
@@ -87,8 +63,3 @@ class Nemotron:
         return result
     def finish(self):
         self.check(self.finish_f(self.stream));self.drain();self.close_stream(self.stream);self.stream=None;return self.last
-
-def create(name):
-    if name.startswith('moonshine-'):return Moonshine(name.split('-')[1],fast=name.endswith('-fast'))
-    if name.startswith('nemotron-'):return Nemotron(int(name.split('-')[1]))
-    raise ValueError(name)

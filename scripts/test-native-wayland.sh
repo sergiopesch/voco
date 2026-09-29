@@ -11,7 +11,7 @@ if [[ ${1:-} != --inside ]]; then
     : "${VOCO_NATIVE_DEPS:?Nested backend requires extracted Xvfb dependencies}"
   fi
   if [[ ${VOCO_WAYLAND_CAPTURE:-0} == 1 ]]; then
-    [[ "$backend" == nested-x11 ]] || { echo "Capture-to-Copy requires the private nested seat" >&2; exit 1; }
+    [[ "$backend" == nested-x11 ]] || { echo "Capture requires the private nested seat" >&2; exit 1; }
     : "${VOCO_WAYLAND_APP_BINARY:?Capture requires an application}"
 
     for helper in pulseaudio pactl paplay wl-copy wl-paste; do command -v "$helper" >/dev/null; done

@@ -219,7 +219,7 @@ try:
                     app.wait(timeout=10)
             # Do not remove stale sockets: the next launch must handle its own state.
     if capture_requested:
-        assert report.get('capture', {}).get('passed'), 'Requested capture-to-Copy was not verified'
+        assert report.get('capture', {}).get('passed'), 'Requested capture was not verified'
     report['passed'] = True
 finally:
     if locals().get('pulse') is not None:

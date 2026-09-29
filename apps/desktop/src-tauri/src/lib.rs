@@ -4,7 +4,6 @@ compile_error!(
 );
 
 mod activation;
-mod audio_transport;
 mod benchmark_stream;
 mod browser_broker;
 mod browser_event_delivery;
@@ -73,7 +72,6 @@ use config::{
 };
 use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
-use std::io::Write;
 use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
 use std::sync::{LazyLock, Mutex};
 use std::time::Instant;
@@ -112,8 +110,6 @@ static TRACE_MODES: LazyLock<(bool, bool)> = LazyLock::new(|| {
 });
 static CONFIG_WRITE_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 static CONFIG_REVISION: AtomicU64 = AtomicU64::new(0);
-static DEBUG_CAPTURE_WRITTEN: AtomicBool = AtomicBool::new(false);
-static DEBUG_CAPTURE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 static REGISTERED_PLUGIN_SHORTCUT: LazyLock<Mutex<Option<String>>> =
     LazyLock::new(|| Mutex::new(None));
 #[cfg(target_os = "linux")]
@@ -122,15 +118,10 @@ static EVDEV_WATCHED_PATHS: LazyLock<Mutex<std::collections::HashSet<std::path::
 
 const TOGGLE_DICTATION_EVENT: &str = "voco:toggle-dictation";
 const CONFIG_CHANGED_EVENT: &str = "voco:config-changed";
-const LEGACY_TOGGLE_DICTATION_EVENT: &str = "voice:toggle-dictation";
 const TOGGLE_DEBOUNCE_MS: i64 = 120;
-const MAX_AUDIO_SECONDS: usize = 600;
 const HIDDEN_WINDOW_POS_X: i32 = -100;
 const HIDDEN_WINDOW_POS_Y: i32 = -100;
 const HIDDEN_WINDOW_SIZE: u32 = 1;
-const OVERLAY_CURSOR_OFFSET_X: i32 = 20;
-const OVERLAY_CURSOR_OFFSET_Y: i32 = 24;
-const OVERLAY_MARGIN: i32 = 16;
 
 fn trace_modes(hotkey: Option<&str>, performance: Option<&str>) -> (bool, bool) {
     (hotkey == Some("1"), performance == Some("1"))
@@ -175,10 +166,6 @@ fn hotkey_trace_path() -> std::path::PathBuf {
     xdg_state_home().join("voco").join("hotkey-trace.jsonl")
 }
 
-fn debug_capture_dir() -> std::path::PathBuf {
-    xdg_state_home().join("voco").join("debug-captures")
-}
-
 fn session_type_label() -> &'static str {
     match std::env::var("XDG_SESSION_TYPE") {
         Ok(value) if value.eq_ignore_ascii_case("wayland") => "Wayland",
@@ -221,34 +208,12 @@ fn trace_hotkey_event_with_fields(
         "session_type": session_type_label(),
     });
     if let Some(fields) = frontend_fields {
-        if let Some(audio_level_bucket) = fields.audio_level_bucket.as_deref() {
-            record["audio_level_bucket"] =
-                serde_json::Value::String(audio_level_bucket.to_string());
-        }
-        if let Some(chunk_count) = fields.chunk_count {
-            record["chunk_count"] = serde_json::Value::Number(chunk_count.into());
-        }
-        if let Some(response_delta_count) = fields.response_delta_count {
-            record["response_delta_count"] = serde_json::Value::Number(response_delta_count.into());
-        }
         if let Some(selected_device_configured) = fields.selected_device_configured {
             record["selected_device_configured"] =
                 serde_json::Value::Bool(selected_device_configured);
         }
         if let Some(track_sample_rate) = fields.track_sample_rate {
             record["track_sample_rate"] = serde_json::Value::Number(track_sample_rate.into());
-        }
-        if let Some(track_channel_count) = fields.track_channel_count {
-            record["track_channel_count"] = serde_json::Value::Number(track_channel_count.into());
-        }
-        if let Some(echo_cancellation) = fields.echo_cancellation {
-            record["echo_cancellation"] = serde_json::Value::Bool(echo_cancellation);
-        }
-        if let Some(noise_suppression) = fields.noise_suppression {
-            record["noise_suppression"] = serde_json::Value::Bool(noise_suppression);
-        }
-        if let Some(auto_gain_control) = fields.auto_gain_control {
-            record["auto_gain_control"] = serde_json::Value::Bool(auto_gain_control);
         }
         if let Some(duration_ms) = fields.duration_ms {
             record["duration_ms"] = serde_json::Value::Number(duration_ms.into());
@@ -342,21 +307,8 @@ fn is_supported_dictation_trace_event(event: &str) -> bool {
             | "dictation_desktop_keyboard_dispatch_completed"
             | "dictation_desktop_stream_started"
             | "dictation_desktop_phrase_queued"
-            | "dictation_desktop_snapshot_requested"
-            | "dictation_desktop_snapshot_limit_reached"
-            | "dictation_desktop_snapshot_recognized"
-            | "dictation_desktop_snapshot_failed"
-            | "dictation_desktop_preview_transcribed"
-            | "dictation_desktop_snapshot_coalesced"
-            | "dictation_desktop_snapshot_superseded"
-            | "dictation_desktop_snapshot_waiting_agreement"
-            | "dictation_desktop_snapshot_unchanged"
             | "dictation_desktop_snapshot_revised"
-            | "dictation_desktop_snapshot_empty"
-            | "dictation_desktop_snapshot_preview_wait"
-            | "dictation_desktop_snapshot_final_wait"
             | "dictation_desktop_live_prefix_dispatched"
-            | "dictation_desktop_phrase_transcribed"
             | "dictation_desktop_first_phrase_dispatched"
             | "dictation_desktop_stream_flush_completed"
             | "dictation_desktop_stream_failed"
@@ -364,7 +316,6 @@ fn is_supported_dictation_trace_event(event: &str) -> bool {
             | "dictation_desktop_paste_unavailable"
             | "dictation_desktop_paste_requested"
             | "dictation_desktop_paste_dispatched"
-            | "dictation_desktop_paste_failed"
             | "dictation_desktop_paste_deferred"
             | "dictation_desktop_remainder_copied"
             | "dictation_desktop_remainder_kept"
@@ -380,94 +331,31 @@ fn is_supported_dictation_trace_event(event: &str) -> bool {
             | "recording_state_active"
             | "dictation_capture_input_gap"
             | "dictation_capture_health_interrupted"
-            | "dictation_live_preview_completed"
-            | "dictation_live_preview_reused"
-            | "dictation_stop_checkpoint_wait_completed"
-            | "dictation_stop_preview_wait_completed"
-            | "dictation_stop_insertion_wait_completed"
-            | "dictation_live_preview_skipped_short_audio"
-            | "dictation_live_preview_empty"
-            | "dictation_live_preview_updated"
-            | "dictation_live_preview_confirmed"
-            | "dictation_live_preview_window_advanced"
-            | "dictation_live_preview_failed"
-            | "dictation_live_cursor_insert_updated"
-            | "dictation_live_cursor_insert_cleared"
-            | "dictation_live_cursor_insert_finalized"
-            | "dictation_live_cursor_insert_failed"
-            | "dictation_live_cursor_overlay_fallback"
-            | "dictation_live_cursor_unsafe_rewrite_blocked"
-            | "dictation_live_cursor_final_unreconciled"
-            | "dictation_live_cursor_commit_waiting"
-            | "dictation_live_cursor_tail_transcribed"
-            | "dictation_live_cursor_tail_flushed"
-            | "dictation_live_cursor_tail_flush_failed"
-            | "dictation_owned_preedit_started"
-            | "dictation_owned_preedit_unavailable"
-            | "dictation_owned_preedit_updated"
-            | "dictation_owned_preedit_failed"
-            | "dictation_owned_preedit_cancelled"
-            | "dictation_owned_preedit_committed"
-            | "dictation_owned_preedit_commit_failed"
-            | "dictation_owned_preedit_final_preserved"
-            | "dictation_owned_preedit_progressive_commit"
-            | "dictation_canonical_checkpoint_completed"
-            | "dictation_canonical_checkpoint_committed"
-            | "dictation_canonical_checkpoint_failed"
-            | "dictation_canonical_final_completed"
-            | "dictation_first_live_text_visible"
             | "dictation_stop_to_final_transcript"
             | "dictation_stop_to_idle"
             | "dictation_interrupted"
             | "dictation_recording_duration"
-            | "dictation_transcription_completed"
             | "dictation_recording_stopped"
             | "dictation_audio_teardown_completed"
-            | "dictation_audio_prepared"
-            | "dictation_transcription_started"
             | "dictation_recovery_retained"
-            | "dictation_manual_transcript_ready"
             | "dictation_recording_limit_reached"
-            | "dictation_enhancement_completed"
-            | "dictation_local_assistant_completed"
-            | "dictation_final_output_completed"
-            | "dictation_final_output_unreconciled"
-            | "dictation_final_insertion_failed"
     )
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct FrontendTraceFields {
-    audio_level_bucket: Option<String>,
-    chunk_count: Option<u64>,
-    response_delta_count: Option<u64>,
     selected_device_configured: Option<bool>,
     track_sample_rate: Option<u64>,
-    track_channel_count: Option<u64>,
-    echo_cancellation: Option<bool>,
-    noise_suppression: Option<bool>,
-    auto_gain_control: Option<bool>,
     duration_ms: Option<u64>,
     dictation_session_id: Option<u64>,
 }
 
 impl FrontendTraceFields {
     fn validate(&self) -> Result<(), String> {
-        if let Some(bucket) = self.audio_level_bucket.as_deref() {
-            match bucket {
-                "silent" | "low" | "medium" | "high" => {}
-                _ => return Err(format!("Unsupported audio level bucket: {bucket}")),
-            }
-        }
         if let Some(sample_rate) = self.track_sample_rate {
             if !(8_000..=384_000).contains(&sample_rate) {
                 return Err(format!("Unsupported track sample rate: {sample_rate}"));
-            }
-        }
-        if let Some(channel_count) = self.track_channel_count {
-            if !(1..=16).contains(&channel_count) {
-                return Err(format!("Unsupported track channel count: {channel_count}"));
             }
         }
         if let Some(duration_ms) = self.duration_ms {
@@ -720,288 +608,6 @@ fn save_cached_update_state(cache: CachedUpdateCheck) -> Result<(), String> {
 }
 
 // --- Transcription ---
-
-fn decode_audio_bytes(bytes: &[u8]) -> Result<Vec<f32>, String> {
-    audio_transport::decode_samples(bytes)
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct DebugDictationCaptureResult {
-    audio_path: String,
-    timeline_path: String,
-}
-
-#[tauri::command]
-fn debug_dictation_capture_enabled() -> bool {
-    std::env::var("VOCO_DEBUG_CAPTURE_AUDIO").as_deref() == Ok("1")
-        && !DEBUG_CAPTURE_WRITTEN.load(Ordering::SeqCst)
-}
-
-#[tauri::command(async)]
-fn save_debug_dictation_capture(
-    audio_bytes: Vec<u8>,
-    timeline: serde_json::Value,
-) -> Result<Option<DebugDictationCaptureResult>, String> {
-    if std::env::var("VOCO_DEBUG_CAPTURE_AUDIO").as_deref() != Ok("1") {
-        return Ok(None);
-    }
-    if DEBUG_CAPTURE_WRITTEN
-        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
-        .is_err()
-    {
-        return Ok(None);
-    }
-
-    let result = write_debug_dictation_capture(&audio_bytes, &timeline);
-    if result.is_err() {
-        DEBUG_CAPTURE_WRITTEN.store(false, Ordering::SeqCst);
-    }
-    result.map(Some)
-}
-
-fn write_debug_dictation_capture(
-    audio_bytes: &[u8],
-    timeline: &serde_json::Value,
-) -> Result<DebugDictationCaptureResult, String> {
-    let samples = decode_audio_bytes(audio_bytes)?;
-    if samples.is_empty() {
-        return Err("Debug capture has no audio samples".to_string());
-    }
-    if samples.len() > 16_000 * MAX_AUDIO_SECONDS {
-        return Err(format!(
-            "Debug capture is too long (max {MAX_AUDIO_SECONDS} seconds)"
-        ));
-    }
-
-    let timeline_bytes = serde_json::to_vec_pretty(timeline)
-        .map_err(|error| format!("Failed to encode debug capture timeline: {error}"))?;
-    if timeline_bytes.len() > 16 * 1024 * 1024 {
-        return Err("Debug capture timeline is too large (max 16MB)".to_string());
-    }
-
-    let directory = debug_capture_dir();
-    prepare_private_debug_capture_directory(&directory)?;
-
-    let capture_id = format!(
-        "dictation-{}-{}-{}",
-        now_ms(),
-        std::process::id(),
-        DEBUG_CAPTURE_SEQUENCE.fetch_add(1, Ordering::SeqCst) + 1
-    );
-    let (audio_path, timeline_path) = write_private_debug_capture_pair(
-        &directory,
-        &capture_id,
-        &encode_pcm16_wav(&samples, 16_000),
-        &timeline_bytes,
-    )?;
-
-    Ok(DebugDictationCaptureResult {
-        audio_path: audio_path.to_string_lossy().into_owned(),
-        timeline_path: timeline_path.to_string_lossy().into_owned(),
-    })
-}
-
-fn encode_pcm16_wav(samples: &[f32], sample_rate: u32) -> Vec<u8> {
-    let data_size = samples.len().saturating_mul(2).min(u32::MAX as usize) as u32;
-    let mut wav = Vec::with_capacity(44 + data_size as usize);
-    wav.extend_from_slice(b"RIFF");
-    wav.extend_from_slice(&(36u32.saturating_add(data_size)).to_le_bytes());
-    wav.extend_from_slice(b"WAVEfmt ");
-    wav.extend_from_slice(&16u32.to_le_bytes());
-    wav.extend_from_slice(&1u16.to_le_bytes());
-    wav.extend_from_slice(&1u16.to_le_bytes());
-    wav.extend_from_slice(&sample_rate.to_le_bytes());
-    wav.extend_from_slice(&sample_rate.saturating_mul(2).to_le_bytes());
-    wav.extend_from_slice(&2u16.to_le_bytes());
-    wav.extend_from_slice(&16u16.to_le_bytes());
-    wav.extend_from_slice(b"data");
-    wav.extend_from_slice(&data_size.to_le_bytes());
-    for sample in samples.iter().take((data_size / 2) as usize) {
-        let pcm = (sample.clamp(-1.0, 1.0) * i16::MAX as f32).round() as i16;
-        wav.extend_from_slice(&pcm.to_le_bytes());
-    }
-    wav
-}
-
-fn prepare_private_debug_capture_directory(path: &std::path::Path) -> Result<(), String> {
-    std::fs::create_dir_all(path).map_err(|error| {
-        format!(
-            "Failed to create debug capture directory {}: {error}",
-            path.display()
-        )
-    })?;
-
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::{MetadataExt, PermissionsExt};
-
-        let metadata = std::fs::symlink_metadata(path).map_err(|error| {
-            format!(
-                "Failed to inspect debug capture directory {}: {error}",
-                path.display()
-            )
-        })?;
-        if metadata.file_type().is_symlink() || !metadata.is_dir() {
-            return Err(format!(
-                "Debug capture path {} must be a real directory",
-                path.display()
-            ));
-        }
-        if metadata.uid() != unsafe { libc::geteuid() } {
-            return Err(format!(
-                "Debug capture directory {} is not owned by the current user",
-                path.display()
-            ));
-        }
-
-        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o700)).map_err(
-            |error| {
-                format!(
-                    "Failed to secure debug capture directory {}: {error}",
-                    path.display()
-                )
-            },
-        )?;
-        let secured = std::fs::symlink_metadata(path).map_err(|error| {
-            format!(
-                "Failed to verify debug capture directory {}: {error}",
-                path.display()
-            )
-        })?;
-        if secured.mode() & 0o777 != 0o700 || secured.uid() != unsafe { libc::geteuid() } {
-            return Err(format!(
-                "Debug capture directory {} could not be secured to mode 0700",
-                path.display()
-            ));
-        }
-    }
-    Ok(())
-}
-
-fn create_private_debug_capture_file(path: &std::path::Path) -> Result<std::fs::File, String> {
-    let mut options = std::fs::OpenOptions::new();
-    options.write(true).create_new(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        options.mode(0o600);
-    }
-    options.open(path).map_err(|error| {
-        format!(
-            "Failed to create private debug capture file {}: {error}",
-            path.display()
-        )
-    })
-}
-
-fn verify_private_debug_capture_file(
-    file: &std::fs::File,
-    path: &std::path::Path,
-) -> Result<(), String> {
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::MetadataExt;
-        let metadata = file.metadata().map_err(|error| {
-            format!(
-                "Failed to inspect debug capture file {}: {error}",
-                path.display()
-            )
-        })?;
-        if !metadata.is_file()
-            || metadata.uid() != unsafe { libc::geteuid() }
-            || metadata.mode() & 0o777 != 0o600
-        {
-            return Err(format!(
-                "Debug capture file {} is not a user-owned 0600 regular file",
-                path.display()
-            ));
-        }
-    }
-    Ok(())
-}
-
-fn write_private_debug_capture_pair(
-    directory: &std::path::Path,
-    capture_id: &str,
-    audio_bytes: &[u8],
-    timeline_bytes: &[u8],
-) -> Result<(std::path::PathBuf, std::path::PathBuf), String> {
-    let audio_path = directory.join(format!("{capture_id}.wav"));
-    let timeline_path = directory.join(format!("{capture_id}.json"));
-    let mut audio_file = create_private_debug_capture_file(&audio_path)?;
-    let mut timeline_file = match create_private_debug_capture_file(&timeline_path) {
-        Ok(file) => file,
-        Err(error) => {
-            let cleanup = std::fs::remove_file(&audio_path).map_err(|cleanup_error| {
-                format!(
-                    "{error}; failed to remove partial debug audio {}: {cleanup_error}",
-                    audio_path.display()
-                )
-            });
-            return cleanup.and(Err(error));
-        }
-    };
-
-    let write_result = (|| {
-        audio_file.write_all(audio_bytes).map_err(|error| {
-            format!(
-                "Failed to write debug audio capture {}: {error}",
-                audio_path.display()
-            )
-        })?;
-        timeline_file.write_all(timeline_bytes).map_err(|error| {
-            format!(
-                "Failed to write debug capture timeline {}: {error}",
-                timeline_path.display()
-            )
-        })?;
-        audio_file.sync_all().map_err(|error| {
-            format!(
-                "Failed to sync debug audio capture {}: {error}",
-                audio_path.display()
-            )
-        })?;
-        timeline_file.sync_all().map_err(|error| {
-            format!(
-                "Failed to sync debug capture timeline {}: {error}",
-                timeline_path.display()
-            )
-        })?;
-        verify_private_debug_capture_file(&audio_file, &audio_path)?;
-        verify_private_debug_capture_file(&timeline_file, &timeline_path)?;
-        if let Ok(directory_file) = std::fs::File::open(directory) {
-            directory_file.sync_all().map_err(|error| {
-                format!(
-                    "Failed to sync debug capture directory {}: {error}",
-                    directory.display()
-                )
-            })?;
-        }
-        Ok::<(), String>(())
-    })();
-
-    drop(audio_file);
-    drop(timeline_file);
-
-    if let Err(error) = write_result {
-        let mut cleanup_errors = Vec::new();
-        for path in [&audio_path, &timeline_path] {
-            if let Err(cleanup_error) = std::fs::remove_file(path) {
-                cleanup_errors.push(format!("{}: {cleanup_error}", path.display()));
-            }
-        }
-        if cleanup_errors.is_empty() {
-            return Err(error);
-        }
-        return Err(format!(
-            "{error}; failed to remove partial debug capture files: {}",
-            cleanup_errors.join(", ")
-        ));
-    }
-
-    Ok((audio_path, timeline_path))
-}
 
 #[tauri::command]
 fn sync_panel_level(app: tauri::AppHandle, epoch: u64, level: f64) {
@@ -1344,95 +950,6 @@ fn hide_overlay_window(window: &tauri::WebviewWindow<tauri::Wry>) -> Result<(), 
     Ok(())
 }
 
-fn clamp_overlay_position(
-    cursor_x: i32,
-    cursor_y: i32,
-    bounds: Option<(i32, i32, u32, u32)>,
-    width: u32,
-    height: u32,
-) -> (i32, i32) {
-    let mut x = cursor_x + OVERLAY_CURSOR_OFFSET_X;
-    let mut y = cursor_y + OVERLAY_CURSOR_OFFSET_Y;
-
-    if let Some((monitor_x, monitor_y, monitor_width, monitor_height)) = bounds {
-        let min_x = monitor_x + OVERLAY_MARGIN;
-        let min_y = monitor_y + OVERLAY_MARGIN;
-        let max_x = (monitor_x + monitor_width as i32 - width as i32 - OVERLAY_MARGIN).max(min_x);
-        let max_y = (monitor_y + monitor_height as i32 - height as i32 - OVERLAY_MARGIN).max(min_y);
-
-        x = x.clamp(min_x, max_x);
-        y = y.clamp(min_y, max_y);
-    }
-
-    (x, y)
-}
-
-fn show_overlay_window(
-    window: &tauri::WebviewWindow<tauri::Wry>,
-    width: u32,
-    height: u32,
-) -> Result<(), String> {
-    window
-        .set_always_on_top(true)
-        .map_err(|e| format!("Failed to keep overlay on top: {e}"))?;
-
-    let cursor = window
-        .cursor_position()
-        .map_err(|e| format!("Failed to read cursor position: {e}"))?;
-
-    let monitor = window
-        .monitor_from_point(cursor.x, cursor.y)
-        .ok()
-        .flatten()
-        .or_else(|| window.current_monitor().ok().flatten())
-        .or_else(|| window.primary_monitor().ok().flatten());
-
-    let bounds = monitor.as_ref().map(|monitor| {
-        (
-            monitor.position().x,
-            monitor.position().y,
-            monitor.size().width,
-            monitor.size().height,
-        )
-    });
-
-    let (x, y) = clamp_overlay_position(
-        cursor.x.round() as i32,
-        cursor.y.round() as i32,
-        bounds,
-        width,
-        height,
-    );
-
-    window
-        .set_size(tauri::Size::Physical(tauri::PhysicalSize::new(
-            width, height,
-        )))
-        .map_err(|e| format!("Failed to resize overlay window: {e}"))?;
-
-    window
-        .set_position(tauri::Position::Physical(tauri::PhysicalPosition::new(
-            x, y,
-        )))
-        .map_err(|e| format!("Failed to position overlay window: {e}"))?;
-
-    window
-        .show()
-        .map_err(|e| format!("Failed to show overlay window: {e}"))?;
-
-    Ok(())
-}
-
-#[tauri::command]
-fn show_status_overlay(app: tauri::AppHandle, width: u32, height: u32) -> Result<(), String> {
-    let window = main_window(&app)?;
-    show_overlay_window(
-        &window,
-        width.max(HIDDEN_WINDOW_SIZE),
-        height.max(HIDDEN_WINDOW_SIZE),
-    )
-}
-
 #[tauri::command]
 fn hide_status_overlay(app: tauri::AppHandle) -> Result<(), String> {
     let window = main_window(&app)?;
@@ -1719,7 +1236,6 @@ fn emit_toggle_event(app_handle: &tauri::AppHandle, backend_used: &str) {
     } else {
         trace_hotkey_event("toggle_event_emitted", Some(backend_used));
     }
-    let _ = app_handle.emit_to("main", LEGACY_TOGGLE_DICTATION_EVENT, ());
 }
 
 fn buffer_toggle_until_frontend_ready(backend_used: &str) {
@@ -2481,7 +1997,6 @@ pub fn run() -> Result<(), String> {
             crash_recovery::finish_crash_journal,
             crash_recovery::keep_crash_journal,
             benchmark_stream::benchmark_stream,
-            benchmark_stream::recover_stream,
             native_capture_commands::native_capture_capabilities,
             native_capture_commands::native_capture_list_sources,
             native_capture_commands::native_capture_select_source,
@@ -2497,8 +2012,6 @@ pub fn run() -> Result<(), String> {
             save_config_patch,
             load_cached_update_state,
             save_cached_update_state,
-            debug_dictation_capture_enabled,
-            save_debug_dictation_capture,
             get_desktop_paste_status,
             get_desktop_input_status,
             get_panel_setup_status,
@@ -2519,7 +2032,6 @@ pub fn run() -> Result<(), String> {
             sync_panel_level,
             trace_frontend_hotkey_event,
             has_pending_hotkey_toggle,
-            show_status_overlay,
             hide_status_overlay,
             show_notification,
             open_external_url,
@@ -2661,95 +2173,6 @@ mod tests {
     }
 
     #[test]
-    fn decode_audio_bytes_valid() {
-        let mut bytes = Vec::new();
-        bytes.extend_from_slice(&0.5f32.to_le_bytes());
-        bytes.extend_from_slice(&(-0.5f32).to_le_bytes());
-        let samples = decode_audio_bytes(&bytes).unwrap();
-        assert_eq!(samples.len(), 2);
-        assert!((samples[0] - 0.5).abs() < f32::EPSILON);
-        assert!((samples[1] + 0.5).abs() < f32::EPSILON);
-    }
-
-    #[test]
-    fn decode_audio_bytes_empty() {
-        assert!(decode_audio_bytes(&[]).unwrap().is_empty());
-    }
-
-    #[test]
-    fn decode_audio_bytes_invalid_length() {
-        assert!(decode_audio_bytes(b"abc")
-            .unwrap_err()
-            .contains("not a multiple of 4"));
-    }
-
-    #[test]
-    fn debug_capture_wav_is_valid_mono_pcm16() {
-        let wav = encode_pcm16_wav(&[-1.0, 0.0, 1.0], 16_000);
-
-        assert_eq!(&wav[0..4], b"RIFF");
-        assert_eq!(&wav[8..12], b"WAVE");
-        assert_eq!(u16::from_le_bytes([wav[20], wav[21]]), 1);
-        assert_eq!(u16::from_le_bytes([wav[22], wav[23]]), 1);
-        assert_eq!(
-            u32::from_le_bytes([wav[24], wav[25], wav[26], wav[27]]),
-            16_000
-        );
-        assert_eq!(u16::from_le_bytes([wav[34], wav[35]]), 16);
-        assert_eq!(&wav[36..40], b"data");
-        assert_eq!(u32::from_le_bytes([wav[40], wav[41], wav[42], wav[43]]), 6);
-        assert_eq!(wav.len(), 50);
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn debug_capture_pair_is_private_and_cleans_up_without_overwriting_collisions() {
-        use std::os::unix::fs::{MetadataExt, PermissionsExt};
-
-        let unique = format!(
-            "voco-debug-capture-test-{}-{}",
-            std::process::id(),
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        );
-        let directory = std::env::temp_dir().join(unique);
-        prepare_private_debug_capture_directory(&directory).unwrap();
-
-        let (audio_path, timeline_path) =
-            write_private_debug_capture_pair(&directory, "success", b"audio", b"timeline").unwrap();
-        assert_eq!(
-            std::fs::metadata(&directory).unwrap().permissions().mode() & 0o777,
-            0o700
-        );
-        for path in [&audio_path, &timeline_path] {
-            let metadata = std::fs::metadata(path).unwrap();
-            assert_eq!(metadata.permissions().mode() & 0o777, 0o600);
-            assert_eq!(metadata.uid(), unsafe { libc::geteuid() });
-        }
-
-        let collision_timeline = directory.join("collision.json");
-        let mut existing = create_private_debug_capture_file(&collision_timeline).unwrap();
-        existing.write_all(b"keep-existing").unwrap();
-        drop(existing);
-        let collision = write_private_debug_capture_pair(
-            &directory,
-            "collision",
-            b"must-be-removed",
-            b"must-not-overwrite",
-        );
-        assert!(collision.is_err());
-        assert!(!directory.join("collision.wav").exists());
-        assert_eq!(
-            std::fs::read(&collision_timeline).unwrap(),
-            b"keep-existing"
-        );
-
-        std::fs::remove_dir_all(directory).unwrap();
-    }
-
-    #[test]
     fn external_url_allowlist_accepts_voco_releases_and_exact_setup_guide() {
         assert!(is_allowed_external_url(
             "https://github.com/sergiopesch/voco/blob/master/docs/platform/README.md#ydotoold-ydotool-daemon"
@@ -2819,17 +2242,10 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
-    fn frontend_trace_fields_accept_only_non_content_audio_buckets() {
+    fn frontend_trace_fields_accept_only_bounded_values() {
         assert!(FrontendTraceFields {
-            audio_level_bucket: Some("medium".to_string()),
-            chunk_count: Some(12),
-            response_delta_count: Some(3),
             selected_device_configured: Some(true),
             track_sample_rate: Some(48000),
-            track_channel_count: Some(1),
-            echo_cancellation: Some(false),
-            noise_suppression: Some(false),
-            auto_gain_control: Some(false),
             duration_ms: Some(42),
             dictation_session_id: Some(1),
         }
@@ -2837,32 +2253,8 @@ mod tests {
         .is_ok());
 
         assert!(FrontendTraceFields {
-            audio_level_bucket: Some("raw audio here".to_string()),
-            chunk_count: None,
-            response_delta_count: None,
-            selected_device_configured: None,
-            track_sample_rate: None,
-            track_channel_count: None,
-            echo_cancellation: None,
-            noise_suppression: None,
-            auto_gain_control: None,
-            duration_ms: None,
-            dictation_session_id: None,
-        }
-        .validate()
-        .unwrap_err()
-        .contains("Unsupported audio level bucket"));
-
-        assert!(FrontendTraceFields {
-            audio_level_bucket: None,
-            chunk_count: None,
-            response_delta_count: None,
             selected_device_configured: None,
             track_sample_rate: Some(1),
-            track_channel_count: Some(1),
-            echo_cancellation: None,
-            noise_suppression: None,
-            auto_gain_control: None,
             duration_ms: None,
             dictation_session_id: None,
         }
@@ -2871,15 +2263,8 @@ mod tests {
         .contains("Unsupported track sample rate"));
 
         assert!(FrontendTraceFields {
-            audio_level_bucket: None,
-            chunk_count: None,
-            response_delta_count: None,
             selected_device_configured: None,
             track_sample_rate: None,
-            track_channel_count: None,
-            echo_cancellation: None,
-            noise_suppression: None,
-            auto_gain_control: None,
             duration_ms: Some(3_600_001),
             dictation_session_id: None,
         }
@@ -2888,15 +2273,8 @@ mod tests {
         .contains("Unsupported duration"));
 
         assert!(FrontendTraceFields {
-            audio_level_bucket: None,
-            chunk_count: None,
-            response_delta_count: None,
             selected_device_configured: None,
             track_sample_rate: None,
-            track_channel_count: None,
-            echo_cancellation: None,
-            noise_suppression: None,
-            auto_gain_control: None,
             duration_ms: None,
             dictation_session_id: Some(0),
         }
@@ -3035,26 +2413,5 @@ mod tests {
         assert!(!is_ignored_evdev_device_name(
             "AT Translated Set 2 keyboard"
         ));
-    }
-
-    #[test]
-    fn overlay_position_uses_cursor_offset_without_monitor_bounds() {
-        assert_eq!(clamp_overlay_position(100, 150, None, 252, 112), (120, 174));
-    }
-
-    #[test]
-    fn overlay_position_stays_inside_monitor_bounds() {
-        assert_eq!(
-            clamp_overlay_position(1900, 1060, Some((0, 0, 1920, 1080)), 252, 112),
-            (1652, 952)
-        );
-    }
-
-    #[test]
-    fn overlay_position_handles_small_monitor_bounds() {
-        assert_eq!(
-            clamp_overlay_position(20, 20, Some((0, 0, 120, 90)), 252, 112),
-            (16, 16)
-        );
     }
 }

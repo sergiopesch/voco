@@ -1,4 +1,4 @@
-"""Optional real application capture-to-Copy in the private nested Wayland seat."""
+"""Optional real application capture in the private nested Wayland seat."""
 if not __debug__:
     raise SystemExit("Wayland qualification requires assertions; unset PYTHONOPTIMIZE and do not use python -O.")
 
@@ -9,7 +9,6 @@ import wave
 import json
 import os
 from pathlib import Path
-import re
 import socket
 import shutil
 import subprocess
@@ -101,8 +100,6 @@ def run_capture(root, app, pump, activate, geometry_provider=None, control_revea
     assert not Path('/dev/snd').exists() and not Path('/dev/input').exists()
     assert Gdk.Display.get_default().__gtype__.name == 'GdkWaylandDisplay'
     remap_capture = os.environ.get('VOCO_WAYLAND_SURFACE_JOURNEY') == '1'
-    if remap_capture:
-        assert os.environ.get('VOCO_DEBUG_CAPTURE_AUDIO') == '1', 'Remap continuity requires isolated synthetic debug WAV'
     trace = root / 'state/voco/hotkey-trace.jsonl'
     target = Gtk.Window(title='VOCO private Wayland unchanged target')
     field = Gtk.Entry()
@@ -111,9 +108,9 @@ def run_capture(root, app, pump, activate, geometry_provider=None, control_revea
     field.connect('changed', lambda entry: changes.append(entry.get_text()))
     target.show_all()
     field.grab_focus()
-    result = {'passed': False, 'boundary': 'nested Wayland / synthetic PulseAudio / real WebKit capture / native IPC / pinned model / explicit Copy',
+    result = {'passed': False, 'boundary': 'nested Wayland / synthetic PulseAudio / real WebKit capture / native IPC / pinned model',
               'physicalMicrophone': False, 'shortcutTested': False, 'targetMutations': changes,
-              'scenario': 'idle-remap-then-capture-open-refused' if remap_capture else 'capture-copy', 'surfaceObservations': []}
+              'scenario': 'idle-remap-then-capture-open-refused' if remap_capture else 'capture', 'surfaceObservations': []}
 
     def event_rows():
         rows = []
@@ -142,20 +139,6 @@ def run_capture(root, app, pump, activate, geometry_provider=None, control_revea
             client.settimeout(2)
             client.connect(str(root / 'runtime/voco.sock'))
 
-    clipboard_owners = []
-
-    def seed_clipboard(label):
-        sentinel = 'VOCO private Copy precondition: ' + label
-        owner = subprocess.Popen(['wl-copy', '--foreground'], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
-        clipboard_owners.append(owner)
-        owner.stdin.write(sentinel)
-        owner.stdin.close()
-        def verified():
-            read = subprocess.run(['wl-paste', '--no-newline'], text=True, capture_output=True, timeout=3)
-            return read.returncode == 0 and read.stdout == sentinel
-        wait(verified, 'distinct private clipboard sentinel ' + label)
-        result.setdefault('clipboardPreconditions', []).append({'stage': label, 'verified': True, 'sentinel': sentinel})
-
     def screenshot(name, geometry=None):
         # Only the private nested compositor's Xvfb output is inspected.
         code = "import gi;gi.require_version('Gdk','3.0');from gi.repository import Gdk;Gdk.init([]);p=Gdk.pixbuf_get_from_window(Gdk.get_default_root_window(),0,0,1280,900);p.savev(__import__('sys').argv[1],'png',[],[])"
@@ -164,7 +147,7 @@ def run_capture(root, app, pump, activate, geometry_provider=None, control_revea
         execution = subprocess.run(['/usr/bin/python3', '-c', code, str(root / ('evidence/' + name)), str(Path(__file__).parent), json.dumps(geometry)], text=True, capture_output=True, env={**os.environ, 'GDK_BACKEND': 'x11', 'DISPLAY': ':77'}, timeout=10, check=True)
         return json.loads(execution.stdout) if geometry is not None else None
 
-    def painted_copy(stage, wanted='Copy transcript'):
+    def painted_copy(stage, wanted):
         attempts = result.setdefault('paintChecks', {}).setdefault(stage, [])
         verified_button = None
         def painted():
@@ -203,10 +186,10 @@ def run_capture(root, app, pump, activate, geometry_provider=None, control_revea
                 verified_button = after
                 return True
             return False
-        wait(painted, 'painted visible Copy ' + stage)
+        wait(painted, 'painted visible ' + wanted + ' ' + stage)
         return verified_button
 
-    def copy_button(wanted='Copy transcript'):
+    def copy_button(wanted):
         desktop = Atspi.get_desktop(0)
         # WebKit accessibility descendants belong to its separate web process.
         # Scope by the application root, then traverse that root's complete tree.
@@ -214,8 +197,6 @@ def run_capture(root, app, pump, activate, geometry_provider=None, control_revea
                    if desktop.get_child_at_index(i).get_process_id() == app.pid]
         found = None
         result['appFrameBounds'] = None
-        texts = []
-        buttons = []
         observations = []
         for _ in range(500):
             if not pending:
@@ -228,11 +209,7 @@ def run_capture(root, app, pump, activate, geometry_provider=None, control_revea
                     if native_bounds.width > 4 and native_bounds.height > 4:
                         result['appFrameBounds'] = [native_bounds.x, native_bounds.y, native_bounds.width, native_bounds.height]
                 name = node.get_name() or ''
-                texts.append(name)
-                if any(interface.endswith('Text') for interface in node.get_interfaces()):
-                    texts.append(Atspi.Text.get_text(node, 0, min(1000, Atspi.Text.get_character_count(node))))
                 if node.get_role() == Atspi.Role.PUSH_BUTTON:
-                    buttons.append(name)
                     if name == wanted:
                         states = node.get_state_set()
                         bounds = node.get_component_iface().get_extents(Atspi.CoordType.WINDOW)
@@ -243,9 +220,6 @@ def run_capture(root, app, pump, activate, geometry_provider=None, control_revea
             except Exception:
                 continue
         (root / 'evidence/wayland-accessibility-diagnostic.json').write_text(json.dumps({'appPid': app.pid, 'nodes': observations}, indent=2))
-        result['manualControls'] = {'normalReady': any('Transcript ready to copy' in text for text in texts),
-                                    'clearAvailable': 'Clear transcript' in buttons,
-                                    'failureActions': [b for b in buttons if b in ('Discard recovery', 'Retry transcription')]}
         if found is not None:
             bounds = result['copyEligibility']['bounds']
             frame = result.get('appFrameBounds')
@@ -300,59 +274,24 @@ def run_capture(root, app, pump, activate, geometry_provider=None, control_revea
         toggle()
         wait(lambda: 'dictation_stop_to_idle' in events(), 'transcription completion', 60)
         result['stopToIdleSeconds'] = time.monotonic() - stopped
-        result['captureTrace'] = [row for row in event_rows() if row.get('event') in ('dictation_recording_stopped', 'dictation_audio_teardown_completed', 'dictation_audio_prepared')]
-        if remap_capture:
-            captures = list((root / 'state/voco/debug-captures').glob('*.wav'))
-            assert len(captures) == 1, 'Expected exactly one synthetic capture WAV'
-            shutil.copyfile(captures[0], root / 'evidence/synthetic-capture.wav')
-            result['captureContinuity'] = capture_continuity(pcm16(sound), pcm16(captures[0]))
-            result['captureContinuity']['capturedSha256'] = hashlib.sha256(captures[0].read_bytes()).hexdigest()
-            assert result['captureContinuity']['passed'], 'Synthetic capture waveform continuity failed'
-        assert events().intersection({'dictation_transcription_completed', 'dictation_canonical_final_completed'})
-        assert 'dictation_recovery_retained' not in events(), 'Expected normal manual result, received failure recovery'
-        assert not changes and field.get_text() == '', 'Target changed before explicit Copy'
-        if os.environ.get('VOCO_WAYLAND_DISMISS_TARGET') == '1':
-            # Separate scenario: user dismisses the fixture. This is not proof
-            # that D-Bus tray activation raises VOCO over a foreground window.
-            target.hide()
-            result['targetExplicitlyDismissed'] = True
-            pump(.5)
-        seed_clipboard('initial-copy')
-        activate('Open VOCO')
-        button = None
-        def ready():
-            nonlocal button
-            button = copy_button()
-            return button is not None and result['manualControls']['normalReady'] and result['manualControls']['clearAvailable']
-        wait(ready, 'visible normal Copy controls')
-        assert not result['manualControls']['failureActions']
-        result['surfaceObservations'].append({'stage': 'normal-copy', 'control': dict(result['copyEligibility'])})
-        button = painted_copy('nested-before-copy')
-        action = button.get_action_iface()
-        assert action is not None and action.get_n_actions() > 0
-        assert action.do_action(0), 'Actual accessibility Copy action was rejected'
-        copied = ''
-        def clipboard_matches():
-            nonlocal copied
-            read = subprocess.run(['wl-paste', '--no-newline'], text=True, capture_output=True, timeout=3)
-            copied = read.stdout if read.returncode == 0 else ''
-            return re.findall('[a-z]+', copied.lower()) == ['go', 'do', 'you', 'hear']
-        wait(clipboard_matches, 'private Wayland clipboard transcript')
-        assert not changes and field.get_text() == '', 'Explicit Copy mutated target'
+        result['captureTrace'] = [row for row in event_rows() if row.get('event') in ('dictation_recording_stopped', 'dictation_audio_teardown_completed', 'dictation_stop_to_idle')]
+        wait(lambda: 'dictation_stop_to_final_transcript' in events(), 'final transcript after Stop', 5)
+        assert 'dictation_recovery_retained' not in events(), 'Expected a normal result, received failure recovery'
+        assert not changes and field.get_text() == '', 'Private target changed during capture'
         if remap_capture:
             # Exercise settings through a visible control, then the ordinary tray
-            # route back to the retained transcript. Do not mutate renderer state.
+            # route back to the popover. Do not mutate renderer state.
             activate('Open VOCO')
             if control_revealer is not None:
                 control_revealer(app.pid, 'Settings')
-            wait(lambda: copy_button('Settings') is not None, 'visible Settings after clipboard readback and Open')
+            wait(lambda: copy_button('Settings') is not None, 'visible Settings after capture and Open')
             settings = painted_copy('nested-before-settings', 'Settings') if geometry_provider else copy_button('Settings')
             assert settings is not None and settings.get_action_iface().do_action(0)
             wait(lambda: copy_button('General') is not None, 'visible settings after remap')
             result['surfaceObservations'].append({'stage': 'settings', 'control': dict(result['copyEligibility'])})
             activate('Open VOCO')
-            wait(ready, 'Copy after settings-to-popover transition')
-            result['surfaceObservations'].append({'stage': 'reopened-copy', 'control': dict(result['copyEligibility'])})
+            wait(lambda: copy_button('Settings') is not None, 'popover after settings-to-popover transition')
+            result['surfaceObservations'].append({'stage': 'reopened-popover', 'control': dict(result['copyEligibility'])})
             # A newly mapped native target receives a real compositor focus
             # transition. Require focus acquisition before judging app blur.
             focus_probe = Gtk.Window(title='VOCO private deliberate focus change')
@@ -360,37 +299,27 @@ def run_capture(root, app, pump, activate, geometry_provider=None, control_revea
             try:
                 focus_probe.show_all()
                 wait(focus_probe.is_active, 'private target acquired compositor focus')
-                wait(lambda: copy_button() is None, 'popover dismisses on real blur')
+                wait(lambda: copy_button('Settings') is None, 'popover dismisses on real blur')
                 result['blurDismissed'] = True
                 focus_probe.destroy()
-                seed_clipboard('blur-reopened-copy')
                 activate('Open VOCO')
-                wait(ready, 'visible Copy after real blur and reopen')
-                button = painted_copy('nested-before-reopened-copy')
-                assert button.get_action_iface().do_action(0)
-                wait(clipboard_matches, 'clipboard after blur/reopen')
-                result['surfaceObservations'].append({'stage': 'blur-reopened-copy', 'control': dict(result['copyEligibility'])})
+                wait(lambda: copy_button('Settings') is not None, 'visible popover after real blur and reopen')
+                if geometry_provider:
+                    painted_copy('nested-before-reopened-settings', 'Settings')
+                result['surfaceObservations'].append({'stage': 'blur-reopened-popover', 'control': dict(result['copyEligibility'])})
             finally:
                 focus_probe.destroy()
-        result.update(passed=True, copiedText=copied, crossProcessClipboardVerified=True)
+        result.update(passed=True)
         return result
     finally:
         # Retain raw evidence even when acceptance fails before transcription or
-        # the normal capture-copy branch. The enclosing sandbox is disposable.
+        # the normal capture branch. The enclosing sandbox is disposable.
         result['evidenceRetentionErrors'] = []
-        for source, destination in [(trace, root / 'evidence/hotkey-trace.jsonl'),
-                                    (root / 'state/voco/debug-captures', root / 'evidence/debug-captures')]:
-            try:
-                if source.is_dir():
-                    shutil.copytree(source, destination, dirs_exist_ok=True)
-                elif source.is_file():
-                    shutil.copyfile(source, destination)
-            except OSError as error:
-                result['evidenceRetentionErrors'].append(str(error))
-        for owner in clipboard_owners:
-            if owner.poll() is None:
-                owner.terminate()
-            owner.wait(timeout=5)
+        try:
+            if trace.is_file():
+                shutil.copyfile(trace, root / 'evidence/hotkey-trace.jsonl')
+        except OSError as error:
+            result['evidenceRetentionErrors'].append(str(error))
         try:
             screenshot('nested-capture.png')
         finally:

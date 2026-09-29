@@ -265,14 +265,15 @@ The [private Wayland harness](wayland-isolated.md) supplements X11 checks with r
 GTK/WebKit surfaces, tray Open/Quit lifecycle and verified bundled-worker warmup.
 It does not qualify physical microphones or an installed GNOME/KDE session.
 
-Long packaged-browser capture requires `VOCO_BROWSER_LONG_CAPTURE=1` and
-`VOCO_BROWSER_DEBUG_CAPTURE=1` in the private synthetic-audio harness. Before
-recording, it verifies every fixture and the reconstructed playback PCM and freezes
-the complete reference. After focus loss, it scores both the final canonical text
-and final transcript against that full reference before clearing recovery. It also
-requires exact preservation of the committed target prefix. Public fixture audio
-and debug JSON are retained in the requested evidence directory. This opt-in
-diagnostic is for the isolated harness, not the user's normal recording configuration.
+Long packaged-browser capture requires `VOCO_BROWSER_LONG_CAPTURE=1` in the private
+synthetic-audio harness. Before recording, it verifies every fixture and the
+reconstructed playback PCM and freezes the complete reference. The full-application
+run scores the text delivered to the field against that full reference. The toolbar
+run moves focus after the first live prefix: the original field must keep exactly
+that prefix, and the prefix plus the remainder copied at Stop is scored against the
+full reference. The repeated plan must also keep its frozen phrase count. Public
+fixture audio and the scores are retained in the requested evidence directory. This
+opt-in check is for the isolated harness, not the user's normal recording configuration.
 
 `npm run verify:cursor-acceptance -- /path/to/hotkey-trace.jsonl --min-duration-ms 60000`
 uses strict exit status for installed-desktop acceptance: unproven/failing sessions and

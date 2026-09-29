@@ -178,7 +178,7 @@ def run_onboarding(root, app, pump, native_windows):
         result['transcriptObserved'] = any(re.findall('[a-z]+', value.lower()) == ['go', 'do', 'you', 'hear'] for value in text)
         assert clipboard() == sentinel, 'Onboarding changed clipboard'
         result['clipboardUnchanged'] = True
-        result['captureTrace'] = [row for row in rows() if row.get('event') in ('dictation_audio_prepared', 'dictation_recording_stopped', 'dictation_audio_teardown_completed', 'dictation_stop_to_idle')]
+        result['captureTrace'] = [row for row in rows() if row.get('event') in ('dictation_recording_stopped', 'dictation_audio_teardown_completed', 'dictation_stop_to_idle')]
         lifecycle = ['recording_state_active', 'dictation_recording_stopped', 'dictation_audio_teardown_completed', 'dictation_stop_to_idle']
         ordered = [row for row in rows() if row.get('event') in lifecycle]
         assert [row['event'] for row in ordered] == lifecycle, 'One ordered Start/Stop/teardown/idle lifecycle required'

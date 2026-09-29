@@ -79,7 +79,7 @@ if [[ "${1:-}" == --browser-application ]]; then
   VOCO_NATIVE_OUTPUT_MODE=final-text-only VOCO_BROWSER_LONG_CAPTURE=0 \
     VOCO_BROWSER_EVIDENCE_DIR="${browser_evidence}/final-text-only" \
     bash "${ROOT_DIR}/scripts/${TEST_SCRIPT}"
-  VOCO_NATIVE_OUTPUT_MODE=stable-cursor-streaming VOCO_BROWSER_LONG_CAPTURE=1 VOCO_BROWSER_DEBUG_CAPTURE=1 \
+  VOCO_NATIVE_OUTPUT_MODE=stable-cursor-streaming VOCO_BROWSER_LONG_CAPTURE=1 \
     VOCO_BROWSER_EVIDENCE_DIR="${browser_evidence}/canonical-checkpoint" \
     bash "${ROOT_DIR}/scripts/${TEST_SCRIPT}"
 elif [[ "${1:-}" == --native-pulse-latency ]]; then

@@ -5,9 +5,11 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import http from 'node:http';
 import assert from 'node:assert/strict';
-import {freezeLongPlayback, scoreLongCapture} from './browser-long-accuracy.mjs';
+import {freezeLongPlayback} from './browser-long-accuracy.mjs';
+import {scoreTranscript} from './speech-score.mjs';
+import {scoreSpeechIntegrity} from './speech-integrity.mjs';
 const longCapture = process.env.VOCO_BROWSER_LONG_CAPTURE === '1';
-assert.ok(!longCapture || process.env.VOCO_BROWSER_DEBUG_CAPTURE === '1', 'Long browser qualification requires VOCO_BROWSER_DEBUG_CAPTURE=1 for full-reference accuracy');
+assert.notEqual(process.env.VOCO_BROWSER_DIAG_SECOND_CAPTURE, '1', 'The retired debug-capture mode is unavailable; use VOCO_BROWSER_LONG_CAPTURE=1 for full-reference Nemotron delivery.');
 const root = process.env.VOCO_BROWSER_TEST_ROOT;
 assert.ok(root && process.env.XDG_RUNTIME_DIR === `${root}/runtime` && process.env.DISPLAY === ':0');
 const hash = async p => crypto.createHash('sha256').update(await fs.readFile(p)).digest('hex');
@@ -32,7 +34,7 @@ await fs.writeFile(`${profile}/NativeMessagingHosts/com.voco.exact_field.json`, 
 const server = http.createServer((_q,r) => r.end('<!doctype html><title>VOCO exact recipient</title><textarea id="a"></textarea><textarea id="b"></textarea>'));
 await new Promise(r=>server.listen(0,'127.0.0.1',r));
 const log = await fs.open(`${root}/evidence/app.log`, 'w');
-const app = spawn(`${root}/voco`, [], {env: {...process.env, VOCO_HOTKEY_TRACE: '1', ...(process.env.VOCO_BROWSER_DEBUG_CAPTURE === '1' ? {VOCO_DEBUG_CAPTURE_AUDIO: '1'} : {})}, stdio:['ignore',log.fd,log.fd]});
+const app = spawn(`${root}/voco`, [], {env: {...process.env, VOCO_HOTKEY_TRACE: '1'}, stdio:['ignore',log.fd,log.fd]});
 const delay = ms=>new Promise(r=>setTimeout(r,ms));
 const traces = async()=> (await fs.readFile(`${root}/state/voco/hotkey-trace.jsonl`,'utf8').catch(()=>'' )).split('\n').flatMap(line=>{try{return [JSON.parse(line)];}catch{return [];}});
 async function until(fn, label, ms=30_000) {const deadline=Date.now()+ms;while(Date.now()<deadline){if(await fn())return;if(playbacks.some(p=>p.record.error || p.record.timedOut || (p.record.exitCode !== undefined && p.record.exitCode !== 0)))throw Error('Fixture playback failed; see playback.json');if(app.exitCode!==null)throw Error(`App exited: ${label}`);await delay(50);}throw Error(`Timed out: ${label}`);}
@@ -54,13 +56,6 @@ async function playFixture(file) {
 try {
   await until(()=>fs.stat(`${root}/runtime/voco-browser/exact-field.sock`).then(()=>true).catch(()=>false),'broker socket');
   await delay(6000);
-  if (process.env.VOCO_BROWSER_DIAG_SECOND_CAPTURE === '1') {
-    assert.equal(process.env.VOCO_BROWSER_DEBUG_CAPTURE, '1');
-    await fs.mkdir(`${root}/state/voco`, {recursive: true});
-    // A failed opt-in debug save resets the existing one-shot latch. This
-    // disposable sink failure reserves that one capture for recording two.
-    await fs.writeFile(`${root}/state/voco/debug-captures`, 'Diagnostic: reject first debug save so the one-shot capture remains available for recording two.', {mode: 0o600});
-  }
   browser = await chromium.launchPersistentContext(profile, {executablePath:'/tmp/browser/chrome',headless:false,args:['--force-renderer-accessibility=complete',`--disable-extensions-except=${extension}`,`--load-extension=${extension}`]});
   worker=browser.serviceWorkers()[0]||await browser.waitForEvent('serviceworker');
   page=await browser.newPage();await page.goto(`http://127.0.0.1:${server.address().port}`);
@@ -128,12 +123,9 @@ try {
     results.push({case:retry?'fresh-recording':reject?'focus-loss':'delivery',passed:true,events:(await traces()).slice(traceStart).map(t=>t.event)});
   }
   if (process.env.VOCO_BROWSER_TOOLBAR_PROBE_ONLY !== '1') {
-  for (const reject of (process.env.VOCO_BROWSER_LONG_CAPTURE === '1' ? (process.env.VOCO_BROWSER_DIAG_SECOND_CAPTURE === '1' ? [false] : []) : [false, true])) await shortCase(reject);
-  if (process.env.VOCO_BROWSER_DIAG_SECOND_CAPTURE === '1') await fs.unlink(`${root}/state/voco/debug-captures`);
+  for (const reject of (process.env.VOCO_BROWSER_LONG_CAPTURE === '1' ? [] : [false, true])) await shortCase(reject);
   if (process.env.VOCO_BROWSER_LONG_CAPTURE === '1') {
     assert.equal(process.env.VOCO_NATIVE_OUTPUT_MODE, 'stable-cursor-streaming');
-    const debugDirectory = `${root}/state/voco/debug-captures`;
-    const priorCaptures = new Set(await fs.readdir(debugDirectory).catch(error => { if (error.code === 'ENOENT') return []; throw error; }));
     await page.reload(); await page.bringToFront();
     await activateToolbar();
     await worker.evaluate(() => { if (!globalThis.observedNativePorts) globalThis.observedNativePorts = new WeakSet(); if (!globalThis.observedNativePorts.has(native)) { globalThis.observedNativePorts.add(native); native.onMessage.addListener(m => { if (['claim', 'append', 'cancel'].includes(m.type)) globalThis.nativeRequestMetadata.push({type:m.type,sequence:m.sequence,expectedCommittedCharacters:m.expectedCommittedCharacters,textCharacters:typeof m.text==='string'?Array.from(m.text).length:null,final:m.final}); }); } });
@@ -143,28 +135,22 @@ try {
     await until(async()=> (await traces()).slice(traceStart).some(t=>t.event==='recording_state_active'),'long real microphone recording');
     const player=await playFixture(`${root}/long.wav`);
     const played=player.done;
-    await until(async()=> (await traces()).slice(traceStart).some(t=>t.event==='dictation_canonical_checkpoint_committed'),'actual canonical checkpoint receipt',55_000);
+    await until(async()=> (await traces()).slice(traceStart).some(t=>t.event==='dictation_desktop_live_prefix_dispatched'),'live browser prefix receipt',55_000);
     const prefix=await page.locator('#a').inputValue(); assert.ok(prefix.length>0);
     await page.locator('#b').focus();
     assert.equal(await played,0); await delay(600); await page.keyboard.press('Alt+Shift+v');
     await until(async()=> (await traces()).slice(traceStart).some(t=>t.event==='dictation_desktop_remainder_copied'),'canonical focus-loss remainder copied',45_000);
     await until(async()=> (await traces()).slice(traceStart).some(t=>t.event==='dictation_stop_to_idle'),'canonical finalization returns idle');
     assert.equal(await page.locator('#a').inputValue(),prefix); assert.equal(await page.locator('#b').inputValue(),'');
-    let captureFile, capture;
-    await until(async () => {
-      const files = (await fs.readdir(debugDirectory).catch(error => { if (error.code === 'ENOENT') return []; throw error; })).filter(file => file.endsWith('.json') && !priorCaptures.has(file));
-      assert.ok(files.length <= 1, 'Expected exactly one new long debug capture');
-      captureFile = files[0];
-      if (!captureFile) return false;
-      try { capture = JSON.parse(await fs.readFile(path.join(debugDirectory, captureFile), 'utf8')); }
-      catch (error) { if (error instanceof SyntaxError) return false; throw error; }
-      return true;
-    }, 'opt-in long debug capture JSON', 30_000);
-    const accuracy = scoreLongCapture(capture, longPlan, prefix, await page.locator('#a').inputValue());
-    accuracy.captureFile = captureFile;
-    await fs.writeFile(`${root}/evidence/long-accuracy.json`, JSON.stringify(accuracy, null, 2));
-    assert.ok(accuracy.passed, `Long browser accuracy failed: ${accuracy.failures.join('; ')}`);
-    results.push({case:'full-reference-long-accuracy', passed:true, maxWer:longPlan.maxWer, scores:accuracy.outputs});
+    // The field kept the live prefix and Stop copied the rest, so together they are the whole transcript.
+    const copied = execFileSync('xclip', ['-selection', 'clipboard', '-o'], {encoding: 'utf8', timeout: 5000});
+    const text = prefix + copied;
+    const score = scoreTranscript(longPlan.reference, text);
+    const integrity = longPlan.integrityRequirements ? scoreSpeechIntegrity(longPlan.reference, text, longPlan.integrityRequirements) : null;
+    const passed = score.hypothesisWords > 0 && score.wer <= longPlan.maxWer && (!integrity || integrity.integrityPassed);
+    await fs.writeFile(`${root}/evidence/long-accuracy.json`, JSON.stringify({plan: longPlan, prefix, copied, score, integrity, passed}, null, 2));
+    assert.ok(passed, 'The kept prefix plus the copied remainder must meet the frozen full-reference WER and repetition checks');
+    results.push({case:'full-reference-long-accuracy', passed, maxWer:longPlan.maxWer, score});
     results.push({case:'canonical-checkpoint-focus-loss',passed:true,checkpointCharacters:Array.from(prefix).length,events:(await traces()).slice(traceStart).map(t=>t.event)});
     await page.screenshot({path:`${root}/evidence/canonical-focus-loss.png`});
   }
@@ -176,21 +162,12 @@ try {
 } catch (error) {
   failure = error.message;
   await Promise.allSettled(playbacks.map(p=>p.done));
-  if (process.env.VOCO_BROWSER_DEBUG_CAPTURE === '1' && page) {
-    const records = await traces();
-    if (records.findLastIndex(t=>t.event==='recording_state_active') > records.findLastIndex(t=>t.event==='dictation_stop_to_idle')) {
-      const start = records.length;
-      await page.keyboard.press('Alt+Shift+v').catch(()=>{});
-      await until(async()=> (await traces()).slice(start).some(t=>t.event==='dictation_stop_to_idle'),'diagnostic stop',45_000).catch(()=>{});
-    }
-  }
   throw error;
 } finally {
   await fs.writeFile(`${root}/evidence/playback.json`, JSON.stringify(playbacks.map(p=>p.record),null,2));
-  if (process.env.VOCO_BROWSER_DEBUG_CAPTURE === '1') await fs.copyFile(`${root}/long.wav`,`${root}/evidence/playback-long.wav`).catch(()=>{});
-  await fs.writeFile(`${root}/evidence/result.json`,JSON.stringify({appSha256:await hash(`${root}/voco`),hostSha256:await hash(`${root}/voco-browser-host`),modelSha256:await hash(`${root}/speech/models/nemotron-speech-streaming-en-0.6b.q8_0.gguf`),extensionHashes, diagnosticSecondCapture: process.env.VOCO_BROWSER_DIAG_SECOND_CAPTURE === '1', outputMode: process.env.VOCO_NATIVE_OUTPUT_MODE || "final-text-only", tests:results, failure, harnessOnlyHostGrant:null, shippedManifestPreserved:await hash(`${extension}/manifest.json`)===extensionHashes['manifest.json']},null,2));
+  if (longCapture) await fs.copyFile(`${root}/long.wav`,`${root}/evidence/playback-long.wav`).catch(()=>{});
+  await fs.writeFile(`${root}/evidence/result.json`,JSON.stringify({appSha256:await hash(`${root}/voco`),hostSha256:await hash(`${root}/voco-browser-host`),modelSha256:await hash(`${root}/speech/models/nemotron-speech-streaming-en-0.6b.q8_0.gguf`),extensionHashes, outputMode: process.env.VOCO_NATIVE_OUTPUT_MODE || "final-text-only", tests:results, failure, harnessOnlyHostGrant:null, shippedManifestPreserved:await hash(`${extension}/manifest.json`)===extensionHashes['manifest.json']},null,2));
   if (worker) await fs.writeFile(`${root}/evidence/native-request-metadata.json`, JSON.stringify(await worker.evaluate(()=>globalThis.nativeRequestMetadata).catch(()=>[]), null, 2));
-  await fs.cp(`${root}/state/voco/debug-captures`, `${root}/evidence/debug-captures`, {recursive:true}).catch(()=>{});
   await fs.copyFile(`${root}/state/voco/hotkey-trace.jsonl`,`${root}/evidence/hotkey-trace.jsonl`).catch(()=>{});
   if (browser) await browser.pages().at(-1)?.screenshot({path:`${root}/evidence/final-browser.png`}).catch(()=>{});
   await browser?.close(); app.kill(); await log.close(); server.close();

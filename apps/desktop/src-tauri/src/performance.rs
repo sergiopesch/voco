@@ -89,13 +89,7 @@ fn lifecycle_payload(record: &Value) -> Option<Value> {
     for key in [
         "dictation_session_id",
         "duration_ms",
-        "chunk_count",
-        "response_delta_count",
         "track_sample_rate",
-        "track_channel_count",
-        "echo_cancellation",
-        "noise_suppression",
-        "auto_gain_control",
         "selected_device_configured",
     ] {
         if record[key].is_number() || record[key].is_boolean() {
@@ -689,11 +683,10 @@ mod tests {
         ))
     }
     #[test]
-    fn stop_wait_diagnostics_exclude_content() {
+    fn stop_timings_exclude_content() {
         for name in [
-            "dictation_stop_checkpoint_wait_completed",
-            "dictation_stop_preview_wait_completed",
-            "dictation_stop_insertion_wait_completed",
+            "dictation_stop_to_final_transcript",
+            "dictation_stop_to_idle",
         ] {
             assert_eq!(
                 lifecycle_payload(&json!({"event":name, "duration_ms":0,
@@ -706,11 +699,11 @@ mod tests {
 
     #[test]
     fn lifecycle_excludes_content_and_unknown_events() {
-        let record = lifecycle_payload(&json!({"event":"dictation_transcription_completed", "duration_ms":123,
+        let record = lifecycle_payload(&json!({"event":"dictation_stop_to_final_transcript", "duration_ms":123,
             "transcript":"private speech", "clipboard":"private clipboard", "url":"https://private.example", "track_sample_rate":"secret"})).unwrap();
         assert_eq!(
             record,
-            json!({"event":"lifecycle", "name":"dictation_transcription_completed", "duration_ms":123})
+            json!({"event":"lifecycle", "name":"dictation_stop_to_final_transcript", "duration_ms":123})
         );
         assert!(lifecycle_payload(&json!({"event":"arbitrary private message"})).is_none());
     }
