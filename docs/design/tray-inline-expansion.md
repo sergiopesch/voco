@@ -2,7 +2,7 @@
 
 This correction supersedes the floating tray presentation in the first brand
 motion pass. The GNOME 46 implementation is in `integrations/gnome/`; the existing React
-popover remains available for explicit recovery and the non-GNOME fallback.
+popover remains the non-GNOME fallback.
 It is not the GNOME recording indicator.
 
 ## Layout and identity

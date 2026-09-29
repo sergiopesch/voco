@@ -178,7 +178,7 @@ public fixtures or JSON sidecars, with no recording or model inference.
 
 The [preview scheduling and cancellation record](preview-scheduling.md) documents
 the retired snapshot decoder. Its exclusive tests are historical; current speech
-gates exercise the production Nemotron stream and recovery path.
+gates exercise the production Nemotron stream.
 
 ```bash
 npm run verify:versions

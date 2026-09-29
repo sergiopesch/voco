@@ -1,4 +1,4 @@
-> Historical implementation, retired in .51. The current single-engine stream and explicit recovery contract are described in [Architecture](README.md#startup-and-recognizer-selection). Paths and decoder behavior below refer to earlier commits.
+> Historical implementation, retired in .51. The current single-engine stream and Review contract are described in [Architecture](README.md#startup-and-recognizer-selection). Paths and decoder behavior below refer to earlier commits.
 
 # Native CPU synchronization
 

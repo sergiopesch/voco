@@ -1,10 +1,10 @@
 # Linux packaging
 
 VOCO packages include model weights, native libraries and their notices; no
-recognition download or GPU is required for normal English dictation and explicit
-recovery. Version 2026.0.43 provides Debian, Fedora, openSUSE and Arch/Omarchy
-profiles. Check [release status](release-candidate.md): build artifacts become
-public downloads only when attached to a published release.
+recognition download or GPU is required for normal English dictation. Version
+2026.0.43 provides Debian, Fedora, openSUSE and Arch/Omarchy profiles. Check
+[release status](release-candidate.md): build artifacts become public downloads
+only when attached to a published release.
 
 ## Build and assemble
 
