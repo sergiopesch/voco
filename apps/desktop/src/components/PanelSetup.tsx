@@ -18,6 +18,8 @@ export function PanelSetup({ disabled = false }: { disabled?: boolean }) {
     }).catch(() => { if (alive) setStatus(unavailable); });
     return () => { alive = false; mounted.current = false; };
   }, []);
+  // The button stays enabled while it runs so keyboard focus never falls to
+  // the page; `pending` blocks a second check.
   async function check(enable: boolean) {
     if (disabled || pending.current) return;
     pending.current = true;
@@ -31,7 +33,7 @@ export function PanelSetup({ disabled = false }: { disabled?: boolean }) {
   return <div className="voco-panel-setup" role="group" aria-label="Panel setup">
     <p role="status">{status?.detail ?? "Checking your panel…"}</p>
     {status && !["active", "other-desktop", "unsupported"].includes(status.status) ?
-      <button className="voco-button voco-button--ghost" disabled={disabled || busy}
+      <button className="voco-button voco-button--ghost" disabled={disabled}
         onClick={() => void check(status.canEnable)}>
         {busy ? "Checking panel…" : status.canEnable ? "Enable live panel" : "Check panel again"}
       </button> : null}

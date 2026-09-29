@@ -50,7 +50,10 @@ try {
             window.__reviewEntries = window.__reviewEntries.filter(entry => entry.id !== args.id); return;
           }
           if (command === 'get_panel_setup_status') return window.__panelStatus ?? {status:'active',detail:'Live panel bars and Stop are active.',canEnable:false};
-          if (command === 'enable_gnome_panel') return {status:'restart',detail:'Panel enabled. Sign out and back in to load it; saving your work first is recommended.',canEnable:false};
+          if (command === 'enable_gnome_panel') {
+            if (window.__holdPanel) await window.__holdPanel;
+            return {status:'restart',detail:'Panel enabled. Sign out and back in to load it; saving your work first is recommended.',canEnable:false};
+          }
           if (command === 'trace_hotkey_event') return;
           if (command === 'get_desktop_input_status') return {available:true,detail:'Fixture desktop prerequisites ready'};
           window.__fixtureViolations.push(command); throw new Error('Fixture must not invoke native commands');
@@ -112,8 +115,17 @@ try {
       // Remount only the ready phase so its panel check uses the disabled fixture.
       await page.getByRole('button',{name:'Test again',exact:true}).click();
       await page.getByRole('button',{name:'Finish test',exact:true}).click();
-      await page.getByRole('button',{name:'Enable live panel',exact:true}).click();
+      // A control disabled while focused can drop keyboard focus, so a keyboard
+      // enable keeps the panel button focused and enabled while it runs and after.
+      await page.evaluate(()=>{window.__holdPanel=new Promise(resolve=>{window.__releasePanel=resolve;});});
+      const panelFocus=()=>page.evaluate(()=>({label:document.activeElement?.textContent,disabled:document.activeElement?.disabled}));
+      await page.getByRole('button',{name:'Enable live panel',exact:true}).focus();
+      await page.keyboard.press('Enter');
+      await page.getByRole('button',{name:'Checking panel…',exact:true}).waitFor();
+      assert.deepEqual(await panelFocus(),{label:'Checking panel…',disabled:false});
+      await page.evaluate(()=>{window.__holdPanel=null;window.__releasePanel();});
       await page.getByText('Panel enabled. Sign out and back in to load it; saving your work first is recommended.',{exact:true}).waitFor();
+      assert.deepEqual(await panelFocus(),{label:'Check panel again',disabled:false});
       await page.setViewportSize({width:760,height:560});
       await capture('panel-restart-required');
       assert.equal(await page.locator('.voco-setup').evaluate(el => el.scrollHeight <= el.clientHeight + 1), true,
