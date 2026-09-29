@@ -58,7 +58,6 @@ export const copyDesktopText = async (text) => { calls.push(['copyDesktopText',t
 export const cancelOwnedPreedit = async (...args) => { calls.push(['cancelOwnedPreedit',...args]); return state(); };
 export const releaseBrowserRecording = async (triggerId) => { calls.push(['releaseBrowserRecording',triggerId]); };
 export const ackBrowserStop = async (triggerId) => { calls.push(['ackBrowserStop',triggerId]); };
-export const commitOwnedPreedit = async (id,text) => { calls.push(['commitOwnedPreedit',id,text]); if(window.deferCommit) await new Promise(resolve=>window.resolveCommit=resolve); window.commitReturned=true; if(window.focusChanged) throw new Error('Original field lost focus'); return {...state(), committedCharacterCount: Array.from(text).length}; };
 export const checkpointOwnedPreedit = async (id,prefix,text) => { calls.push(['checkpointOwnedPreedit',id,prefix,text]); if(window.deferCheckpoint) await new Promise(resolve=>window.resolveCheckpoint=resolve); return {...state(), focusLost:Boolean(window.focusChanged), committedCharacterCount:Array.from(prefix+text).length}; };
 export const finishCanonicalOwnedPreedit = async (id,prefix,text) => { calls.push(['finishCanonicalOwnedPreedit',id,prefix,text]); return {...state(), focusLost:Boolean(window.focusChanged), committedCharacterCount:Array.from(prefix+text).length}; };
 export const debugNativeCaptureEnabled = async () => false;
