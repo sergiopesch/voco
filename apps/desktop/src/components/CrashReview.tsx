@@ -66,6 +66,8 @@ export function CrashReview({ onClose, onOpenSettings }: {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [confirmDiscard, onClose]);
 
+  // Copy stays enabled while it runs so keyboard focus never falls to the
+  // page; `pending` blocks a second copy.
   async function copy() {
     if (!selected || pending.current) return;
     pending.current = true;
@@ -144,7 +146,7 @@ export function CrashReview({ onClose, onOpenSettings }: {
         <div className="voco-review__actions">
           {confirmDiscard ? <><span>Discard this transcript?</span><button ref={actionRef} className="voco-button voco-button--ghost" disabled={busy} onClick={() => toggleConfirm(false)}>Keep</button><button className="voco-button voco-button--secondary" disabled={busy} onClick={() => void discard()}>Discard transcript</button></> : <>
             <button ref={actionRef} className="voco-button voco-button--ghost" disabled={busy} onClick={() => toggleConfirm(true)}>Discard</button>
-            <button className="voco-button voco-button--primary" disabled={busy} onClick={() => void copy()}>Copy transcript</button>
+            <button className="voco-button voco-button--primary" onClick={() => void copy()}>Copy transcript</button>
           </>}
         </div>
       </footer>
