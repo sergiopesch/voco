@@ -1,6 +1,7 @@
 import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
+import GObject from 'gi://GObject';
 import Meta from 'gi://Meta';
 import Shell from 'gi://Shell';
 import St from 'gi://St';
@@ -15,6 +16,21 @@ const PATH = '/org/voco/Panel';
 const INTERFACE = 'org.voco.Panel1';
 const INPUT_PATH = '/org/voco/PanelInput';
 const INPUT_XML = '<node><interface name="org.voco.PanelInput1"><method name="ModifiersClear"><arg type="b" direction="out"/></method></interface></node>';
+
+// Holds the meter at its natural size against the microphone, so opening and
+// closing uncover it in place: only the pill's outer edge moves.
+const Reveal = GObject.registerClass(class VocoReveal extends St.Widget {
+    vfunc_allocate(box) {
+        this.set_allocation(box);
+        const child = this.get_first_child();
+        if (!child?.visible) return;
+        const [, width] = child.get_preferred_width(-1);
+        const [, height] = child.get_preferred_height(width);
+        const x = this.get_text_direction() === Clutter.TextDirection.RTL ? 0 : Math.floor(box.get_width() - width);
+        const y = Math.floor((box.get_height() - height) / 2);
+        child.allocate(Clutter.ActorBox.new(x, y, x + width, y + height));
+    }
+});
 
 export default class VocoPanel extends Extension {
     enable() {
@@ -45,15 +61,18 @@ export default class VocoPanel extends Extension {
         this._indicator.can_focus = false;
         this._indicator.add_style_class_name('voco-panel');
         this._indicator.hide();
-        this._box = new St.BoxLayout({style_class: 'voco-panel-box'});
-        this._indicator.add_child(this._box);
-        this._iconButton = new St.Button({style_class: 'voco-panel-button',
+        // The button is the pill GNOME highlights on hover, focus and an open
+        // menu, so VOCO's tint and the theme's fills share one shape. A primary
+        // click anywhere on it stops or opens VOCO; other mouse buttons open the menu.
+        this._button = new St.Button({style_class: 'voco-panel-button',
             can_focus: true, accessible_name: 'VOCO'});
-        this._iconButton.set_child(new St.Icon({
-            gicon: Gio.FileIcon.new(Gio.File.new_for_path(`${this.path}/voco-symbol.png`)),
-            icon_size: 20, style_class: 'system-status-icon'}));
-        this._iconButton.connect('clicked', () => this._action(this._state?.canStop ? 'stop' : 'open'));
-        this._iconButton.connect('key-press-event', (_actor, event) => {
+        this._indicator.add_child(this._button);
+        this._box = new St.BoxLayout();
+        this._button.set_child(this._box);
+        this._button.connect('clicked', () => this._action(this._state?.canStop ? 'stop' : 'open'));
+        this._button.connect('key-focus-in', () => this._indicator?.add_style_pseudo_class('focus'));
+        this._button.connect('key-focus-out', () => this._indicator?.remove_style_pseudo_class('focus'));
+        this._button.connect('key-press-event', (_actor, event) => {
             if (event.get_key_symbol() !== Clutter.KEY_Menu &&
                 !(event.get_key_symbol() === Clutter.KEY_F10 && event.get_state() & Clutter.ModifierType.SHIFT_MASK))
                 return Clutter.EVENT_PROPAGATE;
@@ -71,7 +90,7 @@ export default class VocoPanel extends Extension {
         this._indicator.menu.addMenuItem(this._stopItem);
         // The top bar's right side grows leftward, so the microphone comes last
         // and never moves: the meter opens and closes on its left.
-        this._clip = new St.Widget({layout_manager: new Clutter.BinLayout(), clip_to_allocation: true, width: 0});
+        this._clip = new Reveal({clip_to_allocation: true, width: 0});
         // The panel packs fractional widths unevenly, which jolts every indicator
         // on this side; the meter eases through whole pixels only.
         this._reveal = new St.Adjustment({actor: this._clip, upper: 1000});
@@ -84,7 +103,8 @@ export default class VocoPanel extends Extension {
         this._detail = new St.BoxLayout({style_class: 'voco-panel-detail', visible: false});
         this._clip.add_child(this._detail);
         this._box.add_child(this._clip);
-        this._box.add_child(this._iconButton);
+        this._box.add_child(new St.Icon({style_class: 'voco-panel-icon', y_align: Clutter.ActorAlign.CENTER,
+            gicon: Gio.FileIcon.new(Gio.File.new_for_path(`${this.path}/voco-symbol.png`)), icon_size: 20}));
         this._wave = new St.BoxLayout({style_class: 'voco-panel-wave', y_align: Clutter.ActorAlign.CENTER});
         this._bars = Array.from({length: 7}, () => {
             const bar = new St.Widget({style_class: 'voco-panel-bar', y_align: Clutter.ActorAlign.CENTER});
@@ -173,7 +193,7 @@ export default class VocoPanel extends Extension {
         const state = this._state;
         const motion = this._settings.get_boolean('enable-animations');
         const action = state.canStop ? 'Stop dictation' : state.canOpen ? 'Open settings' : '';
-        this._iconButton.accessible_name = [state.description, action].filter(Boolean).join('. ');
+        this._button.accessible_name = [state.description, action].filter(Boolean).join('. ');
         const wave = state.active;
         const label = !state.active && state.label.length > 0;
         // A closing meter keeps its last content until the clip hides it.
@@ -205,8 +225,8 @@ export default class VocoPanel extends Extension {
                         autoReverse: true, repeatCount: -1, mode: Clutter.AnimationMode.EASE_IN_OUT_SINE});
             });
         }
-        if (state.status !== 'idle') this._box.add_style_class_name('voco-panel-active');
-        else this._box.remove_style_class_name('voco-panel-active');
+        if (state.status !== 'idle') this._button.add_style_class_name('voco-panel-active');
+        else this._button.remove_style_class_name('voco-panel-active');
         // Open the meter only if the whole right side, meter included, still
         // fits beside the clock. A crowded panel keeps just the actionable icon.
         // St styles hidden actors only on request; measure content as it will look.
@@ -217,8 +237,8 @@ export default class VocoPanel extends Extension {
         const space = Main.panel.get_text_direction() === Clutter.TextDirection.RTL
             ? center.x : Main.panel.width - center.x - center.width;
         // Capture adds GNOME's privacy microphone to this side; a closed meter
-        // keeps an icon's room for it, so it never opens only to close again.
-        const reserve = wave && !this._target ? this._iconButton.get_preferred_width(-1)[1] : 0;
+        // keeps an idle pill's room for it, so it never opens only to close again.
+        const reserve = wave && !this._target ? this._button.get_preferred_width(-1)[1] - this._clip.width : 0;
         const target = (wave || label) && row - this._clip.width + natural + reserve <= space
             ? Math.ceil(natural) : 0;
         if (this._target !== target) {
@@ -318,7 +338,7 @@ export default class VocoPanel extends Extension {
         // Reappear collapsed; a reconnect must not replay a stale expansion.
         this._reveal?.remove_transition('value');
         if (this._reveal) { this._reveal.value = 0; this._detail.hide(); }
-        this._box?.remove_style_class_name('voco-panel-active');
+        this._button?.remove_style_class_name('voco-panel-active');
         if (this._timer) { GLib.source_remove(this._timer); this._timer = 0; }
         this._indicator?.hide();
     }

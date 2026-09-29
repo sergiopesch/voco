@@ -3,7 +3,7 @@ import Gio from 'gi://Gio';
 import St from 'gi://St';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
-const xml = '<node><interface name="org.voco.PanelProbe"><method name="Inspect"><arg type="s" direction="out"/></method><method name="Stop"/><method name="Menu"/><method name="MenuAction"><arg type="s" direction="in"/></method><method name="Overview"/><method name="NativeState"><arg type="s" direction="out"/></method><method name="Crowd"><arg type="b" direction="in"/></method><method name="SlowDown"><arg type="d" direction="in"/></method></interface></node>';
+const xml = '<node><interface name="org.voco.PanelProbe"><method name="Inspect"><arg type="s" direction="out"/></method><method name="Stop"/><method name="Menu"/><method name="MenuAction"><arg type="s" direction="in"/></method><method name="Overview"/><method name="NativeState"><arg type="s" direction="out"/></method><method name="Crowd"><arg type="b" direction="in"/></method><method name="SlowDown"><arg type="d" direction="in"/></method><method name="Focus"><arg type="b" direction="in"/></method></interface></node>';
 function bounds(actor) {
     const [x, y] = actor.get_transformed_position();
     const [width, height] = actor.get_transformed_size();
@@ -26,6 +26,7 @@ export default class Probe extends Extension {
         // The companion eases its meter through an adjustment, not an actor property.
         const reveal = Main.extensionManager.lookup('voco-panel@voco.local')?.stateObj?._reveal;
         return JSON.stringify({animations: St.Settings.get().enable_animations, panel: bounds(Main.panel), indicator: indicator ? bounds(indicator) : null,
+            indicatorFocus: indicator ? indicator.has_style_pseudo_class('focus') : null,
             revealing: Boolean(reveal?.get_transition('value')),
             statusIcons: Object.entries(Main.panel.statusArea).filter(([key, value]) => key.startsWith('appindicator-') && value)
                 .map(([key, value]) => ({key, ...bounds(value), mapped: value.mapped,
@@ -59,6 +60,11 @@ export default class Probe extends Extension {
             this.spacer = new St.Widget({width: 250});
             Main.panel._rightBox.add_child(this.spacer);
         }
+    }
+    Focus(enabled) {
+        const indicator = Main.panel.statusArea['voco-panel@voco.local'];
+        if (enabled) children(indicator).find(actor => actor instanceof St.Button).grab_key_focus();
+        else global.stage.set_key_focus(null);
     }
     // Stretches every Shell animation so a poll can sample many of its frames.
     SlowDown(factor) { St.Settings.get().slow_down_factor = factor; }

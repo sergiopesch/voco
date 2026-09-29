@@ -98,7 +98,7 @@ about once a second. While the lease is fresh, VOCO ignores the passive evdev
 duplicate and the action toggles through the `gnome_panel` backend; otherwise
 the action is refused and evdev toggles. Rejection, disconnect and disable
 release the grab. The v10 `ReserveStopShortcut` is kept only for compatibility.
-Users re-run panel setup, then sign out and back in to load v12. This is
+Users re-run panel setup, then sign out and back in to load v13. This is
 GNOME-specific, not a general Wayland grab.
 
 The main renderer's PageLoad Started event increments a native epoch, so crash

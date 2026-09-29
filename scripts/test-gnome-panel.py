@@ -138,10 +138,12 @@ try:
     pointer_env = {**os.environ, 'DISPLAY': ':77'}
     shell_windows = subprocess.check_output(['xdotool', 'search', '--pid', str(shell.pid)], env=pointer_env, text=True).splitlines()
     subprocess.run(['xdotool', 'windowfocus', shell_windows[0]], env=pointer_env, check=True)
+    def styled(data, name):
+        return [actor for actor in data['actors'] if name in (actor.get('style') or '').split()]
     def anchors(data):
         # The microphone and every right-box item on its right, in panel pixels.
         row = data['rightBox']; own = next(index for index, child in enumerate(row) if child['voco'])
-        return [actor['x'] for actor in data['actors'] if actor.get('style') in ('voco-panel-button', 'system-status-icon')] + \
+        return [actor['x'] for actor in styled(data, 'voco-panel-icon')] + \
             [child['x'] for child in row[own + 1:] if child['visible']]
     frames = []
     sequence = ['idle','starting','recording','processing','recovery','idle','attention']
@@ -169,14 +171,22 @@ try:
         assert a['y'] >= p['y'] and a['y']+a['height'] <= p['y']+p['height']+.1, data
         assert a['x'] >= p['x'] and a['x']+a['width'] <= p['x']+p['width']+.1, data
         frames.append((f'{i}-{status}', anchors(data)))
+        # The pill is the theme's highlight area, 3px inside the indicator, so
+        # VOCO's tint and GNOME's hover, focus and menu fills draw as one shape.
+        pill = styled(data, 'voco-panel-button')[0]; mic = styled(data, 'voco-panel-icon')[0]
+        inset = (pill['x'] - a['x'], pill['y'] - a['y'], a['width'] - pill['width'], a['height'] - pill['height'])
+        assert all(abs(value - expected) < .5 for value, expected in zip(inset, (3, 3, 6, 6))), {'pill': pill, 'indicator': a}
+        assert ('voco-panel-active' in pill['style'].split()) == (status != 'idle'), pill
         if status not in ('idle','recovery'):
             content = [actor for actor in data['actors'] if actor['visible'] and
                        actor.get('style') in ('voco-panel-status', 'voco-panel-wave')]
-            button = next(actor for actor in data['actors'] if actor.get('style') == 'voco-panel-button')
-            # The meter opens on the microphone's left, clear of both edges.
-            insets = (min(actor['x'] for actor in content) - a['x'],
-                      button['x'] - max(actor['x'] + actor['width'] for actor in content))
-            assert insets[0] >= 10 and insets[1] >= 2, f'Meter insets are {insets}px'
+            # The meter opens on the microphone's left. Its content keeps the
+            # glyph's margin from the pill edge, 11px padding plus the glyph's
+            # 4px transparent side, and sits 4px from the icon.
+            insets = (min(actor['x'] for actor in content) - pill['x'],
+                      mic['x'] - max(actor['x'] + actor['width'] for actor in content),
+                      pill['x'] + pill['width'] - mic['x'] - mic['width'])
+            assert all(abs(value - expected) < .5 for value, expected in zip(insets, (15, 4, 11))), f'Meter insets are {insets}px'
             data['meterInsets'] = insets
         assert data['windows'] == 0, data
         if status == 'attention':
@@ -188,11 +198,10 @@ try:
         if status in ('starting', 'recording', 'processing'):
             assert not any(actor['visible'] and actor.get('text') for actor in data['actors']), data
             assert not any(actor.get('style') == 'voco-panel-stop' for actor in data['actors']), data
-        icon = next(actor for actor in data['actors'] if actor.get('style') == 'voco-panel-button')
         subprocess.run(['xdotool', 'mousemove', '400', '300'], env=pointer_env, check=True)
         pump(.1)
-        subprocess.run(['xdotool', 'mousemove', str(round(icon['x'] + icon['width'] / 2)),
-                        str(round(icon['y'] + icon['height'] / 2))], env=pointer_env, check=True)
+        subprocess.run(['xdotool', 'mousemove', str(round(mic['x'] + mic['width'] / 2)),
+                        str(round(mic['y'] + mic['height'] / 2))], env=pointer_env, check=True)
         pump(.1)
         subprocess.run(['xdotool', 'click', '3'], env=pointer_env, check=True)
         pump(.3)
@@ -225,6 +234,23 @@ try:
             report['meterResponds'] = True
             call('Stop'); pump(.2)
             assert actions[-1] == ('stop', state['stopSession']), actions
+            # A primary click anywhere on the pill stops, the meter included.
+            wave = styled(data, 'voco-panel-wave')[0]; before = len(actions)
+            subprocess.run(['xdotool', 'mousemove', str(round(wave['x'] + wave['width'] / 2)),
+                            str(round(wave['y'] + wave['height'] / 2))], env=pointer_env, check=True)
+            pump(.1)
+            subprocess.run(['xdotool', 'click', '1'], env=pointer_env, check=True)
+            pump(.3)
+            assert actions[before:] == [('stop', state['stopSession'])] and not inspect()['menu']['open'], actions[before:]
+            report['meterClickStops'] = True
+    # Keyboard focus shows GNOME's own focus fill on the indicator.
+    subprocess.run(['xdotool', 'mousemove', '400', '300'], env=pointer_env, check=True)
+    call('Focus', GLib.Variant('(b)', (True,))); pump(.4)
+    assert inspect()['indicatorFocus'], 'Keyboard focus did not reach the indicator'
+    screenshot('focus')
+    call('Focus', GLib.Variant('(b)', (False,))); pump(.3)
+    assert not inspect()['indicatorFocus'], 'The indicator kept focus styling'
+    report['focusVisible'] = True
     assert report['states']['2-recording']['indicator']['width'] > report['states']['0-idle']['indicator']['width'] + 20
     assert abs(report['states']['5-idle']['indicator']['width'] - report['states']['0-idle']['indicator']['width']) < 2
     subprocess.run(['gsettings','set','org.gnome.desktop.interface','enable-animations','false'],check=True)

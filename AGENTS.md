@@ -98,7 +98,7 @@ glib 0.20 directly leaves the GTK dependency behind. [Backport](vendor/glib/VOCO
   Release the grab on rejection, disconnect or disable; late replies about an
   earlier grab must not act on a newer one. v10 `ReserveStopShortcut` remains
   only for compatibility. Users re-run panel setup, then sign out and back in to
-  load v12. An evdev toggle while the chord leaks sends one notification per
+  load v13. An evdev toggle while the chord leaks sends one notification per
   launch with the panel's remedy, which Settings also shows.
 - Closing or navigating an enabled browser tab, or losing its native connection,
   stops that tab's active recording. Ordinary field focus loss revokes delivery
