@@ -2002,9 +2002,9 @@ pub fn run() -> Result<(), String> {
                     }
                     native_capture_commands::reset_renderer();
                 }
-                // A renderer reload discards its session ids. Close the
-                // private channel first so the engine clears only its owned
-                // preedit before the replacement renderer can start.
+                // Close the private channel first, so the engine drops a
+                // shortcut armed or triggered for the previous renderer
+                // before its replacement can start.
                 webview
                     .state::<owned_preedit::OwnedPreeditService>()
                     .shutdown();

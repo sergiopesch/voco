@@ -317,9 +317,9 @@ impl OwnedPreeditService {
             Ok(result) => Ok(result),
             Err(BridgeCommandError::Rejected(error)) => Err(error),
             Err(BridgeCommandError::Uncertain(error)) => {
-                // Never retry a mutation across an uncertain connection.
-                // Closing the socket makes the engine discard only VOCO's
-                // active preedit. An ordered engine rejection is safe to keep.
+                // Drop an uncertain connection rather than reuse it. Closing
+                // the socket makes the engine disarm the shortcut and drop a
+                // pending trigger. An ordered engine rejection is safe to keep.
                 guard.take();
                 Err(error)
             }

@@ -1,10 +1,11 @@
 #!/usr/bin/python3
-"""Persistent VOCO IBus preedit engine.
+"""Persistent VOCO IBus shortcut engine.
 
 IBus owns this process after the user explicitly enables the packaged VOCO
-input source.  The VOCO app connects over a private same-user socket.  The
-engine never changes the desktop's active input source, reads surrounding
-text, or requests deletion from a target application.
+input source.  The VOCO app connects over a private same-user socket to poll
+the dictation shortcut; protocol 6 rejects every text operation.  The engine
+never changes the desktop's active input source, reads surrounding text, or
+requests deletion from a target application.
 """
 
 from __future__ import annotations
