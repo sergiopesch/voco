@@ -227,10 +227,9 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     releaseRecordingOrigin();
     const current = useStore.getState();
     if (current.dictationPurpose !== "onboarding") {
-      // A live notification already covered the Stop it asked for; an
-      // interruption that ends the session first still notifies. The error
+      // A live notification already covered the Stop it asked for. The error
       // slot keeps the reason.
-      const alreadyNotified = !cancelledRef.current && interruptionNotifiedSession === sessionRef.current.sessionId;
+      const alreadyNotified = interruptionNotifiedSession === sessionRef.current.sessionId;
       interruptionNotifiedSession = null;
       const native = nativeCaptureRef.current;
       nativeCaptureRef.current = null;
@@ -760,6 +759,9 @@ export function createDictationRecording(env: DictationRecordingEnv) {
   async function cancelRecording(reason = "Recording cancelled.") {
     if (phaseRef.current === "idle" || phaseRef.current === "error" || phaseRef.current === "finalizing" || cancelledRef.current) return;
     cancelledRef.current = reason;
+    // The session now ends without the Stop a live notice asked for, so the
+    // interruption still notifies.
+    if (interruptionNotifiedSession === sessionRef.current.sessionId) interruptionNotifiedSession = null;
     desktopPhraseQueueRef.current?.cancel();
     void browserDeliveryRef.current?.cancel();
     setCancellationPending(true);

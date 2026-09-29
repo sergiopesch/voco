@@ -8,6 +8,7 @@ import {
   clearAudioCaptureBuffer,
   createAudioCaptureBuffer,
 } from "@/lib/audioCaptureBuffer";
+import { AudioCaptureFlushError } from "@/lib/audioCaptureFlush";
 import * as session from "@/lib/dictationSession";
 import {
   createDictationRecording,
@@ -224,6 +225,25 @@ it("notifies an unverified desktop recording once, at start", async () => {
   expect(h.phase.current).toBe("idle");
   expect(h.setError).toHaveBeenLastCalledWith("VOCO couldn't confirm it received all of your audio, so it didn't type this recording. Try again.");
   expect(h.notify).toHaveBeenCalledOnce();
+});
+
+it("keeps the start notice as the only one when Stop cannot flush unverified audio", async () => {
+  const h = harness();
+  h.env.captureSelectionRef.current = () => ({ backend: "webkit" });
+  vi.mocked(h.env.ensureAudioContext).mockResolvedValue({
+    sampleRate: 16000, createMediaStreamSource: vi.fn(() => ({})),
+  } as unknown as AudioContext);
+  vi.mocked(h.env.openTracedMicrophoneStream).mockResolvedValue({
+    getTracks: () => [], getAudioTracks: () => [],
+  } as unknown as MediaStream);
+  vi.mocked(h.env.connectWorklet).mockResolvedValue(false);
+  vi.mocked(h.env.teardownAudioGraph).mockRejectedValue(new AudioCaptureFlushError());
+  await h.startRecording();
+  appendAudioSamples(h.env.audioBufferRef.current, new Float32Array([0.125, -0.25]));
+  await h.stopRecording();
+  expect(h.phase.current).toBe("idle");
+  expect(h.setError).toHaveBeenLastCalledWith("VOCO couldn't confirm it received all of your audio, so it didn't type this recording. Try again.");
+  expect(h.notify).toHaveBeenCalledExactlyOnceWith("Dictation won't be typed", expect.any(String));
 });
 
 it("still notifies when an interruption ends a noticed session before Stop", async () => {
