@@ -222,7 +222,7 @@ Build the frontend before the all-features Clippy gate on a clean checkout. Taur
 - confirm the onboarding fits in the window without scrolling
 - confirm the top bar can drag the window
 - confirm `Hide to tray` works
-- confirm the final onboarding step shows the three tray icons clearly
+- confirm the final setup screen shows your shortcut and says VOCO stays in the tray
 - confirm dictation still works end to end
 - run `npm run report:linux-runtime` on the Linux machine used for release testing
 
