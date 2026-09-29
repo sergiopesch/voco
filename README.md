@@ -37,12 +37,12 @@ separates published assets from source and qualification work.
 ## Dictate at your cursor
 
 1. Open VOCO, choose **Start test**, speak, then **Finish test**. Choose **Done** to check desktop setup and finish.
-2. Focus a text field, press `Alt+D`, and speak.
+2. Click where you want the text (any app), press `Alt+D`, and speak.
 3. Press `Alt+D` again to finish. Review your text before sending it.
 
-VOCO delivers text through clipboard paste and never presses Enter. Stop dictation
-before switching text fields. Some protected or custom editors may not accept delivery; interrupted
-transcripts stay available in VOCO for recovery. [Usage and recovery](docs/everyday-use.md).
+VOCO pastes into whatever has focus and never presses Enter. Later words follow
+focus, so stop dictation before switching fields. If an app does not take the text,
+VOCO copies the rest to the clipboard when you stop. [Usage and recovery](docs/everyday-use.md).
 
 ## Privacy
 

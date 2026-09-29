@@ -9,9 +9,9 @@ export interface DictationRecovery {
   targetMayContainText: boolean;
 }
 
-export const LIVE_LOCAL_TRANSCRIPTION = "Text delivery paused. Stop dictation and check your text field; some words may be missing.";
+export const LIVE_DELIVERY_PAUSED = "Text delivery paused. Stop dictation and check your text field; some words may be missing.";
 
-export const LIVE_DELIVERY_PAUSED = "Dictation interrupted. Stop recording and check your text field before starting again.";
+export const LIVE_RECOGNITION_INTERRUPTED = "Dictation interrupted. Stop recording and check your text field before starting again.";
 
 // Cap source capture independently of device rate, including unusually high-rate devices.
 export const MAX_CAPTURE_SAMPLES = 32 * 1024 * 1024; // 128 MiB of Float32 source audio.

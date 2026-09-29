@@ -2,21 +2,20 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it, vi } from "vitest";
 import { Onboarding } from "./Onboarding";
 
-it("keeps the panel setup action visible when desktop readiness blocks Done", () => {
+it("offers the panel companion as an optional step once desktop input is ready", () => {
   const markup = renderToStaticMarkup(<Onboarding
     microphone="System default" status="idle" transcript="Test worked" passed failed={false}
-    attempted setupError={null} desktopSetupError="Sign out and back in to load Stop." showPanelSetup
+    attempted setupError={null} desktopSetupError={null}
     checkingDesktopSetup={false} preparing={false} saving={false} blocked={false}
-    hotkey="Alt+D" desktopReady={false} onStart={vi.fn()} onStop={vi.fn()}
+    hotkey="Alt+D" desktopReady onStart={vi.fn()} onStop={vi.fn()}
     onFinish={vi.fn(async () => {})} onCheckDesktopSetup={vi.fn()}
   />);
-  expect(markup).toContain("Sign out and back in to load Stop.");
   expect(markup).toContain("Tray setup");
-  expect(markup).toContain("Check desktop setup");
-  expect(markup).not.toContain(">Done</button>");
+  expect(markup).toContain(">Done</button>");
+  expect(markup).not.toContain("Check desktop setup");
 });
 
-it("does not offer companion controls for an input-helper failure", () => {
+it("blocks Done for an input-helper failure without offering companion controls", () => {
   const markup = renderToStaticMarkup(<Onboarding
     microphone="System default" status="idle" transcript="Test worked" passed failed={false}
     attempted setupError={null} desktopSetupError="Input service is unavailable."
@@ -24,5 +23,7 @@ it("does not offer companion controls for an input-helper failure", () => {
     onStart={vi.fn()} onStop={vi.fn()} onFinish={vi.fn(async () => {})}
   />);
   expect(markup).toContain("Input service is unavailable.");
+  expect(markup).toContain("Check desktop setup");
+  expect(markup).not.toContain(">Done</button>");
   expect(markup).not.toContain("Tray setup");
 });

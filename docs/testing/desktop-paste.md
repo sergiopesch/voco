@@ -1,19 +1,85 @@
-> **Current contract (2026.0.37).** Native desktop paste and streaming are enabled
-> by default unless their launcher flags are `0`. NVIDIA Nemotron provides continuous
-> English streaming; the older Whisper 30-second preview limit below belongs to an
-> earlier path. Clipboard replacement, no Enter, no uncertain replay, terminal chord
-> selection and best-effort focus guards remain. Eligible controls also have bounded
-> [sampled readback](delivery-observation.md); unsupported controls remain unobserved.
-> Legacy ydotool needs a literal space argument, not xdotool's `space` keysym.
-> A focus token is not exact-widget
-> ownership; protected fields are not universally detected. No automatic whole-message
-> rewrite or physical Wayland/application-wide qualification is claimed. See
+> **Current contract (2026.0.60).** The first two sections describe current
+> desktop paste and its regression suites. The dated notes after them are retained
+> historical records: their Ctrl+V and Ctrl+Shift+V routing, AT-SPI focus metadata,
+> focus tokens, sampled field readback, opt-in launcher flags, Whisper limits and
+> planned work belong to earlier releases, not current status. See
 > [current architecture](../architecture/README.md) and [candidate gates](../release-candidate.md).
->
-> The dated implementation notes below are retained historical records. Their statements
-> about installation status, opt-in defaults and planned work are not current status.
 
-# Native desktop paste candidate
+# Native desktop paste
+
+## Current contract — 2026.0.60
+
+Each chunk goes to whatever has keyboard focus when it is ready. There is no
+destination token, accessibility query or per-application route.
+`insertion.rs::desktop_paste` copies the chunk to CLIPBOARD, then PRIMARY, and
+sends one Shift+Insert gesture. GTK, Qt, Chromium (including its address bar),
+Firefox and Electron apps paste CLIPBOARD on Shift+Insert; most terminals,
+including VTE terminals, Ghostty and xterm, paste PRIMARY. A PRIMARY failure only
+logs a warning, because some compositors do not provide it. X11 uses xclip and
+xdotool; Wayland uses ydotool with wl-copy, or xclip through XWayland on GNOME.
+
+A single leading joining space is sent as its own Space key before the paste,
+because the Chromium address bar trims a pasted leading space; the selections
+omit it. Legacy ydotool needs a literal space argument, not xdotool's `space`
+keysym. ASCII controls, including line endings, become spaces, so a chunk never
+presses Enter, submits a form or runs a command. A paste first waits until 150 ms
+after the previous one, so that recipient can read its selection. On Wayland it
+then waits at most 1.5 seconds for released shortcut modifiers, from evdev or the
+GNOME companion's `ModifiersClear`; unknown state does not block, and a timeout
+sends no keys.
+
+`no-mutation` means no key was sent, `rejected` means a prerequisite failed, and
+`uncertain` means a helper started but its result is unknown; `clipboardChanged`
+reports whether the selections were replaced. Only `no-mutation` text is retried,
+with the next hypothesis or up to three 250 ms retries at Stop. An uncertain or
+rejected paste stops automatic delivery for the rest of the recording while
+recognition continues. At Stop, `copy_desktop_text` puts the text not dispatched,
+including an uncertain chunk, on both selections without sending keys, and VOCO
+notifies "Dictation copied to clipboard".
+
+A dispatch is not a receipt. VOCO cannot confirm that the recipient displayed the
+text, detect a password field, prompt or read-only mode, or retract text. Apps
+that remap Shift+Insert, remote desktops and virtual machines may not accept it.
+
+## Regression suites
+
+Two suites paste synthetic text with the production gesture into real
+applications and read the result back from the application itself.
+
+| Suite | Local command | Hosted mode | Cases |
+| --- | --- | --- | --- |
+| Applications | `npm run test:application-delivery` | `--application-delivery` | GTK 3, GTK 4 and WebKit fields; GNOME Text Editor; GNOME Terminal with Bash and nano; optional Ghostty, Firefox and VS Code |
+| Browser | `npm run test:browser-delivery` | `--browser-delivery` | Chromium input, textarea, rich editor, placeholder, selection replacement, non-ASCII text, focus change and address bar |
+
+`scripts/test-application-delivery.sh` runs either suite in bubblewrap with no
+network, no `/dev/input`, a private Xvfb `:0`, a private D-Bus session and no
+window manager. `VOCO_DELIVERY_SUITE` selects `applications` (default) or
+`browser`. CI passes the hosted modes to `scripts/test-private-ibus-engine-hosted.sh`
+and, because it does not build Rust, uses the replica paste.
+
+`scripts/fixtures/focused-paste.py` performs every paste. By default it replays
+the X11 helper commands of `desktop_paste`: xclip for both selections, then
+`xdotool key --clearmodifiers [space] shift+Insert`. Set
+`VOCO_FIXTURE_PASTE_BINARY` to the voco library test executable from
+`cargo test --no-run` to paste through production `desktop_paste` instead, via
+the ignored `insertion::tests::paste_fixture_text_into_the_focused_application`
+test. Each `results.json` records `"paste": "production"` or `"replica"`.
+
+- `VOCO_DELIVERY_EVIDENCE_DIR` receives `results.json`, logs and failure screenshots.
+- `VOCO_DELIVERY_BROWSER` selects a Chromium executable by absolute path instead
+  of Playwright's.
+- `VOCO_GHOSTTY_BINARY`, `VOCO_FIREFOX_BINARY` and `VOCO_VSCODE_BINARY` need
+  absolute paths because the sandbox resets `PATH`. Unset cases are recorded as
+  `unavailable`, never passed.
+- `VOCO_APP_CASE` runs only application cases whose name contains its value.
+- `VOCO_NATIVE_DEPS` names an extra native dependency prefix (default `/usr`).
+- `PLAYWRIGHT_BROWSERS_PATH` locates the Playwright browser cache.
+
+These suites cover X11 only. They do not exercise Wayland, ydotool, wl-copy, the
+GNOME companion or a physical keyboard, and passing cases do not certify other
+applications.
+
+## Native paste introduction — 2026.0.27
 
 The 2026.0.27 candidate adds an explicitly enabled native paste path for ordinary
 applications that accept Ctrl+V. It is separate from the Chromium exact-field

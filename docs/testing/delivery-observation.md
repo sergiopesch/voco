@@ -1,3 +1,10 @@
+> **Removed in 2026.0.60.** Desktop paste no longer observes fields: it sends one
+> Shift+Insert gesture to whatever has keyboard focus and reads no field text,
+> caret or focus metadata. See [desktop paste](desktop-paste.md) for the current
+> contract and its X11 application and Chromium suites. `npm run test:delivery-observation`
+> and `npm run test:rich-editor-delivery` no longer exist. The legacy ydotool
+> literal-space fix below still applies. The rest of this page is a historical record.
+
 # Focused-field delivery observation (.37)
 
 The .36 installed fixture reproduced clipboard corruption when a recipient waits

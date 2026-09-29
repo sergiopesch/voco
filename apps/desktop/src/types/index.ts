@@ -124,7 +124,7 @@ export interface DebugDictationCaptureResult {
 
 export interface ShortcutDiagnostics {
   hotkey: string;
-  route: "ibus" | "global-shortcut" | "evdev" | null;
+  route: "ibus" | "global-shortcut" | "evdev" | "gnome-panel" | null;
   state: "available" | "focus-required" | "unavailable" | "unknown";
   detail: string;
 }
@@ -132,7 +132,17 @@ export interface ShortcutDiagnostics {
 export interface DesktopInputStatus {
   available: boolean;
   detail: string;
+  /** Recommendation only: the GNOME Wayland companion is missing or outdated, so
+   * the shortcut may also reach the focused app. It never blocks recording. */
   setupArea?: "panel";
+}
+
+/** Recording prerequisites only; each paste targets whatever has focus then. */
+export interface DesktopPasteStatus {
+  enabled: boolean;
+  available: boolean;
+  streamingEnabled: boolean;
+  detail: string;
 }
 
 export interface RuntimeDiagnostics {

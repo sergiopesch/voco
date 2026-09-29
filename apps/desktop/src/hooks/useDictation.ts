@@ -15,7 +15,6 @@ import { BrowserStreamDelivery } from "@/lib/browserStreamDelivery";
 import { retainedSampleRate,type CaptureDescriptor,type CaptureSelection } from "@/lib/captureDescriptor";
 import { monitorCaptureHealth } from "@/lib/captureHealth";
 import { createDesktopCaptureTail } from "@/lib/desktopCaptureTail";
-import { DesktopShortcutSession } from "@/lib/desktopShortcutSession";
 import {
   isCurrentAudioCaptureSource,
 } from "@/lib/dictationAsyncGuards";
@@ -35,10 +34,8 @@ import { encodeNativeRetainedSource,type NativeCaptureTerminalOutcome } from "@/
 import { NvidiaRecovery } from "@/lib/nvidiaRecovery";
 import type { HotkeyTraceFields } from "@/lib/tauri";
 import {
-  awaitStopShortcutReservation,
-  beginDesktopShortcutSession,
+  copyDesktopText,
   debugNativeCaptureEnabled,
-  endDesktopShortcutSession,
   getDesktopPasteStatus,
   pasteDesktopText,
   releaseBrowserRecording,
@@ -121,10 +118,7 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
   const browserDeliveryRef = useRef<BrowserStreamDelivery | null>(null);
   const activeTriggerIdRef = useRef<string | undefined>(undefined);
   const desktopPasteSessionRef = useRef(false);
-  const desktopTargetTokenRef = useRef<string | null>(null);
   const desktopPhraseQueueRef = useRef<BenchmarkPhraseQueue | null>(null);
-  const desktopShortcutSessionRef = useRef<DesktopShortcutSession | null>(null);
-  const desktopShortcutCleanupRef = useRef<Promise<boolean>>(Promise.resolve(true));
   const desktopStreamedSampleCountRef = useRef(0);
   const desktopPhrasePasteCountRef = useRef(0);
   const debugNativeCaptureEnabledRef = useRef(false);
@@ -325,12 +319,11 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
     const metrics = result.pasteMetrics;
     if (!metrics) return;
     for (const [name, durationMs] of [
-      ["dictation_desktop_target_probe_completed", metrics.targetProbeMs],
       ["dictation_desktop_paste_preflight_completed", metrics.preflightMs],
+      ["dictation_desktop_modifier_wait_completed", metrics.modifierWaitMs],
       ["dictation_desktop_clipboard_write_completed", metrics.clipboardMs],
       ["dictation_desktop_keyboard_dispatch_completed", metrics.keyboardMs],
     ] as const) traceDictationEvent(name, { durationMs }).catch(() => {});
-    traceDictationEvent(metrics.terminal ? "dictation_desktop_terminal_route_dispatched" : "dictation_desktop_standard_route_dispatched").catch(() => {});
   }
 
   const recordingRef = useRef<ReturnType<typeof createDictationRecording> | null>(null);
@@ -545,10 +538,7 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
       disposedRef,
       cancelledRef,
       browserDeliveryRef,
-      desktopShortcutSessionRef,
-      desktopShortcutCleanupRef,
       desktopPhraseQueueRef,
-      desktopTargetTokenRef,
       desktopPasteSessionRef,
       desktopStreamedSampleCountRef,
       desktopPhrasePasteCountRef,
@@ -580,13 +570,10 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
       silentSinkRef,
       primedDeviceIdRef,
       useStore,
-      beginDesktopShortcutSession,
-      endDesktopShortcutSession,
-      awaitStopShortcutReservation,
       getDesktopPasteStatus,
       pasteDesktopText,
+      copyDesktopText,
       traceDictationEvent,
-      traceHotkeyEvent,
       showNotification,
       setCancellationPending,
       setCanCancel,

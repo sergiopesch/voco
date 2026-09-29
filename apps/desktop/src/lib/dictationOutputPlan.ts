@@ -50,7 +50,7 @@ export function keepsLivePreviewInVoco(
   );
 }
 
-/** Every automatic text result stays bound to the field verified at recording start. */
+/** Every automatic text result needs working text delivery; spoken replies do not. */
 export function requiresVerifiedTextTarget(config: Pick<AppConfig, "transcriptTarget"> | null | undefined): boolean {
   return Boolean(config && config.transcriptTarget !== "openclaw-speech");
 }

@@ -2,8 +2,8 @@
 
 This GNOME Shell 46 integration keeps VOCO's microphone and active dictation capsule
 inside the system panel. On GNOME Wayland, the current source requires it for
-**Alt+D** and **Alt+Shift+D** so Shell consumes Stop before the focused application
-can act on the same shortcut. On X11 its panel presentation is optional.
+**Alt+D** and **Alt+Shift+D** so Shell consumes the shortcut, idle included, before
+the focused application can act on it. On X11 its panel presentation is optional.
 It expands to show only the microphone and waveform during capture and finishing,
 then contracts at idle. Right-click the microphone for Settings and Review; Stop
 dictation is available in that menu during capture. Left-clicking the microphone
@@ -48,7 +48,7 @@ The application owns session-bus name `org.voco.Panel`, object `/org/voco/Panel`
 interface `org.voco.Panel1`. `Attach` accepts only the current unique owner of
 `org.gnome.Shell`; subsequent calls must come from that attached connection.
 `GetState` returns protocol version 1 with status, fixed descriptive text, a
-renderer epoch/revision token, epoch/capture-session identity, capture/accelerator reservation identity, action availability and a finite level in [0,1].
+renderer epoch/revision token, epoch/capture-session identity, the configured accelerator Shell may consume (and the version 10 Stop reservation token), action availability and a finite level in [0,1].
 No speech, samples, target-window titles, clipboard contents or device names cross
 this interface. Meter values expire after 250 ms. The renderer supplies at most
 one meter update per 40 ms with at most one call in flight, only while recording.
@@ -59,41 +59,40 @@ polls at 50 ms while active and 1500 ms while idle for meter updates and leases.
 1500 ms deadline and target the app's unique bus owner without auto-start. A
 transient error hides the extension and schedules a bounded-rate reconnect.
 `Action(action, token)` uses the capture identity for Stop and the presentation
-revision for Open, Settings and Review. It rejects stale ownership. Stop is explicit rather than toggle,
+revision for Open, Settings and Review. It rejects stale ownership. Menu and microphone Stop is explicit rather than toggle,
 so an already-finished session cannot accidentally start another recording. Repeated
-Stop requests for the same token are rejected. Existing renderer admission and
-cursor-delivery guards remain authoritative. `Detach` restores the native tray.
+Stop requests for the same token are rejected. Existing renderer admission
+remains authoritative. `Detach` restores the native tray.
 
 On Wayland, the companion consumes Alt+D (or Alt+Shift+D when configured)
-through Starting, Listening and Finishing. A held Stop belongs to the capture
-session, so presentation updates cannot cancel it; a replacement session cannot
-inherit it. Stop is sent after modifier release with the capture identity, which is revalidated at native dispatch and renderer admission.
-Only the authenticated Shell can renew the short native reservation suppressing
-passive duplicates. The reservation token binds the renderer epoch, capture session
-and exact configured accelerator; presentation revisions cannot revoke it. A rejected latest reservation, idle, disconnect, disable and
-state timeout release the grab. Each renewal has a generation: older replies
-cannot release a newer reservation, including renewals of the same grab.
-Without a loaded and attached companion, the current source blocks cursor
-dictation with these GNOME Wayland shortcuts and explains the setup requirement.
-Start also waits for the live reservation for that capture before opening the
-microphone. Other desktops and shortcuts retain their existing input checks.
-If a reservation is lost after capture starts and the application changes its
-selection, continuation delivery is rejected rather than replacing existing
-words. Recognition continues until Stop, but a handled interruption does not
-retain a transcript or open Review. The user must check the original field for
-missing words. This does not establish atomic ownership during a desktop paste
-gesture.
+whenever it is attached, idle included, so the focused application never also
+acts on it. Each press sends one `Action('shortcut', '')`, the ordinary toggle:
+VOCO decides Start or Stop with its usual debounce. Holding the chord does not
+repeat it. `ReserveShortcut(accelerator)` renews a 2.5 second native reservation
+about once a second, with one renewal in flight. Only the authenticated Shell can
+renew it, and only for the exact configured accelerator. That one reservation both
+suppresses the passive duplicate and admits the Shell's shortcut action, so each
+press toggles through exactly one route. A rejected renewal, a changed or
+unsupported accelerator, disconnect and disable release the grab; a failed or
+timed-out renewal also detaches and reconnects. Replies about an earlier grab
+cannot release a newer one. Inside Shell menus and modal dialogs the chord does
+nothing; applications that inhibit system shortcuts, such as virtual machines and
+remote desktops, receive it instead. A version 10 companion loaded before an
+upgrade keeps its Stop-only `ReserveStopShortcut` until the user signs out and back in.
+The companion is recommended, not required. Without a loaded and attached
+companion, dictation still works, but the focused application also receives
+these GNOME Wayland shortcuts (browsers focus the address bar, terminals delete
+a word), and VOCO shows that recommendation.
 
-Streaming pastes can overlap a held Stop before its explicit action is sent.
+The shortcut toggles on press, so a paste can be ready while it is still held.
 The companion exports `/org/voco/PanelInput`, interface `org.voco.PanelInput1`,
 with `ModifiersClear`. Only the attached application may query this boolean;
-key identities and input events never cross the bridge. Native GNOME Wayland
-delivery waits at most 1.5 seconds for released modifiers, revalidates the original
-destination, and checks modifiers again immediately before dispatch. A chord
-pressed during validation requires a new wait and destination check. Unavailable
-compositor state or a timeout sends no keys. VOCO never forces modifier release,
-restores another application's focus, or retries uncertain delivery. This reduces
-the collision window but does not make compositor key delivery atomic.
+key identities and input events never cross the bridge. Before sending
+Shift+Insert, native Wayland delivery waits at most 1.5 seconds for released
+modifiers, asking evdev first and then this companion. Unknown state does not block
+the paste. A timeout sends no keys, and VOCO retries that text later. VOCO pastes
+into whichever application has focus, never forces modifier release, and never
+replays uncertain delivery.
 
 ## Verification
 

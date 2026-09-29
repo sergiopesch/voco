@@ -1,3 +1,9 @@
+> **Retired commands.** 2026.0.60 replaced focus-verified delivery with
+> focus-following Shift+Insert paste; the `test:rich-editor-delivery` command
+> below no longer exists. See
+> [desktop paste](desktop-paste.md) for the current contract and suites. This record
+> retains its original dates and scope.
+
 # First-run follow-up: Brave readback and installer presentation
 
 This records the first investigation against public **2026.0.54**. The owner

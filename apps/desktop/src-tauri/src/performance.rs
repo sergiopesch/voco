@@ -106,25 +106,6 @@ fn lifecycle_payload(record: &Value) -> Option<Value> {
     Some(safe)
 }
 
-/// Finite metadata only: never persist destination tokens, paths, names or text.
-pub fn destination_check(
-    scope: &str,
-    events_tracked: bool,
-    stage: &str,
-    outcome: &str,
-    duration_ms: u64,
-) {
-    if !matches!(scope, "control" | "window" | "unavailable")
-        || !matches!(stage, "status" | "paste")
-        || !matches!(outcome, "observed" | "matched" | "rejected" | "unverified")
-    {
-        return;
-    }
-    emit(json!({"event": "destination_check", "scope": scope,
-        "events_tracked": events_tracked, "stage": stage, "outcome": outcome,
-        "duration_ms": duration_ms}));
-}
-
 pub fn speech_queue_failure(request: &Value) -> Result<(), String> {
     let reason = request["reason"]
         .as_str()
@@ -157,33 +138,18 @@ pub fn speech_quality(request: &Value) -> Result<(), String> {
     if request["event"] == "native_dispatch" {
         return Err("Native dispatch metadata requires a native producer".into());
     }
-    record_speech_quality(request, false)
+    record_speech_quality(request)
 }
 
 pub fn native_speech_quality(request: &Value) -> Result<(), String> {
     if request["event"] != "native_dispatch" {
         return Err("Invalid native quality stage".into());
     }
-    record_speech_quality(request, true)
+    record_speech_quality(request)
 }
 
-fn record_speech_quality(request: &Value, native: bool) -> Result<(), String> {
-    let mut safe = speech_quality_payload(request).ok_or("Invalid speech quality metadata")?;
-    // Only actual native insertion can attest to its bounded field observation.
-    if native {
-        safe["destination_content_observation"] = json!(if request["field_observed"] == true {
-            "observed"
-        } else {
-            "unavailable"
-        });
-        if let Some(value) = request["context_separator"].as_bool() {
-            safe["context_separator"] = json!(value);
-        }
-        if let Some(value) = request["observation_wait_ms"].as_u64() {
-            safe["observation_wait_ms"] = json!(value.min(86_400_000));
-        }
-    }
-    emit(safe);
+fn record_speech_quality(request: &Value) -> Result<(), String> {
+    emit(speech_quality_payload(request).ok_or("Invalid speech quality metadata")?);
     Ok(())
 }
 
@@ -248,6 +214,8 @@ fn speech_quality_payload(request: &Value) -> Option<Value> {
     }
     for key in [
         "duration_ms",
+        "settle_ms",
+        "modifier_wait_ms",
         "queue_age_ms",
         "max_queue_age_ms",
         "pending_age_ms",
@@ -285,7 +253,6 @@ fn speech_quality_payload(request: &Value) -> Option<Value> {
         "finish_responded",
         "accepted_equals_dispatched",
         "leading_separator",
-        "terminal",
         "clipboard_changed",
     ] {
         if let Some(value) = request[key].as_bool() {

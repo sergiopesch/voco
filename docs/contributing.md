@@ -84,9 +84,10 @@ Both are development dependencies; neither ships as a runtime service. Remove
 the compatibility alias only after all API consumers support a stable successor.
 
 `verify-shortcut-backport.py` checks the upstream vendor inventory and rejects
-multiple `global-hotkey` resolutions. The app's X11 focus lease and the Tauri
-shortcut plugin must use the same patched actor. Run the isolated desktop tests
-after upgrading this dependency; a successful compilation cannot prove that link.
+multiple `global-hotkey` resolutions, so the Tauri shortcut plugin uses the patched
+event-driven X11 actor. The application no longer uses the patch's focus-lease
+API. Run the isolated desktop tests after upgrading this dependency; a successful
+compilation cannot prove X11 shortcut behavior.
 
 `verify-tray-backport.py` similarly requires Tauri to resolve one patched
 `tray-icon` library. Tauri updates can change that dependency even within a patch

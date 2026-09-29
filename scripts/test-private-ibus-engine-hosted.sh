@@ -6,7 +6,8 @@ USERNS_POLICY="/proc/sys/kernel/apparmor_restrict_unprivileged_userns"
 ORIGINAL_USERNS_POLICY=""
 case "${1:-}" in
   "") TEST_SCRIPT="test-private-ibus-engine.sh" ;;
-  --rich-editor) TEST_SCRIPT="test-rich-editor-delivery.sh" ;;
+  --application-delivery) TEST_SCRIPT="test-application-delivery.sh"; export VOCO_DELIVERY_SUITE=applications ;;
+  --browser-delivery) TEST_SCRIPT="test-application-delivery.sh"; export VOCO_DELIVERY_SUITE=browser ;;
   --gnome-panel)
     : "${VOCO_NATIVE_DEPS:?Set the installed or extracted Xvfb root/usr}"
     : "${VOCO_PANEL_EVIDENCE_DIR:?Set a fresh directory for GNOME evidence}"

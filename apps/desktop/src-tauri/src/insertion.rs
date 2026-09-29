@@ -1,35 +1,17 @@
 use std::path::Path;
 use std::process::{Command, Stdio};
-use std::sync::Mutex;
+use std::sync::{Mutex, MutexGuard};
 use std::time::{Duration, Instant};
-
-// Includes recipient observation: another local insertion must not replace its payload.
-static DELIVERY_LOCK: Mutex<()> = Mutex::new(());
 
 use crate::process_runner;
 
-// Scope changes serialize with pending clipboard observation. In particular,
-// cancellation must not restore the root grab halfway through an old delivery.
-pub(crate) fn begin_shortcut_session(session: &str, shortcut_epoch: u64) -> Result<(), String> {
-    let _delivery = DELIVERY_LOCK
-        .lock()
-        .map_err(|_| "Desktop delivery state is unavailable.")?;
-    crate::desktop_shortcut::begin(session, shortcut_epoch)
-}
-
-pub(crate) fn end_shortcut_session(session: &str) -> Result<(), String> {
-    let _delivery = DELIVERY_LOCK
-        .lock()
-        .map_err(|_| "Desktop delivery state is unavailable.")?;
-    crate::desktop_shortcut::end(session)
-}
-
-pub(crate) fn reset_shortcut_renderer(cutoff: u64) -> Result<(), String> {
-    let _delivery = DELIVERY_LOCK
-        .lock()
-        .map_err(|_| "Desktop delivery state is unavailable.")?;
-    crate::desktop_shortcut::end_before_epoch(cutoff)
-}
+// One clipboard transaction at a time. The value is when the latest paste keys
+// were sent: an application reads the clipboard only after its key event and no
+// helper reports that read, so the next copy first waits for PASTE_SETTLE.
+static DELIVERY: Mutex<Option<Instant>> = Mutex::new(None);
+const PASTE_SETTLE: Duration = Duration::from_millis(150);
+const MODIFIER_RELEASE_TIMEOUT: Duration = Duration::from_millis(1500);
+const TEXT_MIME: &str = "text/plain;charset=utf-8";
 
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(rename_all = "kebab-case")]
@@ -39,25 +21,22 @@ pub enum ActiveStrategy {
 
 #[derive(Debug, serde::Serialize)]
 pub struct InsertionResult {
-    #[serde(rename = "pasteMetrics", skip_serializing_if = "Option::is_none")]
-    pub paste_metrics: Option<PasteMetrics>,
+    #[serde(rename = "pasteMetrics")]
+    pub paste_metrics: PasteMetrics,
     pub strategy: ActiveStrategy,
-    /// Helpers acknowledge dispatch, not receipt by the intended application.
+    /// Helpers acknowledge dispatch, not receipt by the focused application.
     pub outcome: &'static str,
 }
 
 #[derive(Debug, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PasteMetrics {
-    pub terminal: bool,
-    pub target_probe_ms: u64,
     pub preflight_ms: u64,
+    pub settle_ms: u64,
+    pub modifier_wait_ms: u64,
     pub clipboard_ms: u64,
     pub keyboard_ms: u64,
     pub leading_separator: bool,
-    pub context_separator: bool,
-    pub field_observed: bool,
-    pub observation_wait_ms: u64,
     pub routed_utf8_bytes: usize,
     pub payload_utf8_bytes: usize,
     pub payload_unicode_scalars: usize,
@@ -82,15 +61,10 @@ fn add_text_lengths(record: &mut serde_json::Value, prefix: &str, text: &str) {
 
 pub fn correlated_desktop_paste(
     text: &str,
-    expected_target: Option<&str>,
     correlation: Option<&PasteCorrelation>,
 ) -> Result<InsertionResult, InsertionError> {
     let started = Instant::now();
-    let result = desktop_paste_for_target(
-        text,
-        expected_target,
-        correlation.is_some_and(|c| c.delivery_seq == 1),
-    );
+    let result = desktop_paste(text);
     if let Some(correlation) = correlation {
         let mut record = serde_json::json!({"event":"native_dispatch", "session":correlation.session,
             "dictation_session_id":correlation.dictation_session_id,
@@ -99,19 +73,16 @@ pub fn correlated_desktop_paste(
         add_text_lengths(&mut record, "input", text);
         match &result {
             Ok(result) => {
+                let metrics = &result.paste_metrics;
                 record["outcome"] = serde_json::json!("dispatched");
-                if let Some(metrics) = &result.paste_metrics {
-                    record["context_separator"] = serde_json::json!(metrics.context_separator);
-                    record["field_observed"] = serde_json::json!(metrics.field_observed);
-                    record["observation_wait_ms"] = serde_json::json!(metrics.observation_wait_ms);
-                    record["terminal"] = serde_json::json!(metrics.terminal);
-                    record["leading_separator"] = serde_json::json!(metrics.leading_separator);
-                    record["routed_utf8_bytes"] = serde_json::json!(metrics.routed_utf8_bytes);
-                    record["payload_utf8_bytes"] = serde_json::json!(metrics.payload_utf8_bytes);
-                    record["payload_unicode_scalars"] =
-                        serde_json::json!(metrics.payload_unicode_scalars);
-                    record["payload_utf16_units"] = serde_json::json!(metrics.payload_utf16_units);
-                }
+                record["settle_ms"] = serde_json::json!(metrics.settle_ms);
+                record["modifier_wait_ms"] = serde_json::json!(metrics.modifier_wait_ms);
+                record["leading_separator"] = serde_json::json!(metrics.leading_separator);
+                record["routed_utf8_bytes"] = serde_json::json!(metrics.routed_utf8_bytes);
+                record["payload_utf8_bytes"] = serde_json::json!(metrics.payload_utf8_bytes);
+                record["payload_unicode_scalars"] =
+                    serde_json::json!(metrics.payload_unicode_scalars);
+                record["payload_utf16_units"] = serde_json::json!(metrics.payload_utf16_units);
             }
             Err(error) => {
                 record["outcome"] = serde_json::to_value(error.outcome).unwrap_or_default();
@@ -195,9 +166,6 @@ pub struct RuntimeDiagnostics {
 #[derive(Debug, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DesktopPasteStatus {
-    pub failure_reason: Option<DesktopPasteFailure>,
-    pub shortcut_epoch: u64,
-    pub target_token: Option<String>,
     pub streaming_enabled: bool,
     pub enabled: bool,
     pub available: bool,
@@ -221,14 +189,7 @@ pub struct DesktopInputStatus {
     pub setup_area: Option<&'static str>,
 }
 
-#[derive(Debug, serde::Serialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum DesktopPasteFailure {
-    Setup,
-    Cursor,
-}
-
-/// Check input prerequisites without observing a target or sending keys.
+/// Check input prerequisites without touching the clipboard or sending keys.
 /// Onboarding must remain local even while checking readiness for later dictation.
 pub fn desktop_input_status() -> DesktopInputStatus {
     if !desktop_paste_enabled() {
@@ -250,7 +211,7 @@ pub fn desktop_input_status() -> DesktopInputStatus {
     match compatibility {
         Ok(()) => DesktopInputStatus {
             available: true,
-            detail: "Desktop input helpers are ready. VOCO checks the shortcut and text field when dictation starts.".into(),
+            detail: "Desktop input helpers are ready. VOCO pastes into whichever app has keyboard focus.".into(),
             setup_area: None,
         },
         Err(error) => DesktopInputStatus {
@@ -262,158 +223,17 @@ pub fn desktop_input_status() -> DesktopInputStatus {
 }
 
 pub fn desktop_paste_diagnostics() -> (DesktopInputStatus, DesktopPasteStatus) {
-    // Capture before the blocking probe so a late old-renderer preflight stays stale.
-    let shortcut_epoch = crate::desktop_shortcut::renderer_epoch();
     let input = desktop_input_status();
-    let paste = desktop_paste_status_with_input(shortcut_epoch, &input);
+    let paste = DesktopPasteStatus {
+        streaming_enabled: input.available && desktop_stream_enabled(),
+        enabled: desktop_paste_enabled(),
+        available: input.available,
+        detail: input.detail.clone(),
+    };
     (input, paste)
 }
 
-pub fn desktop_paste_status() -> DesktopPasteStatus {
-    desktop_paste_diagnostics().1
-}
-
-fn desktop_paste_status_with_input(
-    shortcut_epoch: u64,
-    input: &DesktopInputStatus,
-) -> DesktopPasteStatus {
-    let enabled = desktop_paste_enabled();
-    if !input.available {
-        return DesktopPasteStatus {
-            shortcut_epoch,
-            target_token: None,
-            streaming_enabled: false,
-            enabled,
-            available: false,
-            failure_reason: Some(DesktopPasteFailure::Setup),
-            detail: input.detail.clone(),
-        };
-    }
-    let target_started = Instant::now();
-    let target = desktop_target();
-    crate::performance::destination_check(
-        &target.scope,
-        target.events_tracked,
-        "status",
-        "observed",
-        target_started.elapsed().as_millis() as u64,
-    );
-    let available = target.available();
-    if !available {
-        crate::trace_hotkey_event(target.reason.failure_event(), None);
-    }
-    DesktopPasteStatus {
-        shortcut_epoch,
-        target_token: target.token.clone(),
-        streaming_enabled: desktop_stream_enabled(),
-        enabled,
-        available,
-        failure_reason: if available { None } else { Some(DesktopPasteFailure::Cursor) },
-        detail: match target.input_state.as_str() {
-            _ if available => input.detail.clone(),
-            "none" => "Click in a text field, then press your dictation shortcut to start.".into(),
-            "protected" => "Dictation is unavailable in password fields. Click in another text field and try again.".into(),
-            _ if matches!(target.reason, DesktopTargetReason::NoFocusedControl) => "This app is not exposing a text cursor. Check its accessibility support, reopen it, and try again.".into(),
-            _ => "VOCO cannot verify a text cursor here. Click in an editable text field and try again.".into(),
-        },
-    }
-}
-
-// Finite metadata only. Unknown helper output never becomes a log message.
-#[derive(Debug, Default, serde::Deserialize)]
-#[serde(rename_all = "snake_case")]
-enum DesktopTargetReason {
-    Ready,
-    EventsPending,
-    NoActiveWindow,
-    AmbiguousWindows,
-    NoFocusedControl,
-    NotEditable,
-    Protected,
-    ControlUnavailable,
-    ProbeFailed,
-    #[default]
-    #[serde(other)]
-    Unknown,
-}
-
-impl DesktopTargetReason {
-    fn failure_event(&self) -> &'static str {
-        match self {
-            Self::EventsPending => "dictation_desktop_cursor_events_pending",
-            Self::NoActiveWindow => "dictation_desktop_cursor_no_active_window",
-            Self::AmbiguousWindows => "dictation_desktop_cursor_ambiguous_windows",
-            Self::NoFocusedControl => "dictation_desktop_cursor_no_focused_control",
-            Self::NotEditable => "dictation_desktop_cursor_not_editable",
-            Self::Protected => "dictation_desktop_cursor_protected",
-            Self::ControlUnavailable => "dictation_desktop_cursor_control_unavailable",
-            Self::ProbeFailed => "dictation_desktop_cursor_probe_failed",
-            Self::Ready | Self::Unknown => "dictation_desktop_cursor_unavailable",
-        }
-    }
-}
-
-#[derive(Debug, serde::Deserialize)]
-struct DesktopTarget {
-    #[serde(default)]
-    reason: DesktopTargetReason,
-    #[serde(default = "unknown_focus_scope")]
-    input_state: String,
-    shortcut: String,
-    token: Option<String>,
-    #[serde(default = "unknown_focus_scope")]
-    scope: String,
-    #[serde(default)]
-    events_tracked: bool,
-}
-
-impl DesktopTarget {
-    fn available(&self) -> bool {
-        self.scope == "control"
-            && self.token.as_deref().is_some_and(|token| !token.is_empty())
-            && match self.input_state.as_str() {
-                "editable" => true,
-                // A canvas proves focused pane identity, not a readable caret.
-                // Losing event tracking must revoke this dispatch-only route.
-                "terminal_surface" => self.events_tracked && self.shortcut == "ctrl+shift+v",
-                _ => false,
-            }
-    }
-}
-
-fn unknown_focus_scope() -> String {
-    "unavailable".into()
-}
-
-fn desktop_target() -> DesktopTarget {
-    let unknown = || DesktopTarget {
-        reason: DesktopTargetReason::ProbeFailed,
-        input_state: unknown_focus_scope(),
-        shortcut: "ctrl+v".into(),
-        token: None,
-        scope: unknown_focus_scope(),
-        events_tracked: false,
-    };
-    let Ok(response) = crate::focus_probe::probe() else {
-        return unknown();
-    };
-    serde_json::from_value(response).unwrap_or_else(|_| unknown())
-}
-
-fn desktop_paste_for_target(
-    text: &str,
-    expected_target: Option<&str>,
-    first_delivery: bool,
-) -> Result<InsertionResult, InsertionError> {
-    // No IPC caller may turn a missing preflight identity into an unguarded
-    // paste. Reject before probing, reading a field or mutating the clipboard.
-    let expected_target = expected_target
-        .filter(|token| !token.is_empty())
-        .ok_or_else(|| {
-            InsertionError::rejected(
-                "No dictation destination was verified. Focus a text field and start again.",
-            )
-        })?;
+fn validate_text(text: &str) -> Result<(), InsertionError> {
     if !desktop_paste_enabled() {
         return Err(InsertionError::rejected("Desktop paste is not enabled."));
     }
@@ -422,214 +242,139 @@ fn desktop_paste_for_target(
             "Paste requires between 1 and 100000 UTF-8 bytes.",
         ));
     }
-    let _guard = DELIVERY_LOCK.try_lock().map_err(|_| {
-        InsertionError::rejected(
-            "Another insertion is still finishing; no additional text was sent.",
-        )
-    })?;
-    if !crate::desktop_shortcut::delivery_ready() {
-        return Err(InsertionError::rejected(
-            "The recording shortcut scope changed. Check your text field; some words may be missing.",
+    Ok(())
+}
+
+fn delivery_slot() -> MutexGuard<'static, Option<Instant>> {
+    // The slot holds only a timestamp; a panicked delivery cannot corrupt it.
+    DELIVERY
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+fn elapsed_ms(started: Instant) -> u64 {
+    started.elapsed().as_millis() as u64
+}
+
+/// Give the previous recipient time to read the clipboard before replacing it.
+fn settle(last_paste: Option<Instant>) -> u64 {
+    let wait = last_paste.map_or(Duration::ZERO, |sent| {
+        PASTE_SETTLE.saturating_sub(sent.elapsed())
+    });
+    if !wait.is_zero() {
+        std::thread::sleep(wait);
+    }
+    wait.as_millis() as u64
+}
+
+/// Paste into whichever application has keyboard focus. Shift+Insert is the
+/// paste key shared by GTK, Qt, Chromium, Firefox, Electron and terminal
+/// emulators. Terminals paste PRIMARY, so both selections get the same text.
+pub fn desktop_paste(text: &str) -> Result<InsertionResult, InsertionError> {
+    validate_text(text)?;
+    let mut last_paste = delivery_slot();
+    let started = Instant::now();
+    let preflight = input_preflight();
+    if !preflight.diagnostics.clipboard.available {
+        return Err(InsertionError::no_mutation(
+            preflight.diagnostics.clipboard.detail,
         ));
     }
-    let target_started = Instant::now();
-    let target = desktop_target();
-    let target_probe_ms = target_started.elapsed().as_millis() as u64;
-    if !target.available() || Some(expected_target) != target.token.as_deref() {
-        crate::performance::destination_check(
-            &target.scope,
-            target.events_tracked,
-            "paste",
-            "rejected",
-            target_probe_ms,
-        );
-        return Err(InsertionError::rejected("The dictation destination changed or could not be verified. Check your text field; some words may be missing."));
-    }
-    crate::performance::destination_check(
-        &target.scope,
-        target.events_tracked,
-        "paste",
-        "matched",
-        target_probe_ms,
-    );
-    let terminal = target.shortcut == "ctrl+shift+v";
-    let terminal_text;
-    let payload = if terminal {
-        terminal_text = terminal_paste_text(text);
-        terminal_text.as_str()
-    } else {
-        text
-    };
-    // A fresh, bounded read of the focused control is optional. Unsupported
-    // controls retain the existing best-effort route and cannot claim receipt.
-    let prepared = crate::focus_probe::probe_with(serde_json::json!({
-        "op":"prepare", "text":payload, "expected_token":expected_target,
-        "first_delivery":first_delivery,
-    }))
-    .map_err(|_| {
-        InsertionError::rejected("Destination observation was interrupted before insertion.")
-    })?;
-    if !matches!(
-        prepared["observation"].as_str(),
-        Some("prepared" | "unavailable" | "changed" | "unsupported")
-    ) {
-        return Err(InsertionError::rejected(
-            "Invalid destination observation response.",
-        ));
-    }
-    if prepared["observation"] == "unsupported" {
-        return Err(InsertionError::rejected(
-            "This rich text selection cannot be verified. Place the caret inside one paragraph and try again.",
-        ));
-    }
-    if prepared["observation"] == "changed" {
-        return Err(InsertionError::rejected(
-            "The dictation caret or destination changed before insertion.",
-        ));
-    }
-    let receipt = if prepared["observation"] == "prepared" {
-        if prepared["scope"] != "control"
-            || target.token.is_none()
-            || prepared["token"].as_str() != target.token.as_deref()
-            || !prepared["added_separator"].is_boolean()
-        {
-            return Err(InsertionError::rejected(
-                "Destination changed during observation preparation.",
-            ));
-        }
-        Some(
-            prepared["receipt_id"]
-                .as_str()
-                .filter(|id| id.len() == 32 && id.bytes().all(|c| c.is_ascii_hexdigit()))
-                .ok_or_else(|| {
-                    InsertionError::rejected("Invalid destination observation receipt.")
-                })?
-                .to_owned(),
+    let wayland = matches!(preflight.session, SessionKind::Wayland);
+    let routed = paste_text(text);
+    let (payload, leading_separator) = desktop_paste_payload(&routed);
+    // Detect the installed CLI before replacing clipboard contents. Ubuntu's
+    // legacy ydotool takes chord names; newer releases take keycode events.
+    let keys = if wayland {
+        wayland_clipboard_arguments(
+            wayland_paste_arguments(preflight.daemon_running)?,
+            leading_separator,
         )
     } else {
-        None
+        x11_paste_arguments(leading_separator)
     };
-    let separator = receipt.is_some() && prepared["added_separator"].as_bool() == Some(true);
-    let adjusted = if separator {
-        format!(" {payload}")
-    } else {
-        payload.to_owned()
-    };
-    let result = (|| {
-        let mut guard_probe_ms = 0u64;
-        let mut metrics = clipboard_paste_with_shortcut(&adjusted, terminal, || {
-            let started = Instant::now();
-            let current = desktop_target();
-            if !current.available()
-                || current.token.as_deref() != Some(expected_target)
-                || current.shortcut != target.shortcut
-                || !crate::desktop_shortcut::delivery_ready()
-            {
-                return Err(InsertionError::rejected(
-                    "The dictation destination changed before text could be pasted. Check your text field; some words may be missing.",
-                ));
-            }
-            if let Some(receipt_id) = &receipt {
-                let validation = crate::focus_probe::probe_with(serde_json::json!({
-                    "op":"validate", "receipt_id":receipt_id,
-                }))
-                .map_err(|_| {
-                    InsertionError::rejected(
-                        "The dictation caret could not be verified before insertion.",
-                    )
-                })?;
-                if validation["observation"] != "prepared"
-                    || validation["receipt_id"].as_str() != Some(receipt_id)
-                    || validation["token"].as_str() != Some(expected_target)
-                {
-                    return Err(InsertionError::rejected("The dictation selection or caret changed before insertion. Check your text field; some words may be missing."));
-                }
-            }
-            guard_probe_ms = guard_probe_ms.saturating_add(started.elapsed().as_millis() as u64);
-            Ok(())
-        })?;
-        metrics.target_probe_ms = target_probe_ms.saturating_add(guard_probe_ms);
-        metrics.context_separator = separator;
-        if let Some(receipt) = &receipt {
-            let started = Instant::now();
-            observe_delivery(
-                |remaining| {
-                    let response = crate::focus_probe::probe_with_timeout(
-                        serde_json::json!({"op":"verify", "receipt_id":receipt}),
-                        remaining,
-                    )?;
-                    if response["receipt_id"].as_str() != Some(receipt.as_str()) {
-                        return Err(());
-                    }
-                    Ok(response)
-                },
-                Duration::from_secs(3),
-            )
-            .map_err(|(error, event)| {
-                crate::trace_hotkey_event(event, None);
-                error
-            })?;
-            metrics.observation_wait_ms = started.elapsed().as_millis() as u64;
-            metrics.field_observed = true;
+    let mut paste = process_runner::command(if wayland { SYSTEM_YDOTOOL } else { "xdotool" });
+    paste.args(&keys);
+    let (mut clipboard, mut primary) = copy_commands();
+    let preflight_ms = elapsed_ms(started);
+    let settle_ms = settle(*last_paste);
+    let mut modifier_wait_ms = 0;
+    let result = clipboard_transaction(payload, &mut clipboard, &mut primary, &mut paste, || {
+        // Wayland helpers emit raw key events: a still-held shortcut modifier
+        // would turn Shift+Insert into another chord. xdotool clears them itself.
+        if wayland {
+            modifier_wait_ms =
+                wait_for_modifier_release(MODIFIER_RELEASE_TIMEOUT, shortcut_modifiers_held)?;
         }
-        Ok(metrics)
-    })();
-    if receipt.is_some() {
-        let _ = crate::focus_probe::probe_with_timeout(
-            serde_json::json!({"op":"discard"}),
-            Duration::from_millis(100),
-        );
-    }
-    let metrics = result?;
+        Ok(())
+    });
+    // Also after an uncertain failure: the helper may have sent the keys.
+    *last_paste = Some(Instant::now());
+    let (clipboard_ms, keyboard_ms) = result?;
     Ok(InsertionResult {
-        paste_metrics: Some(metrics),
+        paste_metrics: PasteMetrics {
+            preflight_ms,
+            settle_ms,
+            modifier_wait_ms,
+            clipboard_ms,
+            keyboard_ms,
+            leading_separator,
+            routed_utf8_bytes: routed.len(),
+            payload_utf8_bytes: payload.len(),
+            payload_unicode_scalars: payload.chars().count(),
+            payload_utf16_units: payload.encode_utf16().count(),
+        },
         strategy: ActiveStrategy::Clipboard,
         outcome: "dispatched",
     })
 }
 
-fn observation_failure_event(response: Option<&serde_json::Value>) -> &'static str {
-    match response.and_then(|value| value["observation"].as_str()) {
-        Some("pending") => "dictation_delivery_observation_timeout",
-        Some("changed") => "dictation_delivery_observation_changed",
-        Some("unavailable") | None => "dictation_delivery_observation_unavailable",
-        _ => "dictation_delivery_observation_invalid",
+/// Put undelivered dictation on the clipboard without sending keys, so the
+/// person can paste it where they choose.
+pub fn copy_desktop_text(text: &str) -> Result<(), InsertionError> {
+    validate_text(text)?;
+    let helper = desktop_clipboard_helper();
+    if !command_available(helper) {
+        return Err(InsertionError::no_mutation(format!(
+            "Copying dictation requires {helper}."
+        )));
     }
+    let last_paste = delivery_slot();
+    settle(*last_paste);
+    let (mut clipboard, mut primary) = copy_commands();
+    copy_selections(&paste_text(text), &mut clipboard, &mut primary)
 }
 
-fn observe_delivery(
-    mut check: impl FnMut(Duration) -> Result<serde_json::Value, ()>,
+/// Unknown state never blocks delivery: evdev may lack permission, and other
+/// desktops have no companion to ask.
+fn shortcut_modifiers_held() -> Option<bool> {
+    crate::evdev_modifiers_held().or_else(|| {
+        crate::panel::is_attached()
+            .then(crate::panel::paste_modifiers_clear)
+            .and_then(Result::ok)
+            .map(|clear| !clear)
+    })
+}
+
+fn wait_for_modifier_release(
     timeout: Duration,
-) -> Result<(), (InsertionError, &'static str)> {
-    let deadline = Instant::now() + timeout;
-    loop {
-        let remaining = deadline.saturating_duration_since(Instant::now());
-        let response = if remaining.is_zero() {
-            None
-        } else {
-            check(remaining).ok()
-        };
-        match response.as_ref().and_then(|v| v["observation"].as_str()) {
-            Some("observed") => return Ok(()),
-            Some("pending") if Instant::now() < deadline => std::thread::sleep(
-                Duration::from_millis(15).min(deadline.saturating_duration_since(Instant::now())),
-            ),
-            _ => {
-                let event = if remaining.is_zero() {
-                    "dictation_delivery_observation_timeout"
-                } else {
-                    observation_failure_event(response.as_ref())
-                };
-                let mut error = InsertionError::uncertain("The destination did not confirm the expected insertion. Streaming stopped. Check your text field before dictating again.");
-                error.clipboard_changed = true;
-                return Err((error, event));
-            }
+    mut held: impl FnMut() -> Option<bool>,
+) -> Result<u64, InsertionError> {
+    let started = Instant::now();
+    while held() == Some(true) {
+        if started.elapsed() >= timeout {
+            return Err(InsertionError::no_mutation(
+                "Release the keyboard modifiers before dictating; no paste keys were sent.",
+            ));
         }
+        std::thread::sleep(Duration::from_millis(8));
     }
+    Ok(elapsed_ms(started))
 }
 
-fn terminal_paste_text(text: &str) -> String {
-    // Dictation must not send terminal control sequences or embedded line endings.
+fn paste_text(text: &str) -> String {
+    // The focused app may be a terminal: never send control sequences or a
+    // line ending that could submit a command.
     text.chars()
         .map(|ch| if ch.is_ascii_control() { ' ' } else { ch })
         .collect()
@@ -759,7 +504,7 @@ where
             &["ydotoold"],
             |optional_missing| {
                 if optional_missing.is_empty() {
-                    "The Wayland typing helpers are present. Delivery and target focus still require a working desktop session.".to_string()
+                    "The Wayland typing helpers are present. VOCO pastes into whichever app has keyboard focus.".to_string()
                 } else {
                     "Direct type simulation can run on Wayland, but ydotoold is missing or not running; cursor typing may be delayed or unreliable."
                         .to_string()
@@ -777,7 +522,7 @@ where
             &["xdotool"],
             &[],
             |_| {
-                "The X11 typing helper is present. Delivery and target focus still require a working desktop session.".to_string()
+                "The X11 typing helper is present. VOCO pastes into whichever app has keyboard focus.".to_string()
             },
             |missing| {
                 format!(
@@ -799,7 +544,7 @@ where
                 } else {
                     "Clipboard helpers are present, but ydotoold is missing or not running; paste may fail."
                 };
-                format!("{caveat} Clipboard insertion replaces the current selection with the transcript and leaves it there. Automatic restoration is unavailable because these helpers cannot verify ownership or preserve all formats.")
+                format!("{caveat} Clipboard insertion replaces the clipboard and primary selection with the transcript and leaves it there. Automatic restoration is unavailable because these helpers cannot verify ownership or preserve all formats.")
             },
             |missing| {
                 format!(
@@ -813,7 +558,7 @@ where
             &["xclip", "xdotool"],
             &[],
             |_| {
-                "Clipboard helpers are present on X11-like sessions. Clipboard insertion replaces the current selection with the transcript and leaves it there. Automatic restoration is unavailable because these helpers cannot verify ownership or preserve all formats.".to_string()
+                "Clipboard helpers are present on X11-like sessions. Clipboard insertion replaces the clipboard and primary selection with the transcript and leaves it there. Automatic restoration is unavailable because these helpers cannot verify ownership or preserve all formats.".to_string()
             },
             |missing| {
                 format!(
@@ -852,6 +597,26 @@ pub fn desktop_clipboard_helper() -> &'static str {
         &std::env::var("XDG_CURRENT_DESKTOP").unwrap_or_default(),
         std::env::var("DISPLAY").is_ok_and(|value| !value.is_empty()),
     )
+}
+
+fn copy_arguments(helper: &str, primary: bool) -> &'static [&'static str] {
+    match (helper, primary) {
+        ("wl-copy", false) => &["--type", TEXT_MIME],
+        ("wl-copy", true) => &["--primary", "--type", TEXT_MIME],
+        (_, false) => &["-selection", "clipboard", "-in"],
+        (_, true) => &["-selection", "primary", "-in"],
+    }
+}
+
+/// Commands that copy stdin to CLIPBOARD and to PRIMARY.
+fn copy_commands() -> (Command, Command) {
+    let helper = desktop_clipboard_helper();
+    let command = |primary| {
+        let mut command = process_runner::command(helper);
+        command.args(copy_arguments(helper, primary));
+        command
+    };
+    (command(false), command(true))
 }
 
 struct InputPreflight {
@@ -921,110 +686,6 @@ fn run_helper(
     Ok(())
 }
 
-fn clipboard_paste_with_shortcut(
-    text: &str,
-    terminal: bool,
-    mut before_paste: impl FnMut() -> Result<(), InsertionError>,
-) -> Result<PasteMetrics, InsertionError> {
-    let started = Instant::now();
-    let preflight = input_preflight();
-    let wayland = matches!(preflight.session, SessionKind::Wayland);
-    if !preflight.diagnostics.clipboard.available {
-        return Err(InsertionError::no_mutation(
-            preflight.diagnostics.clipboard.detail,
-        ));
-    }
-    // Detect the installed CLI before replacing clipboard contents. Ubuntu's
-    // legacy ydotool takes chord names; newer releases take keycode events.
-    let (payload, leading_separator) = desktop_paste_payload(text);
-    let wayland_args = if wayland {
-        Some(wayland_clipboard_arguments(
-            wayland_paste_arguments(preflight.daemon_running)?,
-            terminal,
-            leading_separator,
-        ))
-    } else {
-        None
-    };
-    let (copy_program, copy_args): (&str, &[&str]) = if desktop_clipboard_helper() == "wl-copy" {
-        ("wl-copy", &["--type", "text/plain;charset=utf-8"])
-    } else {
-        ("xclip", &["-selection", "clipboard", "-in"])
-    };
-    let mut copy = process_runner::command(copy_program);
-    copy.args(copy_args);
-    let x11_args = x11_paste_arguments(terminal, leading_separator);
-    let (paste_program, paste_args): (&str, &[&str]) = if wayland {
-        (
-            SYSTEM_YDOTOOL,
-            wayland_args
-                .as_deref()
-                .expect("Wayland arguments checked above"),
-        )
-    } else {
-        ("xdotool", &x11_args)
-    };
-    let mut paste = process_runner::command(paste_program);
-    paste.args(paste_args);
-    let preflight_ms = started.elapsed().as_millis() as u64;
-    let (clipboard_ms, keyboard_ms) =
-        clipboard_transaction(payload, &mut copy, &mut paste, || {
-            if wayland
-                && std::env::var("XDG_CURRENT_DESKTOP")
-                    .unwrap_or_default()
-                    .split(':')
-                    .any(|name| name.eq_ignore_ascii_case("gnome"))
-            {
-                return prepare_paste_with_modifiers(
-                    Duration::from_millis(1500),
-                    || crate::panel::paste_modifiers_clear().map_err(InsertionError::rejected),
-                    &mut before_paste,
-                );
-            }
-            before_paste()
-        })?;
-    Ok(PasteMetrics {
-        terminal,
-        target_probe_ms: 0,
-        preflight_ms,
-        clipboard_ms,
-        keyboard_ms,
-        leading_separator,
-        context_separator: false,
-        field_observed: false,
-        observation_wait_ms: 0,
-        routed_utf8_bytes: text.len(),
-        payload_utf8_bytes: payload.len(),
-        payload_unicode_scalars: payload.chars().count(),
-        payload_utf16_units: payload.encode_utf16().count(),
-    })
-}
-
-fn prepare_paste_with_modifiers(
-    timeout: Duration,
-    mut clear: impl FnMut() -> Result<bool, InsertionError>,
-    mut validate: impl FnMut() -> Result<(), InsertionError>,
-) -> Result<(), InsertionError> {
-    let started = Instant::now();
-    loop {
-        if clear()? {
-            // Waiting may let focus change; never reuse the earlier target check.
-            validate()?;
-            // A physical chord may begin during the destination probe. Waiting
-            // again requires another fresh destination check before any keys.
-            if clear()? && started.elapsed() < timeout {
-                return Ok(());
-            }
-        }
-        if started.elapsed() >= timeout {
-            return Err(InsertionError::rejected(
-                "Release the keyboard modifiers before dictating; no paste keys were sent.",
-            ));
-        }
-        std::thread::sleep(Duration::from_millis(8));
-    }
-}
-
 fn desktop_paste_payload(text: &str) -> (&str, bool) {
     // Chromium's address bar strips a pasted chunk's leading whitespace. Send
     // VOCO's single joining space as a key in the same ordered paste gesture.
@@ -1035,30 +696,21 @@ fn desktop_paste_payload(text: &str) -> (&str, bool) {
     }
 }
 
-fn x11_paste_arguments(terminal: bool, leading_separator: bool) -> Vec<&'static str> {
+fn x11_paste_arguments(leading_separator: bool) -> Vec<&'static str> {
     let mut args = vec!["key", "--clearmodifiers"];
     if leading_separator {
         args.push("space");
     }
-    args.push(if terminal { "ctrl+shift+v" } else { "ctrl+v" });
+    args.push("shift+Insert");
     args
 }
 
 fn wayland_clipboard_arguments(
     mut args: Vec<&'static str>,
-    terminal: bool,
     leading_separator: bool,
 ) -> Vec<&'static str> {
-    let legacy = args.last() == Some(&"ctrl+v");
-    if terminal {
-        if legacy {
-            *args.last_mut().unwrap() = "ctrl+shift+v";
-        } else {
-            args = vec!["key", "29:1", "42:1", "47:1", "47:0", "42:0", "29:0"];
-        }
-    }
     if leading_separator {
-        if legacy {
+        if args.last() == Some(&"shift+insert") {
             // ydotool 0.1.x treats unknown key names as their first character:
             // "space" emits KEY_S. A literal space emits KEY_SPACE. xdotool
             // uses a different parser and still requires its "space" keysym.
@@ -1074,10 +726,18 @@ fn paste_arguments_from_help(help: &str) -> Result<Vec<&'static str>, InsertionE
     if help.contains("Each key sequence") && help.contains("ctrl+Backspace") {
         // Legacy ydotool defaults to 100 ms and also uses --delay for key
         // spacing (ignoring --key-delay internally). Keep a nonzero 24 ms
-        // delay: normal/terminal paste retains 6–12 ms between key events.
-        Ok(vec!["key", "--delay", "24", "--key-delay", "12", "ctrl+v"])
+        // delay so the chord retains 6–12 ms between key events.
+        Ok(vec![
+            "key",
+            "--delay",
+            "24",
+            "--key-delay",
+            "12",
+            "shift+insert",
+        ])
     } else if help.contains("Syntax: <keycode>:<pressed>") {
-        Ok(vec!["key", "29:1", "47:1", "47:0", "29:0"])
+        // KEY_LEFTSHIFT down, KEY_INSERT down and up, KEY_LEFTSHIFT up.
+        Ok(vec!["key", "42:1", "110:1", "110:0", "42:0"])
     } else {
         Err(InsertionError::rejected("The installed ydotool key interface is unsupported; no clipboard or keyboard action was performed."))
     }
@@ -1124,22 +784,33 @@ fn paste_arguments_from_probe(help: &str) -> Result<Vec<&'static str>, Insertion
     paste_arguments_from_help(help)
 }
 
+/// GUI toolkits paste CLIPBOARD on Shift+Insert and terminals paste PRIMARY.
+/// PRIMARY is best effort because some compositors do not provide it.
+fn copy_selections(
+    text: &str,
+    clipboard: &mut Command,
+    primary: &mut Command,
+) -> Result<(), InsertionError> {
+    run_helper(clipboard, Some(text.as_bytes()), Duration::from_secs(5)).map_err(|mut error| {
+        error.clipboard_changed = error.outcome == DeliveryOutcome::Uncertain;
+        error
+    })?;
+    if let Err(error) = run_helper(primary, Some(text.as_bytes()), Duration::from_secs(5)) {
+        log::warn!("Could not update the primary selection: {error}");
+    }
+    Ok(())
+}
+
 fn clipboard_transaction(
     text: &str,
-    copy: &mut Command,
+    clipboard: &mut Command,
+    primary: &mut Command,
     paste: &mut Command,
     before_paste: impl FnOnce() -> Result<(), InsertionError>,
 ) -> Result<(u64, u64), InsertionError> {
     let copy_started = Instant::now();
-    run_helper(copy, Some(text.as_bytes()), Duration::from_secs(5)).map_err(|mut error| {
-        error.clipboard_changed = error.outcome == DeliveryOutcome::Uncertain;
-        error
-    })?;
-
-    let clipboard_ms = copy_started.elapsed().as_millis() as u64;
-    // Clipboard helpers may block. Revalidate the bound destination after they
-    // finish, immediately before sending keys. This narrows the focus race;
-    // it cannot make a desktop keyboard gesture atomic with another app.
+    copy_selections(text, clipboard, primary)?;
+    let clipboard_ms = elapsed_ms(copy_started);
     before_paste().map_err(|mut error| {
         error.clipboard_changed = true;
         error
@@ -1150,17 +821,15 @@ fn clipboard_transaction(
         // not start. No automatic retry or restoration is safe here.
         error.outcome = DeliveryOutcome::Uncertain;
         error.clipboard_changed = true;
-        error
-            .message
-            .push_str(" The clipboard was changed. Check your text field before pasting to avoid duplicates.");
+        error.message.push_str(
+            " The clipboard was changed. Check your text field before pasting to avoid duplicates.",
+        );
         error
     })?;
-
-    let keyboard_ms = paste_started.elapsed().as_millis() as u64;
     // Neither helper exposes atomic compare-and-restore, all MIME formats, or
     // a target consumption acknowledgement. Restoring after a sleep can erase
     // a newer copy or replace the data before a slow application reads it.
-    Ok((clipboard_ms, keyboard_ms))
+    Ok((clipboard_ms, elapsed_ms(paste_started)))
 }
 
 #[cfg(test)]
@@ -1168,99 +837,43 @@ mod tests {
     use super::*;
     use std::cell::Cell;
 
+    fn scratch_directory(name: &str) -> std::path::PathBuf {
+        let directory = std::env::temp_dir().join(format!(
+            "voco-{name}-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir(&directory).unwrap();
+        directory
+    }
+
+    fn copy_to(path: &Path) -> Command {
+        let mut copy = process_runner::command("/bin/sh");
+        copy.args(["-c", "cat > \"$1\"", "copy"]).arg(path);
+        copy
+    }
+
     #[test]
-    fn paste_waits_for_release_and_revalidates_after_a_chord_during_target_check() {
-        let mut samples = [false, false, true, false, false, true, true].into_iter();
-        let validations = Cell::new(0);
-        prepare_paste_with_modifiers(
-            Duration::from_secs(1),
-            || Ok(samples.next().unwrap()),
-            || {
-                validations.set(validations.get() + 1);
-                Ok(())
-            },
-        )
-        .unwrap();
-        assert_eq!(validations.get(), 2);
+    fn paste_waits_for_modifier_release_and_unknown_state_never_blocks() {
+        let mut samples = [Some(true), Some(true), Some(false)].into_iter();
+        wait_for_modifier_release(Duration::from_secs(1), || samples.next().unwrap()).unwrap();
         assert!(samples.next().is_none());
+        wait_for_modifier_release(Duration::ZERO, || None).unwrap();
+        let error = wait_for_modifier_release(Duration::ZERO, || Some(true)).unwrap_err();
+        assert_eq!(error.outcome, DeliveryOutcome::NoMutation);
+        assert!(!error.clipboard_changed);
     }
 
     #[test]
-    fn held_or_unavailable_modifiers_never_validate_or_dispatch() {
-        for unavailable in [false, true] {
-            let result = prepare_paste_with_modifiers(
-                Duration::ZERO,
-                || {
-                    if unavailable {
-                        Err(InsertionError::rejected("Compositor unavailable"))
-                    } else {
-                        Ok(false)
-                    }
-                },
-                || panic!("Held or unknown modifiers cannot admit a paste"),
-            );
-            assert_eq!(result.unwrap_err().outcome, DeliveryOutcome::Rejected);
-        }
-    }
-
-    #[test]
-    fn target_change_while_waiting_rejects_without_rebinding() {
-        let mut samples = [false, true].into_iter();
-        let result = prepare_paste_with_modifiers(
-            Duration::from_secs(1),
-            || Ok(samples.next().unwrap()),
-            || Err(InsertionError::rejected("Destination changed")),
-        );
-        assert_eq!(result.unwrap_err().message, "Destination changed");
-        assert!(samples.next().is_none());
-    }
-
-    #[test]
-    fn missing_destination_rejects_before_any_desktop_operation() {
-        for target in [None, Some("")] {
-            let error = desktop_paste_for_target("Synthetic phrase.", target, true).unwrap_err();
-            assert_eq!(error.outcome, DeliveryOutcome::Rejected);
-            assert!(!error.clipboard_changed);
-            assert!(error
-                .message
-                .contains("No dictation destination was verified"));
-        }
-    }
-
-    #[test]
-    fn observation_waits_for_content_and_never_retries_uncertain_delivery() {
-        let mut calls = 0;
-        observe_delivery(
-            |_| {
-                calls += 1;
-                Ok(serde_json::json!({"observation": if calls == 1 {"pending"} else {"observed"}}))
-            },
-            Duration::from_millis(100),
-        )
-        .unwrap();
-        assert_eq!(calls, 2);
-        for result in [
-            Ok(serde_json::json!({"observation":"changed"})),
-            Ok(serde_json::json!({"observation":"unavailable"})),
-            Err(()),
-        ] {
-            let (error, event) =
-                observe_delivery(|_| result.clone(), Duration::from_millis(100)).unwrap_err();
-            assert!(matches!(error.outcome, DeliveryOutcome::Uncertain));
-            assert!(error.clipboard_changed);
-            assert!(crate::is_supported_dictation_trace_event(event));
-        }
-        let (error, event) = observe_delivery(
-            |_| panic!("Expired budget must not issue another probe"),
-            Duration::ZERO,
-        )
-        .unwrap_err();
-        assert!(matches!(error.outcome, DeliveryOutcome::Uncertain));
-        assert_eq!(event, "dictation_delivery_observation_timeout");
-        assert_eq!(
-            observation_failure_event(Some(&serde_json::json!({"observation":"private text"}))),
-            "dictation_delivery_observation_invalid"
-        );
+    fn next_copy_waits_only_for_the_remaining_settle_interval() {
+        assert_eq!(settle(None), 0);
+        assert_eq!(settle(Instant::now().checked_sub(PASTE_SETTLE)), 0);
+        let started = Instant::now();
+        settle(Some(started));
+        assert!(started.elapsed() >= PASTE_SETTLE);
     }
 
     #[test]
@@ -1286,104 +899,20 @@ mod tests {
             assert_eq!(desktop_paste_payload(text), (text, false));
         }
         assert_eq!(
-            x11_paste_arguments(false, true),
-            ["key", "--clearmodifiers", "space", "ctrl+v"]
+            x11_paste_arguments(false),
+            ["key", "--clearmodifiers", "shift+Insert"]
         );
         assert_eq!(
-            x11_paste_arguments(true, true),
-            ["key", "--clearmodifiers", "space", "ctrl+shift+v"]
+            x11_paste_arguments(true),
+            ["key", "--clearmodifiers", "space", "shift+Insert"]
         );
     }
 
     #[test]
-    fn cursor_failure_diagnostics_accept_only_finite_metadata() {
-        for (reason, expected) in [
-            ("events_pending", "dictation_desktop_cursor_events_pending"),
-            (
-                "no_active_window",
-                "dictation_desktop_cursor_no_active_window",
-            ),
-            (
-                "ambiguous_windows",
-                "dictation_desktop_cursor_ambiguous_windows",
-            ),
-            (
-                "no_focused_control",
-                "dictation_desktop_cursor_no_focused_control",
-            ),
-            ("not_editable", "dictation_desktop_cursor_not_editable"),
-            ("protected", "dictation_desktop_cursor_protected"),
-            (
-                "control_unavailable",
-                "dictation_desktop_cursor_control_unavailable",
-            ),
-            ("probe_failed", "dictation_desktop_cursor_probe_failed"),
-            ("private field text", "dictation_desktop_cursor_unavailable"),
-        ] {
-            let target: DesktopTarget = serde_json::from_value(serde_json::json!({
-                "shortcut": "ctrl+v", "token": null, "reason": reason,
-            }))
-            .unwrap();
-            assert_eq!(target.reason.failure_event(), expected);
-            assert!(crate::is_supported_dictation_trace_event(expected));
-        }
-        let legacy: DesktopTarget = serde_json::from_value(serde_json::json!({
-            "shortcut": "ctrl+v", "token": null,
-        }))
-        .unwrap();
-        assert_eq!(
-            legacy.reason.failure_event(),
-            "dictation_desktop_cursor_unavailable"
-        );
-    }
-
-    #[test]
-    fn terminal_surface_admission_requires_control_identity_and_focus_tracking() {
-        let valid = serde_json::json!({
-            "input_state": "terminal_surface", "reason": "ready",
-            "scope": "control", "token": "bound-pane", "shortcut": "ctrl+shift+v",
-            "events_tracked": true,
-        });
-        let target: DesktopTarget = serde_json::from_value(valid.clone()).unwrap();
-        assert!(
-            target.available(),
-            "A verified terminal pane does not need an accessible text caret"
-        );
-        for (field, value) in [
-            ("token", serde_json::Value::Null),
-            ("token", serde_json::json!("")),
-            ("scope", serde_json::json!("window")),
-            ("shortcut", serde_json::json!("ctrl+v")),
-            ("events_tracked", serde_json::json!(false)),
-            ("input_state", serde_json::json!("protected")),
-            ("input_state", serde_json::json!("none")),
-            ("input_state", serde_json::json!("unknown")),
-        ] {
-            let mut rejected = valid.clone();
-            rejected[field] = value;
-            let target: DesktopTarget = serde_json::from_value(rejected).unwrap();
-            assert!(
-                !target.available(),
-                "Invalid destination admitted after changing {field}"
-            );
-        }
-        let target: DesktopTarget = serde_json::from_value(serde_json::json!({
-            "input_state": "editable", "scope": "control", "token": "bound-field",
-            "shortcut": "ctrl+v", "events_tracked": false,
-        }))
-        .unwrap();
-        assert!(
-            target.available(),
-            "Ordinary editable controls retain their existing admission"
-        );
-    }
-
-    #[test]
-    fn terminal_paste_preserves_unicode_without_control_keys_or_line_submission() {
-        assert_eq!(
-            terminal_paste_text("café\n你好\r\t\u{1b}text"),
-            "café 你好   text"
-        );
+    fn paste_text_preserves_unicode_without_control_keys_or_line_submission() {
+        let routed = paste_text("café\n你好\r\t\u{1b}text");
+        assert_eq!(routed, "café 你好   text");
+        assert_eq!(routed.len(), "café\n你好\r\t\u{1b}text".len());
     }
 
     #[test]
@@ -1498,14 +1027,31 @@ mod tests {
     }
 
     #[test]
+    fn both_selections_receive_the_text() {
+        assert_eq!(
+            copy_arguments("xclip", false),
+            &["-selection", "clipboard", "-in"]
+        );
+        assert_eq!(
+            copy_arguments("xclip", true),
+            &["-selection", "primary", "-in"]
+        );
+        assert_eq!(copy_arguments("wl-copy", false), &["--type", TEXT_MIME]);
+        assert_eq!(
+            copy_arguments("wl-copy", true),
+            &["--primary", "--type", TEXT_MIME]
+        );
+    }
+
+    #[test]
     fn clipboard_gesture_matches_installed_ydotool_generation() {
         assert_eq!(
             paste_arguments_from_help("Each key sequence ctrl+Backspace").unwrap(),
-            vec!["key", "--delay", "24", "--key-delay", "12", "ctrl+v"]
+            vec!["key", "--delay", "24", "--key-delay", "12", "shift+insert"]
         );
         assert_eq!(
             paste_arguments_from_help("Syntax: <keycode>:<pressed>").unwrap(),
-            vec!["key", "29:1", "47:1", "47:0", "29:0"]
+            vec!["key", "42:1", "110:1", "110:0", "42:0"]
         );
         let error = paste_arguments_from_help("unknown helper").unwrap_err();
         assert_eq!(error.outcome, DeliveryOutcome::Rejected);
@@ -1513,40 +1059,27 @@ mod tests {
     }
 
     #[test]
-    fn wayland_separator_and_terminal_chords_match_both_helper_interfaces() {
-        for terminal in [false, true] {
-            for separator in [false, true] {
-                let legacy = paste_arguments_from_help("Each key sequence ctrl+Backspace").unwrap();
-                let mut expected = vec!["key", "--delay", "24", "--key-delay", "12"];
-                if separator {
-                    expected.push(" ");
-                }
-                expected.push(if terminal { "ctrl+shift+v" } else { "ctrl+v" });
-                assert_eq!(
-                    wayland_clipboard_arguments(legacy, terminal, separator),
-                    expected
-                );
-
-                let modern = paste_arguments_from_help("Syntax: <keycode>:<pressed>").unwrap();
-                let mut expected = vec!["key"];
-                if separator {
-                    expected.extend(["57:1", "57:0"]);
-                }
-                expected.push("29:1");
-                if terminal {
-                    expected.push("42:1");
-                }
-                expected.extend(["47:1", "47:0"]);
-                if terminal {
-                    expected.push("42:0");
-                }
-                expected.push("29:0");
-                assert_eq!(
-                    wayland_clipboard_arguments(modern, terminal, separator),
-                    expected
-                );
-            }
-        }
+    fn wayland_separator_matches_both_helper_interfaces() {
+        let legacy = || paste_arguments_from_help("Each key sequence ctrl+Backspace").unwrap();
+        assert_eq!(wayland_clipboard_arguments(legacy(), false), legacy());
+        assert_eq!(
+            wayland_clipboard_arguments(legacy(), true),
+            [
+                "key",
+                "--delay",
+                "24",
+                "--key-delay",
+                "12",
+                " ",
+                "shift+insert"
+            ]
+        );
+        let modern = || paste_arguments_from_help("Syntax: <keycode>:<pressed>").unwrap();
+        assert_eq!(wayland_clipboard_arguments(modern(), false), modern());
+        assert_eq!(
+            wayland_clipboard_arguments(modern(), true),
+            ["key", "57:1", "57:0", "42:1", "110:1", "110:0", "42:0"]
+        );
     }
 
     #[test]
@@ -1597,20 +1130,11 @@ mod tests {
 
     #[test]
     fn clipboard_transaction_never_restores_over_a_new_copy() {
-        let directory = std::env::temp_dir().join(format!(
-            "voco-clipboard-test-{}-{}",
-            std::process::id(),
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
-        std::fs::create_dir(&directory).unwrap();
-        let clipboard = directory.join("selection");
+        let directory = scratch_directory("clipboard-test");
+        let clipboard = directory.join("clipboard");
+        let primary = directory.join("primary");
         let consumed = directory.join("consumed");
         std::fs::write(&clipboard, b"old text").unwrap();
-        let mut copy = process_runner::command("/bin/sh");
-        copy.args(["-c", "cat > \"$1\"", "copy"]).arg(&clipboard);
         let mut paste = process_runner::command("/bin/sh");
         paste
             .args([
@@ -1620,54 +1144,84 @@ mod tests {
             ])
             .arg(&clipboard)
             .arg(&consumed);
-        clipboard_transaction("intended transcript\n", &mut copy, &mut paste, || Ok(())).unwrap();
+        clipboard_transaction(
+            "intended transcript\n",
+            &mut copy_to(&clipboard),
+            &mut copy_to(&primary),
+            &mut paste,
+            || Ok(()),
+        )
+        .unwrap();
         assert_eq!(std::fs::read(&consumed).unwrap(), b"intended transcript\n");
+        assert_eq!(std::fs::read(&primary).unwrap(), b"intended transcript\n");
         assert_eq!(std::fs::read(&clipboard).unwrap(), b"new user copy");
-        std::fs::remove_file(clipboard).unwrap();
-        std::fs::remove_file(consumed).unwrap();
-        std::fs::remove_dir(directory).unwrap();
+        std::fs::remove_dir_all(directory).unwrap();
     }
 
     #[test]
-    fn destination_change_after_copy_blocks_keyboard_dispatch() {
-        let directory = std::env::temp_dir().join(format!(
-            "voco-before-paste-test-{}-{}",
-            std::process::id(),
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
-        std::fs::create_dir(&directory).unwrap();
-        let clipboard = directory.join("selection");
-        let consumed = directory.join("wrong-recipient");
-        let mut copy = process_runner::command("/bin/sh");
-        copy.args(["-c", "cat > \"$1\"", "copy"]).arg(&clipboard);
+    fn missing_primary_selection_does_not_block_the_paste() {
+        let directory = scratch_directory("primary-test");
+        let clipboard = directory.join("clipboard");
+        let consumed = directory.join("consumed");
         let mut paste = process_runner::command("/bin/sh");
         paste
             .args(["-c", "cp \"$1\" \"$2\"", "paste"])
             .arg(&clipboard)
             .arg(&consumed);
-        let result = clipboard_transaction("Synthetic phrase.", &mut copy, &mut paste, || {
-            assert_eq!(std::fs::read(&clipboard).unwrap(), b"Synthetic phrase.");
-            Err(InsertionError::rejected(
-                "Destination changed during clipboard preparation.",
-            ))
-        });
+        let result = clipboard_transaction(
+            "Synthetic phrase.",
+            &mut copy_to(&clipboard),
+            &mut process_runner::command("/definitely-missing-voco-test-helper"),
+            &mut paste,
+            || Ok(()),
+        );
+        let delivered = std::fs::read(&consumed);
+        std::fs::remove_dir_all(directory).unwrap();
+        result.unwrap();
+        assert_eq!(delivered.unwrap(), b"Synthetic phrase.");
+    }
+
+    #[test]
+    fn held_modifiers_after_copy_block_keyboard_dispatch() {
+        let directory = scratch_directory("before-paste-test");
+        let clipboard = directory.join("clipboard");
+        let consumed = directory.join("wrong-chord");
+        let mut paste = process_runner::command("/bin/sh");
+        paste
+            .args(["-c", "cp \"$1\" \"$2\"", "paste"])
+            .arg(&clipboard)
+            .arg(&consumed);
+        let result = clipboard_transaction(
+            "Synthetic phrase.",
+            &mut copy_to(&clipboard),
+            &mut copy_to(&directory.join("primary")),
+            &mut paste,
+            || {
+                assert_eq!(std::fs::read(&clipboard).unwrap(), b"Synthetic phrase.");
+                wait_for_modifier_release(Duration::ZERO, || Some(true)).map(|_| ())
+            },
+        );
         let keyboard_was_dispatched = consumed.exists();
         std::fs::remove_dir_all(directory).unwrap();
         let error = result.unwrap_err();
-        assert_eq!(error.outcome, DeliveryOutcome::Rejected);
+        assert_eq!(error.outcome, DeliveryOutcome::NoMutation);
         assert!(error.clipboard_changed);
         assert!(!keyboard_was_dispatched);
     }
 
     #[test]
     fn failed_paste_after_copy_is_uncertain_even_if_paste_never_spawned() {
-        let mut copy = process_runner::command("/bin/cat");
+        let mut clipboard = process_runner::command("/bin/cat");
+        let mut primary = process_runner::command("/bin/cat");
         let mut paste = process_runner::command("/definitely-missing-voco-test-helper");
-        let error =
-            clipboard_transaction("transcript", &mut copy, &mut paste, || Ok(())).unwrap_err();
+        let error = clipboard_transaction(
+            "transcript",
+            &mut clipboard,
+            &mut primary,
+            &mut paste,
+            || Ok(()),
+        )
+        .unwrap_err();
         assert_eq!(error.outcome, DeliveryOutcome::Uncertain);
         assert!(error.clipboard_changed);
     }
@@ -1695,5 +1249,19 @@ mod tests {
             diagnostics.clipboard.missing_commands,
             vec!["xclip".to_string()]
         );
+    }
+
+    /// Application-delivery fixtures run this production paste against real
+    /// applications on a private display; it replaces the clipboard there.
+    #[test]
+    #[ignore = "Explicit fixture text and a private desktop session are required"]
+    fn paste_fixture_text_into_the_focused_application() {
+        let text = std::env::var("VOCO_FIXTURE_PASTE_TEXT").expect("explicit fixture text");
+        assert!(
+            !Path::new("/dev/input").exists(),
+            "Run only in a private desktop namespace"
+        );
+        let result = desktop_paste(&text).unwrap();
+        assert_eq!(result.outcome, "dispatched");
     }
 }

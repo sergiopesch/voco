@@ -7,7 +7,7 @@ import time
 
 UUID = 'voco-panel@voco.local'
 # Bump with behavior changes that require reloading the running Shell companion.
-COMPANION_VERSION = 10
+COMPANION_VERSION = 11
 PACKAGE = Path('/usr/share/gnome-shell/extensions') / UUID
 
 
@@ -17,14 +17,14 @@ def result(status, detail, can_enable=False):
 
 def classify(version, installed, info, enabled, globally_disabled):
     if version.split('.')[0] != '46':
-        return result('unsupported', 'The VOCO panel requires GNOME 46. On GNOME Wayland, Alt+D and Alt+Shift+D cannot start cursor dictation without its Stop reservation. Choose another shortcut in VOCO and configure it in your desktop, or use a supported GNOME 46 session.')
+        return result('unsupported', 'The VOCO panel requires GNOME 46. Dictation still works, but without the panel the focused app also receives Alt+D and Alt+Shift+D. To avoid that, choose another shortcut in VOCO and configure it in your desktop to run voco --toggle.')
     if not installed:
         return result('missing', 'The VOCO panel files are missing. Reinstall the complete VOCO package.')
     if globally_disabled:
         return result('blocked', 'GNOME extensions are turned off. Turn them on in Extensions, then check again.')
     if info.get('state') == 1:
         if info.get('version') != COMPANION_VERSION:
-            return result('restart', 'Panel update installed. Save your work, then sign out and back in to load the current bars and Stop controls.')
+            return result('restart', 'Panel update installed. Save your work, then sign out and back in to load the current panel and shortcut.')
         return result('active', 'Live panel bars and Stop are active.')
     if info.get('state') in (3, 4):
         return result('error', 'GNOME could not load the VOCO panel. Sign out and back in, then check Extensions.')

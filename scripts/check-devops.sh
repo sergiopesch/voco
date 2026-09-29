@@ -39,7 +39,7 @@ bash scripts/check-shell-syntax.sh \
   scripts/test-private-ibus-engine.sh \
   scripts/test-private-ibus-engine-hosted.sh \
   scripts/test-native-desktop.sh \
-  scripts/test-rich-editor-delivery.sh \
+  scripts/test-application-delivery.sh \
   scripts/test-native-wayland.sh \
   scripts/test-native-gnome.sh \
   scripts/test-native-kde.sh \
@@ -102,6 +102,7 @@ PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-install-journey.py
 
 node --check scripts/comparative-dictation.mjs
 node --check scripts/comparative-dictation.test.mjs
+node --check scripts/test-browser-delivery.mjs
 node --test scripts/comparative-dictation.test.mjs
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-physical-speech-session.py
 
@@ -113,6 +114,7 @@ for path in (
     Path("scripts/generate-icons.py"),
     Path("scripts/test-application-delivery.py"),
     Path("scripts/fixtures/delivery-native.py"),
+    Path("scripts/fixtures/focused-paste.py"),
     Path("scripts/test-private-ibus-engine.py"),
     Path("scripts/test-native-desktop.py"),
     Path("scripts/test-native-wayland.py"),

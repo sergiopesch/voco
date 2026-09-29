@@ -75,12 +75,13 @@ def trial(output, daemon, name, *, failure='', clients=0, payload=None, client_b
             initial = fd_count(process)
             if client_binary:
                 before = events.stat().st_size
-                commands = [([], 'ctrl+v'), ([' '], 'ctrl+v'), ([], 'ctrl+shift+v'), ([' '], 'ctrl+shift+v')]
+                # The universal Shift+Insert paste, with and without the joining Space.
+                commands = [([], 'shift+insert'), ([' '], 'shift+insert')]
                 result['client_cases'] = []
                 for prefix, chord in commands:
                     args = [str(client_binary), 'key', '--delay', '24', '--key-delay', '12', *prefix, chord]
                     subprocess.run(args, check=True, timeout=3, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
-                    expected_keys = ([29, 42, 47] if 'shift' in chord else [29, 47])
+                    expected_keys = [42, 110]
                     expected = ([(1, 57, 1), (0, 0, 0), (1, 57, 0), (0, 0, 0)] if prefix else [])
                     for value, keys in [(1, expected_keys), (0, list(reversed(expected_keys)))]:
                         for code in keys:

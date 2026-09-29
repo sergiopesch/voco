@@ -30,8 +30,7 @@ or crash-reporting service.
 - ASR model files (stored locally)
 - Dictated text retained in VOCO, delivered through default desktop paste, or sent to an explicitly authorized browser element
 - Captured browser element value and selection checked transiently inside the extension
-- Bounded accessible-field context held transiently by the native observation helper
-- Clipboard contents (replaced by native desktop delivery or explicit Copy; clipboard managers may retain dictated text)
+- Clipboard and primary selection contents (replaced by native desktop delivery, the Stop remainder copy or explicit Copy; clipboard managers may retain dictated text)
 
 ### Attack Surface
 
@@ -40,7 +39,7 @@ or crash-reporting service.
 - Chromium extension, native-messaging host and exact-field broker socket
 - Native Wayland audio capture through the existing per-user PulseAudio-compatible socket,
   or WebView `getUserMedia` on X11
-- Native desktop paste and compatibility insertion via external helpers (ydotool, xdotool, xclip, wl-copy)
+- Native desktop paste and the Stop remainder copy via external helpers (ydotool, xdotool, xclip, wl-copy)
 - Local Python speech worker, bounded IPC, native CPU libraries and packaged model
 - ASR model loading (local files)
 - Automatic and manual GitHub Release checks (HTTPS to api.github.com)
@@ -67,16 +66,16 @@ or crash-reporting service.
   provide cloud sync
 - **Helper execution**: Dictated text is passed through process arguments or stdin,
   without shell interpolation. Helper waits/output are bounded; timed-out child process
-  groups are terminated and reaped. The desktop focus helper uses Python isolated mode.
+  groups are terminated and reaped.
 - **Clipboard boundaries**: The current desktop route deliberately uses clipboard paste for
-  progressive/final delivery. Text replaces the clipboard and stays there; leading join spaces
-  can be typed separately. Helpers cannot atomically prove recipient consumption or preserve all
-  MIME formats. No delayed clipboard restore or automatic uncertain replay is performed
-- **Sampled desktop observation**: Eligible accessible controls permit bounded local-region
-  readback after paste before the next clipboard replacement. Context is transient,
-  excluded from metrics/frontend responses, and discarded after the transaction.
-  Sampling does not provide atomic field ownership; unsupported controls remain
-  unobserved. Timeout or inconsistent identity cannot authorize automatic replay.
+  progressive/final delivery. Text replaces the clipboard and primary selection and stays
+  there; a leading join space is typed separately. Helpers cannot atomically prove recipient
+  consumption or preserve all MIME formats. No delayed clipboard restore or automatic uncertain
+  replay is performed
+- **Focus-following desktop paste**: Each chunk is pasted with Shift+Insert into whatever has
+  keyboard focus. VOCO reads no field text, caret, window title or focus metadata, and cannot
+  identify password fields. ASCII controls become spaces, so delivery never sends Enter. Only
+  text that sent no key is retried; the Stop remainder is copied to the clipboard without keys.
 - **Trigger socket safety**: Runtime directories must be absolute, real, private and
   current-user-owned. With no `XDG_RUNTIME_DIR`, the existing temporary-directory layout
   is retained only under a verified private root or a root-owned sticky temporary root.
@@ -86,7 +85,7 @@ or crash-reporting service.
 - **IBus socket security**: The separate IBus control socket requires a private `XDG_RUNTIME_DIR`, a 0700 VOCO directory, a 0600 socket, Linux `SO_PEERCRED` same-user verification on both ends, one app connection, bounded protocol-v6 JSON messages, ordered request IDs, and no `/tmp` fallback
 - **Input-source safety**: VOCO never selects, switches, restores, registers, or restarts a desktop input source. Its package only advertises a rank-zero persistent component that the user explicitly enables
 - **Safe default**: Generic IBus mutation is disabled at the native client and protocol-v6 engine
-  dispatch boundaries. This does not disable the separately enabled desktop-paste route. Actual
+  dispatch boundaries. This does not disable the separate desktop-paste route. Actual
   WebKit tests showed that focus can move between fields without changing IBus identity, metadata
   or cursor geometry; the old context-token mechanism is not sufficient authorization.
 - **Exact-element browser authorization**: An explicit tab action enables the adapter. A trusted
@@ -249,14 +248,12 @@ and [cross-Linux review](../testing/cross-linux-review-2026-09-15.md) are dated
 evidence for their recorded revisions, fixtures and exclusions. Their test counts
 and package receipts are not qualification of every later source change.
 
-Desktop delivery still uses the original destination token, focus-generation and
-bounded recipient-context checks. The patched X11 shortcut actor binds scope to
-manager, registration generation, nonce and renderer epoch, with bounded waits and
-a 650-second expiry. Failed/uncertain ownership restoration blocks readiness.
-Cleanup does not confer continued delivery authority; generic paste IPC has no
-universal renderer-epoch cancellation guarantee. A responsive actor/X server is
-required for watchdog cleanup. Wayland/no-op and competing-client behavior must
-not be inferred from isolated X11 tests. See [vendored shortcut provenance](../../vendor/global-hotkey/VOCO-UPSTREAM.json)
+Desktop delivery no longer uses destination tokens, focus generations or
+recipient-context checks; each paste goes to whatever has keyboard focus. The X11
+shortcut uses a root grab, and the vendored actor's focus-lease API is unused.
+Generic paste IPC has no universal renderer-epoch cancellation guarantee.
+Wayland/no-op and competing-client behavior must not be inferred from isolated X11
+tests. See [vendored shortcut provenance](../../vendor/global-hotkey/VOCO-UPSTREAM.json)
 and [patch contract](../../vendor/global-hotkey/VOCO-PATCH.md).
 
 The 22 September assessment combines bounded source review, focused regressions
@@ -316,15 +313,15 @@ The original daemon fails the retained connection regression; the production ELF
 passes lifecycle and forced-failure checks in a namespace with input syscalls
 intercepted. This is separate from [isolated VM input qualification](../testing/release-qualification-2026-09-23.md).
 The legacy owner-only fixed socket and uinput privilege boundary are unchanged.
-Input writes still do not acknowledge recipient consumption; bounded destination
-readback and no automatic replay remain necessary.
+Input writes still do not acknowledge recipient consumption, so uncertain output is
+never replayed automatically.
 
 ## Known Limits and Verification
 
 - Generic IBus input contexts do not establish per-widget identity; IBus mutation remains
-  disabled. The separate desktop paste path uses best-effort focus metadata, not exact-widget
-  ownership. It cannot universally detect protected/sensitive fields, user caret movement within
-  the same field, or whether paste was consumed. Availability is not universal app support.
+  disabled. The separate desktop paste path pastes into whatever has keyboard focus, with no
+  widget identity. It cannot detect protected/sensitive fields, focus changes during a recording,
+  or whether paste was consumed. Availability is not universal app support.
 - Exact-field browser support is constrained to eligible plain-text controls. Direct mutation may
   bypass native browser undo history; framework-controlled and rich editors need separate evidence.
 - The recipient expiry assumes the shared host clock; arbitrary clock changes are not covered.

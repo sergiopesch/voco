@@ -1,5 +1,8 @@
 # Testing
 
+The current universal-paste contract and its X11 application and Chromium suites
+are in [desktop paste](desktop-paste.md).
+
 - [27 September end-to-end assessment](end-to-end-assessment-2026-09-27.md): merged GNOME Start gate, startup audio recovery fix, CI evidence hygiene and remaining desktop acceptance gaps.
 
 - [2026.0.59 Stop reservation and installer qualification](stop-reservation-release-2026-09-23.md): rejected renewals, parent-owned cleanup and exact-package release evidence.
@@ -62,7 +65,7 @@ NumPy/psutil and the pinned native/model payload must be present for relevant te
 Never count a missing model or an unrun protocol case as a pass.
 
 The [X11 follow-up](x11-stop-delivery-followup.md) records the reproduced root-grab
-failure and current exact-focus session-grab acceptance plan. Logical frontend
+failure and a since-retired exact-focus session-grab design. Logical frontend
 shortcut begin/end traces also occur on native no-op routes; they do not prove
 physical X11 scope. Match candidate/fixture hashes and preserve all attempted
 trial denominators. Default GNOME, KDE, Cinnamon and Omarchy/Hyprland desktops,
@@ -144,7 +147,7 @@ npm run dev
 - verify progressive words reach the intended test field without an automatic preview window
 - press `Alt+D` again
 - verify the final tail, separators, no unintended Enter and no duplicate text
-- intentionally change focus and check recovery without automatic replay
+- click another field during dictation and verify later chunks follow focus without replaying earlier text
 - for direct delivery, enable the packaged Chromium extension, focus a supported field and use Alt+Shift+V; verify the exact field and receipt
 
 An uninstalled source process does not install native messaging manifests. A browser E2E

@@ -89,7 +89,7 @@ impl ConsumingLease {
     }
 
     pub fn suppresses_backend(&self, backend: &str, now: i64) -> bool {
-        // The X11 backend uses owner_events=false for both root and scoped grabs.
+        // The X11 backend uses an owner_events=false root grab.
         // Its callback proves the key was delivered to the grabbing client,
         // not the destination's ordinary IBus process_key_event route.
         backend == "evdev" && self.is_current(now)

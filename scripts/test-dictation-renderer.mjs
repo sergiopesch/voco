@@ -51,12 +51,11 @@ export const getDesktopInputStatus = async () => ({available:!window.pasteUnavai
 export const getPanelSetupStatus = async () => ({status:'other-desktop',detail:'Use the tray menu.',canEnable:false});
 export const enableGnomePanel = getPanelSetupStatus;
 export const takeLauncherActivation = async () => false;
-export const getDesktopPasteStatus = async () => ({enabled:Boolean(window.desktopPaste),streamingEnabled:Boolean(window.desktopStream),shortcutEpoch:1,targetToken:window.desktopTargetToken === undefined ? 'synthetic-destination' : window.desktopTargetToken,available:!window.pasteUnavailable,detail:'Paste helper unavailable'});
-// Model the native shortcut lease API used by the real hook; no desktop input is touched.
-export const beginDesktopShortcutSession = async (id, epoch) => { if(typeof id !== 'string' || epoch !== 1) throw new Error('Invalid shortcut preflight'); calls.push(['beginDesktopShortcutSession',id,epoch]); };
-export const endDesktopShortcutSession = async (id) => { calls.push(['endDesktopShortcutSession',id]); };
-export const awaitStopShortcutReservation = async (sessionId) => { calls.push(['awaitStopShortcutReservation',sessionId]); if(window.deferStopReservation) await new Promise(resolve=>window.resolveStopReservation=resolve); if(window.failStopReservation) throw new Error('GNOME did not reserve Stop'); };
-export const pasteDesktopText = async (text) => { calls.push(['pasteDesktopText',text]); if(window.failPaste) throw new Error('Uncertain paste dispatch'); return {strategy:'clipboard',outcome:'dispatched',pasteMetrics:window.pasteMetrics?{terminal:true,targetProbeMs:60,preflightMs:5,clipboardMs:8,keyboardMs:350}:undefined}; };
+export const getDesktopPasteStatus = async () => ({enabled:Boolean(window.desktopPaste),streamingEnabled:Boolean(window.desktopStream),available:!window.pasteUnavailable,detail:'Paste helper unavailable'});
+// Model the native paste and clipboard contract; no desktop input is touched.
+const bytes = text => new TextEncoder().encode(text).length;
+export const pasteDesktopText = async (text) => { calls.push(['pasteDesktopText',text]); if(window.failPaste) throw {outcome:window.pasteOutcome ?? 'uncertain',message:'Uncertain paste dispatch',clipboardChanged:true}; return {strategy:'clipboard',outcome:'dispatched',pasteMetrics:{preflightMs:5,settleMs:0,modifierWaitMs:12,clipboardMs:8,keyboardMs:350,leadingSeparator:false,routedUtf8Bytes:bytes(text),payloadUtf8Bytes:bytes(text),payloadUnicodeScalars:Array.from(text).length,payloadUtf16Units:text.length}}; };
+export const copyDesktopText = async (text) => { calls.push(['copyDesktopText',text]); if(window.failCopy) throw {outcome:'uncertain',message:'Clipboard helper failed',clipboardChanged:false}; };
 export const cancelOwnedPreedit = async (...args) => { calls.push(['cancelOwnedPreedit',...args]); return state(); };
 export const releaseBrowserRecording = async (triggerId) => { calls.push(['releaseBrowserRecording',triggerId]); };
 export const ackBrowserStop = async (triggerId) => { calls.push(['ackBrowserStop',triggerId]); };
@@ -183,23 +182,13 @@ async function interrupted() {
  assert.equal(await page.evaluate(()=>window.store.getState().transcript),'');
 }
 
-await load();await page.evaluate(()=>{window.desktopPaste=true;window.desktopStream=true;window.failStopReservation=true;});
+await load();await page.evaluate(()=>{window.desktopPaste=true;window.desktopStream=true;window.pasteUnavailable=true;});
 await page.evaluate(()=>window.hook.toggle());
-await page.waitForFunction(()=>window.nativeCalls.some(c=>c[0]==='awaitStopShortcutReservation'));
+await page.waitForFunction(()=>window.nativeCalls.some(c=>c[0]==='showNotification'));
 assert.equal(await page.evaluate(()=>window.store.getState().status),'idle');
 assert.equal(await page.evaluate(()=>window.tracks.length),0);
-assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>c[0]==='showNotification'&&c[1]==='Dictation setup incomplete')),true);
-results.push('A rejected GNOME Stop reservation returns to idle without opening the microphone.');
-
-await load();await page.evaluate(()=>{window.desktopPaste=true;window.desktopStream=true;window.deferStopReservation=true;});
-await page.evaluate(()=>{void window.hook.toggle();});
-await page.waitForFunction(()=>typeof window.resolveStopReservation==='function');
-assert.equal(await page.evaluate(()=>window.tracks.length),0);
-assert.equal(await page.evaluate(()=>window.captureReady()),false);
-await page.evaluate(()=>window.resolveStopReservation());
-await page.waitForFunction(()=>window.captureReady());
-await page.evaluate(()=>window.hook.cancelRecording());
-results.push('An unconfirmed GNOME Stop reservation holds capture until the session ACK.');
+assert.deepEqual(await page.evaluate(()=>window.nativeCalls.find(c=>c[0]==='showNotification')),['showNotification','Dictation setup incomplete','Paste helper unavailable']);
+results.push('Missing desktop input helpers return to idle with setup guidance before opening the microphone.');
 
 await load();await page.evaluate(()=>{window.desktopPaste=true;window.desktopStream=true;});await start();
 assert.equal(await page.evaluate(()=>window.hook.toggle('tray:stop','stop',window.hook.dictationSessionId+1)),false);
@@ -222,7 +211,7 @@ await page.evaluate(()=>window.hook.toggle('browser:fixture','stop'));
 await page.waitForFunction(()=>window.store.getState().status==='idle');
 assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='checkpointOwnedPreedit').map(c=>c.slice(2))),[['','Recovered words'],['Recovered words',' for manual review.']]);
 assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='finishCanonicalOwnedPreedit').map(c=>c.slice(2))),[['Recovered words for manual review.','']]);
-assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>['pasteDesktopText','beginDesktopShortcutSession','insertText'].includes(c[0]))),false);
+assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>['pasteDesktopText','copyDesktopText','insertText'].includes(c[0]))),false);
 results.push('Browser recording streams Nemotron suffixes through its exact field lease and finalizes without replay.');
 
 await load();await page.evaluate(()=>{window.lease=true;window.focusChanged=true;window.hook.toggle('browser:fixture','start');});
@@ -268,7 +257,7 @@ for (const failure of ['module', 'construction']) {
   results.push(`NVIDIA ${failure} fallback never inserts unverified audio and clears controlled-failure content.`);
 }
 
-await load(); await page.evaluate(()=>{window.desktopPaste=true;window.desktopStream=true;window.pasteMetrics=true;});
+await load(); await page.evaluate(()=>{window.desktopPaste=true;window.desktopStream=true;});
 await start();
 await page.evaluate(()=>window.captureWorklet.port.onmessage({data:{type:'samples',data:new Float32Array(16000)}}));
 await page.waitForFunction(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length===1);
@@ -277,7 +266,7 @@ await page.evaluate(()=>window.samples(1));await stop();await page.waitForFuncti
 assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length),2);
 assert.equal(await page.evaluate(()=>window.benchmarkRequests.filter(r=>['start','push','finish'].includes(r.op)).every((r,index)=>r.seq===index)),true);
 assert.equal(await page.evaluate(()=>window.traceEvents.filter(c=>c[0]==='dictation_desktop_first_phrase_dispatched').length),1);
-assert.equal(await page.evaluate(()=>window.traceEvents.filter(c=>c[0]==='dictation_desktop_terminal_route_dispatched').length),2);
+assert.equal(await page.evaluate(()=>window.traceEvents.filter(c=>c[0]==='dictation_desktop_modifier_wait_completed').length),2);
 assert.equal(await page.evaluate(()=>window.traceEvents.find(c=>c[0]==='dictation_desktop_keyboard_dispatch_completed')[1].durationMs),350);
 results.push('Progressive native dictation pastes before Stop, flushes only the tail, reports paste stages and never repastes the complete transcript.');
 await load();await page.evaluate(()=>{window.desktopPaste=true;window.desktopStream=true;window.deferInference=true;});
@@ -287,17 +276,38 @@ await page.evaluate(()=>{void window.hook.cancelRecording();});await page.evalua
 await page.waitForFunction(()=>window.benchmarkRequests.some(r=>r.op==='cancel'));
 assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length),0);
 results.push('Cancellation while a progressive worker request is in flight drains the cancel command and suppresses its late paste.');
-await load();await page.evaluate(()=>{window.desktopPaste=true;window.desktopStream=true;window.failPaste=true;});
-await start();await page.evaluate(()=>window.captureWorklet.port.onmessage({data:{type:'samples',data:new Float32Array(16000)}}));
-await page.waitForFunction(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length===1);
-await page.evaluate(()=>window.samples(1));await stop();await interrupted();
-assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length),1);
-assert.equal(await page.evaluate(()=>window.benchmarkAudioSamples),48000);
-assert.equal(await page.evaluate(()=>window.store.getState().surface),'hidden');
-assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='showNotification'&&c[1]==='Dictation saved in VOCO').length),0);
-assert.equal(await page.getByRole('button',{name:'Copy transcript',exact:true}).count(),0);
-assert.equal(await page.evaluate(()=>window.journalCalls.at(-1)[0]),'finish_crash_journal');
-results.push('Uncertain progressive paste keeps recognition and Stop flushing but clears controlled-failure text/audio, never opens Review and never retries insertion.');
+for (const failCopy of [false, true]) {
+  await load();await page.evaluate(failCopy=>{window.desktopPaste=true;window.desktopStream=true;window.failPaste=true;window.failCopy=failCopy;},failCopy);
+  await start();await page.evaluate(()=>window.captureWorklet.port.onmessage({data:{type:'samples',data:new Float32Array(16000)}}));
+  await page.waitForFunction(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length===1);
+  await page.evaluate(()=>window.samples(1));await stop();
+  if (failCopy) await interrupted();
+  else await page.waitForFunction(()=>window.store.getState().status==='idle',null,{timeout:6000});
+  assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length),1);
+  assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='copyDesktopText').map(c=>c[1])),['Recovered words for manual review.']);
+  assert.equal(await page.evaluate(()=>window.benchmarkAudioSamples),48000);
+  assert.equal(await page.evaluate(()=>window.store.getState().transcript),'');
+  assert.equal(await page.evaluate(()=>window.store.getState().recovery),null);
+  assert.notEqual(await page.evaluate(()=>window.store.getState().surface),'review');
+  assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>c[0]==='showNotification'&&c[1]==='Dictation copied to clipboard')),!failCopy);
+  assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='showNotification'&&c[1]==='Dictation saved in VOCO').length),0);
+  assert.equal(await page.getByRole('button',{name:'Copy transcript',exact:true}).count(),0);
+  assert.equal(await page.evaluate(()=>window.journalCalls.at(-1)[0]),'finish_crash_journal');
+  if (!failCopy) assert.equal(await page.evaluate(()=>window.store.getState().error),null);
+}
+results.push('Uncertain progressive paste keeps recognition and Stop flushing, never retries insertion, copies the untyped words at Stop and clears text/audio; a failed copy takes the interrupted path.');
+
+await load();await page.evaluate(()=>{window.desktopPaste=true;window.desktopStream=true;window.failPaste=true;window.pasteOutcome='no-mutation';});
+await start();await stop();
+await page.waitForFunction(()=>window.store.getState().status==='idle',null,{timeout:6000});
+const deferredPastes = await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').map(c=>c[1]));
+assert.ok(deferredPastes.length >= 4, 'Stop retries the deferred text');
+assert.ok(deferredPastes.every(text=>text.startsWith('Recovered words')), 'Deferred text is retried whole from its first word');
+assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='copyDesktopText').map(c=>c[1])),['Recovered words for manual review.']);
+assert.equal(await page.evaluate(()=>window.store.getState().error),null);
+assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>c[0]==='showNotification'&&c[1]==='Dictation interrupted')),false);
+assert.equal(await page.evaluate(()=>window.traceEvents.filter(c=>c[0]==='dictation_desktop_remainder_copied').length),1);
+results.push('A paste that types nothing never interrupts dictation: the whole pending text is retried, then copied to the clipboard at Stop.');
 
 
 await load(); await page.evaluate(()=>{window.desktopPaste=true;window.desktopStream=true;window.streamTextAt=[];window.streamFinalText='Exact captured samples.';});
@@ -376,19 +386,21 @@ for(let second=1;second<=300;second++) {
  await page.waitForFunction(samples=>window.benchmarkAudioSamples===samples,second*16000);
 }
 await page.evaluate(()=>window.samples(701/16000));
-await stop();await interrupted();
+await stop();await page.waitForFunction(()=>window.store.getState().status==='idle',null,{timeout:6000});
 assert.equal(await page.evaluate(()=>window.benchmarkAudioSamples),4800701);
 assert.equal(await page.evaluate(()=>window.benchmarkRequests.filter(r=>r.op==='finish').length),1);
 assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length),2,'One successful paste and one rejection; no retry');
+assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='copyDesktopText').map(c=>c[1])),['Later speech remains available through Stop.']);
 assert.equal(await page.evaluate(()=>window.store.getState().transcript),'');
-assert.equal(await page.evaluate(()=>window.store.getState().surface),'hidden');
+assert.equal(await page.evaluate(()=>window.store.getState().error),null);
+assert.notEqual(await page.evaluate(()=>window.store.getState().surface),'review');
 assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='showNotification'&&c[1]==='Dictation saved in VOCO').length),0);
 await page.evaluate(()=>{window.failPaste=false;window.hook.toggle();});
 await page.waitForFunction(()=>window.store.getState().status==='recording');
 assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='showNotification'&&c[1]==='Previous transcript available').length),0);
 assert.equal(await page.evaluate(()=>window.benchmarkRequests.filter(r=>r.op==='start').length),2);
 await page.evaluate(()=>window.hook.cancelRecording());
-results.push('Delivery interrupted at two minutes still recognizes five minutes plus partial Stop tail, never retries insertion, clears controlled-failure content and admits next recording.');
+results.push('Delivery interrupted at two minutes still recognizes five minutes plus partial Stop tail, never retries insertion, copies only the untyped words and admits next recording.');
 
 
 if (evidence) await writeFile(path.join(evidence,'results.json'),JSON.stringify({passed:errors.length===0,results,errors,consoleMessages,browser:'Headless Chromium; real React hook/store/components with explicit capture and native IPC doubles'},null,2));

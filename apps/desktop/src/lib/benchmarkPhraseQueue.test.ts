@@ -5,6 +5,7 @@ import {appendOnlySuffix,BenchmarkPhraseQueue,textLengths} from './benchmarkPhra
 const worker=vi.fn();
 const quality=()=>transport.mock.calls.map(c=>c[1].request).filter(r=>r.op==='quality');
 const requests=()=>transport.mock.calls.map(c=>c[1].request).filter(r=>!['quality','diagnostic'].includes(r.op));
+const noMutation={outcome:'no-mutation',message:'Physical modifiers are still held.',clipboardChanged:true};
 const make=()=>{const paste=vi.fn(async(_s:string)=>{}),observed=vi.fn(),failure=vi.fn();return {paste,observed,failure,queue:new BenchmarkPhraseQueue(paste,observed,failure,vi.fn())};};
 beforeEach(()=>{worker.mockReset().mockResolvedValue({});transport.mockReset().mockImplementation((c,args)=>['quality','diagnostic'].includes(args.request.op)?Promise.resolve({logged:true}):worker(c,args));});
 describe('pinned append-only candidate',()=>{
@@ -29,9 +30,12 @@ describe('pinned append-only candidate',()=>{
  it('preserves the native insertion rejection message for recovery',async()=>{
   worker.mockImplementation(async(_c,{request:r})=>({...r,mode:'append-only',text:r.op==='push'?'Synthetic phrase':null}));
   const failure={outcome:'rejected',message:'Click in a text field and try again.',clipboardChanged:false};
-  const queue=new BenchmarkPhraseQueue(async()=>{throw failure},vi.fn(),vi.fn(),vi.fn());
+  const onFailure=vi.fn();
+  const queue=new BenchmarkPhraseQueue(async()=>{throw failure},vi.fn(),onFailure,vi.fn());
   queue.pushAudio(new Float32Array(1600),16000);
-  await expect(queue.finish()).rejects.toThrow(failure.message);
+  await expect(queue.finish()).resolves.toEqual({undelivered:'Synthetic phrase'});
+  expect(onFailure).toHaveBeenCalledWith(expect.objectContaining({message:failure.message}),'delivery');
+  expect(quality().find(e=>e.event==='delivery_failed')).toMatchObject({delivery_seq:1,outcome:'rejected'});
  });
  it('continues recognition and Stop tail after delivery fails without retrying insertion',async()=>{
   worker.mockImplementation(async(_c,{request:r})=>({...r,mode:'append-only',text:r.op==='start'?null:r.op==='finish'?'First and later words.':r.sample_end<=1600?'First':'First and later words'}));
@@ -40,13 +44,79 @@ describe('pinned append-only candidate',()=>{
   queue.pushAudio(new Float32Array(1600),16000);
   await vi.waitFor(()=>expect(failure).toHaveBeenCalledOnce());
   queue.pushAudio(new Float32Array(1701),16000);queue.enqueue();
-  await expect(queue.finish()).rejects.toThrow('Destination changed');
+  await expect(queue.finish()).resolves.toEqual({undelivered:'First and later words.'});
   expect(observed).toHaveBeenLastCalledWith('First and later words.');
+  expect(failure.mock.calls[0]?.[0]).toMatchObject({message:'Destination changed'});
+  expect(quality().find(e=>e.event==='delivery_failed')).toMatchObject({outcome:'uncertain'});
   expect(paste).toHaveBeenCalledOnce();
   expect(requests().filter(r=>r.op==='push').reduce((n,r)=>n+r.audio.length,0)).toBe(3301);
   expect(requests().filter(r=>r.op==='finish')).toHaveLength(1);
   expect(failure).toHaveBeenCalledOnce();
   expect(quality().filter(e=>e.event==='terminal').pop()).toMatchObject({outcome:'failed',finish_responded:true,responded_samples:3301,failed_delivery_seq:1});
+ });
+ it('defers a no-mutation paste and delivers the whole pending suffix once',async()=>{
+  worker.mockImplementation(async(_c,{request:r})=>({...r,mode:'append-only',text:r.op==='start'?null:r.op==='finish'?'Hello world.':r.sample_end<=1600?'Hello':'Hello world'}));
+  const typed:string[]=[];
+  const paste=vi.fn(async(text:string)=>{if(paste.mock.calls.length===1)throw noMutation;typed.push(text);});
+  const failure=vi.fn(),preview=vi.fn();
+  const queue=new BenchmarkPhraseQueue(paste,vi.fn(),failure,preview);
+  queue.pushAudio(new Float32Array(1600),16000);
+  await vi.waitFor(()=>expect(preview).toHaveBeenCalledWith('deferred'));
+  queue.pushAudio(new Float32Array(1600),16000);queue.enqueue();
+  await expect(queue.finish()).resolves.toEqual({undelivered:''});
+  expect(paste.mock.calls[0]?.[0]).toBe('Hello');
+  expect(typed[0]).toMatch(/^Hello/);
+  expect(typed.join('')).toBe('Hello world.');
+  expect(failure).not.toHaveBeenCalled();
+  expect(quality().filter(e=>e.event==='delivery_failed')).toEqual([expect.objectContaining({delivery_seq:1,outcome:'no-mutation'})]);
+  expect(quality().filter(e=>e.event==='terminal').pop()).toMatchObject({outcome:'finished',accepted_equals_dispatched:true,failed_delivery_seq:null});
+ });
+ it('retries deferred text at Stop and succeeds without replaying it',async()=>{
+  vi.useFakeTimers();
+  try{
+   worker.mockImplementation(async(_c,{request:r})=>({...r,mode:'append-only',text:r.op==='push'?'Hello':null}));
+   const paste=vi.fn(async(_text:string)=>{if(paste.mock.calls.length===1)throw noMutation;});
+   const queue=new BenchmarkPhraseQueue(paste,vi.fn(),vi.fn(),vi.fn());
+   queue.pushAudio(new Float32Array(1600),16000);queue.enqueue();
+   const result=queue.finish();
+   await vi.advanceTimersByTimeAsync(1000);
+   await expect(result).resolves.toEqual({undelivered:''});
+   expect(paste.mock.calls.map(c=>c[0])).toEqual(['Hello','Hello']);
+  }finally{vi.useRealTimers();}
+ });
+ it('gives up after three Stop retries and returns deferred text as undelivered',async()=>{
+  vi.useFakeTimers();
+  try{
+   worker.mockImplementation(async(_c,{request:r})=>({...r,mode:'append-only',text:r.op==='push'?'Hello':null}));
+   const paste=vi.fn(async()=>{throw noMutation;});
+   const failure=vi.fn(),preview=vi.fn();
+   const queue=new BenchmarkPhraseQueue(paste,vi.fn(),failure,preview);
+   queue.pushAudio(new Float32Array(1600),16000);queue.enqueue();
+   const result=queue.finish();
+   await vi.advanceTimersByTimeAsync(1000);
+   await expect(result).resolves.toEqual({undelivered:'Hello'});
+   expect(paste).toHaveBeenCalledTimes(4);
+   expect(failure).not.toHaveBeenCalled();
+   expect(preview.mock.calls.filter(c=>c[0]==='deferred')).toHaveLength(4);
+   expect(quality().filter(e=>e.event==='delivery_failed').map(e=>e.outcome)).toEqual(Array(4).fill('no-mutation'));
+   expect(quality().filter(e=>e.event==='terminal').pop()).toMatchObject({outcome:'finished',accepted_equals_dispatched:false,dispatched_count:0});
+  }finally{vi.useRealTimers();}
+ });
+ it('never replays an uncertain chunk and returns it for the Stop copy',async()=>{
+  vi.useFakeTimers();
+  try{
+   worker.mockImplementation(async(_c,{request:r})=>({...r,mode:'append-only',text:r.op==='start'?null:r.op==='finish'?'One two.':'One'}));
+   const paste=vi.fn(async()=>{throw {outcome:'uncertain',message:'Keyboard dispatch failed',clipboardChanged:true};});
+   const failure=vi.fn();
+   const queue=new BenchmarkPhraseQueue(paste,vi.fn(),failure,vi.fn());
+   queue.pushAudio(new Float32Array(1600),16000);queue.enqueue();
+   const result=queue.finish();
+   await vi.advanceTimersByTimeAsync(1000);
+   await expect(result).resolves.toEqual({undelivered:'One two.'});
+   expect(paste).toHaveBeenCalledOnce();
+   expect(failure).toHaveBeenCalledOnce();
+   expect(failure.mock.calls[0]?.[1]).toBe('delivery');
+  }finally{vi.useRealTimers();}
  });
  it('still bounds recognition failure after a delivery interruption',async()=>{
   worker.mockImplementation(async(_c,{request:r})=>({...r,mode:'append-only',text:r.op==='push'?'First':null}));
@@ -159,7 +229,8 @@ describe('privacy-preserving delivery attribution', () => {
  it('keeps uncertain delivery explicit and does not leak rejection content', async () => {
   worker.mockImplementation(async (_c,{request:r})=>({...r,mode:'append-only',text:r.op==='start'?null:'secret_SENTINEL'}));
   const queue=new BenchmarkPhraseQueue(async()=>{throw new Error('secret_SENTINEL /private/path window title');},vi.fn(),vi.fn(),vi.fn());
-  queue.pushAudio(new Float32Array(1600),16000);await expect(queue.finish()).rejects.toThrow('secret_SENTINEL');
+  queue.pushAudio(new Float32Array(1600),16000);await expect(queue.finish()).resolves.toEqual({undelivered:'secret_SENTINEL'});
+  expect(quality().find(e=>e.event==='delivery_failed')).toMatchObject({delivery_seq:1,outcome:'uncertain',destination_content_observation:'unavailable'});
   expect(quality()[quality().length-1]).toMatchObject({outcome:'failed',failed_delivery_seq:1,pending_delivery_count:0,dispatched_count:0,accepted_equals_dispatched:false,destination_content_observation:'unavailable'});
   expect(JSON.stringify(quality())).not.toContain('SENTINEL');
  });

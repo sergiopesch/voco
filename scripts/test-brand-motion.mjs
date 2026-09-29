@@ -214,7 +214,7 @@ try {
       await page.getByRole('button',{name:'Help',exact:true}).click();
       await capture('help');
       await page.getByText('My words are not appearing',{exact:true}).click();
-      await page.getByText('Keep an editable text field focused.',{exact:false}).waitFor();
+      await page.getByText('Keep the app you’re dictating into focused.',{exact:false}).waitFor();
       await page.getByRole('button',{name:'Updates',exact:true}).click();
       await capture('updates');
       results.push({engine:name,check:'shortcut cancel, focus restoration, capture and apply; Help disclosures and Updates',passed:true});

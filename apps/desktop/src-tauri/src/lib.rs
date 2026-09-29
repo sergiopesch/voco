@@ -16,9 +16,7 @@ mod crash_recovery;
 mod desktop_input_setup;
 #[cfg(target_os = "linux")]
 mod desktop_notifications;
-mod desktop_shortcut;
 mod digest_hex;
-mod focus_probe;
 #[cfg(target_os = "linux")]
 mod hotkey_state;
 mod hotkey_trace;
@@ -59,16 +57,6 @@ pub fn setup_desktop_input() -> Result<String, String> {
     Ok("Desktop input setup is only needed on Linux.".into())
 }
 
-/// Check the focused destination without recording, changing the clipboard or typing.
-pub fn check_desktop_cursor() -> Result<String, String> {
-    let status = insertion::desktop_paste_status();
-    if status.available {
-        Ok("Text cursor verified. VOCO can start here.".into())
-    } else {
-        Err(status.detail)
-    }
-}
-
 /// Request one toggle from the running application without launching a window.
 pub fn toggle_running_application() -> Result<(), String> {
     trigger_socket::toggle().map_err(|error| {
@@ -90,6 +78,9 @@ use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
 use std::sync::{LazyLock, Mutex};
 use std::time::Instant;
 use tauri::{Emitter, Manager};
+
+// Advanced on every main page load; the crash journal rejects older writers.
+static RENDERER_EPOCH: AtomicU64 = AtomicU64::new(1);
 
 // Debounce: ignore duplicate toggle events that arrive almost immediately.
 // This collapses duplicate keyboard backends and duplicate evdev devices
@@ -340,25 +331,15 @@ fn trace_frontend_hotkey_event(
 fn is_supported_dictation_trace_event(event: &str) -> bool {
     matches!(
         event,
-        "dictation_delivery_observation_timeout"
-            | "dictation_delivery_observation_changed"
-            | "dictation_delivery_observation_unavailable"
-            | "dictation_delivery_observation_invalid"
-            | "dictation_trigger_start_rejected"
+        "dictation_trigger_start_rejected"
             | "dictation_trigger_stop_rejected"
             | "dictation_trigger_start_admitted"
             | "dictation_trigger_stop_admitted"
             | "dictation_trigger_toggle_admitted"
-            | "dictation_desktop_shortcut_acquired"
-            | "dictation_desktop_shortcut_released"
-            | "dictation_desktop_shortcut_acquire_failed"
-            | "dictation_desktop_shortcut_release_failed"
-            | "dictation_desktop_target_probe_completed"
             | "dictation_desktop_paste_preflight_completed"
+            | "dictation_desktop_modifier_wait_completed"
             | "dictation_desktop_clipboard_write_completed"
             | "dictation_desktop_keyboard_dispatch_completed"
-            | "dictation_desktop_terminal_route_dispatched"
-            | "dictation_desktop_standard_route_dispatched"
             | "dictation_desktop_stream_started"
             | "dictation_desktop_phrase_queued"
             | "dictation_desktop_snapshot_requested"
@@ -381,18 +362,11 @@ fn is_supported_dictation_trace_event(event: &str) -> bool {
             | "dictation_desktop_stream_failed"
             | "dictation_desktop_paste_session_started"
             | "dictation_desktop_paste_unavailable"
-            | "dictation_desktop_cursor_events_pending"
-            | "dictation_desktop_cursor_no_active_window"
-            | "dictation_desktop_cursor_ambiguous_windows"
-            | "dictation_desktop_cursor_no_focused_control"
-            | "dictation_desktop_cursor_not_editable"
-            | "dictation_desktop_cursor_protected"
-            | "dictation_desktop_cursor_control_unavailable"
-            | "dictation_desktop_cursor_probe_failed"
-            | "dictation_desktop_cursor_unavailable"
             | "dictation_desktop_paste_requested"
             | "dictation_desktop_paste_dispatched"
             | "dictation_desktop_paste_failed"
+            | "dictation_desktop_paste_deferred"
+            | "dictation_desktop_remainder_copied"
             | "recording_state_requested"
             | "recording_get_user_media_started"
             | "recording_get_user_media_constraints_fallback"
@@ -1081,54 +1055,18 @@ fn open_external_url(url: String) -> Result<(), String> {
 }
 
 #[tauri::command(async)]
-fn begin_desktop_shortcut_session(session_id: String, shortcut_epoch: u64) -> Result<(), String> {
-    insertion::begin_shortcut_session(&session_id, shortcut_epoch)
-}
-
-#[tauri::command(async)]
-fn end_desktop_shortcut_session(session_id: String) -> Result<(), String> {
-    insertion::end_shortcut_session(&session_id)
-}
-
-#[tauri::command(async)]
-async fn await_stop_shortcut_reservation(
-    app: tauri::AppHandle,
-    session_id: u64,
-) -> Result<(), String> {
-    let hotkey = tray::current_hotkey(&app)
-        .map_err(|_| "Shortcut configuration is unavailable.".to_string())?;
-    if !prefers_evdev_hotkey(is_wayland_session(), &hotkey) {
-        return Ok(());
-    }
-    let panel_status = panel_setup::check(false)
-        .map_err(|_| "VOCO cannot verify the GNOME Stop shortcut.".to_string())?;
-    if !panel_setup::stop_reservation_required(&panel_status)? {
-        return Ok(());
-    }
-    tauri::async_runtime::spawn_blocking(move || {
-        let started = Instant::now();
-        while started.elapsed() < std::time::Duration::from_millis(1800) {
-            if panel::reserves_stop_shortcut(&app, session_id) {
-                return Ok(());
-            }
-            std::thread::sleep(std::time::Duration::from_millis(25));
-        }
-        Err("GNOME did not reserve VOCO's Stop shortcut. Reopen VOCO or sign out and back in before dictating.".to_string())
-    })
-    .await
-    .map_err(|_| "VOCO could not verify the Stop shortcut.".to_string())?
-}
-
-#[tauri::command(async)]
 fn get_desktop_input_status(app: tauri::AppHandle) -> insertion::DesktopInputStatus {
-    effective_desktop_input_status(&app)
+    with_panel_recommendation(&app, insertion::desktop_input_status())
 }
 
-fn effective_desktop_input_status(app: &tauri::AppHandle) -> insertion::DesktopInputStatus {
-    let mut input = insertion::desktop_input_status();
+/// The GNOME companion keeps the shortcut out of the focused app. It is a
+/// recommendation only: dictation works without it.
+fn with_panel_recommendation(
+    app: &tauri::AppHandle,
+    mut input: insertion::DesktopInputStatus,
+) -> insertion::DesktopInputStatus {
     if input.available {
         if let Some(detail) = stop_shortcut_setup_issue(app) {
-            input.available = false;
             input.detail = detail;
             input.setup_area = Some("panel");
         }
@@ -1147,29 +1085,8 @@ fn enable_gnome_panel() -> Result<panel_setup::PanelSetupStatus, String> {
 }
 
 #[tauri::command(async)]
-fn get_desktop_paste_status(app: tauri::AppHandle) -> insertion::DesktopPasteStatus {
-    effective_desktop_paste_status(&app)
-}
-
-fn effective_desktop_paste_status(app: &tauri::AppHandle) -> insertion::DesktopPasteStatus {
-    effective_desktop_paste_diagnostics(app).1
-}
-
-fn effective_desktop_paste_diagnostics(
-    app: &tauri::AppHandle,
-) -> (insertion::DesktopInputStatus, insertion::DesktopPasteStatus) {
-    let (mut input, mut paste) = insertion::desktop_paste_diagnostics();
-    if let Some(detail) = stop_shortcut_setup_issue(app) {
-        input.available = false;
-        input.detail = detail.clone();
-        input.setup_area = Some("panel");
-        paste.available = false;
-        paste.streaming_enabled = false;
-        paste.target_token = None;
-        paste.failure_reason = Some(insertion::DesktopPasteFailure::Setup);
-        paste.detail = detail;
-    }
-    (input, paste)
+fn get_desktop_paste_status() -> insertion::DesktopPasteStatus {
+    insertion::desktop_paste_diagnostics().1
 }
 
 fn stop_shortcut_setup_issue(app: &tauri::AppHandle) -> Option<String> {
@@ -1194,17 +1111,12 @@ fn stop_shortcut_setup_issue(app: &tauri::AppHandle) -> Option<String> {
 #[tauri::command(async)]
 async fn paste_desktop_text(
     text: String,
-    expected_target_token: Option<String>,
     correlation: Option<insertion::PasteCorrelation>,
 ) -> Result<insertion::InsertionResult, insertion::InsertionError> {
-    // Recipient observation can wait on another app. Keep the UI/capture IPC
-    // event loop responsive while the blocking native transaction settles.
+    // Helpers and the modifier wait block. Keep the UI/capture IPC event loop
+    // responsive while the native transaction settles.
     tauri::async_runtime::spawn_blocking(move || {
-        insertion::correlated_desktop_paste(
-            &text,
-            expected_target_token.as_deref(),
-            correlation.as_ref(),
-        )
+        insertion::correlated_desktop_paste(&text, correlation.as_ref())
     })
     .await
     .map_err(|_| insertion::InsertionError {
@@ -1212,6 +1124,18 @@ async fn paste_desktop_text(
         message: "Input task interrupted; review retained text before retrying.".into(),
         clipboard_changed: true,
     })?
+}
+
+/// Leave undelivered dictation on the clipboard without sending any keys.
+#[tauri::command(async)]
+async fn copy_desktop_text(text: String) -> Result<(), insertion::InsertionError> {
+    tauri::async_runtime::spawn_blocking(move || insertion::copy_desktop_text(&text))
+        .await
+        .map_err(|_| insertion::InsertionError {
+            outcome: insertion::DeliveryOutcome::Uncertain,
+            message: "Copy task interrupted; check the clipboard before pasting.".into(),
+            clipboard_changed: true,
+        })?
 }
 
 #[derive(Debug, Serialize)]
@@ -1260,17 +1184,24 @@ fn get_runtime_diagnostics(
     state: tauri::State<'_, owned_preedit::OwnedPreeditService>,
 ) -> RuntimeDiagnostics {
     let owned_preedit = state.status();
-    let (desktop_input, desktop_paste) = effective_desktop_paste_diagnostics(&app);
+    let (desktop_input, desktop_paste) = insertion::desktop_paste_diagnostics();
+    #[cfg(target_os = "linux")]
+    let panel_reserved = panel::reserves_current_shortcut(&app);
+    #[cfg(not(target_os = "linux"))]
+    let panel_reserved = false;
     RuntimeDiagnostics {
         insertion: insertion::runtime_diagnostics(),
-        shortcut: shortcut_runtime_status(owned_preedit.available),
+        shortcut: shortcut_runtime_status(owned_preedit.available, panel_reserved),
         owned_preedit,
         desktop_paste,
-        desktop_input,
+        desktop_input: with_panel_recommendation(&app, desktop_input),
     }
 }
 
-fn shortcut_runtime_status(bridge_available: bool) -> shortcut_readiness::Status {
+fn shortcut_runtime_status(
+    bridge_available: bool,
+    panel_reserved: bool,
+) -> shortcut_readiness::Status {
     let unknown = || shortcut_readiness::Status {
         hotkey: String::new(),
         route: None,
@@ -1292,7 +1223,7 @@ fn shortcut_runtime_status(bridge_available: bool) -> shortcut_readiness::Status
         return unknown();
     };
     let now = shortcut_monotonic_ms();
-    let mut status = SHORTCUT_OBSERVATIONS.status(shortcut_readiness::Snapshot {
+    SHORTCUT_OBSERVATIONS.status(shortcut_readiness::Snapshot {
         hotkey: &config.hotkey,
         revision: CONFIG_REVISION.load(Ordering::SeqCst),
         now,
@@ -1307,13 +1238,8 @@ fn shortcut_runtime_status(bridge_available: bool) -> shortcut_readiness::Status
         evdev_mode: EVDEV_HOTKEY_MODE.load(Ordering::SeqCst),
         configured_evdev_mode: hotkey_to_evdev_mode(&config.hotkey),
         bridge_available,
-    });
-    if status.route == Some("global-shortcut") && desktop_shortcut::degraded() {
-        status.state = "unavailable";
-        status.detail =
-            "Shortcut restoration could not be confirmed. Restart VOCO before using it.";
-    }
-    status
+        panel_reserved,
+    })
 }
 
 #[tauri::command(async)]
@@ -1817,7 +1743,7 @@ pub fn eval_toggle(app_handle: &tauri::AppHandle) {
 // reason to discard that callback or to change its normal debounce behavior.
 fn suppress_passive_shortcut(app_handle: &tauri::AppHandle, backend: &str) -> bool {
     #[cfg(target_os = "linux")]
-    if backend == "evdev" && panel::reserves_current_stop_shortcut(app_handle) {
+    if backend == "evdev" && panel::reserves_current_shortcut(app_handle) {
         trace_hotkey_event("eval_toggle_suppressed_panel", Some(backend));
         return true;
     }
@@ -1949,9 +1875,8 @@ fn register_global_shortcut_listener(app: &tauri::AppHandle, hotkey: &str) -> Re
     let label = hotkey.to_string();
     let binding_version = HOTKEY_BINDING_VERSION.fetch_add(1, Ordering::SeqCst) + 1;
     let gesture = shortcut_arbitration::PluginGesture::new();
-    // A root X11 passive grab temporarily removes GTK focus while the chord is
-    // held. Observe its completion before querying the destination; no delay or
-    // retry may substitute for the unchanged focus and delivery checks.
+    // A root X11 passive grab sends keyboard input to VOCO while the chord is
+    // held. Toggle on release so the following paste keys reach the focused app.
     let complete_on_release = cfg!(target_os = "linux") && !is_wayland_session();
 
     app.global_shortcut()
@@ -1973,7 +1898,6 @@ fn register_global_shortcut_listener(app: &tauri::AppHandle, hotkey: &str) -> Re
             eval_toggle_with_backend(&handle, "global_shortcut");
         })
         .map_err(|e| format!("Failed to register global shortcut {hotkey}: {e}"))?;
-    desktop_shortcut::registered(Some(shortcut.id()));
     Ok(())
 }
 
@@ -1997,7 +1921,6 @@ fn sync_global_shortcut_binding(
             }
             *current = None;
             HOTKEY_BINDING_VERSION.fetch_add(1, Ordering::SeqCst);
-            desktop_shortcut::registered(None);
             info!("Unregistered previous global shortcut {existing}");
         }
     }
@@ -2460,9 +2383,25 @@ fn spawn_evdev_device_watcher(
     });
 }
 
+// Shared with desktop paste, which waits for physical modifiers to be released.
+#[cfg(target_os = "linux")]
+static EVDEV_KEYS: LazyLock<std::sync::Arc<Mutex<hotkey_state::HotkeyState>>> =
+    LazyLock::new(Default::default);
+
+/// Whether a physical keyboard modifier is held; None without a complete view.
+#[cfg(target_os = "linux")]
+pub(crate) fn evdev_modifiers_held() -> Option<bool> {
+    EVDEV_KEYS.lock().ok()?.modifiers_held()
+}
+
+#[cfg(not(target_os = "linux"))]
+pub(crate) fn evdev_modifiers_held() -> Option<bool> {
+    None
+}
+
 #[cfg(target_os = "linux")]
 fn start_hotkey_listener(app_handle: tauri::AppHandle) -> bool {
-    let key_state = std::sync::Arc::new(Mutex::new(hotkey_state::HotkeyState::default()));
+    let key_state = std::sync::Arc::clone(&EVDEV_KEYS);
 
     let initial_discovered = spawn_supported_evdev_device_workers(&app_handle, &key_state);
     if initial_discovered == 0 {
@@ -2525,7 +2464,10 @@ pub fn run() -> Result<(), String> {
     #[cfg(target_os = "linux")]
     install_socket_cleanup_signal_handler();
     performance::initialize();
-    crash_recovery::initialize(&xdg_state_home())?;
+    // Recovery is optional: an unusable journal must not block dictation.
+    if let Err(error) = crash_recovery::initialize(&xdg_state_home()) {
+        warn!("Crash recovery is unavailable: {error}");
+    }
     native_capture_commands::initialize();
 
     tauri::Builder::default()
@@ -2535,18 +2477,11 @@ pub fn run() -> Result<(), String> {
         .on_page_load(|webview, payload| {
             if matches!(payload.event(), tauri::webview::PageLoadEvent::Started) {
                 if webview.label() == "main" {
-                    let shortcut_epoch = desktop_shortcut::invalidate_renderer();
-                    if let Err(error) = crash_recovery::renderer_restarted(shortcut_epoch) {
+                    // Journal writes from the previous renderer become stale.
+                    let epoch = RENDERER_EPOCH.fetch_add(1, Ordering::SeqCst) + 1;
+                    if let Err(error) = crash_recovery::renderer_restarted(epoch) {
                         log::warn!("Renderer crash recovery could not be prepared: {error}");
                     }
-                    // Revoke authorization immediately; wait for bounded pending
-                    // delivery/X11 cleanup off the UI thread. A late job cannot
-                    // release a replacement renderer's newer ownership.
-                    tauri::async_runtime::spawn_blocking(move || {
-                        if insertion::reset_shortcut_renderer(shortcut_epoch).is_err() {
-                            log::warn!("Renderer reset could not confirm shortcut cleanup");
-                        }
-                    });
                     native_capture_commands::reset_renderer();
                 }
                 // A renderer reload discards its session ids. Close the
@@ -2588,10 +2523,8 @@ pub fn run() -> Result<(), String> {
             get_panel_setup_status,
             enable_gnome_panel,
             activation::take_launcher_activation,
-            begin_desktop_shortcut_session,
-            end_desktop_shortcut_session,
-            await_stop_shortcut_reservation,
             paste_desktop_text,
+            copy_desktop_text,
             get_runtime_diagnostics,
             get_owned_preedit_status,
             start_owned_preedit,

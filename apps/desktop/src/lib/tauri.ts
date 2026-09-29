@@ -4,6 +4,7 @@ import type {
   ConfigSnapshot,
   DebugDictationCaptureResult,
   DesktopInputStatus,
+  DesktopPasteStatus,
   OwnedPreeditStatus,
   RuntimeDiagnostics,
   RuntimeStatusSnapshot
@@ -79,24 +80,39 @@ export function takeLauncherActivation(): Promise<boolean> {
   return invoke("take_launcher_activation");
 }
 
-export async function getDesktopPasteStatus(): Promise<{ enabled: boolean; available: boolean; detail: string; shortcutEpoch: number; streamingEnabled?: boolean; targetToken?: string | null; failureReason?: "setup" | "cursor" | null }> {
+export async function getDesktopPasteStatus(): Promise<DesktopPasteStatus> {
   return invoke("get_desktop_paste_status");
 }
 
-export async function beginDesktopShortcutSession(sessionId: string, shortcutEpoch: number): Promise<void> {
-  return invoke("begin_desktop_shortcut_session", { sessionId, shortcutEpoch });
+/** Rejection value of paste_desktop_text and copy_desktop_text. "no-mutation"
+ * typed nothing and is safe to retry; the other outcomes must not be replayed. */
+export interface InsertionError {
+  outcome: "no-mutation" | "uncertain" | "rejected";
+  message: string;
+  clipboardChanged: boolean;
 }
 
-export async function endDesktopShortcutSession(sessionId: string): Promise<void> {
-  return invoke("end_desktop_shortcut_session", { sessionId });
+export interface DesktopPasteMetrics {
+  preflightMs: number;
+  settleMs: number;
+  modifierWaitMs: number;
+  clipboardMs: number;
+  keyboardMs: number;
+  leadingSeparator: boolean;
+  routedUtf8Bytes: number;
+  payloadUtf8Bytes: number;
+  payloadUnicodeScalars: number;
+  payloadUtf16Units: number;
 }
 
-export async function awaitStopShortcutReservation(sessionId: number): Promise<void> {
-  return invoke("await_stop_shortcut_reservation", { sessionId });
+/** Pastes into whatever has focus now; rejects with an InsertionError. */
+export async function pasteDesktopText(text: string, correlation: PasteCorrelation): Promise<{ strategy: "clipboard"; outcome: "dispatched"; pasteMetrics: DesktopPasteMetrics }> {
+  return invoke("paste_desktop_text", { text, correlation });
 }
 
-export async function pasteDesktopText(text: string, expectedTargetToken?: string | null, correlation?: PasteCorrelation): Promise<{ strategy: "clipboard"; outcome: "dispatched"; pasteMetrics?: { terminal: boolean; targetProbeMs: number; preflightMs: number; clipboardMs: number; keyboardMs: number } }> {
-  return invoke("paste_desktop_text", { text, expectedTargetToken: expectedTargetToken ?? null, correlation: correlation ?? null });
+/** Sets CLIPBOARD and PRIMARY without sending keys; rejects with an InsertionError. */
+export async function copyDesktopText(text: string): Promise<void> {
+  await invoke("copy_desktop_text", { text });
 }
 
 export async function getOwnedPreeditStatus(): Promise<OwnedPreeditStatus> {

@@ -50,7 +50,10 @@ it.each([
   h.api.checkpointOwnedPreedit.mockResolvedValue(h.status(patch));
   await expect(h.delivery.append("Words.")).rejects.toThrow("exact text");
   await expect(h.delivery.append("Later")).rejects.toThrow("no longer active");
+  // Stop reports the delivery failure itself, not only the released lease.
+  await expect(h.delivery.finish()).rejects.toThrow("exact text");
   expect(h.api.checkpointOwnedPreedit).toHaveBeenCalledOnce();
+  expect(h.api.finishCanonicalOwnedPreedit).not.toHaveBeenCalled();
   expect(h.api.cancelOwnedPreedit).toHaveBeenCalledExactlyOnceWith(17);
 });
 

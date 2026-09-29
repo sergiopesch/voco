@@ -1,3 +1,9 @@
+> **Superseded delivery rows (2026.0.60).** This matrix predates native desktop
+> paste. Desktop dictation now pastes each chunk into whatever has keyboard focus
+> with Shift+Insert; see [desktop paste](desktop-paste.md) for the contract and its
+> X11 application and Chromium suites. The manual-Copy rows are the original
+> acceptance plan; the Chromium exact-field rows still describe the explicit adapter.
+
 # Linux end-to-end qualification matrix
 
 Current behavior: native recordings complete through **manual Copy**. Automatic IBus

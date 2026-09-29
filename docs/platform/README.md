@@ -16,7 +16,7 @@ macOS and Windows are outside the current scope.
 - Tauri runtime dependencies: libwebkit2gtk-4.1, libgtk-3, libayatana-appindicator3
 - Node.js 24 LTS (`.nvmrc`) or newer and Rust (for building from source)
 - PulseAudio or PipeWire for microphone access
-- Complete NVIDIA package for local CPU streaming; ordinary desktop output uses clipboard paste with best-effort focus guards
+- Complete NVIDIA package for local CPU streaming; ordinary desktop output pastes into whatever has keyboard focus with Shift+Insert
 - Optional exact-field Chromium extension/native host provides a separate supported-field contract
 - xdotool + xclip (X11); ydotool plus xclip on the GNOME XWayland bridge or wl-copy elsewhere (Wayland) for native desktop delivery
 - No root privileges needed for normal operation
@@ -24,7 +24,7 @@ macOS and Windows are outside the current scope.
 ## Session Detection
 
 The app detects session type via `XDG_SESSION_TYPE`. Native delivery uses the selected
-desktop helpers and retains recovery on failure. Session type alone establishes no
+desktop helpers and copies undelivered text to the clipboard at Stop. Session type alone establishes no
 target identity or delivery proof. Browser output has an independent exact-element
 contract. Helper selection includes:
 
@@ -35,7 +35,8 @@ contract. Helper selection includes:
 Hotkey backend selection:
 
 - Selected, eligible IBus context -> consuming shortcut backend with expiring registration
-- Wayland + `Alt+D` / `Alt+Shift+D` -> passive evdev fallback, suppressed while IBus is armed
+- GNOME Wayland with the VOCO panel -> the Shell consumes `Alt+D` / `Alt+Shift+D` and forwards it to VOCO
+- Wayland + `Alt+D` / `Alt+Shift+D` -> passive evdev fallback, suppressed while IBus is armed or the panel holds the shortcut; the focused app also receives the chord
 - Other combinations -> Tauri global-shortcut fallback
 - Runtime hotkey changes update backend preference immediately
 - Settings → Help → Technical details shows the detected session and whether insertion helpers are currently available. Presence is a prerequisite, not proof of delivery to a target.
@@ -58,7 +59,7 @@ merely to copy a transcript. Physical microphone and compositor coverage remain 
 
 - ydotool works via uinput (kernel-level, compositor-independent)
 - Device/daemon access depends on host setup; evdev access commonly uses the `input` group. Membership grants broad keyboard-device access and is not required just for explicit Copy
-- Explicit clipboard insertion uses wl-copy + ydotool Ctrl+V simulation. It replaces the clipboard with the transcript and leaves it there; helper APIs cannot safely restore clipboard ownership or all MIME formats.
+- Desktop paste copies each chunk to the clipboard and primary selection with wl-copy (xclip through XWayland on GNOME), then sends Shift+Insert with ydotool. It replaces both selections and leaves the text there; helper APIs cannot safely restore clipboard ownership or all MIME formats.
 - Behaviour may vary by compositor (GNOME, KDE, Sway)
 
 ### ydotoold (ydotool daemon)
@@ -134,7 +135,7 @@ output for explicit review and never retries the whole transcript automatically.
 
 - xdotool works via X11 protocol (compositor-independent)
 - No special group membership needed
-- Explicit clipboard insertion uses xclip + xdotool Ctrl+V simulation, with the same no-restoration policy as Wayland.
+- Desktop paste copies each chunk to the clipboard and primary selection with xclip, then sends Shift+Insert with xdotool, with the same no-restoration policy as Wayland.
 
 ## Known Limitations
 
@@ -173,18 +174,18 @@ Flatpak and Snap are not published.
 
 ## Helper delivery outcomes
 
-Automatic desktop delivery requires a bound destination token. `paste_desktop_text` returns
-`outcome: dispatched` only after its helper exits successfully; that confirms command completion,
-not consumption by the intended application. Errors distinguish `no-mutation` (a helper did not
-start), `rejected` (a prerequisite or destination check failed), and `uncertain` (a helper started
-and delivery may have happened). A changed destination after clipboard preparation rejects before
-sending paste keys and reports `clipboardChanged`; a paste-helper failure after the clipboard write
-is uncertain. Neither outcome authorizes an automatic retry to another field.
+`paste_desktop_text` pastes into whatever has keyboard focus. It returns `outcome: dispatched`
+only after its helper exits successfully; that confirms command completion, not consumption by the
+focused application. Errors distinguish `no-mutation` (no key was sent: a helper was unavailable or
+the Wayland modifier wait timed out), `rejected` (a prerequisite failed) and `uncertain` (a helper
+started and delivery may have happened). `clipboardChanged` reports a replaced clipboard. Only
+`no-mutation` text is retried, with the next chunk or at Stop. After `rejected` or `uncertain`,
+automatic delivery stops and Stop copies the remainder to the clipboard without sending keys.
 
 Clipboard write and paste helpers each have a five-second deadline. Stdin writes are nonblocking
 under the same deadline; failed supervision kills and reaps the helper process group. No transcript
-is written to diagnostic output. The transcript stays recoverable in VOCO when the application
-cannot prove delivery.
+is written to diagnostic output. Text that was not typed is copied to the clipboard at Stop; it is
+never replayed as keys.
 
 Clipboard restoration is deliberately unavailable with the current command-line helpers. A fixed
 sleep does not prove the target consumed the clipboard, and reading it before restoring cannot

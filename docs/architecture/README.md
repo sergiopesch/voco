@@ -14,13 +14,13 @@ Browser delivery uses a separately authorized field lease. Each append requires 
 exact prefix receipt and Stop finalizes the acknowledged text without replaying it.
 Crash-only Review exposes the last text checkpoint from an unexpected process or
 renderer exit, with explicit Copy and Discard. Normal Stop and handled failures
-clear text/audio and remove the active checkpoint. No recognition result bypasses
-destination validation; Review has no delivery or retranscription action.
+clear text/audio and remove the active checkpoint. A checkpoint failure never
+blocks dictation. Review has no delivery or retranscription action.
 
 Shortcut arbitration separates completed IBus authority from a poll in flight.
 Registration, config synchronization and readiness use only unexpired Armed/Uncertain
 authority. Passive evdev also suppresses during a pending poll because it may observe
-a chord consumed by IBus. X11 root/scoped grabs use `owner_events=false`: their
+a chord consumed by IBus. X11 root grabs use `owner_events=false`: their
 callback already consumed the chord and proceeds through the existing shared
 debounce. A pending poll must neither discard that callback nor revoke an existing
 registration. The one-second IBus bound and plugin-generation checks are unchanged.
@@ -41,15 +41,15 @@ registration. The one-second IBus bound and plugin-generation checks are unchang
    `streaming.py` handles warmup, silence gating, sample accounting and metrics;
    `adapters.py` bridges the packaged CPU native library. The default is the Q8
    English 0.6B model, context 1, four CPU threads and the pool backend.
-5. The frontend appends accepted live words through `insertion.rs`. `focus_probe.rs`
-   checks the current destination and terminal category. Clipboard and key helpers
-   perform paste. Eligible accessible controls provide bounded sampled local-region
-   confirmation; unsupported controls have dispatch evidence only. Neither is
-   compositor paint or atomic ownership. See [observation](../testing/delivery-observation.md).
+5. The frontend appends accepted live words through `insertion.rs`, which pastes
+   each chunk into whatever has keyboard focus. VOCO records that the keys were
+   dispatched; it does not observe what the application did with them.
 6. Stop drains capture into the live stream before finishing and flushing the
-   remaining suffix. Focus loss, revised already-delivered text or uncertain delivery
-   stops insertion without replay. Healthy recognition continues through Stop, then
-   the handled session is cleared and the user is notified to check their field.
+   remaining suffix. A paste that typed nothing (`no-mutation`) is retried with
+   the next chunk or at Stop. Revised already-delivered text, or an uncertain or
+   rejected paste, stops insertion without replay. Healthy recognition continues
+   through Stop, which copies any undelivered remainder to the clipboard and
+   notifies the user.
 
 The candidate batches released silence-preroll frames into at most one second per
 native call, preserving every released sample and its order. This reduces call
@@ -60,17 +60,14 @@ The zero gate detects digital silence, not speech onset or arbitrary background 
 
 Desktop paste/streaming are enabled unless their launcher overrides are `0`.
 The application fixes cursor output, stable streaming and enhancement off.
-Desktop paste replaces clipboard text and leaves it there; a leading join space can
-be typed separately to preserve address-bar separators. Known terminals use their
-paste chord. VOCO does not submit Enter or rewrite arbitrary editor text after Stop.
-Focus metadata is a best-effort guard, not exact per-widget ownership or protection
-from every sensitive field. See [delivery policy](../testing/desktop-paste.md).
-
-Only a new dictation's first delivery can replace a selection. Later chunks reject
-selected text; prepared position and bounded surrounding context are sampled again
-after clipboard preparation, immediately before keys. These checks prevent a Stop
-shortcut's select-all from replacing earlier text. They cannot make a native key
-gesture atomic with another application's focus or selection changes.
+Desktop paste copies each chunk to CLIPBOARD, then PRIMARY (best effort), and
+sends Shift+Insert to every application: GUI toolkits paste CLIPBOARD and
+terminals paste PRIMARY. A leading joining space is its own Space key because
+Chromium's address bar trims pasted leading whitespace. ASCII control characters
+become spaces, so VOCO never submits Enter, and it does not rewrite text after
+Stop. The paste replaces any selection, as a manual paste would. VOCO does not
+inspect the focused control, so it cannot tell a sensitive field from any other.
+See [delivery policy](../testing/desktop-paste.md).
 
 The explicitly enabled Chromium adapter is a separate, stronger exact-element
 contract: element/document identity, caret and acknowledged prefix are checked
@@ -85,54 +82,31 @@ capabilities remain retired; see [security boundaries](../security/README.md).
 
 ## State, UI and lifecycle
 
-For eligible desktop streams, `desktopShortcutSession.ts` owns a UUID from before
-capture until final queue drain. Native `desktop_shortcut.rs` uses the existing
-global-hotkey actor to move the configured X11 passive grab from root to the exact
-input-focus window. The root ancestor grab caused the observed GTK/AT-SPI focus
-loss during Stop; an exact-window grab avoids that mechanism in the isolated
-proof. Full candidate/toolkit qualification is separate. No focus event is ignored
-and no target token is exempted from verification. Only an initially unavailable
-target is probed once more after acquisition; valid initial tokens never refresh.
+On X11 the configured shortcut is an exclusive global grab, so the focused
+application does not receive it. Passive Wayland evdev observes the chord
+without consuming it.
 
-The actor restores root scope on finish, real focus departure, window loss,
-registration change or fixed 650-second expiry (600 seconds of capture plus
-50 seconds for finalization). This does not extend delivery deadlines. Automatic
-restoration ends session authority; degraded restoration blocks further delivery
-and cannot be advertised as shortcut-ready. Begin/end serialize with recipient
-observation. The frontend cleans uncertain begin replies and prevents stale
-completion from releasing a newer UUID. Unsupported routes retain their existing
-delivery checks.
+On GNOME Wayland the panel companion is recommended, not required. Without it,
+the focused application also receives Alt+D: browsers focus the address bar and
+terminals delete a word. Companion v11 grabs the configured Alt+D or Alt+Shift+D
+at every status, idle included, and each press sends `Action('shortcut', '')`.
+`ReserveShortcut` keeps a 2.5-second lease for the exact accelerator in the
+`shortcutAccelerator` snapshot field. Only the authenticated Shell can renew it,
+about once a second. While the lease is fresh, VOCO ignores the passive evdev
+duplicate and the action toggles through the `gnome_panel` backend; otherwise
+the action is refused and evdev toggles. Rejection, disconnect and disable
+release the grab. The v10 `ReserveStopShortcut` is kept only for compatibility.
+Users re-run panel setup, then sign out and back in to load v11. This is
+GNOME-specific, not a general Wayland grab.
 
-On GNOME Wayland, the panel companion reserves the configured Alt+D or
-Alt+Shift+D while the authoritative app state is starting, recording or processing.
-The compositor consumes the chord before a browser can select its address bar.
-The companion waits for modifier release and sends an explicit, token-checked Stop,
-never a delayed toggle. During processing it consumes repeated chords without an
-action. Only the authenticated Shell can renew a 250 ms native reservation that
-suppresses duplicate passive evdev observations. Existing active-state polling
-renews it; idle, disconnect and extension disable release the grab, and missing app
-state expires it after two seconds. A failed required reservation rejects Start
-before capture; it does not authorize an unguarded delivery or saved-text fallback.
-This is GNOME-specific, not a general Wayland grab.
+The main renderer's PageLoad Started event increments a native epoch, so crash
+journal writes from the previous renderer become stale.
 
-The main renderer's PageLoad Started event synchronously increments a native epoch
-before scheduling old-scope cleanup off the UI thread. Preflight captures that
-epoch before its blocking target probe; Begin checks the immutable epoch before
-and after acquisition, releasing any scope obtained across a reload. Background
-cleanup selects only older epochs, and delivery readiness rejects registered old
-ownership immediately. UUIDs still isolate recordings within a renderer. Generic
-paste IPC is not epoch-bound; this is shortcut-lifetime protection, not a universal
-guarantee that all previously queued renderer work is cancelled.
-
-This is a pinned patch to the existing `global-hotkey` 0.7.0 dependency, not a new
-hotkey engine. See [upstream provenance and patch boundaries](../../vendor/global-hotkey/VOCO-PATCH.md).
-The actor waits on the X11 fd and a nonblocking command signal with `libc::poll`;
-it has no periodic idle wakeup. Buffered X events are drained before waiting,
-commands are queued before signaling, and the sole scheduled deadline is the
-original lease expiry. Interrupted waits preserve that deadline; failed fds
-close the actor and degrade any active lease. This removes the former artificial
-50 ms polling ceiling, while root restoration remains asynchronous with respect
-to other X clients. The existing locked libc version is unchanged.
+VOCO pins a patched `global-hotkey` 0.8.0; see
+[upstream provenance and patch boundaries](../../vendor/global-hotkey/VOCO-PATCH.md).
+Its X11 actor waits on the X11 fd and a nonblocking command signal with
+`libc::poll`, with no periodic idle wakeup. The application no longer uses the
+patch's focus-lease API.
 
 `useDictation.ts` coordinates capture, delivery and recovery; `config.rs` serializes
 field-level settings updates and writes private atomic configuration. Single-instance
@@ -142,12 +116,8 @@ of only the socket inodes registered by this process.
 The backend tray reducer combines microphone, model and dictation states.
 Normal dictation stays out of the way without opening a transcript preview. The
 Crystal Sidebar and rounded glass controls retain OS accessibility preferences.
-A hotkey should be used with the intended destination focused. Automatic desktop
-insertion requires a nonempty destination token; unavailable focus metadata
-rejects startup after shortcut acquisition and independently rejects paste at the
-Rust boundary. GNOME X11's separate `mutter-x11-frames` accessibility application
-is excluded from active-client discovery. Other active-client ambiguity remains a
-rejection. A window-level token is still weaker than exact-control observation.
+Each chunk goes to whatever has keyboard focus when it is ready. Moving to
+another field during dictation sends the later chunks there.
 
 ## Diagnostics and package identity
 

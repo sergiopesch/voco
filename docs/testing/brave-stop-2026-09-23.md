@@ -1,3 +1,10 @@
+> **Retired commands.** 2026.0.60 replaced focus-verified delivery with
+> focus-following Shift+Insert paste; the `test:delivery-observation` and
+> `test:rich-editor-delivery` commands below, including the latter's
+> `VOCO_RICH_EDITOR_PLATFORM=wayland` mode, no longer exist. See
+> [desktop paste](desktop-paste.md) for the current contract and suites. This record
+> retains its original dates and scope.
+
 # Brave address-bar Stop correction — 23 September 2026
 
 Source candidate only. The installed and public release remains **2026.0.57**.

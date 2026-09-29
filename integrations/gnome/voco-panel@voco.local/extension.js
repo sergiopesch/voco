@@ -32,13 +32,13 @@ export default class VocoPanel extends Extension {
         this._timer = 0;
         this._shortcut = 0;
         this._accelerator = null;
-        this._shortcutDeadline = 0;
-        this._stopPending = null;
-        this._shortcutTimer = 0;
+        this._heartbeat = 0;
+        this._reserving = false;
         this._shortcutGeneration = 0;
+        // The consumed chord is the ordinary toggle; VOCO decides Start or Stop.
         this._shortcutSignal = global.display.connect('accelerator-activated', (_display, action) => {
-            if (action === this._shortcut && this._state?.canStop)
-                this._stopPending ??= this._state.stopSession;
+            if (this._shortcut && action === this._shortcut)
+                this._call('Action', new GLib.Variant('(ss)', ['shortcut', '']), () => {});
         });
         this._cancellable = new Gio.Cancellable();
         this._indicator = new PanelMenu.Button(0, 'VOCO');
@@ -105,7 +105,7 @@ export default class VocoPanel extends Extension {
             invocation.return_dbus_error('org.voco.NotAttached', 'Only the attached application can check input readiness');
             return;
         }
-        // Streaming pastes can overlap a held Stop, before the Stop action fires.
+        // A paste can be ready while the consumed shortcut is still held.
         // Observe compositor state; never synthesize releases of the user's keys.
         const modifiers = Clutter.ModifierType.SHIFT_MASK | Clutter.ModifierType.CONTROL_MASK |
             Clutter.ModifierType.MOD1_MASK | Clutter.ModifierType.SUPER_MASK |
@@ -203,57 +203,53 @@ export default class VocoPanel extends Extension {
     }
 
     _syncShortcut() {
-        const state = this._state;
-        const accelerator = state?.active && typeof state.stopShortcutToken === 'string' && state.stopShortcutToken.length > 0 && ['<Alt>d', '<Alt><Shift>d'].includes(state.stopAccelerator)
-            ? state.stopAccelerator : null;
-        if (accelerator !== this._accelerator) {
-            this._releaseShortcut();
-            if (!accelerator) return;
-            const action = global.display.grab_accelerator(accelerator, Meta.KeyBindingFlags.IGNORE_AUTOREPEAT);
-            if (action === Meta.KeyBindingAction.NONE) return;
-            this._shortcut = action;
-            this._accelerator = accelerator;
-            Main.wm.allowKeybinding(Meta.external_binding_name_for_action(action), Shell.ActionMode.NORMAL);
-            this._shortcutTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 16, () => {
-                if (GLib.get_monotonic_time() > this._shortcutDeadline) {
-                    this._releaseShortcut();
-                    return GLib.SOURCE_REMOVE;
-                }
-                // Wait for modifiers to be released before final text can paste.
-                // Only an explicit Stop is emitted, never a delayed toggle/start.
-                if (this._stopPending && !(global.get_pointer()[2] &
-                    (Clutter.ModifierType.MOD1_MASK | Clutter.ModifierType.SHIFT_MASK))) {
-                    const session = this._stopPending;
-                    this._stopPending = null;
-                    if (this._state?.canStop && this._state.stopSession === session)
-                        this._action('stop');
-                }
-                return GLib.SOURCE_CONTINUE;
-            });
-        }
-        if (!this._shortcut) return;
-        // A hung/disconnected app must not leave a key swallowed in the shell.
-        this._shortcutDeadline = GLib.get_monotonic_time() + 2_000_000;
-        // Only the latest renewal owns this grab; late replies must not revoke it.
-        const generation = ++this._shortcutGeneration;
-        const release = () => {
-            if (generation === this._shortcutGeneration) this._releaseShortcut();
-        };
-        this._call('ReserveStopShortcut', new GLib.Variant('(s)', [state.stopShortcutToken]), result => {
-            if (result.deep_unpack()[0] !== true) release();
-        }, release);
+        // Consume the chord whenever attached, idle included, so the focused app
+        // never also acts on it. X11 keeps VOCO's own exclusive global shortcut.
+        const accelerator = this._attached && Meta.is_wayland_compositor()
+            ? this._state?.shortcutAccelerator ?? null : null;
+        if (accelerator === this._accelerator) return;
+        this._releaseShortcut();
+        if (!accelerator) return;
+        const action = global.display.grab_accelerator(accelerator, Meta.KeyBindingFlags.IGNORE_AUTOREPEAT);
+        if (action === Meta.KeyBindingAction.NONE) return;
+        this._shortcut = action;
+        this._accelerator = accelerator;
+        // Ordinary and fullscreen windows and the overview; Shell modals filter it.
+        Main.wm.allowKeybinding(Meta.external_binding_name_for_action(action),
+            Shell.ActionMode.NORMAL | Shell.ActionMode.OVERVIEW);
+        this._reserveShortcut();
+        this._heartbeat = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1000, () => {
+            this._reserveShortcut();
+            return GLib.SOURCE_CONTINUE;
+        });
+    }
+
+    _reserveShortcut() {
+        // VOCO mutes its passive listener only while renewals arrive. One is in
+        // flight at a time, so a hung app times out and the grab is released.
+        if (this._reserving) return;
+        this._reserving = true;
+        const generation = this._shortcutGeneration;
+        this._call('ReserveShortcut', new GLib.Variant('(s)', [this._accelerator]), result => {
+            if (generation !== this._shortcutGeneration) return;
+            this._reserving = false;
+            if (result.deep_unpack()[0] !== true) this._releaseShortcut();
+        }, () => {
+            if (generation === this._shortcutGeneration) this._retry();
+        });
     }
 
     _releaseShortcut() {
+        // Late replies about an earlier grab must never act on a newer one.
         this._shortcutGeneration++;
-        if (this._shortcutTimer) { GLib.source_remove(this._shortcutTimer); this._shortcutTimer = 0; }
+        this._reserving = false;
+        if (this._heartbeat) { GLib.source_remove(this._heartbeat); this._heartbeat = 0; }
         if (this._shortcut) {
             Main.wm.allowKeybinding(Meta.external_binding_name_for_action(this._shortcut), Shell.ActionMode.NONE);
             global.display.ungrab_accelerator(this._shortcut);
         }
         this._shortcut = 0;
         this._accelerator = null;
-        this._stopPending = null;
     }
 
     _action(action) {

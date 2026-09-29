@@ -127,25 +127,24 @@ jobs:
       - name: Chromium exact-field adversarial regression
         run: npm run test:chromium-exact-field
 
-      - name: Onboarding speech test and missing-cursor regression
+      - name: Onboarding speech test and desktop setup regression
         timeout-minutes: 5
         run: npm run test:native-capture-renderer
         env:
           VOCO_RENDERER_SUITE: onboarding
           VOCO_RENDERER_EVIDENCE_DIR: ${{ runner.temp }}/voco-onboarding-renderer
 
-      - name: Rich editor clipboard confirmation regression
+      - name: Browser universal-paste regression
         timeout-minutes: 3
         env:
-          VOCO_RICH_EDITOR_EVIDENCE_DIR: ${{ runner.temp }}/voco-rich-editor
-        run: bash scripts/test-private-ibus-engine-hosted.sh --rich-editor
+          VOCO_DELIVERY_EVIDENCE_DIR: ${{ runner.temp }}/voco-browser-delivery
+        run: bash scripts/test-private-ibus-engine-hosted.sh --browser-delivery
 
-      - name: Native application clipboard matrix
+      - name: Application universal-paste matrix
         timeout-minutes: 3
         env:
-          VOCO_DELIVERY_SUITE: applications
-          VOCO_RICH_EDITOR_EVIDENCE_DIR: ${{ runner.temp }}/voco-application-delivery
-        run: bash scripts/test-private-ibus-engine-hosted.sh --rich-editor
+          VOCO_DELIVERY_EVIDENCE_DIR: ${{ runner.temp }}/voco-application-delivery
+        run: bash scripts/test-private-ibus-engine-hosted.sh --application-delivery
 
       - name: Private headless IBus lifecycle
         run: bash scripts/test-private-ibus-engine-hosted.sh
@@ -169,7 +168,7 @@ jobs:
         with:
           name: native-desktop-evidence
           path: |
-            ${{ runner.temp }}/voco-rich-editor/
+            ${{ runner.temp }}/voco-browser-delivery/
             ${{ runner.temp }}/voco-application-delivery/
             ${{ runner.temp }}/voco-native-desktop/
             ${{ runner.temp }}/voco-native-wayland/

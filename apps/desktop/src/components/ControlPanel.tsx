@@ -316,10 +316,10 @@ export function ControlPanel({
       return "Runtime checks unavailable.";
     }
     switch (runtimeDiagnostics.ownedPreedit.setupState) {
+      // The input source only provides a shortcut; a running engine is ready.
       case "ready":
-        return "Ready";
       case "safety-disabled":
-        return "Manual copy available";
+        return "Ready";
       case "not-enabled":
         return "Input source not enabled";
       case "not-installed":
@@ -728,7 +728,7 @@ export function ControlPanel({
               </div>
               {dictationBusy ?
                 <p>{dictationStatus === "starting" ? "Wait for Listening before speaking." : dictationStatus === "recording" ? `Press ${config.hotkey} to finish.` : "Finishing your dictation…"}</p> :
-                <p>{desktopSetupError ? "Open Help to finish desktop setup." : shortcut.available ? "Focus a text field, then use your shortcut." : "Check shortcut setup in Help."}</p>}
+                <p>{desktopSetupError ? "Open Help to finish desktop setup." : shortcut.available ? "Click where you want the text, then use your shortcut." : "Check shortcut setup in Help."}</p>}
             </div>
             {captureNotice ? <div className="voco-inline-note" role="status">{captureNotice}</div> : null}
             {(canCancelDictation || cancellationPending) ? (
@@ -761,7 +761,6 @@ export function ControlPanel({
             setupError={recovery && testPurpose !== "onboarding" ? "Recover or discard your previous dictation before starting the voice test." : nativeMicrophone?.error ?? errorMessage}
             onRetrySetup={nativeMicrophone?.error ? () => void nativeMicrophone.initialize().catch(() => {}) : undefined}
             desktopSetupError={desktopSetupError}
-            showPanelSetup={desktopInput?.setupArea === "panel"}
             onCheckDesktopSetup={() => void checkDesktopSetup()}
             onOpenDesktopSetupGuide={() => void onOpenReleasePage(DESKTOP_SETUP_GUIDE)}
             checkingDesktopSetup={checkingInput}
@@ -799,7 +798,8 @@ export function ControlPanel({
               <div className="voco-preferences__window-actions" onPointerDown={(event) => void handleHeaderPointerDown(event)} aria-label="Move VOCO window">{!config.onboardingCompleted ? <button className="voco-button voco-button--ghost voco-button--compact" disabled={saving || dictationBusy || hasUnsavedChanges} onClick={() => onSurfaceChange("onboarding")}>Back to setup</button> : null}<button className="voco-button voco-button--ghost voco-button--compact" onClick={requestHide}>Hide to tray</button></div>
               {mainSettings ? <div className="voco-preferences__heading"><h2 tabIndex={-1}>Settings</h2></div> : null}
               {mainSettings ? <>
-                  {desktopSetupError ? <div className="voco-inline-note" role="status">Desktop setup needs attention. <button className="voco-button voco-button--ghost" onClick={() => setActiveSection("Advanced")}>Open Help</button></div> : null}
+                  {desktopSetupError ? <div className="voco-inline-note" role="status">Desktop setup needs attention. <button className="voco-button voco-button--ghost" onClick={() => setActiveSection("Advanced")}>Open Help</button></div>
+                    : desktopInput?.setupArea === "panel" ? <div className="voco-inline-note" role="status">Recommended: enable the VOCO panel so {config.hotkey} isn’t also sent to the app you’re dictating into. Dictation works without it. <button className="voco-button voco-button--ghost" onClick={() => setActiveSection("Advanced")}>Open Help</button></div> : null}
               </> : null}
 
               {mainSettings ? (
@@ -852,7 +852,7 @@ export function ControlPanel({
                         <strong>Desktop shortcut</strong>
                         <p>You can assign <code>voco --toggle</code> to a non-repeating shortcut in your desktop settings.
                           Keep VOCO running and use that shortcut to start and stop dictation.
-                          Use an unused key such as F8. Configure the desktop binding to also work with Ctrl and Ctrl+Shift, which clipboard delivery briefly uses.</p>
+                          Use an unused key such as F8, and let the binding ignore modifiers: VOCO briefly holds Shift while pasting.</p>
                         <p>The shortcut above and its status describe VOCO’s built-in keyboard handling.
                           Your desktop controls external bindings; VOCO cannot verify which keys you assigned.</p>
                       </div> : null}</details>
@@ -894,21 +894,21 @@ export function ControlPanel({
                 <section className="voco-preferences__page">
                   <div className="voco-preferences__heading"><h2 tabIndex={-1}>Help</h2></div>
                   <PanelSetup disabled={saving || dictationBusy} />
-                  <details className="voco-preferences__card voco-preferences__disclosure"><summary>How to dictate</summary><p>Focus a text field and press <kbd>{config.hotkey}</kbd>. The tray bars respond when the microphone is ready. Press again to finish.</p><p>VOCO replaces clipboard text to paste your words and never presses Enter. Keep the same field focused.</p><p>In an enabled Chromium tab, use <kbd>Alt+Shift+V</kbd> for direct delivery to a plain text field.</p></details>
+                  <details className="voco-preferences__card voco-preferences__disclosure"><summary>How to dictate</summary><p>Click where you want your words and press <kbd>{config.hotkey}</kbd>. The tray bars respond when the microphone is ready. Press again to finish.</p><p>VOCO pastes into whichever app has keyboard focus, including terminals and browsers. It replaces clipboard text and never presses Enter.</p><p>In an enabled Chromium tab, use <kbd>Alt+Shift+V</kbd> for direct delivery to a plain text field.</p></details>
                   <details className="voco-preferences__card voco-preferences__disclosure"><summary>My microphone is not working</summary><p>Check the selected microphone and allow access for this session.</p><button className="voco-button voco-button--secondary" onClick={() => setActiveSection("Audio")}>Microphone settings</button></details>
                   <details className="voco-preferences__card voco-preferences__disclosure"><summary>My shortcut is not working</summary><p>{shortcut.detail}</p>{shortcut.setup ? <p>{shortcut.setup}</p> : null}<button className="voco-button voco-button--secondary" onClick={() => setActiveSection("Hotkeys")}>Shortcut settings</button></details>
-                  <details className="voco-preferences__card voco-preferences__disclosure"><summary>My words are not appearing</summary><p>Keep an editable text field focused. If delivery stops, check your field for missing words. Review is available from the tray after an unexpected app exit.</p>{desktopSetupError ? <p role="status">{desktopSetupError}</p> : null}<button className="voco-button voco-button--secondary" onClick={() => void onOpenReleasePage(DESKTOP_SETUP_GUIDE)}>Open setup instructions</button></details>
+                  <details className="voco-preferences__card voco-preferences__disclosure"><summary>My words are not appearing</summary><p>Keep the app you’re dictating into focused. If VOCO can’t type there, it copies the rest of your words to the clipboard when you stop; check the field, then paste with Shift+Insert or Ctrl+V. Review is available from the tray after an unexpected app exit.</p>{desktopSetupError ? <p role="status">{desktopSetupError}</p> : null}<button className="voco-button voco-button--secondary" onClick={() => void onOpenReleasePage(DESKTOP_SETUP_GUIDE)}>Open setup instructions</button></details>
                   <details className="voco-preferences__card voco-preferences__disclosure"><summary>Technical details</summary>
                   <div className="voco-preferences__group"><h3 className="voco-preferences__group-title">Runtime checks</h3>
                     <div className="voco-preferences__card">
                       <div className="voco-preferences__row"><span className="voco-preferences__row-copy"><strong>Session</strong></span><span className="voco-preferences__row-value">{runtimeSessionLabel}</span></div>
-                      <div className="voco-preferences__row"><span className="voco-preferences__row-copy"><strong>IBus recording integration</strong></span><span className="voco-preferences__row-value">{ownedPreeditLabel}</span></div>
+                      <div className="voco-preferences__row"><span className="voco-preferences__row-copy"><strong>IBus shortcut (optional)</strong></span><span className="voco-preferences__row-value">{ownedPreeditLabel}</span></div>
                       <div className="voco-preferences__row"><span className="voco-preferences__row-copy"><strong>Type simulation</strong></span><span className="voco-preferences__row-value">{typeSimulationLabel}</span></div>
                       <div className="voco-preferences__row"><span className="voco-preferences__row-copy"><strong>Clipboard insertion</strong></span><span className="voco-preferences__row-value">{clipboardLabel}</span></div>
                     </div>
                   </div>
                   {runtimeDiagnostics ? <details className="voco-preferences__card voco-preferences__disclosure"><summary>Diagnostic details</summary>
-                    <div className="voco-preferences__form"><p><strong>IBus recording integration:</strong> {runtimeDiagnostics.ownedPreedit.detail}</p><p><strong>Type simulation:</strong> {runtimeDiagnostics.typeSimulation.detail}</p><p><strong>Clipboard insertion:</strong> {runtimeDiagnostics.clipboard.detail}</p></div>
+                    <div className="voco-preferences__form"><p><strong>IBus shortcut (optional):</strong> {runtimeDiagnostics.ownedPreedit.detail}</p><p><strong>Type simulation:</strong> {runtimeDiagnostics.typeSimulation.detail}</p><p><strong>Clipboard insertion:</strong> {runtimeDiagnostics.clipboard.detail}</p></div>
                   </details> : null}
                   </details>
                   <div className="voco-preferences__actions">

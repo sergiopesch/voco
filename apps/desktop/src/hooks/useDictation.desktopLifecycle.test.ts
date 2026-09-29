@@ -36,7 +36,6 @@ it.each(["cancelled", "restarted"])("keeps late native success out of the %s ses
   const cancelledRef = { current: null as string | null };
   const desktopPhrasePasteCountRef = { current: 0 };
   const recordingStartedAtMsRef = { current: performance.now() };
-  const desktopTargetTokenRef = { current: "first-target" };
   const trace = vi.fn<(event: string, detail?: unknown) => Promise<void>>().mockResolvedValue(undefined);
   const metrics = vi.fn();
   let release!: () => void;
@@ -48,7 +47,7 @@ it.each(["cancelled", "restarted"])("keeps late native success out of the %s ses
     const { paste, preview } = callbacks({ onboardingTest: false,
       startingSessionId, cancelledRef, desktopPhrasePasteCountRef,
       manualCopyRequestedRef: { current: false }, browserDeliveryRef: { current: null },
-      recordingStartedAtMsRef, desktopTargetTokenRef,
+      recordingStartedAtMsRef,
       isCurrentSession: (id: number) => id === currentSession,
       assertOutputAllowed: (id: number) => { if (id !== currentSession || cancelledRef.current) throw new Error("cancelled or replaced"); },
       pasteDesktopText: nativePaste, traceDictationEvent: trace, traceDesktopPasteMetrics: metrics,
@@ -66,7 +65,6 @@ it.each(["cancelled", "restarted"])("keeps late native success out of the %s ses
     cancelledRef.current = null; currentSession = 2;
     desktopPhrasePasteCountRef.current = 0;
     recordingStartedAtMsRef.current = performance.now();
-    desktopTargetTokenRef.current = "second-target";
     newQueue = create(2);
   }
   const countBeforeCompletion = desktopPhrasePasteCountRef.current;

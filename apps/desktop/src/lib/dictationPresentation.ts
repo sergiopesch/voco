@@ -65,10 +65,8 @@ export function deriveStatusLabel({
   if (nativeMicrophoneReady == null && microphonePermission === "denied") {
     return "Microphone needs permission";
   }
-  if (cursorRequired && cursorSetupState !== "ready") {
-    if (cursorSetupState === "safety-disabled") return "Ready — manual copy";
-    return "Text delivery needs setup — manual copy available";
-  }
+  // Recording refuses to start without desktop input, so there is no copy fallback.
+  if (cursorRequired && cursorSetupState !== "ready") return "Text delivery needs setup";
   if (!microphoneReady) {
     return "Ready — microphone checks on first use";
   }

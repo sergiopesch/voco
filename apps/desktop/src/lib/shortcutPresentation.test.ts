@@ -13,12 +13,21 @@ describe("shortcut presentation", () => {
       expect(result.instruction).not.toContain("Press Alt+D");
     }
   });
-  it("keeps IBus focus and explicit setup requirements visible", () => {
-    expect(shortcutPresentation("Alt+D", { ...available, route: "ibus" }).instruction).toContain("Focus a supported text field");
+  it("presents the IBus input source as an optional shortcut route", () => {
+    expect(shortcutPresentation("Alt+D", { ...available, route: "ibus" }).instruction).toBe("Press Alt+D to dictate at your cursor.");
     const focused = shortcutPresentation("Alt+D", { ...available, route: "ibus", state: "focus-required" });
     expect(focused.available).toBe(false);
-    expect(focused.setup).toContain("VOCO Dictation selected");
-    expect(shortcutPresentation("Alt+D", null).setup).toContain("never switches");
+    expect(focused.setup).toContain("optional VOCO Dictation input source");
+    expect(focused.setup).toContain("To dictate into any app, start dictation from the tray");
+  });
+  it("points an unavailable shortcut at the tray and voco --toggle", () => {
+    const unavailable = shortcutPresentation("Alt+D", null).setup;
+    expect(unavailable).toContain("start dictation from the tray");
+    expect(unavailable).toContain("voco --toggle");
+    expect(unavailable).not.toContain("Input Sources");
+  });
+  it("advertises the GNOME panel route", () => {
+    expect(shortcutPresentation("Alt+D", { ...available, route: "gnome-panel" }).instruction).toBe("Press Alt+D to dictate at your cursor.");
   });
   it("advertises only the matching verified configured key", () => {
     expect(shortcutPresentation("Alt+D", available).instruction).toBe("Press Alt+D to dictate at your cursor.");

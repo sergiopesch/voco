@@ -643,14 +643,6 @@ pub fn update_runtime_status(app: &tauri::AppHandle, snapshot: RuntimeStatusSnap
     tray_state.native_microphone_ready = snapshot.native_microphone_ready;
     tray_state.dictation_status = snapshot.dictation_status;
     tray_state.dictation_session_id = snapshot.dictation_session_id;
-    #[cfg(target_os = "linux")]
-    if !matches!(
-        snapshot.dictation_status,
-        DictationStatus::Starting | DictationStatus::Recording | DictationStatus::Processing
-    ) {
-        // The compositor releases at idle; passive Start must be available then.
-        crate::panel::clear_shortcut();
-    }
     tray_state.has_recoverable_transcript = snapshot.has_recoverable_transcript;
     tray_state.cursor_delivery = snapshot.cursor_delivery;
     tray_state.cursor_required = snapshot.cursor_required;
@@ -930,20 +922,28 @@ pub fn panel_snapshot(app: &tauri::AppHandle) -> Option<serde_json::Value> {
     let state = state.lock().ok()?;
     let snapshot = runtime_snapshot_from_tray_state(&state);
     let mut presentation = panel_presentation(&snapshot);
-    // X11 already consumes its chord. GNOME only needs this reservation for
-    // the supported passive Wayland shortcuts, through final queue drain.
-    presentation["stopAccelerator"] = serde_json::json!(if crate::is_wayland_session() {
-        match crate::hotkey_to_evdev_mode(&state.current_hotkey) {
-            0 => Some("<Alt>d"),
-            1 => Some("<Alt><Shift>d"),
-            _ => None,
-        }
-    } else {
-        None
-    });
+    let accelerator = panel_accelerator(crate::is_wayland_session(), &state.current_hotkey);
+    // Companion v11 consumes the chord whenever attached; a loaded v10 companion
+    // still reads the Stop-only fields until the session is restarted.
+    presentation["shortcutAccelerator"] = serde_json::json!(accelerator);
+    presentation["stopAccelerator"] = serde_json::json!(accelerator);
     presentation["stopShortcutToken"] =
         serde_json::json!(crate::panel::stop_shortcut_token(&presentation));
     Some(presentation)
+}
+
+/// X11 already consumes its chord. GNOME only grabs the chords that passive
+/// Wayland evdev also observes, so the focused application never receives them.
+#[cfg(target_os = "linux")]
+fn panel_accelerator(wayland: bool, hotkey: &str) -> Option<&'static str> {
+    if !wayland {
+        return None;
+    }
+    match crate::hotkey_to_evdev_mode(hotkey) {
+        0 => Some("<Alt>d"),
+        1 => Some("<Alt><Shift>d"),
+        _ => None,
+    }
 }
 
 #[cfg(target_os = "linux")]
@@ -1130,6 +1130,22 @@ mod tests {
         );
         snapshot.dictation_session_id = 0;
         assert!(panel_presentation(&snapshot)["stopSession"].is_null());
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn panel_grabs_only_the_passive_wayland_chords() {
+        for (hotkey, accelerator) in [
+            ("Alt+D", Some("<Alt>d")),
+            ("alt + d", Some("<Alt>d")),
+            ("Alt+Shift+D", Some("<Alt><Shift>d")),
+            ("SHIFT+ALT+KEYD", Some("<Alt><Shift>d")),
+            ("Ctrl+Shift+V", None),
+            ("Control+Space", None),
+        ] {
+            assert_eq!(panel_accelerator(true, hotkey), accelerator, "{hotkey}");
+            assert_eq!(panel_accelerator(false, hotkey), None, "{hotkey}");
+        }
     }
 
     #[test]

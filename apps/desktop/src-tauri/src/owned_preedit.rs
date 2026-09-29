@@ -520,17 +520,17 @@ fn classify_unavailable_status(
     {
         (
             "not-enabled",
-            "Add VOCO Dictation in the desktop Input Sources settings, select it, and focus the target text field.",
+            "Optional: add VOCO Dictation in the desktop Input Sources settings to use it as a shortcut route. Dictation does not need it.",
         )
     } else if !component_installed {
         (
             "not-installed",
-            "Install the VOCO Debian package to add the VOCO Dictation input source. Source and AppImage builds remain preview-only.",
+            "The optional VOCO Dictation input source comes with the VOCO Debian package. Dictation does not need it.",
         )
     } else {
         (
             "error",
-            "The VOCO input source failed a private IPC safety check. Keep stable cursor mode preview-only and reinstall the current package before retrying.",
+            "The optional VOCO input source failed a private IPC safety check. Reinstall the current package to use it; dictation does not need it.",
         )
     }
 }

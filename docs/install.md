@@ -12,8 +12,8 @@ The [README command](../README.md#get-started) runs the guided installer from
 the published **2026.0.59** tag. That version-pinned installer verifies the publisher
 signature on the checksum manifest, then verifies the package checksum. The signed
 manual procedure below applies the same authentication boundary. On Wayland the
-guided installer installs and checks the input helpers. Onboarding checks the
-live GNOME Stop shortcut after login. If setup is incomplete, follow the
+guided installer installs and checks the input helpers. On GNOME, onboarding
+recommends the VOCO panel after login; dictation works without it. If setup is incomplete, follow the
 [Wayland setup](platform/README.md#ydotoold-ydotool-daemon) instructions.
 Onboarding completion requires a successful voice test and desktop readiness.
 
@@ -94,43 +94,28 @@ are selected. Click **Start test**, speak, and check that the signal band moves
 and your words appear. Choose **Finish test**. VOCO then checks desktop input
 prerequisites before showing **Your voice, ready.** and **Done**.
 If setup needs attention, complete the indicated setup and click **Check desktop setup**.
-Your successful voice test remains available; an external cursor is not required
-for this check. Once onboarding finishes, focus a text field.
-Press **Alt+D** to start and again to stop. You can change the shortcut in
-the **Shortcut** section. Known terminal paste shortcuts are selected automatically.
+Your successful voice test remains available. Once onboarding finishes, click
+where you want the text, in any app. Press **Alt+D** to start and again to stop.
+You can change the shortcut in the **Shortcut** section.
 
-VOCO requires a verifiable editable cursor before automatic desktop
-dictation. If no cursor is available, VOCO displays a notification; click in an
-accessible text field and try again. Password fields are excluded. Changing fields
-during a recording stops delivery; review retained text before copying it.
-Custom controls that do not expose an accessible cursor are not supported.
+VOCO pastes each chunk into whatever has keyboard focus with Shift+Insert, the
+paste key that GTK, Qt, Chromium, Firefox, Electron apps and terminals share. It
+never presses Enter. If you move to another field during a recording, later
+chunks go there. VOCO cannot tell a password field from any other field, so check
+what is focused before you speak. If a chunk cannot be typed, VOCO copies the rest
+of the dictation at Stop and notifies you; paste it yourself with Shift+Insert.
+
+To check the input helpers without recording, copying or typing:
+
+```bash
+voco --check-desktop-input
+```
 
 ### Chromium and Electron applications
 
-Some browsers and Electron apps expose their text cursor only when accessibility
-is enabled. If VOCO asks you to check an app's accessibility support, fully quit
-that app and launch it with its native accessibility bridge and renderer enabled:
-
-```bash
-env ACCESSIBILITY_ENABLED=1 brave --force-renderer-accessibility
-```
-
-Use the app's own command in place of `brave` (`chatgpt` for the tested Codex desktop
-installation). Closing a window may leave the app running; the flags take effect
-only on a new application process. For a persistent change, copy the app's desktop
-launcher into `~/.local/share/applications/` and apply the same environment and flag
-to its `Exec` entries, preserving its icon and other metadata. VOCO's installer
-does not change other apps' launchers or global accessibility preferences.
-
-The .48 candidate also provides `voco --check-cursor`, a read-only check of the
-currently focused text field. To allow time to focus a field after starting it:
-
-```bash
-sleep 3; voco --check-cursor
-```
-
-This checks cursor accessibility without recording, copying or typing. It does not
-guarantee that every custom editor accepts dictation. See the [compatibility evidence](testing/fresh-install-2026-09-21.md#codex-and-brave-follow-up).
+Browsers and Electron apps need no accessibility flags: Shift+Insert pastes into
+their page fields and address bars. You can remove `--force-renderer-accessibility`
+from any launcher you changed for an earlier VOCO version.
 
 ### Desktop input helpers
 
@@ -147,9 +132,9 @@ See [troubleshooting](troubleshooting.md).
 
 Assign `voco --toggle` to an unused, non-repeating key in your desktop's shortcut
 settings, and keep VOCO running. Use an unused key such as **F8**, with a binding
-that also accepts Ctrl and Ctrl+Shift: clipboard delivery briefly uses those
-modifiers. Hyprland supports `ignore_mods`; KDE can assign the three variants to
-one command. Check every variant for conflicts. Avoid holding Alt or Meta during
+that also accepts Shift: paste delivery briefly holds Shift. Hyprland supports
+`ignore_mods`; KDE can assign both variants to one command. Check every variant
+for conflicts. Avoid holding Alt or Meta during
 Stop, and test Start and Stop in your editor before normal use.
 The compositor binding is separate from VOCO's built-in shortcut setting; the
 command cannot identify which key your desktop assigned. See the
@@ -166,14 +151,14 @@ If a session restart is requested, save your work and sign out and back in.
 maintainer scripts never enable a user extension. Other GNOME versions keep the
 native tray fallback; live bars are qualified only on GNOME 46.
 
-On GNOME Wayland, **Alt+D** and **Alt+Shift+D** need the live companion to
-consume Stop. A package installed after this login may be enabled but not yet
-loaded. VOCO checks this during onboarding and before starting cursor dictation;
-it shows setup guidance or sends a tray notification if a new login is needed.
-This prevents the Stop shortcut from
-selecting a browser address or changing another app's focus while final text
-is being delivered. After signing back in, use `voco --check-panel` to confirm
-that it reports active before testing those shortcuts.
+On GNOME Wayland the live companion is recommended for **Alt+D** and
+**Alt+Shift+D**, not required. It consumes the shortcut at every status, idle
+included. Without it dictation still works, but the focused app also receives the
+shortcut: a browser focuses its address bar and a terminal deletes a word.
+A package installed or upgraded after this login may be enabled but not yet
+loaded. VOCO shows this recommendation during onboarding and in settings: run
+panel setup again, then sign out and back in. Afterwards, `voco --check-panel`
+should report it as active.
 
 
 VOCO keeps its controls in the system tray. Stock Fedora GNOME needs the

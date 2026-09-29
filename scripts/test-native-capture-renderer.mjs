@@ -231,7 +231,7 @@ try {
                 name, ...args
             ]);
             if(name==='debugNativeCaptureEnabled')return window.auditEnabled===true&&window.auditUploads.length===0;
-            if(name==='getDesktopPasteStatus')return {enabled:true,available:true,streamingEnabled:true,targetToken:'synthetic-native-target',shortcutEpoch:1,detail:'Fixture target ready'};
+            if(name==='getDesktopPasteStatus')return {enabled:true,available:true,streamingEnabled:true,detail:'Desktop input is ready.'};
             if(name==='pasteDesktopText')return {outcome:'dispatched',strategy:'clipboard'};
             if(name==='saveDebugNativeRetainedSource'){
                 if(!window.stopped||window.ack!==4)throw Error('Retained-source export preceded terminal ACK');
@@ -473,12 +473,12 @@ try {
             }
             if (name === 'getDesktopPasteStatus') {
               window.calls.push([name,...args]);
-              return {enabled:true,available:false,targetToken:null,failureReason:'cursor',detail:'Click in a text field, then press your dictation shortcut to start.'};
+              return {enabled:true,available:false,streamingEnabled:true,detail:'Install ydotool and ydotoold.'};
             }
             if (name === 'getRuntimeDiagnostics') {
               const base = await previous(name,args);
               return {...base, desktopInput:{available:true,detail:'Input helpers are ready.'},
-                desktopPaste:{enabled:true,available:false,detail:'Focus a text field.'},
+                desktopPaste:{enabled:true,available:false,detail:'Install ydotool and ydotoold.'},
                 ownedPreedit:{...base.ownedPreedit,setupState:'not-installed',available:false}};
             }
             return previous(name,args);
@@ -499,7 +499,7 @@ try {
         const calls = await page.evaluate(() => window.calls.map(c=>c[0]));
         assert.ok(!calls.includes('pasteDesktopText'));
         assert.ok(!calls.includes('insertText'));
-        assert.ok(!calls.includes('beginDesktopShortcutSession'));
+        assert.ok(!calls.includes('copyDesktopText'));
         assert.ok(!calls.includes('startOwnedPreedit'));
         assert.equal(await page.evaluate(() => window.copiedText),undefined);
         assert.equal(await page.evaluate(()=>window.nativeCommands.some(c=>c.name==='benchmark_stream'&&c.args.request.op==='quality')),false);
@@ -695,26 +695,13 @@ try {
       await noOutput();
       results.push({case:'alt-d-stops-test-and-keeps-setup-open',passed:true});
       await loadTest();
-      await page.evaluate(()=>{window.store.getState().setSurface('hidden');window.listeners['voco:toggle']?.({payload:null});});
+      await page.evaluate(()=>window.store.getState().setSurface('hidden'));
       // Use the app's actual registered global-shortcut event.
       await page.evaluate(()=>window.listeners['voco:toggle-dictation']?.({payload:null}));
-      await page.waitForFunction(()=>window.calls.some(c=>c[0]==='showNotification'&&c[1]==='No text cursor available'));
+      await page.waitForFunction(()=>window.calls.some(c=>c[0]==='showNotification'&&c[1]==='Dictation setup incomplete'&&c[2]==='Install ydotool and ydotoold.'));
       assert.equal(await page.evaluate(()=>window.nativeCommands.some(c=>c.name==='native_capture_begin')),false);
       assert.equal(await page.evaluate(()=>window.store.getState().surface),'hidden');
-      results.push({case:'no-cursor-notification-without-capture-or-focus-steal',passed:true});
-      await loadTest();
-      await page.evaluate(() => {
-        const previous = window.nativeCall;
-        window.nativeCall = async (name, args) => name === 'getDesktopPasteStatus'
-          ? {enabled:true,available:false,targetToken:null,failureReason:'setup',detail:'Install ydotool and ydotoold.'}
-          : previous(name,args);
-        window.store.getState().setSurface('hidden');
-      });
-      await page.evaluate(()=>window.listeners['voco:toggle-dictation']?.({payload:null}));
-      await page.waitForFunction(()=>window.calls.some(c=>c[0]==='showNotification'&&c[1]==='Dictation setup incomplete'));
-      assert.equal(await page.evaluate(()=>window.nativeCommands.some(c=>c.name==='native_capture_begin')),false);
-      assert.equal(await page.evaluate(()=>window.store.getState().surface),'hidden');
-      results.push({case:'missing-helper-is-not-reported-as-missing-cursor',passed:true});
+      results.push({case:'missing-input-helper-notifies-without-capture-or-focus-steal',passed:true});
       await loadTest('off');
       await page.evaluate(()=>{window.config.selectedMic='previous-mic';window.store.getState().setConfig({...window.config});});
       assert.equal(await page.evaluate(()=>window.streamRequests||0),0);
@@ -765,7 +752,7 @@ try {
     const originalExpected=[...expected];
     const readinessCases = [];
     for (const backend of ['native', 'webkit']) {
-      for (const failure of ['cursor', 'setup', 'microphone']) {
+      for (const failure of ['setup', 'microphone']) {
         await page.goto(origin + '/app-microphone-check?scenario=' + (backend === 'native' ? 'enabled' : 'off'));
         await page.waitForFunction(mode => window.store?.getState().captureBackendMode === mode &&
           window.calls.some(call => call[0] === 'syncRuntimeStatus' && call[1].runtimeInitialized) &&
@@ -781,9 +768,8 @@ try {
           window.nativeCall = async (name, args) => {
             if (name !== 'getDesktopPasteStatus') return original(name, args);
             window.calls.push([name, ...args]);
-            return failure === 'microphone' ? { enabled: true, available: true, streamingEnabled: true, targetToken: 'synthetic-native-target', shortcutEpoch: 1 } : {
-              enabled: true, available: false, targetToken: null,
-              failureReason: failure, detail: 'Fixture ' + failure + ' unavailable',
+            return failure === 'microphone' ? { enabled: true, available: true, streamingEnabled: true, detail: 'Desktop input is ready.' } : {
+              enabled: true, available: false, streamingEnabled: true, detail: 'Fixture ' + failure + ' unavailable',
             };
           };
           if (failure === 'microphone' && backend === 'webkit') window.failNextStream = true;
@@ -1160,9 +1146,9 @@ try {
     await page.getByText('Shortcut help',{exact:true}).click();
     await page.getByText('No readable keyboard.', { exact: false }).waitFor();
     await captureStyledPanel('shortcut-settings-760x560', page.getByRole('button', { name: 'Record keys', exact: true }), { width: 760, height: 560 });
-    await captureStyledPanel('shortcut-settings-instructions-760x560', page.getByText('For IBus recording shortcuts, add VOCO Dictation in your desktop Input Sources settings, select it, then focus a text field. VOCO never switches your input source automatically.', { exact: true }), { width: 760, height: 560 });
+    await captureStyledPanel('shortcut-settings-instructions-760x560', page.getByText('To dictate into any app, start dictation from the tray or assign voco --toggle to a shortcut in your desktop settings.', { exact: true }), { width: 760, height: 560 });
     await page.evaluate(() => { window.shortcutObservation = { hotkey: 'Alt+D', route: 'ibus', state: 'focus-required', detail: 'Focus a supported input field.' }; });
-    await page.getByText('Focus a text field with VOCO Dictation selected as your input source.', { exact: true }).waitFor();
+    await page.getByText('The optional VOCO Dictation input source handles this shortcut only in supported text fields. To dictate into any app, start dictation from the tray or assign voco --toggle to a shortcut in your desktop settings.', { exact: true }).waitFor();
     expected.push('settings-shows-current-focus-required-ibus-instructions'); record(expected.at(-1));
 
     await page.evaluate(() => { window.deferDiagnostics = true; });
@@ -1173,7 +1159,7 @@ try {
       window.deferDiagnostics = false;
     });
     await page.getByText('Shortcut configured: Alt+X. Start dictation from the tray.', { exact: false }).waitFor();
-    assert.equal(await page.getByText('Focus a text field, then use your shortcut.', { exact: true }).count(), 0);
+    assert.equal(await page.getByText('Click where you want the text, then use your shortcut.', { exact: true }).count(), 0);
     await noCapture();
     expected.push('late-old-key-diagnostic-cannot-advertise-new-configuration'); record(expected.at(-1));
     const prepareDeferredDiagnostics = async () => {
@@ -1198,7 +1184,7 @@ try {
         };
         window.store.getState().setSurface('popover');
       });
-      await page.getByText('Focus a text field, then use your shortcut.', { exact: true }).waitFor();
+      await page.getByText('Click where you want the text, then use your shortcut.', { exact: true }).waitFor();
       await page.evaluate(() => { window.holdObserver = true; });
       await page.waitForFunction(() => typeof window.finishObserver === 'function');
     };
@@ -1235,7 +1221,7 @@ try {
         await new Promise(resolve => setTimeout(resolve, 50));
       });
       assert.equal(await page.evaluate(() => window.store.getState().ownedPreeditSetupState), setupBefore, 'Rejected late observer must not publish any diagnostics');
-      assert.equal(await page.getByText('Focus a text field, then use your shortcut.', { exact: true }).count(), 0);
+      assert.equal(await page.getByText('Click where you want the text, then use your shortcut.', { exact: true }).count(), 0);
       if (transition === 'save') await page.evaluate(() => window.finishSave());
       await noCapture();
       expected.push('late-observer-after-' + transition + '-cannot-publish'); record(expected.at(-1));

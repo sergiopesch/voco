@@ -179,9 +179,6 @@ export function App() {
   const microphoneReady = useStore((state) => state.microphoneReady);
   const nativeMicrophoneReady = nativeMicrophone.mode === "webkit" ? null
     : nativeMicrophone.mode === "native" && Boolean(nativeMicrophone.selected) && microphoneReady;
-  const ownedPreeditSetupState = useStore(
-    (state) => state.ownedPreeditSetupState,
-  );
   const config = useStore((state) => state.config);
   const setConfig = useStore((state) => state.setConfig);
   const setError = useStore((state) => state.setError);
@@ -315,15 +312,13 @@ export function App() {
   // Dictation never maps a transcript window over the destination.
   const recoveryAvailable = Boolean(recovery);
   const popoverSize = POPOVER_SIZE;
-  // Presentation uses input prerequisites; an unfocused external field is not
-  // missing setup. Recording still acquires and verifies its own target token.
-  const cursorRequired = requiresVerifiedTextTarget(config) &&
-    !(config?.transcriptTarget === "cursor" && runtimeDiagnostics?.desktopPaste?.enabled &&
+  // Text goes to whichever app has focus, so the desktop input helpers are the
+  // only delivery setup. IBus and the GNOME panel companion never gate it.
+  const desktopInputReady = config?.transcriptTarget === "cursor" &&
+    Boolean(runtimeDiagnostics?.desktopPaste?.enabled &&
       (runtimeDiagnostics.desktopInput?.available ?? runtimeDiagnostics.desktopPaste.available));
-  const cursorSetupState =
-    ownedPreeditSetupState ||
-    runtimeDiagnostics?.ownedPreedit.setupState ||
-    "";
+  const cursorRequired = requiresVerifiedTextTarget(config) && !desktopInputReady;
+  const cursorSetupState = desktopInputReady ? "ready" : runtimeDiagnostics ? "not-enabled" : "";
   const runtimeConfigurationError = shouldBlockRuntimeForConfigErrors(
     startupConfigError,
     settingsError,
@@ -378,7 +373,7 @@ export function App() {
       await hideStatusOverlay().catch(() => {});
       await showNotification(
         "Panel hidden",
-        "Focus the target text field, then press the dictation hotkey again.",
+        "Click where you want the text, then press the dictation hotkey again.",
       ).catch(() => {});
       return true;
     }
@@ -449,7 +444,7 @@ export function App() {
     await hideStatusOverlay().catch(() => {});
     await showNotification(
       "Ready to try dictation",
-      `Focus a text field, then press ${useStore.getState().config?.hotkey ?? "Alt+D"}. The tray bars respond when the microphone is ready.`,
+      `Click where you want the text, then press ${useStore.getState().config?.hotkey ?? "Alt+D"}. The tray bars respond when the microphone is ready.`,
     ).catch(() => {});
   }, [dismissInteractiveSurface]);
 

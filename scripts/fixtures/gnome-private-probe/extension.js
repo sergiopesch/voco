@@ -2,7 +2,7 @@
 import Gio from 'gi://Gio';
 import St from 'gi://St';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
-const xml = '<node><interface name="org.voco.PrivateShellProbe"><method name="GetWindows"><arg type="s" direction="out"/></method><method name="SetClipboard"><arg type="s" direction="in"/></method><method name="GetInputState"><arg type="s" direction="out"/></method></interface></node>';
+const xml = '<node><interface name="org.voco.PrivateShellProbe"><method name="GetWindows"><arg type="s" direction="out"/></method><method name="SetClipboard"><arg type="s" direction="in"/></method><method name="SetPrimary"><arg type="s" direction="in"/></method><method name="GetInputState"><arg type="s" direction="out"/></method></interface></node>';
 function children(actor) { return [actor, ...actor.get_children().flatMap(children)]; }
 export default class Probe extends Extension {
     enable() {
@@ -24,6 +24,7 @@ export default class Probe extends Extension {
         }));
     }
     SetClipboard(text) { St.Clipboard.get_default().set_text(St.ClipboardType.CLIPBOARD, text); }
+    SetPrimary(text) { St.Clipboard.get_default().set_text(St.ClipboardType.PRIMARY, text); }
     GetInputState() {
         return JSON.stringify({modifiers: global.get_pointer()[2],
             windowMenuOpen: children(global.stage).some(actor => actor.mapped && actor.text === 'Take Screenshot')});

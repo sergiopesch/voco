@@ -8,7 +8,9 @@ cleanup from [PR 83](https://github.com/sergiopesch/voco/pull/83), Tauri 2.11.6
 from [PR 81](https://github.com/sergiopesch/voco/pull/81), and Vite 8.3.1 from
 [PR 82](https://github.com/sergiopesch/voco/pull/82). See the
 [reliability record](cloud-reliability-2026-09-28.md) for the original correction's
-tests and limits. Dependency and version integration require fresh protected CI.
+tests and limits. The later tray and crash-recovery changes replace that accessibility
+verification with focus-following Shift+Insert paste; see [desktop paste](desktop-paste.md).
+Dependency and version integration require fresh protected CI.
 
 ## Remaining release gates
 

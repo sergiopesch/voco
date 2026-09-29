@@ -13,9 +13,9 @@ The [historical 22 September candidate delivery matrix](testing/application-deli
 Brave and Chromium address bars/editors, Firefox, VS Code, GTK/WebKit controls,
 GNOME Text Editor, Bash and nano. It separates exact-field confirmation from
 terminal dispatch and records toolkit limitations. It does not certify all Linux apps.
-Stop dictation before switching fields. Destination checks run before keyboard
-insertion, but a focus change during a key gesture can still redirect a fragment;
-recovery cannot retract text from another application.
+Current desktop paste has no destination checks: each chunk goes to whatever has
+keyboard focus, so stop dictation before switching fields. VOCO cannot retract text
+from another application.
 
 This matrix records **2026.0.43** package and desktop qualification. Only assets
 attached to a published [GitHub release](https://github.com/sergiopesch/voco/releases)
@@ -77,16 +77,17 @@ hl.bind("F8", hl.dsp.exec_cmd("voco --toggle"), { ignore_mods = true })
 ```
 
 Use an unused key such as F8. The [modifier-independent flag](https://wiki.hypr.land/configuring/core/binds/flags/)
-keeps the command available while clipboard delivery briefly holds Ctrl or Shift.
+keeps the command available while paste delivery briefly holds Shift.
 It was tested with both plain F8 and Ctrl+F8 on Omarchy. Do not hold Alt or Meta
 while stopping: those keys can affect the final paste or activate application menus.
 Test Start and Stop in the receiving application.
 
-On KDE, assign the same command to an unused key and its Ctrl and Ctrl+Shift
-variants in System Settings → Keyboard → Shortcuts. The isolated test used F7,
-Ctrl+F7 and Ctrl+Shift+F7 after checking all three for conflicts. A plain-key-only
-binding missed a deliberately modified Stop; the three bindings passed that
-control. Choose available keys rather than replacing an existing desktop action.
+On KDE, assign the same command to an unused key and its Shift variant in
+System Settings → Keyboard → Shortcuts, because paste delivery briefly holds Shift.
+The earlier isolated test, run when delivery used Ctrl chords, bound F7, Ctrl+F7
+and Ctrl+Shift+F7 after checking all three for conflicts. A plain-key-only binding
+missed a deliberately modified Stop; the three bindings passed that control.
+Choose available keys rather than replacing an existing desktop action.
 
 Use the syntax of your installed Hyprland release. Keep the binding non-repeating,
 check for conflicts and preserve existing Omarchy dictation bindings. The command

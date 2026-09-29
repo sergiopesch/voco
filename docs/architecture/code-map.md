@@ -34,18 +34,20 @@ recognizer serves desktop, browser and onboarding sessions. See
    and shortcut boundaries live in `src/lib/dictationRecording.ts`. Capture admission
    keeps unverified ScriptProcessor input out of automatic delivery.
    `desktopCaptureTail.ts` retains each source sample and forwards the Stop tail once.
-   `desktopShortcutSession.ts` owns the UUID-bound native shortcut lease through final
-   delivery. `browserStreamDelivery.ts` separately owns an explicit browser field lease,
+   `browserStreamDelivery.ts` separately owns an explicit browser field lease,
    verifies each append receipt and never retries uncertain output. Tab departure or
    native connection loss stops that browser recording; ordinary field focus loss
    revokes its recipient without discarding the session's Stop control.
 3. `src/lib/benchmarkPhraseQueue.ts` serializes bounded NVIDIA requests. Recording
    capture continues while a paste is in flight. A newer append-only hypothesis
    can supersede pending output; already dispatched text cannot be blindly replayed.
-   Delivery rejection disables insertion while recognition continues through Stop.
-   Recognition/transport failure still stops queue admission. Handled cursor failures
-   notify, clear text/audio at Stop and return to a nonblocking idle state. No target
-   retry follows a delivery rejection. Onboarding retains its local test retry path.
+   A `no-mutation` paste typed nothing, so its text stays pending for the next
+   hypothesis or bounded Stop retries. An uncertain or rejected paste disables
+   insertion while recognition continues through Stop, which copies the
+   undelivered remainder to the clipboard and notifies. Recognition/transport
+   failure still stops queue admission. Handled cursor failures notify, clear
+   text/audio at Stop and return to a nonblocking idle state. Onboarding retains
+   its local test retry path.
    The worker owns acoustic boundaries, so this path needs no second phrase segmenter.
 4. `src-tauri/src/benchmark_stream.rs` supervises one local Python process, frames
    bounded JSON, checks session/sequence responses and reaps failures. Start/warmup
@@ -56,11 +58,8 @@ recognizer serves desktop, browser and onboarding sessions. See
    stdout away from protocol stdout and validates identity/sequence/operation and emits sanitized
    metadata. `streaming.py` owns the sample gate and streaming lifecycle;
    `adapters.py::Nemotron` owns native recognizer/stream/result handles.
-6. `src-tauri/src/insertion.rs` performs destination checks, clipboard replacement and
-   key dispatch. `focus_probe.rs` and `resources/voco_desktop_target.py` supply bounded
-   identity and optional accessible-field observation. Rich editors resolve the caret
-   through bounded hypertext links and bind the paragraph route, rather than treating
-   the outer container as flat text. A successful key command is
+6. `src-tauri/src/insertion.rs` copies each chunk to CLIPBOARD and PRIMARY, then
+   sends Shift+Insert to whatever has keyboard focus. A successful key command is
    not proof that a recipient displayed the text.
 7. At Stop, the hook drains capture, forwards only retained samples not yet offered
    to the queue, then finishes recognition and pending delivery. Successful cursor
@@ -73,8 +72,8 @@ recognizer serves desktop, browser and onboarding sessions. See
    cannot update a replacement session.
 
 Paths in steps 2–7 are relative to `apps/desktop` unless prefixed with `runtime/`.
-See [architecture](README.md) and [delivery observation](../testing/delivery-observation.md)
-for measurement and recipient limitations.
+See [architecture](README.md) and [desktop paste](../testing/desktop-paste.md)
+for delivery and recipient limitations.
 
 ## Component ownership
 
@@ -89,7 +88,7 @@ guide retains its original source snapshot.
 | --- | --- |
 | Completed native phrases and current recognizer output | `runtime/speech/adapters.py::Nemotron` |
 | Accepted append-only hypothesis and dispatched prefix | `benchmarkPhraseQueue.ts` |
-| Destination identity, paste admission and sampled receipt | Native insertion or explicit browser delivery |
+| Paste dispatch, or exact-field receipt for explicit browser delivery | Native insertion or explicit browser delivery |
 | Visible transcript and retained recovery | Dictation hook/store, mirroring recognition |
 
 Do not merge these facts into one success flag. IBus owns shortcut authority,
@@ -103,19 +102,18 @@ not another live recognizer or queue.
 | Capture | `apps/desktop/src/lib/audioInput.ts`, `audioCaptureBuffer.ts`, `audioCaptureFlush.ts`, `nativeCapture.ts`; `src-tauri/src/native_capture/` | The .43 candidate selects native capture on Wayland and browser capture on X11. The .44 candidate resolves and grants the default source on an explicit Start Test/recording action; manual selection remains available in settings. Preserve sample ownership and drain ordering. |
 | Desktop capture tail | `src/lib/desktopCaptureTail.ts` | Append-only sample accounting and Stop-tail forwarding into the NVIDIA queue. Do not recopy an already streamed recording. |
 | Speech runtime | `runtime/speech/` | Selected pinned CPU runtime, bounded local protocol, content-free metrics. Model/native artifacts are provisioned separately from Git. |
-| Input/focus | `src-tauri/src/insertion.rs`, `focus_probe.rs`, `resources/voco_desktop_target.py` | Desktop-specific compatibility, fresh preflight checks, bounded observation, no uncertain automatic retry. |
+| Desktop paste | `src-tauri/src/insertion.rs` | One Shift+Insert gesture into whatever has focus, bounded helpers, no uncertain automatic retry. |
 | Desktop input service | `src-tauri/src/desktop_input_setup.rs`, `packaging/ydotool/`, `vendor/ydotool-legacy/` | One installed system client; exact legacy identity selects the private daemon. Only the installed Wayland app can migrate its unmodified service while holding the single-instance guard. No package-hook session mutation. |
 | Desktop notifications | `src-tauri/src/desktop_notifications.rs` | Retain the session D-Bus sender for VOCO's lifetime so GNOME can display registered-app notifications. Use the VOCO icon, normal desktop notification policy, bounded requests and finite error events; service acceptance does not prove banner visibility. |
 | Shortcuts | `src-tauri/src/hotkey_state.rs`, `shortcut_arbitration.rs`, `shortcut_readiness.rs`, `owned_preedit.rs` and IBus resources | Admit one trigger. The optional IBus component does not authorize generic text mutation or switch the owner's input source. |
 | Shortcut arbitration | `src-tauri/src/shortcut_arbitration.rs`; registration/readiness and `suppress_passive_shortcut` in `lib.rs` | Completed IBus authority controls registration. Passive evdev also guards pending polls; an already-consuming X11 callback keeps shared debounce without that passive suppression. X11 global callbacks admit a matched press/release pair on release, after the temporary root keyboard grab; stale bindings and backend changes cancel the pending pair. |
-| X11 recording scope | `src/lib/desktopShortcutSession.ts`, `src-tauri/src/desktop_shortcut.rs`, `vendor/global-hotkey/src/platform_impl/x11/focus_lease.rs` | Same registered shortcut, exact input-focus window, one recording UUID, fixed 650-second expiry. Preserve delivery guards and surface failed root restoration. Vendor path is repository-relative. |
-| X11 actor wakeup | `vendor/global-hotkey/src/platform_impl/x11/{mod.rs,wake.rs}` | Wait on X fd and queued-command signal; drain buffered events before sleeping. No 50 ms periodic idle wakeup. Preserve original expiry deadline and error health. Paths are repository-relative. |
-| Renderer replacement | `src-tauri/src/lib.rs` PageLoad Started, `desktop_shortcut.rs`, `insertion.rs` preflight/reset | Synchronously invalidate the shortcut epoch; asynchronously release only older owners. Reject stale Begin before/after acquisition. The retired unguarded insertion IPC is removed; normal delivery requires a bound destination. |
+| X11 actor wakeup | `vendor/global-hotkey/src/platform_impl/x11/{mod.rs,wake.rs}` | Wait on X fd and queued-command signal; drain buffered events before sleeping. No 50 ms periodic idle wakeup. Preserve error health. The patch's focus-lease API is unused. Paths are repository-relative. |
+| Renderer replacement | `src-tauri/src/lib.rs` PageLoad Started, `crash_recovery.rs` | Increment the renderer epoch so the previous renderer's journal writes become stale, and clear owned preedit before the replacement renderer starts. |
 | Explicit browser field | `integrations/chromium/`, `src-tauri/src/browser_{broker,protocol,socket}.rs`, `src-tauri/src/bin/voco-browser-host.rs` | Explicit tab/field authorization, private same-user transport, ordered bounded receipts. Separate from ordinary desktop paste. |
 | Audio transport | `src-tauri/src/audio_transport.rs`, `native_capture_commands.rs` | Validate binary headers, sample counts and finite values before decoding or retaining. |
 | Config and process lifecycle | `src-tauri/src/config.rs`, `single_instance.rs`, `trigger_socket.rs`, `process_runner.rs` | Private state, exclusive process ownership, bounded helper execution and reaping. |
 | Diagnostics | `src-tauri/src/performance.rs`, `runtime/speech/streaming.py::Metrics`, `scripts/report-*.py` | Bounded local logs; failures cannot stall dictation. Reports distinguish successful events, failures and unavailable evidence. |
-| Read-only setup checks | `src-tauri/src/main.rs`, `lib.rs` | `--check-desktop-input` verifies input prerequisites; `--check-cursor` verifies the current editable destination. Neither records, changes the clipboard or sends keys. |
+| Read-only setup checks | `src-tauri/src/main.rs`, `lib.rs` | `--check-desktop-input` verifies input prerequisites; `--check-panel` checks the GNOME companion. Neither records, changes the clipboard or sends keys. |
 | Build/package | `scripts/build-desktop.sh`, `package-nvidia.py`, `verify-deb-package.sh`, `verify-speech-payload.py`, `packaging/` | Build matching application/host; require pinned complete payload; validate before publishing an artifact. |
 | Quality evidence | `scripts/test-*`, `scripts/dictation-quality*`, `tests/fixtures/`, `docs/testing/` | Tests/reports, not application features. Keep public fixtures separate from private owner recordings. |
 
@@ -188,64 +186,30 @@ The `onboarding:test` trigger reuses `dictationRecording.ts` and
 `BenchmarkPhraseQueue` with an output callback that never touches another app.
 Capture and final recognition must complete before onboarding is saved.
 VOCO then calls `get_desktop_input_status`: a fresh, bounded input-helper
-check with no target lookup, key injection or clipboard mutation. For Alt+D and
-Alt+Shift+D on GNOME Wayland, the running app also requires the current loaded
-companion to be attached. This is separate from `get_desktop_paste_status`, which
-requires the same setup readiness plus a verified cursor when normal dictation
-begins. The latter returns a typed setup/cursor failure so the UI does not
-misclassify missing dependencies as missing focus. After publishing Starting,
-desktop dictation waits for the authenticated companion's Stop reservation for
-that capture session before opening the microphone.
-`voco --check-desktop-input` checks input helpers only, without launching the GUI
-or requiring the running app's companion attachment. This lets installation
-finish before a newly installed GNOME companion can load on the next login;
-onboarding and Start enforce the live shortcut checks afterward.
-`voco_desktop_target.py` classifies focused editable controls without reading
-contents; `insertion.rs` refuses recording preflight without a verified destination.
-Ghostty's GTK canvas uses a separate `terminal_surface` classification: a unique
-focused pane, fresh downward child route and focus/window-loss tracking bind the
-destination without pretending that a text caret is exposed. Terminal delivery
-remains dispatch-only. GTK's synthetic containers can be absent from reverse parent
-links, so this route does not reuse or weaken the generic editable-field hint check.
-The helper also returns a finite failure category; Rust maps it to a fixed local
-trace event, with unknown values mapped to unavailable. This metadata never alters
-target admission or includes field content, titles, paths or destination tokens.
+check with no key injection or clipboard mutation. For Alt+D and Alt+Shift+D on
+GNOME Wayland, a missing or outdated companion adds a recommendation
+(`setupArea: "panel"`) but never blocks: without it, the focused app also
+receives the shortcut. `get_desktop_paste_status` reports the same recording
+prerequisites when normal dictation begins; each paste then targets whatever has
+focus. `voco --check-desktop-input` checks input helpers only, without launching
+the GUI.
 
-Destination and shortcut failures happen before capture. They preserve the approved
-microphone's readiness; only an attempted capture startup can invalidate it, with
-the existing native generation/selection ownership checks.
+Setup failures happen before capture. They preserve the approved microphone's
+readiness; only an attempted capture startup can invalidate it, with the existing
+native generation/selection ownership checks.
 
-### Native field ownership (.55 candidate)
+### Desktop paste
 
-The focus helper resolves a suggestion list back to its editable controller only
-when both accessibility relations agree, the process matches and the controller
-still has a valid focused caret. The retained object must also belong to the
-single active window through fresh ancestry. Paired owner-loss/suggestion-gain
-notifications can be one batch; unresolved loss and real field roundtrips advance
-the generation. Cold lookup follows the same verified relationship from list
-boxes and popup menus, including fresh active-window ancestry. No application
-name, title or URL is used to bypass ownership.
-
-WebKit may mark a scroll container and document focused along with their input.
-Those noneditable wrappers are bounded search roots. Only a focused input can
-qualify; a password role still rejects. Cold lookup orders its bounded queue by
-cached focus/visibility so hidden popup contents do not consume the budget before
-visible controls. Cached flags only order lookup; fresh admission checks remain
-mandatory. Unfocused terminal panes cannot change an editor's paste chord.
-After clipboard preparation, Rust revalidates the bound target and shortcut
-scope immediately before keyboard dispatch. A rejection records that the clipboard
-changed but sends no keys; the destination is never rebound to the new field.
-On GNOME Wayland, companion 10 supplies an authenticated fresh modifier sample.
-Paste waits at most 1.5 seconds for physical modifiers to clear, validates the bound
-target, then samples modifiers again. A chord beginning during validation restarts
-that sequence. Missing compositor authority or a timeout sends no keys.
-After dispatch only, inconsistent accessibility count/caret replies for the same
-freshly verified control may remain pending within the existing receipt deadline.
-They never authorize a new paste or count as a receipt. A definitive content/route
-mismatch, focus departure or lost identity still rejects delivery.
-This narrows, rather than eliminates, the race during a desktop key gesture.
-Existing discovery limits, deadlines, exact text/caret checks and no-replay behavior remain in force. See the
-[application matrix](../testing/application-delivery-2026-09-22.md).
+`insertion.rs::desktop_paste` copies each chunk to CLIPBOARD, then PRIMARY (best
+effort), and sends one Shift+Insert gesture to whatever has keyboard focus. A
+single leading joining space is its own Space key, and ASCII controls become
+spaces, so no chunk can press Enter. On Wayland it first waits at most 1.5 seconds
+for released shortcut modifiers, from evdev or the GNOME companion's
+`ModifiersClear`; unknown state does not block and a timeout sends no keys.
+`copy_desktop_text` sets both selections without keys for the Stop remainder.
+[Desktop paste](../testing/desktop-paste.md) describes the X11 application and
+Chromium suites. The dated [application matrix](../testing/application-delivery-2026-09-22.md)
+records the retired focus-verified route.
 
 ### Transcript diagnostics and microphone feedback
 

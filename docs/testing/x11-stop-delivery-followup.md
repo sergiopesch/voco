@@ -1,5 +1,10 @@
 # X11 Stop during delayed delivery: follow-up design
 
+> **Removed in 2026.0.60.** Desktop paste no longer observes fields or focus
+> targets: it sends one Shift+Insert gesture to whatever has keyboard focus. See
+> [desktop paste](desktop-paste.md) for the current contract. The rest of this page
+> is a historical record.
+
 **Status: frozen `+local5` failure; earlier exception proposal superseded, 15 September 2026.**
 The current `+local6` implementation uses recording-scoped exact-focus X11 grabs,
 preserving the focus guard. Validation C's strict matrix passed 34 selected cases
@@ -52,7 +57,7 @@ lost. No model accuracy or model latency conclusion follows.
 
 ## Reproduced +local5 causal path
 
-[`FocusTracker.event`](../../apps/desktop/src-tauri/resources/voco_desktop_target.py)
+`FocusTracker.event` (in the since-removed `voco_desktop_target.py`)
 invalidates the target generation on a focused-false event. A subsequent true event
 for the same accessible path receives a new identity. `verify_delivery` rejects the
 old receipt/token, and [`observe_delivery`](../../apps/desktop/src-tauri/src/insertion.rs)

@@ -62,7 +62,11 @@ describe("status label presentation", () => {
 
   it("treats completed manual dictation as a usable result", () => {
     expect(deriveStatusLabel({ ...ready, hasRecovery: true, manualTranscriptReady: true })).toBe("Transcript ready to copy");
-    expect(deriveStatusLabel({ ...ready, cursorRequired: true, cursorSetupState: "safety-disabled" })).toBe("Ready — manual copy");
+  });
+
+  it("asks for text delivery setup only while desktop input is not ready", () => {
+    expect(deriveStatusLabel({ ...ready, cursorRequired: true, cursorSetupState: "not-enabled" })).toBe("Text delivery needs setup");
+    expect(deriveStatusLabel({ ...ready, cursorRequired: true, cursorSetupState: "ready" })).toBe("Ready to listen");
   });
 
   it("matches the tray by prioritizing a dictation failure when both modes failed", () => {

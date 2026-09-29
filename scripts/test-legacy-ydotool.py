@@ -56,21 +56,23 @@ def main():
                     if process.poll() is None:
                         process.kill()
                         process.communicate()
-        # Retain the original bug as an explicit negative control.
-        broken = capture(['space', 'ctrl+v'])
+        # Retain the original bug as an explicit negative control: the key name
+        # "space" is parsed as the letter S. VOCO sends a literal space argument.
+        broken = capture(['space', 'shift+insert'])
         assert broken[:2] == [[1, 31, 1], [1, 31, 0]], 'Requires legacy ydotool 0.1.x'
         results.append({'case': 'old-space-name-negative-control', 'events': broken})
-        for terminal in (False, True):
-            for separator in (False, True):
-                command = ([' '] if separator else []) + ['ctrl+shift+v' if terminal else 'ctrl+v']
-                chord = [29] + ([42] if terminal else []) + [47]
-                expected = ([[1, 57, 1], [1, 57, 0]] if separator else [])
-                expected += [[1, key, 1] for key in chord]
-                expected += [[1, key, 0] for key in reversed(chord)]
-                actual = capture(command)
-                assert actual == expected, (command, actual, expected)
-                results.append({'terminal': terminal, 'separator': separator, 'events': actual})
-    print(json.dumps({'status': 'passed', 'positive_cases': 4, 'negative_controls': 1,
+        # The one universal paste gesture: Shift+Insert (KEY_LEFTSHIFT, KEY_INSERT),
+        # optionally preceded by the joining Space (KEY_SPACE).
+        chord = [42, 110]
+        for separator in (False, True):
+            command = ([' '] if separator else []) + ['shift+insert']
+            expected = ([[1, 57, 1], [1, 57, 0]] if separator else [])
+            expected += [[1, key, 1] for key in chord]
+            expected += [[1, key, 0] for key in reversed(chord)]
+            actual = capture(command)
+            assert actual == expected, (command, actual, expected)
+            results.append({'separator': separator, 'events': actual})
+    print(json.dumps({'status': 'passed', 'positive_cases': 2, 'negative_controls': 1,
                       'scope': 'installed legacy helper key events; no target editor or compositor',
                       'helper_sha256': hashlib.sha256(Path('/usr/bin/ydotool').read_bytes()).hexdigest(),
                       'results': results}, indent=2))

@@ -1,3 +1,9 @@
+> **Retired route.** 2026.0.60 replaced this focus-verified delivery with
+> focus-following Shift+Insert paste; the `test:delivery-observation` and
+> `test:rich-editor-delivery` commands below no longer exist. See
+> [desktop paste](desktop-paste.md) for the current contract and suites. This record
+> retains its original dates and scope.
+
 # Application delivery qualification — 22 September 2026
 
 **2026.0.55 candidate, not a published release.** The owner's installed .54 app,

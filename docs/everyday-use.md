@@ -5,8 +5,8 @@ has the earlier in-memory recovery flow; these changes are not published yet.
 
 A successful voice test is followed by a desktop input check
 before onboarding completes. **Desktop setup required** means helpers or their
-service need attention; it is different from **No text cursor available**. Repair
-setup using the [installation guide](install.md), then retry the check.
+service need attention. Repair setup using the [installation guide](install.md),
+then retry the check.
 
 ## First-time setup
 
@@ -23,8 +23,8 @@ successful test, VOCO checks desktop input automatically. **Your voice, ready.**
 shows your shortcut and explains that VOCO stays in the tray. **Done** rechecks
 readiness, saves completion and returns directly to the tray. There is no second
 window to dismiss. Reopening VOCO from the launcher presents
-the existing idle app. During capture it keeps your destination focused. Changing
-microphones requires a new test. Silence,
+the existing idle app. During capture it never takes focus from the app you are
+dictating into. Changing microphones requires a new test. Silence,
 recognition failures and incomplete desktop setup keep onboarding open with an
 action to retry.
 
@@ -40,8 +40,11 @@ While recording, the panel shows the microphone and real input bars, without a
 Listening label or Stop button. Click the icon or use your shortcut to stop.
 Right-click for **Settings**, **Review**, and **Stop** during capture.
 Other desktops use the native tray menu. `voco --check-panel` changes no preferences.
-Companion version 10 is required for the new GNOME modifier safety check; after an
-upgrade, follow setup's sign-out/sign-in guidance before dictating.
+On GNOME Wayland the panel is recommended, not required. It keeps **Alt+D** and
+**Alt+Shift+D** out of the focused app at every status. Without it dictation still
+works, but the focused app also receives the shortcut: a browser focuses its
+address bar and a terminal deletes a word. After an upgrade, run panel setup
+again, then sign out and back in.
 
 The fallback tray replaces its Ready label with
 audio-driven bars while recording. Silence settles the bars; Stop restores the
@@ -50,29 +53,27 @@ Smooth movement follows the desktop's animation preference.
 
 ## Dictation
 
-Check your microphone during setup, then focus an editable field.
+Check your microphone during setup, then click where you want the text, in any
+app: a text field, a browser address bar, an editor or a terminal such as Ghostty.
 Press and release the recording shortcut (default **Alt+D**), wait for the input bars,
 and speak.
 Words appear progressively. Press and release the shortcut again to finish; the final words
 and punctuation are delivered before VOCO returns to Ready.
 
-VOCO binds dictation to a text field or supported terminal pane. If it cannot
-identify the typing destination, it shows a desktop notification and does not
-record. Focus the intended destination and press the shortcut again. Fields
-identified as passwords are excluded. The [.56 release](releases/2026.0.56.md)
-supports Ghostty's focused terminal canvas even though it exposes no text caret.
+Each chunk is pasted into whatever has keyboard focus when it is ready. VOCO
+copies it to the clipboard and primary selection, then presses Shift+Insert, the
+paste key shared by GTK, Qt, Chromium, Firefox, Electron apps and terminals. The
+text stays on the clipboard. Line breaks become spaces and VOCO never presses
+Enter, so it never submits a form or runs a command. Later chunks follow focus:
+stop dictation before switching fields. VOCO cannot tell a password field or
+prompt from any other field, so check what is focused before you speak.
 
-Stop dictation before switching fields. VOCO uses clipboard paste, replaces
-clipboard text, leaves it there and never presses Enter. A focus change during
-a paste gesture can redirect a fragment before VOCO detects it; recovery cannot
-retract text from another app. Recognized terminals use their
-paste chord without changing terminal settings. Protected, custom, remote and rich
-editors need individual testing. The generic desktop route appends text; it does
-not rewrite the entire message after Stop.
-
-Terminal delivery cannot confirm that pasted text appeared or identify every
-password prompt. Read-only terminal mode can reject input. Review terminal text
-before submitting it; VOCO never submits commands for you.
+If a paste types nothing, VOCO tries again with the next words. If a paste fails
+any other way, VOCO stops typing, notifies you and keeps listening until you stop.
+At Stop it copies the words it did not type to the clipboard and notifies you;
+check the field, then paste them with Shift+Insert. VOCO cannot confirm that an
+app displayed pasted text or retract text from another app. It appends text; it
+does not rewrite earlier words after Stop.
 
 A recording is currently bounded to ten minutes, with an additional source-audio
 memory limit for high sample rates. Stop and start a new recording for longer work.
@@ -85,7 +86,7 @@ with **Alt+D** as the default. Updates and Help are separate destinations; Help
 groups troubleshooting by symptom. Drag the top bar or the VOCO brand area to move the window.
 Resize using its edges. Hide to tray closes the panel without quitting.
 
-There is one output behavior: direct cursor dictation. Assistant integrations,
+There is one output behavior: dictation into the focused app. Assistant integrations,
 conversation, enhancement and output-mode selectors are removed. Upgrades ignore
 retired settings and preserve your microphone and shortcut. The interface follows
 system motion, contrast and transparency preferences without an Appearance page.
@@ -100,20 +101,22 @@ Keep editing. Recording is paused while capturing a new shortcut.
 
 Normal dictation is not saved. A temporary owner-only local text checkpoint is
 deleted after Stop, a handled failure, cancellation or a clean app exit. Audio is
-never written by crash recovery. This does not clear the destination or clipboard.
+never written by crash recovery. This does not clear the clipboard or text already
+typed into an app.
 
 After an unexpected app exit, right-click the tray icon and choose **Review**.
 The resizable window keeps long text scrollable and Copy and Discard reachable.
-Check the destination first: some words may already be there. Copy never pastes,
+Check the app you were dictating into first: some words may already be there. Copy never pastes,
 retries delivery or removes the entry; Discard asks for confirmation.
 Up to five interrupted transcripts are retained, each limited to 256 KiB. A sixth
 crash replaces the oldest. Recovery includes only the last completed checkpoint,
 not speech still awaiting recognition. Prior crash entries remain until discarded.
 
-If delivery is interrupted without an app crash, VOCO notifies you, stops sending
-text and keeps healthy recognition running through Stop. After Stop it clears the
-temporary text and audio and allows another recording. Check your field for missing
-words. VOCO never opens Review automatically or blindly replays uncertain output.
+If typing is interrupted without an app crash, VOCO notifies you, stops typing
+and keeps healthy recognition running through Stop. At Stop it copies the words it
+did not type to the clipboard, clears the temporary text and audio and allows
+another recording. VOCO never opens Review automatically or replays uncertain
+output as keys.
 
 ## Optional browser integration
 

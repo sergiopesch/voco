@@ -1,3 +1,7 @@
+> **Superseded in 2026.0.60.** The AT-SPI focus helper described here was removed;
+> desktop paste now goes to whatever has keyboard focus. See
+> [desktop paste](desktop-paste.md). This page is a historical record.
+
 # Focus-event verification and first-word timing
 
 The desktop helper now subscribes to `object:state-changed:focused`. It uses an event's source only as a search hint: before using it, it refreshes its focused state, process identity and parent chain to the active window, including the parent's current child reference. A stale or detached hint falls back to the bounded fresh tree search. The tree fallback now budgets 128 discovered nodes globally instead of truncating each container to 30 children. This covers more wide containers while bounding total child fetches. Some GTK controls do not emit a focus-gained event until an accessibility client first discovers them; the native test exposed this gap. Larger or inaccessible trees can still exceed the budget.

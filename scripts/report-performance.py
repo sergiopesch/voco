@@ -55,12 +55,6 @@ def validate_entry(row):
         require(isinstance(row.get('name'), str) and bool(row['name']))
         if 'duration_ms' in row:
             require(nonnegative(row['duration_ms']))
-    if event == 'destination_check':
-        require(row.get('scope') in ('control', 'window', 'unavailable'))
-        require(row.get('stage') in ('status', 'paste'))
-        require(row.get('outcome') in ('observed', 'matched', 'rejected', 'unverified'))
-        require(type(row.get('events_tracked')) is bool)
-        require(nonnegative(row.get('duration_ms')))
     if event == 'resource_sample':
         require(type(row.get('available')) is bool)
         if row['available']:
@@ -95,8 +89,8 @@ def session_summary(key, events):
             for reason in ('coalesced', 'superseded', 'waiting_agreement', 'unchanged', 'revised', 'empty')},
         'paste_stages_ms': {stage: distribution([e['duration_ms'] for e in events
             if e['name'] == name and 'duration_ms' in e]) for stage, name in (
-                ('target_probe', 'dictation_desktop_target_probe_completed'),
                 ('preflight', 'dictation_desktop_paste_preflight_completed'),
+                ('modifier_wait', 'dictation_desktop_modifier_wait_completed'),
                 ('clipboard_write', 'dictation_desktop_clipboard_write_completed'),
                 ('keyboard_dispatch', 'dictation_desktop_keyboard_dispatch_completed'))},
         'paste_dispatch_ms': distribution([e['duration_ms'] for e in events
@@ -110,9 +104,8 @@ def session_summary(key, events):
         'delivery_observations': {
             'desktop_paste_session': bool(counts['dictation_desktop_paste_session_started']),
             'desktop_stream_session': bool(counts['dictation_desktop_stream_started']),
-            'terminal_paste_dispatch_count': counts['dictation_desktop_terminal_route_dispatched'],
-            'standard_paste_dispatch_count': counts['dictation_desktop_standard_route_dispatched'],
             'desktop_paste_dispatch_count': counts['dictation_desktop_paste_dispatched'],
+            'desktop_paste_deferred_count': counts['dictation_desktop_paste_deferred'],
             'desktop_phrases_queued': counts['dictation_desktop_phrase_queued'],
             'desktop_snapshots_requested': counts['dictation_desktop_snapshot_requested'],
             'desktop_snapshots_recognized': counts['dictation_desktop_snapshot_recognized'],
@@ -122,6 +115,7 @@ def session_summary(key, events):
             'desktop_stream_failed': bool(counts['dictation_desktop_stream_failed']),
             'desktop_paste_dispatched': bool(counts['dictation_desktop_paste_dispatched']),
             'desktop_paste_failed': bool(counts['dictation_desktop_paste_failed']),
+            'desktop_remainder_copied': bool(counts['dictation_desktop_remainder_copied']),
             'cursor_session_started': bool(counts['dictation_owned_preedit_started']),
             'cursor_unavailable': bool(counts['dictation_owned_preedit_unavailable']),
             'cursor_failure': any(counts[name] for name in (
@@ -243,7 +237,8 @@ def summarize(entries, run_id=None, malformed=0):
         flags.append('cursor_delivery_failure_requires_review')
     if any(e['name'] == 'dictation_manual_transcript_ready' for e in lifecycle):
         flags.append('manual_copy_ready_requires_review')
-    if any(e['name'] in {'dictation_desktop_paste_failed', 'dictation_desktop_paste_unavailable', 'dictation_desktop_stream_failed'} for e in lifecycle):
+    if any(e['name'] in {'dictation_desktop_paste_failed', 'dictation_desktop_paste_unavailable',
+                                       'dictation_desktop_stream_failed', 'dictation_desktop_remainder_copied'} for e in lifecycle):
         flags.append('desktop_paste_failure_requires_review')
     if any(e['name'] == 'dictation_desktop_paste_dispatched' for e in lifecycle):
         flags.append('desktop_paste_dispatch_needs_target_verification')
@@ -258,14 +253,6 @@ def summarize(entries, run_id=None, malformed=0):
     if not any(e['name'] == 'recording_state_active' for e in lifecycle):
         flags.append('no_active_recording_observed')
     return {
-        'destination_verification': {
-            stage: {
-                'observations': sum(e['event'] == 'destination_check' and e['stage'] == stage for e in rows),
-                'scopes': dict(Counter(e['scope'] for e in rows if e['event'] == 'destination_check' and e['stage'] == stage)),
-                'outcomes': dict(Counter(e['outcome'] for e in rows if e['event'] == 'destination_check' and e['stage'] == stage)),
-                'event_registration_missing': sum(e['event'] == 'destination_check' and e['stage'] == stage and not e['events_tracked'] for e in rows),
-                'probe_ms': distribution(e['duration_ms'] for e in rows if e['event'] == 'destination_check' and e['stage'] == stage),
-            } for stage in ('status', 'paste')},
         'review_flags': flags,
         'recordings': [session_summary(key, events) for key, events in sessions.items()
                        if any(e['name'] in {'recording_state_requested', 'recording_state_active',

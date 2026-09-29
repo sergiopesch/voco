@@ -15,33 +15,42 @@ With .47 you can also run `voco --check-desktop-input`. It checks prerequisites
 without launching VOCO, recording speech, copying text or sending keystrokes.
 A passing check still requires a real dictation trial in your intended application.
 
-**No text cursor available** has a different meaning: click in an accessible text
-field before pressing your shortcut. Password fields and unsupported custom editors
-remain excluded. VOCO must not record and paste blindly when the target is unknown.
+Earlier releases showed **No text cursor available** and refused to record when
+they could not identify the focused field, for example in a Ghostty pane. VOCO now
+records and pastes into whatever has keyboard focus, in any app.
 
-### Ghostty stops before listening
+### A terminal or browser behaves differently
 
-Ghostty 1.3.1 on Linux exposes a focused graphical terminal pane without an accessible
-text caret. VOCO .55 rejects that pane before recording; repeating onboarding or
-granting microphone access again does not repair this compatibility issue.
-The [.56 release](releases/2026.0.56.md) adds a distinct focused-pane route and
-preserves microphone readiness after a destination rejection. It retains pane
-identity and focus-change checks without requiring Ghostty to expose a text caret.
-Terminal delivery remains dispatch-only: read-only terminal mode can reject paste,
-and VOCO cannot identify every shell password prompt or terminal application mode.
+VOCO pastes the same way everywhere, so terminals such as Ghostty and browsers
+such as Brave need no special setup. It sets both the clipboard and the primary
+selection, then presses Shift+Insert: GTK, Qt, Chromium-based browsers (including
+the address bar), Firefox and Electron apps paste the clipboard, and most
+terminals paste the primary selection. Line breaks become spaces and VOCO never presses
+Enter, but it cannot identify a shell password prompt or a read-only terminal
+mode. Review terminal text before running it.
+
+On GNOME Wayland without the [VOCO panel](#no-live-bars-or-listening-in-the-top-panel),
+the focused app also receives **Alt+D**: a browser focuses its address bar, so
+the words land there, and a terminal deletes a word. Enable the panel and sign out
+and back in, or assign `voco --toggle` to an unused key in your desktop's shortcut
+settings, as in [Wayland compositor shortcuts](install.md#wayland-compositor-shortcuts).
 
 ## VOCO records but does not type into the active application
 
 VOCO normally streams NVIDIA recognition through desktop paste.
 First verify the complete package and worker identity: a base Tauri package lacks the
 NVIDIA payload. Inspect old launcher overrides, especially `VOCO_STREAM_WORKER`,
-`VOCO_DESKTOP_PASTE=0` and `VOCO_DESKTOP_STREAM=0`. Keep the intended editable field
-focused, check helper availability, and review local app/worker diagnostics.
+`VOCO_DESKTOP_PASTE=0` and `VOCO_DESKTOP_STREAM=0`. Keep the app you are dictating
+into focused, check the helpers with `voco --check-desktop-input`, and review local
+app/worker diagnostics. Apps that remap Shift+Insert, remote desktops and virtual
+machines may not accept the paste.
 
-A successful recognizer response or key dispatch does not prove that the target accepted
-text. Open VOCO recovery and inspect the destination before copying: some words may
-already have arrived. Do not repeatedly replay an uncertain insertion. The optional
-Chromium exact-field adapter uses a separate contract; IBus remains shortcut-only.
+A successful key dispatch does not prove that the app accepted the text. If a paste
+fails, VOCO stops typing; at Stop it copies the words it did not type to the
+clipboard and notifies you. Check the field before pasting them with Shift+Insert:
+some words may already have arrived. VOCO never replays an uncertain paste. The
+optional Chromium exact-field adapter uses a separate contract; IBus remains
+shortcut-only.
 
 ## Spaces appear as the letter S
 
@@ -128,7 +137,7 @@ private and distinguish synthetic isolated tests from physical microphone accept
 ## IBus shortcut source is missing or outdated
 
 The optional `VOCO Dictation` source can supply consuming recording shortcuts. It is not an
-insertion prerequisite. Native/engine protocol v5 rejects all legacy composition and text mutation
+insertion prerequisite. Native/engine protocol 6 rejects all legacy composition and text mutation
 operations. An older resident engine cannot be made safe merely by changing output mode; use the
 matching updated application and engine package.
 

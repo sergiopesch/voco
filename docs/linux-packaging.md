@@ -92,8 +92,7 @@ unmodified VOCO service; another running app, custom unit or unrelated daemon
 prevents migration. `voco --setup-desktop-input` performs this step explicitly
 while VOCO is closed. See [helper provenance](../vendor/ydotool-legacy/README.md). It does not change device permissions or group membership.
 Debian 13
-repositories may not provide it, so the recommendation must not block X11 installs. `at-spi2-core` and
-`gir1.2-atspi-2.0` provide the accessibility bus and bindings. Package installation
+repositories may not provide it, so the recommendation must not block X11 installs. Package installation
 does not change the selected input source or restart IBus.
 
 The .43 Debian package repairs inherited `0775` permissions on its own root-owned
@@ -284,13 +283,10 @@ attempted after a clipboard mutation or uncertain dispatch. See
 [desktop paste verification](testing/desktop-paste.md).
 
 
-The current package depends on `gir1.2-atspi-2.0` and `at-spi2-core`. The bounded
-Python helper is embedded in the Rust executable and uses Python/GI plus the AT-SPI
-service. Focus discovery returns opaque identity and paste-gesture metadata. Eligible
-fields also permit bounded transient local-region text readback during delivery
-observation; that text is not logged or returned to the frontend. The helper does
-not change accessibility settings. Unsupported controls retain best-effort delivery,
-without a universal acceptance claim. See [observation](testing/delivery-observation.md).
+Desktop paste sends one Shift+Insert gesture to whatever has keyboard focus. It
+uses no accessibility service and reads no field text or focus metadata. The
+package list still names `gir1.2-atspi-2.0` and `at-spi2-core`, which the removed
+focus helper needed; no application code uses them.
 
 ## Bundled NVIDIA runtime
 

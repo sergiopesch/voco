@@ -1,3 +1,7 @@
+> **Superseded in 2026.0.60.** The AT-SPI focus helper described here was removed;
+> desktop paste now goes to whatever has keyboard focus. See
+> [desktop paste](desktop-paste.md). This page is a historical record.
+
 # Destination-probe performance
 
 The desktop focus helper invalidates each visited AT-SPI object's cache with `clear_cache_single()` immediately before reading its properties. This API is supplied by the Ubuntu reference libatspi. Unlike recursive `clear_cache()`, it avoids repeatedly traversing unrelated descendants as the search visits parents and children. It does not reuse focus results across requests, change the traversal limits, omit terminal detection, or remove the expected-target token comparison.

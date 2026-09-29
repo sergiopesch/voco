@@ -45,7 +45,8 @@ class PerformanceReportTests(unittest.TestCase):
                  ('dictation_desktop_phrase_queued', 2000), ('dictation_desktop_paste_dispatched', 300),
                  ('dictation_desktop_first_phrase_dispatched', 2900), ('dictation_desktop_paste_dispatched', 320),
                  ('dictation_desktop_stream_flush_completed', 1200), ('dictation_desktop_stream_failed', None),
-                 ('dictation_desktop_terminal_route_dispatched', None), ('dictation_desktop_keyboard_dispatch_completed', 350)]
+                 ('dictation_desktop_paste_deferred', None), ('dictation_desktop_modifier_wait_completed', 12),
+                 ('dictation_desktop_keyboard_dispatch_completed', 350), ('dictation_desktop_remainder_copied', None)]
         rows = [self.row(1, 'run_metadata')]
         for i, (name, duration) in enumerate(names, 2):
             fields = {'name': name, 'dictation_session_id': 1}
@@ -57,9 +58,11 @@ class PerformanceReportTests(unittest.TestCase):
         self.assertEqual(session['first_desktop_phrase_dispatch_ms'], 2900)
         self.assertEqual(session['paste_dispatch_ms']['count'], 2)
         self.assertEqual(session['paste_stages_ms']['keyboard_dispatch']['p50'], 350)
-        self.assertEqual(session['delivery_observations']['terminal_paste_dispatch_count'], 1)
+        self.assertEqual(session['paste_stages_ms']['modifier_wait']['p50'], 12)
+        self.assertEqual(session['delivery_observations']['desktop_paste_deferred_count'], 1)
         self.assertEqual(session['delivery_observations']['desktop_paste_dispatch_count'], 2)
         self.assertTrue(session['delivery_observations']['desktop_stream_failed'])
+        self.assertTrue(session['delivery_observations']['desktop_remainder_copied'])
         self.assertIn('desktop_paste_failure_requires_review', result['review_flags'])
 
     def test_live_snapshot_work_and_limit_remain_distinct_from_editor_receipts(self):
@@ -236,25 +239,6 @@ class PerformanceReportTests(unittest.TestCase):
         self.assertEqual(result['backend_resources']['counter_deltas_between_samples']['major_page_faults'], 2)
         self.assertIsNone(result['backend_resources']['counter_deltas_between_samples']['voluntary_context_switches'])
         self.assertEqual(result['writer_queue_delay_ms']['p50'], 3)
-
-
-class DestinationReportTests(unittest.TestCase):
-    def row(self,**changes):
-        return dict(schema=1,seq=1,t_us=1000,run_id='run',event='destination_check',
-            **({'scope':'window','stage':'paste','outcome':'matched','events_tracked':False,'duration_ms':3}|changes))
-    def test_window_match_is_not_promoted_to_control_verification(self):
-        result=report.summarize([report.validate_entry(self.row())])['destination_verification']
-        self.assertEqual(result['paste']['scopes'],{'window':1})
-        self.assertEqual(result['paste']['event_registration_missing'],1)
-        self.assertEqual(result['status']['observations'],0)
-        self.assertIsNone(result['status']['probe_ms']['p50'])
-    def test_invalid_destination_metadata_rejected(self):
-        for changes in [{'scope':'private field name'},{'stage':'unknown'},{'outcome':'secret'},{'events_tracked':1},{'duration_ms':float('nan')}]:
-            with self.assertRaises(ValueError):report.validate_entry(self.row(**changes))
-    def test_legacy_logs_do_not_invent_destination_coverage(self):
-        result=report.summarize([dict(schema=1,seq=1,t_us=1000,run_id='run',event='run_metadata')])
-        self.assertEqual(result['destination_verification']['paste']['observations'],0)
-        self.assertIsNone(result['destination_verification']['paste']['probe_ms']['p50'])
 
 
 if __name__ == '__main__':

@@ -138,6 +138,8 @@ field contents and destination identities are never copied into these events.
 These diagnostics explain a rejected start; they do not authorize cursor delivery.
 The published .47 trace has only the generic `dictation_desktop_paste_unavailable`
 event, so it cannot establish which of those conditions caused an earlier failure.
+2026.0.60 removes these cursor events with the focus probe: desktop paste no longer
+inspects the focused control.
 
 The same source candidate records `desktop_notification_accepted`,
 `desktop_notification_connection_unavailable`, `desktop_notification_request_failed`
@@ -158,8 +160,9 @@ request marker does not prove successful full shutdown.
    and whether the machine is otherwise busy. Avoid changing several variables together.
 2. Try a cold launch and repeated short dictations, then a 1–3 minute natural passage
    with pauses. Include punctuation, numbers and names you normally dictate.
-3. Exercise Stop, Cancel, manual Copy, and switching focus while recording. Note any
-   unexpected destination change, lost words, repeated words, hangs or confusing state.
+3. Exercise Stop, Cancel, manual Copy, and switching focus while recording; later
+   chunks should go to the newly focused field. Note text in an unexpected place,
+   lost words, repeated words, hangs or confusing state.
 4. Write a short observation beside each problematic session: what you did, what you
    expected, what appeared and roughly when. Avoid sensitive text in shared notes.
 5. For measured word accuracy, read an agreed passage and compare the returned text

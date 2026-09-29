@@ -1,5 +1,7 @@
 import type { AudioDeviceOption, DesktopInputStatus, ShortcutDiagnostics } from "@/types";
 
+const ANY_APP = "To dictate into any app, start dictation from the tray or assign voco --toggle to a shortcut in your desktop settings.";
+
 export function unknownShortcut(hotkey: string): ShortcutDiagnostics {
   return { hotkey, route: null, state: "unknown", detail: "Shortcut availability has not been verified." };
 }
@@ -12,15 +14,14 @@ export function shortcutPresentation(hotkey: string, observation?: ShortcutDiagn
     instruction: desktopInput?.available === false
       ? `Desktop setup required. ${desktopInput.detail}`
       : available
-      ? current.route === "ibus"
-        ? `Focus a supported text field and press ${hotkey} to dictate at your cursor.`
-        : `Press ${hotkey} to dictate at your cursor.`
+      ? `Press ${hotkey} to dictate at your cursor.`
       : `Shortcut configured: ${hotkey}. Start dictation from the tray.`,
     detail: current.detail,
+    // Text is pasted into the focused app whichever route starts dictation.
     setup: current.state === "focus-required"
-      ? "Focus a text field with VOCO Dictation selected as your input source."
+      ? `The optional VOCO Dictation input source handles this shortcut only in supported text fields. ${ANY_APP}`
       : !available
-        ? "For IBus recording shortcuts, add VOCO Dictation in your desktop Input Sources settings, select it, then focus a text field. VOCO never switches your input source automatically."
+        ? ANY_APP
         : null,
   };
 }

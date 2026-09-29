@@ -14,6 +14,7 @@ export class BrowserStreamDelivery {
   private lease: number | null = null;
   private committed = "";
   private closed = false;
+  private failure: unknown = null;
 
   constructor(private readonly isCurrent: () => boolean, private readonly api = native) {}
 
@@ -43,12 +44,15 @@ export class BrowserStreamDelivery {
       this.verify(status, lease, next, false);
       this.committed = next;
     } catch (error) {
+      this.failure ??= error;
       await this.cancel();
       throw error;
     }
   }
 
   async finish() {
+    // Report why delivery stopped, not merely that the lease is gone.
+    if (this.failure) throw this.failure;
     this.assertActive();
     const lease = this.requireLease();
     try {

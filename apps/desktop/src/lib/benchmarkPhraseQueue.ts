@@ -1,9 +1,16 @@
 // Production NVIDIA stream: serialize bounded audio IPC and append-only delivery.
-// Capture/recovery belong to the hook; target checks and key dispatch remain native.
+// Capture/recovery belong to the hook; each paste goes to whatever has focus.
 import { invoke } from "@tauri-apps/api/core";
 import { errorMessage } from "./dictationRecovery";
+import type { InsertionError } from "./tauri";
 
-export type DesktopStreamEvent = "appended" | "revised";
+export type DesktopStreamEvent = "appended" | "revised" | "deferred";
+
+// Only an explicit "no-mutation" typed nothing; an unshaped rejection may have.
+function insertionOutcome(error: unknown): InsertionError["outcome"] {
+  const outcome = (error as { outcome?: unknown } | null)?.outcome;
+  return outcome === "no-mutation" || outcome === "rejected" ? outcome : "uncertain";
+}
 
 export function appendOnlySuffix(committed: string, text: string): string {
   if (!text.startsWith(committed)) {
@@ -204,6 +211,7 @@ export class BenchmarkPhraseQueue {
     if (this.delivering || this.cancelled || this.failure || this.deliveryFailure) return;
     this.delivering = true;
     this.delivery = (async () => {
+      let pendingSince: number | null = null;
       try {
         while (!this.cancelled && !this.failure && !this.deliveryFailure && this.latest !== this.committed) {
           const target = this.latest;
@@ -222,6 +230,7 @@ export class BenchmarkPhraseQueue {
             ...textLengths(this.committed, "committed"), ...textLengths(target, "target"),
             ...textLengths(suffix, "suffix"),
           }));
+          pendingSince = this.pendingSince;
           this.pendingSince = null;
           await this.paste(suffix, {
             session: this.session, dictationSessionId: this.dictationSessionId,
@@ -241,11 +250,20 @@ export class BenchmarkPhraseQueue {
           this.onPreview("appended");
         }
       } catch (error) {
-        this.failedDeliverySeq = this.activeDeliverySeq;
-        this.quality("delivery_failed", { delivery_seq: this.activeDeliverySeq,
+        const outcome = insertionOutcome(error);
+        this.quality("delivery_failed", { delivery_seq: this.activeDeliverySeq, outcome,
           destination_content_observation: "unavailable" });
-        this.activeDeliverySeq = null;
-        this.fail(error, "insertion_failed", "delivery");
+        if (outcome === "no-mutation") {
+          // Nothing was typed, so the whole suffix stays pending for the next
+          // hypothesis or Stop. Text that may have been typed is never replayed.
+          this.pendingSince = pendingSince ?? this.pendingSince;
+          this.activeDeliverySeq = null;
+          this.onPreview("deferred");
+        } else {
+          this.failedDeliverySeq = this.activeDeliverySeq;
+          this.activeDeliverySeq = null;
+          this.fail(error, "insertion_failed", "delivery");
+        }
       } finally {
         this.delivering = false;
       }
@@ -309,11 +327,20 @@ export class BenchmarkPhraseQueue {
     });
   }
 
-  async finish() {
+  /** Rejects only for recognition failures. `undelivered` is recognized text
+   * that was not typed, including a chunk whose paste outcome is uncertain. */
+  async finish(): Promise<{ undelivered: string }> {
     await this.pending;
     await this.delivery;
+    // Deferred ("no-mutation") text gets a few bounded retries at Stop.
+    for (let attempt = 0; attempt < 3 && this.latest !== this.committed
+      && !this.cancelled && !this.failure && !this.deliveryFailure; attempt++) {
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      this.deliver();
+      await this.delivery;
+    }
     this.terminal();
     if (this.failure) throw this.failure;
-    if (this.deliveryFailure) throw this.deliveryFailure;
+    return { undelivered: this.cancelled ? "" : this.latest.slice(this.committed.length) };
   }
 }

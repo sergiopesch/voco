@@ -89,9 +89,29 @@ describe("ControlPanel", () => {
       sessionType: "wayland", typeSimulation: support, clipboard: support,
       ownedPreedit: { available: false, ready: false, setupState: "safety-disabled", detail: "Manual copy", sessionId: null, engineActive: false, focusLost: false, progressiveCommitActive: false, committedCharacterCount: 0, ownershipIntact: false, finalizationOutcome: null, error: null },
     } });
-    expect(markup).toContain("Focus a text field, then use your shortcut.");
+    expect(markup).toContain("Click where you want the text, then use your shortcut.");
     expect(markup).toContain("Alt+D");
     expect(markup).not.toContain("Start listening");
+  });
+
+  it("recommends the GNOME panel companion without blocking dictation", () => {
+    const support = { available: true, requiredCommands: [], missingCommands: [], optionalMissingCommands: [], detail: "Fixture" };
+    const runtimeDiagnostics = {
+      desktopInput: { available: true, setupArea: "panel" as const, detail: "VOCO's GNOME panel is not enabled." },
+      desktopPaste: { enabled: true, available: true, detail: "Ready" },
+      shortcut: { hotkey: "Alt+D", route: "evdev" as const, state: "available" as const, detail: "Keyboard ready" },
+      sessionType: "wayland", typeSimulation: support, clipboard: support,
+      ownedPreedit: { available: false, ready: false, setupState: "not-enabled" as const, detail: "Not enabled", sessionId: null, engineActive: false, focusLost: false, progressiveCommitActive: false, committedCharacterCount: 0, ownershipIntact: false, finalizationOutcome: null, error: null },
+    };
+    const settings = renderPanel({ surface: "settings", runtimeDiagnostics });
+    expect(settings).toContain("Recommended: enable the VOCO panel so Alt+D isn’t also sent to the app you’re dictating into. Dictation works without it.");
+    expect(settings).not.toContain("Desktop setup needs attention");
+    const popover = renderPanel({ runtimeDiagnostics });
+    expect(popover).toContain("Click where you want the text, then use your shortcut.");
+    expect(popover).not.toContain("Open Help to finish desktop setup.");
+    const advanced = renderPanel({ surface: "settings", requestedSection: "Advanced", runtimeDiagnostics });
+    expect(advanced).toContain("Tray setup");
+    expect(advanced).not.toContain("Setup required");
   });
 
   it("never exposes handled delivery text in the status popover", () => {
@@ -127,14 +147,15 @@ describe("ControlPanel", () => {
     expect(markup).not.toContain("Accent-aware recognition is planned");
   });
 
-  it("explains the fail-closed live-cursor target boundary", () => {
+  it("explains that words go to the focused app and the clipboard fallback", () => {
     const settingsMarkup = renderPanel({
       surface: "settings",
       requestedSection: "Output",
     });
-    expect(settingsMarkup).toContain("Keep the same field focused");
-    expect(settingsMarkup).toContain("If delivery stops");
+    expect(settingsMarkup).toContain("VOCO pastes into whichever app has keyboard focus, including terminals and browsers.");
+    expect(settingsMarkup).toContain("copies the rest of your words to the clipboard when you stop");
     expect(settingsMarkup).toContain("Review is available from the tray after an unexpected app exit.");
+    expect(settingsMarkup).toContain("IBus shortcut (optional)");
 
     const onboardingMarkup = renderPanel({
       surface: "onboarding",

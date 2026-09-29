@@ -7,12 +7,12 @@ Read [README](README.md), [the code map](docs/architecture/code-map.md) and
 ## Product contract
 
 - No account, subscription, telemetry or cloud transcription.
-- One normal output path: streaming dictation directly to the cursor.
+- One normal output path: streaming dictation into whatever app has keyboard focus.
 - No assistant, OpenClaw, realtime conversation, enhancement or appearance settings.
 - Preserve the tray-first interface and system accessibility preferences.
 - Keep microphone and shortcut configuration; recover interrupted dictation explicitly.
-- Clipboard paste replaces clipboard text and never sends Enter. Never blindly
-  replay uncertain output or overwrite text after focus changes.
+- Clipboard paste replaces the clipboard and primary selection and never sends
+  Enter. Never replay output whose paste is uncertain; copy it for the user instead.
 
 ## Architecture
 
@@ -62,69 +62,39 @@ glib 0.20 directly leaves the GTK dependency behind. [Backport](vendor/glib/VOCO
   VOCO's unmodified user unit while holding its single-instance guard, before
   recording can start. Package hooks must not restart desktop session services.
 - Legacy ydotool requires a literal space argument, not `space`. Its paste delay
-  is 24 ms; modern numeric arguments and terminal gestures have separate contracts.
-- X11 shortcut scope belongs to the exact focus window, UUID and renderer epoch
-  through final delivery. Keep the 650-second lease and release ownership safely.
+  is 24 ms; modern ydotool takes numeric key events.
 - Completed IBus authority and a poll in flight differ. Consuming X11 callbacks
   proceed through debounce; passive evdev retains its duplicate guard.
 - IBus protocol 6 is dictation-shortcut-only; older helpers must reconnect after upgrade. Never restore text mutation there.
-- Bounded accessible-field observations are not atomic ownership or cursor paint.
-  Rich editors require a bounded caret-linked paragraph route, including route identity
-  and trailing noneditable scaffolding. Direct and nested editable HTML div/p blocks
-  can lose their empty BR on first paste; native/plain-text newlines remain literal.
-  Never acknowledge the outer object placeholder.
-  Content and caret can propagate separately. Exact expected content at an earlier
-  known caret is pending, never receipt; retain the deadline and no-replay rule.
-  Post-dispatch focus probing may retain a torn count/caret observation only for
-  the same freshly verified control. Admission and pre-dispatch validation stay
-  strict. Preserve definite progress across uncertain samples; a later regression
-  rejects even when the intervening read was pending.
-- Automatic desktop insertion requires a bound, nonempty destination token. An
-  unavailable preflight is never permission to paste unguarded. GNOME X11's
-  `mutter-x11-frames` decoration is not a second destination; retain rejection for
-  genuinely ambiguous active clients and test focus departure in a real session.
-- Ghostty's GTK terminal canvas is an explicit `terminal_surface` destination,
-  distinct from an accessible editable caret. Bind its unique focused pane through
-  a bounded, fresh downward accessibility route; GTK can omit synthetic parents
-  from reverse ancestry. Require focus/window-loss event tracking and retain
-  departure/return invalidation. Ordinary Ghostty text fields use Ctrl+V. A canvas
-  only supports terminal paste dispatch: never invent caret, protected-input,
-  read-only-mode or content-receipt assurance, and never use an app/window-only fallback.
-- Suggestion focus may resolve to its editable controller only through bounded,
-  reciprocal POPUP_FOR/CONTROLLER_FOR relations, fresh focus, same process and
-  active-window ancestry. Settle owner loss only within the drained event batch;
-  real field departures and roundtrips must invalidate the destination. Cold
-  lookup may follow the same verified popup-owner route; never skip its fresh
-  active-window ancestry check.
-- Focused WebKit wrappers are search roots, not editable carets. Continue bounded
-  discovery to a freshly focused input; retain password and unfocused-child rejection.
-- Cold discovery prioritizes cached focus/visibility across its bounded queue so
-  hidden popup subtrees cannot starve a visible field. Those flags only order
-  searches: fresh state, ancestry and caret validation still govern admission.
-  Preserve the 128-object discovery budget and the 800 ms helper deadline.
-- Revalidate destination and shortcut scope after clipboard preparation and before
-  keyboard dispatch. Rejection there records the changed clipboard and sends no
-  keys. This is a narrower race window, not atomic ownership during a key gesture.
-- Only the first delivery of a new dictation may replace selected text. Later
-  chunks reject selections, including browser select-all caused by passive Alt+D.
-  Revalidate prepared position/context immediately before keys; an intermediate
-  or uncertain readback cannot authorize another paste.
-- On GNOME Wayland the companion consumes supported Stop shortcuts during
-  starting/recording/processing and sends explicit Stop after modifier release.
-  Only the authenticated Shell can renew the native passive-event suppression;
-  stale tokens, idle states and unsupported accelerators cannot reserve it.
-  Release the compositor grab on a rejected latest reservation, idle, disconnect,
-  disable or state timeout. Older renewal replies must not revoke a newer grab.
-  Bind held Stop intent to the renderer epoch and existing capture session ID,
-  not its changing presentation revision. Bind reservations to that identity and
-  the exact accelerator. Validate explicit Stop against the capture identity at
-  both native dispatch and renderer admission.
+- Each chunk pastes into whatever has keyboard focus when it is ready. There is
+  no destination token, focus probe, terminal classification or per-app route.
+  Copy CLIPBOARD, then PRIMARY (best effort; failure only warns), then send
+  Shift+Insert: toolkits paste CLIPBOARD and terminals paste PRIMARY. A leading
+  joining space is its own Space key because Chromium's address bar trims pasted
+  leading whitespace. ASCII controls become spaces; never send Enter.
+- Wayland helpers emit raw key events, so wait at most 1.5 seconds for released
+  shortcut modifiers (evdev, else the companion's `ModifiersClear`). Unknown
+  state does not block; a timeout sends no keys.
+- Only a `no-mutation` failure, which typed nothing, keeps its text pending for
+  the next chunk or bounded Stop retries. An uncertain or rejected paste stops
+  automatic delivery. Stop copies the undelivered remainder with
+  `copy_desktop_text`, then notifies; it never replays that text as keys.
+- The GNOME Wayland companion is recommended, not required: without it the
+  focused app also receives Alt+D (browsers focus the address bar, terminals
+  delete a word). Companion v11 grabs the configured Alt+D or Alt+Shift+D at
+  every status, idle included, and each press sends `Action('shortcut', '')`.
+  `ReserveShortcut` holds a 2.5-second lease for the exact `shortcutAccelerator`;
+  only the authenticated Shell can renew it, about once a second. While it is
+  fresh, passive evdev ignores the chord and the action toggles through the
+  `gnome_panel` backend; otherwise the action is refused and evdev toggles.
+  Release the grab on rejection, disconnect or disable; late replies about an
+  earlier grab must not act on a newer one. v10 `ReserveStopShortcut` remains
+  only for compatibility. Users re-run panel setup, then sign out and back in to
+  load v11.
 - Closing or navigating an enabled browser tab, or losing its native connection,
   stops that tab's active recording. Ordinary field focus loss revokes delivery
   but preserves the original session's explicit Stop; stale tokens cannot stop
   a newer session.
-- Drain accessibility window-transition events within bounded work and time. Never
-  bind through a partially drained queue; cover ordinary GNOME setup backlogs.
 - Logs are optional, private and bounded. No dictated text, audio, clipboard values,
   URLs or window titles in performance logs. Reject unsafe log/socket targets.
 
@@ -152,7 +122,7 @@ npm run test:dictation-renderer
 npm run test:microphone-renderer
 npm run test:native-capture-renderer
 npm run test:chromium-exact-field
-npm run test:rich-editor-delivery
+npm run test:browser-delivery
 npm run test:application-delivery
 python3 scripts/verify-glib-backport.py
 python3 scripts/test-glib-variant.py --output /tmp/voco-glib-check
@@ -213,10 +183,9 @@ automatic default microphone selection on explicit Start test/recording actions
 when no approved microphone is selected,
 with no idle recording or silent device switching during capture. Onboarding
 uses the production recognition queue with local-only transcript output. Never
-acquire an external text destination, shortcut lease, clipboard or preedit output
-for the onboarding test. Finish must flush capture and recognition successfully.
-Check desktop input prerequisites without binding an external target or sending
-keys; a missing cursor inside onboarding is expected. Only then save completion.
+paste, copy or use preedit output for the onboarding test. Finish must flush
+capture and recognition successfully. Check desktop input prerequisites without
+sending keys or changing the clipboard. Only then save completion.
 Done returns directly to the hidden tray surface without presenting or focusing a
 Ready window. A delivery interruption disables insertion but leaves healthy
 recognition running through Stop. Normal cursor completion and handled failures clear
@@ -224,19 +193,18 @@ text/audio and delete the active crash checkpoint; they never expose a saved tra
 Only a previous unexpected process exit promotes text into explicit tray Review.
 The approved journal is owner-only, bounded, local text only, never audio; retain
 prior crash entries until explicit discard (maximum five, oldest evicted by a sixth crash).
-Review must never auto-open, paste or retry output. Onboarding keeps its local test retry.
+The crash journal never blocks dictation: without a checkpoint, dictation continues
+and notifies. Review must never auto-open, paste or retry output. Onboarding keeps its local test retry.
 Active tray presentation is microphone plus waves only; keep Stop in the context
 menu and icon/shortcut actions. Settings and Review are explicit menu destinations.
-GNOME Wayland paste requires fresh authenticated companion modifier clearance,
-then destination validation and a second modifier sample before sending keys.
 The guided installer must use APT to install the local package and explicitly require
 the Wayland client and daemon on Wayland. Successful package installation alone is
 not desktop readiness. After successful setup, request one detached launch as the
 invoking desktop user; never launch a GUI from root or package hooks. Distinguish
 launch request from readiness and retain manual guidance when launching fails.
-Require a verified editable caret or the qualified Ghostty terminal-surface route
-before cursor dictation. A destination rejection must preserve microphone readiness;
-only a capture-stage failure may invalidate it. Native capture permits real window hiding. Preserve the
+Cursor dictation checks its input helpers, never a verified caret or app route.
+A paste rejection must preserve microphone readiness; only a capture-stage failure
+may invalidate it. Native capture permits real window hiding. Preserve the
 failed WebKit hidden-start experiment and independently verify audio retention.
 The debug audit needs all three explicit flags and completed private bundles;
 wait for their COMMIT receipts before terminating an audited test process.
