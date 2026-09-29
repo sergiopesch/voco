@@ -246,6 +246,8 @@ the explicit user-run setup flow; never change enabled extensions in package hoo
 Keep session restart feedback distinct from active presentation. Bump the companion
 metadata and setup contract together when loaded code must change; compare GNOME
 loaded metadata so an in-place upgrade cannot report old code as current. The
-diagnostics poll may reuse a companion check for up to 20 seconds; Attach, Detach,
-name loss and explicit enabling clear it, and explicit setup status always re-checks. Preserve immutable
+diagnostics poll, setup input check and once-per-launch passive shortcut notice
+may reuse a companion check for up to 20 seconds, or 2 seconds after a failed or
+unavailable check; Attach, Detach, name loss and explicit enabling clear it, and
+explicit setup status always re-checks and clears it. Preserve immutable
 tray PNG paths for the process lifetime and explicit Stop actions. Preserve screenshot proof outside build caches.

@@ -684,7 +684,9 @@ fn with_panel_recommendation(
 
 #[tauri::command(async)]
 fn get_panel_setup_status() -> Result<panel_setup::PanelSetupStatus, String> {
-    panel_setup::check(false)
+    let status = panel_setup::check(false);
+    panel_setup::invalidate_check();
+    status
 }
 
 #[tauri::command(async)]

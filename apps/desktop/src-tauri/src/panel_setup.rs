@@ -3,15 +3,19 @@ use serde::{Deserialize, Serialize};
 use std::sync::{Mutex, PoisonError};
 use std::time::{Duration, Instant};
 
-/// How long the diagnostics poll may reuse a companion check. Attach, detach,
-/// name loss and explicit enabling clear it sooner; the TTL catches edits on disk.
+/// How long a companion check may be reused. Attach, detach, name loss and
+/// explicit checks clear it sooner; the TTL catches edits on disk.
 const CHECK_TTL: Duration = Duration::from_secs(20);
+/// A failed check, or a Shell that did not answer, may be a slow start at
+/// login, so it is retried soon; a missing python3 still isn't started every poll.
+const FAILED_CHECK_TTL: Duration = Duration::from_secs(2);
 
 type CheckResult = Result<PanelSetupStatus, String>;
 
 #[derive(Default)]
 struct CheckCache {
     generation: u64,
+    /// When the result stops being reused, and the result.
     entry: Option<(Instant, CheckResult)>,
 }
 
@@ -77,13 +81,16 @@ pub fn check(enable: bool) -> Result<PanelSetupStatus, String> {
     serde_json::from_slice(&output.stdout).map_err(|_| "Invalid panel setup response".to_string())
 }
 
-/// `check(false)` for the once-a-second diagnostics poll, which would otherwise
-/// start python3 and GI every time. Explicit setup status stays uncached.
+/// `check(false)` for the shortcut recommendation, read by the once-a-second
+/// diagnostics poll, the setup input check and the once-per-launch passive
+/// shortcut notice; each would otherwise start python3 and GI. Explicit setup
+/// status stays uncached.
 pub fn cached_check() -> CheckResult {
     cached_check_with(&CHECK_CACHE, Instant::now, || check(false))
 }
 
-/// Forget the cached check: the companion attached, detached or was enabled.
+/// Forget the cached check: the companion attached, detached or was enabled,
+/// or an explicit check saw its current state.
 pub fn invalidate_check() {
     invalidate(&CHECK_CACHE);
 }
@@ -102,8 +109,8 @@ fn cached_check_with(
     let started = now();
     let generation = {
         let cache = cache.lock().unwrap_or_else(PoisonError::into_inner);
-        if let Some((checked, result)) = &cache.entry {
-            if started.saturating_duration_since(*checked) < CHECK_TTL {
+        if let Some((expires, result)) = &cache.entry {
+            if started < *expires {
                 return result.clone();
             }
         }
@@ -112,9 +119,15 @@ fn cached_check_with(
     // The bounded check runs unlocked. Keep its result only if nothing
     // invalidated the cache meanwhile, so a stale answer cannot outlive Attach.
     let result = check();
+    // A success ages from when the check began. A failure waits from when it
+    // returned, so a helper that timed out is not restarted back to back.
+    let expires = match &result {
+        Ok(setup) if setup.status != "unavailable" => started + CHECK_TTL,
+        _ => now() + FAILED_CHECK_TTL,
+    };
     let mut cache = cache.lock().unwrap_or_else(PoisonError::into_inner);
     if cache.generation == generation {
-        cache.entry = Some((started, result.clone()));
+        cache.entry = Some((expires, result.clone()));
     }
     result
 }
@@ -211,16 +224,28 @@ mod tests {
         );
         assert_eq!(runs.get(), 4);
 
-        // Failures are cached too, so a missing python3 is not retried every poll.
-        invalidate(&cache);
-        assert_eq!(
-            status(cached_check_with(&cache, now, || Err("bus".into()))),
-            Err("bus".into())
-        );
-        assert_eq!(
-            status(cached_check_with(&cache, now, check)),
-            Err("bus".into())
-        );
-        assert_eq!(runs.get(), 4);
+        // A failure, or a Shell that did not answer, is reused only briefly:
+        // a missing python3 is not started every poll, yet a transient D-Bus
+        // timeout cannot hold a false recommendation for the full TTL.
+        for failure in [Err("bus".to_string()), panel("unavailable")] {
+            invalidate(&cache);
+            let failed = cached_check_with(&cache, now, || {
+                clock.set(clock.get() + Duration::from_secs(4)); // the helper timed out
+                failure.clone()
+            });
+            assert_eq!(status(failed), status(failure.clone()));
+            let before = runs.get();
+            assert_eq!(
+                status(cached_check_with(&cache, now, check)),
+                status(failure.clone())
+            );
+            assert_eq!(runs.get(), before, "reused just after the slow check");
+            clock.set(clock.get() + FAILED_CHECK_TTL);
+            assert_eq!(
+                status(cached_check_with(&cache, now, check)),
+                Ok("active".into())
+            );
+            assert_eq!(runs.get(), before + 1, "then checked again");
+        }
     }
 }

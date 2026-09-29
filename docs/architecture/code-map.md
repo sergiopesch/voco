@@ -191,7 +191,8 @@ Capture and final recognition must complete before onboarding is saved.
 VOCO then calls `get_desktop_input_status`: a fresh, bounded input-helper
 check with no key injection or clipboard mutation. For Alt+D and Alt+Shift+D on
 GNOME Wayland, a missing or outdated companion adds a recommendation
-(`setupArea: "panel"`) but never blocks: without it, the focused app also
+(`setupArea: "panel"`) from a companion check that may be reused for up to 20
+seconds. It never blocks: without the companion, the focused app also
 receives the shortcut. `get_desktop_paste_status` reports the same recording
 prerequisites when normal dictation begins; each paste then targets whatever has
 focus. `voco --check-desktop-input` checks input helpers only, without launching
