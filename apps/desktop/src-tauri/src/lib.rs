@@ -1338,7 +1338,8 @@ fn notify_passive_shortcut_once(app_handle: &tauri::AppHandle) {
 #[derive(Debug)]
 struct ConfiguredHotkey {
     hotkey: String,
-    repair_notice: Option<String>,
+    /// Startup notification title and body.
+    notice: Option<(&'static str, String)>,
 }
 
 fn repair_invalid_configured_hotkey(config: &mut AppConfig) -> Option<String> {
@@ -1349,26 +1350,31 @@ fn repair_invalid_configured_hotkey(config: &mut AppConfig) -> Option<String> {
     ))
 }
 
+// A settings file VOCO cannot load or repair also fails get_config, so the
+// window pauses dictation until the user fixes it there.
 fn configured_hotkey() -> ConfiguredHotkey {
     let Ok(mut config) = AppConfig::load() else {
         return ConfiguredHotkey {
             hotkey: "Alt+D".to_string(),
-            repair_notice: Some(
-                "VOCO could not load your shortcut and is using Alt+D.".to_string(),
-            ),
+            notice: Some((
+                "Dictation paused",
+                "VOCO could not load your settings. Open VOCO to fix them.".to_string(),
+            )),
         };
     };
-    let repair_notice = repair_invalid_configured_hotkey(&mut config).map(|notice| {
-        if let Err(error) = config.save() {
-            return format!(
-                "{notice} VOCO could not save the reset ({error}); change the shortcut in Settings."
-            );
-        }
-        notice
+    let invalid_hotkey = config.hotkey.clone();
+    let notice = repair_invalid_configured_hotkey(&mut config).map(|notice| match config.save() {
+        Ok(()) => ("Shortcut reset", notice),
+        Err(error) => (
+            "Dictation paused",
+            format!(
+                "VOCO could not reset your shortcut '{invalid_hotkey}' to Alt+D ({error}). Open VOCO to fix your settings."
+            ),
+        ),
     });
     ConfiguredHotkey {
         hotkey: config.hotkey,
-        repair_notice,
+        notice,
     }
 }
 
@@ -2143,9 +2149,9 @@ pub fn run() -> Result<(), String> {
             }
             #[cfg(target_os = "linux")]
             panel::setup(app.handle());
-            if let Some(notice) = configured_hotkey.repair_notice {
+            if let Some((title, notice)) = configured_hotkey.notice {
                 warn!("{notice}");
-                send_notification("Shortcut reset", &notice);
+                send_notification(title, &notice);
             }
 
             let model_handle = app.handle().clone();
