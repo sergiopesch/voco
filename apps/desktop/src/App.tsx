@@ -70,7 +70,7 @@ const PANEL_SIZE = new LogicalSize(1040, 760);
 
 function getCaptureSelection() {
   const state = useStore.getState();
-  if (state.captureBackendMode === "pending") throw new Error("Capture backend has not been verified. Retry capture setup in Audio settings.");
+  if (state.captureBackendMode === "pending") throw new Error("Capture backend has not been verified. Retry capture setup in Microphone settings.");
   return state.captureBackendMode === "native"
     ? { backend: "native" as const, selectionToken: state.nativeCaptureSource?.selectionToken ?? null }
     : { backend: "webkit" as const };
@@ -375,8 +375,8 @@ export function App() {
       if (!dismissInteractiveSurface()) return true;
       await hideStatusOverlay().catch(() => {});
       await showNotification(
-        "Panel hidden",
-        "Click where you want the text, then press the dictation hotkey again.",
+        "VOCO hidden",
+        "Click where you want the text, then start dictation again.",
       ).catch(() => {});
       return true;
     }

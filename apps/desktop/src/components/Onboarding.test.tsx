@@ -10,7 +10,7 @@ it("offers the panel companion as an optional step once desktop input is ready",
     hotkey="Alt+D" desktopReady onStart={vi.fn()} onStop={vi.fn()}
     onFinish={vi.fn(async () => {})} onCheckDesktopSetup={vi.fn()}
   />);
-  expect(markup).toContain("Tray setup");
+  expect(markup).toContain("Panel setup");
   expect(markup).toContain(">Done</button>");
   expect(markup).not.toContain("Check desktop setup");
 });
@@ -25,5 +25,5 @@ it("blocks Done for an input-helper failure without offering companion controls"
   expect(markup).toContain("Input service is unavailable.");
   expect(markup).toContain("Check desktop setup");
   expect(markup).not.toContain(">Done</button>");
-  expect(markup).not.toContain("Tray setup");
+  expect(markup).not.toContain("Panel setup");
 });

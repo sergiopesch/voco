@@ -26,6 +26,13 @@ export function errorMessage(error: unknown): string {
   return String(error);
 }
 
+/** Ends a message with exactly one terminator so text can follow it. */
+export function sentence(message: string): string {
+  const text = message.trim().replace(/\.+$/, "");
+  if (!text) return "";
+  return /[!?…]$/.test(text) ? text : `${text}.`;
+}
+
 /** Preserve pending/active recognition: wait for an active attempt, then retry owned bytes.
  * Recovery continues the exact prefix and never reactivates target delivery. */
 export function resumeCanonicalForRecovery(

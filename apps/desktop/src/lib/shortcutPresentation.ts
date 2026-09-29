@@ -12,7 +12,7 @@ export function shortcutPresentation(hotkey: string, observation?: ShortcutDiagn
   return {
     available,
     instruction: desktopInput?.available === false
-      ? `Desktop setup required. ${desktopInput.detail}`
+      ? `Desktop setup needed. ${desktopInput.detail}`
       : available
       ? `Press ${hotkey} to dictate at your cursor.`
       : `Shortcut configured: ${hotkey}. Start dictation from the tray.`,

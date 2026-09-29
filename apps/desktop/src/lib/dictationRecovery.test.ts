@@ -3,7 +3,7 @@ import { beginCanonicalTranscription, captureCanonicalPreparation, completeCanon
   createCanonicalCursorSession, failCanonicalSession, failCanonicalTranscription, finishCanonicalSession,
   invalidateCanonicalCache, planCanonicalWork, planNextCompleteSourceBlock, recordCanonicalSourceBlock,
   requestCanonicalStop, type CanonicalCursorSession } from "./canonicalCursorSession";
-import {captureSampleLimit,errorMessage,MAX_CAPTURE_SAMPLES,resumeCanonicalForRecovery}from"./dictationRecovery";
+import {captureSampleLimit,errorMessage,MAX_CAPTURE_SAMPLES,resumeCanonicalForRecovery,sentence}from"./dictationRecovery";
 function cached() {
  let s=createCanonicalCursorSession(3,16000);const block=planNextCompleteSourceBlock(s,480000)!;
  s=recordCanonicalSourceBlock(s,block,480000,captureCanonicalPreparation(s,block));
@@ -37,4 +37,11 @@ it("bounds source memory and preserves structured target errors",()=>{
  expect(captureSampleLimit(16000)).toBe(9600000);expect(captureSampleLimit(48000)).toBe(28800000);
  expect(captureSampleLimit(192000)).toBe(MAX_CAPTURE_SAMPLES);
  expect(errorMessage({message:"Target may contain text."})).toBe("Target may contain text.");
+});
+it("ends interpolated messages with exactly one period",()=>{
+ expect(sentence("Capture sample rate changed")).toBe("Capture sample rate changed.");
+ expect(sentence("VOCO stopped transcribing.")).toBe("VOCO stopped transcribing.");
+ expect(sentence(" Worker stopped.. ")).toBe("Worker stopped.");
+ expect(sentence("Is the worker running?")).toBe("Is the worker running?");
+ expect(sentence("")).toBe("");
 });

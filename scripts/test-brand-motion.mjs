@@ -187,7 +187,7 @@ try {
       await page.getByRole('button',{name:'Shortcut',exact:true}).click();
       assert.equal(await page.locator('.voco-preferences__shortcut-summary kbd').innerText(),'Alt+D');
       await page.getByRole('button',{name:'Change shortcut',exact:true}).click();
-      const shortcutInput = page.getByLabel('Start and stop listening',{exact:true});
+      const shortcutInput = page.getByLabel('Start and stop dictation',{exact:true});
       assert.equal(await shortcutInput.evaluate(el => document.activeElement === el),true);
       await shortcutInput.fill('Ctrl+Alt+K');
       await page.getByRole('button',{name:'Cancel',exact:true}).click();

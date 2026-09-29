@@ -258,6 +258,8 @@ for (const failure of ['module', 'construction']) {
   assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>c[0]==='pasteDesktopText')),false);
   await stop();await interrupted();
   assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>['transcribeAudio','pasteDesktopText'].includes(c[0]))),false);
+  const fallbackNotes = await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='showNotification'));
+  assert.ok(fallbackNotes.some(c=>c[1]==='Dictation interrupted'&&c[2].includes("didn't type this recording")), JSON.stringify(fallbackNotes));
   assert.equal(await page.getByRole('button',{name:'Retry transcription',exact:true}).count(),0);
   assert.equal(await page.evaluate(()=>window.journalCalls.at(-1)[0]),'finish_crash_journal');
   results.push(`NVIDIA ${failure} fallback never inserts unverified audio and clears controlled-failure content.`);
@@ -286,6 +288,8 @@ for (const [failCopy, failKeep] of [[false, false], [true, false], [true, true]]
   await load();await page.evaluate(([failCopy,failKeep])=>{window.desktopPaste=true;window.desktopStream=true;window.failPaste=true;window.failCopy=failCopy;window.failKeep=failKeep;},[failCopy,failKeep]);
   await start();await page.evaluate(()=>window.captureWorklet.port.onmessage({data:{type:'samples',data:new Float32Array(16000)}}));
   await page.waitForFunction(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length===1);
+  // Recognition keeps running after a delivery failure, so the live notice says so.
+  await page.waitForFunction(()=>window.nativeCalls.some(c=>c[0]==='showNotification'&&c[1]==='VOCO stopped typing'));
   await page.evaluate(()=>window.samples(1));await stop();
   if (failKeep) await interrupted();
   else await page.waitForFunction(()=>window.store.getState().status==='idle',null,{timeout:6000});
@@ -313,7 +317,7 @@ assert.ok(deferredPastes.length >= 4, 'Stop retries the deferred text');
 assert.ok(deferredPastes.every(text=>text.startsWith('Recovered words')), 'Deferred text is retried whole from its first word');
 assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='copyDesktopText').map(c=>c[1])),['Recovered words for manual review.']);
 assert.equal(await page.evaluate(()=>window.store.getState().error),null);
-assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>c[0]==='showNotification'&&c[1]==='Dictation interrupted')),false);
+assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>c[0]==='showNotification'&&['Dictation interrupted','VOCO stopped typing'].includes(c[1]))),false);
 assert.equal(await page.evaluate(()=>window.traceEvents.filter(c=>c[0]==='dictation_desktop_remainder_copied').length),1);
 results.push('A paste that types nothing never interrupts dictation: the whole pending text is retried, then copied to the clipboard at Stop.');
 

@@ -68,6 +68,13 @@ describe("Silver Lens output guidance", () => {
     expect(markup).toContain("Microphone needs permission");
     expect(markup).not.toContain('>Ready</strong>');
   });
+
+  it("shows Ready for every ready label and sizes the lens from the heading", () => {
+    const markup = renderPanel({ statusLabel: "Ready — microphone checks on first use" });
+    expect(markup).toContain(">Ready</strong>");
+    expect(markup).not.toContain("microphone checks on first use");
+    expect(markup).not.toContain('data-priority="status"');
+  });
 });
 
 describe("ControlPanel", () => {
@@ -104,13 +111,13 @@ describe("ControlPanel", () => {
     };
     const settings = renderPanel({ surface: "settings", runtimeDiagnostics });
     expect(settings).toContain("Alt+D also reaches the app you are dictating into. Enable the VOCO panel in Help to keep the shortcut out of other apps.");
-    expect(settings).not.toContain("Desktop setup needs attention");
+    expect(settings).not.toContain("Desktop setup needed");
     const popover = renderPanel({ runtimeDiagnostics });
     expect(popover).toContain("Click where you want the text, then use your shortcut.");
     expect(popover).not.toContain("Open Help to finish desktop setup.");
     const advanced = renderPanel({ surface: "settings", requestedSection: "Advanced", runtimeDiagnostics });
-    expect(advanced).toContain("Tray setup");
-    expect(advanced).not.toContain("Setup required");
+    expect(advanced).toContain("Panel setup");
+    expect(advanced).not.toContain("Setup needed");
   });
 
   it("never exposes handled delivery text in the status popover", () => {

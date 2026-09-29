@@ -29,7 +29,7 @@ export function NativeMicrophoneSettings({ controls, disabled, showError = true,
 
   if (controls.mode === "pending") {
     return <div className="voco-inline-note" role="status">
-      <p>{controls.error ? showError ? controls.error : "Choose Retry to check microphone access." : "Checking the capture backend…"}</p>
+      <p>{controls.error ? showError ? controls.error : "Choose Retry capture setup to check microphone access." : "Checking the capture backend…"}</p>
       <button type="button" className="voco-button voco-button--secondary" disabled={controls.busy || disabled}
         onClick={() => { void controls.initialize().catch(() => {}); }}>Retry capture setup</button>
     </div>;
@@ -52,8 +52,7 @@ export function NativeMicrophoneSettings({ controls, disabled, showError = true,
         onClick={() => void controls.refresh()}>Refresh devices</button>
     </div>
     {controls.selected ? <p className="voco-motion-feedback" role="status"><StatusMark state="success" />Selected: {controls.selected.label || controls.selected.name}.</p> : null}
-    <details className="voco-preferences__disclosure"><summary>Microphone access details</summary><p>Selecting a microphone allows access for this app session. VOCO uses PipeWire directly, outside the browser permission prompt. Access lasts until VOCO closes or the device identity changes.</p><p>No audio is captured by this setup panel. Use Stop or Cancel during dictation.
-      If the source changes or disconnects, VOCO stops and retains received audio for review.</p>
+    <details className="voco-preferences__disclosure"><summary>Microphone access details</summary><p>Selecting a microphone allows access for this app session. VOCO uses PipeWire directly, outside the browser permission prompt. Access lasts until VOCO closes or the device identity changes.</p><p>No audio is captured by this setup panel. If the microphone changes or disconnects during dictation, VOCO stops and notifies you.</p>
     </details>
     {showError && controls.error ? <div role="alert" className="voco-inline-note voco-inline-note--error">{controls.error}</div> : null}
   </div>;

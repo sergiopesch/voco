@@ -1205,7 +1205,7 @@ try {
         await page.getByRole('button', { name: 'Settings', exact: true }).click();
         await page.getByRole('button', { name: 'Shortcut', exact: true }).click();
         await page.getByRole('button', { name: 'Change shortcut', exact: true }).click();
-        await page.getByLabel('Start and stop listening', { exact: true }).fill('Alt+X');
+        await page.getByLabel('Start and stop dictation', { exact: true }).fill('Alt+X');
         await page.getByRole('button', { name: 'Apply shortcut', exact: true }).click();
         await page.waitForFunction(() => window.savePending === true);
       } else if (transition === 'hide') {

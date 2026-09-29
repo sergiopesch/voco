@@ -42,7 +42,7 @@ describe("shortcut presentation", () => {
 
 it("does not promise dictation when the shortcut works but input setup is missing", () => {
   const result = shortcutPresentation("Alt+D", available, { available: false, detail: "Start ydotoold." });
-  expect(result.instruction).toBe("Desktop setup required. Start ydotoold.");
+  expect(result.instruction).toBe("Desktop setup needed. Start ydotoold.");
   expect(result.instruction).not.toContain("Press Alt+D");
 });
 

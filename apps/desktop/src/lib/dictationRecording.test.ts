@@ -188,7 +188,7 @@ it("reaches source selection from input readiness alone, with no destination bin
   expect(h.trace).toHaveBeenCalledWith("dictation_desktop_paste_session_started");
   // The fixture stops at source selection, after every destination check.
   expect(h.captureSelection).toHaveBeenCalledOnce();
-  expect(h.setError).toHaveBeenLastCalledWith("Choose a microphone in Audio settings.");
+  expect(h.setError).toHaveBeenLastCalledWith("Choose a microphone in Microphone settings.");
 });
 
 it("does not query desktop input for an explicit browser recording", async () => {

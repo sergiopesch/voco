@@ -14,7 +14,7 @@ function insertionOutcome(error: unknown): InsertionError["outcome"] {
 
 export function appendOnlySuffix(committed: string, text: string): string {
   if (!text.startsWith(committed)) {
-    throw new Error("Recognition revised an inserted prefix; transcript retained.");
+    throw new Error("Recognition revised earlier words, so VOCO stopped transcribing.");
   }
   return text.slice(committed.length);
 }
@@ -152,7 +152,7 @@ export class BenchmarkPhraseQueue {
     const seconds = (audio?.length ?? 0) / rate;
     this.queuedSeconds += seconds;
     if (this.queuedSeconds > 3) {
-      this.fail(new Error("Recognition fell over three seconds behind; audio retained for recovery."), "backlog_limit");
+      this.fail(new Error("Recognition fell more than three seconds behind, so VOCO stopped transcribing."), "backlog_limit");
       return;
     }
     const sampleStart = this.enqueuedSamples;

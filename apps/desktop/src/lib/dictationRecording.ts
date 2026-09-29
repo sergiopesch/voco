@@ -13,7 +13,7 @@ import {
 } from "@/lib/captureDescriptor";
 import { monitorCaptureHealth } from "@/lib/captureHealth";
 import type { CursorDeliveryEvent } from "@/lib/dictationDelivery";
-import { errorMessage,LIVE_DELIVERY_PAUSED,LIVE_RECOGNITION_INTERRUPTED } from "@/lib/dictationRecovery";
+import { errorMessage,LIVE_DELIVERY_PAUSED,LIVE_RECOGNITION_INTERRUPTED,sentence } from "@/lib/dictationRecovery";
 import {
   consumeQueuedStop,
   disableLivePreview,
@@ -31,6 +31,9 @@ import type { AppConfig,DesktopPasteStatus,DictationStatus } from "@/types";
 import { BrowserStreamDelivery } from "./browserStreamDelivery";
 
 export type Ref<T> = { current: T };
+
+/** Unverified capture is never typed; Stop explains that with this sentence. */
+const UNVERIFIED_CAPTURE_REASON = "VOCO couldn't confirm it received all of your audio, so it didn't type this recording. Try again.";
 
 export type DictationRecordingPhase =
   | "idle"
@@ -249,7 +252,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       setInterimTranscript("");
       transitionCursorDelivery("session-idle");
       traceDictationEvent("dictation_interrupted").catch(() => {});
-      void showNotification("Dictation interrupted", reason === new CrashJournalCleanupError().message
+      void showNotification("Dictation interrupted", reason === new CrashJournalCleanupError().message || reason === UNVERIFIED_CAPTURE_REASON
         ? reason : "Some words may be missing. Check your text field before starting again.").catch(() => {});
       return;
     }
@@ -393,7 +396,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       const captureSelection = captureSelectionRef.current?.() ?? { backend: "webkit" as const };
       let captureAdmission: CaptureAdmission = "pending";
       if (captureSelection.backend === "native" && !captureSelection.selectionToken) {
-        throw new Error("Choose a microphone in Audio settings.");
+        throw new Error("Choose a microphone in Microphone settings.");
       }
       resetAudioLevel();
       clearCapturedAudio();
@@ -571,12 +574,15 @@ export function createDictationRecording(env: DictationRecordingEnv) {
         }, (error, kind) => {
           if (!isCurrentSession(startingSessionId) || cancelledRef.current) return;
           traceDictationEvent("dictation_desktop_stream_failed").catch(() => {});
-          if (onboardingTest) setError(`Voice test paused: ${error.message} Stop Test, then try again.`);
+          if (onboardingTest) setError(`Voice test paused: ${sentence(error.message)} Finish test, then try again.`);
           else {
             const notice = kind === "delivery" ? LIVE_DELIVERY_PAUSED : LIVE_RECOGNITION_INTERRUPTED;
             useStore.getState().setCaptureNotice(notice);
             if (phaseRef.current === "recording") {
-              void showNotification("Dictation interrupted", "Some words may be missing. Stop dictation and check your text field.").catch(() => {});
+              // A delivery failure stops typing; healthy recognition runs through Stop.
+              void (kind === "delivery"
+                ? showNotification("VOCO stopped typing", "It's still listening. When you stop, VOCO copies the rest of your words to the clipboard.")
+                : showNotification("Dictation interrupted", "Some words may be missing. Stop dictation and check your text field.")).catch(() => {});
             }
           }
         }, (event, durationMs) => {
@@ -691,7 +697,8 @@ export function createDictationRecording(env: DictationRecordingEnv) {
         }).catch(() => {});
       } catch (error) {
         if (error instanceof AudioCaptureFlushError && isCurrentSession(stoppingSessionId)) {
-          cancelledRef.current ??= error.message;
+          // Without a stream queue the capture was never verified, so nothing was typed.
+          cancelledRef.current ??= desktopPhraseQueueRef.current ? error.message : UNVERIFIED_CAPTURE_REASON;
           desktopPhraseQueueRef.current?.cancel();
           useStore.getState().setCaptureNotice(cancelledRef.current);
         }
@@ -704,7 +711,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
         await finishJournal();
         // Unverified capture is never typed.
         if (audioBufferRef.current.sampleCount) {
-          retainRecovery("VOCO couldn't confirm it received all of your audio, so it didn't type this recording. Try again.");
+          retainRecovery(UNVERIFIED_CAPTURE_REASON);
         } else {
           finalizeIdleState();
         }
@@ -759,8 +766,8 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       await finishJournal().catch(failure => { cleanupFailure = failure; });
       traceDictationEvent("dictation_desktop_stream_failed").catch(() => {});
       retainRecovery(cleanupFailure ? errorMessage(cleanupFailure) : cancelledRef.current ?? (useStore.getState().dictationPurpose === "onboarding"
-        ? `Voice test stopped: ${errorMessage(error)}. You can try the test again.`
-        : errorMessage(error)));
+        ? `Voice test stopped: ${sentence(errorMessage(error))} You can try the test again.`
+        : sentence(errorMessage(error))));
     }
   }
 

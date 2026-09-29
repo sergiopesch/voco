@@ -28,7 +28,7 @@ export function PanelSetup({ disabled = false }: { disabled?: boolean }) {
     } catch { if (mounted.current) setStatus(unavailable); }
     finally { pending.current = false; if (mounted.current) setBusy(false); }
   }
-  return <div className="voco-panel-setup" aria-label="Tray setup">
+  return <div className="voco-panel-setup" role="group" aria-label="Panel setup">
     <p role="status">{status?.detail ?? "Checking your panel…"}</p>
     {status && !["active", "other-desktop", "unsupported"].includes(status.status) ?
       <button className="voco-button voco-button--ghost" disabled={disabled || busy}
