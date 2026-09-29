@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import {validateSpeechManifest, validateSpeechFixtureWav} from './speech-score.mjs';
+import {scoreTranscript, validateSpeechManifest, validateSpeechFixtureWav} from './speech-score.mjs';
 import {CONTINUITY_MAX_WER} from './test-speech-continuity.mjs';
+import {scoreSpeechIntegrity} from './speech-integrity.mjs';
 
 const hash = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 
@@ -30,4 +31,25 @@ export function freezeLongPlayback(manifestBytes, playbackBytes, wav, fixtureWav
   });
   assert.ok(wav.subarray(44).equals(Buffer.concat(parts)), 'Playback PCM must match every complete selected fixture and pause');
   return {mode: playback.mode, integrityRequirements: playback.mode === 'repeated' ? {repetition: {phrase: selected[0].reference, count: selected.length}} : null, sourceManifestSha256: hash(manifestBytes), playbackManifestSha256: hash(playbackBytes), wavSha256: hash(wav), selectedBeforeInference: true, reference: selected.map(row => row.reference).join(' '), maxWer: playback.mode === 'repeated' ? CONTINUITY_MAX_WER : manifest.maxAggregateWer, samples};
+}
+
+// The field keeps the live prefix and Stop copies the rest, joining space included,
+// so together they are the whole transcript. Return failed scores as evidence
+// rather than throwing before they can be saved.
+export function scoreLongDelivery(plan, prefix, copied) {
+  const failures = [];
+  const require = (condition, message) => { if (!condition) failures.push(message); };
+  require(typeof prefix === 'string' && prefix.length > 0, 'The field must keep a nonempty live prefix');
+  require(typeof copied === 'string', 'Stop must copy the remainder as text');
+  const text = `${typeof prefix === 'string' ? prefix : ''}${typeof copied === 'string' ? copied : ''}`;
+  const score = scoreTranscript(plan.reference, text);
+  const werPassed = score.hypothesisWords > 0 && Number.isFinite(score.wer) && score.wer <= plan.maxWer;
+  require(werPassed, `Delivered text must be nonempty and satisfy full-reference WER <= ${plan.maxWer}`);
+  let integrity = null;
+  if (plan.mode === 'repeated') {
+    try { integrity = scoreSpeechIntegrity(plan.reference, text, plan.integrityRequirements); }
+    catch (error) { failures.push(error.message); }
+    require(integrity?.integrityPassed === true, 'Delivered text must preserve the exact frozen repetition sequence and count');
+  }
+  return {passed: failures.length === 0, werPassed, integrityPassed: plan.mode === 'repeated' ? integrity?.integrityPassed === true : null, failures, score, integrity};
 }

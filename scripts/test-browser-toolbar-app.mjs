@@ -5,9 +5,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import http from 'node:http';
 import assert from 'node:assert/strict';
-import {freezeLongPlayback} from './browser-long-accuracy.mjs';
-import {scoreTranscript} from './speech-score.mjs';
-import {scoreSpeechIntegrity} from './speech-integrity.mjs';
+import {freezeLongPlayback, scoreLongDelivery} from './browser-long-accuracy.mjs';
 const longCapture = process.env.VOCO_BROWSER_LONG_CAPTURE === '1';
 assert.notEqual(process.env.VOCO_BROWSER_DIAG_SECOND_CAPTURE, '1', 'The retired debug-capture mode is unavailable; use VOCO_BROWSER_LONG_CAPTURE=1 for full-reference Nemotron delivery.');
 const root = process.env.VOCO_BROWSER_TEST_ROOT;
@@ -142,15 +140,11 @@ try {
     await until(async()=> (await traces()).slice(traceStart).some(t=>t.event==='dictation_desktop_remainder_copied'),'canonical focus-loss remainder copied',45_000);
     await until(async()=> (await traces()).slice(traceStart).some(t=>t.event==='dictation_stop_to_idle'),'canonical finalization returns idle');
     assert.equal(await page.locator('#a').inputValue(),prefix); assert.equal(await page.locator('#b').inputValue(),'');
-    // The field kept the live prefix and Stop copied the rest, so together they are the whole transcript.
     const copied = execFileSync('xclip', ['-selection', 'clipboard', '-o'], {encoding: 'utf8', timeout: 5000});
-    const text = prefix + copied;
-    const score = scoreTranscript(longPlan.reference, text);
-    const integrity = longPlan.integrityRequirements ? scoreSpeechIntegrity(longPlan.reference, text, longPlan.integrityRequirements) : null;
-    const passed = score.hypothesisWords > 0 && score.wer <= longPlan.maxWer && (!integrity || integrity.integrityPassed);
-    await fs.writeFile(`${root}/evidence/long-accuracy.json`, JSON.stringify({plan: longPlan, prefix, copied, score, integrity, passed}, null, 2));
-    assert.ok(passed, 'The kept prefix plus the copied remainder must meet the frozen full-reference WER and repetition checks');
-    results.push({case:'full-reference-long-accuracy', passed, maxWer:longPlan.maxWer, score});
+    const report = scoreLongDelivery(longPlan, prefix, copied);
+    await fs.writeFile(`${root}/evidence/long-accuracy.json`, JSON.stringify({plan: longPlan, prefix, copied, ...report}, null, 2));
+    assert.ok(report.passed, `The kept prefix plus the copied remainder must meet the frozen full-reference WER and repetition checks: ${report.failures.join('; ')}`);
+    results.push({case:'full-reference-long-accuracy', passed:report.passed, maxWer:longPlan.maxWer, score:report.score});
     results.push({case:'canonical-checkpoint-focus-loss',passed:true,checkpointCharacters:Array.from(prefix).length,events:(await traces()).slice(traceStart).map(t=>t.event)});
     await page.screenshot({path:`${root}/evidence/canonical-focus-loss.png`});
   }
