@@ -86,11 +86,6 @@ export interface InsertionSupport {
   detail: string;
 }
 
-export interface DebugDictationCaptureResult {
-  audioPath: string;
-  timelinePath: string;
-}
-
 export interface ShortcutDiagnostics {
   hotkey: string;
   route: "ibus" | "global-shortcut" | "evdev" | "gnome-panel" | null;

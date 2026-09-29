@@ -46,7 +46,6 @@ const nativeMock = `
 export const calls = window.nativeCalls = [];
 const state = () => ({ sessionId: 101, setupState: "ready", engineActive: true, focusLost: false, ownershipIntact: true, finalizationOutcome: "committed", committedCharacterCount: 0 });
 export const startOwnedPreedit = async (...args) => { calls.push(['startOwnedPreedit', ...args]); if(window.deferLease) await new Promise(resolve=>window.resolveLease=resolve); if (!window.lease) throw new Error('No eligible original field'); return state(); };
-export const getOwnedPreeditStatus = async () => state();
 export const getDesktopInputStatus = async () => ({available:!window.pasteUnavailable,detail:"Paste helper unavailable"});
 export const getPanelSetupStatus = async () => ({status:'other-desktop',detail:'Use the tray menu.',canEnable:false});
 export const enableGnomePanel = getPanelSetupStatus;
@@ -62,14 +61,11 @@ export const ackBrowserStop = async (triggerId) => { calls.push(['ackBrowserStop
 export const commitOwnedPreedit = async (id,text) => { calls.push(['commitOwnedPreedit',id,text]); if(window.deferCommit) await new Promise(resolve=>window.resolveCommit=resolve); window.commitReturned=true; if(window.focusChanged) throw new Error('Original field lost focus'); return {...state(), committedCharacterCount: Array.from(text).length}; };
 export const checkpointOwnedPreedit = async (id,prefix,text) => { calls.push(['checkpointOwnedPreedit',id,prefix,text]); if(window.deferCheckpoint) await new Promise(resolve=>window.resolveCheckpoint=resolve); return {...state(), focusLost:Boolean(window.focusChanged), committedCharacterCount:Array.from(prefix+text).length}; };
 export const finishCanonicalOwnedPreedit = async (id,prefix,text) => { calls.push(['finishCanonicalOwnedPreedit',id,prefix,text]); return {...state(), focusLost:Boolean(window.focusChanged), committedCharacterCount:Array.from(prefix+text).length}; };
-export const debugDictationCaptureEnabled = async () => false;
 export const debugNativeCaptureEnabled = async () => false;
 export const saveDebugNativeRetainedSource = async () => null;
 export const traceHotkeyEvent = async (...args) => {(window.traceEvents??=[]).push(args);};
 export const refreshShortcutHeartbeat = async (ready) => {calls.push(['refreshShortcutHeartbeat',ready]);};
 export const showNotification = async (...args) => { calls.push(['showNotification',...args]); };
-export const updateOwnedPreedit = async () => state();
-export const saveDebugDictationCapture = async () => null;
 export const insertText = async () => { calls.push(['insertText']); throw new Error('Unsafe generic delivery attempted'); };
 `;
 await page.route('**/src/lib/tauri.ts*', route => route.fulfill({ contentType: 'application/javascript', body: nativeMock }));

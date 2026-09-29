@@ -2,7 +2,6 @@ import type {
   AppConfig,
   CachedUpdateCheck,
   ConfigSnapshot,
-  DebugDictationCaptureResult,
   DesktopInputStatus,
   DesktopPasteStatus,
   OwnedPreeditStatus,
@@ -34,31 +33,12 @@ export async function saveConfigPatch(
   return invoke<ConfigSnapshot>("save_config_patch", { patch });
 }
 
-export async function debugDictationCaptureEnabled(): Promise<boolean> {
-  return invoke<boolean>("debug_dictation_capture_enabled");
-}
-
 export async function debugNativeCaptureEnabled(): Promise<boolean> {
   return invoke<boolean>("debug_native_capture_enabled");
 }
 
 export async function saveDebugNativeRetainedSource(packet: Uint8Array): Promise<string | null> {
   return invoke<string | null>("save_debug_native_retained_source", packet);
-}
-
-export async function saveDebugDictationCapture(
-  samples: Float32Array,
-  timeline: unknown,
-): Promise<DebugDictationCaptureResult | null> {
-  const bytes = new Uint8Array(
-    samples.buffer,
-    samples.byteOffset,
-    samples.byteLength,
-  );
-  return invoke<DebugDictationCaptureResult | null>(
-    "save_debug_dictation_capture",
-    { audioBytes: bytes, timeline },
-  );
 }
 
 export async function getDesktopInputStatus(): Promise<DesktopInputStatus> {
@@ -115,37 +95,12 @@ export async function copyDesktopText(text: string): Promise<void> {
   await invoke("copy_desktop_text", { text });
 }
 
-export async function getOwnedPreeditStatus(): Promise<OwnedPreeditStatus> {
-  return invoke<OwnedPreeditStatus>("get_owned_preedit_status");
-}
-
 export async function refreshShortcutHeartbeat(ready: boolean): Promise<void> {
   return invoke<void>("refresh_shortcut_heartbeat", { ready });
 }
 
 export async function startOwnedPreedit(sessionId: number, triggerId?: string): Promise<OwnedPreeditStatus> {
   return invoke<OwnedPreeditStatus>("start_owned_preedit", { sessionId, triggerId });
-}
-
-export async function updateOwnedPreedit(
-  sessionId: number,
-  confirmedText: string,
-  preeditText: string,
-  provisionalText: string,
-): Promise<OwnedPreeditStatus> {
-  return invoke<OwnedPreeditStatus>("update_owned_preedit", {
-    sessionId,
-    confirmedText,
-    preeditText,
-    provisionalText,
-  });
-}
-
-export async function commitOwnedPreedit(
-  sessionId: number,
-  text: string,
-): Promise<OwnedPreeditStatus> {
-  return invoke<OwnedPreeditStatus>("commit_owned_preedit", { sessionId, text });
 }
 
 export async function checkpointOwnedPreedit(
@@ -193,15 +148,8 @@ export async function beginRuntimeStatusSession(): Promise<number> {
 }
 
 export interface HotkeyTraceFields {
-  audioLevelBucket?: "silent" | "low" | "medium" | "high";
-  chunkCount?: number;
-  responseDeltaCount?: number;
   selectedDeviceConfigured?: boolean;
   trackSampleRate?: number;
-  trackChannelCount?: number;
-  echoCancellation?: boolean;
-  noiseSuppression?: boolean;
-  autoGainControl?: boolean;
   durationMs?: number;
   dictationSessionId?: number;
 }
@@ -215,10 +163,6 @@ export async function traceHotkeyEvent(
 
 export async function hasPendingHotkeyToggle(): Promise<boolean> {
   return invoke<boolean>("has_pending_hotkey_toggle");
-}
-
-export async function showStatusOverlay(width: number, height: number): Promise<void> {
-  return invoke("show_status_overlay", { width, height });
 }
 
 export async function hideStatusOverlay(): Promise<void> {

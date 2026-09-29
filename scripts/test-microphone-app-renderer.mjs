@@ -623,7 +623,6 @@ try {
         },status);
         await page.waitForTimeout(60);
         assert.equal(await page.locator('.voco-status-overlay').count(),0);
-        assert.equal(await page.evaluate(()=>window.calls.some(c=>c[0]==='showStatusOverlay')),false);
         assert.equal(await page.getByText('This transcript must not appear in a popup.').count(),0);
         results.push({case:'dictation-keeps-window-hidden-'+status,passed:true});
     }
