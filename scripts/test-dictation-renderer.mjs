@@ -218,11 +218,17 @@ await load();await page.evaluate(()=>{window.lease=true;window.focusChanged=true
 await page.waitForFunction(()=>window.store.getState().status==='recording');
 await page.evaluate(()=>window.samples(1));
 await page.waitForFunction(()=>window.nativeCalls.some(c=>c[0]==='checkpointOwnedPreedit'));
-await page.evaluate(()=>window.hook.toggle('browser:fixture','stop'));await interrupted();
+await page.evaluate(()=>window.hook.toggle('browser:fixture','stop'));
+await page.waitForFunction(()=>window.store.getState().status==='idle',null,{timeout:6000});
 assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='checkpointOwnedPreedit').length),1);
-assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='checkpointOwnedPreedit').length),1);
+assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>c[0]==='finishCanonicalOwnedPreedit')),false);
+// As after a failed paste, Stop copies the words the field may not have taken.
+assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='copyDesktopText').map(c=>c[1])),['Recovered words for manual review.']);
+assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>c[0]==='showNotification'&&c[1]==='Dictation copied to clipboard')),true);
+assert.equal(await page.evaluate(()=>window.store.getState().error),null);
+assert.equal(await page.evaluate(()=>window.store.getState().transcript),'');
 assert.equal(await page.evaluate(()=>window.journalCalls.at(-1)[0]),'finish_crash_journal');
-results.push('Uncertain browser receipt never retries the field and controlled Stop clears temporary text.');
+results.push('Uncertain browser receipt never retries the field; Stop copies the words it may not have taken and clears temporary text.');
 
 await load();await page.evaluate(()=>{window.desktopPaste=true;window.desktopStream=true;window.streamTextAt=[];});
 await start(0.5);
