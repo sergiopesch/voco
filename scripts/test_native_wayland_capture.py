@@ -108,7 +108,7 @@ def run_capture(root, app, pump, activate, geometry_provider=None, control_revea
     field.connect('changed', lambda entry: changes.append(entry.get_text()))
     target.show_all()
     field.grab_focus()
-    result = {'passed': False, 'boundary': 'nested Wayland / synthetic PulseAudio / real WebKit capture / native IPC / pinned model',
+    result = {'passed': False, 'boundary': 'nested Wayland / synthetic PulseAudio / real native capture / native IPC / pinned model',
               'physicalMicrophone': False, 'shortcutTested': False, 'targetMutations': changes,
               'scenario': 'idle-remap-then-capture-open-refused' if remap_capture else 'capture', 'surfaceObservations': []}
 
@@ -242,8 +242,16 @@ def run_capture(root, app, pump, activate, geometry_provider=None, control_revea
             wait(lambda: copy_button('Settings') is None, 'idle panel hidden before recording')
             assert 'recording_state_active' not in events(), 'Hide to tray unexpectedly started recording'
             result['idlePanelExplicitlyHiddenBeforeRecording'] = True
+        else:
+            # Start with the popover open only hides it, so the user can click
+            # the field that should receive the text first.
+            wait(lambda: copy_button('Settings') is not None, 'visible idle popover before recording')
+            toggle()
+            wait(lambda: copy_button('Settings') is None, 'popover hidden by Start')
+            assert 'recording_state_requested' not in events(), 'Start with the popover open began recording'
+            result['startWithPopoverOpenOnlyHidIt'] = True
         toggle()
-        wait(lambda: 'recording_state_active' in events(), 'real WebKit capture')
+        wait(lambda: 'recording_state_active' in events(), 'real native capture')
         source_outputs = subprocess.check_output([os.environ['VOCO_WAYLAND_PACTL'], 'list', 'source-outputs'], text=True, timeout=5)
         (root / 'evidence/pulse-source-outputs.txt').write_text(source_outputs)
         sound = Path(__file__).resolve().parent.parent / 'tests/fixtures/speech/84-121123-0000.wav'
