@@ -17,7 +17,6 @@ import type {
 import { calculateVisualAudioLevelFromSamples } from "@/lib/audioLevel";
 import { openMicrophoneStream } from "@/lib/audioInput";
 import { createAnimationFrameLease } from "@/lib/animationFrameLease";
-import type { DictationRecovery } from "@/lib/dictationRecovery";
 import { microphoneLabel, shortcutPresentation } from "@/lib/shortcutPresentation";
 import { getDesktopInputStatus, traceHotkeyEvent } from "@/lib/tauri";
 import { Onboarding } from "@/components/Onboarding";
@@ -43,7 +42,6 @@ interface ControlPanelProps {
   updateState: UpdateCheckState;
   runtimeDiagnostics: RuntimeDiagnostics | null;
   dictationStatus: DictationStatus;
-  recovery?: DictationRecovery | null;
   captureNotice?: string | null;
   canCancelDictation?: boolean;
   cancellationPending?: boolean;
@@ -116,7 +114,6 @@ export function ControlPanel({
   updateState,
   runtimeDiagnostics,
   dictationStatus,
-  recovery,
   captureNotice,
   canCancelDictation,
   cancellationPending,
@@ -698,7 +695,7 @@ export function ControlPanel({
             <button className="voco-button voco-button--ghost" onClick={keepEditing}>Keep editing</button>
           </div>
         </section> : null}
-          {errorMessage && !isOnboarding && !recovery ? (
+          {errorMessage && !isOnboarding ? (
             <section className="voco-panel__error" aria-live="polite">
               {errorMessage}
             </section>
@@ -747,7 +744,7 @@ export function ControlPanel({
             passed={testPassed}
             failed={Boolean(errorMessage)}
             attempted={testPurpose === "onboarding"}
-            setupError={recovery && testPurpose !== "onboarding" ? "Recover or discard your previous dictation before starting the voice test." : nativeMicrophone?.error ?? errorMessage}
+            setupError={nativeMicrophone?.error ?? errorMessage}
             onRetrySetup={nativeMicrophone?.error ? () => void nativeMicrophone.initialize().catch(() => {}) : undefined}
             desktopSetupError={desktopSetupError}
             onCheckDesktopSetup={() => void checkDesktopSetup()}
@@ -755,7 +752,7 @@ export function ControlPanel({
             checkingDesktopSetup={checkingInput}
             preparing={testPreparing || finishingTest}
             saving={saving}
-            blocked={Boolean(recovery && testPurpose !== "onboarding") || !onStartTest || nativeMicrophone?.mode === "pending"}
+            blocked={!onStartTest || nativeMicrophone?.mode === "pending"}
             desktopReady={inputReadiness?.available === true}
             microphoneControls={onSelected => nativePreviewDisabled && nativeMicrophone
               ? <NativeMicrophoneSettings controls={nativeMicrophone} disabled={dictationBusy || testPreparing} onSelected={onSelected} />

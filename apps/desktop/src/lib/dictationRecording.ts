@@ -276,7 +276,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     const completed = useStore.getState();
     if (completed.dictationPurpose === "onboarding") {
       completed.setOnboardingTestPassed(!completed.recovery && Boolean(completed.transcript.trim()) && completed.transcript !== "(no speech detected)");
-    } else if (!completed.recovery) {
+    } else {
       clearTranscript();
     }
     releaseRecordingOrigin();

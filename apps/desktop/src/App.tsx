@@ -164,7 +164,6 @@ export function App() {
   const nativeMicrophone = useNativeCaptureSettings();
   const status = useStore((state) => state.status);
   const error = useStore((state) => state.error);
-  const recovery = useStore((state) => state.recovery);
   const captureNotice = useStore((state) => state.captureNotice);
   const surface = useStore((state) => state.surface);
   const onboardingStep = useStore((state) => state.onboardingStep);
@@ -414,10 +413,6 @@ export function App() {
   const handleStartTest = useCallback(async () => {
     const state = useStore.getState();
     if (startRequestRef.current || isDictationActive(state.status) || state.surface !== "onboarding") return;
-    if (state.recovery && state.dictationPurpose !== "onboarding") {
-      setError("Finish recovering your previous dictation before starting the voice test.");
-      return;
-    }
     const request = { cancelled: false, triggerId: "onboarding:test" };
     startRequestRef.current = request;
     setTestPreparing(true);
@@ -1189,7 +1184,6 @@ export function App() {
   }, [dismissInteractiveSurface, surface]);
 
   const statusLabel = deriveStatusLabel({
-    hasRecovery: Boolean(recovery),
     configurationError: runtimeConfigurationError,
     cursorRequired,
     cursorSetupState,
@@ -1241,7 +1235,6 @@ export function App() {
         updateState={updateState}
         runtimeDiagnostics={runtimeDiagnostics}
         dictationStatus={status}
-        recovery={recovery}
         captureNotice={captureNotice}
         canCancelDictation={canCancel}
         cancellationPending={cancellationPending}

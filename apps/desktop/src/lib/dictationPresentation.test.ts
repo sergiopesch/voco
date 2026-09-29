@@ -22,10 +22,6 @@ describe("status label presentation", () => {
     expect(deriveStatusLabel({ ...ready, dictationStatus: "recording" })).toBe("Listening");
   });
 
-  it("presents a retained interruption calmly", () => {
-    expect(deriveStatusLabel({ ...ready, hasRecovery: true, dictationStatus: "error" })).toBe("Dictation saved");
-  });
-
   it("keeps desktop setup pending until the first diagnostics settle", () => {
     const pending = deriveCursorSetupState({ desktopInputReady: false, diagnosticsLoaded: false, diagnosticsFailed: false });
     const failed = deriveCursorSetupState({ desktopInputReady: false, diagnosticsLoaded: false, diagnosticsFailed: true });

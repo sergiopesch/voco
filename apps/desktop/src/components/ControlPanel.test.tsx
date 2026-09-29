@@ -5,6 +5,7 @@ import {
   shouldOpenMicrophonePreview,
   shortcutFromKeyboardEvent,
 } from "@/components/ControlPanel";
+import { deriveStatusLabel } from "@/lib/dictationPresentation";
 import { useStore } from "@/store/useStore";
 import type { AppConfig } from "@/types";
 
@@ -31,7 +32,7 @@ const config: AppConfig = {
 
 afterEach(() => {
   vi.unstubAllGlobals();
-  useStore.setState({ transcript: "", dictationPurpose: "cursor" });
+  useStore.setState({ transcript: "", dictationPurpose: "cursor", recovery: null });
 });
 
 function renderPanel(
@@ -155,6 +156,25 @@ describe("ControlPanel", () => {
     expect(markup).not.toContain("The selected output did not complete");
     expect(markup).not.toContain("A final transcript whose selected output failed.");
     expect(markup).not.toContain("Copy transcript");
+  });
+
+  it("explains a failed voice test in the popover without claiming it was saved", () => {
+    useStore.setState({ recovery: { reason: "Voice test stopped." }, dictationPurpose: "onboarding" });
+    const markup = renderPanel({
+      dictationStatus: "error",
+      errorMessage: "Voice test stopped.",
+      statusLabel: deriveStatusLabel({
+        configurationError: false,
+        cursorRequired: false,
+        cursorSetupState: "ready",
+        dictationStatus: "error",
+        microphonePermission: "granted",
+        microphoneReady: true,
+      }),
+    });
+    expect(markup).toContain("Needs attention");
+    expect(markup).toContain("Voice test stopped.");
+    expect(markup).not.toContain("Dictation saved");
   });
 
   it("renders a compact, actionable settings navigation", () => {
