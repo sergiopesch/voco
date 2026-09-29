@@ -50,9 +50,9 @@ def saved(document):
     return file_text(document)
 
 
-def launch(name, args, stdout=None):
+def launch(name, args, stdout=None, env=None):
     log = (out/f'{name}.log').open('w')
-    process = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=stdout or log, stderr=log, bufsize=0)
+    process = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=stdout or log, stderr=log, bufsize=0, env=env)
     processes.append(process)
     return process
 
@@ -157,10 +157,15 @@ def firefox():
 def vscode():
     profile = home/'vscode'; (profile/'User').mkdir(parents=True)
     (profile/'User/settings.json').write_text(json.dumps({'workbench.startupEditor': 'none', 'update.mode': 'none',
-                                                         'security.workspace.trust.enabled': False}))
+                                                         'security.workspace.trust.enabled': False,
+                                                         'chat.disableAIFeatures': True}))
+    # Sign-in and welcome pages must not open a browser window over the editor.
+    stubs = home/'vscode-bin'; stubs.mkdir()
+    (stubs/'xdg-open').write_text('#!/bin/sh\nexit 0\n'); (stubs/'xdg-open').chmod(0o755)
     document = home/'vscode.txt'; document.write_text('')
     launch('vscode', [os.environ['VOCO_VSCODE_BINARY'], '--no-sandbox', '--disable-gpu', '--password-store=basic',
-                      f'--user-data-dir={profile}', f'--extensions-dir={profile/"extensions"}', '--new-window', str(document)])
+                      f'--user-data-dir={profile}', f'--extensions-dir={profile/"extensions"}', '--new-window', str(document)],
+           env={**os.environ, 'PATH': f'{stubs}:{os.environ["PATH"]}'})
     focus_window(title=r'vscode\.txt')
     time.sleep(2)  # The window title appears before the editor accepts input.
     for text, expected in (('Hello', 'Hello'), (' Linux.', 'Hello Linux.')):

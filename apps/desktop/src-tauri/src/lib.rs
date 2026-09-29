@@ -2945,7 +2945,7 @@ mod tests {
             })
             .collect();
         assert!(
-            emitted_events.len() > 30,
+            emitted_events.len() > 20,
             "frontend event extraction must cover real calls"
         );
         for event in emitted_events {

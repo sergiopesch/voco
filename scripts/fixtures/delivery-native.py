@@ -41,9 +41,12 @@ def widgets(window):
                 reply(json.loads(view.evaluate_javascript_finish(result).to_string()))
             except GLib.Error:
                 reply({})  # The page is still loading.
-        read = lambda: run('''const value = id => document.getElementById(id).value;
-            JSON.stringify({focus: document.hasFocus() ? document.activeElement.id || null : null,
-                            entry: value("entry"), document: value("document")})''', answered)
+        # Each evaluation shares the page's global scope, so declare nothing there.
+        read = lambda: run('''(() => {
+            const value = id => document.getElementById(id).value;
+            return JSON.stringify({focus: document.hasFocus() ? document.activeElement.id || null : null,
+                                   entry: value("entry"), document: value("document")});
+        })()''', answered)
         view.connect('load-changed', lambda _, state: focus_field('entry') if state == WebKit2.LoadEvent.FINISHED else None)
         return
     box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
