@@ -175,6 +175,8 @@ export default class VocoPanel extends Extension {
             this._wave.visible = wave;
             this._label.visible = label;
             if (label) this._label.text = state.label;
+            // St styles only mapped actors; measure the content as it will look.
+            this._detail.show();
         }
         this._settingsItem.setSensitive(state.canOpen);
         this._reviewItem.setSensitive(state.canOpen);
@@ -211,12 +213,12 @@ export default class VocoPanel extends Extension {
         const target = (wave || label) && row - this._clip.width + natural <= space ? Math.ceil(natural) : 0;
         if (this._target !== target) {
             this._target = target;
-            // Closed content leaves the accessibility tree as well as the view.
-            if (target) this._detail.show();
             this._reveal.ease(target, {duration: motion && this._clip.mapped ? 220 : 0,
                 mode: Clutter.AnimationMode.EASE_OUT_CUBIC,
                 onComplete: () => { if (!target) this._detail.hide(); }});
         }
+        // Closed content leaves the accessibility tree as well as the view.
+        if (!target && !this._reveal.get_transition('value')) this._detail.hide();
     }
 
     _syncShortcut() {

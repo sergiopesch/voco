@@ -179,6 +179,10 @@ try:
             assert insets[0] >= 10 and insets[1] >= 2, f'Meter insets are {insets}px'
             data['meterInsets'] = insets
         assert data['windows'] == 0, data
+        if status == 'attention':
+            # Content is measured as styled, so a later idle poll never resizes it.
+            pump(1.7)
+            assert abs(inspect()['indicator']['width'] - a['width']) < .5, 'The label resized after opening'
         report['states'][f'{i}-{status}']=data
         screenshot(f'{i}-{status}')
         if status in ('starting', 'recording', 'processing'):
