@@ -106,8 +106,8 @@ def focused_window(process, title):
     return None
 
 
-def focus_window(process, title=None):
-    deadline = time.monotonic() + 20
+def focus_window(process, title=None, timeout=20):
+    deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         if window := focused_window(process, title):
             windows.append(window)
@@ -216,7 +216,9 @@ def firefox():
     page.write_text('<title>[]</title><textarea autofocus oninput="document.title=\'[\'+this.value+\']\'"></textarea>')
     browser = launch('firefox', [os.environ['VOCO_FIREFOX_BINARY'], '--no-remote', '--profile', str(profile), page.as_uri()],
                      env={**os.environ, 'MOZ_CRASHREPORTER_DISABLE': '1', **({'MOZ_ENABLE_WAYLAND': '1'} if wayland else {})})
-    window = focus_window(browser, title=r'^\[\]')
+    # A fresh hosted runner reads its preinstalled Firefox from a cold disk; the
+    # first start there took up to 26 seconds to show the page.
+    window = focus_window(browser, title=r'^\[\]', timeout=60)
     def title():
         match = re.match(r'\[(.*)\]', window_title(window) or '')
         return match and match.group(1)
