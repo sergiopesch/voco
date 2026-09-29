@@ -3,10 +3,11 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "${ROOT_DIR}/scripts/lib/install-common.sh"
+cd "${ROOT_DIR}"
 
 # VOCO — one-command setup
 # Usage: ./scripts/setup.sh           (dev mode)
-#        ./scripts/setup.sh --install  (build + install as desktop app)
+#        ./scripts/setup.sh --install  (build, assemble and verify the complete NVIDIA package, then install it with APT)
 
 # ─── Colors ─────────────────────────────────────────────
 BOLD='\033[1m'
@@ -105,6 +106,18 @@ fi
 # ─── Step 1: Prerequisites ──────────────────────────────
 step "Prerequisites"
 
+if $INSTALL_MODE; then
+  # The package must carry the pinned runtime; never download a replacement.
+  for runtime_path in runtime/speech/models/nemotron-speech-streaming-en-0.6b.q8_0.gguf \
+    runtime/speech/libbench_nemo_pool.so runtime/speech/lib; do
+    if [[ ! -e "$runtime_path" ]]; then
+      err "Missing pinned runtime ${runtime_path}; see docs/linux-packaging.md#runtime-provisioning"
+      exit 1
+    fi
+  done
+  ok "Pinned speech runtime"
+fi
+
 if command -v node &>/dev/null; then
   NODE_VER=$(node -v | sed 's/v//' | cut -d. -f1)
   if (( NODE_VER >= 24 )); then
@@ -131,17 +144,22 @@ fi
 # ─── Step 2: System Dependencies ────────────────────────
 step "System dependencies"
 
+APT_PACKAGES=(pkg-config libglib2.0-dev libsoup-3.0-dev
+  libjavascriptcoregtk-4.1-dev libwebkit2gtk-4.1-dev
+  libayatana-appindicator3-dev libpulse-dev clang mold
+  ibus gir1.2-ibus-1.0 python3-gi)
+# Assembly compiles the private input helper, then the package verifier runs.
+PACKAGE_TOOLS=(g++ patch binutils desktop-file-utils appstream ripgrep)
+if $INSTALL_MODE; then APT_PACKAGES+=("${PACKAGE_TOOLS[@]}"); fi
+
 if command -v apt &>/dev/null; then
   run_step "System libraries + build tools (apt)" \
-    bash -c 'sudo apt update -qq 2>/dev/null && sudo apt install -y -qq \
-      pkg-config libglib2.0-dev libsoup-3.0-dev \
-      libjavascriptcoregtk-4.1-dev libwebkit2gtk-4.1-dev \
-      libayatana-appindicator3-dev libpulse-dev clang mold \
-      ibus gir1.2-ibus-1.0 python3-gi 2>/dev/null'
+    bash -c 'sudo apt update -qq 2>/dev/null && sudo apt install -y -qq "$@" 2>/dev/null' _ "${APT_PACKAGES[@]}"
 else
   warn "Not using apt — install manually: pkg-config libglib2.0-dev libsoup-3.0-dev"
   warn "libjavascriptcoregtk-4.1-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev libpulse-dev"
   warn "For IBus shortcut integration, install IBus, its GI bindings, and system Python 3"
+  if $INSTALL_MODE; then warn "Package assembly also needs: ${PACKAGE_TOOLS[*]}"; fi
 fi
 
 if [[ -x /usr/bin/python3 ]] && /usr/bin/python3 -c 'import gi; gi.require_version("IBus", "1.0"); from gi.repository import IBus' 2>/dev/null; then
@@ -164,7 +182,11 @@ fi
 # ─── Step 3: npm Dependencies ───────────────────────────
 step "Node dependencies"
 
-run_step "npm install" npm install --silent --prefer-offline
+if $INSTALL_MODE; then
+  run_step "npm ci" npm ci --silent
+else
+  run_step "npm install" npm install --silent --prefer-offline
+fi
 
 # ─── Steps 4-5: Build & Install ─────────────────────────
 if [[ "$INSTALL_MODE" == true ]]; then
@@ -172,9 +194,13 @@ if [[ "$INSTALL_MODE" == true ]]; then
 
   step "Build"
 
+  # The same pin as the release workflow.
+  cargo tauri --version &>/dev/null || run_step "Tauri CLI 2.10.1" cargo install tauri-cli --version "2.10.1" --locked
+
   # Remove stale bundle artifacts so install picks the package from this build only.
   rm -rf apps/desktop/src-tauri/target/release/bundle/deb
   rm -rf apps/desktop/src-tauri/target/release/bundle/appimage
+  rm -rf apps/desktop/src-tauri/target/release/bundle/voco-complete
 
   # Maximize parallelism
   export CMAKE_BUILD_PARALLEL_LEVEL=$(nproc)
@@ -195,8 +221,8 @@ TOML
   BUILD_START=$SECONDS
   BUILD_LOG=$(mktemp)
 
-  # Local install only needs the Debian bundle. AppImage packaging is handled separately.
-  (cd apps/desktop && cargo tauri build --features custom-protocol --bundles deb 2>&1) > "$BUILD_LOG" &
+  # The build wrapper builds the frontend, the browser host and the Debian bundle.
+  (npm run build 2>&1) > "$BUILD_LOG" &
   BUILD_PID=$!
 
   # Show animated progress while build runs
@@ -240,19 +266,22 @@ TOML
   # ─── Install ──────────────────────────────────────────
   step "Install"
 
-  DEB=$(find apps/desktop/src-tauri/target/release/bundle/deb -maxdepth 1 \( -name "voco_*.deb" -o -name "VOCO_*.deb" \) 2>/dev/null | sort | tail -1)
-  if [[ -n "$DEB" ]]; then
-    DEB_SIZE=$(du -h "$DEB" | cut -f1)
-    printf "    ${DIM}Package: %s (%s)${NC}\n" "$(basename "$DEB")" "$DEB_SIZE"
-    EXPECTED_VERSION="$(node -p "require('${ROOT_DIR}/package.json').version")"
-    if voco_install_deb_package "$DEB" "$EXPECTED_VERSION" "amd64"; then
-      ok "VOCO and desktop dependencies installed"
-    else
-      err "Installation failed: ${VOCO_INSTALL_ERROR}"
-      exit 1
-    fi
+  EXPECTED_VERSION="$(node -p "require('${ROOT_DIR}/package.json').version")"
+  BASE_DEB=$(find apps/desktop/src-tauri/target/release/bundle/deb -maxdepth 1 -name "*_${EXPECTED_VERSION}_amd64.deb" 2>/dev/null | sort | tail -1)
+  if [[ -z "$BASE_DEB" ]]; then
+    err "No ${EXPECTED_VERSION} .deb package found"
+    exit 1
+  fi
+  # A base Tauri bundle has no speech runtime; install only the verified complete package.
+  DEB="apps/desktop/src-tauri/target/release/bundle/voco-complete/voco_${EXPECTED_VERSION}_amd64.deb"
+  run_step "Assemble NVIDIA package" python3 scripts/package-nvidia.py "$BASE_DEB" "$DEB" --debian-version "$EXPECTED_VERSION"
+  run_step "Verify package" bash scripts/verify-deb-package.sh "$DEB" "$EXPECTED_VERSION"
+  DEB_SIZE=$(du -h "$DEB" | cut -f1)
+  printf "    ${DIM}Package: %s (%s)${NC}\n" "$(basename "$DEB")" "$DEB_SIZE"
+  if voco_install_deb_package "$DEB" "$EXPECTED_VERSION" "amd64"; then
+    ok "VOCO and desktop dependencies installed"
   else
-    err "No .deb package found"
+    err "Installation failed: ${VOCO_INSTALL_ERROR}"
     exit 1
   fi
 
@@ -279,7 +308,7 @@ TOML
   echo -e "  ${WHITE}${BOLD}▸${NC} Open ${BOLD}VOCO${NC} from your app launcher"
   echo -e "  ${WHITE}${BOLD}▸${NC} Or run: ${GRAPHITE_SOFT}voco${NC}"
   echo
-  echo -e "  ${DIM}Speech needs the pinned runtime: see docs/linux-packaging.md#runtime-provisioning.${NC}"
+  echo -e "  ${DIM}Speech uses the pinned runtime bundled in the package.${NC}"
   echo -e "  ${DIM}Click where you want the text, then press ${BOLD}${HOTKEY}${NC}${DIM} to dictate!${NC}"
   echo
   echo -e "  ${DIM}You can change the hotkey anytime from the system tray icon${NC}"

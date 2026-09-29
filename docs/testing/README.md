@@ -123,10 +123,10 @@ acceptance is a separate physical test gate, not authorization for arbitrary inj
 commands in live apps. Perform the synthetic steps below in the disposable VM described in the cursor
 streaming checklist, and preserve the remote run ID and evidence.
 
-1. Install dependencies:
+1. Provision the [pinned runtime](../linux-packaging.md#runtime-provisioning), then build,
+   assemble, verify and install the complete package:
 
 ```bash
-npm ci
 ./scripts/setup.sh --install
 ```
 
