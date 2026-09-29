@@ -507,14 +507,14 @@ export function createDictationRecording(env: DictationRecordingEnv) {
         sourceRef.current = source;
         traceDictationEvent("recording_media_source_created").catch(() => {});
 
-        // The legacy fallback retains received audio for explicit manual recovery.
+        // The legacy fallback cannot prove a complete recording, so it is never typed.
         const workletOk = await connectWorklet(audioContext!, source);
         assertOutputAllowed(startingSessionId);
         captureAdmission = workletOk ? "automatic" : "manual-review";
         if (!workletOk) {
           sessionRef.current = disableLivePreview(sessionRef.current);
           useStore.getState().setCaptureNotice(
-            "This recording needs manual review because complete audio capture cannot be confirmed. After stopping, retry transcription to review the audio received.",
+            "VOCO can't confirm it is receiving all of your audio, so it won't type this recording. Stop and try again.",
           );
           connectScriptProcessor(audioContext!, source);
           traceDictationEvent("recording_script_processor_connected").catch(() => {});
@@ -703,9 +703,9 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       const queue = desktopPhraseQueueRef.current;
       if (!queue) {
         await finishJournal();
-        // Unverified capture is retained for an explicit local recovery only.
+        // Unverified capture is never typed.
         if (audioBufferRef.current.sampleCount) {
-          retainRecovery("Complete audio capture could not be confirmed. Retry transcription to review the audio received.");
+          retainRecovery("VOCO couldn't confirm it received all of your audio, so it didn't type this recording. Try again.");
         } else {
           finalizeIdleState();
         }

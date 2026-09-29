@@ -214,20 +214,18 @@ delivery are separate paths; installing a helper does not prove target consumpti
 - if the bar stays high at rest, reopen the setup flow after confirming the correct input device is selected
 - if the bar barely moves while speaking, check system input gain in your desktop sound settings before retesting
 
-## VOCO says complete audio capture cannot be confirmed
+## VOCO says it couldn't confirm it received all of your audio
 
-VOCO keeps the audio it received and stops automatic output. Choose **Retry
-transcription** to review that audio locally, then copy the result explicitly, or
-choose **Discard recovery**. Retrying cannot reconstruct missing audio; check the
-ending and any interrupted words before using the transcript. The notice remains
-after Retry so that a readable result is not mistaken for confirmed capture.
+VOCO types only recordings it knows are complete, so it stops without typing the
+rest and discards that audio. Words pasted before the problem stay in your text
+field; check it, then start again. VOCO does not change your microphone or input
+settings.
 
-This can occur when the audio engine does not acknowledge its final samples or
-when AudioWorklet initialization fails and the compatibility capture path is
-used. The latter always requires manual review because its callback API cannot
-confirm a complete recording. Discarding recovery and starting again resets the
-session; a healthy AudioWorklet session resumes normal operation. Neither action
-changes your selected microphone or input settings.
+This happens when the audio engine does not acknowledge the end of a recording,
+when the microphone stops providing input, or when AudioWorklet fails to start and
+VOCO falls back to a capture path that cannot confirm a complete recording. The
+next recording tries AudioWorklet again. If the message returns every time, quit
+VOCO from the tray and reopen it.
 
 ## Old Voice install settings did not appear
 
