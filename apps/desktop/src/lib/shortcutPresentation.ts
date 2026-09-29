@@ -52,6 +52,18 @@ export class DiagnosticsRequestGate {
   }
 }
 
+/** Structural equality for JSON-shaped IPC data, ignoring key order. */
+export function sameJsonValue(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) return true;
+  if (typeof a !== "object" || typeof b !== "object" || a === null || b === null ||
+      Array.isArray(a) !== Array.isArray(b)) return false;
+  const left = a as Record<string, unknown>;
+  const right = b as Record<string, unknown>;
+  const keys = Object.keys(left);
+  return keys.length === Object.keys(right).length && keys.every((key) =>
+    Object.prototype.hasOwnProperty.call(right, key) && sameJsonValue(left[key], right[key]));
+}
+
 /**
  * Runs the launch diagnostics check. If it leaves diagnostics unloaded (timeout,
  * failure or a stale result), setup is reported conservatively and the check is

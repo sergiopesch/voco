@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   DiagnosticsRequestGate,
   microphoneLabel,
+  sameJsonValue,
   shortcutPresentation,
   startLaunchDiagnostics,
   unknownShortcut,
@@ -9,6 +10,18 @@ import {
 import type { ShortcutDiagnostics } from "@/types";
 
 const available: ShortcutDiagnostics = { hotkey: "Alt+D", route: "evdev", state: "available", detail: "Current keyboard is open." };
+
+describe("sameJsonValue", () => {
+  it("compares diagnostics payloads structurally, ignoring key order", () => {
+    expect(sameJsonValue({ a: 1, b: { c: [1, 2], d: null } }, { b: { d: null, c: [1, 2] }, a: 1 })).toBe(true);
+    expect(sameJsonValue({ ...available }, available)).toBe(true);
+    expect(sameJsonValue(available, { ...available, state: "unknown" })).toBe(false);
+    expect(sameJsonValue({ c: [1, 2] }, { c: [2, 1] })).toBe(false);
+    expect(sameJsonValue({ a: 1 }, { a: 1, b: undefined })).toBe(false);
+    expect(sameJsonValue([1], { 0: 1 })).toBe(false);
+    expect(sameJsonValue({ a: null }, { a: {} })).toBe(false);
+  });
+});
 
 describe("shortcut presentation", () => {
   it("does not advertise missing, stale, unknown or route-less readiness", () => {

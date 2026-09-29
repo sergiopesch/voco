@@ -31,7 +31,7 @@ import {
   readCachedUpdateState,
   writeCachedUpdateState,
 } from "@/lib/updates";
-import { DiagnosticsRequestGate, shortcutPresentation, startLaunchDiagnostics, unknownShortcut } from "@/lib/shortcutPresentation";
+import { DiagnosticsRequestGate, sameJsonValue, shortcutPresentation, startLaunchDiagnostics, unknownShortcut } from "@/lib/shortcutPresentation";
 import { UpdateCheckCoordinator } from "@/lib/updateCheckCoordinator";
 import { useGlobalShortcut } from "@/hooks/useGlobalShortcut";
 import { useDictation } from "@/hooks/useDictation";
@@ -558,10 +558,11 @@ export function App() {
   const invalidateShortcutDiagnostics = useCallback(() => {
     diagnosticsGateRef.current.invalidate();
     if (diagnosticsExpiryRef.current !== null) clearTimeout(diagnosticsExpiryRef.current);
-    setRuntimeDiagnostics((current) => current ? {
-      ...current,
-      shortcut: unknownShortcut(useStore.getState().config?.hotkey ?? ""),
-    } : null);
+    setRuntimeDiagnostics((current) => {
+      if (!current) return null;
+      const shortcut = unknownShortcut(useStore.getState().config?.hotkey ?? "");
+      return sameJsonValue(current.shortcut, shortcut) ? current : { ...current, shortcut };
+    });
   }, []);
 
   const requestRuntimeDiagnostics = useCallback(async () => {
@@ -592,7 +593,9 @@ export function App() {
         runtimeDiagnosticsLoadedRef.current = true;
         setRuntimeDiagnosticsFailed(false);
       }
-      setRuntimeDiagnostics(diagnostics);
+      // The poll repeats every second. Keeping the current object when nothing
+      // changed spares a panel re-render; the expiry is re-armed either way.
+      setRuntimeDiagnostics((current) => current && sameJsonValue(current, diagnostics) ? current : diagnostics);
       if (diagnosticsExpiryRef.current !== null) clearTimeout(diagnosticsExpiryRef.current);
       diagnosticsExpiryRef.current = setTimeout(invalidateShortcutDiagnostics, 2000);
     } catch (error) {
