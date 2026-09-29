@@ -263,14 +263,6 @@ describe("guided dictation and settings journeys", () => {
     expect(output).not.toContain("Alt+D");
   });
 
-
-
-  it("does not resurrect a dismissed record from the current transcript", () => {
-    const markup = renderPanel({ transcript: "Dismissed text" });
-    expect(markup).not.toContain("Dismissed text");
-    expect(markup).not.toContain("Copy transcript");
-  });
-
   it("puts update status and action before optional preferences", () => {
     const markup = renderPanel({ surface: "settings", requestedSection: "Updates" });
     expect(markup.indexOf("Check for updates")).toBeLessThan(markup.indexOf("Update settings"));

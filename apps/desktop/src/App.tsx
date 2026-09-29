@@ -610,8 +610,10 @@ export function App() {
     return diagnosticsAttemptRef.current;
   }, [requestRuntimeDiagnostics]);
 
-  // Only the launch check waits for a request already in flight, so it never
-  // mistakes a skipped refresh for a failed one. Opening a surface must not wait.
+  // The launch check joins a request already in flight instead of skipping it.
+  // A refresh skipped while a config save is pending still counts as a failed
+  // attempt, so setup is reported conservatively and retried once. Opening a
+  // surface must not wait.
   const settleLaunchDiagnostics = useCallback(
     () => diagnosticsInFlightRef.current ? diagnosticsAttemptRef.current : refreshRuntimeDiagnostics(),
     [refreshRuntimeDiagnostics],
