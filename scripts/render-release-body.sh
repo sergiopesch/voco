@@ -14,8 +14,8 @@ Local English dictation for Linux. Speak and your words appear at the cursor.
 - Live words and punctuation, with explicit recovery after interrupted dictation.
 - A live voice test with microphone selection inside the same setup canvas.
 - Volume-responsive tray bars while listening; Ready returns after successful completion.
-- One bundled Nemotron recognizer for desktop, browser delivery and recovery.
-- Clear feedback when no editable text cursor is available.
+- One bundled Nemotron recognizer for desktop and browser delivery.
+- Words paste into the focused app with Shift+Insert; VOCO never presses Enter.
 - Microphone and shortcut preferences preserved on upgrade.
 
 [Changes and measured limits](https://github.com/sergiopesch/voco/blob/${TAG_NAME}/docs/releases/${VERSION}.md).
