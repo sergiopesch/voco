@@ -73,7 +73,7 @@ jobs:
             ibus ibus-gtk3 python3 python3-numpy python3-psutil python3-gi gir1.2-ibus-1.0 bubblewrap \
             xvfb xdotool xclip gir1.2-gtk-3.0 gir1.2-webkit2-4.1 gir1.2-atspi-2.0 at-spi2-core \
             weston libweston-13-0 wayland-utils gir1.2-gtk-4.0 gir1.2-webkit-6.0 \
-            gnome-text-editor gnome-terminal nano gnome-shell gnome-shell-extension-appindicator
+            gnome-text-editor gnome-terminal nano gnome-shell gnome-shell-extension-appindicator xwayland
 
       - name: Install Node dependencies
         run: npm ci
@@ -146,6 +146,20 @@ jobs:
           VOCO_DELIVERY_EVIDENCE_DIR: ${{ runner.temp }}/voco-application-delivery
         run: bash scripts/test-private-ibus-engine-hosted.sh --application-delivery
 
+      - name: Browser universal-paste regression on GNOME Wayland
+        timeout-minutes: 3
+        env:
+          VOCO_DELIVERY_PLATFORM: gnome-wayland
+          VOCO_DELIVERY_EVIDENCE_DIR: ${{ runner.temp }}/voco-browser-delivery-gnome-wayland
+        run: bash scripts/test-private-ibus-engine-hosted.sh --browser-delivery
+
+      - name: Application universal-paste matrix on GNOME Wayland
+        timeout-minutes: 3
+        env:
+          VOCO_DELIVERY_PLATFORM: gnome-wayland
+          VOCO_DELIVERY_EVIDENCE_DIR: ${{ runner.temp }}/voco-application-delivery-gnome-wayland
+        run: bash scripts/test-private-ibus-engine-hosted.sh --application-delivery
+
       - name: Private headless IBus lifecycle
         run: bash scripts/test-private-ibus-engine-hosted.sh
 
@@ -170,6 +184,8 @@ jobs:
           path: |
             ${{ runner.temp }}/voco-browser-delivery/
             ${{ runner.temp }}/voco-application-delivery/
+            ${{ runner.temp }}/voco-browser-delivery-gnome-wayland/
+            ${{ runner.temp }}/voco-application-delivery-gnome-wayland/
             ${{ runner.temp }}/voco-native-desktop/
             ${{ runner.temp }}/voco-native-wayland/
             ${{ runner.temp }}/voco-dictation-renderer/

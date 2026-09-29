@@ -115,6 +115,7 @@ for path in (
     Path("scripts/test-application-delivery.py"),
     Path("scripts/fixtures/delivery-native.py"),
     Path("scripts/fixtures/focused-paste.py"),
+    Path("scripts/fixtures/nested-ydotool.py"),
     Path("scripts/test-private-ibus-engine.py"),
     Path("scripts/test-native-desktop.py"),
     Path("scripts/test-native-wayland.py"),

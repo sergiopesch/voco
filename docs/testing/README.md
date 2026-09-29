@@ -1,7 +1,7 @@
 # Testing
 
-The current universal-paste contract and its X11 application and Chromium suites
-are in [desktop paste](desktop-paste.md).
+The current universal-paste contract and its X11 and GNOME Wayland application and
+Chromium suites are in [desktop paste](desktop-paste.md).
 
 - [27 September end-to-end assessment](end-to-end-assessment-2026-09-27.md): merged GNOME Start gate, startup audio recovery fix, CI evidence hygiene and remaining desktop acceptance gaps.
 

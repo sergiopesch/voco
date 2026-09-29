@@ -1,8 +1,9 @@
-"""Paste one synthetic chunk into whatever has focus on the private X11 display.
+"""Paste one synthetic chunk into whatever has focus on the private desktop.
 
 With VOCO_FIXTURE_PASTE_BINARY this runs production desktop_paste through its
-ignored insertion.rs test. Otherwise it replays the same X11 helper commands.
-Usage: python3 focused-paste.py TEXT
+ignored insertion.rs test. Otherwise it replays the same X11 helper commands:
+xclip on DISPLAY, which is XWayland on gnome-wayland, and xdotool keys on the
+private Xvfb. Usage: python3 focused-paste.py TEXT
 """
 import os
 from pathlib import Path
@@ -27,8 +28,10 @@ def replica(text):
         # Without -quiet, xclip forks and serves the selection it now owns.
         subprocess.run(['xclip', '-selection', selection, '-in'], input=payload.encode(),
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True, timeout=5)
+    keyboard = {name: value for name, value in os.environ.items() if name != 'XAUTHORITY'}
+    keyboard['DISPLAY'] = os.environ['VOCO_DELIVERY_KEYBOARD_DISPLAY']
     subprocess.run(['xdotool', 'key', '--clearmodifiers', *(['space'] if leading else []), 'shift+Insert'],
-                   check=True, timeout=5)
+                   env=keyboard, check=True, timeout=5)
 
 
 def production(binary, text):
@@ -41,7 +44,8 @@ def production(binary, text):
 
 
 def main():
-    assert os.environ.get('DISPLAY') == ':0' and not Path('/dev/input').exists(), 'Private fixture display required'
+    assert os.environ.get('VOCO_DELIVERY_KEYBOARD_DISPLAY') == ':0' and not any(
+        Path(path).exists() for path in ('/dev/input', '/dev/uinput')), 'Private fixture display required'
     text = sys.argv[1]
     binary = os.environ.get('VOCO_FIXTURE_PASTE_BINARY')
     if binary:

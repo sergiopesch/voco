@@ -1,27 +1,40 @@
-"""Universal paste into real Linux applications on the private X11 display.
+"""Universal paste into real Linux applications on the private desktop.
 
 Every case pastes with the one production chord through fixtures/focused-paste.py
-and reads the result back from the application itself. Never run this on the
-owner desktop.
+and reads the result back from the application itself. On gnome-wayland the
+applications are clients of a nested GNOME Shell, whose private probe reports
+their windows. Never run this on the owner desktop.
 """
+import contextlib
 import json
 import os
 from pathlib import Path
 import re
 import select
+import signal
 import subprocess
 import sys
 import time
 
+root = Path(sys.argv[1]); home = root/'home'; out = root/'evidence'
+platform = os.environ['VOCO_DELIVERY_PLATFORM']; wayland = platform == 'gnome-wayland'
+# Test keys and screenshots use the private Xvfb, which has no authority file.
+keyboard = {name: value for name, value in os.environ.items() if name != 'XAUTHORITY'}
+keyboard['DISPLAY'] = os.environ['VOCO_DELIVERY_KEYBOARD_DISPLAY']
+assert keyboard['DISPLAY'] == ':0' and os.environ['HOME'] == str(home)
+if wayland:
+    assert os.environ['WAYLAND_DISPLAY'] == 'voco-delivery'
+else:
+    assert os.environ['DISPLAY'] == ':0'
+assert not any(Path(path).exists() for path in ('/dev/input', '/dev/uinput', '/dev/snd'))
+fixtures = Path(__file__).with_name('fixtures')
+results = []; processes = []; windows = []
+SCREENSHOT = """import sys
 import gi
 gi.require_version('Gdk', '3.0')
 from gi.repository import Gdk
-
-root = Path(sys.argv[1]); home = root/'home'; out = root/'evidence'
-assert os.environ['DISPLAY'] == ':0' and os.environ['HOME'] == str(home)
-assert not Path('/dev/input').exists() and not Path('/dev/snd').exists()
-fixtures = Path(__file__).with_name('fixtures')
-results = []; processes = []; windows = []
+Gdk.pixbuf_get_from_window(Gdk.get_default_root_window(), 0, 0, 1280, 900).savev(sys.argv[1], 'png', [], [])
+"""
 
 
 def paste(text):
@@ -30,7 +43,7 @@ def paste(text):
 
 def key(*keys):
     """Test-only keys that read the result back; delivery never sends these."""
-    subprocess.run(['xdotool', 'key', '--clearmodifiers', *keys], check=True, timeout=5)
+    subprocess.run(['xdotool', 'key', '--clearmodifiers', *keys], env=keyboard, check=True, timeout=5)
 
 
 def wait_for(read, expected, what, timeout=10):
@@ -57,25 +70,67 @@ def launch(name, args, stdout=None, env=None):
     return process
 
 
-def window_names():
+def shell_windows():
+    reply = subprocess.run(['dbus-send', '--session', '--print-reply=literal', '--dest=org.gnome.Shell',
+                            '/org/voco/PrivateShellProbe', 'org.voco.PrivateShellProbe.GetWindows'],
+                           capture_output=True, text=True, check=True, timeout=5)
+    return json.loads(reply.stdout)
+
+
+def visible_windows():
+    if wayland:
+        return [window for window in shell_windows() if window['visible']]
     ids = subprocess.run(['xdotool', 'search', '--onlyvisible', '--name', '.*'], capture_output=True, text=True, timeout=5).stdout.split()
-    return [subprocess.run(['xdotool', 'getwindowname', id], capture_output=True, text=True, timeout=5).stdout.strip() for id in ids]
+    return [window_title(id) for id in ids]
+
+
+def window_title(window):
+    if wayland:
+        return next((item['title'] for item in shell_windows() if item['generation'] == window['generation']), None)
+    return subprocess.run(['xdotool', 'getwindowname', window], capture_output=True, text=True, timeout=5).stdout.strip()
+
+
+def focused_window(process, title):
+    """The application's window once it has keyboard focus, or None."""
+    if wayland:
+        # GNOME Shell focuses each new window itself.
+        matches = [window for window in visible_windows()
+                   if (re.search(title, window['title'] or '') if title else window['pid'] == process.pid)]
+        return matches[-1] if matches and matches[-1]['focused'] else None
+    search = ['xdotool', 'search', '--onlyvisible', *(['--name', title] if title else ['--pid', str(process.pid)])]
+    ids = subprocess.run(search, capture_output=True, text=True, timeout=5).stdout.split()
+    if ids:
+        # No window manager runs here, so focus the window directly.
+        subprocess.run(['xdotool', 'windowfocus', '--sync', ids[-1]], check=True, timeout=5)
+        return ids[-1]
+    return None
 
 
 def focus_window(process, title=None):
-    search = ['xdotool', 'search', '--onlyvisible', *(['--name', title] if title else ['--pid', str(process.pid)])]
     deadline = time.monotonic() + 20
     while time.monotonic() < deadline:
-        ids = subprocess.run(search, capture_output=True, text=True, timeout=5).stdout.split()
-        if ids:
-            # No window manager runs here, so focus the window directly.
-            subprocess.run(['xdotool', 'windowfocus', '--sync', ids[-1]], check=True, timeout=5)
-            windows.append(ids[-1])
-            return ids[-1]
+        if window := focused_window(process, title):
+            windows.append(window)
+            return window
         time.sleep(.05)
     if process.poll() is not None:
         raise AssertionError(f'Application window unavailable: the application exited with status {process.returncode}')
-    raise AssertionError(f'Application window unavailable; visible windows: {window_names()}')
+    raise AssertionError(f'Application window unavailable; visible windows: {visible_windows()}')
+
+
+def close_windows(first_window):
+    if not wayland:
+        for window in windows[first_window:]:
+            subprocess.run(['xdotool', 'windowclose', window], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
+        return
+    # The probe cannot close windows, so end every client that still shows one.
+    # A new window takes focus only when no other window holds it.
+    deadline = time.monotonic() + 5
+    while (remaining := shell_windows()) and time.monotonic() < deadline:
+        for pid in {window['pid'] for window in remaining if window['pid'] > 1}:
+            with contextlib.suppress(ProcessLookupError):
+                os.kill(pid, signal.SIGTERM)
+        time.sleep(.2)
 
 
 def toolkit(kind):
@@ -157,11 +212,10 @@ def firefox():
     page = home/'firefox.html'
     page.write_text('<title>[]</title><textarea autofocus oninput="document.title=\'[\'+this.value+\']\'"></textarea>')
     browser = launch('firefox', [os.environ['VOCO_FIREFOX_BINARY'], '--no-remote', '--profile', str(profile), page.as_uri()],
-                     env={**os.environ, 'MOZ_CRASHREPORTER_DISABLE': '1'})
+                     env={**os.environ, 'MOZ_CRASHREPORTER_DISABLE': '1', **({'MOZ_ENABLE_WAYLAND': '1'} if wayland else {})})
     window = focus_window(browser, title=r'^\[\]')
     def title():
-        name = subprocess.run(['xdotool', 'getwindowname', window], capture_output=True, text=True, timeout=5).stdout
-        match = re.match(r'\[(.*)\]', name)
+        match = re.match(r'\[(.*)\]', window_title(window) or '')
         return match and match.group(1)
     for text, expected in (('Hello', 'Hello'), (' Firefox.', 'Hello Firefox.')):
         paste(text)
@@ -178,6 +232,7 @@ def vscode():
     (stubs/'xdg-open').write_text('#!/bin/sh\nexit 0\n'); (stubs/'xdg-open').chmod(0o755)
     document = home/'vscode.txt'; document.write_text('')
     editor = launch('vscode', [os.environ['VOCO_VSCODE_BINARY'], '--no-sandbox', '--disable-gpu', '--password-store=basic',
+                               *(['--ozone-platform=wayland'] if wayland else []),
                                f'--user-data-dir={profile}', f'--extensions-dir={profile/"extensions"}', '--new-window', str(document)],
                     env={**os.environ, 'PATH': f'{stubs}:{os.environ["PATH"]}'})
     focus_window(editor, title=r'vscode\.txt')
@@ -202,11 +257,12 @@ def trial(name, run, requires=None):
         item['status'] = 'passed'
     except Exception as error:
         item.update(status='failed', error=str(error))
-        screenshot = Gdk.pixbuf_get_from_window(Gdk.get_default_root_window(), 0, 0, 1280, 900)
-        screenshot.savev(str(out/(re.sub(r'\W+', '-', name).strip('-').lower() + '.png')), 'png', [], [])
+        # The Xvfb root also shows the nested Shell on gnome-wayland.
+        png = out/(re.sub(r'\W+', '-', name).strip('-').lower() + '.png')
+        with contextlib.suppress(subprocess.SubprocessError):
+            subprocess.run(['/usr/bin/python3', '-c', SCREENSHOT, str(png)], env={**keyboard, 'GDK_BACKEND': 'x11'}, timeout=20)
     finally:
-        for window in windows[first_window:]:
-            subprocess.run(['xdotool', 'windowclose', window], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
+        close_windows(first_window)
         for process in processes[first_process:]:
             if process.poll() is None: process.terminate()
     print(json.dumps(item), flush=True)
@@ -225,7 +281,7 @@ try:
     trial('VS Code editor', vscode, 'VOCO_VSCODE_BINARY')
 finally:
     paste_mode = 'production' if os.environ.get('VOCO_FIXTURE_PASTE_BINARY') else 'replica'
-    (out/'results.json').write_text(json.dumps({'paste': paste_mode, 'results': results}, indent=2) + '\n')
+    (out/'results.json').write_text(json.dumps({'platform': platform, 'paste': paste_mode, 'results': results}, indent=2) + '\n')
     for process in processes:
         if process.poll() is None: process.terminate()
 statuses = [item['status'] for item in results]

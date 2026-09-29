@@ -60,22 +60,34 @@ applications and read the result back from the application itself.
 | Browser | `npm run test:browser-delivery` | `--browser-delivery` | Chromium input, textarea, rich editor, placeholder, selection replacement, non-ASCII text, focus change and address bar |
 
 `scripts/test-application-delivery.sh` runs either suite in bubblewrap with no
-network, no `/dev/input`, a private Xvfb `:0`, a private D-Bus session and no
-window manager. `VOCO_DELIVERY_SUITE` selects `applications` (default) or
-`browser`. CI passes the hosted modes to `scripts/test-private-ibus-engine-hosted.sh`
-and, because it does not build Rust, uses the replica paste.
+network, no `/dev/input`, a private Xvfb `:0` and a private D-Bus session.
+`VOCO_DELIVERY_SUITE` selects `applications` (default) or `browser`.
+`VOCO_DELIVERY_PLATFORM` selects `x11` (default), where the applications use the
+Xvfb with no window manager, or `gnome-wayland`, where they are clients of a
+nested GNOME Shell drawn on the Xvfb, with XWayland for X11 clients. CI passes
+the hosted modes to `scripts/test-private-ibus-engine-hosted.sh` on both
+platforms and, because it does not build Rust, uses the replica paste.
 
 `scripts/fixtures/focused-paste.py` performs every paste. By default it replays
 the X11 helper commands of `desktop_paste`: xclip for both selections, then
-`xdotool key --clearmodifiers [space] shift+Insert`. Set
-`VOCO_FIXTURE_PASTE_BINARY` to the voco library test executable from
-`cargo test --no-run` to paste through production `desktop_paste` instead, via
-the ignored `insertion::tests::paste_fixture_text_into_the_focused_application`
-test. Each `results.json` records `"paste": "production"` or `"replica"`.
+`xdotool key --clearmodifiers [space] shift+Insert`. On `gnome-wayland` xclip
+writes to XWayland, and the keys go to the Xvfb, which the nested Shell passes
+to its focused window. Set `VOCO_FIXTURE_PASTE_BINARY` to the voco library test
+executable from `cargo test --no-run` to paste through production
+`desktop_paste` instead, via the ignored
+`insertion::tests::paste_fixture_text_into_the_focused_application` test. On
+`gnome-wayland` production copies with xclip through XWayland, as it does on a
+GNOME login, and presses the keys with `/usr/bin/ydotool`. The sandbox mounts
+the test-only `scripts/fixtures/nested-ydotool.py` there: it accepts only the
+paste keys and sends them to the Xvfb. This mode needs an installed ydotool
+package for the mount point. Each `results.json` records the platform and
+`"paste": "production"` or `"replica"`.
 
 - `VOCO_DELIVERY_EVIDENCE_DIR` receives `results.json`, logs and failure screenshots.
 - `VOCO_DELIVERY_BROWSER` selects a Chromium executable by absolute path instead
   of Playwright's.
+- `VOCO_DELIVERY_OZONE` selects Chromium's Ozone platform: `x11`, or `wayland`
+  on `gnome-wayland` only. It defaults to the delivery platform.
 - `VOCO_GHOSTTY_BINARY`, `VOCO_FIREFOX_BINARY` and `VOCO_VSCODE_BINARY` need
   absolute paths because the sandbox resets `PATH`. Unset cases are recorded as
   `unavailable`, never passed.
@@ -89,9 +101,10 @@ The Release workflow also runs the whole built app with `--full-application`
 a public speech fixture, Alt+D to start and stop, and each chunk pasted into the
 focused GTK field, including a focus change between two utterances.
 
-These suites cover X11 only. They do not exercise Wayland, ydotool, wl-copy, the
-GNOME companion or a physical keyboard, and passing cases do not certify other
-applications.
+The nested GNOME Shell is not a login session: keys reach it through its window
+on the Xvfb instead of a kernel input device, no real ydotoold runs, and the
+VOCO companion and shortcuts are not exercised. Neither platform covers a
+physical keyboard, and passing cases do not certify other applications.
 
 ## Native paste introduction — 2026.0.27
 
