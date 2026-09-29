@@ -92,6 +92,8 @@ class DependencyTests(unittest.TestCase):
             self.assertIn('glibc >= 2.39', profile)
             self.assertIn('python3-numpy', profile)
             self.assertEqual(len(profile), len(set(profile)))
+            # No shipped code uses the accessibility bus.
+            self.assertFalse([name for name in profile if 'atspi' in name.lower().replace('-', '')])
 
     def test_unknown_rpm_distribution_fails_closed(self):
         with self.assertRaises(ValueError):
@@ -103,7 +105,7 @@ class DependencyTests(unittest.TestCase):
         staging.validate_debian_dependencies(', '.join(config['bundle']['linux']['deb']['depends']))
 
     def test_unknown_empty_alternative_and_versioned_dependencies_fail_closed(self):
-        for value in ('', 'python3, new-runtime', 'python3 (>= 3.14)', 'python3 | pypy'):
+        for value in ('', 'python3, new-runtime', 'python3 (>= 3.14)', 'python3 | pypy', 'python3, at-spi2-core'):
             with self.subTest(value=value), self.assertRaisesRegex(ValueError, 'requires review'):
                 staging.validate_debian_dependencies(value)
 
