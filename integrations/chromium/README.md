@@ -8,7 +8,7 @@ connection loss or a second toolbar click also cancels an enable request still
 waiting for script injection or its reply; a late reply cannot enable another document.
 Click the toolbar action again to disable the current tab. An active browser
 recording receives a stop request and its recipient authorization is revoked;
-any undelivered text remains available for manual recovery.
+at Stop VOCO copies any words the field did not take to the clipboard.
 Closing or navigating the enabled tab, or losing the native host connection,
 also requests Stop for that recording. VOCO retains that request across a
 temporary renderer reload until its listener confirms receipt. Moving focus
@@ -98,7 +98,7 @@ Provision the pinned runtime using [runtime provisioning](../../docs/linux-packa
 the fixture stages and checks the selected runtime identity. Streaming delivery is the production path;
 `VOCO_BROWSER_LONG_CAPTURE=1` concatenates existing speech fixtures in manifest order until at least 37 seconds
 (250ms gaps), waits for a real checkpoint receipt, changes focus, and verifies
-that finalization preserves the committed prefix and retains recovery without
+that finalization preserves the committed prefix and copies the rest without
 writing to the other field. This is synthetic regression coverage, not a
 representative speech-quality benchmark. Hosted Ubuntu CI can use
 `scripts/test-private-ibus-engine-hosted.sh --browser-application`; its temporary

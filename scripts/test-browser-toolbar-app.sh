@@ -30,7 +30,7 @@ MANIFEST
   trap cleanup EXIT
   mkdir -p "$test_root"/{home,runtime,config/voco,data/voco/models,cache,state,evidence}
   mkdir -p "$test_root/evidence/runner-snapshots"
-  cp "$repo/scripts/test-browser-toolbar-app.sh" "$repo/scripts/test-browser-toolbar-app.mjs" "$repo/scripts/test-browser-toolbar-action.py" "$repo/scripts/test-browser-clear-recovery.py" "$repo/scripts/browser-long-accuracy.mjs" "$repo/scripts/speech-score.mjs" "$repo/scripts/test-speech-continuity.mjs" "$repo/scripts/speech-integrity.mjs" "$test_root/evidence/runner-snapshots/"
+  cp "$repo/scripts/test-browser-toolbar-app.sh" "$repo/scripts/test-browser-toolbar-app.mjs" "$repo/scripts/test-browser-toolbar-action.py" "$repo/scripts/browser-long-accuracy.mjs" "$repo/scripts/speech-score.mjs" "$repo/scripts/test-speech-continuity.mjs" "$repo/scripts/speech-integrity.mjs" "$test_root/evidence/runner-snapshots/"
   chmod 700 "$test_root/runtime"
   cp --reflink=auto "$VOCO_NATIVE_APP_BINARY" "$test_root/voco"
   source "$(dirname "${BASH_SOURCE[0]}")/lib/test-speech-runtime.sh"

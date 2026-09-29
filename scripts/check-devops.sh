@@ -137,7 +137,6 @@ for path in (
     Path("scripts/test-native-atspi.py"),
     Path("scripts/test-native-full-app.py"),
     Path("scripts/test-native-recovery-controls.py"),
-    Path("scripts/test-browser-clear-recovery.py"),
     Path("scripts/test-browser-toolbar-action.py"),
 ):
     ast.parse(path.read_text())

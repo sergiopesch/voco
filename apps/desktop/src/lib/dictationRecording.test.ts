@@ -372,6 +372,34 @@ it("takes the interrupted path when neither the clipboard nor Review can keep th
   expect(h.phase.current).toBe("idle");
 });
 
+it("copies the rest when a browser field stops taking text, without finishing its lease", async () => {
+  const h = harness();
+  h.recordingWith(async () => ({ undelivered: " the rest.", uncertain: true }));
+  h.pasteSession.current = false;
+  const browser = { finish: vi.fn(async () => {}), cancel: vi.fn(async () => {}) };
+  (h.env.browserDeliveryRef as { current: unknown }).current = browser;
+  await h.stopRecording();
+  expect(browser.finish).not.toHaveBeenCalled();
+  expect(browser.cancel).toHaveBeenCalled();
+  expect(h.copy).toHaveBeenCalledExactlyOnceWith("the rest.");
+  expect(h.trace).toHaveBeenCalledWith("dictation_desktop_remainder_copied");
+  expect(h.notify).toHaveBeenCalledExactlyOnceWith("Dictation copied to clipboard", expect.stringContaining("Some words may already be in the app"));
+  expect(h.env.browserDeliveryRef.current).toBeNull();
+  expect(h.phase.current).toBe("idle");
+});
+
+it("finishes a browser field that took every word", async () => {
+  const h = harness();
+  h.recordingWith(async () => ({ undelivered: "" }));
+  h.pasteSession.current = false;
+  const browser = { finish: vi.fn(async () => {}), cancel: vi.fn(async () => {}) };
+  (h.env.browserDeliveryRef as { current: unknown }).current = browser;
+  await h.stopRecording();
+  expect(browser.finish).toHaveBeenCalledOnce();
+  expect(h.copy).not.toHaveBeenCalled();
+  expect(h.phase.current).toBe("idle");
+});
+
 it("never uses the clipboard outside a desktop paste session", async () => {
   const h = harness();
   h.recordingWith(async () => ({ undelivered: "Fixture words." }));
@@ -392,6 +420,7 @@ it("controlled recognition failure clears private content and permits the next r
   expect(h.env.audioBufferRef.current.sampleCount).toBe(0);
   expect(h.copy).not.toHaveBeenCalled();
   expect(h.notify).toHaveBeenCalledWith("Dictation interrupted", expect.stringContaining("Some words may be missing"));
+  expect(h.trace).toHaveBeenCalledWith("dictation_interrupted");
   await h.startRecording();
   expect(h.captureSelection).toHaveBeenCalledOnce();
 });

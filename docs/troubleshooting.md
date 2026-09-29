@@ -100,11 +100,12 @@ locations. A missing private `XDG_RUNTIME_DIR`, wrong ownership or public socket
 the broker to reject the connection. Do not weaken permissions to bypass this check. See
 [broker acceptance](testing/browser-broker.md) for paths and protocol details.
 
-A cold or blocked browser/app can outlast the two-second trigger or request deadline. The result
-then stays in VOCO. Requests have a short recipient-side expiry checked after page hooks, so delayed
-work is rejected under the shared host clock assumption; arbitrary wall-clock rollback is not
-covered. No automatic retry is performed after an uncertain result. Review any text already in the
-field before copying a retained transcript, because uncertainty does not prove that nothing landed.
+A cold or blocked browser/app can outlast the two-second trigger or request deadline. Requests
+have a short recipient-side expiry checked after page hooks, so delayed work is rejected under the
+shared host clock assumption; arbitrary wall-clock rollback is not covered. No automatic retry is
+performed after an uncertain result: as with desktop paste, Stop copies the words the field did not
+take to the clipboard. Check the field before pasting them, because uncertainty does not prove that
+nothing landed.
 
 The adapter uses direct mutation of the captured element. Browser native undo may not include these
 writes; do not assume undo support or rich-editor compatibility from a successful plain-text test.
@@ -117,9 +118,9 @@ Use `report-speech-performance.py` for recognition/startup timing and worker fai
 stages. A `first_hypothesis` event is not a visible-field receipt. Whole-message
 post-Stop rewrite is not implemented by the generic desktop route.
 
-For exact-field Chromium sessions, invalidated ownership retains recovery without
-retargeting or automatic fallback. Do not confuse those recipient receipts with native
-paste-dispatch success.
+For exact-field Chromium sessions, invalidated ownership stops delivery without
+retargeting or automatic fallback; Stop copies the rest to the clipboard. Do not confuse
+those recipient receipts with native paste-dispatch success.
 
 For a controlled development reproduction, use:
 

@@ -93,13 +93,19 @@ try {
       await page.locator('#a').focus();
     }
     await delay(600);await page.keyboard.press('Alt+Shift+v');
-    if(reject) await until(async()=> (await traces()).slice(traceStart).some(t=>t.event==='dictation_recovery_retained'),'focus-loss transcript recovery',45_000);
+    // After focus loss, Stop copies the words the field did not take, as a failed paste does.
+    if(reject) await until(async()=> (await traces()).slice(traceStart).some(t=>t.event==='dictation_desktop_remainder_copied'),'focus-loss remainder copied',45_000);
     else await until(async()=> (await page.locator('#a').inputValue()).toLowerCase().match(/[a-z]+/g)?.join(' ')==='go do you hear','real transcript exact-field delivery',45_000);
-    if(!reject) await until(async()=> (await traces()).slice(traceStart).some(t=>t.event==='dictation_stop_to_idle'),'dictation returns idle');
+    await until(async()=> (await traces()).slice(traceStart).some(t=>t.event==='dictation_stop_to_idle'),'dictation returns idle');
     assert.equal(await page.locator('#b').inputValue(),'');
-    if(reject)assert.equal(await page.locator('#a').inputValue(),prefix,'Focus loss preserves already delivered text without replay');
-    await page.screenshot({path:`${root}/evidence/${retry?'after-recovery':reject?'focus-loss':'delivery'}.png`});
-    results.push({case:retry?'fresh-recording-after-clearing-recovery':reject?'focus-loss':'delivery',passed:true,events:(await traces()).slice(traceStart).map(t=>t.event)});
+    if(reject){
+      assert.equal(await page.locator('#a').inputValue(),prefix,'Focus loss preserves already delivered text without replay');
+      const letters = text => text.toLowerCase().replace(/[^a-z]/g, '');
+      const copied = execFileSync('xclip', ['-selection', 'clipboard', '-o'], {encoding: 'utf8', timeout: 5000});
+      assert.equal(letters(prefix + copied), letters('go do you hear'), 'The clipboard holds exactly the words the field did not take');
+    }
+    await page.screenshot({path:`${root}/evidence/${retry?'fresh-recording':reject?'focus-loss':'delivery'}.png`});
+    results.push({case:retry?'fresh-recording':reject?'focus-loss':'delivery',passed:true,events:(await traces()).slice(traceStart).map(t=>t.event)});
   }
   await shortCase(false);
   if (longCapture) {
@@ -126,9 +132,7 @@ try {
     await page.screenshot({path:`${root}/evidence/long-delivery.png`});
   }
   await shortCase(true);
-
-  const clear = spawn('/usr/bin/python3', ['scripts/test-browser-clear-recovery.py'], {stdio: ['ignore', log.fd, log.fd]});
-  assert.equal(await new Promise(resolve => clear.on('exit', resolve)), 0, 'actual recovery clear button');
+  // Nothing waits in VOCO after focus loss, so the next recording starts directly.
   await shortCase(false, true);
 
   // Exercise terminal browser lifetime with real capture and native receipts.
@@ -166,7 +170,7 @@ try {
     await until(async () => {
       captureStop = browserCaptureStopEvidence((await traces()).slice(traceStart), recording.dictation_session_id);
       return captureStop !== null;
-    }, `${departure}: capture tears down and recording reaches recovery or idle`, 15_000);
+    }, `${departure}: capture tears down and recording ends`, 15_000);
     let afterSources;
     await until(() => {
       afterSources = activeSources();
@@ -178,11 +182,6 @@ try {
     if (!recipient.isClosed()) assert.equal(await recipient.locator('#b').inputValue(), '');
     const stopped = (await traces()).slice(traceStart);
     assert.equal(stopped.filter(row => row.event === 'recording_state_active').length, 1);
-    if (captureStop.terminal === 'dictation_recovery_retained') {
-      const clear = spawn('/usr/bin/python3', ['scripts/test-browser-clear-recovery.py'],
-        {stdio: ['ignore', log.fd, log.fd]});
-      assert.equal(await new Promise(resolve => clear.on('exit', resolve)), 0);
-    }
     if (!recipient.isClosed()) await recipient.close();
     results.push({case: `${departure}-stops-active-capture`, passed: true, captureStop,
       pulseCapture: {baselineSources, recordingSources, activeAfterStop: afterSources},

@@ -1,5 +1,5 @@
 import {chromium} from 'playwright';
-import {spawn} from 'node:child_process';
+import {spawn, execFileSync} from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -114,13 +114,18 @@ try {
     assert.equal(await player.done,0);
     if(reject){await page.locator('#b').focus();await page.locator('#a').focus();}
     await delay(600);await page.keyboard.press('Alt+Shift+v');
-    if(reject) await until(async()=> (await traces()).slice(traceStart).some(t=>t.event==='dictation_recovery_retained'),'focus-loss transcript recovery',45_000);
+    // After focus loss, Stop copies the words the field did not take, as a failed paste does.
+    if(reject) await until(async()=> (await traces()).slice(traceStart).some(t=>t.event==='dictation_desktop_remainder_copied'),'focus-loss remainder copied',45_000);
     else await until(async()=> (await page.locator('#a').inputValue()).toLowerCase().match(/[a-z]+/g)?.join(' ')==='go do you hear','real transcript exact-field delivery',45_000);
     await until(async()=> (await traces()).slice(traceStart).some(t=>t.event==='dictation_stop_to_idle'),'dictation returns idle');
     assert.equal(await page.locator('#b').inputValue(),'');
-    if(reject)assert.equal(await page.locator('#a').inputValue(),'');
-    await page.screenshot({path:`${root}/evidence/${retry?'after-recovery':reject?'focus-loss':'delivery'}.png`});
-    results.push({case:retry?'fresh-recording-after-clearing-recovery':reject?'focus-loss':'delivery',passed:true,events:(await traces()).slice(traceStart).map(t=>t.event)});
+    if(reject){
+      assert.equal(await page.locator('#a').inputValue(),'');
+      const copied = execFileSync('xclip', ['-selection', 'clipboard', '-o'], {encoding: 'utf8', timeout: 5000});
+      assert.equal(copied.toLowerCase().match(/[a-z]+/g)?.join(' '), 'go do you hear', 'The clipboard holds the words the field did not take');
+    }
+    await page.screenshot({path:`${root}/evidence/${retry?'fresh-recording':reject?'focus-loss':'delivery'}.png`});
+    results.push({case:retry?'fresh-recording':reject?'focus-loss':'delivery',passed:true,events:(await traces()).slice(traceStart).map(t=>t.event)});
   }
   if (process.env.VOCO_BROWSER_TOOLBAR_PROBE_ONLY !== '1') {
   for (const reject of (process.env.VOCO_BROWSER_LONG_CAPTURE === '1' ? (process.env.VOCO_BROWSER_DIAG_SECOND_CAPTURE === '1' ? [false] : []) : [false, true])) await shortCase(reject);
@@ -142,7 +147,7 @@ try {
     const prefix=await page.locator('#a').inputValue(); assert.ok(prefix.length>0);
     await page.locator('#b').focus();
     assert.equal(await played,0); await delay(600); await page.keyboard.press('Alt+Shift+v');
-    await until(async()=> (await traces()).slice(traceStart).some(t=>t.event==='dictation_recovery_retained'),'canonical focus-loss recovery',45_000);
+    await until(async()=> (await traces()).slice(traceStart).some(t=>t.event==='dictation_desktop_remainder_copied'),'canonical focus-loss remainder copied',45_000);
     await until(async()=> (await traces()).slice(traceStart).some(t=>t.event==='dictation_stop_to_idle'),'canonical finalization returns idle');
     assert.equal(await page.locator('#a').inputValue(),prefix); assert.equal(await page.locator('#b').inputValue(),'');
     let captureFile, capture;
@@ -164,8 +169,7 @@ try {
     await page.screenshot({path:`${root}/evidence/canonical-focus-loss.png`});
   }
 
-  const clear = spawn('/usr/bin/python3', ['scripts/test-browser-clear-recovery.py'], {stdio: ['ignore', log.fd, log.fd]});
-  assert.equal(await new Promise(resolve => clear.on('exit', resolve)), 0, 'actual recovery clear button');
+  // Nothing waits in VOCO after focus loss, so the next recording starts directly.
   await shortCase(false, true);
   }
 

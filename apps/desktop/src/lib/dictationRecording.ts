@@ -250,6 +250,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       setError(reason);
       setInterimTranscript("");
       transitionCursorDelivery("session-idle");
+      traceDictationEvent("dictation_interrupted").catch(() => {});
       void showNotification("Dictation interrupted", reason === new CrashJournalCleanupError().message
         ? reason : "Some words may be missing. Check your text field before starting again.").catch(() => {});
       return;
@@ -715,17 +716,21 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       enqueueDesktopPhrase(audioBufferRef.current.sampleCount);
       const { undelivered, uncertain } = await queue.finish();
       assertOutputAllowed(stoppingSessionId);
-      await browserDeliveryRef.current?.finish();
-      assertOutputAllowed(stoppingSessionId);
+      const browser = browserDeliveryRef.current;
       browserDeliveryRef.current = null;
+      // A browser field that stopped taking text is handled like a failed
+      // paste: its lease is released and the rest is copied below.
+      if (undelivered) void browser?.cancel();
+      else await browser?.finish();
+      assertOutputAllowed(stoppingSessionId);
       traceDictationEvent("dictation_desktop_stream_flush_completed", { durationMs: Math.round(performance.now() - started) }).catch(() => {});
       if (stopRequestedAtMsRef.current !== null) traceDictationEvent("dictation_stop_to_final_transcript", { durationMs: Math.round(performance.now() - stopRequestedAtMsRef.current) }).catch(() => {});
       desktopPhraseQueueRef.current = null;
       const remainder = undelivered.trimStart();
-      if (remainder && desktopPasteSessionRef.current) {
-        // Text the focused app did not take (or may not have taken) is never
-        // replayed as keys; the clipboard lets the user paste it themselves,
-        // and Review keeps the dictation when even the copy fails.
+      if (remainder && (desktopPasteSessionRef.current || browser)) {
+        // Text the app did not take (or may not have taken) is never replayed;
+        // the clipboard lets the user paste it themselves, and Review keeps
+        // the dictation when even the copy fails.
         const copied = await copyDesktopText(remainder).then(() => true, () => false);
         assertOutputAllowed(stoppingSessionId);
         if (!copied) {

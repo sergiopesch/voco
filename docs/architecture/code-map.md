@@ -45,7 +45,8 @@ recognizer serves desktop, browser and onboarding sessions. See
    hypothesis or bounded Stop retries. An uncertain or rejected paste disables
    insertion while recognition continues through Stop, which copies the
    undelivered remainder to the clipboard and notifies; if that copy fails,
-   `CrashJournal.keep` moves the session's text into Review. Recognition/transport
+   `CrashJournal.keep` moves the session's text into Review. A Chromium
+   exact-field session whose field stopped taking text ends the same way. Recognition/transport
    failure still stops queue admission. Handled cursor failures notify, clear
    text/audio at Stop and return to a nonblocking idle state. Onboarding retains
    its local test retry path.

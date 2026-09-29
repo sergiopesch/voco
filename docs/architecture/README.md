@@ -51,6 +51,7 @@ registration. The one-second IBus bound and plugin-generation checks are unchang
    rejected paste, stops insertion without replay. Healthy recognition continues
    through Stop, which copies any undelivered remainder to the clipboard and
    notifies the user, or moves the dictation into Review when that copy fails.
+   A Chromium exact-field session whose field stopped taking text ends the same way.
 
 The candidate batches released silence-preroll frames into at most one second per
 native call, preserving every released sample and its order. This reduces call

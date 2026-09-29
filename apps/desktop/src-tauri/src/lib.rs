@@ -418,6 +418,7 @@ fn is_supported_dictation_trace_event(event: &str) -> bool {
             | "dictation_first_live_text_visible"
             | "dictation_stop_to_final_transcript"
             | "dictation_stop_to_idle"
+            | "dictation_interrupted"
             | "dictation_recording_duration"
             | "dictation_transcription_completed"
             | "dictation_recording_stopped"
