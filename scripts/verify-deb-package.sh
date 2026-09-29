@@ -87,7 +87,6 @@ assert_entry() {
 assert_entry /usr/share/ibus/component/voco.xml -rw-r--r--
 assert_entry /usr/libexec/voco-ibus-engine -rwxr-xr-x
 assert_entry /usr/lib/voco/ibus/voco_ibus_engine.py -rw-r--r--
-assert_entry /usr/lib/voco/ibus/voco_ibus_ownership.py -rw-r--r--
 assert_entry /usr/lib/voco/ibus/voco_ibus_protocol.py -rw-r--r--
 assert_entry /usr/bin/voco -rwxr-xr-x
 for file in metadata.json extension.js model.js stylesheet.css voco-symbol.png; do
@@ -166,7 +165,7 @@ cmp "${ROOT_DIR}/packaging/ibus/voco.xml" \
   "${EXTRACT_ROOT}/usr/share/ibus/component/voco.xml"
 cmp "${ROOT_DIR}/packaging/ibus/voco-ibus-engine" \
   "${EXTRACT_ROOT}/usr/libexec/voco-ibus-engine"
-for module in voco_ibus_engine.py voco_ibus_ownership.py voco_ibus_protocol.py; do
+for module in voco_ibus_engine.py voco_ibus_protocol.py; do
   cmp "${ROOT_DIR}/apps/desktop/src-tauri/resources/${module}" \
     "${EXTRACT_ROOT}/usr/lib/voco/ibus/${module}"
 done
@@ -240,7 +239,6 @@ for path in \
   "${EXTRACT_ROOT}/usr/share/icons/hicolor/256x256@2/apps/voco.png" \
   "${EXTRACT_ROOT}/usr/share/ibus/component/voco.xml" \
   "${EXTRACT_ROOT}/usr/lib/voco/ibus/voco_ibus_engine.py" \
-  "${EXTRACT_ROOT}/usr/lib/voco/ibus/voco_ibus_ownership.py" \
   "${EXTRACT_ROOT}/usr/lib/voco/ibus/voco_ibus_protocol.py"; do
   expected_mode=644
   if [[ "${path}" == "${EXTRACT_ROOT}/usr/bin/voco" ]]; then

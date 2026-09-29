@@ -27,12 +27,12 @@ MANIFEST
   trap cleanup EXIT
   mkdir -p "${TEST_ROOT}"/{home,runtime,config,cache,data,state,evidence}
   chmod 700 "${TEST_ROOT}/runtime"
-  cp "${ROOT_DIR}"/apps/desktop/src-tauri/resources/voco_ibus_{engine,ownership,protocol}.py "${TEST_ROOT}/"
+  cp "${ROOT_DIR}"/apps/desktop/src-tauri/resources/voco_ibus_{engine,protocol}.py "${TEST_ROOT}/"
   if [[ "${VOCO_NATIVE_TRACE:-}" == 1 ]]; then
     /usr/bin/python3 - "${TEST_ROOT}/voco_ibus_engine.py" <<'TRACE'
 import pathlib, sys
 p = pathlib.Path(sys.argv[1])
-s = p.read_text()
+s = p.read_text().replace('from __future__ import annotations\n', 'from __future__ import annotations\nimport os\n', 1)
 for name, args in [('do_focus_in_id', 'object_path, client'), ('do_set_capabilities', 'capabilities'), ('do_set_content_type', 'purpose, hints'), ('do_focus_out_id', '_object_path')]:
     lines = s.splitlines(keepends=True)
     for i, line in enumerate(lines):

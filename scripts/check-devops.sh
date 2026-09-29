@@ -153,7 +153,6 @@ from pathlib import Path
 
 for path in (
     Path("apps/desktop/src-tauri/resources/voco_ibus_engine.py"),
-    Path("apps/desktop/src-tauri/resources/voco_ibus_ownership.py"),
     Path("apps/desktop/src-tauri/resources/voco_ibus_protocol.py"),
 ):
     ast.parse(path.read_text())
@@ -265,7 +264,6 @@ required_files = {
     "/usr/share/ibus/component/voco.xml",
     "/usr/libexec/voco-ibus-engine",
     "/usr/lib/voco/ibus/voco_ibus_engine.py",
-    "/usr/lib/voco/ibus/voco_ibus_ownership.py",
     "/usr/lib/voco/ibus/voco_ibus_protocol.py",
 }
 if not required_files.issubset(deb.get("files", {})):

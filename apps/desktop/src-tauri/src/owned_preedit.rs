@@ -12,14 +12,13 @@ use std::time::Duration;
 const PROTOCOL_VERSION: u32 = 6;
 const EXACT_FIELD_REQUIRED: &str = "Automatic IBus delivery is disabled because the original text field cannot be verified. Recording remains available; review and copy the transcript in VOCO.";
 
-fn require_exact_field_delivery() -> Result<OwnedPreeditStatus, String> {
+pub(crate) fn require_exact_field_delivery() -> Result<OwnedPreeditStatus, String> {
     Err(EXACT_FIELD_REQUIRED.to_string())
 }
 const COMPONENT_PATH: &str = "/usr/share/ibus/component/voco.xml";
 const SOCKET_DIRECTORY_NAME: &str = "voco";
 const SOCKET_FILE_NAME: &str = "ibus-engine.sock";
 const IPC_TIMEOUT: Duration = Duration::from_millis(1_000);
-const MAX_TEXT_BYTES: usize = 1_000_000;
 const MAX_REQUEST_BYTES: usize = 4_000_000;
 const MAX_RESPONSE_BYTES: usize = 64_000;
 
@@ -297,63 +296,6 @@ impl OwnedPreeditService {
         .map_err(|_| ShortcutPollFailure { may_have_armed })
     }
 
-    pub fn start(
-        &self,
-        _client_session_id: u64,
-        _trigger_id: Option<&str>,
-    ) -> Result<OwnedPreeditStatus, String> {
-        require_exact_field_delivery()
-    }
-
-    pub fn update(
-        &self,
-        session_id: u64,
-        confirmed_text: String,
-        preedit_text: String,
-        provisional_text: String,
-    ) -> Result<OwnedPreeditStatus, String> {
-        validate_session_id(session_id)?;
-        validate_text(&confirmed_text)?;
-        validate_text(&preedit_text)?;
-        validate_text(&provisional_text)?;
-        require_exact_field_delivery()
-    }
-
-    pub fn commit(&self, session_id: u64, text: String) -> Result<OwnedPreeditStatus, String> {
-        validate_session_id(session_id)?;
-        validate_text(&text)?;
-        require_exact_field_delivery()
-    }
-
-    pub fn checkpoint(
-        &self,
-        session_id: u64,
-        expected_committed_text: String,
-        append_text: String,
-    ) -> Result<OwnedPreeditStatus, String> {
-        validate_session_id(session_id)?;
-        validate_text(&expected_committed_text)?;
-        validate_text(&append_text)?;
-        require_exact_field_delivery()
-    }
-
-    pub fn finish_canonical(
-        &self,
-        session_id: u64,
-        expected_committed_text: String,
-        append_text: String,
-    ) -> Result<OwnedPreeditStatus, String> {
-        validate_session_id(session_id)?;
-        validate_text(&expected_committed_text)?;
-        validate_text(&append_text)?;
-        require_exact_field_delivery()
-    }
-
-    pub fn cancel(&self, session_id: u64) -> Result<OwnedPreeditStatus, String> {
-        validate_session_id(session_id)?;
-        require_exact_field_delivery()
-    }
-
     pub fn shutdown(&self) {
         if let Ok(mut guard) = self.bridge.lock() {
             guard.take();
@@ -465,22 +407,6 @@ fn current_euid() -> u32 {
     unsafe { libc::geteuid() }
 }
 
-fn validate_session_id(session_id: u64) -> Result<(), String> {
-    if session_id == 0 {
-        Err("sessionId must be a positive integer".to_string())
-    } else {
-        Ok(())
-    }
-}
-
-fn validate_text(text: &str) -> Result<(), String> {
-    if text.len() > MAX_TEXT_BYTES {
-        Err("text exceeds the VOCO preedit safety limit".to_string())
-    } else {
-        Ok(())
-    }
-}
-
 fn unavailable_status(error: String) -> OwnedPreeditStatus {
     let component_installed = Path::new(COMPONENT_PATH).is_file();
     let (setup_state, detail) = classify_unavailable_status(&error, component_installed);
@@ -537,23 +463,6 @@ fn classify_unavailable_status(
 
 #[cfg(test)]
 mod tests {
-    #[test]
-    fn missing_or_malformed_trigger_cannot_contact_the_input_engine() {
-        let service = super::OwnedPreeditService::default();
-        for trigger in [
-            None,
-            Some(""),
-            Some("forged"),
-            Some("not-a-hex-token-of-valid-length!!!!!!!!!!!!!!!!!!"),
-        ] {
-            assert!(service
-                .start(1, trigger)
-                .unwrap_err()
-                .contains("original text field"));
-            assert!(service.bridge.lock().unwrap().is_none());
-        }
-    }
-
     use super::*;
     use std::os::unix::net::UnixListener;
     use std::thread;
@@ -561,36 +470,14 @@ mod tests {
 
     const ENGINE_SCRIPT: &str = include_str!("../resources/voco_ibus_engine.py");
     const PROTOCOL_SCRIPT: &str = include_str!("../resources/voco_ibus_protocol.py");
-    const OWNERSHIP_SCRIPT: &str = include_str!("../resources/voco_ibus_ownership.py");
     const COMPONENT_XML: &str = include_str!("../../../../packaging/ibus/voco.xml");
 
     #[test]
-    fn rejects_invalid_sessions_and_oversized_text() {
-        assert!(validate_session_id(0).is_err());
-        assert!(validate_session_id(1).is_ok());
-        assert!(validate_text("hello").is_ok());
-        assert!(validate_text(&"x".repeat(MAX_TEXT_BYTES + 1)).is_err());
-    }
-
-    #[test]
-    fn canonical_mutations_validate_before_opening_the_bridge() {
-        let service = OwnedPreeditService::default();
-        assert!(service
-            .checkpoint(0, String::new(), String::new())
-            .unwrap_err()
-            .contains("positive integer"));
-        assert!(service
-            .finish_canonical(0, String::new(), String::new())
-            .unwrap_err()
-            .contains("positive integer"));
-        assert!(service
-            .checkpoint(1, "x".repeat(MAX_TEXT_BYTES + 1), String::new())
-            .unwrap_err()
-            .contains("safety limit"));
-        assert!(service
-            .finish_canonical(1, String::new(), "x".repeat(MAX_TEXT_BYTES + 1))
-            .unwrap_err()
-            .contains("safety limit"));
+    fn ibus_text_mutation_is_always_rejected() {
+        assert_eq!(
+            require_exact_field_delivery().unwrap_err(),
+            EXACT_FIELD_REQUIRED
+        );
     }
 
     #[test]
@@ -677,11 +564,8 @@ mod tests {
         }
         assert!(!ENGINE_SCRIPT.contains("self.update_preedit_text"));
         assert!(!ENGINE_SCRIPT.contains("self.commit_text("));
-        assert!(ENGINE_SCRIPT.contains("commit_text"));
         assert!(ENGINE_SCRIPT.contains("return False"));
-        assert!(ENGINE_SCRIPT.contains("clientSessionId"));
         assert!(PROTOCOL_SCRIPT.contains("SO_PEERCRED"));
-        assert!(OWNERSHIP_SCRIPT.contains("cannot authorize destructive editing"));
         assert!(!ENGINE_SCRIPT.contains("print(text"));
     }
 
@@ -769,7 +653,7 @@ mod tests {
     }
 
     #[test]
-    fn all_public_mutations_reject_without_writing_to_a_connected_engine() {
+    fn connected_engine_status_stays_safety_disabled_without_mutations() {
         let socket_path = temporary_socket_path("disabled-mutations");
         let listener = UnixListener::bind(&socket_path).expect("bind fake engine");
         fs::set_permissions(&socket_path, fs::Permissions::from_mode(0o600)).unwrap();
@@ -777,7 +661,7 @@ mod tests {
             let (stream, _) = listener.accept().unwrap();
             let mut reader = BufReader::new(stream.try_clone().unwrap());
             let mut writer = stream;
-            // Any mutation reaching the socket would precede status and fail.
+            // The service may only negotiate and read status before it disconnects.
             for expected in ["hello", "status"] {
                 let mut line = String::new();
                 reader.read_line(&mut line).unwrap();
@@ -795,17 +679,6 @@ mod tests {
         let service = OwnedPreeditService {
             bridge: Mutex::new(Some(bridge)),
         };
-        let token = "a".repeat(48);
-        for result in [
-            service.start(41, Some(&token)),
-            service.update(41, String::new(), "draft".into(), "draft".into()),
-            service.commit(41, "never insert".into()),
-            service.checkpoint(41, String::new(), "never insert".into()),
-            service.finish_canonical(41, String::new(), "never insert".into()),
-            service.cancel(41),
-        ] {
-            assert_eq!(result.unwrap_err(), EXACT_FIELD_REQUIRED);
-        }
         let status = service.status();
         assert!(status.available);
         assert!(!status.ready);

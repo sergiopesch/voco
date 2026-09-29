@@ -1245,22 +1245,7 @@ fn shortcut_runtime_status(
 }
 
 #[tauri::command(async)]
-fn get_owned_preedit_status(
-    state: tauri::State<'_, owned_preedit::OwnedPreeditService>,
-    browser: tauri::State<'_, BrowserIntegration>,
-) -> owned_preedit::OwnedPreeditStatus {
-    if let Some(broker) = &browser.0 {
-        let status = broker.get_status();
-        if status.session_id.is_some() {
-            return status.into();
-        }
-    }
-    state.status()
-}
-
-#[tauri::command(async)]
 fn start_owned_preedit(
-    state: tauri::State<'_, owned_preedit::OwnedPreeditService>,
     browser: tauri::State<'_, BrowserIntegration>,
     session_id: u64,
     trigger_id: Option<String>,
@@ -1276,42 +1261,11 @@ fn start_owned_preedit(
             .start(session_id, trigger)
             .map(Into::into);
     }
-    state.start(session_id, trigger_id.as_deref())
-}
-
-#[tauri::command(async)]
-fn update_owned_preedit(
-    state: tauri::State<'_, owned_preedit::OwnedPreeditService>,
-    browser: tauri::State<'_, BrowserIntegration>,
-    session_id: u64,
-    confirmed_text: String,
-    preedit_text: String,
-    provisional_text: String,
-) -> Result<owned_preedit::OwnedPreeditStatus, String> {
-    // Browser hypotheses stay in VOCO. Only canonical checkpoints or a final
-    // transcript can request an addressed application mutation.
-    if let Some(broker) = browser.session(session_id) {
-        return broker.session_status(session_id).map(Into::into);
-    }
-    state.update(session_id, confirmed_text, preedit_text, provisional_text)
-}
-
-#[tauri::command(async)]
-fn commit_owned_preedit(
-    state: tauri::State<'_, owned_preedit::OwnedPreeditService>,
-    browser: tauri::State<'_, BrowserIntegration>,
-    session_id: u64,
-    text: String,
-) -> Result<owned_preedit::OwnedPreeditStatus, String> {
-    if let Some(broker) = browser.session(session_id) {
-        return broker.commit(session_id, &text).map(Into::into);
-    }
-    state.commit(session_id, text)
+    owned_preedit::require_exact_field_delivery()
 }
 
 #[tauri::command(async)]
 fn checkpoint_owned_preedit(
-    state: tauri::State<'_, owned_preedit::OwnedPreeditService>,
     browser: tauri::State<'_, BrowserIntegration>,
     session_id: u64,
     expected_committed_text: String,
@@ -1322,12 +1276,11 @@ fn checkpoint_owned_preedit(
             .append(session_id, &expected_committed_text, &append_text, false)
             .map(Into::into);
     }
-    state.checkpoint(session_id, expected_committed_text, append_text)
+    owned_preedit::require_exact_field_delivery()
 }
 
 #[tauri::command(async)]
 fn finish_canonical_owned_preedit(
-    state: tauri::State<'_, owned_preedit::OwnedPreeditService>,
     browser: tauri::State<'_, BrowserIntegration>,
     session_id: u64,
     expected_committed_text: String,
@@ -1338,19 +1291,18 @@ fn finish_canonical_owned_preedit(
             .append(session_id, &expected_committed_text, &append_text, true)
             .map(Into::into);
     }
-    state.finish_canonical(session_id, expected_committed_text, append_text)
+    owned_preedit::require_exact_field_delivery()
 }
 
 #[tauri::command(async)]
 fn cancel_owned_preedit(
-    state: tauri::State<'_, owned_preedit::OwnedPreeditService>,
     browser: tauri::State<'_, BrowserIntegration>,
     session_id: u64,
 ) -> Result<owned_preedit::OwnedPreeditStatus, String> {
     if let Some(broker) = browser.session(session_id) {
         return broker.cancel(session_id).map(Into::into);
     }
-    state.cancel(session_id)
+    owned_preedit::require_exact_field_delivery()
 }
 
 #[tauri::command(async)]
@@ -2555,12 +2507,9 @@ pub fn run() -> Result<(), String> {
             paste_desktop_text,
             copy_desktop_text,
             get_runtime_diagnostics,
-            get_owned_preedit_status,
             start_owned_preedit,
             refresh_shortcut_heartbeat,
             ack_browser_stop,
-            update_owned_preedit,
-            commit_owned_preedit,
             checkpoint_owned_preedit,
             finish_canonical_owned_preedit,
             cancel_owned_preedit,

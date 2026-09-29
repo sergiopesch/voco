@@ -74,7 +74,6 @@
           "/usr/share/ibus/component/voco.xml": "../../../packaging/ibus/voco.xml",
           "/usr/libexec/voco-ibus-engine": "../../../packaging/ibus/voco-ibus-engine",
           "/usr/lib/voco/ibus/voco_ibus_engine.py": "resources/voco_ibus_engine.py",
-          "/usr/lib/voco/ibus/voco_ibus_ownership.py": "resources/voco_ibus_ownership.py",
           "/usr/lib/voco/ibus/voco_ibus_protocol.py": "resources/voco_ibus_protocol.py",
           "/usr/share/doc/voco/THIRD-PARTY-NOTICES.txt": "../../../vendor/THIRD-PARTY-NOTICES.txt",
           "/etc/opt/chrome/native-messaging-hosts/com.voco.exact_field.json": "../../../packaging/chromium/com.voco.exact_field.json",
