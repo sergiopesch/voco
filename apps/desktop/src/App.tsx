@@ -33,6 +33,7 @@ import {
 } from "@/lib/updates";
 import { DiagnosticsRequestGate, sameJsonValue, shortcutPresentation, startLaunchDiagnostics, unknownShortcut } from "@/lib/shortcutPresentation";
 import { UpdateCheckCoordinator } from "@/lib/updateCheckCoordinator";
+import { createPanelLevelSender } from "@/lib/audioLevel";
 import { useGlobalShortcut } from "@/hooks/useGlobalShortcut";
 import { useDictation } from "@/hooks/useDictation";
 import { useNativeCaptureSettings } from "@/hooks/useNativeCaptureSettings";
@@ -878,16 +879,9 @@ export function App() {
     if (runtimeStatusEpoch === null || status !== "recording") return;
     // Capture events drive the panel even when WebKit's hidden-window timers
     // are throttled. Do not subscribe the whole App to audio frames.
-    let pending = false;
-    let lastSentAt = -Infinity;
+    const sendLevel = createPanelLevelSender((level) => syncPanelLevel(runtimeStatusEpoch, level));
     return useStore.subscribe((state) => {
-      const now = performance.now();
-      if (state.status !== "recording" || pending || now - lastSentAt < 40) return;
-      pending = true;
-      lastSentAt = now;
-      void syncPanelLevel(runtimeStatusEpoch, state.audioLevel)
-        .catch(() => {})
-        .finally(() => { pending = false; });
+      if (state.status === "recording") sendLevel(state.audioLevel);
     });
   }, [runtimeStatusEpoch, status]);
 

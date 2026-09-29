@@ -1,10 +1,79 @@
 import { describe, expect, it } from "vitest";
 import {
+  createPanelLevelSender,
   calculateCenteredRms,
   calculateVisualAudioLevelFromSamples,
   calculateVisualAudioLevel,
   removeDcOffsetInPlace,
 } from "@/lib/audioLevel";
+
+describe("createPanelLevelSender", () => {
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  it("sends silence once and the next sound without delay", async () => {
+    let clock = 0;
+    const sent: number[] = [];
+    const sendLevel = createPanelLevelSender(async (level) => { sent.push(level); }, () => clock);
+    const at = async (time: number, level: number) => { clock = time; sendLevel(level); await settle(); };
+    await at(0, 0);
+    await at(100, 0);
+    // The zero skipped at 100 ms must not hold back this sound.
+    await at(120, 0.4);
+    await at(130, 0.5);
+    await at(170, 0);
+    await at(220, 0);
+    expect(sent).toEqual([0, 0.4, 0]);
+  });
+
+  it("sends the next zero when the throttle dropped the first", async () => {
+    let clock = 0;
+    const sent: number[] = [];
+    const sendLevel = createPanelLevelSender(async (level) => { sent.push(level); }, () => clock);
+    const at = async (time: number, level: number) => { clock = time; sendLevel(level); await settle(); };
+    await at(0, 0.2);
+    await at(20, 0);
+    await at(40, 0);
+    await at(60, 0);
+    expect(sent).toEqual([0.2, 0]);
+  });
+
+  it("sends the next zero when a send in flight dropped the first", async () => {
+    let finish = () => {};
+    const sent: number[] = [];
+    let clock = 0;
+    const sendLevel = createPanelLevelSender((level) => {
+      sent.push(level);
+      return new Promise<void>((resolve) => { finish = resolve; });
+    }, () => clock);
+    sendLevel(0.2);
+    clock = 50;
+    sendLevel(0);
+    expect(sent).toEqual([0.2]);
+    finish();
+    await settle();
+    clock = 60;
+    sendLevel(0);
+    expect(sent).toEqual([0.2, 0]);
+  });
+
+  it("drops levels while a send is still in flight", async () => {
+    let finish = () => {};
+    const sent: number[] = [];
+    let clock = 0;
+    const sendLevel = createPanelLevelSender((level) => {
+      sent.push(level);
+      return new Promise<void>((resolve) => { finish = resolve; });
+    }, () => clock);
+    sendLevel(0.3);
+    clock = 100;
+    sendLevel(0.6);
+    expect(sent).toEqual([0.3]);
+    finish();
+    await settle();
+    sendLevel(0.6);
+    expect(sent).toEqual([0.3, 0.6]);
+  });
+});
 
 describe("audioLevel", () => {
   it("ignores a constant DC offset when computing RMS", () => {
