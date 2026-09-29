@@ -114,6 +114,8 @@ bind -x '"\\C-t": printf %s "$READLINE_LINE" > {line}'
     def typed():
         key('ctrl+t'); time.sleep(.1)
         return file_text(line)
+    # Bash can print its prompt before the terminal window takes keys.
+    wait_for(typed, '', 'Terminal keyboard input')
     for text, expected in (('hello', 'hello'), (' linux', 'hello linux')):
         paste(text)
         wait_for(typed, expected, 'Bash command line')
@@ -141,9 +143,11 @@ def firefox():
                                    'user_pref("browser.startup.homepage_override.mstone", "ignore");\n'
                                    'user_pref("browser.aboutwelcome.enabled", false);\n'
                                    'user_pref("toolkit.telemetry.reportingpolicy.firstRun", false);\n')
-    # The page mirrors its field into the window title for readback.
-    page = 'data:text/html,<title>[]</title><textarea autofocus oninput="document.title=\'[\'+this.value+\']\'"></textarea>'
-    launch('firefox', [os.environ['VOCO_FIREFOX_BINARY'], '--no-remote', '--profile', str(profile), page])
+    # The page mirrors its field into the window title for readback. Firefox
+    # blocks top-level data: URLs, so it loads a local file.
+    page = home/'firefox.html'
+    page.write_text('<title>[]</title><textarea autofocus oninput="document.title=\'[\'+this.value+\']\'"></textarea>')
+    launch('firefox', [os.environ['VOCO_FIREFOX_BINARY'], '--no-remote', '--profile', str(profile), page.as_uri()])
     window = focus_window(title=r'^\[\]')
     def title():
         name = subprocess.run(['xdotool', 'getwindowname', window], capture_output=True, text=True, timeout=5).stdout
