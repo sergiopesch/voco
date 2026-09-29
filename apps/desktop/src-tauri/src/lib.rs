@@ -1359,7 +1359,7 @@ fn configured_hotkey() -> ConfiguredHotkey {
     let repair_notice = repair_invalid_configured_hotkey(&mut config).map(|notice| {
         if let Err(error) = config.save() {
             return format!(
-                "{notice} VOCO could not persist the repair ({error}); change the shortcut in Settings."
+                "{notice} VOCO could not save the reset ({error}); change the shortcut in Settings."
             );
         }
         notice
