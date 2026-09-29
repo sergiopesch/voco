@@ -100,9 +100,9 @@ try {
     assert.equal(await page.locator('#b').inputValue(),'');
     if(reject){
       assert.equal(await page.locator('#a').inputValue(),prefix,'Focus loss preserves already delivered text without replay');
-      const letters = text => text.toLowerCase().replace(/[^a-z]/g, '');
       const copied = execFileSync('xclip', ['-selection', 'clipboard', '-o'], {encoding: 'utf8', timeout: 5000});
-      assert.equal(letters(prefix + copied), letters('go do you hear'), 'The clipboard holds exactly the words the field did not take');
+      // Pasted right after the field's words, the copy keeps them apart.
+      assert.equal((prefix + copied).toLowerCase().match(/[a-z]+/g)?.join(' '), 'go do you hear', 'The clipboard holds exactly the words the field did not take');
     }
     await page.screenshot({path:`${root}/evidence/${retry?'fresh-recording':reject?'focus-loss':'delivery'}.png`});
     results.push({case:retry?'fresh-recording':reject?'focus-loss':'delivery',passed:true,events:(await traces()).slice(traceStart).map(t=>t.event)});

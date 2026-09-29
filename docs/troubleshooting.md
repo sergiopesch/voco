@@ -51,7 +51,8 @@ Shift+Insert, remote desktops and virtual machines may not accept the paste.
 A successful key dispatch does not prove that the app accepted the text. If a paste
 fails, VOCO stops typing; at Stop it copies the words it did not type to the
 clipboard and notifies you. Check the field before pasting them with Shift+Insert:
-some words may already have arrived. VOCO never replays an uncertain paste. If
+some words may already have arrived. The copy keeps the space before its first
+word, so it joins the words already there. VOCO never replays an uncertain paste. If
 the clipboard copy fails too, VOCO keeps the dictation in tray **Review**. The
 optional Chromium exact-field adapter uses a separate contract; IBus remains
 shortcut-only.

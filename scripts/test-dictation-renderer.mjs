@@ -398,7 +398,7 @@ await stop();await page.waitForFunction(()=>window.store.getState().status==='id
 assert.equal(await page.evaluate(()=>window.benchmarkAudioSamples),4800701);
 assert.equal(await page.evaluate(()=>window.benchmarkRequests.filter(r=>r.op==='finish').length),1);
 assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length),2,'One successful paste and one rejection; no retry');
-assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='copyDesktopText').map(c=>c[1])),['Later speech remains available through Stop.']);
+assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='copyDesktopText').map(c=>c[1])),[' Later speech remains available through Stop.']);
 assert.equal(await page.evaluate(()=>window.store.getState().transcript),'');
 assert.equal(await page.evaluate(()=>window.store.getState().error),null);
 assert.notEqual(await page.evaluate(()=>window.store.getState().surface),'review');

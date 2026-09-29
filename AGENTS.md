@@ -80,11 +80,12 @@ glib 0.20 directly leaves the GTK dependency behind. [Backport](vendor/glib/VOCO
   (`pgrep -x`; the private daemon is not on PATH); desktop setup reports it.
 - Only a `no-mutation` failure, which typed nothing, keeps its text pending for
   the next chunk or bounded Stop retries. An uncertain or rejected paste stops
-  automatic delivery. Stop copies the undelivered remainder with
-  `copy_desktop_text`, then notifies; it never replays that text as keys. When
-  that copy fails too, `keep_crash_journal` moves the session's text into tray
-  Review; only if the journal cannot keep it does Stop report an interruption.
-  A Chromium exact-field session whose field stopped taking text ends the same way.
+  automatic delivery. Stop copies the undelivered remainder, joining space
+  included, with `copy_desktop_text`, then notifies; it never replays that text
+  as keys. When that copy fails too, `keep_crash_journal` moves the session's
+  text into tray Review; only if the journal cannot keep it does Stop report an
+  interruption. A Chromium exact-field session whose field stopped taking text
+  ends the same way.
 - The GNOME Wayland companion is recommended, not required: without it the
   focused app also receives Alt+D (browsers focus the address bar, terminals
   delete a word). Companion v11 grabs the configured Alt+D or Alt+Shift+D at

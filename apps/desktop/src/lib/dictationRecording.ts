@@ -726,12 +726,12 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       traceDictationEvent("dictation_desktop_stream_flush_completed", { durationMs: Math.round(performance.now() - started) }).catch(() => {});
       if (stopRequestedAtMsRef.current !== null) traceDictationEvent("dictation_stop_to_final_transcript", { durationMs: Math.round(performance.now() - stopRequestedAtMsRef.current) }).catch(() => {});
       desktopPhraseQueueRef.current = null;
-      const remainder = undelivered.trimStart();
-      if (remainder && (desktopPasteSessionRef.current || browser)) {
+      if (undelivered.trim() && (desktopPasteSessionRef.current || browser)) {
         // Text the app did not take (or may not have taken) is never replayed;
         // the clipboard lets the user paste it themselves, and Review keeps
-        // the dictation when even the copy fails.
-        const copied = await copyDesktopText(remainder).then(() => true, () => false);
+        // the dictation when even the copy fails. The copy keeps its joining
+        // space, so pasting it after the words that arrived keeps them apart.
+        const copied = await copyDesktopText(undelivered).then(() => true, () => false);
         assertOutputAllowed(stoppingSessionId);
         if (!copied) {
           if (!(await keepJournal())) throw new Error("VOCO couldn't paste, copy or save this dictation.");

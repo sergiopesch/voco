@@ -319,7 +319,8 @@ it("copies words the focused app did not take to the clipboard as a handled Stop
   expect(h.phase.current).toBe("stopping");
   finished.resolve({ undelivered: " and the rest." });
   await stopping;
-  expect(h.copy).toHaveBeenCalledExactlyOnceWith("and the rest.");
+  // The joining space stays, so pasting after "Typed words" keeps them apart.
+  expect(h.copy).toHaveBeenCalledExactlyOnceWith(" and the rest.");
   expect(h.trace).toHaveBeenCalledWith("dictation_desktop_remainder_copied");
   expect(h.notify).toHaveBeenCalledExactlyOnceWith("Dictation copied to clipboard", "VOCO couldn't paste into the focused app. Press Shift+Insert or Ctrl+V to paste it.");
   expect(h.env.pasteDesktopText).not.toHaveBeenCalled();
@@ -329,6 +330,15 @@ it("copies words the focused app did not take to the clipboard as a handled Stop
   expect(h.env.audioBufferRef.current.sampleCount).toBe(0);
   expect(h.state.setSurface).not.toHaveBeenCalled();
   expect(h.setError).not.toHaveBeenCalled();
+});
+
+it("does not replace the clipboard for a remainder with no words", async () => {
+  const h = harness();
+  h.recordingWith(async () => ({ undelivered: " " }));
+  await h.stopRecording();
+  expect(h.copy).not.toHaveBeenCalled();
+  expect(h.notify).not.toHaveBeenCalled();
+  expect(h.phase.current).toBe("idle");
 });
 
 it("asks the user to check the app first when a chunk may already be there", async () => {
@@ -381,7 +391,7 @@ it("copies the rest when a browser field stops taking text, without finishing it
   await h.stopRecording();
   expect(browser.finish).not.toHaveBeenCalled();
   expect(browser.cancel).toHaveBeenCalled();
-  expect(h.copy).toHaveBeenCalledExactlyOnceWith("the rest.");
+  expect(h.copy).toHaveBeenCalledExactlyOnceWith(" the rest.");
   expect(h.trace).toHaveBeenCalledWith("dictation_desktop_remainder_copied");
   expect(h.notify).toHaveBeenCalledExactlyOnceWith("Dictation copied to clipboard", expect.stringContaining("Some words may already be in the app"));
   expect(h.env.browserDeliveryRef.current).toBeNull();
