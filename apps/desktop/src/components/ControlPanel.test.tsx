@@ -104,7 +104,7 @@ describe("ControlPanel", () => {
     const render = (state: "available" | "unavailable") => renderPanel({ runtimeDiagnostics: {
       shortcut: { hotkey: "Alt+D", route: state === "available" ? "global-shortcut" : null, state, detail: "Fixture shortcut" },
       sessionType: "wayland", typeSimulation: support, clipboard: support,
-      ownedPreedit: { available: false, ready: false, setupState: "safety-disabled", detail: "Manual copy", sessionId: null, engineActive: false, focusLost: false, progressiveCommitActive: false, committedCharacterCount: 0, ownershipIntact: false, finalizationOutcome: null, error: null },
+      ownedPreedit: { available: false, ready: false, setupState: "safety-disabled", detail: "Fixture", sessionId: null, engineActive: false, focusLost: false, progressiveCommitActive: false, committedCharacterCount: 0, ownershipIntact: false, finalizationOutcome: null, error: null },
     } });
     const markup = render("available");
     expect(markup).toContain("Click where you want the text, then use your shortcut.");
