@@ -226,6 +226,28 @@ it("notifies an unverified desktop recording once, at start", async () => {
   expect(h.notify).toHaveBeenCalledOnce();
 });
 
+it("still notifies when an interruption ends a noticed session before Stop", async () => {
+  const h = harness();
+  h.env.captureSelectionRef.current = () => ({ backend: "webkit" });
+  vi.mocked(h.env.ensureAudioContext).mockResolvedValue({
+    sampleRate: 16000, createMediaStreamSource: vi.fn(() => ({})),
+  } as unknown as AudioContext);
+  vi.mocked(h.env.openTracedMicrophoneStream).mockResolvedValue({
+    getTracks: () => [], getAudioTracks: () => [],
+  } as unknown as MediaStream);
+  vi.mocked(h.env.connectWorklet).mockResolvedValue(false);
+  await h.startRecording();
+  expect(h.notify).toHaveBeenCalledExactlyOnceWith("Dictation won't be typed", expect.any(String));
+  appendAudioSamples(h.env.audioBufferRef.current, new Float32Array([0.125, -0.25]));
+  await h.cancelRecording("The microphone disconnected or stopped capturing audio.");
+  expect(h.phase.current).toBe("idle");
+  expect(h.setError).toHaveBeenLastCalledWith("The microphone disconnected or stopped capturing audio.");
+  // Without this, the next shortcut press would start a new recording
+  // while the user still expects it to stop this one.
+  expect(h.notify).toHaveBeenLastCalledWith("Dictation interrupted", "Some words may be missing. Check your text field before starting again.");
+  expect(h.notify).toHaveBeenCalledTimes(2);
+});
+
 it("does not query desktop input for an explicit browser recording", async () => {
   const h = harness();
   await h.startRecording("browser:test");

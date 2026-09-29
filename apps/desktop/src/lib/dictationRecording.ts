@@ -227,8 +227,10 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     releaseRecordingOrigin();
     const current = useStore.getState();
     if (current.dictationPurpose !== "onboarding") {
-      // A live notification already covered this session; the error slot keeps the reason.
-      const alreadyNotified = interruptionNotifiedSession === sessionRef.current.sessionId;
+      // A live notification already covered the Stop it asked for; an
+      // interruption that ends the session first still notifies. The error
+      // slot keeps the reason.
+      const alreadyNotified = !cancelledRef.current && interruptionNotifiedSession === sessionRef.current.sessionId;
       interruptionNotifiedSession = null;
       const native = nativeCaptureRef.current;
       nativeCaptureRef.current = null;
