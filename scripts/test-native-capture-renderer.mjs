@@ -729,6 +729,8 @@ try {
     const record=(name)=>results.push({case:name,passed:true});
     const state=()=>page.evaluate(()=>({mode:window.store.getState().captureBackendMode,ready:window.store.getState().microphoneReady,source:window.store.getState().nativeCaptureSource,streams:window.streamRequests||0,enums:window.enumCount||0,commands:window.nativeCommands}));
     const noCapture=async()=>{const s=await state();assert.equal(s.streams,0);assert.equal(s.enums,0);assert.equal(s.commands.filter(x=>/native_capture_(begin|drain|stop|cancel)$/.test(x.name)).length,0);};
+    // Each transcription opens with one benchmark_stream start request.
+    const streamStarts=()=>page.evaluate(()=>window.nativeCommands.filter(x=>x.name==='benchmark_stream'&&x.args.request.op==='start').length);
     const load=async(scenario)=>{
       await page.goto(origin+'/app-microphone-check?scenario='+scenario);
       await page.waitForFunction(()=>window.store && window.nativeCommands.some(x=>x.name==='native_capture_capabilities'));
@@ -950,8 +952,10 @@ try {
     await page.evaluate(()=>window.store.getState().setSurface('hidden'));
     await page.evaluate(()=>window.listeners['voco:toggle-dictation']({payload:null}));
     await page.waitForFunction(()=>window.store.getState().status==='idle'&&window.store.getState().transcript==='');
-    await activate();await page.evaluate(()=>window.unhealthy=true);
+    await activate();assert.equal(await streamStarts(),1);await page.evaluate(()=>window.unhealthy=true);
     await page.waitForFunction(()=>window.store.getState().status==='idle'&&window.store.getState().error);
+    await page.evaluate(()=>new Promise(resolve=>setTimeout(resolve,100)));
+    assert.equal(await streamStarts(),1,'A tail failure must not start another transcription');
     assert.equal((await state()).streams,0);assert.equal((await state()).commands.filter(x=>x.name==='native_capture_begin').length,1);
     expected.push('native-tail-failure-clears-prefix-without-auto-transcription');record(expected.at(-1));
     await load('enabled');await page.getByRole('combobox', { name: 'Microphone', exact: true }).waitFor();
@@ -1049,7 +1053,7 @@ try {
     };
     // Transport fault injection: a retained prefix followed by one lost Drain reply.
     // Native queue/lease behavior is tested separately; this fixture isolates renderer ownership.
-    await activate(true);
+    await activate(true);assert.equal(await streamStarts(),1);
     await page.evaluate(()=>{
       const invoke=window.nativeInvoke,identity={...window.captureIdentity};
       const raw=window.issuedFixturePcm.slice(0,35280);
@@ -1076,6 +1080,7 @@ try {
     assert.equal(await page.locator('vite-error-overlay').count(),0);
     await save('stall-recovery-view.json',{url:page.url(),title:await page.title(),text:await page.locator('body').innerText(),browser:'Browser plugin not available; regular Playwright',viewport:page.viewportSize()});
     await page.screenshot({path:path.join(out,'stall-recovery.png')});
+    assert.equal(await streamStarts(),1,'A drain timeout must not start another transcription');
     expected.push('drain-timeout-clears-content-without-automatic-output');record(expected.at(-1));
     await page.evaluate(()=>window.store.getState().setSurface('settings'));
     await page.getByRole('button',{name:'Settings',exact:true}).click();
@@ -1219,7 +1224,12 @@ try {
       }
       const syncedSetupStates = () => page.evaluate(() =>
         window.calls.filter(call => call[0] === 'syncRuntimeStatus').map(call => call[1].cursorSetupState));
+      // Unmounted, the App has no effect left to sync from; a late reply
+      // could only publish through the shared store or a native call.
+      const published = () => page.evaluate(() =>
+        ({ calls: window.calls.length, commands: window.nativeCommands.length, store: JSON.stringify(window.store.getState()) }));
       const setupBefore = await syncedSetupStates();
+      const publishedBefore = await published();
       assert.equal(setupBefore.at(-1), 'not-enabled');
       await page.evaluate(async () => {
         window.finishObserver();
@@ -1228,6 +1238,8 @@ try {
       if (transition !== 'unmount') {
         assert.ok((await syncedSetupStates()).slice(setupBefore.length).every(state => state === setupBefore.at(-1)),
           'Rejected late observer must not publish any diagnostics');
+      } else {
+        assert.deepEqual(await published(), publishedBefore, 'Rejected late observer must not publish after unmount');
       }
       assert.equal(await page.getByText('Click where you want the text, then use your shortcut.', { exact: true }).count(), 0);
       if (transition === 'save') await page.evaluate(() => window.finishSave());
