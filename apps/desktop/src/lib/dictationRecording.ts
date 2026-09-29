@@ -55,7 +55,7 @@ export interface DictationRecordingEnv {
   browserDeliveryRef: Ref<BrowserStreamDelivery | null>;
   desktopPhraseQueueRef: Ref<{
     cancel(): void;
-    finish(): Promise<{ undelivered: string }>;
+    finish(): Promise<{ undelivered: string; uncertain?: boolean }>;
     pushAudio?(samples: Float32Array, sampleRate: number): void;
     enqueue?(): void;
   } | null>;
@@ -203,6 +203,12 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     });
     await journalCleanup;
   }
+  async function keepJournal() {
+    const owned = journal;
+    if (!owned || !(await owned.keep())) return false;
+    if (journal === owned) journal = null;
+    return true;
+  }
 
   function isCurrentSession(sessionId: number): boolean {
     return !disposedRef.current && sessionRef.current.sessionId === sessionId;
@@ -234,7 +240,6 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       clearCapturedAudio();
       clearTranscript();
       current.setRecovery(null);
-      current.setLastDictationResult(null);
       current.setCaptureNotice(null);
       current.setSurface("hidden");
       phaseRef.current = "idle";
@@ -283,9 +288,6 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     if (completed.dictationPurpose === "onboarding") {
       completed.setOnboardingTestPassed(!completed.recovery && Boolean(completed.transcript.trim()) && completed.transcript !== "(no speech detected)");
     } else if (!completed.recovery) {
-      if (cursorDeliveryStateRef.current !== "unreconciled" && completed.transcript.trim() && completed.transcript !== "(no speech detected)") {
-        completed.setLastDictationResult({ completedAt: Date.now(), outcome: "delivered" });
-      }
       clearTranscript();
     }
     releaseRecordingOrigin();
@@ -537,6 +539,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       phaseRef.current = "recording";
       if (captureAdmission === "automatic") {
         const rate = recordingSampleRate();
+        let firstPhraseDispatched = false;
         desktopPhraseQueueRef.current = new BenchmarkPhraseQueue(async (text, correlation) => {
           assertOutputAllowed(startingSessionId);
           // Onboarding exercises recognition without owning or mutating another app.
@@ -557,7 +560,8 @@ export function createDictationRecording(env: DictationRecordingEnv) {
           if (!isCurrentSession(startingSessionId) || cancelledRef.current) return;
           traceDesktopPasteMetrics(result);
           traceDictationEvent("dictation_desktop_paste_dispatched", { durationMs: Math.round(performance.now() - started) }).catch(() => {});
-          if (desktopPhrasePasteCountRef.current === 1 && recordingStartedAtMsRef.current !== null) {
+          if (!firstPhraseDispatched && recordingStartedAtMsRef.current !== null) {
+            firstPhraseDispatched = true;
             traceDictationEvent("dictation_desktop_first_phrase_dispatched", { durationMs: Math.round(performance.now() - recordingStartedAtMsRef.current) }).catch(() => {});
           }
         }, (text) => {
@@ -709,7 +713,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       }
       const started = performance.now();
       enqueueDesktopPhrase(audioBufferRef.current.sampleCount);
-      const { undelivered } = await queue.finish();
+      const { undelivered, uncertain } = await queue.finish();
       assertOutputAllowed(stoppingSessionId);
       await browserDeliveryRef.current?.finish();
       assertOutputAllowed(stoppingSessionId);
@@ -720,12 +724,24 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       const remainder = undelivered.trimStart();
       if (remainder && desktopPasteSessionRef.current) {
         // Text the focused app did not take (or may not have taken) is never
-        // replayed as keys; the clipboard lets the user paste it themselves.
-        await copyDesktopText(remainder);
+        // replayed as keys; the clipboard lets the user paste it themselves,
+        // and Review keeps the dictation when even the copy fails.
+        const copied = await copyDesktopText(remainder).then(() => true, () => false);
         assertOutputAllowed(stoppingSessionId);
+        if (!copied) {
+          if (!(await keepJournal())) throw new Error("VOCO couldn't paste, copy or save this dictation.");
+          assertOutputAllowed(stoppingSessionId);
+          traceDictationEvent("dictation_desktop_remainder_kept").catch(() => {});
+          useStore.getState().setCaptureNotice(null);
+          void showNotification("Dictation saved in Review", "VOCO couldn't paste or copy it. Choose Review in the VOCO tray menu to copy it.").catch(() => {});
+          finalizeIdleState();
+          return;
+        }
         traceDictationEvent("dictation_desktop_remainder_copied").catch(() => {});
         useStore.getState().setCaptureNotice(null);
-        void showNotification("Dictation copied to clipboard", "VOCO couldn't type into the focused app. Press Shift+Insert or Ctrl+V to paste it.").catch(() => {});
+        void showNotification("Dictation copied to clipboard", uncertain
+          ? "Some words may already be in the app, so check it first. Then press Shift+Insert or Ctrl+V to paste the rest."
+          : "VOCO couldn't paste into the focused app. Press Shift+Insert or Ctrl+V to paste it.").catch(() => {});
       }
       // The dictation completed, so a missed checkpoint no longer matters;
       // checkpoint text that could not be deleted still takes the recovery path.
@@ -805,7 +821,6 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       clearTranscript();
       state.setRecovery(null);
       state.setCaptureNotice(null);
-      state.setLastDictationResult(null);
       setStatus("idle");
       setError(null);
     }

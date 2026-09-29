@@ -33,7 +33,7 @@ describe('pinned append-only candidate',()=>{
   const onFailure=vi.fn();
   const queue=new BenchmarkPhraseQueue(async()=>{throw failure},vi.fn(),onFailure,vi.fn());
   queue.pushAudio(new Float32Array(1600),16000);
-  await expect(queue.finish()).resolves.toEqual({undelivered:'Synthetic phrase'});
+  await expect(queue.finish()).resolves.toEqual({undelivered:'Synthetic phrase',uncertain:false});
   expect(onFailure).toHaveBeenCalledWith(expect.objectContaining({message:failure.message}),'delivery');
   expect(quality().find(e=>e.event==='delivery_failed')).toMatchObject({delivery_seq:1,outcome:'rejected'});
  });
@@ -44,7 +44,7 @@ describe('pinned append-only candidate',()=>{
   queue.pushAudio(new Float32Array(1600),16000);
   await vi.waitFor(()=>expect(failure).toHaveBeenCalledOnce());
   queue.pushAudio(new Float32Array(1701),16000);queue.enqueue();
-  await expect(queue.finish()).resolves.toEqual({undelivered:'First and later words.'});
+  await expect(queue.finish()).resolves.toEqual({undelivered:'First and later words.',uncertain:true});
   expect(observed).toHaveBeenLastCalledWith('First and later words.');
   expect(failure.mock.calls[0]?.[0]).toMatchObject({message:'Destination changed'});
   expect(quality().find(e=>e.event==='delivery_failed')).toMatchObject({outcome:'uncertain'});
@@ -63,7 +63,7 @@ describe('pinned append-only candidate',()=>{
   queue.pushAudio(new Float32Array(1600),16000);
   await vi.waitFor(()=>expect(preview).toHaveBeenCalledWith('deferred'));
   queue.pushAudio(new Float32Array(1600),16000);queue.enqueue();
-  await expect(queue.finish()).resolves.toEqual({undelivered:''});
+  await expect(queue.finish()).resolves.toEqual({undelivered:'',uncertain:false});
   expect(paste.mock.calls[0]?.[0]).toBe('Hello');
   expect(typed[0]).toMatch(/^Hello/);
   expect(typed.join('')).toBe('Hello world.');
@@ -80,7 +80,7 @@ describe('pinned append-only candidate',()=>{
    queue.pushAudio(new Float32Array(1600),16000);queue.enqueue();
    const result=queue.finish();
    await vi.advanceTimersByTimeAsync(1000);
-   await expect(result).resolves.toEqual({undelivered:''});
+   await expect(result).resolves.toEqual({undelivered:'',uncertain:false});
    expect(paste.mock.calls.map(c=>c[0])).toEqual(['Hello','Hello']);
   }finally{vi.useRealTimers();}
  });
@@ -94,7 +94,7 @@ describe('pinned append-only candidate',()=>{
    queue.pushAudio(new Float32Array(1600),16000);queue.enqueue();
    const result=queue.finish();
    await vi.advanceTimersByTimeAsync(1000);
-   await expect(result).resolves.toEqual({undelivered:'Hello'});
+   await expect(result).resolves.toEqual({undelivered:'Hello',uncertain:false});
    expect(paste).toHaveBeenCalledTimes(4);
    expect(failure).not.toHaveBeenCalled();
    expect(preview.mock.calls.filter(c=>c[0]==='deferred')).toHaveLength(4);
@@ -112,7 +112,7 @@ describe('pinned append-only candidate',()=>{
    queue.pushAudio(new Float32Array(1600),16000);queue.enqueue();
    const result=queue.finish();
    await vi.advanceTimersByTimeAsync(1000);
-   await expect(result).resolves.toEqual({undelivered:'One two.'});
+   await expect(result).resolves.toEqual({undelivered:'One two.',uncertain:true});
    expect(paste).toHaveBeenCalledOnce();
    expect(failure).toHaveBeenCalledOnce();
    expect(failure.mock.calls[0]?.[1]).toBe('delivery');
@@ -229,7 +229,7 @@ describe('privacy-preserving delivery attribution', () => {
  it('keeps uncertain delivery explicit and does not leak rejection content', async () => {
   worker.mockImplementation(async (_c,{request:r})=>({...r,mode:'append-only',text:r.op==='start'?null:'secret_SENTINEL'}));
   const queue=new BenchmarkPhraseQueue(async()=>{throw new Error('secret_SENTINEL /private/path window title');},vi.fn(),vi.fn(),vi.fn());
-  queue.pushAudio(new Float32Array(1600),16000);await expect(queue.finish()).resolves.toEqual({undelivered:'secret_SENTINEL'});
+  queue.pushAudio(new Float32Array(1600),16000);await expect(queue.finish()).resolves.toEqual({undelivered:'secret_SENTINEL',uncertain:true});
   expect(quality().find(e=>e.event==='delivery_failed')).toMatchObject({delivery_seq:1,outcome:'uncertain',destination_content_observation:'unavailable'});
   expect(quality()[quality().length-1]).toMatchObject({outcome:'failed',failed_delivery_seq:1,pending_delivery_count:0,dispatched_count:0,accepted_equals_dispatched:false,destination_content_observation:'unavailable'});
   expect(JSON.stringify(quality())).not.toContain('SENTINEL');

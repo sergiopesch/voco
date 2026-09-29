@@ -7,7 +7,6 @@ describe("useStore", () => {
       status: "idle",
       transcript: "",
       recoverableTranscripts: [],
-      lastDictationResult: null,
       interimTranscript: "",
       error: null,
       selectedDeviceId: null,

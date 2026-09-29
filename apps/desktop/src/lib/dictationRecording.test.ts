@@ -39,12 +39,12 @@ function harness() {
   const phase = ref("idle");
   const current = ref(session.createDictationSessionState());
   const cancelled = ref<string | null>(null);
-  const queue = ref<{ finish(): Promise<{ undelivered: string }>; cancel(): void } | null>(null);
+  const queue = ref<{ finish(): Promise<{ undelivered: string; uncertain?: boolean }>; cancel(): void } | null>(null);
   const pasteSession = ref(false);
   const state = {
     config: { transcriptTarget: "cursor", transcriptEnhancement: "off" },
     recovery: null as unknown, transcript: "", setCaptureNotice: vi.fn(),
-    setSurface: vi.fn(), setLastDictationResult: vi.fn(), setRawTranscript: vi.fn(),
+    setSurface: vi.fn(), setRawTranscript: vi.fn(),
     setRecovery: vi.fn((value: unknown) => { state.recovery = value; }),
     selectedDeviceId: null as string | null,
     dictationPurpose: "cursor" as "cursor" | "onboarding",
@@ -132,7 +132,7 @@ function harness() {
   } as unknown as DictationRecordingEnv;
   const recording = createDictationRecording(env);
   // Puts the harness in a live desktop recording that Stop can finish.
-  const recordingWith = (finish: () => Promise<{ undelivered: string }>) => {
+  const recordingWith = (finish: () => Promise<{ undelivered: string; uncertain?: boolean }>) => {
     pasteSession.current = true;
     phase.current = "recording";
     current.current = session.startSession(current.current);
@@ -148,9 +148,22 @@ function harness() {
   };
 }
 
-const journalDeletions = () => ipc.mock.calls
-  .filter(([command]) => command === "finish_crash_journal")
+const journalCalls = (name: string) => ipc.mock.calls
+  .filter(([command]) => command === name)
   .map(([, args]) => (args as { id: string }).id);
+const journalDeletions = () => journalCalls("finish_crash_journal");
+
+// A native recording with an open crash journal, stopped through a fixture queue.
+async function journaledRecording(h: ReturnType<typeof harness>, finish: () => Promise<{ undelivered: string }>) {
+  h.env.captureSelectionRef.current = () => ({ backend: "native", selectionToken: "fixture-source" });
+  vi.mocked(h.env.beginNativeCapture).mockResolvedValue({
+    descriptor: {}, cancel: vi.fn(async () => {}), startDelivery: vi.fn(),
+  } as unknown as NativeCaptureSession);
+  await h.startRecording();
+  expect(h.phase.current).toBe("recording");
+  h.queue.current?.cancel();
+  h.queue.current = { finish: vi.fn(finish), cancel: vi.fn() };
+}
 
 it.each([
   { change: { enabled: false }, title: "Dictation could not start", notice: "Desktop dictation is unavailable. Complete desktop input setup before recording." },
@@ -308,7 +321,7 @@ it("copies words the focused app did not take to the clipboard as a handled Stop
   await stopping;
   expect(h.copy).toHaveBeenCalledExactlyOnceWith("and the rest.");
   expect(h.trace).toHaveBeenCalledWith("dictation_desktop_remainder_copied");
-  expect(h.notify).toHaveBeenCalledExactlyOnceWith("Dictation copied to clipboard", "VOCO couldn't type into the focused app. Press Shift+Insert or Ctrl+V to paste it.");
+  expect(h.notify).toHaveBeenCalledExactlyOnceWith("Dictation copied to clipboard", "VOCO couldn't paste into the focused app. Press Shift+Insert or Ctrl+V to paste it.");
   expect(h.env.pasteDesktopText).not.toHaveBeenCalled();
   expect(h.phase.current).toBe("idle");
   expect(h.state.recovery).toBeNull();
@@ -318,16 +331,42 @@ it("copies words the focused app did not take to the clipboard as a handled Stop
   expect(h.setError).not.toHaveBeenCalled();
 });
 
-it("takes the interrupted path when the Stop clipboard copy fails", async () => {
+it("asks the user to check the app first when a chunk may already be there", async () => {
   const h = harness();
-  h.recordingWith(async () => ({ undelivered: "Uncopied fixture words." }));
-  h.state.transcript = "Uncopied fixture words.";
+  h.recordingWith(async () => ({ undelivered: "Maybe typed.", uncertain: true }));
+  await h.stopRecording();
+  expect(h.copy).toHaveBeenCalledExactlyOnceWith("Maybe typed.");
+  expect(h.notify).toHaveBeenCalledExactlyOnceWith("Dictation copied to clipboard", expect.stringContaining("Some words may already be in the app"));
+});
+
+it("keeps the dictation in Review when the Stop clipboard copy fails", async () => {
+  const h = harness();
+  await journaledRecording(h, async () => ({ undelivered: "Uncopied fixture words." }));
   h.copy.mockRejectedValue({ outcome: "no-mutation", message: "Clipboard helper is unavailable.", clipboardChanged: false });
   await h.stopRecording();
   expect(h.copy).toHaveBeenCalledOnce();
+  expect(journalCalls("keep_crash_journal")).toEqual([h.env.recoverySessionIdRef.current]);
+  expect(journalDeletions()).toEqual([]);
+  expect(h.trace).toHaveBeenCalledWith("dictation_desktop_remainder_kept");
+  expect(h.notify).toHaveBeenLastCalledWith("Dictation saved in Review", expect.stringContaining("Review in the VOCO tray menu"));
+  expect(h.setError).not.toHaveBeenCalledWith(expect.any(String));
+  expect(h.state.recovery).toBeNull();
+  expect(h.phase.current).toBe("idle");
+  // The kept session is not deleted when the next dictation starts.
+  await h.startRecording();
+  expect(journalDeletions()).toEqual([]);
+});
+
+it("takes the interrupted path when neither the clipboard nor Review can keep the words", async () => {
+  const h = harness();
+  await journaledRecording(h, async () => ({ undelivered: "Uncopied fixture words." }));
+  failing.add("keep_crash_journal");
+  h.copy.mockRejectedValue({ outcome: "no-mutation", message: "Clipboard helper is unavailable.", clipboardChanged: false });
+  await h.stopRecording();
   expect(h.trace).not.toHaveBeenCalledWith("dictation_desktop_remainder_copied");
-  expect(h.notify).toHaveBeenCalledExactlyOnceWith("Dictation interrupted", expect.stringContaining("Some words may be missing"));
-  expect(h.setError).toHaveBeenCalledWith("Clipboard helper is unavailable.");
+  expect(h.trace).not.toHaveBeenCalledWith("dictation_desktop_remainder_kept");
+  expect(h.notify).toHaveBeenLastCalledWith("Dictation interrupted", expect.stringContaining("Some words may be missing"));
+  expect(h.setError).toHaveBeenCalledWith("VOCO couldn't paste, copy or save this dictation.");
   expect(h.state.transcript).toBe("");
   expect(h.state.recovery).toBeNull();
   expect(h.phase.current).toBe("idle");
@@ -364,7 +403,6 @@ it("onboarding retains its successful test text and does not create a cursor res
   h.finalizeIdleState();
   expect(h.state.transcript).toBe("Voice test fixture.");
   expect(h.state.setOnboardingTestPassed).toHaveBeenCalledWith(true);
-  expect(h.state.setLastDictationResult).not.toHaveBeenCalled();
 });
 
 it("handled unmount resets cursor store content and state", () => {

@@ -238,7 +238,8 @@ def summarize(entries, run_id=None, malformed=0):
     if any(e['name'] == 'dictation_manual_transcript_ready' for e in lifecycle):
         flags.append('manual_copy_ready_requires_review')
     if any(e['name'] in {'dictation_desktop_paste_failed', 'dictation_desktop_paste_unavailable',
-                                       'dictation_desktop_stream_failed', 'dictation_desktop_remainder_copied'} for e in lifecycle):
+                                       'dictation_desktop_stream_failed', 'dictation_desktop_remainder_copied',
+                                       'dictation_desktop_remainder_kept'} for e in lifecycle):
         flags.append('desktop_paste_failure_requires_review')
     if any(e['name'] == 'dictation_desktop_paste_dispatched' for e in lifecycle):
         flags.append('desktop_paste_dispatch_needs_target_verification')

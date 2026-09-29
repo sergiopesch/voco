@@ -83,7 +83,7 @@ describe("ControlPanel", () => {
   });
 
   it("advertises the shortcut only with explicit current available diagnostics", () => {
-    const support = { available: false, requiredCommands: [], missingCommands: [], optionalMissingCommands: [], detail: "Fixture" };
+    const support = { available: false, requiredCommands: [], missingCommands: [], detail: "Fixture" };
     const markup = renderPanel({ runtimeDiagnostics: {
       shortcut: { hotkey: "Alt+D", route: "global-shortcut", state: "available", detail: "Registered current shortcut" },
       sessionType: "wayland", typeSimulation: support, clipboard: support,
@@ -94,17 +94,17 @@ describe("ControlPanel", () => {
     expect(markup).not.toContain("Start listening");
   });
 
-  it("recommends the GNOME panel companion without blocking dictation", () => {
-    const support = { available: true, requiredCommands: [], missingCommands: [], optionalMissingCommands: [], detail: "Fixture" };
+  it("explains a leaking Wayland shortcut without blocking dictation", () => {
+    const support = { available: true, requiredCommands: [], missingCommands: [], detail: "Fixture" };
     const runtimeDiagnostics = {
-      desktopInput: { available: true, setupArea: "panel" as const, detail: "VOCO's GNOME panel is not enabled." },
+      desktopInput: { available: true, setupArea: "panel" as const, detail: "Alt+D also reaches the app you are dictating into. Enable the VOCO panel in Help to keep the shortcut out of other apps." },
       desktopPaste: { enabled: true, available: true, detail: "Ready" },
       shortcut: { hotkey: "Alt+D", route: "evdev" as const, state: "available" as const, detail: "Keyboard ready" },
       sessionType: "wayland", typeSimulation: support, clipboard: support,
       ownedPreedit: { available: false, ready: false, setupState: "not-enabled" as const, detail: "Not enabled", sessionId: null, engineActive: false, focusLost: false, progressiveCommitActive: false, committedCharacterCount: 0, ownershipIntact: false, finalizationOutcome: null, error: null },
     };
     const settings = renderPanel({ surface: "settings", runtimeDiagnostics });
-    expect(settings).toContain("Recommended: enable the VOCO panel so Alt+D isn’t also sent to the app you’re dictating into. Dictation works without it.");
+    expect(settings).toContain("Alt+D also reaches the app you are dictating into. Enable the VOCO panel in Help to keep the shortcut out of other apps.");
     expect(settings).not.toContain("Desktop setup needs attention");
     const popover = renderPanel({ runtimeDiagnostics });
     expect(popover).toContain("Click where you want the text, then use your shortcut.");
@@ -154,7 +154,7 @@ describe("ControlPanel", () => {
     });
     expect(settingsMarkup).toContain("VOCO pastes into whichever app has keyboard focus, including terminals and browsers.");
     expect(settingsMarkup).toContain("copies the rest of your words to the clipboard when you stop");
-    expect(settingsMarkup).toContain("Review is available from the tray after an unexpected app exit.");
+    expect(settingsMarkup).toContain("If the copy fails too, or VOCO exits unexpectedly, choose Review in the tray to get your words back.");
     expect(settingsMarkup).toContain("IBus shortcut (optional)");
 
     const onboardingMarkup = renderPanel({
@@ -174,7 +174,6 @@ describe("Crystal Sidebar settings", () => {
   it("keeps crash review separate from settings", () => {
     const markup = renderPanel({
       surface: "settings",
-      lastDictationResult: { outcome: "delivered", completedAt: 2 },
       recoverableTranscripts: [{ id: "earlier", text: "Keep this text", createdAt: 1, reason: "delivery-unconfirmed", isPartial: false }],
     });
     expect(markup).not.toContain("A transcript needs attention");

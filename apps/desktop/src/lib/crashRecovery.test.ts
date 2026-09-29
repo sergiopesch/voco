@@ -57,3 +57,13 @@ it("review reads only the backend's previous-run entries and dismissal is identi
   expect(invoke).toHaveBeenCalledWith("list_crash_recovery");
   expect(invoke).toHaveBeenCalledWith("dismiss_crash_recovery", { id: "old-session" });
 });
+it("keep moves only a fully saved session into Review", async () => {
+  const kept = new CrashJournal("session"); await kept.begin(); kept.update("fixture");
+  await expect(kept.keep()).resolves.toBe(true);
+  expect(invoke).toHaveBeenLastCalledWith("keep_crash_journal", { id: "session", epoch: 1 });
+  expect(invoke).not.toHaveBeenCalledWith("finish_crash_journal", expect.anything());
+  vi.mocked(invoke).mockImplementation(async command => { if (command === "get_crash_journal_epoch") return 1; if (command === "update_crash_journal") throw new Error("disk full"); });
+  const partial = new CrashJournal("partial"); await partial.begin(); partial.update("fixture");
+  await expect(partial.keep()).resolves.toBe(false);
+  expect(invoke).not.toHaveBeenCalledWith("keep_crash_journal", { id: "partial", epoch: 1 });
+});

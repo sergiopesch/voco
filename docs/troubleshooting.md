@@ -31,9 +31,10 @@ mode. Review terminal text before running it.
 
 On GNOME Wayland without the [VOCO panel](#no-live-bars-or-listening-in-the-top-panel),
 the focused app also receives **Alt+D**: a browser focuses its address bar, so
-the words land there, and a terminal deletes a word. Enable the panel and sign out
-and back in, or assign `voco --toggle` to an unused key in your desktop's shortcut
-settings, as in [Wayland compositor shortcuts](install.md#wayland-compositor-shortcuts).
+the words land there, and a terminal deletes a word. VOCO notifies you the first
+time this happens after each launch. Enable the panel and sign out and back in, or
+assign `voco --toggle` to an unused key in your desktop's shortcut settings, as in
+[Wayland compositor shortcuts](install.md#wayland-compositor-shortcuts).
 
 ## VOCO records but does not type into the active application
 
@@ -42,13 +43,16 @@ First verify the complete package and worker identity: a base Tauri package lack
 NVIDIA payload. Inspect old launcher overrides, especially `VOCO_STREAM_WORKER`,
 `VOCO_DESKTOP_PASTE=0` and `VOCO_DESKTOP_STREAM=0`. Keep the app you are dictating
 into focused, check the helpers with `voco --check-desktop-input`, and review local
-app/worker diagnostics. Apps that remap Shift+Insert, remote desktops and virtual
-machines may not accept the paste.
+app/worker diagnostics. On Wayland the paste keys need a running `ydotoold`; if
+setup names it, run `systemctl --user enable --now voco-ydotoold.service` and see
+[Wayland helper setup](platform/README.md#ydotoold-ydotool-daemon). Apps that remap
+Shift+Insert, remote desktops and virtual machines may not accept the paste.
 
 A successful key dispatch does not prove that the app accepted the text. If a paste
 fails, VOCO stops typing; at Stop it copies the words it did not type to the
 clipboard and notifies you. Check the field before pasting them with Shift+Insert:
-some words may already have arrived. VOCO never replays an uncertain paste. The
+some words may already have arrived. VOCO never replays an uncertain paste. If
+the clipboard copy fails too, VOCO keeps the dictation in tray **Review**. The
 optional Chromium exact-field adapter uses a separate contract; IBus remains
 shortcut-only.
 
@@ -66,21 +70,15 @@ rewrite previously inserted sentences after Stop. A good transcript in one test
 does not establish punctuation quality across voices and speaking styles. Keep
 recognition accuracy, exact delivery and whole-message refinement separate.
 
-## The tray says Review Transcript instead of Start Dictation
+## Getting back words VOCO kept
 
-A manual transcript is still pending. Choose `Review Transcript` to open it, then use
-`Copy transcript` and paste your text where you need it. Copying keeps the transcript in VOCO;
-choose `Clear transcript` when you are ready for another recording. A failed clipboard write
-leaves the transcript available and displays the error. Clearing VOCO's transcript does not
-clear the clipboard.
-
-If a cancelled or failed recording has recovery available, the tray instead offers
-`Review Recording`. Open it to retry transcription or explicitly discard that recovery.
-
-The review action opens the panel without starting or stopping capture. It remains available
-if microphone access becomes unavailable or settings need repair. Switching to another app
-hides the popover but retains the text; `Review Transcript` opens it again. A pending focus
-query from an older event cannot dismiss a panel after a newer focus observation.
+Choose **Review** in the tray menu. It lists the dictations VOCO kept: text from a
+VOCO process that exited unexpectedly, and a dictation it could neither paste nor
+copy when you stopped. Check your text field first, because some words may already
+be there. **Copy transcript** puts the text on the clipboard; the entry stays until
+you choose **Discard**. VOCO keeps up to five, and a sixth replaces the oldest.
+Review never opens, pastes or retries by itself, and opening it does not start or
+stop dictation.
 
 ## Set up exact-field Chromium dictation
 

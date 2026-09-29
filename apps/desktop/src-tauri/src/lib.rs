@@ -367,6 +367,7 @@ fn is_supported_dictation_trace_event(event: &str) -> bool {
             | "dictation_desktop_paste_failed"
             | "dictation_desktop_paste_deferred"
             | "dictation_desktop_remainder_copied"
+            | "dictation_desktop_remainder_kept"
             | "recording_state_requested"
             | "recording_get_user_media_started"
             | "recording_get_user_media_constraints_fallback"
@@ -1817,6 +1818,9 @@ fn eval_toggle_with_backend(app_handle: &tauri::AppHandle, backend_used: &str) {
         trace_hotkey_event("eval_toggle_debounced", Some(backend_used));
         return;
     }
+    if backend_used == "evdev" {
+        notify_passive_shortcut_once(app_handle);
+    }
 
     if !FRONTEND_HOTKEY_HANDLER_READY.load(Ordering::SeqCst) {
         buffer_toggle_until_frontend_ready(backend_used);
@@ -1824,6 +1828,24 @@ fn eval_toggle_with_backend(app_handle: &tauri::AppHandle, backend_used: &str) {
     }
 
     emit_toggle_event(app_handle, backend_used);
+}
+
+/// Evdev only observes the chord, so the focused app acted on it too, often
+/// moving the cursor before the first paste. Explain the fix once per launch.
+fn notify_passive_shortcut_once(app_handle: &tauri::AppHandle) {
+    static NOTIFIED: AtomicBool = AtomicBool::new(false);
+    if NOTIFIED.load(Ordering::SeqCst) {
+        return;
+    }
+    let app = app_handle.clone();
+    // The panel check runs a bounded helper; keep it off the key listener.
+    std::thread::spawn(move || {
+        if let Some(detail) = stop_shortcut_setup_issue(&app) {
+            if !NOTIFIED.swap(true, Ordering::SeqCst) {
+                send_notification("Your shortcut also reached the app", &detail);
+            }
+        }
+    });
 }
 
 // --- Hotkey configuration ---
@@ -1882,8 +1904,13 @@ fn register_global_shortcut_listener(app: &tauri::AppHandle, hotkey: &str) -> Re
     app.global_shortcut()
         .on_shortcut(shortcut, move |_app, _shortcut, event| {
             let current_version = HOTKEY_BINDING_VERSION.load(Ordering::SeqCst);
+            let pressed = event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed;
+            if complete_on_release {
+                // A paste during the hold would also reach VOCO; it waits instead.
+                insertion::note_x11_shortcut(pressed);
+            }
             if !gesture.admit(
-                event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed,
+                pressed,
                 complete_on_release,
                 current_version == binding_version && !USE_EVDEV_HOTKEY.load(Ordering::SeqCst),
             ) {
@@ -2499,6 +2526,7 @@ pub fn run() -> Result<(), String> {
             crash_recovery::begin_crash_journal,
             crash_recovery::update_crash_journal,
             crash_recovery::finish_crash_journal,
+            crash_recovery::keep_crash_journal,
             benchmark_stream::benchmark_stream,
             benchmark_stream::recover_stream,
             native_capture_commands::native_capture_capabilities,

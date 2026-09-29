@@ -106,7 +106,7 @@ elif [[ "${1:-}" == --full-application ]]; then
       PYTHONDONTWRITEBYTECODE=1 bash "${ROOT_DIR}/scripts/${TEST_SCRIPT}"
   done
   VOCO_NATIVE_APP_CASE=focus-switch VOCO_NATIVE_OUTPUT_MODE=final-text-only \
-    VOCO_NATIVE_EVIDENCE_DIR="${application_evidence}/focus-manual-copy" \
+    VOCO_NATIVE_EVIDENCE_DIR="${application_evidence}/focus-switch" \
     PYTHONDONTWRITEBYTECODE=1 bash "${ROOT_DIR}/scripts/${TEST_SCRIPT}"
 else
   PYTHONDONTWRITEBYTECODE=1 bash "${ROOT_DIR}/scripts/${TEST_SCRIPT}"

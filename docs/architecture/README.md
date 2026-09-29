@@ -12,10 +12,11 @@ warmup reports an error; the app does not download another model.
 
 Browser delivery uses a separately authorized field lease. Each append requires an
 exact prefix receipt and Stop finalizes the acknowledged text without replaying it.
-Crash-only Review exposes the last text checkpoint from an unexpected process or
-renderer exit, with explicit Copy and Discard. Normal Stop and handled failures
-clear text/audio and remove the active checkpoint. A checkpoint failure never
-blocks dictation. Review has no delivery or retranscription action.
+Review exposes the last text checkpoint from an unexpected process or renderer
+exit, or from a Stop that could neither paste nor copy its remainder, with explicit
+Copy and Discard. Normal Stop and handled failures clear text/audio and remove the
+active checkpoint. A checkpoint failure never blocks dictation. Review has no
+delivery or retranscription action.
 
 Shortcut arbitration separates completed IBus authority from a poll in flight.
 Registration, config synchronization and readiness use only unexpired Armed/Uncertain
@@ -49,7 +50,7 @@ registration. The one-second IBus bound and plugin-generation checks are unchang
    the next chunk or at Stop. Revised already-delivered text, or an uncertain or
    rejected paste, stops insertion without replay. Healthy recognition continues
    through Stop, which copies any undelivered remainder to the clipboard and
-   notifies the user.
+   notifies the user, or moves the dictation into Review when that copy fails.
 
 The candidate batches released silence-preroll frames into at most one second per
 native call, preserving every released sample and its order. This reduces call

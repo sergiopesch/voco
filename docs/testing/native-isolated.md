@@ -1,10 +1,11 @@
 # Isolated native GTK and WebKit acceptance
 
-Current acceptance: [iteration 3](foundations-iteration-3-2026-09-05.md). IBus protocol 5
-requires zero target mutation in every context. Full-application cases now verify
-completed manual Copy; Chromium direct delivery is exercised separately by
-`test-browser-full-app.sh`. Earlier insertion reproductions below explain why the
-IBus boundary was suspended and are retained as historical investigation evidence.
+Current acceptance: [iteration 3](foundations-iteration-3-2026-09-05.md). IBus protocol 6
+is shortcut-only and never mutates text. Full-application cases now verify that the
+dictation is pasted into the focused GTK field, as in [desktop paste](desktop-paste.md);
+Chromium direct delivery is exercised separately by `test-browser-full-app.sh`.
+Earlier insertion reproductions below explain why the IBus boundary was suspended
+and are retained as historical investigation evidence.
 
 `scripts/test-native-desktop.sh` runs actual GTK 3 entries and WebKitGTK DOM
 fields on an Xvfb server, with private IBus and session/accessibility D-Bus
@@ -104,17 +105,23 @@ tray-host discovery service, then launches a copied Tauri
 executable with a copied, SHA-256-verified existing model. A private PulseAudio
 null sink and remapped source accept only the public, licensed speech fixture;
 there is no hardware microphone access. Onboarding is completed in the disposable
-config, and final-only output is selected. Actual XTest shortcuts, WebKit capture,
-AudioWorklet, binary IPC, recognition and final GTK mutation are checked.
+config, and final-only output is selected. Actual XTest shortcuts, capture, binary
+IPC and recognition are checked, and each chunk must be pasted with xclip and
+xdotool Shift+Insert into the GTK field that has focus: exactly once in field A for
+`delivery`, and split at the focus change for `focus-switch`, where the fixture plays
+once per field. A copied remainder, a Review entry, IBus preedit or commit, or any
+field change other than an appended paste fails the case. The Ready tray menu and
+popover are then checked through D-Bus and AT-SPI.
 
 ```bash
 VOCO_NATIVE_APP_BINARY=/absolute/path/to/candidate/voco \
-VOCO_NATIVE_MODEL=/absolute/path/to/existing/ggml-base.en.bin \
 VOCO_NATIVE_EVIDENCE_DIR=/absolute/evidence/full-app \
   scripts/test-native-desktop.sh
 ```
 
-This mode also requires `pulseaudio`, `pactl`, and `paplay`. It hashes the actual
+This mode also requires `pulseaudio`, `pactl`, `paplay`, `xclip` and `xdotool`, and
+stages the pinned Nemotron runtime from `runtime/speech` (or `VOCO_TEST_SPEECH_RUNTIME`)
+after verifying its recorded hashes. It hashes the actual
 copied binary before launch and records its identity. Its diagnostic audio export
 contains only the fixture recording and is confined to the disposable test state
 and requested evidence directory. It does not enable diagnostic capture in the
@@ -123,7 +130,8 @@ an earlier preflight build is not final-snapshot proof.
 
 ## Final packaged candidate verification
 
-The executable extracted from the final development Debian bundle was tested
+Historical record: this verification predates desktop paste and the Nemotron
+runtime. The executable extracted from the final development Debian bundle was tested
 without callback instrumentation. Its SHA-256 is
 `1ecd66a1336ca0158be17d66cb96ceba96ebbaa782e12201ca22c8c0d9e4e1fe`;
 the unchanged model is
@@ -163,8 +171,8 @@ VOCO_NATIVE_APP_CASE=focus-switch scripts/test-native-desktop.sh
 ```
 
 Set `VOCO_NATIVE_BUILD_ROLE=packaged-candidate` when testing an extracted candidate.
-The hosted `--full-application` wrapper runs final-only, streaming and focus recovery
-with the same binary. `execution.json` records the exit code and hashes of files
+The hosted `--full-application` wrapper runs final-only and streaming `delivery`, then
+`focus-switch`, with the same binary. `execution.json` records the exit code and hashes of files
 produced by that invocation. When reusing an output directory, treat only files
 listed by that current execution manifest as current evidence; an older report
 outside the manifest cannot turn a failed startup into a pass.

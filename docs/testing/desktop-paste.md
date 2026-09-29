@@ -17,6 +17,8 @@ Firefox and Electron apps paste CLIPBOARD on Shift+Insert; most terminals,
 including VTE terminals, Ghostty and xterm, paste PRIMARY. A PRIMARY failure only
 logs a warning, because some compositors do not provide it. X11 uses xclip and
 xdotool; Wayland uses ydotool with wl-copy, or xclip through XWayland on GNOME.
+Wayland keys need a running `ydotoold`, normally VOCO's `voco-ydotoold.service`;
+until one runs, desktop setup reports paste unavailable and names that service.
 
 A single leading joining space is sent as its own Space key before the paste,
 because the Chromium address bar trims a pasted leading space; the selections
@@ -26,7 +28,9 @@ presses Enter, submits a form or runs a command. A paste first waits until 150 m
 after the previous one, so that recipient can read its selection. On Wayland it
 then waits at most 1.5 seconds for released shortcut modifiers, from evdev or the
 GNOME companion's `ModifiersClear`; unknown state does not block, and a timeout
-sends no keys.
+sends no keys. On X11, VOCO's passive grab receives every key while the shortcut
+is held, the paste keys included, so a paste waits for the shortcut's release, at
+most 1.5 seconds after the press.
 
 `no-mutation` means no key was sent, `rejected` means a prerequisite failed, and
 `uncertain` means a helper started but its result is unknown; `clipboardChanged`
@@ -35,7 +39,11 @@ with the next hypothesis or up to three 250 ms retries at Stop. An uncertain or
 rejected paste stops automatic delivery for the rest of the recording while
 recognition continues. At Stop, `copy_desktop_text` puts the text not dispatched,
 including an uncertain chunk, on both selections without sending keys, and VOCO
-notifies "Dictation copied to clipboard".
+notifies "Dictation copied to clipboard"; after an uncertain chunk it asks the
+person to check the app first, because those words may already be there. When the
+copy fails too, the dictation's text moves from the crash journal into tray Review
+("Dictation saved in Review"); if the journal could not keep it either, Stop
+reports the dictation as interrupted.
 
 A dispatch is not a receipt. VOCO cannot confirm that the recipient displayed the
 text, detect a password field, prompt or read-only mode, or retract text. Apps
@@ -74,6 +82,12 @@ test. Each `results.json` records `"paste": "production"` or `"replica"`.
 - `VOCO_APP_CASE` runs only application cases whose name contains its value.
 - `VOCO_NATIVE_DEPS` names an extra native dependency prefix (default `/usr`).
 - `PLAYWRIGHT_BROWSERS_PATH` locates the Playwright browser cache.
+
+The Release workflow also runs the whole built app with `--full-application`
+(`scripts/test-native-full-app.py`, described in
+[isolated native acceptance](native-isolated.md#full-application-with-virtual-microphone)):
+a public speech fixture, Alt+D to start and stop, and each chunk pasted into the
+focused GTK field, including a focus change between two utterances.
 
 These suites cover X11 only. They do not exercise Wayland, ydotool, wl-copy, the
 GNOME companion or a physical keyboard, and passing cases do not certify other

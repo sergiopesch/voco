@@ -318,6 +318,8 @@ for workflow_path, workflow in (
         )
     if commands.count("run: npm run test:chromium-exact-field") != 1:
         raise SystemExit(f"{workflow_path} must run the Chromium recipient and background lifecycle gates")
+    if not all(re.search(rf"\s{helper}\s", workflow) for helper in ("xdotool", "xclip")):
+        raise SystemExit(f"{workflow_path} must install the X11 paste helpers its desktop gates use")
     if "run: npm run test:private-ibus" in workflow:
         raise SystemExit(f"{workflow_path} bypasses the hosted IBus namespace wrapper")
     if "rustsec/audit-check@" in workflow:

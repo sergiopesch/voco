@@ -1,7 +1,7 @@
-//! Text-only crash journal. Normal completion deletes the active entry; only a
-//! previous process's unfinished entry can appear in Review. No output replay.
-//! Best effort: damaged files are skipped, and no earlier session or failure
-//! can block a new one.
+//! Text-only crash journal. Normal completion deletes the active entry; Review
+//! shows a previous process's unfinished entry, or a Stop that could neither
+//! paste nor copy its text. No output replay. Best effort: damaged files are
+//! skipped, and no earlier session or failure can block a new one.
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::ffi::CStr;
@@ -302,6 +302,18 @@ impl Journal {
         }
         Ok(())
     }
+
+    /// Ends the session like `finish`, but moves its text into Review.
+    fn keep(&mut self, id: &str) -> Result<(), String> {
+        if self
+            .active
+            .as_ref()
+            .is_some_and(|(entry, _)| entry.id == id)
+        {
+            self.recover_active()?;
+        }
+        Ok(())
+    }
 }
 
 impl State {
@@ -368,6 +380,13 @@ impl State {
             _ => Ok(()),
         }
     }
+
+    fn keep(&mut self, id: &str, epoch: u64) -> Result<(), String> {
+        match self.journal.as_mut() {
+            Some(journal) if epoch == self.epoch => journal.keep(id),
+            _ => Ok(()),
+        }
+    }
 }
 
 fn state() -> MutexGuard<'static, State> {
@@ -416,6 +435,10 @@ pub async fn update_crash_journal(
 #[tauri::command]
 pub async fn finish_crash_journal(id: String, epoch: u64) -> Result<(), String> {
     state().finish(&id, epoch)
+}
+#[tauri::command]
+pub async fn keep_crash_journal(id: String, epoch: u64) -> Result<(), String> {
+    state().keep(&id, epoch)
 }
 
 #[cfg(test)]
@@ -677,6 +700,25 @@ mod tests {
         assert!(state.journal().unwrap().active.is_none());
         assert!(!root.join("voco/crash-recovery/active.json").exists());
         state.journal().unwrap().dismiss(ID).unwrap();
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn kept_session_moves_to_review_and_stale_keeps_change_nothing() {
+        let root = root();
+        let mut state = opened(&root);
+        let journal = state.current(0).unwrap();
+        journal.begin(ID.into()).unwrap();
+        journal.update(ID, 1, "Undelivered fixture".into()).unwrap();
+        state.keep(OTHER, 0).unwrap();
+        state.keep(ID, 9).unwrap();
+        assert!(state.journal().unwrap().recovered.is_empty());
+        state.keep(ID, 0).unwrap();
+        let journal = state.journal().unwrap();
+        assert!(journal.active.is_none() && journal.read(ACTIVE).is_none());
+        assert_eq!(journal.recovered[0].text, "Undelivered fixture");
+        state.keep(ID, 0).unwrap();
+        assert_eq!(Journal::open(&root).unwrap().recovered.len(), 1);
         fs::remove_dir_all(root).unwrap();
     }
 

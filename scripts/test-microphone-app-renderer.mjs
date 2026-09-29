@@ -164,8 +164,7 @@ try {
                     sessionType: 'wayland',
                     typeSimulation: {
                         available: true,
-                        missingCommands: [],
-                        optionalMissingCommands: []
+                        missingCommands: []
                     },
                     clipboard: {
                         available: true,

@@ -1,3 +1,7 @@
+> **Superseded delivery (2026.0.60).** Desktop dictation now pastes each chunk into
+> whatever has keyboard focus; see [desktop paste](desktop-paste.md). IBus protocol 6
+> is shortcut-only. The manual-Copy outcome below is a historical record.
+
 # Consuming shortcut origin and input-context ownership
 
 Current foundations candidate, 5 September 2026. IBus protocol version 5.

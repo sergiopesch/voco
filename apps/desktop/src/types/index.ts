@@ -46,10 +46,6 @@ export interface RecoverableTranscript {
   isPartial: boolean;
 }
 
-export interface DictationResult {
-  completedAt: number;
-  outcome: "delivered" | "needs-recovery";
-}
 export type CursorDeliveryState =
   | "inactive"
   | "pending"
@@ -96,7 +92,6 @@ export interface InsertionSupport {
   available: boolean;
   requiredCommands: string[];
   missingCommands: string[];
-  optionalMissingCommands: string[];
   detail: string;
 }
 

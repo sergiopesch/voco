@@ -74,11 +74,16 @@ glib 0.20 directly leaves the GTK dependency behind. [Backport](vendor/glib/VOCO
   leading whitespace. ASCII controls become spaces; never send Enter.
 - Wayland helpers emit raw key events, so wait at most 1.5 seconds for released
   shortcut modifiers (evdev, else the companion's `ModifiersClear`). Unknown
-  state does not block; a timeout sends no keys.
+  state does not block; a timeout sends no keys. On X11 the passive grab takes
+  every key while the chord is held, so a paste waits for its release, at most
+  1.5 seconds after the press. Wayland paste needs a running `ydotoold`
+  (`pgrep -x`; the private daemon is not on PATH); desktop setup reports it.
 - Only a `no-mutation` failure, which typed nothing, keeps its text pending for
   the next chunk or bounded Stop retries. An uncertain or rejected paste stops
   automatic delivery. Stop copies the undelivered remainder with
-  `copy_desktop_text`, then notifies; it never replays that text as keys.
+  `copy_desktop_text`, then notifies; it never replays that text as keys. When
+  that copy fails too, `keep_crash_journal` moves the session's text into tray
+  Review; only if the journal cannot keep it does Stop report an interruption.
 - The GNOME Wayland companion is recommended, not required: without it the
   focused app also receives Alt+D (browsers focus the address bar, terminals
   delete a word). Companion v11 grabs the configured Alt+D or Alt+Shift+D at
@@ -90,7 +95,8 @@ glib 0.20 directly leaves the GTK dependency behind. [Backport](vendor/glib/VOCO
   Release the grab on rejection, disconnect or disable; late replies about an
   earlier grab must not act on a newer one. v10 `ReserveStopShortcut` remains
   only for compatibility. Users re-run panel setup, then sign out and back in to
-  load v11.
+  load v11. An evdev toggle while the chord leaks sends one notification per
+  launch with the panel's remedy, which Settings also shows.
 - Closing or navigating an enabled browser tab, or losing its native connection,
   stops that tab's active recording. Ordinary field focus loss revokes delivery
   but preserves the original session's explicit Stop; stale tokens cannot stop
@@ -190,7 +196,8 @@ Done returns directly to the hidden tray surface without presenting or focusing 
 Ready window. A delivery interruption disables insertion but leaves healthy
 recognition running through Stop. Normal cursor completion and handled failures clear
 text/audio and delete the active crash checkpoint; they never expose a saved transcript.
-Only a previous unexpected process exit promotes text into explicit tray Review.
+Only a previous unexpected process exit, or a Stop that could neither paste nor copy
+its remainder, promotes text into explicit tray Review.
 The approved journal is owner-only, bounded, local text only, never audio; retain
 prior crash entries until explicit discard (maximum five, oldest evicted by a sixth crash).
 The crash journal never blocks dictation: without a checkpoint, dictation continues

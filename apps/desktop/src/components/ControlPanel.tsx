@@ -61,7 +61,6 @@ interface ControlPanelProps {
   onDraftStateChange?: (dirty: boolean) => void;
   onShortcutCaptureChange?: (active: boolean) => void;
   closeRequestId?: number;
-  lastDictationResult?: { completedAt: number; outcome: "delivered" | "needs-recovery" } | null;
   requestedSection: PanelSection;
   requestedSectionRequestId: number;
   selectedDeviceId: string | null;
@@ -293,12 +292,6 @@ export function ControlPanel({
   const typeSimulationLabel = useMemo(() => {
     if (!runtimeDiagnostics) {
       return "Runtime checks unavailable.";
-    }
-    if (
-      runtimeDiagnostics.typeSimulation.available &&
-      runtimeDiagnostics.typeSimulation.optionalMissingCommands.length > 0
-    ) {
-      return `Degraded: ${runtimeDiagnostics.typeSimulation.optionalMissingCommands.join(", ")}`;
     }
     return runtimeDiagnostics.typeSimulation.available
       ? "Ready"
@@ -799,7 +792,7 @@ export function ControlPanel({
               {mainSettings ? <div className="voco-preferences__heading"><h2 tabIndex={-1}>Settings</h2></div> : null}
               {mainSettings ? <>
                   {desktopSetupError ? <div className="voco-inline-note" role="status">Desktop setup needs attention. <button className="voco-button voco-button--ghost" onClick={() => setActiveSection("Advanced")}>Open Help</button></div>
-                    : desktopInput?.setupArea === "panel" ? <div className="voco-inline-note" role="status">Recommended: enable the VOCO panel so {config.hotkey} isn’t also sent to the app you’re dictating into. Dictation works without it. <button className="voco-button voco-button--ghost" onClick={() => setActiveSection("Advanced")}>Open Help</button></div> : null}
+                    : desktopInput?.setupArea === "panel" ? <div className="voco-inline-note" role="status">{desktopInput.detail} <button className="voco-button voco-button--ghost" onClick={() => setActiveSection("Advanced")}>Open Help</button></div> : null}
               </> : null}
 
               {mainSettings ? (
@@ -897,18 +890,18 @@ export function ControlPanel({
                   <details className="voco-preferences__card voco-preferences__disclosure"><summary>How to dictate</summary><p>Click where you want your words and press <kbd>{config.hotkey}</kbd>. The tray bars respond when the microphone is ready. Press again to finish.</p><p>VOCO pastes into whichever app has keyboard focus, including terminals and browsers. It replaces clipboard text and never presses Enter.</p><p>In an enabled Chromium tab, use <kbd>Alt+Shift+V</kbd> for direct delivery to a plain text field.</p></details>
                   <details className="voco-preferences__card voco-preferences__disclosure"><summary>My microphone is not working</summary><p>Check the selected microphone and allow access for this session.</p><button className="voco-button voco-button--secondary" onClick={() => setActiveSection("Audio")}>Microphone settings</button></details>
                   <details className="voco-preferences__card voco-preferences__disclosure"><summary>My shortcut is not working</summary><p>{shortcut.detail}</p>{shortcut.setup ? <p>{shortcut.setup}</p> : null}<button className="voco-button voco-button--secondary" onClick={() => setActiveSection("Hotkeys")}>Shortcut settings</button></details>
-                  <details className="voco-preferences__card voco-preferences__disclosure"><summary>My words are not appearing</summary><p>Keep the app you’re dictating into focused. If VOCO can’t type there, it copies the rest of your words to the clipboard when you stop; check the field, then paste with Shift+Insert or Ctrl+V. Review is available from the tray after an unexpected app exit.</p>{desktopSetupError ? <p role="status">{desktopSetupError}</p> : null}<button className="voco-button voco-button--secondary" onClick={() => void onOpenReleasePage(DESKTOP_SETUP_GUIDE)}>Open setup instructions</button></details>
+                  <details className="voco-preferences__card voco-preferences__disclosure"><summary>My words are not appearing</summary><p>Keep the app you’re dictating into focused. If VOCO can’t paste there, it copies the rest of your words to the clipboard when you stop; check the field, then paste with Shift+Insert or Ctrl+V. If the copy fails too, or VOCO exits unexpectedly, choose Review in the tray to get your words back.</p>{desktopSetupError ? <p role="status">{desktopSetupError}</p> : null}<button className="voco-button voco-button--secondary" onClick={() => void onOpenReleasePage(DESKTOP_SETUP_GUIDE)}>Open setup instructions</button></details>
                   <details className="voco-preferences__card voco-preferences__disclosure"><summary>Technical details</summary>
                   <div className="voco-preferences__group"><h3 className="voco-preferences__group-title">Runtime checks</h3>
                     <div className="voco-preferences__card">
                       <div className="voco-preferences__row"><span className="voco-preferences__row-copy"><strong>Session</strong></span><span className="voco-preferences__row-value">{runtimeSessionLabel}</span></div>
                       <div className="voco-preferences__row"><span className="voco-preferences__row-copy"><strong>IBus shortcut (optional)</strong></span><span className="voco-preferences__row-value">{ownedPreeditLabel}</span></div>
-                      <div className="voco-preferences__row"><span className="voco-preferences__row-copy"><strong>Type simulation</strong></span><span className="voco-preferences__row-value">{typeSimulationLabel}</span></div>
-                      <div className="voco-preferences__row"><span className="voco-preferences__row-copy"><strong>Clipboard insertion</strong></span><span className="voco-preferences__row-value">{clipboardLabel}</span></div>
+                      <div className="voco-preferences__row"><span className="voco-preferences__row-copy"><strong>Paste keys</strong></span><span className="voco-preferences__row-value">{typeSimulationLabel}</span></div>
+                      <div className="voco-preferences__row"><span className="voco-preferences__row-copy"><strong>Clipboard</strong></span><span className="voco-preferences__row-value">{clipboardLabel}</span></div>
                     </div>
                   </div>
                   {runtimeDiagnostics ? <details className="voco-preferences__card voco-preferences__disclosure"><summary>Diagnostic details</summary>
-                    <div className="voco-preferences__form"><p><strong>IBus shortcut (optional):</strong> {runtimeDiagnostics.ownedPreedit.detail}</p><p><strong>Type simulation:</strong> {runtimeDiagnostics.typeSimulation.detail}</p><p><strong>Clipboard insertion:</strong> {runtimeDiagnostics.clipboard.detail}</p></div>
+                    <div className="voco-preferences__form"><p><strong>IBus shortcut (optional):</strong> {runtimeDiagnostics.ownedPreedit.detail}</p><p><strong>Paste keys:</strong> {runtimeDiagnostics.typeSimulation.detail}</p><p><strong>Clipboard:</strong> {runtimeDiagnostics.clipboard.detail}</p></div>
                   </details> : null}
                   </details>
                   <div className="voco-preferences__actions">

@@ -47,7 +47,7 @@ it.each(["cancelled", "restarted"])("keeps late native success out of the %s ses
     const { paste, preview } = callbacks({ onboardingTest: false,
       startingSessionId, cancelledRef, desktopPhrasePasteCountRef,
       manualCopyRequestedRef: { current: false }, browserDeliveryRef: { current: null },
-      recordingStartedAtMsRef,
+      recordingStartedAtMsRef, firstPhraseDispatched: false,
       isCurrentSession: (id: number) => id === currentSession,
       assertOutputAllowed: (id: number) => { if (id !== currentSession || cancelledRef.current) throw new Error("cancelled or replaced"); },
       pasteDesktopText: nativePaste, traceDictationEvent: trace, traceDesktopPasteMetrics: metrics,

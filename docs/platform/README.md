@@ -36,7 +36,7 @@ Hotkey backend selection:
 
 - Selected, eligible IBus context -> consuming shortcut backend with expiring registration
 - GNOME Wayland with the VOCO panel -> the Shell consumes `Alt+D` / `Alt+Shift+D` and forwards it to VOCO
-- Wayland + `Alt+D` / `Alt+Shift+D` -> passive evdev fallback, suppressed while IBus is armed or the panel holds the shortcut; the focused app also receives the chord
+- Wayland + `Alt+D` / `Alt+Shift+D` -> passive evdev fallback, suppressed while IBus is armed or the panel holds the shortcut; the focused app also receives the chord, and VOCO explains the fix in one notification per launch
 - Other combinations -> Tauri global-shortcut fallback
 - Runtime hotkey changes update backend preference immediately
 - Settings → Help → Technical details shows the detected session and whether insertion helpers are currently available. Presence is a prerequisite, not proof of delivery to a target.
@@ -66,7 +66,8 @@ merely to copy a transcript. Physical microphone and compositor coverage remain 
 
 VOCO requires a running `ydotoold` for automatic Wayland paste, including when
 using the legacy 0.1.x client. The persistent virtual device avoids per-command
-creation delays. Modern clients also require access to the daemon socket.
+creation delays. Modern clients also require access to the daemon socket. Until a
+daemon runs, desktop setup reports paste unavailable and dictation does not start.
 
 Ubuntu 24.04 provides the client and daemon separately:
 
@@ -128,14 +129,16 @@ not found` indicates an unavailable daemon or a mismatched socket path. After
 setup, use a disposable text field to verify actual delivery. Settings diagnostics
 check prerequisites; only that destination test proves the complete path.
 
-A failed or timed-out helper may already have typed a prefix. VOCO retains uncertain
-output for explicit review and never retries the whole transcript automatically.
+A failed or timed-out helper may already have typed a prefix. VOCO copies uncertain
+output to the clipboard at Stop, or keeps it in tray Review when that copy fails, and
+never retries it automatically.
 
 ## Compatibility Helpers on X11
 
 - xdotool works via X11 protocol (compositor-independent)
 - No special group membership needed
 - Desktop paste copies each chunk to the clipboard and primary selection with xclip, then sends Shift+Insert with xdotool, with the same no-restoration policy as Wayland.
+- While the shortcut is held, VOCO's passive grab receives every key, the paste keys included, so a paste waits for the shortcut's release, at most 1.5 seconds after the press.
 
 ## Known Limitations
 
@@ -181,6 +184,7 @@ the Wayland modifier wait timed out), `rejected` (a prerequisite failed) and `un
 started and delivery may have happened). `clipboardChanged` reports a replaced clipboard. Only
 `no-mutation` text is retried, with the next chunk or at Stop. After `rejected` or `uncertain`,
 automatic delivery stops and Stop copies the remainder to the clipboard without sending keys.
+If that copy fails, the dictation moves into tray Review instead.
 
 Clipboard write and paste helpers each have a five-second deadline. Stdin writes are nonblocking
 under the same deadline; failed supervision kills and reaps the helper process group. No transcript

@@ -169,7 +169,6 @@ export function App() {
   const rawTranscript = useStore((state) => state.rawTranscript);
   const recoverableTranscripts = useStore((state) => state.recoverableTranscripts);
   const dismissRecoverableTranscript = useStore((state) => state.dismissRecoverableTranscript);
-  const lastDictationResult = useStore((state) => state.lastDictationResult);
   const hasRecoverableTranscript = recoverableTranscripts.length > 0;
   const surface = useStore((state) => state.surface);
   const onboardingStep = useStore((state) => state.onboardingStep);
@@ -1224,7 +1223,6 @@ export function App() {
         onDiscardRecovery={discardRecovery}
         recoverableTranscripts={recoverableTranscripts}
         onDismissRecoverableTranscript={dismissRecoverableTranscript}
-        lastDictationResult={lastDictationResult}
         onPrepareDictation={() => void handlePrepareDictation()}
         onDraftStateChange={handleDraftStateChange}
         onShortcutCaptureChange={handleShortcutCaptureChange}

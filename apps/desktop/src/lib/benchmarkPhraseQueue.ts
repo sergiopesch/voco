@@ -50,6 +50,7 @@ export class BenchmarkPhraseQueue {
   private cancelled = false;
   private failure: Error | null = null;
   private deliveryFailure: Error | null = null;
+  private deliveryUncertain = false;
   private committed = "";
   private buffered: number[] = [];
   private rate = 16000;
@@ -260,6 +261,7 @@ export class BenchmarkPhraseQueue {
           this.activeDeliverySeq = null;
           this.onPreview("deferred");
         } else {
+          this.deliveryUncertain = outcome === "uncertain";
           this.failedDeliverySeq = this.activeDeliverySeq;
           this.activeDeliverySeq = null;
           this.fail(error, "insertion_failed", "delivery");
@@ -328,8 +330,8 @@ export class BenchmarkPhraseQueue {
   }
 
   /** Rejects only for recognition failures. `undelivered` is recognized text
-   * that was not typed, including a chunk whose paste outcome is uncertain. */
-  async finish(): Promise<{ undelivered: string }> {
+   * that was not typed; when `uncertain`, its first chunk may have been. */
+  async finish(): Promise<{ undelivered: string; uncertain: boolean }> {
     await this.pending;
     await this.delivery;
     // Deferred ("no-mutation") text gets a few bounded retries at Stop.
@@ -341,6 +343,6 @@ export class BenchmarkPhraseQueue {
     }
     this.terminal();
     if (this.failure) throw this.failure;
-    return { undelivered: this.cancelled ? "" : this.latest.slice(this.committed.length) };
+    return { undelivered: this.cancelled ? "" : this.latest.slice(this.committed.length), uncertain: this.deliveryUncertain };
   }
 }

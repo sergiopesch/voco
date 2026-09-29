@@ -1,5 +1,21 @@
 #!/usr/bin/python3
-"""Full native capture/IPC/inference/manual Copy with a private virtual microphone."""
+"""Full native capture/IPC/inference, pasted into the focused GTK field of a private X11 session.
+
+A private PulseAudio fixture feeds the real app, which copies each recognized chunk to
+CLIPBOARD and PRIMARY with xclip, then sends xdotool [Space] Shift+Insert to whatever has
+keyboard focus. Final-text-only streams exactly like stable-cursor-streaming: desktop paste
+sessions pin that legacy snapshot and the phrase queue pastes each appended suffix as it
+arrives; Stop pastes only what remains, into the field focused at that moment.
+
+delivery: A keeps focus and receives the fixture words exactly once; B stays empty.
+focus-switch: the fixture plays with A focused; once A's streamed text settles, focus moves
+to B and the fixture plays again, all in one recording. A keeps only text pasted while it
+had focus; B receives the rest, including whatever Stop flushes.
+Both cases fail on IBus preedit or commit, a non-append field change, paste refusal or
+failure, a copied remainder, recovery or fallback capture, then check the real tray menu and
+the Ready popover through AT-SPI.
+"""
+import collections
 import hashlib
 import json
 import os
@@ -24,6 +40,25 @@ assert case in ['delivery', 'focus-switch'], 'Unsupported native application cas
 trace_path = root / 'state/voco/hotkey-trace.jsonl'
 model = root / 'speech/models/nemotron-speech-streaming-en-0.6b.q8_0.gguf'
 assert hashlib.sha256(model.read_bytes()).hexdigest() == 'd9a01898d2a611c8764e23a1c2f45e70bbd5a425dc4de93692ac951dd603812d'
+sound = repo / 'tests/fixtures/speech/84-121123-0000.wav'
+EXPECTED = ['go', 'do', 'you', 'hear']
+# focus-switch speaks the fixture once per field.
+expected = EXPECTED * (2 if case == 'focus-switch' else 1)
+# Every successful paste session traces these. Trace writes are unordered IPC: count, never order.
+REQUIRED = ['dictation_desktop_paste_session_started', 'dictation_desktop_stream_started', 'recording_state_active',
+            'dictation_desktop_paste_requested', 'dictation_desktop_paste_dispatched', 'dictation_desktop_live_prefix_dispatched',
+            'dictation_recording_stopped', 'dictation_desktop_stream_flush_completed', 'dictation_stop_to_final_transcript',
+            'dictation_stop_to_idle']
+# Automatic paste was refused or stopped, the recognizer revised pasted text, or capture fell back to recovery.
+FATAL = {'dictation_desktop_paste_unavailable', 'dictation_desktop_stream_failed', 'dictation_desktop_remainder_copied',
+         'dictation_desktop_remainder_kept', 'dictation_desktop_snapshot_revised', 'recording_script_processor_connected',
+         'dictation_capture_health_interrupted', 'dictation_recovery_retained'}
+# IBus is shortcut-only; these would report text mutation through it.
+IBUS_MUTATIONS = {'dictation_owned_preedit_started', 'dictation_owned_preedit_updated', 'dictation_owned_preedit_committed',
+                  'dictation_owned_preedit_progressive_commit', 'dictation_owned_preedit_final_preserved',
+                  'dictation_canonical_checkpoint_committed', 'dictation_live_cursor_insert_updated',
+                  'dictation_live_cursor_insert_finalized'}
+t0 = time.monotonic()
 
 def pump(duration=.05):
     until = time.monotonic() + duration
@@ -44,6 +79,12 @@ def traces():
             pass # the writer may be appending the final line
     return records
 
+def counts():
+    return collections.Counter(x['event'] for x in traces() if isinstance(x, dict) and x.get('event'))
+
+def words(text):
+    return re.findall('[a-z]+', (text or '').lower())
+
 def wait_for(predicate, description, timeout=20):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
@@ -51,8 +92,80 @@ def wait_for(predicate, description, timeout=20):
             return
         if app.poll() is not None:
             raise RuntimeError('VOCO exited before ' + description)
+        stopped = sorted(FATAL.intersection(counts()))
+        if stopped:
+            raise AssertionError('Automatic paste stopped before %s: %s' % (description, ', '.join(stopped)))
         pump(.05)
-    raise AssertionError('Timed out waiting for ' + description)
+    raise AssertionError('Timed out waiting for %s; last trace events: %s' % (description, [x.get('event') for x in traces()[-8:]]))
+
+def play(description):
+    player = subprocess.Popen([os.environ['VOCO_NATIVE_PAPLAY'], '--device=fixture', str(sound)])
+    wait_for(lambda: player.poll() is not None, description)
+    assert player.returncode == 0, 'paplay failed during ' + description
+
+paste_activity = dict(counts=None, t=t0)
+def quiet(seconds):
+    """No paste requested, in flight or landing: paste counts and fields unchanged for `seconds`."""
+    c = counts()
+    now = time.monotonic()
+    observed = (c['dictation_desktop_paste_requested'], c['dictation_desktop_paste_dispatched'], c['dictation_desktop_paste_deferred'])
+    if observed != paste_activity['counts']:
+        paste_activity.update(counts=observed, t=now)
+    latest = max([paste_activity['t']] + [m['t'] for m in mutations])
+    return observed[0] <= observed[1] + observed[2] and now - latest >= seconds
+
+focus_log = []
+def note_focus(moment):
+    # Diagnostics only: without a window manager, GTK activity flags may lag X focus.
+    focused = subprocess.run(['xdotool', 'getwindowfocus'], capture_output=True, text=True).stdout.strip()
+    focus_log.append(dict(t=round(time.monotonic() - t0, 3), moment=moment, xFocus=focused, harnessWindow=window_id,
+                          harnessActive=window.is_active(), fieldAFocused=field.has_focus(), fieldBFocused=other.has_focus()))
+
+def app_windows(*flags):
+    found = []
+    for xid in subprocess.run(['xdotool', 'search', *flags, '--pid', str(app.pid)], capture_output=True, text=True).stdout.split():
+        shell = subprocess.run(['xdotool', 'getwindowgeometry', '--shell', xid], capture_output=True, text=True).stdout
+        values = dict(line.split('=', 1) for line in shell.splitlines() if '=' in line)
+        if {'X', 'Y', 'WIDTH', 'HEIGHT'} <= values.keys():
+            found.append(dict(window=xid, x=int(values['X']), y=int(values['Y']), width=int(values['WIDTH']), height=int(values['HEIGHT'])))
+    return found
+
+def popover_shown():
+    # WebKit capture keeps the hidden window mapped at 1x1 off-screen; the popover is far larger.
+    return any(w['width'] * w['height'] >= 40000 for w in app_windows('--onlyvisible'))
+
+def inside(bounds):
+    return any(bounds['x'] >= m['workarea'][0] and bounds['y'] >= m['workarea'][1]
+               and bounds['x'] + bounds['width'] <= m['workarea'][0] + m['workarea'][2]
+               and bounds['y'] + bounds['height'] <= m['workarea'][1] + m['workarea'][3] for m in monitors)
+
+def call(name, path, interface, method, values=None):
+    return tray_bus.call_sync(name, path, interface, method, values, None, Gio.DBusCallFlags.NONE, 2000, None).unpack()
+
+def tray_menus():
+    """Label -> item of the app's exported dbusmenu; an absent 'enabled' property means enabled."""
+    items = {}
+    for name, item_path in tray_items:
+        try:
+            menu = call(name, item_path, 'org.freedesktop.DBus.Properties', 'Get', GLib.Variant('(ss)', ('org.kde.StatusNotifierItem', 'Menu')))[0]
+            pending = [call(name, menu, 'com.canonical.dbusmenu', 'GetLayout', GLib.Variant('(iias)', (0, -1, ['label', 'enabled'])))[1]]
+        except GLib.Error as error:
+            if str(error) not in diagnostic_errors:
+                diagnostic_errors.append(str(error))
+            continue
+        while pending:
+            node_id, props, children = pending.pop()
+            if props.get('label'):
+                items.setdefault(props['label'], dict(name=name, menu=menu, id=node_id, enabled=props.get('enabled', True)))
+            pending.extend(children)
+    return items
+
+def tray_click(label):
+    item = tray_menus()[label]
+    call(item['name'], item['menu'], 'com.canonical.dbusmenu', 'Event', GLib.Variant('(isvu)', (item['id'], 'clicked', GLib.Variant('s', ''), 0)))
+
+def screenshot(name):
+    Gdk.pixbuf_get_from_window(Gdk.get_default_root_window(), 0, 0, 1280, 900).savev(str(root / 'evidence' / name), 'png', [], [])
 
 IBus.init()
 bus = IBus.Bus()
@@ -64,17 +177,24 @@ window.set_default_size(1100, 220)
 box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
 window.add(box)
 field = Gtk.Entry()
-field.set_placeholder_text('A: actual dictated text')
+field.set_placeholder_text('A: focused for the first utterance' if case == 'focus-switch' else 'A: focused for the dictation')
 field.set_input_hints(Gtk.InputHints.SPELLCHECK)
 other = Gtk.Entry()
-other.set_placeholder_text('B: must remain empty')
+other.set_placeholder_text('B: focused for the second utterance' if case == 'focus-switch' else 'B: must remain empty')
 other.set_input_hints(Gtk.InputHints.WORD_COMPLETION)
 box.pack_start(field, False, False, 0)
 box.pack_start(other, False, False, 0)
-mutations = []
-field.connect('changed', lambda entry: mutations.append(dict(t=time.monotonic(), field='A', text=entry.get_text())))
-other.connect('changed', lambda entry: mutations.append(dict(t=time.monotonic(), field='B', text=entry.get_text())))
+mutations, preedits = [], []
+for entry, label in [(field, 'A'), (other, 'B')]:
+    entry.connect('changed', lambda widget, label=label: mutations.append(dict(t=time.monotonic(), field=label, text=widget.get_text())))
+    entry.connect('preedit-changed', lambda widget, preedit, label=label: preedits.append(dict(t=time.monotonic(), field=label, text=preedit)))
 window.show_all()
+display = Gdk.Display.get_default()
+monitors = []
+for index in range(display.get_n_monitors()):
+    monitor = display.get_monitor(index)
+    rect, work = monitor.get_geometry(), monitor.get_workarea()
+    monitors.append(dict(x=rect.x, y=rect.y, width=rect.width, height=rect.height, workarea=[work.x, work.y, work.width, work.height], primary=monitor.is_primary()))
 # Supply the standard tray-host discovery service absent from bare Xvfb.
 # The app still exports its real menu; no app command or capture API is mocked.
 tray_items = []
@@ -97,8 +217,10 @@ pump(.1)
 log = (root / 'evidence/full-app.log').open('w')
 app_hash = hashlib.sha256((root / 'voco').read_bytes()).hexdigest()
 app = subprocess.Popen([str(root / 'voco')], stdout=log, stderr=subprocess.STDOUT, env={**os.environ, 'RUST_LOG': 'info', 'VOCO_DEBUG_CAPTURE_AUDIO': '1', 'VOCO_HOTKEY_TRACE': '1'})
-passed = False
+passed, failure, window_id, before_switch = False, None, None, None
+selections, tray_state, popup, popover, diagnostic_errors = {}, None, None, None, []
 try:
+    assert shutil.which('xclip') and shutil.which('xdotool'), 'X11 paste needs xclip and xdotool on PATH'
     wait_for(lambda: (root / 'runtime/voco.sock').exists(), 'application control socket')
     pump(6)
     window.present()
@@ -110,117 +232,129 @@ try:
     field.grab_focus()
     field.set_position(-1)
     pump(1)
-    started = time.monotonic()
+    assert not mutations and field.get_text() == other.get_text() == '', 'A GTK field changed before dictation'
+    note_focus('before-start')
     subprocess.run(['xdotool', 'key', '--clearmodifiers', 'alt+d'], check=True)
-    wait_for(lambda: any(x.get('event') == 'recording_state_active' for x in traces()), 'actual WebKit capture')
+    wait_for(lambda: counts()['recording_state_active'] > 0, 'actual capture')
+    note_focus('recording')
     pulse_outputs = subprocess.check_output([os.environ['VOCO_NATIVE_PACTL'], 'list', 'source-outputs'], text=True)
     observable_fields = ('Source Output #', 'Driver:', 'Source:', 'Sample Specification:', 'Corked:', 'Mute:', 'application.name =', 'application.process.binary =')
     (root / 'evidence/pulse-source-outputs.txt').write_text('\n'.join(line for line in pulse_outputs.splitlines() if line.strip().startswith(observable_fields)) + '\n')
     pump(.5)
-    sound = repo / 'tests/fixtures/speech/84-121123-0000.wav'
-    player = subprocess.Popen([os.environ['VOCO_NATIVE_PAPLAY'], '--device=fixture', str(sound)])
-    wait_for(lambda: player.poll() is not None, 'fixture playback')
-    assert player.returncode == 0
+    play('fixture playback')
     if case == 'focus-switch':
+        # Streaming pastes A's text before Stop. Switch only after it settles, with no
+        # paste requested, in flight or landing, so each chunk has one recipient; the
+        # second utterance cannot be recognized before the switch, so B must get text.
+        wait_for(lambda: quiet(.5) and bool(field.get_text()), 'streamed text to settle in field A', timeout=15)
+        before_switch = field.get_text()
+        mutations.append(dict(t=time.monotonic(), field='switch', text=None))
         other.grab_focus()
         other.set_position(-1)
+        note_focus('after-switch')
         pump(.3)
+        play('second fixture playback after the focus switch')
     pump(.6)
+    note_focus('before-stop')
     subprocess.run(['xdotool', 'key', '--clearmodifiers', 'alt+d'], check=True)
-    wait_for(lambda: any(x.get('event') == 'dictation_stop_to_idle' for x in traces()), 'successful recording returned to idle', timeout=35)
-    pump(.5)
-    assert field.get_text() == '' and other.get_text() == '', 'Unqualified GTK field received automatic output'
-    assert mutations == [], 'An unqualified target was transiently mutated'
-    events = {x.get('event') for x in traces()}
-    assert 'dictation_transcription_completed' in events or 'dictation_canonical_final_completed' in events, 'Manual result lacks actual recognition proof'
-    assert 'dictation_recovery_retained' not in events, 'Successful manual Copy was incorrectly classified as failure recovery'
-    assert not events.intersection({'dictation_owned_preedit_committed', 'dictation_owned_preedit_progressive_commit', 'dictation_canonical_checkpoint_committed'}), 'Disabled IBus mutation was reported as committed'
+    wait_for(lambda: counts()['dictation_stop_to_idle'] > 0, 'successful recording returned to idle', timeout=35)
+    wait_for(lambda: quiet(.5), 'the last paste to land', timeout=5)
+    note_focus('delivered')
+    screenshot('delivered.png')
+    c = counts()
+    text, other_text = field.get_text(), other.get_text()
+    missing = [event for event in REQUIRED if not c[event]]
+    assert not missing, 'Paste session trace lacks ' + ', '.join(missing)
+    assert not FATAL.intersection(c), 'Automatic paste stopped: ' + ', '.join(sorted(FATAL.intersection(c)))
+    assert not IBUS_MUTATIONS.intersection(c), 'IBus text mutation was traced: ' + ', '.join(sorted(IBUS_MUTATIONS.intersection(c)))
+    assert not any(p['text'] for p in preedits), 'A GTK field showed IBus preedit text'
+    changes = [m for m in mutations if m['field'] in ('A', 'B')]
+    for label in ('A', 'B'):
+        history = [''] + [m['text'] for m in changes if m['field'] == label]
+        assert all(after.startswith(before) and len(after) > len(before) for before, after in zip(history, history[1:])), 'Field %s changed other than by appended paste' % label
+    # xdotool sends at most one joining Space and one Shift+Insert per dispatched chunk.
+    assert len(changes) <= 2 * c['dictation_desktop_paste_dispatched'], 'Fields changed more often than VOCO dispatched pastes'
+    if case == 'delivery':
+        assert other_text == '' and not any(m['field'] == 'B' for m in changes), 'Unfocused field B received text'
+        assert words(text) == expected, 'Focused field A did not receive the dictation exactly once: %r' % text
+    else:
+        switch = next(index for index, m in enumerate(mutations) if m['field'] == 'switch')
+        assert text == before_switch and all(index < switch for index, m in enumerate(mutations) if m['field'] == 'A'), 'Field A changed after focus moved to B'
+        assert all(index > switch for index, m in enumerate(mutations) if m['field'] == 'B'), 'Field B changed before it had focus'
+        assert other_text, 'Nothing was pasted into B after focus moved to it'
+        # Concatenate unseparated: a chunk boundary may fall inside a word.
+        assert words(text + other_text) == expected, 'Fields A+B did not receive both utterances exactly once: %r + %r' % (text, other_text)
+    last = changes[-1]
+    history = [''] + [m['text'] for m in changes if m['field'] == last['field']]
+    selections = dict(lastPaste=last['text'][len(history[-2]):], clipboard=Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD).wait_for_text(),
+                      primary=Gtk.Clipboard.get(Gdk.SELECTION_PRIMARY).wait_for_text())
+    assert selections['clipboard'] == selections['lastPaste'], 'CLIPBOARD does not hold the last pasted chunk'
+    assert selections['primary'] == selections['lastPaste'], 'PRIMARY does not hold the last pasted chunk'
+    # Success leaves nothing to copy or review: the tray and popover return to Ready.
+    wait_for(lambda: any(label.startswith('VOCO — Ready') for label in tray_menus()), 'the tray to report Ready', timeout=5)
+    menus = tray_menus()
+    tray_state = dict(status=[label for label in menus if label.startswith('VOCO — ')], openEnabled=menus.get('Open VOCO', {}).get('enabled'))
+    assert tray_state['openEnabled'], 'The tray has no enabled Open VOCO item after dictation'
+    tray_click('Open VOCO')
+    wait_for(popover_shown, 'the tray to open the popover', timeout=10)
+    pump(1)
+    popup = max(app_windows('--onlyvisible'), key=lambda w: w['width'] * w['height'])
+    assert inside(popup), 'The popover extends outside its workarea'
+    probe = subprocess.Popen(['/usr/bin/python3', str(Path(__file__).with_name('test-native-recovery-controls.py'))], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    wait_for(lambda: probe.poll() is not None, 'the popover accessibility probe', timeout=30)
+    output, errors = probe.communicate()
+    assert probe.returncode == 0, errors.strip() or 'The popover accessibility probe failed'
+    popover = json.loads(output)
+    assert popover['ready'], 'The popover is not Ready after a pasted dictation'
+    assert not popover['forbidden'], 'The popover presents failure, recovery or Copy UI after success: ' + ', '.join(popover['forbidden'])
+    for name, anchor in popover['anchors'].items():
+        assert anchor['enabled'] and anchor['showing'] and inside(anchor), 'Popover control %s is disabled, hidden or outside its workarea' % name
+    screenshot('popover.png')
     passed = True
+except Exception as error:
+    failure = '%s: %s' % (type(error).__name__, error)
+    raise
 finally:
-    # Open this isolated app via its real tray before exercising manual Copy.
+    # Show the app's state in the final screenshot when the gate stopped earlier.
     try:
-        connection = Gio.bus_get_sync(Gio.BusType.SESSION, None)
-        def call(name, path, interface, method, values=None):
-            return connection.call_sync(name, path, interface, method, values, None, Gio.DBusCallFlags.NONE, 2000, None).unpack()
-        names = call('org.freedesktop.DBus', '/org/freedesktop/DBus', 'org.freedesktop.DBus', 'ListNames')[0]
-        (root / 'evidence/private-bus-names.json').write_text(json.dumps(names))
-        for name, item_path in tray_items:
-            menu = call(name, item_path, 'org.freedesktop.DBus.Properties', 'Get', GLib.Variant('(ss)', ('org.kde.StatusNotifierItem', 'Menu')))[0]
-            layout = call(name, menu, 'com.canonical.dbusmenu', 'GetLayout', GLib.Variant('(iias)', (0, -1, ['label'])))[1]
-            def find(node):
-                node_id, props, children = node
-                if props.get('label') == 'Open VOCO':
-                    return node_id
-                for child in children:
-                    found = find(child)
-                    if found is not None:
-                        return found
-            item_id = find(layout)
-            if item_id is not None:
-                call(name, menu, 'com.canonical.dbusmenu', 'Event', GLib.Variant('(isvu)', (item_id, 'clicked', GLib.Variant('s', ''), 0)))
-                pump(.5)
-    except Exception as diagnostic_error:
-        (root / 'evidence/popover-diagnostic-error.txt').write_text(str(diagnostic_error))
-    display = Gdk.Display.get_default()
-    monitor_geometry = []
-    for index in range(display.get_n_monitors()):
-        monitor = display.get_monitor(index)
-        rect = monitor.get_geometry()
-        work = monitor.get_workarea()
-        monitor_geometry.append(dict(x=rect.x, y=rect.y, width=rect.width, height=rect.height, workarea=[work.x, work.y, work.width, work.height], primary=monitor.is_primary()))
-    app_windows = subprocess.check_output(['xdotool', 'search', '--pid', str(app.pid)], text=True).splitlines()
-    window_geometry = [subprocess.check_output(['xdotool', 'getwindowgeometry', '--shell', window_id], text=True) for window_id in app_windows]
-    (root / 'evidence/window-geometry.json').write_text(json.dumps(dict(monitors=monitor_geometry, hasPrimaryMonitor=display.get_primary_monitor() is not None, windows=window_geometry), indent=2))
-    recovery_controls = None
-    if passed:
+        if popover is None and app.poll() is None and not popover_shown() and tray_menus().get('Open VOCO', {}).get('enabled'):
+            tray_click('Open VOCO')
+            pump(1)
+    except Exception as error:
+        diagnostic_errors.append('tray: %s' % error)
+    for name, evidence in [('private-bus-names.json', lambda: call('org.freedesktop.DBus', '/org/freedesktop/DBus', 'org.freedesktop.DBus', 'ListNames')[0]),
+                           ('window-geometry.json', lambda: dict(monitors=monitors, hasPrimaryMonitor=display.get_primary_monitor() is not None, windows=app_windows()))]:
         try:
-            app_bounds = [dict(line.split('=', 1) for line in data.splitlines()) for data in window_geometry]
-            popup = next(bounds for bounds in app_bounds if int(bounds['WIDTH']) >= 400 and int(bounds['HEIGHT']) >= 500)
-            def inside(x, y, width, height):
-                return any(x >= m['workarea'][0] and y >= m['workarea'][1] and x + width <= m['workarea'][0] + m['workarea'][2] and y + height <= m['workarea'][1] + m['workarea'][3] for m in monitor_geometry)
-            assert inside(*(int(popup[key]) for key in ['X', 'Y', 'WIDTH', 'HEIGHT'])), 'Manual Copy window extends outside its workarea'
-            probe = subprocess.Popen(['/usr/bin/python3', str(Path(__file__).with_name('test-native-recovery-controls.py'))], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-            wait_for(lambda: probe.poll() is not None, 'accessible normal Copy control', timeout=8)
-            output, errors = probe.communicate()
-            assert probe.returncode == 0, errors
-            recovery_controls = json.loads(output)
-            assert recovery_controls['manualReady'] and recovery_controls['clearTranscriptAvailable'], 'Successful transcript is not presented as normal manual Copy'
-            assert not recovery_controls['recoveryActions'], 'Successful manual transcript exposes failure recovery actions'
-            assert recovery_controls['enabled'] and recovery_controls['showing'], 'Copy control disabled or hidden'
-            assert inside(*(recovery_controls[key] for key in ['x', 'y', 'width', 'height'])), 'Copy control lies outside workarea'
-            before_copy = Gdk.pixbuf_get_from_window(Gdk.get_default_root_window(), 0, 0, 1280, 900)
-            before_copy.savev(str(root / 'evidence/recovery-before-copy.png'), 'png', [], [])
-            if os.environ.get('VOCO_NATIVE_PAINT_TIMELINE') == '1':
-                for index, delay in enumerate([.1, .5, 1.5]):
-                    pump(delay)
-                    frame = Gdk.pixbuf_get_from_window(Gdk.get_default_root_window(), 0, 0, 1280, 900)
-                    frame.savev(str(root / 'evidence' / f'before-interaction-{index}.png'), 'png', [], [])
-            Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD).set_text('VOCO private clipboard sentinel', -1)
-            pump(.05)
-            subprocess.run(['xdotool', 'mousemove', str(recovery_controls['x'] + recovery_controls['width']//2), str(recovery_controls['y'] + recovery_controls['height']//2), 'click', '1'], check=True)
-            pump(.4)
-            copied = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD).wait_for_text()
-            assert copied and re.findall('[a-z]+', copied.lower()) == ['go', 'do', 'you', 'hear'], 'Normal Copy did not populate the private clipboard'
-            recovery_controls['copiedText'] = copied
-            assert field.get_text() == '' and other.get_text() == '' and mutations == [], 'Copy action mutated a destination field'
-        except Exception as control_error:
-            passed = False
-            (root / 'evidence/recovery-control-error.txt').write_text(str(control_error))
-    report = dict(passed=passed, expectedOutcome="normal-manual-copy", manualCopyControls=recovery_controls, callbackTraceInstrumented=os.environ.get('VOCO_NATIVE_TRACE') == '1', case=case, outputMode=os.environ.get('VOCO_NATIVE_OUTPUT_MODE', 'final-text-only'), buildRole=os.environ.get('VOCO_NATIVE_BUILD_ROLE', 'preflight'),
+            (root / 'evidence' / name).write_text(json.dumps(evidence(), indent=2) + '\n')
+        except Exception as error:
+            diagnostic_errors.append('%s: %s' % (name, error))
+    c = counts()
+    capture = 'webkit-audio-worklet' if c['recording_worklet_connected'] else 'webkit-script-processor' if c['recording_script_processor_connected'] else 'native' if c['recording_state_active'] else None
+    report = dict(passed=passed, failure=failure, expectedOutcome='pasted-into-focused-field', case=case,
+                  outputMode=os.environ.get('VOCO_NATIVE_OUTPUT_MODE', 'final-text-only'), buildRole=os.environ.get('VOCO_NATIVE_BUILD_ROLE', 'preflight'),
+                  callbackTraceInstrumented=os.environ.get('VOCO_NATIVE_TRACE') == '1', expectedWords=expected,
+                  text=field.get_text(), otherText=other.get_text(), textBeforeSwitch=before_switch,
+                  mutations=[dict(m, t=round(m['t'] - t0, 3)) for m in mutations], preedits=[dict(p, t=round(p['t'] - t0, 3)) for p in preedits],
+                  selections=selections, traceCounts=dict(sorted(c.items())), captureRoute=capture, focus=focus_log, harnessWindow=window_id,
+                  tray=tray_state, popoverWindow=popup, popover=popover, helpers={name: bool(shutil.which(name)) for name in ['xclip', 'xdotool']},
+                  diagnosticErrors=diagnostic_errors,
                   engineSourceHashes={p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in root.glob('voco_ibus_*.py')},
-                  fixtureSha256=hashlib.sha256((repo / 'tests/fixtures/speech/84-121123-0000.wav').read_bytes()).hexdigest(),
+                  fixtureSha256=hashlib.sha256(sound.read_bytes()).hexdigest(),
                   appSha256=app_hash,
                   modelSha256=hashlib.sha256(model.read_bytes()).hexdigest(),
-                  text=field.get_text(), otherText=other.get_text(), mutations=mutations,
-                  boundary='real WebKit capture / private PulseAudio fixture / Tauri binary IPC / pinned Nemotron / disabled IBus mutation / actual Copy control / private clipboard')
+                  boundary=' / '.join([{'webkit-audio-worklet': 'real WebKit capture', 'native': 'real native capture'}.get(capture, 'capture not established'),
+                                       'private PulseAudio fixture', 'Tauri binary IPC', 'pinned Nemotron', 'xclip CLIPBOARD+PRIMARY',
+                                       'xdotool Shift+Insert into the focused GTK entry', 'no IBus text mutation', 'private X11 without a window manager']))
     (root / 'evidence/full-app.json').write_text(json.dumps(report, indent=2) + '\n')
     debug_captures = root / 'state/voco/debug-captures'
     if debug_captures.exists():
         shutil.copytree(debug_captures, root / 'evidence/debug-captures', dirs_exist_ok=True)
     if trace_path.exists():
         shutil.copyfile(trace_path, root / 'evidence/full-app-trace.jsonl')
-    pixbuf = Gdk.pixbuf_get_from_window(Gdk.get_default_root_window(), 0, 0, 1280, 900)
-    pixbuf.savev(str(root / 'evidence/full-app.png'), 'png', [], [])
+    try:
+        screenshot('full-app.png')
+    except Exception as error:
+        print('Final screenshot failed: %s' % error)
     app.terminate()
     try:
         app.wait(timeout=5)
@@ -233,4 +367,4 @@ finally:
     log.close()
     print(json.dumps(report, indent=2))
 
-assert passed, 'Native application acceptance failed; inspect the retained evidence'
+assert passed, 'Native application paste acceptance failed; inspect the retained evidence'

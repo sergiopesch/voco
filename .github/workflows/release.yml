@@ -59,7 +59,7 @@ jobs:
             libayatana-appindicator3-dev clang mold cmake file wget \
             desktop-file-utils appstream ripgrep \
             ibus ibus-gtk3 python3 python3-numpy python3-psutil python3-gi gir1.2-ibus-1.0 bubblewrap \
-            xvfb xdotool gir1.2-gtk-3.0 gir1.2-webkit2-4.1 gir1.2-atspi-2.0 at-spi2-core \
+            xvfb xdotool xclip gir1.2-gtk-3.0 gir1.2-webkit2-4.1 gir1.2-atspi-2.0 at-spi2-core \
             pulseaudio pulseaudio-utils libpulse-dev gstreamer1.0-plugins-good \
             weston libweston-13-0 wayland-utils gir1.2-gtk-4.0 gir1.2-webkit-6.0
 
@@ -174,7 +174,7 @@ jobs:
           echo "VOCO_BROWSER_HOST_BINARY=${CANDIDATE_DIR}/usr/libexec/voco-browser-host" >> "$GITHUB_ENV"
           echo "VOCO_BROWSER_EXTENSION_DIR=${CANDIDATE_DIR}/usr/share/voco/chromium" >> "$GITHUB_ENV"
 
-      - name: Native application capture and manual Copy
+      - name: Native application capture and paste into the focused field
         timeout-minutes: 5
         env:
           VOCO_NATIVE_BUILD_ROLE: packaged-candidate

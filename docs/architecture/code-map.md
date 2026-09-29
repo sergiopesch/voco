@@ -44,7 +44,8 @@ recognizer serves desktop, browser and onboarding sessions. See
    A `no-mutation` paste typed nothing, so its text stays pending for the next
    hypothesis or bounded Stop retries. An uncertain or rejected paste disables
    insertion while recognition continues through Stop, which copies the
-   undelivered remainder to the clipboard and notifies. Recognition/transport
+   undelivered remainder to the clipboard and notifies; if that copy fails,
+   `CrashJournal.keep` moves the session's text into Review. Recognition/transport
    failure still stops queue admission. Handled cursor failures notify, clear
    text/audio at Stop and return to a nonblocking idle state. Onboarding retains
    its local test retry path.
@@ -66,7 +67,8 @@ recognizer serves desktop, browser and onboarding sessions. See
    dictation clears all transcript/audio state. `crashRecovery.ts` serializes text-only
    checkpoints to `src-tauri/src/crash_recovery.rs`, which owns private atomic files
    under the user's state directory. Clean completion removes the active checkpoint;
-   startup promotes an unfinished prior checkpoint into crash-only Review. No audio
+   startup promotes an unfinished prior checkpoint into Review, and
+   `keep_crash_journal` does the same for a Stop that could neither paste nor copy. No audio
    is persisted. `CrashReview.tsx` opens only on explicit `voco:open-review`, with
    copy and discard but no delivery/retranscription action. Cancelled or old callbacks
    cannot update a replacement session.

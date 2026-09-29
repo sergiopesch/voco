@@ -101,7 +101,7 @@ export function CrashReview({ onClose, onOpenSettings }: {
         </section>
       </div>
       <footer className="voco-review__footer">
-        <div className="voco-review__feedback">{error ? <p role="alert">{error}</p> : <p role="status">{feedback ?? "Recovered after an unexpected exit."}</p>}</div>
+        <div className="voco-review__feedback">{error ? <p role="alert">{error}</p> : <p role="status">{feedback ?? "Kept until you discard it."}</p>}</div>
         <div className="voco-review__actions">
           {confirmDiscard ? <><span>Discard this transcript?</span><button className="voco-button voco-button--ghost" disabled={busy} onClick={() => setConfirmDiscard(false)}>Keep</button><button className="voco-button voco-button--secondary" disabled={busy} onClick={() => void discard()}>Discard transcript</button></> : <>
             <button className="voco-button voco-button--ghost" disabled={busy} onClick={() => setConfirmDiscard(true)}>Discard</button>

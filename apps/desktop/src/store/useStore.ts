@@ -6,7 +6,6 @@ import type {
   AppSurface,
   AudioDeviceOption,
   DictationStatus,
-  DictationResult,
   RecoverableTranscript,
   MicrophonePermission,
   OwnedPreeditStatus,
@@ -46,7 +45,6 @@ interface AppState {
   transcript: string;
   rawTranscript: string;
   recoverableTranscripts: RecoverableTranscript[];
-  lastDictationResult: DictationResult | null;
   interimTranscript: string;
   error: string | null;
   recovery: DictationRecovery | null;
@@ -69,7 +67,6 @@ interface AppState {
   setRawTranscript: (transcript: string) => void;
   retainRecoverableTranscript: (entry: Omit<RecoverableTranscript, "createdAt">) => void;
   dismissRecoverableTranscript: (id: string) => void;
-  setLastDictationResult: (result: DictationResult | null) => void;
   setInterimTranscript: (interim: string) => void;
   setError: (error: string | null) => void;
   setAudioLevel: (level: number) => void;
@@ -107,7 +104,6 @@ export const useStore = create<AppState>((set) => ({
   transcript: "",
   rawTranscript: "",
   recoverableTranscripts: [],
-  lastDictationResult: null,
   interimTranscript: "",
   error: null,
   recovery: null,
@@ -148,7 +144,6 @@ export const useStore = create<AppState>((set) => ({
   dismissRecoverableTranscript: (id) => set((state) => ({
     recoverableTranscripts: state.recoverableTranscripts.filter((entry) => entry.id !== id),
   })),
-  setLastDictationResult: (lastDictationResult) => set({ lastDictationResult }),
   setInterimTranscript: (interim) => set({ interimTranscript: interim }),
   setError: (error) => set({ error }),
   setAudioLevel: (level) => set({ audioLevel: level }),
