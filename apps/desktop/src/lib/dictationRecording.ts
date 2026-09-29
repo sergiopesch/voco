@@ -76,7 +76,6 @@ export interface DictationRecordingEnv {
   initialHotkeyLatencyLoggedRef: Ref<boolean>;
   debugNativeCaptureEnabledRef: Ref<boolean>;
   audioBufferRef: Ref<AudioCaptureBuffer>;
-  cursorDeliveryStateRef: Ref<string>;
   lifecycleEpochRef: Ref<number>;
   audioContextRef: Ref<AudioContext | null>;
   primedStreamRef: Ref<MediaStream | null>;
@@ -150,7 +149,6 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     initialHotkeyLatencyLoggedRef,
     debugNativeCaptureEnabledRef,
     audioBufferRef,
-    cursorDeliveryStateRef,
     lifecycleEpochRef,
     audioContextRef,
     primedStreamRef,
@@ -266,7 +264,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       reason,
       audioAvailable: keepAudio && audioBufferRef.current.sampleCount > 0,
       retrying: false,
-      targetMayContainText: desktopPhrasePasteCountRef.current > 0 || cursorDeliveryStateRef.current === "unreconciled",
+      targetMayContainText: desktopPhrasePasteCountRef.current > 0,
     });
     phaseRef.current = "error";
     sessionRef.current = failSession(sessionRef.current);

@@ -38,20 +38,11 @@ export interface ConfigSnapshot {
 
 export type DictationStatus = "idle" | "starting" | "recording" | "processing" | "error";
 
-export interface RecoverableTranscript {
-  id: string;
-  text: string;
-  createdAt: number;
-  reason: "delivery-unconfirmed" | "output-failed";
-  isPartial: boolean;
-}
+export type CursorDeliveryState = "inactive" | "owned";
 
-export type CursorDeliveryState =
-  | "inactive"
-  | "pending"
-  | "owned"
-  | "preview-only"
-  | "unreconciled";
+/** "" means desktop-input diagnostics have not loaded yet; the tray shows its
+ * initializing presentation for it, not setup needed. */
+export type CursorSetupState = "ready" | "not-enabled" | "";
 
 export type AppSurface = "hidden" | "onboarding" | "settings" | "popover" | "review";
 
@@ -185,7 +176,6 @@ export interface RuntimeStatusSnapshot {
   epoch: number;
   revision: number;
   runtimeInitialized: boolean;
-  hasRecoverableTranscript: boolean;
   configurationError: boolean;
   microphoneReady: boolean;
   microphonePermission: MicrophonePermission;
@@ -194,7 +184,5 @@ export interface RuntimeStatusSnapshot {
   dictationSessionId?: number;
   cursorDelivery: CursorDeliveryState;
   cursorRequired: boolean;
-  cursorSetupState: OwnedPreeditStatus["setupState"];
-  manualTranscriptReady: boolean;
-  recoveryAvailable: boolean;
+  cursorSetupState: CursorSetupState;
 }

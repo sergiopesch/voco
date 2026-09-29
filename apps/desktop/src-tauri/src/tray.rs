@@ -23,15 +23,12 @@ pub struct TrayState {
     pub hotkey_items: Vec<(String, MenuItem<tauri::Wry>)>,
     pub dictation_status: DictationStatus,
     pub dictation_session_id: u64,
-    pub has_recoverable_transcript: bool,
     pub microphone_ready: bool,
     pub microphone_permission: MicrophonePermission,
     pub native_microphone_ready: Option<bool>,
     pub cursor_delivery: CursorDeliveryState,
     pub cursor_required: bool,
     pub cursor_setup_state: String,
-    pub manual_transcript_ready: bool,
-    pub recovery_available: bool,
     pub configuration_error: bool,
     pub model_download_status: ModelDownloadStatus,
     pub runtime_initialized: bool,
@@ -62,10 +59,7 @@ pub enum DictationStatus {
 #[serde(rename_all = "kebab-case")]
 pub enum CursorDeliveryState {
     Inactive,
-    Pending,
     Owned,
-    PreviewOnly,
-    Unreconciled,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Default, Deserialize)]
@@ -99,14 +93,9 @@ pub struct RuntimeStatusSnapshot {
     pub dictation_status: DictationStatus,
     #[serde(default)]
     pub dictation_session_id: u64,
-    #[serde(default)]
-    pub has_recoverable_transcript: bool,
     pub cursor_delivery: CursorDeliveryState,
     pub cursor_required: bool,
     pub cursor_setup_state: String,
-    pub manual_transcript_ready: bool,
-    #[serde(default)]
-    pub recovery_available: bool,
     #[serde(skip)]
     model_download_status: ModelDownloadStatus,
 }
@@ -123,12 +112,9 @@ impl Default for RuntimeStatusSnapshot {
             native_microphone_ready: None,
             dictation_status: DictationStatus::Idle,
             dictation_session_id: 0,
-            has_recoverable_transcript: false,
             cursor_delivery: CursorDeliveryState::Inactive,
             cursor_required: false,
             cursor_setup_state: String::new(),
-            manual_transcript_ready: false,
-            recovery_available: false,
             model_download_status: ModelDownloadStatus::Checking,
         }
     }
@@ -205,25 +191,15 @@ fn derive_tray_presentation(snapshot: &RuntimeStatusSnapshot) -> TrayPresentatio
                 "VOCO — Starting microphone".to_string(),
             ),
             DictationStatus::Recording => {
-                if !snapshot.cursor_required
-                    || snapshot.cursor_delivery == CursorDeliveryState::Inactive
+                if snapshot.cursor_required
+                    && snapshot.cursor_delivery == CursorDeliveryState::Owned
                 {
-                    (TrayVisualState::Recording, "VOCO — Listening".to_string())
-                } else if matches!(snapshot.cursor_delivery, CursorDeliveryState::Owned) {
                     (
                         TrayVisualState::Recording,
                         "VOCO — Listening · target verified".to_string(),
                     )
-                } else if matches!(snapshot.cursor_delivery, CursorDeliveryState::Pending) {
-                    (
-                        TrayVisualState::Recording,
-                        "VOCO — Listening · preparing target".to_string(),
-                    )
                 } else {
-                    (
-                        TrayVisualState::Recording,
-                        "VOCO — Listening · text delivery stopped".to_string(),
-                    )
+                    (TrayVisualState::Recording, "VOCO — Listening".to_string())
                 }
             }
             DictationStatus::Processing => (
@@ -252,9 +228,7 @@ fn derive_tray_presentation(snapshot: &RuntimeStatusSnapshot) -> TrayPresentatio
                 )
             }
             DictationStatus::Idle
-                if snapshot.cursor_required
-                    && snapshot.cursor_setup_state != "ready"
-                    && snapshot.cursor_setup_state != "safety-disabled" =>
+                if snapshot.cursor_required && snapshot.cursor_setup_state != "ready" =>
             {
                 (
                     TrayVisualState::NotReady,
@@ -387,12 +361,9 @@ fn runtime_snapshot_from_tray_state(tray_state: &TrayState) -> RuntimeStatusSnap
         native_microphone_ready: tray_state.native_microphone_ready,
         dictation_status: tray_state.dictation_status,
         dictation_session_id: tray_state.dictation_session_id,
-        has_recoverable_transcript: tray_state.has_recoverable_transcript,
         cursor_delivery: tray_state.cursor_delivery,
         cursor_required: tray_state.cursor_required,
         cursor_setup_state: tray_state.cursor_setup_state.clone(),
-        manual_transcript_ready: tray_state.manual_transcript_ready,
-        recovery_available: tray_state.recovery_available,
         model_download_status: tray_state.model_download_status,
     }
 }
@@ -571,15 +542,12 @@ pub fn setup_tray(app: &tauri::App, hotkey_label: &str) -> Result<(), Box<dyn st
         hotkey_items,
         dictation_status: DictationStatus::Idle,
         dictation_session_id: 0,
-        has_recoverable_transcript: false,
         microphone_ready: false,
         microphone_permission: MicrophonePermission::Unknown,
         native_microphone_ready: None,
         cursor_delivery: CursorDeliveryState::Inactive,
         cursor_required: false,
         cursor_setup_state: String::new(),
-        manual_transcript_ready: false,
-        recovery_available: false,
         configuration_error: false,
         model_download_status: ModelDownloadStatus::Checking,
         runtime_initialized: false,
@@ -645,12 +613,9 @@ pub fn update_runtime_status(app: &tauri::AppHandle, snapshot: RuntimeStatusSnap
     tray_state.native_microphone_ready = snapshot.native_microphone_ready;
     tray_state.dictation_status = snapshot.dictation_status;
     tray_state.dictation_session_id = snapshot.dictation_session_id;
-    tray_state.has_recoverable_transcript = snapshot.has_recoverable_transcript;
     tray_state.cursor_delivery = snapshot.cursor_delivery;
     tray_state.cursor_required = snapshot.cursor_required;
     tray_state.cursor_setup_state = snapshot.cursor_setup_state;
-    tray_state.manual_transcript_ready = snapshot.manual_transcript_ready;
-    tray_state.recovery_available = snapshot.recovery_available;
     tray_state.configuration_error = snapshot.configuration_error;
     tray_state.runtime_initialized = snapshot.runtime_initialized;
     drop(tray_state);
@@ -866,12 +831,9 @@ pub fn begin_runtime_status_session(app: &tauri::AppHandle) -> Result<u64, Strin
     tray_state.native_microphone_ready = None;
     tray_state.dictation_status = DictationStatus::Idle;
     tray_state.dictation_session_id = 0;
-    tray_state.has_recoverable_transcript = false;
     tray_state.cursor_delivery = CursorDeliveryState::Inactive;
     tray_state.cursor_required = false;
     tray_state.cursor_setup_state.clear();
-    tray_state.manual_transcript_ready = false;
-    tray_state.recovery_available = false;
     tray_state.configuration_error = false;
     tray_state.runtime_initialized = false;
     let epoch = tray_state.runtime_epoch;
@@ -1077,7 +1039,6 @@ mod tests {
             assert_eq!(panel["token"], "4:9");
         }
         snapshot.dictation_status = DictationStatus::Idle;
-        snapshot.recovery_available = true;
         snapshot.native_microphone_ready = Some(false);
         let panel = panel_presentation(&snapshot);
         assert_eq!(panel["status"], "attention");
@@ -1195,7 +1156,6 @@ mod tests {
             microphone_ready: true,
             microphone_permission: MicrophonePermission::Granted,
             cursor_setup_state: "ready".to_string(),
-            manual_transcript_ready: false,
             model_download_status: ModelDownloadStatus::Ready,
             runtime_initialized: true,
             ..RuntimeStatusSnapshot::default()
@@ -1243,9 +1203,8 @@ mod tests {
     }
 
     #[test]
-    fn retained_transcript_does_not_replace_dictation_with_review() {
+    fn start_follows_settings_and_microphone_at_idle_and_error() {
         let mut snapshot = ready_snapshot();
-        snapshot.manual_transcript_ready = true;
         for status in [DictationStatus::Idle, DictationStatus::Error] {
             snapshot.dictation_status = status;
             for unavailable in [false, true] {
@@ -1271,11 +1230,6 @@ mod tests {
                 assert!(presentation.settings_enabled);
             }
         }
-        snapshot.manual_transcript_ready = false;
-        assert_eq!(
-            derive_tray_presentation(&snapshot).dictation_action,
-            TrayDictationAction::Ignore
-        );
         snapshot = ready_snapshot();
         assert_eq!(
             derive_tray_presentation(&snapshot).dictation_action,
@@ -1288,9 +1242,8 @@ mod tests {
     }
 
     #[test]
-    fn pending_transcript_does_not_override_active_or_uninitialized_tray_actions() {
+    fn dictation_action_follows_capture_and_runtime_state() {
         let mut snapshot = ready_snapshot();
-        snapshot.manual_transcript_ready = true;
         snapshot.dictation_status = DictationStatus::Recording;
         let recording = derive_tray_presentation(&snapshot);
         assert_eq!(recording.dictation_label, "Stop Dictation");
@@ -1315,7 +1268,6 @@ mod tests {
     #[test]
     fn review_menu_remains_available_without_microphone_or_valid_settings() {
         let mut snapshot = ready_snapshot();
-        snapshot.recovery_available = true;
         snapshot.configuration_error = true;
         snapshot.native_microphone_ready = Some(false);
         snapshot.microphone_permission = MicrophonePermission::Denied;
@@ -1329,7 +1281,6 @@ mod tests {
             assert!(!presentation.popover_enabled);
             assert!(!presentation.dictation_enabled);
         }
-        snapshot.recovery_available = false;
         snapshot.runtime_initialized = false;
         assert!(derive_tray_presentation(&snapshot).settings_enabled);
         assert_eq!(panel_presentation(&snapshot)["canOpen"], true);
@@ -1358,9 +1309,8 @@ mod tests {
     }
 
     #[test]
-    fn review_availability_does_not_replace_ready_presentation() {
+    fn recording_visual_returns_to_ready_at_idle() {
         let mut snapshot = ready_snapshot();
-        snapshot.has_recoverable_transcript = true;
         assert_eq!(
             derive_tray_presentation(&snapshot).visual_state,
             TrayVisualState::Ready
@@ -1379,16 +1329,10 @@ mod tests {
             derive_tray_presentation(&snapshot).visual_state,
             TrayVisualState::Ready
         );
-        snapshot.has_recoverable_transcript = false;
-        snapshot.cursor_delivery = CursorDeliveryState::Inactive;
-        assert_eq!(
-            derive_tray_presentation(&snapshot).visual_state,
-            TrayVisualState::Ready
-        );
     }
 
     #[test]
-    fn recording_distinguishes_owned_cursor_from_preview_fallback() {
+    fn recording_reports_a_verified_target_only_when_owned() {
         let mut snapshot = ready_snapshot();
         snapshot.dictation_status = DictationStatus::Recording;
         snapshot.cursor_required = true;
@@ -1400,13 +1344,11 @@ mod tests {
         assert!(!owned.settings_enabled);
         assert!(!owned.hotkey_menu_enabled);
 
-        snapshot.cursor_delivery = CursorDeliveryState::PreviewOnly;
-        let preview = derive_tray_presentation(&snapshot);
-        assert_eq!(preview.tooltip, "VOCO — Listening · text delivery stopped");
-
-        snapshot.cursor_delivery = CursorDeliveryState::Pending;
-        let pending = derive_tray_presentation(&snapshot);
-        assert_eq!(pending.tooltip, "VOCO — Listening · preparing target");
+        snapshot.cursor_required = false;
+        assert_eq!(
+            derive_tray_presentation(&snapshot).tooltip,
+            "VOCO — Listening"
+        );
     }
 
     #[test]
@@ -1450,19 +1392,13 @@ mod tests {
     }
 
     #[test]
-    fn cursor_setup_and_unreconciled_transcript_are_visible_at_idle() {
+    fn cursor_setup_is_visible_at_idle() {
         let mut snapshot = ready_snapshot();
         snapshot.cursor_required = true;
         snapshot.cursor_setup_state = "incompatible".to_string();
         let setup = derive_tray_presentation(&snapshot);
         assert_eq!(setup.visual_state, TrayVisualState::NotReady);
         assert!(setup.tooltip.contains("Text delivery needs setup"));
-
-        snapshot.cursor_delivery = CursorDeliveryState::Unreconciled;
-        snapshot.has_recoverable_transcript = true;
-        let unreconciled = derive_tray_presentation(&snapshot);
-        assert_eq!(unreconciled.visual_state, TrayVisualState::NotReady);
-        assert!(unreconciled.tooltip.contains("Text delivery needs setup"));
     }
 
     #[test]
@@ -1514,7 +1450,7 @@ mod tests {
 
     #[test]
     fn runtime_snapshot_deserializes_frontend_permission_state() {
-        let snapshot: RuntimeStatusSnapshot = serde_json::from_value(serde_json::json!({
+        let mut payload = serde_json::json!({
             "epoch": 8,
             "revision": 13,
             "runtimeInitialized": true,
@@ -1524,28 +1460,46 @@ mod tests {
             "dictationStatus": "idle",
             "cursorDelivery": "inactive",
             "cursorRequired": false,
-            "cursorSetupState": "ready",
-            "manualTranscriptReady": false
-        }))
-        .expect("frontend runtime snapshot should deserialize");
+            "cursorSetupState": "ready"
+        });
+        let snapshot: RuntimeStatusSnapshot = serde_json::from_value(payload.clone())
+            .expect("frontend runtime snapshot should deserialize");
 
         assert!(snapshot.runtime_initialized);
         assert_eq!(snapshot.microphone_permission, MicrophonePermission::Denied);
-        assert!(!snapshot.recovery_available);
-        let recovery: RuntimeStatusSnapshot = serde_json::from_value(serde_json::json!({
-            "epoch": 8, "revision": 14, "runtimeInitialized": true,
-            "configurationError": false, "microphoneReady": false,
-            "microphonePermission": "denied", "dictationStatus": "error",
-            "cursorDelivery": "inactive", "cursorRequired": false,
-            "cursorSetupState": "ready", "manualTranscriptReady": false,
-            "recoveryAvailable": true
-        }))
-        .expect("retained recovery status should deserialize");
-        assert!(recovery.recovery_available);
+        payload["dictationStatus"] = "error".into();
+        let failed: RuntimeStatusSnapshot = serde_json::from_value(payload.clone())
+            .expect("failed dictation status should deserialize");
+        assert_eq!(failed.dictation_status, DictationStatus::Error);
         assert_eq!(
-            derive_tray_presentation(&recovery).dictation_action,
+            derive_tray_presentation(&failed).dictation_action,
             TrayDictationAction::Ignore
         );
+        // The tray never presents transcript or recovery state, so it refuses them.
+        for retired in [
+            "hasRecoverableTranscript",
+            "manualTranscriptReady",
+            "recoveryAvailable",
+        ] {
+            let mut stale = payload.clone();
+            stale[retired] = false.into();
+            assert!(
+                serde_json::from_value::<RuntimeStatusSnapshot>(stale).is_err(),
+                "{retired}"
+            );
+        }
+        for retired in ["pending", "preview-only", "unreconciled"] {
+            let mut stale = payload.clone();
+            stale["cursorDelivery"] = retired.into();
+            assert!(
+                serde_json::from_value::<RuntimeStatusSnapshot>(stale).is_err(),
+                "{retired}"
+            );
+        }
+        payload["cursorDelivery"] = "owned".into();
+        let owned: RuntimeStatusSnapshot =
+            serde_json::from_value(payload).expect("owned cursor delivery should deserialize");
+        assert_eq!(owned.cursor_delivery, CursorDeliveryState::Owned);
     }
 
     #[test]
@@ -1588,7 +1542,6 @@ mod tests {
     fn configuration_failures_are_visible_at_idle() {
         let mut snapshot = ready_snapshot();
         snapshot.configuration_error = true;
-        snapshot.has_recoverable_transcript = true;
         let presentation = derive_tray_presentation(&snapshot);
         assert_eq!(presentation.visual_state, TrayVisualState::NotReady);
         assert_eq!(presentation.tooltip, "VOCO — Settings need attention");
@@ -1615,12 +1568,6 @@ mod tests {
 
         let mut config_error = ready_snapshot();
         config_error.configuration_error = true;
-        assert_eq!(
-            derive_tray_left_click_action(&config_error),
-            TrayLeftClickAction::Ignore
-        );
-
-        config_error.recovery_available = true;
         assert_eq!(
             derive_tray_left_click_action(&config_error),
             TrayLeftClickAction::Ignore

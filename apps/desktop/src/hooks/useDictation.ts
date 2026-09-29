@@ -78,17 +78,9 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
   const recoverySessionIdRef = useRef<string | null>(null);
   const [cursorDeliveryState, setCursorDeliveryState] =
     useState<CursorDeliveryState>("inactive");
-  const cursorDeliveryStateRef = useRef<CursorDeliveryState>("inactive");
-
-  function updateCursorDeliveryState(next: CursorDeliveryState) {
-    cursorDeliveryStateRef.current = next;
-    setCursorDeliveryState(next);
-  }
 
   function transitionCursorDelivery(event: CursorDeliveryEvent) {
-    updateCursorDeliveryState(
-      nextCursorDeliveryState(cursorDeliveryStateRef.current, event),
-    );
+    setCursorDeliveryState(nextCursorDeliveryState(event));
   }
 
   const captureDescriptorRef = useRef<CaptureDescriptor | null>(null);
@@ -556,7 +548,6 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
       initialHotkeyLatencyLoggedRef,
       debugNativeCaptureEnabledRef,
       audioBufferRef,
-      cursorDeliveryStateRef,
       lifecycleEpochRef,
       audioContextRef,
       primedStreamRef,
@@ -683,7 +674,6 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
 
   function discardRecovery() {
     if (phaseRef.current !== "idle" && phaseRef.current !== "error") return;
-    if (recoverySessionIdRef.current) useStore.getState().dismissRecoverableTranscript(recoverySessionIdRef.current);
     const native = nativeCaptureRef.current;
     nativeCaptureRef.current = null;
     void native?.cancel().catch(() => {});

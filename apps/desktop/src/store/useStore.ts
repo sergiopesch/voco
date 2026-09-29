@@ -6,7 +6,6 @@ import type {
   AppSurface,
   AudioDeviceOption,
   DictationStatus,
-  RecoverableTranscript,
   MicrophonePermission,
   OwnedPreeditStatus,
   UpdateCheckState,
@@ -44,7 +43,6 @@ interface AppState {
   status: DictationStatus;
   transcript: string;
   rawTranscript: string;
-  recoverableTranscripts: RecoverableTranscript[];
   interimTranscript: string;
   error: string | null;
   recovery: DictationRecovery | null;
@@ -65,8 +63,6 @@ interface AppState {
   setStatus: (status: DictationStatus) => void;
   setTranscript: (transcript: string) => void;
   setRawTranscript: (transcript: string) => void;
-  retainRecoverableTranscript: (entry: Omit<RecoverableTranscript, "createdAt">) => void;
-  dismissRecoverableTranscript: (id: string) => void;
   setInterimTranscript: (interim: string) => void;
   setError: (error: string | null) => void;
   setAudioLevel: (level: number) => void;
@@ -103,7 +99,6 @@ export const useStore = create<AppState>((set) => ({
   status: "idle",
   transcript: "",
   rawTranscript: "",
-  recoverableTranscripts: [],
   interimTranscript: "",
   error: null,
   recovery: null,
@@ -130,20 +125,6 @@ export const useStore = create<AppState>((set) => ({
   setStatus: (status) => set({ status, error: null }),
   setTranscript: (transcript) => set({ transcript }),
   setRawTranscript: (rawTranscript) => set({ rawTranscript }),
-  // Recovery is intentionally session-only and separate from the current capture.
-  retainRecoverableTranscript: (entry) => set((state) => {
-    if (!entry.text.trim()) return state;
-    const existing = state.recoverableTranscripts.find((item) => item.id === entry.id);
-    const retained = { ...entry, createdAt: existing?.createdAt ?? Date.now() };
-    return {
-      recoverableTranscripts: existing
-        ? state.recoverableTranscripts.map((item) => item.id === entry.id ? retained : item)
-        : [...state.recoverableTranscripts, retained],
-    };
-  }),
-  dismissRecoverableTranscript: (id) => set((state) => ({
-    recoverableTranscripts: state.recoverableTranscripts.filter((entry) => entry.id !== id),
-  })),
   setInterimTranscript: (interim) => set({ interimTranscript: interim }),
   setError: (error) => set({ error }),
   setAudioLevel: (level) => set({ audioLevel: level }),

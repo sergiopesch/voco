@@ -1,18 +1,14 @@
 import type {
-  CursorDeliveryState,
+  CursorSetupState,
   DictationStatus,
   MicrophonePermission,
-  OwnedPreeditStatus,
 } from "@/types";
 
 interface StatusLabelInput {
   configurationError: boolean;
   hasRecovery?: boolean;
-  manualTranscriptReady?: boolean;
-  hasRecoverableTranscript?: boolean;
-  cursorDeliveryState: CursorDeliveryState;
   cursorRequired: boolean;
-  cursorSetupState: OwnedPreeditStatus["setupState"];
+  cursorSetupState: CursorSetupState;
   dictationStatus: DictationStatus;
   microphonePermission: MicrophonePermission;
   nativeMicrophoneReady?: boolean | null;
@@ -22,9 +18,6 @@ interface StatusLabelInput {
 export function deriveStatusLabel({
   configurationError,
   hasRecovery = false,
-  manualTranscriptReady = false,
-  hasRecoverableTranscript = false,
-  cursorDeliveryState,
   cursorRequired,
   cursorSetupState,
   dictationStatus,
@@ -36,27 +29,16 @@ export function deriveStatusLabel({
     return "Starting microphone";
   }
   if (dictationStatus === "recording") {
-    if (cursorDeliveryState === "pending") {
-      return "Listening — verifying original field";
-    }
-    return cursorDeliveryState === "preview-only"
-      ? "Listening — preview only"
-      : "Listening";
+    return "Listening";
   }
   if (dictationStatus === "processing") {
     return "Processing";
   }
   if (hasRecovery) {
-    return manualTranscriptReady ? "Transcript ready to copy" : "Dictation saved";
-  }
-  if (cursorDeliveryState === "unreconciled") {
-    return "Transcript needs attention";
+    return "Dictation saved";
   }
   if (configurationError) {
     return "Settings need attention";
-  }
-  if (hasRecoverableTranscript) {
-    return "Transcript needs attention";
   }
   if (dictationStatus === "error") {
     return "Needs attention";

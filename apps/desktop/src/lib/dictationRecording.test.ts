@@ -85,7 +85,6 @@ function harness() {
     initialHotkeyLatencyLoggedRef: ref(false),
     debugNativeCaptureEnabledRef: ref(false),
     audioBufferRef: ref(audioBuffer),
-    cursorDeliveryStateRef: ref("idle"),
     lifecycleEpochRef: ref(0),
     audioContextRef: ref(null),
     primedStreamRef: ref(null),

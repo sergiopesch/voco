@@ -167,9 +167,6 @@ export function App() {
   const captureNotice = useStore((state) => state.captureNotice);
   const transcript = useStore((state) => state.transcript);
   const rawTranscript = useStore((state) => state.rawTranscript);
-  const recoverableTranscripts = useStore((state) => state.recoverableTranscripts);
-  const dismissRecoverableTranscript = useStore((state) => state.dismissRecoverableTranscript);
-  const hasRecoverableTranscript = recoverableTranscripts.length > 0;
   const surface = useStore((state) => state.surface);
   const onboardingStep = useStore((state) => state.onboardingStep);
   const selectedDeviceId = useStore((state) => state.selectedDeviceId);
@@ -309,7 +306,6 @@ export function App() {
     [dismissInteractiveSurface, setSurface],
   );
   // Dictation never maps a transcript window over the destination.
-  const recoveryAvailable = Boolean(recovery);
   const popoverSize = POPOVER_SIZE;
   // Text goes to whichever app has focus, so the desktop input helpers are the
   // only delivery setup. IBus and the GNOME panel companion never gate it.
@@ -866,7 +862,6 @@ export function App() {
       epoch: runtimeStatusEpoch,
       revision: runtimeStatusRevisionRef.current,
       runtimeInitialized: initComplete,
-      hasRecoverableTranscript,
       configurationError: runtimeConfigurationError,
       microphoneReady,
       microphonePermission,
@@ -876,8 +871,6 @@ export function App() {
       cursorDelivery: cursorDeliveryState,
       cursorRequired,
       cursorSetupState,
-      manualTranscriptReady: recovery?.kind === "manual-copy",
-      recoveryAvailable,
     }).catch((error) => {
       console.warn("Failed to synchronize VOCO runtime status:", error);
     });
@@ -886,15 +879,12 @@ export function App() {
     cursorRequired,
     cursorDeliveryState,
     cursorSetupState,
-    hasRecoverableTranscript,
     initComplete,
     microphonePermission,
     microphoneReady,
     nativeMicrophoneReady,
     runtimeConfigurationError,
     runtimeStatusEpoch,
-    recoveryAvailable,
-    recovery?.kind,
     status,
   ]);
 
@@ -1157,10 +1147,7 @@ export function App() {
 
   const statusLabel = deriveStatusLabel({
     hasRecovery: Boolean(recovery),
-    manualTranscriptReady: recovery?.kind === "manual-copy",
-    hasRecoverableTranscript,
     configurationError: runtimeConfigurationError,
-    cursorDeliveryState,
     cursorRequired,
     cursorSetupState,
     dictationStatus: status,
@@ -1211,7 +1198,6 @@ export function App() {
         updateState={updateState}
         runtimeDiagnostics={runtimeDiagnostics}
         dictationStatus={status}
-        cursorDeliveryState={cursorDeliveryState}
         transcript={transcript}
         rawTranscript={rawTranscript}
         recovery={recovery}
@@ -1221,8 +1207,6 @@ export function App() {
         onCancelDictation={() => void cancelRecording()}
         onRetryRecovery={() => void retryRecovery()}
         onDiscardRecovery={discardRecovery}
-        recoverableTranscripts={recoverableTranscripts}
-        onDismissRecoverableTranscript={dismissRecoverableTranscript}
         onPrepareDictation={() => void handlePrepareDictation()}
         onDraftStateChange={handleDraftStateChange}
         onShortcutCaptureChange={handleShortcutCaptureChange}

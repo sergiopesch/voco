@@ -35,7 +35,7 @@ function Fixture() {
   return <ControlPanel surface={surface} onboardingStep={0} config={config} dictationStatus={status}
     statusLabel={status === "recording" ? "Listening" : status === "starting" ? "Getting ready" : status === "processing" ? "Finishing" : status === "error" ? "Needs attention" : "Ready to listen"}
     errorMessage={initial === "error" ? "The test could not finish. Try again when your microphone is ready." : null}
-    cursorDeliveryState={initial === "error" ? "unreconciled" : "inactive"} transcript={transcript}
+    transcript={transcript}
     updateState={{ status: "idle", currentVersion: desktopPackage.version, latestRelease: null, lastCheckedAt: null, error: null }}
     runtimeDiagnostics={null} requestedSection={section} requestedSectionRequestId={0}
     selectedDeviceId={null} availableDevices={[]} microphonePermission="unknown"

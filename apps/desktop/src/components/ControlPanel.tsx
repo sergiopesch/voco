@@ -8,12 +8,10 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import type {
   AppConfig,
   AudioDeviceOption,
-  CursorDeliveryState,
   DictationStatus,
   DesktopInputStatus,
   MicrophonePermission,
   RuntimeDiagnostics,
-  RecoverableTranscript,
   UpdateCheckState,
 } from "@/types";
 import { calculateVisualAudioLevelFromSamples } from "@/lib/audioLevel";
@@ -45,7 +43,6 @@ interface ControlPanelProps {
   updateState: UpdateCheckState;
   runtimeDiagnostics: RuntimeDiagnostics | null;
   dictationStatus: DictationStatus;
-  cursorDeliveryState: CursorDeliveryState;
   transcript: string;
   rawTranscript?: string;
   recovery?: DictationRecovery | null;
@@ -55,8 +52,6 @@ interface ControlPanelProps {
   onCancelDictation?: () => void;
   onRetryRecovery?: () => void;
   onDiscardRecovery?: () => void;
-  recoverableTranscripts?: RecoverableTranscript[];
-  onDismissRecoverableTranscript?: (id: string) => void;
   onPrepareDictation?: () => void;
   onDraftStateChange?: (dirty: boolean) => void;
   onShortcutCaptureChange?: (active: boolean) => void;

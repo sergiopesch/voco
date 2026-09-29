@@ -42,7 +42,6 @@ function renderPanel(
       }}
       runtimeDiagnostics={null}
       dictationStatus="idle"
-      cursorDeliveryState="inactive"
       transcript=""
       requestedSection="General"
       requestedSectionRequestId={0}
@@ -116,9 +115,8 @@ describe("ControlPanel", () => {
 
   it("never exposes handled delivery text in the status popover", () => {
     const markup = renderPanel({
-      cursorDeliveryState: "unreconciled",
       transcript: "A transcript that stayed safely inside VOCO.",
-      statusLabel: "Transcript needs attention",
+      statusLabel: "Needs attention",
     });
     expect(markup).not.toContain("Transcript kept safely in VOCO");
     expect(markup).not.toContain("A transcript that stayed safely inside VOCO.");
@@ -171,17 +169,6 @@ describe("ControlPanel", () => {
 });
 
 describe("Crystal Sidebar settings", () => {
-  it("keeps crash review separate from settings", () => {
-    const markup = renderPanel({
-      surface: "settings",
-      recoverableTranscripts: [{ id: "earlier", text: "Keep this text", createdAt: 1, reason: "delivery-unconfirmed", isPartial: false }],
-    });
-    expect(markup).not.toContain("A transcript needs attention");
-    expect(markup).not.toContain("Review saved transcripts");
-    expect(markup).not.toContain("A dictation was delivered this session");
-    expect(markup).not.toContain("Keep this text");
-  });
-
   it("does not equate microphone permission with detected sound", () => {
     const markup = renderPanel({ surface: "settings", requestedSection: "Audio", microphonePermission: "granted" });
     expect(markup).toMatch(/<p[^>]*role="status"[^>]*>Waiting for sound<\/p>/);
@@ -268,23 +255,9 @@ describe("guided dictation and settings journeys", () => {
 
 
   it("does not resurrect a dismissed record from the current transcript", () => {
-    const markup = renderPanel({ recoverableTranscripts: [], transcript: "Dismissed text", cursorDeliveryState: "unreconciled" });
+    const markup = renderPanel({ transcript: "Dismissed text" });
     expect(markup).not.toContain("Dismissed text");
     expect(markup).not.toContain("Copy transcript");
-  });
-
-  it("does not expose legacy retained transcripts in the normal popover", () => {
-    const markup = renderPanel({
-      recoverableTranscripts: [
-        { id: "one", text: "Earlier unreconciled text.", createdAt: 1, reason: "delivery-unconfirmed", isPartial: false },
-        { id: "two", text: "Only the preserved prefix.", createdAt: 2, reason: "output-failed", isPartial: true },
-      ],
-      onDismissRecoverableTranscript: vi.fn(),
-    });
-    expect(markup).not.toContain("Earlier unreconciled text.");
-    expect(markup).not.toContain("Only the preserved prefix.");
-    expect(markup).not.toContain("Partial transcript");
-    expect(markup).not.toContain("Dismiss transcript");
   });
 
   it("puts update status and action before optional preferences", () => {

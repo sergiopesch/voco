@@ -2,7 +2,6 @@ import type { CanonicalCursorSession } from "@/lib/canonicalCursorSession";
 
 /** A single recovery slot; audio itself stays in the recording hook's memory. */
 export interface DictationRecovery {
-  kind?: "manual-copy" | "failure";
   reason: string;
   audioAvailable: boolean;
   retrying: boolean;
