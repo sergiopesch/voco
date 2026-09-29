@@ -178,6 +178,9 @@ bind -x '"\\C-t": printf %s "$READLINE_LINE" > {line}'
         return file_text(line)
     # Bash can print its prompt before the terminal window takes keys.
     wait_for(typed, '', 'Terminal keyboard input')
+    # Ghostty applies its key bindings about a second after its window takes
+    # keys; until then Shift+Insert reaches Bash as an unbound escape sequence.
+    time.sleep(1)
     for text, expected in (('hello', 'hello'), (' linux', 'hello linux')):
         paste(text)
         wait_for(typed, expected, 'Bash command line')
