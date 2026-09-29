@@ -1,5 +1,11 @@
-import { describe, expect, it } from "vitest";
-import { DiagnosticsRequestGate, microphoneLabel, shortcutPresentation, unknownShortcut } from "./shortcutPresentation";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  DiagnosticsRequestGate,
+  microphoneLabel,
+  shortcutPresentation,
+  startLaunchDiagnostics,
+  unknownShortcut,
+} from "./shortcutPresentation";
 import type { ShortcutDiagnostics } from "@/types";
 
 const available: ShortcutDiagnostics = { hotkey: "Alt+D", route: "evdev", state: "available", detail: "Current keyboard is open." };
@@ -64,6 +70,59 @@ describe("diagnostics request ownership", () => {
     gate.activate();
     expect(original()).toBe(false);
     expect(gate.begin()()).toBe(true);
+  });
+});
+
+describe("launch diagnostics", () => {
+  afterEach(() => { vi.useRealTimers(); });
+
+  function launch(results: boolean[]) {
+    let loaded = false;
+    const refresh = vi.fn(async () => { loaded = results.shift() ?? false; });
+    const onFailed = vi.fn();
+    const dispose = startLaunchDiagnostics(refresh, () => loaded, onFailed);
+    return { refresh, onFailed, dispose, load: () => { loaded = true; } };
+  }
+
+  it("reports nothing when the first check loads", async () => {
+    vi.useFakeTimers();
+    const run = launch([true]);
+    await vi.runAllTimersAsync();
+    expect(run.refresh).toHaveBeenCalledTimes(1);
+    expect(run.onFailed).not.toHaveBeenCalled();
+  });
+
+  it("reports a failed check and retries it exactly once", async () => {
+    vi.useFakeTimers();
+    const run = launch([false, false]);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(run.onFailed).toHaveBeenCalledTimes(1);
+    expect(run.refresh).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1999);
+    expect(run.refresh).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(run.refresh).toHaveBeenCalledTimes(2);
+    await vi.runAllTimersAsync();
+    expect(run.refresh).toHaveBeenCalledTimes(2);
+    expect(run.onFailed).toHaveBeenCalledTimes(2);
+  });
+
+  it("skips the retry once another refresh has loaded diagnostics", async () => {
+    vi.useFakeTimers();
+    const run = launch([false]);
+    await vi.advanceTimersByTimeAsync(0);
+    run.load();
+    await vi.runAllTimersAsync();
+    expect(run.refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("cancels the retry when disposed", async () => {
+    vi.useFakeTimers();
+    const run = launch([false]);
+    await vi.advanceTimersByTimeAsync(0);
+    run.dispose();
+    await vi.runAllTimersAsync();
+    expect(run.refresh).toHaveBeenCalledTimes(1);
   });
 });
 

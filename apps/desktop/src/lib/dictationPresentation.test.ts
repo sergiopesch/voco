@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  deriveCursorSetupState,
   deriveStatusLabel,
 } from "@/lib/dictationPresentation";
 
@@ -25,9 +26,18 @@ describe("status label presentation", () => {
     expect(deriveStatusLabel({ ...ready, hasRecovery: true, dictationStatus: "error" })).toBe("Dictation saved");
   });
 
-  it("asks for text delivery setup only while desktop input is not ready", () => {
-    expect(deriveStatusLabel({ ...ready, cursorRequired: true, cursorSetupState: "not-enabled" })).toBe("Text delivery needs setup");
-    expect(deriveStatusLabel({ ...ready, cursorRequired: true, cursorSetupState: "ready" })).toBe("Ready to listen");
+  it("keeps desktop setup pending until the first diagnostics settle", () => {
+    const pending = deriveCursorSetupState({ desktopInputReady: false, diagnosticsLoaded: false, diagnosticsFailed: false });
+    const failed = deriveCursorSetupState({ desktopInputReady: false, diagnosticsLoaded: false, diagnosticsFailed: true });
+    const missing = deriveCursorSetupState({ desktopInputReady: false, diagnosticsLoaded: true, diagnosticsFailed: false });
+    const ready = deriveCursorSetupState({ desktopInputReady: true, diagnosticsLoaded: true, diagnosticsFailed: true });
+    expect([pending, failed, missing, ready]).toEqual(["", "not-enabled", "not-enabled", "ready"]);
+  });
+
+  it("shows initializing while desktop diagnostics are pending, never setup needed", () => {
+    expect(deriveStatusLabel({ ...ready, cursorRequired: true, cursorSetupState: "" })).toBe("Initializing…");
+    expect(deriveStatusLabel({ ...ready, cursorRequired: true, cursorSetupState: "not-enabled" })).toBe("Desktop setup needed");
+    expect(deriveStatusLabel({ ...ready, cursorRequired: false, cursorSetupState: "ready" })).toBe("Ready to listen");
   });
 
   it("matches the tray by prioritizing a dictation failure when both modes failed", () => {

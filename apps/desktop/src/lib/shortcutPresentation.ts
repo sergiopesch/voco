@@ -50,3 +50,34 @@ export class DiagnosticsRequestGate {
     return () => this.alive && generation === this.generation;
   }
 }
+
+/**
+ * Runs the launch diagnostics check. If it leaves diagnostics unloaded (timeout,
+ * failure or a stale result), setup is reported conservatively and the check is
+ * retried exactly once, unless a later refresh loads diagnostics first.
+ * Returns a disposer that cancels the pending retry.
+ */
+export function startLaunchDiagnostics(
+  refresh: () => Promise<void>,
+  loaded: () => boolean,
+  onFailed: () => void,
+  retryDelayMs = 2000,
+): () => void {
+  let disposed = false;
+  let retry: ReturnType<typeof setTimeout> | undefined;
+  const attempt = async (retryOnFailure: boolean) => {
+    await refresh();
+    if (disposed || loaded()) return;
+    onFailed();
+    if (retryOnFailure) {
+      retry = setTimeout(() => {
+        if (!loaded()) void attempt(false);
+      }, retryDelayMs);
+    }
+  };
+  void attempt(true);
+  return () => {
+    disposed = true;
+    if (retry !== undefined) clearTimeout(retry);
+  };
+}

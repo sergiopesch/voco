@@ -31,7 +31,7 @@ import {
   readCachedUpdateState,
   writeCachedUpdateState,
 } from "@/lib/updates";
-import { DiagnosticsRequestGate, unknownShortcut } from "@/lib/shortcutPresentation";
+import { DiagnosticsRequestGate, startLaunchDiagnostics, unknownShortcut } from "@/lib/shortcutPresentation";
 import { UpdateCheckCoordinator } from "@/lib/updateCheckCoordinator";
 import { useGlobalShortcut } from "@/hooks/useGlobalShortcut";
 import { useDictation } from "@/hooks/useDictation";
@@ -45,6 +45,7 @@ import { requiresVerifiedTextTarget } from "@/lib/dictationOutputPlan";
 import { probeMicrophoneAccess } from "@/lib/audioInput";
 import { MicrophoneRefresh, queryMicrophonePermission, microphoneAccessFailure } from "@/lib/microphoneRefresh";
 import {
+  deriveCursorSetupState,
   deriveStatusLabel,
 } from "@/lib/dictationPresentation";
 import { canStopOnboardingTest, cancelsPendingStart, isBrowserTrigger, type DictationTriggerAction } from "@/lib/dictationTrigger";
@@ -222,6 +223,7 @@ export function App() {
   const onboardingHandoffRef = useRef(false);
   const [initComplete, setInitComplete] = useState(false);
   const [runtimeDiagnostics, setRuntimeDiagnostics] = useState<RuntimeDiagnostics | null>(null);
+  const [runtimeDiagnosticsFailed, setRuntimeDiagnosticsFailed] = useState(false);
   const [runtimeStatusEpoch, setRuntimeStatusEpoch] = useState<number | null>(null);
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [startupConfigError, setStartupConfigError] = useState<string | null>(null);
@@ -257,6 +259,8 @@ export function App() {
   const lastConfigRevisionRef = useRef(-1);
   const diagnosticsGateRef = useRef(new DiagnosticsRequestGate());
   const diagnosticsInFlightRef = useRef(false);
+  const diagnosticsAttemptRef = useRef<Promise<void>>(Promise.resolve());
+  const runtimeDiagnosticsLoadedRef = useRef(false);
   const diagnosticsExpiryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const runtimeStatusRevisionRef = useRef(0);
   const microphoneRefreshRef = useRef(new MicrophoneRefresh());
@@ -313,7 +317,11 @@ export function App() {
     Boolean(runtimeDiagnostics?.desktopPaste?.enabled &&
       (runtimeDiagnostics.desktopInput?.available ?? runtimeDiagnostics.desktopPaste.available));
   const cursorRequired = requiresVerifiedTextTarget(config) && !desktopInputReady;
-  const cursorSetupState = desktopInputReady ? "ready" : runtimeDiagnostics ? "not-enabled" : "";
+  const cursorSetupState = deriveCursorSetupState({
+    desktopInputReady,
+    diagnosticsLoaded: runtimeDiagnostics !== null,
+    diagnosticsFailed: runtimeDiagnosticsFailed,
+  });
   const runtimeConfigurationError = shouldBlockRuntimeForConfigErrors(
     startupConfigError,
     settingsError,
@@ -555,8 +563,7 @@ export function App() {
     } : null);
   }, []);
 
-  const refreshRuntimeDiagnostics = useCallback(async () => {
-    if (diagnosticsInFlightRef.current || configSavePendingCountRef.current > 0) return;
+  const requestRuntimeDiagnostics = useCallback(async () => {
     const isCurrent = diagnosticsGateRef.current.begin();
     const hotkey = useStore.getState().config?.hotkey;
     const revision = lastConfigRevisionRef.current;
@@ -580,6 +587,10 @@ export function App() {
         return;
       }
       runtimeSessionTypeRef.current = diagnostics.sessionType;
+      if (!runtimeDiagnosticsLoadedRef.current) {
+        runtimeDiagnosticsLoadedRef.current = true;
+        setRuntimeDiagnosticsFailed(false);
+      }
       setRuntimeDiagnostics(diagnostics);
       setOwnedPreeditSetupState(diagnostics.ownedPreedit.setupState);
       if (diagnosticsExpiryRef.current !== null) clearTimeout(diagnosticsExpiryRef.current);
@@ -591,6 +602,19 @@ export function App() {
       if (timeout !== undefined) clearTimeout(timeout);
     }
   }, [invalidateShortcutDiagnostics, setOwnedPreeditSetupState]);
+
+  const refreshRuntimeDiagnostics = useCallback((): Promise<void> => {
+    if (diagnosticsInFlightRef.current || configSavePendingCountRef.current > 0) return Promise.resolve();
+    diagnosticsAttemptRef.current = requestRuntimeDiagnostics();
+    return diagnosticsAttemptRef.current;
+  }, [requestRuntimeDiagnostics]);
+
+  // Only the launch check waits for a request already in flight, so it never
+  // mistakes a skipped refresh for a failed one. Opening a surface must not wait.
+  const settleLaunchDiagnostics = useCallback(
+    () => diagnosticsInFlightRef.current ? diagnosticsAttemptRef.current : refreshRuntimeDiagnostics(),
+    [refreshRuntimeDiagnostics],
+  );
 
   useEffect(() => {
     diagnosticsGateRef.current.activate();
@@ -616,6 +640,20 @@ export function App() {
       invalidateShortcutDiagnostics();
     };
   }, [surface, config, invalidateShortcutDiagnostics, refreshRuntimeDiagnostics]);
+
+  // Once the loaded config commits, launch checks desktop input alongside microphone
+  // preparation, so the tray shows initializing rather than setup needed while
+  // diagnostics load. This must follow the poll effect, whose leading invalidation
+  // would discard the request.
+  const configLoaded = config !== null;
+  useEffect(() => {
+    if (!configLoaded) return;
+    return startLaunchDiagnostics(
+      settleLaunchDiagnostics,
+      () => runtimeDiagnosticsLoadedRef.current,
+      () => setRuntimeDiagnosticsFailed(true),
+    );
+  }, [configLoaded, settleLaunchDiagnostics]);
 
   const refreshAuthoritativeConfig = useCallback(async () => {
     const snapshot = await getConfig();

@@ -15,6 +15,21 @@ interface StatusLabelInput {
   microphoneReady: boolean;
 }
 
+/** Desktop input setup for the tray: "" until the first diagnostics load, which the
+ * tray presents as initializing. A failed launch check reports not enabled. */
+export function deriveCursorSetupState({
+  desktopInputReady,
+  diagnosticsLoaded,
+  diagnosticsFailed,
+}: {
+  desktopInputReady: boolean;
+  diagnosticsLoaded: boolean;
+  diagnosticsFailed: boolean;
+}): CursorSetupState {
+  if (desktopInputReady) return "ready";
+  return diagnosticsLoaded || diagnosticsFailed ? "not-enabled" : "";
+}
+
 export function deriveStatusLabel({
   configurationError,
   hasRecovery = false,
@@ -48,7 +63,9 @@ export function deriveStatusLabel({
     return "Microphone needs permission";
   }
   // Recording refuses to start without desktop input, so there is no copy fallback.
-  if (cursorRequired && cursorSetupState !== "ready") return "Text delivery needs setup";
+  // cursorRequired already means desktop input is not ready; while its diagnostics
+  // are pending, mirror the tray's initializing state instead of setup needed.
+  if (cursorRequired) return cursorSetupState === "" ? "Initializing…" : "Desktop setup needed";
   if (!microphoneReady) {
     return "Ready — microphone checks on first use";
   }
