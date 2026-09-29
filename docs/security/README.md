@@ -57,8 +57,7 @@ or crash-reporting service.
 - **Scoped permissions**: WebView permission grants restricted to UserMedia (microphone) only
 - **Scoped input limits**: Desktop delivery rejects empty text and payloads above 100,000
   UTF-8 bytes. Browser frames are capped at 1 MiB with a separate 100,000-byte text limit.
-  Native capture has a ten-minute frame ceiling; explicit recovery accepts at most
-  ten minutes or 32 Mi samples, whichever is smaller. These are route-specific limits,
+  Native capture has a ten-minute frame ceiling. These are route-specific limits,
   not one universal IPC size bound.
 - **External link allowlist**: WebView-triggered external opens allow VOCO GitHub release
   URLs and the fixed ydotoold troubleshooting link

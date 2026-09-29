@@ -109,7 +109,7 @@ VOCO pins a patched `global-hotkey` 0.8.0; see
 Its X11 actor waits on the X11 fd and a nonblocking command signal with
 `libc::poll`, with no periodic idle wakeup.
 
-`useDictation.ts` coordinates capture, delivery and recovery; `config.rs` serializes
+`useDictation.ts` coordinates capture and delivery; `config.rs` serializes
 field-level settings updates and writes private atomic configuration. Single-instance
 ownership prevents two VOCO processes from competing for sockets or shortcuts.
 `trigger_socket.rs` owns trigger-path validation, same-UID peer checks and cleanup

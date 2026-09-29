@@ -2,8 +2,7 @@
 
 This is the reading path for humans and agents working on the Linux dictation
 application. Names containing `benchmark` are historical: the files below run in the
-production NVIDIA path. A research adapter's presence does not make it a supported
-user-selectable model.
+production NVIDIA path.
 
 ## Installer presentation
 
@@ -30,7 +29,7 @@ recognizer serves desktop, browser and onboarding sessions. See
 1. `apps/desktop/src/App.tsx` mounts the thin UI and dictation hook. The store in
    `src/store/useStore.ts` represents preferences and visible state; it does not
    own native input authority.
-2. `src/hooks/useDictation.ts` wires capture and explicit recovery. Start/Stop/Cancel
+2. `src/hooks/useDictation.ts` wires capture and delivery. Start/Stop/Cancel
    and shortcut boundaries live in `src/lib/dictationRecording.ts`. Capture admission
    keeps unverified ScriptProcessor input out of automatic delivery.
    `desktopCaptureTail.ts` retains each source sample and forwards the Stop tail once.
@@ -71,8 +70,9 @@ recognizer serves desktop, browser and onboarding sessions. See
    startup promotes an unfinished prior checkpoint into Review, and
    `keep_crash_journal` does the same for a Stop that could neither paste nor copy. No audio
    is persisted. `CrashReview.tsx` opens only on explicit `voco:open-review`, with
-   copy and discard but no delivery/retranscription action. Cancelled or old callbacks
-   cannot update a replacement session.
+   copy and discard but no delivery/retranscription action. Copy uses
+   `copy_desktop_text` (CLIPBOARD and PRIMARY), falling back to the WebView
+   clipboard. Cancelled or old callbacks cannot update a replacement session.
 
 Paths in steps 2–7 are relative to `apps/desktop` unless prefixed with `runtime/`.
 See [architecture](README.md) and [desktop paste](../testing/desktop-paste.md)
@@ -92,7 +92,7 @@ guide retains its original source snapshot.
 | Completed native phrases and current recognizer output | `runtime/speech/adapters.py::Nemotron` |
 | Accepted append-only hypothesis and dispatched prefix | `benchmarkPhraseQueue.ts` |
 | Paste dispatch, or exact-field receipt for explicit browser delivery | Native insertion or explicit browser delivery |
-| Visible transcript and retained recovery | Dictation hook/store, mirroring recognition |
+| Visible transcript and voice-test failure reason | Dictation hook/store, mirroring recognition |
 
 Do not merge these facts into one success flag. IBus owns shortcut authority,
 not text delivery. Future personalisation is a [separate gated plan](personalisation-plan.md),

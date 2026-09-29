@@ -1,5 +1,10 @@
 # Capture admission and local recovery
 
+> Update, 29 September 2026: `recover_stream`, its private recovery slot and
+> `NvidiaRecovery` were removed because no control could reach them. VOCO no
+> longer recognizes retained audio a second time. Capture admission is unchanged:
+> only automatic admission creates the NVIDIA delivery queue.
+
 Accepted scope: the owner approved the bounded reliability milestone on 19 September
 2026. Public 2026.0.39 is frozen; this implementation is candidate 2026.0.41.
 

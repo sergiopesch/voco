@@ -181,9 +181,9 @@ GNOME session and KDE/Omarchy have their own tray integrations. Installing an
 extension does not configure microphone access, a compositor shortcut or ydotoold.
 
 The model lives under `/usr/lib/voco/speech`. Readiness follows worker warmup.
-Desktop dictation, browser dictation and explicit recovery use the bundled
-Nemotron model. No separate recognition model is downloaded. A failed warmup
-reports an error. See [release status](release-candidate.md) for current downloads.
+Desktop and browser dictation use the bundled Nemotron model. No separate
+recognition model is downloaded. A failed warmup reports an error. See
+[release status](release-candidate.md) for current downloads.
 
 ## Source development
 

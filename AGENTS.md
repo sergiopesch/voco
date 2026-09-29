@@ -20,8 +20,8 @@ The production path is `runtime/speech/` → Rust `benchmark_stream.rs` →
 `benchmarkPhraseQueue.ts` → `insertion.rs`. Despite their historical names,
 these are production modules. The selected runtime is NVIDIA Nemotron English
 0.6B Q8 CPU. Keep the default worker count capped to at most four threads, leaving one CPU
-from process affinity for desktop work (minimum one worker); preserve explicit research overrides and record actual counts. Desktop, Chromium exact-field dictation and local recovery all use this one recognizer.
-Browser field ownership is a delivery concern, independent of recognition. Research model adapters are not selectable products.
+from process affinity for desktop work (minimum one worker); preserve explicit research overrides and record actual counts. Desktop and Chromium exact-field dictation use this one recognizer.
+Browser field ownership is a delivery concern, independent of recognition.
 
 Rust owns OS integration, files, processes, packaging and validation. React owns
 presentation and recording orchestration. Keep both typed and state-driven.
@@ -54,9 +54,8 @@ glib 0.20 directly leaves the GTK dependency behind. [Backport](vendor/glib/VOCO
   the bounded duration-deficit guard and separate complete-reference waveform
   tests; healthy local ACKs alone do not prove source continuity.
 - Unverified ScriptProcessor fallback cannot enter automatic NVIDIA delivery.
-- Explicit NVIDIA recovery uses `recover_stream` and the bundled runtime, with no
-  destination callback or alternate recognizer. Preserve source samples/rate; publish
-  only a completed result. Cancel keeps audio and stale cleanup is session-bound.
+- VOCO never recognizes retained audio a second time. A failed recording notifies
+  and returns to idle; the voice test's Test again records anew.
 - The private legacy input daemon is selected only for the qualified system client.
   Keep `/usr/bin/ydotool` consistent between probing and dispatch. Migrate only
   VOCO's unmodified user unit while holding its single-instance guard, before
@@ -64,7 +63,9 @@ glib 0.20 directly leaves the GTK dependency behind. [Backport](vendor/glib/VOCO
 - Legacy ydotool requires a literal space argument, not `space`. Its paste delay
   is 24 ms; modern ydotool takes numeric key events.
 - Completed IBus authority and a poll in flight differ. Consuming X11 callbacks
-  proceed through debounce; passive evdev retains its duplicate guard.
+  proceed through debounce; passive evdev retains its duplicate guard. The listener
+  posts fallback arbitration only when the config revision or fallback decision
+  changes, otherwise once a second; the main-thread closure re-checks its inputs.
 - IBus protocol 6 is dictation-shortcut-only; older helpers must reconnect after upgrade. Never restore text mutation there.
 - Each chunk pastes into whatever has keyboard focus when it is ready. There is
   no destination token, focus probe, terminal classification or per-app route.
@@ -244,5 +245,7 @@ The guided installer checks `/usr/bin/voco`, not an older PATH override. Bundle 
 the explicit user-run setup flow; never change enabled extensions in package hooks.
 Keep session restart feedback distinct from active presentation. Bump the companion
 metadata and setup contract together when loaded code must change; compare GNOME
-loaded metadata so an in-place upgrade cannot report old code as current. Preserve immutable
+loaded metadata so an in-place upgrade cannot report old code as current. The
+diagnostics poll may reuse a companion check for up to 20 seconds; Attach, Detach,
+name loss and explicit enabling clear it, and explicit setup status always re-checks. Preserve immutable
 tray PNG paths for the process lifetime and explicit Stop actions. Preserve screenshot proof outside build caches.
