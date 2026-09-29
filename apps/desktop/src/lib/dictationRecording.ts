@@ -13,7 +13,7 @@ import {
 } from "@/lib/captureDescriptor";
 import { monitorCaptureHealth } from "@/lib/captureHealth";
 import type { CursorDeliveryEvent } from "@/lib/dictationDelivery";
-import { errorMessage,LIVE_DELIVERY_PAUSED,LIVE_RECOGNITION_INTERRUPTED,sentence } from "@/lib/dictationRecovery";
+import { errorMessage,sentence } from "@/lib/dictationRecovery";
 import {
   consumeQueuedStop,
   disableLivePreview,
@@ -194,6 +194,9 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     releaseBrowserRecording,
   } = env;
 
+  // One controller lives for the whole launch, so these limit repeat notifications.
+  let crashRecoveryUnavailableNotified = false;
+  let recognitionFailureNotifiedSession: number | null = null;
   let journal: CrashJournal | null = null;
   let journalCleanup: Promise<void> = Promise.resolve();
   async function finishJournal() {
@@ -234,6 +237,9 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     releaseRecordingOrigin();
     const current = useStore.getState();
     if (current.dictationPurpose !== "onboarding") {
+      // A live recognition failure already notified; the error slot keeps the reason.
+      const failureNotified = recognitionFailureNotifiedSession === sessionRef.current.sessionId;
+      recognitionFailureNotifiedSession = null;
       const native = nativeCaptureRef.current;
       nativeCaptureRef.current = null;
       void native?.cancel().catch(() => {});
@@ -252,8 +258,9 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       setInterimTranscript("");
       transitionCursorDelivery("session-idle");
       traceDictationEvent("dictation_interrupted").catch(() => {});
-      void showNotification("Dictation interrupted", reason === new CrashJournalCleanupError().message || reason === UNVERIFIED_CAPTURE_REASON
-        ? reason : "Some words may be missing. Check your text field before starting again.").catch(() => {});
+      const body = reason === new CrashJournalCleanupError().message || reason === UNVERIFIED_CAPTURE_REASON
+        ? reason : failureNotified ? null : "Some words may be missing. Check your text field before starting again.";
+      if (body) void showNotification("Dictation interrupted", body).catch(() => {});
       return;
     }
     traceDictationEvent("dictation_recovery_retained", {
@@ -276,11 +283,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     setStatus("error");
     setError(reason);
     setInterimTranscript("");
-    const state = useStore.getState();
-    if (state.captureNotice === LIVE_DELIVERY_PAUSED || state.captureNotice === LIVE_RECOGNITION_INTERRUPTED) {
-      state.setCaptureNotice(null);
-    }
-    state.setSurface("onboarding");
+    useStore.getState().setSurface("onboarding");
   }
 
   function finalizeIdleState() {
@@ -321,6 +324,8 @@ export function createDictationRecording(env: DictationRecordingEnv) {
 
     useStore.getState().setRecovery(null);
     const onboardingTest = triggerId === "onboarding:test";
+    // A notice from an earlier attempt must not outlive the next start.
+    if (!onboardingTest) useStore.getState().setCaptureNotice(null);
     useStore.getState().setDictationPurpose(onboardingTest ? "onboarding" : "cursor");
     if (onboardingTest) useStore.getState().setOnboardingTestPassed(false);
     activeTriggerIdRef.current = triggerId;
@@ -423,7 +428,10 @@ export function createDictationRecording(env: DictationRecordingEnv) {
         if (!opened) {
           // Crash protection is optional: dictate without a checkpoint.
           journal = null;
-          void showNotification("Crash recovery unavailable", "Dictation continues without a crash recovery checkpoint.").catch(() => {});
+          if (!crashRecoveryUnavailableNotified) {
+            crashRecoveryUnavailableNotified = true;
+            void showNotification("Crash recovery unavailable", "Dictation continues, but VOCO can't recover it if VOCO exits unexpectedly.").catch(() => {});
+          }
         }
       }
       if (captureSelection.backend === "native") {
@@ -515,9 +523,10 @@ export function createDictationRecording(env: DictationRecordingEnv) {
         captureAdmission = workletOk ? "automatic" : "manual-review";
         if (!workletOk) {
           sessionRef.current = disableLivePreview(sessionRef.current);
-          useStore.getState().setCaptureNotice(
-            "VOCO can't confirm it is receiving all of your audio, so it won't type this recording. Stop and try again.",
-          );
+          // The popover cannot open during dictation, so notify instead.
+          if (!onboardingTest) {
+            void showNotification("Dictation won't be typed", "VOCO can't confirm it is receiving all of your audio, so it won't type this recording. Stop and try again.").catch(() => {});
+          }
           connectScriptProcessor(audioContext!, source);
           traceDictationEvent("recording_script_processor_connected").catch(() => {});
         } else {
@@ -575,15 +584,12 @@ export function createDictationRecording(env: DictationRecordingEnv) {
           if (!isCurrentSession(startingSessionId) || cancelledRef.current) return;
           traceDictationEvent("dictation_desktop_stream_failed").catch(() => {});
           if (onboardingTest) setError(`Voice test paused: ${sentence(error.message)} Finish test, then try again.`);
-          else {
-            const notice = kind === "delivery" ? LIVE_DELIVERY_PAUSED : LIVE_RECOGNITION_INTERRUPTED;
-            useStore.getState().setCaptureNotice(notice);
-            if (phaseRef.current === "recording") {
-              // A delivery failure stops typing; healthy recognition runs through Stop.
-              void (kind === "delivery"
-                ? showNotification("VOCO stopped typing", "It's still listening. When you stop, VOCO copies the rest of your words to the clipboard.")
-                : showNotification("Dictation interrupted", "Some words may be missing. Stop dictation and check your text field.")).catch(() => {});
-            }
+          else if (phaseRef.current === "recording") {
+            // A delivery failure stops typing; healthy recognition runs through Stop.
+            if (kind === "recognition") recognitionFailureNotifiedSession = startingSessionId;
+            void (kind === "delivery"
+              ? showNotification("VOCO stopped typing", "It's still listening. When you stop, VOCO copies the rest of your words to the clipboard.")
+              : showNotification("Dictation interrupted", "Some words may be missing. Stop dictation and check your text field.")).catch(() => {});
           }
         }, (event, durationMs) => {
           if (!isCurrentSession(startingSessionId) || cancelledRef.current || onboardingTest) return;

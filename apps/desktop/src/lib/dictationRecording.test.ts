@@ -191,6 +191,25 @@ it("reaches source selection from input readiness alone, with no destination bin
   expect(h.setError).toHaveBeenLastCalledWith("Choose a microphone in Microphone settings.");
 });
 
+it("notifies a live recognition failure once, not again at Stop", async () => {
+  const h = harness();
+  failing.add("benchmark_stream");
+  h.env.captureSelectionRef.current = () => ({ backend: "native", selectionToken: "fixture-source" });
+  vi.mocked(h.env.beginNativeCapture).mockResolvedValue({
+    descriptor: {}, cancel: vi.fn(async () => {}), startDelivery: vi.fn(),
+  } as unknown as NativeCaptureSession);
+  const interrupted = () => h.notify.mock.calls.filter(([title]) => title === "Dictation interrupted");
+  await h.startRecording();
+  await vi.waitFor(() => expect(interrupted()).toHaveLength(1));
+  expect(interrupted()[0]![1]).toBe("Some words may be missing. Stop dictation and check your text field.");
+  await h.stopRecording();
+  expect(h.phase.current).toBe("idle");
+  expect(h.setError).toHaveBeenLastCalledWith("read-only filesystem.");
+  expect(interrupted()).toHaveLength(1);
+  // Live failures notify instead of setting a notice the popover cannot show.
+  expect(h.state.setCaptureNotice.mock.calls.every(([notice]) => notice === null)).toBe(true);
+});
+
 it("does not query desktop input for an explicit browser recording", async () => {
   const h = harness();
   await h.startRecording("browser:test");
@@ -198,7 +217,7 @@ it("does not query desktop input for an explicit browser recording", async () =>
   expect(h.pasteStatus).not.toHaveBeenCalled();
 });
 
-it("records without a crash checkpoint when the journal cannot open", async () => {
+it("records without a crash checkpoint when the journal cannot open, notifying once per launch", async () => {
   const h = harness();
   failing.add("begin_crash_journal");
   h.env.captureSelectionRef.current = () => ({ backend: "native", selectionToken: "fixture-source" });
@@ -210,7 +229,12 @@ it("records without a crash checkpoint when the journal cannot open", async () =
   expect(h.phase.current).toBe("recording");
   expect(h.queue.current).not.toBeNull();
   expect(h.setError).not.toHaveBeenCalled();
-  expect(h.notify).toHaveBeenCalledExactlyOnceWith("Crash recovery unavailable", "Dictation continues without a crash recovery checkpoint.");
+  expect(h.notify).toHaveBeenCalledExactlyOnceWith("Crash recovery unavailable", "Dictation continues, but VOCO can't recover it if VOCO exits unexpectedly.");
+  await h.stopRecording();
+  expect(h.phase.current).toBe("idle");
+  await h.startRecording();
+  expect(h.phase.current).toBe("recording");
+  expect(h.notify).toHaveBeenCalledOnce();
   h.unmount();
   expect(journalDeletions()).toEqual([]);
 });

@@ -31,7 +31,7 @@ import {
   readCachedUpdateState,
   writeCachedUpdateState,
 } from "@/lib/updates";
-import { DiagnosticsRequestGate, startLaunchDiagnostics, unknownShortcut } from "@/lib/shortcutPresentation";
+import { DiagnosticsRequestGate, shortcutPresentation, startLaunchDiagnostics, unknownShortcut } from "@/lib/shortcutPresentation";
 import { UpdateCheckCoordinator } from "@/lib/updateCheckCoordinator";
 import { useGlobalShortcut } from "@/hooks/useGlobalShortcut";
 import { useDictation } from "@/hooks/useDictation";
@@ -441,15 +441,22 @@ export function App() {
     }
   }, [discardRecovery, nativeMicrophone.ensureDefault, setError, toggle]);
 
+  const prepareNotifiedRef = useRef(false);
   const handlePrepareDictation = useCallback(async () => {
     if (isDictationActive(useStore.getState().status)) return;
     if (!dismissInteractiveSurface()) return;
     await hideStatusOverlay().catch(() => {});
+    // Once per launch, naming the shortcut only when it is verified to work.
+    if (prepareNotifiedRef.current) return;
+    prepareNotifiedRef.current = true;
+    const hotkey = useStore.getState().config?.hotkey ?? "Alt+D";
     await showNotification(
       "Ready to try dictation",
-      `Click where you want the text, then press ${useStore.getState().config?.hotkey ?? "Alt+D"}. The tray bars respond when the microphone is ready.`,
+      shortcutPresentation(hotkey, runtimeDiagnostics?.shortcut).available
+        ? `Click where you want the text, then press ${hotkey}. The tray bars respond when the microphone is ready.`
+        : "Click where you want the text, then choose Start dictation in the VOCO tray menu.",
     ).catch(() => {});
-  }, [dismissInteractiveSurface]);
+  }, [dismissInteractiveSurface, runtimeDiagnostics]);
 
   useGlobalShortcut(
     handleToggleRequest,

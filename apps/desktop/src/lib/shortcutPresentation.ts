@@ -11,6 +11,7 @@ export function shortcutPresentation(hotkey: string, observation?: ShortcutDiagn
   const available = current.state === "available" && current.route !== null;
   return {
     available,
+    unavailable: current.state === "unavailable",
     instruction: desktopInput?.available === false
       ? `Desktop setup needed. ${desktopInput.detail}`
       : available

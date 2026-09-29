@@ -718,7 +718,7 @@ export function ControlPanel({
               </div>
               {dictationBusy ?
                 <p>{dictationStatus === "starting" ? "Wait for Listening before speaking." : dictationStatus === "recording" ? `Press ${config.hotkey} to finish.` : "Finishing your dictation…"}</p> :
-                <p>{desktopSetupError ? "Open Help to finish desktop setup." : shortcut.available ? "Click where you want the text, then use your shortcut." : "Check shortcut setup in Help."}</p>}
+                <p>{desktopSetupError ? "Open Help to finish desktop setup." : shortcut.available ? "Click where you want the text, then use your shortcut." : shortcut.unavailable ? "Check shortcut setup in Help." : "Click where you want the text, then start dictation."}</p>}
             </div>
             {captureNotice ? <div className="voco-inline-note" role="status">{captureNotice}</div> : null}
             {(canCancelDictation || cancellationPending) ? (

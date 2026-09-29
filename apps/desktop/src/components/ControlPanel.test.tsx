@@ -80,7 +80,8 @@ describe("Silver Lens output guidance", () => {
 describe("ControlPanel", () => {
   it("keeps popover dictation focus-safe and names the microphone clearly", () => {
     const markup = renderPanel();
-    expect(markup).toContain("Check shortcut setup in Help.");
+    expect(markup).toContain("Click where you want the text, then start dictation.");
+    expect(markup).not.toContain("Check shortcut setup in Help.");
     expect(markup).not.toContain("Press Alt+D to dictate at your cursor.");
     expect(markup).toContain("Alt+D");
     expect(markup).toContain("Alt+D");
@@ -90,14 +91,17 @@ describe("ControlPanel", () => {
 
   it("advertises the shortcut only with explicit current available diagnostics", () => {
     const support = { available: false, requiredCommands: [], missingCommands: [], detail: "Fixture" };
-    const markup = renderPanel({ runtimeDiagnostics: {
-      shortcut: { hotkey: "Alt+D", route: "global-shortcut", state: "available", detail: "Registered current shortcut" },
+    const render = (state: "available" | "unavailable") => renderPanel({ runtimeDiagnostics: {
+      shortcut: { hotkey: "Alt+D", route: state === "available" ? "global-shortcut" : null, state, detail: "Fixture shortcut" },
       sessionType: "wayland", typeSimulation: support, clipboard: support,
       ownedPreedit: { available: false, ready: false, setupState: "safety-disabled", detail: "Manual copy", sessionId: null, engineActive: false, focusLost: false, progressiveCommitActive: false, committedCharacterCount: 0, ownershipIntact: false, finalizationOutcome: null, error: null },
     } });
+    const markup = render("available");
     expect(markup).toContain("Click where you want the text, then use your shortcut.");
     expect(markup).toContain("Alt+D");
     expect(markup).not.toContain("Start listening");
+    // Only an explicit unavailable observation points to Help.
+    expect(render("unavailable")).toContain("Check shortcut setup in Help.");
   });
 
   it("explains a leaking Wayland shortcut without blocking dictation", () => {

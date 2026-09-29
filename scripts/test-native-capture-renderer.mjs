@@ -1190,7 +1190,7 @@ try {
 
     await prepareDeferredDiagnostics();
     const pendingCalls = await page.evaluate(() => window.observerCalls);
-    await page.getByText('Check shortcut setup in Help.', { exact: true }).waitFor({ timeout: 3000 });
+    await page.getByText('Click where you want the text, then start dictation.', { exact: true }).waitFor({ timeout: 3000 });
     const openStarted = performance.now();
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
     await page.getByRole('button', { name: 'Shortcut', exact: true }).waitFor({ timeout: 3000 });

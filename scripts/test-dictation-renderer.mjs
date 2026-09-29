@@ -254,6 +254,8 @@ for (const failure of ['module', 'construction']) {
   },failure);
   await start(1);
   assert.equal(await page.evaluate(()=>Boolean(window.processor?.onaudioprocess)),true);
+  assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>c[0]==='showNotification'&&c[1]==="Dictation won't be typed")),true);
+  assert.equal(await page.evaluate(()=>window.store.getState().captureNotice),null);
   assert.equal(await page.evaluate(()=>window.benchmarkRequests.some(r=>['start','push'].includes(r.op))),false);
   assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>c[0]==='pasteDesktopText')),false);
   await stop();await interrupted();
