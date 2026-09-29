@@ -4,7 +4,7 @@ These instructions describe the private **2026.0.60** candidate. Public **2026.0
 has the earlier in-memory recovery flow; these changes are not published yet.
 
 A successful voice test is followed by a desktop input check
-before onboarding completes. **Desktop setup required** means helpers or their
+before onboarding completes. **Desktop setup needed** means helpers or their
 service need attention. Repair setup using the [installation guide](install.md),
 then retry the check.
 
@@ -37,8 +37,9 @@ not enable extensions. If setup says to sign out, save your work and sign out an
 back in; installing files alone cannot reload a running Wayland Shell.
 
 While recording, real input bars open on the microphone's left, without a
-Listening label or Stop button; the microphone itself stays put. Click the icon or
-use your shortcut to stop.
+Listening label or Stop button. The bars never push the microphone aside, though
+GNOME's privacy indicator shifts panel icons while the microphone is in use. Click
+the icon or use your shortcut to stop.
 Right-click for **Settings**, **Review**, and **Stop** during capture.
 Other desktops use the native tray menu. `voco --check-panel` changes no preferences.
 On GNOME Wayland the panel is recommended, not required. It keeps **Alt+D** and

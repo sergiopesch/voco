@@ -4,10 +4,9 @@
 ## Supported Platforms
 
 VOCO targets Linux x86-64. The [Linux support matrix](../linux-support.md) records
-package families, runtime floors and qualification limits. The public Ubuntu/Debian release is
-2026.0.51; Fedora, openSUSE and Arch/Omarchy packages remain at 2026.0.43.
-The .51 release includes installer and desktop readiness checks, measured tray
-bars and the bundled Nemotron recognizer. Consult GitHub
+package families, runtime floors and qualification limits. The recorded public
+Ubuntu/Debian release is 2026.0.59 (see [release status](../release-candidate.md));
+Fedora, openSUSE and Arch/Omarchy packages remain at 2026.0.43. Consult GitHub
 Releases for the exact published assets.
 macOS and Windows are outside the current scope.
 
@@ -41,7 +40,7 @@ Hotkey backend selection:
 - Runtime hotkey changes update backend preference immediately
 - Settings → Help → Technical details shows the detected session and whether insertion helpers are currently available. Presence is a prerequisite, not proof of delivery to a target.
 - The evdev fallback tracks left/right Alt, Shift, Control, and Super independently for each open keyboard. Extra Control/Super modifiers reject the default matches; repeats do not retrigger. Disconnect clears only that device's state, and reopening revalidates capabilities and the virtual-device exclusion before synchronizing currently held keys. Dropped kernel events suppress activation until the stream has been resynchronized; synthetic recovery never triggers a hotkey.
-- Native IBus, global-shortcut, evdev and external socket triggers use the configured desktop output route.
+- Native IBus, global-shortcut, evdev and external socket triggers all use the same desktop paste: clipboard and primary selection, then one Shift+Insert.
   Protocol-v6 IBus is shortcut-only; older helpers must reconnect after upgrade.
 - The browser extension uses `Alt+Shift+V` after the user enables it in a tab. It addresses the
   captured plain-text DOM element; no global shortcut grab or IBus insertion is used for this route.

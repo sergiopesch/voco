@@ -12,11 +12,11 @@ This file is the current VOCO copy pack for GitHub Releases, Flathub preparation
 
 ## One-Line Summary
 
-VOCO is a voice-first Linux desktop tool for dictation, interaction, and fast system workflows.
+VOCO is a local dictation app for Linux that pastes what you say into the focused app.
 
 ## Short Description
 
-VOCO lives in the Linux tray and listens on demand. It transcribes locally and delivers text through the selected VOCO Dictation input source when the target field can be verified; otherwise the transcript remains available for manual copying.
+VOCO lives in the Linux tray and listens on demand. It transcribes locally and pastes into whatever has keyboard focus. If typing is interrupted, Stop copies the words it did not type to the clipboard; after an unexpected exit, tray Review offers the last saved text.
 
 ## Full Description
 
@@ -33,7 +33,7 @@ It stays out of the way until you trigger it, then moves through a small set of 
 Key product points:
 
 - tray-first workflow with a compact command panel
-- first-run setup for microphone, hotkey, the VOCO Dictation input source, and tray workflow
+- first-run voice test and desktop setup check
 - local-first transcription path
 - explicit Linux install and upgrade guidance
 - settings that remain compact instead of sprawling
@@ -102,13 +102,11 @@ One paragraph describing the headline product change.
 
 Capture these surfaces on a clean Linux desktop with legible text and restrained composition:
 
-1. First-run welcome screen
-2. Microphone check with live level meter
-3. Hotkey and tray-state onboarding step
-4. Linux insertion strategy onboarding step
-5. Compact command panel with current state visible
-6. Settings window on the Updates section
-7. Listening HUD in-context on a desktop
+1. First-run voice test with live transcript
+2. Desktop setup check
+3. Compact command panel with current state visible
+4. Settings window on the Updates section
+5. Tray or GNOME panel microphone and waveform during dictation
 
 ## Screenshot Rules
 

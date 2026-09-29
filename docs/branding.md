@@ -90,12 +90,10 @@ folder for this work session, not a shipping asset dependency.
 
 ## Silver Lens interface material
 
-The command panel uses a 420 × 380 logical-pixel Silver Lens layout: one silver
-microphone, state and configured shortcut, one cue, a Hide to dictate action,
-and microphone/More controls. Recovery expands the native window to 420 × 660
-and retains its scrollable transcript list. Microphone opens Microphone settings.
-More opens a glass disclosure above its trigger; Escape closes it and returns
-focus before the panel's normal Escape-to-hide behavior applies.
+The command panel uses a 420 × 380 logical-pixel Silver Lens layout: a Settings
+button, one silver microphone, state and configured shortcut, one cue, a Hide to
+tray action, and Microphone and Help controls. Microphone opens microphone
+settings; Help opens Help. Escape hides the panel.
 
 The static generated microphone mesh lives at
 `apps/desktop/public/textures/microphone-mesh.webp`. It is a single covered image,
@@ -119,20 +117,18 @@ requires an on-device check; browser previews are not proof of native dictation.
 ## Crystal Sidebar settings
 
 Settings carries the silver and graphite identity through one navigation surface
-and grouped, readable controls. Overview brings together microphone, shortcut,
-output and appearance choices; retained transcripts appear before these groups
-and take priority over previous delivery-success copy. Updates and Help
-remain in a separate app-settings navigation group.
+and grouped, readable controls. Settings, which holds the microphone controls,
+and Shortcut form the first navigation group; Updates and Help remain in a
+separate app-settings group.
 
 Use semantic buttons, inputs and disclosures inside the material treatment.
 Microphone selectors use the controlled listbox described below; other selects stay native.
-Reduce motion reports the system preference as On, Off or Unavailable rather than
-offering a misleading second switch. Output descriptions are associated with
-their controls, and the microphone check has qualitative status text alongside
-the visual meter. Keep functional signal feedback independent of decorative motion.
+Reduced motion follows the system preference; there is no app-level switch. The
+microphone check has qualitative status text alongside the visual meter. Keep
+functional signal feedback independent of decorative motion.
 
-Text drafts and their save/discard protection remain in the control-panel state
-across settings navigation. Save feedback is shown when there is an edit, an
+The shortcut draft and its save/discard protection remain in the control-panel
+state across settings navigation. Save feedback is shown when there is an edit, an
 operation or a result; idle settings do not need a permanent save-status footer.
 
 The command panel's settings and chevron icons are unmodified GNOME Adwaita assets, vendored from the
@@ -173,16 +169,15 @@ Bits micro-interaction patterns; no React Bits source is vendored.
 `VoiceSignal` consumes the owner's audio level; it never opens a microphone or
 simulates speech. The labelled onboarding Start/Stop button remains separate from
 the accessible meter. The popover keeps its microphone artwork and adds the same
-level display while listening. Active dictation prioritises the finish instruction;
-getting-started guidance remains in More and in the idle view. Recovery stays
-persistent. The [GNOME panel extension](../integrations/gnome/README.md) supersedes
-the floating recording presentation when attached: the unchanged microphone
-expands horizontally into a silver capsule inside the panel. Native tray menus
-remain the fallback when it is absent.
+level display while listening. The [GNOME panel extension](../integrations/gnome/README.md)
+supersedes the floating recording presentation when attached: a silver capsule
+expands horizontally inside the panel, opening a waveform on the microphone's
+left without moving the microphone. Native tray menus remain the fallback when
+it is absent.
 
 `StatusMark` is decorative beside readable status text. Pending, working,
 listening, success and attention are supplied by the owning operation. A passed
-voice test never implies desktop-input readiness. Settings save/copy results use
+voice test never implies desktop-input readiness. Settings save results use
 the actual promise outcome. Only working indicators loop, and reduced motion
 removes that animation as well as the level interpolation and expanding surfaces.
 Contrast and transparency fallbacks remain authoritative.
@@ -223,8 +218,8 @@ handoff. Phase changes move keyboard focus to the next primary action.
 The opening renderer uses the original microphone asset and a working indicator
 while configuration loads. Native window presentation still controls whether
 that state is visible during cold launch; a browser fixture is not proof of native
-startup timing. The panel capsule remains horizontal and labels processing
-“Finishing” to match setup.
+startup timing. The panel capsule remains horizontal and shows no label while
+processing.
 
 The current source installer uses a five-row VOCO block wordmark in colour terminals
 at least 64 columns wide and 16 rows tall. Short colour terminals keep a one-line
