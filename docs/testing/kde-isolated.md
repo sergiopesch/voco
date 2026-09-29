@@ -31,6 +31,12 @@ For the complete synthetic journey, also set `VOCO_KDE_CAPTURE=1`,
 virtual source. It uses the app's private control socket to start/stop recording,
 so it does not qualify a hardware/global recording shortcut.
 
+This capture journey is the historical manual-Copy one. Current cursor-only
+dictation correctly refuses to record without desktop input setup, which this
+harness does not provide, so it is not current acceptance evidence. Its private
+audio server was aligned with native capture on 2026-09-29 without a rerun; the
+record below keeps its original scope.
+
 The watcher is the real kded `statusnotifierwatcher` module. The harness observes
 its D-Bus interface, explicitly loads that actual module in the private session,
 and verifies its unique bus owner, PID, UID, executable bytes and private PID

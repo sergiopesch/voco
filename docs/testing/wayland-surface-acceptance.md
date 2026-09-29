@@ -1,5 +1,7 @@
 # Private Wayland surface acceptance
 
+This is the historical manual-Copy journey. Current cursor-only dictation correctly refuses to record without desktop input setup, which the Weston harness does not provide; a 2026-09-29 run stopped at that refusal. It is not current acceptance evidence, and the record below keeps its original scope.
+
 The existing `scripts/test-native-wayland.sh` harness supports an additional opt-in journey. Set `VOCO_WAYLAND_CAPTURE=1`, `VOCO_WAYLAND_SURFACE_JOURNEY=1`, and `VOCO_DEBUG_CAPTURE_AUDIO=1` with the usual `VOCO_WAYLAND_BACKEND=nested-x11`, extracted dependency, exact packaged application, pinned model, and fresh evidence-directory variables.
 
 The supported journey remaps the idle popover **before** recording, then invokes its visible Hide to tray control and verifies it is hidden before the recording toggle. An open panel deliberately consumes the first toggle as dismissal; the harness does not mistake that for capture startup. During synthetic playback, actual tray Open must be refused by the application's recording guard. After recording, actual Open must expose normal Copy. Because clipboard readback can change focus, the journey explicitly invokes Open again before requiring and clicking visible Settings, reopens the transcript, maps a separate native focus target, verifies real compositor focus and blur dismissal, and reopens visible Copy with actual clipboard readback. It does not bypass the application's state guard. No surface, recording, or clipboard result is supplied by a mock.

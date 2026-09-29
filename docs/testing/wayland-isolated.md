@@ -87,6 +87,11 @@ passed native GTK 3/4 Wayland mapping and a cross-process `wl-copy`/`wl-paste`
 round trip. This is nested Wayland protocol evidence, not GNOME/KDE or hardware
 compositor qualification.
 
+`VOCO_WAYLAND_CAPTURE=1` is the historical manual-Copy journey. Current cursor-only
+dictation correctly refuses to record without desktop input setup, which this
+harness does not provide; a 2026-09-29 run stopped at that refusal. The journey is
+not current acceptance evidence, and the record below keeps its original scope.
+
 The optional capture-to-Copy extension has passed on the extracted iteration 4
 package. To reproduce it in a fresh evidence directory:
 
