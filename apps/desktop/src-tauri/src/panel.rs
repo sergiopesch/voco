@@ -83,6 +83,8 @@ fn set_owner(sender: Option<String>) {
     if let Ok(mut owner) = OWNER.lock() {
         *owner = sender;
     }
+    // Attach, Detach and lease expiry change what the companion check reports.
+    crate::panel_setup::invalidate_check();
 }
 
 /// Sample the authenticated compositor, not an asynchronously polled shortcut
@@ -399,7 +401,10 @@ pub fn setup(app: &tauri::AppHandle) {
             }
         },
         |_, _| {},
-        move |_, _| crate::tray::panel_visibility(&lost_app, true),
+        move |_, _| {
+            crate::panel_setup::invalidate_check();
+            crate::tray::panel_visibility(&lost_app, true);
+        },
     );
 }
 

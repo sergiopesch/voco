@@ -6,6 +6,8 @@ use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 // Matches the engine's monotonic poll-trigger arm lifetime. Start this bound
 // when a response/error arrives, conservatively later than engine processing.
 const ENGINE_ARM_MS: i64 = 1_000;
+// Retries an arbitration pass the main thread skipped for a concurrent writer.
+const ARBITRATION_REFRESH_MS: i64 = 1_000;
 
 /// A plugin callback owns one registration; a release cannot borrow another press.
 pub struct PluginGesture {
@@ -93,6 +95,28 @@ impl ConsumingLease {
         // Its callback proves the key was delivered to the grabbing client,
         // not the destination's ordinary IBus process_key_event route.
         backend == "evdev" && self.is_current(now)
+    }
+}
+
+/// Fallback arbitration on the main thread is idempotent and re-checks its own
+/// inputs, so the listener posts it only when the configuration revision or the
+/// fallback decision changes, and otherwise once a second.
+#[derive(Default)]
+pub struct ArbitrationPosts {
+    last: Option<(u64, bool, i64)>,
+}
+
+impl ArbitrationPosts {
+    pub fn should_post(&mut self, revision: u64, fallback: bool, now: i64) -> bool {
+        if let Some((last_revision, last_fallback, posted)) = self.last {
+            if (last_revision, last_fallback) == (revision, fallback)
+                && now.saturating_sub(posted) < ARBITRATION_REFRESH_MS
+            {
+                return false;
+            }
+        }
+        self.last = Some((revision, fallback, now));
+        true
     }
 }
 
@@ -312,5 +336,22 @@ mod tests {
         assert!(!admit_toggle(&last, 1089, 90));
         assert!(admit_toggle(&last, 1090, 90));
         assert!(lease.suppresses_backend("evdev", 1090));
+    }
+
+    #[test]
+    fn arbitration_posts_only_on_a_change_or_once_a_second() {
+        let mut posts = ArbitrationPosts::default();
+        assert!(posts.should_post(1, true, 0), "the first pass posts");
+        assert!(!posts.should_post(1, true, 50));
+        assert!(posts.should_post(1, false, 100), "a decision change posts");
+        assert!(!posts.should_post(1, false, 150));
+        assert!(posts.should_post(1, true, 200), "and so does changing back");
+        assert!(posts.should_post(2, true, 250), "a new revision posts");
+        assert!(!posts.should_post(2, true, 1_249));
+        assert!(
+            posts.should_post(2, true, 1_250),
+            "an unchanged pass retries after 1 s"
+        );
+        assert!(!posts.should_post(2, true, 1_300));
     }
 }

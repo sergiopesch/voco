@@ -689,7 +689,9 @@ fn get_panel_setup_status() -> Result<panel_setup::PanelSetupStatus, String> {
 
 #[tauri::command(async)]
 fn enable_gnome_panel() -> Result<panel_setup::PanelSetupStatus, String> {
-    panel_setup::check(true)
+    let status = panel_setup::check(true);
+    panel_setup::invalidate_check();
+    status
 }
 
 #[tauri::command(async)]
@@ -709,7 +711,7 @@ fn stop_shortcut_setup_issue(app: &tauri::AppHandle) -> Option<String> {
         return panel_setup::stop_shortcut_setup_detail(
             &session_type,
             chord,
-            panel_setup::check(false),
+            panel_setup::cached_check(),
             panel::is_attached(),
         );
     }
@@ -792,13 +794,13 @@ fn get_runtime_diagnostics(
     state: tauri::State<'_, owned_preedit::OwnedPreeditService>,
 ) -> RuntimeDiagnostics {
     let owned_preedit = state.status();
-    let (desktop_input, desktop_paste) = insertion::desktop_paste_diagnostics();
+    let (insertion, desktop_input, desktop_paste) = insertion::runtime_input_diagnostics();
     #[cfg(target_os = "linux")]
     let panel_reserved = panel::reserves_current_shortcut(&app);
     #[cfg(not(target_os = "linux"))]
     let panel_reserved = false;
     RuntimeDiagnostics {
-        insertion: insertion::runtime_diagnostics(),
+        insertion,
         shortcut: shortcut_runtime_status(owned_preedit.available, panel_reserved),
         owned_preedit,
         desktop_paste,
@@ -1065,7 +1067,18 @@ fn should_register_shortcut_fallback(use_evdev: bool, consuming_context: bool) -
     should_register_global_shortcut(use_evdev) && !consuming_context
 }
 
-fn schedule_shortcut_arbitration(app: &tauri::AppHandle, snapshot: &ConfigSnapshot) {
+fn schedule_shortcut_arbitration(
+    app: &tauri::AppHandle,
+    snapshot: &ConfigSnapshot,
+    posts: &mut shortcut_arbitration::ArbitrationPosts,
+) {
+    let fallback = should_register_shortcut_fallback(
+        USE_EVDEV_HOTKEY.load(Ordering::SeqCst),
+        IBUS_SHORTCUT_LEASE.has_authority(shortcut_monotonic_ms()),
+    );
+    if !posts.should_post(snapshot.revision, fallback, shortcut_monotonic_ms()) {
+        return;
+    }
     let handle = app.clone();
     let revision = snapshot.revision;
     let hotkey = snapshot.config.hotkey.clone();
@@ -1095,6 +1108,7 @@ fn schedule_shortcut_arbitration(app: &tauri::AppHandle, snapshot: &ConfigSnapsh
 fn start_ibus_shortcut_listener(app_handle: tauri::AppHandle) {
     std::thread::spawn(move || {
         let mut shortcut_config = None;
+        let mut arbitration_posts = shortcut_arbitration::ArbitrationPosts::default();
         loop {
             std::thread::sleep(std::time::Duration::from_millis(50));
             // Capture the observation epoch before checking renderer readiness,
@@ -1107,7 +1121,7 @@ fn start_ibus_shortcut_listener(app_handle: tauri::AppHandle) {
                 )
             {
                 if let Some(snapshot) = shortcut_config.as_ref() {
-                    schedule_shortcut_arbitration(&app_handle, snapshot);
+                    schedule_shortcut_arbitration(&app_handle, snapshot, &mut arbitration_posts);
                 }
                 continue;
             }
@@ -1119,7 +1133,7 @@ fn start_ibus_shortcut_listener(app_handle: tauri::AppHandle) {
             .is_err()
             {
                 if let Some(snapshot) = shortcut_config.as_ref() {
-                    schedule_shortcut_arbitration(&app_handle, snapshot);
+                    schedule_shortcut_arbitration(&app_handle, snapshot, &mut arbitration_posts);
                 }
                 continue;
             }
@@ -1151,7 +1165,7 @@ fn start_ibus_shortcut_listener(app_handle: tauri::AppHandle) {
                             shortcut_arbitration::PollOutcome::Disarmed
                         },
                     );
-                    schedule_shortcut_arbitration(&app_handle, snapshot);
+                    schedule_shortcut_arbitration(&app_handle, snapshot, &mut arbitration_posts);
                     if CONFIG_REVISION.load(Ordering::SeqCst) != snapshot.revision {
                         continue;
                     }
@@ -1195,7 +1209,7 @@ fn start_ibus_shortcut_listener(app_handle: tauri::AppHandle) {
                             shortcut_arbitration::PollOutcome::Unavailable
                         },
                     );
-                    schedule_shortcut_arbitration(&app_handle, snapshot);
+                    schedule_shortcut_arbitration(&app_handle, snapshot, &mut arbitration_posts);
                     std::thread::sleep(std::time::Duration::from_millis(450));
                 }
             }

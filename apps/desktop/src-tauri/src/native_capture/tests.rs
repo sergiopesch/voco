@@ -691,6 +691,28 @@ fn disconnected_backend_waits_for_commands_without_poll_timeouts() {
 }
 
 #[test]
+fn pump_interval_is_fast_only_while_a_session_captures_or_drains() {
+    assert_eq!(Worker::<Fake>::new().pump_interval(), None);
+    let mut worker = active();
+    assert_eq!(worker.pump_interval(), Some(LIVE_PUMP), "live capture");
+    worker.handle(drain(0)).unwrap();
+    worker.pulse.as_mut().unwrap().status.stopped = true;
+    assert_eq!(
+        worker.pump_interval(),
+        Some(LIVE_PUMP),
+        "stopped with blocks still to deliver"
+    );
+    worker.handle(drain(2)).unwrap();
+    assert_eq!(
+        worker.pump_interval(),
+        Some(IDLE_PUMP),
+        "stopped and acknowledged"
+    );
+    worker.session = None;
+    assert_eq!(worker.pump_interval(), Some(IDLE_PUMP), "no session");
+}
+
+#[test]
 fn connected_backend_keeps_periodic_pump_and_lease_checks() {
     let worker = active();
     let (_send, incoming) = mpsc::sync_channel(1);

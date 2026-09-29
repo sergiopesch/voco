@@ -21,6 +21,10 @@ use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
 const LEASE: Duration = Duration::from_secs(5);
+// A capturing or still-draining session needs the 5 ms pump for audio and the
+// lease check. Otherwise only Pulse housekeeping remains, so poll slowly.
+const LIVE_PUMP: Duration = Duration::from_millis(5);
+const IDLE_PUMP: Duration = Duration::from_millis(250);
 const CALL_TIMEOUT: Duration = Duration::from_secs(8);
 type Reply = SyncSender<Result<Response, String>>;
 enum Request {
@@ -276,19 +280,26 @@ impl<B: CaptureBackend> Worker<B> {
             .as_mut()
             .ok_or_else(|| "Native source must be explicitly selected".into())
     }
+    fn pump_interval(&self) -> Option<Duration> {
+        let status = self.pulse.as_ref()?.status();
+        let live = self.session.as_ref().is_some_and(|session| {
+            !status.stopped
+                || (session.failure.is_none() && session.delivery.acknowledged() != status.blocks)
+        });
+        Some(if live { LIVE_PUMP } else { IDLE_PUMP })
+    }
     fn next_command(
         &self,
         incoming: &Receiver<Envelope>,
     ) -> Result<Envelope, mpsc::RecvTimeoutError> {
-        if self.pulse.is_some() {
+        match self.pump_interval() {
             // A connected backend still needs event pumping and lease checks.
-            incoming.recv_timeout(Duration::from_millis(5))
-        } else {
+            Some(interval) => incoming.recv_timeout(interval),
             // With no backend, tick has no work. Wake for a command or channel
             // disconnection instead of polling 200 times per second while idle.
-            incoming
+            None => incoming
                 .recv()
-                .map_err(|_| mpsc::RecvTimeoutError::Disconnected)
+                .map_err(|_| mpsc::RecvTimeoutError::Disconnected),
         }
     }
     fn tick(&mut self) {

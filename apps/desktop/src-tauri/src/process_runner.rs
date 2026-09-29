@@ -5,7 +5,7 @@ use std::io::{Read, Write};
 use std::os::fd::AsRawFd;
 use std::os::unix::process::CommandExt;
 use std::process::{Child, Command, Output, Stdio};
-use std::sync::{Arc, LazyLock, Mutex};
+use std::sync::{Arc, Condvar, LazyLock, Mutex};
 use std::time::{Duration, Instant};
 
 const IO_BATCH_BYTES: usize = 16 * 1024;
@@ -20,36 +20,62 @@ pub(crate) fn command(program: &str) -> Command {
     command
 }
 
+// How often the reaper checks launchers that are still running. With none
+// left it sleeps until the next launch.
+const REAP_POLL: Duration = Duration::from_millis(250);
+
+struct DetachedChildren {
+    children: Mutex<Vec<Child>>,
+    launched: Condvar,
+}
+
 // Desktop launchers may exec their application and legitimately stay alive for
 // its entire lifetime. Reap them without deadline/group termination, pipe
 // ownership, or one blocked thread per opened window.
-static DETACHED_CHILDREN: LazyLock<Result<Arc<Mutex<Vec<Child>>>, String>> = LazyLock::new(|| {
-    let children = Arc::new(Mutex::new(Vec::<Child>::new()));
-    let pending = Arc::clone(&children);
+static DETACHED_CHILDREN: LazyLock<Result<Arc<DetachedChildren>, String>> = LazyLock::new(|| {
+    let detached = Arc::new(DetachedChildren {
+        children: Mutex::new(Vec::new()),
+        launched: Condvar::new(),
+    });
+    let reaper = Arc::clone(&detached);
     std::thread::Builder::new()
         .name("voco-desktop-reaper".to_string())
-        .spawn(move || loop {
-            std::thread::sleep(Duration::from_millis(100));
-            let mut children = pending
+        .spawn(move || {
+            let mut children = reaper
+                .children
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
-            children.retain_mut(|child| match child.try_wait() {
-                Ok(None) => true,
-                Ok(Some(_)) => false,
-                Err(error) => {
-                    log::warn!("Could not reap desktop launcher {}: {error}", child.id());
-                    false
-                }
-            });
+            loop {
+                children = if children.is_empty() {
+                    reaper
+                        .launched
+                        .wait(children)
+                        .unwrap_or_else(std::sync::PoisonError::into_inner)
+                } else {
+                    reaper
+                        .launched
+                        .wait_timeout(children, REAP_POLL)
+                        .unwrap_or_else(std::sync::PoisonError::into_inner)
+                        .0
+                };
+                children.retain_mut(|child| match child.try_wait() {
+                    Ok(None) => true,
+                    Ok(Some(_)) => false,
+                    Err(error) => {
+                        log::warn!("Could not reap desktop launcher {}: {error}", child.id());
+                        false
+                    }
+                });
+            }
         })
         .map_err(|error| format!("Failed to start desktop process reaper: {error}"))?;
-    Ok(children)
+    Ok(detached)
 });
 
 /// Success means the launcher was spawned, not that a desktop window appeared.
 /// Output is discarded; it must not hold pipes or delay the app command.
 pub(crate) fn spawn_desktop_launcher(command: &mut Command) -> Result<u32, String> {
-    let children = DETACHED_CHILDREN.as_ref().map_err(Clone::clone)?;
+    let detached = DETACHED_CHILDREN.as_ref().map_err(Clone::clone)?;
     let child = command
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -57,10 +83,12 @@ pub(crate) fn spawn_desktop_launcher(command: &mut Command) -> Result<u32, Strin
         .spawn()
         .map_err(|error| format!("Failed to launch desktop application: {error}"))?;
     let pid = child.id();
-    children
+    detached
+        .children
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
         .push(child);
+    detached.launched.notify_one();
     Ok(pid)
 }
 

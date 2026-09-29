@@ -1,8 +1,26 @@
 //! Bounded, explicit companion setup; no package hook changes a user profile.
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
+use std::sync::{Mutex, PoisonError};
+use std::time::{Duration, Instant};
 
-#[derive(Deserialize, Serialize)]
+/// How long the diagnostics poll may reuse a companion check. Attach, detach,
+/// name loss and explicit enabling clear it sooner; the TTL catches edits on disk.
+const CHECK_TTL: Duration = Duration::from_secs(20);
+
+type CheckResult = Result<PanelSetupStatus, String>;
+
+#[derive(Default)]
+struct CheckCache {
+    generation: u64,
+    entry: Option<(Instant, CheckResult)>,
+}
+
+static CHECK_CACHE: Mutex<CheckCache> = Mutex::new(CheckCache {
+    generation: 0,
+    entry: None,
+});
+
+#[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PanelSetupStatus {
     pub status: String,
@@ -59,9 +77,52 @@ pub fn check(enable: bool) -> Result<PanelSetupStatus, String> {
     serde_json::from_slice(&output.stdout).map_err(|_| "Invalid panel setup response".to_string())
 }
 
+/// `check(false)` for the once-a-second diagnostics poll, which would otherwise
+/// start python3 and GI every time. Explicit setup status stays uncached.
+pub fn cached_check() -> CheckResult {
+    cached_check_with(&CHECK_CACHE, Instant::now, || check(false))
+}
+
+/// Forget the cached check: the companion attached, detached or was enabled.
+pub fn invalidate_check() {
+    invalidate(&CHECK_CACHE);
+}
+
+fn invalidate(cache: &Mutex<CheckCache>) {
+    let mut cache = cache.lock().unwrap_or_else(PoisonError::into_inner);
+    cache.generation = cache.generation.wrapping_add(1);
+    cache.entry = None;
+}
+
+fn cached_check_with(
+    cache: &Mutex<CheckCache>,
+    now: impl Fn() -> Instant,
+    check: impl FnOnce() -> CheckResult,
+) -> CheckResult {
+    let started = now();
+    let generation = {
+        let cache = cache.lock().unwrap_or_else(PoisonError::into_inner);
+        if let Some((checked, result)) = &cache.entry {
+            if started.saturating_duration_since(*checked) < CHECK_TTL {
+                return result.clone();
+            }
+        }
+        cache.generation
+    };
+    // The bounded check runs unlocked. Keep its result only if nothing
+    // invalidated the cache meanwhile, so a stale answer cannot outlive Attach.
+    let result = check();
+    let mut cache = cache.lock().unwrap_or_else(PoisonError::into_inner);
+    if cache.generation == generation {
+        cache.entry = Some((started, result.clone()));
+    }
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::cell::Cell;
 
     fn panel(status: &str) -> Result<PanelSetupStatus, String> {
         Ok(PanelSetupStatus {
@@ -99,5 +160,67 @@ mod tests {
             stop_shortcut_setup_detail("wayland", "Control+Space", panel("restart"), false)
                 .is_none()
         );
+    }
+
+    #[test]
+    fn cached_check_is_reused_until_invalidated_or_expired() {
+        let cache = Mutex::new(CheckCache::default());
+        let start = Instant::now();
+        let clock = Cell::new(start);
+        let now = || clock.get();
+        let runs = Cell::new(0);
+        let check = || {
+            runs.set(runs.get() + 1);
+            panel("active")
+        };
+        let status = |result: CheckResult| result.map(|setup| setup.status);
+
+        assert_eq!(
+            status(cached_check_with(&cache, now, check)),
+            Ok("active".into())
+        );
+        clock.set(start + CHECK_TTL / 2);
+        assert_eq!(
+            status(cached_check_with(&cache, now, check)),
+            Ok("active".into())
+        );
+        assert_eq!(runs.get(), 1, "a fresh check is reused");
+
+        invalidate(&cache);
+        assert!(cached_check_with(&cache, now, check).is_ok());
+        assert_eq!(
+            runs.get(),
+            2,
+            "attach, detach and enabling force a new check"
+        );
+
+        clock.set(start + CHECK_TTL / 2 + CHECK_TTL);
+        assert!(cached_check_with(&cache, now, check).is_ok());
+        assert_eq!(runs.get(), 3, "the TTL catches changes on disk");
+
+        // A check that races an invalidation is returned but never reused.
+        clock.set(start + CHECK_TTL * 4);
+        let raced = cached_check_with(&cache, now, || {
+            invalidate(&cache);
+            panel("restart")
+        });
+        assert_eq!(status(raced), Ok("restart".into()));
+        assert_eq!(
+            status(cached_check_with(&cache, now, check)),
+            Ok("active".into())
+        );
+        assert_eq!(runs.get(), 4);
+
+        // Failures are cached too, so a missing python3 is not retried every poll.
+        invalidate(&cache);
+        assert_eq!(
+            status(cached_check_with(&cache, now, || Err("bus".into()))),
+            Err("bus".into())
+        );
+        assert_eq!(
+            status(cached_check_with(&cache, now, check)),
+            Err("bus".into())
+        );
+        assert_eq!(runs.get(), 4);
     }
 }
