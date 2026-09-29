@@ -54,7 +54,9 @@ async function playFixture(file) {
 try {
   await until(()=>fs.stat(`${root}/runtime/voco-browser/exact-field.sock`).then(()=>true).catch(()=>false),'broker socket');
   await delay(6000);
-  browser = await chromium.launchPersistentContext(profile, {executablePath:'/tmp/browser/chrome',headless:false,args:['--force-renderer-accessibility=complete',`--disable-extensions-except=${extension}`,`--load-extension=${extension}`]});
+  // Chromium exposes its toolbar over AT-SPI only when it is told an assistive
+  // technology is running; the renderer flag alone covers just the page.
+  browser = await chromium.launchPersistentContext(profile, {executablePath:'/tmp/browser/chrome',headless:false,env:{...process.env,ACCESSIBILITY_ENABLED:'1'},args:['--force-renderer-accessibility=complete',`--disable-extensions-except=${extension}`,`--load-extension=${extension}`]});
   worker=browser.serviceWorkers()[0]||await browser.waitForEvent('serviceworker');
   page=await browser.newPage();await page.goto(`http://127.0.0.1:${server.address().port}`);
   await worker.evaluate(() => { globalThis.nativeRequestMetadata = []; });
@@ -105,7 +107,13 @@ try {
     await delay(500);
     const player=await playFixture('tests/fixtures/speech/84-121123-0000.wav');
     assert.equal(await player.done,0);
-    if(reject){await page.locator('#b').focus();await page.locator('#a').focus();}
+    let prefix;
+    if(reject){
+      await until(async()=> (await page.locator('#a').inputValue()).length > 0,'live browser prefix');
+      await page.locator('#b').focus();
+      prefix = await page.locator('#a').inputValue();
+      await page.locator('#a').focus();
+    }
     await delay(600);await page.keyboard.press('Alt+Shift+v');
     // After focus loss, Stop copies the words the field did not take, as a failed paste does.
     if(reject) await until(async()=> (await traces()).slice(traceStart).some(t=>t.event==='dictation_desktop_remainder_copied'),'focus-loss remainder copied',45_000);
@@ -113,9 +121,10 @@ try {
     await until(async()=> (await traces()).slice(traceStart).some(t=>t.event==='dictation_stop_to_idle'),'dictation returns idle');
     assert.equal(await page.locator('#b').inputValue(),'');
     if(reject){
-      assert.equal(await page.locator('#a').inputValue(),'');
+      assert.equal(await page.locator('#a').inputValue(),prefix,'Focus loss preserves already delivered text without replay');
       const copied = execFileSync('xclip', ['-selection', 'clipboard', '-o'], {encoding: 'utf8', timeout: 5000});
-      assert.equal(copied.toLowerCase().match(/[a-z]+/g)?.join(' '), 'go do you hear', 'The clipboard holds the words the field did not take');
+      // Pasted right after the field's words, the copy keeps them apart.
+      assert.equal((prefix + copied).toLowerCase().match(/[a-z]+/g)?.join(' '), 'go do you hear', 'The clipboard holds exactly the words the field did not take');
     }
     await page.screenshot({path:`${root}/evidence/${retry?'fresh-recording':reject?'focus-loss':'delivery'}.png`});
     results.push({case:retry?'fresh-recording':reject?'focus-loss':'delivery',passed:true,events:(await traces()).slice(traceStart).map(t=>t.event)});
