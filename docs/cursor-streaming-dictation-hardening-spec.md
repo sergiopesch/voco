@@ -50,9 +50,9 @@ These failures have already occurred and must be designed out:
 - VOCO must not send destructive key sequences to arbitrary target apps during live streaming.
 - Hotkey stop must remain responsive even while preview or insertion work is in progress.
 - Normal operational logs and privacy-safe timing traces must not contain transcript text, audio
-  samples, or target-app content. The explicitly enabled `VOCO_DEBUG_CAPTURE_AUDIO=1` developer
-  capture is the documented exception: it persists one private WAV and transcript timeline for
-  local diagnosis until the user deletes them.
+  samples, or target-app content. Native raw-capture evidence, enabled only by three explicit
+  developer flags, is the documented exception: it persists one recording's private audio and
+  source metadata for local diagnosis until the user deletes them.
 
 ## Core Design Principle
 

@@ -51,9 +51,9 @@ VOCO needs microphone access for voice input. Normal dictation is transcribed on
 not require an account or cloud transcription service. There are no assistant or cloud conversation modes.
 
 Configuration stays local on the machine. VOCO automatically requests GitHub Releases metadata for
-update awareness, without uploading audio or transcripts. A developer-only environment flag can
-persist one debug WAV and transcript timeline for regression testing; it is off by default and is
-not part of normal dictation. Existing `voice` installs migrate forward to `voco` paths
+update awareness, without uploading audio or transcripts. Developer-only environment flags can
+save one recording's raw audio for regression testing; they are off by default and are not part
+of normal dictation. Existing `voice` installs migrate forward to `voco` paths
 automatically.
 
 ## Packaging Notes
