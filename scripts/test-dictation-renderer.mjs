@@ -116,7 +116,7 @@ await page.addInitScript(() => {
  window.benchmarkAudioSamples = 0;
  window.__TAURI_INTERNALS__ = {invoke: async (command, args) => {
    if(command === 'get_crash_journal_epoch') return 1;
-   if(command.endsWith('_crash_journal')) { (window.journalCalls??=[]).push([command,args]); return; }
+   if(command.endsWith('_crash_journal')) { (window.journalCalls??=[]).push([command,args]); if(command === 'keep_crash_journal' && window.failKeep) throw new Error('Synthetic Review failure'); return; }
    const {request}=args;
    if(command === 'recover_stream') {
      (window.recoveryRequests ??= []).push(request);
@@ -276,12 +276,12 @@ await page.evaluate(()=>{void window.hook.cancelRecording();});await page.evalua
 await page.waitForFunction(()=>window.benchmarkRequests.some(r=>r.op==='cancel'));
 assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length),0);
 results.push('Cancellation while a progressive worker request is in flight drains the cancel command and suppresses its late paste.');
-for (const failCopy of [false, true]) {
-  await load();await page.evaluate(failCopy=>{window.desktopPaste=true;window.desktopStream=true;window.failPaste=true;window.failCopy=failCopy;},failCopy);
+for (const [failCopy, failKeep] of [[false, false], [true, false], [true, true]]) {
+  await load();await page.evaluate(([failCopy,failKeep])=>{window.desktopPaste=true;window.desktopStream=true;window.failPaste=true;window.failCopy=failCopy;window.failKeep=failKeep;},[failCopy,failKeep]);
   await start();await page.evaluate(()=>window.captureWorklet.port.onmessage({data:{type:'samples',data:new Float32Array(16000)}}));
   await page.waitForFunction(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length===1);
   await page.evaluate(()=>window.samples(1));await stop();
-  if (failCopy) await interrupted();
+  if (failKeep) await interrupted();
   else await page.waitForFunction(()=>window.store.getState().status==='idle',null,{timeout:6000});
   assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length),1);
   assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='copyDesktopText').map(c=>c[1])),['Recovered words for manual review.']);
@@ -290,12 +290,14 @@ for (const failCopy of [false, true]) {
   assert.equal(await page.evaluate(()=>window.store.getState().recovery),null);
   assert.notEqual(await page.evaluate(()=>window.store.getState().surface),'review');
   assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>c[0]==='showNotification'&&c[1]==='Dictation copied to clipboard')),!failCopy);
-  assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='showNotification'&&c[1]==='Dictation saved in VOCO').length),0);
+  assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>c[0]==='showNotification'&&c[1]==='Dictation saved in Review')),failCopy&&!failKeep);
   assert.equal(await page.getByRole('button',{name:'Copy transcript',exact:true}).count(),0);
-  assert.equal(await page.evaluate(()=>window.journalCalls.at(-1)[0]),'finish_crash_journal');
-  if (!failCopy) assert.equal(await page.evaluate(()=>window.store.getState().error),null);
+  // Review keeps a dictation the clipboard could not take; otherwise Stop clears the checkpoint.
+  assert.equal(await page.evaluate(()=>window.journalCalls.at(-1)[0]),failCopy&&!failKeep?'keep_crash_journal':'finish_crash_journal');
+  if (failKeep) assert.match(await page.evaluate(()=>window.store.getState().error),/couldn't paste, copy or save/);
+  else assert.equal(await page.evaluate(()=>window.store.getState().error),null);
 }
-results.push('Uncertain progressive paste keeps recognition and Stop flushing, never retries insertion, copies the untyped words at Stop and clears text/audio; a failed copy takes the interrupted path.');
+results.push('Uncertain progressive paste keeps recognition and Stop flushing, never retries insertion, copies the untyped words at Stop and clears text/audio; Review keeps them when the copy fails, and only a failed Review save takes the interrupted path.');
 
 await load();await page.evaluate(()=>{window.desktopPaste=true;window.desktopStream=true;window.failPaste=true;window.pasteOutcome='no-mutation';});
 await start();await stop();
@@ -394,7 +396,7 @@ assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='co
 assert.equal(await page.evaluate(()=>window.store.getState().transcript),'');
 assert.equal(await page.evaluate(()=>window.store.getState().error),null);
 assert.notEqual(await page.evaluate(()=>window.store.getState().surface),'review');
-assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='showNotification'&&c[1]==='Dictation saved in VOCO').length),0);
+assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='showNotification'&&c[1]==='Dictation saved in Review').length),0);
 await page.evaluate(()=>{window.failPaste=false;window.hook.toggle();});
 await page.waitForFunction(()=>window.store.getState().status==='recording');
 assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='showNotification'&&c[1]==='Previous transcript available').length),0);
