@@ -206,8 +206,11 @@ The crash journal never blocks dictation: without a checkpoint, dictation contin
 and notifies. Review must never auto-open, paste or retry output. Onboarding keeps its local test retry.
 Active tray presentation is microphone plus waves only; keep Stop in the context
 menu and icon/shortcut actions. Settings and Review are explicit menu destinations.
-The microphone never moves when dictation starts or stops: the companion's meter
-opens on its left, and the fallback tray has no idle label.
+VOCO's own layout never moves the microphone when dictation starts or stops: the
+companion's meter opens on its left, and the fallback tray has no idle label.
+GNOME's privacy microphone indicator appears in Quick Settings while the capture
+stream exists and shifts the indicators on its left, VOCO included; never hide it
+or hold a stream open to avoid that.
 The guided installer must use APT to install the local package and explicitly require
 the Wayland client and daemon on Wayland. Successful package installation alone is
 not desktop readiness. After successful setup, request one detached launch as the

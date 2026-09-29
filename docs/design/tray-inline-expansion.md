@@ -15,7 +15,9 @@ the panel, overlap other indicators, or reserve space outside the panel.
 The expanded arrangement is a compact meter on the microphone's left. GNOME
 anchors the panel's right side at the screen edge and grows it leftward, so the
 meter opens and closes there while the microphone, and every indicator to its
-right, holds still in every frame. The waveform uses real audio level data.
+right, holds still in every frame. GNOME's privacy microphone indicator is outside
+VOCO's control: it appears in Quick Settings while the capture stream exists and
+moves the indicators on its left, VOCO included. The waveform uses real audio level data.
 Starting and processing show their actual state. Returning to ready collapses to
 the icon. The microphone and its menu keep Stop; Settings and Review remain
 explicitly opened application views rather than content squeezed into the panel.

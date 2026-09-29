@@ -5,8 +5,10 @@ inside the system panel. On GNOME Wayland it is recommended for **Alt+D** and
 **Alt+Shift+D**: Shell consumes the shortcut, idle included, before the focused
 application can act on it. On X11 its panel presentation is optional. During
 capture and finishing a waveform opens on the microphone's left and closes again
-at idle; the microphone and the indicators to its right never move. Right-click
-the microphone for Settings and Review; Stop
+at idle, without moving the microphone or the indicators to its right. While
+VOCO's capture stream is open, GNOME also shows its privacy microphone indicator in
+Quick Settings, which shifts everything on its left, VOCO included, by one icon.
+Right-click the microphone for Settings and Review; Stop
 dictation is available in that menu during capture. Left-clicking the microphone
 also stops capture; at idle it opens Settings. Review opens only on explicit menu
 selection. No recording or review window is opened automatically by the extension.
@@ -114,6 +116,7 @@ exercise the real app bridge, Shell-only attachment and fallback tray restoratio
 The software-rendered harness uses GNOME’s `--force-animations` to observe
 intermediate frames, then verifies the system reduced-motion setting. It slows
 opening and closing eightfold and checks that the microphone and the indicators
-to its right hold still in every sampled frame.
+to its right hold still in every sampled frame. Its synthetic service opens no
+capture stream, so GNOME's privacy indicator is outside this check.
 Rust tray tests cover authoritative state mapping; the application must separately
 pass its native build, capture and release qualification before installation.
