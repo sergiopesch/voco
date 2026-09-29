@@ -4,10 +4,7 @@ import {
   createAudioCaptureBuffer,
 } from "@/lib/audioCaptureBuffer";
 import { AudioCaptureFlushError,CAPTURE_INPUT_INTERRUPTED,createAudioCaptureFlush } from "@/lib/audioCaptureFlush";
-import {
-  openMicrophoneStreamWithDiagnostics,
-  probeMicrophoneAccess,
-} from "@/lib/audioInput";
+import { openMicrophoneStreamWithDiagnostics } from "@/lib/audioInput";
 import {
   calculateVisualAudioLevelFromSamples,
 } from "@/lib/audioLevel";
@@ -155,66 +152,6 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
       if (!disposedRef.current && audioContextRef.current === audioContext) workletModuleLoadedRef.current = true;
     },
     [],
-  );
-
-  const initializeMicrophone = useCallback(
-    async (appStartMs: number) => {
-      const lifecycleEpoch = lifecycleEpochRef.current;
-      const initializationSessionId = sessionRef.current.sessionId;
-      const isCurrentInitialization = () => !disposedRef.current &&
-        lifecycleEpochRef.current === lifecycleEpoch && sessionRef.current.sessionId === initializationSessionId;
-      if (!isCurrentInitialization()) return;
-      try {
-        if (captureSelectionRef.current?.().backend === "native") return;
-        const deviceId = useStore.getState().selectedDeviceId;
-        await probeMicrophoneAccess(deviceId);
-        if (!isCurrentInitialization()) return;
-        const audioContext = await ensureAudioContext();
-        if (!isCurrentInitialization()) return;
-        await ensureWorkletModuleLoaded(audioContext).catch(() => {});
-        if (!isCurrentInitialization()) return;
-
-        setStatus("idle");
-        setError(null);
-        setInterimTranscript("");
-        setMicrophoneReadyState(true);
-        console.info("Microphone ready");
-        console.info(
-          `[timing] app start -> microphone ready: ${Math.round(
-            performance.now() - appStartMs,
-          )}ms`,
-        );
-      } catch (err) {
-        if (!isCurrentInitialization()) return;
-        setStatus("error");
-        setMicrophoneReadyState(false);
-        showNotification(
-          "Microphone not ready",
-          `Press ${useStore.getState().config?.hotkey ?? "Alt+D"} to re-initialize microphone access.`,
-        ).catch(() => {});
-
-        if (err instanceof DOMException) {
-          if (err.name === "NotAllowedError") {
-            setError(
-              `Microphone access denied on startup. Press ${useStore.getState().config?.hotkey ?? "Alt+D"} to retry after granting permission.`,
-            );
-          } else if (err.name === "NotFoundError") {
-            setError(`No microphone found. Connect one and press ${useStore.getState().config?.hotkey ?? "Alt+D"} to retry.`);
-          } else {
-            setError(`Microphone startup error: ${err.message}`);
-          }
-        } else {
-          setError(`Microphone startup failed: ${err}`);
-        }
-      }
-    },
-    [
-      ensureAudioContext,
-      ensureWorkletModuleLoaded,
-      setError,
-      setInterimTranscript,
-      setMicrophoneReadyState,
-    ],
   );
 
   const prepareAudioEngine = useCallback(async () => {
@@ -744,7 +681,6 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
 
   return {
     dictationSessionId: sessionRef.current.sessionId,
-    initializeMicrophone,
     prepareAudioEngine,
     primeRecordingStream,
     cursorDeliveryState,

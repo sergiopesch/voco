@@ -167,7 +167,6 @@ export function App() {
   const recovery = useStore((state) => state.recovery);
   const captureNotice = useStore((state) => state.captureNotice);
   const transcript = useStore((state) => state.transcript);
-  const rawTranscript = useStore((state) => state.rawTranscript);
   const surface = useStore((state) => state.surface);
   const onboardingStep = useStore((state) => state.onboardingStep);
   const selectedDeviceId = useStore((state) => state.selectedDeviceId);
@@ -211,7 +210,6 @@ export function App() {
     canCancel,
     cancellationPending,
     cancelRecording,
-    retryRecovery,
     discardRecovery,
     finishOnboardingTest,
     toggle,
@@ -1244,14 +1242,11 @@ export function App() {
         runtimeDiagnostics={runtimeDiagnostics}
         dictationStatus={status}
         transcript={transcript}
-        rawTranscript={rawTranscript}
         recovery={recovery}
         captureNotice={captureNotice}
         canCancelDictation={canCancel}
         cancellationPending={cancellationPending}
         onCancelDictation={() => void cancelRecording()}
-        onRetryRecovery={() => void retryRecovery()}
-        onDiscardRecovery={discardRecovery}
         onPrepareDictation={() => void handlePrepareDictation()}
         onDraftStateChange={handleDraftStateChange}
         onShortcutCaptureChange={handleShortcutCaptureChange}

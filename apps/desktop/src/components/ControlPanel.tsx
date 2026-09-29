@@ -44,14 +44,11 @@ interface ControlPanelProps {
   runtimeDiagnostics: RuntimeDiagnostics | null;
   dictationStatus: DictationStatus;
   transcript: string;
-  rawTranscript?: string;
   recovery?: DictationRecovery | null;
   captureNotice?: string | null;
   canCancelDictation?: boolean;
   cancellationPending?: boolean;
   onCancelDictation?: () => void;
-  onRetryRecovery?: () => void;
-  onDiscardRecovery?: () => void;
   onPrepareDictation?: () => void;
   onDraftStateChange?: (dirty: boolean) => void;
   onShortcutCaptureChange?: (active: boolean) => void;
