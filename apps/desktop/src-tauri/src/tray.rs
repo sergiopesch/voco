@@ -40,6 +40,9 @@ pub struct TrayState {
     meter_timer: Option<glib::SourceId>,
     meter: crate::tray_icons::MeterEnvelope,
     applied_meter: Option<usize>,
+    // Tracks recording boundaries apart from the timer, which also stops while
+    // the companion hides the fallback tray.
+    meter_recording: bool,
     fallback_visible: bool,
 }
 
@@ -579,6 +582,7 @@ pub fn setup_tray(app: &tauri::App, hotkey_label: &str) -> Result<(), Box<dyn st
         meter_timer: None,
         meter: crate::tray_icons::MeterEnvelope::default(),
         applied_meter: None,
+        meter_recording: false,
         fallback_visible: true,
     }));
     {
@@ -748,11 +752,34 @@ fn apply_tray_state(app: &tauri::AppHandle, tray_state: &mut TrayState) {
     tray_state.applied_presentation = Some(presentation);
 }
 
+/// Every frame is a StatusNotifier icon swap that the panel host reloads from
+/// disk. About eleven a second keeps speech legible without flooding it.
+const METER_TICK: std::time::Duration = std::time::Duration::from_millis(90);
+
+/// Only a visible fallback tray draws levels; the GNOME companion polls them itself.
+fn meter_timer_wanted(status: DictationStatus, fallback_visible: bool) -> bool {
+    status == DictationStatus::Recording && fallback_visible
+}
+
+/// Skip one-frame jitter, but always land exactly on silence and full scale.
+fn meter_swap(applied: Option<usize>, frame: usize) -> bool {
+    let top = crate::tray_icons::METER_FRAMES - 1;
+    applied.is_none_or(|applied| {
+        applied != frame && (applied.abs_diff(frame) >= 2 || frame == 0 || frame == top)
+    })
+}
+
 fn sync_meter_timer(app: &tauri::AppHandle, state: &mut TrayState) {
-    if state.dictation_status != DictationStatus::Recording {
+    let recording = state.dictation_status == DictationStatus::Recording;
+    if state.meter_recording != recording {
+        // Levels belong to one recording, whichever meter shows them.
+        state.meter_recording = recording;
+        crate::panel::reset_level();
+        state.meter = crate::tray_icons::MeterEnvelope::default();
+    }
+    if !meter_timer_wanted(state.dictation_status, state.fallback_visible) {
         if let Some(timer) = state.meter_timer.take() {
             timer.remove();
-            crate::panel::reset_level();
         }
         state.applied_meter = None;
         return;
@@ -760,41 +787,38 @@ fn sync_meter_timer(app: &tauri::AppHandle, state: &mut TrayState) {
     if state.meter_timer.is_some() {
         return;
     }
-    crate::panel::reset_level();
-    state.meter = crate::tray_icons::MeterEnvelope::default();
     state.applied_meter = None;
     let app = app.clone();
     let mut previous = std::time::Instant::now();
-    state.meter_timer = Some(glib::timeout_add(
-        std::time::Duration::from_millis(33),
-        move || {
-            let managed = app.state::<TrayMutex>();
-            let Ok(mut state) = managed.try_lock() else {
-                return glib::ControlFlow::Continue;
-            };
-            let now = std::time::Instant::now();
-            let elapsed = now.duration_since(previous).as_secs_f64();
-            previous = now;
-            if state.dictation_status != DictationStatus::Recording {
-                return glib::ControlFlow::Continue;
+    state.meter_timer = Some(glib::timeout_add(METER_TICK, move || {
+        // Only the stored SourceId removes this source; returning Break would
+        // make that later removal panic.
+        let managed = app.state::<TrayMutex>();
+        let Ok(mut state) = managed.try_lock() else {
+            return glib::ControlFlow::Continue;
+        };
+        let now = std::time::Instant::now();
+        let elapsed = now.duration_since(previous).as_secs_f64();
+        previous = now;
+        if !meter_timer_wanted(state.dictation_status, state.fallback_visible) {
+            return glib::ControlFlow::Continue;
+        }
+        let level = crate::panel::level(state.runtime_epoch, state.dictation_status);
+        let frame = state.meter.step(level, elapsed, meter_animations_enabled());
+        if !meter_swap(state.applied_meter, frame) {
+            return glib::ControlFlow::Continue;
+        }
+        if let Some(tray) = app.tray_by_id(&state.tray_id) {
+            let path = state.icons.meter_path(frame);
+            match tray.with_inner_tray_icon(move |inner| {
+                inner.set_icon_path(path).map_err(|e| e.to_string())
+            }) {
+                Ok(Ok(())) => state.applied_meter = Some(frame),
+                error => error!("Failed to update tray meter: {error:?}"),
             }
-            let level = crate::panel::level(state.runtime_epoch, state.dictation_status);
-            let frame = state.meter.step(level, elapsed, meter_animations_enabled());
-            if !state.fallback_visible || state.applied_meter == Some(frame) {
-                return glib::ControlFlow::Continue;
-            }
-            if let Some(tray) = app.tray_by_id(&state.tray_id) {
-                let path = state.icons.meter_path(frame);
-                match tray.with_inner_tray_icon(move |inner| {
-                    inner.set_icon_path(path).map_err(|e| e.to_string())
-                }) {
-                    Ok(Ok(())) => state.applied_meter = Some(frame),
-                    error => error!("Failed to update tray meter: {error:?}"),
-                }
-            }
-            glib::ControlFlow::Continue
-        },
-    ));
+        }
+        glib::ControlFlow::Continue
+    }));
 }
 
 fn meter_animations_enabled() -> bool {
@@ -964,6 +988,7 @@ pub fn panel_visibility(app: &tauri::AppHandle, visible: bool) {
         if let Ok(mut state) = state.lock() {
             state.fallback_visible = visible;
             state.applied_meter = None;
+            sync_meter_timer(app, &mut state);
             if let Some(tray) = app.tray_by_id(&state.tray_id) {
                 let _ = tray.set_visible(visible);
             }
@@ -1691,5 +1716,67 @@ mod tests {
             derive_tray_left_click_action(&processing),
             TrayLeftClickAction::Ignore
         );
+    }
+
+    #[test]
+    fn meter_timer_runs_only_for_a_visible_recording() {
+        for status in [
+            DictationStatus::Idle,
+            DictationStatus::Starting,
+            DictationStatus::Recording,
+            DictationStatus::Processing,
+            DictationStatus::Error,
+        ] {
+            assert_eq!(
+                meter_timer_wanted(status, true),
+                status == DictationStatus::Recording
+            );
+            assert!(!meter_timer_wanted(status, false));
+        }
+    }
+
+    #[test]
+    fn meter_swaps_skip_jitter_but_land_on_silence_and_full_scale() {
+        let top = crate::tray_icons::METER_FRAMES - 1;
+        assert!(meter_swap(None, 0));
+        assert!(meter_swap(None, 30));
+        for (applied, frame, swap) in [
+            (30, 30, false),
+            (30, 31, false),
+            (30, 29, false),
+            (30, 32, true),
+            (30, 28, true),
+            (1, 0, true),
+            (0, 0, false),
+            (0, 1, false),
+            (top - 1, top, true),
+            (top, top, false),
+            (top, top - 1, false),
+        ] {
+            assert_eq!(
+                meter_swap(Some(applied), frame),
+                swap,
+                "{applied} -> {frame}"
+            );
+        }
+    }
+
+    #[test]
+    fn meter_tick_keeps_attack_quick_and_release_short() {
+        let tick = METER_TICK.as_secs_f64();
+        let top = crate::tray_icons::METER_FRAMES - 1;
+        let mut meter = crate::tray_icons::MeterEnvelope::default();
+        assert!(meter.step(1.0, tick, true) >= top - 8);
+        assert_eq!(meter.step(1.0, tick, true), top);
+        let mut applied = Some(top);
+        let mut ticks = 0;
+        while applied != Some(0) {
+            ticks += 1;
+            assert!(ticks <= 10, "silence must land within a second");
+            let frame = meter.step(0.0, tick, true);
+            if meter_swap(applied, frame) {
+                applied = Some(frame);
+            }
+        }
     }
 }
