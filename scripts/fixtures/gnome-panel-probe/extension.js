@@ -3,7 +3,7 @@ import Gio from 'gi://Gio';
 import St from 'gi://St';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
-const xml = '<node><interface name="org.voco.PanelProbe"><method name="Inspect"><arg type="s" direction="out"/></method><method name="Stop"/><method name="Menu"/><method name="MenuAction"><arg type="s" direction="in"/></method><method name="Overview"/><method name="NativeState"><arg type="s" direction="out"/></method><method name="Crowd"><arg type="b" direction="in"/></method></interface></node>';
+const xml = '<node><interface name="org.voco.PanelProbe"><method name="Inspect"><arg type="s" direction="out"/></method><method name="Stop"/><method name="Menu"/><method name="MenuAction"><arg type="s" direction="in"/></method><method name="Overview"/><method name="NativeState"><arg type="s" direction="out"/></method><method name="Crowd"><arg type="b" direction="in"/></method><method name="SlowDown"><arg type="d" direction="in"/></method></interface></node>';
 function bounds(actor) {
     const [x, y] = actor.get_transformed_position();
     const [width, height] = actor.get_transformed_size();
@@ -33,6 +33,7 @@ export default class Probe extends Extension {
                 items: indicator.menu._getMenuItems().map(item => ({text: item.label?.text,
                     sensitive: item.sensitive, ...bounds(item)}))} : null,
             windowMenuOpen: children(global.stage).some(actor => actor.mapped && actor.text === 'Take Screenshot'),
+            rightBox: Main.panel._rightBox.get_children().map(child => ({...bounds(child), voco: child === indicator?.container})),
             actors: actors.map(actor => ({...bounds(actor), name: actor.accessible_name,
                 text: actor.text ?? null, scale: actor.scale_y, opacity: actor.opacity,
                 style: actor.style_class, transitions: actor.get_transition('width') !== null}))});
@@ -56,10 +57,12 @@ export default class Probe extends Extension {
             Main.panel._rightBox.add_child(this.spacer);
         }
     }
+    // Stretches every Shell animation so a poll can sample many of its frames.
+    SlowDown(factor) { St.Settings.get().slow_down_factor = factor; }
     NativeState() {
         return Gio.DBus.session.call_sync('org.voco.Panel', '/org/voco/Panel', 'org.voco.Panel1',
             'GetState', null, null, Gio.DBusCallFlags.NO_AUTO_START, 1500, null).deep_unpack()[0];
     }
     Overview() { Main.overview.hide(); }
-    disable() { this.spacer?.destroy(); this.object?.unexport(); this.object = null; }
+    disable() { this.SlowDown(1); this.spacer?.destroy(); this.object?.unexport(); this.object = null; }
 }

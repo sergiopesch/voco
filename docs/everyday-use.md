@@ -36,8 +36,9 @@ live panel** in onboarding or Help, or run `voco --setup-panel`. Package hooks d
 not enable extensions. If setup says to sign out, save your work and sign out and
 back in; installing files alone cannot reload a running Wayland Shell.
 
-While recording, the panel shows the microphone and real input bars, without a
-Listening label or Stop button. Click the icon or use your shortcut to stop.
+While recording, real input bars open on the microphone's left, without a
+Listening label or Stop button; the microphone itself stays put. Click the icon or
+use your shortcut to stop.
 Right-click for **Settings**, **Review**, and **Stop** during capture.
 Other desktops use the native tray menu. `voco --check-panel` changes no preferences.
 On GNOME Wayland the panel is recommended, not required. It keeps **Alt+D** and
@@ -46,9 +47,10 @@ works, but the focused app also receives the shortcut: a browser focuses its
 address bar and a terminal deletes a word. After an upgrade, run panel setup
 again, then sign out and back in.
 
-The fallback tray replaces its Ready label with
-audio-driven bars while recording. Silence settles the bars; Stop restores the
-normal status. The tray menu keeps a readable status and an explicit Stop action.
+The fallback tray icon shows audio-driven bars while recording. Silence settles
+the bars; Stop restores the microphone. It shows a label beside the icon only while
+VOCO starts or needs setup. The tray menu keeps a readable status and an explicit
+Stop action.
 Smooth movement follows the desktop's animation preference.
 
 ## Dictation

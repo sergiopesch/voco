@@ -138,30 +138,46 @@ try:
     pointer_env = {**os.environ, 'DISPLAY': ':77'}
     shell_windows = subprocess.check_output(['xdotool', 'search', '--pid', str(shell.pid)], env=pointer_env, text=True).splitlines()
     subprocess.run(['xdotool', 'windowfocus', shell_windows[0]], env=pointer_env, check=True)
-    for i,status in enumerate(['idle','starting','recording','processing','recovery','idle','attention']):
+    def anchors(data):
+        # The microphone and every right-box item on its right, in panel pixels.
+        row = data['rightBox']; own = next(index for index, child in enumerate(row) if child['voco'])
+        return [actor['x'] for actor in data['actors'] if actor.get('style') in ('voco-panel-button', 'system-status-icon')] + \
+            [child['x'] for child in row[own + 1:] if child['visible']]
+    frames = []
+    sequence = ['idle','starting','recording','processing','recovery','idle','attention']
+    for i,status in enumerate(sequence):
+        # Stretch the meter opening and closing so the probe samples many frames.
+        animated = {1: 'expanding', 4: 'collapsing'}.get(i)
+        if animated: call('SlowDown', GLib.Variant('(d)', (8.0,)))
         state.update(token=f'1:{i+1}',status=status,description=status,canStop=status in ('starting','recording'),canOpen=status not in ('starting','recording','processing'),level=.8 if status=='recording' else 0)
         if attached:
             bus.emit_signal(attached[-1], '/org/voco/Panel', 'org.voco.Panel1', 'Changed', None)
-        if i == 1:
-            for _ in range(50):
+        if animated:
+            settled = report['states'][f'{i-1}-{sequence[i-1]}']['indicator']['width']
+            for _ in range(400):
                 pump(.01)
-                frame = inspect()
-                if frame['indicator']['width'] > report['states']['0-idle']['indicator']['width'] + 2 and any(actor['transitions'] for actor in frame['actors']):
-                    report['intermediate'] = frame
-                    screenshot('expanding')
-                    break
-            report['animationProbe'] = inspect()
-            assert 'intermediate' in report, 'No width animation observed'
+                frame = inspect(); frames.append((animated, anchors(frame)))
+                moving = any(actor['transitions'] for actor in frame['actors'])
+                if animated not in report and moving and abs(frame['indicator']['width'] - settled) > 2:
+                    report[animated] = frame
+                    screenshot(animated)
+                elif animated in report and not moving: break
+            call('SlowDown', GLib.Variant('(d)', (1.0,)))
+            assert animated in report, f'No {animated} width animation observed'
         pump(.4)
         data=inspect(); p=data['panel']; a=data['indicator']
         assert a['y'] >= p['y'] and a['y']+a['height'] <= p['y']+p['height']+.1, data
         assert a['x'] >= p['x'] and a['x']+a['width'] <= p['x']+p['width']+.1, data
+        frames.append((f'{i}-{status}', anchors(data)))
         if status not in ('idle','recovery'):
             content = [actor for actor in data['actors'] if actor['visible'] and
                        actor.get('style') in ('voco-panel-status', 'voco-panel-wave')]
-            right_gap = a['x'] + a['width'] - max(actor['x'] + actor['width'] for actor in content)
-            assert right_gap >= 10, f'Panel right inset is only {right_gap}px'
-            data['rightInset'] = right_gap
+            button = next(actor for actor in data['actors'] if actor.get('style') == 'voco-panel-button')
+            # The meter opens on the microphone's left, clear of both edges.
+            insets = (min(actor['x'] for actor in content) - a['x'],
+                      button['x'] - max(actor['x'] + actor['width'] for actor in content))
+            assert insets[0] >= 10 and insets[1] >= 2, f'Meter insets are {insets}px'
+            data['meterInsets'] = insets
         assert data['windows'] == 0, data
         report['states'][f'{i}-{status}']=data
         screenshot(f'{i}-{status}')
@@ -205,6 +221,12 @@ try:
             report['meterResponds'] = True
             call('Stop'); pump(.2)
             assert actions[-1] == ('stop', state['stopSession']), actions
+    # Opening and closing the meter never moves the microphone or its neighbours.
+    reference = frames[0][1]
+    moved = [frame for frame in frames if len(frame[1]) != len(reference) or
+             any(abs(value - fixed) > .5 for value, fixed in zip(frame[1], reference))]
+    assert not moved, {'reference': reference, 'moved': moved[:5]}
+    report['fixedMicrophone'] = {'frames': len(frames), 'anchors': reference}
     assert report['states']['2-recording']['indicator']['width'] > report['states']['0-idle']['indicator']['width'] + 20
     assert abs(report['states']['5-idle']['indicator']['width'] - report['states']['0-idle']['indicator']['width']) < 2
     subprocess.run(['gsettings','set','org.gnome.desktop.interface','enable-animations','false'],check=True)
@@ -373,7 +395,7 @@ try:
     assert press('alt+shift+d') == consumed, 'enable must regrab'
     shortcut_state('idle', None)
     assert press('alt+shift+d') == released and press('alt+d') == released, 'no supported chord must release the grab'
-    assert not stop_reservations, 'companion v11 must not use the v10 Stop reservation'
+    assert not stop_reservations, 'the companion must not use the v10 Stop reservation'
     assert entry.get_text() == 'Keep my dictated words ', entry.get_text()
     # Super may open the overview; test it only after all focused-field checks.
     for modifier in ('Alt_L', 'Alt_R', 'Control_L', 'Control_R', 'Shift_L', 'Shift_R', 'Super_L', 'Super_R'):
@@ -448,7 +470,8 @@ try:
             return bus.call_sync(service,item_path,'org.freedesktop.DBus.Properties','Get',
                 GLib.Variant('(ss)',('org.kde.StatusNotifierItem',name)),None,Gio.DBusCallFlags.NONE,1500,None).unpack()[0]
         report['fallbackLabel'] = tray_property('XAyatanaLabel')
-        assert report['fallbackLabel'] in ['Starting VOCO', 'Check setup', 'Ready']
+        # Ready has no label, so starting or stopping never resizes the icon.
+        assert report['fallbackLabel'] in ['', 'Starting VOCO', 'Check setup']
         old_icon = Path(tray_property('IconName'))
         assert old_icon.exists()
         pump(2)

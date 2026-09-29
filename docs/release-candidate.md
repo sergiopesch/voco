@@ -8,7 +8,7 @@ The private 28 September follow-up changes the tray to microphone/bars with a
 right-click Settings/Review menu, adds crash-only local text checkpoints, and guards
 Wayland paste against held keyboard modifiers. It also fixes native Pulse transport
 starvation and rejects material capture-duration deficits. Desktop paste sends
-Shift+Insert to whatever has keyboard focus, in any app. On GNOME Wayland companion 11
+Shift+Insert to whatever has keyboard focus, in any app. On GNOME Wayland companion 12
 is recommended, not required: it keeps Alt+D and Alt+Shift+D from the focused app. Its new
 bytes need fresh package qualification; the historical results below do not qualify
 these changes. See [current usage](everyday-use.md) for the revised privacy contract.

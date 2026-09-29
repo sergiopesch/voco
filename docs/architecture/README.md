@@ -90,7 +90,7 @@ without consuming it.
 
 On GNOME Wayland the panel companion is recommended, not required. Without it,
 the focused application also receives Alt+D: browsers focus the address bar and
-terminals delete a word. Companion v11 grabs the configured Alt+D or Alt+Shift+D
+terminals delete a word. Since v11 the companion grabs the configured Alt+D or Alt+Shift+D
 at every status, idle included, and each press sends `Action('shortcut', '')`.
 `ReserveShortcut` keeps a 2.5-second lease for the exact accelerator in the
 `shortcutAccelerator` snapshot field. Only the authenticated Shell can renew it,
@@ -98,7 +98,7 @@ about once a second. While the lease is fresh, VOCO ignores the passive evdev
 duplicate and the action toggles through the `gnome_panel` backend; otherwise
 the action is refused and evdev toggles. Rejection, disconnect and disable
 release the grab. The v10 `ReserveStopShortcut` is kept only for compatibility.
-Users re-run panel setup, then sign out and back in to load v11. This is
+Users re-run panel setup, then sign out and back in to load v12. This is
 GNOME-specific, not a general Wayland grab.
 
 The main renderer's PageLoad Started event increments a native epoch, so crash

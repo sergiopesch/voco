@@ -23,7 +23,7 @@ export default class VocoPanel extends Extension {
         this._inputGuard.export(Gio.DBus.session, INPUT_PATH);
         this._generation = 0;
         this._target = null;
-        this._previousStatus = null;
+        this._barsKey = null;
         this._state = null;
         this._polling = false;
         this._refreshQueued = false;
@@ -48,7 +48,7 @@ export default class VocoPanel extends Extension {
         this._box = new St.BoxLayout({style_class: 'voco-panel-box'});
         this._indicator.add_child(this._box);
         this._iconButton = new St.Button({style_class: 'voco-panel-button',
-            can_focus: true, accessible_name: 'VOCO settings'});
+            can_focus: true, accessible_name: 'VOCO'});
         this._iconButton.set_child(new St.Icon({
             gicon: Gio.FileIcon.new(Gio.File.new_for_path(`${this.path}/voco-symbol.png`)),
             icon_size: 20, style_class: 'system-status-icon'}));
@@ -69,11 +69,13 @@ export default class VocoPanel extends Extension {
         this._stopItem = new PopupMenu.PopupMenuItem('Stop dictation');
         this._stopItem.connect('activate', () => this._action('stop'));
         this._indicator.menu.addMenuItem(this._stopItem);
-        this._box.add_child(this._iconButton);
+        // The top bar's right side grows leftward, so the microphone comes last
+        // and never moves: the meter opens and closes on its left.
         this._clip = new St.Widget({layout_manager: new Clutter.BinLayout(), clip_to_allocation: true, width: 0});
-        this._detail = new St.BoxLayout({style_class: 'voco-panel-detail'});
+        this._detail = new St.BoxLayout({style_class: 'voco-panel-detail', visible: false});
         this._clip.add_child(this._detail);
         this._box.add_child(this._clip);
+        this._box.add_child(this._iconButton);
         this._wave = new St.BoxLayout({style_class: 'voco-panel-wave', y_align: Clutter.ActorAlign.CENTER});
         this._bars = Array.from({length: 7}, () => {
             const bar = new St.Widget({style_class: 'voco-panel-bar', y_align: Clutter.ActorAlign.CENTER});
@@ -160,45 +162,56 @@ export default class VocoPanel extends Extension {
         if (!this._state || !this._alive) return;
         const state = this._state;
         const motion = this._settings.get_boolean('enable-animations');
-        this._iconButton.accessible_name = `VOCO: ${state.description}. ${state.canStop ? 'Stop dictation' : 'Open VOCO'}`;
-        this._iconButton.reactive = true;
-        this._label.text = state.label;
-        this._label.visible = !state.active && state.label.length > 0;
-        this._wave.visible = state.active;
+        const action = state.canStop ? 'Stop dictation' : state.canOpen ? 'Open VOCO' : '';
+        this._iconButton.accessible_name = [state.description, action].filter(Boolean).join('. ');
+        const wave = state.active;
+        const label = !state.active && state.label.length > 0;
+        // A closing meter keeps its last content until the clip hides it.
+        if (wave || label) {
+            this._wave.visible = wave;
+            this._label.visible = label;
+            if (label) this._label.text = state.label;
+        }
         this._settingsItem.setSensitive(state.canOpen);
         this._reviewItem.setSensitive(state.canOpen);
         this._stopItem.visible = state.canStop;
         this._stopItem.setSensitive(state.canStop);
+        // Only new levels, statuses or motion settings move the bars; the
+        // processing pulse runs until the status changes.
+        const processing = state.status === 'processing';
         const scales = barScales(state.level);
-        this._bars.forEach((bar, index) => {
-            if (state.status === 'processing' && this._previousStatus === 'processing' && motion === this._previousMotion) return;
-            bar.remove_all_transitions();
-            const scale = state.status === 'processing' ? 0.35 : scales[index];
-            const duration = scale >= bar.scale_y ? 45 : 100;
-            bar.ease({scale_y: scale, duration: motion ? duration : 0, mode: Clutter.AnimationMode.EASE_OUT_QUAD});
-            // Processing uses a restrained pulse; listening only reflects real levels.
-            bar.opacity = 255;
-            if (state.status === 'processing' && motion)
-                bar.ease({opacity: 90, duration: 700, delay: index * 40,
-                    autoReverse: true, repeatCount: -1, mode: Clutter.AnimationMode.EASE_IN_OUT_SINE});
-        });
-        this._previousStatus = state.status;
-        this._previousMotion = motion;
-        const expanded = state.status !== 'idle';
-        if (expanded) this._box.add_style_class_name('voco-panel-active');
+        const bars = `${processing}:${motion}:${scales}`;
+        if (bars !== this._barsKey) {
+            this._barsKey = bars;
+            this._bars.forEach((bar, index) => {
+                bar.remove_all_transitions();
+                const scale = processing ? 0.35 : scales[index];
+                const duration = scale >= bar.scale_y ? 45 : 100;
+                bar.ease({scale_y: scale, duration: motion ? duration : 0, mode: Clutter.AnimationMode.EASE_OUT_QUAD});
+                // Processing uses a restrained pulse; listening only reflects real levels.
+                bar.opacity = 255;
+                if (processing && motion)
+                    bar.ease({opacity: 90, duration: 700, delay: index * 40,
+                        autoReverse: true, repeatCount: -1, mode: Clutter.AnimationMode.EASE_IN_OUT_SINE});
+            });
+        }
+        if (state.status !== 'idle') this._box.add_style_class_name('voco-panel-active');
         else this._box.remove_style_class_name('voco-panel-active');
+        // Open the meter only if the whole right side, meter included, still
+        // fits beside the clock. A crowded panel keeps just the actionable icon.
         const [, natural] = this._detail.get_preferred_width(-1);
-        // Leave centre and other panel items their space. On a crowded panel,
-        // retain the actionable icon instead of clipping its meter.
-        const right = Main.panel._rightBox;
-        const other = right.get_children().filter(child => child !== this._indicator.container && child !== this._indicator)
-            .reduce((sum, child) => sum + child.get_width(), 0);
-        const budget = Math.max(0, Main.panel.width / 2 - Main.panel._centerBox.width / 2 - other - 48);
-        const target = expanded && natural <= budget ? natural : 0;
+        const [, row] = Main.panel._rightBox.get_preferred_width(-1);
+        const center = Main.panel._centerBox;
+        const space = Main.panel.get_text_direction() === Clutter.TextDirection.RTL
+            ? center.x : Main.panel.width - center.x - center.width;
+        const target = (wave || label) && row - this._clip.width + natural <= space ? natural : 0;
         if (this._target !== target) {
             this._target = target;
             this._clip.remove_all_transitions();
-            this._clip.ease({width: target, duration: motion ? 220 : 0, mode: Clutter.AnimationMode.EASE_OUT_CUBIC});
+            // Closed content leaves the accessibility tree as well as the view.
+            if (target) this._detail.show();
+            this._clip.ease({width: target, duration: motion ? 220 : 0, mode: Clutter.AnimationMode.EASE_OUT_CUBIC,
+                onComplete: () => { if (!target) this._detail.hide(); }});
         }
     }
 
@@ -283,10 +296,13 @@ export default class VocoPanel extends Extension {
         this._refreshQueued = false;
         if (this._signal) { Gio.DBus.session.signal_unsubscribe(this._signal); this._signal = 0; }
         this._state = null;
-        this._previousStatus = null;
+        this._barsKey = null;
         this._target = null;
         this._bars?.forEach(bar => bar.remove_all_transitions());
+        // Reappear collapsed; a reconnect must not replay a stale expansion.
         this._clip?.remove_all_transitions();
+        if (this._clip) { this._clip.width = 0; this._detail.hide(); }
+        this._box?.remove_style_class_name('voco-panel-active');
         if (this._timer) { GLib.source_remove(this._timer); this._timer = 0; }
         this._indicator?.hide();
     }

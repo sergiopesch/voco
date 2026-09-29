@@ -266,8 +266,9 @@ Run `voco --check-panel`. If disabled, use **Enable live panel** in Help or
 run `voco --setup-panel`. If enabled but waiting for a new session, save your work,
 sign out and back in. A global Extensions switch or administrator policy is not
 changed by VOCO. GNOME versions other than 46 use the native tray fallback.
-The fallback menu always contains the current status; adjacent labels depend on
-the desktop. Disabling the companion restores the native tray.
+The fallback menu always contains the current status. A label beside the icon
+appears only while VOCO starts or needs setup, where the desktop supports one.
+Disabling the companion restores the native tray.
 
 ## Opening VOCO again does nothing
 

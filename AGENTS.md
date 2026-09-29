@@ -88,7 +88,7 @@ glib 0.20 directly leaves the GTK dependency behind. [Backport](vendor/glib/VOCO
   ends the same way.
 - The GNOME Wayland companion is recommended, not required: without it the
   focused app also receives Alt+D (browsers focus the address bar, terminals
-  delete a word). Companion v11 grabs the configured Alt+D or Alt+Shift+D at
+  delete a word). Since v11 the companion grabs the configured Alt+D or Alt+Shift+D at
   every status, idle included, and each press sends `Action('shortcut', '')`.
   `ReserveShortcut` holds a 2.5-second lease for the exact `shortcutAccelerator`;
   only the authenticated Shell can renew it, about once a second. While it is
@@ -97,7 +97,7 @@ glib 0.20 directly leaves the GTK dependency behind. [Backport](vendor/glib/VOCO
   Release the grab on rejection, disconnect or disable; late replies about an
   earlier grab must not act on a newer one. v10 `ReserveStopShortcut` remains
   only for compatibility. Users re-run panel setup, then sign out and back in to
-  load v11. An evdev toggle while the chord leaks sends one notification per
+  load v12. An evdev toggle while the chord leaks sends one notification per
   launch with the panel's remedy, which Settings also shows.
 - Closing or navigating an enabled browser tab, or losing its native connection,
   stops that tab's active recording. Ordinary field focus loss revokes delivery
@@ -206,6 +206,8 @@ The crash journal never blocks dictation: without a checkpoint, dictation contin
 and notifies. Review must never auto-open, paste or retry output. Onboarding keeps its local test retry.
 Active tray presentation is microphone plus waves only; keep Stop in the context
 menu and icon/shortcut actions. Settings and Review are explicit menu destinations.
+The microphone never moves when dictation starts or stops: the companion's meter
+opens on its left, and the fallback tray has no idle label.
 The guided installer must use APT to install the local package and explicitly require
 the Wayland client and daemon on Wayland. Successful package installation alone is
 not desktop readiness. After successful setup, request one detached launch as the

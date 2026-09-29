@@ -17,7 +17,7 @@ const XML: &str = r#"<node><interface name="org.voco.Panel1">
 </interface></node>"#;
 /// The chords passive Wayland evdev also observes; Shell can reserve no other.
 const ACCELERATORS: [&str; 2] = ["<Alt>d", "<Alt><Shift>d"];
-/// Companion v11 holds its grab at every status and renews about once a second.
+/// Companions since v11 hold their grab at every status and renew about once a second.
 const SHORTCUT_LEASE: Duration = Duration::from_millis(2500);
 /// A loaded v10 companion renews its Stop-only grab on every active poll.
 const STOP_LEASE: Duration = Duration::from_millis(250);

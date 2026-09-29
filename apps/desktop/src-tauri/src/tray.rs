@@ -309,6 +309,8 @@ fn derive_tray_presentation(snapshot: &RuntimeStatusSnapshot) -> TrayPresentatio
     let popover_enabled =
         snapshot.runtime_initialized && !dictation_active && !snapshot.configuration_error;
 
+    // Only states that need the user carry a label beside the icon. Ready and
+    // dictating share the bare icon, so toggling never shifts the panel.
     let title = match snapshot.dictation_status {
         _ if !snapshot.runtime_initialized
             && snapshot.model_download_status == ModelDownloadStatus::Failed =>
@@ -319,7 +321,7 @@ fn derive_tray_presentation(snapshot: &RuntimeStatusSnapshot) -> TrayPresentatio
         DictationStatus::Starting | DictationStatus::Recording | DictationStatus::Processing => "",
         _ if visual_state == TrayVisualState::NotReady => "Check setup",
         _ if snapshot.model_download_status != ModelDownloadStatus::Ready => "Starting VOCO",
-        _ => "Ready",
+        _ => "",
     };
     TrayPresentation {
         visual_state,
@@ -923,7 +925,7 @@ pub fn panel_snapshot(app: &tauri::AppHandle) -> Option<serde_json::Value> {
     let snapshot = runtime_snapshot_from_tray_state(&state);
     let mut presentation = panel_presentation(&snapshot);
     let accelerator = panel_accelerator(crate::is_wayland_session(), &state.current_hotkey);
-    // Companion v11 consumes the chord whenever attached; a loaded v10 companion
+    // Companions since v11 consume the chord whenever attached; a loaded v10 companion
     // still reads the Stop-only fields until the session is restarted.
     presentation["shortcutAccelerator"] = serde_json::json!(accelerator);
     presentation["stopAccelerator"] = serde_json::json!(accelerator);
@@ -1215,7 +1217,8 @@ mod tests {
     #[test]
     fn fallback_labels_match_capture_state_and_stop_is_never_toggle() {
         let mut snapshot = ready_snapshot();
-        assert_eq!(derive_tray_presentation(&snapshot).title, "Ready");
+        // Ready has no label, so starting or stopping never resizes the icon.
+        assert_eq!(derive_tray_presentation(&snapshot).title, "");
         for (status, title) in [
             (DictationStatus::Starting, ""),
             (DictationStatus::Recording, ""),

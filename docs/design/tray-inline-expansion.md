@@ -12,12 +12,14 @@ indicator expands horizontally inside the desktop panel, keeping the panel's
 allocated height. It must not open a floating recording surface above or below
 the panel, overlap other indicators, or reserve space outside the panel.
 
-The proposed expanded arrangement is microphone, compact activity/status, and
-Stop. The full animated version uses real audio level data for its small waveform.
-Starting and processing show their actual state; recovery remains discoverable
-until resolved. Returning to ready collapses to the icon. Settings and detailed
-recovery remain explicitly opened application views rather than content squeezed
-into the panel. Preserve existing start/stop safety gates and cursor ownership.
+The expanded arrangement is a compact meter on the microphone's left. GNOME
+anchors the panel's right side at the screen edge and grows it leftward, so the
+meter opens and closes there while the microphone, and every indicator to its
+right, holds still in every frame. The waveform uses real audio level data.
+Starting and processing show their actual state. Returning to ready collapses to
+the icon. The microphone and its menu keep Stop; Settings and Review remain
+explicitly opened application views rather than content squeezed into the panel.
+Preserve existing start/stop safety gates.
 
 Use existing VOCO artwork and icons. The panel controls typography, height and
 contrast; VOCO motion must respect system reduced-motion preferences. Expansion
@@ -32,11 +34,12 @@ extension supports an adjacent label. VOCO's current Tauri tray implementation
 can supply it through `TrayIcon::set_title`, backed by AppIndicator `set_label`.
 This provides native horizontal icon-and-text allocation without a new dependency.
 It does not provide React children, inline buttons, or VOCO control over width
-interpolation. Other tray hosts may omit the title entirely. The .51 release
-uses the native icon slot for a measured waveform while recording, removing the
-adjacent Ready text. It selects from 64 immutable images, with bounded updates
-and a short envelope instead of allocating images continuously. Accessible status
-and Stop stay available in the menu. This also covers a companion awaiting login.
+interpolation. Other tray hosts may omit the title entirely. Since .51 the native
+icon slot shows a measured waveform while recording. It selects from 64 immutable
+images, with bounded updates and a short envelope instead of allocating images
+continuously. Ready and dictating carry no title, so toggling never resizes the
+slot; only startup and setup problems add a short label. Accessible status and
+Stop stay available in the menu. This also covers a companion awaiting login.
 
 The full animated capsule requires a panel integration, such as a GNOME Shell
 extension. That introduces a separately supported desktop component and an IPC
@@ -53,6 +56,8 @@ nor native integration.
 - On the supported desktop, compare panel/indicator bounds at idle, starting,
   listening, processing and recovery; the indicator stays within panel bounds.
 - Inspect intermediate expansion frames and crowded/multiple-monitor panels.
+- Record the microphone and every indicator to its right at each state and across
+  slowed opening and closing frames; none may move by half a pixel or more.
 - Confirm the original microphone artwork remains stable and other indicators
   remain accessible.
 - Verify Stop, shortcut, settings and recovery use existing guarded operations;

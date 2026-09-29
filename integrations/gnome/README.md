@@ -1,11 +1,12 @@
 # VOCO GNOME panel
 
 This GNOME Shell 46 integration keeps VOCO's microphone and active dictation capsule
-inside the system panel. On GNOME Wayland, the current source requires it for
-**Alt+D** and **Alt+Shift+D** so Shell consumes the shortcut, idle included, before
-the focused application can act on it. On X11 its panel presentation is optional.
-It expands to show only the microphone and waveform during capture and finishing,
-then contracts at idle. Right-click the microphone for Settings and Review; Stop
+inside the system panel. On GNOME Wayland it is recommended for **Alt+D** and
+**Alt+Shift+D**: Shell consumes the shortcut, idle included, before the focused
+application can act on it. On X11 its panel presentation is optional. During
+capture and finishing a waveform opens on the microphone's left and closes again
+at idle; the microphone and the indicators to its right never move. Right-click
+the microphone for Settings and Review; Stop
 dictation is available in that menu during capture. Left-clicking the microphone
 also stops capture; at idle it opens Settings. Review opens only on explicit menu
 selection. No recording or review window is opened automatically by the extension.
@@ -37,9 +38,9 @@ python3 scripts/package-gnome-panel.py /tmp/voco-panel@voco.local.shell-extensio
 
 Disable with `gnome-extensions disable voco-panel@voco.local`. The ordinary VOCO
 tray returns on detach, or within approximately six seconds after lost heartbeats.
-During recording it replaces Ready with measured-volume bars; active states have
-no text label. Stop restores Ready. Its menu includes Settings, Review and an
-explicit Stop action. See
+During recording its icon shows measured-volume bars. Ready and dictating have no
+text label, so the icon keeps its place; only startup and setup problems add one.
+Its menu includes Settings, Review and an explicit Stop action. See
 [release status](../../docs/release-candidate.md) for current downloads.
 
 ## Bridge
@@ -111,6 +112,8 @@ physical microphone capture, installed-app interoperability or cursor insertion.
 Set `VOCO_PANEL_APP_BINARY` to a matching debug/custom-protocol build to also
 exercise the real app bridge, Shell-only attachment and fallback tray restoration.
 The software-rendered harness uses GNOME’s `--force-animations` to observe
-intermediate frames, then verifies the system reduced-motion setting.
+intermediate frames, then verifies the system reduced-motion setting. It slows
+opening and closing eightfold and checks that the microphone and the indicators
+to its right hold still in every sampled frame.
 Rust tray tests cover authoritative state mapping; the application must separately
 pass its native build, capture and release qualification before installation.

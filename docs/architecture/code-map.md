@@ -245,7 +245,8 @@ recording boundary. Stale samples settle to silence; reduced motion uses direct
 level changes. No audio update writes another image or opens a window.
 The additive vendored tray-icon path API selects these without deleting older
 advertised paths. `tray.rs` suppresses equivalent presentation updates and exposes
-both an adjacent status label and a menu status row. State-token publication stays
+a menu status row; its adjacent label appears only for startup and setup problems,
+so starting or stopping dictation never resizes the icon. State-token publication stays
 independent from native icon deduplication. Native Stop uses an explicit stop action.
 
 Onboarding swaps microphone selection into the existing setup canvas rather than
