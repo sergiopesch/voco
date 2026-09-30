@@ -219,7 +219,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     void releaseBrowserRecording(triggerId).catch(() => {});
   }
 
-  function retainRecovery(reason: string) {
+  function interruptRecording(reason: string) {
     if (disposedRef.current) return;
     void browserDeliveryRef.current?.cancel();
     releaseRecordingOrigin();
@@ -605,14 +605,14 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       let cleanupFailure: unknown = null;
       await finishJournal().catch(failure => { cleanupFailure = failure; });
       if (cleanupFailure) {
-        retainRecovery(errorMessage(cleanupFailure));
+        interruptRecording(errorMessage(cleanupFailure));
         return;
       }
       // Teardown can flush a WebKit prefix even when cancellation or failure
       // happened before Listening. Retention belongs to the received samples,
       // not the backend or interruption reason.
       if (audioBufferRef.current.sampleCount > 0) {
-        retainRecovery(cancelledRef.current ?? `Microphone startup failed: ${errorMessage(err)}`);
+        interruptRecording(cancelledRef.current ?? `Microphone startup failed: ${errorMessage(err)}`);
         return;
       }
       if (cancelledRef.current) {
@@ -688,7 +688,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
         await finishJournal();
         // Unverified capture is never typed.
         if (audioBufferRef.current.sampleCount) {
-          retainRecovery(UNVERIFIED_CAPTURE_REASON);
+          interruptRecording(UNVERIFIED_CAPTURE_REASON);
         } else {
           finalizeIdleState();
         }
@@ -742,7 +742,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       let cleanupFailure: unknown = null;
       await finishJournal().catch(failure => { cleanupFailure = failure; });
       traceDictationEvent("dictation_desktop_stream_failed").catch(() => {});
-      retainRecovery(cleanupFailure ? errorMessage(cleanupFailure) : cancelledRef.current ?? (useStore.getState().dictationPurpose === "onboarding"
+      interruptRecording(cleanupFailure ? errorMessage(cleanupFailure) : cancelledRef.current ?? (useStore.getState().dictationPurpose === "onboarding"
         ? `Voice test stopped: ${sentence(errorMessage(error))} You can try the test again.`
         : sentence(errorMessage(error))));
     }

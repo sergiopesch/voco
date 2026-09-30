@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Assemble a complete local NVIDIA Debian candidate from a Tauri base package."""
+"""Assemble the complete NVIDIA Debian package from a Tauri base package."""
 import argparse
 import hashlib
 import json
@@ -151,7 +151,7 @@ def main():
     if actual != version:
         parser.error(f"Base package version {actual} does not match source {version}")
     if output.exists():
-        parser.error("Output already exists; choose a fresh candidate filename")
+        parser.error("Output already exists; choose a new filename")
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="voco-package-", dir=output.parent) as directory:
         stage = Path(directory) / "stage"
@@ -199,10 +199,10 @@ def main():
         control.write_text("\n".join(lines) + f"\nVersion: {package_version}\nInstalled-Size: {size}\n")
         (stage / "DEBIAN/md5sums").write_text("".join(
             f"{digest(path, 'md5')}  {path.relative_to(stage)}\n" for path in files))
-        temporary_output = Path(directory) / "candidate.deb"
+        temporary_output = Path(directory) / "package.deb"
         subprocess.run(["dpkg-deb", "--root-owner-group", "-Zzstd", "-z9", "--build",
                         str(stage), str(temporary_output)], check=True)
-        # Publish only a completely built archive; an existing candidate is never replaced.
+        # Publish only a completely built archive; an existing file is never replaced.
         os.link(temporary_output, output)
     print(json.dumps({"package": str(output), "version": package_version,
                       "application_version": version, "bytes": output.stat().st_size,

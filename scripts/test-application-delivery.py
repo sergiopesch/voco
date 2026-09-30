@@ -1,4 +1,4 @@
-"""Universal paste into real Linux applications on the private desktop.
+"""VOCO's paste into real Linux applications on the private desktop.
 
 Every case pastes with the one production chord through fixtures/focused-paste.py
 and reads the result back from the application itself. On gnome-wayland the

@@ -6,7 +6,7 @@ set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 export PYTHONDONTWRITEBYTECODE=1
 
-# Source provenance: the retired recognizer stays out; patched crates match upstream.
+# Source provenance: one speech engine, and patched crates that match upstream.
 python3 scripts/verify-speech-engine.py
 python3 scripts/verify-tray-backport.py
 python3 scripts/verify-shortcut-backport.py

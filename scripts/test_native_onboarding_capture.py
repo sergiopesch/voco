@@ -99,7 +99,7 @@ def run_onboarding(root, app, pump, native_windows):
         wait(lambda: any(r.get('event') == 'recording_state_active' for r in rows()), 'native onboarding capture')
         active_sources = wait(lambda: [source for source in sources() if source['index'] not in baseline_ids and source.get('corked') is False], 'uncorked private audio source')
         assert len(active_sources) == 1 and active_sources[0]['properties'].get('application.process.id') == str(app.pid), 'Unexpected capture process'
-        assert active_sources[0]['properties'].get('application.name') == 'VOCO native capture development'
+        assert active_sources[0]['properties'].get('application.name') == 'VOCO'
         result['captureBackend'] = 'native-pulse'
         result['activePulseSources'] = active_sources
         (evidence / 'onboarding-pulse-source-outputs.json').write_text(json.dumps(active_sources, indent=2) + '\n')

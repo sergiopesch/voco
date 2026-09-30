@@ -1,4 +1,4 @@
-// Universal paste into Chromium on the private desktop. Every case pastes with
+// VOCO's paste into Chromium on the private desktop. Every case pastes with
 // the one production chord through fixtures/focused-paste.py and reads the
 // result back from the page or the browser's own copy. VOCO_DELIVERY_OZONE
 // picks the browser's x11 (default on x11) or wayland (default on gnome-wayland)
