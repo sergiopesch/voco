@@ -1361,6 +1361,10 @@ if ! voco_start_wayland_service || ! voco_verify_desktop_input; then
   dim "${VOCO_INPUT_ERROR}"
   dim "Setup instructions: https://github.com/sergiopesch/voco/blob/master/docs/platform/README.md#ydotoold-ydotool-daemon"
   dim "After setup, run: voco --check-desktop-input"
+  if [[ -n "${VOCO_INSTALL_LOG:-}" ]]; then
+    VOCO_KEEP_LOG=true
+    dim "Details: $VOCO_INSTALL_LOG"
+  fi
   exit 2
 fi
 ok "Desktop input prerequisites verified"
