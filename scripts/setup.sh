@@ -145,7 +145,7 @@ step "System dependencies"
 APT_PACKAGES=(pkg-config libglib2.0-dev libsoup-3.0-dev
   libjavascriptcoregtk-4.1-dev libwebkit2gtk-4.1-dev
   libayatana-appindicator3-dev libpulse-dev clang mold
-  ibus gir1.2-ibus-1.0 python3-gi)
+  ibus gir1.2-ibus-1.0 python3-gi python3-numpy python3-psutil)
 # Assembly compiles the private input helper, then the package verifier runs.
 PACKAGE_TOOLS=(g++ patch binutils desktop-file-utils appstream)
 if $INSTALL_MODE; then APT_PACKAGES+=("${PACKAGE_TOOLS[@]}"); fi
@@ -157,6 +157,7 @@ else
   warn "Not using apt — install manually: pkg-config libglib2.0-dev libsoup-3.0-dev"
   warn "libjavascriptcoregtk-4.1-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev libpulse-dev"
   warn "For IBus shortcut integration, install IBus, its GI bindings, and system Python 3"
+  warn "The speech worker needs system Python 3 with NumPy and psutil"
   if $INSTALL_MODE; then warn "Package assembly also needs: ${PACKAGE_TOOLS[*]}"; fi
 fi
 
@@ -191,7 +192,11 @@ if [[ "$INSTALL_MODE" == true ]]; then
   step "Build"
 
   # The same pin as scripts/assemble-release.sh.
-  cargo tauri --version &>/dev/null || run_step "Tauri CLI 2.10.1" cargo install tauri-cli --version "2.10.1" --locked
+  if ! TAURI_CLI=$(cargo tauri --version 2>/dev/null); then
+    run_step "Tauri CLI 2.10.1" cargo install tauri-cli --version "2.10.1" --locked
+  elif [[ "$TAURI_CLI" != "tauri-cli 2.10.1" ]]; then
+    warn "Found ${TAURI_CLI}; releases use 2.10.1: cargo install tauri-cli --version 2.10.1 --locked"
+  fi
 
   # Remove stale bundle artifacts so install picks the package from this build only.
   rm -rf apps/desktop/src-tauri/target/release/bundle/deb
