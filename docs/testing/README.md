@@ -1,308 +1,231 @@
 # Testing
 
-The current universal-paste contract and its X11 and GNOME Wayland application and
-Chromium suites are in [desktop paste](desktop-paste.md).
+VOCO's automated tests never touch the desktop you work in: renderer suites mock
+the microphone, desktop suites play public speech into private audio servers and
+displays, and speech suites feed audio straight to the worker. `npm test` runs
+the quick checks and the rest are separate steps. A person with a physical
+microphone finishes with the [manual acceptance](#manual-acceptance) check.
+[CONTRIBUTING.md](../../CONTRIBUTING.md#prerequisites) lists the tools.
 
-- [27 September end-to-end assessment](end-to-end-assessment-2026-09-27.md): merged GNOME Start gate, startup audio recovery fix, CI evidence hygiene and remaining desktop acceptance gaps.
+## npm test
 
-- [2026.0.59 Stop reservation and installer qualification](stop-reservation-release-2026-09-23.md): rejected renewals, parent-owned cleanup and exact-package release evidence.
-- [2026.0.58 Brave Stop release qualification](brave-release-2026-09-23.md): exact-package upgrade, five-minute dictation and signed public assets.
-- [2026.0.57 tray and installer release qualification](tray-brand-release-2026-09-23.md): exact-package installation, recovery and desktop checks.
-[The unreleased installer brand refresh](installer-brand-2026-09-23.md) records the
-larger shared wordmark, terminal fallbacks, prompt handoff and rendering cost.
+`npm test` runs `scripts/test-unit.sh`, which needs no microphone, speech model
+or desktop session and stops at the first failure:
 
-[The unreleased onboarding and recovery review](onboarding-recovery-2026-09-23.md)
-records direct-to-tray completion, continued recognition after delivery interruption,
-quiet recovery, multi-minute trials and the remaining qualification limits.
+| Group | Steps |
+| --- | --- |
+| Source provenance | `verify-speech-engine.py`, which finds no second speech engine in shipping source or dependency metadata; `verify-tray-backport.py` and `verify-shortcut-backport.py`, which check the vendored tray and shortcut crates against upstream and that the app resolves only those copies |
+| Speech reports, the package assembler and the speech runtime | `test:dictation-quality`, `test:dictation-quality-events`, `test:speech-report`, `test:speech-package` (the package assembler and the Debian maintainer script), `test:speech-runtime` (the worker's unit tests) and `test-report-performance.py` |
+| Capture and desktop integration | `test-panel-setup.py`, `audio-worklet-capture.test.mjs`, `test:native-capture-audit`, `test:ibus`, `test-native-kde-identity.py` and `test-speech-worker.py` |
+| Dictation scoring and evaluation tools | `comparative-dictation.test.mjs`, `test-audio-continuity.py`, `speech-score.test.mjs`, `speech-integrity.test.mjs`, `speech-continuity.test.mjs`, `browser-long-accuracy.test.mjs`, `browser-capture-lifecycle.test.mjs` and `test:dictation-evaluation` |
+| The desktop app | Vitest, as `vitest run` in `apps/desktop` |
 
-[The .56 installer and Ghostty qualification](installer-ghostty-2026-09-23.md)
-records the exact released package, repeated X11 Start/Stop, separate native
-Wayland checks, installer opening, installed worker and package removal checks,
-and signed public-download verification.
+Names with a colon are npm scripts; the others are in `scripts/`. The worker's
+tests run under `/usr/bin/python3` with NumPy and psutil, and `test:ibus` needs
+python3-gi and gir1.2-ibus-1.0. The evaluation tests make no network requests.
 
-[The .55 qualification and publication record](release-qualification-2026-09-23.md)
-binds the final package to installation/removal, worker, 16 private GNOME X11,
-nine browser lifecycle, native Wayland onboarding and real VM helper migration
-checks. It also records signing and anonymous release-download verification.
-Physical microphone and owner-session acceptance remain separate from those fixtures.
+## Types, lint and Rust
 
-[The 22 September review](release-readiness-2026-09-22.md) retains the earlier
-security/performance assessment, superseded candidates and failed attempts.
-[The first-run follow-up](first-run-follow-up-2026-09-22.md) records the Brave
-readback regression and installer canvas work against the then-public .54 baseline.
-
-- [2026.0.52 release qualification](installer-release-2026-09-22.md) — exact package, desktop, signing and public-download receipts.
-
-The [.52 installer performance record](installer-performance-2026-09-22.md) records
-download timing, CPU overhead, event-driven presentation and real Ubuntu APT prompt
-tests. Package and desktop qualification are recorded separately above.
-
-The [.51 public release record](linux-release-2026-09-22.md) identifies the signed
-package, source and verified downloads. The
-[tray, setup and single-engine integration record](tray-setup-2026-09-21.md)
-retains the candidate's desktop/audio evidence and remaining coverage limits.
-
-[Wayland installation and onboarding readiness](wayland-install-2026-09-20.md) records the .46 regression fix and installed-guest scope.
-
-The [public benchmark gallery](../release-assets/2026.0.43/README.md) presents the
-matched seven-model comparison and separate historical cohorts, with 8K graphics,
-numeric data and measurement boundaries.
-
-Current publication and qualification status: [release gates](../release-candidate.md).
-Dated reports below are historical evidence, not qualification of a later binary.
-The [.43 Linux qualification report](linux-release-2026-09-19.md) tracks native
-packages and the Wayland hidden-capture change. See the [native capture contract](native-capture-development.md)
-for explicit permission, interruption recovery and independently verified audio audits.
-
-The [TypeSafe evaluation protocol](typesafe-evaluation.md) defines timing, word and
-punctuation accuracy, semantic judgments, corpus requirements and rejection rules.
-The [19 September before/after experiment](typesafe-results-2026-09-19.md) records
-actual local-worker comparisons and live Jev scores, separately from product QA.
-
-Run worker tests with `python3 -m unittest discover -s runtime/speech -p 'test_*.py'`;
-run the actual model protocol separately with `python3 runtime/speech/test_worker_protocol.py --output-dir /path/to/new/receipts`.
-NumPy/psutil and the pinned native/model payload must be present for relevant tests.
-Never count a missing model or an unrun protocol case as a pass.
-
-The [X11 follow-up](x11-stop-delivery-followup.md) records the reproduced root-grab
-failure and a since-retired exact-focus session-grab design. Logical frontend
-shortcut begin/end traces also occur on native no-op routes; they do not prove
-physical X11 scope. Match candidate/fixture hashes and preserve all attempted
-trial denominators. Default GNOME, KDE, Cinnamon and Omarchy/Hyprland desktops,
-physical audio and owner applications still require their own acceptance.
-The 15 September review includes paired event-driven versus polling-actor callback and
-idle tests. A planned zero-delay shortcut was scheduled by a helper after XSync;
-it is not an atomic same-server-batch test. Zero sampled CPU ticks means below the
-10 ms accounting resolution, not zero cost or measured app energy savings.
-Renderer-reload tests cover epoch-bound shortcut Begin/cleanup and replacement
-UUIDs; generic paste IPC remains a separate contract. Final source checks passed
-498 Rust test executions and 459 frontend tests (2 optional skips), with full npm,
-20 assembler tests and static checks passing. The strict Stop matrix passed
-34 selected cases from 35 attempts; model protocol passed 65 cases in five userspaces.
-Normal userspace/shortcut continuation passed five selected cases from eight attempts.
-Three original fixtures incorrectly assumed root-X11 ownership when IBus owned the
-shortcut; corrected real Start/Stop checks passed and failed receipts are retained.
-Use each supplied artifact's external native install/parity/remove receipts; see
-the [dated review](stop-delivery-review-2026-09-15.md).
-The packaged-UI reload attempt found no supported action; Ctrl+R did not initialize
-a second renderer. Epoch race tests pass, but active-owner full-app reload remains
-unqualified; no debugger/backdoor or child-process kill substituted for that test.
-Validation B stopped after two attempts: one completion under its original harness,
-then a pre-capture startup failure. Do not reclassify the first using C's tightened
-actual-Stop-overlap/focus-identity gates. C includes consuming-X11 versus passive-evdev
-arbitration tests; preserve actual attempted denominators for the native matrix.
-
-See the [historical foundational acceptance record](foundations-iteration-13-2026-09-06.md)
-for implemented changes, reproduced regressions, verification and open coverage.
-
-See the historical [preview timestamp geometry](preview-geometry.md) record for
-the retired snapshot decoder's bounds and provisional-text design. Its unused
-modules and exclusive tests have been removed; current speech gates exercise the
-production Nemotron stream.
-
-See [laptop performance diagnostics](laptop-performance.md) for opt-in local backend
-timings, resource samples, privacy boundaries and a report for manual laptop trials.
-
-Run the headless IBus mutation-rejection command matrix before any isolated desktop cursor test:
+`npm run check` runs `tsc --noEmit` and `npm run lint` runs ESLint, both in
+`apps/desktop`. `npm run verify:devops` checks script syntax, package metadata,
+the CI workflow rules and the installer, then rehearses a release, as the
+[release process](../release-process.md#what-ci-checks) describes. Clippy with
+every feature embeds the built interface, so build that first:
 
 ```bash
-npm run test:owned-preedit
-```
-
-This does not attach to the live input session. The [native fixture](native-isolated.md) adds actual
-GTK/WebKit widgets inside private X11, D-Bus, IBus and process namespaces. It can also launch the
-candidate with a private synthetic microphone. The [GNOME harness](gnome-isolated.md)
-also runs an actual private Shell/Mutter compositor. Installed-distribution acceptance
-still requires its own disposable VM or microVM; local namespaces do not establish that coverage.
-
-## Disposable desktop test
-
-Do not run VOCO input-method, injection, or virtual-audio experiments on an active workstation.
-Automated injection must stay in a private fixture. Owner-authorized manual laptop
-acceptance is a separate physical test gate, not authorization for arbitrary injected
-commands in live apps. Perform the synthetic steps below in the disposable VM described in the cursor
-streaming checklist, and preserve the remote run ID and evidence.
-
-1. Provision the [pinned runtime](../linux-packaging.md#runtime-provisioning), then build,
-   assemble, verify and install the complete package:
-
-```bash
-./scripts/setup.sh --install
-```
-
-2. Start VOCO:
-
-```bash
-npm run dev
-```
-
-3. Test the product:
-- install the Debian package in the disposable VM so the persistent component exists
-- optionally add and select `VOCO Dictation` only when testing consuming IBus shortcuts;
-  the default NVIDIA desktop-paste route does not require changing Input Sources
-- allow microphone access
-- finish onboarding
-- press `Alt+D`
-- speak a short sentence
-- verify progressive words reach the intended test field without an automatic preview window
-- press `Alt+D` again
-- verify the final tail, separators, no unintended Enter and no duplicate text
-- click another field during dictation and verify later chunks follow focus without replaying earlier text
-- for direct delivery, enable the packaged Chromium extension, focus a supported field and use Alt+Shift+V; verify the exact field and receipt
-
-An uninstalled source process does not install native messaging manifests. A browser E2E
-fixture must provide the explicit host registration and extension, as the isolated test does.
-
-For a production-mode headless build without packaging, run:
-
-```bash
-cd apps/desktop
-cargo tauri build --features custom-protocol --no-bundle
-```
-
-Do not use plain `cargo build --release` for a runnable desktop build. The app's
-`custom-protocol` feature enables Tauri's production frontend protocol; the Rust build now rejects
-release binaries that omit it.
-
-## Offline physical and comparative qualification
-
-The [physical microphone protocol](physical-microphone-qualification.md) includes
-an executable, consent-gated import workflow that preserves original WAVs and
-unrun case status without opening a microphone. The
-[comparative evaluation contract](comparative-dictation.md) imports retained peer
-measurements with source/model binding and explicit failed/censored denominators.
-Both tool suites run in `npm test` and `npm run verify:devops`; their tests use
-public fixtures or JSON sidecars, with no recording or model inference.
-
-## Automated checks
-
-The [preview scheduling and cancellation record](preview-scheduling.md) documents
-the retired snapshot decoder. Its exclusive tests are historical; current speech
-gates exercise the production Nemotron stream.
-
-```bash
-npm run verify:versions
-npm run test:owned-preedit
-npm run test:private-ibus
-npm run test:native-desktop
-npm run check
-npm run lint
-CARGO_BUILD_JOBS=2 cargo test --locked --all-targets --manifest-path apps/desktop/src-tauri/Cargo.toml
-cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml -- --check
 npm --workspace @voco/desktop run build:frontend
-CARGO_BUILD_JOBS=2 cargo clippy --locked --manifest-path apps/desktop/src-tauri/Cargo.toml --all-targets --all-features -- -D warnings
-npm test
+cd apps/desktop/src-tauri
+cargo fmt --check
+cargo clippy --locked --all-targets --all-features -- -D warnings
+cargo test --locked --all-targets
 ```
 
-Run `npm run test:private-ibus` directly on development machines. CI and release jobs use
-`scripts/test-private-ibus-engine-hosted.sh` instead. That wrapper refuses to run outside GitHub
-Actions and, on affected Ubuntu 24.04 hosted runners, temporarily permits Bubblewrap's private user
-namespace only for the test before restoring the original AppArmor policy. The private network,
-mount, IPC, PID, and UTS namespaces remain enabled.
+A release build fails to compile without the `custom-protocol` feature, which CI
+and `scripts/build-desktop.sh` turn on. `python3 scripts/verify-glib-backport.py`
+checks that `vendor/glib` is the upstream release plus one upstream fix and that
+the app resolves only that copy; `scripts/test-glib-variant.py --output NEW-DIR`
+tests it with release optimization. Both work offline, from crates Cargo has
+fetched. `npm run test:native-capture-callbacks` compiles VOCO's C capture code
+against libpulse, with `CC` or `cc`, and runs its callbacks with no audio server.
 
-The same hosted wrapper's `--native-desktop` selection runs the real GTK/WebKit fixture. Missing
-local dependencies or isolation fail the check; there is no fallback to an active desktop.
-`npm run test:speech-baseline` runs the pinned Nemotron streaming worker against
-eight fixed speech fixtures, repeated-speech integrity, silence and capture-boundary
-variants. Original corpus thresholds remain unchanged. `scripts/provision-ci-speech.sh`
-provisions only the checksum-pinned native payload from release .47; it keeps Python
-worker code from this checkout. Local runs can use an already verified runtime.
-`runtime/speech/test_worker_protocol.py` separately checks startup, sequence bounds,
-stale-session rejection, cancellation and cleanup. Reports identify the actual model.
+## Renderer suites
 
-The earlier [adversarial evaluation](speech-adversarial-evaluation.md) and
-[phase diagnostics](speech-continuity.md) are historical Whisper evidence. Their
-retired decoder runners are not current release gates.
+These load VOCO's interface from a local Vite server into Playwright's Chromium,
+which `npx playwright install --with-deps chromium` installs. The dictation,
+microphone and native-capture suites run the real app, hooks and store with every
+microphone, clipboard and native call mocked; none opens a microphone.
 
-Build the frontend before the all-features Clippy gate on a clean checkout. Tauri's production
-`custom-protocol` context validates `apps/desktop/dist` at compile time.
+| Command | Covers |
+| --- | --- |
+| `npm run test:dictation-renderer` | Recording into native and browser fields, progressive paste, Stop, cancellation and paste failures, including five minutes of simulated audio in 100 ms packets with a paste failure at two minutes |
+| `npm run test:microphone-renderer` | Microphone permission, device discovery, retries and the level preview |
+| `npm run test:native-capture-renderer` | Native source selection and capture-failure recovery; with `VOCO_RENDERER_SUITE=onboarding`, the setup voice test |
+| `npm run test:brand-motion` | The setup, popover, settings and Review surfaces with synthetic state, as [Branding](../branding.md#check-the-presentation) describes |
+| `npm run test:chromium-exact-field` | The extension's scripts against a mock `chrome` API, then the extension in Chromium with a local page; the [Chromium extension](../../integrations/chromium/README.md#files-and-tests) README covers `--native`, which adds the real host |
+| `node --test scripts/test-panel-model.mjs` | The GNOME companion's presentation model, in Node |
 
-## Manual checks before release
+`VOCO_RENDERER_EVIDENCE_DIR` receives screenshots and results. The microphone,
+native-capture and brand-motion suites require it and create it, so name a new
+directory whose parent exists.
 
-- confirm the onboarding fits in the window without scrolling
-- confirm the top bar can drag the window
-- confirm `Hide to tray` works
-- confirm the final setup screen shows your shortcut and says VOCO stays in the tray
-- confirm dictation still works end to end
-- run `npm run report:linux-runtime` on the Linux machine used for release testing
+## Isolated desktop suites
 
-Use [linux-e2e.md](./linux-e2e.md) as the release sign-off checklist for Ubuntu-class Linux environments.
+These run real programs: GNOME Shell, Weston, Xvfb, IBus, PulseAudio, Chromium
+and the app itself. Each suite runs in Bubblewrap with private network, IPC, PID
+and UTS namespaces and starts the display, D-Bus, IBus or audio servers it needs,
+so nothing reaches your session. CI runs them through
+`scripts/test-private-ibus-engine-hosted.sh`, which works only on GitHub Actions,
+where it relaxes Ubuntu's AppArmor limit on unprivileged user namespaces for the
+test and then restores it. Locally, run the named script with the same variables.
 
-Use [browser-broker.md](./browser-broker.md) and the
-[current adapter contract](../../integrations/chromium/README.md) for direct delivery.
-The older [cursor checklist](./cursor-streaming-manual-qa.md) and
-[results](./cursor-streaming-qa-results.md) describe the suspended IBus implementation.
+| Wrapper option | Script | What runs |
+| --- | --- | --- |
+| None | `test-private-ibus-engine.sh` | VOCO's IBus engine against a private IBus daemon, with no display or session bus |
+| `--gnome-panel` | `test-gnome-panel.sh` | GNOME Shell with the [companion](../../integrations/gnome/README.md#files-and-tests) and synthetic app status; with `VOCO_PANEL_APP_BINARY`, the app's tray bridge |
+| `--native-desktop` | `test-native-desktop.sh` | Real GTK and WebKit widgets with private X11, D-Bus and IBus |
+| `--native-wayland` | `test-native-wayland.sh` | Real Wayland surfaces in headless Weston; with `VOCO_WAYLAND_APP_BINARY`, the app starting, opening and quitting from its tray |
+| `--native-pulse-latency` | `test-native-capture-pulse-latency.py` | VOCO's C capture from a private PulseAudio: a short clip, a long clip, and a starved run that must fail with `capture-duration-deficit` |
+| `--legacy-ydotool` | `test-legacy-ydotool-daemon.py` | VOCO's `ydotoold`, built fresh, with no input devices and its uinput calls redirected to a file |
+| `--application-delivery`, `--browser-delivery` | `test-application-delivery.sh` | Paste into desktop programs and into Chromium, below |
+| `--full-application` | `test-native-desktop.sh` with `VOCO_NATIVE_APP_BINARY` | The app capturing a clip from a private PulseAudio and pasting into GTK fields |
+| `--browser-application`, `--browser-toolbar` | `test-browser-full-app.sh`, `test-browser-toolbar-app.sh` | The app, extension and host dictating into an exact Chromium field, started with Alt+Shift+V or the toolbar button |
 
+`npm run test:private-ibus`, `test:native-desktop`, `test:application-delivery`,
+`test:browser-delivery` and `test:browser-full-app` run the matching scripts. Give
+each suite a new evidence directory; the wrapper requires one for all but the IBus
+engine, native desktop and delivery suites. `VOCO_NATIVE_DEPS` and
+`VOCO_WAYLAND_DEPS` name the `usr` directory holding Xvfb and Weston, usually `/usr`.
 
-## Foundation regression gates
+The full-application, Wayland and browser suites run the release build with the
+[provisioned runtime](../linux-packaging.md#runtime-provisioning), checked
+against `MODEL-IDENTITY.json` and `NATIVE-BUILD.json`. `--full-application` has
+two cases: in `delivery`, one field keeps focus and gets the words exactly once;
+in `focus-switch`, focus moves mid-recording and each field keeps only what was
+pasted while it had focus. Any IBus preedit or commit, refused paste, copied
+remainder or fallback capture fails them. `--browser-application` runs a short
+recording and, with `VOCO_BROWSER_LONG_CAPTURE=1`, a long one.
 
-The [worklet input-continuity contract](worklet-input-continuity.md) covers an observable
-input gap, exact received-prefix recovery, valid silence, producer sealing and stale
-messages. Its model-free worklet tests run in `npm test`; the renderer suite exercises
-the actual dictation hook and manual recovery with mocked device/native boundaries.
+### Delivery suites
 
-`npm run test:dictation-renderer` drives the real recording hook, store, and recovery
-panel in headless Chromium with explicit microphone/Tauri mocks. Install the development
-browser once using `npx playwright install chromium`. CI and release jobs enforce this
-suite. It starts and closes its own loopback Vite server/browser and does not capture the
-host microphone or inject input. Set `VOCO_RENDERER_EVIDENCE_DIR` to an external directory
-for screenshots/results. Coverage includes five minutes of simulated audio and a
-delivery rejection at two minutes with continued recognition through Stop. These
-are renderer checks, not native Wayland or WebKit proof.
+`test-application-delivery.sh` pastes into real programs as VOCO does, with the
+clipboard, the primary selection and Shift+Insert, and reads the result back from
+the program. `VOCO_DELIVERY_PLATFORM` is `x11`, a private Xvfb and the default, or
+`gnome-wayland`, a nested GNOME Shell with XWayland and no input devices.
+`VOCO_DELIVERY_SUITE` picks the cases:
 
-`npm run test:microphone-renderer` checks the real App's asynchronous device discovery,
-access retries and preview ownership with mocked microphones. Set
-`VOCO_RENDERER_EVIDENCE_DIR` to a new output directory; its parent must exist.
-CI and release jobs enforce this suite too. See [microphone recovery](microphone-recovery.md)
-for the separate installed Linux qualification protocol and evidence boundaries.
+- `applications`, the default: GTK 3, GTK 4 and WebKit fields, GNOME Text Editor,
+  and GNOME Terminal with Bash and with nano. Ghostty, Firefox and VS Code run
+  when `VOCO_GHOSTTY_BINARY`, `VOCO_FIREFOX_BINARY` or `VOCO_VSCODE_BINARY` names
+  the program, and are recorded as unavailable otherwise. `VOCO_APP_CASE` picks
+  cases by name. The run passes when one case passes and none fails.
+- `browser`: a Chromium input, a textarea, empty editors, a placeholder, a
+  selection, non-ASCII text, a focus change and the address bar. All must pass.
 
-The current speech baseline is a repeatable regression floor, not a representative
-product-wide accuracy benchmark. Use `--report /path/to/new/report.json` to retain
-complete results; existing report files are refused. It never downloads a model or
-reads personal recordings. CI retains failures as well as successful reports.
+A replica of VOCO's paste commands runs unless `VOCO_FIXTURE_PASTE_BINARY` names
+the `voco` library test executable, which pastes through the production code.
+`VOCO_DELIVERY_EVIDENCE_DIR` receives `results.json` and failure screenshots.
 
-The [private Wayland harness](wayland-isolated.md) supplements X11 checks with real
-GTK/WebKit surfaces, tray Open/Quit lifecycle and verified bundled-worker warmup.
-It does not qualify physical microphones or an installed GNOME/KDE session.
+## Speech suites
 
-Long packaged-browser capture requires `VOCO_BROWSER_LONG_CAPTURE=1` in the private
-synthetic-audio harness. Before recording, it verifies every fixture and the
-reconstructed playback PCM and freezes the complete reference. The full-application
-run scores the text delivered to the field against that full reference. The toolbar
-run moves focus after the first live prefix: the original field must keep exactly
-that prefix, and the prefix plus the remainder copied at Stop is scored against the
-full reference. The repeated plan must also keep its frozen phrase count. Public
-fixture audio and the scores are retained in the requested evidence directory. This
-opt-in check is for the isolated harness, not the user's normal recording configuration.
+These run `runtime/speech/stream_worker.py` with the model and runtime in
+`runtime/speech/`, as [runtime provisioning](../linux-packaging.md#runtime-provisioning)
+describes. They never download a model and leave out capture, IPC and paste.
 
-`npm run verify:cursor-acceptance -- /path/to/hotkey-trace.jsonl --min-duration-ms 60000`
-uses strict exit status for installed-desktop acceptance: unproven/failing sessions and
-copy/overlay fallbacks cannot count as successful supported-target delivery. Ordinary
-`npm run report:cursor-streaming` remains diagnostic and can describe incomplete runs.
+`npm run test:speech-baseline -- --report NEW-report.json` is the regression
+floor. After checking the model against `MODEL-IDENTITY.json` and each clip's
+SHA-256, it streams eight LibriSpeech clips from `tests/fixtures/speech/`, 71.01
+seconds in all, in 100 ms packets of 1,600 samples, as VOCO sends them. The
+worker must answer each request within 120 seconds and only ever extend its
+text. The run passes when:
 
-[Foundation changes and acceptance record](foundations-2026-09-04.md) distinguish automated
-proof from pending native desktop and microphone validation.
+- each clip returns words with a word error rate of at most 0.5, and all clips
+  together at most 0.25;
+- `84-121123-0000`, repeated 18 times with 250 ms pauses, returns 18 whole copies
+  of its phrase and a word error rate of at most 0.15;
+- 10, 20 and 30 seconds of silence return no text;
+- the same clip stays within 0.5 at a tenth of its volume, with a second of
+  silence before or after it, and padded so Stop's last packet has one sample;
+- the worker exits with status 0.
 
-See [Native capture development](native-capture-development.md) for the optional native backend, explicit app-session source selection and its separate qualification gates.
+`--report` refuses an existing file. `VOCO_PYTHON` and `VOCO_NEMOTRON_MODEL`
+override the interpreter, `/usr/bin/python3`, and the model path.
+[Speech fixtures](../../tests/fixtures/speech/README.md) records the clips'
+source and what the bounds can't show.
 
-- [Combined UI, UX and laptop testing](combined-laptop-testing.md)
+`/usr/bin/python3 runtime/speech/test_worker_protocol.py --output-dir NEW-DIR`
+checks the protocol with the real model: warm-up, stale and duplicate requests, a
+replacement session, cancellation, silence, a bad sample rate, a clean exit and
+logs without audio or text. Without `--output-dir` it writes into `runtime/speech/`.
 
-## Exact text and delivery quality
+`scripts/evaluate-dictation-worker.py` replays the development or held-out clips
+into the worker to compare changes, as [TypeSafe evaluation](typesafe-evaluation.md)
+describes. Neither `npm test` nor CI runs it.
 
-[Quality attribution and scorer](dictation-quality.md) describes diagnostic .36,
-the privacy boundary, and why helper completion is not confirmed insertion.
+## Suites CI doesn't run
 
-## glib iterator safety
+These need programs or permissions that CI doesn't have. A run is evidence only
+for the host it ran on. Where you don't run them, record them as unavailable.
 
-Run `python3 scripts/verify-glib-backport.py`, then
-`python3 scripts/test-glib-variant.py --output /tmp/voco-glib-check` using a fresh
-output directory. The latter uses the resolved dependency and production optimization
-without starting a desktop. Add `--debug` for the debug control.
+| Script | What runs | Needs |
+| --- | --- | --- |
+| `test-native-gnome.sh` | GNOME Shell with Ubuntu's AppIndicator extension on a private Xvfb seat. `VOCO_GNOME_APP_BINARY` adds the app and its tray, and `VOCO_GNOME_CRASH_REVIEW=1`, `VOCO_GNOME_ONBOARDING=1` or `VOCO_GNOME_CURSOR=1` adds Review, the voice test or dictation into a field | `VOCO_NATIVE_DEPS` and a new `VOCO_GNOME_EVIDENCE_DIR`. The voice test and dictation also need `VOCO_DEV_NATIVE_CAPTURE`, `VOCO_DEBUG_CAPTURE_AUDIO` and `VOCO_DEBUG_NATIVE_CAPTURE` set to 1 |
+| `test-native-kde.sh` | KWin and Plasma on a private Xvfb seat. `VOCO_KDE_APP_BINARY` adds the app | `VOCO_NATIVE_DEPS`, `VOCO_KDE_DEPS`, the extracted KDE `usr` directory, and a new `VOCO_KDE_EVIDENCE_DIR` |
+| `test-legacy-ydotool.py` | A system ydotool 0.1.x sending VOCO's paste keys to a private socket, never to a device | Bubblewrap and ydotool 0.1.x |
+| `test-install-apt.py --allow-container-package-changes` | The installer's APT step with a fixture package: a maintainer script's prompt, then a configuration-file prompt that must keep the owner's edit | A disposable Docker container, because it installs and purges the fixture |
 
-## Current Linux package milestone
+## CI jobs
 
-[19 September native packaging and Hyprland experiments](linux-release-2026-09-19.md)
-records the .43 development work, successful checks and unresolved release gates.
-It is not a publication or universal compatibility claim.
+`.github/workflows/ci.yml` runs five jobs on Ubuntu 24.04 for pushes to `master` and
+pull requests into it. Evidence artifacts upload even after a failure and stay 7 days.
 
-- [22 September dependency refresh and .53 qualification](dependency-release-2026-09-22.md)
+| Job | Runs | Artifact |
+| --- | --- | --- |
+| Code Guide | The [Inside VOCO](../guide/README.md) guide's server, catalog and lesson tests | None |
+| RustSec Audit | `cargo audit` with cargo-audit 0.22.2 | None |
+| Frontend Checks | `verify:devops`, `verify:security`, `check`, `lint` and `npm test`; the renderer suites, the panel model and the exact-field suite; the GNOME companion; both delivery suites on `x11` and on `gnome-wayland`; the IBus engine, native desktop and native Wayland suites; the frontend build, and desktop entry and AppStream validation | `native-desktop-evidence` |
+| Rust Check & Test | `cargo fmt`, Clippy, the glib checks, `cargo test`, the C callbacks, the private `ydotoold` and native capture latency; then it provisions the runtime and runs the speech baseline and the worker protocol | `speech-regression-evidence` |
+| Application | The release build of `voco` and `voco-browser-host` with the runtime, then the tray bridge on GNOME, `--full-application`, the Wayland lifecycle, `--browser-application` and `--browser-toolbar` | `application-evidence` |
+
+## Manual acceptance
+
+No automated suite hears a real microphone or runs in a real desktop session.
+Before a release, and after a change to capture, paste, the tray or the GNOME
+companion, check VOCO on a Linux desktop with a physical microphone. Use a test
+account, because dictation replaces the clipboard, and made-up sentences.
+
+1. Install the package with `sudo apt install ./voco_<version>_amd64.deb`, or run
+   `bash scripts/setup.sh --install` in a checkout with the runtime. On Wayland,
+   turn on the [input service](../install.md#wayland-input-service).
+2. Run `voco --version` and `voco --check-desktop-input`. On GNOME 46, run
+   `voco --setup-panel`, sign out and back in, then run `voco --check-panel`.
+3. Start VOCO from the app menu. On a first start it opens setup: run the voice
+   test, check that your words appear, and finish desktop setup.
+4. Press the shortcut and dictate into a text editor, then a terminal. Words appear
+   as you speak; Stop adds only the rest, with no repeats and no Enter.
+5. Switch windows while you dictate. Later words go to the new window; the first
+   keeps only what it had.
+6. Watch the tray icon or GNOME panel as the microphone starts, while you speak
+   and while VOCO finishes. Open Settings and Review from its menu.
+7. Dictate until words appear, then run `pkill -KILL -x voco`. Start VOCO again,
+   open Review, and find the interrupted dictation with Copy transcript and Discard.
+8. Start VOCO with `VOCO_PERFORMANCE_LOG=1 voco`, dictate, quit, and run the
+   [report scripts](../troubleshooting.md#performance-logs).
+   `npm run report:linux-runtime` prints the session, desktop and paste helpers.
+
+Record the version, distribution, desktop, session type, microphone and programs,
+and every step's result, including failures and steps you couldn't run. The
+runtime report holds local paths; remove them before you share it.
+
+## Evidence rules
+
+- Use synthetic or public fixtures, and made-up sentences when you dictate by hand.
+- Remove personal recordings, transcripts, credentials and local paths before
+  you share logs, reports or evidence directories.
+- Never inject test speech into a live user session. Use isolated audio, input,
+  clipboard and desktop fixtures, as the suites above do.
+- Record a check that couldn't run as unavailable, never as passed. A missing
+  model, program or dependency is never a pass.
+- Keep failures and the number of attempted trials, not only the successes, and
+  give each run a new evidence directory.
+- Hosted CI never assembles the NVIDIA package or signs anything. The maintainer
+  does both locally, as the [release process](../release-process.md) describes.

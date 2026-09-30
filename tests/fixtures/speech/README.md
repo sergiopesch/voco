@@ -43,15 +43,16 @@ seconds and only ever extend the text it has returned. The run passes when:
 - `84-121123-0000`, repeated 18 times with 250 ms of silence after each, comes
   back word for word as 18 copies of its phrase;
 - 10, 20 and 30 seconds of digital silence return no text;
-- `84-121123-0000` still meets 0.5 at a tenth of its volume, and with one second
-  of silence before or after it;
+- `84-121123-0000` still meets 0.5 at a tenth of its volume, with one second of
+  silence before or after it, and padded with silence so Stop's last packet
+  holds one sample;
 - the worker exits with status 0.
 
 The word error rate counts substituted, deleted and inserted words against the
 number of reference words, ignoring case and punctuation, as
 `scripts/speech-score.mjs` computes it. Every clip ends with a packet shorter
-than 100 ms, so each run covers the partial packet at Stop; the
-`partial-stop-packet` variant repeats the short clip unchanged.
+than 100 ms, so each run covers the partial packet at Stop, and the
+`partial-stop-packet` variant covers the shortest one.
 
 ```bash
 npm run test:speech-baseline -- --report /tmp/voco-speech-baseline.json

@@ -277,13 +277,13 @@ you want them gone.
 
 ## Installer output
 
-In a color terminal at least 64 columns wide and 12 rows tall, the installer
+In a colour terminal at least 64 columns wide and 12 rows tall, the installer
 shows an animated progress view. It prints plain lines instead when its output
 isn't a terminal, `NO_COLOR` is set or `TERM` is `dumb`. GNOME's
 reduced-animation setting turns the animation off. You can also choose:
 
 ```bash
-VOCO_INSTALL_PLAIN=1 bash voco-install      # plain lines without color
+VOCO_INSTALL_PLAIN=1 bash voco-install      # plain lines without colour
 VOCO_INSTALL_NO_MOTION=1 bash voco-install  # progress view without animation
 ```
 
