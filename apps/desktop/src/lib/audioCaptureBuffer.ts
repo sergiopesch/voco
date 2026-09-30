@@ -49,38 +49,6 @@ export function appendAudioSamplesUpTo(
   };
 }
 
-export function collectRecentAudioSamples(
-  buffer: AudioCaptureBuffer,
-  maxSamples: number,
-): Float32Array {
-  if (buffer.sampleCount === 0 || maxSamples <= 0) {
-    return new Float32Array();
-  }
-
-  const targetLength = Math.min(buffer.sampleCount, maxSamples);
-  const result = new Float32Array(targetLength);
-  let remaining = targetLength;
-  let targetOffset = targetLength;
-
-  for (
-    let index = buffer.chunks.length - 1;
-    index >= 0 && remaining > 0;
-    index -= 1
-  ) {
-    const chunk = buffer.chunks[index];
-    if (!chunk) {
-      continue;
-    }
-
-    const copyLength = Math.min(chunk.length, remaining);
-    targetOffset -= copyLength;
-    result.set(chunk.subarray(chunk.length - copyLength), targetOffset);
-    remaining -= copyLength;
-  }
-
-  return result;
-}
-
 export function collectAudioSamplesRange(
   buffer: AudioCaptureBuffer,
   startSample: number,
@@ -143,23 +111,4 @@ function findFirstChunkEndingAfter(
     }
   }
   return low;
-}
-
-export function drainAudioCaptureBuffer(
-  buffer: AudioCaptureBuffer,
-): Float32Array {
-  if (buffer.sampleCount === 0) {
-    clearAudioCaptureBuffer(buffer);
-    return new Float32Array();
-  }
-
-  const merged = new Float32Array(buffer.sampleCount);
-  let offset = 0;
-  for (const chunk of buffer.chunks) {
-    merged.set(chunk, offset);
-    offset += chunk.length;
-  }
-
-  clearAudioCaptureBuffer(buffer);
-  return merged;
 }

@@ -64,25 +64,3 @@ export function createPanelLevelSender(
       .finally(() => { pending = false; });
   };
 }
-
-export function removeDcOffsetInPlace(samples: Float32Array): Float32Array {
-  if (samples.length === 0) {
-    return samples;
-  }
-
-  let sum = 0;
-  for (let i = 0; i < samples.length; i += 1) {
-    sum += samples[i] ?? 0;
-  }
-
-  const mean = sum / samples.length;
-  if (Math.abs(mean) < 1e-6) {
-    return samples;
-  }
-
-  for (let i = 0; i < samples.length; i += 1) {
-    samples[i] = (samples[i] ?? 0) - mean;
-  }
-
-  return samples;
-}
