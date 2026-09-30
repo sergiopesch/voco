@@ -1,6 +1,9 @@
+# Store text with LF line endings; Git detects binary files itself.
+* text=auto eol=lf
+
 # Preserve pinned third-party source and notices byte-for-byte.
-vendor/** -whitespace linguist-vendored
-runtime/notices/** -whitespace
+vendor/** -text -whitespace linguist-vendored
+runtime/notices/** -text -whitespace
 
 # Plotter-generated vector exports; numeric inputs and methods remain reviewable.
 docs/release-assets/**/svg/*.svg linguist-generated=true

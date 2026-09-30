@@ -1,63 +1,51 @@
-# Dependencies
-node_modules/
+# Dependencies. No trailing slash, so a reused node_modules symlink is ignored too.
+node_modules
 
 # Build output
 dist/
 build/
 target/
+coverage/
+*.tsbuildinfo
+**/*.rs.bk
 
 # Tauri
-apps/desktop/src-tauri/target/
 apps/desktop/src-tauri/gen/
 apps/desktop/src-tauri/.cargo/
 
-# TypeScript
-*.tsbuildinfo
+# Python
+__pycache__/
+*.py[cod]
 
-# Testing
-coverage/
+# Pinned speech runtime: provision it separately and never commit model
+# weights or host binaries (docs/linux-packaging.md#runtime-provisioning).
+models/
+runtime/speech/lib/
+runtime/speech/*.so
 
-# Environment
+# Real-worker protocol receipts belong in external evidence directories.
+runtime/speech/worker-protocol*.json
+runtime/speech/worker-protocol.stderr
+
+# Local environment
 .env
 .env*.local
+.tmp/
 
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-
-# OS
-.DS_Store
-Thumbs.db
+# Package managers
+.npm
+*.tgz
+npm-debug.log*
+yarn-debug.log*
 
 # Logs
 *.log
 logs/
 
-# Rust
-**/*.rs.bk
-
-# ASR models (large binary files)
-models/
-
-# Debug
-npm-debug.log*
-yarn-debug.log*
-
-# Package manager
-.npm
-*.tgz
-.tmp/
-__pycache__/
-
-# Provision pinned local speech artifacts separately; never commit host binaries.
-runtime/speech/lib/
-runtime/speech/*.so
-
-# Also ignore a reused dependency-directory symlink.
-node_modules
-
-# Real-worker protocol receipts belong in external evidence directories.
-runtime/speech/worker-protocol*.json
-runtime/speech/worker-protocol.stderr
+# Editors and operating systems
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
