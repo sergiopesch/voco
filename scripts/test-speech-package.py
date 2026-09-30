@@ -203,6 +203,25 @@ class VendoredNoticeTests(unittest.TestCase):
                     self.assertFalse(doc.exists())
 
 
+class PackagedDocsTests(unittest.TestCase):
+    def test_skips_developer_folders_only_at_the_top_of_docs(self):
+        docs = package.ROOT / "docs"
+        names = ["guide", "release-assets", "testing", "install.md", "__pycache__", "cache.pyc"]
+        self.assertEqual(package.packaged_docs_ignore(str(docs), names),
+                         {"guide", "release-assets", "testing", "__pycache__", "cache.pyc"})
+        self.assertEqual(package.packaged_docs_ignore(str(docs / "architecture"), ["testing", "README.md"]),
+                         set())
+
+    def test_copyright_carries_the_license_and_points_to_bundled_notices(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            doc = Path(temporary)
+            package.write_copyright(package.ROOT, doc)
+            copyright = (doc / "copyright").read_text()
+            self.assertTrue(copyright.endswith((package.ROOT / "LICENSE").read_text()))
+            for notice in ("nvidia/", "vendor/", "THIRD-PARTY-NOTICES.txt"):
+                self.assertIn(notice, copyright)
+
+
 class PayloadModeTests(unittest.TestCase):
     def test_modes_are_independent_of_checkout_permissions(self):
         with tempfile.TemporaryDirectory() as temporary:

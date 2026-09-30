@@ -98,6 +98,7 @@ assert_entry /usr/libexec/voco/ydotool-legacy/ydotoold -rwxr-xr-x
 assert_entry /usr/libexec/voco/ydotool-legacy/MANIFEST.json -rw-r--r--
 assert_entry /usr/libexec/voco/ydotool-legacy/qualified-client.json -rw-r--r--
 assert_entry /usr/share/doc/voco/THIRD-PARTY-NOTICES.txt -rw-r--r--
+assert_entry /usr/share/doc/voco/copyright -rw-r--r--
 assert_entry /usr/libexec/voco-browser-host -rwxr-xr-x
 assert_entry /etc/opt/chrome/native-messaging-hosts/com.voco.exact_field.json -rw-r--r--
 assert_entry /etc/chromium/native-messaging-hosts/com.voco.exact_field.json -rw-r--r--
@@ -135,6 +136,8 @@ for executable in /usr/bin/voco /usr/libexec/voco-browser-host; do
 done
 
 cmp "${ROOT_DIR}/vendor/THIRD-PARTY-NOTICES.txt" "${EXTRACT_ROOT}/usr/share/doc/voco/THIRD-PARTY-NOTICES.txt"
+tail -n "$(wc -l < "${ROOT_DIR}/LICENSE")" "${EXTRACT_ROOT}/usr/share/doc/voco/copyright" \
+  | cmp - "${ROOT_DIR}/LICENSE"
 cmp "${ROOT_DIR}/packaging/systemd/voco-ydotoold.service" "${EXTRACT_ROOT}/usr/lib/systemd/user/voco-ydotoold.service"
 cmp "${ROOT_DIR}/packaging/ydotool/voco-ydotool-launcher" "${EXTRACT_ROOT}/usr/libexec/voco/ydotool-launcher"
 cmp "${ROOT_DIR}/packaging/ydotool/qualified-client.json" "${EXTRACT_ROOT}/usr/libexec/voco/ydotool-legacy/qualified-client.json"

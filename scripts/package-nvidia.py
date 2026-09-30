@@ -19,6 +19,12 @@ VENDORED_NOTICES = {
 }
 # The guide site, test evidence and graphics stay in the source repository.
 UNPACKAGED_DOCS = {"guide", "release-assets", "testing"}
+COPYRIGHT_PREFACE = """\
+VOCO is distributed under the MIT License below. The speech runtime, speech
+model and helper programs in this package keep their own licenses and notices:
+see nvidia/, vendor/ and THIRD-PARTY-NOTICES.txt in this folder.
+
+"""
 
 
 def packaged_docs_ignore(directory, names):
@@ -88,6 +94,11 @@ def validate_base_executables(stage):
             raise ValueError(
                 f"Base package is missing a regular executable /{name}; "
                 "run npm run build to bundle the matching application and browser host")
+
+
+def write_copyright(source_root, doc):
+    """Debian policy requires /usr/share/doc/<package>/copyright."""
+    (doc / "copyright").write_text(COPYRIGHT_PREFACE + (source_root / "LICENSE").read_text())
 
 
 def copy_vendored_notices(source_root, doc):
@@ -167,6 +178,7 @@ def main():
             shutil.copy2(ROOT / name, doc / name)
         shutil.copytree(ROOT / "docs", doc / "docs", dirs_exist_ok=True, ignore=packaged_docs_ignore)
         copy_vendored_notices(ROOT, doc)
+        write_copyright(ROOT, doc)
         stage_legacy_input(stage, Path(directory) / "legacy-input-build")
         identity = {"version": package_version, "application_version": version,
                     "backend": "CPU native pool", "context": 1, "cpu_threads": 4,
