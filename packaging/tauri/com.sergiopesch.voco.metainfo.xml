@@ -28,8 +28,11 @@
   <url type="vcs-browser">https://github.com/sergiopesch/voco</url>
   <content_rating type="oars-1.1" />
   <releases>
-    <release version="2026.0.60" date="2026-09-28">
-      <description><p>Paste dictation into whatever app has keyboard focus: VOCO copies each chunk to the clipboard and primary selection, then presses Shift+Insert. If typing is interrupted, Stop copies the words it did not type to the clipboard. Refresh desktop dependencies and remove unused streaming code.</p></description>
+    <release version="2026.0.60" date="2026-09-30">
+      <description>
+        <p>Dictation now pastes into whatever app has keyboard focus. If pasting stops, VOCO keeps listening and copies the words it could not paste to the clipboard when you stop. Review keeps dictation after a crash.</p>
+        <p>In the GNOME top bar, the live bars open beside a microphone that stays still, inside one pill shared with GNOME's highlight. After upgrading, run panel setup again, then sign out and back in.</p>
+      </description>
     </release>
     <release version="2026.0.59" date="2026-09-23">
       <description><p>Release rejected GNOME shortcut reservations promptly and preserve newer accepted renewals.</p></description>
@@ -49,12 +52,6 @@
     <release version="2026.0.54" date="2026-09-22"><description><p>Updated Vite, React and Tauri build dependencies, preserving live tray feedback with the updated tray library.</p></description></release>
     <release version="2026.0.44" date="2026-09-20"><description><p>Test live local speech during onboarding and check for an editable cursor before dictation.</p></description></release>
     <release version="2026.0.43" date="2026-09-19"><description><p>Safer capture admission, offline recovery, and public evaluation tools.</p></description></release>
-    <release version="2026.0.41" date="2026-09-19"><description><p>Guard incomplete capture and recover dictation with the bundled local model.</p></description></release>
-    <release version="2026.0.40" date="2026-09-18">
-      <description>
-        <p>Candidate source for the next VOCO cut. Local dictation, tray-first UI and streaming cursor delivery are unchanged. Public download remains 2026.0.39 until this version is qualified and published.</p>
-      </description>
-    </release>
     <release version="2026.0.39" date="2026-09-15">
       <description>
         <p>Adds persistent VOCO Dictation input-source support with revisable live preedit, authoritative local checkpoints, exact-prefix delivery, and recoverable fail-closed final transcripts.</p>
