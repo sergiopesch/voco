@@ -165,10 +165,6 @@
   .voco-preferences__form { padding: 16px; }
 }
 /* Accessible materials keep selection, boundaries and native control semantics. */
-.voco-panel[data-surface="settings"][data-visual-effects="reduced"] .voco-panel__shell::before { display: none; }
-.voco-panel[data-surface="settings"][data-visual-effects="reduced"] :is(.voco-preferences__sidebar,.voco-preferences__card) { background: #242c38; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
-.voco-panel[data-surface="settings"][data-visual-effects="reduced"] .voco-preferences__nav-item[aria-current="page"] { background: #3c495b; box-shadow: none; }
-.voco-panel[data-surface="settings"][data-visual-effects="reduced"] .voco-preferences .voco-button--primary { background: #3c495b; box-shadow: none; transform: none; }
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
   .voco-panel[data-surface="settings"] .voco-panel__shell::before { display: none; }
   .voco-preferences :is(.voco-preferences__sidebar,.voco-preferences__card) { background: #242c38; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
@@ -177,9 +173,10 @@
 }
 @media (forced-colors: active) {
   .voco-panel[data-surface="settings"] .voco-panel__shell::before { display: none; }
+  /* The repeated class outranks styles.css, which imports this file first. */
   .voco-panel[data-surface="settings"] .voco-panel__shell,
-  .voco-panel[data-surface="settings"]:is([data-visual-effects], .voco-panel) .voco-preferences :is(.voco-preferences__sidebar,.voco-preferences__card,.voco-button) { background: Canvas; color: CanvasText; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; border-color: ButtonText; }
-  .voco-panel[data-surface="settings"]:is([data-visual-effects], .voco-panel) .voco-preferences .voco-preferences__nav-item[aria-current="page"] { border: 2px solid Highlight; background: Canvas; color: CanvasText; box-shadow: none; }
+  .voco-panel.voco-panel[data-surface="settings"] .voco-preferences :is(.voco-preferences__sidebar,.voco-preferences__card,.voco-button) { background: Canvas; color: CanvasText; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; border-color: ButtonText; }
+  .voco-panel.voco-panel[data-surface="settings"] .voco-preferences .voco-preferences__nav-item[aria-current="page"] { border: 2px solid Highlight; background: Canvas; color: CanvasText; box-shadow: none; }
   .voco-preferences .voco-settings-icon { filter: none; background: white; border-radius: 2px; }
   .voco-preferences :is(button,summary,input,select,textarea):focus-visible { outline-color: Highlight; }
 }

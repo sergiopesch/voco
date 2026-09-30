@@ -614,7 +614,7 @@ export function ControlPanel({
   }
 
   return (
-    <main className="voco-panel" data-surface={surface} data-visual-effects="full" ref={headingContainerRef}>
+    <main className="voco-panel" data-surface={surface} ref={headingContainerRef}>
       <section className="voco-panel__shell">
         {surface !== "settings" ? <header
           className="voco-panel__hero"

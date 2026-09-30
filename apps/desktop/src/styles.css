@@ -828,20 +828,6 @@ input[type="checkbox"]:focus-visible {
 .voco-device-picker span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* The material is optional; these modes keep controls and focus boundaries solid. */
-.voco-panel[data-visual-effects="reduced"] .voco-panel__shell::before,
-.voco-panel[data-visual-effects="reduced"] .voco-glass--primary::before { display: none; }
-.voco-panel[data-visual-effects="reduced"] .voco-glass,
-.voco-panel[data-visual-effects="reduced"] .voco-button--primary {
-  background: #34383e;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-  box-shadow: none;
-}
-.voco-panel[data-visual-effects="reduced"] *,
-.voco-panel[data-visual-effects="reduced"] *::before { animation: none !important; transition: none !important; }
-.voco-panel[data-visual-effects="reduced"] .voco-button,
-.voco-panel[data-visual-effects="reduced"] .voco-button:hover:not(:disabled),
-.voco-panel[data-visual-effects="reduced"] .voco-button:active:not(:disabled) { transform: none; box-shadow: none; }
 @media (prefers-reduced-motion: reduce) {
   .voco-glass--primary::before { display: none; }
   .voco-panel .voco-button { transition: none; transform: none !important; }

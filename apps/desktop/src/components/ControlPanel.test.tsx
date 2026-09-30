@@ -223,7 +223,7 @@ describe("Crystal Sidebar settings", () => {
     vi.stubGlobal("window", { localStorage: { getItem }, matchMedia: () => ({ matches: true }) });
     for (const requestedSection of ["General"] as const) {
       const markup = renderPanel({ surface: "settings", requestedSection });
-      expect(markup).toContain('data-visual-effects="full"');
+      expect(markup).not.toContain("data-visual-effects");
       expect(markup).not.toContain('role="switch"');
       expect(markup).not.toContain("Glass effects");
       expect(markup).not.toContain("Reduce motion");

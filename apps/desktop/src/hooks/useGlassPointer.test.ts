@@ -15,7 +15,7 @@ function createHandlers() {
   return handlers;
 }
 
-function createElementFixture(options: { disabled?: boolean; ariaDisabled?: boolean; reduced?: boolean; width?: number } = {}) {
+function createElementFixture(options: { disabled?: boolean; ariaDisabled?: boolean; width?: number } = {}) {
   const properties = new Map<string, string>();
   const element = {
     style: {
@@ -24,7 +24,6 @@ function createElementFixture(options: { disabled?: boolean; ariaDisabled?: bool
     },
     matches: () => options.disabled ?? false,
     getAttribute: () => options.ariaDisabled ? "true" : null,
-    closest: () => options.reduced ? {} : null,
     getBoundingClientRect: () => ({ left: 10, top: 20, width: options.width ?? 200, height: 100 }),
   } as unknown as HTMLButtonElement;
   return { element, properties };
@@ -67,9 +66,8 @@ describe("glass pointer highlight", () => {
   it.each([
     { disabled: true },
     { ariaDisabled: true },
-    { reduced: true },
     { width: 0 },
-  ])("skips disabled, reduced-effect, and unmeasurable controls: %j", (options) => {
+  ])("skips disabled and unmeasurable controls: %j", (options) => {
     mediaPreferences();
     const handlers = createHandlers();
     const { element, properties } = createElementFixture(options);
