@@ -171,7 +171,7 @@ fn exchange_with_worker(
     }
     if guard.is_none() {
         if request["op"] != "warmup" && request["op"] != "start" {
-            return Err("worker lost; recording retained for recovery".into());
+            return Err("worker lost".into());
         }
         *guard = Some(create_worker()?);
     }
@@ -198,7 +198,7 @@ fn exchange_with_worker(
             return Err("worker response identity mismatch".into());
         }
         if response.get("error").is_some() {
-            return Err("worker rejected request; recording retained for recovery".into());
+            return Err("worker rejected request".into());
         }
         Ok(response)
     })();

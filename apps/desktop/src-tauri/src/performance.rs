@@ -352,7 +352,7 @@ fn speech_worker_failure_payload(
         "invalid worker response" => "response_invalid",
         "worker did not become ready" => "ready_invalid",
         "worker response identity mismatch" => "identity_mismatch",
-        "worker rejected request; recording retained for recovery" => "request_rejected",
+        "worker rejected request" => "request_rejected",
         _ => "transport_failed",
     };
     Some(

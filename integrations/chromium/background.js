@@ -49,7 +49,7 @@ async function enableTab(tab) {
     for (let attempts = 0; attempts < 20 && current() && native === port && !ready; attempts++) await new Promise(resolve => setTimeout(resolve, 50));
     if (!current()) return;
     if (!ready || native !== port) {
-      await chrome.action.setTitle({tabId: tab.id, title: 'Open VOCO and enable its browser integration first'}).catch(() => {});
+      await chrome.action.setTitle({tabId: tab.id, title: 'Start VOCO, then click again'}).catch(() => {});
       return;
     }
     await chrome.scripting.executeScript({target: {tabId: tab.id}, files: ['content.js']});

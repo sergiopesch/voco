@@ -15,8 +15,8 @@
     <ul>
       <li>Local English speech transcription with Nemotron</li>
       <li>Setup for your microphone and shortcut; dictation pastes into whatever app has keyboard focus</li>
-      <li>Live cursor dictation and explicit transcript recovery</li>
-      <li>GitHub Release update checks for manual install channels</li>
+      <li>Words VOCO cannot paste are copied to the clipboard when you stop, and Review in the tray recovers dictation after a crash</li>
+      <li>Update checks against GitHub Releases; VOCO never downloads or installs updates itself</li>
       <li>Linux-specific install, upgrade, and troubleshooting guidance</li>
     </ul>
   </description>
