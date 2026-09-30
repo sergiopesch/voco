@@ -80,7 +80,6 @@ node --check scripts/comparative-dictation.mjs
 node --check scripts/comparative-dictation.test.mjs
 node --check scripts/test-browser-delivery.mjs
 node --test scripts/comparative-dictation.test.mjs
-PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-physical-speech-session.py
 
 PYTHONDONTWRITEBYTECODE=1 python3 - <<'PY'
 import ast

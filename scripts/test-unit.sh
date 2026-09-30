@@ -26,7 +26,6 @@ npm run test:native-capture-audit
 npm run test:ibus
 python3 scripts/test-native-kde-identity.py
 python3 scripts/test-speech-worker.py
-python3 scripts/test-physical-speech-session.py
 
 # Dictation scoring and evaluation tools.
 node --test scripts/comparative-dictation.test.mjs

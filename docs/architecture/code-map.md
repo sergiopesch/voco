@@ -268,7 +268,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `test-speech-continuity.mjs`, `audio_continuity.py` — Continuity checks for lost audio.
 - `browser-long-accuracy.mjs`, `browser-capture-lifecycle.mjs` — Long-recording helpers for the browser tests.
 - `speech_worker.py` — Bounded JSON framing for evaluation workers.
-- `typesafe-evaluate.py`, `prepare-physical-speech-session.py` — Research tooling; see the [evaluation protocol](../testing/typesafe-evaluation.md).
+- `typesafe-evaluate.py` — Research tooling; see the [evaluation protocol](../testing/typesafe-evaluation.md).
 - `*.test.mjs` next to these files — Their unit tests.
 
 ### Reports
@@ -290,7 +290,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `test-native-capture-callbacks.py`, `test-native-capture-pulse-latency.py`, `native-capture-lifecycle.test.c`, `test-native-capture-renderer.mjs`, `test_verify_native_capture_audit.py` — Native capture.
 - `test-dictation-renderer.mjs`, `test-microphone-app-renderer.mjs`, `test-brand-motion.mjs`, `audio-worklet-capture.test.mjs` — Renderer and AudioWorklet.
 - `test-ydotool-service.py`, `test-legacy-ydotool.py`, `test-legacy-ydotool-daemon.py` — Input service selection and the private daemon.
-- `test-speech-package.py`, `test-speech-worker.py`, `test-audio-continuity.py`, `test-physical-speech-session.py` — Speech packaging and worker pipes.
+- `test-speech-package.py`, `test-speech-worker.py`, `test-audio-continuity.py` — Speech packaging and worker pipes.
 - `test-install-apt.py`, `test-install-common.sh`, `test-install-journey.py`, `test-install-launch.py`, `test-install-performance.py`, `test-install-prefetch.py`, `test-install-presentation.py` — Installer.
 - `test-glib-variant.py`, `test-debian-maintainer.py`, `test-check-shell-syntax.py`, `test-report-dictation-quality-events.py`, `test-report-performance.py`, `test-report-speech-timing.py`, `test-typesafe-evaluation.py` — Other checks.
 - `fixtures/*` — Test-only helpers: synthetic fields, a nested `ydotool`, probe extensions and a syscall shim. None is installed.
