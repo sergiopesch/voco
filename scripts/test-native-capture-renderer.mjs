@@ -265,7 +265,7 @@ try {
                         available: true,
                         missingCommands: []
                     },
-                    ownedPreedit: {
+                    ibusShortcut: {
                         setupState: 'ready',
                         available: true
                     }
@@ -484,7 +484,7 @@ try {
               const base = await previous(name,args);
               return {...base, desktopInput:{available:true,detail:'Input helpers are ready.'},
                 desktopPaste:{enabled:true,available:false,detail:'Install ydotool and ydotoold.'},
-                ownedPreedit:{...base.ownedPreedit,setupState:'not-installed',available:false}};
+                ibusShortcut:{...base.ibusShortcut,setupState:'not-installed',available:false}};
             }
             return previous(name,args);
           };
@@ -505,7 +505,7 @@ try {
         assert.ok(!calls.includes('pasteDesktopText'));
         assert.ok(!calls.includes('insertText'));
         assert.ok(!calls.includes('copyDesktopText'));
-        assert.ok(!calls.includes('startOwnedPreedit'));
+        assert.ok(!calls.includes('startBrowserField'));
         assert.equal(await page.evaluate(() => window.copiedText),undefined);
         assert.equal(await page.evaluate(()=>window.nativeCommands.some(c=>c.name==='benchmark_stream'&&c.args.request.op==='quality')),false);
       };
@@ -835,7 +835,7 @@ try {
         window.store.getState().setSurface('hidden');
         const original = window.nativeCall;
         window.nativeCall = async (name, args) => {
-          if (name !== 'startOwnedPreedit') return original(name, args);
+          if (name !== 'startBrowserField') return original(name, args);
           window.calls.push([name, ...args]);
           if (failure === 'broker') throw Error('Fixture browser connection unavailable');
           return { sessionId: failure === 'lease' ? null : 901,
@@ -860,8 +860,8 @@ try {
         error: window.store.getState().error,
         streamRequests: window.streamRequests || 0,
         nativeBegins: window.nativeCommands.filter(call => call.name === 'native_capture_begin').length,
-        starts: window.calls.filter(call => call[0] === 'startOwnedPreedit'),
-        cancels: window.calls.filter(call => call[0] === 'cancelOwnedPreedit'),
+        starts: window.calls.filter(call => call[0] === 'startBrowserField'),
+        cancels: window.calls.filter(call => call[0] === 'cancelBrowserField'),
         releases: window.calls.filter(call => call[0] === 'releaseBrowserRecording'),
         snapshot: window.calls.filter(call => call[0] === 'syncRuntimeStatus').at(-1)[1],
       }));
@@ -876,7 +876,7 @@ try {
       assert.equal(proof.starts.length, 1);
       assert.ok(proof.starts.every(call => call[2] === 'browser:readiness-fixture'));
       assert.ok(proof.releases.some(call => call[1] === 'browser:readiness-fixture'));
-      assert.deepEqual(proof.cancels, failure === 'ownership' || captureFailure ? [['cancelOwnedPreedit', 901]] : []);
+      assert.deepEqual(proof.cancels, failure === 'ownership' || captureFailure ? [['cancelBrowserField', 901]] : []);
       const name = backend + '-browser-' + failure + '-failure-' + (captureFailure ? 'invalidates' : 'preserves') + '-microphone-readiness';
       expected.push(name);
       const passed = proof.ready === !captureFailure && proof.snapshot.microphoneReady === !captureFailure &&

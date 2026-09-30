@@ -45,7 +45,7 @@ const results = [];
 const nativeMock = `
 export const calls = window.nativeCalls = [];
 const state = () => ({ sessionId: 101, setupState: "ready", engineActive: true, focusLost: false, ownershipIntact: true, finalizationOutcome: "committed", committedCharacterCount: 0 });
-export const startOwnedPreedit = async (...args) => { calls.push(['startOwnedPreedit', ...args]); if(window.deferLease) await new Promise(resolve=>window.resolveLease=resolve); if (!window.lease) throw new Error('No eligible original field'); return state(); };
+export const startBrowserField = async (...args) => { calls.push(['startBrowserField', ...args]); if(window.deferLease) await new Promise(resolve=>window.resolveLease=resolve); if (!window.lease) throw new Error('No eligible original field'); return state(); };
 export const getDesktopInputStatus = async () => ({available:!window.pasteUnavailable,detail:"Paste helper unavailable"});
 export const getPanelSetupStatus = async () => ({status:'other-desktop',detail:'Use the tray menu.',canEnable:false});
 export const enableGnomePanel = getPanelSetupStatus;
@@ -55,11 +55,11 @@ export const getDesktopPasteStatus = async () => ({enabled:Boolean(window.deskto
 const bytes = text => new TextEncoder().encode(text).length;
 export const pasteDesktopText = async (text) => { calls.push(['pasteDesktopText',text]); if(window.failPaste) throw {outcome:window.pasteOutcome ?? 'uncertain',message:'Uncertain paste dispatch',clipboardChanged:true}; return {strategy:'clipboard',outcome:'dispatched',pasteMetrics:{preflightMs:5,settleMs:0,modifierWaitMs:12,clipboardMs:8,keyboardMs:350,leadingSeparator:false,routedUtf8Bytes:bytes(text),payloadUtf8Bytes:bytes(text),payloadUnicodeScalars:Array.from(text).length,payloadUtf16Units:text.length}}; };
 export const copyDesktopText = async (text) => { calls.push(['copyDesktopText',text]); if(window.failCopy) throw {outcome:'uncertain',message:'Clipboard helper failed',clipboardChanged:false}; };
-export const cancelOwnedPreedit = async (...args) => { calls.push(['cancelOwnedPreedit',...args]); return state(); };
+export const cancelBrowserField = async (...args) => { calls.push(['cancelBrowserField',...args]); return state(); };
 export const releaseBrowserRecording = async (triggerId) => { calls.push(['releaseBrowserRecording',triggerId]); };
 export const ackBrowserStop = async (triggerId) => { calls.push(['ackBrowserStop',triggerId]); };
-export const checkpointOwnedPreedit = async (id,prefix,text) => { calls.push(['checkpointOwnedPreedit',id,prefix,text]); if(window.deferCheckpoint) await new Promise(resolve=>window.resolveCheckpoint=resolve); return {...state(), focusLost:Boolean(window.focusChanged), committedCharacterCount:Array.from(prefix+text).length}; };
-export const finishCanonicalOwnedPreedit = async (id,prefix,text) => { calls.push(['finishCanonicalOwnedPreedit',id,prefix,text]); return {...state(), focusLost:Boolean(window.focusChanged), committedCharacterCount:Array.from(prefix+text).length}; };
+export const appendBrowserField = async (id,prefix,text) => { calls.push(['appendBrowserField',id,prefix,text]); if(window.deferCheckpoint) await new Promise(resolve=>window.resolveCheckpoint=resolve); return {...state(), focusLost:Boolean(window.focusChanged), committedCharacterCount:Array.from(prefix+text).length}; };
+export const finishBrowserField = async (id,prefix) => { calls.push(['finishBrowserField',id,prefix]); return {...state(), focusLost:Boolean(window.focusChanged), committedCharacterCount:Array.from(prefix).length}; };
 export const debugNativeCaptureEnabled = async () => false;
 export const saveDebugNativeRetainedSource = async () => null;
 export const traceHotkeyEvent = async (...args) => {(window.traceEvents??=[]).push(args);};
@@ -193,22 +193,22 @@ results.push('Unavailable cursor delivery fails closed before capture; no manual
 await load();await page.evaluate(()=>{window.lease=true;window.hook.toggle('browser:fixture','start');});
 await page.waitForFunction(()=>window.store.getState().status==='recording');
 await page.evaluate(()=>window.samples(1));
-await page.waitForFunction(()=>window.nativeCalls.some(c=>c[0]==='checkpointOwnedPreedit'));
+await page.waitForFunction(()=>window.nativeCalls.some(c=>c[0]==='appendBrowserField'));
 await page.evaluate(()=>window.hook.toggle('browser:fixture','stop'));
 await page.waitForFunction(()=>window.store.getState().status==='idle');
-assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='checkpointOwnedPreedit').map(c=>c.slice(2))),[['','Recovered words'],['Recovered words',' for manual review.']]);
-assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='finishCanonicalOwnedPreedit').map(c=>c.slice(2))),[['Recovered words for manual review.','']]);
+assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='appendBrowserField').map(c=>c.slice(2))),[['','Recovered words'],['Recovered words',' for manual review.']]);
+assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='finishBrowserField').map(c=>c.slice(2))),[['Recovered words for manual review.']]);
 assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>['pasteDesktopText','copyDesktopText','insertText'].includes(c[0]))),false);
 results.push('Browser recording streams Nemotron suffixes through its exact field lease and finalizes without replay.');
 
 await load();await page.evaluate(()=>{window.lease=true;window.focusChanged=true;window.hook.toggle('browser:fixture','start');});
 await page.waitForFunction(()=>window.store.getState().status==='recording');
 await page.evaluate(()=>window.samples(1));
-await page.waitForFunction(()=>window.nativeCalls.some(c=>c[0]==='checkpointOwnedPreedit'));
+await page.waitForFunction(()=>window.nativeCalls.some(c=>c[0]==='appendBrowserField'));
 await page.evaluate(()=>window.hook.toggle('browser:fixture','stop'));
 await page.waitForFunction(()=>window.store.getState().status==='idle',null,{timeout:6000});
-assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='checkpointOwnedPreedit').length),1);
-assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>c[0]==='finishCanonicalOwnedPreedit')),false);
+assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='appendBrowserField').length),1);
+assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>c[0]==='finishBrowserField')),false);
 // As after a failed paste, Stop copies the words the field may not have taken.
 assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='copyDesktopText').map(c=>c[1])),['Recovered words for manual review.']);
 assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>c[0]==='showNotification'&&c[1]==='Dictation copied to clipboard')),true);

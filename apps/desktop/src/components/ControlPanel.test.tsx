@@ -104,7 +104,7 @@ describe("ControlPanel", () => {
     const render = (state: "available" | "unavailable") => renderPanel({ runtimeDiagnostics: {
       shortcut: { hotkey: "Alt+D", route: state === "available" ? "global-shortcut" : null, state, detail: "Fixture shortcut" },
       sessionType: "wayland", typeSimulation: support, clipboard: support,
-      ownedPreedit: { available: false, ready: false, setupState: "safety-disabled", detail: "Fixture", sessionId: null, engineActive: false, focusLost: false, progressiveCommitActive: false, committedCharacterCount: 0, ownershipIntact: false, finalizationOutcome: null, error: null },
+      ibusShortcut: { available: false, setupState: "not-installed", detail: "Fixture", error: null },
     } });
     const markup = render("available");
     expect(markup).toContain("Click where you want the text, then use your shortcut.");
@@ -121,7 +121,7 @@ describe("ControlPanel", () => {
       desktopPaste: { enabled: true, available: true, detail: "Ready" },
       shortcut: { hotkey: "Alt+D", route: "evdev" as const, state: "available" as const, detail: "Keyboard ready" },
       sessionType: "wayland", typeSimulation: support, clipboard: support,
-      ownedPreedit: { available: false, ready: false, setupState: "not-enabled" as const, detail: "Not enabled", sessionId: null, engineActive: false, focusLost: false, progressiveCommitActive: false, committedCharacterCount: 0, ownershipIntact: false, finalizationOutcome: null, error: null },
+      ibusShortcut: { available: false, setupState: "not-enabled" as const, detail: "Not enabled", error: null },
     };
     const settings = renderPanel({ surface: "settings", runtimeDiagnostics });
     expect(settings).toContain("Alt+D also reaches the app you are dictating into. Enable the VOCO panel in Help to keep the shortcut out of other apps.");

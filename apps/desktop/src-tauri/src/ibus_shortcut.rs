@@ -10,78 +10,43 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 const PROTOCOL_VERSION: u32 = 6;
-const EXACT_FIELD_REQUIRED: &str = "Automatic IBus delivery is disabled because the original text field cannot be verified. Recording remains available; review and copy the transcript in VOCO.";
-
-pub(crate) fn require_exact_field_delivery() -> Result<OwnedPreeditStatus, String> {
-    Err(EXACT_FIELD_REQUIRED.to_string())
-}
 const COMPONENT_PATH: &str = "/usr/share/ibus/component/voco.xml";
 const SOCKET_DIRECTORY_NAME: &str = "voco";
 const SOCKET_FILE_NAME: &str = "ibus-engine.sock";
 const IPC_TIMEOUT: Duration = Duration::from_millis(1_000);
 const MAX_REQUEST_BYTES: usize = 4_000_000;
 const MAX_RESPONSE_BYTES: usize = 64_000;
+const CONNECTED_DETAIL: &str = "The VOCO Dictation input source is running. It takes the dictation shortcut in IBus-aware fields; dictation does not need it.";
 
+/// The optional IBus input source only takes the dictation shortcut. VOCO
+/// never asks it to change text.
 #[derive(Debug, Clone, Default, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-pub struct OwnedPreeditStatus {
+pub struct IbusShortcutStatus {
     pub available: bool,
-    pub ready: bool,
     pub setup_state: String,
     pub detail: String,
-    pub session_id: Option<u64>,
-    pub engine_active: bool,
-    pub focus_lost: bool,
-    pub progressive_commit_active: bool,
-    pub committed_character_count: usize,
-    pub ownership_intact: bool,
-    pub finalization_outcome: Option<String>,
     pub error: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct EngineStatus {
-    ready: bool,
-    #[serde(default = "ready_setup_state")]
-    setup_state: String,
-    session_id: Option<u64>,
-    engine_active: bool,
-    focus_lost: bool,
-    #[serde(default)]
-    progressive_commit_active: bool,
-    #[serde(default)]
-    committed_character_count: usize,
-    #[serde(default)]
-    ownership_intact: bool,
-    #[serde(default)]
-    finalization_outcome: Option<String>,
-    #[serde(default)]
-    error: String,
-}
-
-fn ready_setup_state() -> String {
-    "ready".to_string()
-}
-
-impl From<EngineStatus> for OwnedPreeditStatus {
-    fn from(status: EngineStatus) -> Self {
-        let _ = (&status.ready, &status.setup_state, &status.ownership_intact);
+impl IbusShortcutStatus {
+    fn connected() -> Self {
         Self {
             available: true,
-            ready: false,
-            setup_state: "safety-disabled".to_string(),
-            detail: EXACT_FIELD_REQUIRED.to_string(),
-            session_id: status.session_id,
-            engine_active: status.engine_active,
-            focus_lost: status.focus_lost,
-            progressive_commit_active: status.progressive_commit_active,
-            committed_character_count: status.committed_character_count,
-            ownership_intact: false,
-            finalization_outcome: status.finalization_outcome,
-            error: (!status.error.is_empty()).then_some(status.error),
+            setup_state: "ready".to_string(),
+            detail: CONNECTED_DETAIL.to_string(),
+            error: None,
         }
     }
+}
+
+/// Protocol 6 engines still send the text-insertion status fields, reporting
+/// "safety-disabled", so that earlier apps can decode them. A well-formed
+/// reply only proves that the shortcut route is connected.
+#[derive(Debug, Deserialize)]
+struct EngineStatus {
+    #[serde(rename = "ready")]
+    _ready: bool,
 }
 
 #[derive(Debug)]
@@ -171,12 +136,12 @@ impl SocketBridge {
     fn send_status(
         &mut self,
         mut command: Value,
-    ) -> Result<OwnedPreeditStatus, BridgeCommandError> {
+    ) -> Result<IbusShortcutStatus, BridgeCommandError> {
         let result = self.send(&mut command)?;
-        let status = serde_json::from_value::<EngineStatus>(result).map_err(|error| {
+        serde_json::from_value::<EngineStatus>(result).map_err(|error| {
             BridgeCommandError::Uncertain(format!("Invalid VOCO input method status: {error}"))
         })?;
-        Ok(OwnedPreeditStatus::from(status))
+        Ok(IbusShortcutStatus::connected())
     }
 
     fn send(&mut self, command: &mut Value) -> Result<Value, BridgeCommandError> {
@@ -269,12 +234,12 @@ impl SocketBridge {
 }
 
 #[derive(Default)]
-pub struct OwnedPreeditService {
+pub struct IbusShortcutService {
     bridge: Mutex<Option<SocketBridge>>,
 }
 
-impl OwnedPreeditService {
-    pub fn status(&self) -> OwnedPreeditStatus {
+impl IbusShortcutService {
+    pub fn status(&self) -> IbusShortcutStatus {
         match self.with_bridge(|bridge| bridge.send_status(json!({ "operation": "status" }))) {
             Ok(status) => status,
             Err(error) => unavailable_status(error),
@@ -407,14 +372,14 @@ fn current_euid() -> u32 {
     unsafe { libc::geteuid() }
 }
 
-fn unavailable_status(error: String) -> OwnedPreeditStatus {
+fn unavailable_status(error: String) -> IbusShortcutStatus {
     let component_installed = Path::new(COMPONENT_PATH).is_file();
     let (setup_state, detail) = classify_unavailable_status(&error, component_installed);
-    OwnedPreeditStatus {
+    IbusShortcutStatus {
         setup_state: setup_state.to_string(),
         detail: detail.to_string(),
         error: Some(error),
-        ..OwnedPreeditStatus::default()
+        ..IbusShortcutStatus::default()
     }
 }
 
@@ -473,37 +438,12 @@ mod tests {
     const COMPONENT_XML: &str = include_str!("../../../../packaging/ibus/voco.xml");
 
     #[test]
-    fn ibus_text_mutation_is_always_rejected() {
-        assert_eq!(
-            require_exact_field_delivery().unwrap_err(),
-            EXACT_FIELD_REQUIRED
-        );
-    }
-
-    #[test]
-    fn converts_engine_status_without_exposing_empty_errors() {
-        let status = OwnedPreeditStatus::from(EngineStatus {
-            ready: true,
-            setup_state: "ready".to_string(),
-            session_id: Some(7),
-            engine_active: true,
-            focus_lost: false,
-            progressive_commit_active: true,
-            committed_character_count: 18,
-            ownership_intact: true,
-            finalization_outcome: None,
-            error: String::new(),
-        });
-
-        assert!(status.available);
-        assert!(!status.ready);
-        assert_eq!(status.setup_state, "safety-disabled");
-        assert_eq!(status.session_id, Some(7));
-        assert!(status.engine_active);
-        assert!(status.progressive_commit_active);
-        assert_eq!(status.committed_character_count, 18);
-        assert!(!status.ownership_intact);
-        assert_eq!(status.error, None);
+    fn decodes_the_protocol_status_and_rejects_malformed_replies() {
+        let reply = engine_status_response(1, PROTOCOL_VERSION)["result"].clone();
+        assert!(serde_json::from_value::<EngineStatus>(reply).is_ok());
+        for malformed in [Value::Null, json!({}), json!({ "ready": "yes" })] {
+            assert!(serde_json::from_value::<EngineStatus>(malformed).is_err());
+        }
     }
 
     #[test]
@@ -583,7 +523,7 @@ mod tests {
             .expect("clock after epoch")
             .as_nanos();
         let directory = std::env::temp_dir().join(format!(
-            "voco-owned-preedit-{label}-{}-{nonce}",
+            "voco-ibus-shortcut-{label}-{}-{nonce}",
             std::process::id()
         ));
         fs::create_dir(&directory).expect("create private test directory");
@@ -592,22 +532,23 @@ mod tests {
         directory.join("ibus-engine.sock")
     }
 
-    fn ready_response(id: u64, protocol_version: u32) -> Value {
+    /// What a protocol 6 engine replies to hello and status.
+    fn engine_status_response(id: u64, protocol_version: u32) -> Value {
         json!({
             "version": protocol_version,
             "id": id,
             "ok": true,
             "result": {
-                "ready": true,
-                "setupState": "ready",
+                "ready": false,
+                "setupState": "safety-disabled",
                 "sessionId": null,
                 "engineActive": false,
                 "focusLost": false,
                 "progressiveCommitActive": false,
                 "committedCharacterCount": 0,
-                "ownershipIntact": true,
+                "ownershipIntact": false,
                 "finalizationOutcome": null,
-                "error": ""
+                "error": "Automatic IBus delivery is disabled."
             }
         })
     }
@@ -635,7 +576,7 @@ mod tests {
                 assert_eq!(request["version"], PROTOCOL_VERSION);
                 assert_eq!(request["operation"], expected_operation);
                 let id = request["id"].as_u64().expect("request id");
-                write_response(&mut writer, &ready_response(id, PROTOCOL_VERSION));
+                write_response(&mut writer, &engine_status_response(id, PROTOCOL_VERSION));
             }
         });
 
@@ -643,8 +584,7 @@ mod tests {
         let status = bridge
             .send_status(json!({ "operation": "status" }))
             .expect("read fake status");
-        assert!(status.available);
-        assert_eq!(status.setup_state, "safety-disabled");
+        assert_eq!(status, IbusShortcutStatus::connected());
         drop(bridge);
         server.join().expect("fake server completed");
         fs::remove_file(&socket_path).expect("remove fake socket");
@@ -653,8 +593,8 @@ mod tests {
     }
 
     #[test]
-    fn connected_engine_status_stays_safety_disabled_without_mutations() {
-        let socket_path = temporary_socket_path("disabled-mutations");
+    fn connected_engine_reports_a_ready_shortcut_route_without_text_operations() {
+        let socket_path = temporary_socket_path("shortcut-only");
         let listener = UnixListener::bind(&socket_path).expect("bind fake engine");
         fs::set_permissions(&socket_path, fs::Permissions::from_mode(0o600)).unwrap();
         let server = thread::spawn(move || {
@@ -669,21 +609,21 @@ mod tests {
                 assert_eq!(request["operation"], expected);
                 write_response(
                     &mut writer,
-                    &ready_response(request["id"].as_u64().unwrap(), PROTOCOL_VERSION),
+                    &engine_status_response(request["id"].as_u64().unwrap(), PROTOCOL_VERSION),
                 );
             }
             let mut byte = [0_u8; 1];
             assert_eq!(reader.read(&mut byte).unwrap(), 0);
         });
         let bridge = SocketBridge::connect_to(&socket_path).unwrap();
-        let service = OwnedPreeditService {
+        let service = IbusShortcutService {
             bridge: Mutex::new(Some(bridge)),
         };
         let status = service.status();
         assert!(status.available);
-        assert!(!status.ready);
-        assert_eq!(status.setup_state, "safety-disabled");
-        assert!(status.detail.contains("original text field"));
+        assert_eq!(status.setup_state, "ready");
+        assert!(status.detail.contains("takes the dictation shortcut"));
+        assert_eq!(status.error, None);
         service.shutdown();
         server.join().unwrap();
         fs::remove_file(&socket_path).unwrap();
@@ -704,7 +644,10 @@ mod tests {
                 .expect("read hello");
             let request: Value = serde_json::from_str(&line).expect("decode hello");
             let id = request["id"].as_u64().expect("request id");
-            write_response(&mut stream, &ready_response(id, PROTOCOL_VERSION + 1));
+            write_response(
+                &mut stream,
+                &engine_status_response(id, PROTOCOL_VERSION + 1),
+            );
         });
 
         let error = match SocketBridge::connect_to(&socket_path) {
@@ -746,13 +689,13 @@ mod tests {
             reader.read_line(&mut line).expect("read hello");
             let request: Value = serde_json::from_str(&line).expect("decode hello");
             let id = request["id"].as_u64().expect("request id");
-            write_response(&mut writer, &ready_response(id, PROTOCOL_VERSION));
+            write_response(&mut writer, &engine_status_response(id, PROTOCOL_VERSION));
             let mut byte = [0_u8; 1];
             assert_eq!(reader.read(&mut byte).expect("read client close"), 0);
         });
 
         let bridge = SocketBridge::connect_to(&socket_path).expect("connect fake engine");
-        let service = OwnedPreeditService {
+        let service = IbusShortcutService {
             bridge: Mutex::new(Some(bridge)),
         };
         service.shutdown();
@@ -779,7 +722,7 @@ mod tests {
             let hello: Value = serde_json::from_str(&hello_line).expect("decode hello");
             write_response(
                 &mut writer,
-                &ready_response(hello["id"].as_u64().expect("hello id"), PROTOCOL_VERSION),
+                &engine_status_response(hello["id"].as_u64().expect("hello id"), PROTOCOL_VERSION),
             );
 
             let mut stale_line = String::new();
@@ -806,15 +749,18 @@ mod tests {
             assert_eq!(status["operation"], "status");
             write_response(
                 &mut writer,
-                &ready_response(status["id"].as_u64().expect("status id"), PROTOCOL_VERSION),
+                &engine_status_response(
+                    status["id"].as_u64().expect("status id"),
+                    PROTOCOL_VERSION,
+                ),
             );
         });
 
         let bridge = SocketBridge::connect_to(&socket_path).expect("connect fake engine");
-        let service = OwnedPreeditService {
+        let service = IbusShortcutService {
             bridge: Mutex::new(Some(bridge)),
         };
-        // Exercise bridge ordering directly; public mutation APIs are disabled.
+        // Drive the bridge directly: the app itself never sends a text operation.
         let error = service
             .with_bridge(|bridge| {
                 bridge.send_status(json!({

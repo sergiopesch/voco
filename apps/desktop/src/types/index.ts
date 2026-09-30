@@ -116,21 +116,29 @@ export interface RuntimeDiagnostics {
   sessionType: string;
   typeSimulation: InsertionSupport;
   clipboard: InsertionSupport;
-  ownedPreedit: OwnedPreeditStatus;
+  ibusShortcut: IbusShortcutStatus;
 }
 
-export interface OwnedPreeditStatus {
+/** The optional IBus input source only takes the dictation shortcut. */
+export interface IbusShortcutStatus {
   available: boolean;
-  ready: boolean;
   setupState:
     | "ready"
-    | "safety-disabled"
     | "not-enabled"
     | "not-installed"
     | "runtime-unavailable"
     | "incompatible"
-    | "error"
-    | "";
+    | "error";
+  detail: string;
+  error: string | null;
+}
+
+/** A Chromium exact-field receipt: only a matching receipt proves that the
+ * field took the text. */
+export interface BrowserFieldStatus {
+  available: boolean;
+  ready: boolean;
+  setupState: "ready" | "safety-disabled";
   detail: string;
   sessionId: number | null;
   engineActive: boolean;
@@ -138,13 +146,7 @@ export interface OwnedPreeditStatus {
   progressiveCommitActive: boolean;
   committedCharacterCount: number;
   ownershipIntact: boolean;
-  finalizationOutcome:
-    | "none"
-    | "committed"
-    | "discarded"
-    | "preserved"
-    | "uncertain"
-    | null;
+  finalizationOutcome: "committed" | "uncertain" | null;
   error: string | null;
 }
 

@@ -19,11 +19,11 @@ mod digest_hex;
 #[cfg(target_os = "linux")]
 mod hotkey_state;
 mod hotkey_trace;
+mod ibus_shortcut;
 mod insertion;
 #[cfg(all(target_os = "linux", feature = "native-capture"))]
 mod native_capture;
 mod native_capture_commands;
-mod owned_preedit;
 pub mod panel_setup;
 mod performance;
 mod process_runner;
@@ -755,7 +755,7 @@ async fn copy_desktop_text(text: String) -> Result<(), insertion::InsertionError
 struct RuntimeDiagnostics {
     #[serde(flatten)]
     insertion: insertion::RuntimeDiagnostics,
-    owned_preedit: owned_preedit::OwnedPreeditStatus,
+    ibus_shortcut: ibus_shortcut::IbusShortcutStatus,
     shortcut: shortcut_readiness::Status,
     desktop_paste: insertion::DesktopPasteStatus,
     desktop_input: insertion::DesktopInputStatus,
@@ -763,24 +763,9 @@ struct RuntimeDiagnostics {
 
 struct BrowserIntegration(Option<browser_broker::BrowserBroker>);
 
-impl From<browser_broker::BrowserStatus> for owned_preedit::OwnedPreeditStatus {
-    fn from(status: browser_broker::BrowserStatus) -> Self {
-        Self {
-            available: status.available,
-            ready: status.ready,
-            setup_state: status.setup_state,
-            detail: status.detail,
-            session_id: status.session_id,
-            engine_active: status.engine_active,
-            focus_lost: status.focus_lost,
-            progressive_commit_active: status.progressive_commit_active,
-            committed_character_count: status.committed_character_count,
-            ownership_intact: status.ownership_intact,
-            finalization_outcome: status.finalization_outcome,
-            error: status.error,
-        }
-    }
-}
+/// Browser field commands act only on the broker's current session. Any other
+/// session gets this error, which stops its delivery; Stop copies the rest.
+const NO_BROWSER_FIELD: &str = "No enabled browser field is taking this dictation.";
 
 impl BrowserIntegration {
     fn session(&self, id: u64) -> Option<&browser_broker::BrowserBroker> {
@@ -793,9 +778,9 @@ impl BrowserIntegration {
 #[tauri::command(async)]
 fn get_runtime_diagnostics(
     app: tauri::AppHandle,
-    state: tauri::State<'_, owned_preedit::OwnedPreeditService>,
+    state: tauri::State<'_, ibus_shortcut::IbusShortcutService>,
 ) -> RuntimeDiagnostics {
-    let owned_preedit = state.status();
+    let ibus_shortcut = state.status();
     let (insertion, desktop_input, desktop_paste) = insertion::runtime_input_diagnostics();
     #[cfg(target_os = "linux")]
     let panel_reserved = panel::reserves_current_shortcut(&app);
@@ -803,8 +788,8 @@ fn get_runtime_diagnostics(
     let panel_reserved = false;
     RuntimeDiagnostics {
         insertion,
-        shortcut: shortcut_runtime_status(owned_preedit.available, panel_reserved),
-        owned_preedit,
+        shortcut: shortcut_runtime_status(ibus_shortcut.available, panel_reserved),
+        ibus_shortcut,
         desktop_paste,
         desktop_input: with_panel_recommendation(&app, desktop_input),
     }
@@ -855,64 +840,59 @@ fn shortcut_runtime_status(
 }
 
 #[tauri::command(async)]
-fn start_owned_preedit(
+fn start_browser_field(
     browser: tauri::State<'_, BrowserIntegration>,
     session_id: u64,
-    trigger_id: Option<String>,
-) -> Result<owned_preedit::OwnedPreeditStatus, String> {
-    if let Some(trigger) = trigger_id
-        .as_deref()
-        .filter(|id| id.starts_with("browser:"))
-    {
-        return browser
-            .0
-            .as_ref()
-            .ok_or("The local browser integration is unavailable.")?
-            .start(session_id, trigger)
-            .map(Into::into);
+    trigger_id: String,
+) -> Result<browser_broker::BrowserStatus, String> {
+    if !trigger_id.starts_with("browser:") {
+        return Err(NO_BROWSER_FIELD.to_string());
     }
-    owned_preedit::require_exact_field_delivery()
+    browser
+        .0
+        .as_ref()
+        .ok_or("The local browser integration is unavailable.")?
+        .start(session_id, &trigger_id)
 }
 
 #[tauri::command(async)]
-fn checkpoint_owned_preedit(
+fn append_browser_field(
     browser: tauri::State<'_, BrowserIntegration>,
     session_id: u64,
     expected_committed_text: String,
     append_text: String,
-) -> Result<owned_preedit::OwnedPreeditStatus, String> {
-    if let Some(broker) = browser.session(session_id) {
-        return broker
-            .append(session_id, &expected_committed_text, &append_text, false)
-            .map(Into::into);
-    }
-    owned_preedit::require_exact_field_delivery()
+) -> Result<browser_broker::BrowserStatus, String> {
+    browser.session(session_id).ok_or(NO_BROWSER_FIELD)?.append(
+        session_id,
+        &expected_committed_text,
+        &append_text,
+        false,
+    )
 }
 
 #[tauri::command(async)]
-fn finish_canonical_owned_preedit(
+fn finish_browser_field(
     browser: tauri::State<'_, BrowserIntegration>,
     session_id: u64,
     expected_committed_text: String,
-    append_text: String,
-) -> Result<owned_preedit::OwnedPreeditStatus, String> {
-    if let Some(broker) = browser.session(session_id) {
-        return broker
-            .append(session_id, &expected_committed_text, &append_text, true)
-            .map(Into::into);
-    }
-    owned_preedit::require_exact_field_delivery()
+) -> Result<browser_broker::BrowserStatus, String> {
+    browser.session(session_id).ok_or(NO_BROWSER_FIELD)?.append(
+        session_id,
+        &expected_committed_text,
+        "",
+        true,
+    )
 }
 
 #[tauri::command(async)]
-fn cancel_owned_preedit(
+fn cancel_browser_field(
     browser: tauri::State<'_, BrowserIntegration>,
     session_id: u64,
-) -> Result<owned_preedit::OwnedPreeditStatus, String> {
-    if let Some(broker) = browser.session(session_id) {
-        return broker.cancel(session_id).map(Into::into);
-    }
-    owned_preedit::require_exact_field_delivery()
+) -> Result<browser_broker::BrowserStatus, String> {
+    browser
+        .session(session_id)
+        .ok_or(NO_BROWSER_FIELD)?
+        .cancel(session_id)
 }
 
 #[tauri::command(async)]
@@ -1142,7 +1122,7 @@ fn start_ibus_shortcut_listener(app_handle: tauri::AppHandle) {
             let Some(snapshot) = shortcut_config.as_ref() else {
                 continue;
             };
-            let state = app_handle.state::<owned_preedit::OwnedPreeditService>();
+            let state = app_handle.state::<ibus_shortcut::IbusShortcutService>();
             let observation_started = shortcut_monotonic_ms();
             SHORTCUT_OBSERVATIONS.begin_poll(observation_ticket);
             IBUS_SHORTCUT_LEASE.begin_poll();
@@ -1991,7 +1971,7 @@ pub fn run() -> Result<(), String> {
     tauri::Builder::default()
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .manage(single_instance_guard)
-        .manage(owned_preedit::OwnedPreeditService::default())
+        .manage(ibus_shortcut::IbusShortcutService::default())
         .on_page_load(|webview, payload| {
             if matches!(payload.event(), tauri::webview::PageLoadEvent::Started) {
                 if webview.label() == "main" {
@@ -2006,7 +1986,7 @@ pub fn run() -> Result<(), String> {
                 // shortcut armed or triggered for the previous renderer
                 // before its replacement can start.
                 webview
-                    .state::<owned_preedit::OwnedPreeditService>()
+                    .state::<ibus_shortcut::IbusShortcutService>()
                     .shutdown();
             }
         })
@@ -2042,12 +2022,12 @@ pub fn run() -> Result<(), String> {
             paste_desktop_text,
             copy_desktop_text,
             get_runtime_diagnostics,
-            start_owned_preedit,
+            start_browser_field,
             refresh_shortcut_heartbeat,
             ack_browser_stop,
-            checkpoint_owned_preedit,
-            finish_canonical_owned_preedit,
-            cancel_owned_preedit,
+            append_browser_field,
+            finish_browser_field,
+            cancel_browser_field,
             release_browser_recording,
             begin_runtime_status_session,
             sync_runtime_status,
@@ -2174,7 +2154,7 @@ pub fn run() -> Result<(), String> {
                 crash_recovery::clean_exit();
                 performance::shutdown();
                 native_capture_commands::shutdown();
-                app.state::<owned_preedit::OwnedPreeditService>().shutdown();
+                app.state::<ibus_shortcut::IbusShortcutService>().shutdown();
                 cleanup_socket_files();
             }
         });

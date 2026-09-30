@@ -287,14 +287,12 @@ export function ControlPanel({
     if (desktopSetupError) return "Setup needed";
     return "Ready";
   }, [runtimeDiagnostics, desktopInput, desktopSetupError]);
-  const ownedPreeditLabel = useMemo(() => {
+  const ibusShortcutLabel = useMemo(() => {
     if (!runtimeDiagnostics) {
       return "Runtime checks unavailable.";
     }
-    switch (runtimeDiagnostics.ownedPreedit.setupState) {
-      // The input source only provides a shortcut; a running engine is ready.
+    switch (runtimeDiagnostics.ibusShortcut.setupState) {
       case "ready":
-      case "safety-disabled":
         return "Ready";
       case "not-enabled":
         return "Input source not enabled";
@@ -305,7 +303,7 @@ export function ControlPanel({
       case "runtime-unavailable":
         return "Desktop session unavailable";
       default:
-        return runtimeDiagnostics.ownedPreedit.available
+        return runtimeDiagnostics.ibusShortcut.available
           ? "Ready"
           : "Unavailable";
     }
@@ -871,13 +869,13 @@ export function ControlPanel({
                   <div className="voco-preferences__group"><h3 className="voco-preferences__group-title">Runtime checks</h3>
                     <div className="voco-preferences__card">
                       <div className="voco-preferences__row"><span className="voco-preferences__row-copy"><strong>Session</strong></span><span className="voco-preferences__row-value">{runtimeSessionLabel}</span></div>
-                      <div className="voco-preferences__row"><span className="voco-preferences__row-copy"><strong>IBus shortcut (optional)</strong></span><span className="voco-preferences__row-value">{ownedPreeditLabel}</span></div>
+                      <div className="voco-preferences__row"><span className="voco-preferences__row-copy"><strong>IBus shortcut (optional)</strong></span><span className="voco-preferences__row-value">{ibusShortcutLabel}</span></div>
                       <div className="voco-preferences__row"><span className="voco-preferences__row-copy"><strong>Paste keys</strong></span><span className="voco-preferences__row-value">{typeSimulationLabel}</span></div>
                       <div className="voco-preferences__row"><span className="voco-preferences__row-copy"><strong>Clipboard</strong></span><span className="voco-preferences__row-value">{clipboardLabel}</span></div>
                     </div>
                   </div>
                   {runtimeDiagnostics ? <details className="voco-preferences__card voco-preferences__disclosure"><summary>Diagnostic details</summary>
-                    <div className="voco-preferences__form"><p><strong>IBus shortcut (optional):</strong> {runtimeDiagnostics.ownedPreedit.detail}</p><p><strong>Paste keys:</strong> {runtimeDiagnostics.typeSimulation.detail}</p><p><strong>Clipboard:</strong> {runtimeDiagnostics.clipboard.detail}</p></div>
+                    <div className="voco-preferences__form"><p><strong>IBus shortcut (optional):</strong> {runtimeDiagnostics.ibusShortcut.detail}</p><p><strong>Paste keys:</strong> {runtimeDiagnostics.typeSimulation.detail}</p><p><strong>Clipboard:</strong> {runtimeDiagnostics.clipboard.detail}</p></div>
                   </details> : null}
                   </details>
                   <div className="voco-preferences__actions">

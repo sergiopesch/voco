@@ -1,10 +1,10 @@
 import type {
   AppConfig,
+  BrowserFieldStatus,
   CachedUpdateCheck,
   ConfigSnapshot,
   DesktopInputStatus,
   DesktopPasteStatus,
-  OwnedPreeditStatus,
   RuntimeDiagnostics,
   RuntimeStatusSnapshot
 } from "@/types";
@@ -99,36 +99,31 @@ export async function refreshShortcutHeartbeat(ready: boolean): Promise<void> {
   return invoke<void>("refresh_shortcut_heartbeat", { ready });
 }
 
-export async function startOwnedPreedit(sessionId: number, triggerId?: string): Promise<OwnedPreeditStatus> {
-  return invoke<OwnedPreeditStatus>("start_owned_preedit", { sessionId, triggerId });
+export async function startBrowserField(sessionId: number, triggerId: string): Promise<BrowserFieldStatus> {
+  return invoke<BrowserFieldStatus>("start_browser_field", { sessionId, triggerId });
 }
 
-export async function checkpointOwnedPreedit(
+export async function appendBrowserField(
   sessionId: number,
   expectedCommittedText: string,
   appendText: string,
-): Promise<OwnedPreeditStatus> {
-  return invoke<OwnedPreeditStatus>("checkpoint_owned_preedit", {
+): Promise<BrowserFieldStatus> {
+  return invoke<BrowserFieldStatus>("append_browser_field", {
     sessionId,
     expectedCommittedText,
     appendText,
   });
 }
 
-export async function finishCanonicalOwnedPreedit(
+export async function finishBrowserField(
   sessionId: number,
   expectedCommittedText: string,
-  appendText: string,
-): Promise<OwnedPreeditStatus> {
-  return invoke<OwnedPreeditStatus>("finish_canonical_owned_preedit", {
-    sessionId,
-    expectedCommittedText,
-    appendText,
-  });
+): Promise<BrowserFieldStatus> {
+  return invoke<BrowserFieldStatus>("finish_browser_field", { sessionId, expectedCommittedText });
 }
 
-export async function cancelOwnedPreedit(sessionId: number): Promise<OwnedPreeditStatus> {
-  return invoke<OwnedPreeditStatus>("cancel_owned_preedit", { sessionId });
+export async function cancelBrowserField(sessionId: number): Promise<BrowserFieldStatus> {
+  return invoke<BrowserFieldStatus>("cancel_browser_field", { sessionId });
 }
 
 export async function releaseBrowserRecording(triggerId: string): Promise<void> {

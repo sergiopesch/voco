@@ -170,7 +170,7 @@ try {
                         available: true,
                         missingCommands: []
                     },
-                    ownedPreedit: {
+                    ibusShortcut: {
                         setupState: 'ready',
                         available: true
                     }
