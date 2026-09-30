@@ -10,7 +10,7 @@ const titles = [
   "Meet the languages",
   "Pressing the shortcut",
   "Listening to sound",
-  "Audio on a conveyor belt",
+  "The phrase queue",
   "The speech worker",
   "From sounds to words",
   "Words at the cursor",
@@ -24,8 +24,8 @@ const titles = [
   "Building and shipping",
   "Borrowed libraries",
   "Reading the code",
-  "TypeSafe and measured improvement",
-  "Linux package qualification",
+  "A microphone in the top bar",
+  "Desktops and helpers",
 ];
 let chapters = [],
   catalog,
@@ -99,7 +99,7 @@ async function openSource(path) {
     `${f.group}. ${f.role} ${f.bytes.toLocaleString()} bytes · Git blob ${f.blob.slice(0, 12)}.`;
   const body = document.querySelector("#source-body"),
     symbols = document.querySelector("#symbol-list>div");
-  body.replaceChildren(node("span", {}, "Loading pinned source…"));
+  body.replaceChildren(node("span", {}, "Loading source…"));
   symbols.replaceChildren();
   if (!dialog.open) dialog.showModal();
   document.querySelector("#symbol-list").open = false;
@@ -120,7 +120,7 @@ async function openSource(path) {
     );
     if (!response.ok)
       throw Error(
-        "Source unavailable. Check that the local VOCO checkout contains the pinned commit.",
+        "Source unavailable. Check that the local VOCO checkout contains the commit recorded in catalog.json.",
       );
     const data = await response.json();
     if (request !== sourceRequest) return;
@@ -216,19 +216,19 @@ function renderChapter(ch) {
       ),
     );
   content.append(facts);
-  for (const comparison of ch.comparison ? [ch.comparison, ...(ch.comparison.additional || [])] : []) {
+  if (ch.comparison) {
+    const c = ch.comparison;
     const table = node("table", { class: "evaluation-table" },
-      node("caption", {}, comparison.title),
-      node("thead", {}, node("tr", {}, ...comparison.headers.map(text => node("th", { scope: "col" }, text)))),
-      node("tbody", {}, ...comparison.rows.map(row => node("tr", {},
+      node("caption", {}, c.title),
+      node("thead", {}, node("tr", {}, ...c.headers.map(text => node("th", { scope: "col" }, text)))),
+      node("tbody", {}, ...c.rows.map(row => node("tr", {},
         node("th", { scope: "row" }, row[0]), ...row.slice(1).map(text => node("td", {}, text))))),
     );
-    content.append(node("section", { class: "evaluation-comparison", "aria-label": "Measured before and after" },
-      node("h2", {}, "Before and after the experiment"),
-      node("p", {}, comparison.scope),
+    content.append(node("section", { class: "evaluation-comparison", "aria-label": "Side-by-side comparison" },
+      node("h2", {}, "Side by side"),
+      node("p", {}, c.scope),
       node("div", { class: "table-scroll", tabindex: "0", role: "region", "aria-label": "Comparison table, scroll horizontally on small screens" }, table),
-      node("p", {}, comparison.decision),
-      node("p", {}, comparison.limits)));
+      node("p", {}, c.limits)));
   }
   const interactive = lab(ch.lab);
   if (interactive) content.append(interactive);
@@ -316,7 +316,7 @@ function renderFiles() {
     node(
       "p",
       { class: "intro" },
-      `${catalog.fileCount.toLocaleString()} tracked files. One pinned snapshot. Explore the application, its tests, its tools and the libraries it borrows.`,
+      `${catalog.fileCount.toLocaleString()} tracked files at one recorded commit. Explore the application, its tests, its tools and the libraries it borrows.`,
     ),
   );
   const input = node("input", {
@@ -345,7 +345,7 @@ function renderFiles() {
     );
   function draw() {
     const found = matchingFiles();
-    count.textContent = `${found.length.toLocaleString()} ${found.length === 1 ? "match" : "matches"} · Showing ${Math.min(visible, found.length)} · Snapshot ${catalog.commit.slice(0, 12)}`;
+    count.textContent = `${found.length.toLocaleString()} ${found.length === 1 ? "match" : "matches"} · Showing ${Math.min(visible, found.length)} · Source commit ${catalog.commit.slice(0, 12)}`;
     list.replaceChildren(
       ...found
         .slice(0, visible)

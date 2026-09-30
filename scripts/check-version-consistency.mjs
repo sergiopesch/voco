@@ -64,19 +64,11 @@ const sources = [
     value: expectMatch("install", /^VERSION="([^"]+)"/m, "install script version"),
   },
   {
-    label: "Flatpak/Snap AppStream release",
-    value: expectMatch(
-      "packaging/flatpak/com.sergiopesch.voco.metainfo.xml",
-      /<release version="([^"]+)"/,
-      "AppStream release version",
-    ),
-  },
-  {
-    label: "Tauri Debian/AppImage AppStream release",
+    label: "AppStream release",
     value: expectMatch(
       "packaging/tauri/com.sergiopesch.voco.metainfo.xml",
       /<release version="([^"]+)"/,
-      "Tauri AppStream release version",
+      "AppStream release version",
     ),
   },
   {
@@ -86,10 +78,6 @@ const sources = [
       /<version>([^<]+)<\/version>/,
       "IBus component version",
     ),
-  },
-  {
-    label: "snapcraft.yaml",
-    value: expectMatch("snap/snapcraft.yaml", /^version:\s+'([^']+)'/m, "Snap version"),
   },
 ];
 

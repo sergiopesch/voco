@@ -13,6 +13,9 @@ export function presentation(state) {
         canOpen: state.canOpen === true && !['starting', 'recording', 'processing'].includes(state.status),
         level: state.status === 'recording' && Number.isFinite(state.level)
             ? Math.max(0, Math.min(1, state.level)) : 0,
+        // Grabbed at every status; only chords passive evdev also observes.
+        shortcutAccelerator: ['<Alt>d', '<Alt><Shift>d'].includes(state.shortcutAccelerator)
+            ? state.shortcutAccelerator : null,
     };
 }
 export function barScales(level) {

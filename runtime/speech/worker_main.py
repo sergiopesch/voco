@@ -15,8 +15,6 @@ def configure_cpu_threads():
     except (AttributeError, OSError):
         available = os.cpu_count() or 1
     # Leave a CPU available for capture, the compositor and the receiving app.
-    # A two-core Firefox/KDE trial exceeded the queue deadline with two workers;
-    # one worker completed the same real-time fixture without changing the model.
     os.environ['NEMO_SPEECH_CPU_THREADS'] = str(max(1, min(4, available - 1)))
 
 

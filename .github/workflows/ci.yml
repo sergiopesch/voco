@@ -11,7 +11,8 @@ permissions:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Master runs finish so their Rust cache save is not lost.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   code-guide:
@@ -38,7 +39,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de
+      - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # master, 2026-09-12
         with:
           toolchain: 1.94.0
 
@@ -69,11 +70,11 @@ jobs:
             pkg-config libglib2.0-dev libsoup-3.0-dev \
             libjavascriptcoregtk-4.1-dev libwebkit2gtk-4.1-dev \
             libayatana-appindicator3-dev libpulse-dev \
-            desktop-file-utils appstream cmake ripgrep \
+            desktop-file-utils appstream cmake \
             ibus ibus-gtk3 python3 python3-numpy python3-psutil python3-gi gir1.2-ibus-1.0 bubblewrap \
             xvfb xdotool xclip gir1.2-gtk-3.0 gir1.2-webkit2-4.1 gir1.2-atspi-2.0 at-spi2-core \
             weston libweston-13-0 wayland-utils gir1.2-gtk-4.0 gir1.2-webkit-6.0 \
-            gnome-text-editor gnome-terminal nano gnome-shell gnome-shell-extension-appindicator
+            gnome-text-editor gnome-terminal nano gnome-shell gnome-shell-extension-appindicator xwayland
 
       - name: Install Node dependencies
         run: npm ci
@@ -101,7 +102,7 @@ jobs:
         env:
           VOCO_RENDERER_EVIDENCE_DIR: ${{ runner.temp }}/voco-brand-motion
 
-      - name: GNOME consuming Stop and lifecycle regression
+      - name: GNOME companion shortcut and lifecycle regression
         timeout-minutes: 3
         env:
           VOCO_NATIVE_DEPS: /usr
@@ -127,25 +128,38 @@ jobs:
       - name: Chromium exact-field adversarial regression
         run: npm run test:chromium-exact-field
 
-      - name: Onboarding speech test and missing-cursor regression
+      - name: Onboarding speech test and desktop setup regression
         timeout-minutes: 5
         run: npm run test:native-capture-renderer
         env:
           VOCO_RENDERER_SUITE: onboarding
           VOCO_RENDERER_EVIDENCE_DIR: ${{ runner.temp }}/voco-onboarding-renderer
 
-      - name: Rich editor clipboard confirmation regression
+      - name: Browser delivery
         timeout-minutes: 3
         env:
-          VOCO_RICH_EDITOR_EVIDENCE_DIR: ${{ runner.temp }}/voco-rich-editor
-        run: bash scripts/test-private-ibus-engine-hosted.sh --rich-editor
+          VOCO_DELIVERY_EVIDENCE_DIR: ${{ runner.temp }}/voco-browser-delivery
+        run: bash scripts/test-private-ibus-engine-hosted.sh --browser-delivery
 
-      - name: Native application clipboard matrix
+      - name: Application delivery
         timeout-minutes: 3
         env:
-          VOCO_DELIVERY_SUITE: applications
-          VOCO_RICH_EDITOR_EVIDENCE_DIR: ${{ runner.temp }}/voco-application-delivery
-        run: bash scripts/test-private-ibus-engine-hosted.sh --rich-editor
+          VOCO_DELIVERY_EVIDENCE_DIR: ${{ runner.temp }}/voco-application-delivery
+        run: bash scripts/test-private-ibus-engine-hosted.sh --application-delivery
+
+      - name: Browser delivery on GNOME Wayland
+        timeout-minutes: 3
+        env:
+          VOCO_DELIVERY_PLATFORM: gnome-wayland
+          VOCO_DELIVERY_EVIDENCE_DIR: ${{ runner.temp }}/voco-browser-delivery-gnome-wayland
+        run: bash scripts/test-private-ibus-engine-hosted.sh --browser-delivery
+
+      - name: Application delivery on GNOME Wayland
+        timeout-minutes: 3
+        env:
+          VOCO_DELIVERY_PLATFORM: gnome-wayland
+          VOCO_DELIVERY_EVIDENCE_DIR: ${{ runner.temp }}/voco-application-delivery-gnome-wayland
+        run: bash scripts/test-private-ibus-engine-hosted.sh --application-delivery
 
       - name: Private headless IBus lifecycle
         run: bash scripts/test-private-ibus-engine-hosted.sh
@@ -169,8 +183,10 @@ jobs:
         with:
           name: native-desktop-evidence
           path: |
-            ${{ runner.temp }}/voco-rich-editor/
+            ${{ runner.temp }}/voco-browser-delivery/
             ${{ runner.temp }}/voco-application-delivery/
+            ${{ runner.temp }}/voco-browser-delivery-gnome-wayland/
+            ${{ runner.temp }}/voco-application-delivery-gnome-wayland/
             ${{ runner.temp }}/voco-native-desktop/
             ${{ runner.temp }}/voco-native-wayland/
             ${{ runner.temp }}/voco-dictation-renderer/
@@ -187,12 +203,10 @@ jobs:
 
       - name: Validate desktop metadata
         run: |
-          desktop-file-validate packaging/flatpak/com.sergiopesch.voco.desktop
           desktop-file-validate packaging/tauri/VOCO.desktop
 
       - name: Validate AppStream metadata
         run: |
-          appstreamcli validate packaging/flatpak/com.sergiopesch.voco.metainfo.xml
           appstreamcli validate packaging/tauri/com.sergiopesch.voco.metainfo.xml
 
   rust:
@@ -218,7 +232,7 @@ jobs:
             libayatana-appindicator3-dev libpulse-dev cmake python3-numpy python3-psutil libsentencepiece0 \
             pulseaudio pulseaudio-utils bubblewrap g++-13 patch binutils ydotool
 
-      - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de
+      - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # master, 2026-09-12
         with:
           toolchain: 1.94.0
           components: clippy,rustfmt
@@ -226,6 +240,11 @@ jobs:
       - uses: Swatinem/rust-cache@f0d9c3887740aee45f6153b24b3a6b815192ec16 # v2
         with:
           workspaces: apps/desktop/src-tauri
+          save-if: ${{ github.ref == 'refs/heads/master' }}
+
+      - name: Cargo fmt
+        working-directory: apps/desktop/src-tauri
+        run: cargo fmt --check
 
       - name: Install Node dependencies
         run: npm ci
@@ -233,22 +252,15 @@ jobs:
       - name: Build production frontend for Tauri checks
         run: npm --workspace @voco/desktop run build:frontend
 
-      - name: Cargo check
+      # Clippy fetches the locked crates that the offline glib checks read.
+      - name: Cargo clippy
         working-directory: apps/desktop/src-tauri
-        run: cargo check --locked --all-targets --all-features
+        run: cargo clippy --locked --all-targets --all-features -- -D warnings
 
       - name: Verify glib source backport and optimized iterator regression
         run: |
           python3 scripts/verify-glib-backport.py
           python3 scripts/test-glib-variant.py --output "${{ runner.temp }}/voco-glib-regression"
-
-      - name: Cargo fmt
-        working-directory: apps/desktop/src-tauri
-        run: cargo fmt --check
-
-      - name: Cargo clippy
-        working-directory: apps/desktop/src-tauri
-        run: cargo clippy --locked --all-targets --all-features -- -D warnings
 
       - name: Cargo test
         working-directory: apps/desktop/src-tauri
@@ -270,10 +282,6 @@ jobs:
           VOCO_NATIVE_PULSE_EVIDENCE_DIR: ${{ runner.temp }}/voco-native-pulse-latency
         run: bash scripts/test-private-ibus-engine-hosted.sh --native-pulse-latency
 
-      - name: Native capture development contracts
-        working-directory: apps/desktop/src-tauri
-        run: cargo test --locked --lib --features native-capture-dev
-
       - name: Provision checksum-pinned Nemotron runtime
         run: bash scripts/provision-ci-speech.sh
 
@@ -293,5 +301,117 @@ jobs:
             ${{ runner.temp }}/voco-legacy-input/
             ${{ runner.temp }}/voco-worker-protocol/*.json
             ${{ runner.temp }}/voco-speech-*.json
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # Hosted CI never assembles or signs the NVIDIA package; scripts/assemble-release.sh
+  # does that locally. This job runs the release build end to end in private sessions.
+  application:
+    name: Application
+    timeout-minutes: 60
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            pkg-config libglib2.0-dev libsoup-3.0-dev \
+            libjavascriptcoregtk-4.1-dev libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev libpulse-dev cmake \
+            ibus ibus-gtk3 python3 python3-numpy python3-psutil python3-gi gir1.2-ibus-1.0 bubblewrap \
+            xvfb xdotool xclip gir1.2-gtk-3.0 gir1.2-webkit2-4.1 gir1.2-atspi-2.0 at-spi2-core \
+            weston libweston-13-0 wayland-utils gir1.2-gtk-4.0 gir1.2-webkit-6.0 \
+            gnome-shell gnome-shell-extension-appindicator xwayland \
+            libsentencepiece0 pulseaudio pulseaudio-utils
+
+      - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # master, 2026-09-12
+        with:
+          toolchain: 1.94.0
+
+      - uses: Swatinem/rust-cache@f0d9c3887740aee45f6153b24b3a6b815192ec16 # v2
+        with:
+          workspaces: apps/desktop/src-tauri
+          save-if: ${{ github.ref == 'refs/heads/master' }}
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Install test browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Build production frontend
+        run: npm --workspace @voco/desktop run build:frontend
+
+      - name: Provision checksum-pinned Nemotron runtime
+        run: bash scripts/provision-ci-speech.sh
+
+      - name: Build release application
+        working-directory: apps/desktop/src-tauri
+        run: |
+          cargo build --locked --release --features custom-protocol --bin voco --bin voco-browser-host
+          # The packaged extension files, staged outside the harnesses' private /tmp.
+          extension="${RUNNER_TEMP}/voco-chromium-extension"
+          mkdir -p "${extension}"
+          cp ../../../integrations/chromium/manifest.json ../../../integrations/chromium/background.js \
+            ../../../integrations/chromium/content.js "${extension}/"
+          {
+            echo "VOCO_NATIVE_APP_BINARY=${PWD}/target/release/voco"
+            echo "VOCO_BROWSER_HOST_BINARY=${PWD}/target/release/voco-browser-host"
+            echo "VOCO_BROWSER_EXTENSION_DIR=${extension}"
+          } >> "${GITHUB_ENV}"
+
+      - name: Application tray bridge on GNOME
+        timeout-minutes: 5
+        env:
+          VOCO_NATIVE_DEPS: /usr
+          VOCO_PANEL_EVIDENCE_DIR: ${{ runner.temp }}/voco-application-panel
+        run: VOCO_PANEL_APP_BINARY="${VOCO_NATIVE_APP_BINARY}" bash scripts/test-private-ibus-engine-hosted.sh --gnome-panel
+
+      - name: Application capture and paste into the focused field
+        timeout-minutes: 5
+        env:
+          VOCO_NATIVE_BUILD_ROLE: ci-release-build
+          VOCO_NATIVE_EVIDENCE_DIR: ${{ runner.temp }}/voco-application-native
+        run: bash scripts/test-private-ibus-engine-hosted.sh --full-application
+
+      - name: Application Wayland lifecycle and model cache readiness
+        timeout-minutes: 3
+        env:
+          VOCO_WAYLAND_DEPS: /usr
+          VOCO_WAYLAND_EVIDENCE_DIR: ${{ runner.temp }}/voco-application-wayland
+        run: VOCO_WAYLAND_APP_BINARY="${VOCO_NATIVE_APP_BINARY}" bash scripts/test-private-ibus-engine-hosted.sh --native-wayland
+
+      - name: Application capture into an exact Chromium field
+        timeout-minutes: 8
+        env:
+          VOCO_BROWSER_EVIDENCE_DIR: ${{ runner.temp }}/voco-application-browser
+        run: bash scripts/test-private-ibus-engine-hosted.sh --browser-application
+
+      - name: Application Chromium toolbar action
+        timeout-minutes: 5
+        env:
+          VOCO_BROWSER_EVIDENCE_DIR: ${{ runner.temp }}/voco-application-toolbar
+        run: bash scripts/test-private-ibus-engine-hosted.sh --browser-toolbar
+
+      - name: Retain application evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: application-evidence
+          path: |
+            ${{ runner.temp }}/voco-application-panel/
+            ${{ runner.temp }}/voco-application-native/
+            ${{ runner.temp }}/voco-application-wayland/
+            ${{ runner.temp }}/voco-application-browser/
+            ${{ runner.temp }}/voco-application-toolbar/
           if-no-files-found: ignore
           retention-days: 7

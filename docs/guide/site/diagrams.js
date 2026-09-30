@@ -131,15 +131,15 @@ export function lab(type) {
       done = 0,
       stopped = false;
     area.append(
-      node("h2", {}, "Try a tiny audio queue"),
+      node("h2", {}, "Try a tiny phrase queue"),
       node(
         "p",
         {},
-        "Add a box, process it, then finish the queue. Stop must account for every box already captured.",
+        "Each box stands for 100 ms of audio. Add boxes, let the worker answer one, then stop. Stop sends every captured box before the final answer.",
       ),
     );
     function draw() {
-      output.textContent = `Captured: ${waiting + done}  ·  Waiting: ${waiting}  ·  Processed: ${done}\n${stopped ? "Finished. No boxes left behind." : waiting ? "□ ".repeat(waiting) : "The queue is empty."}`;
+      output.textContent = `Captured: ${waiting + done}  ·  Waiting: ${waiting}  ·  Answered: ${done}\n${stopped ? "Finished. Every captured box was sent before the final answer." : waiting ? "□ ".repeat(waiting) : "The queue is empty."}`;
     }
     controls.append(
       node(
@@ -149,14 +149,14 @@ export function lab(type) {
             if (stopped) return;
             if (waiting >= 6) {
               output.textContent =
-                "This toy queue is full. A bounded system must surface overload, not grow forever.";
+                "This toy queue is full. The real queue has a limit too: when more than three seconds of audio is waiting, VOCO stops transcribing instead of falling further behind.";
               return;
             }
             waiting++;
             draw();
           },
         },
-        "Add audio box",
+        "Add 100 ms of audio",
       ),
       node(
         "button",
@@ -169,7 +169,7 @@ export function lab(type) {
             draw();
           },
         },
-        "Process one",
+        "Worker answers one",
       ),
       node(
         "button",
@@ -198,31 +198,31 @@ export function lab(type) {
     draw();
   }
   if (type === "focus") {
-    let same = true,
-      valid = true;
     area.append(
-      node("h2", {}, "A safe delivery decision"),
+      node("h2", {}, "A paste decision"),
       node(
         "p",
         {},
-        "Change the conditions. A useful recovery state is safer than guessing.",
+        "One paste passes three stages in order. Untick a stage to see how VOCO labels the result.",
       ),
     );
-    const focus = node("input", { type: "checkbox", checked: "" }),
-      session = node("input", { type: "checkbox", checked: "" });
+    const copied = node("input", { type: "checkbox", checked: "" }),
+      released = node("input", { type: "checkbox", checked: "" }),
+      clean = node("input", { type: "checkbox", checked: "" });
     function draw() {
-      same = focus.checked;
-      valid = session.checked;
-      output.textContent =
-        same && valid
-          ? "Checks pass in this simplified example. Delivery may proceed. This is not a universal safety guarantee."
-          : "Hold delivery. Preserve recovery; do not paste into a changed target or use an old session.";
+      output.textContent = !copied.checked
+        ? "No-mutation. The clipboard helper never started, so nothing changed. The words stay pending for the next phrase or for Stop."
+        : !released.checked
+          ? "No-mutation. The clipboard holds the words, but the shortcut keys were still down after 1.5 s, so no paste keys were sent. The words stay pending."
+          : !clean.checked
+            ? "Uncertain. The keys may have gone out, so VOCO never repeats them. Typing stops for this recording, listening continues, and Stop copies the rest to the clipboard."
+            : "Dispatched. Shift+Insert went to whichever app has keyboard focus. This means the keys were sent, not that the app accepted the text.";
     }
-    focus.addEventListener("change", draw);
-    session.addEventListener("change", draw);
+    for (const box of [copied, released, clean]) box.addEventListener("change", draw);
     area.append(
-      node("label", {}, focus, "Destination still matches"),
-      node("label", {}, session, "Recording session still matches"),
+      node("label", {}, copied, "1. Clipboard helper started"),
+      node("label", {}, released, "2. Shortcut keys released within 1.5 s"),
+      node("label", {}, clean, "3. Paste helper finished cleanly"),
     );
     draw();
   }
@@ -232,34 +232,28 @@ export function lab(type) {
       node(
         "p",
         {},
-        "These small metadata-only examples show the protocol shape. Real push requests also carry validated audio.",
+        "These metadata-only examples show the message shapes. A real push carries about 100 ms of audio at the capture's own sample rate, such as 44100 Hz from native capture.",
       ),
     );
     let seq = 0;
+    const answers = { start: null, push: "example words", finish: "Example words.", cancel: null };
     for (const op of ["start", "push", "finish", "cancel"])
       controls.append(
         node(
           "button",
           {
             onclick: () => {
-              output.textContent = JSON.stringify(
-                {
-                  session: "example-recording",
-                  seq: seq++,
-                  op,
-                  ...(op === "push"
-                    ? { rate: 16000, audio: "omitted in this teaching diagram" }
-                    : {}),
-                },
-                null,
-                2,
-              );
+              const number = seq++;
+              const request = { op, session: "example-session", seq: number };
+              if (op === "push") Object.assign(request, { rate: 44100, audio: "4410 samples, omitted here" });
+              const response = { session: "example-session", seq: number, text: answers[op], mode: "append-only" };
+              output.textContent = `Request\n${JSON.stringify(request, null, 2)}\n\nResponse\n${JSON.stringify(response, null, 2)}`;
             },
           },
           op,
         ),
       );
-    output.textContent = "Choose an operation to see its message shape.";
+    output.textContent = "Choose an operation to see a request and its response.";
   }
   if (type === "wave") {
     area.append(
@@ -267,7 +261,7 @@ export function lab(type) {
       node(
         "p",
         {},
-        "More dots show a finer drawing of the same wave. This is a schematic, not a resampler.",
+        "More dots show a finer drawing of the same wave. Native capture takes 44,100 snapshots a second on each of two channels. This drawing is a schematic, not a resampler.",
       ),
     );
     const range = node("input", {
@@ -281,6 +275,18 @@ export function lab(type) {
     svg.setAttribute("viewBox", "0 0 700 110");
     svg.setAttribute("role", "img");
     svg.setAttribute("aria-label", "A schematic wave made from sample dots");
+    const level = node("input", {
+      type: "range",
+      min: "0",
+      max: "100",
+      value: "60",
+      "aria-label": "Microphone level from 0 to 100 percent",
+    });
+    const bars = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    bars.setAttribute("viewBox", "0 0 700 110");
+    bars.setAttribute("role", "img");
+    const weights = [0.35, 0.65, 0.9, 1, 0.8, 0.55, 0.3];
+    const levelCopy = node("p", { "aria-live": "polite" });
     function draw() {
       const n = Number(range.value);
       svg.replaceChildren();
@@ -295,11 +301,40 @@ export function lab(type) {
         c.setAttribute("fill", "#111318");
         svg.append(c);
       }
-      output.textContent = `${n} sample dots in this drawing. The real app carries the actual sample rate with its audio.`;
+      output.textContent = `${n} sample dots in this drawing. Each real audio packet carries its actual sample rate.`;
+    }
+    function drawBars() {
+      // The same formula as the GNOME companion's model.js barScales().
+      const value = Number(level.value) / 100;
+      const scales = weights.map((weight) => 0.15 + 0.85 * value * weight);
+      bars.replaceChildren();
+      scales.forEach((scale, i) => {
+        const height = 96 * scale;
+        const r = document.createElementNS(bars.namespaceURI, "rect");
+        r.setAttribute("x", String(245 + i * 32));
+        r.setAttribute("y", String(55 - height / 2));
+        r.setAttribute("width", "14");
+        r.setAttribute("height", String(height));
+        r.setAttribute("rx", "7");
+        r.setAttribute("fill", "#111318");
+        bars.append(r);
+      });
+      const list = scales.map((scale) => scale.toFixed(2)).join(", ");
+      bars.setAttribute("aria-label", `Seven meter bars at heights ${list}`);
+      levelCopy.textContent = `Level ${value.toFixed(2)} gives bar heights ${list}. Silence still leaves each bar at 0.15.`;
     }
     range.addEventListener("input", draw);
-    area.append(node("label", {}, "Detail", range), svg);
+    level.addEventListener("input", drawBars);
+    area.append(
+      node("label", {}, "Detail", range),
+      svg,
+      node("h3", {}, "From level to top-bar bars"),
+      node("label", {}, "Level", level),
+      bars,
+      levelCopy,
+    );
     draw();
+    drawBars();
   }
   if (type === "latency") {
     area.append(

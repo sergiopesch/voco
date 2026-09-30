@@ -17,7 +17,7 @@ def run_cursor(root, app, pump, native_windows, activate):
     gi.require_version('Gtk', '3.0')
     gi.require_version('Atspi', '2.0')
     from gi.repository import Gtk, Atspi, Gio, GLib
-    from test_native_wayland_capture import capture_continuity, pcm16
+    from audio_continuity import capture_continuity, pcm16
     # This process also owns the target widget. Service AT-SPI immediately like
     # Gtk.main(), without adding a polling sleep to every accessibility request.
     def pump(seconds=0):
@@ -110,12 +110,14 @@ def run_cursor(root, app, pump, native_windows, activate):
             pending.extend(node.get_child_at_index(i) for i in range(min(node.get_child_count(), 100)))
         return None
 
-    def cursor_ready():
-        probe = subprocess.Popen([str(root / 'voco'), '--check-cursor'],
+    def desktop_input_ready():
+        # Read-only prerequisite check: paste helpers and input service only.
+        # Dictation pastes into whatever has focus; there is no cursor probe.
+        probe = subprocess.Popen([str(root / 'voco'), '--check-desktop-input'],
                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        wait(lambda: probe.poll() is not None, 'read-only cursor prerequisite probe', 8)
+        wait(lambda: probe.poll() is not None, 'read-only desktop input prerequisite check', 8)
         stdout, stderr = probe.communicate()
-        result.setdefault('cursorProbes', []).append({'code': probe.returncode, 'stdout': stdout, 'stderr': stderr})
+        result.setdefault('desktopInputChecks', []).append({'code': probe.returncode, 'stdout': stdout, 'stderr': stderr})
         return probe.returncode == 0
 
     def screenshot(name):
@@ -143,7 +145,11 @@ def run_cursor(root, app, pump, native_windows, activate):
         target.show_all()
         field.grab_focus()
         target.present()
-        wait(lambda: any(w['pid'] == os.getpid() and w['visible'] and w['focused'] for w in native_windows()), 'focused GTK destination')
+        def destination_focused():
+            return field.has_focus() and any(w['pid'] == os.getpid() and w['visible'] and w['focused']
+                                             for w in native_windows())
+        wait(destination_focused, 'focused GTK destination')
+        assert desktop_input_ready(), 'Desktop input prerequisites unavailable'
         buffer = field.get_buffer()
 
         def text():
@@ -161,7 +167,7 @@ def run_cursor(root, app, pump, native_windows, activate):
             field.grab_focus()
             target.present()
             pump(.3)
-            wait(cursor_ready, 'unambiguous accessible cursor', 15)
+            wait(destination_focused, 'focused GTK destination', 15)
             previous_active = sum(row.get('event') == 'recording_state_active' for row in rows())
             previous_idle = sum(row.get('event') == 'dictation_stop_to_idle' for row in rows())
             assert not (journal / 'active.json').exists(), 'Previous normal dictation retained its journal'
@@ -224,10 +230,11 @@ def run_cursor(root, app, pump, native_windows, activate):
             if baseline:
                 subprocess.run([str(root / 'voco'), '--toggle'], check=True, timeout=5)
             else:
+                # The companion consumes the shortcut and toggles on press. A final
+                # paste must wait for release; the dispatch log checks modifiers below.
                 keys('keydown', 'Alt_L', 'keydown', 'd')
                 pump(.45)
                 assert not input_state()['windowMenuOpen'], 'Held Stop opened the window menu'
-                assert sum(row.get('event') == 'dictation_stop_to_idle' for row in rows()) == previous_idle
                 keys('keyup', 'd', 'keyup', 'Alt_L')
             wait(lambda: (quality_terminal(trial_index + 1) is not None and not (journal / 'active.json').exists())
                  if interruption is not None else
@@ -269,7 +276,7 @@ def run_cursor(root, app, pump, native_windows, activate):
             assert not any(entry.get('text') == text() for entry in recovered)
             assert not any(w['pid'] == app.pid and w['visible'] for w in native_windows()), 'Dictation presented a transcript window'
             assert not input_state()['windowMenuOpen']
-            assert any(w['pid'] == os.getpid() and w['focused'] for w in native_windows()), 'Stop lost the original destination'
+            assert any(w['pid'] == os.getpid() and w['focused'] for w in native_windows()), 'Stop moved focus away from the dictated field'
             bundles = root / 'state/voco/debug-native-captures'
             wait(lambda: len(list(bundles.glob('native-*/COMMIT.json'))) == 1
                  and len(list(bundles.glob('renderer-*/COMMIT.json'))) == 1,

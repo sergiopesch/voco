@@ -27,7 +27,7 @@ def fixture():
             quality('hypothesis', quality_seq=0, quality_dropped=0, hypothesis_seq=1, previous_hypothesis_seq=0,
                     changed=True, append_only=True, **lengths('recognized')),
             quality('delivery_requested', quality_seq=1, quality_dropped=0, delivery_seq=1, hypothesis_seq=1, **lengths('suffix'), **lengths('target'), **lengths('committed', 0)),
-            quality('native_dispatch', delivery_seq=1, hypothesis_seq=1, outcome='dispatched',
+            quality('native_dispatch', delivery_seq=1, hypothesis_seq=1, outcome='dispatched', settle_ms=0, modifier_wait_ms=12,
                     routed_utf8_bytes=5, leading_separator=False, **lengths('input'), **lengths('payload')),
             quality('delivery_dispatched', quality_seq=2, quality_dropped=0, delivery_seq=1, hypothesis_seq=1, **lengths('committed')),
             quality('hypothesis', quality_seq=3, quality_dropped=0, hypothesis_seq=2, previous_hypothesis_seq=1,
@@ -50,7 +50,10 @@ class QualityEventsTest(unittest.TestCase):
         report = self.run_report(fixture())
         self.assertEqual(report['status'], 'reconciled_dispatch_metadata')
         self.assertEqual(report['destination_content_observation'], 'unavailable')
-        self.assertEqual(report['runs'][0]['streams'][0]['reasons'], [])
+        stream = report['runs'][0]['streams'][0]
+        self.assertEqual(stream['reasons'], [])
+        self.assertEqual(stream['timing_observations']['native_modifier_wait'], {'count': 1, 'p50_ms': 12, 'max_ms': 12})
+        self.assertEqual(stream['timing_observations']['native_settle']['count'], 1)
 
     def test_finished_empty_stream_reconciles_without_inventing_hypotheses(self):
         rows = fixture()
@@ -102,12 +105,14 @@ class QualityEventsTest(unittest.TestCase):
         self.assertEqual(result['status'], 'incomplete')
         self.assertIn('routed_input_length_mismatch_or_unavailable', result['runs'][0]['streams'][0]['reasons'])
 
-    def test_explicit_context_separator_is_a_traceable_transformation(self):
+    def test_leading_space_key_is_a_traceable_transformation(self):
         rows = fixture()
-        rows[3].update(context_separator=True, leading_separator=True, routed_utf8_bytes=6)
+        rows[3].update(leading_separator=True, payload_utf8_bytes=4)
         self.assertEqual(self.run_report(rows)['status'], 'reconciled_dispatch_metadata')
-        del rows[3]['context_separator']
-        self.assertEqual(self.run_report(rows)['status'], 'incomplete')
+        rows[3]['payload_utf8_bytes'] = 5
+        result = self.run_report(rows)
+        self.assertEqual(result['status'], 'incomplete')
+        self.assertIn('payload_transformation_unavailable_or_inconsistent', result['runs'][0]['streams'][0]['reasons'])
 
     def test_recorder_rotation_order_can_be_reconstructed_without_deduplicating_silently(self):
         rows = fixture()

@@ -4,10 +4,7 @@ import {
   createAudioCaptureBuffer,
 } from "@/lib/audioCaptureBuffer";
 import { AudioCaptureFlushError,CAPTURE_INPUT_INTERRUPTED,createAudioCaptureFlush } from "@/lib/audioCaptureFlush";
-import {
-  openMicrophoneStreamWithDiagnostics,
-  probeMicrophoneAccess,
-} from "@/lib/audioInput";
+import { openMicrophoneStreamWithDiagnostics } from "@/lib/audioInput";
 import {
   calculateVisualAudioLevelFromSamples,
 } from "@/lib/audioLevel";
@@ -15,7 +12,6 @@ import { BrowserStreamDelivery } from "@/lib/browserStreamDelivery";
 import { retainedSampleRate,type CaptureDescriptor,type CaptureSelection } from "@/lib/captureDescriptor";
 import { monitorCaptureHealth } from "@/lib/captureHealth";
 import { createDesktopCaptureTail } from "@/lib/desktopCaptureTail";
-import { DesktopShortcutSession } from "@/lib/desktopShortcutSession";
 import {
   isCurrentAudioCaptureSource,
 } from "@/lib/dictationAsyncGuards";
@@ -24,7 +20,6 @@ import {
   type CursorDeliveryEvent,
 } from "@/lib/dictationDelivery";
 import { createDictationRecording } from "@/lib/dictationRecording";
-import { errorMessage } from "@/lib/dictationRecovery";
 import {
   createDictationSessionState,
   requestToggle as requestSessionToggle,
@@ -32,13 +27,10 @@ import {
 import { admitsDictationTrigger,type DictationTriggerAction } from "@/lib/dictationTrigger";
 import { beginNativeCapture,type NativeCaptureSession } from "@/lib/nativeCapture";
 import { encodeNativeRetainedSource,type NativeCaptureTerminalOutcome } from "@/lib/nativeCaptureAudit";
-import { NvidiaRecovery } from "@/lib/nvidiaRecovery";
 import type { HotkeyTraceFields } from "@/lib/tauri";
 import {
-  awaitStopShortcutReservation,
-  beginDesktopShortcutSession,
+  copyDesktopText,
   debugNativeCaptureEnabled,
-  endDesktopShortcutSession,
   getDesktopPasteStatus,
   pasteDesktopText,
   releaseBrowserRecording,
@@ -48,12 +40,11 @@ import {
 } from "@/lib/tauri";
 import { useStore } from "@/store/useStore";
 import type {
-  AppConfig,
   CursorDeliveryState,
   DictationStatus
 } from "@/types";
 import { useCallback,useEffect,useRef,useState } from "react";
-import { BenchmarkPhraseQueue } from '../lib/benchmarkPhraseQueue';
+import { DictationStream } from '../lib/dictationStream';
 
 const AUDIO_LEVEL_ATTACK = 0.68;
 const AUDIO_LEVEL_RELEASE = 0.24;
@@ -65,7 +56,6 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
   captureSelectionRef.current = options.getCaptureSelection;
   const setStatus = useStore((state) => state.setStatus);
   const setTranscript = useStore((state) => state.setTranscript);
-  const setInterimTranscript = useStore((state) => state.setInterimTranscript);
   const setError = useStore((state) => state.setError);
   const setAudioLevel = useStore((state) => state.setAudioLevel);
   const setMicrophoneReadyState = useStore((state) => state.setMicrophoneReady);
@@ -75,23 +65,13 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
   const disposedRef = useRef(false);
   const lifecycleEpochRef = useRef(0);
   const cancelledRef = useRef<string | null>(null);
-  const recoveryWaitRef = useRef<{ cancel: () => void } | null>(null);
-  const nvidiaRecoveryRef = useRef<NvidiaRecovery | null>(null);
   const captureHealthRef = useRef<ReturnType<typeof monitorCaptureHealth> | null>(null);
   const recoverySessionIdRef = useRef<string | null>(null);
   const [cursorDeliveryState, setCursorDeliveryState] =
     useState<CursorDeliveryState>("inactive");
-  const cursorDeliveryStateRef = useRef<CursorDeliveryState>("inactive");
-
-  function updateCursorDeliveryState(next: CursorDeliveryState) {
-    cursorDeliveryStateRef.current = next;
-    setCursorDeliveryState(next);
-  }
 
   function transitionCursorDelivery(event: CursorDeliveryEvent) {
-    updateCursorDeliveryState(
-      nextCursorDeliveryState(cursorDeliveryStateRef.current, event),
-    );
+    setCursorDeliveryState(nextCursorDeliveryState(event));
   }
 
   const captureDescriptorRef = useRef<CaptureDescriptor | null>(null);
@@ -109,7 +89,6 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
   const primedStreamPromiseRef = useRef<Promise<MediaStream> | null>(null);
   const audioBufferRef = useRef(createAudioCaptureBuffer());
   const sessionRef = useRef(createDictationSessionState());
-  const sessionConfigRef = useRef<AppConfig | null>(null);
   const phaseRef = useRef<DictationPhase>("idle");
   const workletModuleLoadedRef = useRef(false);
   const smoothedAudioLevelRef = useRef(0);
@@ -121,10 +100,7 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
   const browserDeliveryRef = useRef<BrowserStreamDelivery | null>(null);
   const activeTriggerIdRef = useRef<string | undefined>(undefined);
   const desktopPasteSessionRef = useRef(false);
-  const desktopTargetTokenRef = useRef<string | null>(null);
-  const desktopPhraseQueueRef = useRef<BenchmarkPhraseQueue | null>(null);
-  const desktopShortcutSessionRef = useRef<DesktopShortcutSession | null>(null);
-  const desktopShortcutCleanupRef = useRef<Promise<boolean>>(Promise.resolve(true));
+  const dictationStreamRef = useRef<DictationStream | null>(null);
   const desktopStreamedSampleCountRef = useRef(0);
   const desktopPhrasePasteCountRef = useRef(0);
   const debugNativeCaptureEnabledRef = useRef(false);
@@ -169,66 +145,6 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
       if (!disposedRef.current && audioContextRef.current === audioContext) workletModuleLoadedRef.current = true;
     },
     [],
-  );
-
-  const initializeMicrophone = useCallback(
-    async (appStartMs: number) => {
-      const lifecycleEpoch = lifecycleEpochRef.current;
-      const initializationSessionId = sessionRef.current.sessionId;
-      const isCurrentInitialization = () => !disposedRef.current &&
-        lifecycleEpochRef.current === lifecycleEpoch && sessionRef.current.sessionId === initializationSessionId;
-      if (!isCurrentInitialization()) return;
-      try {
-        if (captureSelectionRef.current?.().backend === "native") return;
-        const deviceId = useStore.getState().selectedDeviceId;
-        await probeMicrophoneAccess(deviceId);
-        if (!isCurrentInitialization()) return;
-        const audioContext = await ensureAudioContext();
-        if (!isCurrentInitialization()) return;
-        await ensureWorkletModuleLoaded(audioContext).catch(() => {});
-        if (!isCurrentInitialization()) return;
-
-        setStatus("idle");
-        setError(null);
-        setInterimTranscript("");
-        setMicrophoneReadyState(true);
-        console.info("Microphone ready");
-        console.info(
-          `[timing] app start -> microphone ready: ${Math.round(
-            performance.now() - appStartMs,
-          )}ms`,
-        );
-      } catch (err) {
-        if (!isCurrentInitialization()) return;
-        setStatus("error");
-        setMicrophoneReadyState(false);
-        showNotification(
-          "Microphone not ready",
-          `Press ${useStore.getState().config?.hotkey ?? "Alt+D"} to re-initialize microphone access.`,
-        ).catch(() => {});
-
-        if (err instanceof DOMException) {
-          if (err.name === "NotAllowedError") {
-            setError(
-              `Microphone access denied on startup. Press ${useStore.getState().config?.hotkey ?? "Alt+D"} to retry after granting permission.`,
-            );
-          } else if (err.name === "NotFoundError") {
-            setError(`No microphone found. Connect one and press ${useStore.getState().config?.hotkey ?? "Alt+D"} to retry.`);
-          } else {
-            setError(`Microphone startup error: ${err.message}`);
-          }
-        } else {
-          setError(`Microphone startup failed: ${err}`);
-        }
-      }
-    },
-    [
-      ensureAudioContext,
-      ensureWorkletModuleLoaded,
-      setError,
-      setInterimTranscript,
-      setMicrophoneReadyState,
-    ],
   );
 
   const prepareAudioEngine = useCallback(async () => {
@@ -325,12 +241,11 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
     const metrics = result.pasteMetrics;
     if (!metrics) return;
     for (const [name, durationMs] of [
-      ["dictation_desktop_target_probe_completed", metrics.targetProbeMs],
       ["dictation_desktop_paste_preflight_completed", metrics.preflightMs],
+      ["dictation_desktop_modifier_wait_completed", metrics.modifierWaitMs],
       ["dictation_desktop_clipboard_write_completed", metrics.clipboardMs],
       ["dictation_desktop_keyboard_dispatch_completed", metrics.keyboardMs],
     ] as const) traceDictationEvent(name, { durationMs }).catch(() => {});
-    traceDictationEvent(metrics.terminal ? "dictation_desktop_terminal_route_dispatched" : "dictation_desktop_standard_route_dispatched").catch(() => {});
   }
 
   const recordingRef = useRef<ReturnType<typeof createDictationRecording> | null>(null);
@@ -338,7 +253,7 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
   if (desktopCaptureRef.current === null) {
     desktopCaptureRef.current = createDesktopCaptureTail({
       audioBufferRef,
-      desktopPhraseQueueRef,
+      dictationStreamRef,
       desktopStreamedSampleCountRef,
       phaseRef,
       captureHealthRef,
@@ -545,17 +460,12 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
       disposedRef,
       cancelledRef,
       browserDeliveryRef,
-      desktopShortcutSessionRef,
-      desktopShortcutCleanupRef,
-      desktopPhraseQueueRef,
-      desktopTargetTokenRef,
+      dictationStreamRef,
       desktopPasteSessionRef,
       desktopStreamedSampleCountRef,
       desktopPhrasePasteCountRef,
       activeTriggerIdRef,
       recoverySessionIdRef,
-      recoveryWaitRef,
-      sessionConfigRef,
       nativeCaptureRef,
       captureDescriptorRef,
       captureSelectionRef,
@@ -566,7 +476,6 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
       initialHotkeyLatencyLoggedRef,
       debugNativeCaptureEnabledRef,
       audioBufferRef,
-      cursorDeliveryStateRef,
       lifecycleEpochRef,
       audioContextRef,
       primedStreamRef,
@@ -575,23 +484,16 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
       workletFlushRef,
       streamRef,
       sourceRef,
-      workletRef,
-      processorRef,
-      silentSinkRef,
       primedDeviceIdRef,
       useStore,
-      beginDesktopShortcutSession,
-      endDesktopShortcutSession,
-      awaitStopShortcutReservation,
       getDesktopPasteStatus,
       pasteDesktopText,
+      copyDesktopText,
       traceDictationEvent,
-      traceHotkeyEvent,
       showNotification,
       setCancellationPending,
       setCanCancel,
       setStatus,
-      setInterimTranscript,
       setTranscript,
       setError,
       setMicrophoneReadyState,
@@ -622,86 +524,18 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
   function finalizeIdleState() {
     recording.finalizeIdleState();
   }
-  function retainRecovery(reason: string, keepAudio = true) {
-    recording.retainRecovery(reason, keepAudio);
-  }
   function releaseRecordingOrigin(triggerId = activeTriggerIdRef.current) {
     recording.releaseRecordingOrigin(triggerId);
   }
   function isCurrentSession(sessionId: number): boolean {
     return recording.isCurrentSession(sessionId);
   }
-  function assertOutputAllowed(sessionId = sessionRef.current.sessionId) {
-    recording.assertOutputAllowed(sessionId);
-  }
-
-  async function retryRecovery() {
-    const recovery = useStore.getState().recovery;
-    if (!recovery?.audioAvailable || recovery.retrying || (phaseRef.current !== "idle" && phaseRef.current !== "error")) return;
-    const recoverySessionId = sessionRef.current.sessionId;
-    useStore.getState().setRecovery({ ...recovery, retrying: true,
-      reason: "Waiting for the previous local operation to finish. Cancel dictation stops this wait and keeps your audio; it does not interrupt that operation.",
-    });
-    phaseRef.current = "processing";
-    setStatus("processing");
-    setCanCancel(true);
-    setCancellationPending(false);
-    setInterimTranscript("Waiting for the previous local operation to finish...");
-    // Cancellation cannot interrupt an outstanding native request. A subsequent
-    // Retry waits for that request and its private recovery worker cleanup.
-    let nativeRecovery: NvidiaRecovery | null = null;
-    let cancelWait: () => void = () => {};
-    const cancelled = new Promise<false>((resolve) => {
-      cancelWait = () => { nativeRecovery?.cancel(); resolve(false); };
-    });
-    const attempt = { cancel: cancelWait };
-    recoveryWaitRef.current = attempt;
-    const settled = Promise.all([
-      nvidiaRecoveryRef.current?.settled(),
-    ]).then(() => true);
-    const ready = await Promise.race([settled, cancelled]);
-    if (!ready || recoveryWaitRef.current !== attempt || !isCurrentSession(recoverySessionId)) return;
-    useStore.getState().setRecovery({ ...recovery, retrying: true,
-      reason: "Recovering the audio received locally. The result will stay in VOCO.",
-    });
-    cancelledRef.current = null;
-    setCancellationPending(false);
-    setCanCancel(true);
-    phaseRef.current = "processing";
-    setStatus("processing");
-    setInterimTranscript("Recovering transcription locally. The result will stay in VOCO.");
-    try {
-      nativeRecovery = new NvidiaRecovery();
-      nvidiaRecoveryRef.current = nativeRecovery;
-      const audio = collectAudioSamplesRange(audioBufferRef.current, 0, audioBufferRef.current.sampleCount);
-      const result = await Promise.race([
-        nativeRecovery.transcribe(audio, recordingSampleRate()).then(text => ({ text })),
-        cancelled,
-      ]);
-      if (result === false || recoveryWaitRef.current !== attempt || !isCurrentSession(recoverySessionId)) return;
-      const transcript = result.text;
-      assertOutputAllowed(recoverySessionId);
-      useStore.getState().setRawTranscript(transcript);
-      setTranscript(transcript || "(no speech detected)");
-      retainRecovery("Recovered locally with the bundled NVIDIA model. Review any text already in the target, then copy the text you need. Nothing was inserted automatically.", false);
-      finalizeIdleState();
-    } catch (error) {
-      if (!isCurrentSession(recoverySessionId)) return;
-      if (recoveryWaitRef.current !== attempt) return;
-      retainRecovery(cancelledRef.current ?? `Recovery transcription failed: ${errorMessage(error)}`);
-    } finally {
-      if (recoveryWaitRef.current === attempt) recoveryWaitRef.current = null;
-    }
-  }
 
   function discardRecovery() {
     if (phaseRef.current !== "idle" && phaseRef.current !== "error") return;
-    if (recoverySessionIdRef.current) useStore.getState().dismissRecoverableTranscript(recoverySessionIdRef.current);
     const native = nativeCaptureRef.current;
     nativeCaptureRef.current = null;
     void native?.cancel().catch(() => {});
-    recoveryWaitRef.current?.cancel();
-    recoveryWaitRef.current = null;
     clearCapturedAudio();
     useStore.getState().setRecovery(null);
     useStore.getState().setCaptureNotice(null);
@@ -739,9 +573,6 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
         void stopRecording();
         return true;
       case "none":
-        if (sessionRef.current.phase === "starting" && sessionRef.current.queuedAction === "stop") {
-          setInterimTranscript("Stop requested. Waiting for microphone initialization to finish.");
-        }
         return false;
     }
   }, []);
@@ -767,14 +598,12 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
 
   return {
     dictationSessionId: sessionRef.current.sessionId,
-    initializeMicrophone,
     prepareAudioEngine,
     primeRecordingStream,
     cursorDeliveryState,
     canCancel,
     cancellationPending,
     cancelRecording,
-    retryRecovery,
     discardRecovery,
     finishOnboardingTest,
     toggle,

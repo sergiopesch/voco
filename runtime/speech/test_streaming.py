@@ -5,7 +5,7 @@ import os
 import json
 from pathlib import Path
 import numpy as np
-from streaming import SilenceGate, Metrics
+from streaming import SilenceGate, Metrics, state_home
 class GateTests(unittest.TestCase):
     def test_logging_disabled_creates_no_directory(self):
         with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {'VOCO_PERFORMANCE_LOG':'0','XDG_STATE_HOME':directory}):
@@ -25,6 +25,12 @@ class GateTests(unittest.TestCase):
             files=list((Path(directory)/'voco/stream-performance').iterdir())
             self.assertEqual(len(files),3)
             self.assertTrue(all(p.stat().st_mode & 0o777 == 0o600 for p in files))
+    def test_empty_or_relative_state_home_falls_back_to_the_home_directory(self):
+        for value in ('', 'relative/state'):
+            with patch.dict(os.environ, {'XDG_STATE_HOME':value}):
+                self.assertEqual(state_home(), Path.home()/'.local/state')
+        with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {'XDG_STATE_HOME':directory}):
+            self.assertEqual(state_home(), Path(directory))
     def test_zero_gate_does_not_discard_nonzero_quiet_speech(self):
         gate=SilenceGate();speech=np.full(800,1e-7,np.float32)
         self.assertEqual(sum(map(len,gate.push(speech,16000))),800)

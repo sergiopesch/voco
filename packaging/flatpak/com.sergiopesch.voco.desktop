@@ -1,9 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=VOCO
-Comment=Turn speech into text at your cursor with local dictation
-Exec=voco
-Icon=com.sergiopesch.voco
-Terminal=false
-Categories=AudioVideo;Audio;
-StartupNotify=true

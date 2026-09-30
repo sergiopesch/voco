@@ -3,7 +3,7 @@
 # signature against KEYS from this repository. No network. Exit codes:
 #   0 signed and verified
 #   1 integrity failure or unsafe checksum path
-#   2 checksums match but no usable publisher signature (unsigned cut)
+#   2 checksums match but no usable publisher signature
 set -euo pipefail
 
 usage() {
@@ -68,7 +68,7 @@ elif [[ -f "$dir/$file.sig" ]]; then
 fi
 
 if [[ -z "$sig" ]]; then
-  echo "Checksums matched. No $file.asc signature; this cut is unsigned." >&2
+  echo "Checksums matched. No $file.asc signature; this release is unsigned." >&2
   echo "Integrity is not publisher identity." >&2
   exit 2
 fi
@@ -90,6 +90,7 @@ fi
 
 homedir="$(mktemp -d "${TMPDIR:-/tmp}/voco-verify-gnupg.XXXXXX")"
 cleanup() {
+  gpgconf --homedir "$homedir" --kill all >/dev/null 2>&1 || true
   rm -rf -- "$homedir"
 }
 trap cleanup EXIT

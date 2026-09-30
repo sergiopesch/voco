@@ -37,24 +37,30 @@ export function calculateVisualAudioLevelFromSamples(
   return calculateVisualAudioLevel(calculateCenteredRms(samples));
 }
 
-export function removeDcOffsetInPlace(samples: Float32Array): Float32Array {
-  if (samples.length === 0) {
-    return samples;
-  }
-
-  let sum = 0;
-  for (let i = 0; i < samples.length; i += 1) {
-    sum += samples[i] ?? 0;
-  }
-
-  const mean = sum / samples.length;
-  if (Math.abs(mean) < 1e-6) {
-    return samples;
-  }
-
-  for (let i = 0; i < samples.length; i += 1) {
-    samples[i] = (samples[i] ?? 0) - mean;
-  }
-
-  return samples;
+/**
+ * Forwards recording levels to the tray panel at most every 40 ms, one request
+ * at a time. Silence is sent once: the panel already reads a level older than
+ * 250 ms as zero, so repeating zero only costs IPC. Only a level that was
+ * actually sent counts, so pass every frame, repeated zeros included: a zero
+ * the throttle or an in-flight send dropped goes out with the next one. A
+ * skipped zero does not use up the throttle, so the next sound is not delayed.
+ */
+export function createPanelLevelSender(
+  send: (level: number) => Promise<unknown>,
+  now: () => number = () => performance.now(),
+): (level: number) => void {
+  let pending = false;
+  let lastSentAt = -Infinity;
+  let lastSent: number | null = null;
+  return (level) => {
+    if (pending || (level === 0 && lastSent === 0)) return;
+    const at = now();
+    if (at - lastSentAt < 40) return;
+    pending = true;
+    lastSentAt = at;
+    lastSent = level;
+    void send(level)
+      .catch(() => {})
+      .finally(() => { pending = false; });
+  };
 }

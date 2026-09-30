@@ -14,7 +14,7 @@ import wave
 
 def run_onboarding(root, app, pump, native_windows):
     from gi.repository import Atspi
-    from test_native_wayland_capture import capture_continuity, pcm16
+    from audio_continuity import capture_continuity, pcm16
 
     assert __debug__ and 'DISPLAY' not in os.environ
     assert os.environ['PULSE_SERVER'] == f'unix:/run/user/{os.getuid()}/pulse/native'
@@ -99,7 +99,7 @@ def run_onboarding(root, app, pump, native_windows):
         wait(lambda: any(r.get('event') == 'recording_state_active' for r in rows()), 'native onboarding capture')
         active_sources = wait(lambda: [source for source in sources() if source['index'] not in baseline_ids and source.get('corked') is False], 'uncorked private audio source')
         assert len(active_sources) == 1 and active_sources[0]['properties'].get('application.process.id') == str(app.pid), 'Unexpected capture process'
-        assert active_sources[0]['properties'].get('application.name') == 'VOCO native capture development'
+        assert active_sources[0]['properties'].get('application.name') == 'VOCO'
         result['captureBackend'] = 'native-pulse'
         result['activePulseSources'] = active_sources
         (evidence / 'onboarding-pulse-source-outputs.json').write_text(json.dumps(active_sources, indent=2) + '\n')
@@ -178,7 +178,7 @@ def run_onboarding(root, app, pump, native_windows):
         result['transcriptObserved'] = any(re.findall('[a-z]+', value.lower()) == ['go', 'do', 'you', 'hear'] for value in text)
         assert clipboard() == sentinel, 'Onboarding changed clipboard'
         result['clipboardUnchanged'] = True
-        result['captureTrace'] = [row for row in rows() if row.get('event') in ('dictation_audio_prepared', 'dictation_recording_stopped', 'dictation_audio_teardown_completed', 'dictation_stop_to_idle')]
+        result['captureTrace'] = [row for row in rows() if row.get('event') in ('dictation_recording_stopped', 'dictation_audio_teardown_completed', 'dictation_stop_to_idle')]
         lifecycle = ['recording_state_active', 'dictation_recording_stopped', 'dictation_audio_teardown_completed', 'dictation_stop_to_idle']
         ordered = [row for row in rows() if row.get('event') in lifecycle]
         assert [row['event'] for row in ordered] == lifecycle, 'One ordered Start/Stop/teardown/idle lifecycle required'

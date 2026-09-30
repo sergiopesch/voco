@@ -361,7 +361,7 @@ vc_pulse*vc_new(const char*socket_path) {
         vc_free(p);
         return NULL;
     }
-    p->context=pa_context_new(pa_mainloop_get_api(p->loop),"VOCO native capture development");
+    p->context=pa_context_new(pa_mainloop_get_api(p->loop),"VOCO");
     if(!p->context) {
         vc_free(p);
         return NULL;
@@ -488,7 +488,7 @@ int vc_begin(vc_pulse*p,const vc_source*source,uint64_t revision) {
     };
     pa_channel_map map;
     pa_channel_map_init_stereo(&map);
-    p->stream=pa_stream_new(p->context,"VOCO explicitly selected microphone",&spec,&map);
+    p->stream=pa_stream_new(p->context,"Dictation",&spec,&map);
     if(!p->stream) {
         fail(p,"stream-create-failed");
         return -1;

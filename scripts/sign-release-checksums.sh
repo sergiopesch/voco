@@ -15,7 +15,7 @@ fi
 
 key="${GPG_KEY_FINGERPRINT:-$(git config --get user.signingkey || true)}"
 if [[ -z "$key" ]]; then
-  echo "Set user.signingkey or GPG_KEY_FINGERPRINT. Run scripts/setup-release-signing.sh first." >&2
+  echo "Set user.signingkey or GPG_KEY_FINGERPRINT to the release key." >&2
   exit 1
 fi
 

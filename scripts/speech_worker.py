@@ -1,4 +1,4 @@
-"""Bounded JSON response framing for local speech qualification workers."""
+"""Bounded JSON response framing for the speech worker in local evaluation scripts."""
 import json
 import os
 import select

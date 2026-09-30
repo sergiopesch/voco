@@ -1,5 +1,5 @@
-export const CAPTURE_TAIL_UNCONFIRMED = "The end of this recording could not be confirmed. Retrying can transcribe only the audio received.";
-export const CAPTURE_INPUT_INTERRUPTED = "The microphone stopped providing input during this recording. Retrying can transcribe only the audio received before the interruption.";
+export const CAPTURE_TAIL_UNCONFIRMED = "The end of this recording could not be confirmed, so VOCO did not finish it. Try again.";
+export const CAPTURE_INPUT_INTERRUPTED = "The microphone stopped providing input during this recording, so VOCO did not finish it. Try again.";
 
 export class AudioCaptureFlushError extends Error {
   constructor(reason = CAPTURE_TAIL_UNCONFIRMED) {

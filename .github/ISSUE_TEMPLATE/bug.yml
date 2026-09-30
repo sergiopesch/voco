@@ -1,25 +1,26 @@
 name: Bug report
 description: Report a reproducible problem with VOCO.
+labels: [bug]
 body:
   - type: markdown
     attributes:
-      value: "Use synthetic examples. Remove personal text, recordings, paths and credentials. For vulnerabilities, use the private Security tab instead."
+      value: "Check [Troubleshooting](https://github.com/sergiopesch/voco/blob/master/docs/troubleshooting.md) first. Use made-up examples, and remove personal text, recordings, paths and credentials. Report vulnerabilities privately from the Security tab."
   - type: input
     id: environment
     attributes:
       label: Version and environment
-      description: VOCO version, distribution, desktop, X11 or Wayland, and affected app.
+      description: The output of `voco --version`, your distribution and desktop, X11 or Wayland, and the app you dictated into.
     validations:
       required: true
   - type: textarea
     id: reproduction
     attributes:
       label: What happened?
-      description: Steps to reproduce, expected behavior and actual behavior.
+      description: Steps to reproduce, what you expected and what happened.
     validations:
       required: true
   - type: textarea
     id: evidence
     attributes:
       label: Optional sanitized evidence
-      description: Include only the relevant error code or timing summary. Inspect attachments before sharing.
+      description: The exact error text, or a summary from the report scripts. Check attachments before you share them.

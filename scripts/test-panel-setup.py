@@ -38,8 +38,8 @@ class PanelSetupTests(unittest.TestCase):
             status = panel.classify(version, True, {}, False, False)
             self.assertEqual(status['status'], 'unsupported')
             self.assertFalse(status['canEnable'])
-            self.assertIn('cannot start cursor dictation', status['detail'])
-            self.assertIn('configure it in your desktop', status['detail'])
+            self.assertIn('Dictation still works', status['detail'])
+            self.assertIn('configure it in your desktop to run voco --toggle', status['detail'])
 
     def test_debian_maps_every_runtime_extension_file(self):
         import json

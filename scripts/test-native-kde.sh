@@ -7,32 +7,25 @@ if [[ ${1:-} != --inside ]]; then
   : "${VOCO_KDE_DEPS:?Set extracted KDE root/usr}"
   : "${VOCO_KDE_EVIDENCE_DIR:?Set fresh evidence directory}"
   [[ ! -e "$VOCO_KDE_EVIDENCE_DIR" ]] || { echo 'Evidence directory must be fresh' >&2; exit 1; }
-  if [[ ${VOCO_KDE_CAPTURE:-0} == 1 ]]; then
-    : "${VOCO_KDE_APP_BINARY:?Capture requires app}"
-
-    for helper in pulseaudio pactl paplay wl-copy wl-paste; do command -v "$helper" >/dev/null; done
-    export VOCO_WAYLAND_PULSEAUDIO="$(command -v pulseaudio)"
-    export VOCO_WAYLAND_PACTL="$(command -v pactl)"
-    export VOCO_WAYLAND_PAPLAY="$(command -v paplay)"
-  fi
   run=$(mktemp -d)
-  mkdir -p "$run"/{home,runtime,config,cache,data,state,evidence}
-  chmod 700 "$run/runtime"
+  mkdir -p "$run"/{home,runtime,config,cache,data,state,evidence,pulse}
+  chmod 700 "$run/runtime" "$run/pulse"
   cp -a "$VOCO_KDE_DEPS/../etc/xdg/." "$run/config/"
   mkdir -p "$run/evidence/sources"
-  cp "$ROOT/scripts/test-native-kde.sh" "$ROOT/scripts/test-native-kde.py" "$ROOT/scripts/test-native-wayland.py" "$ROOT/scripts/test_native_wayland_capture.py" "$run/evidence/sources/"
+  cp "$ROOT/scripts/test-native-kde.sh" "$ROOT/scripts/test-native-kde.py" "$ROOT/scripts/test-native-wayland.py" "$run/evidence/sources/"
   if [[ -n ${VOCO_KDE_APP_BINARY:-} ]]; then
     [[ -f "$VOCO_KDE_APP_BINARY" && -x "$VOCO_KDE_APP_BINARY" ]]
     cp "$VOCO_KDE_APP_BINARY" "$run/voco"
     source "$(dirname "${BASH_SOURCE[0]}")/lib/test-speech-runtime.sh"
     voco_stage_test_speech "$run"
     mkdir -p "$run/config/voco"
-    printf '%s\n' '{"onboardingCompleted":true,"liveCursorMode":"final-text-only","transcriptTarget":"cursor","transcriptEnhancement":"off","hotkey":"Alt+D"}' > "$run/config/voco/config.json"
+    printf '%s\n' '{"onboardingCompleted":true,"hotkey":"Alt+D"}' > "$run/config/voco/config.json"
   fi
   trap 'status=$?; mkdir -p "$VOCO_KDE_EVIDENCE_DIR"; cp -a "$run/evidence/." "$VOCO_KDE_EVIDENCE_DIR/"; printf "%s\n" "$status" > "$VOCO_KDE_EVIDENCE_DIR/exit-code"; rm -rf "$run"; exit "$status"' EXIT
   bwrap --die-with-parent --new-session --unshare-ipc --unshare-net --unshare-pid --unshare-uts \
     --ro-bind / / --dev /dev --proc /proc --tmpfs /tmp --tmpfs /run/user --tmpfs /run/dbus \
     --bind "$run" "$run" --ro-bind "$VOCO_NATIVE_DEPS" /tmp/native-deps --ro-bind "$VOCO_KDE_DEPS" /tmp/kde-deps \
+    --dir "/run/user/$(id -u)" --bind "$run/pulse" "/run/user/$(id -u)/pulse" \
     --setenv HOME "$run/home" --setenv XDG_RUNTIME_DIR "$run/runtime" \
     --setenv XDG_CONFIG_HOME "$run/config" --setenv XDG_CACHE_HOME "$run/cache" \
     --setenv XDG_DATA_HOME "$run/data" --setenv XDG_STATE_HOME "$run/state" \

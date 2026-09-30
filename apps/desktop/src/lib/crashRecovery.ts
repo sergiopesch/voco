@@ -45,15 +45,28 @@ export class CrashJournal {
       await invoke("update_crash_journal", { id: this.id, epoch: this.epoch, sequence: ++this.sequence, text });
     }
   }
-  async finish() {
+  private async settle() {
     this.closed = true;
     await this.opening?.catch(() => {});
     while (this.pending) await this.pending;
+  }
+  async finish() {
+    await this.settle();
     if (this.epoch !== null) {
       try { await invoke("finish_crash_journal", { id: this.id, epoch: this.epoch }); }
       catch { throw new CrashJournalCleanupError(); }
     }
     this.cleanupComplete = true;
     if (this.error) throw new Error("Crash recovery checkpoint failed during dictation.");
+  }
+  /** Ends the session by moving its complete text into Review; resolves false,
+   * keeping nothing, when that text was not fully saved. */
+  async keep() {
+    await this.settle();
+    if (this.epoch === null || this.error) return false;
+    try { await invoke("keep_crash_journal", { id: this.id, epoch: this.epoch }); }
+    catch { return false; }
+    this.cleanupComplete = true;
+    return true;
   }
 }

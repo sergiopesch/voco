@@ -63,7 +63,7 @@ export function monitorCaptureHealth({
     } else if ([...mutedSince.values()].some((since) => current - since >= muteTimeoutMs)) {
       interrupt("The microphone stopped providing audio while muted by the system.");
     } else if (current - lastSampleAt >= sampleTimeoutMs) {
-      interrupt("Audio capture stopped responding. The recording captured so far is available to recover.");
+      interrupt("Audio capture stopped responding.");
     } else if (current - startedAt >= maximumDurationMs) {
       dispose();
       onDurationLimit();

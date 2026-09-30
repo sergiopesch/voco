@@ -10,7 +10,6 @@ import {browserCaptureStopEvidence} from './browser-capture-lifecycle.mjs';
 import {scoreTranscript} from './speech-score.mjs';
 import {scoreSpeechIntegrity} from './speech-integrity.mjs';
 const longCapture = process.env.VOCO_BROWSER_LONG_CAPTURE === '1';
-assert.notEqual(process.env.VOCO_BROWSER_DIAG_SECOND_CAPTURE, '1', 'The retired debug-capture mode is unavailable; use VOCO_BROWSER_LONG_CAPTURE=1 for full-reference Nemotron delivery.');
 const root = process.env.VOCO_BROWSER_TEST_ROOT;
 assert.ok(root && process.env.XDG_RUNTIME_DIR === `${root}/runtime` && process.env.DISPLAY === ':0');
 const hash = async p => crypto.createHash('sha256').update(await fs.readFile(p)).digest('hex');
@@ -93,13 +92,19 @@ try {
       await page.locator('#a').focus();
     }
     await delay(600);await page.keyboard.press('Alt+Shift+v');
-    if(reject) await until(async()=> (await traces()).slice(traceStart).some(t=>t.event==='dictation_recovery_retained'),'focus-loss transcript recovery',45_000);
+    // After focus loss, Stop copies the words the field did not take, as a failed paste does.
+    if(reject) await until(async()=> (await traces()).slice(traceStart).some(t=>t.event==='dictation_desktop_remainder_copied'),'focus-loss remainder copied',45_000);
     else await until(async()=> (await page.locator('#a').inputValue()).toLowerCase().match(/[a-z]+/g)?.join(' ')==='go do you hear','real transcript exact-field delivery',45_000);
-    if(!reject) await until(async()=> (await traces()).slice(traceStart).some(t=>t.event==='dictation_stop_to_idle'),'dictation returns idle');
+    await until(async()=> (await traces()).slice(traceStart).some(t=>t.event==='dictation_stop_to_idle'),'dictation returns idle');
     assert.equal(await page.locator('#b').inputValue(),'');
-    if(reject)assert.equal(await page.locator('#a').inputValue(),prefix,'Focus loss preserves already delivered text without replay');
-    await page.screenshot({path:`${root}/evidence/${retry?'after-recovery':reject?'focus-loss':'delivery'}.png`});
-    results.push({case:retry?'fresh-recording-after-clearing-recovery':reject?'focus-loss':'delivery',passed:true,events:(await traces()).slice(traceStart).map(t=>t.event)});
+    if(reject){
+      assert.equal(await page.locator('#a').inputValue(),prefix,'Focus loss preserves already delivered text without replay');
+      const copied = execFileSync('xclip', ['-selection', 'clipboard', '-o'], {encoding: 'utf8', timeout: 5000});
+      // Pasted right after the field's words, the copy keeps them apart.
+      assert.equal((prefix + copied).toLowerCase().match(/[a-z]+/g)?.join(' '), 'go do you hear', 'The clipboard holds exactly the words the field did not take');
+    }
+    await page.screenshot({path:`${root}/evidence/${retry?'fresh-recording':reject?'focus-loss':'delivery'}.png`});
+    results.push({case:retry?'fresh-recording':reject?'focus-loss':'delivery',passed:true,events:(await traces()).slice(traceStart).map(t=>t.event)});
   }
   await shortCase(false);
   if (longCapture) {
@@ -126,9 +131,7 @@ try {
     await page.screenshot({path:`${root}/evidence/long-delivery.png`});
   }
   await shortCase(true);
-
-  const clear = spawn('/usr/bin/python3', ['scripts/test-browser-clear-recovery.py'], {stdio: ['ignore', log.fd, log.fd]});
-  assert.equal(await new Promise(resolve => clear.on('exit', resolve)), 0, 'actual recovery clear button');
+  // Nothing waits in VOCO after focus loss, so the next recording starts directly.
   await shortCase(false, true);
 
   // Exercise terminal browser lifetime with real capture and native receipts.
@@ -166,7 +169,7 @@ try {
     await until(async () => {
       captureStop = browserCaptureStopEvidence((await traces()).slice(traceStart), recording.dictation_session_id);
       return captureStop !== null;
-    }, `${departure}: capture tears down and recording reaches recovery or idle`, 15_000);
+    }, `${departure}: capture tears down and recording ends`, 15_000);
     let afterSources;
     await until(() => {
       afterSources = activeSources();
@@ -178,11 +181,6 @@ try {
     if (!recipient.isClosed()) assert.equal(await recipient.locator('#b').inputValue(), '');
     const stopped = (await traces()).slice(traceStart);
     assert.equal(stopped.filter(row => row.event === 'recording_state_active').length, 1);
-    if (captureStop.terminal === 'dictation_recovery_retained') {
-      const clear = spawn('/usr/bin/python3', ['scripts/test-browser-clear-recovery.py'],
-        {stdio: ['ignore', log.fd, log.fd]});
-      assert.equal(await new Promise(resolve => clear.on('exit', resolve)), 0);
-    }
     if (!recipient.isClosed()) await recipient.close();
     results.push({case: `${departure}-stops-active-capture`, passed: true, captureStop,
       pulseCapture: {baselineSources, recordingSources, activeAfterStop: afterSources},
@@ -198,7 +196,7 @@ try {
 } finally {
   await fs.writeFile(`${root}/evidence/playback.json`, JSON.stringify(playbacks.map(p=>p.record),null,2));
   if (longCapture) await fs.copyFile(`${root}/long.wav`,`${root}/evidence/playback-long.wav`).catch(()=>{});
-  await fs.writeFile(`${root}/evidence/result.json`,JSON.stringify({appSha256:await hash(`${root}/voco`),hostSha256:await hash(`${root}/voco-browser-host`),modelSha256:await hash(`${root}/speech/models/nemotron-speech-streaming-en-0.6b.q8_0.gguf`),extensionHashes, recognizer: 'Nemotron 0.6B Q8', outputMode: 'stable-cursor-streaming', tests:results, failure, harnessOnlyHostGrant:'http://127.0.0.1/*'},null,2));
+  await fs.writeFile(`${root}/evidence/result.json`,JSON.stringify({appSha256:await hash(`${root}/voco`),hostSha256:await hash(`${root}/voco-browser-host`),modelSha256:await hash(`${root}/speech/models/nemotron-speech-streaming-en-0.6b.q8_0.gguf`),extensionHashes, recognizer: 'Nemotron 0.6B Q8', tests:results, failure, harnessOnlyHostGrant:'http://127.0.0.1/*'},null,2));
   if (worker) await fs.writeFile(`${root}/evidence/native-request-metadata.json`, JSON.stringify(await worker.evaluate(()=>globalThis.nativeRequestMetadata).catch(()=>[]), null, 2));
   await fs.copyFile(`${root}/state/voco/hotkey-trace.jsonl`,`${root}/evidence/hotkey-trace.jsonl`).catch(()=>{});
   if (browser) await browser.pages().at(-1)?.screenshot({path:`${root}/evidence/final-browser.png`}).catch(()=>{});

@@ -6,7 +6,8 @@ USERNS_POLICY="/proc/sys/kernel/apparmor_restrict_unprivileged_userns"
 ORIGINAL_USERNS_POLICY=""
 case "${1:-}" in
   "") TEST_SCRIPT="test-private-ibus-engine.sh" ;;
-  --rich-editor) TEST_SCRIPT="test-rich-editor-delivery.sh" ;;
+  --application-delivery) TEST_SCRIPT="test-application-delivery.sh"; export VOCO_DELIVERY_SUITE=applications ;;
+  --browser-delivery) TEST_SCRIPT="test-application-delivery.sh"; export VOCO_DELIVERY_SUITE=browser ;;
   --gnome-panel)
     : "${VOCO_NATIVE_DEPS:?Set the installed or extracted Xvfb root/usr}"
     : "${VOCO_PANEL_EVIDENCE_DIR:?Set a fresh directory for GNOME evidence}"
@@ -29,14 +30,18 @@ case "${1:-}" in
   --browser-application)
     : "${VOCO_BROWSER_HOST_BINARY:?Set the packaged native host executable}"
     : "${VOCO_BROWSER_EXTENSION_DIR:?Set the packaged Chromium extension directory}"
-    : "${VOCO_NATIVE_APP_BINARY:?Set the built candidate executable}"
-
+    : "${VOCO_NATIVE_APP_BINARY:?Set the built application executable}"
     : "${VOCO_BROWSER_EVIDENCE_DIR:?Set a directory for browser application evidence}"
     TEST_SCRIPT="test-browser-full-app.sh"
     ;;
+  --browser-toolbar)
+    : "${VOCO_NATIVE_APP_BINARY:?Set the built application executable}"
+    : "${VOCO_BROWSER_HOST_BINARY:?Set the built native host executable}"
+    : "${VOCO_BROWSER_EVIDENCE_DIR:?Set a fresh directory for toolbar evidence}"
+    TEST_SCRIPT="test-browser-toolbar-app.sh"
+    ;;
   --full-application)
-    : "${VOCO_NATIVE_APP_BINARY:?Set the built candidate executable}"
-
+    : "${VOCO_NATIVE_APP_BINARY:?Set the built application executable}"
     : "${VOCO_NATIVE_EVIDENCE_DIR:?Set a directory for native application evidence}"
     TEST_SCRIPT="test-native-desktop.sh"
     ;;
@@ -75,11 +80,9 @@ fi
 
 if [[ "${1:-}" == --browser-application ]]; then
   browser_evidence="${VOCO_BROWSER_EVIDENCE_DIR}"
-  VOCO_NATIVE_OUTPUT_MODE=final-text-only VOCO_BROWSER_LONG_CAPTURE=0 \
-    VOCO_BROWSER_EVIDENCE_DIR="${browser_evidence}/final-text-only" \
+  VOCO_BROWSER_LONG_CAPTURE=0 VOCO_BROWSER_EVIDENCE_DIR="${browser_evidence}/short" \
     bash "${ROOT_DIR}/scripts/${TEST_SCRIPT}"
-  VOCO_NATIVE_OUTPUT_MODE=stable-cursor-streaming VOCO_BROWSER_LONG_CAPTURE=1 VOCO_BROWSER_DEBUG_CAPTURE=1 \
-    VOCO_BROWSER_EVIDENCE_DIR="${browser_evidence}/canonical-checkpoint" \
+  VOCO_BROWSER_LONG_CAPTURE=1 VOCO_BROWSER_EVIDENCE_DIR="${browser_evidence}/long" \
     bash "${ROOT_DIR}/scripts/${TEST_SCRIPT}"
 elif [[ "${1:-}" == --native-pulse-latency ]]; then
   mkdir -m 700 "${VOCO_NATIVE_PULSE_EVIDENCE_DIR}"
@@ -99,14 +102,10 @@ elif [[ "${1:-}" == --legacy-ydotool ]]; then
     --output "${VOCO_LEGACY_INPUT_EVIDENCE_DIR}"
 elif [[ "${1:-}" == --full-application ]]; then
   application_evidence="${VOCO_NATIVE_EVIDENCE_DIR}"
-  for output_mode in final-text-only stable-cursor-streaming; do
-    VOCO_NATIVE_APP_CASE=delivery VOCO_NATIVE_OUTPUT_MODE="${output_mode}" \
-      VOCO_NATIVE_EVIDENCE_DIR="${application_evidence}/${output_mode}" \
+  for app_case in delivery focus-switch; do
+    VOCO_NATIVE_APP_CASE="${app_case}" VOCO_NATIVE_EVIDENCE_DIR="${application_evidence}/${app_case}" \
       PYTHONDONTWRITEBYTECODE=1 bash "${ROOT_DIR}/scripts/${TEST_SCRIPT}"
   done
-  VOCO_NATIVE_APP_CASE=focus-switch VOCO_NATIVE_OUTPUT_MODE=final-text-only \
-    VOCO_NATIVE_EVIDENCE_DIR="${application_evidence}/focus-manual-copy" \
-    PYTHONDONTWRITEBYTECODE=1 bash "${ROOT_DIR}/scripts/${TEST_SCRIPT}"
 else
   PYTHONDONTWRITEBYTECODE=1 bash "${ROOT_DIR}/scripts/${TEST_SCRIPT}"
 fi

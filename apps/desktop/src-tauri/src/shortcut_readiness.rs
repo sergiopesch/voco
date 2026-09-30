@@ -44,6 +44,7 @@ pub(crate) struct Snapshot<'a> {
     pub evdev_mode: u8,
     pub configured_evdev_mode: u8,
     pub bridge_available: bool,
+    pub panel_reserved: bool,
 }
 
 impl Observations {
@@ -131,6 +132,14 @@ impl Observations {
                 None,
                 "unknown",
                 "The input-context shortcut is being checked. Start dictation from the tray.",
+            );
+        }
+        // A fresh GNOME panel lease means Shell consumes the chord and toggles.
+        if snapshot.panel_reserved {
+            return status(
+                Some("gnome-panel"),
+                "available",
+                "VOCO's GNOME panel handles this shortcut.",
             );
         }
         if !snapshot.use_evdev && snapshot.plugin_hotkey == Some(snapshot.hotkey) {
@@ -226,6 +235,7 @@ mod tests {
             evdev_mode: 0,
             configured_evdev_mode: 0,
             bridge_available: false,
+            panel_reserved: false,
         }
     }
     #[test]
@@ -301,6 +311,20 @@ mod tests {
         o.clear_poll();
         o.poll(ticket, 1, "Alt+D", 100, Poll::Armed);
         assert_ne!(o.status(snapshot()).state, "available");
+    }
+    #[test]
+    fn gnome_panel_lease_is_an_available_route_without_devices() {
+        let o = Observations::default();
+        let reserved = || Snapshot {
+            panel_reserved: true,
+            ..snapshot()
+        };
+        assert_eq!(o.status(reserved()).route, Some("gnome-panel"));
+        let stale = Snapshot {
+            renderer_current: false,
+            ..reserved()
+        };
+        assert_eq!(o.status(stale).state, "unknown");
     }
     #[test]
     fn plugin_must_match_current_key_and_selected_route() {

@@ -3,7 +3,11 @@ name = "voco"
 version = "2026.0.60"
 description = "Turn speech into text at your cursor with local dictation"
 authors = ["VOCO Contributors"]
+license = "MIT"
+repository = "https://github.com/sergiopesch/voco"
 edition = "2021"
+# The toolchain CI builds with; keep it in step with .github/workflows/ci.yml.
+rust-version = "1.94.0"
 default-run = "voco"
 
 [lib]
@@ -23,7 +27,6 @@ pkg-config = "=0.3.34"
 default = ["native-capture"]
 custom-protocol = ["tauri/custom-protocol"]
 native-capture = []
-native-capture-dev = ["native-capture"]
 
 [dependencies]
 tauri = { version = "=2.11.6", features = ["tray-icon"] }

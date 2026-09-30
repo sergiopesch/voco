@@ -1,125 +1,160 @@
-# Using VOCO
+# Everyday use
 
-These instructions describe the private **2026.0.60** candidate. Public **2026.0.59**
-has the earlier in-memory recovery flow; these changes are not published yet.
+This guide covers dictating, VOCO's controls, Review and what VOCO keeps on
+your computer. To set VOCO up, see [Install VOCO](install.md).
 
-A successful voice test is followed by a desktop input check
-before onboarding completes. **Desktop setup required** means helpers or their
-service need attention; it is different from **No text cursor available**. Repair
-setup using the [installation guide](install.md), then retry the check.
+## Dictate
 
-## First-time setup
+1. Click where you want the text.
+2. Press `Alt+D` and wait until VOCO shows **Listening**.
+3. Speak. Your words appear a phrase at a time, with punctuation and capital
+   letters.
+4. Press `Alt+D` again to finish.
 
-Choose **Start test** and speak. The signal moves with microphone input and your
-words appear here. Speech stays on this computer; the test never pastes into
-other apps or changes the clipboard. Choose **Change microphone** to select a
-different input within the same setup canvas. Applying
-a microphone returns directly to the test; **Back to test** leaves the chooser
-without applying a new choice. VOCO uses your selection, or the system
-default if you have not selected a microphone.
+You can also start and stop from the tray menu. The GNOME panel replaces the
+tray icon and can stop a dictation, but you start with the shortcut. If a VOCO
+window is open when you press the shortcut, VOCO hides it instead of starting.
+Click in your app and press the shortcut again.
 
-Choose **Finish test** to stop capture and collect the final words. After a
-successful test, VOCO checks desktop input automatically. **Your voice, ready.**
-shows your shortcut and explains that VOCO stays in the tray. **Done** rechecks
-readiness, saves completion and returns directly to the tray. There is no second
-window to dismiss. Reopening VOCO from the launcher presents
-the existing idle app. During capture it keeps your destination focused. Changing
-microphones requires a new test. Silence,
-recognition failures and incomplete desktop setup keep onboarding open with an
-action to retry.
+## Where your words go
 
-## Panel setup
+VOCO pastes each phrase into the window that has keyboard focus. It puts the
+phrase on the clipboard and the primary selection, then presses Shift+Insert.
 
-The Debian package includes the GNOME 46 panel. The guided installer
-activates it for the user running setup. Manual APT installs can choose **Enable
-live panel** in onboarding or Help, or run `voco --setup-panel`. Package hooks do
-not enable extensions. If setup says to sign out, save your work and sign out and
-back in; installing files alone cannot reload a running Wayland Shell.
+- Text follows focus. If you switch windows while you speak, the next phrase
+  goes to the new window.
+- Dictation replaces what you copied last. The last phrase stays on the
+  clipboard, and clipboard managers may keep copies.
+- VOCO never presses Enter. It turns line breaks and tabs into spaces, so a
+  phrase can't run a terminal command. Read terminal text before you press
+  Enter.
 
-While recording, the panel shows the microphone and real input bars, without a
-Listening label or Stop button. Click the icon or use your shortcut to stop.
-Right-click for **Settings**, **Review**, and **Stop** during capture.
-Other desktops use the native tray menu. `voco --check-panel` changes no preferences.
-Companion version 10 is required for the new GNOME modifier safety check; after an
-upgrade, follow setup's sign-out/sign-in guidance before dictating.
+### If a paste fails
 
-The fallback tray replaces its Ready label with
-audio-driven bars while recording. Silence settles the bars; Stop restores the
-normal status. The tray menu keeps a readable status and an explicit Stop action.
-Smooth movement follows the desktop's animation preference.
+VOCO shows **VOCO stopped typing** and keeps listening. When you stop, it
+copies the words it didn't type to the clipboard and shows
+**Dictation copied to clipboard**. Some words may already be in the field, so
+check it first, then press Shift+Insert or Ctrl+V. If the copy also fails,
+VOCO saves the text in [Review](#review) and shows **Dictation saved in Review**.
 
-## Dictation
+## Controls
 
-Check your microphone during setup, then focus an editable field.
-Press and release the recording shortcut (default **Alt+D**), wait for the input bars,
-and speak.
-Words appear progressively. Press and release the shortcut again to finish; the final words
-and punctuation are delivered before VOCO returns to Ready.
+| Control | What it does |
+| --- | --- |
+| Shortcut | Starts and stops dictation. It is `Alt+D` unless you change it. |
+| Tray icon | Click to stop while you dictate, or to open the VOCO popover. |
+| Tray menu | **Open VOCO**, **Start dictation** or **Stop dictation**, **Settings**, **Review**, **Change shortcut** and **Quit VOCO** |
+| GNOME panel | Seven bars move with your voice. Click to stop while you dictate, or to open Settings. |
+| GNOME panel menu | Right-click the panel, or press Menu or Shift+F10 on it, for **Settings**, **Review** and **Stop dictation**. |
+| Popover | Shows VOCO's status, your shortcut and your microphone, with **Help** and **Hide to tray**. |
 
-VOCO binds dictation to a text field or supported terminal pane. If it cannot
-identify the typing destination, it shows a desktop notification and does not
-record. Focus the intended destination and press the shortcut again. Fields
-identified as passwords are excluded. The [.56 release](releases/2026.0.56.md)
-supports Ghostty's focused terminal canvas even though it exposes no text caret.
+Settings has four pages: **Settings** for your microphone, **Shortcut**,
+**Updates** and **Help**, which has setup steps and runtime checks. Opening
+VOCO from your app menu shows the popover, except while you dictate. The panel
+menu has no quit item, so with the panel, finish dictating and run
+`pkill -x voco` to quit VOCO.
 
-Stop dictation before switching fields. VOCO uses clipboard paste, replaces
-clipboard text, leaves it there and never presses Enter. A focus change during
-a paste gesture can redirect a fragment before VOCO detects it; recovery cannot
-retract text from another app. Recognized terminals use their
-paste chord without changing terminal settings. Protected, custom, remote and rich
-editors need individual testing. The generic desktop route appends text; it does
-not rewrite the entire message after Stop.
+## Microphone
 
-Terminal delivery cannot confirm that pasted text appeared or identify every
-password prompt. Read-only terminal mode can reject input. Review terminal text
-before submitting it; VOCO never submits commands for you.
+VOCO uses your system's default microphone unless you choose another on the
+**Settings** page.
 
-A recording is currently bounded to ten minutes, with an additional source-audio
-memory limit for high sample rates. Stop and start a new recording for longer work.
-This is not an unlimited continuous-session guarantee.
+- **Wayland:** choose from **Microphone**. **System default (current device)**
+  follows your system setting. **Refresh devices** updates the list, and
+  **Retry capture setup** checks microphone access again.
+- **X11:** choose from **Input device**. **Test microphone** opens a sound check
+  with a live level. If the chosen microphone is missing, VOCO uses the system
+  default and shows **Microphone changed**.
 
-## Settings
+VOCO has no volume control, so set the input level in your system's sound
+settings. If the microphone disconnects or stops sending audio while you
+dictate, VOCO stops and tells you.
 
-Right-click the tray icon and choose **Settings** for microphone controls. Shortcut has its own sidebar section,
-with **Alt+D** as the default. Updates and Help are separate destinations; Help
-groups troubleshooting by symptom. Drag the top bar or the VOCO brand area to move the window.
-Resize using its edges. Hide to tray closes the panel without quitting.
+## Shortcut
 
-There is one output behavior: direct cursor dictation. Assistant integrations,
-conversation, enhancement and output-mode selectors are removed. Upgrades ignore
-retired settings and preserve your microphone and shortcut. The interface follows
-system motion, contrast and transparency preferences without an Appearance page.
+To change the shortcut, choose **Change shortcut** in the tray menu, then
+**Alt+D**, **Alt+Shift+D** or **Custom shortcut…**. On the **Shortcut** page,
+choose **Change shortcut**, type a shortcut or choose **Record keys**, then
+choose **Apply shortcut**. A shortcut needs Alt, Ctrl or Super plus another key.
+If your saved shortcut isn't valid, VOCO sets it back to `Alt+D` and shows
+**Shortcut reset**.
 
-Microphone choices apply immediately. Choosing a native microphone allows access
-for this app session; no extra checkbox is required. Selecting a device does not start capture.
-Choose **Change shortcut**, edit or record keys, then **Apply shortcut** or **Cancel**. If you
-hide the window with unsaved edits, choose Save and hide, Discard and hide, or
-Keep editing. Recording is paused while capturing a new shortcut.
+| Desktop | How the shortcut reaches VOCO |
+| --- | --- |
+| X11 | VOCO registers the shortcut with the desktop. |
+| GNOME 46 on Wayland | The [VOCO panel](install.md#gnome-panel) handles an `Alt+D` or `Alt+Shift+D` shortcut and keeps it from the app you are typing in. |
+| Other Wayland desktops | Bind a key to `voco --toggle`, as described in [Wayland compositor shortcuts](install.md#wayland-compositor-shortcuts). |
 
-## Crash Recovery
+On Wayland without the panel, VOCO can still watch for `Alt+D` and
+`Alt+Shift+D` if your account can read keyboard devices, but the key press also
+reaches your app. See
+[The shortcut also reaches your app](troubleshooting.md#the-shortcut-also-reaches-your-app)
+for fixes.
 
-Normal dictation is not saved. A temporary owner-only local text checkpoint is
-deleted after Stop, a handled failure, cancellation or a clean app exit. Audio is
-never written by crash recovery. This does not clear the destination or clipboard.
+## Browser fields
 
-After an unexpected app exit, right-click the tray icon and choose **Review**.
-The resizable window keeps long text scrollable and Copy and Discard reachable.
-Check the destination first: some words may already be there. Copy never pastes,
-retries delivery or removes the entry; Discard asks for confirmation.
-Up to five interrupted transcripts are retained, each limited to 256 KiB. A sixth
-crash replaces the oldest. Recovery includes only the last completed checkpoint,
-not speech still awaiting recognition. Prior crash entries remain until discarded.
+With the optional [Chromium extension](install.md#chromium-extension), VOCO
+writes straight into one text field in Google Chrome or Chromium instead of
+pasting.
 
-If delivery is interrupted without an app crash, VOCO notifies you, stops sending
-text and keeps healthy recognition running through Stop. After Stop it clears the
-temporary text and audio and allows another recording. Check your field for missing
-words. VOCO never opens Review automatically or blindly replays uncertain output.
+1. Click the extension's toolbar button in the tab. Each new page needs this.
+2. Click in a text field and press `Alt+Shift+V`.
+3. Speak, then press `Alt+Shift+V` again to finish.
 
-## Optional browser integration
+It works in multi-line text boxes and in text, search, URL and phone number
+fields on the main page, with no text selected. It rejects password, one-time
+code and card fields, rich text editors, fields inside frames and incognito
+tabs.
 
-The packaged Chromium extension remains a separate dictation route for eligible
-plain fields in an explicitly enabled tab. Its shortcut is **Alt+Shift+V**. It
-checks the original field and stops on focus changes or edits. IBus supplies
-consuming recording shortcuts; it never mutates text. See [delivery details](testing/desktop-paste.md).
+If focus leaves the field, VOCO stops writing into it but keeps listening. At
+Stop, it copies any words the field didn't take to the clipboard. Closing or
+leaving the page stops dictation. Browser undo may not remove dictated text. To
+turn the extension off for the tab, click its toolbar button again.
 
-[Diagnostics](testing/laptop-performance.md) explains optional local metrics.
+## Review
+
+Review keeps text that didn't reach your app: a dictation that was running when
+VOCO closed unexpectedly, or one VOCO could neither paste nor copy. Choose
+**Review** in the tray menu or the GNOME panel menu. Each
+**Interrupted dictation** has **Copy transcript** and **Discard**, and some of
+its words may already be in your app. VOCO keeps the five most recent entries
+until you discard them.
+
+## What VOCO keeps
+
+| Location | Contents |
+| --- | --- |
+| `~/.config/voco/` | Settings, the last update check, and a backup of old settings if you reset them |
+| `~/.local/state/voco/crash-recovery/` | A copy of the text while you dictate, deleted when the dictation ends normally, and Review entries |
+| `~/.local/state/voco/` | Diagnostic logs, only if you turn them on (see [Performance logs](troubleshooting.md#performance-logs)) |
+| `~/.local/share/com.sergiopesch.voco/` | Data and cache for VOCO's window |
+
+Only your account can read VOCO's settings and recovery files. VOCO doesn't
+save audio in normal use. It also uses private sockets in your session's runtime
+folder, which your system clears when you sign out.
+
+VOCO's only network request asks GitHub which releases exist. It runs when VOCO
+starts, reusing an answer for up to six hours, and when you choose
+**Check for updates**. VOCO never downloads or installs updates. To upgrade,
+see [Upgrade](install.md#upgrade).
+
+After you [remove VOCO](install.md#remove), delete its folders to remove your
+data:
+
+```bash
+rm -rf ~/.config/voco ~/.local/state/voco ~/.local/share/com.sergiopesch.voco
+```
+
+## Limits
+
+- VOCO recognizes English only.
+- A dictation stops after 10 minutes, or sooner if your microphone records
+  above about 56 kHz.
+- VOCO can't tell a password field from other fields. Don't dictate into one.
+- VOCO only adds text. It can't correct words after it pastes them.
+- If recognition falls more than three seconds behind, or revises words it has
+  already given, VOCO stops transcribing and shows **Dictation interrupted**.
+- On Wayland, typing needs `ydotoold`. Outside GNOME 46, the shortcut also
+  needs a desktop binding.
+- Apps that remap Shift+Insert, remote desktops and virtual machines may not
+  accept the paste.

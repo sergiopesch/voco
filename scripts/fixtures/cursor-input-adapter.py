@@ -32,9 +32,13 @@ def call(method, params=None):
         Gio.DBusCallFlags.NO_AUTO_START, 1500, None).unpack()
 
 if Path(sys.argv[0]).name == 'wl-copy':
+    # VOCO fills both selections: GUI toolkits paste CLIPBOARD on Shift+Insert,
+    # terminals paste PRIMARY.
+    primary = '--primary' in sys.argv[1:]
+    assert [arg for arg in sys.argv[1:] if arg != '--primary'] == ['--type', 'text/plain;charset=utf-8'], sys.argv
     text = sys.stdin.buffer.read(1024 * 1024 + 1).decode('utf-8')
     assert len(text.encode('utf-8')) <= 1024 * 1024
-    call('SetClipboard', GLib.Variant('(s)', (text,)))
+    call('SetPrimary' if primary else 'SetClipboard', GLib.Variant('(s)', (text,)))
     sys.exit(0)
 
 assert Path(sys.argv[0]).name == 'ydotool', sys.argv
@@ -43,14 +47,15 @@ if sys.argv[1:] == ['key', '--help']:
     sys.exit(0)
 assert sys.argv[1:6] == ['key', '--delay', '24', '--key-delay', '12'], sys.argv
 chords = sys.argv[6:]
-assert chords in (['ctrl+v'], [' ', 'ctrl+v'], ['ctrl+shift+v'], [' ', 'ctrl+shift+v']), chords
+# The legacy client form of the one paste gesture.
+assert chords in (['shift+insert'], [' ', 'shift+insert']), chords
 state = json.loads(call('GetInputState')[0])
 with (root / 'evidence/cursor-input-dispatch.jsonl').open('a') as out:
     out.write(json.dumps({'time': time.monotonic(), 'keys': chords, 'input': state}) + '\n')
 # Preserve the ordered joining Space and paste chord; deliberately do not clear
-# physical modifiers. The production guard must prevent their collision.
+# physical modifiers. The production modifier wait must prevent their collision.
 subprocess.run(['/usr/bin/xdotool', 'key', '--delay', '24',
-    *('space' if chord == ' ' else chord for chord in chords)],
+    *('space' if chord == ' ' else 'shift+Insert' for chord in chords)],
     env={**os.environ, 'DISPLAY': ':77'}, check=True, timeout=5)
 with (root / 'evidence/cursor-input-completed.jsonl').open('a') as out:
     out.write(json.dumps({'time': time.monotonic(), 'keys': chords,

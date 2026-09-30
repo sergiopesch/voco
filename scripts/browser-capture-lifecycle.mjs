@@ -1,5 +1,5 @@
-// A retained recovery is a terminal recording state even though the UI is not idle.
-// Require the capture-release witness before either terminal outcome.
+// A recording ends idle, either finished or interrupted. Require the
+// capture-release witness before either terminal outcome.
 export function browserCaptureStopEvidence(events, sessionId) {
   if (!Number.isSafeInteger(sessionId) || sessionId <= 0) return null;
   const session = events.filter(event => event.dictation_session_id === sessionId);
@@ -8,7 +8,7 @@ export function browserCaptureStopEvidence(events, sessionId) {
     index > stopIndex && event.event === 'dictation_audio_teardown_completed');
   if (stopIndex < 0 || teardownIndex < 0) return null;
   const terminal = session.slice(teardownIndex + 1).find(event =>
-    ['dictation_stop_to_idle', 'dictation_recovery_retained'].includes(event.event));
+    ['dictation_stop_to_idle', 'dictation_interrupted'].includes(event.event));
   if (!terminal) return null;
   const stop = session[stopIndex], teardown = session[teardownIndex];
   return {

@@ -2,13 +2,12 @@
 set -euo pipefail
 
 # If you are reading this file in `less`, you are looking at the installer source.
-# Run `./voco-install` to start the branded VOCO install flow.
+# Run `bash voco-install` to install VOCO.
 #
-# VOCO — release install helper
+# VOCO release installer. It installs only the release named in VERSION.
 # Usage:
 #   wget https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.60/install -O voco-install
-#   chmod +x voco-install
-#   ./voco-install
+#   bash voco-install
 
 VERSION="2026.0.60"
 RELEASE_TAG="voco.${VERSION}"
@@ -461,8 +460,7 @@ voco_write_default_config() {
   if ! cat > "${temp_file}" << EOF
 {
   "hotkey": "${escaped_hotkey}",
-  "selectedMic": null,
-  "insertionStrategy": "auto"
+  "selectedMic": null
 }
 EOF
   then
@@ -1363,6 +1361,10 @@ if ! voco_start_wayland_service || ! voco_verify_desktop_input; then
   dim "${VOCO_INPUT_ERROR}"
   dim "Setup instructions: https://github.com/sergiopesch/voco/blob/master/docs/platform/README.md#ydotoold-ydotool-daemon"
   dim "After setup, run: voco --check-desktop-input"
+  if [[ -n "${VOCO_INSTALL_LOG:-}" ]]; then
+    VOCO_KEEP_LOG=true
+    dim "Details: $VOCO_INSTALL_LOG"
+  fi
   exit 2
 fi
 ok "Desktop input prerequisites verified"

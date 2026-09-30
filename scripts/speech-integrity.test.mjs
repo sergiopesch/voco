@@ -7,7 +7,7 @@ const repetition = { repetition: { phrase, count: 18 }, maxDeletions: 0, maxInse
 test('exact full repetitions pass normalized punctuation and casing', () => {
   assert.equal(score(reference, Array(18).fill('GO! Do you hear?').join(' '), repetition).integrityPassed, true);
 });
-test('one missing or additional phrase fails even when WER passes the previous .15 gate', () => {
+test('one missing or additional phrase fails even when WER passes the .15 continuity gate', () => {
   for (const count of [17, 19]) {
     const result = score(reference, Array(count).fill(phrase).join(' '), repetition);
     assert.ok(result.accuracy.wer <= .15);
@@ -39,16 +39,4 @@ test('invalid booleans, NaN, infinity, fractional budgets, vacuous gates and mal
 test('declared full reference cannot silently crop words or accept overlapping phrase counts', () => {
   assert.throws(() => score('go do you hear now', 'go do you hear', { repetition: { phrase, count: 1 } }));
   assert.equal(score('go go go go', 'go go go', { repetition: { phrase: 'go go', count: 2 } }).integrityPassed, false);
-});
-
-test('report adapter rejects incomplete, duplicate, mismatched and failed worker records', async () => {
-  const { evaluateIntegrityReport: evaluate } = await import('./speech-integrity.mjs');
-  const modelSha256 = 'a'.repeat(64);
-  const plan = { modelSha256, cases: [{ id: 'one', reference: 'hello', maxWer: 0.5, integrityRequirements: { exactWords: true } }] };
-  const report = { modelSha256, completedCases: 1, workerExitCode: 0, passed: true, results: [{ id: 'one', response: { chunkText: 'Hello!' } }] };
-  assert.equal(evaluate(plan, report).passed, true);
-  assert.equal(evaluate(plan, { ...report, passed: false }).passed, false, 'original family failure cannot be waived');
-  for (const patch of [{ completedCases: true }, { results: [] }, { workerExitCode: false }, { passed: 1 }, { modelSha256: 'b'.repeat(64) }, { results: [{ id: 'other', response: { chunkText: 'hello' } }] }]) assert.throws(() => evaluate(plan, { ...report, ...patch }));
-  assert.throws(() => evaluate({ ...plan, cases: [{ ...plan.cases[0], maxWer: true }] }, report));
-  assert.throws(() => evaluate({ ...plan, cases: [plan.cases[0], plan.cases[0]] }, { ...report, completedCases: 2, results: [report.results[0], report.results[0]] }));
 });

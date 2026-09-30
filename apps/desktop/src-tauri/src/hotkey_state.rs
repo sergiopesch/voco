@@ -29,6 +29,27 @@ impl HotkeyState {
         self.resynchronizing.remove(device);
     }
 
+    /// Unknown until every watched keyboard is synchronized.
+    pub(crate) fn modifiers_held(&self) -> Option<bool> {
+        if self.devices.is_empty() || !self.resynchronizing.is_empty() {
+            return None;
+        }
+        Some(self.devices.values().any(|keys| {
+            [
+                KeyCode::KEY_LEFTALT,
+                KeyCode::KEY_RIGHTALT,
+                KeyCode::KEY_LEFTSHIFT,
+                KeyCode::KEY_RIGHTSHIFT,
+                KeyCode::KEY_LEFTCTRL,
+                KeyCode::KEY_RIGHTCTRL,
+                KeyCode::KEY_LEFTMETA,
+                KeyCode::KEY_RIGHTMETA,
+            ]
+            .iter()
+            .any(|modifier| keys.contains(modifier))
+        }))
+    }
+
     /// Discard an incomplete kernel event batch and require a fresh state query
     /// after SYN_REPORT. Resynchronization never creates activation events.
     pub(crate) fn batch(
@@ -241,6 +262,28 @@ mod tests {
             key(&mut state, "first", KeyCode::KEY_D, 1, 0),
             Some(HotkeyAction::Dictation)
         );
+    }
+
+    #[test]
+    fn modifier_state_is_unknown_until_every_keyboard_is_synchronized() {
+        assert_eq!(HotkeyState::default().modifiers_held(), None);
+        let mut state = state();
+        assert_eq!(state.modifiers_held(), Some(false));
+        key(&mut state, "first", KeyCode::KEY_D, 1, 0);
+        assert_eq!(state.modifiers_held(), Some(false));
+        key(&mut state, "second", KeyCode::KEY_RIGHTMETA, 1, 0);
+        assert_eq!(state.modifiers_held(), Some(true));
+        key(&mut state, "second", KeyCode::KEY_RIGHTMETA, 0, 0);
+        assert_eq!(state.modifiers_held(), Some(false));
+        let dropped = [InputEvent::new(
+            evdev::EventType::SYNCHRONIZATION.0,
+            SynchronizationCode::SYN_DROPPED.0,
+            0,
+        )];
+        state.batch(Path::new("first"), &dropped, 0);
+        assert_eq!(state.modifiers_held(), None);
+        state.attach(Path::new("first"), [KeyCode::KEY_LEFTSHIFT]);
+        assert_eq!(state.modifiers_held(), Some(true));
     }
 
     #[test]

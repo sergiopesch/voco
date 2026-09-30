@@ -31,21 +31,29 @@ try {
       await page.addInitScript(() => {
         window.__fixtureViolations = [];
         window.__reviewEntries = [{id:'crash-one',createdAt:1790630000000,text:('A public fixture sentence for crash recovery.\n').repeat(500)+'Final visible sentence.'}, {id:'crash-two',createdAt:1790631000000,text:'Second interrupted dictation.'}];
+        // Review copies through the desktop command and uses the browser clipboard only as a fallback.
         Object.defineProperty(navigator, 'clipboard', { configurable: true, value: {writeText: async text => {
           if (window.__copyFails) throw new Error('Fixture copy failure');
-          window.__copiedText = text;
+          window.__browserCopiedText = text;
         }} });
         if (navigator.mediaDevices) navigator.mediaDevices.getUserMedia = async () => {
           window.__fixtureViolations.push('microphone'); throw new Error('Fixture must not capture');
         };
         window.__TAURI_INTERNALS__ = { invoke: async (command, args) => {
           if (command === 'list_crash_recovery') return window.__reviewEntries;
+          if (command === 'copy_desktop_text') {
+            if (window.__copyFails || window.__desktopCopyFails) throw {outcome:'no-mutation',message:'Fixture copy failure',clipboardChanged:false};
+            window.__copiedText = args.text; return;
+          }
           if (command === 'dismiss_crash_recovery') {
             if(window.__discardFails) throw new Error('Fixture discard failure');
             window.__reviewEntries = window.__reviewEntries.filter(entry => entry.id !== args.id); return;
           }
           if (command === 'get_panel_setup_status') return window.__panelStatus ?? {status:'active',detail:'Live panel bars and Stop are active.',canEnable:false};
-          if (command === 'enable_gnome_panel') return {status:'restart',detail:'Panel enabled. Sign out and back in to load it; saving your work first is recommended.',canEnable:false};
+          if (command === 'enable_gnome_panel') {
+            if (window.__holdPanel) await window.__holdPanel;
+            return {status:'restart',detail:'Panel enabled. Sign out and back in to load it; saving your work first is recommended.',canEnable:false};
+          }
           if (command === 'trace_hotkey_event') return;
           if (command === 'get_desktop_input_status') return {available:true,detail:'Fixture desktop prerequisites ready'};
           window.__fixtureViolations.push(command); throw new Error('Fixture must not invoke native commands');
@@ -107,8 +115,17 @@ try {
       // Remount only the ready phase so its panel check uses the disabled fixture.
       await page.getByRole('button',{name:'Test again',exact:true}).click();
       await page.getByRole('button',{name:'Finish test',exact:true}).click();
-      await page.getByRole('button',{name:'Enable live panel',exact:true}).click();
+      // A control disabled while focused can drop keyboard focus, so a keyboard
+      // enable keeps the panel button focused and enabled while it runs and after.
+      await page.evaluate(()=>{window.__holdPanel=new Promise(resolve=>{window.__releasePanel=resolve;});});
+      const panelFocus=()=>page.evaluate(()=>({label:document.activeElement?.textContent,disabled:document.activeElement?.disabled}));
+      await page.getByRole('button',{name:'Enable live panel',exact:true}).focus();
+      await page.keyboard.press('Enter');
+      await page.getByRole('button',{name:'Checking panel…',exact:true}).waitFor();
+      assert.deepEqual(await panelFocus(),{label:'Checking panel…',disabled:false});
+      await page.evaluate(()=>{window.__holdPanel=null;window.__releasePanel();});
       await page.getByText('Panel enabled. Sign out and back in to load it; saving your work first is recommended.',{exact:true}).waitFor();
+      assert.deepEqual(await panelFocus(),{label:'Check panel again',disabled:false});
       await page.setViewportSize({width:760,height:560});
       await capture('panel-restart-required');
       assert.equal(await page.locator('.voco-setup').evaluate(el => el.scrollHeight <= el.clientHeight + 1), true,
@@ -187,7 +204,7 @@ try {
       await page.getByRole('button',{name:'Shortcut',exact:true}).click();
       assert.equal(await page.locator('.voco-preferences__shortcut-summary kbd').innerText(),'Alt+D');
       await page.getByRole('button',{name:'Change shortcut',exact:true}).click();
-      const shortcutInput = page.getByLabel('Start and stop listening',{exact:true});
+      const shortcutInput = page.getByLabel('Start and stop dictation',{exact:true});
       assert.equal(await shortcutInput.evaluate(el => document.activeElement === el),true);
       await shortcutInput.fill('Ctrl+Alt+K');
       await page.getByRole('button',{name:'Cancel',exact:true}).click();
@@ -214,7 +231,7 @@ try {
       await page.getByRole('button',{name:'Help',exact:true}).click();
       await capture('help');
       await page.getByText('My words are not appearing',{exact:true}).click();
-      await page.getByText('Keep an editable text field focused.',{exact:false}).waitFor();
+      await page.getByText('Keep the app you’re dictating into focused.',{exact:false}).waitFor();
       await page.getByRole('button',{name:'Updates',exact:true}).click();
       await capture('updates');
       results.push({engine:name,check:'shortcut cancel, focus restoration, capture and apply; Help disclosures and Updates',passed:true});
@@ -239,6 +256,10 @@ try {
       await page.goto(`${origin}tests/brand-motion.html?surface=review`);
       const recovered = page.getByRole('textbox', {name:'Recovered transcript'});
       await recovered.waitFor();
+      const focusedOn = selector => page.waitForFunction(selector => document.activeElement?.matches(selector), selector, {timeout: 2000});
+      const focusedButton = label => page.waitForFunction(label => document.activeElement?.tagName === 'BUTTON' && document.activeElement.textContent === label, label, {timeout: 2000});
+      // Review takes focus when it opens, so the keyboard starts inside it.
+      await focusedOn('.voco-review textarea');
       const originalText = await recovered.inputValue();
       for (const viewport of [{width:1040,height:760},{width:760,height:560},{width:390,height:600}]) {
         await page.setViewportSize(viewport);
@@ -263,9 +284,21 @@ try {
       await page.getByRole('button',{name:'Copy transcript',exact:true}).click();
       await page.getByRole('status').filter({hasText:'Copied.'}).waitFor();
       assert.equal(await page.evaluate(()=>window.__copiedText), originalText);
+      assert.equal(await page.evaluate(()=>window.__browserCopiedText), undefined, 'Copy sets CLIPBOARD and PRIMARY through the desktop command');
+      await page.evaluate(()=>window.__desktopCopyFails=true);
+      await page.getByRole('button',{name:'Copy transcript',exact:true}).click();
+      await page.waitForFunction(text=>window.__browserCopiedText===text, originalText);
+      await page.getByRole('status').filter({hasText:'Copied.'}).waitFor();
+      await page.evaluate(()=>window.__desktopCopyFails=false);
       assert.equal(await page.evaluate(()=>window.__reviewEntries.length),2,'Copy does not discard or paste');
       await page.getByRole('button',{name:'Discard',exact:true}).click();
+      await focusedButton('Keep');
+      await page.keyboard.press('Escape');
+      await focusedButton('Discard');
+      assert.equal(await page.locator('html').getAttribute('data-closed'), null, 'Escape cancels the confirmation before it hides Review');
+      await page.getByRole('button',{name:'Discard',exact:true}).click();
       await page.getByRole('button',{name:'Keep',exact:true}).click();
+      await focusedButton('Discard');
       await page.getByRole('button',{name:'Discard',exact:true}).click();
       await page.evaluate(()=>window.__discardFails=true);
       await page.getByRole('button',{name:'Discard transcript',exact:true}).click();
@@ -274,15 +307,21 @@ try {
       await page.evaluate(()=>window.__discardFails=false);
       await page.getByRole('button',{name:'Discard transcript',exact:true}).click();
       await page.waitForFunction(()=>document.querySelector('textarea')?.value==='Second interrupted dictation.');
+      await focusedOn('.voco-review textarea');
       await page.getByRole('button',{name:'Discard',exact:true}).click();
       await page.getByRole('button',{name:'Discard transcript',exact:true}).click();
       await page.getByRole('status').filter({hasText:'No interrupted dictation.'}).waitFor();
+      await focusedOn('.voco-review__empty p');
       await capture('review-empty');
       await page.getByRole('button',{name:'Settings',exact:true}).click();
       assert.equal(await page.locator('html').getAttribute('data-settings'),'true');
       await page.getByRole('button',{name:'Hide to tray',exact:true}).click();
       assert.equal(await page.locator('html').getAttribute('data-closed'),'true');
-      results.push({engine:name,check:'crash review long text, compact geometry, copy failure/success, discard confirmation/failure/success, empty state and explicit navigation',passed:true});
+      await page.goto(`${origin}tests/brand-motion.html?surface=review`);
+      await focusedOn('.voco-review textarea');
+      await page.keyboard.press('Escape');
+      assert.equal(await page.locator('html').getAttribute('data-closed'),'true', 'Escape hides Review as soon as it opens');
+      results.push({engine:name,check:'crash review long text, compact geometry, focus and Escape, desktop copy with browser fallback, discard confirmation/failure/success, empty state and explicit navigation',passed:true});
 
       await page.setViewportSize({ width: 760, height: 620 });
       await load('surface=onboarding&state=error');

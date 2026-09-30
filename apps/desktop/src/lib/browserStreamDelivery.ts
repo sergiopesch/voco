@@ -1,12 +1,7 @@
-import {
-  cancelOwnedPreedit,
-  checkpointOwnedPreedit,
-  finishCanonicalOwnedPreedit,
-  startOwnedPreedit,
-} from "./tauri";
-import type { OwnedPreeditStatus } from "@/types";
+import { appendBrowserField, cancelBrowserField, finishBrowserField, startBrowserField } from "./tauri";
+import type { BrowserFieldStatus } from "@/types";
 
-const native = { startOwnedPreedit, checkpointOwnedPreedit, finishCanonicalOwnedPreedit, cancelOwnedPreedit };
+const native = { startBrowserField, appendBrowserField, finishBrowserField, cancelBrowserField };
 
 /** A browser field lease is independent of recognition. Never retry a mutation
  * whose exact receipt is missing, even when the recognizer kept producing text. */
@@ -14,12 +9,13 @@ export class BrowserStreamDelivery {
   private lease: number | null = null;
   private committed = "";
   private closed = false;
+  private failure: unknown = null;
 
   constructor(private readonly isCurrent: () => boolean, private readonly api = native) {}
 
   async start(sessionId: number, triggerId: string) {
     this.assertActive();
-    const status = await this.api.startOwnedPreedit(sessionId, triggerId);
+    const status = await this.api.startBrowserField(sessionId, triggerId);
     const lease = status.sessionId;
     if (lease === null || lease <= 0) throw new Error("Browser did not issue a field lease.");
     this.lease = lease;
@@ -39,20 +35,23 @@ export class BrowserStreamDelivery {
     const lease = this.requireLease();
     const next = this.committed + text;
     try {
-      const status = await this.api.checkpointOwnedPreedit(lease, this.committed, text);
+      const status = await this.api.appendBrowserField(lease, this.committed, text);
       this.verify(status, lease, next, false);
       this.committed = next;
     } catch (error) {
+      this.failure ??= error;
       await this.cancel();
       throw error;
     }
   }
 
   async finish() {
+    // Report why delivery stopped, not merely that the lease is gone.
+    if (this.failure) throw this.failure;
     this.assertActive();
     const lease = this.requireLease();
     try {
-      const status = await this.api.finishCanonicalOwnedPreedit(lease, this.committed, "");
+      const status = await this.api.finishBrowserField(lease, this.committed);
       this.verify(status, lease, this.committed, true);
       this.closed = true;
       this.lease = null;
@@ -66,7 +65,7 @@ export class BrowserStreamDelivery {
     this.closed = true;
     const lease = this.lease;
     this.lease = null;
-    if (lease !== null) await this.api.cancelOwnedPreedit(lease).catch(() => {});
+    if (lease !== null) await this.api.cancelBrowserField(lease).catch(() => {});
   }
 
   private assertActive() {
@@ -78,12 +77,12 @@ export class BrowserStreamDelivery {
     return this.lease;
   }
 
-  private verify(status: OwnedPreeditStatus, lease: number, text: string, final: boolean) {
+  private verify(status: BrowserFieldStatus, lease: number, text: string, final: boolean) {
     this.assertActive();
     if (status.sessionId !== lease || !status.engineActive || status.focusLost || !status.ownershipIntact ||
         status.committedCharacterCount !== Array.from(text).length ||
         (final && status.finalizationOutcome !== "committed")) {
-      throw new Error("Browser did not acknowledge the exact text. Review the field before recovering the transcript.");
+      throw new Error("The browser field didn't confirm the exact text. Check the field.");
     }
   }
 }

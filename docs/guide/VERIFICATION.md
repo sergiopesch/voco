@@ -1,157 +1,85 @@
-# Guide verification history
+# Verification
 
-## Unreleased first-run follow-up · 22 September 2026
-
-The delivery and Linux lessons explain the Brave empty-block regression and the
-compact installer canvas as candidate changes. The source viewer remains pinned
-to .43. Nine guide tests and 26 browser checks passed, including every chapter,
-pinned source, search, glossary, simulations and a 390px layout. See the
-[bounded verification record](../testing/first-run-follow-up-2026-09-22.md).
-
-## Published .52 installer · 22 September 2026
-
-The Linux lesson now identifies the published .52 installer and separates its
-download measurements from package/desktop qualification. The .43 source catalog
-is unchanged. Lesson regeneration and all nine guide tests pass. Browser checks
-verified the published lesson, journey next step, correct quiz feedback, pinned
-source modal, 18 installation-file search matches, glossary and narrow chapter
-drawer. At 390 × 844, content and scroll widths were both 375 px. No console
-warnings/errors were observed; the viewport was restored and the test tab closed.
-The initial unit invocation used the repository root and ran zero tests; the
-correct guide-directory invocation passed all nine. This is guide verification,
-not an owner microphone or fresh installation result.
-
-## Installer performance candidate · 22 September 2026
-
-The Linux chapter now describes the unreleased Signal + Silver sweep installer
-candidate, distinguishes local download timings from whole-install performance,
-and keeps the historical .43 code catalog unchanged. All nine guide tests and
-authored lesson regeneration pass. Local browser checks verified the new lesson,
-journey next step, quiz feedback, pinned source modal, installation-file search,
-glossary and narrow chapter drawer. At a 390 × 844 viewport, content and scroll
-widths both measured 375 px; no horizontal overflow or console warnings/errors
-were observed. The viewport was restored and the test tab closed. These checks
-qualify the guide, not a public release or physical desktop installation.
-
-## Rich-editor follow-up · 21 September 2026
-
-The delivery chapter explains the .48 first-word confirmation failure and the
-.49 candidate correction. The .43 source catalog remains pinned. Lesson
-regeneration and all nine guide tests pass. The updated lesson, source modal,
-journey, quiz, search, glossary and narrow layout are checked locally; this
-qualifies the guide independently of application delivery tests.
-
-## Wayland installer follow-up · 20 September 2026
-
-The Linux chapter now explains the .45 guided-installer dependency gap and the
-.46 candidate readiness boundary. The .43 source catalog remains pinned. All nine
-guide tests and lesson-regeneration checks pass. Browser checks covered the new
-lesson, journey controls, quiz feedback, pinned source viewer, installation-file
-search, glossary entries and the narrow chapter drawer. At 390 × 844, content and
-scroll widths were both 390 px. The viewport was restored and the test browser
-closed. No browser errors were reported. These checks qualify the guide only.
-
-## Final .43 package evidence · 19 September 2026
-
-The catalog pins `c0b657f2299fb477d297786fe5d0606e88e7e4cc`, including the
-final package and desktop report. Twenty chapters distinguish public availability
-from candidate evidence, retain the original TypeSafe experiment identity and
-explain measured fixes and remaining gaps. No private recordings or credentials
-were added.
-
-Browser checks verified the final Linux chapter, exact pinned report in the source
-reader, installation-file search, glossary, journey step and quiz feedback. The
-390 × 844 responsive check measured 375 px for both content and scroll width; the
-chapter drawer opened correctly. The viewport override was reset. No console
-warnings or errors were observed. Nine guide tests pass after regeneration.
-
-## Linux package chapter · 19 September 2026
-
-Twenty chapters now include separate package/desktop gates and the unsuccessful
-Hyprland hidden-microphone experiment. The source catalog pins the .43 development
-commit a2f3c36b7434; it does not announce a release. All nine guide tests pass.
-
-Browser checks passed for the new navigation label, journey steps, quiz feedback,
-pinned trigger-client source, file search, glossary and mobile chapter drawer.
-At 390 × 844, content and scroll widths both measured 375 px. No console errors
-or warnings were observed. The temporary viewport override was reset.
-
-Initial checks caught an omitted navigation title, an outdated source-note
-assertion and an incorrect unittest working directory; these were corrected.
-Regenerating a catalog requires restarting the guide server before browser checks,
-because the server retains its pinned catalog in memory.
-
-
-## Public .42 source refresh · 19 September 2026
-
-The source catalog now pins the .42 release-preparation commit recorded in
-`site/catalog.json`. Version metadata is read from that commit, and tests compare
-every catalog path/blob and version against Git. The 19 chapters cite this source,
-including the explicit NVIDIA recovery implementation and evaluation tools.
-The before/after experiment tables keep their original .41 measurement identity.
-
-Nine server, source, generation and chapter-contract tests pass after this refresh.
-External-facing language identifies the test hardware without referring to a
-particular reader or personal machine. Historical checks below remain dated.
-
-## Historical evaluation chapter update · 19 September 2026
-
-At this checkpoint the source catalog remained pinned to .39. A nineteenth chapter now explains the
-later .41 TypeSafe evaluation, with curated context/thread comparisons and explicit
-limits. No raw benchmark logs, speech transcripts or credentials enter the site.
-
-Nine standard-library tests pass, including the dated comparison contract and all
-original server/source protections. Chapter generation is reproducible. The
-separate evaluation tools pass six Python and five Node tests; 28 existing text
-quality/comparison regression tests also pass.
-
-Checked in the in-app browser: the new journey's Next control, consequential-error
-quiz feedback, pinned source modal, exact-file search, new glossary entries, both
-comparison tables, and the narrow chapter drawer. At a 390 × 844 viewport the
-document width and scroll width both measured 375 px (remaining space is the
-scrollbar); the table scrolls within its own region. The temporary viewport was
-reset. No error or warning console entries were recorded during these flows.
-
-One initial unittest invocation used the repository root and discovered no guide
-tests. It was not counted as a pass; the corrected invocation from `docs/guide`
-ran all nine successfully. This verifies the guide, not physical dictation quality.
-
-## Original application tour · 15 September 2026
-
-Verified on 15 September 2026 against VOCO commit `fb957ff052547c24be92265b6b5343a4c29aff4b`.
+Run these checks before a guide change lands. They check the guide, not VOCO's
+recognition, delivery or desktop support.
 
 ## Automated checks
 
-Eight standard-library tests pass:
+From the repository root:
 
-- Loopback binding and security response headers.
-- Foreign Host, Origin and cross-site request rejection.
-- Source content equals the pinned Git blob; unknown paths and private-file paths are denied.
-- Traversal attempts, unknown endpoints, duplicate source parameters and writes are denied.
-- Binary source remains metadata-only.
-- Every tracked path and blob matches the pinned Git tree, including C/C++ source.
-- Chapter generation is reproducible.
-- All 18 chapters cite existing files and contain valid step and quiz structures.
+```sh
+export PYTHONDONTWRITEBYTECODE=1
+python3 docs/guide/tools/write_lessons.py --check
+VOCO_SOURCE=. PYTHONPATH=docs/guide python3 -m unittest discover -s docs/guide/tests -v
+node --check docs/guide/site/app.js
+node --check docs/guide/site/diagrams.js
+node --check docs/guide/site/glossary.js
+```
 
-Run `VOCO_SOURCE=/path/to/voco python3 -m unittest discover -s tests -v`.
+`PYTHONDONTWRITEBYTECODE=1` keeps `__pycache__` out of the guide. The nine tests
+start the real server on a free loopback port and check that:
 
-## Browser evidence
+- it listens on 127.0.0.1 and sends its security headers: a content security
+  policy with `frame-ancestors 'none'`, `Cache-Control: no-store` and no
+  cross-origin permission;
+- a foreign Host, a foreign Origin and a cross-site fetch get 403;
+- source text equals the Git blob at the recorded commit, and unknown, private
+  and untracked paths get 404;
+- path traversal and unknown endpoints get 404, a repeated query parameter gets
+  400, and POST gets 405;
+- a binary file is metadata only and gets 415;
+- the catalog lists every tracked path and blob at the recorded commit, and its
+  version matches that commit's `package.json`;
+- `site/chapters.json` is exactly what `tools/write_lessons.py` writes;
+- there are 20 chapters with unique ids, five steps each, a valid quiz answer and
+  only cited files that are in the catalog;
+- only the desktops chapter has a comparison table, the table names wl-copy,
+  xclip, xdotool and ydotool, `insertion.rs` at the recorded commit uses all four,
+  and no chapter uses the release-history words the test lists.
 
-Checked in the Codex in-app browser:
+## Content review
 
-- Chapter navigation and the five-step diagram.
-- Correct-answer feedback in the opening quiz.
-- Queue exercise: two captured boxes become two processed boxes with zero waiting after Stop.
-- Exact-path source search, source dialog open/close, and displayed TypeScript and native C source.
-- Glossary filtering.
-- Desktop layout and 390 × 844 narrow layout, with no horizontal overflow.
-- Narrow chapter drawer open/close; closed chapter links are absent from accessible navigation.
-- No warning/error console entries during the checked flows.
+Review every chapter you changed against the recorded commit:
 
-The initial narrow drawer could remain keyboard-accessible while off-screen. It now uses hidden visibility when closed; the fix was verified in the browser. The initial catalog classified native C and replay examples too broadly; they now have explicit groups and readable text blobs.
+- Each number and each quoted message appears in the code at that commit. Check
+  with `git grep -F` on the commit, excluding `docs/`.
+- Each cited file is source, a script or packaging, not VOCO's other
+  documentation. Vendor READMEs and `VOCO-PATCH.md` notes are fine.
+- The prose describes current behaviour only, with no dates, run IDs or release
+  history, and no claim of fastest, most accurate, universal compatibility or
+  stability.
+- Simulations say they are simulations, and each quiz explanation says why the
+  right answer is right.
+- The glossary defines every new term and has no entry for removed behaviour.
 
-The concept, desktop/narrow screenshots and raw verification receipts are retained separately from this public source tree. See DESIGN.md for the visual fidelity ledger.
+## Browser checks
+
+Start the server with `python3 docs/guide/serve.py --repo .`, open
+http://127.0.0.1:8785 and check:
+
+- Every chapter opens from the rail, and Play, Pause and Next step work in its
+  journey.
+- Each simulation responds to its controls and shows its simulation label.
+- A quiz answer shows feedback with its explanation.
+- A cited file opens in the source viewer with line numbers, the commit and the
+  function and type list, and Close returns to the chapter.
+- File search finds a path and a function name, and the group filter narrows the
+  list.
+- Glossary search filters terms.
+- In the desktops chapter, Tab reaches the table's scroll region, and at a narrow
+  width the table scrolls inside its frame.
+- At 390 × 844 the page doesn't scroll sideways, the Chapters drawer opens and
+  closes, and a closed drawer can't be reached with the keyboard.
+- With reduced motion requested, nothing animates.
+- The console shows no warnings or errors, and every request goes to
+  127.0.0.1.
+
+Stop the server when you finish. If you regenerate the catalog, restart the
+server before checking again, because it loads the catalog when it starts.
 
 ## Limits
 
-These checks qualify this study guide, not VOCO’s recognition accuracy or every Linux desktop integration. The lessons explain major layers and contracts. Every tracked file is indexed, but the catalog’s generic summaries are not individual audits of every upstream function. No private audio or benchmark logs are bundled. No public website deployment is configured.
+These checks cover the guide only. They don't measure recognition accuracy or
+speed, and they don't test any Linux desktop. Every tracked file is indexed, but
+the catalog's group descriptions aren't reviews of each file. A check that
+couldn't run counts as not run, never as passed.

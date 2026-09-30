@@ -1,9 +1,53 @@
-# Additional public speech fixtures
+# Held-out speech fixtures
 
-Four untrimmed utterances from [LibriSpeech dev-clean](https://www.openslr.org/12/), copyright 2014 Vassil Panayotov, licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The original notice is in `LICENSE.txt`. Reader names, references, original archive members, FLAC/WAV/PCM SHA-256 hashes and archive MD5/SHA-256 checksums are recorded in `manifest.json`.
+Four clips of read English from
+[LibriSpeech dev-clean](https://www.openslr.org/12/), 30.26 seconds from four
+readers, two in each of the corpus's F and M categories. None of them reads in
+the [development set](../README.md), so they give a small check of whether a
+change that helps those eight speakers holds for others. Despite the folder's
+name, they are ordinary clean recordings, not altered audio.
 
-The selection was fixed before candidate inference: exclude the original eight baseline speakers, take the first four remaining numeric speaker IDs, and choose each speaker's first lexicographic utterance. The selected speakers are 777, 1272, 1988 and 1993. These 30.26 seconds of public read English add independent speakers to the bounded regression corpus; they are not a representative dictation benchmark.
+## Source
 
-WAVs are lossless decodes of the original mono 16 kHz FLAC samples to PCM16. No words, timing, loudness or samples were changed. The checked-in WAVs are byte-identical to those used in the prospectively frozen 58-case evaluation plan. References come from corpus transcripts, never model output.
+LibriSpeech is by Vassil Panayotov and is licensed under
+[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/); `LICENSE.txt` keeps
+the corpus notice. The selection is fixed: leave out the eight development
+speakers, take the next four speaker IDs in numeric order, 777, 1272, 1988 and
+1993, and each speaker's first utterance in lexicographic order, chosen before
+any recognition ran. Each WAV holds the corpus FLAC's samples, untrimmed, as
+mono 16-bit PCM at 16 kHz, and the references are the corpus transcripts.
 
-`python3 scripts/test-speech-adversarial.py prepare --plan-dir NEW_DIRECTORY` verifies and uses these files without network access or ffmpeg. The optional `--archive /path/to/dev-clean.tar.gz` verifies the original archive, independently repeats the selection, verifies source FLAC and reference text, decodes the same samples with ffmpeg, and requires their PCM hashes to match. Both modes generate identical 58 case definitions and PCM; their provenance identifies which source mode was used.
+`manifest.json` records the archive with its MD5 and SHA-256, the license, the
+selection rule and the excluded speaker IDs, and for each clip the reader,
+speaker ID, category, archive member, SHA-256 of the FLAC, the WAV and its PCM
+samples, reference, length and `maxWer`.
+
+## Evaluate
+
+`scripts/evaluate-dictation-worker.py` checks each clip's SHA-256, then streams
+the clips into the worker of a provisioned `runtime/speech/`, as
+[runtime provisioning](../../../../docs/linux-packaging.md#runtime-provisioning)
+describes, without opening a microphone or audio device. It writes transcripts
+and timings to a new directory, and `scripts/score-dictation-worker.mjs` scores
+them. From the repository root:
+
+```bash
+/usr/bin/python3 scripts/evaluate-dictation-worker.py --runtime runtime/speech \
+  --output /tmp/voco-held-out --split held-out
+node scripts/score-dictation-worker.mjs /tmp/voco-held-out/run.json /tmp/voco-held-out/score.json
+```
+
+`--split all` adds the development clips. The evaluator sends 100 ms packets,
+as VOCO does, unless `--packet-ms` says otherwise. Its Python needs NumPy and
+psutil.
+[TypeSafe evaluation](../../../../docs/testing/typesafe-evaluation.md) covers
+the other options.
+
+## Known limits
+
+- Four clean clips from four readers are too few to rank models or settings,
+  and say nothing about accents, noise, microphones or conversational speech.
+- Neither `npm test` nor CI uses these clips, and no script applies their
+  `maxWer` values.
+- The references are in capitals without sentence punctuation, so scoring
+  ignores case and punctuation.

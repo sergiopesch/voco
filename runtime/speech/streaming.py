@@ -26,8 +26,9 @@ def coalesce_frames(frames, rate):
 class SilenceGate:
     """Skip only long quiet interiors; preserve 640ms onset and 1.5s tail.
 
-    Digital-zero mode is the default. Acoustic VAD is opt-in pending broader
-    microphone qualification. Original audio is retained by the desktop.
+    Digital-zero mode is the default. Acoustic VAD is opt-in and needs onnxruntime
+    and vad/silero_vad.onnx, which the package does not ship. Original audio is
+    retained by the desktop.
     """
     def __init__(self, mode='zero'):
         if mode not in ('off', 'zero', 'vad'): raise ValueError('gate mode')
@@ -175,6 +176,12 @@ class StreamingSession:
         self.cancel()
         self.model.close()
 
+def state_home():
+    """XDG_STATE_HOME if it is absolute; the spec says to ignore empty or relative values."""
+    value = os.environ.get('XDG_STATE_HOME', '')
+    return Path(value) if os.path.isabs(value) else Path.home()/'.local/state'
+
+
 class PrivateRotatingHandler(RotatingFileHandler):
     def handleError(self, record):
         raise OSError("metrics write failed")
@@ -215,7 +222,7 @@ class Metrics:
         print('{"event":"worker_metrics_unavailable"}', file=sys.stderr, flush=True)
 
     def _initialize(self):
-        root = Path(os.environ.get('XDG_STATE_HOME', str(Path.home()/'.local/state')))/'voco/stream-performance'
+        root = state_home()/'voco/stream-performance'
         root.mkdir(mode=0o700, parents=True, exist_ok=True)
         metadata = root.lstat()
         if (not stat.S_ISDIR(metadata.st_mode) or metadata.st_uid != os.geteuid()
