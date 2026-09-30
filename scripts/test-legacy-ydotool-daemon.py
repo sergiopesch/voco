@@ -75,7 +75,7 @@ def trial(output, daemon, name, *, failure='', clients=0, payload=None, client_b
             initial = fd_count(process)
             if client_binary:
                 before = events.stat().st_size
-                # The universal Shift+Insert paste, with and without the joining Space.
+                # The Shift+Insert paste, with and without the joining Space.
                 commands = [([], 'shift+insert'), ([' '], 'shift+insert')]
                 result['client_cases'] = []
                 for prefix, chord in commands:

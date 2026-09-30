@@ -15,7 +15,7 @@ app you are typing in.
 - Words arrive while you speak. VOCO puts each phrase on the clipboard and
   primary selection, then presses Shift+Insert. It never presses Enter.
 - If pasting is interrupted, VOCO keeps listening and copies the remaining words
-  to the clipboard at Stop. If that copy fails too, tray Review keeps them.
+  to the clipboard at Stop. If that copy fails too, Review keeps them.
 - Start and stop with your shortcut (Alt+D by default), the tray icon or the
   GNOME panel.
 

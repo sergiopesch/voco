@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Private desktop for the universal-paste suites. VOCO_DELIVERY_SUITE picks
+# Private desktop for the delivery suites. VOCO_DELIVERY_SUITE picks
 # applications (default) or browser. VOCO_DELIVERY_PLATFORM picks x11 (default),
 # the bare private Xvfb, or gnome-wayland, a nested GNOME Shell with XWayland on
 # that Xvfb. VOCO_FIXTURE_PASTE_BINARY, when set, is the voco library test

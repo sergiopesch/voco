@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Full Chromium recipient + real VOCO capture/inference, inside private X11/Pulse.
+# The toolbar button starts real VOCO capture and inference into a Chromium field,
+# inside private X11/Pulse.
 set -euo pipefail
 if [[ ${PYTHONOPTIMIZE:-0} != 0 && -n ${PYTHONOPTIMIZE:-} ]]; then
   echo "Toolbar qualification requires Python assertions; unset PYTHONOPTIMIZE" >&2

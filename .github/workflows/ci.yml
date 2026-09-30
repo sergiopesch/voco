@@ -135,26 +135,26 @@ jobs:
           VOCO_RENDERER_SUITE: onboarding
           VOCO_RENDERER_EVIDENCE_DIR: ${{ runner.temp }}/voco-onboarding-renderer
 
-      - name: Browser universal-paste regression
+      - name: Browser delivery
         timeout-minutes: 3
         env:
           VOCO_DELIVERY_EVIDENCE_DIR: ${{ runner.temp }}/voco-browser-delivery
         run: bash scripts/test-private-ibus-engine-hosted.sh --browser-delivery
 
-      - name: Application universal-paste matrix
+      - name: Application delivery
         timeout-minutes: 3
         env:
           VOCO_DELIVERY_EVIDENCE_DIR: ${{ runner.temp }}/voco-application-delivery
         run: bash scripts/test-private-ibus-engine-hosted.sh --application-delivery
 
-      - name: Browser universal-paste regression on GNOME Wayland
+      - name: Browser delivery on GNOME Wayland
         timeout-minutes: 3
         env:
           VOCO_DELIVERY_PLATFORM: gnome-wayland
           VOCO_DELIVERY_EVIDENCE_DIR: ${{ runner.temp }}/voco-browser-delivery-gnome-wayland
         run: bash scripts/test-private-ibus-engine-hosted.sh --browser-delivery
 
-      - name: Application universal-paste matrix on GNOME Wayland
+      - name: Application delivery on GNOME Wayland
         timeout-minutes: 3
         env:
           VOCO_DELIVERY_PLATFORM: gnome-wayland
