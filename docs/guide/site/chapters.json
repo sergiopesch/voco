@@ -2,1727 +2,2171 @@
   {
     "id": "big-picture",
     "title": "A voice becomes words.",
-    "intro": "Imagine a tiny team on your laptop. One helper listens, one understands, and one puts the words where you are typing.",
+    "intro": "Imagine a small team inside your computer. One member listens, one understands, and one puts the words where you are typing.",
     "story": [
-      "When you press a shortcut, VOCO listens to your microphone, turns the sound into words, and puts those words at your cursor.",
-      "Each part does one job. They pass small messages to each other instead of waiting for one enormous recording.",
-      "In this chapter, follow the whole journey. Later chapters open each box and show the real code inside."
+      "Press the shortcut and VOCO starts listening. It turns your speech into words on your own computer and pastes them at your cursor while you are still talking. Press the shortcut again and VOCO finishes the last words.",
+      "Each part of VOCO does one job and passes small messages to the next. Sound travels in packets of one tenth of a second, so words can appear before you finish a sentence.",
+      "Nothing you say leaves the computer. The speech model runs on the processor, and the only network request asks GitHub whether a new release exists. Later chapters open each box and show the real code inside."
     ],
     "steps": [
       {
         "label": "Shortcut",
-        "detail": "You press Alt+D. VOCO checks that it is safe to start."
+        "detail": "You press Alt+D, or the shortcut you chose. The same shortcut, or Stop dictation in VOCO's menu, ends the recording."
       },
       {
         "label": "Microphone",
-        "detail": "The microphone turns changing air pressure into a stream of numbers."
+        "detail": "VOCO records the microphone. On Wayland, Rust records through libpulse. On X11, the window records through a WebKit AudioWorklet."
       },
       {
         "label": "Speech model",
-        "detail": "A local trained model predicts words from those numbers."
+        "detail": "A Python worker runs NVIDIA Nemotron Speech Streaming on the processor and answers with the transcript so far."
       },
       {
         "label": "Delivery",
-        "detail": "VOCO checks the destination and sends the new text."
+        "detail": "Only the new words move on. VOCO puts them on the clipboard, then presses Shift+Insert."
       },
       {
         "label": "Your cursor",
-        "detail": "The receiving app accepts the paste. VOCO never presses Enter for you."
+        "detail": "The words land in whichever app has keyboard focus. VOCO never presses Enter for you."
       }
     ],
     "facts": [
       {
-        "title": "A team, not one magic function",
-        "text": "React manages the visible app and recording flow. Rust handles operating-system work. A Python worker calls the native speech library. The receiving app is a separate program."
+        "title": "One warm worker",
+        "text": "The speech worker starts and loads its model when VOCO launches, then stays running between recordings. If it has exited, the next recording starts a fresh one."
       },
       {
-        "title": "The current route",
-        "text": "VOCO uses NVIDIA Nemotron English 0.6B Q8 on the CPU. Names containing benchmark in the streaming code are historical; they do real production work."
+        "title": "Words follow the focus",
+        "text": "VOCO doesn't remember where a recording started. Each group of words goes to whatever has keyboard focus when that group is ready."
       },
       {
-        "title": "Keep the boundary clear",
-        "text": "The speech worker can return words even if another application refuses a paste. Recognition success and successful delivery are different things."
+        "title": "Local by design",
+        "text": "The window's content security policy allows connections only to VOCO itself, Tauri's message channel and api.github.com. Speech never needs the network."
+      },
+      {
+        "title": "Stop finishes the job",
+        "text": "Stop sends the last audio, waits for the final transcript and pastes it. Words that couldn't be pasted are copied to the clipboard, and VOCO tells you."
       }
     ],
     "files": [
       {
-        "path": "apps/desktop/src/App.tsx",
-        "why": "Connects the interface, saved preferences and dictation hook."
+        "path": "apps/desktop/src/lib/dictationRecording.ts",
+        "why": "Runs one recording from Start through Stop."
       },
       {
-        "path": "apps/desktop/src/hooks/useDictation.ts",
-        "why": "Coordinates one recording from Start through Stop."
+        "path": "apps/desktop/src/lib/dictationStream.ts",
+        "why": "Sends audio packets and passes on only the new words."
       },
       {
-        "path": "runtime/speech/stream_worker.py",
-        "why": "Starts the selected local speech worker."
+        "path": "apps/desktop/src-tauri/src/speech_stream.rs",
+        "why": "Starts the speech worker and exchanges one message at a time with it."
+      },
+      {
+        "path": "runtime/speech/worker_main.py",
+        "why": "The worker's main loop: one request in, one answer out."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/insertion.rs",
+        "why": "Copies words to the clipboard and presses the paste key."
+      },
+      {
+        "path": "apps/desktop/src-tauri/tauri.conf.json",
+        "why": "The app's identity, its content security policy and the Debian package contents."
       }
     ],
-    "caution": "This guide describes a pinned development source snapshot recorded in its catalog. It does not promise every Linux app or compositor accepts delivery.",
+    "caution": "VOCO pastes into whatever has keyboard focus. Sending the paste keys doesn't prove that the app accepted the words.",
     "quiz": {
-      "question": "Which part owns the text box you are dictating into?",
+      "question": "You start dictating in an editor, then click into a chat window while you keep talking. Where do the next words go?",
       "answers": [
-        "VOCO always owns it",
-        "The receiving application",
-        "The speech model"
+        "Back to the editor, where the recording started",
+        "To the chat window, because it now has keyboard focus",
+        "Nowhere, because VOCO pauses when focus changes"
       ],
       "correct": 1,
-      "why": "The receiving application owns its own text field. VOCO must respect that boundary."
+      "why": "VOCO pastes each group of words into whatever has keyboard focus when the group is ready. It doesn't remember where the recording started."
     },
     "lab": "journey"
   },
   {
     "id": "languages",
     "title": "Meet the languages.",
-    "intro": "Different tools do different jobs, like cooks, waiters and a kitchen manager.",
+    "intro": "VOCO is one app written in several languages. Each language sits where it fits best.",
     "story": [
-      "TypeScript helps us describe what kind of information is allowed. React uses it to build the interface.",
-      "Rust is the careful manager at the door to Linux. Python connects the speech pieces. A compiled native library does the heavy model work.",
-      "A language is not a performance score. Where the time goes matters more than the name of the language."
+      "Rust is the part the operating system sees. It starts processes, owns files and sockets, talks to the desktop and presses the paste keys.",
+      "The window is a small React app written in TypeScript. It runs inside WebKitGTK and can reach the system only through commands that Rust registers.",
+      "Speech recognition runs in a Python worker. A small C++ bridge connects it to NeMo-Speech.cpp, the native recognizer. Two optional extensions, one for GNOME Shell and one for Chromium, are written in JavaScript."
     ],
     "steps": [
       {
-        "label": "TypeScript",
-        "detail": "Describes data shapes and catches many mistakes before the app runs."
-      },
-      {
-        "label": "React",
-        "detail": "Updates controls and status when application state changes."
-      },
-      {
         "label": "Rust",
-        "detail": "Owns native commands, processes, files and input checks."
+        "detail": "The Tauri 2 shell: processes, sockets, files, D-Bus, the tray, Wayland capture and paste."
+      },
+      {
+        "label": "TypeScript",
+        "detail": "The React 19 window: onboarding, settings, each recording and X11 capture."
       },
       {
         "label": "Python",
-        "detail": "Validates streaming messages and calls the speech adapter."
+        "detail": "The speech worker reads one JSON line and writes one JSON line for each request."
       },
       {
-        "label": "Native library",
-        "detail": "Runs trained model calculations using CPU threads."
+        "label": "C and C++",
+        "detail": "native_capture_pulse.c talks to libpulse. nemo_bridge.cpp calls the recognizer."
+      },
+      {
+        "label": "JavaScript",
+        "detail": "The GNOME companion in the top bar and the Chromium extension."
       }
     ],
     "facts": [
       {
-        "title": "Two kinds of checking",
-        "text": "TypeScript types disappear when compiled. Rust and Python must still validate messages received at runtime. A correctly typed sender is not a security guarantee."
+        "title": "Pinned toolchains",
+        "text": "CI builds with Rust 1.94.0 and the Node version in .nvmrc, which is 24. Cargo.toml pins Tauri to exactly 2.11.6."
       },
       {
-        "title": "What Tauri provides",
-        "text": "Tauri connects a WebKit-rendered interface to native Rust commands. An invoke call crosses that boundary; it is not an ordinary same-language function call."
+        "title": "Messages, not shared memory",
+        "text": "The parts talk through Tauri commands and events, a pipe to the worker, local sockets and D-Bus. No part reaches into another's memory."
       },
       {
-        "title": "How to read unfamiliar syntax",
-        "text": "An import brings in another tool. A function names a job. A class or struct groups related information. A test checks what happens in a particular situation."
+        "title": "A clean Python process",
+        "text": "Rust starts the worker with PYTHONDONTWRITEBYTECODE=1, so Python writes no cache files next to the installed code."
+      },
+      {
+        "title": "Where each part lives",
+        "text": "apps/desktop/src holds the window, apps/desktop/src-tauri the Rust shell, runtime/speech the worker, runtime/native the recognizer build and integrations the two extensions."
       }
     ],
     "files": [
       {
-        "path": "apps/desktop/src/lib/tauri.ts",
-        "why": "Typed frontend wrappers for native commands."
-      },
-      {
         "path": "apps/desktop/src-tauri/src/lib.rs",
-        "why": "Registers native commands and initializes the desktop application."
+        "why": "The Rust shell: startup, shortcuts and every registered command."
       },
       {
-        "path": "runtime/speech/adapters.py",
-        "why": "Connects Python to native C-compatible functions."
+        "path": "apps/desktop/src/App.tsx",
+        "why": "The root of the React window."
+      },
+      {
+        "path": "runtime/speech/worker_main.py",
+        "why": "The Python worker's request loop."
+      },
+      {
+        "path": "runtime/speech/nemo_bridge.cpp",
+        "why": "The C++ bridge from Python to the native recognizer."
+      },
+      {
+        "path": "apps/desktop/src-tauri/native/native_capture_pulse.c",
+        "why": "The C layer that records through libpulse."
+      },
+      {
+        "path": "integrations/gnome/voco-panel@voco.local/extension.js",
+        "why": "The GNOME Shell companion, in JavaScript."
+      },
+      {
+        "path": "integrations/chromium/content.js",
+        "why": "The Chromium extension's script inside web pages."
       },
       {
         "path": "apps/desktop/src-tauri/Cargo.toml",
-        "why": "Lists Rust dependencies."
+        "why": "Rust dependencies, the exact Tauri version and the minimum Rust version."
       },
       {
         "path": "apps/desktop/package.json",
-        "why": "Lists frontend dependencies and scripts."
+        "why": "The window's dependencies: React, TypeScript and Vite."
+      },
+      {
+        "path": "package.json",
+        "why": "Repository scripts and the required Node version."
       }
     ],
-    "caution": "The model weights and compiled speech payload are provisioned separately. They are not all present as readable source in this checkout.",
+    "caution": "The window has no shell plugin and can't start programs. It can ask only for the commands that lib.rs registers.",
     "quiz": {
-      "question": "Does a TypeScript type remove the need to validate a native message?",
+      "question": "Which part starts the speech worker and the paste helpers?",
       "answers": [
-        "Yes",
-        "No"
+        "The React window",
+        "The GNOME companion",
+        "The Rust shell"
       ],
-      "correct": 1,
-      "why": "Runtime messages still need validation at each trust boundary."
+      "correct": 2,
+      "why": "Only Rust starts processes. The window asks Rust through registered commands, and the companion talks to VOCO over D-Bus."
     },
     "lab": "journey"
   },
   {
     "id": "shortcut",
     "title": "One press, one recording.",
-    "intro": "A shortcut is a doorbell. One ring should produce one response, even when two helpers hear it.",
+    "intro": "A shortcut makes a small promise: one press starts a recording, and the next press finishes it.",
     "story": [
-      "Linux can report a key press through different routes. VOCO must avoid treating one press as two separate instructions.",
-      "During a recording, the shortcut belongs to that recording session. An old callback must not stop a newer session.",
-      "If a shortcut has already been consumed, ignoring its callback can lose the user\u2019s only signal. That is why the arbitration rules are careful."
+      "The shortcut is Alt+D unless you change it. Change shortcut in VOCO's menu offers Alt+D, Alt+Shift+D and Custom shortcut\u2026, which opens the shortcut settings. A custom shortcut needs Alt, Control or Super plus one main key.",
+      "How the key press reaches VOCO depends on the desktop. On X11, VOCO grabs the shortcut. On Wayland, VOCO reads the keyboards for the two preset shortcuts, or the GNOME companion grabs them inside the Shell.",
+      "Every route ends at the same gate. It ignores a second toggle that arrives within 120 ms of the first, so one press never counts twice."
     ],
     "steps": [
       {
-        "label": "Key chord",
-        "detail": "The configured chord is pressed."
+        "label": "Choose",
+        "detail": "VOCO checks the saved shortcut at startup. An invalid one is reset to Alt+D, and VOCO tells you why."
       },
       {
-        "label": "Arbitration",
-        "detail": "VOCO checks which shortcut route currently has authority."
+        "label": "Route",
+        "detail": "The press arrives through the X11 grab, the companion's grab, keyboard reading, the VOCO Dictation IBus input source or voco --toggle."
+      },
+      {
+        "label": "Consume",
+        "detail": "A grab keeps the keys away from other apps. Reading the keyboards only observes, so the focused app sees the keys too."
       },
       {
         "label": "Debounce",
-        "detail": "A repeated observation of the same press is suppressed when appropriate."
+        "detail": "A toggle within 120 ms of the previous one is ignored."
       },
       {
-        "label": "Session lease",
-        "detail": "One recording gets a specific ownership token."
-      },
-      {
-        "label": "Release",
-        "detail": "Finish, cancellation or expiry releases that ownership."
+        "label": "Toggle",
+        "detail": "The window starts or stops the recording. A toggle that arrives before the window is ready is kept and applied once it is."
       }
     ],
     "facts": [
       {
-        "title": "Root and focused-window grabs",
-        "text": "On X11, a passive grab can be attached to the root window or the exact input-focus window. The selected recording scope avoids the root-grab focus disturbance found in testing."
+        "title": "X11 toggles on release",
+        "text": "While the chord is held, VOCO's grab receives every key. VOCO waits for the release before it toggles, so the paste keys reach the app."
       },
       {
-        "title": "IBus is a shortcut helper",
-        "text": "Protocol 6 does not authorize generic text mutation. It helps deliver the recording trigger; it is not the normal text insertion engine."
+        "title": "Passive keys also reach the app",
+        "text": "When VOCO reads the keyboards, the focused app gets the shortcut as well. Browsers move the cursor to the address bar, so your words land there, and terminals delete a word. Once per launch VOCO shows \"Your shortcut also reached the app\" with a way to avoid it."
       },
       {
-        "title": "A lease has an end",
-        "text": "The X11 recording lease has a fixed 650-second expiry. This covers the 600-second capture limit plus finishing allowance; it is not permission to record forever."
+        "title": "One toggle, however it arrives",
+        "text": "The GNOME companion holds a 2.5-second lease on the shortcut, and while it is fresh VOCO ignores the same keys from the keyboards. The IBus source holds a 1-second lease, and VOCO also releases its X11 grab so the source receives the keys."
+      },
+      {
+        "title": "voco --toggle",
+        "text": "A desktop binding can run voco --toggle. It connects once to VOCO's owner-only socket, and the connection itself is the request. It never launches VOCO, changes focus or confirms whether recording started."
+      },
+      {
+        "title": "Other shortcuts on Wayland",
+        "text": "Keyboard reading covers only Alt+D and Alt+Shift+D. VOCO registers any other shortcut through Tauri's global-shortcut plugin. Whenever settings can't confirm that the shortcut works, they advise: \"To dictate into other apps, start dictation from the tray or assign voco --toggle to a shortcut in your desktop settings.\""
+      },
+      {
+        "title": "Reading keyboards",
+        "text": "VOCO reads the keyboards in /dev/input, skips ydotoold's virtual keyboard and watches for keyboards you plug in later. It needs read access to those devices."
+      },
+      {
+        "title": "Plain status",
+        "text": "Shortcut help in Settings explains the current route in plain words, for example \"VOCO's GNOME panel handles this shortcut.\" or \"A live synchronized keyboard supports the configured shortcut.\""
       }
     ],
     "files": [
       {
-        "path": "apps/desktop/src/hooks/useGlobalShortcut.ts",
-        "why": "Receives shortcut events in the interface."
-      },
-      {
-        "path": "apps/desktop/src/lib/desktopShortcutSession.ts",
-        "why": "Owns the UUID and renderer epoch for one recording."
+        "path": "apps/desktop/src-tauri/src/lib.rs",
+        "why": "Registers the shortcut, reads keyboards on Wayland and emits the toggle."
       },
       {
         "path": "apps/desktop/src-tauri/src/shortcut_arbitration.rs",
-        "why": "Decides which trigger observations may proceed."
+        "why": "The 120 ms gate every toggle passes, and the IBus lease."
       },
       {
-        "path": "apps/desktop/src-tauri/src/desktop_shortcut.rs",
-        "why": "Acquires and releases native recording scope."
+        "path": "apps/desktop/src-tauri/src/hotkey_state.rs",
+        "why": "Tracks which keys each keyboard holds, so unplugging one can't leave a modifier stuck."
       },
       {
-        "path": "vendor/global-hotkey/src/platform_impl/x11/focus_lease.rs",
-        "why": "Implements the patched X11 focus lease."
+        "path": "apps/desktop/src-tauri/src/shortcut_readiness.rs",
+        "why": "Explains in plain words whether the shortcut can work right now."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/panel.rs",
+        "why": "The GNOME companion's D-Bus service and its shortcut lease."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/ibus_shortcut.rs",
+        "why": "Receives the shortcut from the VOCO Dictation input source."
+      },
+      {
+        "path": "apps/desktop/src-tauri/resources/voco_ibus_engine.py",
+        "why": "The IBus input source that consumes the chord and changes no text."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/trigger_socket.rs",
+        "why": "The owner-only socket behind voco --toggle."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/main.rs",
+        "why": "Command-line options, including --toggle."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/tray.rs",
+        "why": "The tray menu, including Change shortcut."
+      },
+      {
+        "path": "apps/desktop/src/hooks/useGlobalShortcut.ts",
+        "why": "Listens for the toggle event in the window."
+      },
+      {
+        "path": "apps/desktop/src/lib/dictationTrigger.ts",
+        "why": "Tells desktop and browser triggers apart."
+      },
+      {
+        "path": "apps/desktop/src/lib/shortcutPresentation.ts",
+        "why": "Turns the shortcut's status into the words settings show."
       }
     ],
-    "caution": "An IBus poll in flight is different from completed IBus ownership. Treating them as identical previously lost valid X11 callbacks.",
+    "caution": "Reading the keyboards only observes. The companion's grab keeps the keys out of every app, and the IBus source keeps them out of IBus-aware fields.",
     "quiz": {
-      "question": "An old recording finishes after a new one starts. What should its callback do?",
+      "question": "On Wayland without the GNOME companion, you press Alt+D in a browser. What happens?",
       "answers": [
-        "Update the new recording",
-        "Respect its old session identity"
+        "Only VOCO sees the key press",
+        "The browser may also act on Alt+D, for example by focusing its address bar",
+        "Nothing, because VOCO blocks Alt+D on Wayland"
       ],
       "correct": 1,
-      "why": "Session tokens prevent old asynchronous work from changing a replacement recording."
+      "why": "Without the companion, VOCO reads the keyboards and only observes. The browser receives Alt+D too, which is why VOCO warns you once per launch."
     },
-    "lab": "focus"
+    "lab": "journey"
   },
   {
     "id": "microphone",
     "title": "Sound becomes numbers.",
-    "intro": "A microphone makes a very fast flipbook of sound. Each tiny measurement is called a sample.",
+    "intro": "A microphone measures tiny changes in air pressure. VOCO reads those measurements as a long list of numbers called samples.",
     "story": [
-      "Imagine writing down the height of a wave many times each second. The list of heights is digital audio.",
-      "Sample rate means how many measurements happen in one second. It must travel with the numbers, like units on a ruler.",
-      "The .43 candidate uses native audio capture on Wayland so the panel can stay hidden. X11 uses WebKit and an AudioWorklet to collect ordered pieces while the interface does other work."
+      "On Wayland, Rust records through libpulse from PipeWire's Pulse service, which gives each source the identity VOCO needs to select it. It takes 44,100 samples per second on two channels and averages them into one.",
+      "On X11, the window records through WebKit with an AudioWorklet. If WebKit offers only the older ScriptProcessor fallback, VOCO can't confirm that it receives every sample. It shows \"Dictation won't be typed\" and never pastes that recording.",
+      "Silence is valid audio, so a long pause never ends a recording. VOCO stops on its own only when capture fails or after ten minutes."
     ],
     "steps": [
       {
-        "label": "Permission",
-        "detail": "On Wayland, explicitly allow the selected source for this app session. On X11, use browser microphone permission."
+        "label": "Choose a source",
+        "detail": "Microphone settings list every source and mark monitors of your speakers as (output monitor). VOCO uses the system default only when it is a microphone with a PipeWire identity."
       },
       {
-        "label": "Device",
-        "detail": "Bind the recording to the selected input. Native system-default selection resolves to a specific source."
+        "label": "Capture",
+        "detail": "The C layer records 16-bit stereo at 44,100 Hz in 10 ms fragments."
       },
       {
-        "label": "Samples",
-        "detail": "Capture ordered blocks and retain their sample rate through conversion."
+        "label": "Mix to mono",
+        "detail": "On Wayland, VOCO averages the two channels into one, because the speech model needs one channel."
       },
       {
-        "label": "Descriptor",
-        "detail": "Keep source, rate and sample-count information together."
+        "label": "Drain",
+        "detail": "Rust pumps the stream every 5 ms while recording, and the window collects the samples. If the window stops collecting for 5 seconds, capture ends with \"Renderer drain lease expired\"."
       },
       {
-        "label": "Queue",
-        "detail": "Offer the blocks to the recording\u2019s speech queue."
+        "label": "Watch health",
+        "detail": "If capture reports a problem, VOCO ends the recording with an error. At 600 seconds it stops normally, like pressing Stop."
       }
     ],
     "facts": [
       {
-        "title": "A sample is not a word",
-        "text": "One number says something about the waveform at one instant. Recognition needs patterns across many samples to infer speech."
+        "title": "No default microphone",
+        "text": "When there is no default, or the default is a monitor or has no PipeWire identity, VOCO says \"No default microphone is available. Connect a microphone or choose one in Microphone settings.\""
       },
       {
-        "title": "Never guess the rate",
-        "text": "Calling 44,100 samples \u201cone second at 16 kHz\u201d changes the meaning of the audio. Rate validation and resampling must be deliberate."
+        "title": "Health checks in WebKit",
+        "text": "Every 250 ms VOCO checks the WebKit track. It cancels the recording if the track ends, stays muted by the system for 3 seconds or delivers no samples for 5 seconds."
       },
       {
-        "title": "Permission is not a recording",
-        "text": "Selecting and allowing a native source does not open a recording. Start begins capture; Stop closes it. A removed source cannot silently become a different microphone."
+        "title": "The drain lease",
+        "text": "Only VOCO's main page may drain native capture. If the window stops draining, capture ends after 5 seconds, so a stuck window can't keep the microphone open."
+      },
+      {
+        "title": "A ten-minute limit",
+        "text": "Both capture paths stop after 600 seconds, and the recording finishes like a normal Stop."
+      },
+      {
+        "title": "The level meter",
+        "text": "The meter's level spans -44 to -12 dB. VOCO sends a new level at most every 40 ms, and a level older than 250 ms reads as silence."
       }
     ],
     "files": [
       {
-        "path": "apps/desktop/src/lib/audioInput.ts",
-        "why": "Opens and checks browser microphone input."
+        "path": "apps/desktop/src/lib/nativeCapture.ts",
+        "why": "The window's side of native capture: start, drain and stop."
       },
       {
-        "path": "apps/desktop/src/lib/audioCaptureBuffer.ts",
-        "why": "Retains bounded audio for a recording."
+        "path": "apps/desktop/src-tauri/src/native_capture/mod.rs",
+        "why": "Native capture's lease, pump and call timeouts."
       },
       {
-        "path": "apps/desktop/src/lib/captureDescriptor.ts",
-        "why": "Keeps audio identity and rate facts together."
+        "path": "apps/desktop/src-tauri/src/native_capture/pulse.rs",
+        "why": "Rust's side of the C capture layer."
       },
       {
-        "path": "apps/desktop/src/lib/audioResampling.ts",
-        "why": "Handles explicit sample-rate conversion."
+        "path": "apps/desktop/src-tauri/native/native_capture_pulse.c",
+        "why": "Records from libpulse: 16-bit stereo at 44,100 Hz."
       },
       {
         "path": "apps/desktop/src-tauri/src/native_capture_commands.rs",
-        "why": "Native source selection, permission and bounded capture commands."
+        "why": "The commands the window uses for native capture."
+      },
+      {
+        "path": "apps/desktop/public/audio-processor.js",
+        "why": "The X11 AudioWorklet that forwards samples."
+      },
+      {
+        "path": "apps/desktop/src/hooks/useDictation.ts",
+        "why": "Opens the microphone and wires capture into a recording."
+      },
+      {
+        "path": "apps/desktop/src/hooks/useNativeCaptureSettings.ts",
+        "why": "Loads the list of native sources for settings."
+      },
+      {
+        "path": "apps/desktop/src/lib/captureHealth.ts",
+        "why": "The WebKit health checks."
+      },
+      {
+        "path": "apps/desktop/src/lib/audioLevel.ts",
+        "why": "Turns samples into a meter level."
+      },
+      {
+        "path": "apps/desktop/src/lib/desktopCaptureTail.ts",
+        "why": "Keeps samples in memory for the Stop tail and sets the 600-second limit."
+      },
+      {
+        "path": "apps/desktop/src/components/NativeMicrophoneSettings.tsx",
+        "why": "Microphone settings, including monitor labels."
       }
     ],
-    "caution": "The waveform below is a teaching drawing. It never activates your microphone.",
+    "caution": "A long pause keeps the recording open. Press the shortcut again when you finish, or VOCO keeps listening until the ten-minute limit.",
     "quiz": {
-      "question": "What must accompany a list of audio samples?",
+      "question": "You pause for ten seconds in the middle of a sentence. What does VOCO do?",
       "answers": [
-        "The sample rate",
-        "The window wallpaper",
-        "The font size"
+        "Keeps recording, because silence is valid audio",
+        "Stops after five seconds of silence",
+        "Deletes the words so far"
       ],
       "correct": 0,
-      "why": "The rate tells the receiver how much time those samples represent."
+      "why": "The health checks look for capture that stopped delivering samples, not for quiet. Only a capture failure or the ten-minute limit ends a recording on its own."
     },
     "lab": "wave"
   },
   {
     "id": "queue",
     "title": "Audio on a conveyor belt.",
-    "intro": "Small boxes arrive in order. The next worker opens them one at a time.",
+    "intro": "Audio doesn't wait for the end of a sentence. It moves to the speech worker in small packets, like boxes on a conveyor belt.",
     "story": [
-      "A queue is a waiting line for work. It lets microphone capture continue while an earlier request is being processed.",
-      "Each box carries a session and sequence number. Those labels stop a late reply from being mistaken for the next box.",
-      "A bounded queue has a maximum size. If the worker falls too far behind, keeping unlimited audio would make memory and delay grow. The candidate groups 100 ms of audio per worker request to reduce IPC overhead; Stop sends any remaining partial packet immediately."
+      "VOCO cuts the audio into packets of one tenth of a second and sends one request to the worker at a time. Each request carries the recording's session name and a number that grows by one.",
+      "Each answer holds the whole transcript so far. VOCO compares it with the previous one and passes on only the new ending. Words never change once they move on.",
+      "If recognition falls more than three seconds behind, or rewrites words it already gave, VOCO stops transcribing this recording. Words already pasted stay where they are."
     ],
     "steps": [
       {
-        "label": "Capture",
-        "detail": "A new ordered block of audio arrives."
+        "label": "Collect",
+        "detail": "The stream gathers round(rate \u00d7 0.1) samples, which is 100 ms of audio at any sample rate."
       },
       {
-        "label": "Label",
-        "detail": "Attach session, sequence and sample-range metadata."
+        "label": "Send",
+        "detail": "Only one request is in flight. Newer packets wait in line."
       },
       {
-        "label": "Wait",
-        "detail": "The block waits behind earlier work."
+        "label": "Check",
+        "detail": "Each answer must carry the same session and number as its request, and the append-only mode."
       },
       {
-        "label": "Exchange",
-        "detail": "Rust sends it to the worker and checks the reply."
+        "label": "Compare",
+        "detail": "VOCO keeps only text that extends the previous transcript."
       },
       {
-        "label": "Account",
-        "detail": "Update capture, enqueue and response counters."
+        "label": "Paste",
+        "detail": "The new words go to delivery. If a paste is still running, newer words wait and go together."
       }
     ],
     "facts": [
       {
-        "title": "The real bound",
-        "text": "The production phrase queue rejects backlog beyond three seconds of queued audio. That is a failure boundary, not a desired steady delay."
+        "title": "A three-second limit",
+        "text": "When more than three seconds of audio wait in line, VOCO stops with \"Recognition fell more than three seconds behind, so VOCO stopped transcribing.\""
       },
       {
-        "title": "Words have a queue too",
-        "text": "A newer append-only hypothesis can replace pending output. Text already sent to an external app cannot be blindly replaced or replayed."
+        "title": "No rewrites",
+        "text": "If an answer changes earlier words, VOCO stops with \"Recognition revised earlier words, so VOCO stopped transcribing.\" Either way you see \"Dictation interrupted\", and the words already pasted stay."
       },
       {
-        "title": "Counters explain missing work",
-        "text": "Captured, enqueued and responded samples should reconcile at the queue boundary. Those counts do not prove that a physical microphone captured every spoken sound."
+        "title": "Three paste outcomes",
+        "text": "A paste that changes nothing leaves the words pending, and Stop retries them 3 times, 250 ms apart. A rejected paste, refused before the clipboard changed, stops typing. An uncertain paste also stops typing, and VOCO never sends those words again."
+      },
+      {
+        "title": "Metadata, not words",
+        "text": "The queue reports lengths, counts and timings, never the words, and Rust records them only when VOCO_PERFORMANCE_LOG=1. At most 32 reports are in flight; extra ones are dropped and counted, and Rust keeps only the fields it knows."
       }
     ],
     "files": [
       {
-        "path": "apps/desktop/src/lib/benchmarkPhraseQueue.ts",
-        "why": "Serializes the production NVIDIA stream and delivery accounting."
+        "path": "apps/desktop/src/lib/dictationStream.ts",
+        "why": "Packets, the one-request rule, append-only checks and the three-second limit."
       },
       {
-        "path": "apps/desktop/src/lib/desktopPhraseStream.ts",
-        "why": "Handles the live phrase-delivery contract."
+        "path": "apps/desktop/src/lib/dictationStream.test.ts",
+        "why": "Tests for revisions, backlogs and paste outcomes."
       },
       {
-        "path": "apps/desktop/src-tauri/src/benchmark_stream.rs",
-        "why": "Supervises bounded worker requests and replies."
+        "path": "apps/desktop/src/lib/dictationStream.startup.test.ts",
+        "why": "Tests for the start of a stream."
+      },
+      {
+        "path": "apps/desktop/src/lib/desktopCaptureTail.ts",
+        "why": "Forwards retained audio to the stream at Stop."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/performance.rs",
+        "why": "Keeps only known metadata fields from queue reports."
       }
     ],
-    "caution": "The boxes in this simulator are illustrative. They are not measured audio or the real app\u2019s queue.",
+    "caution": "Append-only is a promise about delivery, not about the model. The model may change its mind, and VOCO stops rather than edit text that is already in an app.",
     "quiz": {
-      "question": "Why is an unlimited queue a bad idea?",
+      "question": "The worker's new answer changes a word VOCO already pasted. What happens?",
       "answers": [
-        "It always improves accuracy",
-        "Memory and waiting time could grow without a bound"
+        "VOCO deletes the old word and pastes the new one",
+        "VOCO ignores the change and keeps pasting",
+        "VOCO stops transcribing this recording, and the pasted words stay"
       ],
-      "correct": 1,
-      "why": "Limits turn overload into an explicit recoverable problem instead of silent unlimited growth."
+      "correct": 2,
+      "why": "VOCO never edits text it already delivered. A revision breaks the append-only rule, so transcription stops and the pasted words stay as they are."
     },
     "lab": "queue"
   },
   {
     "id": "worker",
     "title": "The speech worker has a rulebook.",
-    "intro": "Two helpers pass numbered notes through a pipe. Both must agree on what each note means.",
+    "intro": "The speech worker is a separate program. VOCO and the worker follow a short rulebook, one message at a time.",
     "story": [
-      "The Rust backend runs one local Python worker. It sends a line of JSON for each request.",
-      "The worker accepts start, push, finish and cancel. It checks the shape and identity of the message before using it.",
-      "Normal protocol output is kept separate from native-library diagnostic output, so a log line cannot masquerade as a reply."
+      "VOCO starts one worker when it launches and keeps it warm. The two talk through a pipe: VOCO writes one line of JSON, and the worker answers with one line. The requests are start, push, finish and cancel, and a push carries at most one second of audio.",
+      "Every message is checked on both sides. If anything goes wrong, such as a timeout, a mismatched answer or a rejected request, Rust drops the worker.",
+      "A new worker starts only at the next warmup or the next recording. VOCO never sends the same request twice, so no audio is processed twice."
     ],
     "steps": [
       {
+        "label": "Launch",
+        "detail": "Rust runs /usr/bin/python3 with stream_worker.py. VOCO_STREAM_PYTHON and VOCO_STREAM_WORKER may name other absolute local files. The worker has 30 seconds to load the model and report ready."
+      },
+      {
         "label": "Start",
-        "detail": "Open a new recognition stream and remember its session."
+        "detail": "A start names the session, 1 to 80 characters long, and a number that is 0 or more."
       },
       {
         "label": "Push",
-        "detail": "Add a validated audio block in increasing sequence order."
+        "detail": "Each push carries at most one second of mono audio at 8,000 to 96,000 Hz. The rate stays the same for the whole session, and every value must be a finite number."
       },
       {
-        "label": "Reply",
-        "detail": "Return matching session/sequence fields and any new text."
+        "label": "Answer",
+        "detail": "The worker answers within 10 seconds. A push returns text only when the transcript changed; a finish always returns the final text."
       },
       {
-        "label": "Finish",
-        "detail": "Drain the live stream and return the final hypothesis."
-      },
-      {
-        "label": "Cancel",
-        "detail": "Close the correct stream without replaying old audio."
+        "label": "Close",
+        "detail": "A finish or cancel ends the session. Each request's number must be larger than the last."
       }
     ],
     "facts": [
       {
-        "title": "Small enough to trust",
-        "text": "worker_main.py bounds each input line to 4 MiB and requires a newline. StreamingSession accepts one-dimensional finite audio blocks no longer than one second at the supplied rate."
+        "title": "Bounded messages",
+        "text": "A request may be at most 4 MiB and an answer at most 1 MiB. Anything larger is refused."
       },
       {
-        "title": "Numbers are checked too",
-        "text": "The accepted sample-rate range is 8,000\u201396,000 Hz, with no rate change inside a session. NaN and infinity are rejected."
+        "title": "Clean output",
+        "text": "stream_worker.py keeps library messages off the protocol, so only answers travel on the worker's output."
       },
       {
-        "title": "A stale cancel is special",
-        "text": "A cancel for a different session is acknowledged without cancelling the active recording. Safety sometimes means intentionally doing nothing."
+        "title": "The thread rule",
+        "text": "The worker uses one less than the processors it may run on, between 1 and 4, to leave room for capture, the compositor and the app you are typing into. NEMO_SPEECH_CPU_THREADS overrides it."
+      },
+      {
+        "title": "No replay",
+        "text": "If the worker dies during a recording, the next push or finish gets \"worker lost\". Transcription ends for that recording, and the next recording starts a new worker."
+      },
+      {
+        "title": "Private diagnostics",
+        "text": "When the worker rejects a request, its answer names only the error type after \"stream request rejected: \". It never contains audio or text."
       }
     ],
     "files": [
       {
+        "path": "apps/desktop/src-tauri/src/speech_stream.rs",
+        "why": "Starts the worker, enforces time limits and never replays a request."
+      },
+      {
         "path": "runtime/speech/stream_worker.py",
-        "why": "Separates protocol stdout before importing the runtime."
+        "why": "The worker's entry point; keeps library output off the protocol."
       },
       {
         "path": "runtime/speech/worker_main.py",
-        "why": "Parses, validates and routes protocol messages."
+        "why": "Checks every request and answers one line at a time."
       },
       {
         "path": "runtime/speech/streaming.py",
-        "why": "Validates audio and owns each streaming session."
+        "why": "Checks audio packets and runs the silence gate."
       },
       {
-        "path": "apps/desktop/src-tauri/src/benchmark_stream.rs",
-        "why": "Starts the process, bounds I/O and verifies replies."
+        "path": "runtime/speech/test_worker_protocol.py",
+        "why": "Tests for the rulebook."
+      },
+      {
+        "path": "runtime/speech/test_cpu_threads.py",
+        "why": "Tests for the thread rule."
       }
     ],
-    "caution": "A worker that dies during push/finish is not silently restarted with replayed text. Recovery needs a safe session boundary.",
+    "caution": "The worker's answer says what the model heard, not what reached an app. Delivery is a separate step with its own outcomes.",
     "quiz": {
-      "question": "Why do replies repeat the session and sequence?",
+      "question": "The worker crashes in the middle of a recording. What happens?",
       "answers": [
-        "To make logs colorful",
-        "To prove which request they belong to"
+        "VOCO restarts it and replays the audio",
+        "Transcription stops for this recording, and the next recording starts a new worker",
+        "VOCO keeps pasting from its own copy of the model"
       ],
       "correct": 1,
-      "why": "A correct-looking reply for the wrong recording must still be rejected."
+      "why": "Rust never replays a request. A push or finish without a worker gets \"worker lost\", and a new worker starts only at the next warmup or recording."
     },
     "lab": "protocol"
   },
   {
     "id": "model",
     "title": "How the model guesses words.",
-    "intro": "The model is a practiced pattern-finder, not a little person reading your mind.",
+    "intro": "A speech model doesn't look words up. It makes a careful guess from patterns it learned, and the guess grows as you speak.",
     "story": [
-      "Training happened before you installed VOCO. It produced many learned numbers called weights.",
-      "During dictation, the model uses those weights and recent audio context to predict text. A runtime is the engine that performs the calculations.",
-      "VOCO\u2019s selected model is English-focused. It does not promise automatic language switching."
+      "VOCO uses NVIDIA Nemotron Speech Streaming, an English model with 0.6 billion parameters, stored at 8-bit precision in a GGUF file. It runs on the processor through NeMo-Speech.cpp and needs no graphics card.",
+      "The model is built for streaming. It listens in short chunks and keeps a growing guess of the transcript, with punctuation.",
+      "Before loading, the worker checks the file's SHA-256 fingerprint. If it doesn't match the pinned value, the worker refuses to start."
     ],
     "steps": [
       {
-        "label": "Weights",
-        "detail": "Load the pinned Q8 model and verify its SHA-256."
+        "label": "Verify",
+        "detail": "The worker computes the model file's SHA-256 and compares it with the pinned value. A mismatch stops the worker before the model loads."
       },
       {
-        "label": "Recognizer",
-        "detail": "Create one reusable native recognizer."
+        "label": "Load",
+        "detail": "The recognizer loads with its right-context setting at 1. VOCO_NEMOTRON_CONTEXT accepts 0 or 1."
       },
       {
-        "label": "Stream",
-        "detail": "Open a stream for this recording."
+        "label": "Warm up",
+        "detail": "Before the first recording, the worker runs one second of zeros at 16,000 Hz through the recognizer."
       },
       {
-        "label": "Context",
-        "detail": "Use incoming audio and recent context to produce hypotheses."
+        "label": "Gate",
+        "detail": "Long runs of exact digital zeros are skipped. The gate keeps 640 ms before sound and 1.5 seconds after it."
       },
       {
-        "label": "Result",
-        "detail": "Read and free each native result handle."
+        "label": "Transcribe",
+        "detail": "The recognizer returns its finished text joined with its latest partial guess."
       }
     ],
     "facts": [
       {
-        "title": "Model versus runtime",
-        "text": "A model is the learned data; the runtime is the software that executes it. The same model may behave differently with different quantization, threading or streaming settings."
+        "title": "A pinned build",
+        "text": "NATIVE-BUILD.json records the NeMo-Speech.cpp and ggml revisions and the patch digests. The build targets generic x86-64 with AVX, AVX2, FMA and F16C, and leaves AVX-512, AMX and OpenMP off. That sets the processor VOCO needs."
       },
       {
-        "title": "The selected configuration",
-        "text": "The worker defaults to Nemotron English 0.6B Q8, context 1, four CPU threads and the pool backend. Q8 is quantization: a compact representation of model values, not a statement of 98% accuracy."
+        "title": "Two small patches",
+        "text": "One patch lets the first chunk start without waiting for another 90 ms of audio. The other runs 1 to 16 threads in a pool that sleeps between steps instead of spinning."
       },
       {
-        "title": "Python is the bridge",
-        "text": "The Nemotron adapter uses ctypes to call the packaged native library. It defines argument/result types and closes recognizer, stream and result handles to avoid resource leaks."
+        "title": "Fewer, larger frames",
+        "text": "When the gate releases audio it held back, the worker joins those packets into frames of at most one second, without changing any samples."
+      },
+      {
+        "title": "Original samples",
+        "text": "The recognizer always receives the original samples at the capture rate, and each push names that rate."
+      },
+      {
+        "title": "Turning the gate off",
+        "text": "VOCO_SILENCE_GATE=off disables the gate. The default mode, zero, treats a packet as quiet only when every sample is exactly zero."
       }
     ],
     "files": [
       {
         "path": "runtime/speech/adapters.py",
-        "why": "Nemotron owns native recognizer and result handles."
+        "why": "Checks the model fingerprint and loads the native library."
+      },
+      {
+        "path": "runtime/speech/nemo_bridge.cpp",
+        "why": "The bridge into NeMo-Speech.cpp."
       },
       {
         "path": "runtime/speech/streaming.py",
-        "why": "Loads and warms the selected configuration."
+        "why": "The warmup, the silence gate and frame joining."
       },
       {
         "path": "runtime/speech/worker_main.py",
-        "why": "Reports sanitized runtime identity and readiness."
+        "why": "The request loop and the thread rule."
       },
       {
-        "path": "runtime/notices/NOTICE",
-        "why": "Records notices for bundled model and library components."
+        "path": "runtime/speech/MODEL-IDENTITY.json",
+        "why": "The model's source, revision and fingerprint."
+      },
+      {
+        "path": "runtime/speech/NATIVE-BUILD.json",
+        "why": "Pinned revisions, patch digests and processor flags."
+      },
+      {
+        "path": "runtime/native/build.py",
+        "why": "Builds the native recognizer from pinned source."
+      },
+      {
+        "path": "runtime/native/thread-pool.patch",
+        "why": "Bounded threads that sleep between steps."
+      },
+      {
+        "path": "runtime/native/first-chunk.patch",
+        "why": "Lets the first chunk start without extra audio."
       }
     ],
-    "caution": "The native binary and model weights are separately provisioned artifacts. Research adapters such as Moonshine are not selectable product features.",
+    "caution": "The transcript is the model's best guess. VOCO checks that the model file is the right one, not that each word is right.",
     "quiz": {
-      "question": "What is the difference between model and runtime?",
+      "question": "Someone replaces the model file with a different one. What happens?",
       "answers": [
-        "Weights versus the engine that executes them",
-        "They are always the same file"
+        "The worker refuses it because the fingerprint doesn't match",
+        "VOCO downloads a fresh copy",
+        "The worker loads it and transcribes as usual"
       ],
       "correct": 0,
-      "why": "The runtime executes calculations using the learned model weights."
+      "why": "The worker compares the file's SHA-256 with the pinned value before loading. VOCO never downloads models, so a mismatch stops the worker."
     },
     "lab": "journey"
   },
   {
     "id": "delivery",
     "title": "Words meet the cursor.",
-    "intro": "Delivering a letter means checking the address, not just finishing the letter.",
+    "intro": "The last step puts words into another app. VOCO does it the way you would: copy, then paste.",
     "story": [
-      "The recognizer\u2019s words travel back to VOCO. Delivery checks whether the intended destination still looks valid.",
-      "The normal desktop route uses clipboard replacement and a paste gesture appropriate to the target category.",
-      "A successful key command is not proof that an application displayed the words. Some fields offer readback; some do not."
+      "insertion.rs pastes one group of words at a time. It puts the words on the clipboard, then presses Shift+Insert. In the code's words, \"Shift+Insert is the paste key shared by GTK, Qt, Chromium, Firefox, Electron and terminal emulators.\"",
+      "Terminals paste the PRIMARY selection instead of the clipboard, so VOCO fills both. Before each paste it checks the helper programs, including a running ydotoold on Wayland, and waits for you to release the shortcut's keys.",
+      "An optional Chromium extension offers a second route. In a tab where you enable it, VOCO inserts words at the caret of one plain text field, and the extension confirms each insert with a receipt."
     ],
     "steps": [
       {
-        "label": "Hypothesis",
-        "detail": "Accept a new append-only text suffix."
+        "label": "Check",
+        "detail": "The text must be 1 to 100,000 bytes, and the helper programs must be ready."
       },
       {
-        "label": "Destination",
-        "detail": "Check current focus and available target identity."
+        "label": "Clean",
+        "detail": "Control characters, including newlines and tabs, become spaces, so a terminal never receives Enter."
       },
       {
-        "label": "Clipboard",
-        "detail": "Place the new text on the clipboard."
+        "label": "Settle",
+        "detail": "VOCO waits until 150 ms have passed since the previous paste, so that app can read the clipboard first."
       },
       {
-        "label": "Paste",
-        "detail": "Dispatch the appropriate key gesture without Enter."
+        "label": "Copy",
+        "detail": "The words go to CLIPBOARD, then PRIMARY. A PRIMARY failure only logs a warning."
       },
       {
-        "label": "Observe",
-        "detail": "Use bounded field readback when available."
+        "label": "Press",
+        "detail": "VOCO waits up to 1.5 seconds for the shortcut's modifier keys to be released, then sends Shift+Insert."
       }
     ],
     "facts": [
       {
-        "title": "Why spacing needs care",
-        "text": "Address bars and editors may treat leading spaces specially. The implementation has explicit joining rules and a literal-space path for the legacy helper."
+        "title": "A separate leading space",
+        "text": "When new words start with VOCO's joining space, that space goes out as its own Space key before the paste, because Chromium's address bar strips pasted leading spaces."
       },
       {
-        "title": "Terminals are different",
-        "text": "Known terminal targets use their paste chord. VOCO does not edit the terminal\u2019s shortcut configuration to make that work."
+        "title": "Three failure outcomes",
+        "text": "No change: no keys were sent, so the words wait for the next try. Rejected: VOCO refused before touching the clipboard, and typing stops. Uncertain: a helper failed after it started, so typing stops and VOCO never sends those words again."
       },
       {
-        "title": "Why one word could get stuck",
-        "text": "A September .48 Codex trial inserted the first word, then stopped. Chromium exposed a fixed outer object placeholder while the actual text lived in a nested paragraph. The .49 candidate follows the caret into that paragraph and confirms its text and position, while retaining the original field identity and the no-replay rule. This newer finding does not change the source viewer pinned to .43."
+        "title": "Checked before recording",
+        "text": "If a helper is missing, the recording doesn't start. VOCO shows \"Dictation setup incomplete\" with the reason."
       },
       {
-        "title": "An empty editor can contain a placeholder",
-        "text": "A .54 first-run report led to an isolated Brave regression: an empty editable HTML block exposed a line break that disappeared when its first character arrived. Counting that placeholder as user text made readback reject the successful paste. The follow-up source candidate applies the existing rich-paragraph handling to editable HTML blocks while retaining field identity, exact text checks and literal newlines in plain text controls. This candidate is not a published release or qualification of every website; the pinned viewer remains unchanged."
+        "title": "VOCO steps aside",
+        "text": "If VOCO's own window is showing when you start, VOCO hides it instead of recording and shows \"VOCO hidden\" with \"Click where you want the text, then start dictation again.\""
       },
       {
-        "title": "Suggestions are not a new typing destination",
-        "text": "The owner narrowed the .54 report to Brave\u2019s address bar. Its suggestion list announced focus while the entry still owned the keyboard. The .55 candidate resolves a popup to its focused entry only when their accessibility relationships agree; a real field change still stops delivery. WebKit also marks its web-view containers focused, so bounded discovery must reach the actual input. Cold discovery gives visible controls priority over hidden popup contents and follows the same verified popup-owner relationship, within bounded searches. An unfocused terminal pane cannot change an editor\u2019s paste shortcut. Tests cover browsers, native editors and terminal programs, with limits recorded per application. The .43 source viewer remains unchanged."
+        "title": "The browser route",
+        "text": "The Chromium extension works through its toolbar button and Alt+Shift+V. It inserts only into a text area or a text, search, URL or telephone input with a collapsed caret. It skips disabled and read-only fields, fields inside a private or inert area, and fields whose autocomplete asks for a password, a one-time code or payment details. Incognito tabs are refused, and an insert counts only when a matching receipt comes back."
       },
       {
-        "title": "Observation has limits",
-        "text": "Accessible-field samples are best-effort local observations, not atomic ownership or compositor paint. Firefox can report newly inserted text before its caret catches up. VOCO waits within the existing three-second limit for exact text and position to agree; an intermediate sample cannot confirm delivery, and an uncertain paste is never replayed. A final destination check runs after clipboard preparation and before paste keys. A target can still change during the keyboard gesture itself, so stop dictation before switching fields; recovery cannot retract text from another app."
+        "title": "The clipboard keeps the words",
+        "text": "VOCO doesn't restore what the clipboard held before. After dictation, the clipboard holds the last words VOCO pasted."
       }
     ],
     "files": [
       {
         "path": "apps/desktop/src-tauri/src/insertion.rs",
-        "why": "Owns destination checks, clipboard writes and key dispatch."
+        "why": "Checks helpers, copies both selections and presses Shift+Insert."
       },
       {
-        "path": "apps/desktop/src-tauri/src/focus_probe.rs",
-        "why": "Collects bounded focus/target identity."
+        "path": "apps/desktop/src/lib/dictationRecording.ts",
+        "why": "Checks paste readiness before a recording starts."
       },
       {
-        "path": "apps/desktop/src-tauri/resources/voco_desktop_target.py",
-        "why": "Provides desktop target observations."
+        "path": "apps/desktop/src/App.tsx",
+        "why": "Hides VOCO's window before dictation into another app."
       },
       {
-        "path": "apps/desktop/src/lib/dictationDelivery.ts",
-        "why": "Coordinates delivery outcomes in the frontend."
+        "path": "apps/desktop/src/lib/dictationStream.ts",
+        "why": "Hands new words to delivery one group at a time."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/process_runner.rs",
+        "why": "Runs helper programs within bounds and tells a failed start apart from a failure after the helper may have acted."
+      },
+      {
+        "path": "apps/desktop/src/lib/tauri.ts",
+        "why": "Typed wrappers for the paste and copy commands."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/browser_broker.rs",
+        "why": "Hands words to the Chromium extension and matches receipts."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/bin/voco-browser-host.rs",
+        "why": "The native messaging host the extension talks to."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/browser_protocol.rs",
+        "why": "The messages between VOCO and the extension."
+      },
+      {
+        "path": "integrations/chromium/content.js",
+        "why": "Finds the eligible field and inserts at the caret."
+      },
+      {
+        "path": "apps/desktop/src/lib/browserStreamDelivery.ts",
+        "why": "Never retries an insert whose receipt is missing."
       }
     ],
-    "caution": "Clipboard paste replaces the current clipboard text. VOCO never automatically sends the message by pressing Enter.",
+    "caution": "Dispatched means the paste keys went out. Only the browser route gets a receipt from the page; for other apps VOCO can't see whether the words arrived.",
     "quiz": {
-      "question": "The model returned words but focus changed. What is safer?",
+      "question": "A paste helper fails after it started. Why doesn't VOCO simply try again?",
       "answers": [
-        "Paste into whatever is focused now",
-        "Retain recovery instead of guessing"
+        "The keys may already have reached the app, so a retry could type the words twice",
+        "Helpers can run only once per recording",
+        "VOCO retries silently in the background"
       ],
-      "correct": 1,
-      "why": "Uncertain delivery must not become a blind paste into a different app."
+      "correct": 0,
+      "why": "After a helper starts, the clipboard or the app may already hold the words. VOCO marks the paste uncertain and never replays it."
     },
     "lab": "focus"
   },
   {
     "id": "stop",
     "title": "Stop means finish the work.",
-    "intro": "Closing a shop means serving the people already in line before locking the door.",
+    "intro": "Pressing Stop doesn't throw away the end of your sentence. VOCO finishes the work before it goes quiet.",
     "story": [
-      "Stopping capture and finishing recognition are two different jobs. Some sound can still be waiting in the last capture block.",
-      "VOCO drains that tail into the same live stream, asks the model to finish, then waits for remaining delivery.",
-      "Only then should the session become idle. Cancellation follows a different path and must not deliver old pending work."
+      "When you stop, VOCO flushes the microphone and sends the audio the worker hasn't heard yet, including the last partial packet. Then it asks for the final transcript and pastes the last words.",
+      "If some words couldn't be pasted, VOCO copies them to the clipboard and tells you. If even the copy fails, the words wait in Review.",
+      "A recognition failure is different. VOCO copies nothing, because the transcript may be missing words, and asks you to check your text field."
     ],
     "steps": [
       {
-        "label": "Stop capture",
-        "detail": "Stop accepting new microphone input."
+        "label": "Flush",
+        "detail": "On X11 the AudioWorklet must confirm its flush within 80 ms. Otherwise VOCO says \"The end of this recording could not be confirmed, so VOCO did not finish it. Try again.\""
       },
       {
-        "label": "Drain tail",
-        "detail": "Take the final captured samples that have not been offered yet."
+        "label": "Forward the tail",
+        "detail": "VOCO sends the retained samples the stream hasn't received, then the partial packet."
       },
       {
-        "label": "Finish stream",
-        "detail": "Finish the existing recognizer stream once."
+        "label": "Finish",
+        "detail": "The worker returns the final transcript. Words still pending get up to 3 more paste attempts, 250 ms apart."
       },
       {
-        "label": "Flush text",
-        "detail": "Deliver the remaining accepted suffix safely."
+        "label": "Deliver or copy",
+        "detail": "Words left over go to CLIPBOARD and PRIMARY, joining space included, and VOCO shows \"Dictation copied to clipboard\"."
       },
       {
-        "label": "Idle",
-        "detail": "Release session ownership and report completion."
+        "label": "Clean up",
+        "detail": "VOCO clears the audio from memory and deletes the recording's journal entry."
       }
     ],
     "facts": [
       {
-        "title": "Do not send the whole recording again",
-        "text": "The production Stop path forwards retained samples not yet offered. Replaying the whole recording would waste work and could duplicate delivered words."
+        "title": "Typing stopped, listening continues",
+        "text": "When a paste is rejected or uncertain, VOCO shows \"VOCO stopped typing\" with \"It's still listening. When you stop, VOCO copies the rest of your words to the clipboard.\""
       },
       {
-        "title": "One recording owns its tail",
-        "text": "Asynchronous guards keep delayed stop/capture callbacks attached to their original recording."
+        "title": "After an uncertain paste",
+        "text": "The clipboard notice warns: \"Some words may already be in the app, so check it first. Then press Shift+Insert or Ctrl+V to paste the rest.\""
       },
       {
-        "title": "Why several timings exist",
-        "text": "Stop-to-final measures recognition completion. Stop-to-idle includes the rest of shutdown and delivery. Neither is the same as the instant the receiving app paints text."
+        "title": "When the copy fails",
+        "text": "VOCO keeps the words in Review and shows \"Dictation saved in Review\" with \"VOCO couldn't paste or copy it. Choose Review in VOCO's menu to copy it.\" If even that fails, the window shows \"VOCO couldn't paste, copy or save this dictation.\""
+      },
+      {
+        "title": "When recognition fails",
+        "text": "VOCO shows \"Dictation interrupted\" with \"Some words may be missing. Check your text field before starting again.\" Nothing is copied."
+      },
+      {
+        "title": "Unconfirmed audio is never typed",
+        "text": "When WebKit offered only the ScriptProcessor fallback, VOCO already showed \"Dictation won't be typed\". At Stop it clears the audio, and the window shows \"VOCO couldn't confirm it received all of your audio, so it didn't type this recording. Try again.\""
       }
     ],
     "files": [
       {
-        "path": "apps/desktop/src/hooks/useDictation.ts",
-        "why": "Orders the complete Stop sequence."
+        "path": "apps/desktop/src/lib/dictationRecording.ts",
+        "why": "The Stop sequence, the clipboard copy and every notice."
+      },
+      {
+        "path": "apps/desktop/src/lib/desktopCaptureTail.ts",
+        "why": "Forwards the audio the stream hasn't received."
       },
       {
         "path": "apps/desktop/src/lib/audioCaptureFlush.ts",
-        "why": "Waits for final capture blocks."
+        "why": "The 80 ms flush confirmation."
       },
       {
-        "path": "apps/desktop/src/lib/dictationFinalizer.ts",
-        "why": "Coordinates finalization outcomes."
+        "path": "apps/desktop/src/lib/dictationStream.ts",
+        "why": "Finishes the stream and reports undelivered words."
       },
       {
-        "path": "apps/desktop/src/lib/dictationAsyncGuards.ts",
-        "why": "Prevents stale asynchronous updates."
+        "path": "apps/desktop/src-tauri/src/insertion.rs",
+        "why": "Copies leftover words to both selections without sending keys."
       },
       {
-        "path": "runtime/speech/streaming.py",
-        "why": "Flushes gated samples and finishes the native stream."
+        "path": "apps/desktop/src/lib/crashRecovery.ts",
+        "why": "Saves words in Review when copying fails."
       }
     ],
-    "caution": "A fast Stop that silently loses the final syllable is a failure, not an optimization.",
+    "caution": "Stop never replays words as key presses after typing stopped. Words that weren't typed go to the clipboard, or to Review if copying fails.",
     "quiz": {
-      "question": "What should happen to unoffered tail samples at Stop?",
+      "question": "A paste failed during the recording, but recognition kept going. What does Stop do with the words that weren't typed?",
       "answers": [
-        "Send them into the existing stream",
-        "Throw them away",
-        "Replay all earlier audio too"
+        "Types them with simulated key presses",
+        "Copies them to the clipboard and tells you to paste them",
+        "Discards them"
       ],
-      "correct": 0,
-      "why": "Finish the same stream with only the remaining samples."
+      "correct": 1,
+      "why": "Stop never replays words as key presses. It copies the rest to CLIPBOARD and PRIMARY and shows \"Dictation copied to clipboard\", so you choose where to paste."
     },
     "lab": "queue"
   },
   {
     "id": "recovery",
     "title": "When something goes wrong.",
-    "intro": "A good helper says \u201cI\u2019m not sure\u201d instead of pretending the job is done.",
+    "intro": "Computers crash sometimes. VOCO keeps a small private note of what you said, so a crash doesn't lose your words.",
     "story": [
-      "A microphone can disappear, a worker can stop, a window can change, or a paste can be uncertain.",
-      "VOCO keeps recovery explicit. Retry transcribes retained normal-dictation audio with the bundled NVIDIA model, then offers the result for review and Copy. It does not paste it into another application.",
-      "Retained audio or text belongs to the recording that produced it. An old error must not overwrite a new session\u2019s state."
+      "While you dictate, VOCO writes the transcript, and only the transcript, to a journal on disk. A normal finish deletes the entry, and so do Quit and a clean shutdown signal.",
+      "If VOCO exits unexpectedly, the entry stays. At the next start VOCO moves it to Review, where it waits for you.",
+      "Review opens only when you choose it from VOCO's menu. You can copy each transcript or discard it, and Review never pastes anything by itself."
     ],
     "steps": [
       {
-        "label": "Notice",
-        "detail": "Detect capture, worker or delivery failure."
+        "label": "Record",
+        "detail": "Each new result updates the recording's entry. An entry larger than 256 KiB is refused."
       },
       {
-        "label": "Identify",
-        "detail": "Keep the failed work attached to its session."
+        "label": "Finish",
+        "detail": "A normal finish deletes the entry."
       },
       {
-        "label": "Retain",
-        "detail": "Preserve available recovery material."
+        "label": "Recover",
+        "detail": "At the next start, an unfinished entry moves to Review. If only the window reloads, it moves at once."
       },
       {
-        "label": "Explain",
-        "detail": "Show a useful recovery state instead of false success."
+        "label": "Keep five",
+        "detail": "Review keeps up to five entries and removes the oldest."
       },
       {
-        "label": "Retry safely",
-        "detail": "Recover locally, review the result and copy deliberately."
+        "label": "Choose",
+        "detail": "Copy transcript puts the text on the clipboard. Discard first asks \"Discard this transcript?\" and offers Keep or Discard transcript."
       }
     ],
     "facts": [
       {
-        "title": "Idle worker repair",
-        "text": "A confirmed-dead idle worker may be replaced at a safe boundary. That permission does not extend to automatically replaying an in-flight push or finish."
+        "title": "Owner-only files",
+        "text": "The journal lives in $XDG_STATE_HOME/voco/crash-recovery, or ~/.local/state/voco/crash-recovery when that variable is unset, empty or relative. Only your user can read it."
       },
       {
-        "title": "State is a map",
-        "text": "States such as idle, starting, recording and processing make allowed transitions visible. They are more reliable than several unrelated booleans."
+        "title": "When the journal is unavailable",
+        "text": "Dictation still works. VOCO shows \"Crash recovery unavailable\" with \"Dictation continues, but VOCO can't recover it if VOCO exits unexpectedly.\""
       },
       {
-        "title": "A separate recovery worker",
-        "text": "Recovery preserves the original sample rate and uses a bounded private worker. Cancel retains the audio, suppresses late results and cleans up that session; it cannot cancel a newer recovery or live dictation."
+        "title": "Clean exits clean up",
+        "text": "Quit VOCO, SIGINT and SIGTERM delete the active entry, because those exits are chosen, not crashes."
+      },
+      {
+        "title": "Review is explicit",
+        "text": "Each entry is \"Kept until you discard it.\" VOCO never opens, pastes or retries recovered text for you."
+      },
+      {
+        "title": "Cleanup failures",
+        "text": "If temporary text can't be deleted, VOCO says \"Temporary dictation text could not be deleted. VOCO will retry cleanup before the next recording.\""
       }
     ],
     "files": [
       {
-        "path": "apps/desktop/src/lib/dictationRecovery.ts",
-        "why": "Represents retained recovery work."
+        "path": "apps/desktop/src-tauri/src/crash_recovery.rs",
+        "why": "The owner-only journal, its size bound and Review's five entries."
       },
       {
-        "path": "apps/desktop/src/lib/dictationSession.ts",
-        "why": "Keeps recording identity and lifecycle facts."
+        "path": "apps/desktop/src/lib/crashRecovery.ts",
+        "why": "The window's side of the journal."
       },
       {
-        "path": "apps/desktop/src/lib/nvidiaRecovery.ts",
-        "why": "Runs explicit offline recovery without a destination callback."
+        "path": "apps/desktop/src/components/CrashReview.tsx",
+        "why": "The Review screen: copy or discard."
       },
       {
-        "path": "apps/desktop/src-tauri/src/benchmark_stream.rs",
-        "why": "Reaps failed workers and controls restart boundaries."
+        "path": "apps/desktop/src/lib/dictationRecording.ts",
+        "why": "Writes and finishes the journal during a recording."
+      },
+      {
+        "path": "apps/desktop/src/lib/crashRecovery.test.ts",
+        "why": "Tests for journal updates and cleanup."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/tray.rs",
+        "why": "The menu item that opens Review."
       }
     ],
-    "caution": "This guide\u2019s recovery simulator does not kill or restart the installed app.",
+    "caution": "Quitting VOCO while you dictate deletes the unfinished entry. Review protects against crashes, not against choosing Quit.",
     "quiz": {
-      "question": "Why avoid an automatic paste retry after an uncertain result?",
+      "question": "VOCO crashes in the middle of a recording. What happens to the words you said?",
       "answers": [
-        "It may duplicate or misdirect text",
-        "Retries are always slow"
+        "They are pasted automatically at the next start",
+        "They are lost, because the journal is deleted",
+        "They wait in Review until you open it from VOCO's menu"
       ],
-      "correct": 0,
-      "why": "The first paste may already have succeeded. Uncertainty must be handled explicitly."
+      "correct": 2,
+      "why": "An unexpected exit leaves the journal entry in place. At the next start VOCO moves it to Review, which opens only when you choose it and never pastes by itself."
     },
-    "lab": "focus"
+    "lab": "journey"
   },
   {
     "id": "settings",
     "title": "A small interface, clear ownership.",
-    "intro": "The control panel is the dashboard light, not the engine.",
+    "intro": "VOCO has few settings, and one part owns them. That keeps the file simple and safe.",
     "story": [
-      "The interface shows microphone, shortcut, readiness and recovery. It does not perform neural-network calculations.",
-      "A store keeps visible state and preferences together. Native code still owns operating-system authority.",
-      "VOCO keeps the normal output fixed to live cursor delivery. Removed assistant and appearance controls are not hidden extra modes."
+      "VOCO stores five settings in one file, and Rust owns it. The window sends small changes, called patches, and Rust refuses fields it doesn't know and null values.",
+      "Fields from older versions are ignored and dropped at the next save. If VOCO can't read the file, it never overwrites it. Dictation pauses, and a recovery panel offers three ways out.",
+      "Only Reset keeps a backup of the old file."
     ],
     "steps": [
       {
         "label": "Load",
-        "detail": "Read a validated configuration snapshot."
+        "detail": "Rust reads $XDG_CONFIG_HOME/voco/config.json."
       },
       {
-        "label": "Present",
-        "detail": "Derive clear state and helpful labels."
+        "label": "Migrate",
+        "detail": "If that file doesn't exist, VOCO copies $XDG_CONFIG_HOME/voice/config.json when present."
       },
       {
-        "label": "Edit",
-        "detail": "Change supported preferences such as microphone or shortcut."
+        "label": "Patch",
+        "detail": "The window sends only the fields that changed. Unknown fields and null values are refused."
       },
       {
-        "label": "Validate",
-        "detail": "Native code validates and saves a supported patch."
+        "label": "Save",
+        "detail": "Rust writes the file atomically. The folder is 0700 and the file 0600, so only you can read them."
       },
       {
-        "label": "Refresh",
-        "detail": "Update the interface without losing unrelated state."
+        "label": "Recover",
+        "detail": "When the file can't be read, the recovery panel offers Retry loading settings, Open config directory and Reset to defaults."
       }
     ],
     "facts": [
       {
-        "title": "A migration is deliberate",
-        "text": "The config loader ignores retired fields and fixes cursor output, stable streaming and enhancement off. It preserves microphone, shortcut and onboarding state."
+        "title": "Five fields",
+        "text": "hotkey, which defaults to Alt+D; selectedMic; onboardingCompleted; updateChannel; and installChannel."
       },
       {
-        "title": "Accessibility is part of the design",
-        "text": "Reduced motion, contrast and transparency follow system preferences. Rounded controls and the silver microphone remain the visual identity."
+        "title": "Update checks",
+        "text": "VOCO checks after startup and when you change the update channel. It reuses an answer younger than 6 hours, and otherwise asks GitHub for the 12 newest releases, with a 15-second timeout. Check for updates in Settings always asks."
       },
       {
-        "title": "Window movement is native work",
-        "text": "Dragging/resizing a Tauri window uses native APIs. CSS alone cannot move a Linux desktop window."
+        "title": "Only a notice",
+        "text": "When a newer release exists, VOCO shows an \"Update available\" notification once for that release, and Settings offers Open latest release. VOCO never downloads or installs anything."
       },
       {
-        "title": "A delivered status needs a visible component",
-        "text": "A .49 owner trial on 21 September found that successful dictation did not make live bars appear: the separate GNOME companion was absent from the normal installer, while the GTK tray tooltip did nothing. The .50 candidate bundles the GNOME 46 component, offers explicit activation and reports a required session restart. Its fallback has a visible label where supported and a status row in its menu. These newer changes do not alter this guide's pinned .43 source viewer."
+        "title": "Two channels",
+        "text": "The default channel ignores pre-releases, and its helper text reads \"Recommended for everyday use.\" Beta includes them: \"Beta releases change more often.\" Drafts are always ignored."
       },
       {
-        "title": "Finishing setup is a handoff",
-        "text": "The .51 release cut includes the .50 handoff: Ready stays visible after Done, and a second launch opens the existing idle app. During capture, launcher activation keeps the text destination focused. Microphone selection stays in the same setup canvas and returns to Start test after applying it. Alt+D replaces Ready with measured volume bars from a fixed, retained image set; silence settles the bars and Stop restores Ready. The GNOME companion follows measured levels and system reduced motion. These changes do not alter the pinned .43 source viewer."
+        "title": "Installation method",
+        "text": "installChannel only chooses which update instructions VOCO shows."
+      },
+      {
+        "title": "Reset is confirmed",
+        "text": "Reset to defaults asks \"Reset local settings?\" and needs Confirm reset before it replaces the file."
       }
     ],
     "files": [
       {
+        "path": "apps/desktop/src-tauri/src/config.rs",
+        "why": "Loads, patches and saves the five settings."
+      },
+      {
         "path": "apps/desktop/src/components/ControlPanel.tsx",
-        "why": "Builds the actual panel and settings sections."
+        "why": "The settings window, including the update channel."
+      },
+      {
+        "path": "apps/desktop/src/components/ConfigRecoveryPanel.tsx",
+        "why": "The three ways out when settings can't load."
+      },
+      {
+        "path": "apps/desktop/src/lib/updates.ts",
+        "why": "Asks GitHub for releases and filters them by channel."
+      },
+      {
+        "path": "apps/desktop/src/lib/updateCheckCoordinator.ts",
+        "why": "Decides when to check and when to reuse the cached answer."
       },
       {
         "path": "apps/desktop/src/store/useStore.ts",
-        "why": "Holds frontend state and preferences."
-      },
-      {
-        "path": "apps/desktop/src-tauri/src/config.rs",
-        "why": "Validates persisted configuration and supported patches."
+        "why": "The window's in-memory state."
       },
       {
         "path": "apps/desktop/src/lib/configSnapshot.ts",
-        "why": "Guards incoming config snapshots."
-      },
-      {
-        "path": "apps/desktop/src/preferences.css",
-        "why": "Applies system accessibility preferences."
+        "why": "Applies only the newest settings and pauses dictation when they can't load."
       }
     ],
-    "caution": "Some old branding documents mention removed features. Read the pinned ControlPanel and config implementation for current behavior.",
+    "caution": "Settings stay on this computer. VOCO has no account and syncs nothing.",
     "quiz": {
-      "question": "Where should Linux input authority live?",
+      "question": "The window sends a patch with a field Rust doesn't know. What happens?",
       "answers": [
-        "Only in a React checkbox",
-        "In the native backend and its guarded integrations"
+        "Rust refuses the change",
+        "Rust saves it for later versions",
+        "Rust drops that field and saves the rest"
       ],
-      "correct": 1,
-      "why": "The UI requests operations; native code enforces their boundaries."
+      "correct": 0,
+      "why": "Rust owns the file and accepts only the five fields it knows. A patch with an unknown field is refused, so nothing unexpected reaches the file."
     },
     "lab": "journey"
   },
   {
     "id": "linux",
     "title": "One app, several Linux paths.",
-    "intro": "Linux desktops are neighborhoods with different doorbells and mail slots.",
+    "intro": "A Linux desktop is made of many parts. VOCO fits into them with a few small, private pieces.",
     "story": [
-      "X11 and Wayland expose different integration mechanisms. Desktop environments and receiving apps add more variation.",
-      "The normal desktop paste route, optional IBus shortcut helper and explicit Chromium field adapter have different contracts.",
-      "A test inside one distribution\u2019s container does not test its real default desktop or compositor."
+      "Only one copy of VOCO runs per login. Launching it again brings the running copy forward and never starts a recording.",
+      "Other programs reach VOCO through private sockets that check the caller's user ID. Notifications go through D-Bus, the desktop's message bus.",
+      "On Wayland, a small user service runs ydotoold, the helper that turns VOCO's paste keys into real key presses."
     ],
     "steps": [
       {
-        "label": "Desktop route",
-        "detail": "Use current native focus checks and paste helpers."
+        "label": "Lock",
+        "detail": "instance.lock in $XDG_RUNTIME_DIR/voco makes sure only one copy runs."
       },
       {
-        "label": "X11 scope",
-        "detail": "Bind the recording shortcut to the intended focus window."
+        "label": "Activate",
+        "detail": "A second launch connects to voco-activate.sock and asks the running copy to show itself, waiting at most 2 seconds."
       },
       {
-        "label": "IBus",
-        "detail": "Optionally receive owned shortcut events; no text mutation."
+        "label": "Trigger",
+        "detail": "voco.sock and voice.sock sit in $XDG_RUNTIME_DIR, or in a private voco-<uid> folder in the temporary directory when that variable is unset. The sockets are 0600, and a connection is the request."
       },
       {
-        "label": "Chromium",
-        "detail": "Use explicit element/document authorization in that separate route."
+        "label": "Notify",
+        "detail": "Notifications go through D-Bus with a 3-second timeout."
       },
       {
-        "label": "Qualification",
-        "detail": "Test the actual desktop, application and microphone together."
+        "label": "Input service",
+        "detail": "Once enabled, voco-ydotoold.service starts with the graphical session when /dev/uinput exists."
       }
     ],
     "facts": [
       {
-        "title": "Stronger browser identity",
-        "text": "The explicit browser adapter can check element/document identity, caret and acknowledged prefix. It rejects unsupported fields, including password inputs."
+        "title": "Command-line options",
+        "text": "voco accepts --toggle, --check-desktop-input, --setup-desktop-input, --check-panel, --setup-panel, --version and --help. Unknown arguments exit with code 2."
       },
       {
-        "title": "Native messaging is local transport",
-        "text": "The browser host and private socket connect authorized browser work to the desktop. That integration is not a cloud transcription service."
+        "title": "A hidden window",
+        "text": "With native capture VOCO really hides its window. On X11, where WebKit records, VOCO instead shrinks the window to 1 by 1 pixel and moves it off-screen."
       },
       {
-        "title": "A support claim needs the right test",
-        "text": "Ubuntu userspace, package installation, Hyprland behavior and native microphone operation are separate evidence categories."
+        "title": "Checking input",
+        "text": "voco --check-desktop-input checks the input helpers without launching VOCO or sending keys, and exits with code 1 when something is missing."
+      },
+      {
+        "title": "A hardened service",
+        "text": "The input service runs with umask 0077 and no new privileges, may open only local sockets, and restarts 3 seconds after a failure."
+      },
+      {
+        "title": "One Debian package",
+        "text": "The package depends on xclip, xdotool and wl-clipboard, among others, and recommends ydotool and ydotoold."
       }
     ],
     "files": [
       {
-        "path": "apps/desktop/src-tauri/src/browser_broker.rs",
-        "why": "Coordinates authorized browser sessions."
+        "path": "apps/desktop/src-tauri/src/main.rs",
+        "why": "Command-line options and their exit codes."
       },
       {
-        "path": "apps/desktop/src-tauri/src/browser_protocol.rs",
-        "why": "Defines bounded browser messages."
+        "path": "apps/desktop/src-tauri/src/lib.rs",
+        "why": "Startup, the window and the keyboard reader."
       },
       {
-        "path": "apps/desktop/src-tauri/src/bin/voco-browser-host.rs",
-        "why": "Runs the native-messaging bridge."
+        "path": "apps/desktop/src-tauri/src/single_instance.rs",
+        "why": "The lock that keeps one copy per login."
       },
       {
-        "path": "apps/desktop/src-tauri/resources/voco_ibus_engine.py",
-        "why": "Implements the shortcut-only IBus engine."
+        "path": "apps/desktop/src-tauri/src/activation.rs",
+        "why": "Brings the running copy forward."
       },
       {
-        "path": "docs/platform/README.md",
-        "why": "Documents platform qualification boundaries."
+        "path": "apps/desktop/src-tauri/src/desktop_notifications.rs",
+        "why": "Notifications over D-Bus."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/trigger_socket.rs",
+        "why": "The owner-only sockets behind voco --toggle."
+      },
+      {
+        "path": "apps/desktop/src-tauri/tauri.conf.json",
+        "why": "The Debian package's dependencies and files."
+      },
+      {
+        "path": "packaging/systemd/voco-ydotoold.service",
+        "why": "The input service unit."
+      },
+      {
+        "path": "packaging/tauri/VOCO.desktop",
+        "why": "The desktop entry."
       }
     ],
-    "caution": "Compatibility is not universal. A successful GTK/X11 fixture cannot prove Codex, Brave, Ghostty or every Wayland compositor works.",
+    "caution": "A second launch never starts a recording. To toggle from a desktop shortcut, bind voco --toggle.",
     "quiz": {
-      "question": "Does a successful container test prove the real Hyprland desktop works?",
+      "question": "VOCO is already running and you launch it again from the app menu. What happens?",
       "answers": [
-        "Yes",
-        "No"
+        "The running copy shows itself, and no recording starts",
+        "A second copy starts",
+        "The running copy starts recording"
       ],
-      "correct": 1,
-      "why": "A container shares the host kernel and may not run the target compositor or physical devices."
+      "correct": 0,
+      "why": "The instance lock keeps one copy per login. A second launch asks the running copy to show itself through voco-activate.sock and never toggles dictation."
     },
     "lab": "journey"
   },
   {
     "id": "privacy",
     "title": "Draw the trust boundaries.",
-    "intro": "Keep private letters inside the house. Check visitors before opening the door.",
+    "intro": "Privacy is easier to check when you can see where each piece of data goes. VOCO keeps the map short.",
     "story": [
-      "Normal speech recognition runs locally. It does not require a cloud transcription account.",
-      "Local still needs security: files, sockets, child processes, browser messages and clipboard delivery all cross boundaries.",
-      "Optional timing logs contain counters and identities, not dictated text or recordings. Update checks contact GitHub."
+      "Audio stays in memory while you record and is cleared when the recording ends. It travels to the worker over a private pipe, never over the network.",
+      "Text lives briefly in the crash journal and on the clipboard. The window may connect only to VOCO itself and GitHub's release API.",
+      "Logs are off by default. When you turn them on, they hold metadata such as lengths and timings, never your words or audio."
     ],
     "steps": [
       {
         "label": "Microphone",
-        "detail": "Personal audio enters an authorized recording."
+        "detail": "VOCO opens the microphone only for a recording or a voice test."
       },
       {
-        "label": "Local worker",
-        "detail": "Bounded validated messages stay on the machine."
+        "label": "Worker",
+        "detail": "Audio and text travel to the worker through its standard input and output."
       },
       {
-        "label": "Private state",
-        "detail": "Configuration, sockets and optional logs need safe paths."
+        "label": "Sockets",
+        "detail": "VOCO's sockets are owner-only, and the trigger and browser sockets check the caller's user ID."
       },
       {
-        "label": "Other apps",
-        "detail": "Clipboard delivery crosses into a separate process."
+        "label": "Files",
+        "detail": "Settings, the journal and logs are private to your user."
       },
       {
-        "label": "Updates",
-        "detail": "A separate network operation checks GitHub for releases."
+        "label": "Network",
+        "detail": "The only request asks GitHub's API about new releases."
       }
     ],
     "facts": [
       {
-        "title": "No arbitrary diagnostic strings",
-        "text": "The worker maps failures to safe error codes rather than logging arbitrary exceptions, request data or transcript text."
+        "title": "Opt-in logs",
+        "text": "VOCO_PERFORMANCE_LOG=1 and VOCO_HOTKEY_TRACE=1 turn on metadata logs. They never record dictated text, audio or window titles."
       },
       {
-        "title": "Private paths must stay private",
-        "text": "Permissions, symlink checks and same-user socket rules help prevent another local user from redirecting sensitive output."
+        "title": "Debug audio",
+        "text": "Saving audio needs three variables, VOCO_DEV_NATIVE_CAPTURE, VOCO_DEBUG_CAPTURE_AUDIO and VOCO_DEBUG_NATIVE_CAPTURE, all set to exactly 1. Then VOCO writes one owner-only bundle in $XDG_STATE_HOME/voco/debug-native-captures after the recording."
       },
       {
-        "title": "No silent security shortcuts",
-        "text": "A successful helper command is not proof of safe destination ownership. Content-free logging is not proof that every possible data flow is private."
+        "title": "The clipboard is shared",
+        "text": "Other apps can read the clipboard. VOCO pastes through it and doesn't restore what it held before."
+      },
+      {
+        "title": "No shell access",
+        "text": "The window has no shell plugin. Its permissions cover Tauri's core defaults, window controls, events and registering global shortcuts."
+      },
+      {
+        "title": "Browser limits",
+        "text": "The Chromium extension refuses incognito tabs, skips password, one-time-code and payment fields, and works only in tabs where you enable it."
+      },
+      {
+        "title": "Same user, not same program",
+        "text": "The sockets keep out other users. They are not a boundary against a compromised program that runs as you."
       }
     ],
     "files": [
       {
-        "path": "runtime/speech/worker_main.py",
-        "why": "Sanitizes worker error reporting."
+        "path": "apps/desktop/src-tauri/src/performance.rs",
+        "why": "The opt-in metadata log and its fixed fields."
       },
       {
-        "path": "apps/desktop/src-tauri/src/performance.rs",
-        "why": "Writes bounded content-free performance events."
+        "path": "apps/desktop/src-tauri/src/hotkey_trace.rs",
+        "why": "The opt-in shortcut trace."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/crash_recovery.rs",
+        "why": "The owner-only journal."
+      },
+      {
+        "path": "apps/desktop/src/lib/updates.ts",
+        "why": "The single network request."
+      },
+      {
+        "path": "apps/desktop/src-tauri/tauri.conf.json",
+        "why": "The content security policy."
+      },
+      {
+        "path": "apps/desktop/src-tauri/capabilities/default.json",
+        "why": "The window's permissions."
       },
       {
         "path": "apps/desktop/src-tauri/src/trigger_socket.rs",
-        "why": "Protects private local control sockets."
+        "why": "Checks the caller's user ID."
       },
       {
-        "path": "apps/desktop/src-tauri/src/process_runner.rs",
-        "why": "Runs and reaps bounded helper processes."
+        "path": "apps/desktop/src-tauri/src/browser_socket.rs",
+        "why": "The browser host's owner-only socket."
       },
       {
-        "path": "docs/security/README.md",
-        "why": "Explains current security boundaries."
+        "path": "apps/desktop/src-tauri/src/native_capture/audit.rs",
+        "why": "Debug audio, off unless three variables are set."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/native_capture/private_bundle.rs",
+        "why": "Writes the owner-only debug bundle."
+      },
+      {
+        "path": "integrations/chromium/content.js",
+        "why": "The field rules inside web pages."
       }
     ],
-    "caution": "The study site itself makes no external requests. Its source reader only serves catalogued Git blobs from the pinned commit.",
+    "caution": "Local processing protects your audio. It doesn't protect the clipboard, which other apps can read.",
     "quiz": {
-      "question": "Which statement is accurate?",
+      "question": "What is VOCO's only network request?",
       "answers": [
-        "Local apps never need security checks",
-        "Local apps still need file, process and input boundaries"
+        "It uploads audio for better recognition",
+        "It sends usage statistics",
+        "It asks GitHub's API about new releases"
       ],
-      "correct": 1,
-      "why": "Local execution reduces some exposures but does not remove local trust boundaries."
+      "correct": 2,
+      "why": "Speech runs on the computer, and the content security policy allows only VOCO itself, Tauri's message channel and api.github.com. The update check is the only request."
     },
-    "lab": "focus"
+    "lab": "journey"
   },
   {
     "id": "performance",
     "title": "Measure the right stopwatch.",
-    "intro": "If two runners start their watches at different times, their numbers cannot be compared fairly.",
+    "intro": "A time is only useful when you know where the stopwatch starts and stops. VOCO's measurements always say which clock they use.",
     "story": [
-      "First sound, first hypothesis, first paste dispatch and first observed field update are different moments.",
-      "A queue\u2019s waiting time is different from model compute time. Stop-to-idle is different from Stop-to-final.",
-      "A measurement needs its clock origin, units, scope and missing evidence. Good charts keep those labels attached."
+      "Performance logging is off until you turn it on. Then VOCO and the worker record timings and resource use, never words or audio.",
+      "report-performance.py summarizes the log with counts, medians, 95th percentiles and maximums, and never scores what it didn't measure.",
+      "A replay script feeds pinned public speech to the real worker, so one machine can be measured again under the same conditions."
     ],
     "steps": [
       {
-        "label": "Playback starts",
-        "detail": "Recorded-audio launch can include leading silence."
+        "label": "Opt in",
+        "detail": "Set VOCO_PERFORMANCE_LOG=1 before starting VOCO."
       },
       {
-        "label": "Worker text",
-        "detail": "The recognizer returns a first nonempty hypothesis."
+        "label": "Record",
+        "detail": "VOCO writes performance.jsonl up to 8 MiB, then keeps one previous file. It samples resource use every 2 seconds."
       },
       {
-        "label": "Dispatch",
-        "detail": "The helper completes its delivery command."
+        "label": "Worker timings",
+        "detail": "The worker writes worker.jsonl up to 8 MiB and keeps 3 older files."
       },
       {
-        "label": "Field changes",
-        "detail": "An independent observer sees the recipient\u2019s text change."
+        "label": "Summarize",
+        "detail": "report-performance.py and report-speech-performance.py turn the logs into counts and percentiles."
       },
       {
-        "label": "Paint",
-        "detail": "The compositor draws pixels; this needs separate evidence."
+        "label": "Replay",
+        "detail": "evaluate-dictation-worker.py replays public speech into the worker without opening any audio or input device."
       }
     ],
     "facts": [
       {
-        "title": "Median and p95",
-        "text": "The median is the middle result. The 95th percentile describes the slow tail of a set of observations. Three repeated recordings are not three different speakers."
+        "title": "Logging never blocks speech",
+        "text": "Log records wait in a queue of 256. When it is full, VOCO drops the record and counts it rather than slow dictation."
       },
       {
-        "title": "CPU and memory have scope",
-        "text": "Worker RSS covers one process. Summed app-tree RSS can count shared memory more than once. CPU-seconds are work consumed, not battery energy."
+        "title": "Named failures",
+        "text": "Queue failures are logged by name, such as backlog_limit and prefix_revision, with a hashed session instead of the session itself."
       },
       {
-        "title": "Logs must not become a bottleneck",
-        "text": "Logging is optional and bounded. Dropped events and missing sequences must be reported because incomplete evidence can make a graph misleading."
+        "title": "Threads",
+        "text": "By default the worker uses at most 4 threads, one less than the processors it may use."
+      },
+      {
+        "title": "Know what is measured",
+        "text": "Each quality record names its clock_domain and counts samples at queue_ingress, where audio enters the queue. The replay measures the worker's process boundary, not capture, the receiving app or the screen."
+      },
+      {
+        "title": "Descriptive statistics",
+        "text": "Percentiles use the nearest-rank method and keep their sample counts. A few runs describe those runs, nothing more."
       }
     ],
     "files": [
       {
         "path": "apps/desktop/src-tauri/src/performance.rs",
-        "why": "Records frontend/native performance events."
+        "why": "The opt-in log, its bounded queue and fixed fields."
       },
       {
         "path": "runtime/speech/streaming.py",
-        "why": "Metrics records worker timings and resource counters."
+        "why": "The worker's timing log."
+      },
+      {
+        "path": "apps/desktop/src/lib/dictationStream.ts",
+        "why": "Sends queue metadata when logging is on."
       },
       {
         "path": "scripts/report-performance.py",
-        "why": "Summarizes application performance logs."
+        "why": "Summarizes VOCO's performance log."
       },
       {
         "path": "scripts/report-speech-performance.py",
-        "why": "Reports speech timing evidence."
+        "why": "Summarizes the worker's log; missing measurements stay unavailable."
+      },
+      {
+        "path": "scripts/report-dictation-quality-events.py",
+        "why": "Matches queue and dispatch records without guessing what an app received."
+      },
+      {
+        "path": "scripts/evaluate-dictation-worker.py",
+        "why": "Replays pinned public speech into the real worker."
+      },
+      {
+        "path": "scripts/score-dictation-worker.mjs",
+        "why": "Scores replay results with descriptive statistics."
+      },
+      {
+        "path": "runtime/native/thread-pool.patch",
+        "why": "The bounded thread pool that sleeps between steps."
       }
     ],
-    "caution": "The interactive timeline is an illustration, not benchmark data. Real benchmark assets stay outside this guide repository.",
+    "caution": "Compare timings only when they use the same clock, the same audio and the same machine.",
     "quiz": {
-      "question": "Can helper dispatch time be labeled \u201cpixels appeared\u201d?",
+      "question": "You add two seconds of silence before the first word. Which delay grows?",
       "answers": [
-        "Yes",
-        "No"
+        "Time from the start of playback to the words in the field",
+        "Time from the start of speech to the words in the field",
+        "Neither, because VOCO skips silence"
       ],
-      "correct": 1,
-      "why": "The receiver and compositor do additional work. Dispatch is a different observation."
+      "correct": 0,
+      "why": "A stopwatch that starts at playback includes the silence, and one that starts at speech doesn't. That's why every timing must say where its clock starts."
     },
     "lab": "latency"
   },
   {
     "id": "tests",
     "title": "Tests are little promises.",
-    "intro": "A test sets up a situation, performs an action, and checks what should happen.",
+    "intro": "A test is a promise written as code: when this happens, VOCO does that. Running the tests checks that the promises still hold.",
     "story": [
-      "A useful test catches a consequence: a lost final sample, a stale callback, duplicate text or a malformed message.",
-      "Unit tests examine small rules. Integration tests exercise cooperating pieces. Native end-to-end tests use real application boundaries.",
-      "Passing tests gives evidence for the situations tested. It does not prove every future input will work."
+      "npm test runs scripts/test-unit.sh, the fast checks that need no microphone, speech model or desktop session.",
+      "CI runs on every push and pull request to master, in five jobs. Some jobs start the real app in private desktop sessions and paste into real applications.",
+      "Tests use only public or synthetic audio. No personal recording is part of any test."
     ],
     "steps": [
       {
-        "label": "Arrange",
-        "detail": "Choose a known starting state and input."
+        "label": "Unit checks",
+        "detail": "scripts/test-unit.sh checks the patched libraries, the speech reports and runtime, capture helpers, the IBus engine and the window's Vitest suite."
       },
       {
-        "label": "Act",
-        "detail": "Run the operation under test."
+        "label": "Rust checks",
+        "detail": "cargo fmt, clippy with warnings treated as errors, and cargo test."
       },
       {
-        "label": "Assert",
-        "detail": "Check the expected result and forbidden side effects."
+        "label": "Speech checks",
+        "detail": "CI reuses the native speech runtime from a released package, checked against a fixed checksum, then runs the speech baseline and the worker protocol tests."
       },
       {
-        "label": "Record",
-        "detail": "Keep exact versions, inputs and attempted-run counts."
+        "label": "Application checks",
+        "detail": "A release build runs end to end in private sessions: the GNOME panel, capture and paste into a focused field, the Wayland lifecycle and Chromium."
       },
       {
-        "label": "Repeat",
-        "detail": "Fix a real failure and rerun the relevant checks."
+        "label": "Audit",
+        "detail": "RustSec checks the Rust dependencies, and npm run verify:security checks the JavaScript ones."
       }
     ],
     "facts": [
       {
-        "title": "Test the failure path",
-        "text": "A dead worker, a missing microphone or a changed target may reveal defects that a happy-path demonstration misses."
+        "title": "Five CI jobs",
+        "text": "Code Guide, RustSec Audit, Frontend Checks, Rust Check & Test, and Application."
       },
       {
-        "title": "Do not erase failed attempts",
-        "text": "A fixture failure still belongs in the attempt record. Explain exclusions instead of silently changing the denominator."
+        "title": "Private sessions",
+        "text": "The hosted desktop tests refuse to run outside GitHub Actions, so they never touch a developer's own session."
       },
       {
-        "title": "Different proof levels",
-        "text": "A browser-rendered UI test can mock all native/media boundaries. It proves interface behavior in that harness, not real microphone or desktop insertion."
+        "title": "Many apps, one paste",
+        "text": "test-application-delivery.py pastes with the one production chord and reads the result back from each application itself."
+      },
+      {
+        "title": "What CI never does",
+        "text": "Hosted CI never assembles or signs the NVIDIA package. The maintainer does that locally with assemble-release.sh."
+      },
+      {
+        "title": "The guide checks itself",
+        "text": "The Code Guide job runs this guide's own tests: chapters, catalog and server safety."
       }
     ],
     "files": [
       {
-        "path": "apps/desktop/src/lib/benchmarkPhraseQueue.test.ts",
-        "why": "Checks queue behavior and its invariants."
+        "path": "scripts/test-unit.sh",
+        "why": "The fast checks behind npm test."
+      },
+      {
+        "path": ".github/workflows/ci.yml",
+        "why": "The five CI jobs."
+      },
+      {
+        "path": "scripts/test-private-ibus-engine-hosted.sh",
+        "why": "Runs desktop tests in private sessions, and only on GitHub Actions."
+      },
+      {
+        "path": "scripts/test-application-delivery.py",
+        "why": "Pastes into real apps and reads the text back."
       },
       {
         "path": "runtime/speech/test_worker_protocol.py",
-        "why": "Checks validation and state transitions at the worker protocol boundary."
+        "why": "The worker rulebook tests."
       },
       {
-        "path": "scripts/test-dictation-renderer.mjs",
-        "why": "Exercises the actual frontend with controlled boundaries."
+        "path": "apps/desktop/src/lib/dictationStream.test.ts",
+        "why": "Queue and delivery tests."
       },
       {
-        "path": "scripts/test-native-desktop.sh",
-        "why": "Runs isolated native desktop checks."
-      },
-      {
-        "path": "docs/testing/README.md",
-        "why": "Indexes test categories and evidence."
+        "path": "package.json",
+        "why": "npm test and the other test scripts."
       }
     ],
-    "caution": "Test files and benchmark research adapters are engineering tools, not extra user-facing app features.",
+    "caution": "Tests prove promises on the systems they ran on. Another desktop or app needs its own run.",
     "quiz": {
-      "question": "A mocked browser test passed. What does that establish?",
+      "question": "Which command runs the fast checks that need no microphone, model or desktop?",
       "answers": [
-        "Every physical microphone works",
-        "The tested interface behavior passed in that harness"
+        "A full release build",
+        "Recording a sample with your own microphone",
+        "npm test, which runs scripts/test-unit.sh"
       ],
-      "correct": 1,
-      "why": "The proof must stay within the boundaries actually exercised."
+      "correct": 2,
+      "why": "npm test runs scripts/test-unit.sh, which needs no microphone, speech model or desktop session. The heavier checks run in CI."
     },
     "lab": "journey"
   },
   {
     "id": "shipping",
     "title": "How source becomes an app.",
-    "intro": "A recipe is not a cake. Building, packaging and checking the result are separate steps.",
+    "intro": "Shipping turns source code into a package someone can trust. Each step leaves proof that the next step can check.",
     "story": [
-      "Frontend tools turn TypeScript and CSS into application assets. Rust is compiled into a native executable.",
-      "The package must also contain the pinned speech runtime, model artifacts, helper programs and notices.",
-      "Checksums and exact identities let us verify which bytes were installed and tested. A matching version label alone is not enough."
+      "A release starts from a signed tag on a commit that already passed CI on master. The build runs from a clean tree, and its timestamps come from the last commit.",
+      "The build produces a Debian package, adds the speech runtime and model, checks the result and signs the checksums.",
+      "The installer runs the chain backwards. It checks the signature, then the checksum, and only then installs."
     ],
     "steps": [
       {
-        "label": "Source",
-        "detail": "Choose a clean commit and locked dependencies."
+        "label": "Tag",
+        "detail": "assemble-release.sh needs a signed voco.<version> tag that git verify-tag accepts, on a commit that passed CI on master."
       },
       {
         "label": "Build",
-        "detail": "Compile the frontend and native application."
+        "detail": "The tree must be clean, SOURCE_DATE_EPOCH comes from the last commit, and the build must not change tracked files."
       },
       {
-        "label": "Assemble",
-        "detail": "Add pinned model/runtime payload and Linux integration."
+        "label": "Package",
+        "detail": "package-nvidia.py adds the speech runtime and model to the Tauri package, and verify-deb-package.sh checks the result."
       },
       {
-        "label": "Verify",
-        "detail": "Check package structure, licenses, hashes and execution."
+        "label": "Sign",
+        "detail": "sign-release-checksums.sh signs the checksum files."
       },
       {
-        "label": "Release",
-        "detail": "Publish only after the required tests and acceptance gates."
+        "label": "Install",
+        "detail": "The install script checks the signature with gpgv, then the package checksum, then installs."
       }
     ],
     "facts": [
       {
-        "title": "Lock files are part of the recipe",
-        "text": "package-lock.json and Cargo.lock pin resolved dependency versions. They are not obsolete copies of the package manifests."
+        "title": "Nothing is uploaded",
+        "text": "assemble-release.sh ends with the assembled, signed files and prints the gh release create command with --draft and --verify-tag. A person uploads the release."
       },
       {
-        "title": "A base Tauri package can be incomplete",
-        "text": "VOCO\u2019s packaging scripts assemble and validate the speech payload. The raw desktop build alone is not the complete distributable."
+        "title": "Checking a download",
+        "text": "verify-release.sh exits 0 when the files are signed and verified, 1 on an integrity failure or unsafe path, and 2 when the checksums match but no usable signature exists."
       },
       {
-        "title": "Frozen evidence stays frozen",
-        "text": "A code change creates new bytes. Tests of an earlier package cannot automatically qualify a newer package, even with the same displayed version."
+        "title": "The installer",
+        "text": "It supports amd64 only. After installing, it sets up desktop input; if that step fails, it says \"VOCO is installed. Desktop setup needs one more step.\" and exits with code 2."
+      },
+      {
+        "title": "A pinned install line",
+        "text": "The README's install line stays pinned to the release named in packaging/published-release.json, and rehearse-release.sh checks that the documented lines match."
+      },
+      {
+        "title": "One maintainer script",
+        "text": "The package's only maintainer script repairs directory modes from older installs, without following links or touching user data. debian_maintainer.py generates and verifies it."
       }
     ],
     "files": [
       {
+        "path": "scripts/assemble-release.sh",
+        "why": "Builds and signs a release from a signed tag, and uploads nothing."
+      },
+      {
         "path": "scripts/build-desktop.sh",
-        "why": "Builds the desktop artifacts."
+        "why": "Builds the desktop app."
       },
       {
         "path": "scripts/package-nvidia.py",
-        "why": "Assembles the pinned NVIDIA package payload."
+        "why": "Adds the speech runtime and model to the Debian package."
       },
       {
         "path": "scripts/verify-deb-package.sh",
-        "why": "Checks Debian package contents."
+        "why": "Checks the package contents."
       },
       {
-        "path": "scripts/verify-speech-payload.py",
-        "why": "Verifies speech runtime/model identity."
+        "path": "scripts/sign-release-checksums.sh",
+        "why": "Signs the checksum files and uploads nothing."
       },
       {
-        "path": "docs/release-process.md",
-        "why": "Documents release and acceptance gates."
+        "path": "scripts/verify-release.sh",
+        "why": "Checks downloaded files and their signature."
+      },
+      {
+        "path": "scripts/render-release-body.sh",
+        "why": "Prints the GitHub release notes for a release tag."
+      },
+      {
+        "path": "scripts/rehearse-release.sh",
+        "why": "Checks versions, the installer and the documented install lines."
+      },
+      {
+        "path": "install",
+        "why": "The installer: signature, checksum, package and desktop setup."
+      },
+      {
+        "path": "KEYS",
+        "why": "The public key that signs releases."
+      },
+      {
+        "path": "packaging/published-release.json",
+        "why": "The release the install instructions point to."
+      },
+      {
+        "path": "scripts/debian_maintainer.py",
+        "why": "Generates and verifies the one maintainer script."
+      },
+      {
+        "path": "packaging/debian/postinst.py.in",
+        "why": "Repairs directory modes left by older installs."
       }
     ],
-    "caution": "Published releases are available on GitHub with versioned artifacts, checksums and documented test scope. This learning site does not publish or install the app.",
+    "caution": "A signature proves where the files came from and that they are unchanged. It doesn't prove how VOCO behaves on a given desktop.",
     "quiz": {
-      "question": "Is a version string enough to prove two packages are identical?",
+      "question": "The downloaded package doesn't match its checksum. What does the installer do?",
       "answers": [
-        "Yes",
-        "No; compare exact artifacts and hashes"
+        "Installs it and warns you",
+        "Stops without installing",
+        "Downloads a different version"
       ],
       "correct": 1,
-      "why": "Different bytes can accidentally share a version label. Artifact identity is stronger."
+      "why": "The installer checks the signature, then the checksum. A mismatch stops it with \"The download could not be verified. Run the installer again; nothing was installed.\""
     },
     "lab": "journey"
   },
   {
     "id": "dependencies",
     "title": "Borrowed code needs care.",
-    "intro": "You can build a bicycle with borrowed parts, but you still need to know which parts you fitted.",
+    "intro": "VOCO builds on libraries other people wrote. A few need small fixes, so VOCO keeps patched copies and checks them.",
     "story": [
-      "A dependency is software that VOCO uses rather than rewriting. Vendored code is a copy kept in the repository.",
-      "VOCO vendors glib 0.18.5 with a specific upstream iterator-safety fix. Other GTK/WebKit users must resolve to that same patched copy.",
-      "A dependency name on a list is not enough. We need the actual resolved version, patch, license and tests."
+      "Three Rust libraries are patched in vendor: glib, global-hotkey and tray-icon. Cargo.toml tells every part of VOCO to use those copies.",
+      "On Wayland, VOCO can run its own copy of ydotoold, built from pinned source with a small patch, when the system's ydotool client is the Ubuntu 24.04 version.",
+      "Scripts check each patched copy against its recorded origin, so a later update can't quietly bring back the unpatched code."
     ],
     "steps": [
       {
-        "label": "Manifest",
-        "detail": "Request a dependency and version range or source."
+        "label": "glib",
+        "detail": "0.18.5 with the two-line upstream fix for RUSTSEC-2024-0429."
       },
       {
-        "label": "Lock",
-        "detail": "Record the resolved dependency graph."
+        "label": "global-hotkey",
+        "detail": "0.8.0 with an event-driven X11 actor."
       },
       {
-        "label": "Vendor",
-        "detail": "Keep a reviewed patched copy when needed."
+        "label": "tray-icon",
+        "detail": "0.24.2 with a Linux call that sets icons by file path."
+      },
+      {
+        "label": "ydotool-legacy",
+        "detail": "ydotool 0.1.8 with libuInputPlus 0.1.4, patched for client lifecycles."
       },
       {
         "label": "Verify",
-        "detail": "Compare provenance and run a targeted regression."
-      },
-      {
-        "label": "Notice",
-        "detail": "Include required licenses and acknowledgments."
+        "detail": "Three verify scripts compare each copy with its recorded origin and check how Cargo resolves it."
       }
     ],
     "facts": [
       {
-        "title": "Why not just add a newer glib?",
-        "text": "Adding a second glib version can leave GTK using the old vulnerable copy. The fix must reach the library actually used by the dependency graph."
+        "title": "One glib for everyone",
+        "text": "GTK 0.18 and WebKit2GTK need glib 0.18, so VOCO patches Cargo's resolution and every glib user gets the fixed copy. verify-glib-backport.py checks the source against the pinned archive and the exact upstream fix, and that only one glib resolves."
       },
       {
-        "title": "Upstream code is a different reading layer",
-        "text": "The complete catalog includes vendor files. Their implementations belong to their upstream libraries; start with the local patch notes to see VOCO\u2019s changes."
+        "title": "Why the X11 actor waits",
+        "text": "The patched global-hotkey waits on the X11 connection and a command signal instead of a timer, so key events never wait for a 50 ms tick and an idle actor never wakes. VOCO and Tauri's shortcut plugin must share this one copy."
       },
       {
-        "title": "No perfect-security badge",
-        "text": "A fixed issue does not prove that all dependencies have no other risks. Current security documents keep remaining scope separate."
+        "title": "Why icons stay put",
+        "text": "The patch adds set_icon_path. VOCO writes 4 state icons and 64 meter frames into a private folder once and keeps them while it runs, so a slow tray reader can still open any icon VOCO announced."
+      },
+      {
+        "title": "Why a private daemon",
+        "text": "Ubuntu 24.04's ydotool client is version 0.1.8. VOCO builds a matching 0.1.8 daemon from pinned source, with a patch that retries interrupted calls, closes each client's socket and stops cleanly when accepting fails."
+      },
+      {
+        "title": "Checked sources",
+        "text": "SOURCE.json pins each archive's SHA-256. build-legacy-ydotool.py builds from the verified source and never runs the result."
       }
     ],
     "files": [
       {
+        "path": "vendor/README.md",
+        "why": "What is vendored and why."
+      },
+      {
         "path": "vendor/glib/VOCO-PATCH.md",
-        "why": "Explains the exact iterator backport and provenance."
+        "why": "The glib fix and why one copy serves everyone."
+      },
+      {
+        "path": "vendor/global-hotkey/VOCO-PATCH.md",
+        "why": "The event-driven X11 actor."
+      },
+      {
+        "path": "vendor/tray-icon/VOCO-PATCH.md",
+        "why": "Icons set by path that stay valid."
+      },
+      {
+        "path": "vendor/ydotool-legacy/SOURCE.json",
+        "why": "Pinned archives for the private daemon."
+      },
+      {
+        "path": "vendor/ydotool-legacy/patches/0001-client-lifecycle.patch",
+        "why": "Retries interrupted calls, closes client sockets and stops on accept errors."
       },
       {
         "path": "scripts/verify-glib-backport.py",
-        "why": "Checks vendored sources and dependency resolution."
+        "why": "Checks the glib fix and its single resolution."
       },
       {
-        "path": "scripts/test-glib-variant.py",
-        "why": "Runs the optimized iterator regression."
+        "path": "scripts/verify-shortcut-backport.py",
+        "why": "Rejects a second, unpatched shortcut actor."
       },
       {
-        "path": "apps/desktop/src-tauri/Cargo.lock",
-        "why": "Records Rust dependency resolution when present."
+        "path": "scripts/verify-tray-backport.py",
+        "why": "Checks the tray source and requires Tauri to use the patched icon call."
+      },
+      {
+        "path": "scripts/build-legacy-ydotool.py",
+        "why": "Builds the private daemon from verified source."
+      },
+      {
+        "path": "apps/desktop/src-tauri/Cargo.toml",
+        "why": "Rust dependencies and the [patch.crates-io] overrides."
+      },
+      {
+        "path": "apps/desktop/package.json",
+        "why": "The window's JavaScript dependencies."
+      },
+      {
+        "path": "vendor/THIRD-PARTY-NOTICES.txt",
+        "why": "Licenses for the vendored code."
+      },
+      {
+        "path": "runtime/notices/THIRD_PARTY_NOTICES.md",
+        "why": "Licenses for the speech runtime."
       }
     ],
-    "caution": "Do not edit a vendored library casually. A patch needs a reason, provenance, a focused regression and full dependency validation.",
+    "caution": "Scanners that compare version numbers only may still flag glib 0.18.5. The fix is in the patched source, which verify-glib-backport.py checks.",
     "quiz": {
-      "question": "Why can installing a second fixed library version fail to solve an issue?",
+      "question": "A dependency update would make Tauri's shortcut plugin use an unpatched global-hotkey. What catches it?",
       "answers": [
-        "The application may still use the old copy",
-        "Version numbers cannot be compared"
+        "verify-shortcut-backport.py rejects a split dependency graph",
+        "Nothing, because Cargo always picks the patched copy",
+        "The GNOME companion"
       ],
       "correct": 0,
-      "why": "The resolved consumer dependency must use the patched library."
+      "why": "VOCO and tauri-plugin-global-shortcut must resolve to the one patched copy. verify-shortcut-backport.py fails when a second, unpatched shortcut actor appears."
     },
     "lab": "journey"
   },
   {
     "id": "code-reading",
     "title": "Open any piece of the code.",
-    "intro": "Read code like a map: find the entrance, follow the arrows, then inspect one room at a time.",
+    "intro": "Reading a large project is easier with a thread to follow. Pick one event and follow it from file to file.",
     "story": [
-      "Start with the job of a file, not with its first unfamiliar punctuation mark. Read its imports, named functions and tests.",
-      "Use the file catalog to find every tracked entry at the pinned commit. Open a file to inspect its exact source and jump to a named symbol.",
-      "The chapters explain the central architecture. The catalog supplies complete file coverage; it is not a claim that every upstream line has a hand-written explanation."
+      "Follow the toggle. Rust emits voco:toggle-dictation from lib.rs. useGlobalShortcut.ts hears it, useDictation.ts and dictationRecording.ts start the recording, and dictationStream.ts sends audio through the speech_stream command.",
+      "From there, speech_stream.rs talks to the worker, and insertion.rs pastes the words. Tests sit next to the code they check, usually in a file with test in its name.",
+      "All source files lists every tracked file at the commit this guide records, so the code you read matches the chapters."
     ],
     "steps": [
       {
-        "label": "Find the owner",
-        "detail": "Which module owns the rule you are studying?"
+        "label": "Event",
+        "detail": "lib.rs emits voco:toggle-dictation after the 120 ms gate."
       },
       {
-        "label": "Read the boundary",
-        "detail": "What inputs does it accept, and what does it return?"
+        "label": "Hook",
+        "detail": "useGlobalShortcut.ts listens for the event and hands it to App.tsx, which decides whether this press starts or stops a recording."
       },
       {
-        "label": "Follow a call",
-        "detail": "Jump to the next helper or native command."
+        "label": "Recording",
+        "detail": "dictationRecording.ts checks setup, opens capture and starts the journal."
       },
       {
-        "label": "Read a test",
-        "detail": "See a concrete input and the expected consequence."
+        "label": "Stream",
+        "detail": "dictationStream.ts sends packets through the speech_stream command to speech_stream.rs and the worker."
       },
       {
-        "label": "Ask why",
-        "detail": "Look for ordering, identity, limits and failure behavior."
+        "label": "Paste",
+        "detail": "New words go through a Tauri command to insertion.rs."
       }
     ],
     "facts": [
       {
-        "title": "Production names can mislead",
-        "text": "benchmarkPhraseQueue.ts and benchmark_stream.rs are live product modules. A historical name is not a reason to delete code."
+        "title": "Find the command",
+        "text": "Every command the window can call is registered in lib.rs. Search for the command's name there first."
       },
       {
-        "title": "Tests are example stories",
-        "text": "Find the matching .test.ts or test_*.py file. A well-chosen test often explains a tricky rule more clearly than a long comment."
+        "title": "Types cross the boundary",
+        "text": "lib/tauri.ts gives many commands typed wrappers, so the window calls them like ordinary functions."
       },
       {
-        "title": "Know what the viewer can show",
-        "text": "Text blobs up to 2 MB are readable. Binary assets are indexed with size and Git identity. Native binaries and model weights supplied outside Git are explained as external artifacts."
+        "title": "Follow the numbers",
+        "text": "Constants have names such as TOGGLE_DEBOUNCE_MS. Search for the name to find every place that uses it."
+      },
+      {
+        "title": "Read the tests",
+        "text": "A test shows in a few lines how the code is expected to behave."
       }
     ],
     "files": [
       {
-        "path": "docs/architecture/code-map.md",
-        "why": "The project\u2019s implementation map."
+        "path": "apps/desktop/src/App.tsx",
+        "why": "Decides what each toggle means."
       },
       {
-        "path": "AGENTS.md",
-        "why": "Rules for humans and agents working on VOCO."
+        "path": "apps/desktop/src/hooks/useGlobalShortcut.ts",
+        "why": "Hears the toggle event."
       },
       {
-        "path": "apps/desktop/src/lib/benchmarkPhraseQueue.ts",
-        "why": "A good first detailed queue reading."
+        "path": "apps/desktop/src/hooks/useDictation.ts",
+        "why": "Wires capture into a recording."
+      },
+      {
+        "path": "apps/desktop/src/lib/dictationRecording.ts",
+        "why": "Runs one recording from Start through Stop."
+      },
+      {
+        "path": "apps/desktop/src/lib/dictationStream.ts",
+        "why": "Sends packets and passes on new words."
+      },
+      {
+        "path": "apps/desktop/src/lib/tauri.ts",
+        "why": "Typed wrappers for Tauri commands."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/lib.rs",
+        "why": "Emits the toggle and registers every command."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/speech_stream.rs",
+        "why": "Talks to the worker."
       },
       {
         "path": "runtime/speech/worker_main.py",
-        "why": "A compact protocol-validation reading."
+        "why": "Answers each request."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/insertion.rs",
+        "why": "Pastes the words."
       }
     ],
-    "caution": "The source reader is read-only and pinned to a commit. It never serves your uncommitted files, credentials or personal recordings.",
+    "caution": "The guide shows one recorded commit. Your working tree may differ, so check the commit before you compare.",
     "quiz": {
-      "question": "What is the best first question when opening a file?",
+      "question": "You want to find the Rust function behind a command the window calls. Where do you look first?",
       "answers": [
-        "How many lines can I delete?",
-        "What job and invariant does this file own?"
+        "In the speech worker",
+        "In the tray menu",
+        "In lib.rs, where commands are registered"
       ],
-      "correct": 1,
-      "why": "Understanding ownership makes later changes safer and more focused."
+      "correct": 2,
+      "why": "Every command the window can call is registered in lib.rs, so the command's name leads you to the Rust function."
     },
     "lab": "journey"
   },
   {
-    "id": "typesafe",
-    "title": "Measure before we optimize.",
-    "intro": "A quicker transcript is useful only if it keeps your words, meaning and punctuation intact.",
+    "id": "top-bar",
+    "title": "A microphone in the top bar.",
+    "intro": "On GNOME, VOCO can live in the top bar near the clock, with bars that move while you speak.",
     "story": [
-      "This chapter teaches the evaluation method used by VOCO contributors. The dated measurements were collected on the .41 development snapshot; the .42 release preserves its model and defaults. These experiments are not fresh .42 performance measurements.",
-      "A stopwatch and exact text comparison answer different questions from a language model. Code measures timing, word errors and delivery failures. TypeSafe judges whether a transcript preserves meaning.",
-      "We give Jev a public reference and a transcript, plus separate questions for meaning and consequential mistakes. Punctuation judgments need an audited reference. Personal dictation never enters this research service; VOCO itself remains local.",
-      "We challenge the judge before trusting it, freeze the speech fixtures, then run the same audio through baseline and candidate settings. We keep unsuccessful experiments because they explain why a tempting change was rejected."
+      "The optional GNOME 46 companion shows VOCO's microphone in the top bar. While you dictate, a seven-bar meter opens on its left when there is room beside the clock.",
+      "The installer runs voco --setup-panel, and VOCO's setup and Help offer Enable live panel. Enabling adds only this extension, may need you to sign out and back in, and never restarts the Shell. The package alone never enables it, and voco --check-panel changes nothing.",
+      "Once the companion attaches, VOCO hides its tray icon. On Wayland the companion grabs Alt+D or Alt+Shift+D inside the Shell, so other apps never see the shortcut."
     ],
     "steps": [
       {
-        "label": "Define",
-        "detail": "Freeze timing boundaries, reference text, rubric and rejection rules before measuring."
+        "label": "Enable",
+        "detail": "voco --setup-panel or Enable live panel turns on this one extension for your user."
       },
       {
-        "label": "Measure",
-        "detail": "Replay the same public audio and record timings, word errors and resources."
+        "label": "Attach",
+        "detail": "The companion calls Attach over D-Bus. VOCO accepts it only from the process that owns org.gnome.Shell, then hides the tray icon."
       },
       {
-        "label": "Judge",
-        "detail": "Ask TypeSafe narrow questions about meaning; retain probabilities and uncertainty."
+        "label": "Poll",
+        "detail": "The companion asks for VOCO's state every 50 ms while recording and every 1500 ms otherwise."
       },
       {
-        "label": "Compare",
-        "detail": "Compare repeated trials and separate speakers. Missing evidence stays missing."
-      },
-      {
-        "label": "Decide",
-        "detail": "Reject regressions. A higher average never excuses a wrong destination or lost meaning."
-      }
-    ],
-    "facts": [
-      {
-        "title": "What contributors provide",
-        "text": "Evidence, explicit question criteria, a model version, an API key for live evaluation and independently labeled cases. The skill does not award a built-in app grade."
-      },
-      {
-        "title": "What a score means",
-        "text": "Meaning has four concrete levels: contradicted or absent; an important detail wrong; only a minor detail lost; all meaning preserved. A score divided by three and multiplied by 100 is a rubric position, not word accuracy. Confidence is not a truth guarantee."
-      },
-      {
-        "title": "Check the judge too",
-        "text": "The 16 authored challenge cases produced 10 true material-error flags and six true negatives at a provisional 0.5 threshold. This small synthetic check is not independent human calibration. An invented action still received 2.10/3 for overall meaning, so the separate consequential-error question matters."
-      },
-      {
-        "title": "The measurements still missing",
-        "text": "These public audiobook references have no audited punctuation or word-end times. We cannot honestly score punctuation accuracy, word-end-to-screen latency, physical microphone quality or worldwide rank from them."
-      },
-      {
-        "title": "Where to reproduce it",
-        "text": "Follow docs/testing/typesafe-evaluation.md. Provision the pinned runtime, use public fixtures, freeze the rubric and reference text, then run the local measurement and optional TypeSafe tools. Keep API keys and raw receipts out of Git."
-      }
-    ],
-    "files": [
-      {
-        "path": "scripts/evaluate-dictation-worker.py",
-        "why": "Measures the real pinned worker with public audio fixtures."
-      },
-      {
-        "path": "scripts/typesafe-evaluate.py",
-        "why": "Asks narrow semantic questions only after explicit opt-in."
-      },
-      {
-        "path": "docs/testing/typesafe-evaluation.md",
-        "why": "Defines metric boundaries, targets and reproducible commands."
-      }
-    ],
-    "caution": "The comparison is an experiment, not a world ranking or a release. Worker output, observed recipient text and painted pixels are different boundaries. No production setting changes automatically from a TypeSafe score.",
-    "quiz": {
-      "question": "A candidate has a higher meaning score but inserts text into the wrong window. What happens?",
-      "answers": [
-        "Accept it because its average improved",
-        "Reject it: delivery safety is a separate hard gate",
-        "Ask the model to average the two"
-      ],
-      "correct": 1,
-      "why": "Safety failures cannot be compensated by better speed or a higher semantic score."
-    },
-    "lab": "journey",
-    "comparison": {
-      "title": "19 September 2026 \u00b7 same .41 runtime and model",
-      "headers": [
-        "Measure",
-        "Before: context 1, 4 threads",
-        "Experiment: context 0, 4 threads"
-      ],
-      "scope": "24 paired real-time worker trials across 12 public-fixture speakers. A\u2013B\u2013B\u2013A run order. TypeSafe judged one transcript per speaker and setting; repeated playback does not add independent speakers. Four isolated packaged GTK/X11 trials use one public clip, two trials per setting; their ranges are descriptive and state observation polls every 50 ms.",
-      "rows": [
-        [
-          "Word error rate, all 12 speakers",
-          "2.52%",
-          "2.10%"
-        ],
-        [
-          "Word error rate, 4 held-out speakers",
-          "2.56%",
-          "2.56%"
-        ],
-        [
-          "Worker first text from paced replay, median",
-          "1175.1 ms",
-          "1167.6 ms"
-        ],
-        [
-          "Worker finish acknowledgement, median",
-          "66.7 ms",
-          "76.5 ms"
-        ],
-        [
-          "Worker service / audio duration, median",
-          "0.257",
-          "0.384"
-        ],
-        [
-          "TypeSafe meaning, 8 development speakers",
-          "95.79 / 100",
-          "97.29 / 100"
-        ],
-        [
-          "TypeSafe meaning, 4 held-out speakers",
-          "86.50 / 100",
-          "86.17 / 100"
-        ],
-        [
-          "Private GTK: Start command \u2192 active observation",
-          "50.7\u201350.7 ms",
-          "50.8\u2013101.0 ms"
-        ],
-        [
-          "Private GTK: playback launch \u2192 first field text",
-          "1365.5\u20131380.8 ms",
-          "1455.0\u20131457.8 ms"
-        ],
-        [
-          "Private GTK: Stop command \u2192 idle observation",
-          "207.3\u2013207.8 ms",
-          "207.4\u2013208.5 ms"
-        ],
-        [
-          "Punctuation accuracy / word-end-to-screen lag",
-          "Not measured",
-          "Not measured"
-        ]
-      ],
-      "decision": "Decision: retain the current context 1 setting. Context 0 improves one development recognition error but uses about 49% more service time, barely changes first-text timing and does not improve held-out accuracy or meaning.",
-      "limits": "Experimental results, not a shipped before/after improvement or worldwide ranking. Word timestamps and punctuation gold are absent. These worker numbers are not shortcut, recipient or pixel-paint timings. TypeSafe scores are rubric positions, not percentages of correct words.",
-      "additional": [
-        {
-          "title": "Same context 1 \u00b7 CPU-thread follow-up",
-          "headers": [
-            "Worker measure",
-            "Before: 4 threads",
-            "Experiment: 6 threads"
-          ],
-          "rows": [
-            [
-              "Word error rate",
-              "2.52%",
-              "2.52%"
-            ],
-            [
-              "Complete transcript parity",
-              "Reference arm",
-              "24 / 24 paired final texts identical"
-            ],
-            [
-              "Median service / audio duration",
-              "0.257",
-              "0.228"
-            ],
-            [
-              "Median finish acknowledgement",
-              "66.7 ms",
-              "59.8 ms"
-            ],
-            [
-              "Median first hypothesis from paced replay",
-              "1175.1 ms",
-              "1170.5 ms"
-            ]
-          ],
-          "scope": "24 trials per setting across the same 12 public fixtures. The six-thread runs followed the earlier baseline; this follow-up was not counterbalanced in time.",
-          "decision": "Promising local compute headroom: 11.2% less median service time on the AMD Ryzen 7 PRO 8840HS test system, with only 4.6 ms earlier first text. Retain the portable four-thread default until loaded-desktop, energy and other-CPU checks support a change.",
-          "limits": "This is not a shipped speedup or a six-thread desktop qualification. Complete text parity allows reuse of existing semantic judgments; no extra TypeSafe calls or new independent speakers are implied."
-        }
-      ]
-    },
-    "sourceNote": "Evaluation tools from the pinned 2026.0.43 development snapshot. Tables retain their original .41 experiment identity."
-  },
-  {
-    "id": "linux-support",
-    "title": "One VOCO, different Linux desktops.",
-    "intro": "A download is ready only when installation, microphone, shortcut and text delivery work together.",
-    "story": [
-      "VOCO keeps a shared recognition model and application source. Native Debian, Fedora, openSUSE and Arch packages translate that application into dependencies each system understands.",
-      "The desktop matters too. A package can install correctly while a compositor handles windows, shortcuts or clipboard access differently. Omarchy needs Hyprland testing as well as Arch package testing.",
-      "The .43 source snapshot has bounded qualification evidence. The support matrix separates final package and desktop evidence from signing and public availability; only a published GitHub release establishes a download."
-    ],
-    "steps": [
-      {
-        "label": "Package",
-        "detail": "Resolve native dependencies and verify every installed payload file."
-      },
-      {
-        "label": "Desktop",
-        "detail": "Run the intended compositor in a booted guest and finish fresh-user setup."
-      },
-      {
-        "label": "Dictation",
-        "detail": "Send public fixture audio, observe the receiving field and check Start and Stop."
-      },
-      {
-        "label": "Failures",
-        "detail": "Switch focus, repeat sessions, interrupt devices and retain recovery safely."
+        "label": "Grab",
+        "detail": "On Wayland it grabs the configured preset and renews a 2.5-second lease about once a second."
       },
       {
         "label": "Release",
-        "detail": "Sign exact qualified artifacts and verify the downloaded copies before installation."
+        "detail": "If GetState stops arriving for more than 5 seconds, or the companion calls Detach, VOCO drops the lease and shows the tray icon again."
       }
     ],
     "facts": [
       {
-        "title": "Before: a transparent tile",
-        "text": "Hyprland kept the off-screen VOCO window tiled. An isolated test reproduced it even though short dictation worked."
+        "title": "The menu",
+        "text": "A primary click stops dictation, or opens VOCO when nothing can be stopped. Other mouse buttons, the Menu key and Shift+F10 open a menu with Settings, Review and Stop dictation."
       },
       {
-        "title": "Why hiding alone failed",
-        "text": "A diagnostic native hide removed the tile, but a fresh WebKit microphone request did not become active within 25 seconds. That failed attempt led to native capture qualification."
+        "title": "Motion",
+        "text": "Bars grow in 45 ms and shrink in 100 ms. While VOCO processes, the bars hold at 0.35 and pulse over 700 ms, each bar 40 ms after the last. The meter opens in 220 ms. When GNOME's animations are off, every change happens at once and nothing pulses."
       },
       {
-        "title": "After: native capture while hidden",
-        "text": "The final .43 Arch candidate passed repeated dictation under Omarchy\u2019s packaged desktop configuration with a truly hidden panel and an unchanged second field. A 577.68-second repetition delivered all 1,162 normalized words and reached idle 922 ms after Stop. All 25,505,676 retained frames matched native capture, with independent whole-waveform alignment. These individual VM observations do not certify physical microphones or arbitrary apps."
+        "title": "The bar formula",
+        "text": "Each bar's height is 0.15 + 0.85 \u00d7 level \u00d7 weight, with weights 0.35, 0.65, 0.9, 1, 0.8, 0.55 and 0.3 from left to right."
       },
       {
-        "title": "A measured shortcut improvement",
-        "text": "The candidate's voco --toggle command used a compositor binding without keyboard-device access. One isolated fixture delivered all 14 words and left the second field unchanged. This does not certify every shortcut or application."
+        "title": "Fresh levels only",
+        "text": "A level older than 250 ms reads as silence, so the bars never freeze on an old value."
       },
       {
-        "title": "Fit the available CPUs",
-        "text": "A two-core VM took 35.37 seconds to warm a four-thread recognizer, exceeding startup limits. Two threads took 1.53 seconds in a controlled check. The candidate leaves one CPU from process affinity available for desktop work, with at least one recognizer thread and at most four. All 12 public fixtures produced identical transcripts across the final Fedora, openSUSE, Ubuntu and Omarchy workers: six lexical edits in 238 words. This small corpus does not establish worldwide accuracy."
+        "title": "Keys released",
+        "text": "When VOCO can't read the keyboards, it asks the companion through ModifiersClear whether the shortcut's keys are up before a Wayland paste."
       },
       {
-        "title": "Reject an unknown destination",
-        "text": "An X11 focus-switch test caught text continuing into a second field. GNOME exposed both the client and its decoration as active, and VOCO incorrectly allowed an unbound paste. The candidate distinguishes the decoration and requires a destination token. The installed regression then left the second field empty and retained recovery. Successful ordinary dictation had not exposed this bug."
+        "title": "Setup messages",
+        "text": "Active: \"Live panel bars and Stop are active.\" Disabled: \"Enable live microphone bars and the VOCO menu in your top panel.\" After enabling: \"Panel enabled. Sign out and back in to load it; saving your work first is recommended.\""
       },
       {
-        "title": "Let desktop focus settle safely",
-        "text": "A fresh Fedora GNOME setup queued about 970 accessibility events after hiding the panel. The old 256-event budget rejected Start. The candidate drains ordinary transition backlogs within a 50 ms time limit, while still refusing an unsettled destination. Installed Fedora GNOME and openSUSE KDE tests then passed repeated dictation, focus departure and explicit recovery after source loss."
+        "title": "Other desktops",
+        "text": "Without GNOME 46: \"The VOCO panel requires GNOME 46. Dictation still works, but without the panel the focused app also receives Alt+D and Alt+Shift+D. To avoid that, choose another shortcut in VOCO and configure it in your desktop to run voco --toggle.\" On other desktops: \"Use the VOCO tray menu for status and Stop. Labels depend on your desktop.\""
       },
       {
-        "title": "Test the receiving application",
-        "text": "Kate and Konsole accepted the public fixture in a booted KDE guest. Firefox exposed both shortcut-modifier interference and CPU contention that GTK-only tests had missed. The final package delivered all 1,162 words in a 577.68-second Firefox trial and stopped in 376 ms after the browser settled. Its page had no growing DOM diagnostic logger; a preceding logged attempt timed out after 741 words, showing why measurement overhead must remain explicit. Cold-start CPU-pressure failures remain recorded. Separate controls showed that Stop bindings must also accept the Ctrl and Shift modifiers used by clipboard delivery: Omarchy uses ignore_mods; KDE can bind the key and its Ctrl variants. A separate final Fedora GNOME ten-minute run delivered all 1,162 words with full retained-audio parity but took 2,813 ms after Stop. These observations do not establish universal speed or compatibility."
+        "title": "The tray fallback",
+        "text": "Without the companion, the tray shows 4 state icons and animates 64 meter frames every 90 ms."
       },
       {
-        "title": "Test the actual installation command",
-        "text": "A fresh .45 Ubuntu Wayland installation on 20 September passed its local voice test, then rejected all 11 dictation attempts before recording. The short installer used dpkg and dependency repair, which skipped the recommended ydotool client and daemon. Earlier package tests used APT directly on X11, so they did not cover that journey. The .46 source candidate installs Wayland helpers explicitly and checks desktop input before onboarding completes. A voice test, helper readiness and verified cursor delivery are three separate checks. These follow-up findings describe newer work; the code viewer remains pinned to its recorded .43 snapshot."
-      },
-      {
-        "title": "Progress should follow the work",
-        "text": "The published .52 installer connects signal bars to measured transfer rates and a brief silver sweep to phase changes. The download runs independently: finishing work cancels animation immediately. Checksums download alongside the package and must pass before installation. Fifty-six local download trials found lower overhead than the .51 installer, but do not measure whole installations over the internet. Real Ubuntu APT tests preserve both package questions and existing configuration choices. The .52 release retains the same model and dictation behavior; its package and desktop checks are separate from these download timings. The pinned code viewer is unchanged."
-      },
-      {
-        "title": "Keep the installation in one place",
-        "text": "The .54 installer could leave old progress frames, separate stage headings and raw service messages in the terminal. The follow-up source candidate uses one compact Signal + Silver canvas through setup and replaces it with the completed state. Password and package prompts remain native and visible; a required desktop sign-out stays in the final view. This is candidate behavior, not a newly published installer. Download observations and isolated prompt tests do not qualify physical dictation."
-      },
-      {
-        "title": "Keep dependency upgrades accountable",
-        "text": "The .53 maintenance release integrates the 12 dependency PRs queued at the start of its cleanup. One shortcut update compiled successfully but would have loaded a second keyboard actor, bypassing VOCO's focus protection. The release carries the patch onto the new library and checks that both consumers share it. Compatible updates now arrive in small weekly groups; major upgrades and input dependencies remain separate. Exact-package installation and desktop tests qualify each new cut. The pinned .43 code viewer remains unchanged."
-      },
-      {
-        "title": "Upgrade the build as one system",
-        "text": "The .54 release pairs Vite 8 with React plugin 6 and Node 24 LTS. The app and its renderer tests must use the same Vite version; otherwise a passing test can exercise an older tool. Explicit output targets keep the previous compiler targets, but only the packaged WebKit app can establish how the production build behaves. Tauri also requires an updated tray library, carrying the same immutable icon-path patch. Source tests, fresh installation checks and the private GNOME journey have separate evidence. The signed release assets and public downloads are verified; the pinned .43 code viewer is unchanged."
-      },
-      {
-        "title": "Safe upgrades",
-        "text": "Debian preserves existing directory modes during upgrades. A real legacy-install test exposed inherited group-write permissions. A narrowly checked migration repairs only the known package-owned mode, preserving custom permissions and personal settings."
-      },
-      {
-        "title": "Keep obligations installed",
-        "text": "RPM can omit ordinary documentation on minimal systems. License files need explicit license metadata so those terms remain installed."
-      },
-      {
-        "title": "Keep build identities honest",
-        "text": "The 20 September release polish changed one Updates help sentence and bundled documentation. The refreshed c04a65c application passed all seven package lifecycles and four installed desktop scenarios: repeated sessions on Fedora, Omarchy and Ubuntu, plus Firefox on openSUSE. Their observed Stop times were 220\u2013498 ms. Earlier long and recovery tests above belong to the preceding f634e621 engine build; they were not rerun or relabeled. Two post-login Fedora focus setup failures and one temporary Omarchy test-keyring failure remain recorded. These small samples are not latency percentiles."
-      },
-      {
-        "title": "What TypeSafe contributes",
-        "text": "Optional semantic judgments assess a transcript's meaning. Exact code and real desktop tests establish package identity, audio timing, destination safety and compatibility. A language-model score cannot replace those checks."
+        "title": "The check cache",
+        "text": "VOCO reuses a panel check for 20 seconds, or for 2 seconds after a failed check."
       }
     ],
     "files": [
       {
-        "path": "docs/linux-support.md",
-        "why": "The support scope, setup and remaining release gates."
+        "path": "integrations/gnome/voco-panel@voco.local/extension.js",
+        "why": "The companion: the pill, the bars, the menu and the Wayland grab."
       },
       {
-        "path": "scripts/stage-native-packages.py",
-        "why": "Explicit native dependency profiles and license metadata."
+        "path": "integrations/gnome/voco-panel@voco.local/model.js",
+        "why": "The bar weights and height formula."
       },
       {
-        "path": "apps/desktop/src-tauri/src/trigger_socket.rs",
-        "why": "Private, single-attempt compositor control transport."
+        "path": "integrations/gnome/voco-panel@voco.local/metadata.json",
+        "why": "Declares GNOME 46 support."
       },
       {
-        "path": "docs/testing/linux-release-2026-09-19.md",
-        "why": "Dated outcomes and qualification limits."
+        "path": "apps/desktop/src-tauri/src/panel.rs",
+        "why": "VOCO's D-Bus service for the companion: Attach, state and the shortcut lease."
       },
       {
-        "path": "docs/testing/linux-release-2026-09-20.md",
-        "why": "Refreshed package checks and exact-build evidence boundaries."
+        "path": "apps/desktop/src-tauri/src/panel_setup.rs",
+        "why": "Checks and enables the companion, and caches the result."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/tray.rs",
+        "why": "The tray icon, hidden while the companion is attached."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/tray_icons.rs",
+        "why": "Writes the state icons and meter frames once."
+      },
+      {
+        "path": "apps/desktop/src-tauri/resources/voco_gnome_panel.py",
+        "why": "The helper behind --check-panel and --setup-panel."
+      },
+      {
+        "path": "apps/desktop/src/components/PanelSetup.tsx",
+        "why": "The Enable live panel button in setup and Help."
+      },
+      {
+        "path": "scripts/test-gnome-panel.py",
+        "why": "Runs real GNOME actors with a synthetic, transcript-free fixture."
+      },
+      {
+        "path": "scripts/test-panel-model.mjs",
+        "why": "Tests the bar formula."
+      },
+      {
+        "path": "apps/desktop/src/lib/audioLevel.ts",
+        "why": "Turns samples into the level the bars show."
+      },
+      {
+        "path": "scripts/package-gnome-panel.py",
+        "why": "Builds a reproducible extension zip without installing it."
       }
     ],
-    "caution": "These measurements cover the listed guests and scenarios; published availability is a separate check. The Omarchy long-session result uses virtual audio and one GTK recipient. Ubuntu GNOME Wayland/X11, Fedora GNOME Wayland and openSUSE KDE Wayland also have installed virtual-audio trials. Debian and Mint container checks establish package behavior, not their default desktops. Physical microphones and the wider application matrix still need their own evidence.",
+    "caution": "The companion is optional and supports only GNOME 46. Elsewhere, use the tray menu and, for another chord, a desktop binding that runs voco --toggle.",
     "quiz": {
-      "question": "The RPM installs, but dictation fails under the default compositor. Is that distribution ready?",
+      "question": "GNOME Shell stops calling GetState. What does VOCO do?",
       "answers": [
-        "Yes: installation is sufficient",
-        "No: package and desktop acceptance are separate gates"
+        "Keeps the tray icon hidden",
+        "Releases the companion and shows its tray icon again after 5 seconds",
+        "Restarts GNOME Shell"
       ],
       "correct": 1,
-      "why": "A native package is only one part of the experience. The microphone, shortcut, window and destination must work together."
+      "why": "VOCO watches for GetState. After more than 5 seconds without it, VOCO drops the companion's lease and brings back the tray icon, so status and Stop stay reachable."
     },
-    "lab": "journey"
+    "lab": "wave"
+  },
+  {
+    "id": "desktops",
+    "title": "Each desktop, its own helpers.",
+    "intro": "Linux desktops differ in how programs may read keys and send them. VOCO picks a helper for each job from the session it runs in.",
+    "story": [
+      "VOCO reads XDG_SESSION_TYPE. If it says wayland, VOCO takes the Wayland path; anything else takes the X11 path.",
+      "On Wayland, keys go through ydotool and its service, ydotoold. On GNOME with an X display, xclip sets the clipboard through XWayland: GNOME lacks the wlroots data-control protocol, wl-copy's temporary focus surface can stall, and XWayland bridges the clipboard without taking focus. Other Wayland desktops use wl-copy.",
+      "On X11, xdotool sends the keys and xclip sets the clipboard. The table below shows each combination."
+    ],
+    "steps": [
+      {
+        "label": "Detect",
+        "detail": "XDG_SESSION_TYPE=wayland selects the Wayland path. Any other value, or none, selects X11."
+      },
+      {
+        "label": "Shortcut",
+        "detail": "On X11 VOCO grabs the chord. On Wayland the GNOME companion grabs it, or VOCO reads the keyboards for the two presets."
+      },
+      {
+        "label": "Keys",
+        "detail": "On Wayland VOCO asks ydotool key --help which syntax the client takes: chord names for 0.1.8, keycode events for newer releases. X11 uses xdotool."
+      },
+      {
+        "label": "Clipboard",
+        "detail": "xclip on X11 and on GNOME with DISPLAY set, wl-copy on other Wayland sessions."
+      },
+      {
+        "label": "Paste",
+        "detail": "Every path ends with Shift+Insert into the focused app."
+      }
+    ],
+    "facts": [
+      {
+        "title": "Which daemon runs",
+        "text": "The service's launcher runs VOCO's private 0.1.8 daemon only when /usr/bin/ydotool matches a recorded identity: its SHA-256, and what dpkg reports about its package, version, architecture, install status and owner. Every file involved, and its parent folders, must be owned by root, not writable by group or others, and free of setuid or setgid bits. The private daemon must match its manifest. Otherwise the launcher runs /usr/bin/ydotoold."
+      },
+      {
+        "title": "The installer's part",
+        "text": "On Wayland the installer installs ydotool and ydotoold even when APT skips recommendations, runs voco --setup-desktop-input and reuses an input service that already works. Otherwise it needs write access to /dev/uinput, leaves any other running ydotoold alone and starts voco-ydotoold.service."
+      },
+      {
+        "title": "Updating the service",
+        "text": "voco --setup-desktop-input updates VOCO's packaged input service, and only while VOCO is closed."
+      },
+      {
+        "title": "Only a running daemon counts",
+        "text": "Before a Wayland paste VOCO checks with pgrep that ydotoold is running. If it isn't, VOCO suggests starting its input service with systemctl --user enable --now voco-ydotoold.service. A client that can't reach its service is rejected, with advice to start ydotoold for this login and check desktop setup again."
+      },
+      {
+        "title": "Keys stay on Wayland",
+        "text": "Even when xclip sets the clipboard on GNOME, the paste keys still go through ydotool."
+      }
+    ],
+    "files": [
+      {
+        "path": "apps/desktop/src-tauri/src/insertion.rs",
+        "why": "Chooses the clipboard helper and the paste keys for each session."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/desktop_input_setup.rs",
+        "why": "Checks and updates VOCO's input service."
+      },
+      {
+        "path": "packaging/systemd/voco-ydotoold.service",
+        "why": "The hardened input service."
+      },
+      {
+        "path": "packaging/ydotool/voco-ydotool-launcher",
+        "why": "Chooses which ydotoold the service runs."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/lib.rs",
+        "why": "Shortcut routes for each session."
+      },
+      {
+        "path": "integrations/gnome/voco-panel@voco.local/extension.js",
+        "why": "The GNOME grab on Wayland."
+      },
+      {
+        "path": "install",
+        "why": "Installs the Wayland helpers and starts the input service."
+      },
+      {
+        "path": "scripts/build-legacy-ydotool.py",
+        "why": "Builds the private daemon from verified source."
+      },
+      {
+        "path": "vendor/ydotool-legacy/SOURCE.json",
+        "why": "Pinned archives for the private daemon."
+      },
+      {
+        "path": "apps/desktop/src-tauri/tauri.conf.json",
+        "why": "The package's helper dependencies and recommendations."
+      },
+      {
+        "path": "scripts/test-ydotool-service.py",
+        "why": "Private tests for daemon selection, with no real input access."
+      }
+    ],
+    "caution": "The table shows which code path runs on each desktop, not whether every app there accepts the paste.",
+    "quiz": {
+      "question": "You use GNOME on Wayland, and DISPLAY is set. Which program sets the clipboard?",
+      "answers": [
+        "wl-copy",
+        "xclip, through XWayland",
+        "xdotool"
+      ],
+      "correct": 1,
+      "why": "GNOME lacks the data-control protocol, so with DISPLAY set VOCO uses xclip through XWayland, which needs no window that takes focus. The paste keys still go through ydotool."
+    },
+    "lab": "journey",
+    "comparison": {
+      "title": "Which helper does each job",
+      "headers": [
+        "Session",
+        "Shortcut",
+        "Keys",
+        "Clipboard helper"
+      ],
+      "rows": [
+        [
+          "GNOME on Wayland",
+          "The companion's Shell grab of Alt+D or Alt+Shift+D when attached; otherwise VOCO reads the keyboards for those presets, and the focused app also sees them",
+          "ydotool through the running ydotoold, after the modifier wait",
+          "xclip through XWayland when DISPLAY is set, otherwise wl-copy"
+        ],
+        [
+          "Other Wayland desktops",
+          "VOCO reads the keyboards for Alt+D and Alt+Shift+D, and the focused app also sees them; for another chord, a desktop binding that runs voco --toggle",
+          "ydotool through the running ydotoold, after the modifier wait",
+          "wl-copy"
+        ],
+        [
+          "X11",
+          "VOCO's global key grab, toggling on release",
+          "xdotool key --clearmodifiers shift+Insert",
+          "xclip"
+        ],
+        [
+          "IBus input source, any session",
+          "The VOCO Dictation input source consumes the chord in IBus-aware fields",
+          "Unchanged: the session's helper",
+          "Unchanged: the session's helper"
+        ]
+      ],
+      "scope": "Code paths at the commit this guide records. A session whose XDG_SESSION_TYPE isn't wayland takes the X11 path.",
+      "limits": "Pasting replaces CLIPBOARD and PRIMARY and leaves the words there. Keys go to whichever app has focus. Each desktop and app still needs its own testing."
+    },
+    "sourceNote": "The table follows insertion.rs (helpers and keys), lib.rs (shortcut routes) and extension.js (the GNOME grab). It describes code paths, not a compatibility promise."
   }
 ]

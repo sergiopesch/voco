@@ -3,81 +3,36 @@
 from pathlib import Path
 import argparse, hashlib, json, re, subprocess
 
-DEFAULT_COMMIT = "d8d14b3"
+DEFAULT_COMMIT = "7a533ed"
 GROUPS = [
-    ("apps/desktop/src-tauri/native/", "Native audio bridge", "C code connecting native microphone capture to the Rust boundary."),
-    ("apps/desktop/src-tauri/examples/", "Replay and research tools", "An executable replay, fixture or measurement example; not the ordinary app entry point."),
+    # First match wins, so specific prefixes come before the areas that contain them.
+    ("apps/desktop/src-tauri/native/", "Native audio bridge", "The C shim that opens one PulseAudio or PipeWire recording stream for native capture."),
+    ("apps/desktop/src-tauri/examples/", "Engineering tools", "A Rust fixture program that tests drive, such as the browser broker fixture; not built into the app."),
     ("apps/desktop/src-tauri/icons/", "Product assets", "An application icon bundled for desktop integration."),
-    (
-        "vendor/",
-        "Borrowed libraries",
-        "Upstream library code. VOCO carries specific patches; this is not all code written for VOCO.",
-    ),
-    (
-        "apps/desktop/src-tauri/resources/",
-        "Linux helpers",
-        "A packaged Linux integration helper or its tests.",
-    ),
-    (
-        "apps/desktop/src-tauri/src/",
-        "Rust backend",
-        "Native application code: operating-system authority, validation or lifecycle.",
-    ),
-    (
-        "apps/desktop/src/",
-        "Interface and capture",
-        "Frontend interface, recording orchestration or a supporting module.",
-    ),
-    (
-        "apps/desktop/public/",
-        "Product assets",
-        "A shipped static interface resource or audio worklet.",
-    ),
-    (
-        "runtime/speech/",
-        "Speech worker",
-        "Local recognition runtime, protocol, streaming or tests.",
-    ),
-    (
-        "runtime/",
-        "Runtime packaging",
-        "Pinned runtime configuration, notices or provisioning.",
-    ),
-    (
-        "integrations/",
-        "Optional browser route",
-        "Explicit Chromium integration; separate from normal desktop paste.",
-    ),
-    (
-        "scripts/",
-        "Engineering tools",
-        "A build, test, benchmark, verification or maintenance program.",
-    ),
-    (
-        "tests/",
-        "Test fixtures",
-        "A public test input or expectation; not private personal recordings.",
-    ),
-    (
-        "docs/",
-        "Documentation",
-        "Written guidance. Current implementation wins when a dated document disagrees.",
-    ),
-    (
-        "packaging/",
-        "Linux packages",
-        "Installation, desktop integration or package-channel metadata.",
-    ),
-    (
-        ".github/",
-        "GitHub automation",
-        "Repository automation and CI/release workflows.",
-    ),
-    (
-        "assets/",
-        "Brand identity",
-        "A retained brand asset or source; not recognition code.",
-    ),
+    ("apps/desktop/src-tauri/resources/", "Linux helpers", "The packaged IBus shortcut engine and its protocol, the GNOME companion check, and their tests."),
+    ("apps/desktop/src-tauri/src/", "Rust backend", "Native application code: operating-system access, validation, delivery and lifecycle."),
+    ("apps/desktop/src-tauri/tests/", "Rust backend", "A Rust integration test run by cargo test, such as desktop notifications or the glib iterator fix."),
+    ("apps/desktop/src-tauri/capabilities/", "Rust backend", "The Tauri capability file that limits which commands the interface may call."),
+    ("apps/desktop/src-tauri/", "Rust backend", "Rust crate setup: Cargo manifest and lock, build script and the Tauri app and package configuration."),
+    ("apps/desktop/src/", "Interface and capture", "React interface, recording orchestration, the phrase queue or a supporting module and its tests."),
+    ("apps/desktop/public/", "Product assets", "A shipped static interface resource, tray image or the audio worklet."),
+    ("apps/desktop/tests/", "Engineering tools", "A browser test page for the brand motion checks."),
+    ("apps/desktop/", "Interface and capture", "Frontend build setup: Vite, TypeScript, ESLint and the interface package manifest."),
+    ("runtime/speech/", "Speech worker", "The local recognition worker: protocol, streaming, native bridge, model identity and tests."),
+    ("runtime/native/", "Speech runtime build", "The pinned native recognizer build recipe and the patches VOCO applies to it."),
+    ("runtime/notices/", "Speech runtime build", "Licenses and notices shipped with the speech runtime and model."),
+    ("integrations/gnome/", "GNOME companion", "The optional GNOME Shell top-bar companion: meter, menu and Wayland shortcut grab."),
+    ("integrations/chromium/", "Browser field route", "The optional Chromium extension that writes into one exact text field."),
+    ("scripts/", "Engineering tools", "A build, test, packaging, verification or measurement program."),
+    ("tests/", "Test fixtures", "Public test inputs such as speech clips and installer fixtures; no personal recordings."),
+    ("docs/guide/", "This guide", "Inside VOCO itself: the local server, site, lesson generator and tests."),
+    ("docs/", "Documentation", "Written guidance. When a document and the code disagree, the code wins."),
+    ("packaging/", "Linux packages", "Package files: desktop entry, AppStream data, IBus component, input service, browser host manifest, install hook and the published-release record."),
+    ("vendor/", "Borrowed libraries", "Upstream code that VOCO patches or builds, with provenance records; not code written for VOCO."),
+    (".github/", "GitHub automation", "The CI workflow, issue and pull request templates, and dependency update settings."),
+    ("assets/", "Brand identity", "A brand image or its source notes; not application logic."),
+    ("install", "Release installer", "The guided installer that downloads a release, checks its signature and checksums, and installs the package."),
+    ("KEYS", "Release installer", "The public key that signs release checksums."),
 ]
 
 
