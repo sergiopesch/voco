@@ -84,7 +84,9 @@ try{
   report.continuity={...result,...checkRepeatedContinuity(Array(18).fill(short.reference).join(' '),result.text,short.reference),wavSha256:hash(repeated)};
   console.log(`${report.continuity.passed?'PASS':'FAIL'} repeated speech`);
   for(const seconds of [10,20,30]){const result=await transcribe(Array(seconds*16000).fill(0));report.silence.push({seconds,...result,passed:result.text===''});}
-  for(const [name,audio] of [['quiet',short.audio.map(x=>x*0.1)],['leading-silence',[...Array(16000).fill(0),...short.audio]],['trailing-silence',[...short.audio,...Array(16000).fill(0)]],['partial-stop-packet',short.audio]]){
+  // Stop just after a packet boundary: the final push carries one sample.
+  const stopTail=(1601-short.audio.length%1600)%1600;
+  for(const [name,audio] of [['quiet',short.audio.map(x=>x*0.1)],['leading-silence',[...Array(16000).fill(0),...short.audio]],['trailing-silence',[...short.audio,...Array(16000).fill(0)]],['partial-stop-packet',[...short.audio,...Array(stopTail).fill(0)]]]){
     const result=await transcribe(audio),score=scoreTranscript(short.reference,result.text);
     report.variants.push({name,...result,score,passed:score.hypothesisWords>0 && score.wer<=short.maxWer});
   }

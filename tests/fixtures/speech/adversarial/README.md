@@ -33,13 +33,13 @@ them. From the repository root:
 
 ```bash
 /usr/bin/python3 scripts/evaluate-dictation-worker.py --runtime runtime/speech \
-  --output /tmp/voco-held-out --split held-out --packet-ms 100
+  --output /tmp/voco-held-out --split held-out
 node scripts/score-dictation-worker.mjs /tmp/voco-held-out/run.json /tmp/voco-held-out/score.json
 ```
 
-`--split all` adds the development clips. The evaluator sends 20 ms packets
-unless `--packet-ms` says otherwise, and VOCO sends 100 ms. Its Python needs
-NumPy and psutil.
+`--split all` adds the development clips. The evaluator sends 100 ms packets,
+as VOCO does, unless `--packet-ms` says otherwise. Its Python needs NumPy and
+psutil.
 [TypeSafe evaluation](../../../../docs/testing/typesafe-evaluation.md) covers
 the other options.
 

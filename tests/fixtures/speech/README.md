@@ -87,6 +87,7 @@ keeps the report for 7 days in the `speech-regression-evidence` artifact.
 - The references are in capitals without sentence punctuation, so nothing here
   scores case or punctuation.
 - The baseline tests the worker alone, not capture, Tauri IPC or paste.
-- The runner checks only the form of the manifest's `modelSha256`; the model's
+- The manifest's `modelSha256` identifies the recognizer the bounds were first
+  set against, not Nemotron. The runner checks only its form; the pinned model's
   hash comes from `MODEL-IDENTITY.json`. The worker hash in the report covers
   `stream_worker.py`, not the modules it imports.
