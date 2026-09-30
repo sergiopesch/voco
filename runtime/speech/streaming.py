@@ -175,6 +175,12 @@ class StreamingSession:
         self.cancel()
         self.model.close()
 
+def state_home():
+    """XDG_STATE_HOME if it is absolute; the spec says to ignore empty or relative values."""
+    value = os.environ.get('XDG_STATE_HOME', '')
+    return Path(value) if os.path.isabs(value) else Path.home()/'.local/state'
+
+
 class PrivateRotatingHandler(RotatingFileHandler):
     def handleError(self, record):
         raise OSError("metrics write failed")
@@ -215,7 +221,7 @@ class Metrics:
         print('{"event":"worker_metrics_unavailable"}', file=sys.stderr, flush=True)
 
     def _initialize(self):
-        root = Path(os.environ.get('XDG_STATE_HOME', str(Path.home()/'.local/state')))/'voco/stream-performance'
+        root = state_home()/'voco/stream-performance'
         root.mkdir(mode=0o700, parents=True, exist_ok=True)
         metadata = root.lstat()
         if (not stat.S_ISDIR(metadata.st_mode) or metadata.st_uid != os.geteuid()

@@ -155,9 +155,8 @@ fn monotonic_trace_ms() -> u128 {
 }
 
 fn xdg_state_home() -> std::path::PathBuf {
-    std::env::var_os("XDG_STATE_HOME")
-        .map(std::path::PathBuf::from)
-        .or_else(dirs::state_dir)
+    // dirs ignores an empty or relative XDG_STATE_HOME, as the XDG spec requires.
+    dirs::state_dir()
         .or_else(|| dirs::home_dir().map(|home| home.join(".local/state")))
         .unwrap_or_else(std::env::temp_dir)
 }

@@ -215,8 +215,11 @@ def read_entries(paths):
 
 
 def main():
+    # Like VOCO, ignore an empty or relative XDG_STATE_HOME.
+    state_home = os.environ.get('XDG_STATE_HOME', '')
+    state = Path(state_home) if os.path.isabs(state_home) else Path.home() / '.local/state'
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('directory', nargs='?', type=Path, default=Path(os.environ.get('XDG_STATE_HOME', str(Path.home() / '.local/state'))) / 'voco/performance')
+    parser.add_argument('directory', nargs='?', type=Path, default=state / 'voco/performance')
     parser.add_argument('--run', help='Run ID; defaults to the latest observed run')
     parser.add_argument('--json', action='store_true', help='Print the complete machine-readable report')
     args = parser.parse_args()
