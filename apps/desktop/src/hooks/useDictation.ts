@@ -44,7 +44,7 @@ import type {
   DictationStatus
 } from "@/types";
 import { useCallback,useEffect,useRef,useState } from "react";
-import { BenchmarkPhraseQueue } from '../lib/benchmarkPhraseQueue';
+import { DictationStream } from '../lib/dictationStream';
 
 const AUDIO_LEVEL_ATTACK = 0.68;
 const AUDIO_LEVEL_RELEASE = 0.24;
@@ -100,7 +100,7 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
   const browserDeliveryRef = useRef<BrowserStreamDelivery | null>(null);
   const activeTriggerIdRef = useRef<string | undefined>(undefined);
   const desktopPasteSessionRef = useRef(false);
-  const desktopPhraseQueueRef = useRef<BenchmarkPhraseQueue | null>(null);
+  const dictationStreamRef = useRef<DictationStream | null>(null);
   const desktopStreamedSampleCountRef = useRef(0);
   const desktopPhrasePasteCountRef = useRef(0);
   const debugNativeCaptureEnabledRef = useRef(false);
@@ -253,7 +253,7 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
   if (desktopCaptureRef.current === null) {
     desktopCaptureRef.current = createDesktopCaptureTail({
       audioBufferRef,
-      desktopPhraseQueueRef,
+      dictationStreamRef,
       desktopStreamedSampleCountRef,
       phaseRef,
       captureHealthRef,
@@ -460,7 +460,7 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
       disposedRef,
       cancelledRef,
       browserDeliveryRef,
-      desktopPhraseQueueRef,
+      dictationStreamRef,
       desktopPasteSessionRef,
       desktopStreamedSampleCountRef,
       desktopPhrasePasteCountRef,

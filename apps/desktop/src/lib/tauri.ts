@@ -9,7 +9,7 @@ import type {
   RuntimeStatusSnapshot
 } from "@/types";
 import { invoke } from "@tauri-apps/api/core";
-import type { PasteCorrelation } from "./benchmarkPhraseQueue";
+import type { PasteCorrelation } from "./dictationStream";
 
 export async function getConfig(): Promise<ConfigSnapshot> {
   return invoke<ConfigSnapshot>("get_config");

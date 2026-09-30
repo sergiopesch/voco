@@ -23,7 +23,7 @@ beforeEach(() => {
   ipc.mockReset().mockImplementation(async (command: string, args?: { request?: object }) => {
     if (failing.has(command)) throw new Error("read-only filesystem");
     if (command === "get_crash_journal_epoch") return 1;
-    if (command === "benchmark_stream") return { ...args?.request, mode: "append-only", text: null };
+    if (command === "speech_stream") return { ...args?.request, mode: "append-only", text: null };
   });
 });
 
@@ -68,7 +68,7 @@ function harness() {
     disposedRef: ref(false),
     cancelledRef: cancelled,
     browserDeliveryRef: ref(null),
-    desktopPhraseQueueRef: queue,
+    dictationStreamRef: queue,
     desktopPasteSessionRef: pasteSession,
     desktopStreamedSampleCountRef: ref(0),
     desktopPhrasePasteCountRef: ref(0),
@@ -188,7 +188,7 @@ it("reaches source selection from input readiness alone, with no destination bin
 
 it("notifies a live recognition failure once, not again at Stop", async () => {
   const h = harness();
-  failing.add("benchmark_stream");
+  failing.add("speech_stream");
   h.env.captureSelectionRef.current = () => ({ backend: "native", selectionToken: "fixture-source" });
   vi.mocked(h.env.beginNativeCapture).mockResolvedValue({
     descriptor: {}, cancel: vi.fn(async () => {}), startDelivery: vi.fn(),

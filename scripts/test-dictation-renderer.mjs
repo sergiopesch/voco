@@ -107,24 +107,24 @@ await page.addInitScript(() => {
  window.tracks = [];
  // Exercise the real append-only queue against an explicit native IPC double.
  // No alternate recognition transport exists.
- window.benchmarkRequests = [];
- window.benchmarkAudioSamples = 0;
+ window.speechRequests = [];
+ window.speechAudioSamples = 0;
  window.__TAURI_INTERNALS__ = {invoke: async (command, args) => {
    if(command === 'get_crash_journal_epoch') return 1;
    if(command.endsWith('_crash_journal')) { (window.journalCalls??=[]).push([command,args]); if(command === 'keep_crash_journal' && window.failKeep) throw new Error('Synthetic Review failure'); return; }
    const {request}=args;
-   if(command !== 'benchmark_stream') throw new Error('Unexpected native command: ' + command);
-   window.benchmarkRequests.push(request);
+   if(command !== 'speech_stream') throw new Error('Unexpected native command: ' + command);
+   window.speechRequests.push(request);
    if(request.op === 'warmup' || request.op === 'diagnostic' || request.op === 'quality') return {};
    if(request.op === 'start') {
      if(request.seq !== 0 || typeof request.session !== 'string') throw new Error('Invalid stream start');
-     window.benchmarkSession = request.session;
-     window.benchmarkSequence = 0;
-     window.benchmarkAudioSamples = 0;
-   } else if(request.session !== window.benchmarkSession || request.seq <= window.benchmarkSequence) {
+     window.speechSession = request.session;
+     window.speechSequence = 0;
+     window.speechAudioSamples = 0;
+   } else if(request.session !== window.speechSession || request.seq <= window.speechSequence) {
      throw new Error('Stream request identity or sequence changed');
    }
-   window.benchmarkSequence = request.seq;
+   window.speechSequence = request.seq;
    let text = null;
    if(request.op === 'push') {
      if(request.rate !== 16000 || !Array.isArray(request.audio) || !request.audio.length ||
@@ -133,9 +133,9 @@ await page.addInitScript(() => {
        await new Promise(resolve => window.resolveInference = resolve);
        window.deferInference = false;
      }
-     window.benchmarkAudioSamples += request.audio.length;
+     window.speechAudioSamples += request.audio.length;
      const plan = window.streamTextAt ?? [{samples:16000,text:'Recovered words'}];
-     text = plan.filter(item => item.samples <= window.benchmarkAudioSamples).at(-1)?.text ?? null;
+     text = plan.filter(item => item.samples <= window.speechAudioSamples).at(-1)?.text ?? null;
    } else if(request.op === 'finish') {
      text = window.streamFinalText ?? 'Recovered words for manual review.';
    } else if(!['start','cancel'].includes(request.op)) throw new Error('Unexpected stream operation');
@@ -229,7 +229,7 @@ await load();await page.evaluate(()=>{window.desktopPaste=true;window.desktopStr
 await start(0.5);
 await page.evaluate(()=>{window.captureWorklet.port.postMessage=()=>{};});
 await stop();await interrupted();
-assert.equal(await page.evaluate(()=>window.benchmarkRequests.some(r=>r.op==='finish')),false);
+assert.equal(await page.evaluate(()=>window.speechRequests.some(r=>r.op==='finish')),false);
 assert.match(await page.evaluate(()=>window.store.getState().error),/end of this recording/);
 results.push('A missing capture-flush receipt cannot finish recognition or deliver a final suffix.');
 // Default NVIDIA route must honor the same capture-completeness policy.
@@ -243,7 +243,7 @@ for (const failure of ['module', 'construction']) {
   assert.equal(await page.evaluate(()=>Boolean(window.processor?.onaudioprocess)),true);
   assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>c[0]==='showNotification'&&c[1]==="Dictation won't be typed")),true);
   assert.equal(await page.evaluate(()=>window.store.getState().captureNotice),null);
-  assert.equal(await page.evaluate(()=>window.benchmarkRequests.some(r=>['start','push'].includes(r.op))),false);
+  assert.equal(await page.evaluate(()=>window.speechRequests.some(r=>['start','push'].includes(r.op))),false);
   assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>c[0]==='pasteDesktopText')),false);
   await stop();await interrupted();
   assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>['transcribeAudio','pasteDesktopText'].includes(c[0]))),false);
@@ -263,7 +263,7 @@ await page.waitForFunction(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktop
 assert.equal(await page.evaluate(()=>window.store.getState().status),'recording');
 await page.evaluate(()=>window.samples(1));await stop();await page.waitForFunction(()=>window.store.getState().status==='idle');
 assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length),2);
-assert.equal(await page.evaluate(()=>window.benchmarkRequests.filter(r=>['start','push','finish'].includes(r.op)).every((r,index)=>r.seq===index)),true);
+assert.equal(await page.evaluate(()=>window.speechRequests.filter(r=>['start','push','finish'].includes(r.op)).every((r,index)=>r.seq===index)),true);
 assert.equal(await page.evaluate(()=>window.traceEvents.filter(c=>c[0]==='dictation_desktop_first_phrase_dispatched').length),1);
 assert.equal(await page.evaluate(()=>window.traceEvents.filter(c=>c[0]==='dictation_desktop_modifier_wait_completed').length),2);
 assert.equal(await page.evaluate(()=>window.traceEvents.find(c=>c[0]==='dictation_desktop_keyboard_dispatch_completed')[1].durationMs),350);
@@ -272,7 +272,7 @@ await load();await page.evaluate(()=>{window.desktopPaste=true;window.desktopStr
 await start();await page.evaluate(()=>window.captureWorklet.port.onmessage({data:{type:'samples',data:new Float32Array(16000)}}));
 await page.waitForFunction(()=>Boolean(window.resolveInference));
 await page.evaluate(()=>{void window.hook.cancelRecording();});await page.evaluate(()=>window.resolveInference());
-await page.waitForFunction(()=>window.benchmarkRequests.some(r=>r.op==='cancel'));
+await page.waitForFunction(()=>window.speechRequests.some(r=>r.op==='cancel'));
 assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length),0);
 results.push('Cancellation while a progressive worker request is in flight drains the cancel command and suppresses its late paste.');
 for (const [failCopy, failKeep] of [[false, false], [true, false], [true, true]]) {
@@ -286,7 +286,7 @@ for (const [failCopy, failKeep] of [[false, false], [true, false], [true, true]]
   else await page.waitForFunction(()=>window.store.getState().status==='idle',null,{timeout:6000});
   assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length),1);
   assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='copyDesktopText').map(c=>c[1])),['Recovered words for manual review.']);
-  assert.equal(await page.evaluate(()=>window.benchmarkAudioSamples),48000);
+  assert.equal(await page.evaluate(()=>window.speechAudioSamples),48000);
   assert.equal(await page.evaluate(()=>window.store.getState().transcript),'');
   assert.equal(await page.evaluate(()=>window.store.getState().recovery),null);
   assert.notEqual(await page.evaluate(()=>window.store.getState().surface),'review');
@@ -324,13 +324,13 @@ await page.evaluate(()=>{
    window.captureWorklet.port.onmessage({data:{type:'samples',data:batch.slice(from,to)}});
  }
 });
-await page.waitForFunction(()=>window.benchmarkAudioSamples===32000);
+await page.waitForFunction(()=>window.speechAudioSamples===32000);
 assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length),0);
 await stop(); await page.waitForFunction(()=>window.store.getState().status==='idle');
-assert.deepEqual(await page.evaluate(()=>window.benchmarkRequests.filter(r=>r.op==='push').flatMap(r=>r.audio)),await page.evaluate(()=>window.expectedStreamAudio));
-assert.deepEqual(await page.evaluate(()=>window.benchmarkRequests.filter(r=>r.op==='push').map(r=>r.audio.length)),[...Array(20).fill(1600),321]);
+assert.deepEqual(await page.evaluate(()=>window.speechRequests.filter(r=>r.op==='push').flatMap(r=>r.audio)),await page.evaluate(()=>window.expectedStreamAudio));
+assert.deepEqual(await page.evaluate(()=>window.speechRequests.filter(r=>r.op==='push').map(r=>r.audio.length)),[...Array(20).fill(1600),321]);
 assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').map(c=>c[1])),['Exact captured samples.']);
-assert.equal(await page.evaluate(()=>window.benchmarkRequests.filter(r=>r.op==='finish').length),1);
+assert.equal(await page.evaluate(()=>window.speechRequests.filter(r=>r.op==='finish').length),1);
 results.push('Irregular callbacks retain every speech and silence sample in 100 ms packets, flush the partial tail exactly once, and deliver only the final recognized text.');
 
 await load(); await page.evaluate(()=>{
@@ -340,7 +340,7 @@ await load(); await page.evaluate(()=>{
 });
 await start(0);
 await page.evaluate(()=>window.samples(0.8));
-await page.waitForFunction(()=>window.benchmarkAudioSamples===12800);
+await page.waitForFunction(()=>window.speechAudioSamples===12800);
 assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length),0);
 await page.evaluate(()=>window.samples(0.2));
 await page.waitForFunction(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length===1);
@@ -350,13 +350,13 @@ await page.evaluate(()=>window.samples(0.3));
 await page.waitForFunction(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length===2);
 assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').map(c=>c[1])),['Words appe','ar during speech']);
 await page.evaluate(()=>window.samples(0.25));
-await page.waitForFunction(()=>window.benchmarkAudioSamples===24000);
+await page.waitForFunction(()=>window.speechAudioSamples===24000);
 assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length),2);
 await stop(); await page.waitForFunction(()=>window.store.getState().status==='idle');
 assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').map(c=>c[1])),['Words appe','ar during speech',' before stopping now.']);
 assert.equal(await page.evaluate(()=>window.traceEvents.filter(c=>c[0]==='dictation_desktop_live_prefix_dispatched').length),3);
 assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>['previewTranscribeAudio','transcribeAudio'].includes(c[0])).length),0);
-assert.equal(await page.evaluate(()=>window.benchmarkRequests.filter(r=>r.op==='finish').length),1);
+assert.equal(await page.evaluate(()=>window.speechRequests.filter(r=>r.op==='finish').length),1);
 await screenshot('continuous-speech-finished.png');
 results.push('Uninterrupted input appends partial words exactly as the worker responds, suppresses repeated hypotheses, and Stop adds only the remaining suffix without legacy re-decoding.');
 
@@ -366,13 +366,13 @@ await start(0);
 // multi-minute backlog intentionally rejected by the three-second queue bound.
 for(let second=1;second<=300;second++) {
  await page.evaluate(()=>window.samples(1));
- await page.waitForFunction(samples=>window.benchmarkAudioSamples===samples,second*16000);
+ await page.waitForFunction(samples=>window.speechAudioSamples===samples,second*16000);
 }
-assert.equal(await page.evaluate(()=>window.benchmarkRequests.filter(r=>r.op==='push').length),3000);
-assert.equal(await page.evaluate(()=>window.benchmarkRequests.some(r=>r.op==='diagnostic')),false);
+assert.equal(await page.evaluate(()=>window.speechRequests.filter(r=>r.op==='push').length),3000);
+assert.equal(await page.evaluate(()=>window.speechRequests.some(r=>r.op==='diagnostic')),false);
 assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>['previewTranscribeAudio','transcribeAudio'].includes(c[0]))),false);
 await stop(); await page.waitForFunction(()=>window.store.getState().status==='idle');
-assert.equal(await page.evaluate(()=>window.benchmarkRequests.filter(r=>r.op==='finish').length),1);
+assert.equal(await page.evaluate(()=>window.speechRequests.filter(r=>r.op==='finish').length),1);
 assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').map(c=>c[1])),['Long stream completed.']);
 results.push('Five minutes of simulated captured audio maintains sequenced 100 ms IPC packets, avoids whole-history decoding and finishes once after all captured audio.');
 
@@ -386,12 +386,12 @@ await start(0);
 for(let second=1;second<=300;second++) {
  if(second===120) await page.evaluate(()=>window.failPaste=true);
  await page.evaluate(()=>window.samples(1));
- await page.waitForFunction(samples=>window.benchmarkAudioSamples===samples,second*16000);
+ await page.waitForFunction(samples=>window.speechAudioSamples===samples,second*16000);
 }
 await page.evaluate(()=>window.samples(701/16000));
 await stop();await page.waitForFunction(()=>window.store.getState().status==='idle',null,{timeout:6000});
-assert.equal(await page.evaluate(()=>window.benchmarkAudioSamples),4800701);
-assert.equal(await page.evaluate(()=>window.benchmarkRequests.filter(r=>r.op==='finish').length),1);
+assert.equal(await page.evaluate(()=>window.speechAudioSamples),4800701);
+assert.equal(await page.evaluate(()=>window.speechRequests.filter(r=>r.op==='finish').length),1);
 assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length),2,'One successful paste and one rejection; no retry');
 assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='copyDesktopText').map(c=>c[1])),[' Later speech remains available through Stop.']);
 assert.equal(await page.evaluate(()=>window.store.getState().transcript),'');
@@ -401,7 +401,7 @@ assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='showNo
 await page.evaluate(()=>{window.failPaste=false;window.hook.toggle();});
 await page.waitForFunction(()=>window.store.getState().status==='recording');
 assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='showNotification'&&c[1]==='Previous transcript available').length),0);
-assert.equal(await page.evaluate(()=>window.benchmarkRequests.filter(r=>r.op==='start').length),2);
+assert.equal(await page.evaluate(()=>window.speechRequests.filter(r=>r.op==='start').length),2);
 await page.evaluate(()=>window.hook.cancelRecording());
 results.push('Delivery interrupted at two minutes still recognizes five minutes plus partial Stop tail, never retries insertion, copies only the untyped words and admits next recording.');
 

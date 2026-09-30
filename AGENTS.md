@@ -16,9 +16,8 @@ Read [README](README.md), [the code map](docs/architecture/code-map.md) and
 
 ## Architecture
 
-The production path is `runtime/speech/` → Rust `benchmark_stream.rs` →
-`benchmarkPhraseQueue.ts` → `insertion.rs`. Despite their historical names,
-these are production modules. The selected runtime is NVIDIA Nemotron English
+The production path is `runtime/speech/` → Rust `speech_stream.rs` →
+`dictationStream.ts` → `insertion.rs`. The selected runtime is NVIDIA Nemotron English
 0.6B Q8 CPU. Keep the default worker count capped to at most four threads, leaving one CPU
 from process affinity for desktop work (minimum one worker); preserve explicit research overrides and record actual counts. Desktop and Chromium exact-field dictation use this one recognizer.
 Browser field ownership is a delivery concern, independent of recognition.

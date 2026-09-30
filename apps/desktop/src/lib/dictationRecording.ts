@@ -5,7 +5,7 @@ import {
 } from "@/lib/audioCaptureBuffer";
 import { AudioCaptureFlushError } from "@/lib/audioCaptureFlush";
 import { calculateVisualAudioLevelFromSamples } from "@/lib/audioLevel";
-import { BenchmarkPhraseQueue } from "@/lib/benchmarkPhraseQueue";
+import { DictationStream } from "@/lib/dictationStream";
 import {
   createCaptureDescriptor,
   type CaptureDescriptor,
@@ -55,7 +55,7 @@ export interface DictationRecordingEnv {
   disposedRef: Ref<boolean>;
   cancelledRef: Ref<string | null>;
   browserDeliveryRef: Ref<BrowserStreamDelivery | null>;
-  desktopPhraseQueueRef: Ref<{
+  dictationStreamRef: Ref<{
     cancel(): void;
     finish(): Promise<{ undelivered: string; uncertain?: boolean }>;
     pushAudio?(samples: Float32Array, sampleRate: number): void;
@@ -125,7 +125,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     disposedRef,
     cancelledRef,
     browserDeliveryRef,
-    desktopPhraseQueueRef,
+    dictationStreamRef,
     desktopPasteSessionRef,
     desktopStreamedSampleCountRef,
     desktopPhrasePasteCountRef,
@@ -232,7 +232,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       const native = nativeCaptureRef.current;
       nativeCaptureRef.current = null;
       void native?.cancel().catch(() => {});
-      desktopPhraseQueueRef.current = null;
+      dictationStreamRef.current = null;
       clearCapturedAudio();
       clearTranscript();
       current.setRecovery(null);
@@ -312,8 +312,8 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     if (onboardingTest) useStore.getState().setOnboardingTestPassed(false);
     activeTriggerIdRef.current = triggerId;
     desktopPasteSessionRef.current = false;
-    desktopPhraseQueueRef.current?.cancel();
-    desktopPhraseQueueRef.current = null;
+    dictationStreamRef.current?.cancel();
+    dictationStreamRef.current = null;
     void browserDeliveryRef.current?.cancel();
     browserDeliveryRef.current = null;
     desktopStreamedSampleCountRef.current = 0;
@@ -526,7 +526,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       if (captureAdmission === "automatic") {
         const rate = recordingSampleRate();
         let firstPhraseDispatched = false;
-        desktopPhraseQueueRef.current = new BenchmarkPhraseQueue(async (text, correlation) => {
+        dictationStreamRef.current = new DictationStream(async (text, correlation) => {
           assertOutputAllowed(startingSessionId);
           // Onboarding exercises recognition without owning or mutating another app.
           if (onboardingTest) return;
@@ -575,7 +575,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
         // Audio can arrive while the worklet is starting. Keep planner offsets
         // aligned with the complete retained source, including that prefix.
         const prefix = collectAudioSamplesRange(audioBufferRef.current, 0, audioBufferRef.current.sampleCount);
-        desktopPhraseQueueRef.current?.pushAudio?.(prefix, rate);
+        dictationStreamRef.current?.pushAudio?.(prefix, rate);
         desktopStreamedSampleCountRef.current = prefix.length;
         traceDictationEvent("dictation_desktop_stream_started").catch(() => {});
       }
@@ -675,15 +675,15 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       } catch (error) {
         if (error instanceof AudioCaptureFlushError && isCurrentSession(stoppingSessionId)) {
           // Without a stream queue the capture was never verified, so nothing was typed.
-          cancelledRef.current ??= desktopPhraseQueueRef.current ? error.message : UNVERIFIED_CAPTURE_REASON;
-          desktopPhraseQueueRef.current?.cancel();
+          cancelledRef.current ??= dictationStreamRef.current ? error.message : UNVERIFIED_CAPTURE_REASON;
+          dictationStreamRef.current?.cancel();
           useStore.getState().setCaptureNotice(cancelledRef.current);
         }
         throw error;
       }
       assertOutputAllowed(stoppingSessionId);
       resetAudioLevel();
-      const queue = desktopPhraseQueueRef.current;
+      const queue = dictationStreamRef.current;
       if (!queue) {
         await finishJournal();
         // Unverified capture is never typed.
@@ -707,7 +707,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       assertOutputAllowed(stoppingSessionId);
       traceDictationEvent("dictation_desktop_stream_flush_completed", { durationMs: Math.round(performance.now() - started) }).catch(() => {});
       if (stopRequestedAtMsRef.current !== null) traceDictationEvent("dictation_stop_to_final_transcript", { durationMs: Math.round(performance.now() - stopRequestedAtMsRef.current) }).catch(() => {});
-      desktopPhraseQueueRef.current = null;
+      dictationStreamRef.current = null;
       if (undelivered.trim() && (desktopPasteSessionRef.current || browser)) {
         // Text the app did not take (or may not have taken) is never replayed;
         // the clipboard lets the user paste it themselves, and Review keeps
@@ -736,7 +736,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       finalizeIdleState();
     } catch (error) {
       if (!isCurrentSession(stoppingSessionId)) return;
-      desktopPhraseQueueRef.current?.cancel();
+      dictationStreamRef.current?.cancel();
       void browserDeliveryRef.current?.cancel();
       resetAudioLevel();
       let cleanupFailure: unknown = null;
@@ -754,7 +754,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     // The session now ends without the Stop a live notice asked for, so the
     // interruption still notifies.
     if (interruptionNotifiedSession === sessionRef.current.sessionId) interruptionNotifiedSession = null;
-    desktopPhraseQueueRef.current?.cancel();
+    dictationStreamRef.current?.cancel();
     void browserDeliveryRef.current?.cancel();
     setCancellationPending(true);
     setCanCancel(false);
@@ -768,7 +768,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
 
   function dispose() {
     disposedRef.current = true;
-    desktopPhraseQueueRef.current?.cancel();
+    dictationStreamRef.current?.cancel();
     void browserDeliveryRef.current?.cancel();
     releaseRecordingOrigin();
     lifecycleEpochRef.current += 1;

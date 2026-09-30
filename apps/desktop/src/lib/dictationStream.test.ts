@@ -1,12 +1,12 @@
 import {beforeEach,describe,expect,it,vi} from 'vitest';
 const transport=vi.hoisted(()=>vi.fn().mockResolvedValue({}));
 vi.mock('@tauri-apps/api/core',()=>({invoke:transport}));
-import {appendOnlySuffix,BenchmarkPhraseQueue,textLengths} from './benchmarkPhraseQueue';
+import {appendOnlySuffix,DictationStream,textLengths} from './dictationStream';
 const worker=vi.fn();
 const quality=()=>transport.mock.calls.map(c=>c[1].request).filter(r=>r.op==='quality');
 const requests=()=>transport.mock.calls.map(c=>c[1].request).filter(r=>!['quality','diagnostic'].includes(r.op));
 const noMutation={outcome:'no-mutation',message:'Physical modifiers are still held.',clipboardChanged:true};
-const make=()=>{const paste=vi.fn(async(_s:string)=>{}),observed=vi.fn(),failure=vi.fn();return {paste,observed,failure,queue:new BenchmarkPhraseQueue(paste,observed,failure,vi.fn())};};
+const make=()=>{const paste=vi.fn(async(_s:string)=>{}),observed=vi.fn(),failure=vi.fn();return {paste,observed,failure,queue:new DictationStream(paste,observed,failure,vi.fn())};};
 beforeEach(()=>{worker.mockReset().mockResolvedValue({});transport.mockReset().mockImplementation((c,args)=>['quality','diagnostic'].includes(args.request.op)?Promise.resolve({logged:true}):worker(c,args));});
 describe('pinned append-only candidate',()=>{
  it('extends partial words and punctuation without inventing spaces',()=>{
@@ -25,13 +25,13 @@ describe('pinned append-only candidate',()=>{
   let n=0;worker.mockImplementation(async(_c,{request:r})=>({...r,mode:'append-only',text:r.op==='start'?null:['Hello','Hallo'][n++]}));
   const {queue,paste,observed,failure}=make();queue.pushAudio(new Float32Array(3200),16000);await expect(queue.finish()).rejects.toThrow('revised');
   expect(paste).toHaveBeenCalledTimes(1);expect(observed).toHaveBeenLastCalledWith('Hallo');expect(failure).toHaveBeenCalledOnce();
-  expect(transport).toHaveBeenCalledWith('benchmark_stream',{request:expect.objectContaining({op:'diagnostic',reason:'prefix_revision'})});
+  expect(transport).toHaveBeenCalledWith('speech_stream',{request:expect.objectContaining({op:'diagnostic',reason:'prefix_revision'})});
  });
  it('preserves the native insertion rejection message for recovery',async()=>{
   worker.mockImplementation(async(_c,{request:r})=>({...r,mode:'append-only',text:r.op==='push'?'Synthetic phrase':null}));
   const failure={outcome:'rejected',message:'Click in a text field and try again.',clipboardChanged:false};
   const onFailure=vi.fn();
-  const queue=new BenchmarkPhraseQueue(async()=>{throw failure},vi.fn(),onFailure,vi.fn());
+  const queue=new DictationStream(async()=>{throw failure},vi.fn(),onFailure,vi.fn());
   queue.pushAudio(new Float32Array(1600),16000);
   await expect(queue.finish()).resolves.toEqual({undelivered:'Synthetic phrase',uncertain:false});
   expect(onFailure).toHaveBeenCalledWith(expect.objectContaining({message:failure.message}),'delivery');
@@ -40,7 +40,7 @@ describe('pinned append-only candidate',()=>{
  it('continues recognition and Stop tail after delivery fails without retrying insertion',async()=>{
   worker.mockImplementation(async(_c,{request:r})=>({...r,mode:'append-only',text:r.op==='start'?null:r.op==='finish'?'First and later words.':r.sample_end<=1600?'First':'First and later words'}));
   const paste=vi.fn(async()=>{throw new Error('Destination changed');}),observed=vi.fn(),failure=vi.fn();
-  const queue=new BenchmarkPhraseQueue(paste,observed,failure,vi.fn());
+  const queue=new DictationStream(paste,observed,failure,vi.fn());
   queue.pushAudio(new Float32Array(1600),16000);
   await vi.waitFor(()=>expect(failure).toHaveBeenCalledOnce());
   queue.pushAudio(new Float32Array(1701),16000);queue.enqueue();
@@ -59,7 +59,7 @@ describe('pinned append-only candidate',()=>{
   const typed:string[]=[];
   const paste=vi.fn(async(text:string)=>{if(paste.mock.calls.length===1)throw noMutation;typed.push(text);});
   const failure=vi.fn(),preview=vi.fn();
-  const queue=new BenchmarkPhraseQueue(paste,vi.fn(),failure,preview);
+  const queue=new DictationStream(paste,vi.fn(),failure,preview);
   queue.pushAudio(new Float32Array(1600),16000);
   await vi.waitFor(()=>expect(preview).toHaveBeenCalledWith('deferred'));
   queue.pushAudio(new Float32Array(1600),16000);queue.enqueue();
@@ -76,7 +76,7 @@ describe('pinned append-only candidate',()=>{
   try{
    worker.mockImplementation(async(_c,{request:r})=>({...r,mode:'append-only',text:r.op==='push'?'Hello':null}));
    const paste=vi.fn(async(_text:string)=>{if(paste.mock.calls.length===1)throw noMutation;});
-   const queue=new BenchmarkPhraseQueue(paste,vi.fn(),vi.fn(),vi.fn());
+   const queue=new DictationStream(paste,vi.fn(),vi.fn(),vi.fn());
    queue.pushAudio(new Float32Array(1600),16000);queue.enqueue();
    const result=queue.finish();
    await vi.advanceTimersByTimeAsync(1000);
@@ -90,7 +90,7 @@ describe('pinned append-only candidate',()=>{
    worker.mockImplementation(async(_c,{request:r})=>({...r,mode:'append-only',text:r.op==='push'?'Hello':null}));
    const paste=vi.fn(async()=>{throw noMutation;});
    const failure=vi.fn(),preview=vi.fn();
-   const queue=new BenchmarkPhraseQueue(paste,vi.fn(),failure,preview);
+   const queue=new DictationStream(paste,vi.fn(),failure,preview);
    queue.pushAudio(new Float32Array(1600),16000);queue.enqueue();
    const result=queue.finish();
    await vi.advanceTimersByTimeAsync(1000);
@@ -108,7 +108,7 @@ describe('pinned append-only candidate',()=>{
    worker.mockImplementation(async(_c,{request:r})=>({...r,mode:'append-only',text:r.op==='start'?null:r.op==='finish'?'One two.':'One'}));
    const paste=vi.fn(async()=>{throw {outcome:'uncertain',message:'Keyboard dispatch failed',clipboardChanged:true};});
    const failure=vi.fn();
-   const queue=new BenchmarkPhraseQueue(paste,vi.fn(),failure,vi.fn());
+   const queue=new DictationStream(paste,vi.fn(),failure,vi.fn());
    queue.pushAudio(new Float32Array(1600),16000);queue.enqueue();
    const result=queue.finish();
    await vi.advanceTimersByTimeAsync(1000);
@@ -121,7 +121,7 @@ describe('pinned append-only candidate',()=>{
  it('still bounds recognition failure after a delivery interruption',async()=>{
   worker.mockImplementation(async(_c,{request:r})=>({...r,mode:'append-only',text:r.op==='push'?'First':null}));
   const paste=vi.fn(async()=>{throw new Error('Destination changed');}),failure=vi.fn();
-  const queue=new BenchmarkPhraseQueue(paste,vi.fn(),failure,vi.fn());
+  const queue=new DictationStream(paste,vi.fn(),failure,vi.fn());
   queue.pushAudio(new Float32Array(1600),16000);
   await vi.waitFor(()=>expect(failure).toHaveBeenCalledOnce());
   worker.mockRejectedValue(new Error('Worker unavailable'));
@@ -133,7 +133,7 @@ describe('pinned append-only candidate',()=>{
  });
  it('bounds queued audio and retains recovery without sending a partial backlog',async()=>{
   const {queue,failure}=make();queue.pushAudio(new Float32Array(16000*4),16000);
-  await expect(queue.finish()).rejects.toThrow('three seconds');expect(failure).toHaveBeenCalledOnce();expect(transport).toHaveBeenCalledWith('benchmark_stream',{request:expect.objectContaining({op:'diagnostic',reason:'backlog_limit'})});
+  await expect(queue.finish()).rejects.toThrow('three seconds');expect(failure).toHaveBeenCalledOnce();expect(transport).toHaveBeenCalledWith('speech_stream',{request:expect.objectContaining({op:'diagnostic',reason:'backlog_limit'})});
  });
  it('ignores an in-flight response after cancellation',async()=>{
   let resolve!:(x:unknown)=>void;let inflight:Record<string,unknown>={};
@@ -150,7 +150,7 @@ describe('pinned append-only candidate',()=>{
   let n=0;worker.mockImplementation(async(_c,{request:r})=>({...r,mode:'append-only',text:r.op==='start'?null:['Every','Every elevat','Every elevation.'][n++]}));
   let release!:()=>void;const pasted:string[]=[];
   const paste=vi.fn(async(text:string)=>{pasted.push(text);if(pasted.length===1)await new Promise<void>(done=>{release=done;});});
-  const queue=new BenchmarkPhraseQueue(paste,vi.fn(),vi.fn(),vi.fn());
+  const queue=new DictationStream(paste,vi.fn(),vi.fn(),vi.fn());
   queue.pushAudio(new Float32Array(4800),16000);
   await vi.waitFor(()=>expect(requests()).toHaveLength(4));
   expect(paste).toHaveBeenCalledTimes(1);release();await queue.finish();
@@ -206,7 +206,7 @@ describe('privacy-preserving delivery attribution', () => {
  it('correlates native paste identities and reconciles a completed stream without claiming field receipt', async () => {
   worker.mockImplementation(async (_c,{request:r}) => ({...r,mode:'append-only',text:r.op==='start'?null:'Private_SENTINEL é😀'}));
   const paste=vi.fn(async()=>{});
-  const queue=new BenchmarkPhraseQueue(paste,vi.fn(),vi.fn(),vi.fn(),17);
+  const queue=new DictationStream(paste,vi.fn(),vi.fn(),vi.fn(),17);
   queue.pushAudio(new Float32Array(327),16000);queue.enqueue();await queue.finish();await queue.finish();
   const events=quality();
   const requested=events.find(e=>e.event==='delivery_requested');
@@ -219,7 +219,7 @@ describe('privacy-preserving delivery attribution', () => {
  it('reports coalescing and a pending delivery without mistaking it for lost recognition', async () => {
   let n=0;worker.mockImplementation(async (_c,{request:r}) => ({...r,mode:'append-only',text:r.op==='start'?null:['A','A b','A bc'][n++]}));
   let release!:()=>void;const paste=vi.fn(async()=>{if(paste.mock.calls.length===1)await new Promise<void>(done=>{release=done;});});
-  const queue=new BenchmarkPhraseQueue(paste,vi.fn(),vi.fn(),vi.fn());queue.pushAudio(new Float32Array(4800),16000);
+  const queue=new DictationStream(paste,vi.fn(),vi.fn(),vi.fn());queue.pushAudio(new Float32Array(4800),16000);
   await vi.waitFor(()=>expect(requests()).toHaveLength(4));release();await queue.finish();
   const deliveries=quality().filter(e=>e.event==='delivery_requested');
   expect(deliveries.map(e=>[e.delivery_seq,e.hypothesis_seq,e.coalesced_hypotheses])).toEqual([[1,1,0],[2,3,1]]);
@@ -228,7 +228,7 @@ describe('privacy-preserving delivery attribution', () => {
  });
  it('keeps uncertain delivery explicit and does not leak rejection content', async () => {
   worker.mockImplementation(async (_c,{request:r})=>({...r,mode:'append-only',text:r.op==='start'?null:'secret_SENTINEL'}));
-  const queue=new BenchmarkPhraseQueue(async()=>{throw new Error('secret_SENTINEL /private/path window title');},vi.fn(),vi.fn(),vi.fn());
+  const queue=new DictationStream(async()=>{throw new Error('secret_SENTINEL /private/path window title');},vi.fn(),vi.fn(),vi.fn());
   queue.pushAudio(new Float32Array(1600),16000);await expect(queue.finish()).resolves.toEqual({undelivered:'secret_SENTINEL',uncertain:true});
   expect(quality().find(e=>e.event==='delivery_failed')).toMatchObject({delivery_seq:1,outcome:'uncertain',destination_content_observation:'unavailable'});
   expect(quality()[quality().length-1]).toMatchObject({outcome:'failed',failed_delivery_seq:1,pending_delivery_count:0,dispatched_count:0,accepted_equals_dispatched:false,destination_content_observation:'unavailable'});
@@ -280,7 +280,7 @@ describe('exact suffix preservation with attributed diagnostics', () => {
  it('waits for an in-flight dispatch on cancellation and reports its weaker outcome', async () => {
   worker.mockImplementation(async (_c,{request:r})=>({...r,mode:'append-only',text:r.op==='push'?'Hello':null}));
   let release!:()=>void;const paste=vi.fn(async()=>new Promise<void>(done=>{release=done;}));
-  const queue=new BenchmarkPhraseQueue(paste,vi.fn(),vi.fn(),vi.fn());queue.pushAudio(new Float32Array(1600),16000);
+  const queue=new DictationStream(paste,vi.fn(),vi.fn(),vi.fn());queue.pushAudio(new Float32Array(1600),16000);
   await vi.waitFor(()=>expect(release).toBeDefined());queue.cancel();
   expect(quality().some(e=>e.event==='terminal')).toBe(false);release();await queue.finish();
   expect(quality()[quality().length-1]).toMatchObject({outcome:'cancelled',dispatched_count:1,destination_content_observation:'unavailable'});
@@ -291,7 +291,7 @@ describe('exact suffix preservation with attributed diagnostics', () => {
 it('keeps coalesced delivery linked to a recorded hypothesis when identical replies repeat', async () => {
  let n=0;worker.mockImplementation(async (_c,{request:r})=>({...r,mode:'append-only',text:r.op==='start'?null:['A','A b','A b'][n++]}));
  let release!:()=>void;const paste=vi.fn(async()=>{if(paste.mock.calls.length===1)await new Promise<void>(done=>{release=done;});});
- const queue=new BenchmarkPhraseQueue(paste,vi.fn(),vi.fn(),vi.fn());queue.pushAudio(new Float32Array(4800),16000);
+ const queue=new DictationStream(paste,vi.fn(),vi.fn(),vi.fn());queue.pushAudio(new Float32Array(4800),16000);
  await vi.waitFor(()=>expect(requests()).toHaveLength(4));release();await queue.finish();
  const hypotheses=quality().filter(e=>e.event==='hypothesis').map(e=>e.hypothesis_seq);
  const deliveries=quality().filter(e=>e.event==='delivery_requested').map(e=>e.hypothesis_seq);

@@ -220,7 +220,7 @@ pub(crate) fn warmup() -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn benchmark_stream(request: Value) -> Result<Value, String> {
+pub async fn speech_stream(request: Value) -> Result<Value, String> {
     if request["op"] == "quality" {
         crate::performance::speech_quality(&request)?;
         return Ok(serde_json::json!({"logged":true}));

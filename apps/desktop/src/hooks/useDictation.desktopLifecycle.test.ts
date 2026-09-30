@@ -4,13 +4,13 @@ import ts from "typescript";
 import source from "@/lib/dictationRecording.ts?raw";
 const transport = vi.hoisted(() => vi.fn().mockResolvedValue({}));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: transport }));
-import { BenchmarkPhraseQueue, type DesktopStreamEvent, type PasteCorrelation } from "@/lib/benchmarkPhraseQueue";
+import { DictationStream, type DesktopStreamEvent, type PasteCorrelation } from "@/lib/dictationStream";
 
 function callbacks(scope: Record<string, unknown>) {
   const ast = ts.createSourceFile("useDictation.ts", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
   let constructor: ts.NewExpression | undefined;
   function visit(node: ts.Node) {
-    if (ts.isNewExpression(node) && node.expression.getText(ast) === "BenchmarkPhraseQueue") constructor = node;
+    if (ts.isNewExpression(node) && node.expression.getText(ast) === "DictationStream") constructor = node;
     ts.forEachChild(node, visit);
   }
   visit(ast);
@@ -52,14 +52,14 @@ it.each(["cancelled", "restarted"])("keeps late native success out of the %s ses
       assertOutputAllowed: (id: number) => { if (id !== currentSession || cancelledRef.current) throw new Error("cancelled or replaced"); },
       pasteDesktopText: nativePaste, traceDictationEvent: trace, traceDesktopPasteMetrics: metrics,
     });
-    return new BenchmarkPhraseQueue(paste, vi.fn(), vi.fn(), preview, startingSessionId);
+    return new DictationStream(paste, vi.fn(), vi.fn(), preview, startingSessionId);
   };
   const oldQueue = create(1);
   oldQueue.pushAudio(new Float32Array(1600), 16000);
   await vi.waitFor(() => expect(release).toBeDefined());
   cancelledRef.current = "cancelled";
   oldQueue.cancel();
-  let newQueue: BenchmarkPhraseQueue | undefined;
+  let newQueue: DictationStream | undefined;
   if (stage === "restarted") {
     // Discard resets cancellation; the next Start replaces session-bound refs.
     cancelledRef.current = null; currentSession = 2;

@@ -45,7 +45,7 @@ export function textLengths(text: string, prefix: string): Record<string, number
   };
 }
 
-export class BenchmarkPhraseQueue {
+export class DictationStream {
   private pending: Promise<void> = Promise.resolve();
   private cancelled = false;
   private failure: Error | null = null;
@@ -90,7 +90,7 @@ export class BenchmarkPhraseQueue {
     if (this.qualityInFlight >= 32) { this.qualityDropped++; return; }
     this.qualityInFlight++;
     // Fire and forget: recorder failures cannot block or fail dictation.
-    void invoke("benchmark_stream", { request: {
+    void invoke("speech_stream", { request: {
       op: "quality", event, session: this.session,
       dictation_session_id: this.dictationSessionId, quality_seq: qualitySeq,
       quality_dropped: this.qualityDropped, ...(typeof fields === "function" ? fields() : fields),
@@ -139,7 +139,7 @@ export class BenchmarkPhraseQueue {
       this.failure = failure;
       this.buffered = [];
     }
-    void invoke("benchmark_stream", {
+    void invoke("speech_stream", {
       request: { op: "diagnostic", reason, session: this.session, dictation_session_id: this.dictationSessionId },
     }).catch(() => {});
     this.onFailure(failure, kind);
@@ -164,7 +164,7 @@ export class BenchmarkPhraseQueue {
         if (this.cancelled || this.failure) return;
         const queueAgeMs = performance.now() - queuedAt;
         this.maxQueueAgeMs = Math.max(this.maxQueueAgeMs, queueAgeMs);
-        const response = await invoke<{ text: string | null; mode: string; session: string; seq: number }>("benchmark_stream", {
+        const response = await invoke<{ text: string | null; mode: string; session: string; seq: number }>("speech_stream", {
           request: { op, audio, rate, session: this.session, seq, dictation_session_id: this.dictationSessionId, queue_age_ms: queueAgeMs, sample_start: sampleStart, sample_end: sampleEnd },
         });
         if (this.cancelled) return;
@@ -323,7 +323,7 @@ export class BenchmarkPhraseQueue {
     this.cancelled = true;
     this.buffered = [];
     this.pending = this.pending.then(async () => {
-      await invoke("benchmark_stream", { request: { op: "cancel", session: this.session, seq: this.seq++, dictation_session_id: this.dictationSessionId } }).catch(() => {});
+      await invoke("speech_stream", { request: { op: "cancel", session: this.session, seq: this.seq++, dictation_session_id: this.dictationSessionId } }).catch(() => {});
       await this.delivery;
       this.terminal();
     });

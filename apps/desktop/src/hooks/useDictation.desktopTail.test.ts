@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as buffers from "@/lib/audioCaptureBuffer";
 const transport = vi.hoisted(() => vi.fn().mockResolvedValue({}));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: transport }));
-import { BenchmarkPhraseQueue } from "@/lib/benchmarkPhraseQueue";
+import { DictationStream } from "@/lib/dictationStream";
 import {
   createDesktopCaptureTail,
   type DesktopCaptureTailEnv,
@@ -17,7 +17,7 @@ function harness(rate = 16000, limitSeconds = 600) {
   const collect = vi.fn(buffers.collectAudioSamplesRange);
   const paste = vi.fn(async () => {});
   const failure = vi.fn();
-  const queue = new BenchmarkPhraseQueue(paste, vi.fn(), failure, vi.fn());
+  const queue = new DictationStream(paste, vi.fn(), failure, vi.fn());
   const native = { current: null as null | { stopAndDrain(): Promise<void> } };
   const flush = vi.fn(async () => {});
   const disconnect = vi.fn();
@@ -25,7 +25,7 @@ function harness(rate = 16000, limitSeconds = 600) {
     recordingSampleRate: () => rate, maxAudioSeconds: limitSeconds,
     captureHealthRef: { current: null },
     phaseRef: phase, audioBufferRef: { current: buffer },
-    desktopPhraseQueueRef: { current: queue },
+    dictationStreamRef: { current: queue },
     desktopStreamedSampleCountRef: sent,
     traceDictationEvent: vi.fn(async () => {}), stopRecording: vi.fn(),
     nativeCaptureRef: native, cancelledRef: { current: null },
@@ -219,7 +219,7 @@ describe("Stop while the recognizer is behind capture", () => {
     expect(h.paste).not.toHaveBeenCalled();
     expect(packets()).toHaveLength(1);
     expect(transport.mock.calls.some(([command, { request }]) =>
-      command === "benchmark_stream" && request.op === "finish")).toBe(false);
+      command === "speech_stream" && request.op === "finish")).toBe(false);
     const source = buffers.collectAudioSamplesRange(h.buffer, 0, h.buffer.sampleCount);
     expect(Array.from(source)).toEqual([...live, ...tail]);
   });

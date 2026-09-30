@@ -42,7 +42,7 @@ const save = (n, v) => writeFile(path.join(out, n), JSON.stringify(v, null, 2) +
     flag: 'wx'
 });
 const files = [
-    'src/main.tsx', 'src/styles.css', 'src/lib/shortcutPresentation.ts', 'src/lib/windowRemap.ts', 'src/types/index.ts', 'src/App.tsx', 'src/components/ControlPanel.tsx', 'src/components/Onboarding.tsx', 'src/lib/dictationRecording.ts', 'src/lib/benchmarkPhraseQueue.ts', 'src/lib/microphoneRefresh.ts', 'src/lib/audioInput.ts', 'src/store/useStore.ts', 'src/lib/nativeCapture.ts', 'src/lib/nativeCaptureAudit.ts', 'src/lib/captureDescriptor.ts', 'src/lib/tauri.ts', 'src/lib/nativeCaptureSettings.ts', 'src/hooks/useNativeCaptureSettings.ts', 'src/components/NativeMicrophoneSettings.tsx', 'src/hooks/useDictation.ts'
+    'src/main.tsx', 'src/styles.css', 'src/lib/shortcutPresentation.ts', 'src/lib/windowRemap.ts', 'src/types/index.ts', 'src/App.tsx', 'src/components/ControlPanel.tsx', 'src/components/Onboarding.tsx', 'src/lib/dictationRecording.ts', 'src/lib/dictationStream.ts', 'src/lib/microphoneRefresh.ts', 'src/lib/audioInput.ts', 'src/store/useStore.ts', 'src/lib/nativeCapture.ts', 'src/lib/nativeCaptureAudit.ts', 'src/lib/captureDescriptor.ts', 'src/lib/tauri.ts', 'src/lib/nativeCaptureSettings.ts', 'src/hooks/useNativeCaptureSettings.ts', 'src/components/NativeMicrophoneSettings.tsx', 'src/hooks/useDictation.ts'
 ];
 await save('SOURCE.json', Object.fromEntries(await Promise.all(files.map(async (f) => [
     f, createHash('sha256').update(await readFile(path.join(root, 'apps/desktop', f))).digest('hex')
@@ -183,7 +183,7 @@ try {
           if(name.endsWith('_crash_journal')) return null;
           if(name==='list_crash_recovery') return window.crashEntries??[];
           if(name==='dismiss_crash_recovery') { window.crashEntries=(window.crashEntries??[]).filter(entry=>entry.id!==args.id); return null; }
-          if(name==='benchmark_stream') {
+          if(name==='speech_stream') {
             const r=args.request;
             if(['quality','diagnostic','cancel'].includes(r.op))return {};
             if(window.recognitionError || window.transcriptionError)throw {message:'Speech engine unavailable for this test.'};
@@ -498,7 +498,7 @@ try {
         assert.ok(!calls.includes('copyDesktopText'));
         assert.ok(!calls.includes('startBrowserField'));
         assert.equal(await page.evaluate(() => window.copiedText),undefined);
-        assert.equal(await page.evaluate(()=>window.nativeCommands.some(c=>c.name==='benchmark_stream'&&c.args.request.op==='quality')),false);
+        assert.equal(await page.evaluate(()=>window.nativeCommands.some(c=>c.name==='speech_stream'&&c.args.request.op==='quality')),false);
       };
       for (const scenario of ['onboarding-toggle', 'dictation-toggle', 'dictation-stop', 'browser-stop']) {
         await loadTest();
@@ -721,8 +721,8 @@ try {
     const record=(name)=>results.push({case:name,passed:true});
     const state=()=>page.evaluate(()=>({mode:window.store.getState().captureBackendMode,ready:window.store.getState().microphoneReady,source:window.store.getState().nativeCaptureSource,streams:window.streamRequests||0,enums:window.enumCount||0,commands:window.nativeCommands}));
     const noCapture=async()=>{const s=await state();assert.equal(s.streams,0);assert.equal(s.enums,0);assert.equal(s.commands.filter(x=>/native_capture_(begin|drain|stop|cancel)$/.test(x.name)).length,0);};
-    // Each transcription opens with one benchmark_stream start request.
-    const streamStarts=()=>page.evaluate(()=>window.nativeCommands.filter(x=>x.name==='benchmark_stream'&&x.args.request.op==='start').length);
+    // Each transcription opens with one speech_stream start request.
+    const streamStarts=()=>page.evaluate(()=>window.nativeCommands.filter(x=>x.name==='speech_stream'&&x.args.request.op==='start').length);
     const load=async(scenario)=>{
       await page.goto(origin+'/app-microphone-check?scenario='+scenario);
       await page.waitForFunction(()=>window.store && window.nativeCommands.some(x=>x.name==='native_capture_capabilities'));
@@ -1089,7 +1089,7 @@ try {
     await page.evaluate(()=>window.listeners['voco:toggle-dictation']({payload:null}));
     await page.waitForFunction(()=>window.store.getState().transcript===''&&window.store.getState().status==='idle');
     const lateProof=await page.evaluate(()=>({released:window.oldDrainReleased,
-      streamSamples:window.nativeCommands.filter(x=>x.name==='benchmark_stream'&&x.args.request.op==='push'&&x.args.request.dictation_session_id===window.captureIdentity.sessionId).reduce((s,x)=>s+x.args.request.audio.length,0),
+      streamSamples:window.nativeCommands.filter(x=>x.name==='speech_stream'&&x.args.request.op==='push'&&x.args.request.dictation_session_id===window.captureIdentity.sessionId).reduce((s,x)=>s+x.args.request.audio.length,0),
       starts:window.nativeCommands.filter(x=>x.name==='native_capture_begin').map(x=>x.args.request),
       uploads:window.auditUploads.length,cancels:window.nativeCommands.filter(x=>x.name==='native_capture_cancel').map(x=>x.args.request)}));
     assert.equal(lateProof.released,true);assert.equal(lateProof.streamSamples,35280);

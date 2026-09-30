@@ -4,7 +4,6 @@ compile_error!(
 );
 
 mod activation;
-mod benchmark_stream;
 mod browser_broker;
 mod browser_event_delivery;
 mod browser_protocol;
@@ -30,6 +29,7 @@ mod process_runner;
 mod shortcut_arbitration;
 mod shortcut_readiness;
 mod single_instance;
+mod speech_stream;
 mod tray_icons;
 mod trigger_socket;
 
@@ -989,7 +989,7 @@ fn is_allowed_external_url(url: &str) -> bool {
 
 fn prepare_model_at_startup(app: &tauri::AppHandle) -> Result<(), String> {
     info!("Preparing bundled Nemotron streaming model at startup");
-    benchmark_stream::warmup()?;
+    speech_stream::warmup()?;
     info!("Bundled Nemotron streaming model ready");
     tray::update_model_download_status(app, tray::ModelDownloadStatus::Ready);
     Ok(())
@@ -1998,7 +1998,7 @@ pub fn run() -> Result<(), String> {
             crash_recovery::update_crash_journal,
             crash_recovery::finish_crash_journal,
             crash_recovery::keep_crash_journal,
-            benchmark_stream::benchmark_stream,
+            speech_stream::speech_stream,
             native_capture_commands::native_capture_capabilities,
             native_capture_commands::native_capture_list_sources,
             native_capture_commands::native_capture_select_source,
