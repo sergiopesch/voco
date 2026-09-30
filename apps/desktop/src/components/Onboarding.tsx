@@ -5,17 +5,16 @@ import { PanelSetup } from "./PanelSetup";
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type { DictationStatus } from "@/types";
+import { useStore } from "@/store/useStore";
 
 interface OnboardingProps {
   microphone: string;
   status: DictationStatus;
-  transcript: string;
   passed: boolean;
   failed: boolean;
   attempted: boolean;
   setupError?: string | null;
   desktopSetupError?: string | null;
-  showPanelSetup?: boolean;
   checkingDesktopSetup?: boolean;
   onCheckDesktopSetup?: () => void;
   onOpenDesktopSetupGuide?: () => void;
@@ -31,10 +30,12 @@ interface OnboardingProps {
   onFinish: () => Promise<void>;
 }
 
-export function Onboarding({ microphone, status, transcript, passed,
+export function Onboarding({ microphone, status, passed,
   failed, preparing, saving, blocked, hotkey, microphoneControls, desktopReady = false,
   onStart, onStop, onFinish, attempted, setupError, onRetrySetup, desktopSetupError,
-  showPanelSetup, checkingDesktopSetup, onCheckDesktopSetup, onOpenDesktopSetupGuide }: OnboardingProps) {
+  checkingDesktopSetup, onCheckDesktopSetup, onOpenDesktopSetupGuide }: OnboardingProps) {
+  // Only this view shows recognition text, so only it re-renders per hypothesis.
+  const transcript = useStore((state) => state.dictationPurpose === "onboarding" ? state.transcript : "");
   const [changingMicrophone, setChangingMicrophone] = useState(false);
   const primaryRef = useRef<HTMLButtonElement>(null);
   const previousPhase = useRef("");
@@ -73,12 +74,11 @@ export function Onboarding({ microphone, status, transcript, passed,
     </div>
     {desktopSetupError ? <details className="voco-setup__details"><summary>Details</summary><p>{desktopSetupError}</p></details> : null}
     {desktopSetupError && onOpenDesktopSetupGuide ? <button className="voco-button voco-button--ghost" onClick={onOpenDesktopSetupGuide}>Open setup instructions</button> : null}
-    {passed && desktopSetupError && showPanelSetup ? <PanelSetup disabled={busy || blocked} /> : null}
     <div className="voco-setup__transcript" role="region" aria-label="Test transcript" tabIndex={0}>
       {transcript && transcript !== "(no speech detected)" ? transcript : <span>Try saying “This is my voice, typed.”</span>}
     </div>
     {ready ? <div className="voco-setup__handoff">
-      <p>Click in a text field and press <kbd className="voco-glass voco-shortcut">{hotkey}</kbd>. Press again to finish.</p>
+      <p>Click where you want the text and press <kbd className="voco-glass voco-shortcut">{hotkey}</kbd>. Press again to finish.</p>
       <p>VOCO stays in your tray. You can reopen it from your app launcher.</p>
       <PanelSetup disabled={busy || blocked} />
     </div> : <p className="voco-setup__privacy">{!passed && !recording && !busy ? "Start test turns on your microphone. " : ""}Speech stays on this computer; this test only displays words here.</p>}

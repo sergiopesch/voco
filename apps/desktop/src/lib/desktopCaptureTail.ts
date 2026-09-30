@@ -12,14 +12,14 @@ export const MAX_AUDIO_SECONDS = 600;
 
 export type Ref<T> = { current: T };
 
-export interface DesktopPhraseQueue {
+export interface DictationStreamInput {
   pushAudio(samples: Float32Array, sampleRate: number): void;
   enqueue(): void;
 }
 
 export interface DesktopCaptureTailEnv {
   audioBufferRef: Ref<AudioCaptureBuffer>;
-  desktopPhraseQueueRef: Ref<DesktopPhraseQueue | null>;
+  dictationStreamRef: Ref<DictationStreamInput | null>;
   desktopStreamedSampleCountRef: Ref<number>;
   phaseRef: Ref<string>;
   captureHealthRef: Ref<{ samplesReceived(): void; dispose(): void } | null>;
@@ -51,7 +51,7 @@ export function createDesktopCaptureTail(env: DesktopCaptureTailEnv) {
   const collectRange = env.collectAudioSamplesRange ?? collectAudioSamplesRange;
 
   function enqueueDesktopPhrase(end: number) {
-    const queue = env.desktopPhraseQueueRef.current;
+    const queue = env.dictationStreamRef.current;
     if (!queue) return;
     const start = env.desktopStreamedSampleCountRef.current;
     // Stop drains capture after the recording phase has ended. Forward only the
@@ -80,7 +80,7 @@ export function createDesktopCaptureTail(env: DesktopCaptureTailEnv) {
     );
     // The production worker owns streaming boundaries; queue existence is the
     // only live-delivery gate. Stop-drained samples are forwarded at finalization.
-    const queue = env.desktopPhraseQueueRef.current;
+    const queue = env.dictationStreamRef.current;
     if (queue && env.phaseRef.current === "recording") {
       const accepted = samples.subarray(0, appendResult.appendedSampleCount);
       queue.pushAudio(accepted, sampleRate);

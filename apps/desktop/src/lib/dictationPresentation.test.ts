@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  deriveCursorSetupState,
   deriveStatusLabel,
 } from "@/lib/dictationPresentation";
 
 describe("status label presentation", () => {
   const ready = {
     configurationError: false,
-    cursorDeliveryState: "inactive" as const,
     cursorRequired: false,
     cursorSetupState: "ready" as const,
     dictationStatus: "idle" as const,
@@ -18,51 +18,22 @@ describe("status label presentation", () => {
     expect(deriveStatusLabel({ ...ready, dictationStatus: "starting" })).toBe("Starting microphone");
   });
 
-  it("keeps recovery visible across later successful captures until dismissal", () => {
-    expect(deriveStatusLabel({ ...ready, hasRecoverableTranscript: true })).toBe("Transcript needs attention");
-    expect(deriveStatusLabel({ ...ready, cursorDeliveryState: "inactive", hasRecoverableTranscript: false })).toBe("Ready to listen");
+  it("shows one listening label for every recording", () => {
+    expect(deriveStatusLabel({ ...ready, dictationStatus: "recording" })).toBe("Listening");
   });
 
-  it("prioritizes transcript recovery over stale activity errors", () => {
-    expect(
-      deriveStatusLabel({
-        ...ready,
-        cursorDeliveryState: "unreconciled",
-        hasRecoverableTranscript: true,
-        dictationStatus: "error",
-      }),
-    ).toBe("Transcript needs attention");
+  it("keeps desktop setup pending until the first diagnostics settle", () => {
+    const pending = deriveCursorSetupState({ desktopInputReady: false, diagnosticsLoaded: false, diagnosticsFailed: false });
+    const failed = deriveCursorSetupState({ desktopInputReady: false, diagnosticsLoaded: false, diagnosticsFailed: true });
+    const missing = deriveCursorSetupState({ desktopInputReady: false, diagnosticsLoaded: true, diagnosticsFailed: false });
+    const ready = deriveCursorSetupState({ desktopInputReady: true, diagnosticsLoaded: true, diagnosticsFailed: true });
+    expect([pending, failed, missing, ready]).toEqual(["", "not-enabled", "not-enabled", "ready"]);
   });
 
-
-
-  it("distinguishes pending and preview-only cursor delivery", () => {
-    expect(
-      deriveStatusLabel({
-        ...ready,
-        cursorDeliveryState: "pending",
-        cursorRequired: true,
-        dictationStatus: "recording",
-      }),
-    ).toBe("Listening — verifying original field");
-    expect(
-      deriveStatusLabel({
-        ...ready,
-        cursorDeliveryState: "preview-only",
-        cursorRequired: true,
-        dictationStatus: "recording",
-      }),
-    ).toBe("Listening — preview only");
-  });
-
-
-  it("presents a retained interruption calmly", () => {
-    expect(deriveStatusLabel({ ...ready, hasRecovery: true, dictationStatus: "error" })).toBe("Dictation saved");
-  });
-
-  it("treats completed manual dictation as a usable result", () => {
-    expect(deriveStatusLabel({ ...ready, hasRecovery: true, manualTranscriptReady: true })).toBe("Transcript ready to copy");
-    expect(deriveStatusLabel({ ...ready, cursorRequired: true, cursorSetupState: "safety-disabled" })).toBe("Ready — manual copy");
+  it("shows initializing while desktop diagnostics are pending, never setup needed", () => {
+    expect(deriveStatusLabel({ ...ready, cursorRequired: true, cursorSetupState: "" })).toBe("Initializing…");
+    expect(deriveStatusLabel({ ...ready, cursorRequired: true, cursorSetupState: "not-enabled" })).toBe("Desktop setup needed");
+    expect(deriveStatusLabel({ ...ready, cursorRequired: false, cursorSetupState: "ready" })).toBe("Ready to listen");
   });
 
   it("matches the tray by prioritizing a dictation failure when both modes failed", () => {
@@ -77,9 +48,6 @@ describe("status label presentation", () => {
   it("surfaces a configuration failure without turning it into a dictation error", () => {
     expect(
       deriveStatusLabel({ ...ready, configurationError: true }),
-    ).toBe("Settings need attention");
-    expect(
-      deriveStatusLabel({ ...ready, configurationError: true, hasRecoverableTranscript: true }),
     ).toBe("Settings need attention");
     expect(
       deriveStatusLabel({

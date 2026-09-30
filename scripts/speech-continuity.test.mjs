@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { buildRepeatedSpeech, checkCanonicalContinuity, checkRepeatedContinuity, continuityWindows, CONTINUITY_MAX_WER } from "./test-speech-continuity.mjs";
+import { buildRepeatedSpeech, checkRepeatedContinuity, CONTINUITY_MAX_WER } from "./test-speech-continuity.mjs";
 import { scoreTranscript, validateSpeechFixtureWav } from "./speech-score.mjs";
 
 test("continuity corpus recipe is exactly 18 unchanged utterances plus 250ms pauses", () => {
@@ -21,25 +21,10 @@ test("continuity corpus recipe is exactly 18 unchanged utterances plus 250ms pau
   assert.equal(CONTINUITY_MAX_WER, 0.15);
 });
 
-test("30 second canonical windows share exactly one second and cover the tail", () => {
-  assert.deepEqual(continuityWindows(673920), [
-    { startSample: 0, endSample: 480000 },
-    { startSample: 464000, endSample: 673920 },
-  ]);
-  assert.throws(() => continuityWindows(0));
-});
-
-test("canonical validation rejects rewritten prefixes, wrong append boundaries and malformed results", () => {
-  assert.equal(checkCanonicalContinuity("Keep café.", { canonicalText: "Keep café. Next.", appendText: " Next.", chunkText: "Next." }), "Keep café. Next.");
-  assert.throws(() => checkCanonicalContinuity("Keep café.", { canonicalText: "Keep cafe. Next.", appendText: " Next.", chunkText: "Next." }));
-  assert.throws(() => checkCanonicalContinuity("Keep café.", { canonicalText: "Keep café. Next.", appendText: "Keep café. Next.", chunkText: "Next." }));
-  assert.throws(() => checkCanonicalContinuity("", { canonicalText: "Next.", appendText: "Next." }));
-});
-
-test("fixed gate rejects the demonstrated 24-word merger loss", () => {
+test("the fixed WER gate rejects losing a third of the repetitions", () => {
   const reference = Array(18).fill("GO DO YOU HEAR").join(" ");
-  const originalFailure = Array(12).fill("GO DO YOU HEAR").join(" ");
-  const score = scoreTranscript(reference, originalFailure);
+  const truncated = Array(12).fill("GO DO YOU HEAR").join(" ");
+  const score = scoreTranscript(reference, truncated);
   assert.equal(score.deletions, 24);
   assert.equal(score.hypothesisWords, 48);
   assert.ok(score.wer > CONTINUITY_MAX_WER);

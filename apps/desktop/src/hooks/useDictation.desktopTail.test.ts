@@ -1,11 +1,10 @@
-// Execute production capture/Stop-tail accounting and the actual NVIDIA queue
+// Execute production capture/Stop-tail accounting and the actual DictationStream
 // with deterministic capture and worker IPC; no microphone/model required.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as buffers from "@/lib/audioCaptureBuffer";
 const transport = vi.hoisted(() => vi.fn().mockResolvedValue({}));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: transport }));
-import { BenchmarkPhraseQueue } from "@/lib/benchmarkPhraseQueue";
-import { NvidiaRecovery } from "@/lib/nvidiaRecovery";
+import { DictationStream } from "@/lib/dictationStream";
 import {
   createDesktopCaptureTail,
   type DesktopCaptureTailEnv,
@@ -18,7 +17,7 @@ function harness(rate = 16000, limitSeconds = 600) {
   const collect = vi.fn(buffers.collectAudioSamplesRange);
   const paste = vi.fn(async () => {});
   const failure = vi.fn();
-  const queue = new BenchmarkPhraseQueue(paste, vi.fn(), failure, vi.fn());
+  const queue = new DictationStream(paste, vi.fn(), failure, vi.fn());
   const native = { current: null as null | { stopAndDrain(): Promise<void> } };
   const flush = vi.fn(async () => {});
   const disconnect = vi.fn();
@@ -26,7 +25,7 @@ function harness(rate = 16000, limitSeconds = 600) {
     recordingSampleRate: () => rate, maxAudioSeconds: limitSeconds,
     captureHealthRef: { current: null },
     phaseRef: phase, audioBufferRef: { current: buffer },
-    desktopPhraseQueueRef: { current: queue },
+    dictationStreamRef: { current: queue },
     desktopStreamedSampleCountRef: sent,
     traceDictationEvent: vi.fn(async () => {}), stopRecording: vi.fn(),
     nativeCaptureRef: native, cancelledRef: { current: null },
@@ -136,7 +135,7 @@ describe("NVIDIA capture drain and Stop-tail accounting", () => {
 });
 
 // Hold a real worker push across Stop, rather than substituting queue.finish.
-// Only IPC is mocked: packet admission, capture retention and recovery are real.
+// Only IPC is mocked: packet admission and capture retention are real.
 describe("Stop while the recognizer is behind capture", () => {
   it.each([16000, 44100])("waits for the unresolved push and sends the Stop tail once at %i Hz", async rate => {
     let release!: () => void;
@@ -182,14 +181,11 @@ describe("Stop while the recognizer is behind capture", () => {
     expect(packets().every(request => request.rate === rate)).toBe(true);
   });
 
-  it.each([16000, 44100])("retains gradual overload and the Stop tail for explicit source recovery at %i Hz", async rate => {
+  it.each([16000, 44100])("keeps capturing through the Stop tail after gradual overload at %i Hz", async rate => {
     let release!: () => void;
     let pushing = false;
     const gate = new Promise<void>(resolve => { release = resolve; });
-    transport.mockImplementation(async (command, { request }) => {
-      if (command === "recover_stream") {
-        return { ...request, mode: "append-only", text: request.op === "finish" ? "Recovered entire source." : null };
-      }
+    transport.mockImplementation(async (_command, { request }) => {
       if (request.op === "push" && request.seq === 1) {
         pushing = true;
         await gate;
@@ -200,8 +196,8 @@ describe("Stop while the recognizer is behind capture", () => {
     const live = fixture(packetSize * 32 + 19), tail = fixture(53, live.length);
     h.appendRecordingSamples(live.subarray(0, packetSize));
     await vi.waitFor(() => expect(pushing).toBe(true));
-    // Separate capture callbacks accumulate behind the in-flight request. Keep
-    // capturing after admission fails so recovery must include unqueued audio.
+    // Separate capture callbacks accumulate behind the in-flight request, and
+    // capture continues after admission fails.
     for (let offset = packetSize; offset < live.length; offset += packetSize) {
       h.appendRecordingSamples(live.subarray(offset, offset + packetSize));
       await Promise.resolve();
@@ -223,26 +219,8 @@ describe("Stop while the recognizer is behind capture", () => {
     expect(h.paste).not.toHaveBeenCalled();
     expect(packets()).toHaveLength(1);
     expect(transport.mock.calls.some(([command, { request }]) =>
-      command === "benchmark_stream" && request.op === "finish")).toBe(false);
-    expect(transport.mock.calls.some(([command]) => command === "recover_stream")).toBe(false);
+      command === "speech_stream" && request.op === "finish")).toBe(false);
     const source = buffers.collectAudioSamplesRange(h.buffer, 0, h.buffer.sampleCount);
     expect(Array.from(source)).toEqual([...live, ...tail]);
-    // Match failed-session cleanup before an explicit retry. No live stream is
-    // restarted and the private recovery recognizer has no insertion callback.
-    h.queue.cancel();
-    await expect(h.queue.finish()).rejects.toThrow("three seconds");
-    const recovery = new NvidiaRecovery();
-    await expect(recovery.transcribe(source, rate)).resolves.toBe("Recovered entire source.");
-    const recovered = transport.mock.calls.filter(([command]) => command === "recover_stream")
-      .map(([, { request }]) => request);
-    expect(recovered.filter(request => request.op === "push").flatMap(request => request.audio)).toEqual(Array.from(source));
-    expect(recovered.filter(request => request.op === "push").every(request => request.rate === rate)).toBe(true);
-    expect(recovered.filter(request => request.op === "start")).toHaveLength(1);
-    expect(recovered.filter(request => request.op === "finish")).toHaveLength(1);
-    expect(recovered[recovered.length - 1].op).toBe("cancel");
-    expect(new Set(recovered.map(request => request.session)).size).toBe(1);
-    expect(recovered[0].session).not.toBe(packets()[0].session);
-    expect(h.buffer.sampleCount).toBe(source.length);
-    expect(h.paste).not.toHaveBeenCalled();
   });
 });

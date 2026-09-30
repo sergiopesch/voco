@@ -178,6 +178,19 @@ impl Fixture {
             .0
     }
 
+    // The bus daemon notices a closed connection asynchronously, so a name can
+    // briefly outlive close_sync from another connection's point of view.
+    fn sender_released(&self, sender: &str) -> bool {
+        let deadline = Instant::now() + Duration::from_secs(2);
+        while self.sender_alive(sender) {
+            if Instant::now() >= deadline {
+                return false;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        true
+    }
+
     fn sender(&self) -> String {
         self.last_sender.lock().unwrap().clone()
     }
@@ -221,7 +234,10 @@ fn retains_sender_between_notifications_and_reconnects_only_after_disconnect() {
         .unwrap()
         .close_sync(gio::Cancellable::NONE)
         .unwrap();
-    assert!(!fixture.sender_alive(&first_sender));
+    assert!(
+        fixture.sender_released(&first_sender),
+        "closed sender must leave the bus"
+    );
     fixture.send(&client, "after disconnect").unwrap();
     assert_ne!(fixture.sender(), first_sender);
     assert!(fixture.sender_alive(&fixture.sender()));

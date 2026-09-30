@@ -4,34 +4,32 @@ compile_error!(
 );
 
 mod activation;
-mod audio_transport;
-mod benchmark_stream;
 mod browser_broker;
 mod browser_event_delivery;
 mod browser_protocol;
 mod browser_socket;
 mod config;
+mod crash_recovery;
 #[cfg(target_os = "linux")]
 mod desktop_input_setup;
 #[cfg(target_os = "linux")]
 mod desktop_notifications;
-mod desktop_shortcut;
 mod digest_hex;
-mod focus_probe;
 #[cfg(target_os = "linux")]
 mod hotkey_state;
 mod hotkey_trace;
+mod ibus_shortcut;
 mod insertion;
 #[cfg(all(target_os = "linux", feature = "native-capture"))]
 mod native_capture;
 mod native_capture_commands;
-mod owned_preedit;
 pub mod panel_setup;
 mod performance;
 mod process_runner;
 mod shortcut_arbitration;
 mod shortcut_readiness;
 mod single_instance;
+mod speech_stream;
 mod tray_icons;
 mod trigger_socket;
 
@@ -58,16 +56,6 @@ pub fn setup_desktop_input() -> Result<String, String> {
     Ok("Desktop input setup is only needed on Linux.".into())
 }
 
-/// Check the focused destination without recording, changing the clipboard or typing.
-pub fn check_desktop_cursor() -> Result<String, String> {
-    let status = insertion::desktop_paste_status();
-    if status.available {
-        Ok("Text cursor verified. VOCO can start here.".into())
-    } else {
-        Err(status.detail)
-    }
-}
-
 /// Request one toggle from the running application without launching a window.
 pub fn toggle_running_application() -> Result<(), String> {
     trigger_socket::toggle().map_err(|error| {
@@ -84,11 +72,13 @@ use config::{
 };
 use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
-use std::io::Write;
 use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
 use std::sync::{LazyLock, Mutex};
 use std::time::Instant;
 use tauri::{Emitter, Manager};
+
+// Advanced on every main page load; the crash journal rejects older writers.
+static RENDERER_EPOCH: AtomicU64 = AtomicU64::new(1);
 
 // Debounce: ignore duplicate toggle events that arrive almost immediately.
 // This collapses duplicate keyboard backends and duplicate evdev devices
@@ -120,8 +110,6 @@ static TRACE_MODES: LazyLock<(bool, bool)> = LazyLock::new(|| {
 });
 static CONFIG_WRITE_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 static CONFIG_REVISION: AtomicU64 = AtomicU64::new(0);
-static DEBUG_CAPTURE_WRITTEN: AtomicBool = AtomicBool::new(false);
-static DEBUG_CAPTURE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 static REGISTERED_PLUGIN_SHORTCUT: LazyLock<Mutex<Option<String>>> =
     LazyLock::new(|| Mutex::new(None));
 #[cfg(target_os = "linux")]
@@ -130,15 +118,10 @@ static EVDEV_WATCHED_PATHS: LazyLock<Mutex<std::collections::HashSet<std::path::
 
 const TOGGLE_DICTATION_EVENT: &str = "voco:toggle-dictation";
 const CONFIG_CHANGED_EVENT: &str = "voco:config-changed";
-const LEGACY_TOGGLE_DICTATION_EVENT: &str = "voice:toggle-dictation";
 const TOGGLE_DEBOUNCE_MS: i64 = 120;
-const MAX_AUDIO_SECONDS: usize = 600;
 const HIDDEN_WINDOW_POS_X: i32 = -100;
 const HIDDEN_WINDOW_POS_Y: i32 = -100;
 const HIDDEN_WINDOW_SIZE: u32 = 1;
-const OVERLAY_CURSOR_OFFSET_X: i32 = 20;
-const OVERLAY_CURSOR_OFFSET_Y: i32 = 24;
-const OVERLAY_MARGIN: i32 = 16;
 
 fn trace_modes(hotkey: Option<&str>, performance: Option<&str>) -> (bool, bool) {
     (hotkey == Some("1"), performance == Some("1"))
@@ -172,19 +155,14 @@ fn monotonic_trace_ms() -> u128 {
 }
 
 fn xdg_state_home() -> std::path::PathBuf {
-    std::env::var_os("XDG_STATE_HOME")
-        .map(std::path::PathBuf::from)
-        .or_else(dirs::state_dir)
+    // dirs ignores an empty or relative XDG_STATE_HOME, as the XDG spec requires.
+    dirs::state_dir()
         .or_else(|| dirs::home_dir().map(|home| home.join(".local/state")))
         .unwrap_or_else(std::env::temp_dir)
 }
 
 fn hotkey_trace_path() -> std::path::PathBuf {
     xdg_state_home().join("voco").join("hotkey-trace.jsonl")
-}
-
-fn debug_capture_dir() -> std::path::PathBuf {
-    xdg_state_home().join("voco").join("debug-captures")
 }
 
 fn session_type_label() -> &'static str {
@@ -229,34 +207,12 @@ fn trace_hotkey_event_with_fields(
         "session_type": session_type_label(),
     });
     if let Some(fields) = frontend_fields {
-        if let Some(audio_level_bucket) = fields.audio_level_bucket.as_deref() {
-            record["audio_level_bucket"] =
-                serde_json::Value::String(audio_level_bucket.to_string());
-        }
-        if let Some(chunk_count) = fields.chunk_count {
-            record["chunk_count"] = serde_json::Value::Number(chunk_count.into());
-        }
-        if let Some(response_delta_count) = fields.response_delta_count {
-            record["response_delta_count"] = serde_json::Value::Number(response_delta_count.into());
-        }
         if let Some(selected_device_configured) = fields.selected_device_configured {
             record["selected_device_configured"] =
                 serde_json::Value::Bool(selected_device_configured);
         }
         if let Some(track_sample_rate) = fields.track_sample_rate {
             record["track_sample_rate"] = serde_json::Value::Number(track_sample_rate.into());
-        }
-        if let Some(track_channel_count) = fields.track_channel_count {
-            record["track_channel_count"] = serde_json::Value::Number(track_channel_count.into());
-        }
-        if let Some(echo_cancellation) = fields.echo_cancellation {
-            record["echo_cancellation"] = serde_json::Value::Bool(echo_cancellation);
-        }
-        if let Some(noise_suppression) = fields.noise_suppression {
-            record["noise_suppression"] = serde_json::Value::Bool(noise_suppression);
-        }
-        if let Some(auto_gain_control) = fields.auto_gain_control {
-            record["auto_gain_control"] = serde_json::Value::Bool(auto_gain_control);
         }
         if let Some(duration_ms) = fields.duration_ms {
             record["duration_ms"] = serde_json::Value::Number(duration_ms.into());
@@ -339,59 +295,29 @@ fn trace_frontend_hotkey_event(
 fn is_supported_dictation_trace_event(event: &str) -> bool {
     matches!(
         event,
-        "dictation_delivery_observation_timeout"
-            | "dictation_delivery_observation_changed"
-            | "dictation_delivery_observation_unavailable"
-            | "dictation_delivery_observation_invalid"
-            | "dictation_trigger_start_rejected"
+        "dictation_trigger_start_rejected"
             | "dictation_trigger_stop_rejected"
             | "dictation_trigger_start_admitted"
             | "dictation_trigger_stop_admitted"
             | "dictation_trigger_toggle_admitted"
-            | "dictation_desktop_shortcut_acquired"
-            | "dictation_desktop_shortcut_released"
-            | "dictation_desktop_shortcut_acquire_failed"
-            | "dictation_desktop_shortcut_release_failed"
-            | "dictation_desktop_target_probe_completed"
             | "dictation_desktop_paste_preflight_completed"
+            | "dictation_desktop_modifier_wait_completed"
             | "dictation_desktop_clipboard_write_completed"
             | "dictation_desktop_keyboard_dispatch_completed"
-            | "dictation_desktop_terminal_route_dispatched"
-            | "dictation_desktop_standard_route_dispatched"
             | "dictation_desktop_stream_started"
             | "dictation_desktop_phrase_queued"
-            | "dictation_desktop_snapshot_requested"
-            | "dictation_desktop_snapshot_limit_reached"
-            | "dictation_desktop_snapshot_recognized"
-            | "dictation_desktop_snapshot_failed"
-            | "dictation_desktop_preview_transcribed"
-            | "dictation_desktop_snapshot_coalesced"
-            | "dictation_desktop_snapshot_superseded"
-            | "dictation_desktop_snapshot_waiting_agreement"
-            | "dictation_desktop_snapshot_unchanged"
             | "dictation_desktop_snapshot_revised"
-            | "dictation_desktop_snapshot_empty"
-            | "dictation_desktop_snapshot_preview_wait"
-            | "dictation_desktop_snapshot_final_wait"
             | "dictation_desktop_live_prefix_dispatched"
-            | "dictation_desktop_phrase_transcribed"
             | "dictation_desktop_first_phrase_dispatched"
             | "dictation_desktop_stream_flush_completed"
             | "dictation_desktop_stream_failed"
             | "dictation_desktop_paste_session_started"
             | "dictation_desktop_paste_unavailable"
-            | "dictation_desktop_cursor_events_pending"
-            | "dictation_desktop_cursor_no_active_window"
-            | "dictation_desktop_cursor_ambiguous_windows"
-            | "dictation_desktop_cursor_no_focused_control"
-            | "dictation_desktop_cursor_not_editable"
-            | "dictation_desktop_cursor_protected"
-            | "dictation_desktop_cursor_control_unavailable"
-            | "dictation_desktop_cursor_probe_failed"
-            | "dictation_desktop_cursor_unavailable"
             | "dictation_desktop_paste_requested"
             | "dictation_desktop_paste_dispatched"
-            | "dictation_desktop_paste_failed"
+            | "dictation_desktop_paste_deferred"
+            | "dictation_desktop_remainder_copied"
+            | "dictation_desktop_remainder_kept"
             | "recording_state_requested"
             | "recording_get_user_media_started"
             | "recording_get_user_media_constraints_fallback"
@@ -404,93 +330,31 @@ fn is_supported_dictation_trace_event(event: &str) -> bool {
             | "recording_state_active"
             | "dictation_capture_input_gap"
             | "dictation_capture_health_interrupted"
-            | "dictation_live_preview_completed"
-            | "dictation_live_preview_reused"
-            | "dictation_stop_checkpoint_wait_completed"
-            | "dictation_stop_preview_wait_completed"
-            | "dictation_stop_insertion_wait_completed"
-            | "dictation_live_preview_skipped_short_audio"
-            | "dictation_live_preview_empty"
-            | "dictation_live_preview_updated"
-            | "dictation_live_preview_confirmed"
-            | "dictation_live_preview_window_advanced"
-            | "dictation_live_preview_failed"
-            | "dictation_live_cursor_insert_updated"
-            | "dictation_live_cursor_insert_cleared"
-            | "dictation_live_cursor_insert_finalized"
-            | "dictation_live_cursor_insert_failed"
-            | "dictation_live_cursor_overlay_fallback"
-            | "dictation_live_cursor_unsafe_rewrite_blocked"
-            | "dictation_live_cursor_final_unreconciled"
-            | "dictation_live_cursor_commit_waiting"
-            | "dictation_live_cursor_tail_transcribed"
-            | "dictation_live_cursor_tail_flushed"
-            | "dictation_live_cursor_tail_flush_failed"
-            | "dictation_owned_preedit_started"
-            | "dictation_owned_preedit_unavailable"
-            | "dictation_owned_preedit_updated"
-            | "dictation_owned_preedit_failed"
-            | "dictation_owned_preedit_cancelled"
-            | "dictation_owned_preedit_committed"
-            | "dictation_owned_preedit_commit_failed"
-            | "dictation_owned_preedit_final_preserved"
-            | "dictation_owned_preedit_progressive_commit"
-            | "dictation_canonical_checkpoint_completed"
-            | "dictation_canonical_checkpoint_committed"
-            | "dictation_canonical_checkpoint_failed"
-            | "dictation_canonical_final_completed"
-            | "dictation_first_live_text_visible"
             | "dictation_stop_to_final_transcript"
             | "dictation_stop_to_idle"
+            | "dictation_interrupted"
             | "dictation_recording_duration"
-            | "dictation_transcription_completed"
             | "dictation_recording_stopped"
             | "dictation_audio_teardown_completed"
-            | "dictation_audio_prepared"
-            | "dictation_transcription_started"
             | "dictation_recovery_retained"
-            | "dictation_manual_transcript_ready"
             | "dictation_recording_limit_reached"
-            | "dictation_enhancement_completed"
-            | "dictation_local_assistant_completed"
-            | "dictation_final_output_completed"
-            | "dictation_final_output_unreconciled"
-            | "dictation_final_insertion_failed"
     )
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct FrontendTraceFields {
-    audio_level_bucket: Option<String>,
-    chunk_count: Option<u64>,
-    response_delta_count: Option<u64>,
     selected_device_configured: Option<bool>,
     track_sample_rate: Option<u64>,
-    track_channel_count: Option<u64>,
-    echo_cancellation: Option<bool>,
-    noise_suppression: Option<bool>,
-    auto_gain_control: Option<bool>,
     duration_ms: Option<u64>,
     dictation_session_id: Option<u64>,
 }
 
 impl FrontendTraceFields {
     fn validate(&self) -> Result<(), String> {
-        if let Some(bucket) = self.audio_level_bucket.as_deref() {
-            match bucket {
-                "silent" | "low" | "medium" | "high" => {}
-                _ => return Err(format!("Unsupported audio level bucket: {bucket}")),
-            }
-        }
         if let Some(sample_rate) = self.track_sample_rate {
             if !(8_000..=384_000).contains(&sample_rate) {
                 return Err(format!("Unsupported track sample rate: {sample_rate}"));
-            }
-        }
-        if let Some(channel_count) = self.track_channel_count {
-            if !(1..=16).contains(&channel_count) {
-                return Err(format!("Unsupported track channel count: {channel_count}"));
             }
         }
         if let Some(duration_ms) = self.duration_ms {
@@ -744,288 +608,6 @@ fn save_cached_update_state(cache: CachedUpdateCheck) -> Result<(), String> {
 
 // --- Transcription ---
 
-fn decode_audio_bytes(bytes: &[u8]) -> Result<Vec<f32>, String> {
-    audio_transport::decode_samples(bytes)
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct DebugDictationCaptureResult {
-    audio_path: String,
-    timeline_path: String,
-}
-
-#[tauri::command]
-fn debug_dictation_capture_enabled() -> bool {
-    std::env::var("VOCO_DEBUG_CAPTURE_AUDIO").as_deref() == Ok("1")
-        && !DEBUG_CAPTURE_WRITTEN.load(Ordering::SeqCst)
-}
-
-#[tauri::command(async)]
-fn save_debug_dictation_capture(
-    audio_bytes: Vec<u8>,
-    timeline: serde_json::Value,
-) -> Result<Option<DebugDictationCaptureResult>, String> {
-    if std::env::var("VOCO_DEBUG_CAPTURE_AUDIO").as_deref() != Ok("1") {
-        return Ok(None);
-    }
-    if DEBUG_CAPTURE_WRITTEN
-        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
-        .is_err()
-    {
-        return Ok(None);
-    }
-
-    let result = write_debug_dictation_capture(&audio_bytes, &timeline);
-    if result.is_err() {
-        DEBUG_CAPTURE_WRITTEN.store(false, Ordering::SeqCst);
-    }
-    result.map(Some)
-}
-
-fn write_debug_dictation_capture(
-    audio_bytes: &[u8],
-    timeline: &serde_json::Value,
-) -> Result<DebugDictationCaptureResult, String> {
-    let samples = decode_audio_bytes(audio_bytes)?;
-    if samples.is_empty() {
-        return Err("Debug capture has no audio samples".to_string());
-    }
-    if samples.len() > 16_000 * MAX_AUDIO_SECONDS {
-        return Err(format!(
-            "Debug capture is too long (max {MAX_AUDIO_SECONDS} seconds)"
-        ));
-    }
-
-    let timeline_bytes = serde_json::to_vec_pretty(timeline)
-        .map_err(|error| format!("Failed to encode debug capture timeline: {error}"))?;
-    if timeline_bytes.len() > 16 * 1024 * 1024 {
-        return Err("Debug capture timeline is too large (max 16MB)".to_string());
-    }
-
-    let directory = debug_capture_dir();
-    prepare_private_debug_capture_directory(&directory)?;
-
-    let capture_id = format!(
-        "dictation-{}-{}-{}",
-        now_ms(),
-        std::process::id(),
-        DEBUG_CAPTURE_SEQUENCE.fetch_add(1, Ordering::SeqCst) + 1
-    );
-    let (audio_path, timeline_path) = write_private_debug_capture_pair(
-        &directory,
-        &capture_id,
-        &encode_pcm16_wav(&samples, 16_000),
-        &timeline_bytes,
-    )?;
-
-    Ok(DebugDictationCaptureResult {
-        audio_path: audio_path.to_string_lossy().into_owned(),
-        timeline_path: timeline_path.to_string_lossy().into_owned(),
-    })
-}
-
-fn encode_pcm16_wav(samples: &[f32], sample_rate: u32) -> Vec<u8> {
-    let data_size = samples.len().saturating_mul(2).min(u32::MAX as usize) as u32;
-    let mut wav = Vec::with_capacity(44 + data_size as usize);
-    wav.extend_from_slice(b"RIFF");
-    wav.extend_from_slice(&(36u32.saturating_add(data_size)).to_le_bytes());
-    wav.extend_from_slice(b"WAVEfmt ");
-    wav.extend_from_slice(&16u32.to_le_bytes());
-    wav.extend_from_slice(&1u16.to_le_bytes());
-    wav.extend_from_slice(&1u16.to_le_bytes());
-    wav.extend_from_slice(&sample_rate.to_le_bytes());
-    wav.extend_from_slice(&sample_rate.saturating_mul(2).to_le_bytes());
-    wav.extend_from_slice(&2u16.to_le_bytes());
-    wav.extend_from_slice(&16u16.to_le_bytes());
-    wav.extend_from_slice(b"data");
-    wav.extend_from_slice(&data_size.to_le_bytes());
-    for sample in samples.iter().take((data_size / 2) as usize) {
-        let pcm = (sample.clamp(-1.0, 1.0) * i16::MAX as f32).round() as i16;
-        wav.extend_from_slice(&pcm.to_le_bytes());
-    }
-    wav
-}
-
-fn prepare_private_debug_capture_directory(path: &std::path::Path) -> Result<(), String> {
-    std::fs::create_dir_all(path).map_err(|error| {
-        format!(
-            "Failed to create debug capture directory {}: {error}",
-            path.display()
-        )
-    })?;
-
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::{MetadataExt, PermissionsExt};
-
-        let metadata = std::fs::symlink_metadata(path).map_err(|error| {
-            format!(
-                "Failed to inspect debug capture directory {}: {error}",
-                path.display()
-            )
-        })?;
-        if metadata.file_type().is_symlink() || !metadata.is_dir() {
-            return Err(format!(
-                "Debug capture path {} must be a real directory",
-                path.display()
-            ));
-        }
-        if metadata.uid() != unsafe { libc::geteuid() } {
-            return Err(format!(
-                "Debug capture directory {} is not owned by the current user",
-                path.display()
-            ));
-        }
-
-        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o700)).map_err(
-            |error| {
-                format!(
-                    "Failed to secure debug capture directory {}: {error}",
-                    path.display()
-                )
-            },
-        )?;
-        let secured = std::fs::symlink_metadata(path).map_err(|error| {
-            format!(
-                "Failed to verify debug capture directory {}: {error}",
-                path.display()
-            )
-        })?;
-        if secured.mode() & 0o777 != 0o700 || secured.uid() != unsafe { libc::geteuid() } {
-            return Err(format!(
-                "Debug capture directory {} could not be secured to mode 0700",
-                path.display()
-            ));
-        }
-    }
-    Ok(())
-}
-
-fn create_private_debug_capture_file(path: &std::path::Path) -> Result<std::fs::File, String> {
-    let mut options = std::fs::OpenOptions::new();
-    options.write(true).create_new(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        options.mode(0o600);
-    }
-    options.open(path).map_err(|error| {
-        format!(
-            "Failed to create private debug capture file {}: {error}",
-            path.display()
-        )
-    })
-}
-
-fn verify_private_debug_capture_file(
-    file: &std::fs::File,
-    path: &std::path::Path,
-) -> Result<(), String> {
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::MetadataExt;
-        let metadata = file.metadata().map_err(|error| {
-            format!(
-                "Failed to inspect debug capture file {}: {error}",
-                path.display()
-            )
-        })?;
-        if !metadata.is_file()
-            || metadata.uid() != unsafe { libc::geteuid() }
-            || metadata.mode() & 0o777 != 0o600
-        {
-            return Err(format!(
-                "Debug capture file {} is not a user-owned 0600 regular file",
-                path.display()
-            ));
-        }
-    }
-    Ok(())
-}
-
-fn write_private_debug_capture_pair(
-    directory: &std::path::Path,
-    capture_id: &str,
-    audio_bytes: &[u8],
-    timeline_bytes: &[u8],
-) -> Result<(std::path::PathBuf, std::path::PathBuf), String> {
-    let audio_path = directory.join(format!("{capture_id}.wav"));
-    let timeline_path = directory.join(format!("{capture_id}.json"));
-    let mut audio_file = create_private_debug_capture_file(&audio_path)?;
-    let mut timeline_file = match create_private_debug_capture_file(&timeline_path) {
-        Ok(file) => file,
-        Err(error) => {
-            let cleanup = std::fs::remove_file(&audio_path).map_err(|cleanup_error| {
-                format!(
-                    "{error}; failed to remove partial debug audio {}: {cleanup_error}",
-                    audio_path.display()
-                )
-            });
-            return cleanup.and(Err(error));
-        }
-    };
-
-    let write_result = (|| {
-        audio_file.write_all(audio_bytes).map_err(|error| {
-            format!(
-                "Failed to write debug audio capture {}: {error}",
-                audio_path.display()
-            )
-        })?;
-        timeline_file.write_all(timeline_bytes).map_err(|error| {
-            format!(
-                "Failed to write debug capture timeline {}: {error}",
-                timeline_path.display()
-            )
-        })?;
-        audio_file.sync_all().map_err(|error| {
-            format!(
-                "Failed to sync debug audio capture {}: {error}",
-                audio_path.display()
-            )
-        })?;
-        timeline_file.sync_all().map_err(|error| {
-            format!(
-                "Failed to sync debug capture timeline {}: {error}",
-                timeline_path.display()
-            )
-        })?;
-        verify_private_debug_capture_file(&audio_file, &audio_path)?;
-        verify_private_debug_capture_file(&timeline_file, &timeline_path)?;
-        if let Ok(directory_file) = std::fs::File::open(directory) {
-            directory_file.sync_all().map_err(|error| {
-                format!(
-                    "Failed to sync debug capture directory {}: {error}",
-                    directory.display()
-                )
-            })?;
-        }
-        Ok::<(), String>(())
-    })();
-
-    drop(audio_file);
-    drop(timeline_file);
-
-    if let Err(error) = write_result {
-        let mut cleanup_errors = Vec::new();
-        for path in [&audio_path, &timeline_path] {
-            if let Err(cleanup_error) = std::fs::remove_file(path) {
-                cleanup_errors.push(format!("{}: {cleanup_error}", path.display()));
-            }
-        }
-        if cleanup_errors.is_empty() {
-            return Err(error);
-        }
-        return Err(format!(
-            "{error}; failed to remove partial debug capture files: {}",
-            cleanup_errors.join(", ")
-        ));
-    }
-
-    Ok((audio_path, timeline_path))
-}
-
 #[tauri::command]
 fn sync_panel_level(app: tauri::AppHandle, epoch: u64, level: f64) {
     #[cfg(target_os = "linux")]
@@ -1080,54 +662,18 @@ fn open_external_url(url: String) -> Result<(), String> {
 }
 
 #[tauri::command(async)]
-fn begin_desktop_shortcut_session(session_id: String, shortcut_epoch: u64) -> Result<(), String> {
-    insertion::begin_shortcut_session(&session_id, shortcut_epoch)
-}
-
-#[tauri::command(async)]
-fn end_desktop_shortcut_session(session_id: String) -> Result<(), String> {
-    insertion::end_shortcut_session(&session_id)
-}
-
-#[tauri::command(async)]
-async fn await_stop_shortcut_reservation(
-    app: tauri::AppHandle,
-    session_id: u64,
-) -> Result<(), String> {
-    let hotkey = tray::current_hotkey(&app)
-        .map_err(|_| "Shortcut configuration is unavailable.".to_string())?;
-    if !prefers_evdev_hotkey(is_wayland_session(), &hotkey) {
-        return Ok(());
-    }
-    let panel_status = panel_setup::check(false)
-        .map_err(|_| "VOCO cannot verify the GNOME Stop shortcut.".to_string())?;
-    if !panel_setup::stop_reservation_required(&panel_status)? {
-        return Ok(());
-    }
-    tauri::async_runtime::spawn_blocking(move || {
-        let started = Instant::now();
-        while started.elapsed() < std::time::Duration::from_millis(1800) {
-            if panel::reserves_stop_shortcut(&app, session_id) {
-                return Ok(());
-            }
-            std::thread::sleep(std::time::Duration::from_millis(25));
-        }
-        Err("GNOME did not reserve VOCO's Stop shortcut. Reopen VOCO or sign out and back in before dictating.".to_string())
-    })
-    .await
-    .map_err(|_| "VOCO could not verify the Stop shortcut.".to_string())?
-}
-
-#[tauri::command(async)]
 fn get_desktop_input_status(app: tauri::AppHandle) -> insertion::DesktopInputStatus {
-    effective_desktop_input_status(&app)
+    with_panel_recommendation(&app, insertion::desktop_input_status())
 }
 
-fn effective_desktop_input_status(app: &tauri::AppHandle) -> insertion::DesktopInputStatus {
-    let mut input = insertion::desktop_input_status();
+/// The GNOME companion keeps the shortcut out of the focused app. It is a
+/// recommendation only: dictation works without it.
+fn with_panel_recommendation(
+    app: &tauri::AppHandle,
+    mut input: insertion::DesktopInputStatus,
+) -> insertion::DesktopInputStatus {
     if input.available {
         if let Some(detail) = stop_shortcut_setup_issue(app) {
-            input.available = false;
             input.detail = detail;
             input.setup_area = Some("panel");
         }
@@ -1137,38 +683,21 @@ fn effective_desktop_input_status(app: &tauri::AppHandle) -> insertion::DesktopI
 
 #[tauri::command(async)]
 fn get_panel_setup_status() -> Result<panel_setup::PanelSetupStatus, String> {
-    panel_setup::check(false)
+    let status = panel_setup::check(false);
+    panel_setup::invalidate_check();
+    status
 }
 
 #[tauri::command(async)]
 fn enable_gnome_panel() -> Result<panel_setup::PanelSetupStatus, String> {
-    panel_setup::check(true)
+    let status = panel_setup::check(true);
+    panel_setup::invalidate_check();
+    status
 }
 
 #[tauri::command(async)]
-fn get_desktop_paste_status(app: tauri::AppHandle) -> insertion::DesktopPasteStatus {
-    effective_desktop_paste_status(&app)
-}
-
-fn effective_desktop_paste_status(app: &tauri::AppHandle) -> insertion::DesktopPasteStatus {
-    effective_desktop_paste_diagnostics(app).1
-}
-
-fn effective_desktop_paste_diagnostics(
-    app: &tauri::AppHandle,
-) -> (insertion::DesktopInputStatus, insertion::DesktopPasteStatus) {
-    let (mut input, mut paste) = insertion::desktop_paste_diagnostics();
-    if let Some(detail) = stop_shortcut_setup_issue(app) {
-        input.available = false;
-        input.detail = detail.clone();
-        input.setup_area = Some("panel");
-        paste.available = false;
-        paste.streaming_enabled = false;
-        paste.target_token = None;
-        paste.failure_reason = Some(insertion::DesktopPasteFailure::Setup);
-        paste.detail = detail;
-    }
-    (input, paste)
+fn get_desktop_paste_status() -> insertion::DesktopPasteStatus {
+    insertion::desktop_paste_diagnostics().1
 }
 
 fn stop_shortcut_setup_issue(app: &tauri::AppHandle) -> Option<String> {
@@ -1183,7 +712,7 @@ fn stop_shortcut_setup_issue(app: &tauri::AppHandle) -> Option<String> {
         return panel_setup::stop_shortcut_setup_detail(
             &session_type,
             chord,
-            panel_setup::check(false),
+            panel_setup::cached_check(),
             panel::is_attached(),
         );
     }
@@ -1193,17 +722,12 @@ fn stop_shortcut_setup_issue(app: &tauri::AppHandle) -> Option<String> {
 #[tauri::command(async)]
 async fn paste_desktop_text(
     text: String,
-    expected_target_token: Option<String>,
     correlation: Option<insertion::PasteCorrelation>,
 ) -> Result<insertion::InsertionResult, insertion::InsertionError> {
-    // Recipient observation can wait on another app. Keep the UI/capture IPC
-    // event loop responsive while the blocking native transaction settles.
+    // Helpers and the modifier wait block. Keep the UI/capture IPC event loop
+    // responsive while the native transaction settles.
     tauri::async_runtime::spawn_blocking(move || {
-        insertion::correlated_desktop_paste(
-            &text,
-            expected_target_token.as_deref(),
-            correlation.as_ref(),
-        )
+        insertion::correlated_desktop_paste(&text, correlation.as_ref())
     })
     .await
     .map_err(|_| insertion::InsertionError {
@@ -1213,12 +737,24 @@ async fn paste_desktop_text(
     })?
 }
 
+/// Leave undelivered dictation on the clipboard without sending any keys.
+#[tauri::command(async)]
+async fn copy_desktop_text(text: String) -> Result<(), insertion::InsertionError> {
+    tauri::async_runtime::spawn_blocking(move || insertion::copy_desktop_text(&text))
+        .await
+        .map_err(|_| insertion::InsertionError {
+            outcome: insertion::DeliveryOutcome::Uncertain,
+            message: "Copy task interrupted; check the clipboard before pasting.".into(),
+            clipboard_changed: true,
+        })?
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct RuntimeDiagnostics {
     #[serde(flatten)]
     insertion: insertion::RuntimeDiagnostics,
-    owned_preedit: owned_preedit::OwnedPreeditStatus,
+    ibus_shortcut: ibus_shortcut::IbusShortcutStatus,
     shortcut: shortcut_readiness::Status,
     desktop_paste: insertion::DesktopPasteStatus,
     desktop_input: insertion::DesktopInputStatus,
@@ -1226,24 +762,9 @@ struct RuntimeDiagnostics {
 
 struct BrowserIntegration(Option<browser_broker::BrowserBroker>);
 
-impl From<browser_broker::BrowserStatus> for owned_preedit::OwnedPreeditStatus {
-    fn from(status: browser_broker::BrowserStatus) -> Self {
-        Self {
-            available: status.available,
-            ready: status.ready,
-            setup_state: status.setup_state,
-            detail: status.detail,
-            session_id: status.session_id,
-            engine_active: status.engine_active,
-            focus_lost: status.focus_lost,
-            progressive_commit_active: status.progressive_commit_active,
-            committed_character_count: status.committed_character_count,
-            ownership_intact: status.ownership_intact,
-            finalization_outcome: status.finalization_outcome,
-            error: status.error,
-        }
-    }
-}
+/// Browser field commands act only on the broker's current session. Any other
+/// session gets this error, which stops its delivery; Stop copies the rest.
+const NO_BROWSER_FIELD: &str = "No enabled browser field is taking this dictation.";
 
 impl BrowserIntegration {
     fn session(&self, id: u64) -> Option<&browser_broker::BrowserBroker> {
@@ -1256,20 +777,27 @@ impl BrowserIntegration {
 #[tauri::command(async)]
 fn get_runtime_diagnostics(
     app: tauri::AppHandle,
-    state: tauri::State<'_, owned_preedit::OwnedPreeditService>,
+    state: tauri::State<'_, ibus_shortcut::IbusShortcutService>,
 ) -> RuntimeDiagnostics {
-    let owned_preedit = state.status();
-    let (desktop_input, desktop_paste) = effective_desktop_paste_diagnostics(&app);
+    let ibus_shortcut = state.status();
+    let (insertion, desktop_input, desktop_paste) = insertion::runtime_input_diagnostics();
+    #[cfg(target_os = "linux")]
+    let panel_reserved = panel::reserves_current_shortcut(&app);
+    #[cfg(not(target_os = "linux"))]
+    let panel_reserved = false;
     RuntimeDiagnostics {
-        insertion: insertion::runtime_diagnostics(),
-        shortcut: shortcut_runtime_status(owned_preedit.available),
-        owned_preedit,
+        insertion,
+        shortcut: shortcut_runtime_status(ibus_shortcut.available, panel_reserved),
+        ibus_shortcut,
         desktop_paste,
-        desktop_input,
+        desktop_input: with_panel_recommendation(&app, desktop_input),
     }
 }
 
-fn shortcut_runtime_status(bridge_available: bool) -> shortcut_readiness::Status {
+fn shortcut_runtime_status(
+    bridge_available: bool,
+    panel_reserved: bool,
+) -> shortcut_readiness::Status {
     let unknown = || shortcut_readiness::Status {
         hotkey: String::new(),
         route: None,
@@ -1291,7 +819,7 @@ fn shortcut_runtime_status(bridge_available: bool) -> shortcut_readiness::Status
         return unknown();
     };
     let now = shortcut_monotonic_ms();
-    let mut status = SHORTCUT_OBSERVATIONS.status(shortcut_readiness::Snapshot {
+    SHORTCUT_OBSERVATIONS.status(shortcut_readiness::Snapshot {
         hotkey: &config.hotkey,
         revision: CONFIG_REVISION.load(Ordering::SeqCst),
         now,
@@ -1306,122 +834,64 @@ fn shortcut_runtime_status(bridge_available: bool) -> shortcut_readiness::Status
         evdev_mode: EVDEV_HOTKEY_MODE.load(Ordering::SeqCst),
         configured_evdev_mode: hotkey_to_evdev_mode(&config.hotkey),
         bridge_available,
-    });
-    if status.route == Some("global-shortcut") && desktop_shortcut::degraded() {
-        status.state = "unavailable";
-        status.detail =
-            "Shortcut restoration could not be confirmed. Restart VOCO before using it.";
-    }
-    status
+        panel_reserved,
+    })
 }
 
 #[tauri::command(async)]
-fn get_owned_preedit_status(
-    state: tauri::State<'_, owned_preedit::OwnedPreeditService>,
-    browser: tauri::State<'_, BrowserIntegration>,
-) -> owned_preedit::OwnedPreeditStatus {
-    if let Some(broker) = &browser.0 {
-        let status = broker.get_status();
-        if status.session_id.is_some() {
-            return status.into();
-        }
-    }
-    state.status()
-}
-
-#[tauri::command(async)]
-fn start_owned_preedit(
-    state: tauri::State<'_, owned_preedit::OwnedPreeditService>,
+fn start_browser_field(
     browser: tauri::State<'_, BrowserIntegration>,
     session_id: u64,
-    trigger_id: Option<String>,
-) -> Result<owned_preedit::OwnedPreeditStatus, String> {
-    if let Some(trigger) = trigger_id
-        .as_deref()
-        .filter(|id| id.starts_with("browser:"))
-    {
-        return browser
-            .0
-            .as_ref()
-            .ok_or("The local browser integration is unavailable.")?
-            .start(session_id, trigger)
-            .map(Into::into);
+    trigger_id: String,
+) -> Result<browser_broker::BrowserStatus, String> {
+    if !trigger_id.starts_with("browser:") {
+        return Err(NO_BROWSER_FIELD.to_string());
     }
-    state.start(session_id, trigger_id.as_deref())
+    browser
+        .0
+        .as_ref()
+        .ok_or("The local browser integration is unavailable.")?
+        .start(session_id, &trigger_id)
 }
 
 #[tauri::command(async)]
-fn update_owned_preedit(
-    state: tauri::State<'_, owned_preedit::OwnedPreeditService>,
-    browser: tauri::State<'_, BrowserIntegration>,
-    session_id: u64,
-    confirmed_text: String,
-    preedit_text: String,
-    provisional_text: String,
-) -> Result<owned_preedit::OwnedPreeditStatus, String> {
-    // Browser hypotheses stay in VOCO. Only canonical checkpoints or a final
-    // transcript can request an addressed application mutation.
-    if let Some(broker) = browser.session(session_id) {
-        return broker.session_status(session_id).map(Into::into);
-    }
-    state.update(session_id, confirmed_text, preedit_text, provisional_text)
-}
-
-#[tauri::command(async)]
-fn commit_owned_preedit(
-    state: tauri::State<'_, owned_preedit::OwnedPreeditService>,
-    browser: tauri::State<'_, BrowserIntegration>,
-    session_id: u64,
-    text: String,
-) -> Result<owned_preedit::OwnedPreeditStatus, String> {
-    if let Some(broker) = browser.session(session_id) {
-        return broker.commit(session_id, &text).map(Into::into);
-    }
-    state.commit(session_id, text)
-}
-
-#[tauri::command(async)]
-fn checkpoint_owned_preedit(
-    state: tauri::State<'_, owned_preedit::OwnedPreeditService>,
+fn append_browser_field(
     browser: tauri::State<'_, BrowserIntegration>,
     session_id: u64,
     expected_committed_text: String,
     append_text: String,
-) -> Result<owned_preedit::OwnedPreeditStatus, String> {
-    if let Some(broker) = browser.session(session_id) {
-        return broker
-            .append(session_id, &expected_committed_text, &append_text, false)
-            .map(Into::into);
-    }
-    state.checkpoint(session_id, expected_committed_text, append_text)
+) -> Result<browser_broker::BrowserStatus, String> {
+    browser.session(session_id).ok_or(NO_BROWSER_FIELD)?.append(
+        session_id,
+        &expected_committed_text,
+        &append_text,
+        false,
+    )
 }
 
 #[tauri::command(async)]
-fn finish_canonical_owned_preedit(
-    state: tauri::State<'_, owned_preedit::OwnedPreeditService>,
+fn finish_browser_field(
     browser: tauri::State<'_, BrowserIntegration>,
     session_id: u64,
     expected_committed_text: String,
-    append_text: String,
-) -> Result<owned_preedit::OwnedPreeditStatus, String> {
-    if let Some(broker) = browser.session(session_id) {
-        return broker
-            .append(session_id, &expected_committed_text, &append_text, true)
-            .map(Into::into);
-    }
-    state.finish_canonical(session_id, expected_committed_text, append_text)
+) -> Result<browser_broker::BrowserStatus, String> {
+    browser.session(session_id).ok_or(NO_BROWSER_FIELD)?.append(
+        session_id,
+        &expected_committed_text,
+        "",
+        true,
+    )
 }
 
 #[tauri::command(async)]
-fn cancel_owned_preedit(
-    state: tauri::State<'_, owned_preedit::OwnedPreeditService>,
+fn cancel_browser_field(
     browser: tauri::State<'_, BrowserIntegration>,
     session_id: u64,
-) -> Result<owned_preedit::OwnedPreeditStatus, String> {
-    if let Some(broker) = browser.session(session_id) {
-        return broker.cancel(session_id).map(Into::into);
-    }
-    state.cancel(session_id)
+) -> Result<browser_broker::BrowserStatus, String> {
+    browser
+        .session(session_id)
+        .ok_or(NO_BROWSER_FIELD)?
+        .cancel(session_id)
 }
 
 #[tauri::command(async)]
@@ -1461,95 +931,6 @@ fn hide_overlay_window(window: &tauri::WebviewWindow<tauri::Wry>) -> Result<(), 
         .map_err(|e| format!("Failed to move overlay window off-screen: {e}"))?;
 
     Ok(())
-}
-
-fn clamp_overlay_position(
-    cursor_x: i32,
-    cursor_y: i32,
-    bounds: Option<(i32, i32, u32, u32)>,
-    width: u32,
-    height: u32,
-) -> (i32, i32) {
-    let mut x = cursor_x + OVERLAY_CURSOR_OFFSET_X;
-    let mut y = cursor_y + OVERLAY_CURSOR_OFFSET_Y;
-
-    if let Some((monitor_x, monitor_y, monitor_width, monitor_height)) = bounds {
-        let min_x = monitor_x + OVERLAY_MARGIN;
-        let min_y = monitor_y + OVERLAY_MARGIN;
-        let max_x = (monitor_x + monitor_width as i32 - width as i32 - OVERLAY_MARGIN).max(min_x);
-        let max_y = (monitor_y + monitor_height as i32 - height as i32 - OVERLAY_MARGIN).max(min_y);
-
-        x = x.clamp(min_x, max_x);
-        y = y.clamp(min_y, max_y);
-    }
-
-    (x, y)
-}
-
-fn show_overlay_window(
-    window: &tauri::WebviewWindow<tauri::Wry>,
-    width: u32,
-    height: u32,
-) -> Result<(), String> {
-    window
-        .set_always_on_top(true)
-        .map_err(|e| format!("Failed to keep overlay on top: {e}"))?;
-
-    let cursor = window
-        .cursor_position()
-        .map_err(|e| format!("Failed to read cursor position: {e}"))?;
-
-    let monitor = window
-        .monitor_from_point(cursor.x, cursor.y)
-        .ok()
-        .flatten()
-        .or_else(|| window.current_monitor().ok().flatten())
-        .or_else(|| window.primary_monitor().ok().flatten());
-
-    let bounds = monitor.as_ref().map(|monitor| {
-        (
-            monitor.position().x,
-            monitor.position().y,
-            monitor.size().width,
-            monitor.size().height,
-        )
-    });
-
-    let (x, y) = clamp_overlay_position(
-        cursor.x.round() as i32,
-        cursor.y.round() as i32,
-        bounds,
-        width,
-        height,
-    );
-
-    window
-        .set_size(tauri::Size::Physical(tauri::PhysicalSize::new(
-            width, height,
-        )))
-        .map_err(|e| format!("Failed to resize overlay window: {e}"))?;
-
-    window
-        .set_position(tauri::Position::Physical(tauri::PhysicalPosition::new(
-            x, y,
-        )))
-        .map_err(|e| format!("Failed to position overlay window: {e}"))?;
-
-    window
-        .show()
-        .map_err(|e| format!("Failed to show overlay window: {e}"))?;
-
-    Ok(())
-}
-
-#[tauri::command]
-fn show_status_overlay(app: tauri::AppHandle, width: u32, height: u32) -> Result<(), String> {
-    let window = main_window(&app)?;
-    show_overlay_window(
-        &window,
-        width.max(HIDDEN_WINDOW_SIZE),
-        height.max(HIDDEN_WINDOW_SIZE),
-    )
 }
 
 #[tauri::command]
@@ -1607,7 +988,7 @@ fn is_allowed_external_url(url: &str) -> bool {
 
 fn prepare_model_at_startup(app: &tauri::AppHandle) -> Result<(), String> {
     info!("Preparing bundled Nemotron streaming model at startup");
-    benchmark_stream::warmup()?;
+    speech_stream::warmup()?;
     info!("Bundled Nemotron streaming model ready");
     tray::update_model_download_status(app, tray::ModelDownloadStatus::Ready);
     Ok(())
@@ -1667,7 +1048,18 @@ fn should_register_shortcut_fallback(use_evdev: bool, consuming_context: bool) -
     should_register_global_shortcut(use_evdev) && !consuming_context
 }
 
-fn schedule_shortcut_arbitration(app: &tauri::AppHandle, snapshot: &ConfigSnapshot) {
+fn schedule_shortcut_arbitration(
+    app: &tauri::AppHandle,
+    snapshot: &ConfigSnapshot,
+    posts: &mut shortcut_arbitration::ArbitrationPosts,
+) {
+    let fallback = should_register_shortcut_fallback(
+        USE_EVDEV_HOTKEY.load(Ordering::SeqCst),
+        IBUS_SHORTCUT_LEASE.has_authority(shortcut_monotonic_ms()),
+    );
+    if !posts.should_post(snapshot.revision, fallback, shortcut_monotonic_ms()) {
+        return;
+    }
     let handle = app.clone();
     let revision = snapshot.revision;
     let hotkey = snapshot.config.hotkey.clone();
@@ -1697,6 +1089,7 @@ fn schedule_shortcut_arbitration(app: &tauri::AppHandle, snapshot: &ConfigSnapsh
 fn start_ibus_shortcut_listener(app_handle: tauri::AppHandle) {
     std::thread::spawn(move || {
         let mut shortcut_config = None;
+        let mut arbitration_posts = shortcut_arbitration::ArbitrationPosts::default();
         loop {
             std::thread::sleep(std::time::Duration::from_millis(50));
             // Capture the observation epoch before checking renderer readiness,
@@ -1709,7 +1102,7 @@ fn start_ibus_shortcut_listener(app_handle: tauri::AppHandle) {
                 )
             {
                 if let Some(snapshot) = shortcut_config.as_ref() {
-                    schedule_shortcut_arbitration(&app_handle, snapshot);
+                    schedule_shortcut_arbitration(&app_handle, snapshot, &mut arbitration_posts);
                 }
                 continue;
             }
@@ -1721,14 +1114,14 @@ fn start_ibus_shortcut_listener(app_handle: tauri::AppHandle) {
             .is_err()
             {
                 if let Some(snapshot) = shortcut_config.as_ref() {
-                    schedule_shortcut_arbitration(&app_handle, snapshot);
+                    schedule_shortcut_arbitration(&app_handle, snapshot, &mut arbitration_posts);
                 }
                 continue;
             }
             let Some(snapshot) = shortcut_config.as_ref() else {
                 continue;
             };
-            let state = app_handle.state::<owned_preedit::OwnedPreeditService>();
+            let state = app_handle.state::<ibus_shortcut::IbusShortcutService>();
             let observation_started = shortcut_monotonic_ms();
             SHORTCUT_OBSERVATIONS.begin_poll(observation_ticket);
             IBUS_SHORTCUT_LEASE.begin_poll();
@@ -1753,7 +1146,7 @@ fn start_ibus_shortcut_listener(app_handle: tauri::AppHandle) {
                             shortcut_arbitration::PollOutcome::Disarmed
                         },
                     );
-                    schedule_shortcut_arbitration(&app_handle, snapshot);
+                    schedule_shortcut_arbitration(&app_handle, snapshot, &mut arbitration_posts);
                     if CONFIG_REVISION.load(Ordering::SeqCst) != snapshot.revision {
                         continue;
                     }
@@ -1797,7 +1190,7 @@ fn start_ibus_shortcut_listener(app_handle: tauri::AppHandle) {
                             shortcut_arbitration::PollOutcome::Unavailable
                         },
                     );
-                    schedule_shortcut_arbitration(&app_handle, snapshot);
+                    schedule_shortcut_arbitration(&app_handle, snapshot, &mut arbitration_posts);
                     std::thread::sleep(std::time::Duration::from_millis(450));
                 }
             }
@@ -1816,7 +1209,7 @@ pub fn eval_toggle(app_handle: &tauri::AppHandle) {
 // reason to discard that callback or to change its normal debounce behavior.
 fn suppress_passive_shortcut(app_handle: &tauri::AppHandle, backend: &str) -> bool {
     #[cfg(target_os = "linux")]
-    if backend == "evdev" && panel::reserves_current_stop_shortcut(app_handle) {
+    if backend == "evdev" && panel::reserves_current_shortcut(app_handle) {
         trace_hotkey_event("eval_toggle_suppressed_panel", Some(backend));
         return true;
     }
@@ -1838,7 +1231,6 @@ fn emit_toggle_event(app_handle: &tauri::AppHandle, backend_used: &str) {
     } else {
         trace_hotkey_event("toggle_event_emitted", Some(backend_used));
     }
-    let _ = app_handle.emit_to("main", LEGACY_TOGGLE_DICTATION_EVENT, ());
 }
 
 fn buffer_toggle_until_frontend_ready(backend_used: &str) {
@@ -1890,6 +1282,9 @@ fn eval_toggle_with_backend(app_handle: &tauri::AppHandle, backend_used: &str) {
         trace_hotkey_event("eval_toggle_debounced", Some(backend_used));
         return;
     }
+    if backend_used == "evdev" {
+        notify_passive_shortcut_once(app_handle);
+    }
 
     if !FRONTEND_HOTKEY_HANDLER_READY.load(Ordering::SeqCst) {
         buffer_toggle_until_frontend_ready(backend_used);
@@ -1899,42 +1294,66 @@ fn eval_toggle_with_backend(app_handle: &tauri::AppHandle, backend_used: &str) {
     emit_toggle_event(app_handle, backend_used);
 }
 
+/// Evdev only observes the chord, so the focused app acted on it too, often
+/// moving the cursor before the first paste. Explain the fix once per launch.
+fn notify_passive_shortcut_once(app_handle: &tauri::AppHandle) {
+    static NOTIFIED: AtomicBool = AtomicBool::new(false);
+    if NOTIFIED.load(Ordering::SeqCst) {
+        return;
+    }
+    let app = app_handle.clone();
+    // The panel check runs a bounded helper; keep it off the key listener.
+    std::thread::spawn(move || {
+        if let Some(detail) = stop_shortcut_setup_issue(&app) {
+            if !NOTIFIED.swap(true, Ordering::SeqCst) {
+                send_notification("Your shortcut also reached the app", &detail);
+            }
+        }
+    });
+}
+
 // --- Hotkey configuration ---
 
 #[derive(Debug)]
 struct ConfiguredHotkey {
     hotkey: String,
-    repair_notice: Option<String>,
+    /// Startup notification title and body.
+    notice: Option<(&'static str, String)>,
 }
 
 fn repair_invalid_configured_hotkey(config: &mut AppConfig) -> Option<String> {
     let error = validate_dictation_hotkey(&config.hotkey).err()?;
     let invalid_hotkey = std::mem::replace(&mut config.hotkey, "Alt+D".to_string());
     Some(format!(
-        "Configured hotkey '{invalid_hotkey}' was reset: {error}"
+        "Your shortcut '{invalid_hotkey}' was reset to Alt+D: {error}"
     ))
 }
 
+// A settings file VOCO cannot load or repair also fails get_config, so the
+// window pauses dictation until the user fixes it there.
 fn configured_hotkey() -> ConfiguredHotkey {
     let Ok(mut config) = AppConfig::load() else {
         return ConfiguredHotkey {
             hotkey: "Alt+D".to_string(),
-            repair_notice: Some(
-                "VOCO could not load the configured hotkey and is using Alt+D.".to_string(),
-            ),
+            notice: Some((
+                "Dictation paused",
+                "VOCO could not load your settings. Open VOCO to fix them.".to_string(),
+            )),
         };
     };
-    let repair_notice = repair_invalid_configured_hotkey(&mut config).map(|notice| {
-        if let Err(error) = config.save() {
-            return format!(
-                "{notice} VOCO could not persist the repair ({error}); update the hotkey in Settings."
-            );
-        }
-        notice
+    let invalid_hotkey = config.hotkey.clone();
+    let notice = repair_invalid_configured_hotkey(&mut config).map(|notice| match config.save() {
+        Ok(()) => ("Shortcut reset", notice),
+        Err(error) => (
+            "Dictation paused",
+            format!(
+                "VOCO could not reset your shortcut '{invalid_hotkey}' to Alt+D ({error}). Open VOCO to fix your settings."
+            ),
+        ),
     });
     ConfiguredHotkey {
         hotkey: config.hotkey,
-        repair_notice,
+        notice,
     }
 }
 
@@ -1948,16 +1367,20 @@ fn register_global_shortcut_listener(app: &tauri::AppHandle, hotkey: &str) -> Re
     let label = hotkey.to_string();
     let binding_version = HOTKEY_BINDING_VERSION.fetch_add(1, Ordering::SeqCst) + 1;
     let gesture = shortcut_arbitration::PluginGesture::new();
-    // A root X11 passive grab temporarily removes GTK focus while the chord is
-    // held. Observe its completion before querying the destination; no delay or
-    // retry may substitute for the unchanged focus and delivery checks.
+    // A root X11 passive grab sends keyboard input to VOCO while the chord is
+    // held. Toggle on release so the following paste keys reach the focused app.
     let complete_on_release = cfg!(target_os = "linux") && !is_wayland_session();
 
     app.global_shortcut()
         .on_shortcut(shortcut, move |_app, _shortcut, event| {
             let current_version = HOTKEY_BINDING_VERSION.load(Ordering::SeqCst);
+            let pressed = event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed;
+            if complete_on_release {
+                // A paste during the hold would also reach VOCO; it waits instead.
+                insertion::note_x11_shortcut(pressed);
+            }
             if !gesture.admit(
-                event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed,
+                pressed,
                 complete_on_release,
                 current_version == binding_version && !USE_EVDEV_HOTKEY.load(Ordering::SeqCst),
             ) {
@@ -1972,7 +1395,6 @@ fn register_global_shortcut_listener(app: &tauri::AppHandle, hotkey: &str) -> Re
             eval_toggle_with_backend(&handle, "global_shortcut");
         })
         .map_err(|e| format!("Failed to register global shortcut {hotkey}: {e}"))?;
-    desktop_shortcut::registered(Some(shortcut.id()));
     Ok(())
 }
 
@@ -1996,7 +1418,6 @@ fn sync_global_shortcut_binding(
             }
             *current = None;
             HOTKEY_BINDING_VERSION.fetch_add(1, Ordering::SeqCst);
-            desktop_shortcut::registered(None);
             info!("Unregistered previous global shortcut {existing}");
         }
     }
@@ -2105,6 +1526,7 @@ fn install_socket_cleanup_signal_handler() {
             }
 
             native_capture_commands::shutdown();
+            crash_recovery::clean_exit();
             cleanup_socket_files();
             std::process::exit(128 + received_signal);
         });
@@ -2155,7 +1577,7 @@ fn start_socket_listener(app_handle: tauri::AppHandle) {
     }
 }
 
-// --- evdev hotkey listener (primary mechanism on Wayland) ---
+// --- evdev hotkey listener (passive Wayland shortcut) ---
 
 #[cfg(target_os = "linux")]
 fn is_ignored_evdev_device_name(name: &str) -> bool {
@@ -2458,9 +1880,25 @@ fn spawn_evdev_device_watcher(
     });
 }
 
+// Shared with desktop paste, which waits for physical modifiers to be released.
+#[cfg(target_os = "linux")]
+static EVDEV_KEYS: LazyLock<std::sync::Arc<Mutex<hotkey_state::HotkeyState>>> =
+    LazyLock::new(Default::default);
+
+/// Whether a physical keyboard modifier is held; None without a complete view.
+#[cfg(target_os = "linux")]
+pub(crate) fn evdev_modifiers_held() -> Option<bool> {
+    EVDEV_KEYS.lock().ok()?.modifiers_held()
+}
+
+#[cfg(not(target_os = "linux"))]
+pub(crate) fn evdev_modifiers_held() -> Option<bool> {
+    None
+}
+
 #[cfg(target_os = "linux")]
 fn start_hotkey_listener(app_handle: tauri::AppHandle) -> bool {
-    let key_state = std::sync::Arc::new(Mutex::new(hotkey_state::HotkeyState::default()));
+    let key_state = std::sync::Arc::clone(&EVDEV_KEYS);
 
     let initial_discovered = spawn_supported_evdev_device_workers(&app_handle, &key_state);
     if initial_discovered == 0 {
@@ -2473,7 +1911,7 @@ fn start_hotkey_listener(app_handle: tauri::AppHandle) -> bool {
             initial_discovered
         );
     }
-    // This retained event marks discovery supervision, not an open keyboard.
+    // evdev_listener_started marks the discovery supervisor, not an open keyboard.
     info!("evdev device discovery supervisor started");
     trace_hotkey_event("evdev_listener_started", Some("evdev"));
 
@@ -2523,37 +1961,43 @@ pub fn run() -> Result<(), String> {
     #[cfg(target_os = "linux")]
     install_socket_cleanup_signal_handler();
     performance::initialize();
+    // Recovery is optional: an unusable journal must not block dictation.
+    if let Err(error) = crash_recovery::initialize(&xdg_state_home()) {
+        warn!("Crash recovery is unavailable: {error}");
+    }
     native_capture_commands::initialize();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .manage(single_instance_guard)
-        .manage(owned_preedit::OwnedPreeditService::default())
+        .manage(ibus_shortcut::IbusShortcutService::default())
         .on_page_load(|webview, payload| {
             if matches!(payload.event(), tauri::webview::PageLoadEvent::Started) {
                 if webview.label() == "main" {
-                    let shortcut_epoch = desktop_shortcut::invalidate_renderer();
-                    // Revoke authorization immediately; wait for bounded pending
-                    // delivery/X11 cleanup off the UI thread. A late job cannot
-                    // release a replacement renderer's newer ownership.
-                    tauri::async_runtime::spawn_blocking(move || {
-                        if insertion::reset_shortcut_renderer(shortcut_epoch).is_err() {
-                            log::warn!("Renderer reset could not confirm shortcut cleanup");
-                        }
-                    });
+                    // Journal writes from the previous renderer become stale.
+                    let epoch = RENDERER_EPOCH.fetch_add(1, Ordering::SeqCst) + 1;
+                    if let Err(error) = crash_recovery::renderer_restarted(epoch) {
+                        log::warn!("Renderer crash recovery could not be prepared: {error}");
+                    }
                     native_capture_commands::reset_renderer();
                 }
-                // A renderer reload discards its session ids. Close the
-                // private channel first so the engine clears only its owned
-                // preedit before the replacement renderer can start.
+                // Close the private channel first, so the engine drops a
+                // shortcut armed or triggered for the previous renderer
+                // before its replacement can start.
                 webview
-                    .state::<owned_preedit::OwnedPreeditService>()
+                    .state::<ibus_shortcut::IbusShortcutService>()
                     .shutdown();
             }
         })
         .invoke_handler(tauri::generate_handler![
-            benchmark_stream::benchmark_stream,
-            benchmark_stream::recover_stream,
+            crash_recovery::list_crash_recovery,
+            crash_recovery::get_crash_journal_epoch,
+            crash_recovery::dismiss_crash_recovery,
+            crash_recovery::begin_crash_journal,
+            crash_recovery::update_crash_journal,
+            crash_recovery::finish_crash_journal,
+            crash_recovery::keep_crash_journal,
+            speech_stream::speech_stream,
             native_capture_commands::native_capture_capabilities,
             native_capture_commands::native_capture_list_sources,
             native_capture_commands::native_capture_select_source,
@@ -2569,34 +2013,26 @@ pub fn run() -> Result<(), String> {
             save_config_patch,
             load_cached_update_state,
             save_cached_update_state,
-            debug_dictation_capture_enabled,
-            save_debug_dictation_capture,
             get_desktop_paste_status,
             get_desktop_input_status,
             get_panel_setup_status,
             enable_gnome_panel,
             activation::take_launcher_activation,
-            begin_desktop_shortcut_session,
-            end_desktop_shortcut_session,
-            await_stop_shortcut_reservation,
             paste_desktop_text,
+            copy_desktop_text,
             get_runtime_diagnostics,
-            get_owned_preedit_status,
-            start_owned_preedit,
+            start_browser_field,
             refresh_shortcut_heartbeat,
             ack_browser_stop,
-            update_owned_preedit,
-            commit_owned_preedit,
-            checkpoint_owned_preedit,
-            finish_canonical_owned_preedit,
-            cancel_owned_preedit,
+            append_browser_field,
+            finish_browser_field,
+            cancel_browser_field,
             release_browser_recording,
             begin_runtime_status_session,
             sync_runtime_status,
             sync_panel_level,
             trace_frontend_hotkey_event,
             has_pending_hotkey_toggle,
-            show_status_overlay,
             hide_status_overlay,
             show_notification,
             open_external_url,
@@ -2692,9 +2128,9 @@ pub fn run() -> Result<(), String> {
             }
             #[cfg(target_os = "linux")]
             panel::setup(app.handle());
-            if let Some(notice) = configured_hotkey.repair_notice {
+            if let Some((title, notice)) = configured_hotkey.notice {
                 warn!("{notice}");
-                send_notification("Hotkey repaired", &notice);
+                send_notification(title, &notice);
             }
 
             let model_handle = app.handle().clone();
@@ -2714,9 +2150,10 @@ pub fn run() -> Result<(), String> {
         .expect("error while building tauri application")
         .run(|app, event| {
             if let tauri::RunEvent::Exit = event {
+                crash_recovery::clean_exit();
                 performance::shutdown();
                 native_capture_commands::shutdown();
-                app.state::<owned_preedit::OwnedPreeditService>().shutdown();
+                app.state::<ibus_shortcut::IbusShortcutService>().shutdown();
                 cleanup_socket_files();
             }
         });
@@ -2734,95 +2171,6 @@ mod tests {
         assert_eq!(trace_modes(Some("true"), None), (false, false));
         assert_eq!(trace_modes(Some("1"), None), (true, false));
         assert_eq!(trace_modes(None, Some("1")), (false, true));
-    }
-
-    #[test]
-    fn decode_audio_bytes_valid() {
-        let mut bytes = Vec::new();
-        bytes.extend_from_slice(&0.5f32.to_le_bytes());
-        bytes.extend_from_slice(&(-0.5f32).to_le_bytes());
-        let samples = decode_audio_bytes(&bytes).unwrap();
-        assert_eq!(samples.len(), 2);
-        assert!((samples[0] - 0.5).abs() < f32::EPSILON);
-        assert!((samples[1] + 0.5).abs() < f32::EPSILON);
-    }
-
-    #[test]
-    fn decode_audio_bytes_empty() {
-        assert!(decode_audio_bytes(&[]).unwrap().is_empty());
-    }
-
-    #[test]
-    fn decode_audio_bytes_invalid_length() {
-        assert!(decode_audio_bytes(b"abc")
-            .unwrap_err()
-            .contains("not a multiple of 4"));
-    }
-
-    #[test]
-    fn debug_capture_wav_is_valid_mono_pcm16() {
-        let wav = encode_pcm16_wav(&[-1.0, 0.0, 1.0], 16_000);
-
-        assert_eq!(&wav[0..4], b"RIFF");
-        assert_eq!(&wav[8..12], b"WAVE");
-        assert_eq!(u16::from_le_bytes([wav[20], wav[21]]), 1);
-        assert_eq!(u16::from_le_bytes([wav[22], wav[23]]), 1);
-        assert_eq!(
-            u32::from_le_bytes([wav[24], wav[25], wav[26], wav[27]]),
-            16_000
-        );
-        assert_eq!(u16::from_le_bytes([wav[34], wav[35]]), 16);
-        assert_eq!(&wav[36..40], b"data");
-        assert_eq!(u32::from_le_bytes([wav[40], wav[41], wav[42], wav[43]]), 6);
-        assert_eq!(wav.len(), 50);
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn debug_capture_pair_is_private_and_cleans_up_without_overwriting_collisions() {
-        use std::os::unix::fs::{MetadataExt, PermissionsExt};
-
-        let unique = format!(
-            "voco-debug-capture-test-{}-{}",
-            std::process::id(),
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        );
-        let directory = std::env::temp_dir().join(unique);
-        prepare_private_debug_capture_directory(&directory).unwrap();
-
-        let (audio_path, timeline_path) =
-            write_private_debug_capture_pair(&directory, "success", b"audio", b"timeline").unwrap();
-        assert_eq!(
-            std::fs::metadata(&directory).unwrap().permissions().mode() & 0o777,
-            0o700
-        );
-        for path in [&audio_path, &timeline_path] {
-            let metadata = std::fs::metadata(path).unwrap();
-            assert_eq!(metadata.permissions().mode() & 0o777, 0o600);
-            assert_eq!(metadata.uid(), unsafe { libc::geteuid() });
-        }
-
-        let collision_timeline = directory.join("collision.json");
-        let mut existing = create_private_debug_capture_file(&collision_timeline).unwrap();
-        existing.write_all(b"keep-existing").unwrap();
-        drop(existing);
-        let collision = write_private_debug_capture_pair(
-            &directory,
-            "collision",
-            b"must-be-removed",
-            b"must-not-overwrite",
-        );
-        assert!(collision.is_err());
-        assert!(!directory.join("collision.wav").exists());
-        assert_eq!(
-            std::fs::read(&collision_timeline).unwrap(),
-            b"keep-existing"
-        );
-
-        std::fs::remove_dir_all(directory).unwrap();
     }
 
     #[test]
@@ -2895,17 +2243,10 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
-    fn frontend_trace_fields_accept_only_non_content_audio_buckets() {
+    fn frontend_trace_fields_accept_only_bounded_values() {
         assert!(FrontendTraceFields {
-            audio_level_bucket: Some("medium".to_string()),
-            chunk_count: Some(12),
-            response_delta_count: Some(3),
             selected_device_configured: Some(true),
             track_sample_rate: Some(48000),
-            track_channel_count: Some(1),
-            echo_cancellation: Some(false),
-            noise_suppression: Some(false),
-            auto_gain_control: Some(false),
             duration_ms: Some(42),
             dictation_session_id: Some(1),
         }
@@ -2913,32 +2254,8 @@ mod tests {
         .is_ok());
 
         assert!(FrontendTraceFields {
-            audio_level_bucket: Some("raw audio here".to_string()),
-            chunk_count: None,
-            response_delta_count: None,
-            selected_device_configured: None,
-            track_sample_rate: None,
-            track_channel_count: None,
-            echo_cancellation: None,
-            noise_suppression: None,
-            auto_gain_control: None,
-            duration_ms: None,
-            dictation_session_id: None,
-        }
-        .validate()
-        .unwrap_err()
-        .contains("Unsupported audio level bucket"));
-
-        assert!(FrontendTraceFields {
-            audio_level_bucket: None,
-            chunk_count: None,
-            response_delta_count: None,
             selected_device_configured: None,
             track_sample_rate: Some(1),
-            track_channel_count: Some(1),
-            echo_cancellation: None,
-            noise_suppression: None,
-            auto_gain_control: None,
             duration_ms: None,
             dictation_session_id: None,
         }
@@ -2947,15 +2264,8 @@ mod tests {
         .contains("Unsupported track sample rate"));
 
         assert!(FrontendTraceFields {
-            audio_level_bucket: None,
-            chunk_count: None,
-            response_delta_count: None,
             selected_device_configured: None,
             track_sample_rate: None,
-            track_channel_count: None,
-            echo_cancellation: None,
-            noise_suppression: None,
-            auto_gain_control: None,
             duration_ms: Some(3_600_001),
             dictation_session_id: None,
         }
@@ -2964,15 +2274,8 @@ mod tests {
         .contains("Unsupported duration"));
 
         assert!(FrontendTraceFields {
-            audio_level_bucket: None,
-            chunk_count: None,
-            response_delta_count: None,
             selected_device_configured: None,
             track_sample_rate: None,
-            track_channel_count: None,
-            echo_cancellation: None,
-            noise_suppression: None,
-            auto_gain_control: None,
             duration_ms: None,
             dictation_session_id: Some(0),
         }
@@ -2999,7 +2302,7 @@ mod tests {
             })
             .collect();
         assert!(
-            emitted_events.len() > 30,
+            emitted_events.len() > 20,
             "frontend event extraction must cover real calls"
         );
         for event in emitted_events {
@@ -3111,26 +2414,5 @@ mod tests {
         assert!(!is_ignored_evdev_device_name(
             "AT Translated Set 2 keyboard"
         ));
-    }
-
-    #[test]
-    fn overlay_position_uses_cursor_offset_without_monitor_bounds() {
-        assert_eq!(clamp_overlay_position(100, 150, None, 252, 112), (120, 174));
-    }
-
-    #[test]
-    fn overlay_position_stays_inside_monitor_bounds() {
-        assert_eq!(
-            clamp_overlay_position(1900, 1060, Some((0, 0, 1920, 1080)), 252, 112),
-            (1652, 952)
-        );
-    }
-
-    #[test]
-    fn overlay_position_handles_small_monitor_bounds() {
-        assert_eq!(
-            clamp_overlay_position(20, 20, Some((0, 0, 120, 90)), 252, 112),
-            (16, 16)
-        );
     }
 }

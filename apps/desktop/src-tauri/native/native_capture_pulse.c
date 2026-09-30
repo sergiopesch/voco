@@ -21,9 +21,11 @@ struct vc_pulse  {
     struct vc_slot slots[VC_SLOTS];
     uint64_t produced, consumed, exposed_through;
     uint64_t started_ms, stop_ms;
+    uint64_t ready_ms, first_pcm_ms, first_pcm_frames, source_fragment_ms;
     uint32_t cookie;
     bool context_ready, subscribed, listing, list_done, server_done, selected_verified;
     bool starting, stopping, active, recheck, server_recheck;
+    bool first_pcm_received;
 };
 static uint64_t now_ms(void)  {
     struct timespec t;
@@ -37,6 +39,27 @@ static bool copy_text(char *dst,size_t cap,const char *src)  {
 }
 static void fail(vc_pulse *p,const char *reason)  {
     if(!p->status.error[0])copy_text(p->status.error,sizeof p->status.error,reason);
+}
+static void reset_duration_integrity(vc_pulse *p) {
+    p->ready_ms=p->first_pcm_ms=p->first_pcm_frames=p->source_fragment_ms=0;
+    p->first_pcm_received=false;
+}
+/* Pulse recording overflow has no client callback and its queue indices omit
+ * discarded input. This catches material loss, not individual missing samples:
+ * allow one second of scheduling jitter, one negotiated fragment, and 1% clock
+ * drift. Anchor once at first PCM, excluding initial source wake-up latency. */
+static void check_duration_integrity(vc_pulse *p,uint64_t current_ms) {
+    if(!p->active||!p->status.ready||p->status.error[0]||p->status.limit_reached)return;
+    uint64_t end_ms=p->stopping&&p->stop_ms<current_ms?p->stop_ms:current_ms;
+    if(!p->first_pcm_received) {
+        if(end_ms>=p->ready_ms&&end_ms-p->ready_ms>5000)fail(p,"capture-first-audio-timeout");
+        return;
+    }
+    if(end_ms<p->first_pcm_ms)return;
+    uint64_t elapsed_ms=end_ms-p->first_pcm_ms;
+    uint64_t received_ms=(p->status.frames-p->first_pcm_frames)*1000/44100;
+    uint64_t allowance_ms=1000+p->source_fragment_ms+elapsed_ms/100;
+    if(elapsed_ms>received_ms&&elapsed_ms-received_ms>allowance_ms)fail(p,"capture-duration-deficit");
 }
 /* References are retained until completion or explicit cancellation. Pulse's
  * operation.h guarantees cancellation suppresses future client callbacks. */
@@ -115,6 +138,11 @@ static bool queue_bytes(vc_pulse *p, const void *data, size_t size)  {
             p->status.blocks = p->produced;
         }
     }
+    if(accepted&&!p->first_pcm_received) {
+        p->first_pcm_received=true;
+        p->first_pcm_ms=now_ms();
+        p->first_pcm_frames=p->status.frames;
+    }
     if (p->status.frames == VC_MAX_FRAMES) p->status.limit_reached = 1;
     return true;
 }
@@ -172,6 +200,7 @@ static void barrier_cb(pa_stream*s,int success,void*data) {
     if(!success)fail(p,"timing-barrier-failed");
     else p->status.barrier_ack=1;
     read_available(p);
+    check_duration_integrity(p,now_ms());
     p->status.stopped=1;
 }
 static void cork_cb(pa_stream*s,int success,void*data) {
@@ -196,6 +225,7 @@ static void uncork_cb(pa_stream*s,int success,void*data) {
         return;
     }
     p->status.ready=1;
+    p->ready_ms=now_ms();
     p->starting=false;
 }
 static bool matches(vc_pulse*p,const pa_source_info*i) {
@@ -236,6 +266,9 @@ static void stream_state(pa_stream*s,void*data) {
                 fail(p,"negotiated-source-or-format-mismatch");
                 break;
             }
+            const pa_buffer_attr *attrs=pa_stream_get_buffer_attr(s);
+            uint64_t fragment=attrs&&attrs->fragsize<VC_BLOCK_BYTES?attrs->fragsize:VC_BLOCK_BYTES;
+            p->source_fragment_ms=(fragment*1000+176399)/176400;
             p->selected_verified=false;
             operation(p,pa_context_get_source_info_by_index(p->context,p->selected.index,verify_before_uncork,p));
             break;
@@ -328,7 +361,7 @@ vc_pulse*vc_new(const char*socket_path) {
         vc_free(p);
         return NULL;
     }
-    p->context=pa_context_new(pa_mainloop_get_api(p->loop),"VOCO native capture development");
+    p->context=pa_context_new(pa_mainloop_get_api(p->loop),"VOCO");
     if(!p->context) {
         vc_free(p);
         return NULL;
@@ -339,6 +372,7 @@ vc_pulse*vc_new(const char*socket_path) {
 }
 void vc_cancel(vc_pulse*p) {
     detach_stream(p);
+    reset_duration_integrity(p);
     p->consumed=p->produced;
     if (!p->context || pa_context_get_state(p->context) != PA_CONTEXT_READY) fail(p, "audio-server-disconnected");
     /* A healthy cancelled recording does not revoke explicit device consent.
@@ -373,7 +407,18 @@ void vc_stop(vc_pulse*p) {
 }
 void vc_tick(vc_pulse*p) {
     int result=0;
-    if(pa_mainloop_iterate(p->loop,0,&result)<0)fail(p,"mainloop-failed");
+    uint64_t pump_started=now_ms();
+    /* One protocol packet may need several dispatches. Sleeping after each
+     * dispatch starves small record fragments until Pulse silently drops audio. */
+    for(unsigned dispatch=0;dispatch<64;dispatch++) {
+        int ready=pa_mainloop_iterate(p->loop,0,&result);
+        if(ready<0) {
+            fail(p,"mainloop-failed");
+            break;
+        }
+        if(!ready||now_ms()-pump_started>=2)break;
+    }
+    check_duration_integrity(p,now_ms());
     clear_operations(p, false);
     if(p->active&&p->recheck&&!p->stopping) {
         p->recheck=false;
@@ -426,6 +471,7 @@ int vc_begin(vc_pulse*p,const vc_source*source,uint64_t revision) {
     (void)revision;
     if(p->active||!p->subscribed||!source->serial[0]||p->status.error[0])return -1;
     memset(&p->status,0,sizeof p->status);
+    reset_duration_integrity(p);
     p->produced=0;
     p->consumed=0;
     p->exposed_through=0;
@@ -442,7 +488,7 @@ int vc_begin(vc_pulse*p,const vc_source*source,uint64_t revision) {
     };
     pa_channel_map map;
     pa_channel_map_init_stereo(&map);
-    p->stream=pa_stream_new(p->context,"VOCO explicitly selected microphone",&spec,&map);
+    p->stream=pa_stream_new(p->context,"Dictation",&spec,&map);
     if(!p->stream) {
         fail(p,"stream-create-failed");
         return -1;

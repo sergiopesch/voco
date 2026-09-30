@@ -5,7 +5,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-// Actual App, hooks, store and ControlPanel; every native/media boundary is mocked.
+// WebKit microphone permission, device enumeration, retry and preview lifecycle in the actual
+// App, hooks, store and ControlPanel; every native/media boundary is mocked.
 // These checks never request host microphone access or model inference.
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const out = process.env.VOCO_RENDERER_EVIDENCE_DIR;
@@ -74,7 +75,7 @@ try {
     }));
     await page.route('**/@tauri-apps_api_core.js*', r => r.fulfill({
         contentType: 'application/javascript',
-        body: 'export async function invoke(name) { if (name === "native_capture_capabilities") return {enabled:false}; throw new Error("Unexpected native command: " + name); }'
+        body: 'export async function invoke(name) { if (name === "native_capture_capabilities") return {enabled:false}; if(name === "get_crash_journal_epoch") return 1; if(name.endsWith("_crash_journal")) return; throw new Error("Unexpected native command: " + name); }'
     }));
     await page.route('**/@tauri-apps_api_app.js*', r => r.fulfill({
         contentType: 'application/javascript',
@@ -137,18 +138,9 @@ try {
         window.config = {
             hotkey: 'Alt+D',
             selectedMic: null,
-            insertionStrategy: 'auto',
-            transcriptTarget: 'cursor',
-            liveCursorMode: 'final-text-only',
-
-
-            transcriptEnhancement: 'off',
-
-
             onboardingCompleted: false,
             updateChannel: 'stable',
             installChannel: 'github-release',
-            voiceProfile: 'default'
         };
         window.nativeCall = async (name, args) => {
             window.calls.push([
@@ -164,14 +156,13 @@ try {
                     sessionType: 'wayland',
                     typeSimulation: {
                         available: true,
-                        missingCommands: [],
-                        optionalMissingCommands: []
+                        missingCommands: []
                     },
                     clipboard: {
                         available: true,
                         missingCommands: []
                     },
-                    ownedPreedit: {
+                    ibusShortcut: {
                         setupState: 'ready',
                         available: true
                     }
@@ -620,11 +611,10 @@ try {
     for (const status of ['starting','recording','processing','error','idle']) {
         await page.evaluate(status => {
             window.calls = [];
-            window.store.setState({surface:'hidden',status,interimTranscript:'This transcript must not appear in a popup.',captureNotice:'Capture notice'});
+            window.store.setState({surface:'hidden',status,transcript:'This transcript must not appear in a popup.',captureNotice:'Capture notice'});
         },status);
         await page.waitForTimeout(60);
         assert.equal(await page.locator('.voco-status-overlay').count(),0);
-        assert.equal(await page.evaluate(()=>window.calls.some(c=>c[0]==='showStatusOverlay')),false);
         assert.equal(await page.getByText('This transcript must not appear in a popup.').count(),0);
         results.push({case:'dictation-keeps-window-hidden-'+status,passed:true});
     }

@@ -17,8 +17,8 @@ for name in paths:
     path = root / name
     if not path.is_file():
         continue
-    # Upstream model cards, sample attributions and dated qualification records
-    # live outside this executable-source gate and retain their original facts.
+    # Upstream model cards and sample attributions live outside this
+    # executable-source gate and keep their original facts.
     content = path.read_bytes().lower()
     if "whisper" in name.lower() or any(token in content for token in retired):
         failures.append(name)

@@ -90,7 +90,7 @@ def main():
             report['sanitizerOptions'] = {key: env[key] for key in ['ASAN_OPTIONS', 'UBSAN_OPTIONS']}
             result = checked('runtime', [executable], 10)
             rows = [json.loads(line) for line in result['stdout'].splitlines()]
-            if not rows or rows[-1] != {'passed': True, 'cases': 66, 'actualProductionCallbacks': True,
+            if not rows or rows[-1] != {'passed': True, 'cases': 81, 'actualProductionCallbacks': True,
                                        'pulseTransportMocked': True, 'deviceConnections': 0}:
                 raise ValueError('Missing exact terminal success record')
             report['results'] = rows
@@ -103,7 +103,7 @@ def main():
                 json.dump(report, handle, indent=2)
                 handle.write('\n')
     if report['passed']:
-        print('PASS: 66 native callback cases; ASan/UBSan; Pulse transport and clock mocked; no audio server.')
+        print('PASS: 81 native callback cases; ASan/UBSan; Pulse transport and clock mocked; no audio server.')
     else:
         print('FAIL: '+report['error'], file=sys.stderr)
     return 0 if report['passed'] else 1

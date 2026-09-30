@@ -30,7 +30,7 @@ export function validateSpeechManifest(manifest) {
     files.add(fixture.file);
     require(hash(fixture.sha256) && hash(fixture.sourceFlacSha256), `${fixture.id}: invalid fixture/source SHA-256`);
     require(Number.isFinite(fixture.seconds) && fixture.seconds > 0 && fixture.seconds <= 30,
-      `${fixture.id}: seconds must be positive and within the 30-second canonical limit`);
+      `${fixture.id}: seconds must be positive and within the 30-second fixture limit`);
     require(bound(fixture.maxWer), `${fixture.id}: maxWer must be finite and nonnegative`);
     require(typeof fixture.reference === "string" && words(fixture.reference).length > 0,
       `${fixture.id}: reference must contain words`);
@@ -38,20 +38,6 @@ export function validateSpeechManifest(manifest) {
   }
   require(Number.isSafeInteger(referenceWords) && referenceWords > 0, "total reference words must be positive");
   return manifest;
-}
-
-export function buildSpeechReplayRequests(samples, previousCanonicalText = "") {
-  if (!Number.isSafeInteger(samples) || samples <= 0 || samples > 30 * 16_000) {
-    throw new Error("Speech replay must contain between one sample and 30 seconds");
-  }
-  const requests = [
-    { mode: "full", request: { startSample: 0, endSample: samples, fullSession: true } },
-    { mode: "canonical", request: { startSample: 0, endSample: samples, canonical: true, previousCanonicalText } },
-  ];
-  if (samples >= 0.7 * 16_000 && samples <= 20 * 16_000) {
-    requests.push({ mode: "preview", request: { startSample: 0, endSample: samples } });
-  }
-  return requests;
 }
 
 export function validateSpeechFixtureWav(wav, seconds) {
@@ -62,29 +48,13 @@ export function validateSpeechFixtureWav(wav, seconds) {
     wav.readUInt32LE(24) !== 16_000 || wav.readUInt32LE(28) !== 32_000 ||
     wav.readUInt16LE(32) !== 2 || wav.readUInt16LE(34) !== 16 ||
     wav.readUInt32LE(40) !== wav.length - 44 || (wav.length - 44) % 2 !== 0) {
-    throw new Error("Speech fixture must be complete mono 16 kHz PCM16 WAV in the replay worker's supported layout");
+    throw new Error("Speech fixture must be complete mono 16 kHz PCM16 WAV in the speech worker's supported layout");
   }
   const samples = (wav.length - 44) / 2;
   if (!Number.isFinite(seconds) || samples <= 0 || Math.round(seconds * 16_000) !== samples) {
     throw new Error("Speech fixture duration does not match its complete WAV samples");
   }
   return samples;
-}
-
-export function validateSpeechReplayResults(requests, responses) {
-  if (!Array.isArray(responses) || responses.length !== requests.length) {
-    throw new Error("Replay worker returned incomplete results");
-  }
-  return Object.fromEntries(requests.map(({ mode }, index) => {
-    const response = responses[index];
-    const textFields = mode === "canonical" ? ["canonicalText", "appendText", "chunkText"] : ["text"];
-    if (response === null || typeof response !== "object" || Array.isArray(response) ||
-      textFields.some((field) => typeof response[field] !== "string") ||
-      (mode === "preview" && !Array.isArray(response.segments))) {
-      throw new Error(`Replay worker returned invalid ${mode} output`);
-    }
-    return [mode, response];
-  }));
 }
 
 // Levenshtein WER with a deterministic substitution/deletion/insertion tie order.

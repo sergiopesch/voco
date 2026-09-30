@@ -5,7 +5,6 @@
   const documentId = id();
   const MAX_BYTES = 100_000, MAX_TOTAL = 1_000_000;
   let armed = false, session = null, ownEvent = null;
-  const retired = new Map();
   const send = message => chrome.runtime.sendMessage({protocol: 1, documentId, ...message}).catch(() => { armed = false; invalidate('disconnected'); });
   function eligible(e) {
     return (e instanceof HTMLTextAreaElement || (e instanceof HTMLInputElement && ['text', 'search', 'url', 'tel'].includes(e.type))) &&
@@ -58,9 +57,6 @@
     if (session && !session.finished) { send({type: 'stop', token: session.token}); return; }
     const element = document.activeElement;
     if (!document.hasFocus() || !eligible(element) || element.value.length > MAX_TOTAL) return;
-    if (session) retired.set(session.token, {expires: Date.now() + 60_000, journal: session.journal});
-    for (const [token, previous] of retired) if (Date.now() > previous.expires) retired.delete(token);
-    if (retired.size >= 16) retired.delete(retired.keys().next().value);
     observer.takeRecords(); // This shortcut authorizes the current tree, not earlier edits.
     const ancestors = new Set();
     for (let ancestor = element; ancestor; ancestor = ancestor.parentNode) ancestors.add(ancestor);
@@ -76,10 +72,6 @@
       const stopToken = session && !session.finished ? session.token : null;
       armed = false; invalidate('disconnected'); if (session) session.finished = true; observer.disconnect();
       respond({documentId, stopToken}); return;
-    }
-    if (message.type === 'query' && message.documentId === documentId && retired.has(message.token)) {
-      const previous = retired.get(message.token);
-      respond(Date.now() <= previous.expires ? previous.journal.get(message.sequence)?.receipt || null : null); return;
     }
     if (!session || message.token !== session.token || message.documentId !== documentId) { respond(null); return; }
     // Losing insertion ownership must not release the recording's Stop token.

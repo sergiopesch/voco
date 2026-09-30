@@ -21,7 +21,7 @@ const model=process.env.VOCO_NEMOTRON_MODEL || path.join(root,'runtime/speech/mo
 if(!fs.existsSync(model) || hashFile(model)!==identity.model_sha256) throw Error('Provision the pinned Nemotron payload first. This test never downloads a model.');
 const fixtureDir=path.join(root,'tests/fixtures/speech');
 const manifestPath=path.join(fixtureDir,'manifest.json');
-// Corpus identity and thresholds stay fixed; the report identifies the new engine.
+// Corpus identity and thresholds stay fixed; the report hashes the model, worker and native build.
 const manifest=validateSpeechManifest(JSON.parse(fs.readFileSync(manifestPath)));
 const pcm=wav=>Array.from({length:(wav.length-44)/2},(_,i)=>wav.readInt16LE(44+i*2)/32768);
 const fixtures=manifest.fixtures.map(f=>{
@@ -33,7 +33,7 @@ const fixtures=manifest.fixtures.map(f=>{
 const state=fs.mkdtempSync(path.join(os.tmpdir(),'voco-nemotron-regression-'));
 const worker=path.join(root,'runtime/speech/stream_worker.py');
 const child=spawn(process.env.VOCO_PYTHON || '/usr/bin/python3',[worker],{
-  env:{...process.env,PYTHONDONTWRITEBYTECODE:'1',VOCO_NEMOTRON_MODEL:model,XDG_STATE_HOME:state,VOCO_SPEECH_PERF:'0'},stdio:['pipe','pipe','pipe'],
+  env:{...process.env,PYTHONDONTWRITEBYTECODE:'1',VOCO_NEMOTRON_MODEL:model,XDG_STATE_HOME:state},stdio:['pipe','pipe','pipe'],
 });
 child.stdin.on('error',()=>{});
 let stderr='';child.stderr.on('data',data=>{stderr=(stderr+data).slice(-8192);});
@@ -42,7 +42,7 @@ const lines=createInterface({input:child.stdout})[Symbol.asyncIterator]();
 const report={schemaVersion:3,startedAt:new Date().toISOString(),modelSha256:identity.model_sha256,
   manifestSha256:hashFile(manifestPath),workerSha256:hashFile(worker),nativeBuildSha256:hashFile(path.join(root,'runtime/speech/NATIVE-BUILD.json')),
   source:{gitHead:execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim(),gitDirty:Boolean(execFileSync('git',['status','--porcelain'],{cwd:root,encoding:'utf8'}).trim())},
-  note:'Pinned Nemotron, production streaming worker, 100 ms packets, original corpus thresholds. Excludes microphones, Tauri IPC and field delivery. Historical decoder evidence is not requalified.',
+  note:'Pinned Nemotron, production streaming worker, 100 ms packets, original corpus thresholds. Excludes microphones, Tauri IPC and field delivery.',
   fixtures:[],silence:[],variants:[],continuity:null,passed:false};
 async function read(){
   let timer;
@@ -84,7 +84,9 @@ try{
   report.continuity={...result,...checkRepeatedContinuity(Array(18).fill(short.reference).join(' '),result.text,short.reference),wavSha256:hash(repeated)};
   console.log(`${report.continuity.passed?'PASS':'FAIL'} repeated speech`);
   for(const seconds of [10,20,30]){const result=await transcribe(Array(seconds*16000).fill(0));report.silence.push({seconds,...result,passed:result.text===''});}
-  for(const [name,audio] of [['quiet',short.audio.map(x=>x*0.1)],['leading-silence',[...Array(16000).fill(0),...short.audio]],['trailing-silence',[...short.audio,...Array(16000).fill(0)]],['partial-stop-packet',short.audio]]){
+  // Stop just after a packet boundary: the final push carries one sample.
+  const stopTail=(1601-short.audio.length%1600)%1600;
+  for(const [name,audio] of [['quiet',short.audio.map(x=>x*0.1)],['leading-silence',[...Array(16000).fill(0),...short.audio]],['trailing-silence',[...short.audio,...Array(16000).fill(0)]],['partial-stop-packet',[...short.audio,...Array(stopTail).fill(0)]]]){
     const result=await transcribe(audio),score=scoreTranscript(short.reference,result.text);
     report.variants.push({name,...result,score,passed:score.hypothesisWords>0 && score.wer<=short.maxWer});
   }

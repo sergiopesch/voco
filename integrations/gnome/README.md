@@ -1,104 +1,141 @@
-# VOCO GNOME panel
+# GNOME companion
 
-This GNOME Shell 46 integration keeps VOCO's microphone and active dictation capsule
-inside the system panel. On GNOME Wayland, the current source requires it for
-**Alt+D** and **Alt+Shift+D** so Shell consumes Stop before the focused application
-can act on the same shortcut. On X11 its panel presentation is optional.
-It expands horizontally for Starting, Listening and
-Finishing, then contracts at idle. Review remains visible for unresolved recovery.
-The microphone and Stop button issue an explicit Stop during capture. At idle the
-microphone opens settings; Review opens the existing recovery interface on request.
-No recording window is opened by the extension.
+`voco-panel@voco.local` is an optional GNOME Shell extension for GNOME 46, and
+the VOCO package installs it. While VOCO runs, the companion replaces VOCO's
+tray icon with a pill in the top bar that shows a live microphone meter while
+you dictate. In a Wayland session it also consumes VOCO's shortcut, so the
+focused app never receives it. It keeps no recording state: VOCO decides, and
+the companion shows what VOCO reports. [Platform support](../../docs/platform/README.md)
+covers the other shortcut routes, and [Architecture](../../docs/architecture/README.md)
+follows a recording.
 
-The packaged image is byte-identical to `assets/voco-symbol-ui.png`. The waveform
-uses VOCO's real normalized capture level; it does not capture audio itself. GNOME
-controls panel height and text styling. Width changes take 220 ms; processing uses
-a subtle pulse. System reduced motion disables transitions and pulsing. When the
-panel is crowded, the capsule contracts to its actionable microphone instead of
-covering adjacent indicators. The microphone remains an accessible Stop control.
+## What it shows
 
-## Build and install
+The pill sits at the start of the top bar's right side and shows VOCO's icon.
+It appears once VOCO answers, and stays hidden while VOCO isn't running. It adds
+"Starting VOCO" while VOCO loads and runs its first checks, and "Check setup"
+when something needs attention, such as the microphone or the paste helpers.
+While you record, seven bars follow the microphone level; while VOCO processes,
+they rest at about a third of their height and pulse. The pill takes a light
+tint whenever VOCO isn't idle.
 
-The Debian package includes this GNOME Shell 46 extension. The guided
-installer calls `voco --setup-panel` for its current desktop user. A manual APT
-installation can use that command or **Enable live panel** in onboarding/Help.
-Package hooks do not touch user extension settings. A newly installed component
-may require signing out and back in; setup reports this separately from active.
-Run `voco --check-panel` for a read-only check. Setup compares the loaded companion
-version with the application contract, so an upgrade cannot report stale loaded
-code as current; follow its sign-out guidance. Other Shell versions use the native
-tray fallback and remain unqualified for this companion.
+The meter opens to the left of the icon, so the icon never moves, and only if
+the right side of the bar still fits beside the clock with room for GNOME's
+microphone privacy indicator, which the companion never touches. On a crowded
+panel only the icon shows. With `enable-animations` off in
+`org.gnome.desktop.interface`, the meter opens without motion and the bars
+don't pulse.
 
-The separately built archive remains available for development:
+A primary click stops dictation while VOCO is starting or recording, and
+otherwise opens Settings when VOCO allows it. Other mouse buttons, the Menu key
+or Shift+F10 open the menu, where **Settings** and **Review** work only while
+you aren't dictating and **Stop dictation** shows only while VOCO is starting or
+recording.
 
-```bash
-python3 scripts/package-gnome-panel.py /tmp/voco-panel@voco.local.shell-extension.zip
-```
+## Set it up
 
-Disable with `gnome-extensions disable voco-panel@voco.local`. The ordinary VOCO
-tray returns on detach, or within approximately six seconds after lost heartbeats.
-Its label reports Starting or Finishing where the desktop supports labels.
-During recording it replaces Ready with measured-volume bars; Stop restores
-Ready. Its menu always shows status and an explicit Stop action. See
-[release status](../../docs/release-candidate.md) for current downloads.
+The package installs the companion in
+`/usr/share/gnome-shell/extensions/voco-panel@voco.local/`, and its scripts
+never change user settings. Each user turns it on once, with `voco --setup-panel`,
+which the guided installer runs, or with **Enable live panel** on VOCO's Help
+page or last onboarding step. Setup turns on only this extension, asks the
+running Shell first, and never restarts Shell or changes GNOME's switch that
+turns off all extensions.
 
-## Bridge
+A Shell that started before the files arrived finds them at the next login, so
+after installing, save your work and sign out and back in. After an upgrade
+that changes the companion, Shell keeps the loaded copy until you do the same.
+`voco --check-panel` reports the status and changes nothing:
 
-The application owns session-bus name `org.voco.Panel`, object `/org/voco/Panel`,
-interface `org.voco.Panel1`. `Attach` accepts only the current unique owner of
-`org.gnome.Shell`; subsequent calls must come from that attached connection.
-`GetState` returns protocol version 1 with status, fixed descriptive text, a
-renderer epoch/revision token, epoch/capture-session identity, capture/accelerator reservation identity, action availability and a finite level in [0,1].
-No speech, samples, target-window titles, clipboard contents or device names cross
-this interface. Meter values expire after 250 ms. The renderer supplies at most
-one meter update per 40 ms with at most one call in flight, only while recording.
-Capture-store events drive updates without an additional hidden-window timer.
+| Status | Meaning | Exit status |
+| --- | --- | --- |
+| `active` | Loaded and current. | 0 |
+| `other-desktop`, `unsupported` | Not GNOME, or not GNOME 46. VOCO uses its tray. | 0 |
+| `disabled`, `restart` | Off, or turned on or upgraded but not loaded yet. | 2 |
+| `missing`, `blocked`, `error`, `pending`, `unavailable` | Files missing, extensions off or forbidden, a load failure, activation in progress, or no answer. The message says which. | 2 |
 
-A directed `Changed` signal updates transitions immediately. The extension also
-polls at 50 ms while active and 1500 ms while idle for meter updates and leases. Calls have a
-1500 ms deadline and target the app's unique bus owner without auto-start. A
-transient error hides the extension and schedules a bounded-rate reconnect.
-`Action(action, token)` uses the capture identity for Stop and the presentation
-revision for Open. It rejects stale ownership. Stop is explicit rather than toggle,
-so an already-finished session cannot accidentally start another recording. Repeated
-Stop requests for the same token are rejected. Existing renderer admission and
-cursor-delivery guards remain authoritative. `Detach` restores the native tray.
+It exits 1 when its helper can't run. To turn the companion off, run
+`gnome-extensions disable voco-panel@voco.local`; VOCO shows its tray again.
 
-On Wayland, the companion consumes Alt+D (or Alt+Shift+D when configured)
-through Starting, Listening and Finishing. A held Stop belongs to the capture
-session, so presentation updates cannot cancel it; a replacement session cannot
-inherit it. Stop is sent after modifier release with the capture identity, which is revalidated at native dispatch and renderer admission.
-Only the authenticated Shell can renew the short native reservation suppressing
-passive duplicates. The reservation token binds the renderer epoch, capture session
-and exact configured accelerator; presentation revisions cannot revoke it. A rejected latest reservation, idle, disconnect, disable and
-state timeout release the grab. Each renewal has a generation: older replies
-cannot release a newer reservation, including renewals of the same grab.
-Without a loaded and attached companion, the current source blocks cursor
-dictation with these GNOME Wayland shortcuts and explains the setup requirement.
-Start also waits for the live reservation for that capture before opening the
-microphone. Other desktops and shortcuts retain their existing input checks.
-If a reservation is lost after capture starts and the application changes its
-selection, continuation text is rejected and retained for recovery rather than
-replacing existing words. This does not establish atomic ownership during a
-desktop paste gesture.
+## The shortcut on Wayland
 
-## Verification
+In a Wayland session the attached companion grabs VOCO's shortcut at every
+status, idle included, when it is Alt+D or Alt+Shift+D. Each press, autorepeat
+ignored, calls `Action('shortcut', '')`, which toggles like any other route. It
+works in windows, full screen included, and the overview, but not in Shell menus
+or dialogs.
 
-```bash
-node --test scripts/test-panel-model.mjs
-# Fresh output directory and an extracted Xvfb runtime; never the live desktop:
-VOCO_NATIVE_DEPS=/path/to/extracted/usr \
-VOCO_PANEL_EVIDENCE_DIR=/tmp/voco-panel-evidence \
-  bash scripts/test-gnome-panel.sh
-```
+VOCO accepts the grab only while the companion renews it: a `ReserveShortcut`
+call every second, one at a time, holds a 2.5-second lease. While the lease is
+fresh, VOCO's passive evdev listener ignores the chord and the companion's
+press toggles; otherwise VOCO refuses that press and evdev decides, so each
+press toggles once. When VOCO refuses a renewal, for example after you change
+the shortcut, the companion releases the grab, and when a call fails, it
+detaches and attaches again 2 seconds later. On X11 the companion grabs
+nothing, because VOCO's own grab consumes the chord.
 
-The native harness runs actual GNOME Shell/Mutter and the production extension in
-an isolated filesystem, D-Bus, display and network namespace. Its app status service
-is synthetic: it proves panel geometry, state rendering and protocol actions, not
-physical microphone capture, installed-app interoperability or cursor insertion.
-Set `VOCO_PANEL_APP_BINARY` to a matching debug/custom-protocol build to also
-exercise the real app bridge, Shell-only attachment and fallback tray restoration.
-The software-rendered harness uses GNOME’s `--force-animations` to observe
-intermediate frames, then verifies the system reduced-motion setting.
-Rust tray tests cover authoritative state mapping; the application must separately
-pass its native build, capture and release qualification before installation.
+## D-Bus interface
+
+VOCO owns `org.voco.Panel` on the session bus and serves `org.voco.Panel1` at
+`/org/voco/Panel`.
+
+| Member | Behaviour |
+| --- | --- |
+| `Attach() → b` | True only when the caller owns `org.gnome.Shell`. Hides VOCO's tray and clears any lease. |
+| `GetState() → s` | The state as JSON. Each call keeps the attachment alive. |
+| `ReserveShortcut(s) → b` | Holds the 2.5-second lease when the argument is the configured accelerator. |
+| `ReserveStopShortcut(s) → b` | Holds a 250 ms Stop lease for a `stopSession/accelerator` token, for an earlier companion copy that Shell keeps loaded until the next login. |
+| `Action(s, s) → b` | `shortcut` with an empty token, `stop` with `stopSession`, or `settings`, `open` or `review` with `token`. Each Stop token works once. |
+| `Detach()` | Drops the lease and shows the tray. |
+| `Changed` | Signal sent only to the attached connection when the state changes. |
+
+Every method but `Attach` returns `org.voco.NotAttached` to anyone other than
+the attached connection. VOCO also drops the lease and shows its tray when no
+`GetState` arrives for more than 5 seconds, and shows its tray when it loses its
+bus name.
+
+`GetState` returns `version` (1), `status` (`initializing`, `starting`,
+`recording`, `processing`, `attention` or `idle`), `description` (the tray
+tooltip), `token`, `stopSession`, `canStop`, `canOpen`, `level` (0 to 1, only
+while recording, 0 after 250 ms without a new level), `shortcutAccelerator`,
+`stopAccelerator` and `stopShortcutToken`. The accelerators are `<Alt>d`,
+`<Alt><Shift>d` or null, and null on X11. The companion polls every 50 ms
+while recording, every 1.5 seconds otherwise, and at each `Changed`.
+
+The companion serves `org.voco.PanelInput1` at `/org/voco/PanelInput`. When
+VOCO can't read the keyboards before a Wayland paste, it calls
+`ModifiersClear() → b`, with a 150 ms limit. The companion answers only the
+attached VOCO, returns true when the compositor reports no modifier held, and
+never sends key events.
+
+## Files and tests
+
+`voco-panel@voco.local/` holds `extension.js` (pill, menu, meter, grab and bus
+calls), `model.js` (state checks, shared with Node tests), `metadata.json`,
+`stylesheet.css` and `voco-symbol.png`, a copy of `assets/voco-symbol-ui.png`.
+In `apps/desktop/src-tauri/`, `src/panel.rs` serves the bus, `src/tray.rs` builds
+the state and `src/panel_setup.rs` runs `resources/voco_gnome_panel.py`. A change
+that needs Shell to load new code raises both `version` in `metadata.json` and
+`COMPANION_VERSION` in `voco_gnome_panel.py`. `scripts/package-gnome-panel.py`
+writes a reproducible archive of the five files, attached to each release.
+
+- `node --test scripts/test-panel-model.mjs` checks state validation, meter
+  bounds and accelerator filtering.
+- `python3 scripts/test-panel-setup.py`, part of `npm test`, checks the setup
+  statuses and that the two version numbers match.
+- `scripts/test-gnome-panel.sh` runs GNOME Shell 46 nested on Wayland in
+  bubblewrap, with its own D-Bus, XDG directories and display, against a
+  synthetic VOCO service. Set `VOCO_PANEL_EVIDENCE_DIR` to a new directory and
+  `VOCO_NATIVE_DEPS` to a root with `bin/Xvfb`. `VOCO_PANEL_APP_BINARY` adds a
+  real `voco`, and `VOCO_PANEL_PACKAGE_ROOT`, an extracted package, adds setup
+  and an upgrade. CI runs it with the `--gnome-panel` option of
+  `scripts/test-private-ibus-engine-hosted.sh`, which runs only on GitHub Actions.
+
+## Known limits
+
+- Only GNOME 46 loads the companion. Elsewhere VOCO uses its tray, which on
+  GNOME needs an AppIndicator extension.
+- The grab covers Alt+D and Alt+Shift+D only. Apps that inhibit system
+  shortcuts, such as virtual machines and remote desktops, receive the chord.
+- The tests use a synthetic VOCO service in a nested session, not other themes,
+  other panel extensions or physical displays.

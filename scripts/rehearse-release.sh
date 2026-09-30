@@ -6,7 +6,6 @@ VERSION="$(node -p "require('${ROOT_DIR}/package.json').version")"
 TAG_NAME="voco.${VERSION}"
 DEB_NAME="voco_${VERSION}_amd64.deb"
 LATEST_DEB_NAME="voco_latest_amd64.deb"
-APPIMAGE_NAME="VOCO-${VERSION}-x86_64.AppImage"
 TMP_DIR="$(mktemp -d)"
 
 cleanup() {
@@ -19,14 +18,15 @@ echo "  version: ${VERSION}"
 echo "  tag: ${TAG_NAME}"
 echo "  deb: ${DEB_NAME}"
 echo "  latest deb: ${LATEST_DEB_NAME}"
-echo "  appimage: ${APPIMAGE_NAME}"
 
 (
   cd "${ROOT_DIR}"
   npm run verify:versions
-  bash scripts/check-shell-syntax.sh install scripts/install.sh scripts/setup.sh scripts/build-desktop.sh scripts/package-appimage.sh scripts/render-release-body.sh scripts/lib/install-common.sh scripts/test-install-common.sh
+  bash scripts/check-shell-syntax.sh install scripts/setup.sh scripts/build-desktop.sh \
+    scripts/assemble-release.sh scripts/render-release-body.sh scripts/lib/install-common.sh \
+    scripts/test-install-common.sh
   bash scripts/test-install-common.sh
-  if rg -n 'Examples:.*Alt\+Shift\+R|Downloading VOCO.*~5 MB' install scripts/lib/install-common.sh; then
+  if grep -En 'Examples:.*Alt\+Shift\+R|Downloading VOCO.*~5 MB' install scripts/lib/install-common.sh; then
     echo "Installer still advertises a reserved hotkey or stale package size"
     exit 1
   fi
@@ -37,31 +37,20 @@ echo "  appimage: ${APPIMAGE_NAME}"
   grep -F 'sha256sum -c' docs/install.md > /dev/null
   grep -F 'wget "$BASE/$TAG/install" -O voco-install' docs/install.md > /dev/null
   grep -F "raw.githubusercontent.com/sergiopesch/voco/${TAG_NAME}/install" install > /dev/null
-  # README stays pinned to the published release while source is a new candidate.
+  # README installs the published release, not the version this source tree would release.
   PUBLISHED_VERSION="$(node -p "require('./packaging/published-release.json').version")"
   grep -Fx "wget -qO voco-install https://raw.githubusercontent.com/sergiopesch/voco/voco.${PUBLISHED_VERSION}/install && bash voco-install" README.md > /dev/null
   grep -F 'sha256sum -c voco_latest_checksums.txt' docs/install.md > /dev/null
-  grep -F -- '- "voco.*"' .github/workflows/release.yml > /dev/null
-  if grep -F -- '- "v*"' .github/workflows/release.yml > /dev/null; then
-    echo "Release workflow still accepts non-canonical v* tags"
-    exit 1
-  fi
-  grep -F 'draft: true' .github/workflows/release.yml > /dev/null
-  bash ./scripts/render-release-body.sh "${VERSION}" "${TAG_NAME}" > "${TMP_DIR}/release-body-no-appimage.md"
-  bash ./scripts/render-release-body.sh "${VERSION}" "${TAG_NAME}" "${APPIMAGE_NAME}" > "${TMP_DIR}/release-body-with-appimage.md"
-  grep -F 'voco_checksums.txt' "${TMP_DIR}/release-body-no-appimage.md" > /dev/null
-  platforms=(debian)
-  if [[ "$VERSION" == "2026.0.43" ]]; then platforms+=(fedora opensuse arch); fi
-  for platform in "${platforms[@]}"; do
-    grep -F "gpg --verify voco_${VERSION}_${platform}_checksums.txt.asc voco_${VERSION}_${platform}_checksums.txt && sha256sum --check --strict voco_${VERSION}_${platform}_checksums.txt" "${TMP_DIR}/release-body-no-appimage.md" > /dev/null
+  grep -F 'gh release create ${TAG} --draft --verify-tag' scripts/assemble-release.sh > /dev/null
+  bash ./scripts/render-release-body.sh "${VERSION}" "${TAG_NAME}" > "${TMP_DIR}/release-body.md"
+  for expected in \
+    'voco_checksums.txt' \
+    "wget -qO voco-install https://raw.githubusercontent.com/sergiopesch/voco/${TAG_NAME}/install && bash voco-install" \
+    "gpg --verify voco_${VERSION}_debian_checksums.txt.asc voco_${VERSION}_debian_checksums.txt && sha256sum --check --strict voco_${VERSION}_debian_checksums.txt"; do
+    grep -F -- "${expected}" "${TMP_DIR}/release-body.md" > /dev/null
   done
-  if grep -F 'PLATFORM_checksums.txt' "${TMP_DIR}/release-body-no-appimage.md"; then
-    echo "Release verification still contains an unresolved platform placeholder"
-    exit 1
-  fi
-  grep -F "grep \" ${APPIMAGE_NAME}\$\" voco_checksums.txt | sha256sum --check -" "${TMP_DIR}/release-body-with-appimage.md" > /dev/null
 )
 
 echo
 echo "Rendered release body preview:"
-sed -n '1,80p' "${TMP_DIR}/release-body-no-appimage.md"
+sed -n '1,80p' "${TMP_DIR}/release-body.md"

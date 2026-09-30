@@ -1,60 +1,194 @@
 # VOCO branding
 
-VOCO is a local English dictation app for Linux. The lead message is **Your voice,
-typed. Built for Linux.** Speech becomes text at the cursor, without an account,
-subscription or cloud transcription.
+VOCO's lead message is **Your voice, typed. Built for Linux.** VOCO is local
+English dictation: speech becomes text where you are typing, without an account,
+a subscription or cloud transcription.
 
-Use calm, precise, brief copy and sentence case. Name the action: Start test,
-Finish test, Done, Change shortcut. Keep everyday controls visible and technical
-explanations in Help. Show recording, recovery and permission information when
-it matters; never trade truthful state or safe recovery for shorter copy.
+## Voice
+
+- Write calm, precise, brief copy in sentence case.
+- Name the action: Start test, Finish test, Done, Change shortcut.
+- Keep everyday controls visible and technical explanations in Help.
+- Show recording, recovery and permission state when it matters. Never trade
+  truthful state or safe recovery for shorter copy.
+- A passed voice test never implies that desktop input is ready.
 
 ## Identity
 
-Keep the uppercase VOCO name and upright silver microphone. The visual character
-is quiet, precise desktop equipment: graphite surfaces, satin silver, clear
-shapes, and minimal decorative effects. Do not stretch the microphone, recolor
-its entire body for status, or add tiny inscriptions that disappear at icon sizes.
+The name is always VOCO, in capitals. The mark is an upright, front-facing
+satin-silver microphone on graphite: quiet, precise desktop equipment. Don't
+stretch the microphone, recolour its whole body to show status, or add details
+that vanish at icon sizes.
 
-- `assets/voco-logo.png`: square 1024px primary master, a broad simplified grille.
-  Use for large launcher icons and promotional material.
-- `assets/voco-symbol.png`: square 1024px optical master, three broad channels and
-  a simpler support. Use for icons through 64px, app headers and status visuals.
-- `assets/voco-symbol-ui.png`: generated 128px derivative of the optical master.
-  Frontend components import this lightweight file, not the 1024px source.
-- `assets/voco-readme-banner.svg`: self-contained graphite banner with the primary
-  master and an uppercase wordmark. Geist is preferred; the SVG retains a system
-  sans-serif fallback when the font is unavailable.
-- Primary canvas: `#111318`; silver text: `#f1f3f6`; supporting text: `#c7ccd4`.
-  Keep the existing app palette in `apps/desktop/src/styles.css` authoritative.
-- UI uses Geist and Geist Mono from existing bundled font packages. Wordmark
-  letter spacing is restrained; supporting copy stays plainly readable.
-
-Both masters have genuine alpha transparency. Preserve their square canvas and
-aspect ratio. Do not add transparent padding when exporting them. Check native
-16, 24, 32, 48 and 128px sizes against both light and dark backgrounds.
-
-## Status identity
-
-The microphone remains silver and fixed in place. A contrasting badge combines
-shape and color; color alone is not the status channel:
-
-| State | Indicator |
+| Asset | Use |
 | --- | --- |
-| Not ready / attention | Amber exclamation in a triangle |
-| Ready | Green check in a shield |
-| Recording | Red dot in a circle |
-| Processing | Amber hourglass in a diamond |
+| `assets/voco-logo.png` | 1024 px primary master with a broad grille, for launcher icons above 64 px and promotional material |
+| `assets/voco-symbol.png` | 1024 px optical master with three broad channels, for icons up to 64 px, headers and status images |
+| `assets/voco-symbol-ui.png` | 128 px copy of the optical master, which the interface imports |
+| `assets/voco-readme-banner.svg` | The README banner |
 
-The native tray and frontend status legend consume the same generated PNGs in
-`apps/desktop/public/tray/`. Existing runtime tooltips and visible labels provide
-textual status. The badges do not change recording or error handling behavior.
-Small desktop trays remain constrained; inspect the target shell rather than
-assuming a large preview proves small-size readability.
+Both masters are square, with real alpha transparency. Keep the square canvas and
+the aspect ratio, and don't add transparent padding. Check the 16, 24, 32, 48 and
+128 px sizes on both light and dark backgrounds.
 
-## Regeneration
+The banner is a 560 × 184 graphite card (`#111318`, 22 px corners) with the 256 px
+launcher icon drawn at 152 px, "BUILT FOR LINUX" in `#aeb5bf`, "VOCO" in
+`#f1f3f6` and "Your voice, typed." in `#c7ccd4`. Its font falls back from Geist to
+Inter, then the system sans serif.
 
-From the repository root, with Python 3.10+ and ffmpeg available:
+Two third-party icon sets ship unmodified. The settings and chevron icons come
+from GNOME's Adwaita theme, with `apps/desktop/public/icons/ADWAITA-LICENSE.txt`.
+The settings navigation icons come from Lucide, in
+`apps/desktop/public/icons/settings/` with their `LICENSE` and `SOURCE.md`.
+
+## Colour, type and shape
+
+`apps/desktop/src/styles.css` defines the palette:
+
+| Token | Value | Token | Value |
+| --- | --- | --- | --- |
+| `--voco-bg` | `#090a0d` | `--voco-text` | `#ffffff` |
+| `--voco-surface` | `#1a1d23` | `--voco-text-secondary` | `#c7ccd4` |
+| `--voco-divider` | `#2b3038` | `--voco-text-muted` | `#8c929c` |
+| `--voco-accent` | `#9ea4af` | `--voco-error` | `#ff5c7a` |
+| `--voco-accent-active` | `#878e99` | `--voco-accent-highlight` | `#e1e5ec` |
+
+Red is only for real errors. The interface uses Geist and Geist Mono, bundled
+from `@fontsource`. Every VOCO window and control has rounded corners:
+`--voco-radius-window` is 28 px and `--voco-radius-control` is 12 px.
+
+Surfaces are smoked glass: a translucent tint, a thin silver edge and, where
+WebKitGTK supports it, a backdrop blur of 18 px on the settings sidebar and 14 px
+elsewhere. The blur samples VOCO's own window, not the desktop behind it. Behind
+the glass, `apps/desktop/public/textures/settings-studio.webp` (1040 × 760) fills
+Settings and `microphone-mesh.webp` the other windows. Their sources and prompts
+are in `assets/brand-sources/`.
+
+## Motion and accessibility
+
+`apps/desktop/src/motion.css` uses 150 ms for feedback and 220 ms for settling,
+eased with `cubic-bezier(.2, .8, .2, 1)`. Only a working indicator loops: its ring
+turns every 1.1 s. Voice bars follow the measured microphone level with 75 ms
+transitions; they never simulate speech.
+
+- Reduced motion removes the animations and transitions.
+- Reduced transparency or increased contrast replaces the glass and textures
+  with solid surfaces.
+- Forced colours switch to the system's colours.
+- `StatusMark` is decorative and always sits beside readable text. Its states
+  are idle, working, listening, success and attention.
+- `DeviceSelect` is a labelled combobox and listbox. It supports the arrow keys,
+  Home, End, typeahead, Enter, Space, Escape and Tab. Disabled devices can't be
+  chosen, Escape closes it without a change, and choosing never starts capture.
+- Tooltips open on hover and focus and close with Escape. Essential instructions
+  stay on the page.
+
+## Windows
+
+The **popover** is 420 × 380 logical pixels. It shows the VOCO title with a
+Settings button, the microphone, a status heading with its `StatusMark` and the
+shortcut, and one cue:
+
+| When | Cue |
+| --- | --- |
+| Starting microphone | Wait for Listening before speaking. |
+| Listening | Press {shortcut} to finish. |
+| Processing | Finishing your dictation… |
+| Setup needed | Open Help to finish desktop setup. |
+| The shortcut works | Click where you want the text, then use your shortcut. |
+| The shortcut is unavailable | Check shortcut setup in Help. |
+| Otherwise | Click where you want the text, then start dictation. |
+
+Until a dictation starts finishing, Cancel dictation appears; after a click it
+reads Cancelling output…. The main button is Hide to tray, and the footer holds
+the microphone, which opens microphone settings, and Help. Escape hides the
+popover.
+
+**Settings** is 1040 × 760 and at least 760 × 560. Its sidebar has two groups:
+Settings and Shortcut, then Updates and Help. The microphone controls are on the
+Settings page. Hide to tray sits at the top right, with Back to setup beside it
+until setup is complete.
+
+**Setup** opens with "Say something. See it here." and a voice test: Start test,
+then Finish test. The words appear only in that window. When desktop input needs
+work, Done becomes Check desktop setup; only verified readiness shows "Your
+voice, ready.", the shortcut and Done. Each phase moves keyboard focus to its
+main action.
+
+## Status
+
+The microphone is never recoloured or animated. Status shows as a badge whose
+shape and colour both change, or as live level bars, and text always says it too.
+
+### Tray
+
+`scripts/generate-icons.py` draws the 32 px tray icons in `apps/desktop/public/tray/`,
+the microphone with a badge at its lower right: `ready.png` has a green check in a
+shield, `processing.png` an amber hourglass in a diamond and `not-ready.png` an
+amber exclamation mark in a triangle. While VOCO listens, the icon is five silver
+level bars instead, redrawn every 90 ms from 64 frames the app draws at launch. The
+script also draws `recording.png`, a red dot in a circle, which the app never
+shows because the bars take its place.
+
+| Tooltip, after "VOCO — " | Icon | Label |
+| --- | --- | --- |
+| Initializing…, Checking speech model… | Processing | Starting VOCO |
+| Ready to listen, Ready · microphone checks on first use | Ready | None |
+| Starting microphone, Transcribing | Processing | None |
+| Listening, Listening · browser field | Level bars | None |
+| Desktop setup needed, Microphone setup required, Microphone needs permission, Speech model needs attention, Settings need attention, Needs attention | Not ready | Check setup |
+
+Ready and dictating carry no label, so starting and stopping never shifts the
+panel. The menu holds the status line, Open VOCO, Start dictation, Stop dictation,
+Settings, Review, Change shortcut and Quit VOCO. While the microphone opens, Stop
+dictation reads Stop after microphone starts.
+
+### GNOME companion
+
+On GNOME 46 the [companion](../integrations/gnome/README.md) replaces the tray
+icon. It is one pill (3 px vertical margin, 11 px side padding, fully rounded) that
+shares GNOME's hover, focus and open-menu highlight, tinted
+`rgba(190, 198, 208, 0.14)` whenever VOCO isn't idle. The 20 px microphone comes
+last and never moves:
+
+- From the moment the microphone starts until the text is ready, seven 2 × 14 px
+  bars in `#dfe3e9` open on its left over 220 ms, in whole pixels, and only if
+  the top bar has room beside the clock.
+- Listening bars follow the measured level, rising in 45 ms and falling in
+  100 ms. While VOCO processes they rest at 35% height and pulse over 700 ms.
+- In the same place, the pill reads Starting VOCO while VOCO initializes and
+  Check setup when something needs you.
+- With GNOME's animations off, the bars and the pill change without motion.
+
+A primary click stops dictation or opens Settings. Any other mouse button, the
+Menu key or Shift+F10 opens the menu: Settings, Review and, while there is
+something to stop, Stop dictation.
+
+### Installer
+
+`scripts/lib/install-brand.json` defines the installer's four-glyph, five-row
+wordmark and its palette: silver `199,204,212`, shine `241,243,246`, muted
+`122,128,138`, complete `165,217,178` and active `239,206,131`. After editing it,
+run `python3 scripts/sync-installer-ui.py`; `npm run verify:devops` fails if the
+installer is out of sync.
+
+| Terminal | Output |
+| --- | --- |
+| A terminal with colour, Bash 5 or later, at least 64 × 12 | A progress canvas: 14 lines with the block wordmark from 16 rows, otherwise 10 lines with "V O C O" |
+| Anything else, `NO_COLOR`, `TERM=dumb` or `VOCO_INSTALL_PLAIN=1` | Plain lines under "VOCO · v<version>" and "Your voice, typed." |
+
+The canvas marks stages with ✓ in green when done, › in amber while active and
+○ in grey while waiting: Check, Download, Verify and Install. When a stage
+begins, a brighter silver passes across the block letters, one every 125 ms. Downloads
+sample four times a second and show seven bars on a fixed log scale, the bytes
+received and the average rate, without a percentage or time estimate. APT output
+repaints at most every 0.1 s. `VOCO_INSTALL_NO_MOTION=1`, or GNOME's animations
+turned off, keeps the canvas still. The canvas gives way to plain text before any
+password or package question.
+
+## Regenerate the assets
+
+From the repository root, with Python 3.10 or later and ffmpeg:
 
 ```bash
 python3 scripts/prepare-brand-masters.py
@@ -62,209 +196,21 @@ python3 scripts/generate-icons.py
 python3 scripts/generate-brand-banner.py
 ```
 
-The first step removes the explicit green key from retained generated exports
-and suppresses edge spill; the second creates Linux launcher, favicon and status
-PNGs; the third embeds the generated 256px primary icon into the banner. The
-pipeline uses no additional project dependency. Inspect transparency after
-regeneration. Linux packaging uses PNG assets; historical `.ico` and `.icns`
-files are unused and are not regenerated as falsely named PNG containers.
+The first script keys the green background out of the sources in
+`assets/brand-sources/` and writes the two masters. The second writes the 32,
+128 and 256 px launcher icons, a 64 px favicon, `voco-symbol-ui.png` and the tray
+badges. The third embeds the 256 px icon in the banner. Inspect the transparency
+afterwards.
 
-## Source provenance
+## Check the presentation
 
-This refinement was produced on the `codex/branding-refinement` branch from
-`6ab2b2c`, retaining the existing microphone identity. Built-in ImageGen produced
-the revised sources in `assets/brand-sources/`; GPT-6 Astra agents handled
-implementation and review. The unmodified original brand remains recoverable in
-Git at the baseline commit.
-
-The generated source brief was: preserve an upright, front-facing satin-silver
-and graphite vintage microphone, simplify the grille to five channels for the
-primary and three for the optical master, strengthen the U support and foot,
-remove tiny emblems and photographic noise, fill approximately 86% of a square
-canvas, and avoid text, glow and decorative scenery. Final source exports used
-an explicit green key for deterministic transparent packaging. Two earlier
-transparency attempts were rejected because the checkerboard was painted into
-RGB data; they are not referenced by the app. Their retained local provenance,
-along with full prompts and review evidence, is in the adjacent branding-evidence
-folder for this work session, not a shipping asset dependency.
-
-## Silver Lens interface material
-
-The command panel uses a 420 × 380 logical-pixel Silver Lens layout: one silver
-microphone, state and configured shortcut, one cue, a Hide to dictate action,
-and microphone/More controls. Recovery expands the native window to 420 × 660
-and retains its scrollable transcript list. Microphone opens Microphone settings.
-More opens a glass disclosure above its trigger; Escape closes it and returns
-focus before the panel's normal Escape-to-hide behavior applies.
-
-The static generated microphone mesh lives at
-`apps/desktop/public/textures/microphone-mesh.webp`. It is a single covered image,
-not a seamless tile; a graphite wash and mask keep reading areas quiet. Original
-source, prompt, and export provenance are in
-`assets/brand-sources/silver-lens-microphone-mesh.md`.
-Controls combine smoked tint, backdrop blur where supported, thin silver edges,
-and restrained highlights. The primary command button tracks a fine mouse
-pointer only during interaction, with no idle animation loop. This is a CSS
-interpretation of glass, not Apple's native refraction renderer. On Linux,
-backdrop filtering samples the app's own content; desktop wallpaper blur is not
-part of this implementation.
-
-Glass is the default appearance; there is no app-level effects toggle. Increased
-contrast/reduced-transparency preferences use solid materials; reduced motion
-disables pointer glints and motion. Unsupported backdrop filtering also receives
-a solid control surface. The separate configuration-recovery screen remains
-outside this material treatment. Native WebKitGTK/compositor appearance still
-requires an on-device check; browser previews are not proof of native dictation.
-
-## Crystal Sidebar settings
-
-Settings carries the silver and graphite identity through one navigation surface
-and grouped, readable controls. Overview brings together microphone, shortcut,
-output and appearance choices; retained transcripts appear before these groups
-and take priority over previous delivery-success copy. Updates and Help
-remain in a separate app-settings navigation group.
-
-Use semantic buttons, inputs and disclosures inside the material treatment.
-Microphone selectors use the controlled listbox described below; other selects stay native.
-Reduce motion reports the system preference as On, Off or Unavailable rather than
-offering a misleading second switch. Output descriptions are associated with
-their controls, and the microphone check has qualitative status text alongside
-the visual meter. Keep functional signal feedback independent of decorative motion.
-
-Text drafts and their save/discard protection remain in the control-panel state
-across settings navigation. Save feedback is shown when there is an edit, an
-operation or a result; idle settings do not need a permanent save-status footer.
-
-The command panel's settings and chevron icons are unmodified GNOME Adwaita assets, vendored from the
-host's icon theme without adding a runtime dependency. Attribution and license
-are retained in `apps/desktop/public/icons/ADWAITA-LICENSE.txt` (GNOME Project,
-https://www.gnome.org).
-
-Crystal Sidebar uses unmodified Lucide SVG files in
-`apps/desktop/public/icons/settings/`, with source provenance and license retained
-alongside them. These are static assets and add no runtime package dependency.
-
-The settings canvas uses `apps/desktop/public/textures/settings-studio.webp`, a
-1040 × 760 graphite microphone-grille backdrop. Its generated source and prompt
-are retained under `assets/brand-sources/crystal-sidebar-settings-studio.*`.
-The texture stays behind the reading surface and is removed when effects,
-transparency, or contrast preferences call for an opaque interface.
-
-
-### Rounded surface contract
-
-All VOCO-owned window surfaces and visible interactive controls use rounded
-corners. `--voco-radius-window` (28 px) and `--voco-radius-control` (12 px) provide
-shared defaults; smaller controls keep appropriate nonzero radii. Settings texture
-is clipped to the window radius, and grouped row hover/focus states stay inside
-their rounded boundaries. Checkbox controls keep native keyboard/checked semantics.
-OS reduced motion, contrast and transparency fallbacks remain authoritative.
-
-## Shared interaction motion
-
-Onboarding, the React tray popover and settings share the Silver Lens motion
-vocabulary in `apps/desktop/src/motion.css`: 150 ms feedback and 220 ms settling,
-with silver state marks, a recording capsule, and a sliding device-menu highlight.
-The silver microphone, existing Adwaita/Lucide icons, graphite materials and Geist
-fonts remain the source of identity. No additional icon or animation package is
-required. These are original VOCO presentation components inspired by the React
-Bits micro-interaction patterns; no React Bits source is vendored.
-
-`VoiceSignal` consumes the owner's audio level; it never opens a microphone or
-simulates speech. The labelled onboarding Start/Stop button remains separate from
-the accessible meter. The popover keeps its microphone artwork and adds the same
-level display while listening. Active dictation prioritises the finish instruction;
-getting-started guidance remains in More and in the idle view. Recovery stays
-persistent. The [GNOME panel extension](../integrations/gnome/README.md) supersedes
-the floating recording presentation when attached: the unchanged microphone
-expands horizontally into a silver capsule inside the panel. Native tray menus
-remain the fallback when it is absent.
-
-`StatusMark` is decorative beside readable status text. Pending, working,
-listening, success and attention are supplied by the owning operation. A passed
-voice test never implies desktop-input readiness. Settings save/copy results use
-the actual promise outcome. Only working indicators loop, and reduced motion
-removes that animation as well as the level interpolation and expanding surfaces.
-Contrast and transparency fallbacks remain authoritative.
-
-`DeviceSelect` uses a labelled combobox and listbox with arrow keys, Home/End,
-typeahead, Enter/Space, Escape and Tab. Disabled devices cannot be selected, long
-names wrap in a bounded scrolling menu, and Escape dismisses without applying a
-choice. Native microphone access still requires acknowledgement and the explicit
-Use this microphone action; changing the draft resets acknowledgement. Tooltips
-support focus and Escape, keep essential instructions in the page, and warm up
-between adjacent controls without an idle loop.
-
-### Review and verification
-
-Run `npm run test:brand-motion` with an exclusive `VOCO_RENDERER_EVIDENCE_DIR` to
-exercise the production presentation components using synthetic fixture state.
-The suite defaults to Chromium; set `VOCO_MOTION_BROWSERS=chromium,webkit` when
-both browser runtimes and their host libraries are installed. Use
-`VOCO_RENDERER_PORT` to isolate the test server from other work. The native capture
-renderer suite also accepts that port override. On hosts with exhausted file
-watchers, `CHOKIDAR_USEPOLLING=1 CHOKIDAR_INTERVAL=1500` applies to that process only.
-
-The dev-only `/tests/brand-motion.html` fixture supports `surface=onboarding`,
-`surface=popover` or `surface=settings`, and `state=starting`, `recording`,
-`processing`, `success` or `error`. Its Start/Stop actions change synthetic state;
-this is not a microphone or native desktop trial and is not a production entry.
-Use the full native-capture renderer suite for the mocked App/recording integration,
-and separately qualify installed WebKitGTK and physical audio before release.
-
-### First-run continuity
-
-Setup keeps microphone selection inline and uses real capture levels. Working
-labels distinguish Preparing, Listening, Finishing and Checking setup. A passed
-voice test is retained while desktop prerequisites are repaired. Only verified
-readiness reveals “Your voice, ready.”, the configured shortcut and the tray
-handoff. Phase changes move keyboard focus to the next primary action.
-
-The opening renderer uses the original microphone asset and a working indicator
-while configuration loads. Native window presentation still controls whether
-that state is visible during cold launch; a browser fixture is not proof of native
-startup timing. The panel capsule remains horizontal and labels processing
-“Finishing” to match setup.
-
-The current source installer uses a five-row VOCO block wordmark in colour terminals
-at least 64 columns wide and 16 rows tall. Short colour terminals keep a one-line
-wordmark; narrow or static output keeps a compact VOCO heading. This larger treatment
-ships in public .57; .56 retains the earlier small heading.
-
-The letters stay satin silver, with one brief brighter-silver sweep on stage entry.
-Completed steps use soft green and a check; the active step uses amber and a chevron.
-Pending steps remain muted with an open circle. Red is reserved for actual errors.
-The wordmark appears immediately and never delays installation to finish a reveal.
-`scripts/lib/install-brand.json` defines the glyphs and palette once for both the
-Bash download canvas and Python APT canvas. Run `python3 scripts/sync-installer-ui.py`
-after editing it; that updates their generated constants and the standalone installer.
-
-The larger canvas uses 14 lines, with the existing ten-line compact layout on short
-terminals. Both release their entire canvas before password or package questions. Only
-measured download bytes update while receiving a file; the line settles
-to a check on completion. Average speed uses received bytes and elapsed time,
-with no invented percentage or ETA. Redirected output, TERM=dumb and NO_COLOR use
-static
-text without ANSI escapes. No logo reveal, artificial percentage, simulated
-typing or hidden package-manager prompts. Downloads make at most three attempts
-and can continue a partial file during that
-run. Cancelling removes temporary payloads; a new installer run starts fresh.
-Failures retain a private diagnostic log and a short recovery action. Routine
-package details stay out of the main flow; APT and final readiness checks remain
-authoritative. New installs use Alt+D; upgrades keep the existing shortcut. Terminal completion hands off to the actual Start test,
-Finish test and Done controls; installation alone does not claim voice setup is
-complete.
-
-The .52 installer extends this vocabulary with **Signal + Silver
-sweep**. Seven bars retain recent measured transfer rates, including quiet samples;
-they do not imitate microphone capture. A single brief silver highlight marks a
-phase entry and stops when the work finishes, even before the highlight completes.
-Downloads repaint at four samples per second; APT updates are event driven and
-paint at most ten times per second. Neither rendering nor a cosmetic completion
-pause may delay installation. Package percentages belong only to APT's current
-phase. Questions and unexpected output release the view to ordinary terminal text.
-GNOME reduced motion or `VOCO_INSTALL_NO_MOTION=1` removes moving bars and sweeps;
-`VOCO_INSTALL_PLAIN=1`, redirected output, `NO_COLOR` and `TERM=dumb` use static
-output. The [dated measurements](testing/installer-performance-2026-09-22.md)
-compare the exact .52 installer with the prior .51 download path. Package and
-desktop checks are recorded separately in the [.52 release qualification](testing/installer-release-2026-09-22.md).
+`npm run test:brand-motion` renders the setup, popover, settings and Review
+components with synthetic state in Playwright Chromium. It answers a few app
+commands with fixtures and fails if the page opens a microphone or calls any
+other command. `VOCO_RENDERER_EVIDENCE_DIR` must name a
+directory that doesn't exist yet. Set `VOCO_MOTION_BROWSERS=chromium,webkit` to
+add WebKit, and `VOCO_RENDERER_PORT` to move the test server from port 5189. In
+development, `/tests/brand-motion.html` takes `surface=onboarding`, `popover`,
+`settings` or `review`, and `state=starting`, `recording`, `processing`, `success`
+or `error`. A browser preview doesn't show how WebKitGTK and the compositor draw
+the native window, so check that on a real desktop.

@@ -8,7 +8,7 @@ if [[ ${1:-} != --inside ]]; then
   [[ ! -e "$VOCO_PANEL_EVIDENCE_DIR" ]] || { echo 'Evidence directory exists' >&2; exit 1; }
   run=$(mktemp -d)
   mkdir -p "$run"/{home,runtime,config,cache,data,state,evidence}
-  chmod 700 "$run/runtime"
+  chmod 700 "$run/runtime" "$run/state"
   if [[ -n ${VOCO_PANEL_APP_BINARY:-} ]]; then
     cp --reflink=auto "$VOCO_PANEL_APP_BINARY" "$run/voco"
   fi

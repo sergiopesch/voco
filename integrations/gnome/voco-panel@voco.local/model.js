@@ -2,8 +2,8 @@
 export function presentation(state) {
     if (!state || state.version !== 1 || typeof state.token !== 'string')
         throw new Error('Unsupported VOCO panel state');
-    const labels = {idle: '', initializing: 'Starting VOCO', starting: 'Starting', recording: 'Listening',
-        processing: 'Finishing', recovery: 'Review', attention: 'Check setup'};
+    const labels = {idle: '', initializing: 'Starting VOCO', starting: '', recording: '',
+        processing: '', recovery: '', attention: 'Check setup'};
     if (!Object.hasOwn(labels, state.status)) throw new Error('Unknown VOCO state');
     return {
         ...state,
@@ -13,6 +13,9 @@ export function presentation(state) {
         canOpen: state.canOpen === true && !['starting', 'recording', 'processing'].includes(state.status),
         level: state.status === 'recording' && Number.isFinite(state.level)
             ? Math.max(0, Math.min(1, state.level)) : 0,
+        // Grabbed at every status; only chords passive evdev also observes.
+        shortcutAccelerator: ['<Alt>d', '<Alt><Shift>d'].includes(state.shortcutAccelerator)
+            ? state.shortcutAccelerator : null,
     };
 }
 export function barScales(level) {

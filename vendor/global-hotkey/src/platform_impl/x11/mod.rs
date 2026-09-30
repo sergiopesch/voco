@@ -4,11 +4,8 @@
 
 use std::collections::BTreeMap;
 use std::os::fd::AsFd;
-use std::sync::Arc;
 
-mod focus_lease;
 mod wake;
-pub use focus_lease::{acquire_focus_lease, FocusLease, FocusLeaseError};
 
 use crossbeam_channel::Sender;
 use keyboard_types::{Code, Modifiers};
@@ -26,38 +23,23 @@ enum ThreadMessage {
     RegisterHotKeys(Vec<HotKey>, Sender<crate::Result<()>>),
     UnRegisterHotKey(HotKey, Sender<crate::Result<()>>),
     UnRegisterHotKeys(Vec<HotKey>, Sender<crate::Result<()>>),
-    AcquireFocusLease {
-        request: focus_lease::AcquireRequest,
-        reply: Sender<Result<(), FocusLeaseError>>,
-    },
-    ReleaseFocusLease {
-        nonce: u64,
-        reply: Option<Sender<Result<(), FocusLeaseError>>>,
-    },
     DropThread,
 }
 
 pub struct GlobalHotKeyManager {
     thread_tx: wake::WakeSender<ThreadMessage>,
-    _actor: Arc<focus_lease::Actor>,
 }
 
 impl GlobalHotKeyManager {
     pub fn new() -> crate::Result<Self> {
         let (thread_tx, thread_rx) = wake::channel()?;
-        let actor = focus_lease::Actor::new(thread_tx.clone());
-        let thread_actor = actor.clone();
         std::thread::spawn(move || {
-            if let Err(_err) = events_processor(thread_rx, &thread_actor) {
+            if let Err(_err) = events_processor(thread_rx) {
                 #[cfg(feature = "tracing")]
                 tracing::error!("{}", _err);
             }
-            thread_actor.clear();
         });
-        Ok(Self {
-            thread_tx,
-            _actor: actor,
-        })
+        Ok(Self { thread_tx })
     }
 
     pub fn register(&self, hotkey: HotKey) -> crate::Result<()> {
@@ -253,12 +235,8 @@ struct HotKeyState {
     mods: ModMask,
 }
 
-fn events_processor(
-    thread_rx: wake::WakeReceiver<ThreadMessage>,
-    actor: &focus_lease::Actor,
-) -> Result<(), String> {
+fn events_processor(thread_rx: wake::WakeReceiver<ThreadMessage>) -> Result<(), String> {
     let mut hotkeys = BTreeMap::<Keycode, Vec<HotKeyState>>::new();
-    let mut lease = focus_lease::LeaseState::default();
 
     let (conn, screen) = RustConnection::connect(None)
         .map_err(|err| format!("Unable to open x11 connection, maybe you are not running under X11? Other window systems on Linux are not supported by `global-hotkey` crate: {err}"))?;
@@ -287,7 +265,6 @@ fn events_processor(
     let full_mask = KeyButMask::CONTROL | KeyButMask::SHIFT | KeyButMask::MOD4 | KeyButMask::MOD1;
 
     loop {
-        lease.maintain(&conn, root, actor);
         conn.flush()
             .map_err(|_| "X11 output connection failed".to_string())?;
         let mut events_drained = false;
@@ -299,7 +276,6 @@ fn events_processor(
                 events_drained = true;
                 break;
             };
-            lease.observe(&conn, root, actor, &event);
             match event {
                 Event::KeyPress(event) => {
                     let keycode = event.detail;
@@ -345,71 +321,25 @@ fn events_processor(
             .map_err(|_| "X11 command wake source failed".to_string())?;
         match thread_rx.queue.try_recv() {
             Ok(msg) => match msg {
-                ThreadMessage::AcquireFocusLease { request, reply } => {
-                    let nonce = request.nonce;
-                    let result = if events_drained {
-                        lease.acquire(&conn, root, &hotkeys, actor, request)
-                    } else {
-                        Err(FocusLeaseError::FocusUnavailable)
-                    };
-                    if reply.send(result).is_err() && result.is_ok() {
-                        let _ = lease.release(&conn, root, actor, nonce);
-                    }
-                }
-                ThreadMessage::ReleaseFocusLease { nonce, reply } => {
-                    let result = lease.release(&conn, root, actor, nonce);
-                    if let Some(reply) = reply {
-                        let _ = reply.send(result);
-                    }
-                }
                 ThreadMessage::RegisterHotKey(hotkey, tx) => {
-                    let result = lease
-                        .restore(&conn, root, actor)
-                        .map_err(|e| Error::FailedToRegister(e.to_string()))
-                        .and_then(|_| register_hotkey(&conn, root, &mut hotkeys, hotkey));
-                    if result.is_ok() {
-                        actor.registered(hotkey.id());
-                    }
-                    let _ = tx.send(result);
+                    let _ = tx.send(register_hotkey(&conn, root, &mut hotkeys, hotkey));
                 }
                 ThreadMessage::RegisterHotKeys(keys, tx) => {
-                    let result = lease
-                        .restore(&conn, root, actor)
-                        .map_err(|e| Error::FailedToRegister(e.to_string()))
-                        .and_then(|_| {
-                            keys.into_iter().try_for_each(|hotkey| {
-                                register_hotkey(&conn, root, &mut hotkeys, hotkey)?;
-                                actor.registered(hotkey.id());
-                                Ok(())
-                            })
-                        });
+                    let result = keys
+                        .into_iter()
+                        .try_for_each(|hotkey| register_hotkey(&conn, root, &mut hotkeys, hotkey));
                     let _ = tx.send(result);
                 }
                 ThreadMessage::UnRegisterHotKey(hotkey, tx) => {
-                    let restored = lease.restore(&conn, root, actor);
-                    let result = unregister_hotkey(&conn, root, &mut hotkeys, hotkey);
-                    actor.unregistered(hotkey.id());
-                    let _ = tx.send(
-                        restored
-                            .map_err(|e| Error::FailedToRegister(e.to_string()))
-                            .and(result),
-                    );
+                    let _ = tx.send(unregister_hotkey(&conn, root, &mut hotkeys, hotkey));
                 }
                 ThreadMessage::UnRegisterHotKeys(keys, tx) => {
-                    let restored = lease.restore(&conn, root, actor);
                     let result = keys.into_iter().try_for_each(|hotkey| {
-                        let result = unregister_hotkey(&conn, root, &mut hotkeys, hotkey);
-                        actor.unregistered(hotkey.id());
-                        result
+                        unregister_hotkey(&conn, root, &mut hotkeys, hotkey)
                     });
-                    let _ = tx.send(
-                        restored
-                            .map_err(|e| Error::FailedToRegister(e.to_string()))
-                            .and(result),
-                    );
+                    let _ = tx.send(result);
                 }
                 ThreadMessage::DropThread => {
-                    let _ = lease.restore(&conn, root, actor);
                     return Ok(());
                 }
             },
@@ -419,7 +349,7 @@ fn events_processor(
                 // while an already-buffered X event remains unprocessed.
                 if events_drained {
                     thread_rx
-                        .wait(conn.stream().as_fd(), lease.deadline())
+                        .wait(conn.stream().as_fd(), None)
                         .map_err(|_| "X11 event wait failed".to_string())?;
                 }
             }
@@ -596,12 +526,9 @@ mod actor_shutdown_tests {
         crossbeam_channel::Receiver<ThreadMessage>,
     ) {
         let (tx, rx) = crossbeam_channel::unbounded();
-        let tx: wake::WakeSender<_> = tx.into();
-        let actor = focus_lease::Actor::new(tx.clone());
         (
             GlobalHotKeyManager {
-                thread_tx: tx,
-                _actor: actor,
+                thread_tx: tx.into(),
             },
             rx,
         )

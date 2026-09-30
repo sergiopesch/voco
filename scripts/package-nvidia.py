@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Assemble a complete local NVIDIA Debian candidate from a Tauri base package."""
+"""Assemble the complete NVIDIA Debian package from a Tauri base package."""
 import argparse
 import hashlib
 import json
@@ -17,6 +17,22 @@ VENDORED_NOTICES = {
     "global-hotkey": ("VOCO-PATCH.md", "VOCO-UPSTREAM.json", "LICENSE-APACHE", "LICENSE-MIT", "LICENSE.spdx"),
     "glib": ("VOCO-PATCH.md", "VOCO-UPSTREAM.json", "upstream-fix.patch", "LICENSE", "COPYRIGHT"),
 }
+# The guide site and the test docs stay in the source repository.
+UNPACKAGED_DOCS = {"guide", "testing"}
+COPYRIGHT_PREFACE = """\
+VOCO is distributed under the MIT License below. The speech runtime, speech
+model and helper programs in this package keep their own licenses and notices:
+see nvidia/, vendor/ and THIRD-PARTY-NOTICES.txt in this folder.
+
+"""
+
+
+def packaged_docs_ignore(directory, names):
+    """Skip caches everywhere and developer-only folders at the top of docs/."""
+    ignored = shutil.ignore_patterns("__pycache__", "*.pyc")(directory, names)
+    if Path(directory) == ROOT / "docs":
+        ignored |= UNPACKAGED_DOCS & set(names)
+    return ignored
 
 
 def digest(path, algorithm="sha256"):
@@ -80,6 +96,11 @@ def validate_base_executables(stage):
                 "run npm run build to bundle the matching application and browser host")
 
 
+def write_copyright(source_root, doc):
+    """Debian policy requires /usr/share/doc/<package>/copyright."""
+    (doc / "copyright").write_text(COPYRIGHT_PREFACE + (source_root / "LICENSE").read_text())
+
+
 def copy_vendored_notices(source_root, doc):
     """Ship patched dependencies' licenses and provenance, preserving doc links."""
     for crate, names in VENDORED_NOTICES.items():
@@ -130,7 +151,7 @@ def main():
     if actual != version:
         parser.error(f"Base package version {actual} does not match source {version}")
     if output.exists():
-        parser.error("Output already exists; choose a fresh candidate filename")
+        parser.error("Output already exists; choose a new filename")
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="voco-package-", dir=output.parent) as directory:
         stage = Path(directory) / "stage"
@@ -155,9 +176,9 @@ def main():
             shutil.copy2(ROOT / "scripts" / name, doc / name)
         for name in ("README.md", "AGENTS.md"):
             shutil.copy2(ROOT / name, doc / name)
-        shutil.copytree(ROOT / "docs", doc / "docs", dirs_exist_ok=True,
-                        ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+        shutil.copytree(ROOT / "docs", doc / "docs", dirs_exist_ok=True, ignore=packaged_docs_ignore)
         copy_vendored_notices(ROOT, doc)
+        write_copyright(ROOT, doc)
         stage_legacy_input(stage, Path(directory) / "legacy-input-build")
         identity = {"version": package_version, "application_version": version,
                     "backend": "CPU native pool", "context": 1, "cpu_threads": 4,
@@ -178,10 +199,10 @@ def main():
         control.write_text("\n".join(lines) + f"\nVersion: {package_version}\nInstalled-Size: {size}\n")
         (stage / "DEBIAN/md5sums").write_text("".join(
             f"{digest(path, 'md5')}  {path.relative_to(stage)}\n" for path in files))
-        temporary_output = Path(directory) / "candidate.deb"
+        temporary_output = Path(directory) / "package.deb"
         subprocess.run(["dpkg-deb", "--root-owner-group", "-Zzstd", "-z9", "--build",
                         str(stage), str(temporary_output)], check=True)
-        # Publish only a completely built archive; an existing candidate is never replaced.
+        # Publish only a completely built archive; an existing file is never replaced.
         os.link(temporary_output, output)
     print(json.dumps({"package": str(output), "version": package_version,
                       "application_version": version, "bytes": output.stat().st_size,

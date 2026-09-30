@@ -1,15 +1,15 @@
 import type {
   AppConfig,
+  BrowserFieldStatus,
   CachedUpdateCheck,
   ConfigSnapshot,
-  DebugDictationCaptureResult,
   DesktopInputStatus,
-  OwnedPreeditStatus,
+  DesktopPasteStatus,
   RuntimeDiagnostics,
   RuntimeStatusSnapshot
 } from "@/types";
 import { invoke } from "@tauri-apps/api/core";
-import type { PasteCorrelation } from "./benchmarkPhraseQueue";
+import type { PasteCorrelation } from "./dictationStream";
 
 export async function getConfig(): Promise<ConfigSnapshot> {
   return invoke<ConfigSnapshot>("get_config");
@@ -33,31 +33,12 @@ export async function saveConfigPatch(
   return invoke<ConfigSnapshot>("save_config_patch", { patch });
 }
 
-export async function debugDictationCaptureEnabled(): Promise<boolean> {
-  return invoke<boolean>("debug_dictation_capture_enabled");
-}
-
 export async function debugNativeCaptureEnabled(): Promise<boolean> {
   return invoke<boolean>("debug_native_capture_enabled");
 }
 
 export async function saveDebugNativeRetainedSource(packet: Uint8Array): Promise<string | null> {
   return invoke<string | null>("save_debug_native_retained_source", packet);
-}
-
-export async function saveDebugDictationCapture(
-  samples: Float32Array,
-  timeline: unknown,
-): Promise<DebugDictationCaptureResult | null> {
-  const bytes = new Uint8Array(
-    samples.buffer,
-    samples.byteOffset,
-    samples.byteLength,
-  );
-  return invoke<DebugDictationCaptureResult | null>(
-    "save_debug_dictation_capture",
-    { audioBytes: bytes, timeline },
-  );
 }
 
 export async function getDesktopInputStatus(): Promise<DesktopInputStatus> {
@@ -79,85 +60,70 @@ export function takeLauncherActivation(): Promise<boolean> {
   return invoke("take_launcher_activation");
 }
 
-export async function getDesktopPasteStatus(): Promise<{ enabled: boolean; available: boolean; detail: string; shortcutEpoch: number; streamingEnabled?: boolean; targetToken?: string | null; failureReason?: "setup" | "cursor" | null }> {
+export async function getDesktopPasteStatus(): Promise<DesktopPasteStatus> {
   return invoke("get_desktop_paste_status");
 }
 
-export async function beginDesktopShortcutSession(sessionId: string, shortcutEpoch: number): Promise<void> {
-  return invoke("begin_desktop_shortcut_session", { sessionId, shortcutEpoch });
+/** Rejection value of paste_desktop_text and copy_desktop_text. "no-mutation"
+ * typed nothing and is safe to retry; the other outcomes must not be replayed. */
+export interface InsertionError {
+  outcome: "no-mutation" | "uncertain" | "rejected";
+  message: string;
+  clipboardChanged: boolean;
 }
 
-export async function endDesktopShortcutSession(sessionId: string): Promise<void> {
-  return invoke("end_desktop_shortcut_session", { sessionId });
+export interface DesktopPasteMetrics {
+  preflightMs: number;
+  settleMs: number;
+  modifierWaitMs: number;
+  clipboardMs: number;
+  keyboardMs: number;
+  leadingSeparator: boolean;
+  routedUtf8Bytes: number;
+  payloadUtf8Bytes: number;
+  payloadUnicodeScalars: number;
+  payloadUtf16Units: number;
 }
 
-export async function awaitStopShortcutReservation(sessionId: number): Promise<void> {
-  return invoke("await_stop_shortcut_reservation", { sessionId });
+/** Pastes into whatever has focus now; rejects with an InsertionError. */
+export async function pasteDesktopText(text: string, correlation: PasteCorrelation): Promise<{ strategy: "clipboard"; outcome: "dispatched"; pasteMetrics: DesktopPasteMetrics }> {
+  return invoke("paste_desktop_text", { text, correlation });
 }
 
-export async function pasteDesktopText(text: string, expectedTargetToken?: string | null, correlation?: PasteCorrelation): Promise<{ strategy: "clipboard"; outcome: "dispatched"; pasteMetrics?: { terminal: boolean; targetProbeMs: number; preflightMs: number; clipboardMs: number; keyboardMs: number } }> {
-  return invoke("paste_desktop_text", { text, expectedTargetToken: expectedTargetToken ?? null, correlation: correlation ?? null });
-}
-
-export async function getOwnedPreeditStatus(): Promise<OwnedPreeditStatus> {
-  return invoke<OwnedPreeditStatus>("get_owned_preedit_status");
+/** Sets CLIPBOARD and PRIMARY without sending keys; rejects with an InsertionError. */
+export async function copyDesktopText(text: string): Promise<void> {
+  await invoke("copy_desktop_text", { text });
 }
 
 export async function refreshShortcutHeartbeat(ready: boolean): Promise<void> {
   return invoke<void>("refresh_shortcut_heartbeat", { ready });
 }
 
-export async function startOwnedPreedit(sessionId: number, triggerId?: string): Promise<OwnedPreeditStatus> {
-  return invoke<OwnedPreeditStatus>("start_owned_preedit", { sessionId, triggerId });
+export async function startBrowserField(sessionId: number, triggerId: string): Promise<BrowserFieldStatus> {
+  return invoke<BrowserFieldStatus>("start_browser_field", { sessionId, triggerId });
 }
 
-export async function updateOwnedPreedit(
-  sessionId: number,
-  confirmedText: string,
-  preeditText: string,
-  provisionalText: string,
-): Promise<OwnedPreeditStatus> {
-  return invoke<OwnedPreeditStatus>("update_owned_preedit", {
-    sessionId,
-    confirmedText,
-    preeditText,
-    provisionalText,
-  });
-}
-
-export async function commitOwnedPreedit(
-  sessionId: number,
-  text: string,
-): Promise<OwnedPreeditStatus> {
-  return invoke<OwnedPreeditStatus>("commit_owned_preedit", { sessionId, text });
-}
-
-export async function checkpointOwnedPreedit(
+export async function appendBrowserField(
   sessionId: number,
   expectedCommittedText: string,
   appendText: string,
-): Promise<OwnedPreeditStatus> {
-  return invoke<OwnedPreeditStatus>("checkpoint_owned_preedit", {
+): Promise<BrowserFieldStatus> {
+  return invoke<BrowserFieldStatus>("append_browser_field", {
     sessionId,
     expectedCommittedText,
     appendText,
   });
 }
 
-export async function finishCanonicalOwnedPreedit(
+export async function finishBrowserField(
   sessionId: number,
   expectedCommittedText: string,
-  appendText: string,
-): Promise<OwnedPreeditStatus> {
-  return invoke<OwnedPreeditStatus>("finish_canonical_owned_preedit", {
-    sessionId,
-    expectedCommittedText,
-    appendText,
-  });
+): Promise<BrowserFieldStatus> {
+  return invoke<BrowserFieldStatus>("finish_browser_field", { sessionId, expectedCommittedText });
 }
 
-export async function cancelOwnedPreedit(sessionId: number): Promise<OwnedPreeditStatus> {
-  return invoke<OwnedPreeditStatus>("cancel_owned_preedit", { sessionId });
+export async function cancelBrowserField(sessionId: number): Promise<BrowserFieldStatus> {
+  return invoke<BrowserFieldStatus>("cancel_browser_field", { sessionId });
 }
 
 export async function releaseBrowserRecording(triggerId: string): Promise<void> {
@@ -177,15 +143,8 @@ export async function beginRuntimeStatusSession(): Promise<number> {
 }
 
 export interface HotkeyTraceFields {
-  audioLevelBucket?: "silent" | "low" | "medium" | "high";
-  chunkCount?: number;
-  responseDeltaCount?: number;
   selectedDeviceConfigured?: boolean;
   trackSampleRate?: number;
-  trackChannelCount?: number;
-  echoCancellation?: boolean;
-  noiseSuppression?: boolean;
-  autoGainControl?: boolean;
   durationMs?: number;
   dictationSessionId?: number;
 }
@@ -199,10 +158,6 @@ export async function traceHotkeyEvent(
 
 export async function hasPendingHotkeyToggle(): Promise<boolean> {
   return invoke<boolean>("has_pending_hotkey_toggle");
-}
-
-export async function showStatusOverlay(width: number, height: number): Promise<void> {
-  return invoke("show_status_overlay", { width, height });
 }
 
 export async function hideStatusOverlay(): Promise<void> {

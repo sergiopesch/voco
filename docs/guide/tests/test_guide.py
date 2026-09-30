@@ -1,4 +1,4 @@
-"""Exercise the real loopback server and the pinned lesson/source contract."""
+"""Exercise the real loopback server and the lesson/source contract at the recorded commit."""
 
 import http.client
 import json
@@ -145,16 +145,35 @@ class GuideTests(unittest.TestCase):
                     chapter["quiz"]["correct"], range(len(chapter["quiz"]["answers"]))
                 )
 
-    def test_evaluation_is_dated_and_separate_from_release_source(self):
+    def test_desktops_comparison_describes_current_code_paths(self):
         chapters = json.loads((ROOT / "site/chapters.json").read_text())
-        chapter = next(c for c in chapters if c["id"] == "typesafe")
-        self.assertIn(self.server.catalog["version"], chapter["sourceNote"])
-        self.assertIn(".41", chapter["comparison"]["title"])
-        self.assertIn("not", chapter["comparison"]["limits"])
-        for comparison in [chapter["comparison"], *chapter["comparison"].get("additional", [])]:
-            self.assertEqual(len(comparison["headers"]), 3)
-            self.assertTrue(comparison["rows"])
-            self.assertTrue(all(len(row) == 3 for row in comparison["rows"]))
+        self.assertEqual([c["id"] for c in chapters if "comparison" in c], ["desktops"])
+        chapter = next(c for c in chapters if c["id"] == "desktops")
+        comparison = chapter["comparison"]
+        self.assertEqual(comparison["headers"], ["Session", "Shortcut", "Keys", "Clipboard helper"])
+        self.assertGreaterEqual(len(comparison["rows"]), 3)
+        self.assertTrue(all(len(row) == len(comparison["headers"]) for row in comparison["rows"]))
+        for key in ("title", "scope", "limits"):
+            self.assertTrue(comparison[key])
+        # The table names the helpers the delivery code runs at the recorded commit.
+        path = "apps/desktop/src-tauri/src/insertion.rs"
+        self.assertIn(path, {entry["path"] for entry in chapter["files"]})
+        self.assertIn("insertion.rs", chapter["sourceNote"])
+        source = subprocess.check_output(
+            ["git", "-C", str(self.repo), "show", self.server.catalog["commit"] + ":" + path]
+        ).decode()
+        cells = " ".join(cell for row in comparison["rows"] for cell in row)
+        for helper in ("wl-copy", "xclip", "xdotool", "ydotool"):
+            with self.subTest(helper=helper):
+                self.assertIn(helper, source)
+                self.assertIn(helper, cells)
+        # Lessons teach current behaviour; release history stays out of the prose.
+        for lesson in chapters:
+            prose = json.dumps({k: v for k, v in lesson.items() if k != "files"})
+            prose += " ".join(entry["why"] for entry in lesson["files"])
+            for word in ("TypeSafe", ".43", "candidate", "qualified"):
+                with self.subTest(chapter=lesson["id"], word=word):
+                    self.assertNotIn(word, prose)
 
 
 if __name__ == "__main__":

@@ -1,34 +1,13 @@
-export type InsertionStrategy = "auto" | "clipboard" | "type-simulation";
-export type TranscriptTarget =
-  | "cursor"
-  | "local-agent"
-  | "openclaw-agent"
-  | "openclaw-speech";
-export type TranscriptEnhancement = "off" | "conservative" | "commands-only";
-export type LiveCursorMode =
-  | "stable-cursor-streaming"
-  | "preview-overlay-only"
-  | "final-text-only";
 export type UpdateChannel = "stable" | "beta";
-export type InstallChannel =
-  | "github-release"
-  | "appimage"
-  | "source"
-  | "flatpak"
-  | "snap";
-export type VoiceProfile = "default" | "accent-aware";
+/** Only chooses which update instructions Settings shows. */
+export type InstallChannel = "github-release" | "source";
 
 export interface AppConfig {
   hotkey: string;
   selectedMic: string | null;
-  insertionStrategy: InsertionStrategy;
-  transcriptTarget: TranscriptTarget;
-  liveCursorMode: LiveCursorMode;
-  transcriptEnhancement: TranscriptEnhancement;
   onboardingCompleted: boolean;
   updateChannel: UpdateChannel;
   installChannel: InstallChannel;
-  voiceProfile: VoiceProfile;
 }
 
 export interface ConfigSnapshot {
@@ -38,26 +17,13 @@ export interface ConfigSnapshot {
 
 export type DictationStatus = "idle" | "starting" | "recording" | "processing" | "error";
 
-export interface RecoverableTranscript {
-  id: string;
-  text: string;
-  createdAt: number;
-  reason: "delivery-unconfirmed" | "output-failed";
-  isPartial: boolean;
-}
+export type CursorDeliveryState = "inactive" | "owned";
 
-export interface DictationResult {
-  completedAt: number;
-  outcome: "delivered" | "needs-recovery";
-}
-export type CursorDeliveryState =
-  | "inactive"
-  | "pending"
-  | "owned"
-  | "preview-only"
-  | "unreconciled";
+/** "" means desktop-input diagnostics have not loaded yet; the tray shows its
+ * initializing presentation for it, not setup needed. */
+export type CursorSetupState = "ready" | "not-enabled" | "";
 
-export type AppSurface = "hidden" | "onboarding" | "settings" | "popover";
+export type AppSurface = "hidden" | "onboarding" | "settings" | "popover" | "review";
 
 export interface AudioDeviceOption {
   deviceId: string;
@@ -96,35 +62,12 @@ export interface InsertionSupport {
   available: boolean;
   requiredCommands: string[];
   missingCommands: string[];
-  optionalMissingCommands: string[];
   detail: string;
-}
-
-export interface TranscriptionSegment {
-  text: string;
-  startMs: number;
-  endMs: number;
-}
-
-export interface PreviewTranscription {
-  text: string;
-  segments: TranscriptionSegment[];
-}
-
-export interface CanonicalTranscription {
-  canonicalText: string;
-  appendText: string;
-  chunkText: string;
-}
-
-export interface DebugDictationCaptureResult {
-  audioPath: string;
-  timelinePath: string;
 }
 
 export interface ShortcutDiagnostics {
   hotkey: string;
-  route: "ibus" | "global-shortcut" | "evdev" | null;
+  route: "ibus" | "global-shortcut" | "evdev" | "gnome-panel" | null;
   state: "available" | "focus-required" | "unavailable" | "unknown";
   detail: string;
 }
@@ -132,7 +75,17 @@ export interface ShortcutDiagnostics {
 export interface DesktopInputStatus {
   available: boolean;
   detail: string;
+  /** Recommendation only: the GNOME Wayland companion is missing or outdated, so
+   * the shortcut may also reach the focused app. It never blocks recording. */
   setupArea?: "panel";
+}
+
+/** Recording prerequisites only; each paste targets whatever has focus then. */
+export interface DesktopPasteStatus {
+  enabled: boolean;
+  available: boolean;
+  streamingEnabled: boolean;
+  detail: string;
 }
 
 export interface RuntimeDiagnostics {
@@ -142,21 +95,29 @@ export interface RuntimeDiagnostics {
   sessionType: string;
   typeSimulation: InsertionSupport;
   clipboard: InsertionSupport;
-  ownedPreedit: OwnedPreeditStatus;
+  ibusShortcut: IbusShortcutStatus;
 }
 
-export interface OwnedPreeditStatus {
+/** The optional IBus input source only takes the dictation shortcut. */
+export interface IbusShortcutStatus {
   available: boolean;
-  ready: boolean;
   setupState:
     | "ready"
-    | "safety-disabled"
     | "not-enabled"
     | "not-installed"
     | "runtime-unavailable"
     | "incompatible"
-    | "error"
-    | "";
+    | "error";
+  detail: string;
+  error: string | null;
+}
+
+/** A Chromium exact-field receipt: only a matching receipt proves that the
+ * field took the text. */
+export interface BrowserFieldStatus {
+  available: boolean;
+  ready: boolean;
+  setupState: "ready" | "safety-disabled";
   detail: string;
   sessionId: number | null;
   engineActive: boolean;
@@ -164,13 +125,7 @@ export interface OwnedPreeditStatus {
   progressiveCommitActive: boolean;
   committedCharacterCount: number;
   ownershipIntact: boolean;
-  finalizationOutcome:
-    | "none"
-    | "committed"
-    | "discarded"
-    | "preserved"
-    | "uncertain"
-    | null;
+  finalizationOutcome: "committed" | "uncertain" | null;
   error: string | null;
 }
 
@@ -180,7 +135,6 @@ export interface RuntimeStatusSnapshot {
   epoch: number;
   revision: number;
   runtimeInitialized: boolean;
-  hasRecoverableTranscript: boolean;
   configurationError: boolean;
   microphoneReady: boolean;
   microphonePermission: MicrophonePermission;
@@ -189,7 +143,5 @@ export interface RuntimeStatusSnapshot {
   dictationSessionId?: number;
   cursorDelivery: CursorDeliveryState;
   cursorRequired: boolean;
-  cursorSetupState: OwnedPreeditStatus["setupState"];
-  manualTranscriptReady: boolean;
-  recoveryAvailable: boolean;
+  cursorSetupState: CursorSetupState;
 }

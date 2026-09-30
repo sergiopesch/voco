@@ -18,7 +18,7 @@ ICON_DIR = ROOT / "apps/desktop/src-tauri/icons"
 PUBLIC_DIR = ROOT / "apps/desktop/public"
 TRAY_SIZE = 32
 SUPERSAMPLE = 4
-STATES = ("not-ready", "muted", "ready", "recording", "processing")
+STATES = ("not-ready", "ready", "recording", "processing")
 
 
 def run_ffmpeg(ffmpeg: str, arguments: list[str], data: bytes | None = None) -> bytes:
@@ -57,8 +57,6 @@ def badge_mark(x: float, y: float, state: str) -> bool:
     elif state == "processing":
         segments = [((22.5, 22), (27.5, 22)), ((22.5, 28), (27.5, 28)),
                     ((22.5, 22), (27.5, 28)), ((27.5, 22), (22.5, 28))]
-    elif state == "muted":
-        segments = [((23, 22.5), (23, 27.5)), ((27, 22.5), (27, 27.5))]
     else:
         return near_segment(x, y, (25, 22), (25, 25), 2) or math.hypot(x - 25, y - 28) <= 0.9
     return any(near_segment(x, y, start, end, 2) for start, end in segments)
@@ -70,10 +68,6 @@ def badge_contains(x: float, y: float, state: str, inset: float = 0) -> bool:
     radius = 6.6
     if state == "recording":
         return math.hypot(x, y) <= radius - inset
-    if state == "muted":
-        corner = 1.2
-        straight = radius - corner - inset
-        return math.hypot(max(abs(x) - straight, 0), max(abs(y) - straight, 0)) <= corner
     outlines = {
         "ready": [(-1, -1), (1, -1), (1, 0), (0, 1), (-1, 0)],
         "processing": [(0, -1), (1, 0), (0, 1), (-1, 0)],
@@ -95,7 +89,6 @@ def render_tray_icons(ffmpeg: str) -> None:
         raise ValueError("Unexpected tray master pixel buffer")
     colors = {
         "not-ready": (239, 191, 104, 255),
-        "muted": (224, 228, 234, 255),
         "ready": (129, 215, 165, 255),
         "recording": (250, 121, 127, 255),
         "processing": (239, 191, 104, 255),

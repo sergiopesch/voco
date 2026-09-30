@@ -89,13 +89,7 @@ fn lifecycle_payload(record: &Value) -> Option<Value> {
     for key in [
         "dictation_session_id",
         "duration_ms",
-        "chunk_count",
-        "response_delta_count",
         "track_sample_rate",
-        "track_channel_count",
-        "echo_cancellation",
-        "noise_suppression",
-        "auto_gain_control",
         "selected_device_configured",
     ] {
         if record[key].is_number() || record[key].is_boolean() {
@@ -104,25 +98,6 @@ fn lifecycle_payload(record: &Value) -> Option<Value> {
     }
     // Frontend reloads restart frontend session numbering; reports separate epochs.
     Some(safe)
-}
-
-/// Finite metadata only: never persist destination tokens, paths, names or text.
-pub fn destination_check(
-    scope: &str,
-    events_tracked: bool,
-    stage: &str,
-    outcome: &str,
-    duration_ms: u64,
-) {
-    if !matches!(scope, "control" | "window" | "unavailable")
-        || !matches!(stage, "status" | "paste")
-        || !matches!(outcome, "observed" | "matched" | "rejected" | "unverified")
-    {
-        return;
-    }
-    emit(json!({"event": "destination_check", "scope": scope,
-        "events_tracked": events_tracked, "stage": stage, "outcome": outcome,
-        "duration_ms": duration_ms}));
 }
 
 pub fn speech_queue_failure(request: &Value) -> Result<(), String> {
@@ -157,33 +132,18 @@ pub fn speech_quality(request: &Value) -> Result<(), String> {
     if request["event"] == "native_dispatch" {
         return Err("Native dispatch metadata requires a native producer".into());
     }
-    record_speech_quality(request, false)
+    record_speech_quality(request)
 }
 
 pub fn native_speech_quality(request: &Value) -> Result<(), String> {
     if request["event"] != "native_dispatch" {
         return Err("Invalid native quality stage".into());
     }
-    record_speech_quality(request, true)
+    record_speech_quality(request)
 }
 
-fn record_speech_quality(request: &Value, native: bool) -> Result<(), String> {
-    let mut safe = speech_quality_payload(request).ok_or("Invalid speech quality metadata")?;
-    // Only actual native insertion can attest to its bounded field observation.
-    if native {
-        safe["destination_content_observation"] = json!(if request["field_observed"] == true {
-            "observed"
-        } else {
-            "unavailable"
-        });
-        if let Some(value) = request["context_separator"].as_bool() {
-            safe["context_separator"] = json!(value);
-        }
-        if let Some(value) = request["observation_wait_ms"].as_u64() {
-            safe["observation_wait_ms"] = json!(value.min(86_400_000));
-        }
-    }
-    emit(safe);
+fn record_speech_quality(request: &Value) -> Result<(), String> {
+    emit(speech_quality_payload(request).ok_or("Invalid speech quality metadata")?);
     Ok(())
 }
 
@@ -248,6 +208,8 @@ fn speech_quality_payload(request: &Value) -> Option<Value> {
     }
     for key in [
         "duration_ms",
+        "settle_ms",
+        "modifier_wait_ms",
         "queue_age_ms",
         "max_queue_age_ms",
         "pending_age_ms",
@@ -285,7 +247,6 @@ fn speech_quality_payload(request: &Value) -> Option<Value> {
         "finish_responded",
         "accepted_equals_dispatched",
         "leading_separator",
-        "terminal",
         "clipboard_changed",
     ] {
         if let Some(value) = request[key].as_bool() {
@@ -391,7 +352,7 @@ fn speech_worker_failure_payload(
         "invalid worker response" => "response_invalid",
         "worker did not become ready" => "ready_invalid",
         "worker response identity mismatch" => "identity_mismatch",
-        "worker rejected request; recording retained for recovery" => "request_rejected",
+        "worker rejected request" => "request_rejected",
         _ => "transport_failed",
     };
     Some(
@@ -722,11 +683,10 @@ mod tests {
         ))
     }
     #[test]
-    fn stop_wait_diagnostics_exclude_content() {
+    fn stop_timings_exclude_content() {
         for name in [
-            "dictation_stop_checkpoint_wait_completed",
-            "dictation_stop_preview_wait_completed",
-            "dictation_stop_insertion_wait_completed",
+            "dictation_stop_to_final_transcript",
+            "dictation_stop_to_idle",
         ] {
             assert_eq!(
                 lifecycle_payload(&json!({"event":name, "duration_ms":0,
@@ -739,11 +699,11 @@ mod tests {
 
     #[test]
     fn lifecycle_excludes_content_and_unknown_events() {
-        let record = lifecycle_payload(&json!({"event":"dictation_transcription_completed", "duration_ms":123,
+        let record = lifecycle_payload(&json!({"event":"dictation_stop_to_final_transcript", "duration_ms":123,
             "transcript":"private speech", "clipboard":"private clipboard", "url":"https://private.example", "track_sample_rate":"secret"})).unwrap();
         assert_eq!(
             record,
-            json!({"event":"lifecycle", "name":"dictation_transcription_completed", "duration_ms":123})
+            json!({"event":"lifecycle", "name":"dictation_stop_to_final_transcript", "duration_ms":123})
         );
         assert!(lifecycle_payload(&json!({"event":"arbitrary private message"})).is_none());
     }

@@ -3,7 +3,7 @@ import type { KeyboardEvent } from "react";
 
 export interface DeviceOption { value: string; label: string; disabled?: boolean }
 
-/** Selection is controlled; choosing a draft never applies native microphone permission. */
+/** Arrow keys preview options; only an explicit choice calls onChange. */
 export function DeviceSelect({ label, value, options, disabled = false, onChange }: {
   label: string; value: string; options: DeviceOption[]; disabled?: boolean;
   onChange: (value: string) => void;

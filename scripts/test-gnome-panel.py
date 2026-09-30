@@ -13,11 +13,14 @@ from gi.repository import Gio, GLib
 root = Path(sys.argv[1]); evidence = root / 'evidence'
 report = {'passed': False, 'scope': 'GNOME 46 nested Wayland, synthetic app service', 'states': {}}
 state = dict(version=1, token='1:1', stopSession='1:1', status='idle', description='Ready', canStop=False, canOpen=True, level=0)
-actions = []; attached = []; fail_next = []; stalled = []; stall_state = []; delayed_reservations = []; delay_reservation = []; advance_reservation = []; reservation_revisions = []; advance_action = []; action_revisions = []
+actions = []; attached = []; detached = []; fail_next = []; stalled = []; stall_state = []
+reservations = []; held = []; hold_reservation = []; fail_reservation = []; stop_reservations = []
 bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
-xml = '''<node><interface name="org.voco.Panel1"><method name="Attach"><arg type="b" direction="out"/></method><method name="GetState"><arg type="s" direction="out"/></method><method name="ReserveStopShortcut"><arg type="s" direction="in"/><arg type="b" direction="out"/></method><method name="Action"><arg type="s" direction="in"/><arg type="s" direction="in"/><arg type="b" direction="out"/></method><method name="Detach"/><signal name="Changed"/></interface></node>'''
+xml = '''<node><interface name="org.voco.Panel1"><method name="Attach"><arg type="b" direction="out"/></method><method name="GetState"><arg type="s" direction="out"/></method><method name="ReserveShortcut"><arg type="s" direction="in"/><arg type="b" direction="out"/></method><method name="ReserveStopShortcut"><arg type="s" direction="in"/><arg type="b" direction="out"/></method><method name="Action"><arg type="s" direction="in"/><arg type="s" direction="in"/><arg type="b" direction="out"/></method><method name="Detach"/><signal name="Changed"/></interface></node>'''
+SUPPORTED = ('<Alt>d', '<Alt><Shift>d')
 def shortcut_token():
-    if state['status'] in ('starting','recording','processing') and state.get('stopSession') and state.get('stopAccelerator') in ('<Alt>d','<Alt><Shift>d'):
+    # Stop-only field the native app still publishes for a loaded v10 companion.
+    if state['status'] in ('starting','recording','processing') and state.get('stopSession') and state.get('stopAccelerator') in SUPPORTED:
         return state['stopSession'] + '/' + state['stopAccelerator']
     return None
 def snapshot():
@@ -31,24 +34,26 @@ def method(connection, sender, path, interface, name, params, invocation):
         if fail_next:
             fail_next.pop(); invocation.return_dbus_error('org.voco.TestUnavailable', 'Synthetic transient failure')
         else: invocation.return_value(GLib.Variant('(s)', (snapshot(),)))
+    elif name == 'ReserveShortcut':
+        if hold_reservation:
+            held.append(invocation); return
+        if fail_reservation:
+            fail_reservation.pop(); invocation.return_dbus_error('org.voco.TestUnavailable', 'Synthetic transient failure'); return
+        accelerator = params.unpack()[0]
+        accepted = accelerator in SUPPORTED and accelerator == state.get('shortcutAccelerator')
+        reservations.append((time.monotonic(), accelerator, accepted))
+        invocation.return_value(GLib.Variant('(b)', (accepted,)))
     elif name == 'ReserveStopShortcut':
-        if delay_reservation:
-            delayed_reservations.append(invocation); return
-        if advance_reservation:
-            advance_reservation.pop()
-            previous = state['token']; state['token'] += ':renewed'
-            reservation_revisions.append([previous, state['token']])
+        stop_reservations.append(params.unpack()[0])
         invocation.return_value(GLib.Variant('(b)', (params.unpack()[0] == shortcut_token(),)))
     elif name == 'Action':
-        if advance_action:
-            advance_action.pop()
-            previous = state['token']; state['token'] += ':action'
-            action_revisions.append([previous, state['token']])
         action, token = params.unpack()
-        accepted = (action == 'stop' and state['canStop'] and token == state['stopSession']) or (action == 'open' and state['canOpen'] and token == state['token'])
+        # A consumed chord is the plain toggle; the native app decides Start or Stop.
+        accepted = (action == 'shortcut' and token == '') or (action == 'stop' and state['canStop'] and token == state['stopSession']) or (action in ('open','settings','review') and state['canOpen'] and token == state['token'])
         if accepted: actions.append((action, token))
         invocation.return_value(GLib.Variant('(b)', (accepted,)))
-    elif name == 'Detach': invocation.return_value(None)
+    elif name == 'Detach':
+        detached.append(sender); invocation.return_value(None)
 registration = bus.register_object('/org/voco/Panel', Gio.DBusNodeInfo.new_for_xml(xml).interfaces[0], method, None, None)
 owner = Gio.bus_own_name_on_connection(bus, 'org.voco.Panel', Gio.BusNameOwnerFlags.NONE, None, None)
 def pump(seconds):
@@ -130,27 +135,95 @@ try:
     report['compositorAnimationsInitially'] = inspect()['animations']
     report['forceAnimationsForSoftwareRenderer'] = True
     assert inspect()['animations']
-    for i,status in enumerate(['idle','starting','recording','processing','recovery','idle']):
+    pointer_env = {**os.environ, 'DISPLAY': ':77'}
+    shell_windows = subprocess.check_output(['xdotool', 'search', '--pid', str(shell.pid)], env=pointer_env, text=True).splitlines()
+    subprocess.run(['xdotool', 'windowfocus', shell_windows[0]], env=pointer_env, check=True)
+    def styled(data, name):
+        return [actor for actor in data['actors'] if name in (actor.get('style') or '').split()]
+    def anchors(data):
+        # The microphone and every right-box item on its right, in panel pixels.
+        row = data['rightBox']; own = next(index for index, child in enumerate(row) if child['voco'])
+        return [actor['x'] for actor in styled(data, 'voco-panel-icon')] + \
+            [child['x'] for child in row[own + 1:] if child['visible']]
+    frames = []
+    sequence = ['idle','starting','recording','processing','recovery','idle','attention']
+    for i,status in enumerate(sequence):
+        # Stretch the meter opening and closing so the probe samples many frames.
+        animated = {1: 'expanding', 4: 'collapsing'}.get(i)
+        if animated: call('SlowDown', GLib.Variant('(d)', (8.0,)))
         state.update(token=f'1:{i+1}',status=status,description=status,canStop=status in ('starting','recording'),canOpen=status not in ('starting','recording','processing'),level=.8 if status=='recording' else 0)
         if attached:
             bus.emit_signal(attached[-1], '/org/voco/Panel', 'org.voco.Panel1', 'Changed', None)
-        if i == 1:
-            for _ in range(50):
+        if animated:
+            settled = report['states'][f'{i-1}-{sequence[i-1]}']['indicator']['width']
+            for _ in range(400):
                 pump(.01)
-                frame = inspect()
-                if frame['indicator']['width'] > report['states']['0-idle']['indicator']['width'] + 2 and any(actor['transitions'] for actor in frame['actors']):
-                    report['intermediate'] = frame
-                    screenshot('expanding')
-                    break
-            report['animationProbe'] = inspect()
-            assert 'intermediate' in report, 'No width animation observed'
+                frame = inspect(); frames.append((animated, anchors(frame)))
+                moving = frame['revealing']
+                if animated not in report and moving and abs(frame['indicator']['width'] - settled) > 2:
+                    report[animated] = frame
+                    screenshot(animated)
+                elif animated in report and not moving: break
+            call('SlowDown', GLib.Variant('(d)', (1.0,)))
+            assert animated in report, f'No {animated} width animation observed'
         pump(.4)
         data=inspect(); p=data['panel']; a=data['indicator']
         assert a['y'] >= p['y'] and a['y']+a['height'] <= p['y']+p['height']+.1, data
         assert a['x'] >= p['x'] and a['x']+a['width'] <= p['x']+p['width']+.1, data
+        frames.append((f'{i}-{status}', anchors(data)))
+        # The pill is the theme's highlight area, 3px inside the indicator, so
+        # VOCO's tint and GNOME's hover, focus and menu fills draw as one shape.
+        pill = styled(data, 'voco-panel-button')[0]; mic = styled(data, 'voco-panel-icon')[0]
+        inset = (pill['x'] - a['x'], pill['y'] - a['y'], a['width'] - pill['width'], a['height'] - pill['height'])
+        assert all(abs(value - expected) < .5 for value, expected in zip(inset, (3, 3, 6, 6))), {'pill': pill, 'indicator': a}
+        assert ('voco-panel-active' in pill['style'].split()) == (status != 'idle'), pill
+        if status not in ('idle','recovery'):
+            content = [actor for actor in data['actors'] if actor['visible'] and
+                       actor.get('style') in ('voco-panel-status', 'voco-panel-wave')]
+            # The meter opens on the microphone's left. Its content keeps the
+            # glyph's margin from the pill edge, 11px padding plus the glyph's
+            # 4px transparent side, and sits 4px from the icon.
+            insets = (min(actor['x'] for actor in content) - pill['x'],
+                      mic['x'] - max(actor['x'] + actor['width'] for actor in content),
+                      pill['x'] + pill['width'] - mic['x'] - mic['width'])
+            assert all(abs(value - expected) < .5 for value, expected in zip(insets, (15, 4, 11))), f'Meter insets are {insets}px'
+            data['meterInsets'] = insets
         assert data['windows'] == 0, data
+        if status == 'attention':
+            # Content is measured as styled, so a later idle poll never resizes it.
+            pump(1.7)
+            assert abs(inspect()['indicator']['width'] - a['width']) < .5, 'The label resized after opening'
         report['states'][f'{i}-{status}']=data
         screenshot(f'{i}-{status}')
+        if status in ('starting', 'recording', 'processing'):
+            assert not any(actor['visible'] and actor.get('text') for actor in data['actors']), data
+            assert not any(actor.get('style') == 'voco-panel-stop' for actor in data['actors']), data
+        subprocess.run(['xdotool', 'mousemove', '400', '300'], env=pointer_env, check=True)
+        pump(.1)
+        subprocess.run(['xdotool', 'mousemove', str(round(mic['x'] + mic['width'] / 2)),
+                        str(round(mic['y'] + mic['height'] / 2))], env=pointer_env, check=True)
+        pump(.1)
+        subprocess.run(['xdotool', 'click', '3'], env=pointer_env, check=True)
+        pump(.3)
+        menu = inspect()['menu']
+        assert menu['open'], {'menu': menu, 'actions': actions, 'state': status}
+        items = {item['text']: item for item in menu['items']}
+        assert items['Settings']['sensitive'] == state['canOpen'], items
+        assert items['Review']['sensitive'] == state['canOpen'], items
+        assert items['Stop dictation']['visible'] == state['canStop'], items
+        assert menu['x'] >= 0 and menu['x'] + menu['width'] <= 800, menu
+        if status == 'idle':
+            screenshot('idle-menu')
+            for label, action in [('Settings', 'settings'), ('Review', 'review')]:
+                call('MenuAction', GLib.Variant('(s)', (label,))); pump(.2)
+                assert actions[-1] == (action, state['token']), actions
+                call('Menu'); pump(.1)
+        elif status == 'recording':
+            screenshot('recording-menu')
+            call('MenuAction', GLib.Variant('(s)', ('Stop dictation',))); pump(.2)
+            assert actions[-1] == ('stop', state['stopSession']), actions
+            call('Menu'); pump(.1)
+        call('Menu'); pump(.2)
         if status=='recording':
             state['level'] = 0; pump(.2)
             quiet = inspect()
@@ -161,17 +234,43 @@ try:
             report['meterResponds'] = True
             call('Stop'); pump(.2)
             assert actions[-1] == ('stop', state['stopSession']), actions
-    assert report['states']['2-recording']['indicator']['width'] > report['states']['0-idle']['indicator']['width'] + 50
+            # A primary click anywhere on the pill stops, the meter included.
+            wave = styled(data, 'voco-panel-wave')[0]; before = len(actions)
+            subprocess.run(['xdotool', 'mousemove', str(round(wave['x'] + wave['width'] / 2)),
+                            str(round(wave['y'] + wave['height'] / 2))], env=pointer_env, check=True)
+            pump(.1)
+            subprocess.run(['xdotool', 'click', '1'], env=pointer_env, check=True)
+            pump(.3)
+            assert actions[before:] == [('stop', state['stopSession'])] and not inspect()['menu']['open'], actions[before:]
+            report['meterClickStops'] = True
+    # Keyboard focus shows GNOME's own focus fill on the indicator.
+    subprocess.run(['xdotool', 'mousemove', '400', '300'], env=pointer_env, check=True)
+    call('Focus', GLib.Variant('(b)', (True,))); pump(.4)
+    assert inspect()['indicatorFocus'], 'Keyboard focus did not reach the indicator'
+    screenshot('focus')
+    call('Focus', GLib.Variant('(b)', (False,))); pump(.3)
+    assert not inspect()['indicatorFocus'], 'The indicator kept focus styling'
+    report['focusVisible'] = True
+    assert report['states']['2-recording']['indicator']['width'] > report['states']['0-idle']['indicator']['width'] + 20
     assert abs(report['states']['5-idle']['indicator']['width'] - report['states']['0-idle']['indicator']['width']) < 2
     subprocess.run(['gsettings','set','org.gnome.desktop.interface','enable-animations','false'],check=True)
     state.update(status='recording',canStop=True,canOpen=False,level=.4); pump(1.8)
     report['reducedMotion']=inspect(); screenshot('reduced-motion')
-    assert not any(a['transitions'] for a in report['reducedMotion']['actors'])
+    assert not report['reducedMotion']['revealing']
+    frames.append(('reduced-motion', anchors(report['reducedMotion'])))
     call('Crowd', GLib.Variant('(b)', (True,))); pump(.3)
     report['crowded'] = inspect(); screenshot('crowded')
     assert report['crowded']['indicator']['width'] <= report['states']['0-idle']['indicator']['width'] + 2
     call('Crowd', GLib.Variant('(b)', (False,))); pump(.3)
-    assert inspect()['indicator']['width'] > report['crowded']['indicator']['width'] + 50
+    uncrowded = inspect()
+    assert uncrowded['indicator']['width'] > report['crowded']['indicator']['width'] + 20, uncrowded['indicator']
+    frames.append(('uncrowded', anchors(uncrowded)))
+    # Opening and closing the meter never moves the microphone or its neighbours.
+    reference = frames[0][1]
+    moved = [frame for frame in frames if len(frame[1]) != len(reference) or
+             any(abs(value - fixed) > .5 for value, fixed in zip(frame[1], reference))]
+    assert not moved, {'reference': reference, 'moved': moved[:5]}
+    report['fixedMicrophone'] = {'frames': len(frames), 'anchors': reference}
     subprocess.run(['gsettings','set','org.gnome.desktop.interface','gtk-theme','HighContrast'],check=True)
     pump(.5); screenshot('high-contrast')
     fail_next.append(True)
@@ -194,8 +293,9 @@ try:
     subprocess.run(['gnome-extensions','enable','voco-panel@voco.local'],check=True)
     pump(.5)
     assert inspect()['indicator']['visible']
-    assert inspect()['indicator']['width'] > report['states']['0-idle']['indicator']['width'] + 50
+    assert inspect()['indicator']['width'] > report['states']['0-idle']['indicator']['width'] + 20
     report['reenableVisible'] = True
+    detaches = len(detached)
     # Real compositor key delivery to a disposable GTK input. No host devices.
     gi.require_version('Gtk', '3.0'); gi.require_version('Gdk', '3.0')
     os.environ.update(WAYLAND_DISPLAY='voco-panel-test', GDK_BACKEND='wayland')
@@ -213,88 +313,152 @@ try:
     ids=subprocess.check_output(['xdotool','search','--pid',str(shell.pid)],env=xenv,text=True).splitlines()
     subprocess.run(['xdotool','windowfocus',ids[0]],env=xenv,check=True)
     def keys(*args): subprocess.run(['xdotool',*args],env=xenv,check=True,timeout=3)
+    def modifiers_clear():
+        return bus.call_sync('org.gnome.Shell', '/org/voco/PanelInput', 'org.voco.PanelInput1',
+            'ModifiersClear', None, None, Gio.DBusCallFlags.NO_AUTO_START, 1500, None).unpack()[0]
+    unauthorized = Gio.DBusConnection.new_for_address_sync(os.environ['DBUS_SESSION_BUS_ADDRESS'],
+        Gio.DBusConnectionFlags.AUTHENTICATION_CLIENT | Gio.DBusConnectionFlags.MESSAGE_BUS_CONNECTION, None, None)
+    try:
+        unauthorized.call_sync('org.gnome.Shell', '/org/voco/PanelInput', 'org.voco.PanelInput1',
+            'ModifiersClear', None, None, Gio.DBusCallFlags.NO_AUTO_START, 1500, None)
+        raise AssertionError('Unattached application read compositor input state')
+    except GLib.Error as error:
+        assert 'NotAttached' in str(error), error
+    finally: unauthorized.close_sync(None)
+    # This fixture answers the companion only while it pumps. Loading GTK can
+    # outlast the companion's 1.5-second call timeout; the companion then
+    # detaches and attaches again 2 seconds later, as it would from a stalled app.
+    deadline = time.monotonic() + 5
+    while True:
+        try: ready = modifiers_clear(); break
+        except GLib.Error as error:
+            if 'NotAttached' not in str(error) or time.monotonic() > deadline: raise
+            pump(.05)
+    report['reattachedAfterFixtureStall'] = len(detached) > detaches
+    assert ready
+    def wait_for(predicate, seconds):
+        end = time.monotonic() + seconds
+        while not predicate() and time.monotonic() < end: pump(.01)
+        return predicate()
     def shortcut_state(status, accelerator='<Alt>d'):
         state.update(token='2:'+str(time.monotonic_ns()),status=status,canStop=status in ('starting','recording'),
-                     stopSession='2:1',
-                     canOpen=status=='idle',stopAccelerator=accelerator)
+                     stopSession='2:1',canOpen=status=='idle',
+                     shortcutAccelerator=accelerator,stopAccelerator=accelerator)
         bus.emit_signal(attached[-1], '/org/voco/Panel', 'org.voco.Panel1', 'Changed', None);pump(.3)
-    shortcut_state('idle'); entry.set_text('Keep my dictated words');entry.set_position(-1)
-    keys('key','alt+d');pump(.2)
-    assert leaked and entry.get_selection_bounds(), 'fixture must reproduce browser-style select-all'
-    leaked.clear();entry.select_region(-1,-1);shortcut_state('recording')
-    shortcut_state('starting')
-    before=len(actions);keys('keydown','Alt_L','keydown','d');pump(.3)
-    assert not leaked and not entry.get_selection_bounds(), 'reserved Stop leaked into input'
-    assert len(actions)==before, 'held modifiers must not initiate final paste'
-    # Force the native presentation to advance after Shell has read it, while
-    # the chord remains held. This must not revoke ownership of this capture.
-    advance_reservation.append(True);pump(.15)
-    assert len(reservation_revisions) == 1, 'revision race was not exercised'
-    shortcut_state('recording')  # Same capture, new presentation revision while held.
-    advance_action.append(True)
-    keys('keyup','d','keyup','Alt_L');pump(.3)
-    assert len(action_revisions) == 1, 'action revision race was not exercised'
-    assert len(actions)==before+1 and actions[-1]==('stop',state['stopSession']), actions
-    before_replacement=len(actions);keys('keydown','Alt_L','keydown','d');pump(.1)
-    state.update(token='2:replacement',stopSession='2:2')
-    bus.emit_signal(attached[-1], '/org/voco/Panel', 'org.voco.Panel1', 'Changed', None);pump(.15)
+    def press(combo):
+        # (reached the focused field, panel actions sent) for one tapped chord.
+        leaked.clear();entry.select_region(-1,-1);before=len(actions)
+        keys('key',combo);pump(.2)
+        return bool(leaked), actions[before:]
+    consumed = (False, [('shortcut', '')]); released = (True, [])
+    shortcut_state('idle', None); entry.set_text('Keep my dictated words');entry.set_position(-1)
+    assert press('alt+d') == released and entry.get_selection_bounds(), 'fixture must reproduce browser-style select-all'
+    # Attached at idle: Shell grabs and reserves immediately, before any capture exists.
+    shortcut_state('idle')
+    assert reservations and reservations[-1][1:] == ('<Alt>d', True), reservations
+    assert press('alt+d') == consumed, 'idle chord must be consumed as exactly one toggle'
+    # Held past the autorepeat delay: one toggle on press, never a delayed one.
+    leaked.clear();entry.select_region(-1,-1);before=len(actions)
+    keys('keydown','Alt_L','keydown','d');pump(.9)
+    assert not leaked and actions[before:] == [('shortcut', '')], actions[before:]
+    assert not modifiers_clear(), 'a held chord must block final paste until release'
+    assert not inspect()['windowMenuOpen'], 'held chord opened a window menu without paste'
     keys('keyup','d','keyup','Alt_L');pump(.2)
-    assert len(actions)==before_replacement, 'held Stop must not affect a replacement recording'
-    shortcut_state('processing');keys('key','alt+d');pump(.2)
-    assert not leaked and len(actions)==before+1, 'processing must consume without another action'
-    shortcut_state('idle');keys('key','alt+d');pump(.2)
-    assert leaked, 'idle must return the shortcut to the application'
-    leaked.clear();entry.select_region(-1,-1);shortcut_state('recording','<Alt><Shift>d')
-    keys('key','alt+shift+d');pump(.2)
-    assert not leaked and actions[-1]==('stop',state['stopSession'])
-    delay_reservation.append(True);pump(.12)
-    assert delayed_reservations, 'fixture must hold an old reservation response'
-    shortcut_state('idle');delay_reservation.clear()
-    shortcut_state('recording','<Alt><Shift>d')
-    for pending in delayed_reservations: pending.return_dbus_error('org.voco.TestExpired','Old recording expired')
-    delayed_reservations.clear();pump(.01)
-    keys('key','alt+shift+d');pump(.2)
-    assert not leaked and actions[-1]==('stop',state['stopSession']), 'late old failure must not release a new grab'
-    # A newer accepted renewal must survive an older false reply on the same grab.
-    delay_reservation.append(True);pump(.12)
-    assert delayed_reservations
-    delay_reservation.clear();pump(.15)
-    for pending in delayed_reservations: pending.return_value(GLib.Variant('(b)', (False,)))
-    delayed_reservations.clear();pump(.01)
-    keys('key','alt+shift+d');pump(.1)
-    assert not leaked, 'old rejection must not release a newer accepted renewal'
+    assert modifiers_clear(), 'released chord must permit delivery'
+    keys('key', 'space');pump(.1)
+    assert not inspect()['windowMenuOpen'], 'joining separator must not open the GNOME window menu'
+    assert entry.get_text() == 'Keep my dictated words ', entry.get_text()
+    assert actions[before:] == [('shortcut', '')], 'release must not send another action'
+    # Presentation revisions and every status keep the same grab and toggle.
+    for status in ('starting', 'recording', 'processing', 'attention', 'idle'):
+        shortcut_state(status)
+        assert press('alt+d') == consumed, status
+    # Renewal is a heartbeat, independent of state polling and Changed signals.
+    mark=len(reservations);pump(2.5)
+    renewals=reservations[mark:]
+    renewal_gaps=[round(later[0]-earlier[0],3) for earlier,later in zip(renewals,renewals[1:])]
+    assert len(renewals) >= 2 and all(item[1:] == ('<Alt>d', True) for item in renewals), renewals
+    assert all(.7 < gap < 1.5 for gap in renewal_gaps), renewal_gaps
+    shortcut_state('idle','<Alt><Shift>d')
+    assert press('alt+shift+d') == consumed, 'a changed chord must be regrabbed'
+    assert press('alt+d') == released, 'the previous chord must return to the application'
+    # Late replies about a replaced grab, false or failed, must not release or
+    # detach the newer one.
+    for accelerator, combo, settle in [
+            ('<Alt>d', 'alt+d', lambda pending: pending.return_value(GLib.Variant('(b)', (False,)))),
+            ('<Alt><Shift>d', 'alt+shift+d', lambda pending: pending.return_dbus_error('org.voco.TestExpired', 'Old grab expired'))]:
+        hold_reservation.append(True)
+        assert wait_for(lambda: held, 1.3), 'fixture must hold a renewal'
+        hold_reservation.clear();shortcut_state('idle',accelerator);before_detach=len(detached)
+        for pending in held: settle(pending)
+        held.clear();pump(.1)
+        assert press(combo) == consumed and len(detached) == before_detach, f'a late reply revoked the {accelerator} grab'
     # Freeze the next state read so this proves immediate rejection cleanup,
-    # rather than eventual idle polling or the two-second state timeout.
-    delay_reservation.append(True);pump(.12)
-    assert delayed_reservations
-    stall_state.append(True);pump(.08)
-    for pending in delayed_reservations: pending.return_value(GLib.Variant('(b)', (False,)))
-    delayed_reservations.clear();delay_reservation.clear();pump(.03)
-    before_rejected=len(actions)
-    keys('key','alt+shift+d');pump(.05)
-    assert leaked and len(actions)==before_rejected, 'rejected reservation must release the shortcut immediately'
+    # rather than a later poll.
+    hold_reservation.append(True)
+    assert wait_for(lambda: held, 1.3), 'fixture must hold a renewal'
+    stall_state.append(True)
+    bus.emit_signal(attached[-1], '/org/voco/Panel', 'org.voco.Panel1', 'Changed', None)
+    assert wait_for(lambda: stalled, .5), 'fixture must hold a state read'
+    for pending in held: pending.return_value(GLib.Variant('(b)', (False,)))
+    held.clear();hold_reservation.clear();pump(.03)
+    assert press('alt+shift+d') == released, 'a rejected renewal must release the shortcut immediately'
     stall_state.clear()
     for pending in stalled: pending.return_value(GLib.Variant('(s)', (snapshot(),)))
-    stalled.clear();pump(.2)
-    leaked.clear();entry.select_region(-1,-1)
-    stall_state.append(True)
-    bus.emit_signal(attached[-1], '/org/voco/Panel', 'org.voco.Panel1', 'Changed', None);pump(2.2)
-    keys('key','alt+shift+d');pump(.2)
-    assert leaked, 'an unresponsive app must not leave the shortcut swallowed'
-    stall_state.clear()
-    for pending in stalled: pending.return_dbus_error('org.voco.TestExpired', 'Synthetic expired request')
-    stalled.clear();pump(2.5)
-    leaked.clear();entry.select_region(-1,-1);shortcut_state('recording','<Alt><Shift>d')
+    stalled.clear();pump(.3)
+    assert press('alt+shift+d') == consumed, 'the next state read must regrab'
+    # A hung app times out its single in-flight renewal; Shell detaches and releases
+    # within one heartbeat plus the call timeout, then attaches again.
+    hold_reservation.append(True);started=time.monotonic()
+    before_detach=len(detached);before_attach=len(attached)
+    assert wait_for(lambda: len(detached) > before_detach, 3.2), 'an unresponsive app kept the shortcut swallowed'
+    unresponsive_released=round(time.monotonic()-started,3)
+    assert unresponsive_released < 3.0, unresponsive_released
+    assert press('alt+shift+d') == released, 'an unresponsive app must not leave the shortcut swallowed'
+    hold_reservation.clear()
+    for pending in held: pending.return_dbus_error('org.voco.TestExpired', 'Synthetic expired request')
+    held.clear()
+    assert wait_for(lambda: len(attached) > before_attach, 3), 'companion did not attach again'
+    pump(.4)
+    assert press('alt+shift+d') == consumed, 'an attached companion must regrab'
+    fail_reservation.append(True);before_detach=len(detached);before_attach=len(attached)
+    assert wait_for(lambda: len(detached) > before_detach, 1.5), 'a failed renewal must detach'
+    assert press('alt+shift+d') == released, 'a failed renewal must release the shortcut'
+    assert wait_for(lambda: len(attached) > before_attach, 3), 'companion did not attach again'
+    pump(.4)
+    assert press('alt+shift+d') == consumed, 'an attached companion must regrab'
     Gio.bus_unown_name(owner);owner=None;pump(.2)
-    keys('key','alt+shift+d');pump(.2)
-    assert leaked, 'disconnect must release the compositor shortcut'
+    assert press('alt+shift+d') == released, 'disconnect must release the compositor shortcut'
+    owner=Gio.bus_own_name_on_connection(bus,'org.voco.Panel',Gio.BusNameOwnerFlags.NONE,None,None);pump(.5)
+    assert press('alt+shift+d') == consumed, 'reconnect must regrab'
+    before_detach=len(detached)
+    subprocess.run(['gnome-extensions','disable','voco-panel@voco.local'],check=True);pump(.3)
+    assert len(detached) > before_detach, 'disable must detach'
+    assert press('alt+shift+d') == released, 'disable must release the compositor shortcut'
+    subprocess.run(['gnome-extensions','enable','voco-panel@voco.local'],check=True);pump(.6)
+    assert press('alt+shift+d') == consumed, 'enable must regrab'
+    shortcut_state('idle', None)
+    assert press('alt+shift+d') == released and press('alt+d') == released, 'no supported chord must release the grab'
+    assert not stop_reservations, 'the companion must not use the v10 Stop reservation'
+    assert entry.get_text() == 'Keep my dictated words ', entry.get_text()
+    # Super may open the overview; test it only after all focused-field checks.
+    for modifier in ('Alt_L', 'Alt_R', 'Control_L', 'Control_R', 'Shift_L', 'Shift_R', 'Super_L', 'Super_R'):
+        keys('keydown', modifier);pump(.03)
+        assert not modifiers_clear(), f'{modifier} must block streaming paste'
+        keys('keyup', modifier);pump(.03)
+        assert modifiers_clear(), f'{modifier} release must restore paste readiness'
+    Gio.bus_unown_name(owner);owner=None;call('Overview');pump(.4)
     window.destroy();pump(.2)
     owner=Gio.bus_own_name_on_connection(bus,'org.voco.Panel',Gio.BusNameOwnerFlags.NONE,None,None)
-    state.pop('stopAccelerator',None);pump(.4)
-    report['shortcutProtection']={'realCompositorKeys':True,'heldModifierWait':True,'sameSessionRevisionPreserved':True,'reservationRevisionRaces':reservation_revisions,'actionRevisionRaces':action_revisions,'replacementSessionRejected':True,'processingConsumed':True,
-        'idleReleased':True,'disconnectReleased':True,'unresponsiveAppReleased':True,'staleReservationIsolated':True,
-        'rejectedReservationReleased':True,'olderRejectedRenewalIsolated':True,'alternateHotkey':True,'textPreserved':True}
+    state.pop('stopAccelerator',None);state.pop('shortcutAccelerator',None);pump(.4)
+    report['shortcutProtection']={'realCompositorKeys':True,'idleConsumed':True,'heldChordTogglesOnce':True,'heldModifierWait':True,
+        'everyStatusConsumed':True,'renewalGaps':renewal_gaps,'changedChordRegrabbed':True,'staleRepliesIsolated':True,
+        'rejectedRenewalReleased':True,'unresponsiveAppReleasedAfter':unresponsive_released,'failedRenewalReattached':True,
+        'disconnectReleased':True,'disableReleased':True,'unsupportedChordReleased':True,'noLegacyStopReservation':True,
+        'alternateHotkey':True,'textPreserved':True}
     report['actions']=actions
+    report['modifierGuard'] = {'callerAuthenticated': True, 'allEightModifiers': True,
+        'heldStreamingSeparatorBlocked': True, 'releasePreservedText': True}
     if (root / 'voco').exists():
         Gio.bus_unown_name(owner); owner=None; pump(.3)
         app_log = (evidence / 'app.log').open('w')
@@ -308,6 +472,7 @@ try:
         else: raise AssertionError('Native application bridge did not attach')
         native = json.loads(call('NativeState').unpack()[0])
         assert native['version'] == 1 and not native['canStop'], native
+        assert native.get('shortcutAccelerator') == '<Alt>d' and native.get('stopShortcutToken') is None, native
         report['nativeBridgeState'] = native
         try:
             bus.call_sync('org.voco.Panel','/org/voco/Panel','org.voco.Panel1','GetState',None,None,Gio.DBusCallFlags.NONE,1500,None)
@@ -315,11 +480,14 @@ try:
         except GLib.Error as error:
             assert 'NotAttached' in str(error), error
         report['unattachedClientRejected'] = True
-        try:
-            bus.call_sync('org.voco.Panel','/org/voco/Panel','org.voco.Panel1','ReserveStopShortcut',GLib.Variant('(s)',(native['token'],)),None,Gio.DBusCallFlags.NONE,1500,None)
-            raise AssertionError('Unattached client reserved the shortcut')
-        except GLib.Error as error:
-            assert 'NotAttached' in str(error), error
+        for name, params in (('ReserveShortcut', GLib.Variant('(s)', ('<Alt>d',))),
+                             ('ReserveStopShortcut', GLib.Variant('(s)', (native['token'],))),
+                             ('Action', GLib.Variant('(ss)', ('shortcut', '')))):
+            try:
+                bus.call_sync('org.voco.Panel','/org/voco/Panel','org.voco.Panel1',name,params,None,Gio.DBusCallFlags.NONE,1500,None)
+                raise AssertionError(f'Unattached client called {name}')
+            except GLib.Error as error:
+                assert 'NotAttached' in str(error), error
         report['unattachedShortcutReservationRejected'] = True
         attach = bus.call_sync('org.voco.Panel','/org/voco/Panel','org.voco.Panel1','Attach',None,None,Gio.DBusCallFlags.NONE,1500,None).unpack()[0]
         assert attach is False
@@ -346,7 +514,8 @@ try:
             return bus.call_sync(service,item_path,'org.freedesktop.DBus.Properties','Get',
                 GLib.Variant('(ss)',('org.kde.StatusNotifierItem',name)),None,Gio.DBusCallFlags.NONE,1500,None).unpack()[0]
         report['fallbackLabel'] = tray_property('XAyatanaLabel')
-        assert report['fallbackLabel'] in ['Starting VOCO', 'Check setup', 'Ready']
+        # Only startup and setup problems carry a label; Ready and dictating share the bare icon.
+        assert report['fallbackLabel'] in ['', 'Starting VOCO', 'Check setup']
         old_icon = Path(tray_property('IconName'))
         assert old_icon.exists()
         pump(2)

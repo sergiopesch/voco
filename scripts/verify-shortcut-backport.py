@@ -15,9 +15,7 @@ for name, expected in provenance['upstream_files_sha256'].items():
     assert path.is_file(), f'Missing upstream file: {name}'
     if hashlib.sha256(path.read_bytes()).hexdigest() != expected:
         modified.append(name)
-assert sorted(modified) == [
-    'Cargo.toml', 'src/lib.rs', 'src/platform_impl/mod.rs', 'src/platform_impl/x11/mod.rs'
-], modified
+assert sorted(modified) == ['Cargo.toml', 'src/platform_impl/x11/mod.rs'], modified
 manifest = tomllib.loads((crate / 'Cargo.toml').read_text())
 assert manifest['package']['version'] == provenance['version']
 lock = tomllib.loads((root / 'apps/desktop/src-tauri/Cargo.lock').read_text())

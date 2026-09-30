@@ -27,12 +27,12 @@ MANIFEST
   trap cleanup EXIT
   mkdir -p "${TEST_ROOT}"/{home,runtime,config,cache,data,state,evidence}
   chmod 700 "${TEST_ROOT}/runtime"
-  cp "${ROOT_DIR}"/apps/desktop/src-tauri/resources/voco_ibus_{engine,ownership,protocol}.py "${TEST_ROOT}/"
+  cp "${ROOT_DIR}"/apps/desktop/src-tauri/resources/voco_ibus_{engine,protocol}.py "${TEST_ROOT}/"
   if [[ "${VOCO_NATIVE_TRACE:-}" == 1 ]]; then
     /usr/bin/python3 - "${TEST_ROOT}/voco_ibus_engine.py" <<'TRACE'
 import pathlib, sys
 p = pathlib.Path(sys.argv[1])
-s = p.read_text()
+s = p.read_text().replace('from __future__ import annotations\n', 'from __future__ import annotations\nimport os\n', 1)
 for name, args in [('do_focus_in_id', 'object_path, client'), ('do_set_capabilities', 'capabilities'), ('do_set_content_type', 'purpose, hints'), ('do_focus_out_id', '_object_path')]:
     lines = s.splitlines(keepends=True)
     for i, line in enumerate(lines):
@@ -60,12 +60,7 @@ TRACE
 
     chmod 755 "${TEST_ROOT}/data/voco/models"
 
-    output_mode=${VOCO_NATIVE_OUTPUT_MODE:-final-text-only}
-    case "$output_mode" in
-      final-text-only|stable-cursor-streaming|preview-overlay-only) ;;
-      *) echo "Unsupported native test output mode: $output_mode" >&2; exit 1 ;;
-    esac
-    printf '{"onboardingCompleted":true,"liveCursorMode":"%s","transcriptTarget":"cursor","transcriptEnhancement":"off","hotkey":"Alt+D"}\n' "$output_mode" >"${TEST_ROOT}/config/voco/config.json"
+    printf '%s\n' '{"onboardingCompleted":true,"hotkey":"Alt+D"}' >"${TEST_ROOT}/config/voco/config.json"
     export VOCO_NATIVE_AUDIO=1
   fi
   if [[ "${VOCO_NATIVE_AUDIO:-}" == 1 ]]; then

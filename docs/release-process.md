@@ -1,116 +1,170 @@
 # Release process
 
-Release tags use `voco.<version>`. Keep public releases separate from private
-candidate preparation. Never move a cut tag or replace its frozen artifacts.
+A VOCO release is a signed Git tag, `voco.<version>`, and a GitHub release that
+carries the Debian package, the source, the installer, two records and signed
+checksum manifests. The maintainer builds, verifies and signs each release on
+their own Linux computer with `scripts/assemble-release.sh`. Hosted CI tests
+every commit on `master`, including a release build of the app, but it never
+packages the speech runtime, holds the signing key or publishes anything.
 
-## Prepare
+Versions have the form `YYYY.0.N`: the year, then a number that grows with each
+release. A fix ships as a new version; a published tag or asset is never replaced.
 
-1. Start from the current default branch and use a dedicated release branch.
-2. Update all version metadata with the same version. Keep historical records unchanged.
-3. Run the source, renderer, worker, native delivery and package checks in
-   [AGENTS.md](../AGENTS.md). Pass the pinned Nemotron accuracy, continuity and worker protocol gates.
-4. Update product, install, architecture and security docs. Describe limitations
-   without publishing personal audio, transcripts or local machine paths.
-5. Build a complete NVIDIA package using pinned runtime/model artifacts. Verify
-   its payload, licenses, ELF dependencies, native install/remove and checksums.
-6. Review the diff and require all CI checks before merging to the default branch.
+## One-time setup
 
-## Cut a private draft
+On the Linux computer that signs releases:
 
-Record the exact merged commit, source tree, build environment and package SHA-256.
-Create an annotated local tag at that commit. Create a **draft** GitHub release
-with versioned package, source archive, checksums, provenance and concise release
-notes. Download the uploaded assets and verify every byte before marking the cut ready.
-If the signing key is unavailable, keep this release pending. Checksums are
-integrity checks, not a substitute for the required publisher signatures.
+1. Keep the secret half of the release key in that computer's GnuPG keyring and
+   nowhere else: not in CI, the repository or another service. `KEYS` holds only
+   the public half, whose fingerprint `SECURITY.md` and the
+   [security model](security/README.md#release-signing) publish.
+2. Sign tags with it:
+   `git config user.signingkey B33C7C6AAEC8C20433A7A837540796453D8E3865`.
+3. Install what [CONTRIBUTING.md](../CONTRIBUTING.md#prerequisites) lists,
+   including Tauri CLI 2.10.1, run `bash scripts/setup.sh`, and add the packaging
+   tools: `sudo apt install g++ patch binutils desktop-file-utils appstream`.
+   The assembler also needs `gpgv`, and the upload needs `gh`.
 
-## Signed tags and checksums
+## Make a release
 
-Publisher signatures are created on the maintainer’s local signing environment. The hosted Release
-workflow must not hold the private key or assemble NVIDIA installers.
+### 1. Set the version
 
-One-time setup (interactive; never paste the private key into chat or CI):
+Change the version by hand in `package.json`, `apps/desktop/package.json`, the
+three `package-lock.json` entries (top level, root and `apps/desktop`),
+`apps/desktop/src-tauri/Cargo.toml`, the `voco` entry in its `Cargo.lock`,
+`tauri.conf.json`, `packaging/ibus/voco.xml`, and `VERSION` and the example tag
+in the header comment of `install`. `npm run verify:versions` names any file
+that differs; `npm run rehearse:release` checks the installer's tag.
+
+### 2. Describe the changes
+
+- Write `docs/releases/<version>.md`: what's new, how to upgrade, and known
+  limits. The GitHub release links to this file at the tag, and the assembler
+  stops without it.
+- Add a `## [<version>] - <date>` section at the top of [CHANGELOG.md](../CHANGELOG.md),
+  with its compare link at the bottom.
+- Put a `<release version="<version>" date="<date>">` element with a short
+  `<description>` first in `packaging/tauri/com.sergiopesch.voco.metainfo.xml`.
+
+### 3. Merge with CI green
+
+Merge the pull request to `master`. The assembler asks GitHub's public API for
+the `ci.yml` push run on `master` for that exact commit. The run must be
+complete and successful, with every job passed, Application included.
+
+### 4. Tag the commit
+
+On the signing computer, check out the merged commit. The tree must be clean,
+with no untracked files. Keep the tag local until the package has been tried.
 
 ```bash
-bash scripts/setup-release-signing.sh
+git tag -s voco.<version> -m "VOCO <version>"
+git verify-tag voco.<version>
 ```
 
-That wizard creates a 2-year ed25519 key, writes the **public** key to `KEYS`,
-opens GitHub's GPG key form, and enables `tag.gpgSign` for this clone only. It
-refuses to retag `voco.2026.0.39`.
-
-For each **new** version, after checksums exist:
+### 5. Provision the runtime
 
 ```bash
-git tag -s "voco.<version>" -m "VOCO <version>"
-git tag -v "voco.<version>"
-bash scripts/sign-release-checksums.sh voco_<version>_checksums.txt voco_latest_checksums.txt
-bash scripts/verify-release.sh --keys KEYS voco_<version>_checksums.txt
+bash scripts/provision-ci-speech.sh
 ```
 
-Attach both the checksum files and the `.asc` signatures to the GitHub release.
-Do not move or recreate an already published tag to add a signature.
+This fills `runtime/speech/` with the pinned model and native libraries, which Git
+ignores; see [runtime provisioning](linux-packaging.md#runtime-provisioning).
 
-The hosted tag workflow still needs portable pinned NVIDIA provisioning from a
-fresh clone. Do not re-enable it or push a later tag into that assembler. Public
-releases attach verified local NVIDIA packages. This changes the delivery
-mechanism, not the test gates.
+### 6. Assemble and try the package
 
-Historical cuts and published tags are immutable. The release version is recorded
-in package metadata; confirm the current public release on GitHub before cutting a
-new version. The .40 and .41 development milestones are superseded by .42.
+```bash
+bash scripts/assemble-release.sh ~/voco-release
+```
 
-## Publish
+The output directory must be outside the repository and must not exist yet. The
+script stops unless the tag is annotated, points at `HEAD` and is signed by the
+release key, `KEYS` holds exactly that key, its secret half is present, the
+versions agree, `install` pins the key, the release notes and runtime exist, the
+Tauri CLI is 2.10.1 and CI passed. It builds with `SOURCE_DATE_EPOCH` set to the
+commit time, stops if the build changed a tracked file, assembles and verifies
+the package, and runs the worker protocol checks against the packaged worker.
+Then it writes the assets, signs each manifest and verifies it with
+`verify-release.sh --keys KEYS`, repeats the installer's `gpgv` check with the
+key embedded in `install`, and renders `release-notes.md`. It uploads nothing.
 
-Finish final artifact benchmarks, manual acceptance and performance documentation.
-Obtain explicit publication approval, then activate the release channel and verify
-the published installer, versioned assets and latest aliases. Keep the previous
-release available for rollback. Follow-up changes require a new version.
+| Asset | Contents |
+| --- | --- |
+| `voco_<version>_amd64.deb`, `voco_latest_amd64.deb` | The package, under its own name and the fixed name the manual install uses |
+| `voco_<version>_source.tar.gz` | `git archive` of the tag |
+| `voco-panel@voco.local.shell-extension.zip` | The GNOME companion |
+| `install`, `KEYS` | The guided installer and the public key |
+| `voco_<version>_provenance.json`, `voco_<version>_validation.json` | The source, file hashes and build tools; the CI run, the local checks and their limits |
+| `voco_<version>_checksums.txt`, `voco_checksums.txt` | Every other asset except the signatures, under two names |
+| `voco_<version>_debian_checksums.txt`, `voco_latest_checksums.txt`, `voco_<version>_source_checksums.txt` | One file each |
+| `*.asc` | A detached signature for each manifest |
 
-Keep 2026.0.39 available for rollback after publishing .42. Never relabel an older
-package as a new build. The hosted Release workflow stays disabled.
+Install the package with the `sudo apt install` command the script prints and
+run the [manual acceptance check](testing/README.md#manual-acceptance).
 
-## Repository hygiene
+### 7. Push the tag and create a draft
 
-Remove remote branches only when their exact tips are already merged, and retain
-the recorded commit IDs. Do not delete dirty local worktrees or unresolved PRs.
-Keep security updates separate when their dependency graph fails compilation;
-never waive a gate or ignore an advisory just to clear the PR list.
+```bash
+git push origin voco.<version>
+gh release create voco.<version> --draft --verify-tag --title "VOCO <version>" \
+  --notes-file ~/voco-release/release-notes.md ~/voco-release/assets/*
+```
 
-Version updates run weekly on Monday at 09:00 Europe/London, with at most two
-open version PRs per ecosystem. Compatible minor/patch updates are grouped.
-Vite and its React plugin form a dedicated build-tools group, including majors,
-so their peer requirements can be reviewed together. Other major upgrades and
-the pre-1.0 input/hash libraries remain separate. Shortcut
-plugin updates also stay separate because both consumers must resolve to the
-same vendored actor. Security updates keep their independent queue; no advisory
-is suppressed by this policy. Require the same protected checks for every merge.
+`--verify-tag` stops `gh` unless the tag is already on GitHub, so creating the
+release can't create an unsigned tag.
 
-Automatic deletion of merged PR branches is enabled in GitHub. For a combined
-integration PR, merge the original dependency heads into it, resolve their
-compatibility changes, and use a merge commit after CI passes. Verify those exact
-heads are ancestors of the default branch before deleting any residual branches.
-Do not squash away the ancestry needed to close the constituent PRs accurately.
+### 8. Check the draft, then publish
 
-Housekeeping, workflow and documentation changes alone do not require an app
-release. Dependency or application changes included in shipped binaries do:
-advance the version and qualify a fresh package; never replace published assets.
+Download the draft's assets into a new directory, compare them with the files
+you uploaded, and verify them:
 
-## Additional native Linux channels
+```bash
+gh release download voco.<version> --dir ~/voco-draft
+diff -r ~/voco-release/assets ~/voco-draft
+bash scripts/verify-release.sh --keys KEYS ~/voco-draft/voco_checksums.txt
+```
 
-Follow [the support gates](linux-support.md) for each distribution and desktop.
-Build Fedora and openSUSE RPMs from their explicit dependency profiles; preserve
-companion source packages and all bundled licenses. Validate nodocs license
-retention as well as full-document payload parity. Keep native package revisions,
-checksums and signatures independent. A successful .deb test or a renamed RPM is
-not acceptance for another channel. Sign each RPM header and each Arch package
-with the publisher key; never publish disposable guest-test signatures. Verify
-RPM headers in an isolated RPM key database and Arch detached signatures against
-the checked publisher key. Signing may change RPM archive hashes, so compare
-installed payload identity with the qualified unsigned candidate afterward.
+Read the draft's notes on GitHub, publish with
+`gh release edit voco.<version> --draft=false`, then try the guided installer
+from the published tag in a desktop session:
 
-Provide a signed manifest per platform, listing only that platform's package and
-required companion. Keep the complete versioned manifest for source, provenance,
-validation and all release assets. Preserve the Debian latest alias for existing
-users; do not point it at a different package format. Verify the exact uploaded
-and anonymously downloaded bytes before publishing and upgrading the host.
+```bash
+wget -qO voco-install https://raw.githubusercontent.com/sergiopesch/voco/voco.<version>/install && bash voco-install
+```
+
+### 9. Point the docs at the release
+
+After publishing, update in one pull request `version` in
+`packaging/published-release.json`, the version and install command in
+[README.md](../README.md), and the guided install command, `TAG` and the `KEYS`
+address in [Install](install.md). Until then they install the previous release,
+and `npm run rehearse:release` fails if the README doesn't match the JSON file.
+
+## What CI checks
+
+`.github/workflows/ci.yml` is the only workflow. It runs on every pull request
+and push to `master`, with read-only permissions, actions pinned to commit SHAs
+and checkouts that keep no credentials. Its Application job runs the release
+executables in isolated desktops, as [Testing](testing/README.md) describes. The
+signing computer rebuilds them from the same commit, so the released files
+aren't byte-identical to the ones CI ran; the validation record says so.
+
+`npm run verify:devops` runs `scripts/check-devops.sh`, which fails when another
+workflow file appears or when `ci.yml` mentions `package-nvidia.py`,
+`sign-release-checksums`, `assemble-release` or any secret. It also runs
+`npm run rehearse:release`, which needs no key or network. The rehearsal checks
+the versions, the release scripts and the installer helper tests; that no
+README, doc or installer comment installs from `master` or pipes a download into
+a shell; that the install guide keeps its checksum steps, the installer names
+its own tag, the README installs the published version and the assembler creates
+drafts with `--verify-tag`. Then it prints the release notes it would render.
+
+## Change the release key
+
+A new key must replace the old fingerprint everywhere `git grep` finds it, in
+one change: `KEYS`, `VOCO_RELEASE_KEY_BASE64` and `VOCO_RELEASE_KEY_FINGERPRINT`
+in `install`, `FINGERPRINT` in `scripts/assemble-release.sh`,
+`scripts/render-release-body.sh`, `scripts/test-install-journey.py`,
+[SECURITY.md](../SECURITY.md), the install guide, the security model and this
+page. Then set `user.signingkey` to the new key. Each tag's installer carries
+its own copy of the key that signed that tag's release.

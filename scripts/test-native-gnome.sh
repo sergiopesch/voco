@@ -4,14 +4,10 @@ set -euo pipefail
 umask 077
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 if [[ ${1:-} != --inside ]]; then
-  if [[ ${VOCO_GNOME_CAPTURE:-0} == 1 ]]; then
-    echo "The historical manual-Copy capture fixture is retired. Use VOCO_GNOME_ONBOARDING=1 with all three documented audio audit flags." >&2
-    exit 2
-  fi
   : "${VOCO_NATIVE_DEPS:?Set extracted Xvfb root/usr}"
   : "${VOCO_GNOME_EVIDENCE_DIR:?Set fresh evidence directory}"
   [[ ! -e "$VOCO_GNOME_EVIDENCE_DIR" ]] || { echo 'Evidence directory must be fresh' >&2; exit 1; }
-  if [[ ${VOCO_GNOME_ONBOARDING:-0} == 1 ]]; then
+  if [[ ${VOCO_GNOME_ONBOARDING:-0} == 1 || ${VOCO_GNOME_CURSOR:-0} == 1 ]]; then
     : "${VOCO_GNOME_APP_BINARY:?Capture requires app}"
     for audit_flag in VOCO_DEV_NATIVE_CAPTURE VOCO_DEBUG_CAPTURE_AUDIO VOCO_DEBUG_NATIVE_CAPTURE; do
       [[ ${!audit_flag:-0} == 1 ]] || { echo "$audit_flag=1 is required for complete private native audio evidence" >&2; exit 2; }
@@ -24,12 +20,20 @@ if [[ ${1:-} != --inside ]]; then
   fi
   run=$(mktemp -d)
   mkdir -p "$run"/{home,runtime,config,cache,data,state,evidence,pulse}
-  chmod 700 "$run/runtime" "$run/pulse"
+  chmod 700 "$run/runtime" "$run/pulse" "$run/state"
   mkdir -p "$run/evidence/sources"
-  cp "$ROOT/scripts/test-native-gnome.sh" "$ROOT/scripts/test-native-gnome.py" "$ROOT/scripts/test-native-wayland.py" "$ROOT/scripts/test_native_wayland_capture.py" "$ROOT/scripts/test_native_onboarding_capture.py" "$run/evidence/sources/"
+  cp "$ROOT/scripts/test-native-gnome.sh" "$ROOT/scripts/test-native-gnome.py" "$ROOT/scripts/test-native-wayland.py" "$ROOT/scripts/audio_continuity.py" "$ROOT/scripts/test_native_onboarding_capture.py" "$ROOT/scripts/test_native_crash_review.py" "$run/evidence/sources/"
   mkdir -p "$run/data/gnome-shell/extensions/voco-private-probe@test.invalid"
   cp "$ROOT/scripts/fixtures/gnome-private-probe/"* "$run/data/gnome-shell/extensions/voco-private-probe@test.invalid/"
   cp -a "$ROOT/scripts/fixtures/gnome-private-probe" "$run/evidence/sources/"
+  cursor_mounts=()
+  if [[ ${VOCO_GNOME_CURSOR:-0} == 1 ]]; then
+    cp "$ROOT/scripts/test_native_cursor_capture.py" "$ROOT/scripts/fixtures/cursor-input-adapter.py" "$run/evidence/sources/"
+    cp -a "${VOCO_GNOME_PANEL_SOURCE_DIR:-$ROOT/integrations/gnome/voco-panel@voco.local}" "$run/data/gnome-shell/extensions/voco-panel@voco.local"
+    cp -a "$run/data/gnome-shell/extensions/voco-panel@voco.local" "$run/evidence/sources/"
+    cursor_mounts=(--ro-bind "$ROOT/scripts/fixtures/cursor-input-adapter.py" /usr/bin/ydotool
+      --ro-bind "$ROOT/scripts/fixtures/cursor-input-adapter.py" /usr/bin/wl-copy)
+  fi
   if [[ -n ${VOCO_GNOME_APP_BINARY:-} ]]; then
     [[ -f "$VOCO_GNOME_APP_BINARY" && -x "$VOCO_GNOME_APP_BINARY" ]]
     cp "$VOCO_GNOME_APP_BINARY" "$run/voco"
@@ -44,6 +48,7 @@ if [[ ${1:-} != --inside ]]; then
   bwrap --die-with-parent --new-session --unshare-ipc --unshare-net --unshare-pid --unshare-uts \
     --ro-bind / / --dev /dev --proc /proc --tmpfs /tmp --tmpfs /run/user --tmpfs /run/dbus \
     --bind "$run" "$run" --ro-bind "$VOCO_NATIVE_DEPS" /tmp/native-deps \
+    "${cursor_mounts[@]}" \
     --dir "/run/user/$(id -u)" --bind "$run/pulse" "/run/user/$(id -u)/pulse" \
     --setenv HOME "$run/home" --setenv XDG_RUNTIME_DIR "$run/runtime" \
     --setenv XDG_CONFIG_HOME "$run/config" --setenv XDG_CACHE_HOME "$run/cache" \

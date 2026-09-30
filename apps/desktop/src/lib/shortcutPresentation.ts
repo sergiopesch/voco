@@ -1,5 +1,7 @@
 import type { AudioDeviceOption, DesktopInputStatus, ShortcutDiagnostics } from "@/types";
 
+const ANY_APP = "To dictate into other apps, start dictation from the tray or assign voco --toggle to a shortcut in your desktop settings.";
+
 export function unknownShortcut(hotkey: string): ShortcutDiagnostics {
   return { hotkey, route: null, state: "unknown", detail: "Shortcut availability has not been verified." };
 }
@@ -9,18 +11,18 @@ export function shortcutPresentation(hotkey: string, observation?: ShortcutDiagn
   const available = current.state === "available" && current.route !== null;
   return {
     available,
+    unavailable: current.state === "unavailable",
     instruction: desktopInput?.available === false
-      ? `Desktop setup required. ${desktopInput.detail}`
+      ? `Desktop setup needed. ${desktopInput.detail}`
       : available
-      ? current.route === "ibus"
-        ? `Focus a supported text field and press ${hotkey} to dictate at your cursor.`
-        : `Press ${hotkey} to dictate at your cursor.`
+      ? `Press ${hotkey} to dictate at your cursor.`
       : `Shortcut configured: ${hotkey}. Start dictation from the tray.`,
     detail: current.detail,
+    // Text is pasted into the focused app whichever route starts dictation.
     setup: current.state === "focus-required"
-      ? "Focus a text field with VOCO Dictation selected as your input source."
+      ? `The optional VOCO Dictation input source handles this shortcut only in supported text fields. ${ANY_APP}`
       : !available
-        ? "For IBus recording shortcuts, add VOCO Dictation in your desktop Input Sources settings, select it, then focus a text field. VOCO never switches your input source automatically."
+        ? ANY_APP
         : null,
   };
 }
@@ -48,4 +50,63 @@ export class DiagnosticsRequestGate {
     const generation = ++this.generation;
     return () => this.alive && generation === this.generation;
   }
+}
+
+/** Structural equality for JSON-shaped IPC data, ignoring key order. */
+export function sameJsonValue(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) return true;
+  if (typeof a !== "object" || typeof b !== "object" || a === null || b === null ||
+      Array.isArray(a) !== Array.isArray(b)) return false;
+  const left = a as Record<string, unknown>;
+  const right = b as Record<string, unknown>;
+  const keys = Object.keys(left);
+  return keys.length === Object.keys(right).length && keys.every((key) =>
+    Object.prototype.hasOwnProperty.call(right, key) && sameJsonValue(left[key], right[key]));
+}
+
+/** How long a desktop check may take before VOCO treats it as unanswered. */
+export const DIAGNOSTICS_TIMEOUT_MS = 7500;
+
+/** Settles with the operation, or resolves null if `timeoutMs` passes first. */
+export async function withTimeout<T>(operation: Promise<T>, timeoutMs: number): Promise<T | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      operation,
+      new Promise<null>((resolve) => { timer = setTimeout(() => resolve(null), timeoutMs); }),
+    ]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}
+
+/**
+ * Runs the launch diagnostics check. If it leaves diagnostics unloaded (timeout,
+ * failure or a stale result), setup is reported conservatively and the check is
+ * retried exactly once, unless a later refresh loads diagnostics first.
+ * Returns a disposer that cancels the pending retry.
+ */
+export function startLaunchDiagnostics(
+  refresh: () => Promise<void>,
+  loaded: () => boolean,
+  onFailed: () => void,
+  retryDelayMs = 2000,
+): () => void {
+  let disposed = false;
+  let retry: ReturnType<typeof setTimeout> | undefined;
+  const attempt = async (retryOnFailure: boolean) => {
+    await refresh();
+    if (disposed || loaded()) return;
+    onFailed();
+    if (retryOnFailure) {
+      retry = setTimeout(() => {
+        if (!loaded()) void attempt(false);
+      }, retryDelayMs);
+    }
+  };
+  void attempt(true);
+  return () => {
+    disposed = true;
+    if (retry !== undefined) clearTimeout(retry);
+  };
 }
