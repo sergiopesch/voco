@@ -27,7 +27,6 @@ pkg-config = "=0.3.34"
 default = ["native-capture"]
 custom-protocol = ["tauri/custom-protocol"]
 native-capture = []
-native-capture-dev = ["native-capture"]
 
 [dependencies]
 tauri = { version = "=2.11.6", features = ["tray-icon"] }

@@ -282,10 +282,6 @@ jobs:
           VOCO_NATIVE_PULSE_EVIDENCE_DIR: ${{ runner.temp }}/voco-native-pulse-latency
         run: bash scripts/test-private-ibus-engine-hosted.sh --native-pulse-latency
 
-      - name: Native capture development contracts
-        working-directory: apps/desktop/src-tauri
-        run: cargo test --locked --lib --features native-capture-dev
-
       - name: Provision checksum-pinned Nemotron runtime
         run: bash scripts/provision-ci-speech.sh
 
