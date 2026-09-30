@@ -17,8 +17,8 @@ VENDORED_NOTICES = {
     "global-hotkey": ("VOCO-PATCH.md", "VOCO-UPSTREAM.json", "LICENSE-APACHE", "LICENSE-MIT", "LICENSE.spdx"),
     "glib": ("VOCO-PATCH.md", "VOCO-UPSTREAM.json", "upstream-fix.patch", "LICENSE", "COPYRIGHT"),
 }
-# The guide site, test evidence and graphics stay in the source repository.
-UNPACKAGED_DOCS = {"guide", "release-assets", "testing"}
+# The guide site and the test docs stay in the source repository.
+UNPACKAGED_DOCS = {"guide", "testing"}
 COPYRIGHT_PREFACE = """\
 VOCO is distributed under the MIT License below. The speech runtime, speech
 model and helper programs in this package keep their own licenses and notices:

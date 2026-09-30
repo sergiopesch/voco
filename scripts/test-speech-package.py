@@ -206,9 +206,9 @@ class VendoredNoticeTests(unittest.TestCase):
 class PackagedDocsTests(unittest.TestCase):
     def test_skips_developer_folders_only_at_the_top_of_docs(self):
         docs = package.ROOT / "docs"
-        names = ["guide", "release-assets", "testing", "install.md", "__pycache__", "cache.pyc"]
+        names = ["guide", "testing", "install.md", "__pycache__", "cache.pyc"]
         self.assertEqual(package.packaged_docs_ignore(str(docs), names),
-                         {"guide", "release-assets", "testing", "__pycache__", "cache.pyc"})
+                         {"guide", "testing", "__pycache__", "cache.pyc"})
         self.assertEqual(package.packaged_docs_ignore(str(docs / "architecture"), ["testing", "README.md"]),
                          set())
 

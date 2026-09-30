@@ -121,6 +121,9 @@ to upgrade.
   modes.
 - AT-SPI from the package dependencies, and `docs/guide`, `docs/testing` and
   `docs/release-assets` from the package.
+- The dated test reports, audits, decision records and benchmark assets in `docs/`,
+  and the release notes before 2026.0.60. Each release's tag keeps the documents
+  its notes link to.
 - ripgrep from CI and the scripts.
 
 ### Fixed

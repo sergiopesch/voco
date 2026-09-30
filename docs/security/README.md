@@ -157,9 +157,15 @@ source, as [vendor/](../../vendor/README.md) records:
 
 CI runs `cargo audit` on the Rust lockfile and `npm run verify:security`, which
 is `npm audit` at the moderate level. Scanners that match only version numbers
-may still flag glib 0.18.5, because the fix is a backport. A clean audit doesn't
-show that every dependency is maintained or free of defects. The package
-installs the third-party notices in `/usr/share/doc/voco/`.
+may still flag glib 0.18.5, because the fix is a backport. `cargo audit` also
+warns, without failing, about seven unmaintained crates and about rand 0.7.3
+([RUSTSEC-2026-0097](https://rustsec.org/advisories/RUSTSEC-2026-0097.html)),
+which is unsound only with a custom logger that calls the thread RNG while it
+reseeds. rand 0.7.3 runs only in the build script of `selectors`, through
+`phf_codegen` and `phf_generator` 0.8.0, whose generator uses a seeded
+`SmallRng`, and VOCO has no such logger. Check both again when the lockfile
+changes. A clean audit doesn't show that every dependency is maintained or free
+of defects. The package installs the third-party notices in `/usr/share/doc/voco/`.
 
 ## Release signing
 
