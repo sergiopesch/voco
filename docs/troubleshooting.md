@@ -1,282 +1,272 @@
 # Troubleshooting
 
-## Voice test works, but dictation does not start
+Start with the quick checks, then find your symptom below. If nothing here
+helps, [report a bug](#report-a-bug).
 
-On Wayland, the .45 guided installer could skip `ydotool` and `ydotoold` even
-though microphone recognition worked. A banner naming `ydotool` is a desktop
-input setup failure. Installing the binaries alone is insufficient: the daemon
-must run with accessible device and socket permissions for your login. Follow
-[Wayland helper setup](platform/README.md#ydotoold-ydotool-daemon).
+## Quick checks
 
-The .47 installer installs the helpers explicitly and checks desktop input before
-saving onboarding completion. After repairing setup, click **Check desktop setup**
-and **Done**; the voice test does not need an external text field.
-With .47 you can also run `voco --check-desktop-input`. It checks prerequisites
-without launching VOCO, recording speech, copying text or sending keystrokes.
-A passing check still requires a real dictation trial in your intended application.
-
-Earlier releases showed **No text cursor available** and refused to record when
-they could not identify the focused field, for example in a Ghostty pane. VOCO now
-records and pastes into whatever has keyboard focus, in any app.
-
-### A terminal or browser behaves differently
-
-VOCO pastes the same way everywhere, so terminals such as Ghostty and browsers
-such as Brave need no special setup. It sets both the clipboard and the primary
-selection, then presses Shift+Insert: GTK, Qt, Chromium-based browsers (including
-the address bar), Firefox and Electron apps paste the clipboard, and most
-terminals paste the primary selection. Line breaks become spaces and VOCO never presses
-Enter, but it cannot identify a shell password prompt or a read-only terminal
-mode. Review terminal text before running it.
-
-On GNOME Wayland without the [VOCO panel](#no-live-bars-or-listening-in-the-top-panel),
-the focused app also receives **Alt+D**: a browser focuses its address bar, so
-the words land there, and a terminal deletes a word. VOCO notifies you the first
-time this happens after each launch. Enable the panel and sign out and back in, or
-assign `voco --toggle` to an unused key in your desktop's shortcut settings, as in
-[Wayland compositor shortcuts](install.md#wayland-compositor-shortcuts).
-
-## VOCO records but does not type into the active application
-
-VOCO normally streams NVIDIA recognition through desktop paste.
-First verify the complete package and worker identity: a base Tauri package lacks the
-NVIDIA payload. Inspect old launcher overrides, especially `VOCO_STREAM_WORKER`,
-`VOCO_DESKTOP_PASTE=0` and `VOCO_DESKTOP_STREAM=0`. Keep the app you are dictating
-into focused, check the helpers with `voco --check-desktop-input`, and review local
-app/worker diagnostics. On Wayland the paste keys need a running `ydotoold`; if
-setup names it, run `systemctl --user enable --now voco-ydotoold.service` and see
-[Wayland helper setup](platform/README.md#ydotoold-ydotool-daemon). Apps that remap
-Shift+Insert, remote desktops and virtual machines may not accept the paste.
-
-A successful key dispatch does not prove that the app accepted the text. If a paste
-fails, VOCO stops typing; at Stop it copies the words it did not type to the
-clipboard and notifies you. Check the field before pasting them with Shift+Insert:
-some words may already have arrived. The copy keeps the space before its first
-word, so it joins the words already there. VOCO never replays an uncertain paste. If
-the clipboard copy fails too, VOCO keeps the dictation in tray **Review**. The
-optional Chromium exact-field adapter uses a separate contract; IBus remains
-shortcut-only.
-
-## Spaces appear as the letter S
-
-The .37+local2 candidate used the wrong separator name for legacy ydotool 0.1.x.
-The fixed revision passes a literal space; modern ydotool uses keycode 57 and
-xdotool uses its `space` keysym. Verify the installed and running revision before
-testing. Do not remap S or change recipient-app shortcuts to work around this bug.
-
-## Final words or punctuation need review
-
-Stop must drain the captured tail before the worker finishes. Regression tests cover this ordering. Normal dictation remains append-only: it does not
-rewrite previously inserted sentences after Stop. A good transcript in one test
-does not establish punctuation quality across voices and speaking styles. Keep
-recognition accuracy, exact delivery and whole-message refinement separate.
-
-## Getting back words VOCO kept
-
-Choose **Review** in the tray menu. It lists the dictations VOCO kept: text from a
-VOCO process that exited unexpectedly, and a dictation it could neither paste nor
-copy when you stopped. Check your text field first, because some words may already
-be there. **Copy transcript** puts the text on the clipboard; the entry stays until
-you choose **Discard**. VOCO keeps up to five, and a sixth replaces the oldest.
-Review never opens, pastes or retries by itself, and opening it does not start or
-stop dictation.
-
-## Set up exact-field Chromium dictation
-
-The Debian package includes a native host and unpacked extension files. Follow
-[installation](install.md) for explicit browser setup; building the package does not activate an
-extension in the current profile. Once enabled, click the extension action to authorize the tab,
-focus an eligible plain-text input or textarea, and use `Alt+Shift+V` to start and stop. The ordinary
-VOCO hotkey uses the separate native desktop-paste route.
-
-The extension requires a collapsed selection and a supported editable control. Password/recognized-sensitive
-controls, rich editors, unsupported frames, disabled/read-only inputs and fields marked private
-are unavailable. Switching fields, leaving and returning, navigation, element replacement, user
-edits or selection changes revoke the current authorization. Enable/start a new session deliberately;
-the old token cannot authorize a different field.
-
-If the extension cannot connect, check that the native host is present and the packaged manifest
-matches the installed extension identity. Chrome and Chromium use different native-host manifest
-locations. A missing private `XDG_RUNTIME_DIR`, wrong ownership or public socket permissions causes
-the broker to reject the connection. Do not weaken permissions to bypass this check. See
-[broker acceptance](testing/browser-broker.md) for paths and protocol details.
-
-A cold or blocked browser/app can outlast the two-second trigger or request deadline. Requests
-have a short recipient-side expiry checked after page hooks, so delayed work is rejected under the
-shared host clock assumption; arbitrary wall-clock rollback is not covered. No automatic retry is
-performed after an uncertain result: as with desktop paste, Stop copies the words the field did not
-take to the clipboard. Check the field before pasting them, because uncertainty does not prove that
-nothing landed.
-
-The adapter uses direct mutation of the captured element. Browser native undo may not include these
-writes; do not assume undo support or rich-editor compatibility from a successful plain-text test.
-
-## Live preview appears only in VOCO
-
-Check whether the active session has desktop streaming enabled and transcript enhancement
-off. Stop-only delivery may reflect configuration or an unavailable streaming worker.
-Use `report-speech-performance.py` for recognition/startup timing and worker failure
-stages. A `first_hypothesis` event is not a visible-field receipt. Whole-message
-post-Stop rewrite is not implemented by the generic desktop route.
-
-For exact-field Chromium sessions, invalidated ownership stops delivery without
-retargeting or automatic fallback; Stop copies the rest to the clipboard. Do not confuse
-those recipient receipts with native paste-dispatch success.
-
-For a controlled development reproduction, use:
+Run these in a terminal in your desktop session:
 
 ```bash
-npm run reset:cursor-streaming-trace
-npm run report:cursor-streaming
+voco --version
+echo "$XDG_SESSION_TYPE"
+voco --check-desktop-input
+voco --check-panel
 ```
 
-A trace without a validated recipient receipt is not proof of exact-field delivery. Short final
-fixtures do not establish sustained rolling checkpoint coverage. Keep audio/transcript diagnostics
-private and distinguish synthetic isolated tests from physical microphone acceptance.
+They show the installed version, whether your session is `x11` or `wayland`,
+whether VOCO can paste or which helper is missing, and what the GNOME panel
+needs. The two checks send no keys, leave the clipboard alone and change no
+settings. On Wayland, `systemctl --user status voco-ydotoold.service` shows
+whether the input service is running.
 
-## IBus shortcut source is missing or outdated
+In VOCO, open **Settings** and choose **Help**. The sections
+**My microphone is not working**, **My shortcut is not working** and
+**My words are not appearing** describe what VOCO sees. **Technical details**
+lists runtime checks for your session, the optional IBus shortcut, paste keys
+and the clipboard. After you fix something, choose **Refresh runtime checks**.
 
-The optional `VOCO Dictation` source can supply consuming recording shortcuts. It is not an
-insertion prerequisite. Native/engine protocol 6 rejects all legacy composition and text mutation
-operations. An older resident engine cannot be made safe merely by changing output mode; use the
-matching updated application and engine package.
+### Debug log
 
-If you explicitly use the source and have installed a protocol upgrade, quit VOCO and restart IBus
-or sign out and back in before reopening. Switching sources alone does not reliably reload the
-resident engine. VOCO itself never changes or restarts the active source. No desktop service restart
-is needed just to copy a transcript or refresh VOCO's panel.
-
-Legacy ydotool/xdotool/clipboard helper setup is documented separately in
-[platform support](platform/README.md). The native desktop route uses these helpers; the separate explicit Copy path does
-not require input injection. Do not change input-group membership without understanding
-the broader keyboard-device access it grants.
-
-## Tray and panel controls disagree
-
-The tray and panel use the same runtime state: microphone readiness, model readiness,
-recording, processing and recovery. A recording can always be stopped; a new
-recording waits for capture/processing to finish. Retained transcripts remain
-available for review. Settings stays available to resolve a configuration problem.
-
-If the two surfaces disagree, collect local diagnostics with the exact package
-version and test time. Do not assume a successful key dispatch proves editor delivery.
-
-## A hotkey or setting changes back unexpectedly
-
-Settings and native-tray hotkey changes use the same serialized field-patch writer. The backend
-reloads the latest config for every patch, saves it atomically, and returns and broadcasts the
-authoritative result to the frontend. Opening Settings or the popover refreshes that state again.
-This prevents an older full settings object from overwriting an independent tray change.
-
-If the persisted value is still wrong, close any external editor that is writing the file while
-VOCO is running, make the change once in VOCO, and inspect:
+VOCO writes its log to the terminal it starts from. For more detail, quit VOCO
+and start it with debug logging. The log includes file, device and socket paths
+from your computer, so read it before you share it.
 
 ```bash
-sed -n '1,240p' "${XDG_CONFIG_HOME:-$HOME/.config}/voco/config.json"
+RUST_LOG=debug voco
 ```
 
-Do not include that file in a public bug report without reviewing it for local endpoints, model
-names, agent names, and other personal configuration.
+## The installer stops
 
-Custom dictation shortcuts must include Alt, Control, or Super plus a main key. Bare keys and
-Shift-only combinations are rejected because they would turn ordinary typing into a dictation
-control event. Alt+Shift+R is no longer reserved for a conversation mode.
+The installer prints the reason. When it keeps a log, it prints the path after
+`Details:` or `Installation details:`. The log is in `/tmp`, or in `TMPDIR` if
+you set it, and only your account can read it.
 
-## VOCO says local settings need attention
+| Message | What to do |
+| --- | --- |
+| `… is required before downloading VOCO.` | Install the named tool with `sudo apt install`, then run the installer again. |
+| `The download stopped.` | Check your connection and run the installer again. If the release file is unavailable, check that the release exists. |
+| A key, signature, signer or checksum error | Nothing was installed. Run the installer again. If the check fails again, don't install the file another way, and report it as described in [SECURITY.md](../SECURITY.md). |
+| `Installation failed:` | APT couldn't install the package. Fix the APT error it shows, then run the installer again. |
 
-VOCO pauses dictation when `config.json` cannot be parsed or cannot pass its ownership, file-type,
-or permission checks. The recovery panel offers three explicit choices:
+Exit status 2 means VOCO is installed but can't paste yet. The installer names
+the problem. The most common ones are:
 
-- correct the file and choose `Retry loading settings`; VOCO validates and applies the repaired
-  hotkey before accepting the new configuration
-- choose `Open config directory` to inspect the local entry
-- choose `Reset to defaults`, then confirm; VOCO preserves the previous entry as a uniquely named
-  `config.recovery-backup-*.json` item before writing private defaults
+| Message | What to do |
+| --- | --- |
+| `This login cannot access /dev/uinput.` | Give your login write access to `/dev/uinput`. [Platform support](platform/README.md#ydotoold-ydotool-daemon) explains the options. |
+| `An existing ydotoold is running but is unavailable to this login.` | Another `ydotoold` is running. Check its socket permissions. VOCO doesn't replace it. |
+| `Could not start the VOCO input service.` | Run `systemctl --user status voco-ydotoold.service` to see why. |
 
-Do not replace the VOCO config directory with a symlink. If the directory itself fails the safety
-check, repair `${XDG_CONFIG_HOME:-$HOME/.config}/voco` as a real directory owned by your user with
-mode `0700`, then retry. Config files are normalized to mode `0600`.
+When `voco --check-desktop-input` passes, run `voco --setup-panel` on GNOME 46,
+then open VOCO. See [Wayland input service](install.md#wayland-input-service).
 
-## Missing X11 insertion helpers
+## Dictation won't start
 
-Missing `xdotool` or `xclip` can block the native X11 desktop route before capture.
-Check the selected helper and runtime report. Explicit Copy and exact-field browser
-delivery are separate paths; installing a helper does not prove target consumption.
+| What you see | What to do |
+| --- | --- |
+| **Desktop setup needed**, or a **Dictation setup incomplete** notification | VOCO doesn't record when it can't paste. Run `voco --check-desktop-input` and fix what it names. |
+| **VOCO hidden** | A VOCO window was open. Click where you want the text, then press the shortcut again. |
+| **Dictation could not start** or **Microphone could not start** | Read the reason in the notification. For microphone reasons, see [Microphone problems](#microphone-problems). |
+| **Microphone access is blocked** | Allow microphone access in your desktop's privacy settings, then choose **Retry microphone access** on the **Settings** page. |
+| **Choose a microphone in Microphone settings.** | Choose a microphone on the **Settings** page. |
+| **Streaming dictation is disabled in the desktop environment.** | VOCO started with `VOCO_DESKTOP_STREAM=0`. Quit VOCO and start it without that variable. |
 
-## VOCO says the microphone is not ready
+## The shortcut does nothing
 
-- confirm your microphone is available in the system sound settings
-- confirm PipeWire or PulseAudio is running
-- restart VOCO after granting microphone access
+1. Check that VOCO is running. Its tray icon or GNOME panel shows when it is.
+2. Start dictation from the tray menu, or run `voco --toggle` in a terminal. If
+   dictation starts, the problem is the shortcut.
+3. Open **Help**, then **My shortcut is not working**. It says how the shortcut
+   reaches VOCO and whether that works.
+4. On Wayland outside GNOME 46, bind a key to `voco --toggle`, as described in
+   [Wayland compositor shortcuts](install.md#wayland-compositor-shortcuts).
 
-## VOCO shows a microphone level that feels too high or too low
+If `voco --toggle` prints `Could not reach VOCO's private control socket`, VOCO
+isn't running in this desktop session. Open VOCO, then try again. To record key
+events for a bug report, see [Shortcut traces](#shortcut-traces).
 
-- treat the onboarding meter as a visual confidence check, not a calibrated input meter
-- test at silence first, then while speaking at a normal distance from the microphone
-- if the bar stays high at rest, reopen the setup flow after confirming the correct input device is selected
-- if the bar barely moves while speaking, check system input gain in your desktop sound settings before retesting
+## The shortcut also reaches your app
 
-## VOCO says it couldn't confirm it received all of your audio
+On Wayland without the GNOME panel, VOCO watches for `Alt+D` and `Alt+Shift+D`
+but can't stop your app from receiving them. Browsers jump to the address bar,
+so your words land there, and terminals delete a word. VOCO warns once per
+launch with **Your shortcut also reached the app**. Fix it one of these ways:
 
-VOCO types only recordings it knows are complete, so it stops without typing the
-rest and discards that audio. Words pasted before the problem stay in your text
-field; check it, then start again. VOCO does not change your microphone or input
-settings.
+- On GNOME 46, choose **Enable live panel** on the **Help** page, or run
+  `voco --setup-panel`. Then sign out and back in.
+- Elsewhere, choose another shortcut in VOCO and bind it to `voco --toggle` in
+  your desktop's keyboard settings.
+- Add the [VOCO Dictation input source](install.md#ibus-input-source). It keeps
+  the shortcut from supported text fields.
 
-This happens when the audio engine does not acknowledge the end of a recording,
-when the microphone stops providing input, or when AudioWorklet fails to start and
-VOCO falls back to a capture path that cannot confirm a complete recording. The
-next recording tries AudioWorklet again. If the message returns every time, quit
-VOCO from the tray and reopen it.
+## Words don't appear
 
-## Old Voice install settings did not appear
+- Click in the field before you start. VOCO pastes into the window that has
+  keyboard focus.
+- Run `voco --check-desktop-input` and fix what it names.
+- Let go of the shortcut and other modifier keys, such as Alt, Ctrl and Super,
+  while VOCO types. VOCO waits up to 1.5 seconds for them before it pastes,
+  then stops typing.
+- If VOCO reports that the paste helper can't reach its input service, run
+  `systemctl --user enable --now voco-ydotoold.service` and check again.
+- Apps that remap Shift+Insert, remote desktops and virtual machines may ignore
+  the paste, and VOCO can't tell when they do.
 
-VOCO attempts to migrate:
+When a paste fails, VOCO shows **VOCO stopped typing** and keeps listening. At
+Stop, it copies the words it didn't type to the clipboard. See
+[If a paste fails](everyday-use.md#if-a-paste-fails).
 
-- `~/.config/voice/config.json`
-- `~/.local/share/voice/models/`
+## Dictation interrupted
 
-If the migration did not happen automatically, copy those files into the `voco` paths manually and restart the app.
+VOCO stops transcribing and shows **Dictation interrupted** when it can't trust
+the rest of the recording:
 
-## Trigger VOCO manually through the socket
+| Cause | What to do |
+| --- | --- |
+| The microphone disconnected, stopped sending audio or was muted by the system | Check the connection and your sound settings. |
+| Recognition fell more than three seconds behind | Close busy programs. Recognition uses up to four processor threads. |
+| Recognition revised words it had already given | Start again. |
+
+The words VOCO already typed stay in your app. Words it hadn't typed yet aren't
+kept, so check the end of your text before you continue.
+
+On X11, **Dictation won't be typed** means VOCO can't confirm it receives all of
+your audio. Stop and try again. If it happens again, quit and reopen VOCO.
+
+If VOCO closed during a dictation, or couldn't paste or copy the rest, the text
+is in [Review](everyday-use.md#review).
+
+## Microphone problems
+
+| What you see | What to do |
+| --- | --- |
+| **No microphone found.** | Connect a microphone, or choose one on the **Settings** page. |
+| **Microphone could not be read; it may be busy.** | Close other programs that use the microphone, or choose another one. |
+| **Microphone changed** | Your chosen microphone is missing, so VOCO uses the system default. Choose it again when it's connected. |
+| `VOCO requires a microphone sample rate from 8 to 96 kHz.` | Choose a supported format in your sound settings, then restart VOCO. |
+| `Native capture requires a PipeWire source identity` | Check that PipeWire and its PulseAudio service are running. |
+| Missing or wrong words | Set the input level in your sound settings so your voice is clear but not distorted, and reduce background noise. |
+
+## The GNOME panel doesn't appear
+
+The panel shows only while VOCO is running. Run `voco --check-panel` and follow
+the line it prints. It exits with status 2 when the panel needs a step.
+
+- If the panel isn't enabled, choose **Enable live panel** on the **Help** page,
+  or run `voco --setup-panel`. Then save your work and sign out and back in.
+  GNOME loads the panel, and any update to it, when you sign in.
+- If GNOME extensions are turned off, turn them on in the Extensions app. If a
+  policy blocks them, ask your administrator.
+- If the panel files are missing, reinstall the VOCO package.
+- On other GNOME versions and other desktops, use the tray menu.
+
+While you dictate, GNOME's microphone privacy indicator appears and moves the
+VOCO panel to the left. This is expected.
+
+## VOCO settings need attention
+
+VOCO pauses dictation and shows **VOCO settings need attention** when it can't
+safely load `~/.config/voco/config.json`. This happens when the file isn't
+valid JSON or has a value VOCO doesn't accept, or when the file or its folder
+is a symbolic link or belongs to another user. VOCO fixes their permissions
+itself. A **Dictation paused** notification may ask you to open VOCO.
+
+- **Retry loading settings** tries again after you correct the file.
+- **Open config directory** opens `~/.config/voco/`.
+- **Reset to defaults**, then **Confirm reset**, renames the file to
+  `config.recovery-backup-<numbers>.json` in the same folder and writes default
+  settings. Your shortcut returns to `Alt+D`, and VOCO runs the voice test
+  again. VOCO keeps these backups until you delete them.
+
+## Chromium extension problems
+
+| Toolbar button tooltip | What to do |
+| --- | --- |
+| **Start VOCO, then click again** | VOCO isn't running, or the browser can't reach it. Open VOCO, then click the button again. |
+| **VOCO cannot access this page** | Browser pages and some sites block extensions. Use a normal web page. |
+| **Enable VOCO in this tab** | The extension is off in this tab. It turns off when the page changes or VOCO quits. Click it to turn it on. |
+
+The package registers VOCO for Google Chrome and Chromium in
+`/etc/opt/chrome/native-messaging-hosts` and
+`/etc/chromium/native-messaging-hosts`. A browser that doesn't read those
+folders can't reach VOCO. If `Alt+Shift+V` does nothing in a field, check that
+the field is one VOCO accepts, as described in
+[Browser fields](everyday-use.md#browser-fields).
+
+## IBus input source problems
+
+Open **Help**, then **Technical details**, and read **IBus shortcut (optional)**:
+
+- **Input source not enabled:** add and select **VOCO Dictation**, as described
+  in [IBus input source](install.md#ibus-input-source).
+- **Package refresh required:** the input source and the app are from different
+  versions. Quit VOCO, run `ibus restart` or sign out and back in, then open
+  VOCO. Switching input sources isn't enough.
+- **Desktop session unavailable:** sign out and back in.
+
+## Opening VOCO does nothing
+
+While you dictate, opening VOCO from the app menu doesn't show the popover.
+Finish dictating first. Otherwise, a **VOCO could not start** notification
+gives the reason:
+
+| Reason | What to do |
+| --- | --- |
+| `VOCO is running but could not receive the launcher request` | The running VOCO didn't answer. This can happen with a copy started before an upgrade. Use its tray or panel menu, or quit it with `pkill -x voco` and open VOCO again. |
+| Starts with `Desktop input setup` | VOCO couldn't confirm that its input service is up to date. Check `systemctl --user status voco-ydotoold.service`, then open VOCO again. If it keeps failing, run `voco --setup-desktop-input` to see why. |
+
+## Performance logs
+
+Performance logs record how long each step of a dictation takes. They are off
+by default. To turn them on, quit VOCO and start it from a terminal. They stay
+on until VOCO quits.
 
 ```bash
-SOCKET_DIR="${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}/voco-$(id -u)}"
-socat - UNIX-CONNECT:"${SOCKET_DIR}/voco.sock" < /dev/null
+VOCO_PERFORMANCE_LOG=1 voco
 ```
 
-## Capture Linux runtime details for a bug report or release check
+VOCO writes `performance/performance.jsonl` and
+`stream-performance/worker.jsonl` in `~/.local/state/voco`, or in
+`$XDG_STATE_HOME/voco` if you set it. Only your account can read them. At
+8 MiB, VOCO starts a new file. It keeps one older performance file and up to
+three older worker files.
+
+The logs contain timings, counts, sizes, status codes, processor and memory
+use, the app and model versions, and hashed session IDs. They never contain
+audio, dictated text, clipboard contents, window titles, web addresses or
+device names. If the disk can't keep up, VOCO drops log events instead of
+slowing dictation.
+
+The package includes two summary scripts. Quit VOCO first so the files are
+complete:
 
 ```bash
-npm run report:linux-runtime
+python3 /usr/share/doc/voco/report-performance.py
+python3 /usr/share/doc/voco/report-speech-performance.py ~/.local/state/voco
 ```
 
-## Supported release channels
+`report-performance.py` summarizes the latest run. Add `--run` with a run ID to
+pick another, or `--json` for the full report.
 
-The published Ubuntu/Debian artifact is the GitHub Release `.deb`. Ubuntu is the
-primary reference environment; Debian-derived distributions are best-effort.
-Fedora, openSUSE and Arch/Omarchy use their separately qualified native packages.
-Check [release status](release-candidate.md) and the exact artifact's verification
-records for current versions and limits. AppImage, Flatpak, Flathub, Snap and
-Ubuntu App Center are not published VOCO release channels.
+### Shortcut traces
 
-## No live bars or Listening in the top panel
+To record shortcut events, start VOCO with `VOCO_HOTKEY_TRACE=1 voco`. VOCO
+writes event names, timings, the shortcut route and your session type to
+`~/.local/state/voco/hotkey-trace.jsonl`. At 8 MiB, it renames the file to
+`hotkey-trace.previous.jsonl` and starts a new one.
 
-Run `voco --check-panel`. If disabled, use **Enable live panel** in Help or
-run `voco --setup-panel`. If enabled but waiting for a new session, save your work,
-sign out and back in. A global Extensions switch or administrator policy is not
-changed by VOCO. GNOME versions other than 46 use the native tray fallback.
-The fallback menu always contains the current status. A label beside the icon
-appears only while VOCO starts or needs setup, where the desktop supports one.
-Disabling the companion restores the native tray.
+## Report a bug
 
-## Opening VOCO again does nothing
+Open an issue from the
+[issue templates](https://github.com/sergiopesch/voco/issues/new/choose).
+Include:
 
-The launcher asks the existing app to present its current idle window. It does
-not launch another recognizer or interrupt a recording. Finish dictation first if
-VOCO is Listening or Finishing. After upgrading while an older app is still
-running, quit that app through its tray and reopen VOCO once. Do not kill an app
-that has an unfinished recording or recovery you need.
+- The output of `voco --version`, your distribution and desktop, X11 or
+  Wayland, and the app you dictated into
+- The steps to reproduce, what you expected and what happened
+- The exact error text, or a summary from the report scripts
 
-Completing onboarding leaves Ready visible. The worker from your voice
-test remains warm; completing setup does not start a second model process.
+Don't post recordings, transcripts, credentials or full logs. Use made-up
+sample sentences, and remove personal text and paths from anything you share.
+Report security problems privately, as described in [SECURITY.md](../SECURITY.md).

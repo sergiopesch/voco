@@ -3,78 +3,95 @@
 
 # VOCO
 
-Speak. Your words appear at the cursor.
+[![CI](https://github.com/sergiopesch/voco/actions/workflows/ci.yml/badge.svg)](https://github.com/sergiopesch/voco/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-VOCO makes dictation on Linux simple and private. Speech
-recognition runs on your computer. No account, subscription or cloud transcription.
+Private dictation for Linux. Press a shortcut, speak, and your words appear
+where you are typing.
 
-- **Live dictation:** words and punctuation appear as you speak.
-- **One shortcut:** press `Alt+D` to start, then again to stop.
-- **Local English model:** NVIDIA Nemotron runs on the CPU; no GPU needed.
-- **Live tray feedback:** volume bars follow your voice; Stop returns to Ready.
+- **Speech stays on your computer.** An English speech model runs on your
+  processor. You don't need a GPU, an account or a cloud service.
+- **Types into the app you are using.** VOCO pastes into whichever app has
+  keyboard focus, including browsers and terminals.
+- **Words appear while you speak,** with punctuation and capital letters.
+- **One shortcut.** Press `Alt+D` to start and again to finish. VOCO never
+  presses Enter.
+- **Stays out of the way** in the system tray, or in the GNOME top bar with live
+  microphone bars.
+- **Keeps your words.** If a paste fails, VOCO copies the rest of your words to
+  the clipboard. If VOCO closes unexpectedly, Review gives your text back.
 
 ## Get started
 
-Install the current public Ubuntu/Debian x86_64 release with one command:
+Install the current release, 2026.0.59, from a terminal in your desktop session:
 
 ```bash
 wget -qO voco-install https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.59/install && bash voco-install
 ```
 
-The guided installer downloads **2026.0.59**, verifies the publisher signature
-and package checksum, installs the package and required Wayland input helpers,
-then requests VOCO to open in your local desktop session.
-Desktop readiness is checked before onboarding finishes. If setup is incomplete, follow the
-[desktop input setup](docs/platform/README.md#ydotoold-ydotool-daemon) instructions.
-[Manual installation and signature verification](docs/install.md#published-release).
+The installer checks the release signature against its built-in VOCO key and
+verifies the package checksum, then installs VOCO and its desktop helpers with
+APT and opens VOCO. To verify by hand, upgrade or remove VOCO, see
+[Install VOCO](docs/install.md).
 
-Ubuntu x86_64 is the reference platform. See the [installation guide](docs/install.md)
-for setup, upgrades, source builds and Linux compatibility.
-The [latest published release](https://github.com/sergiopesch/voco/releases/latest)
-is authoritative for available downloads. [Release status](docs/release-candidate.md)
-separates published assets from source and qualification work.
+## Your first dictation
 
-## Dictate at your cursor
+VOCO opens with a short voice test.
 
-1. Open VOCO, choose **Start test**, speak, then **Finish test**. Choose **Done** to check desktop setup and finish.
-2. Click where you want the text (any app), press `Alt+D`, and speak.
-3. Press `Alt+D` again to finish. Review your text before sending it.
+1. Choose **Start test** and say a sentence. Your words appear in the window.
+2. Choose **Finish test**.
+3. Choose **Done**. If the button says **Check desktop setup**, choose it first
+   and follow any instructions VOCO shows.
+4. Click where you want the text in another app, press `Alt+D` and speak. Press
+   `Alt+D` again to finish.
 
-VOCO pastes into whatever has focus and never presses Enter. Later words follow
-focus, so stop dictation before switching fields. If an app does not take the text,
-VOCO copies the rest to the clipboard when you stop. [Usage and recovery](docs/everyday-use.md).
+VOCO pastes through the clipboard, so dictation replaces what you copied last.
+Text goes to whichever window has keyboard focus. See
+[Everyday use](docs/everyday-use.md) for the tray, shortcuts and Review.
+
+## Requirements
+
+- A 64-bit Intel or AMD processor with AVX2, FMA and F16C
+- Ubuntu 24.04 or later, or another Debian-based system with glibc 2.39 or later
+- An X11 or Wayland desktop session and a microphone
+- On Wayland, write access to `/dev/uinput` for VOCO's input service
+- On Wayland desktops other than GNOME 46, a desktop keyboard shortcut that runs
+  `voco --toggle`
+
+The reference desktop is Ubuntu 24.04 with GNOME 46.
 
 ## Privacy
 
-Audio stays on your device. Optional local performance logs contain timings and
-counts, not recordings or dictated text. Update checks contact GitHub.
-[Diagnostics](docs/testing/laptop-performance.md) · [Security](docs/security/README.md).
+- Recognition runs on your computer. Audio never leaves it, and VOCO doesn't
+  save audio in normal use.
+- VOCO has no account and no telemetry. Its only network request checks GitHub
+  for new releases. It never downloads or installs updates.
+- Each phrase passes through the clipboard, and the last one stays there.
+  Clipboard managers may keep a copy.
+- While you dictate, VOCO keeps a private copy of the text so it can recover it
+  after a crash. It deletes that copy when the dictation ends normally.
+- Diagnostic logs are off unless you turn them on.
 
-Curious how it works? Explore the [visual code guide](docs/guide/README.md).
-Compare the tested models in the [benchmark gallery](docs/release-assets/2026.0.43/README.md),
-with full-resolution release graphics, exact values and methods.
+See [What VOCO keeps](docs/everyday-use.md#what-voco-keeps) and the
+[security model](docs/security/README.md).
 
-## Native Linux packages
+## Documentation
 
-**2026.0.59** preserves Brave dictation when Alt+D stops recording and keeps held
-Stop requests bound to their recording. It also improves GNOME upgrade detection
-and protects installer downloads when progress tasks stop early.
-Fedora, openSUSE and Arch/Omarchy packages remain at **2026.0.43**; download those
-from their matching release. Install only assets attached to a published release.
-Wayland uses native microphone capture so dictation can start with its panel
-hidden; X11 keeps browser capture.
-See the [support matrix](docs/linux-support.md),
-[native package installation](docs/install-native.md) and
-[.59 changes and qualification](docs/releases/2026.0.59.md).
+- [Documentation index](docs/README.md)
+- [Install VOCO](docs/install.md)
+- [Everyday use](docs/everyday-use.md)
+- [Troubleshooting](docs/troubleshooting.md)
+- [Platform support](docs/platform/README.md)
+- [Inside VOCO: a visual tour](docs/guide/README.md)
 
-## Contribute
+## Contributing
 
-Start with [development setup](docs/contributing.md), [the code map](docs/architecture/code-map.md)
-and [AGENTS.md](AGENTS.md). Please follow the [code of conduct](CODE_OF_CONDUCT.md).
-Report vulnerabilities via the [security policy](SECURITY.md), not a public issue.
-Tests and benchmark methods are indexed in [testing](docs/testing/README.md).
+Contributions are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md), then
+read [AGENTS.md](AGENTS.md) and the [code map](docs/architecture/code-map.md).
+Everyone taking part follows the [Code of Conduct](CODE_OF_CONDUCT.md).
 
-## License
+Report security problems privately, as described in [SECURITY.md](SECURITY.md).
 
-VOCO is [MIT licensed](LICENSE). Bundled models and native libraries have
-[their own licenses](runtime/notices/NOTICE).
+VOCO is released under the [MIT License](LICENSE). The bundled speech runtime
+and model come with their own notices and license terms, starting with
+[runtime/notices/NOTICE](runtime/notices/NOTICE).
