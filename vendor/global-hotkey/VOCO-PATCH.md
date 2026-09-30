@@ -8,13 +8,9 @@ and original file hashes. Cache marker `.cargo-ok`, upstream CI/changelog-tool
 configuration and Renovate configuration were omitted; application builds do not
 use the vendored examples or their development dependencies.
 
-The 0.8.0 refresh carries VOCO's event-driven actor patch onto the new upstream
-release, including its F13-F24 X11 mappings and Windows release-loop fix. Both VOCO
-and tauri-plugin-global-shortcut must resolve to this single patched copy;
-`scripts/verify-shortcut-backport.py` rejects a split graph.
-
-An earlier VOCO patch also added a Linux-only focus-lease API. The application
-stopped using it, and it has been removed; the crate's public API is upstream's.
+Both VOCO and tauri-plugin-global-shortcut must resolve to this single patched
+copy; `scripts/verify-shortcut-backport.py` rejects a split graph. The crate's
+public API is upstream's.
 
 The actor waits on the X11 connection fd and a nonblocking UnixStream command signal
 with `libc::poll`; idle operation has no periodic wakeup. Command senders queue
@@ -33,12 +29,7 @@ Modified upstream files: `Cargo.toml` and `src/platform_impl/x11/mod.rs`. New
 production module: `src/platform_impl/x11/wake.rs`. The X11 actor's
 bulk-registration response now sends one terminal result, avoiding a bounded
 reply-channel deadlock on a partial registration failure. Unregister checks all
-server replies before reporting success; the isolated actor test caught the former
-buffered-write false success. Original platform code outside X11 is unchanged.
+server replies before reporting success, so a buffered write cannot report a
+false success. Original platform code outside X11 is unchanged.
 
-Tests live beside the new module and in the X11 actor. In this workspace the
-isolated focused harness is under `stop-delivery-review-2026-09-15/shortcut-unit`;
-it compiles this exact library source without downloading upstream GUI example
-development dependencies. Retain its raw failures and fixture/binary identities
-separately from passing application tests; a mechanism proof is not full-app
-acceptance.
+Tests live beside the new module and in the X11 actor.
