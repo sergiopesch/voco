@@ -4,10 +4,6 @@ set -euo pipefail
 umask 077
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 if [[ ${1:-} != --inside ]]; then
-  if [[ ${VOCO_GNOME_CAPTURE:-0} == 1 ]]; then
-    echo "The historical manual-Copy capture fixture is retired. Use VOCO_GNOME_ONBOARDING=1 with all three documented audio audit flags." >&2
-    exit 2
-  fi
   : "${VOCO_NATIVE_DEPS:?Set extracted Xvfb root/usr}"
   : "${VOCO_GNOME_EVIDENCE_DIR:?Set fresh evidence directory}"
   [[ ! -e "$VOCO_GNOME_EVIDENCE_DIR" ]] || { echo 'Evidence directory must be fresh' >&2; exit 1; }

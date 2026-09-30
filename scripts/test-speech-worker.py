@@ -1,14 +1,9 @@
 #!/usr/bin/env python3
 """Exercise actual pipe behavior without loading a speech model."""
-import importlib.util
 import os
-from pathlib import Path
 import unittest
 
-spec = importlib.util.spec_from_file_location(
-    'speech_evaluation', Path(__file__).with_name('test-speech-adversarial.py'))
-evaluation = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(evaluation)
+from speech_worker import WorkerResponses
 
 
 class WorkerResponseTests(unittest.TestCase):
@@ -18,7 +13,7 @@ class WorkerResponseTests(unittest.TestCase):
         self.writer = os.fdopen(writer, 'wb', buffering=0)
         self.addCleanup(self.reader.close)
         self.addCleanup(self.writer.close)
-        self.responses = evaluation.WorkerResponses(self.reader, max_bytes=64)
+        self.responses = WorkerResponses(self.reader, max_bytes=64)
 
     def test_multiple_responses_in_one_pipe_read(self):
         self.writer.write(b'{"text":"one"}\n{"text":"two"}\n')

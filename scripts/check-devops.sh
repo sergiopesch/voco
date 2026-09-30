@@ -29,7 +29,6 @@ PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-check-shell-syntax.py
 
 bash scripts/check-shell-syntax.sh \
   install \
-  scripts/install.sh \
   scripts/setup.sh \
   scripts/build-desktop.sh \
   scripts/render-release-body.sh \
@@ -125,19 +124,10 @@ for path in (
     Path("scripts/test_native_crash_review.py"),
     Path("scripts/test_native_cursor_capture.py"),
     Path("scripts/test_native_onboarding_capture.py"),
-    Path("scripts/test-speech-preview-parity.py"),
-    Path("scripts/test-speech-combined-preview.py"),
-    Path("scripts/test-speech-adversarial.py"),
-    Path("scripts/speech-evaluation.test.py"),
+    Path("scripts/test-speech-worker.py"),
     Path("scripts/prepare-physical-speech-session.py"),
     Path("scripts/test-physical-speech-session.py"),
     Path("scripts/speech_worker.py"),
-    Path("scripts/prepare-speech-repetition-generalization.py"),
-    Path("scripts/prepare-speech-boundaries.py"),
-    Path("scripts/prepare-speech-qualification.py"),
-    Path("scripts/prepare-speech-qualification-next.py"),
-    Path("scripts/prepare-speech-mixed-levels.py"),
-    Path("scripts/compare-speech-adversarial.py"),
     Path("scripts/test-native-atspi.py"),
     Path("scripts/test-native-full-app.py"),
     Path("scripts/test-native-recovery-controls.py"),

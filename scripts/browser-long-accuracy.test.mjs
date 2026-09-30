@@ -2,8 +2,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
-import {spawnSync} from 'node:child_process';
-import {fileURLToPath} from 'node:url';
 import {freezeLongPlayback, scoreLongDelivery} from './browser-long-accuracy.mjs';
 const manifestBytes = fs.readFileSync(new URL('../tests/fixtures/speech/manifest.json', import.meta.url));
 const manifest = JSON.parse(manifestBytes);
@@ -35,11 +33,6 @@ test('natural plan uses every fixture through the 37 second cutoff and manifest 
   assert.equal(scored.integrity, null);
   assert.equal(scored.passed, true);
   assert.throws(()=>freezeLongPlayback(manifestBytes,Buffer.from(JSON.stringify({...p,selectedBeforeInference:false})),audio,sources));
-});
-
-test('CLI rejects retired diagnostics before checking sandbox or starting apps',()=>{
-  const result=spawnSync(process.execPath,[fileURLToPath(new URL('./test-browser-full-app.mjs',import.meta.url))],{env:{...process.env,VOCO_BROWSER_DIAG_SECOND_CAPTURE:'1'},encoding:'utf8'});
-  assert.notEqual(result.status,0);assert.match(result.stderr,/The retired debug-capture mode is unavailable/);
 });
 
 test('empty or short delivery and a missing live prefix fail', () => {

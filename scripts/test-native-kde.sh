@@ -3,10 +3,6 @@
 set -euo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 if [[ ${1:-} != --inside ]]; then
-  if [[ ${VOCO_KDE_CAPTURE:-0} == 1 ]]; then
-    echo "VOCO_KDE_CAPTURE is retired: this harness checks the toolkit and tray lifecycle only. scripts/test-application-delivery.sh covers delivery." >&2
-    exit 2
-  fi
   : "${VOCO_NATIVE_DEPS:?Set extracted Xvfb root/usr}"
   : "${VOCO_KDE_DEPS:?Set extracted KDE root/usr}"
   : "${VOCO_KDE_EVIDENCE_DIR:?Set fresh evidence directory}"
