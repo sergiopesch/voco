@@ -45,11 +45,6 @@
       "icons/128x128@2x.png"
     ],
     "linux": {
-      "appimage": {
-        "files": {
-          "/usr/share/metainfo/com.sergiopesch.voco.metainfo.xml": "../../../packaging/tauri/com.sergiopesch.voco.metainfo.xml"
-        }
-      },
       "deb": {
         "desktopTemplate": "../../../packaging/tauri/VOCO.desktop",
         "depends": [

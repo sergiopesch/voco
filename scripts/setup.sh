@@ -199,7 +199,6 @@ if [[ "$INSTALL_MODE" == true ]]; then
 
   # Remove stale bundle artifacts so install picks the package from this build only.
   rm -rf apps/desktop/src-tauri/target/release/bundle/deb
-  rm -rf apps/desktop/src-tauri/target/release/bundle/appimage
   rm -rf apps/desktop/src-tauri/target/release/bundle/voco-complete
 
   # Maximize parallelism

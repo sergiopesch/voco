@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
-VERSION="${1:?usage: render-release-body.sh <version> <tag> [appimage-name]}"
+VERSION="${1:?usage: render-release-body.sh <version> <tag>}"
 TAG_NAME="${2:?release tag required}"
-APPIMAGE_NAME="${3:-}"
 PLATFORMS=(debian)
 if [[ "$VERSION" == "2026.0.43" ]]; then PLATFORMS+=(fedora opensuse arch); fi
 cat <<EOF_BODY
@@ -81,15 +80,3 @@ A draft is not a public download. See the attached validation record for exact
 artifact identity, test results and remaining limitations. Source checks alone
 do not qualify every Linux distribution or application.
 EOF_BODY
-if [[ -n "${APPIMAGE_NAME}" ]]; then
-  cat <<EOF_BODY
-
-## Experimental AppImage
-
-This is not a qualified NVIDIA installation channel. If supplied for research:
-
-\`\`\`bash
-grep " ${APPIMAGE_NAME}\$" voco_checksums.txt | sha256sum --check -
-\`\`\`
-EOF_BODY
-fi

@@ -80,9 +80,7 @@ jobs:
 
       - name: Validate Linux desktop metadata
         run: |
-          desktop-file-validate packaging/flatpak/com.sergiopesch.voco.desktop
           desktop-file-validate packaging/tauri/VOCO.desktop
-          appstreamcli validate packaging/flatpak/com.sergiopesch.voco.metainfo.xml
           appstreamcli validate packaging/tauri/com.sergiopesch.voco.metainfo.xml
 
       - name: Dependency security audit

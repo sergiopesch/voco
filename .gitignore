@@ -51,9 +51,6 @@ yarn-debug.log*
 .tmp/
 __pycache__/
 
-# Snap build artifacts
-snap/*.snap
-
 # Provision pinned local speech artifacts separately; never commit host binaries.
 runtime/speech/lib/
 runtime/speech/*.so

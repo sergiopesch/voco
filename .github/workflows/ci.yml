@@ -203,12 +203,10 @@ jobs:
 
       - name: Validate desktop metadata
         run: |
-          desktop-file-validate packaging/flatpak/com.sergiopesch.voco.desktop
           desktop-file-validate packaging/tauri/VOCO.desktop
 
       - name: Validate AppStream metadata
         run: |
-          appstreamcli validate packaging/flatpak/com.sergiopesch.voco.metainfo.xml
           appstreamcli validate packaging/tauri/com.sergiopesch.voco.metainfo.xml
 
   rust:

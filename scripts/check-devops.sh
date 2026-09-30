@@ -32,7 +32,6 @@ bash scripts/check-shell-syntax.sh \
   scripts/install.sh \
   scripts/setup.sh \
   scripts/build-desktop.sh \
-  scripts/package-appimage.sh \
   scripts/render-release-body.sh \
   scripts/rehearse-release.sh \
   scripts/test-install-common.sh \
@@ -165,36 +164,17 @@ import os
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-flatpak_metainfo_path = Path("packaging/flatpak/com.sergiopesch.voco.metainfo.xml")
-tauri_metainfo_path = Path("packaging/tauri/com.sergiopesch.voco.metainfo.xml")
-flatpak_metainfo = flatpak_metainfo_path.read_text()
-tauri_metainfo = tauri_metainfo_path.read_text()
-expected_tauri_metainfo = flatpak_metainfo.replace(
-    ">com.sergiopesch.voco.desktop<",
-    ">VOCO.desktop<",
-    1,
-)
-if expected_tauri_metainfo == flatpak_metainfo:
-    raise SystemExit("Flatpak AppStream metadata is missing its canonical desktop launchable")
-if tauri_metainfo != expected_tauri_metainfo:
-    raise SystemExit(
-        "Tauri and Flatpak AppStream metadata must differ only by desktop launchable"
-    )
-
-for path, expected_launchable in (
-    (flatpak_metainfo_path, "com.sergiopesch.voco.desktop"),
-    (tauri_metainfo_path, "VOCO.desktop"),
-):
-    metadata = ET.parse(path).getroot()
-    if metadata.findtext("id") != "com.sergiopesch.voco":
-        raise SystemExit(f"Unexpected AppStream component ID in {path}")
-    launchables = [
-        node.text
-        for node in metadata.findall("launchable")
-        if node.attrib.get("type") == "desktop-id"
-    ]
-    if launchables != [expected_launchable]:
-        raise SystemExit(f"Unexpected desktop launchable in {path}: {launchables!r}")
+metainfo_path = Path("packaging/tauri/com.sergiopesch.voco.metainfo.xml")
+metadata = ET.parse(metainfo_path).getroot()
+if metadata.findtext("id") != "com.sergiopesch.voco":
+    raise SystemExit(f"Unexpected AppStream component ID in {metainfo_path}")
+launchables = [
+    node.text
+    for node in metadata.findall("launchable")
+    if node.attrib.get("type") == "desktop-id"
+]
+if launchables != ["VOCO.desktop"]:
+    raise SystemExit(f"Unexpected desktop launchable in {metainfo_path}: {launchables!r}")
 
 desktop_path = Path("packaging/tauri/VOCO.desktop")
 desktop_fields = {}
@@ -240,18 +220,14 @@ if config["bundle"].get("targets") != ["deb"]:
     raise SystemExit("Default Tauri bundle targets must remain Debian-only")
 linux_bundle = config["bundle"]["linux"]
 deb = linux_bundle["deb"]
-appimage = linux_bundle["appimage"]
-tauri_metainfo_source = "../../../packaging/tauri/com.sergiopesch.voco.metainfo.xml"
+if set(linux_bundle) != {"deb"}:
+    raise SystemExit("The Debian package is the only Linux bundle")
 if deb.get("desktopTemplate") != "../../../packaging/tauri/VOCO.desktop":
-    raise SystemExit("Debian desktop template is not the Tauri channel template")
+    raise SystemExit("Debian desktop template is not packaging/tauri/VOCO.desktop")
 if deb.get("files", {}).get(
     "/usr/share/metainfo/com.sergiopesch.voco.metainfo.xml"
-) != tauri_metainfo_source:
-    raise SystemExit("Debian AppStream metadata is not mapped from the Tauri variant")
-if appimage.get("files", {}).get(
-    "/usr/share/metainfo/com.sergiopesch.voco.metainfo.xml"
-) != tauri_metainfo_source:
-    raise SystemExit("AppImage AppStream metadata is not mapped from the Tauri variant")
+) != "../../../packaging/tauri/com.sergiopesch.voco.metainfo.xml":
+    raise SystemExit("Debian AppStream metadata is not mapped from packaging/tauri")
 required_dependencies = {"ibus", "python3", "python3-gi", "gir1.2-ibus-1.0",
                          "xdotool", "xclip", "wl-clipboard", "libnotify-bin",
                          "libc6 (>= 2.39)", "libstdc++6 (>= 13.2.0)"}
