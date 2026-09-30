@@ -1,5 +1,6 @@
-//! Explicitly selected development capture. The worker alone owns the Pulse shim;
-//! renderer requests never run inside an audio callback. Raw audit persistence is opt-in.
+//! Native Pulse capture, used by default on Wayland and on X11 only with the development
+//! override. The worker alone owns the Pulse shim; renderer requests never run inside an
+//! audio callback. Raw audit persistence is opt-in.
 pub(crate) mod audit;
 pub(crate) mod private_bundle;
 pub mod protocol;

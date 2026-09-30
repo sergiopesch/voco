@@ -1,4 +1,4 @@
-// Execute production capture/Stop-tail accounting and the actual NVIDIA queue
+// Execute production capture/Stop-tail accounting and the actual DictationStream
 // with deterministic capture and worker IPC; no microphone/model required.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as buffers from "@/lib/audioCaptureBuffer";

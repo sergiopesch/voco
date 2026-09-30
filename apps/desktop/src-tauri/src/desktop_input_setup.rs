@@ -74,7 +74,7 @@ mod tests {
 
     #[test]
     fn extracted_and_development_apps_never_migrate_the_owner_service() {
-        for executable in ["/tmp/candidate/usr/bin/voco", "/tmp/target/debug/voco"] {
+        for executable in ["/tmp/extracted/usr/bin/voco", "/tmp/target/debug/voco"] {
             assert!(!is_installed_wayland_app(Path::new(executable), "wayland"));
         }
         assert!(!is_installed_wayland_app(Path::new("/usr/bin/voco"), "x11"));

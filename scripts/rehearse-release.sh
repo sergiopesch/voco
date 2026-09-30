@@ -37,7 +37,7 @@ echo "  latest deb: ${LATEST_DEB_NAME}"
   grep -F 'sha256sum -c' docs/install.md > /dev/null
   grep -F 'wget "$BASE/$TAG/install" -O voco-install' docs/install.md > /dev/null
   grep -F "raw.githubusercontent.com/sergiopesch/voco/${TAG_NAME}/install" install > /dev/null
-  # README stays pinned to the published release while source is a new candidate.
+  # README installs the published release, not the version this source tree would release.
   PUBLISHED_VERSION="$(node -p "require('./packaging/published-release.json').version")"
   grep -Fx "wget -qO voco-install https://raw.githubusercontent.com/sergiopesch/voco/voco.${PUBLISHED_VERSION}/install && bash voco-install" README.md > /dev/null
   grep -F 'sha256sum -c voco_latest_checksums.txt' docs/install.md > /dev/null

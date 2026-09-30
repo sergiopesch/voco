@@ -1,5 +1,5 @@
-// Production NVIDIA stream: serialize bounded audio IPC and append-only delivery.
-// Capture/recovery belong to the hook; each paste goes to whatever has focus.
+// Speech worker stream: serializes bounded audio IPC and append-only delivery.
+// dictationRecording.ts owns capture and recovery; each paste goes to whatever has focus.
 import { invoke } from "@tauri-apps/api/core";
 import { errorMessage } from "./dictationRecovery";
 import type { InsertionError } from "./tauri";

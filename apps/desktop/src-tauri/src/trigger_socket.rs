@@ -1,4 +1,4 @@
-//! Owner-only legacy dictation triggers. Paths preserve the documented XDG/TMPDIR layout.
+//! Owner-only dictation trigger sockets. Paths preserve the documented XDG/TMPDIR layout.
 use std::fs::{self, DirBuilder};
 use std::io;
 use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
@@ -40,7 +40,7 @@ pub fn paths() -> io::Result<[PathBuf; 2]> {
     resolve_paths(std::env::var_os("XDG_RUNTIME_DIR"), &std::env::temp_dir())
 }
 
-/// Connect once: the legacy server treats connection acceptance as the trigger.
+/// Connect once: the app's listener treats connection acceptance as the trigger.
 /// Success means queued, not that recording has started or stopped.
 pub fn toggle() -> io::Result<()> {
     connect_trigger(&paths()?[0])

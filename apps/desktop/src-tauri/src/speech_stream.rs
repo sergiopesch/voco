@@ -1,4 +1,4 @@
-//! Isolated candidate adapter. Explicit local executable, bounded IPC and reaping.
+//! Speech worker bridge: an explicit local executable, bounded IPC and reaping.
 use serde_json::Value;
 use std::time::Instant;
 use std::{

@@ -5,8 +5,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-// Actual App, hooks, store and ControlPanel; every native/media boundary is mocked.
-// These checks never request host microphone access or model inference.
+// Native source selection, the onboarding voice test and native/WebKit capture-failure
+// recovery in the actual App, hooks, store and ControlPanel; every native/media boundary
+// is mocked. These checks never request host microphone access or model inference.
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const out = process.env.VOCO_RENDERER_EVIDENCE_DIR;
 if (!out)

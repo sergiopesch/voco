@@ -21,7 +21,7 @@ const model=process.env.VOCO_NEMOTRON_MODEL || path.join(root,'runtime/speech/mo
 if(!fs.existsSync(model) || hashFile(model)!==identity.model_sha256) throw Error('Provision the pinned Nemotron payload first. This test never downloads a model.');
 const fixtureDir=path.join(root,'tests/fixtures/speech');
 const manifestPath=path.join(fixtureDir,'manifest.json');
-// Corpus identity and thresholds stay fixed; the report identifies the new engine.
+// Corpus identity and thresholds stay fixed; the report hashes the model, worker and native build.
 const manifest=validateSpeechManifest(JSON.parse(fs.readFileSync(manifestPath)));
 const pcm=wav=>Array.from({length:(wav.length-44)/2},(_,i)=>wav.readInt16LE(44+i*2)/32768);
 const fixtures=manifest.fixtures.map(f=>{
@@ -33,7 +33,7 @@ const fixtures=manifest.fixtures.map(f=>{
 const state=fs.mkdtempSync(path.join(os.tmpdir(),'voco-nemotron-regression-'));
 const worker=path.join(root,'runtime/speech/stream_worker.py');
 const child=spawn(process.env.VOCO_PYTHON || '/usr/bin/python3',[worker],{
-  env:{...process.env,PYTHONDONTWRITEBYTECODE:'1',VOCO_NEMOTRON_MODEL:model,XDG_STATE_HOME:state,VOCO_SPEECH_PERF:'0'},stdio:['pipe','pipe','pipe'],
+  env:{...process.env,PYTHONDONTWRITEBYTECODE:'1',VOCO_NEMOTRON_MODEL:model,XDG_STATE_HOME:state},stdio:['pipe','pipe','pipe'],
 });
 child.stdin.on('error',()=>{});
 let stderr='';child.stderr.on('data',data=>{stderr=(stderr+data).slice(-8192);});
@@ -42,7 +42,7 @@ const lines=createInterface({input:child.stdout})[Symbol.asyncIterator]();
 const report={schemaVersion:3,startedAt:new Date().toISOString(),modelSha256:identity.model_sha256,
   manifestSha256:hashFile(manifestPath),workerSha256:hashFile(worker),nativeBuildSha256:hashFile(path.join(root,'runtime/speech/NATIVE-BUILD.json')),
   source:{gitHead:execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim(),gitDirty:Boolean(execFileSync('git',['status','--porcelain'],{cwd:root,encoding:'utf8'}).trim())},
-  note:'Pinned Nemotron, production streaming worker, 100 ms packets, original corpus thresholds. Excludes microphones, Tauri IPC and field delivery. Historical decoder evidence is not requalified.',
+  note:'Pinned Nemotron, production streaming worker, 100 ms packets, original corpus thresholds. Excludes microphones, Tauri IPC and field delivery.',
   fixtures:[],silence:[],variants:[],continuity:null,passed:false};
 async function read(){
   let timer;

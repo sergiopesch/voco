@@ -26,8 +26,9 @@ def coalesce_frames(frames, rate):
 class SilenceGate:
     """Skip only long quiet interiors; preserve 640ms onset and 1.5s tail.
 
-    Digital-zero mode is the default. Acoustic VAD is opt-in pending broader
-    microphone qualification. Original audio is retained by the desktop.
+    Digital-zero mode is the default. Acoustic VAD is opt-in and needs onnxruntime
+    and vad/silero_vad.onnx, which the package does not ship. Original audio is
+    retained by the desktop.
     """
     def __init__(self, mode='zero'):
         if mode not in ('off', 'zero', 'vad'): raise ValueError('gate mode')

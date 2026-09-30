@@ -17,15 +17,17 @@ const XML: &str = r#"<node><interface name="org.voco.Panel1">
 </interface></node>"#;
 /// The chords passive Wayland evdev also observes; Shell can reserve no other.
 const ACCELERATORS: [&str; 2] = ["<Alt>d", "<Alt><Shift>d"];
-/// Companions since v11 hold their grab at every status and renew about once a second.
+/// ReserveShortcut: the companion holds its grab at every status and renews it about
+/// once a second.
 const SHORTCUT_LEASE: Duration = Duration::from_millis(2500);
-/// A loaded v10 companion renews its Stop-only grab on every active poll.
+/// ReserveStopShortcut: an older companion still loaded in the Shell renews its Stop-only
+/// grab on every active poll.
 const STOP_LEASE: Duration = Duration::from_millis(250);
 static BUS: Mutex<Option<gio::DBusConnection>> = Mutex::new(None);
 static OWNER: Mutex<Option<String>> = Mutex::new(None);
 static LEVEL: Mutex<Option<(u64, f64, Instant)>> = Mutex::new(None);
-// The attached Shell's latest proven grab: a v11 accelerator or a v10
-// "session/accelerator" Stop token. The two key spaces cannot collide.
+// The attached Shell's latest proven grab: a ReserveShortcut accelerator or a
+// ReserveStopShortcut "session/accelerator" token. The two key spaces cannot collide.
 static SHORTCUT_UNTIL: Mutex<Option<(String, Instant)>> = Mutex::new(None);
 
 // Refreshed only by the authenticated Shell while it holds the compositor grab.
@@ -133,7 +135,7 @@ pub fn clear_shortcut() {
     }
 }
 
-/// Legacy v10 Stop lease: follows a capture and its configured chord, not UI revisions.
+/// ReserveStopShortcut token: follows a capture and its configured chord, not UI revisions.
 pub(crate) fn stop_shortcut_token(state: &serde_json::Value) -> Option<String> {
     if !matches!(
         state["status"].as_str(),
@@ -287,7 +289,7 @@ fn handle(
         "Action" => {
             let (action, token) = parameters.get::<(String, String)>().unwrap_or_default();
             if action == "shortcut" {
-                // v11 consumes the chord at every status; it is the plain toggle.
+                // The ReserveShortcut grab covers every status; its chord is the plain toggle.
                 let accepted = host.snapshot().is_some_and(|state| holds_shortcut(&state));
                 if accepted {
                     host.toggle();
@@ -687,7 +689,7 @@ mod tests {
         let mut finished = state.clone();
         finished["status"] = "idle".into();
         assert!(!reserves(&finished));
-        // A v10 Stop token authorizes no v11 toggle.
+        // A ReserveStopShortcut token authorizes no plain toggle.
         assert_eq!(
             call(&host, &mut lease, ":1.5", "Action", shortcut_call()),
             Ok(false)

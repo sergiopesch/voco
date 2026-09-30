@@ -8,7 +8,7 @@ const requests=()=>transport.mock.calls.map(c=>c[1].request).filter(r=>!['qualit
 const noMutation={outcome:'no-mutation',message:'Physical modifiers are still held.',clipboardChanged:true};
 const make=()=>{const paste=vi.fn(async(_s:string)=>{}),observed=vi.fn(),failure=vi.fn();return {paste,observed,failure,queue:new DictationStream(paste,observed,failure,vi.fn())};};
 beforeEach(()=>{worker.mockReset().mockResolvedValue({});transport.mockReset().mockImplementation((c,args)=>['quality','diagnostic'].includes(args.request.op)?Promise.resolve({logged:true}):worker(c,args));});
-describe('pinned append-only candidate',()=>{
+describe('append-only dictation stream',()=>{
  it('extends partial words and punctuation without inventing spaces',()=>{
   expect(appendOnlySuffix('Every elevat','Every elevation')).toBe('ion');
   expect(appendOnlySuffix('Hello','Hello, world.')).toBe(', world.');

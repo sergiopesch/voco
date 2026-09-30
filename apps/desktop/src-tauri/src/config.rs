@@ -203,7 +203,7 @@ impl AppConfig {
             {
                 if let Err(error) = config.save() {
                     warn!(
-                        "Loaded legacy VOCO settings, but could not persist the optional default migration: {error}"
+                        "Loaded VOCO settings, but could not save them in the current format: {error}"
                     );
                 }
             }

@@ -1,4 +1,5 @@
-// Exercise the actual hook callbacks and queue with a delayed native dispatch.
+// Exercise dictationRecording.ts's paste and preview callbacks and DictationStream with a
+// delayed native dispatch.
 import { beforeEach, expect, it, vi } from "vitest";
 import ts from "typescript";
 import source from "@/lib/dictationRecording.ts?raw";
@@ -7,7 +8,7 @@ vi.mock("@tauri-apps/api/core", () => ({ invoke: transport }));
 import { DictationStream, type DesktopStreamEvent, type PasteCorrelation } from "@/lib/dictationStream";
 
 function callbacks(scope: Record<string, unknown>) {
-  const ast = ts.createSourceFile("useDictation.ts", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  const ast = ts.createSourceFile("dictationRecording.ts", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
   let constructor: ts.NewExpression | undefined;
   function visit(node: ts.Node) {
     if (ts.isNewExpression(node) && node.expression.getText(ast) === "DictationStream") constructor = node;
@@ -31,7 +32,7 @@ beforeEach(() => {
   }));
 });
 
-it.each(["cancelled", "restarted"])("keeps late native success out of the %s session UI while preserving queue evidence", async stage => {
+it.each(["cancelled", "restarted"])("keeps late native success out of the %s session UI while preserving stream evidence", async stage => {
   let currentSession = 1;
   const cancelledRef = { current: null as string | null };
   const desktopPhrasePasteCountRef = { current: 0 };

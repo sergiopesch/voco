@@ -1577,7 +1577,7 @@ fn start_socket_listener(app_handle: tauri::AppHandle) {
     }
 }
 
-// --- evdev hotkey listener (primary mechanism on Wayland) ---
+// --- evdev hotkey listener (passive Wayland shortcut) ---
 
 #[cfg(target_os = "linux")]
 fn is_ignored_evdev_device_name(name: &str) -> bool {
@@ -1911,7 +1911,7 @@ fn start_hotkey_listener(app_handle: tauri::AppHandle) -> bool {
             initial_discovered
         );
     }
-    // This retained event marks discovery supervision, not an open keyboard.
+    // evdev_listener_started marks the discovery supervisor, not an open keyboard.
     info!("evdev device discovery supervisor started");
     trace_hotkey_event("evdev_listener_started", Some("evdev"));
 
