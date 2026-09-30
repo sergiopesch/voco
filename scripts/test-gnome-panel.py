@@ -295,6 +295,7 @@ try:
     assert inspect()['indicator']['visible']
     assert inspect()['indicator']['width'] > report['states']['0-idle']['indicator']['width'] + 20
     report['reenableVisible'] = True
+    detaches = len(detached)
     # Real compositor key delivery to a disposable GTK input. No host devices.
     gi.require_version('Gtk', '3.0'); gi.require_version('Gdk', '3.0')
     os.environ.update(WAYLAND_DISPLAY='voco-panel-test', GDK_BACKEND='wayland')
@@ -324,7 +325,17 @@ try:
     except GLib.Error as error:
         assert 'NotAttached' in str(error), error
     finally: unauthorized.close_sync(None)
-    assert modifiers_clear()
+    # This fixture answers the companion only while it pumps. Loading GTK can
+    # outlast the companion's 1.5-second call timeout; the companion then
+    # detaches and attaches again 2 seconds later, as it would from a stalled app.
+    deadline = time.monotonic() + 5
+    while True:
+        try: ready = modifiers_clear(); break
+        except GLib.Error as error:
+            if 'NotAttached' not in str(error) or time.monotonic() > deadline: raise
+            pump(.05)
+    report['reattachedAfterFixtureStall'] = len(detached) > detaches
+    assert ready
     def wait_for(predicate, seconds):
         end = time.monotonic() + seconds
         while not predicate() and time.monotonic() < end: pump(.01)
