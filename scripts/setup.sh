@@ -131,14 +131,12 @@ else
   exit 1
 fi
 
-if command -v rustc &>/dev/null || [[ -f "$HOME/.cargo/bin/rustc" ]]; then
-  RUSTC="${HOME}/.cargo/bin/rustc"
-  command -v rustc &>/dev/null && RUSTC="rustc"
-  ok "Rust $($RUSTC --version | awk '{print $2}')"
+export PATH="$HOME/.cargo/bin:$PATH"
+if command -v rustc &>/dev/null; then
+  ok "Rust $(rustc --version | awk '{print $2}')"
 else
-  run_step "Installing Rust via rustup" \
-    bash -c 'curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y'
-  source "$HOME/.cargo/env"
+  err "Rust not found — install it with rustup: https://rustup.rs"
+  exit 1
 fi
 
 # ─── Step 2: System Dependencies ────────────────────────
@@ -190,8 +188,6 @@ fi
 
 # ─── Steps 4-5: Build & Install ─────────────────────────
 if [[ "$INSTALL_MODE" == true ]]; then
-  export PATH="$HOME/.cargo/bin:$PATH"
-
   step "Build"
 
   # The same pin as scripts/assemble-release.sh.
@@ -311,7 +307,7 @@ TOML
   echo -e "  ${DIM}Speech uses the pinned runtime bundled in the package.${NC}"
   echo -e "  ${DIM}Click where you want the text, then press ${BOLD}${HOTKEY}${NC}${DIM} to dictate!${NC}"
   echo
-  echo -e "  ${DIM}You can change the hotkey anytime from the system tray icon${NC}"
+  echo -e "  ${DIM}Change the shortcut on the Shortcut page of VOCO's Settings,${NC}"
   echo -e "  ${DIM}or edit ${CONFIG_FILE}${NC}"
   echo
 

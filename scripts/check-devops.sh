@@ -229,6 +229,11 @@ if workflow.count('cargo install cargo-audit --version "0.22.2" --locked') != 1:
     raise SystemExit(f"{workflow_path} must install one lockfile-pinned cargo-audit tool")
 if workflow.count("\n          cargo audit\n") != 1:
     raise SystemExit(f"{workflow_path} must run one Rust dependency audit")
+rust_version = re.search(r'^rust-version = "([^"]+)"$',
+                         Path("apps/desktop/src-tauri/Cargo.toml").read_text(), re.M)
+toolchains = set(re.findall(r"^\s+toolchain: (\S+)$", workflow, re.M))
+if not rust_version or toolchains != {rust_version[1]}:
+    raise SystemExit(f"{workflow_path} Rust toolchains {sorted(toolchains)} must match Cargo.toml rust-version")
 print("CI workflow gates, pins and permissions are valid.")
 PY
 

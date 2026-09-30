@@ -2,13 +2,12 @@
 set -euo pipefail
 
 # If you are reading this file in `less`, you are looking at the installer source.
-# Run `./voco-install` to start the branded VOCO install flow.
+# Run `bash voco-install` to install VOCO.
 #
-# VOCO — release install helper
+# VOCO release installer. It installs only the release named in VERSION.
 # Usage:
 #   wget https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.60/install -O voco-install
-#   chmod +x voco-install
-#   ./voco-install
+#   bash voco-install
 
 VERSION="2026.0.60"
 RELEASE_TAG="voco.${VERSION}"
