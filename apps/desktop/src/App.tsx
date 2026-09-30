@@ -400,7 +400,7 @@ export function App() {
       rejectBrowserStart();
       await showNotification(
         "Microphone access is blocked",
-        "Grant microphone access in VOCO settings before starting dictation.",
+        "Open VOCO Settings and choose Retry microphone access, then start again.",
       ).catch(() => {});
       return true;
     }
@@ -439,7 +439,7 @@ export function App() {
     await showNotification(
       "Ready to try dictation",
       shortcutPresentation(hotkey, runtimeDiagnostics?.shortcut).available
-        ? `Click where you want the text, then press ${hotkey}. The tray bars respond when the microphone is ready.`
+        ? `Click where you want the text, then press ${hotkey}. VOCO's bars move once it is listening.`
         : "Click where you want the text, then choose Start dictation in the VOCO tray menu.",
     ).catch(() => {});
   }, [dismissInteractiveSurface, runtimeDiagnostics]);

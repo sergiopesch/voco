@@ -720,7 +720,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
           assertOutputAllowed(stoppingSessionId);
           traceDictationEvent("dictation_desktop_remainder_kept").catch(() => {});
           useStore.getState().setCaptureNotice(null);
-          void showNotification("Dictation saved in Review", "VOCO couldn't paste or copy it. Choose Review in the VOCO tray menu to copy it.").catch(() => {});
+          void showNotification("Dictation saved in Review", "VOCO couldn't paste or copy it. Choose Review in VOCO's menu to copy it.").catch(() => {});
           finalizeIdleState();
           return;
         }

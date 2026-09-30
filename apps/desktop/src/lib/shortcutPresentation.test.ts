@@ -61,7 +61,7 @@ describe("shortcut presentation", () => {
     const focused = shortcutPresentation("Alt+D", { ...available, route: "ibus", state: "focus-required" });
     expect(focused.available).toBe(false);
     expect(focused.setup).toContain("optional VOCO Dictation input source");
-    expect(focused.setup).toContain("To dictate into any app, start dictation from the tray");
+    expect(focused.setup).toContain("To dictate into other apps, start dictation from the tray");
   });
   it("points an unavailable shortcut at the tray and voco --toggle", () => {
     const unavailable = shortcutPresentation("Alt+D", null).setup;

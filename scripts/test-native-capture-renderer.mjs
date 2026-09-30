@@ -1142,9 +1142,9 @@ try {
     await page.getByText('Shortcut help',{exact:true}).click();
     await page.getByText('No readable keyboard.', { exact: false }).waitFor();
     await captureStyledPanel('shortcut-settings-760x560', page.getByRole('button', { name: 'Record keys', exact: true }), { width: 760, height: 560 });
-    await captureStyledPanel('shortcut-settings-instructions-760x560', page.getByText('To dictate into any app, start dictation from the tray or assign voco --toggle to a shortcut in your desktop settings.', { exact: true }), { width: 760, height: 560 });
+    await captureStyledPanel('shortcut-settings-instructions-760x560', page.getByText('To dictate into other apps, start dictation from the tray or assign voco --toggle to a shortcut in your desktop settings.', { exact: true }), { width: 760, height: 560 });
     await page.evaluate(() => { window.shortcutObservation = { hotkey: 'Alt+D', route: 'ibus', state: 'focus-required', detail: 'Focus a supported input field.' }; });
-    await page.getByText('The optional VOCO Dictation input source handles this shortcut only in supported text fields. To dictate into any app, start dictation from the tray or assign voco --toggle to a shortcut in your desktop settings.', { exact: true }).waitFor();
+    await page.getByText('The optional VOCO Dictation input source handles this shortcut only in supported text fields. To dictate into other apps, start dictation from the tray or assign voco --toggle to a shortcut in your desktop settings.', { exact: true }).waitFor();
     expected.push('settings-shows-current-focus-required-ibus-instructions'); record(expected.at(-1));
 
     await page.evaluate(() => { window.deferDiagnostics = true; });

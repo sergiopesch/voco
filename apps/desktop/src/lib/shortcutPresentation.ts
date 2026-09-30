@@ -1,6 +1,6 @@
 import type { AudioDeviceOption, DesktopInputStatus, ShortcutDiagnostics } from "@/types";
 
-const ANY_APP = "To dictate into any app, start dictation from the tray or assign voco --toggle to a shortcut in your desktop settings.";
+const ANY_APP = "To dictate into other apps, start dictation from the tray or assign voco --toggle to a shortcut in your desktop settings.";
 
 export function unknownShortcut(hotkey: string): ShortcutDiagnostics {
   return { hotkey, route: null, state: "unknown", detail: "Shortcut availability has not been verified." };

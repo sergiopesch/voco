@@ -438,7 +438,7 @@ it("keeps the dictation in Review when the Stop clipboard copy fails", async () 
   expect(journalCalls("keep_crash_journal")).toEqual([h.env.recoverySessionIdRef.current]);
   expect(journalDeletions()).toEqual([]);
   expect(h.trace).toHaveBeenCalledWith("dictation_desktop_remainder_kept");
-  expect(h.notify).toHaveBeenLastCalledWith("Dictation saved in Review", expect.stringContaining("Review in the VOCO tray menu"));
+  expect(h.notify).toHaveBeenLastCalledWith("Dictation saved in Review", expect.stringContaining("Review in VOCO's menu"));
   expect(h.setError).not.toHaveBeenCalledWith(expect.any(String));
   expect(h.state.recovery).toBeNull();
   expect(h.phase.current).toBe("idle");

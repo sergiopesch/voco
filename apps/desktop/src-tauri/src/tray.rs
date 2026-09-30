@@ -210,7 +210,7 @@ fn derive_tray_presentation(snapshot: &RuntimeStatusSnapshot) -> TrayPresentatio
                 {
                     (
                         TrayVisualState::Recording,
-                        "VOCO — Listening · target verified".to_string(),
+                        "VOCO — Listening · browser field".to_string(),
                     )
                 } else {
                     (TrayVisualState::Recording, "VOCO — Listening".to_string())
@@ -1378,13 +1378,13 @@ mod tests {
     }
 
     #[test]
-    fn recording_reports_a_verified_target_only_when_owned() {
+    fn recording_names_the_browser_field_only_when_owned() {
         let mut snapshot = ready_snapshot();
         snapshot.dictation_status = DictationStatus::Recording;
         snapshot.cursor_required = true;
         snapshot.cursor_delivery = CursorDeliveryState::Owned;
         let owned = derive_tray_presentation(&snapshot);
-        assert_eq!(owned.tooltip, "VOCO — Listening · target verified");
+        assert_eq!(owned.tooltip, "VOCO — Listening · browser field");
         assert_eq!(owned.dictation_label, "Stop dictation");
         assert!(!owned.popover_enabled);
         assert!(!owned.settings_enabled);

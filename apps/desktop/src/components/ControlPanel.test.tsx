@@ -185,7 +185,7 @@ describe("ControlPanel", () => {
     });
     expect(settingsMarkup).toContain("VOCO pastes into whichever app has keyboard focus, including terminals and browsers.");
     expect(settingsMarkup).toContain("copies the rest of your words to the clipboard when you stop");
-    expect(settingsMarkup).toContain("If the copy fails too, or VOCO exits unexpectedly, choose Review in the tray to get your words back.");
+    expect(settingsMarkup).toContain("If the copy fails too, or VOCO exits unexpectedly, choose Review in VOCO’s menu to get your words back.");
     expect(settingsMarkup).toContain("IBus shortcut (optional)");
 
     const onboardingMarkup = renderPanel({ surface: "onboarding" });

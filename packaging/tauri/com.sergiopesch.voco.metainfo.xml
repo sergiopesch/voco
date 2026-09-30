@@ -10,14 +10,13 @@
   </developer>
   <launchable type="desktop-id">VOCO.desktop</launchable>
   <description>
-    <p>Your voice, typed. Built for Linux. VOCO turns speech into text at your cursor. Press a shortcut, speak, and press it again to finish. Normal dictation is transcribed on your device and needs no account or subscription.</p>
-    <p>VOCO stays in the tray, with a compact panel for microphone feedback and dictation status. Text insertion depends on your desktop session and the target field.</p>
+    <p>Your voice, typed. Built for Linux. Press a shortcut, speak, and VOCO pastes your words into the app you are typing in. Speech is recognized on your computer, with no account, subscription or cloud service.</p>
+    <p>VOCO stays in the system tray, or in the GNOME top bar with live microphone bars. Pasting depends on your desktop session and the app you type in.</p>
     <ul>
-      <li>Local English speech transcription with Nemotron</li>
-      <li>Setup for your microphone and shortcut; dictation pastes into whatever app has keyboard focus</li>
-      <li>Words VOCO cannot paste are copied to the clipboard when you stop, and Review in the tray recovers dictation after a crash</li>
+      <li>Local English speech recognition with NVIDIA Nemotron</li>
+      <li>Words appear while you speak, in whichever app has keyboard focus</li>
+      <li>Words VOCO cannot paste are copied to the clipboard when you stop, and Review recovers dictation after a crash</li>
       <li>Update checks against GitHub Releases; VOCO never downloads or installs updates itself</li>
-      <li>Linux-specific install, upgrade, and troubleshooting guidance</li>
     </ul>
   </description>
   <categories>
