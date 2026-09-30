@@ -5,11 +5,11 @@ import { PanelSetup } from "./PanelSetup";
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type { DictationStatus } from "@/types";
+import { useStore } from "@/store/useStore";
 
 interface OnboardingProps {
   microphone: string;
   status: DictationStatus;
-  transcript: string;
   passed: boolean;
   failed: boolean;
   attempted: boolean;
@@ -30,10 +30,12 @@ interface OnboardingProps {
   onFinish: () => Promise<void>;
 }
 
-export function Onboarding({ microphone, status, transcript, passed,
+export function Onboarding({ microphone, status, passed,
   failed, preparing, saving, blocked, hotkey, microphoneControls, desktopReady = false,
   onStart, onStop, onFinish, attempted, setupError, onRetrySetup, desktopSetupError,
   checkingDesktopSetup, onCheckDesktopSetup, onOpenDesktopSetupGuide }: OnboardingProps) {
+  // Only this view shows recognition text, so only it re-renders per hypothesis.
+  const transcript = useStore((state) => state.dictationPurpose === "onboarding" ? state.transcript : "");
   const [changingMicrophone, setChangingMicrophone] = useState(false);
   const primaryRef = useRef<HTMLButtonElement>(null);
   const previousPhase = useRef("");

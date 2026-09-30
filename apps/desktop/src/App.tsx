@@ -31,20 +31,21 @@ import {
   readCachedUpdateState,
   writeCachedUpdateState,
 } from "@/lib/updates";
-import { DiagnosticsRequestGate, unknownShortcut } from "@/lib/shortcutPresentation";
+import { DIAGNOSTICS_TIMEOUT_MS, DiagnosticsRequestGate, sameJsonValue, shortcutPresentation, startLaunchDiagnostics, unknownShortcut, withTimeout } from "@/lib/shortcutPresentation";
 import { UpdateCheckCoordinator } from "@/lib/updateCheckCoordinator";
+import { createPanelLevelSender } from "@/lib/audioLevel";
 import { useGlobalShortcut } from "@/hooks/useGlobalShortcut";
 import { useDictation } from "@/hooks/useDictation";
 import { useNativeCaptureSettings } from "@/hooks/useNativeCaptureSettings";
-import { ControlPanel } from "@/components/ControlPanel";
+import { ControlPanel, type PanelSection } from "@/components/ControlPanel";
 import { CrashReview } from "@/components/CrashReview";
 import { StatusMark } from "@/components/StatusMark";
 import vocoBrandImage from "../../../assets/voco-symbol-ui.png";
 import { ConfigRecoveryPanel } from "@/components/ConfigRecoveryPanel";
-import { requiresVerifiedTextTarget } from "@/lib/dictationOutputPlan";
 import { probeMicrophoneAccess } from "@/lib/audioInput";
 import { MicrophoneRefresh, queryMicrophonePermission, microphoneAccessFailure } from "@/lib/microphoneRefresh";
 import {
+  deriveCursorSetupState,
   deriveStatusLabel,
 } from "@/lib/dictationPresentation";
 import { canStopOnboardingTest, cancelsPendingStart, isBrowserTrigger, type DictationTriggerAction } from "@/lib/dictationTrigger";
@@ -69,12 +70,13 @@ const PANEL_SIZE = new LogicalSize(1040, 760);
 
 function getCaptureSelection() {
   const state = useStore.getState();
-  if (state.captureBackendMode === "pending") throw new Error("Capture backend has not been verified. Retry capture setup in Audio settings.");
+  if (state.captureBackendMode === "pending") throw new Error("Capture backend has not been verified. Retry capture setup in Microphone settings.");
   return state.captureBackendMode === "native"
     ? { backend: "native" as const, selectionToken: state.nativeCaptureSource?.selectionToken ?? null }
     : { backend: "webkit" as const };
 }
 const PANEL_MIN_SIZE = new LogicalSize(760, 560);
+// Dictation never maps a transcript window over the destination.
 const POPOVER_SIZE = new LogicalSize(420, 380);
 
 type ResizeDirection =
@@ -163,15 +165,8 @@ export function App() {
   const nativeMicrophone = useNativeCaptureSettings();
   const status = useStore((state) => state.status);
   const error = useStore((state) => state.error);
-  const recovery = useStore((state) => state.recovery);
   const captureNotice = useStore((state) => state.captureNotice);
-  const transcript = useStore((state) => state.transcript);
-  const rawTranscript = useStore((state) => state.rawTranscript);
-  const recoverableTranscripts = useStore((state) => state.recoverableTranscripts);
-  const dismissRecoverableTranscript = useStore((state) => state.dismissRecoverableTranscript);
-  const hasRecoverableTranscript = recoverableTranscripts.length > 0;
   const surface = useStore((state) => state.surface);
-  const onboardingStep = useStore((state) => state.onboardingStep);
   const selectedDeviceId = useStore((state) => state.selectedDeviceId);
   const availableDevices = useStore((state) => state.availableDevices);
   const microphonePermission = useStore((state) => state.microphonePermission);
@@ -183,13 +178,9 @@ export function App() {
   const setError = useStore((state) => state.setError);
   const setStatus = useStore((state) => state.setStatus);
   const setSurface = useStore((state) => state.setSurface);
-  const setOnboardingStep = useStore((state) => state.setOnboardingStep);
   const setAvailableDevices = useStore((state) => state.setAvailableDevices);
   const setMicrophonePermission = useStore((state) => state.setMicrophonePermission);
   const setMicrophoneReadyState = useStore((state) => state.setMicrophoneReady);
-  const setOwnedPreeditSetupState = useStore(
-    (state) => state.setOwnedPreeditSetupState,
-  );
   const updateState = useStore((state) => state.updateState);
   const setUpdateState = useStore((state) => state.setUpdateState);
   const [updateCheckCoordinator] = useState(
@@ -213,7 +204,6 @@ export function App() {
     canCancel,
     cancellationPending,
     cancelRecording,
-    retryRecovery,
     discardRecovery,
     finishOnboardingTest,
     toggle,
@@ -225,11 +215,12 @@ export function App() {
   const onboardingHandoffRef = useRef(false);
   const [initComplete, setInitComplete] = useState(false);
   const [runtimeDiagnostics, setRuntimeDiagnostics] = useState<RuntimeDiagnostics | null>(null);
+  const [runtimeDiagnosticsFailed, setRuntimeDiagnosticsFailed] = useState(false);
   const [runtimeStatusEpoch, setRuntimeStatusEpoch] = useState<number | null>(null);
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [startupConfigError, setStartupConfigError] = useState<string | null>(null);
   const [settingsRequest, setSettingsRequest] = useState<{
-    section: "General" | "Audio" | "Hotkeys" | "Advanced" | "Output" | "Updates";
+    section: PanelSection;
     id: number;
   }>({ section: "General", id: 0 });
   const [closeRequestId, setCloseRequestId] = useState(0);
@@ -260,6 +251,8 @@ export function App() {
   const lastConfigRevisionRef = useRef(-1);
   const diagnosticsGateRef = useRef(new DiagnosticsRequestGate());
   const diagnosticsInFlightRef = useRef(false);
+  const diagnosticsAttemptRef = useRef<Promise<void>>(Promise.resolve());
+  const runtimeDiagnosticsLoadedRef = useRef(false);
   const diagnosticsExpiryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const runtimeStatusRevisionRef = useRef(0);
   const microphoneRefreshRef = useRef(new MicrophoneRefresh());
@@ -308,16 +301,17 @@ export function App() {
     },
     [dismissInteractiveSurface, setSurface],
   );
-  // Dictation never maps a transcript window over the destination.
-  const recoveryAvailable = Boolean(recovery);
-  const popoverSize = POPOVER_SIZE;
   // Text goes to whichever app has focus, so the desktop input helpers are the
   // only delivery setup. IBus and the GNOME panel companion never gate it.
-  const desktopInputReady = config?.transcriptTarget === "cursor" &&
+  const desktopInputReady = config !== null &&
     Boolean(runtimeDiagnostics?.desktopPaste?.enabled &&
       (runtimeDiagnostics.desktopInput?.available ?? runtimeDiagnostics.desktopPaste.available));
-  const cursorRequired = requiresVerifiedTextTarget(config) && !desktopInputReady;
-  const cursorSetupState = desktopInputReady ? "ready" : runtimeDiagnostics ? "not-enabled" : "";
+  const cursorRequired = config !== null && !desktopInputReady;
+  const cursorSetupState = deriveCursorSetupState({
+    desktopInputReady,
+    diagnosticsLoaded: runtimeDiagnostics !== null,
+    diagnosticsFailed: runtimeDiagnosticsFailed,
+  });
   const runtimeConfigurationError = shouldBlockRuntimeForConfigErrors(
     startupConfigError,
     settingsError,
@@ -371,8 +365,8 @@ export function App() {
       if (!dismissInteractiveSurface()) return true;
       await hideStatusOverlay().catch(() => {});
       await showNotification(
-        "Panel hidden",
-        "Click where you want the text, then press the dictation hotkey again.",
+        "VOCO hidden",
+        "Click where you want the text, then start dictation again.",
       ).catch(() => {});
       return true;
     }
@@ -406,7 +400,7 @@ export function App() {
       rejectBrowserStart();
       await showNotification(
         "Microphone access is blocked",
-        "Grant microphone access in VOCO settings before starting dictation.",
+        "Open VOCO Settings and choose Retry microphone access, then start again.",
       ).catch(() => {});
       return true;
     }
@@ -416,10 +410,6 @@ export function App() {
   const handleStartTest = useCallback(async () => {
     const state = useStore.getState();
     if (startRequestRef.current || isDictationActive(state.status) || state.surface !== "onboarding") return;
-    if (state.recovery && state.dictationPurpose !== "onboarding") {
-      setError("Finish recovering your previous dictation before starting the voice test.");
-      return;
-    }
     const request = { cancelled: false, triggerId: "onboarding:test" };
     startRequestRef.current = request;
     setTestPreparing(true);
@@ -437,15 +427,22 @@ export function App() {
     }
   }, [discardRecovery, nativeMicrophone.ensureDefault, setError, toggle]);
 
+  const prepareNotifiedRef = useRef(false);
   const handlePrepareDictation = useCallback(async () => {
     if (isDictationActive(useStore.getState().status)) return;
     if (!dismissInteractiveSurface()) return;
     await hideStatusOverlay().catch(() => {});
+    // Once per launch, naming the shortcut only when it is verified to work.
+    if (prepareNotifiedRef.current) return;
+    prepareNotifiedRef.current = true;
+    const hotkey = useStore.getState().config?.hotkey ?? "Alt+D";
     await showNotification(
       "Ready to try dictation",
-      `Click where you want the text, then press ${useStore.getState().config?.hotkey ?? "Alt+D"}. The tray bars respond when the microphone is ready.`,
+      shortcutPresentation(hotkey, runtimeDiagnostics?.shortcut).available
+        ? `Click where you want the text, then press ${hotkey}. VOCO's bars move once it is listening.`
+        : "Click where you want the text, then choose Start dictation in the VOCO tray menu.",
     ).catch(() => {});
-  }, [dismissInteractiveSurface]);
+  }, [dismissInteractiveSurface, runtimeDiagnostics]);
 
   useGlobalShortcut(
     handleToggleRequest,
@@ -553,29 +550,25 @@ export function App() {
   const invalidateShortcutDiagnostics = useCallback(() => {
     diagnosticsGateRef.current.invalidate();
     if (diagnosticsExpiryRef.current !== null) clearTimeout(diagnosticsExpiryRef.current);
-    setRuntimeDiagnostics((current) => current ? {
-      ...current,
-      shortcut: unknownShortcut(useStore.getState().config?.hotkey ?? ""),
-    } : null);
+    setRuntimeDiagnostics((current) => {
+      if (!current) return null;
+      const shortcut = unknownShortcut(useStore.getState().config?.hotkey ?? "");
+      return sameJsonValue(current.shortcut, shortcut) ? current : { ...current, shortcut };
+    });
   }, []);
 
-  const refreshRuntimeDiagnostics = useCallback(async () => {
-    if (diagnosticsInFlightRef.current || configSavePendingCountRef.current > 0) return;
+  const requestRuntimeDiagnostics = useCallback(async () => {
     const isCurrent = diagnosticsGateRef.current.begin();
     const hotkey = useStore.getState().config?.hotkey;
     const revision = lastConfigRevisionRef.current;
     const saveVersion = configSaveRequestVersionRef.current;
     diagnosticsInFlightRef.current = true;
-    let timeout: ReturnType<typeof setTimeout> | undefined;
     try {
       // A stalled observer must neither block opening Settings nor accumulate requests.
       const request = Promise.resolve().then(getRuntimeDiagnostics).finally(() => {
         diagnosticsInFlightRef.current = false;
       });
-      const diagnostics = await Promise.race([
-        request,
-        new Promise<null>((resolve) => { timeout = setTimeout(() => resolve(null), 7500); }),
-      ]);
+      const diagnostics = await withTimeout(request, DIAGNOSTICS_TIMEOUT_MS);
       if (!isCurrent()) return;
       if (!diagnostics || revision !== lastConfigRevisionRef.current ||
           saveVersion !== configSaveRequestVersionRef.current ||
@@ -584,17 +577,35 @@ export function App() {
         return;
       }
       runtimeSessionTypeRef.current = diagnostics.sessionType;
-      setRuntimeDiagnostics(diagnostics);
-      setOwnedPreeditSetupState(diagnostics.ownedPreedit.setupState);
+      if (!runtimeDiagnosticsLoadedRef.current) {
+        runtimeDiagnosticsLoadedRef.current = true;
+        setRuntimeDiagnosticsFailed(false);
+      }
+      // The poll repeats every second. Keeping the current object when nothing
+      // changed spares a panel re-render; the expiry is re-armed either way.
+      setRuntimeDiagnostics((current) => current && sameJsonValue(current, diagnostics) ? current : diagnostics);
       if (diagnosticsExpiryRef.current !== null) clearTimeout(diagnosticsExpiryRef.current);
       diagnosticsExpiryRef.current = setTimeout(invalidateShortcutDiagnostics, 2000);
     } catch (error) {
       if (isCurrent()) invalidateShortcutDiagnostics();
       console.warn("Failed to load runtime diagnostics:", error);
-    } finally {
-      if (timeout !== undefined) clearTimeout(timeout);
     }
-  }, [invalidateShortcutDiagnostics, setOwnedPreeditSetupState]);
+  }, [invalidateShortcutDiagnostics]);
+
+  const refreshRuntimeDiagnostics = useCallback((): Promise<void> => {
+    if (diagnosticsInFlightRef.current || configSavePendingCountRef.current > 0) return Promise.resolve();
+    diagnosticsAttemptRef.current = requestRuntimeDiagnostics();
+    return diagnosticsAttemptRef.current;
+  }, [requestRuntimeDiagnostics]);
+
+  // The launch check joins a request already in flight instead of skipping it.
+  // A refresh skipped while a config save is pending still counts as a failed
+  // attempt, so setup is reported conservatively and retried once. Opening a
+  // surface must not wait.
+  const settleLaunchDiagnostics = useCallback(
+    () => diagnosticsInFlightRef.current ? diagnosticsAttemptRef.current : refreshRuntimeDiagnostics(),
+    [refreshRuntimeDiagnostics],
+  );
 
   useEffect(() => {
     diagnosticsGateRef.current.activate();
@@ -621,6 +632,20 @@ export function App() {
     };
   }, [surface, config, invalidateShortcutDiagnostics, refreshRuntimeDiagnostics]);
 
+  // Once the loaded config commits, launch checks desktop input alongside microphone
+  // preparation, so the tray shows initializing rather than setup needed while
+  // diagnostics load. This must follow the poll effect, whose leading invalidation
+  // would discard the request.
+  const configLoaded = config !== null;
+  useEffect(() => {
+    if (!configLoaded) return;
+    return startLaunchDiagnostics(
+      settleLaunchDiagnostics,
+      () => runtimeDiagnosticsLoadedRef.current,
+      () => setRuntimeDiagnosticsFailed(true),
+    );
+  }, [configLoaded, settleLaunchDiagnostics]);
+
   const refreshAuthoritativeConfig = useCallback(async () => {
     const snapshot = await getConfig();
     applyAuthoritativeConfig(snapshot);
@@ -640,7 +665,7 @@ export function App() {
     }
   }, [refreshAuthoritativeConfig, refreshDevices, refreshRuntimeDiagnostics]);
 
-  const openSettings = useCallback(async (section: "General" | "Audio" | "Hotkeys" | "Advanced" | "Output" | "Updates" = "General") => {
+  const openSettings = useCallback(async (section: PanelSection = "General") => {
     const requestVersion = panelRequestVersionRef.current + 1;
     panelRequestVersionRef.current = requestVersion;
     const currentStatus = useStore.getState().status;
@@ -812,7 +837,6 @@ export function App() {
           ? loadedSnapshot.config
           : useStore.getState().config ?? loadedSnapshot.config;
         setStartupConfigError(null);
-        setOnboardingStep(0);
         await retryCaptureSetup();
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -827,7 +851,7 @@ export function App() {
       }
     }
     void init();
-  }, [applyAuthoritativeConfig, retryCaptureSetup, setError, setOnboardingStep, setStatus, setSurface]);
+  }, [applyAuthoritativeConfig, retryCaptureSetup, setError, setStatus, setSurface]);
 
   useEffect(() => {
     if (!initComplete || !config?.updateChannel) {
@@ -844,16 +868,9 @@ export function App() {
     if (runtimeStatusEpoch === null || status !== "recording") return;
     // Capture events drive the panel even when WebKit's hidden-window timers
     // are throttled. Do not subscribe the whole App to audio frames.
-    let pending = false;
-    let lastSentAt = -Infinity;
+    const sendLevel = createPanelLevelSender((level) => syncPanelLevel(runtimeStatusEpoch, level));
     return useStore.subscribe((state) => {
-      const now = performance.now();
-      if (state.status !== "recording" || pending || now - lastSentAt < 40) return;
-      pending = true;
-      lastSentAt = now;
-      void syncPanelLevel(runtimeStatusEpoch, state.audioLevel)
-        .catch(() => {})
-        .finally(() => { pending = false; });
+      if (state.status === "recording") sendLevel(state.audioLevel);
     });
   }, [runtimeStatusEpoch, status]);
 
@@ -866,7 +883,6 @@ export function App() {
       epoch: runtimeStatusEpoch,
       revision: runtimeStatusRevisionRef.current,
       runtimeInitialized: initComplete,
-      hasRecoverableTranscript,
       configurationError: runtimeConfigurationError,
       microphoneReady,
       microphonePermission,
@@ -876,8 +892,6 @@ export function App() {
       cursorDelivery: cursorDeliveryState,
       cursorRequired,
       cursorSetupState,
-      manualTranscriptReady: recovery?.kind === "manual-copy",
-      recoveryAvailable,
     }).catch((error) => {
       console.warn("Failed to synchronize VOCO runtime status:", error);
     });
@@ -886,15 +900,12 @@ export function App() {
     cursorRequired,
     cursorDeliveryState,
     cursorSetupState,
-    hasRecoverableTranscript,
     initComplete,
     microphonePermission,
     microphoneReady,
     nativeMicrophoneReady,
     runtimeConfigurationError,
     runtimeStatusEpoch,
-    recoveryAvailable,
-    recovery?.kind,
     status,
   ]);
 
@@ -966,7 +977,7 @@ export function App() {
             height: workArea?.size.height ?? targetMonitor?.size.height ?? window.screen.availHeight * scaleFactor,
             scaleFactor,
           },
-          { width: popoverSize.width, height: popoverSize.height },
+          { width: POPOVER_SIZE.width, height: POPOVER_SIZE.height },
         );
         if (!isCurrentRequest()) return;
         await showInteractiveWindow({
@@ -1009,7 +1020,7 @@ export function App() {
 
     const operation = surfaceSyncQueueRef.current.then(syncWindowSurface);
     surfaceSyncQueueRef.current = operation.catch(() => {});
-  }, [popoverSize, surface, activationRequest]);
+  }, [surface, activationRequest]);
 
   useEffect(() => {
     if (surface !== "settings" && surface !== "onboarding" && surface !== "review") {
@@ -1156,11 +1167,7 @@ export function App() {
   }, [dismissInteractiveSurface, surface]);
 
   const statusLabel = deriveStatusLabel({
-    hasRecovery: Boolean(recovery),
-    manualTranscriptReady: recovery?.kind === "manual-copy",
-    hasRecoverableTranscript,
     configurationError: runtimeConfigurationError,
-    cursorDeliveryState,
     cursorRequired,
     cursorSetupState,
     dictationStatus: status,
@@ -1204,25 +1211,16 @@ export function App() {
         onFinishTest={finishOnboardingTest}
         testPreparing={testPreparing || !initComplete}
         surface={surface}
-        onboardingStep={onboardingStep}
         config={config}
         errorMessage={error ?? settingsError}
         statusLabel={statusLabel}
         updateState={updateState}
         runtimeDiagnostics={runtimeDiagnostics}
         dictationStatus={status}
-        cursorDeliveryState={cursorDeliveryState}
-        transcript={transcript}
-        rawTranscript={rawTranscript}
-        recovery={recovery}
         captureNotice={captureNotice}
         canCancelDictation={canCancel}
         cancellationPending={cancellationPending}
         onCancelDictation={() => void cancelRecording()}
-        onRetryRecovery={() => void retryRecovery()}
-        onDiscardRecovery={discardRecovery}
-        recoverableTranscripts={recoverableTranscripts}
-        onDismissRecoverableTranscript={dismissRecoverableTranscript}
         onPrepareDictation={() => void handlePrepareDictation()}
         onDraftStateChange={handleDraftStateChange}
         onShortcutCaptureChange={handleShortcutCaptureChange}
@@ -1233,7 +1231,6 @@ export function App() {
         availableDevices={availableDevices}
         microphonePermission={microphonePermission}
         onSurfaceChange={handleSurfaceChange}
-        onOnboardingStepChange={setOnboardingStep}
         onConfigChange={applyConfigPatch}
         onRefreshDevices={refreshDevices}
         onRequestMicrophoneAccess={requestMicrophoneAccess}

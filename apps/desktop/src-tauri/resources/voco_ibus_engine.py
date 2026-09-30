@@ -1,20 +1,18 @@
 #!/usr/bin/python3
-"""Persistent VOCO IBus preedit engine.
+"""Persistent VOCO IBus shortcut engine.
 
 IBus owns this process after the user explicitly enables the packaged VOCO
-input source.  The VOCO app connects over a private same-user socket.  The
-engine never changes the desktop's active input source, reads surrounding
-text, or requests deletion from a target application.
+input source.  The VOCO app connects over a private same-user socket to poll
+the dictation shortcut; protocol 6 rejects every text operation.  The engine
+never changes the desktop's active input source, reads surrounding text, or
+requests deletion from a target application.
 """
 
 from __future__ import annotations
 
-import json
-import os
 import signal
 import secrets
 import time
-from pathlib import Path
 from typing import Any, Optional
 
 import gi
@@ -22,11 +20,6 @@ import gi
 gi.require_version("IBus", "1.0")
 from gi.repository import GLib, IBus  # noqa: E402
 
-from voco_ibus_ownership import (  # noqa: E402
-    FinalizationAction,
-    FinalizationPlan,
-    OwnedPreeditLease,
-)
 from voco_ibus_protocol import (  # noqa: E402
     PROTOCOL_VERSION,
     PrivateSocketServer,
@@ -37,18 +30,6 @@ from voco_ibus_protocol import (  # noqa: E402
 ENGINE_NAME = "voco"
 ENGINE_BUS_NAME = "org.freedesktop.IBus.Voco"
 ENGINE_PATH_PREFIX = "/org/freedesktop/IBus/Voco/Engine/"
-MAX_TEXT_BYTES = 1_000_000
-DEFAULT_DICTATION_HOTKEY = "Alt+D"
-SESSION_CONTROL_KEYVALS = {
-    IBus.keyval_from_name("Alt_L"),
-    IBus.keyval_from_name("Alt_R"),
-    IBus.keyval_from_name("Control_L"),
-    IBus.keyval_from_name("Control_R"),
-    IBus.keyval_from_name("Shift_L"),
-    IBus.keyval_from_name("Shift_R"),
-    IBus.keyval_from_name("Super_L"),
-    IBus.keyval_from_name("Super_R"),
-}
 SHORTCUT_MODIFIER_NAMES = {
     "ALT": "alt",
     "OPTION": "alt",
@@ -188,18 +169,11 @@ class VocoCoordinator:
     """Serializes one app connection, dictation lease, and input context."""
 
     def __init__(self) -> None:
-        self.session_id: Optional[int] = None
         self.focused_engine: Optional[VocoEngine] = None
-        self.target_engine: Optional[VocoEngine] = None
-        self.committed_text = ""
-        self.provisional_text = ""
-        self.finalization_pending = False
-        self.ownership_intact = True
         self.focus_lost = False
         self.shortcut_armed_until = 0.0
         self.shortcut_specs = ()
         self.shortcut_config = None
-        self.pending_trigger = None
         self.trigger_to_deliver = None
         self.consumed_shortcut_keys: set[int] = set()
 
@@ -209,7 +183,6 @@ class VocoCoordinator:
         if hotkey != self.shortcut_config:
             self.shortcut_specs = session_control_hotkey_specs(hotkey)
             self.shortcut_config = hotkey
-            self.pending_trigger = None
             self.trigger_to_deliver = None
         engine = self.focused_engine
         armed = bool(engine and engine.focus_active and engine.can_accept_preedit)
@@ -242,323 +215,45 @@ class VocoCoordinator:
         for hotkey in self.shortcut_specs:
             if _matches_session_hotkey(keyval, state, hotkey):
                 token = secrets.token_hex(24)
-                self.pending_trigger = (token, engine, engine.context_revision,
-                                        time.monotonic() + 2.0)
                 self.trigger_to_deliver = {"triggerId": token,
                                            "mode": "dictation"}
                 self.consumed_shortcut_keys.add(key)
                 return True
         return False
 
-    def claim_trigger(self, trigger_id: Any) -> None:
-        pending = self.pending_trigger
-        self.pending_trigger = None
-        self.trigger_to_deliver = None
-        if (not isinstance(trigger_id, str) or pending is None
-                or not secrets.compare_digest(trigger_id, pending[0])
-                or time.monotonic() >= pending[3]
-                or self.focused_engine is not pending[1]
-                or not pending[1].focus_active
-                or pending[1].context_revision != pending[2]
-                or not pending[1].can_accept_preedit):
-            raise RuntimeError("The shortcut's original input context could not be verified. Review and copy the transcript in VOCO.")
-
     def activate_engine(self, engine: "VocoEngine") -> None:
         if self.focused_engine is not None and self.focused_engine is not engine:
             self.consumed_shortcut_keys.clear()
-            self._invalidate_target(self.focused_engine)
+            self.focus_lost = True
         self.focused_engine = engine
-        if self.session_id is not None and self.target_engine is not engine:
-            self._invalidate_target(self.target_engine)
 
     def deactivate_engine(self, engine: "VocoEngine") -> None:
-        self.pending_trigger = None
         if self.focused_engine is engine:
             self.consumed_shortcut_keys.clear()
             self.focused_engine = None
-        if self.target_engine is engine and self.session_id is not None:
-            self._invalidate_target(engine)
 
     def disable_engine(self, engine: "VocoEngine") -> None:
         self.deactivate_engine(engine)
 
-    def register_key_event(self, keyval: int, state: int) -> None:
-        if not is_session_control_key(keyval, state, ()):
-            self.pending_trigger = None
-        if self.session_id is None:
-            return
-        session_hotkeys = getattr(
-            self.target_engine,
-            "_voco_session_control_hotkeys",
-            (),
-        )
-        if is_session_control_key(keyval, state, session_hotkeys):
-            return
-        # Normal input always passes through. It also ends VOCO's exclusive
-        # lease before any later cursor update or finalization can mutate the
-        # target. Only VOCO's preedit is cleared; committed text is preserved.
-        self.ownership_intact = False
-        if self.target_engine is not None:
-            self.target_engine.invalidate_context()
-            try:
-                self.target_engine.clear_preedit()
-            except Exception:
-                pass
-        self.provisional_text = ""
-
-    def register_context_reset(self, engine: "VocoEngine") -> None:
-        self.pending_trigger = None
-        if self.session_id is None or self.target_engine is not engine:
-            return
-        self.ownership_intact = False
-        engine.invalidate_context()
-        self.provisional_text = ""
-
-    def validate_session(self, raw_session_id: Any) -> int:
-        if not is_positive_integer(raw_session_id):
-            raise ValueError("sessionId must be a positive integer")
-        if self.session_id != raw_session_id:
-            raise ValueError("stale or inactive session")
-        return raw_session_id
-
-    def start(self, client_session_id: Any) -> dict[str, Any]:
-        if not is_positive_integer(client_session_id):
-            raise ValueError("clientSessionId must be a positive integer")
-        if self.session_id is not None:
-            raise RuntimeError("active dictation session must be canceled first")
-
-        engine = self.focused_engine
-        if engine is None or not engine.focus_active:
-            raise RuntimeError(
-                "Enable the VOCO Dictation input source and focus a text field first"
-            )
-        if not engine.can_accept_preedit:
-            raise RuntimeError(
-                "The focused field does not expose a safe non-sensitive preedit context"
-            )
-
-        session_id = client_session_id
-        self.session_id = session_id
-        self.target_engine = engine
-        self.committed_text = ""
-        self.provisional_text = ""
-        self.finalization_pending = False
-        self.ownership_intact = True
-        self.focus_lost = False
-        engine.bind_session(session_id)
-        return self.status()
-
-    def update(
-        self,
-        session_id: Any,
-        confirmed_text: Any,
-        preedit_text: Any,
-        provisional_text: Any,
-    ) -> dict[str, Any]:
-        self.validate_session(session_id)
-        if self.finalization_pending:
-            raise RuntimeError("final cursor commit is already being prepared")
-        confirmed_text = validate_text(confirmed_text)
-        preedit_text = validate_text(preedit_text)
-        provisional_text = validate_text(provisional_text)
-        engine = self._require_owned_target()
-        if provisional_text != confirmed_text + preedit_text:
-            raise ValueError("provisional text does not match its owned ranges")
-        if not confirmed_text.startswith(self.committed_text):
-            raise ValueError("confirmed text cannot revise an already sealed segment")
-
-        append_text = confirmed_text[len(self.committed_text) :]
-        if append_text and not self.provisional_text.startswith(append_text):
-            raise ValueError(
-                "confirmed text was not an exact prefix of the previously owned preedit"
-            )
-        engine.advance_preedit(append_text, preedit_text)
-        self.committed_text = confirmed_text
-        self.provisional_text = preedit_text
-        return self.status()
-
-    def commit(self, session_id: Any, text: Any) -> dict[str, Any]:
-        self.validate_session(session_id)
-        text = validate_text(text)
-        engine = self._require_current_target()
-        plan = engine.plan_finalization(
-            session_id,
-            self.committed_text,
-            self.provisional_text,
-            text,
-            self.ownership_intact,
-        )
-        # The only revisable range is VOCO's preedit. Clear it before the pure
-        # plan emits at most one non-destructive commit command.
-        self.finalization_pending = True
-        self.provisional_text = ""
-        engine.clear_preedit()
-        engine.execute_finalization(plan)
-        # A final acknowledgement counts exactly the text sent by this lease,
-        # including an owned tail preserved when the requested final differs.
-        # Update only after the engine command succeeds; an exception cannot
-        # masquerade as confirmation of the requested full result.
-        self.committed_text += plan.commit_text
-        outcome = {
-            FinalizationAction.COMMIT: "committed",
-            FinalizationAction.PRESERVE: "preserved",
-        }[plan.action]
-        result = self.status()
-        result["finalizationOutcome"] = outcome
-        self._clear_session()
-        return result
-
-    def checkpoint(
-        self,
-        session_id: Any,
-        expected_committed_text: Any,
-        append_text: Any,
-    ) -> dict[str, Any]:
-        return self._apply_canonical_append(
-            session_id,
-            expected_committed_text,
-            append_text,
-            finish=False,
-        )
-
-    def finish_canonical(
-        self,
-        session_id: Any,
-        expected_committed_text: Any,
-        append_text: Any,
-    ) -> dict[str, Any]:
-        return self._apply_canonical_append(
-            session_id,
-            expected_committed_text,
-            append_text,
-            finish=True,
-        )
-
-    def cancel(self, session_id: Any) -> dict[str, Any]:
-        self.validate_session(session_id)
-        return self._cancel_active()
-
     def disconnect_client(self) -> None:
         self.shortcut_armed_until = 0.0
-        self.pending_trigger = None
         self.trigger_to_deliver = None
-        if self.session_id is not None:
-            try:
-                self._cancel_active()
-            except Exception:
-                self._clear_session()
 
     def status(self) -> dict[str, Any]:
-        engine_active = (
-            self.target_engine is not None
-            and self.target_engine is self.focused_engine
-            and self.target_engine.focus_active
-            and not self.focus_lost
-        )
+        # Protocol 6 has no insertion session. Keep every key that the app's
+        # EngineStatus decoder requires.
         return {
             "ready": True,
             "setupState": "ready",
-            "sessionId": self.session_id,
-            "engineActive": engine_active,
+            "sessionId": None,
+            "engineActive": False,
             "focusLost": self.focus_lost,
-            "progressiveCommitActive": bool(self.committed_text),
-            "committedCharacterCount": len(self.committed_text),
-            "ownershipIntact": self.ownership_intact,
+            "progressiveCommitActive": False,
+            "committedCharacterCount": 0,
+            "ownershipIntact": False,
             "finalizationOutcome": None,
             "error": "",
         }
-
-    def _require_current_target(self) -> "VocoEngine":
-        engine = self.target_engine
-        if (
-            self.focus_lost
-            or engine is None
-            or engine is not self.focused_engine
-            or not engine.focus_active
-            or engine.bound_session_id != self.session_id
-            or not engine.can_accept_preedit
-        ):
-            raise RuntimeError("target text field lost focus")
-        return engine
-
-    def _require_owned_target(self) -> "VocoEngine":
-        engine = self._require_current_target()
-        if not self.ownership_intact:
-            raise RuntimeError("target cursor context changed during dictation")
-        return engine
-
-    def _invalidate_target(self, engine: Optional["VocoEngine"]) -> None:
-        if engine is None:
-            return
-        had_owned_preedit = bool(self.provisional_text)
-        self.focus_lost = True
-        self.ownership_intact = False
-        self.provisional_text = ""
-        engine.invalidate_context()
-        if had_owned_preedit:
-            try:
-                engine.clear_preedit()
-            except Exception:
-                pass
-
-    def _cancel_active(self) -> dict[str, Any]:
-        outcome = "none"
-        engine = self.target_engine
-        had_provisional_text = bool(self.provisional_text)
-        try:
-            if engine is not None:
-                # Preedit is VOCO-owned and may be cleared non-destructively.
-                # The engine never deletes or rewrites committed target text.
-                engine.clear_preedit()
-                if self.committed_text:
-                    outcome = "preserved"
-                elif had_provisional_text:
-                    outcome = "discarded"
-            result = self.status()
-            result["finalizationOutcome"] = outcome
-            return result
-        finally:
-            self._clear_session()
-
-    def _apply_canonical_append(
-        self,
-        session_id: Any,
-        expected_committed_text: Any,
-        append_text: Any,
-        *,
-        finish: bool,
-    ) -> dict[str, Any]:
-        self.validate_session(session_id)
-        if self.finalization_pending:
-            raise RuntimeError("final cursor commit is already being prepared")
-        expected_committed_text = validate_text(expected_committed_text)
-        append_text = validate_text(append_text)
-        if expected_committed_text != self.committed_text:
-            raise ValueError("expected committed text does not match the active session")
-        engine = self._require_owned_target()
-
-        if finish:
-            self.finalization_pending = True
-        engine.commit_canonical_append(append_text)
-        self.committed_text = expected_committed_text + append_text
-        self.provisional_text = ""
-
-        result = self.status()
-        if finish:
-            result["finalizationOutcome"] = "committed"
-            self._clear_session()
-        return result
-
-    def _clear_session(self) -> None:
-        if self.target_engine is not None:
-            self.target_engine.unbind_session()
-        self.session_id = None
-        self.target_engine = None
-        self.committed_text = ""
-        self.provisional_text = ""
-        self.finalization_pending = False
-        self.ownership_intact = True
-        self.focus_lost = False
 
 
 class VocoEngine(IBus.Engine):
@@ -576,11 +271,9 @@ class VocoEngine(IBus.Engine):
             kwargs["has_focus_id"] = True
         super().__init__(**kwargs)
         self.coordinator = coordinator
-        self.ownership_lease = OwnedPreeditLease()
         self.context_revision = 0
         self.focus_active = False
         self.focus_identity: Optional[tuple[str, ...]] = None
-        self.bound_session_id: Optional[int] = None
         self._voco_target_identity: Optional[tuple[str, ...]] = None
         self._voco_target_capabilities = 0
         # With a global IBus engine, one engine instance is reused across real
@@ -597,16 +290,10 @@ class VocoEngine(IBus.Engine):
         self._voco_content_type_known = False
         self._voco_content_type_established = False
         self._voco_content_type_revision: Optional[int] = None
-        self._voco_session_control_hotkeys: tuple[
-            tuple[frozenset[str], int], ...
-        ] = ()
         self._voco_destroyed = False
 
     def do_process_key_event(self, keyval: int, _keycode: int, state: int) -> bool:
-        if self.coordinator.consume_shortcut(self, keyval, state):
-            return True
-        self.coordinator.register_key_event(keyval, state)
-        return False
+        return self.coordinator.consume_shortcut(self, keyval, state)
 
     def do_focus_in(self) -> None:
         self._enter_focus(("legacy",))
@@ -617,18 +304,12 @@ class VocoEngine(IBus.Engine):
         self.coordinator.activate_engine(self)
 
     def do_focus_out(self) -> None:
-        try:
-            self._clear_owned_preedit_before_focus_loss()
-        finally:
-            self._leave_focus()
-            self.coordinator.deactivate_engine(self)
+        self._leave_focus()
+        self.coordinator.deactivate_engine(self)
 
     def do_focus_out_id(self, _object_path: str) -> None:
-        try:
-            self._clear_owned_preedit_before_focus_loss()
-        finally:
-            self._leave_focus()
-            self.coordinator.deactivate_engine(self)
+        self._leave_focus()
+        self.coordinator.deactivate_engine(self)
 
     def _enter_focus(self, identity: tuple[str, ...]) -> None:
         if not self.focus_active:
@@ -637,13 +318,6 @@ class VocoEngine(IBus.Engine):
             self.focus_active = True
             self.focus_identity = identity
             self._clear_content_type_observation()
-            return
-        if self.bound_session_id is not None:
-            # Once text is owned, a legacy callback cannot prove it still
-            # names the same target. Only an exact repeated ID is harmless.
-            if identity[0] == "id" and identity == self.focus_identity:
-                return
-            self._replace_focus_identity(identity)
             return
         if self.focus_identity == ("legacy",) and identity[0] == "id":
             # Some clients deliver the legacy callback immediately before the
@@ -657,20 +331,13 @@ class VocoEngine(IBus.Engine):
         self._replace_focus_identity(identity)
 
     def _replace_focus_identity(self, identity: tuple[str, ...]) -> None:
-        # A target changed without a matching focus-out. Invalidate before
-        # accepting another app command for the new context. Clearing preedit
-        # is non-destructive; committed application text is untouched.
-        try:
-            self._clear_owned_preedit_before_focus_loss()
-        except Exception:
-            pass
-        finally:
-            self.context_revision += 1
-            self.focus_identity = identity
-            self._adopt_focus_target(identity)
-            self._clear_content_type_observation()
-            self.ownership_lease.invalidate()
-            self.coordinator.deactivate_engine(self)
+        # A target changed without a matching focus-out. Revoke the old
+        # context's content proof before it can arm another shortcut.
+        self.context_revision += 1
+        self.focus_identity = identity
+        self._adopt_focus_target(identity)
+        self._clear_content_type_observation()
+        self.coordinator.deactivate_engine(self)
 
     def _adopt_focus_target(self, identity: tuple[str, ...]) -> None:
         if self._is_fake_focus(identity):
@@ -707,54 +374,21 @@ class VocoEngine(IBus.Engine):
         self.focus_active = False
         self.focus_identity = None
         self._clear_content_type_observation()
-        self.ownership_lease.invalidate()
-
-    def _clear_owned_preedit_before_focus_loss(self) -> None:
-        if self.bound_session_id is not None:
-            self.clear_preedit()
-
-    def bind_session(self, session_id: int) -> None:
-        self.bound_session_id = session_id
-        # Bind the exact controls with the ownership lease. Reading/parsing
-        # configuration on every IBus key event would add filesystem latency
-        # to the input path and could change the meaning of an active lease.
-        self._voco_session_control_hotkeys = session_control_hotkey_specs()
-        self.ownership_lease.bind_session(session_id, self.context_revision)
-
-    def unbind_session(self) -> None:
-        self.bound_session_id = None
-        self._voco_session_control_hotkeys = ()
-        self.ownership_lease.unbind_session()
-
-    def invalidate_context(self) -> None:
-        self.ownership_lease.invalidate()
-
-    def do_reset(self) -> None:
-        self.coordinator.register_context_reset(self)
-        self.clear_preedit()
 
     def do_enable(self) -> None:
         pass
 
     def do_disable(self) -> None:
-        try:
-            self._clear_owned_preedit_before_focus_loss()
-        finally:
-            self._leave_focus()
-            self.coordinator.disable_engine(self)
+        self._leave_focus()
+        self.coordinator.disable_engine(self)
 
     def do_destroy(self) -> None:
         if self._voco_destroyed:
             return
         self._voco_destroyed = True
         try:
-            try:
-                self._clear_owned_preedit_before_focus_loss()
-            except Exception:
-                pass
-            finally:
-                self._leave_focus()
-                self.coordinator.deactivate_engine(self)
+            self._leave_focus()
+            self.coordinator.deactivate_engine(self)
         finally:
             super().destroy()
 
@@ -784,22 +418,10 @@ class VocoEngine(IBus.Engine):
         )
 
     def do_set_capabilities(self, capabilities: int) -> None:
-        if int(capabilities) != self._voco_target_capabilities:
-            self.coordinator.pending_trigger = None
         if not self._is_fake_focus(self.focus_identity):
             self._voco_target_capabilities = int(capabilities)
-        if self.bound_session_id is not None and not self.can_accept_preedit:
-            try:
-                self.clear_preedit()
-            finally:
-                self.coordinator.deactivate_engine(self)
 
     def do_set_content_type(self, purpose: int, hints: int) -> None:
-        if (self._voco_content_type_observed and
-                (self._voco_input_purpose != purpose or self._voco_input_hints != int(hints))):
-            # A changed metadata tuple may be the only observable field change
-            # inside a toolkit input context. Never renew an existing proof.
-            self.coordinator.register_context_reset(self)
         raw_hints = int(hints)
         self._voco_content_type_observed = True
         raw_purpose = int(purpose)
@@ -849,66 +471,12 @@ class VocoEngine(IBus.Engine):
             )
             else None
         )
-        if self.bound_session_id is not None and not self.can_accept_preedit:
-            try:
-                self.clear_preedit()
-            finally:
-                self.coordinator.deactivate_engine(self)
 
     def _clear_content_type_observation(self) -> None:
         self._voco_content_type_observed = False
         self._voco_content_type_known = False
         self._voco_content_type_established = False
         self._voco_content_type_revision = None
-
-    def set_preedit(self, text: str) -> None:
-        raise RuntimeError(EXACT_FIELD_REQUIRED)
-
-    def clear_preedit(self) -> None:
-        # No public session can own preedit on this context-only transport.
-        # Reset/focus/disconnect callbacks must not send even an empty
-        # composition update into whichever DOM field is currently selected.
-        return None
-
-    def commit_value(self, text: str) -> None:
-        raise RuntimeError(EXACT_FIELD_REQUIRED)
-
-    def advance_preedit(self, append_text: str, preedit_text: str) -> None:
-        if append_text:
-            self.clear_preedit()
-            self.commit_value(append_text)
-        self.set_preedit(preedit_text)
-
-    def commit_canonical_append(self, append_text: str) -> None:
-        # This pair runs in one private-protocol callback. Only VOCO's current
-        # preedit is cleared; normal application text is never deleted or
-        # rewritten. An empty append is a safe draft-clear checkpoint.
-        self.clear_preedit()
-        self.commit_value(append_text)
-
-    def plan_finalization(
-        self,
-        session_id: int,
-        owned_text: str,
-        owned_preedit_text: str,
-        final_text: str,
-        ownership_intact: bool,
-    ) -> FinalizationPlan:
-        return self.ownership_lease.plan(
-            session_id,
-            self.context_revision,
-            ownership_intact,
-            owned_text,
-            owned_preedit_text,
-            final_text,
-        )
-
-    def execute_finalization(self, plan: FinalizationPlan) -> None:
-        for command in plan.commands():
-            if command.operation == "commit-text":
-                self.commit_value(command.text)
-            else:
-                raise RuntimeError("invalid finalization command")
 
 
 class VocoFactory(IBus.Factory):
@@ -926,36 +494,8 @@ class VocoFactory(IBus.Factory):
         return VocoEngine(self.bus, path, self.coordinator)
 
 
-def validate_text(value: Any) -> str:
-    if not isinstance(value, str):
-        raise ValueError("text must be a string")
-    if len(value.encode("utf-8")) > MAX_TEXT_BYTES:
-        raise ValueError("text exceeds the VOCO preedit safety limit")
-    return value
-
-
 def is_positive_integer(value: Any) -> bool:
     return isinstance(value, int) and not isinstance(value, bool) and value > 0
-
-
-def configured_dictation_hotkey() -> str:
-    config_home = os.environ.get("XDG_CONFIG_HOME", "")
-    base = Path(config_home).expanduser() if config_home else Path.home() / ".config"
-    if not base.is_absolute():
-        base = Path.home() / ".config"
-    path = base / "voco" / "config.json"
-    try:
-        with path.open("rb") as config_file:
-            raw_config = config_file.read(MAX_TEXT_BYTES + 1)
-        if len(raw_config) > MAX_TEXT_BYTES:
-            return DEFAULT_DICTATION_HOTKEY
-        config = json.loads(raw_config.decode("utf-8"))
-    except (OSError, UnicodeError, json.JSONDecodeError):
-        return DEFAULT_DICTATION_HOTKEY
-    hotkey = config.get("hotkey") if isinstance(config, dict) else None
-    if isinstance(hotkey, str) and hotkey.strip():
-        return hotkey.strip()
-    return DEFAULT_DICTATION_HOTKEY
 
 
 def _shortcut_keyval(raw_name: str) -> Optional[int]:
@@ -1057,18 +597,10 @@ def _event_shortcut_keyval(keyval: int) -> int:
 
 
 def session_control_hotkey_specs(
-    dictation_hotkey: Optional[str] = None,
+    dictation_hotkey: str,
 ) -> tuple[tuple[frozenset[str], int], ...]:
-    controls = (
-        configured_dictation_hotkey()
-        if dictation_hotkey is None
-        else dictation_hotkey,
-    )
-    return tuple(
-        specification
-        for control in controls
-        if (specification := _parse_session_hotkey(control)) is not None
-    )
+    specification = _parse_session_hotkey(dictation_hotkey)
+    return () if specification is None else (specification,)
 
 
 def _matches_session_hotkey(
@@ -1083,23 +615,6 @@ def _matches_session_hotkey(
     return (
         actual_modifiers == expected_modifiers
         and _event_shortcut_keyval(keyval) == expected_keyval
-    )
-
-
-def is_session_control_key(
-    keyval: int,
-    state: int,
-    session_hotkeys: Optional[tuple[tuple[frozenset[str], int], ...]] = None,
-) -> bool:
-    if int(state) & int(IBus.ModifierType.RELEASE_MASK):
-        return True
-    if keyval in SESSION_CONTROL_KEYVALS:
-        return True
-    if session_hotkeys is None:
-        session_hotkeys = session_control_hotkey_specs()
-    return any(
-        _matches_session_hotkey(keyval, state, hotkey)
-        for hotkey in session_hotkeys
     )
 
 

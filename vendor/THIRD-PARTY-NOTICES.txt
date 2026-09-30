@@ -5,12 +5,18 @@ Source: https://github.com/gtk-rs/gtk-rs-core
 Local change: upstream RUSTSEC-2024-0429 iterator out-pointer safety backport.
 Full license and provenance: vendor/glib/LICENSE, VOCO-UPSTREAM.json, VOCO-PATCH.md.
 
-Vendored tray-icon 0.23.1, MIT / Apache-2.0
+Vendored tray-icon 0.24.2, MIT / Apache-2.0
 Source: https://github.com/tauri-apps/tray-icon
 Local change: additive caller-owned immutable Linux icon path API.
 Full licenses and provenance: vendor/tray-icon/LICENSE-MIT, LICENSE-APACHE, UPSTREAM-SHA256.json, VOCO-PATCH.md.
 
-Vendored global-hotkey, MIT / Apache-2.0
+Vendored global-hotkey 0.8.0, MIT / Apache-2.0
 Source: https://github.com/tauri-apps/global-hotkey
-Local changes and full provenance: vendor/global-hotkey/VOCO-PATCH.md, VOCO-UPSTREAM.json.
-Full licenses: vendor/global-hotkey/LICENSE-MIT, LICENSE-APACHE.
+Local change: event-driven X11 shortcut actor.
+Full licenses and provenance: vendor/global-hotkey/LICENSE-MIT, LICENSE-APACHE, VOCO-UPSTREAM.json, VOCO-PATCH.md.
+
+Private ydotoold from ydotool 0.1.8 and libuInputPlus 0.1.4, MIT licenses
+Source: Ubuntu noble source packages ydotool 0.1.8 and libuinputplus 0.1.4
+Local changes: socket lifecycle fixes and fewer header dependencies; see vendor/ydotool-legacy/README.md.
+Installed as /usr/libexec/voco/ydotool-legacy/ydotoold.
+Full licenses, build receipts and the notices of the system headers and libraries it uses: vendor/ydotool-legacy/.

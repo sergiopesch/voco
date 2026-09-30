@@ -26,7 +26,7 @@ from voco_ibus_protocol import (
 class ProtocolTests(unittest.TestCase):
     def test_protocol_version_matches_every_private_engine_peer(self) -> None:
         repository_root = Path(__file__).resolve().parents[4]
-        rust_client = (repository_root / "apps/desktop/src-tauri/src/owned_preedit.rs").read_text()
+        rust_client = (repository_root / "apps/desktop/src-tauri/src/ibus_shortcut.rs").read_text()
         smoke_client = (repository_root / "scripts/test-private-ibus-engine.py").read_text()
 
         rust_match = re.search(r"const PROTOCOL_VERSION: u32 = (\d+);", rust_client)

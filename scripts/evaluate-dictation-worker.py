@@ -120,7 +120,7 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--context', type=int, choices=[0, 1], default=1)
     parser.add_argument('--threads', type=int, choices=range(1, 9), default=4)
-    parser.add_argument('--packet-ms', type=int, choices=[20, 40, 50, 100], default=20)
+    parser.add_argument('--packet-ms', type=int, choices=[20, 40, 50, 100], default=100)
     parser.add_argument('--repeats', type=int, choices=range(1, 11), default=1)
     parser.add_argument('--split', choices=['development', 'held-out', 'all'], default='development')
     parser.add_argument('--paced', action='store_true')

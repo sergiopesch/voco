@@ -8,6 +8,7 @@ import {
   clearAudioCaptureBuffer,
   createAudioCaptureBuffer,
 } from "@/lib/audioCaptureBuffer";
+import { AudioCaptureFlushError } from "@/lib/audioCaptureFlush";
 import * as session from "@/lib/dictationSession";
 import {
   createDictationRecording,
@@ -22,7 +23,7 @@ beforeEach(() => {
   ipc.mockReset().mockImplementation(async (command: string, args?: { request?: object }) => {
     if (failing.has(command)) throw new Error("read-only filesystem");
     if (command === "get_crash_journal_epoch") return 1;
-    if (command === "benchmark_stream") return { ...args?.request, mode: "append-only", text: null };
+    if (command === "speech_stream") return { ...args?.request, mode: "append-only", text: null };
   });
 });
 
@@ -42,9 +43,9 @@ function harness() {
   const queue = ref<{ finish(): Promise<{ undelivered: string; uncertain?: boolean }>; cancel(): void } | null>(null);
   const pasteSession = ref(false);
   const state = {
-    config: { transcriptTarget: "cursor", transcriptEnhancement: "off" },
+    config: { hotkey: "Alt+D" },
     recovery: null as unknown, transcript: "", setCaptureNotice: vi.fn(),
-    setSurface: vi.fn(), setRawTranscript: vi.fn(),
+    setSurface: vi.fn(),
     setRecovery: vi.fn((value: unknown) => { state.recovery = value; }),
     selectedDeviceId: null as string | null,
     dictationPurpose: "cursor" as "cursor" | "onboarding",
@@ -67,14 +68,12 @@ function harness() {
     disposedRef: ref(false),
     cancelledRef: cancelled,
     browserDeliveryRef: ref(null),
-    desktopPhraseQueueRef: queue,
+    dictationStreamRef: queue,
     desktopPasteSessionRef: pasteSession,
     desktopStreamedSampleCountRef: ref(0),
     desktopPhrasePasteCountRef: ref(0),
     activeTriggerIdRef: ref<string | undefined>(undefined),
     recoverySessionIdRef: ref<string | null>(null),
-    recoveryWaitRef: ref<{ cancel: () => void } | null>(null),
-    sessionConfigRef: ref(null),
     nativeCaptureRef: ref(null),
     captureDescriptorRef: ref(null),
     captureSelectionRef: ref(captureSelection),
@@ -85,7 +84,6 @@ function harness() {
     initialHotkeyLatencyLoggedRef: ref(false),
     debugNativeCaptureEnabledRef: ref(false),
     audioBufferRef: ref(audioBuffer),
-    cursorDeliveryStateRef: ref("idle"),
     lifecycleEpochRef: ref(0),
     audioContextRef: ref(null),
     primedStreamRef: ref(null),
@@ -94,9 +92,6 @@ function harness() {
     workletFlushRef: ref(null),
     streamRef: ref(null),
     sourceRef: ref(null),
-    workletRef: ref(null),
-    processorRef: ref(null),
-    silentSinkRef: ref(null),
     primedDeviceIdRef: ref(null),
     useStore: { getState: () => state },
     getDesktopPasteStatus: pasteStatus,
@@ -107,7 +102,6 @@ function harness() {
     setCancellationPending: noop,
     setCanCancel: noop,
     setStatus: noop,
-    setInterimTranscript: noop,
     setTranscript: noop,
     setError,
     setMicrophoneReadyState: vi.fn(),
@@ -189,7 +183,88 @@ it("reaches source selection from input readiness alone, with no destination bin
   expect(h.trace).toHaveBeenCalledWith("dictation_desktop_paste_session_started");
   // The fixture stops at source selection, after every destination check.
   expect(h.captureSelection).toHaveBeenCalledOnce();
-  expect(h.setError).toHaveBeenLastCalledWith("Choose a microphone in Audio settings.");
+  expect(h.setError).toHaveBeenLastCalledWith("Choose a microphone in Microphone settings.");
+});
+
+it("notifies a live recognition failure once, not again at Stop", async () => {
+  const h = harness();
+  failing.add("speech_stream");
+  h.env.captureSelectionRef.current = () => ({ backend: "native", selectionToken: "fixture-source" });
+  vi.mocked(h.env.beginNativeCapture).mockResolvedValue({
+    descriptor: {}, cancel: vi.fn(async () => {}), startDelivery: vi.fn(),
+  } as unknown as NativeCaptureSession);
+  const interrupted = () => h.notify.mock.calls.filter(([title]) => title === "Dictation interrupted");
+  await h.startRecording();
+  await vi.waitFor(() => expect(interrupted()).toHaveLength(1));
+  expect(interrupted()[0]![1]).toBe("Some words may be missing. Stop dictation and check your text field.");
+  await h.stopRecording();
+  expect(h.phase.current).toBe("idle");
+  expect(h.setError).toHaveBeenLastCalledWith("read-only filesystem.");
+  expect(interrupted()).toHaveLength(1);
+  // Live failures notify instead of setting a notice the popover cannot show.
+  expect(h.state.setCaptureNotice.mock.calls.every(([notice]) => notice === null)).toBe(true);
+});
+
+it("notifies an unverified desktop recording once, at start", async () => {
+  const h = harness();
+  h.env.captureSelectionRef.current = () => ({ backend: "webkit" });
+  vi.mocked(h.env.ensureAudioContext).mockResolvedValue({
+    sampleRate: 16000, createMediaStreamSource: vi.fn(() => ({})),
+  } as unknown as AudioContext);
+  vi.mocked(h.env.openTracedMicrophoneStream).mockResolvedValue({
+    getTracks: () => [], getAudioTracks: () => [],
+  } as unknown as MediaStream);
+  vi.mocked(h.env.connectWorklet).mockResolvedValue(false);
+  await h.startRecording();
+  expect(h.phase.current).toBe("recording");
+  expect(h.notify).toHaveBeenCalledExactlyOnceWith("Dictation won't be typed",
+    "VOCO can't confirm it is receiving all of your audio, so it won't type this recording. Stop and try again.");
+  appendAudioSamples(h.env.audioBufferRef.current, new Float32Array([0.125, -0.25]));
+  await h.stopRecording();
+  expect(h.phase.current).toBe("idle");
+  expect(h.setError).toHaveBeenLastCalledWith("VOCO couldn't confirm it received all of your audio, so it didn't type this recording. Try again.");
+  expect(h.notify).toHaveBeenCalledOnce();
+});
+
+it("keeps the start notice as the only one when Stop cannot flush unverified audio", async () => {
+  const h = harness();
+  h.env.captureSelectionRef.current = () => ({ backend: "webkit" });
+  vi.mocked(h.env.ensureAudioContext).mockResolvedValue({
+    sampleRate: 16000, createMediaStreamSource: vi.fn(() => ({})),
+  } as unknown as AudioContext);
+  vi.mocked(h.env.openTracedMicrophoneStream).mockResolvedValue({
+    getTracks: () => [], getAudioTracks: () => [],
+  } as unknown as MediaStream);
+  vi.mocked(h.env.connectWorklet).mockResolvedValue(false);
+  vi.mocked(h.env.teardownAudioGraph).mockRejectedValue(new AudioCaptureFlushError());
+  await h.startRecording();
+  appendAudioSamples(h.env.audioBufferRef.current, new Float32Array([0.125, -0.25]));
+  await h.stopRecording();
+  expect(h.phase.current).toBe("idle");
+  expect(h.setError).toHaveBeenLastCalledWith("VOCO couldn't confirm it received all of your audio, so it didn't type this recording. Try again.");
+  expect(h.notify).toHaveBeenCalledExactlyOnceWith("Dictation won't be typed", expect.any(String));
+});
+
+it("still notifies when an interruption ends a noticed session before Stop", async () => {
+  const h = harness();
+  h.env.captureSelectionRef.current = () => ({ backend: "webkit" });
+  vi.mocked(h.env.ensureAudioContext).mockResolvedValue({
+    sampleRate: 16000, createMediaStreamSource: vi.fn(() => ({})),
+  } as unknown as AudioContext);
+  vi.mocked(h.env.openTracedMicrophoneStream).mockResolvedValue({
+    getTracks: () => [], getAudioTracks: () => [],
+  } as unknown as MediaStream);
+  vi.mocked(h.env.connectWorklet).mockResolvedValue(false);
+  await h.startRecording();
+  expect(h.notify).toHaveBeenCalledExactlyOnceWith("Dictation won't be typed", expect.any(String));
+  appendAudioSamples(h.env.audioBufferRef.current, new Float32Array([0.125, -0.25]));
+  await h.cancelRecording("The microphone disconnected or stopped capturing audio.");
+  expect(h.phase.current).toBe("idle");
+  expect(h.setError).toHaveBeenLastCalledWith("The microphone disconnected or stopped capturing audio.");
+  // Without this, the next shortcut press would start a new recording
+  // while the user still expects it to stop this one.
+  expect(h.notify).toHaveBeenLastCalledWith("Dictation interrupted", "Some words may be missing. Check your text field before starting again.");
+  expect(h.notify).toHaveBeenCalledTimes(2);
 });
 
 it("does not query desktop input for an explicit browser recording", async () => {
@@ -199,7 +274,7 @@ it("does not query desktop input for an explicit browser recording", async () =>
   expect(h.pasteStatus).not.toHaveBeenCalled();
 });
 
-it("records without a crash checkpoint when the journal cannot open", async () => {
+it("records without a crash checkpoint when the journal cannot open, notifying once per launch", async () => {
   const h = harness();
   failing.add("begin_crash_journal");
   h.env.captureSelectionRef.current = () => ({ backend: "native", selectionToken: "fixture-source" });
@@ -211,7 +286,12 @@ it("records without a crash checkpoint when the journal cannot open", async () =
   expect(h.phase.current).toBe("recording");
   expect(h.queue.current).not.toBeNull();
   expect(h.setError).not.toHaveBeenCalled();
-  expect(h.notify).toHaveBeenCalledExactlyOnceWith("Crash recovery unavailable", "Dictation continues without a crash recovery checkpoint.");
+  expect(h.notify).toHaveBeenCalledExactlyOnceWith("Crash recovery unavailable", "Dictation continues, but VOCO can't recover it if VOCO exits unexpectedly.");
+  await h.stopRecording();
+  expect(h.phase.current).toBe("idle");
+  await h.startRecording();
+  expect(h.phase.current).toBe("recording");
+  expect(h.notify).toHaveBeenCalledOnce();
   h.unmount();
   expect(journalDeletions()).toEqual([]);
 });
@@ -358,7 +438,7 @@ it("keeps the dictation in Review when the Stop clipboard copy fails", async () 
   expect(journalCalls("keep_crash_journal")).toEqual([h.env.recoverySessionIdRef.current]);
   expect(journalDeletions()).toEqual([]);
   expect(h.trace).toHaveBeenCalledWith("dictation_desktop_remainder_kept");
-  expect(h.notify).toHaveBeenLastCalledWith("Dictation saved in Review", expect.stringContaining("Review in the VOCO tray menu"));
+  expect(h.notify).toHaveBeenLastCalledWith("Dictation saved in Review", expect.stringContaining("Review in VOCO's menu"));
   expect(h.setError).not.toHaveBeenCalledWith(expect.any(String));
   expect(h.state.recovery).toBeNull();
   expect(h.phase.current).toBe("idle");
@@ -447,7 +527,7 @@ it("onboarding retains its successful test text and does not create a cursor res
 it("handled unmount resets cursor store content and state", () => {
   const h = harness();
   h.state.transcript = "Synthetic in-flight text.";
-  h.state.recovery = { audioAvailable: true };
+  h.state.recovery = { reason: "Voice test stopped." };
   h.phase.current = "recording";
   h.unmount();
   expect(h.state.transcript).toBe("");

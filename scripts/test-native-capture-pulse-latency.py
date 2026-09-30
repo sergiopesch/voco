@@ -14,7 +14,7 @@ import sys
 import time
 import wave
 
-from test_native_wayland_capture import capture_continuity, pcm16
+from audio_continuity import capture_continuity, pcm16
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / 'apps/desktop/src-tauri/native/native_capture_pulse.c'
@@ -261,7 +261,7 @@ def main():
                          '-I' + str(SOURCE.parent), str(output / 'source.c'), '-o', str(output / 'bridge.so')] + flags
     (output / 'build.json').write_text(json.dumps({'argv': command, 'sourceSha256': digest(output / 'source.c'),
         'headerSha256': digest(SOURCE.with_suffix('.h')), 'scriptSha256': digest(Path(__file__)),
-        'continuityHelperSha256': digest(ROOT / 'scripts/test_native_wayland_capture.py')}, indent=2) + '\n')
+        'continuityHelperSha256': digest(ROOT / 'scripts/audio_continuity.py')}, indent=2) + '\n')
     subprocess.run(command, check=True, timeout=60)
     # Explicit server plus network/PID/device isolation rules out host microphones,
     # host Pulse sockets and uinput. Only the evidence directory is writable.

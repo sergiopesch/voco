@@ -19,7 +19,7 @@ pub fn request() -> Result<(), String> {
                 std::io::ErrorKind::NotFound | std::io::ErrorKind::ConnectionRefused) => {
                 std::thread::sleep(Duration::from_millis(25));
             }
-            Err(_) => return Err("VOCO is running but could not receive the launcher request. Use its tray menu, or quit and reopen VOCO after upgrading.".to_string()),
+            Err(_) => return Err("VOCO is running but could not receive the launcher request. Use its tray or panel menu, or quit and reopen VOCO after upgrading.".to_string()),
         }
     }
 }

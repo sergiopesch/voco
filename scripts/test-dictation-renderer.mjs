@@ -45,8 +45,7 @@ const results = [];
 const nativeMock = `
 export const calls = window.nativeCalls = [];
 const state = () => ({ sessionId: 101, setupState: "ready", engineActive: true, focusLost: false, ownershipIntact: true, finalizationOutcome: "committed", committedCharacterCount: 0 });
-export const startOwnedPreedit = async (...args) => { calls.push(['startOwnedPreedit', ...args]); if(window.deferLease) await new Promise(resolve=>window.resolveLease=resolve); if (!window.lease) throw new Error('No eligible original field'); return state(); };
-export const getOwnedPreeditStatus = async () => state();
+export const startBrowserField = async (...args) => { calls.push(['startBrowserField', ...args]); if(window.deferLease) await new Promise(resolve=>window.resolveLease=resolve); if (!window.lease) throw new Error('No eligible original field'); return state(); };
 export const getDesktopInputStatus = async () => ({available:!window.pasteUnavailable,detail:"Paste helper unavailable"});
 export const getPanelSetupStatus = async () => ({status:'other-desktop',detail:'Use the tray menu.',canEnable:false});
 export const enableGnomePanel = getPanelSetupStatus;
@@ -56,20 +55,16 @@ export const getDesktopPasteStatus = async () => ({enabled:Boolean(window.deskto
 const bytes = text => new TextEncoder().encode(text).length;
 export const pasteDesktopText = async (text) => { calls.push(['pasteDesktopText',text]); if(window.failPaste) throw {outcome:window.pasteOutcome ?? 'uncertain',message:'Uncertain paste dispatch',clipboardChanged:true}; return {strategy:'clipboard',outcome:'dispatched',pasteMetrics:{preflightMs:5,settleMs:0,modifierWaitMs:12,clipboardMs:8,keyboardMs:350,leadingSeparator:false,routedUtf8Bytes:bytes(text),payloadUtf8Bytes:bytes(text),payloadUnicodeScalars:Array.from(text).length,payloadUtf16Units:text.length}}; };
 export const copyDesktopText = async (text) => { calls.push(['copyDesktopText',text]); if(window.failCopy) throw {outcome:'uncertain',message:'Clipboard helper failed',clipboardChanged:false}; };
-export const cancelOwnedPreedit = async (...args) => { calls.push(['cancelOwnedPreedit',...args]); return state(); };
+export const cancelBrowserField = async (...args) => { calls.push(['cancelBrowserField',...args]); return state(); };
 export const releaseBrowserRecording = async (triggerId) => { calls.push(['releaseBrowserRecording',triggerId]); };
 export const ackBrowserStop = async (triggerId) => { calls.push(['ackBrowserStop',triggerId]); };
-export const commitOwnedPreedit = async (id,text) => { calls.push(['commitOwnedPreedit',id,text]); if(window.deferCommit) await new Promise(resolve=>window.resolveCommit=resolve); window.commitReturned=true; if(window.focusChanged) throw new Error('Original field lost focus'); return {...state(), committedCharacterCount: Array.from(text).length}; };
-export const checkpointOwnedPreedit = async (id,prefix,text) => { calls.push(['checkpointOwnedPreedit',id,prefix,text]); if(window.deferCheckpoint) await new Promise(resolve=>window.resolveCheckpoint=resolve); return {...state(), focusLost:Boolean(window.focusChanged), committedCharacterCount:Array.from(prefix+text).length}; };
-export const finishCanonicalOwnedPreedit = async (id,prefix,text) => { calls.push(['finishCanonicalOwnedPreedit',id,prefix,text]); return {...state(), focusLost:Boolean(window.focusChanged), committedCharacterCount:Array.from(prefix+text).length}; };
-export const debugDictationCaptureEnabled = async () => false;
+export const appendBrowserField = async (id,prefix,text) => { calls.push(['appendBrowserField',id,prefix,text]); if(window.deferCheckpoint) await new Promise(resolve=>window.resolveCheckpoint=resolve); return {...state(), focusLost:Boolean(window.focusChanged), committedCharacterCount:Array.from(prefix+text).length}; };
+export const finishBrowserField = async (id,prefix) => { calls.push(['finishBrowserField',id,prefix]); return {...state(), focusLost:Boolean(window.focusChanged), committedCharacterCount:Array.from(prefix).length}; };
 export const debugNativeCaptureEnabled = async () => false;
 export const saveDebugNativeRetainedSource = async () => null;
 export const traceHotkeyEvent = async (...args) => {(window.traceEvents??=[]).push(args);};
 export const refreshShortcutHeartbeat = async (ready) => {calls.push(['refreshShortcutHeartbeat',ready]);};
 export const showNotification = async (...args) => { calls.push(['showNotification',...args]); };
-export const updateOwnedPreedit = async () => state();
-export const saveDebugDictationCapture = async () => null;
 export const insertText = async () => { calls.push(['insertText']); throw new Error('Unsafe generic delivery attempted'); };
 `;
 await page.route('**/src/lib/tauri.ts*', route => route.fulfill({ contentType: 'application/javascript', body: nativeMock }));
@@ -88,7 +83,7 @@ const {useStore} = await import(storeImport);
 for (const weight of [400,500,600,700]) await import('/@fs/' + ${JSON.stringify(root)} + '/node_modules/@fontsource/geist/latin-' + weight + '.css');
 await import('/src/styles.css');
 window.store = useStore;
-const config = {hotkey:'Alt+D',selectedMic:null,insertionStrategy:'auto',transcriptTarget:'cursor',liveCursorMode:'final-text-only',transcriptEnhancement:'off',onboardingCompleted:true,updateChannel:'stable',installChannel:'github-release',voiceProfile:'default'};
+const config = {hotkey:'Alt+D',selectedMic:null,onboardingCompleted:true,updateChannel:'stable',installChannel:'github-release'};
 useStore.getState().setConfig(config); useStore.getState().setSurface('popover');
 const noop = async () => {};
 function Harness() {
@@ -97,7 +92,7 @@ function Harness() {
  useGlobalShortcut(hook.toggle,()=>true,Boolean(window.shortcutReady),0,()=>{});
  return React.createElement(React.Fragment,null,
 
- React.createElement(ControlPanel,{surface:state.surface,onboardingStep:0,config:state.config,errorMessage:state.error,statusLabel:deriveStatusLabel({configurationError:false,hasRecovery:Boolean(state.recovery),manualTranscriptReady:state.recovery?.kind==='manual-copy',cursorDeliveryState:hook.cursorDeliveryState,cursorRequired:true,cursorSetupState:'ready',dictationStatus:state.status,microphonePermission:'granted',microphoneReady:true,}),updateState:state.updateState,runtimeDiagnostics:null,dictationStatus:state.status,cursorDeliveryState:hook.cursorDeliveryState,transcript:state.transcript,rawTranscript:state.rawTranscript,recovery:state.recovery,captureNotice:state.captureNotice,canCancelDictation:hook.canCancel,cancellationPending:hook.cancellationPending,onCancelDictation:()=>void hook.cancelRecording(),onRetryRecovery:()=>void hook.retryRecovery(),onDiscardRecovery:hook.discardRecovery,requestedSection:'General',requestedSectionRequestId:0,selectedDeviceId:null,availableDevices:[],microphonePermission:'granted',onSurfaceChange:surface=>state.setSurface(surface),onOnboardingStepChange:()=>{},onConfigChange:noop,onRefreshDevices:noop,onRequestMicrophoneAccess:noop,onCheckForUpdates:noop,onOpenReleasePage:noop,onRefreshRuntimeDiagnostics:noop,onOpenSettings:noop}));
+ React.createElement(ControlPanel,{surface:state.surface,config:state.config,errorMessage:state.error,statusLabel:deriveStatusLabel({configurationError:false,cursorRequired:false,cursorSetupState:'ready',dictationStatus:state.status,microphonePermission:'granted',microphoneReady:true,}),updateState:state.updateState,runtimeDiagnostics:null,dictationStatus:state.status,captureNotice:state.captureNotice,canCancelDictation:hook.canCancel,cancellationPending:hook.cancellationPending,onCancelDictation:()=>void hook.cancelRecording(),requestedSection:'General',requestedSectionRequestId:0,selectedDeviceId:null,availableDevices:[],microphonePermission:'granted',onSurfaceChange:surface=>state.setSurface(surface),onConfigChange:noop,onRefreshDevices:noop,onRequestMicrophoneAccess:noop,onCheckForUpdates:noop,onOpenReleasePage:noop,onRefreshRuntimeDiagnostics:noop,onOpenSettings:noop}));
 }
 window.reactRoot = createRoot(document.getElementById('root')); window.reactRoot.render(React.createElement(React.StrictMode,null,React.createElement(Harness)));
 window.remountHarness = () => { window.reactRoot = createRoot(document.getElementById('root')); window.reactRoot.render(React.createElement(React.StrictMode,null,React.createElement(Harness))); };
@@ -112,32 +107,24 @@ await page.addInitScript(() => {
  window.tracks = [];
  // Exercise the real append-only queue against an explicit native IPC double.
  // No alternate recognition transport exists.
- window.benchmarkRequests = [];
- window.benchmarkAudioSamples = 0;
+ window.speechRequests = [];
+ window.speechAudioSamples = 0;
  window.__TAURI_INTERNALS__ = {invoke: async (command, args) => {
    if(command === 'get_crash_journal_epoch') return 1;
    if(command.endsWith('_crash_journal')) { (window.journalCalls??=[]).push([command,args]); if(command === 'keep_crash_journal' && window.failKeep) throw new Error('Synthetic Review failure'); return; }
    const {request}=args;
-   if(command === 'recover_stream') {
-     (window.recoveryRequests ??= []).push(request);
-     if(request.op === 'push' && window.deferRecovery) {
-       await new Promise(resolve => window.resolveRecovery = resolve);
-     }
-     if(window.failRecovery && request.op === 'push') throw new Error('Synthetic recovery worker failure');
-     return {session:request.session,seq:request.seq,mode:'append-only',text:request.op==='finish'?'Recovered with bundled NVIDIA.':null};
-   }
-   if(command !== 'benchmark_stream') throw new Error('Unexpected native command: ' + command);
-   window.benchmarkRequests.push(request);
+   if(command !== 'speech_stream') throw new Error('Unexpected native command: ' + command);
+   window.speechRequests.push(request);
    if(request.op === 'warmup' || request.op === 'diagnostic' || request.op === 'quality') return {};
    if(request.op === 'start') {
      if(request.seq !== 0 || typeof request.session !== 'string') throw new Error('Invalid stream start');
-     window.benchmarkSession = request.session;
-     window.benchmarkSequence = 0;
-     window.benchmarkAudioSamples = 0;
-   } else if(request.session !== window.benchmarkSession || request.seq <= window.benchmarkSequence) {
+     window.speechSession = request.session;
+     window.speechSequence = 0;
+     window.speechAudioSamples = 0;
+   } else if(request.session !== window.speechSession || request.seq <= window.speechSequence) {
      throw new Error('Stream request identity or sequence changed');
    }
-   window.benchmarkSequence = request.seq;
+   window.speechSequence = request.seq;
    let text = null;
    if(request.op === 'push') {
      if(request.rate !== 16000 || !Array.isArray(request.audio) || !request.audio.length ||
@@ -146,9 +133,9 @@ await page.addInitScript(() => {
        await new Promise(resolve => window.resolveInference = resolve);
        window.deferInference = false;
      }
-     window.benchmarkAudioSamples += request.audio.length;
+     window.speechAudioSamples += request.audio.length;
      const plan = window.streamTextAt ?? [{samples:16000,text:'Recovered words'}];
-     text = plan.filter(item => item.samples <= window.benchmarkAudioSamples).at(-1)?.text ?? null;
+     text = plan.filter(item => item.samples <= window.speechAudioSamples).at(-1)?.text ?? null;
    } else if(request.op === 'finish') {
      text = window.streamFinalText ?? 'Recovered words for manual review.';
    } else if(!['start','cancel'].includes(request.op)) throw new Error('Unexpected stream operation');
@@ -206,22 +193,22 @@ results.push('Unavailable cursor delivery fails closed before capture; no manual
 await load();await page.evaluate(()=>{window.lease=true;window.hook.toggle('browser:fixture','start');});
 await page.waitForFunction(()=>window.store.getState().status==='recording');
 await page.evaluate(()=>window.samples(1));
-await page.waitForFunction(()=>window.nativeCalls.some(c=>c[0]==='checkpointOwnedPreedit'));
+await page.waitForFunction(()=>window.nativeCalls.some(c=>c[0]==='appendBrowserField'));
 await page.evaluate(()=>window.hook.toggle('browser:fixture','stop'));
 await page.waitForFunction(()=>window.store.getState().status==='idle');
-assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='checkpointOwnedPreedit').map(c=>c.slice(2))),[['','Recovered words'],['Recovered words',' for manual review.']]);
-assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='finishCanonicalOwnedPreedit').map(c=>c.slice(2))),[['Recovered words for manual review.','']]);
+assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='appendBrowserField').map(c=>c.slice(2))),[['','Recovered words'],['Recovered words',' for manual review.']]);
+assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='finishBrowserField').map(c=>c.slice(2))),[['Recovered words for manual review.']]);
 assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>['pasteDesktopText','copyDesktopText','insertText'].includes(c[0]))),false);
 results.push('Browser recording streams Nemotron suffixes through its exact field lease and finalizes without replay.');
 
 await load();await page.evaluate(()=>{window.lease=true;window.focusChanged=true;window.hook.toggle('browser:fixture','start');});
 await page.waitForFunction(()=>window.store.getState().status==='recording');
 await page.evaluate(()=>window.samples(1));
-await page.waitForFunction(()=>window.nativeCalls.some(c=>c[0]==='checkpointOwnedPreedit'));
+await page.waitForFunction(()=>window.nativeCalls.some(c=>c[0]==='appendBrowserField'));
 await page.evaluate(()=>window.hook.toggle('browser:fixture','stop'));
 await page.waitForFunction(()=>window.store.getState().status==='idle',null,{timeout:6000});
-assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='checkpointOwnedPreedit').length),1);
-assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>c[0]==='finishCanonicalOwnedPreedit')),false);
+assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='appendBrowserField').length),1);
+assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>c[0]==='finishBrowserField')),false);
 // As after a failed paste, Stop copies the words the field may not have taken.
 assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='copyDesktopText').map(c=>c[1])),['Recovered words for manual review.']);
 assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>c[0]==='showNotification'&&c[1]==='Dictation copied to clipboard')),true);
@@ -242,7 +229,7 @@ await load();await page.evaluate(()=>{window.desktopPaste=true;window.desktopStr
 await start(0.5);
 await page.evaluate(()=>{window.captureWorklet.port.postMessage=()=>{};});
 await stop();await interrupted();
-assert.equal(await page.evaluate(()=>window.benchmarkRequests.some(r=>r.op==='finish')),false);
+assert.equal(await page.evaluate(()=>window.speechRequests.some(r=>r.op==='finish')),false);
 assert.match(await page.evaluate(()=>window.store.getState().error),/end of this recording/);
 results.push('A missing capture-flush receipt cannot finish recognition or deliver a final suffix.');
 // Default NVIDIA route must honor the same capture-completeness policy.
@@ -254,10 +241,16 @@ for (const failure of ['module', 'construction']) {
   },failure);
   await start(1);
   assert.equal(await page.evaluate(()=>Boolean(window.processor?.onaudioprocess)),true);
-  assert.equal(await page.evaluate(()=>window.benchmarkRequests.some(r=>['start','push'].includes(r.op))),false);
+  assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>c[0]==='showNotification'&&c[1]==="Dictation won't be typed")),true);
+  assert.equal(await page.evaluate(()=>window.store.getState().captureNotice),null);
+  assert.equal(await page.evaluate(()=>window.speechRequests.some(r=>['start','push'].includes(r.op))),false);
   assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>c[0]==='pasteDesktopText')),false);
   await stop();await interrupted();
   assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>['transcribeAudio','pasteDesktopText'].includes(c[0]))),false);
+  // Start already said this recording won't be typed, so Stop only sets the error.
+  const fallbackNotes = await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='showNotification'));
+  assert.deepEqual(fallbackNotes.map(c=>c[1]), ["Dictation won't be typed"], JSON.stringify(fallbackNotes));
+  assert.match(await page.evaluate(()=>window.store.getState().error), /didn't type this recording/);
   assert.equal(await page.getByRole('button',{name:'Retry transcription',exact:true}).count(),0);
   assert.equal(await page.evaluate(()=>window.journalCalls.at(-1)[0]),'finish_crash_journal');
   results.push(`NVIDIA ${failure} fallback never inserts unverified audio and clears controlled-failure content.`);
@@ -270,7 +263,7 @@ await page.waitForFunction(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktop
 assert.equal(await page.evaluate(()=>window.store.getState().status),'recording');
 await page.evaluate(()=>window.samples(1));await stop();await page.waitForFunction(()=>window.store.getState().status==='idle');
 assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length),2);
-assert.equal(await page.evaluate(()=>window.benchmarkRequests.filter(r=>['start','push','finish'].includes(r.op)).every((r,index)=>r.seq===index)),true);
+assert.equal(await page.evaluate(()=>window.speechRequests.filter(r=>['start','push','finish'].includes(r.op)).every((r,index)=>r.seq===index)),true);
 assert.equal(await page.evaluate(()=>window.traceEvents.filter(c=>c[0]==='dictation_desktop_first_phrase_dispatched').length),1);
 assert.equal(await page.evaluate(()=>window.traceEvents.filter(c=>c[0]==='dictation_desktop_modifier_wait_completed').length),2);
 assert.equal(await page.evaluate(()=>window.traceEvents.find(c=>c[0]==='dictation_desktop_keyboard_dispatch_completed')[1].durationMs),350);
@@ -279,19 +272,21 @@ await load();await page.evaluate(()=>{window.desktopPaste=true;window.desktopStr
 await start();await page.evaluate(()=>window.captureWorklet.port.onmessage({data:{type:'samples',data:new Float32Array(16000)}}));
 await page.waitForFunction(()=>Boolean(window.resolveInference));
 await page.evaluate(()=>{void window.hook.cancelRecording();});await page.evaluate(()=>window.resolveInference());
-await page.waitForFunction(()=>window.benchmarkRequests.some(r=>r.op==='cancel'));
+await page.waitForFunction(()=>window.speechRequests.some(r=>r.op==='cancel'));
 assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length),0);
 results.push('Cancellation while a progressive worker request is in flight drains the cancel command and suppresses its late paste.');
 for (const [failCopy, failKeep] of [[false, false], [true, false], [true, true]]) {
   await load();await page.evaluate(([failCopy,failKeep])=>{window.desktopPaste=true;window.desktopStream=true;window.failPaste=true;window.failCopy=failCopy;window.failKeep=failKeep;},[failCopy,failKeep]);
   await start();await page.evaluate(()=>window.captureWorklet.port.onmessage({data:{type:'samples',data:new Float32Array(16000)}}));
   await page.waitForFunction(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length===1);
+  // Recognition keeps running after a delivery failure, so the live notice says so.
+  await page.waitForFunction(()=>window.nativeCalls.some(c=>c[0]==='showNotification'&&c[1]==='VOCO stopped typing'));
   await page.evaluate(()=>window.samples(1));await stop();
   if (failKeep) await interrupted();
   else await page.waitForFunction(()=>window.store.getState().status==='idle',null,{timeout:6000});
   assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length),1);
   assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='copyDesktopText').map(c=>c[1])),['Recovered words for manual review.']);
-  assert.equal(await page.evaluate(()=>window.benchmarkAudioSamples),48000);
+  assert.equal(await page.evaluate(()=>window.speechAudioSamples),48000);
   assert.equal(await page.evaluate(()=>window.store.getState().transcript),'');
   assert.equal(await page.evaluate(()=>window.store.getState().recovery),null);
   assert.notEqual(await page.evaluate(()=>window.store.getState().surface),'review');
@@ -313,7 +308,7 @@ assert.ok(deferredPastes.length >= 4, 'Stop retries the deferred text');
 assert.ok(deferredPastes.every(text=>text.startsWith('Recovered words')), 'Deferred text is retried whole from its first word');
 assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='copyDesktopText').map(c=>c[1])),['Recovered words for manual review.']);
 assert.equal(await page.evaluate(()=>window.store.getState().error),null);
-assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>c[0]==='showNotification'&&c[1]==='Dictation interrupted')),false);
+assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>c[0]==='showNotification'&&['Dictation interrupted','VOCO stopped typing'].includes(c[1]))),false);
 assert.equal(await page.evaluate(()=>window.traceEvents.filter(c=>c[0]==='dictation_desktop_remainder_copied').length),1);
 results.push('A paste that types nothing never interrupts dictation: the whole pending text is retried, then copied to the clipboard at Stop.');
 
@@ -329,13 +324,13 @@ await page.evaluate(()=>{
    window.captureWorklet.port.onmessage({data:{type:'samples',data:batch.slice(from,to)}});
  }
 });
-await page.waitForFunction(()=>window.benchmarkAudioSamples===32000);
+await page.waitForFunction(()=>window.speechAudioSamples===32000);
 assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length),0);
 await stop(); await page.waitForFunction(()=>window.store.getState().status==='idle');
-assert.deepEqual(await page.evaluate(()=>window.benchmarkRequests.filter(r=>r.op==='push').flatMap(r=>r.audio)),await page.evaluate(()=>window.expectedStreamAudio));
-assert.deepEqual(await page.evaluate(()=>window.benchmarkRequests.filter(r=>r.op==='push').map(r=>r.audio.length)),[...Array(20).fill(1600),321]);
+assert.deepEqual(await page.evaluate(()=>window.speechRequests.filter(r=>r.op==='push').flatMap(r=>r.audio)),await page.evaluate(()=>window.expectedStreamAudio));
+assert.deepEqual(await page.evaluate(()=>window.speechRequests.filter(r=>r.op==='push').map(r=>r.audio.length)),[...Array(20).fill(1600),321]);
 assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').map(c=>c[1])),['Exact captured samples.']);
-assert.equal(await page.evaluate(()=>window.benchmarkRequests.filter(r=>r.op==='finish').length),1);
+assert.equal(await page.evaluate(()=>window.speechRequests.filter(r=>r.op==='finish').length),1);
 results.push('Irregular callbacks retain every speech and silence sample in 100 ms packets, flush the partial tail exactly once, and deliver only the final recognized text.');
 
 await load(); await page.evaluate(()=>{
@@ -345,7 +340,7 @@ await load(); await page.evaluate(()=>{
 });
 await start(0);
 await page.evaluate(()=>window.samples(0.8));
-await page.waitForFunction(()=>window.benchmarkAudioSamples===12800);
+await page.waitForFunction(()=>window.speechAudioSamples===12800);
 assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length),0);
 await page.evaluate(()=>window.samples(0.2));
 await page.waitForFunction(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length===1);
@@ -355,13 +350,13 @@ await page.evaluate(()=>window.samples(0.3));
 await page.waitForFunction(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length===2);
 assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').map(c=>c[1])),['Words appe','ar during speech']);
 await page.evaluate(()=>window.samples(0.25));
-await page.waitForFunction(()=>window.benchmarkAudioSamples===24000);
+await page.waitForFunction(()=>window.speechAudioSamples===24000);
 assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length),2);
 await stop(); await page.waitForFunction(()=>window.store.getState().status==='idle');
 assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').map(c=>c[1])),['Words appe','ar during speech',' before stopping now.']);
 assert.equal(await page.evaluate(()=>window.traceEvents.filter(c=>c[0]==='dictation_desktop_live_prefix_dispatched').length),3);
 assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>['previewTranscribeAudio','transcribeAudio'].includes(c[0])).length),0);
-assert.equal(await page.evaluate(()=>window.benchmarkRequests.filter(r=>r.op==='finish').length),1);
+assert.equal(await page.evaluate(()=>window.speechRequests.filter(r=>r.op==='finish').length),1);
 await screenshot('continuous-speech-finished.png');
 results.push('Uninterrupted input appends partial words exactly as the worker responds, suppresses repeated hypotheses, and Stop adds only the remaining suffix without legacy re-decoding.');
 
@@ -371,13 +366,13 @@ await start(0);
 // multi-minute backlog intentionally rejected by the three-second queue bound.
 for(let second=1;second<=300;second++) {
  await page.evaluate(()=>window.samples(1));
- await page.waitForFunction(samples=>window.benchmarkAudioSamples===samples,second*16000);
+ await page.waitForFunction(samples=>window.speechAudioSamples===samples,second*16000);
 }
-assert.equal(await page.evaluate(()=>window.benchmarkRequests.filter(r=>r.op==='push').length),3000);
-assert.equal(await page.evaluate(()=>window.benchmarkRequests.some(r=>r.op==='diagnostic')),false);
+assert.equal(await page.evaluate(()=>window.speechRequests.filter(r=>r.op==='push').length),3000);
+assert.equal(await page.evaluate(()=>window.speechRequests.some(r=>r.op==='diagnostic')),false);
 assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>['previewTranscribeAudio','transcribeAudio'].includes(c[0]))),false);
 await stop(); await page.waitForFunction(()=>window.store.getState().status==='idle');
-assert.equal(await page.evaluate(()=>window.benchmarkRequests.filter(r=>r.op==='finish').length),1);
+assert.equal(await page.evaluate(()=>window.speechRequests.filter(r=>r.op==='finish').length),1);
 assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').map(c=>c[1])),['Long stream completed.']);
 results.push('Five minutes of simulated captured audio maintains sequenced 100 ms IPC packets, avoids whole-history decoding and finishes once after all captured audio.');
 
@@ -391,12 +386,12 @@ await start(0);
 for(let second=1;second<=300;second++) {
  if(second===120) await page.evaluate(()=>window.failPaste=true);
  await page.evaluate(()=>window.samples(1));
- await page.waitForFunction(samples=>window.benchmarkAudioSamples===samples,second*16000);
+ await page.waitForFunction(samples=>window.speechAudioSamples===samples,second*16000);
 }
 await page.evaluate(()=>window.samples(701/16000));
 await stop();await page.waitForFunction(()=>window.store.getState().status==='idle',null,{timeout:6000});
-assert.equal(await page.evaluate(()=>window.benchmarkAudioSamples),4800701);
-assert.equal(await page.evaluate(()=>window.benchmarkRequests.filter(r=>r.op==='finish').length),1);
+assert.equal(await page.evaluate(()=>window.speechAudioSamples),4800701);
+assert.equal(await page.evaluate(()=>window.speechRequests.filter(r=>r.op==='finish').length),1);
 assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length),2,'One successful paste and one rejection; no retry');
 assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='copyDesktopText').map(c=>c[1])),[' Later speech remains available through Stop.']);
 assert.equal(await page.evaluate(()=>window.store.getState().transcript),'');
@@ -406,7 +401,7 @@ assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='showNo
 await page.evaluate(()=>{window.failPaste=false;window.hook.toggle();});
 await page.waitForFunction(()=>window.store.getState().status==='recording');
 assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='showNotification'&&c[1]==='Previous transcript available').length),0);
-assert.equal(await page.evaluate(()=>window.benchmarkRequests.filter(r=>r.op==='start').length),2);
+assert.equal(await page.evaluate(()=>window.speechRequests.filter(r=>r.op==='start').length),2);
 await page.evaluate(()=>window.hook.cancelRecording());
 results.push('Delivery interrupted at two minutes still recognizes five minutes plus partial Stop tail, never retries insertion, copies only the untyped words and admits next recording.');
 

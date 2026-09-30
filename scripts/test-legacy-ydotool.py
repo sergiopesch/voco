@@ -61,7 +61,7 @@ def main():
         broken = capture(['space', 'shift+insert'])
         assert broken[:2] == [[1, 31, 1], [1, 31, 0]], 'Requires legacy ydotool 0.1.x'
         results.append({'case': 'old-space-name-negative-control', 'events': broken})
-        # The one universal paste gesture: Shift+Insert (KEY_LEFTSHIFT, KEY_INSERT),
+        # The one paste gesture: Shift+Insert (KEY_LEFTSHIFT, KEY_INSERT),
         # optionally preceded by the joining Space (KEY_SPACE).
         chord = [42, 110]
         for separator in (False, True):

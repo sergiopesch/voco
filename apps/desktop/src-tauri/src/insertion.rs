@@ -191,16 +191,23 @@ pub struct DesktopInputStatus {
 /// Onboarding must remain local even while checking readiness for later dictation.
 pub fn desktop_input_status() -> DesktopInputStatus {
     if !desktop_paste_enabled() {
-        return DesktopInputStatus {
-            available: false,
-            detail: "Desktop paste is not enabled.".into(),
-            setup_area: None,
-        };
+        return paste_disabled_status();
     }
-    let preflight = input_preflight();
-    let support = preflight.diagnostics.clipboard;
+    input_status_with(&input_preflight())
+}
+
+fn paste_disabled_status() -> DesktopInputStatus {
+    DesktopInputStatus {
+        available: false,
+        detail: "Desktop paste is not enabled.".into(),
+        setup_area: None,
+    }
+}
+
+fn input_status_with(preflight: &InputPreflight) -> DesktopInputStatus {
+    let support = &preflight.diagnostics.clipboard;
     let compatibility = if !support.available {
-        Err(InsertionError::rejected(support.detail))
+        Err(InsertionError::rejected(support.detail.clone()))
     } else if matches!(preflight.session, SessionKind::Wayland) {
         wayland_paste_arguments().map(|_| ())
     } else {
@@ -221,7 +228,10 @@ pub fn desktop_input_status() -> DesktopInputStatus {
 }
 
 pub fn desktop_paste_diagnostics() -> (DesktopInputStatus, DesktopPasteStatus) {
-    let input = desktop_input_status();
+    paste_status_for(desktop_input_status())
+}
+
+fn paste_status_for(input: DesktopInputStatus) -> (DesktopInputStatus, DesktopPasteStatus) {
     let paste = DesktopPasteStatus {
         streaming_enabled: input.available && desktop_stream_enabled(),
         enabled: desktop_paste_enabled(),
@@ -229,6 +239,19 @@ pub fn desktop_paste_diagnostics() -> (DesktopInputStatus, DesktopPasteStatus) {
         detail: input.detail.clone(),
     };
     (input, paste)
+}
+
+/// Helper diagnostics plus input and paste status from a single helper scan,
+/// so each diagnostics poll probes the daemon once.
+pub fn runtime_input_diagnostics() -> (RuntimeDiagnostics, DesktopInputStatus, DesktopPasteStatus) {
+    let preflight = input_preflight();
+    let input = if desktop_paste_enabled() {
+        input_status_with(&preflight)
+    } else {
+        paste_disabled_status()
+    };
+    let (input, paste) = paste_status_for(input);
+    (preflight.diagnostics, input, paste)
 }
 
 fn validate_text(text: &str) -> Result<(), InsertionError> {
@@ -612,10 +635,6 @@ fn input_preflight() -> InputPreflight {
         command_available,
         || process_running("ydotoold"),
     )
-}
-
-pub fn runtime_diagnostics() -> RuntimeDiagnostics {
-    input_preflight().diagnostics
 }
 
 /// A failed spawn proves the helper did not run. Any later error is uncertain:

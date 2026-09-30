@@ -15,7 +15,7 @@ METAINFO_PATH="/usr/share/metainfo/com.sergiopesch.voco.metainfo.xml"
 TAURI_DESKTOP_SOURCE="${ROOT_DIR}/packaging/tauri/VOCO.desktop"
 TAURI_METAINFO_SOURCE="${ROOT_DIR}/packaging/tauri/com.sergiopesch.voco.metainfo.xml"
 
-for command in dpkg-deb desktop-file-validate appstreamcli python3 rg readelf; do
+for command in dpkg-deb desktop-file-validate appstreamcli python3 readelf; do
   if ! command -v "${command}" >/dev/null 2>&1; then
     echo "Required package verification command is unavailable: ${command}" >&2
     exit 1
@@ -45,7 +45,7 @@ PACKAGE_DEPENDS="$(dpkg-deb -f "${DEB_PATH}" Depends)"
   exit 1
 }
 
-for dependency in ibus python3 python3-gi gir1.2-ibus-1.0 python3-numpy python3-psutil procps libsentencepiece0 libpulse0 libnotify-bin xclip xdotool wl-clipboard gir1.2-atspi-2.0 at-spi2-core; do
+for dependency in ibus python3 python3-gi gir1.2-ibus-1.0 python3-numpy python3-psutil procps libsentencepiece0 libpulse0 libnotify-bin xclip xdotool wl-clipboard; do
   if ! grep -Eq "(^|, )${dependency}( \\([^)]*\\))?(,|$)" <<<"${PACKAGE_DEPENDS}"; then
     echo "Debian package is missing dependency: ${dependency}" >&2
     exit 1
@@ -87,7 +87,6 @@ assert_entry() {
 assert_entry /usr/share/ibus/component/voco.xml -rw-r--r--
 assert_entry /usr/libexec/voco-ibus-engine -rwxr-xr-x
 assert_entry /usr/lib/voco/ibus/voco_ibus_engine.py -rw-r--r--
-assert_entry /usr/lib/voco/ibus/voco_ibus_ownership.py -rw-r--r--
 assert_entry /usr/lib/voco/ibus/voco_ibus_protocol.py -rw-r--r--
 assert_entry /usr/bin/voco -rwxr-xr-x
 for file in metadata.json extension.js model.js stylesheet.css voco-symbol.png; do
@@ -99,6 +98,7 @@ assert_entry /usr/libexec/voco/ydotool-legacy/ydotoold -rwxr-xr-x
 assert_entry /usr/libexec/voco/ydotool-legacy/MANIFEST.json -rw-r--r--
 assert_entry /usr/libexec/voco/ydotool-legacy/qualified-client.json -rw-r--r--
 assert_entry /usr/share/doc/voco/THIRD-PARTY-NOTICES.txt -rw-r--r--
+assert_entry /usr/share/doc/voco/copyright -rw-r--r--
 assert_entry /usr/libexec/voco-browser-host -rwxr-xr-x
 assert_entry /etc/opt/chrome/native-messaging-hosts/com.voco.exact_field.json -rw-r--r--
 assert_entry /etc/chromium/native-messaging-hosts/com.voco.exact_field.json -rw-r--r--
@@ -111,7 +111,7 @@ assert_entry /usr/share/icons/hicolor/32x32/apps/voco.png -rw-r--r--
 assert_entry /usr/share/icons/hicolor/128x128/apps/voco.png -rw-r--r--
 assert_entry /usr/share/icons/hicolor/256x256@2/apps/voco.png -rw-r--r--
 
-if awk '{ print $NF }' <<<"${PACKAGE_LISTING}" | rg -q '(__pycache__|\.pyc$|_test\.py$)'; then
+if awk '$NF ~ /(__pycache__|\.pyc$|_test\.py$)/ { found = 1 } END { exit !found }' <<<"${PACKAGE_LISTING}"; then
   echo "Debian package contains a Python cache or test artifact." >&2
   exit 1
 fi
@@ -128,14 +128,16 @@ python3 "${ROOT_DIR}/scripts/debian_maintainer.py" "${EXTRACT_ROOT}/DEBIAN" "${E
 # incidental transitive installation to satisfy that runtime dependency.
 for executable in /usr/bin/voco /usr/libexec/voco-browser-host; do
   dynamic_dependencies="$(readelf -d "${EXTRACT_ROOT}${executable}")"
-  if rg -q 'NEEDED.*\[libpulse\.so\.0\]' <<<"${dynamic_dependencies}" \
-    && ! rg -q '(^|, )libpulse0( \([^)]*\))?(,|$)' <<<"${PACKAGE_DEPENDS}"; then
+  if grep -Eq 'NEEDED.*\[libpulse\.so\.0\]' <<<"${dynamic_dependencies}" \
+    && ! grep -Eq '(^|, )libpulse0( \([^)]*\))?(,|$)' <<<"${PACKAGE_DEPENDS}"; then
     echo "Debian package links libpulse.so.0 but does not declare libpulse0." >&2
     exit 1
   fi
 done
 
 cmp "${ROOT_DIR}/vendor/THIRD-PARTY-NOTICES.txt" "${EXTRACT_ROOT}/usr/share/doc/voco/THIRD-PARTY-NOTICES.txt"
+tail -n "$(wc -l < "${ROOT_DIR}/LICENSE")" "${EXTRACT_ROOT}/usr/share/doc/voco/copyright" \
+  | cmp - "${ROOT_DIR}/LICENSE"
 cmp "${ROOT_DIR}/packaging/systemd/voco-ydotoold.service" "${EXTRACT_ROOT}/usr/lib/systemd/user/voco-ydotoold.service"
 cmp "${ROOT_DIR}/packaging/ydotool/voco-ydotool-launcher" "${EXTRACT_ROOT}/usr/libexec/voco/ydotool-launcher"
 cmp "${ROOT_DIR}/packaging/ydotool/qualified-client.json" "${EXTRACT_ROOT}/usr/libexec/voco/ydotool-legacy/qualified-client.json"
@@ -166,7 +168,7 @@ cmp "${ROOT_DIR}/packaging/ibus/voco.xml" \
   "${EXTRACT_ROOT}/usr/share/ibus/component/voco.xml"
 cmp "${ROOT_DIR}/packaging/ibus/voco-ibus-engine" \
   "${EXTRACT_ROOT}/usr/libexec/voco-ibus-engine"
-for module in voco_ibus_engine.py voco_ibus_ownership.py voco_ibus_protocol.py; do
+for module in voco_ibus_engine.py voco_ibus_protocol.py; do
   cmp "${ROOT_DIR}/apps/desktop/src-tauri/resources/${module}" \
     "${EXTRACT_ROOT}/usr/lib/voco/ibus/${module}"
 done
@@ -240,7 +242,6 @@ for path in \
   "${EXTRACT_ROOT}/usr/share/icons/hicolor/256x256@2/apps/voco.png" \
   "${EXTRACT_ROOT}/usr/share/ibus/component/voco.xml" \
   "${EXTRACT_ROOT}/usr/lib/voco/ibus/voco_ibus_engine.py" \
-  "${EXTRACT_ROOT}/usr/lib/voco/ibus/voco_ibus_ownership.py" \
   "${EXTRACT_ROOT}/usr/lib/voco/ibus/voco_ibus_protocol.py"; do
   expected_mode=644
   if [[ "${path}" == "${EXTRACT_ROOT}/usr/bin/voco" ]]; then

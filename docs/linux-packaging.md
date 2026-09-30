@@ -1,400 +1,211 @@
 # Linux packaging
 
-VOCO packages include model weights, native libraries and their notices; no
-recognition download or GPU is required for normal English dictation and explicit
-recovery. Version 2026.0.43 provides Debian, Fedora, openSUSE and Arch/Omarchy
-profiles. Check [release status](release-candidate.md): build artifacts become
-public downloads only when attached to a published release.
+VOCO ships as one Debian package, `voco`, for Ubuntu and Debian on amd64. It
+holds the app, the speech worker, the Nemotron model, the native CPU runtime,
+the optional desktop integrations and their license notices, so dictation needs
+no download at run time. The CPU needs AVX2, FMA and F16C, and the system needs
+glibc 2.39 or later. [Install](install.md) covers installing the package; this
+page covers how it is built and what it contains.
 
-## Build and assemble
+## How the package is built
 
-Use a clean tagged checkout and the repository build wrapper. It builds both the
-application and native browser host. Neither links a second recognizer. The pinned
-Nemotron payload has its own AVX2/FMA/F16C baseline, identity and qualification
-requirements; host-native and AVX-512/AMX flags remain disabled in its native build.
+Three scripts turn a checkout into a package:
 
-```bash
-npm ci
-npm run build
-version=$(node -p 'require("./package.json").version')
-python3 scripts/package-nvidia.py /path/to/tauri-base.deb "/path/to/voco_${version}_amd64.deb" --debian-version "$version"
-bash scripts/verify-deb-package.sh "/path/to/voco_${version}_amd64.deb" "$version"
-```
+1. `scripts/build-desktop.sh`, which `npm run build` runs, builds the interface
+   and `voco-browser-host`, then runs `cargo tauri build --bundles deb`. The
+   result is a base package in `apps/desktop/src-tauri/target/release/bundle/deb/`.
+   It holds the app and the integration files but no speech runtime, so it can't
+   dictate and is never installed on its own.
+2. `python3 scripts/package-nvidia.py BASE.deb OUTPUT.deb` adds the speech
+   runtime, the documentation, the licenses and the private input daemon, and
+   writes the complete package.
+3. `bash scripts/verify-deb-package.sh OUTPUT.deb [VERSION]` checks the result.
 
-A base Tauri bundle is incomplete and must never be published as VOCO. The assembler
-checks versions, app/browser-host executables, model identity, native libraries,
-relative symlinks and notices, and emits a payload manifest and receipt. Verify the
-complete artifact, dependency resolution, install/upgrade/remove behavior and
-isolated runtime before publication. Record source and package SHA-256 identities.
-Do not include personal recordings, transcripts, API credentials or private receipts.
+`bash scripts/setup.sh --install` runs all three and installs the package with
+APT. `scripts/assemble-release.sh` runs them for a release, as the
+[release process](release-process.md) describes. Both need the
+[provisioned runtime](#runtime-provisioning).
 
-The independent speech-payload verifier rejects special files, linked manifest or
-parent directories, escaping library links, and writable or set-ID runtime payloads
-before hashing. These checks do not rely only on the assembler normalizing modes.
-Minimal container images can exclude documentation through their dpkg policy;
-record that policy explicitly and verify the complete installed payload separately.
-`dpkg --verify` can print missing files without a failing exit status, so use the
-native inventory verifier when qualifying installation and removal.
+`package-nvidia.py` stops unless the base package's version equals the one in
+`package.json`. `--debian-version` may only extend that version with a `+suffix`,
+and the output file must not exist yet. The script checks that the base package
+holds the `voco` and `voco-browser-host` executables, runs
+`scripts/verify-glib-backport.py`, and refuses a model whose SHA-256 differs from
+`runtime/speech/MODEL-IDENTITY.json`. It then writes `MANIFEST.json`, an
+inventory of every speech file and link with its SHA-256, sets directories to
+0755 and files to 0644 or 0755, generates the maintainer script and rewrites the
+control file's version, installed size and checksums. It builds the package with
+Zstandard at level 9 and prints its path, version, size and SHA-256.
 
-The package requires Python 3, NumPy, psutil and the declared native dependencies.
-The .48 assembler uses Zstandard level 9: a small lossless download-size reduction
-with the same installed model and runtime bytes. It does not reduce model memory.
-The .48 installer downloads missing Wayland helpers as the current user while the
-main package downloads. APT verifies those helper downloads; the final privileged
-transaction reuses completed archives only after VOCO's signed manifest and package checksum pass. Failed
-prefetches fall back to the ordinary APT installation. Desktop settings are unchanged.
+## Contents
 
-The [.52 installer](testing/installer-performance-2026-09-22.md)
-overlaps checksum metadata with the package download and waits directly on wget.
-Optional helper prefetches run in an isolated download-only process group; any
-still running after verification are stopped, and APT fetches remaining helpers.
-Package compression, payload, verification and runtime settings are unchanged.
-The optional APT view uses Python's standard library only when Python is already
-installed. Its fixed sudo wrapper opens a dedicated status descriptor **after**
-sudo; using stdout as APT's status descriptor would close package-script output.
-Raw output and progress are separate, stdin remains the original terminal, and
-unknown output releases the view. Restricted sudo policies fall back to the ordinary
-APT command. There are no new sudo rules or automatic answers to package questions.
+| Path | Contents |
+| --- | --- |
+| `/usr/bin/voco` | The app |
+| `/usr/lib/voco/speech/` | The worker (`stream_worker.py` and its modules), the model in `models/`, the native libraries in `lib/`, `libbench_nemo_pool.so`, the two identity receipts and `MANIFEST.json` |
+| `/usr/libexec/voco/ydotool-launcher`, `/usr/libexec/voco/ydotool-legacy/` | The [Wayland input helper](#wayland-input-helper) launcher and VOCO's private `ydotoold` |
+| `/usr/lib/systemd/user/voco-ydotoold.service` | The per-login input service, off until it is enabled |
+| `/usr/libexec/voco-browser-host` | The native messaging host for the [Chromium extension](../integrations/chromium/README.md) |
+| `/usr/share/voco/chromium/` | The extension's `manifest.json`, `background.js` and `content.js` |
+| `/etc/opt/chrome/native-messaging-hosts/`, `/etc/chromium/native-messaging-hosts/` | `com.voco.exact_field.json`, which lets the extension start the host |
+| `/usr/share/gnome-shell/extensions/voco-panel@voco.local/` | The [GNOME companion](../integrations/gnome/README.md) |
+| `/usr/libexec/voco-ibus-engine`, `/usr/lib/voco/ibus/`, `/usr/share/ibus/component/voco.xml` | The optional IBus shortcut engine |
+| `/usr/share/applications/VOCO.desktop` | The desktop entry |
+| `/usr/share/metainfo/com.sergiopesch.voco.metainfo.xml` | AppStream metadata, including the release notes |
+| `/usr/share/icons/hicolor/*/apps/voco.png` | Icons at 32, 128 and 256 pixels |
+| `/usr/share/doc/voco/` | [Documentation and licenses](#documentation-and-licenses) |
 
-The [first-run installer](testing/first-run-follow-up-2026-09-22.md)
-keeps one compact terminal canvas across checks, download, verification and setup.
-Signal bars follow received bytes; phase sweeps never delay completion. Native
-password/package prompts release the canvas before taking input. The final view
-replaces intermediate progress and retains any required panel sign-out action.
-Narrow terminals and `VOCO_INSTALL_PLAIN=1` use sequential text; reduced motion
-keeps measured progress without sweeps. Routine service output joins the private
-installation log, which is retained on failure. This behavior shipped before .56. The .57 release enlarges the silver wordmark
-and uses shared green/amber progress accents while preserving plain and reduced-motion modes.
+Installing the package turns nothing on. The input service and the GNOME
+companion stay off until the guided installer or you enable them, and the IBus
+input source and the Chromium extension stay off until you add them.
 
-Setup resolves an absolute `XDG_CONFIG_HOME` exactly as the app does. It preserves
-existing settings and publishes fresh defaults without overwriting a file that
-appears concurrently. Inline Python runs in isolated mode, including the optional
-APT renderer, so the launch directory cannot supply its imports.
+## Documentation and licenses
 
-The .47 metadata explicitly includes the `pgrep` provider (`procps` on Debian/openSUSE,
-`procps-ng` on Fedora/Arch), used to check the Wayland input daemon.
-The worker defaults to at most four CPU threads, leaving one CPU from its affinity
-available for desktop work, with a minimum of one recognizer thread. This avoids
-oversubscribing a constrained desktop while the receiving application is active. Explicit research overrides stay
-explicit; diagnostics record the effective thread count. CPU quotas imposed without
-matching affinity remain a separate performance constraint.
-Its ABI floor includes glibc 2.39 and libstdc++ 13.2.0. X11 helpers are required;
-ydotool and the separately packaged Ubuntu ydotoold are recommended for Wayland;
-the input service must also be configured and running. The .47 guided installer
-uses APT for the local package and explicitly requests both Wayland packages when
-running on Wayland; dependency repair after `dpkg -i` is insufficient. The package
-includes an opt-in per-login `voco-ydotoold.service`. The installer starts it only
-with existing device access and verifies readiness without sending keys. Starting
-with .55, its launcher selects a private source-built daemon only for the exact
-qualified Ubuntu 24.04 legacy client. The system client and daemon are preserved.
-On upgrade, the installed app holds its instance lock before migrating only an
-unmodified VOCO service; another running app, custom unit or unrelated daemon
-prevents migration. `voco --setup-desktop-input` performs this step explicitly
-while VOCO is closed. See [helper provenance](../vendor/ydotool-legacy/README.md). It does not change device permissions or group membership.
-Debian 13
-repositories may not provide it, so the recommendation must not block X11 installs. Package installation
-does not change the selected input source or restart IBus.
+`/usr/share/doc/voco/` holds:
 
-The .43 Debian package repairs inherited `0775` permissions on its own root-owned
-directories to `0755` during configuration. The reviewed migration uses directory
-descriptors, rejects symlink traversal and leaves user files, custom modes and
-`dpkg-statoverride` entries unchanged. Missing documentation directories are allowed
-when the system uses `path-exclude`. The verifier checks the exact generated hook;
-native RPM and Arch packages omit it because their managers apply archive modes.
-Upgrade qualification includes legacy installations, not only fresh extraction.
+- `copyright`: a short preface followed by VOCO's MIT License. The preface says
+  that the speech runtime, the model and the helper programs keep their own
+  licenses, and points to the files below.
+- `THIRD-PARTY-NOTICES.txt`: a summary of the vendored glib, tray-icon,
+  global-hotkey and ydotool sources, their licenses and VOCO's changes, from
+  `vendor/THIRD-PARTY-NOTICES.txt`.
+- `nvidia/`: the model license and card and the runtime notices, from
+  `runtime/notices/`.
+- `vendor/`: the license, patch and upstream record of each vendored crate, and
+  the notices of the private `ydotoold` build.
+- `README.md`, `AGENTS.md` and `docs/`, without `docs/guide/` and `docs/testing/`.
+- `report-performance.py` and `report-speech-performance.py`, which summarize
+  the opt-in [performance logs](troubleshooting.md#performance-logs).
 
-The .43 candidate additionally links libpulse (`libpulse-dev` on Debian build
-hosts, `libpulse0` at runtime). Fedora, openSUSE and Arch profiles map that library
-to their native package names. Native Wayland capture requires PipeWire's Pulse
-compatibility server and explicit microphone selection/session permission;
-installing the client library alone does not establish that capture works.
+## Dependencies
+
+| Used by | Packages |
+| --- | --- |
+| The app | `libpulse0` for Wayland capture, `libnotify-bin` for the startup failure notice, `libc6 (>= 2.39)`, `libstdc++6 (>= 13.2.0)` |
+| Speech worker | `python3`, `python3-numpy`, `python3-psutil`, `libsentencepiece0` |
+| Paste | `xdotool`, `xclip`, `wl-clipboard`, and `procps` for the `pgrep` check that `ydotoold` runs |
+| IBus engine | `ibus`, `gir1.2-ibus-1.0`, `python3-gi` |
+
+The package recommends `ydotool` and `ydotoold`. Only Wayland needs them, so an
+X11 system can install VOCO without them. On Wayland the guided installer and
+`setup.sh --install` ask APT for both.
+
+## Wayland input helper
+
+`voco-ydotoold.service` runs `ydotoold` for one login, so that paste keys reach
+apps on Wayland. It starts with the graphical session only when `/dev/uinput`
+exists, runs with `NoNewPrivileges=yes`, a 0077 umask and Unix sockets only, and
+restarts 3 seconds after a failure. [Install](install.md#wayland-input-service)
+shows how to enable it, and
+[Platform support](platform/README.md#access-to-devuinput) covers device access.
+
+The service starts `/usr/libexec/voco/ydotool-launcher`, which picks the daemon:
+
+- When `/usr/bin/ydotool` is Ubuntu 24.04's ydotool 0.1.8-3build1 for amd64,
+  matched by its SHA-256 and its dpkg owner, the launcher runs VOCO's private
+  `ydotoold` from `/usr/libexec/voco/ydotool-legacy/`, after checking it against
+  that folder's `MANIFEST.json`. It is built from the vendored ydotool and
+  libuInputPlus sources, as [its notes](../vendor/ydotool-legacy/README.md)
+  describe. The identity of the Ubuntu client is recorded in `packaging/ydotool/`.
+- Otherwise it runs the system's `/usr/bin/ydotoold`.
+
+The launcher trusts only files owned by root whose own and parent directories'
+modes give no write access to group or others. `ydotool-launcher --select`
+prints the chosen daemon without starting it. With `--migrate`, it reloads
+VOCO's unit and, when the running service uses another daemon, restarts it on
+the chosen one. It acts only on VOCO's unmodified unit and refuses when the unit
+has edits or drop-ins. Before a restart it also refuses when another `ydotoold`
+runs or the login can't write `/dev/uinput`. The installed app runs the
+migration at startup on Wayland, before recording can begin, and
+`voco --setup-desktop-input` runs it on demand.
+
+The guided installer and `setup.sh --install` share `voco_start_wayland_service`
+in `scripts/lib/install-common.sh`. On Wayland it runs
+`voco --setup-desktop-input` and stops there if `voco --check-desktop-input`
+passes. Otherwise it needs write access to `/dev/uinput` and no other running
+`ydotoold`, runs `systemctl --user enable --now voco-ydotoold.service`, and
+checks the helpers again. Package hooks never start, stop or restart user
+services.
+
+## Maintainer script
+
+The package has one maintainer script, `postinst`. `scripts/debian_maintainer.py`
+generates it from `packaging/debian/postinst.py.in` with the list of every
+directory the package owns under `/usr/lib/voco`, `/usr/libexec/voco`,
+`/usr/share/voco` and `/usr/share/doc/voco`.
+
+On `configure`, the script changes a listed directory's mode only when it is
+0775, to 0755. It opens each path component without following links and fails
+if one isn't owned by root. It skips directories that `dpkg-statoverride` lists
+and directories that a dpkg `path-exclude` rule left out. It doesn't touch user
+files, services, input sources or GNOME extensions.
+
+## Upgrade and removal
+
+An upgrade replaces the package's files. The package declares no configuration
+files and has no removal scripts, so `apt remove voco` deletes every file it
+installed, including the host manifests in `/etc`. Nothing in your home folder
+changes: settings and Review stay, as [What VOCO keeps](everyday-use.md#what-voco-keeps)
+lists.
+
+Quit VOCO before you upgrade ([Upgrade](install.md#upgrade)). When a release
+changes the GNOME companion, run `voco --setup-panel` again, then sign out and
+back in. Before you remove the package, disable the input service
+([Remove](install.md#remove)).
 
 ## Runtime provisioning
 
-Git excludes model weights and compiled native libraries. `git clone` and `npm ci`
-are enough for source-only checks, but not a complete NVIDIA package. Provision:
+Git doesn't hold the model or the compiled runtime, and `.gitignore` excludes
+them. A complete package needs these in `runtime/speech/`:
 
-- `runtime/speech/models/nemotron-speech-streaming-en-0.6b.q8_0.gguf`
-- `runtime/speech/libbench_nemo_pool.so`
-- `runtime/speech/lib/`, preserving relative native-library links
+- `models/nemotron-speech-streaming-en-0.6b.q8_0.gguf`
+- `libbench_nemo_pool.so`
+- `lib/`, the native libraries with their relative version links
 
-The .42 release keeps the verified .39 model and rebuilds the native runtime with
-an explicit AVX2/FMA/F16C baseline, relative library paths and neutral source paths.
-Extract the model from a checksum-verified versioned release package. Either use
-that same package's complete native payload and `NATIVE-BUILD.json`, or follow the
-[pinned native build recipe](../runtime/native/README.md) and qualify the new bytes.
-Keep Python worker code from the matching source checkout. Preserve model terms,
-native-library licenses, source provenance and the payload manifest.
-
-The NVIDIA model revision is `ebe59e5a817142986528bbbee5dba8db7b38ed50`.
-Converted model SHA-256:
-`d9a01898d2a611c8764e23a1c2f45e70bbd5a425dc4de93692ac951dd603812d`.
-Native source commits, patches, compiler options and output hashes are recorded in
-`runtime/speech/NATIVE-BUILD.json`. The package verifier rejects mixed native
-receipts and binaries, broken links and model hash mismatches. A similarly named
-upstream download is not an equivalent artifact.
-
-The native build recipe is public; independent model conversion to these exact
-GGUF bytes remains a reproducibility gap. Retain the exact payload inventory with
-releases. Hosted installer publication remains disabled; never silently replace
-pinned artifacts with mutable downloads.
-
-## Published-channel structure
-
-- GitHub Releases
-- `.deb`
-- release checksums
-- update checks against GitHub Releases inside the app
-
-AppImage remains a local packaging experiment and is not published until the full linuxdeploy and
-appimagetool chain can be supplied from immutable, checksum-verified sources.
-
-Native RPM and Arch channels require independent build, dependency, payload,
-install/remove and desktop receipts. Flatpak, Snap and AppImage remain research
-formats; no store submission or additional channel is implied by their recipes.
-
-## Asset Naming
-
-Branding note:
-- package and listing assets should use VOCO's graphite microphone branding rather than the older purple treatment
-
-- `voco_<version>_amd64.deb`
-- `voco_checksums.txt`
-
-## Packaging Principles
-
-- use Linux-native desktop metadata
-- keep uninstall paths clean
-- avoid hidden system modification
-- document permissions and runtime expectations
-- keep the first-run setup clear about microphone access and feature availability
-
-## Support Matrix
-
-Current primary validation target:
-
-- Ubuntu
-- x86_64 / amd64
-- Wayland and X11, with documented insertion caveats
-
-Debian-derived distributions are best-effort. The `.deb` format and dependency metadata target
-Debian-family package managers, but that compatibility is not a substitute for a recorded desktop
-runtime test. Historical baselines passed actual application/GTK/X11 virtual-microphone
-checks in Ubuntu 26, Debian 13, Fedora 44, Linux Mint 22.3 and genuine Omarchy 4.0.3
-official ISO-derived installer userspace after dependency provisioning. It does not
-include an installed Hyprland compositor in this test. These checks share the host kernel and do not run each distribution's
-default compositor, installed desktop or physical microphone. Native RPM/Arch
-packaging and broader stress-case acceptance require their own receipts; see
-[the evidence matrix](testing/cross-linux-review-2026-09-15.md#baseline-userspace-results).
-
-The optional consuming-shortcut IBus component remains package-owned at
-`/usr/share/ibus/component/voco.xml` and `/usr/libexec/voco-ibus-engine`. Protocol 6
-rejects text mutation. The package does not select an input source or restart IBus.
-
-The Chromium integration packages `/usr/libexec/voco-browser-host`, native host
-manifests in `/etc/opt/chrome/native-messaging-hosts` and
-`/etc/chromium/native-messaging-hosts`, and `/usr/share/voco/chromium`.
-Its fixed extension origin is the only allowed origin. The build script obtains
-the host executable from Cargo's machine-readable output before bundling, including
-custom target directories. Package verification checks the executable, manifests,
-extension public-key identity, permissions and origin rejection.
-
-The extension is activated by the user; package installation does not modify a
-browser profile. The host connects only to the same user's private Unix socket.
-Experimental AppImage/Flatpak/Snap packaging has not validated this host boundary.
-
-## Listing Assets
-
-Store copy, release-note structure, and screenshot requirements live in [docs/store-listing.md](store-listing.md).
-Submission status and release gating live in [docs/submission-readiness.md](submission-readiness.md).
-Release rehearsal steps live in [docs/release-process.md](release-process.md).
-
-## Flatpak Baseline
-
-The repo now includes an initial Flatpak packaging baseline:
-
-- `packaging/flatpak/com.sergiopesch.voco.yml`
-- `packaging/flatpak/com.sergiopesch.voco.desktop`
-- `packaging/flatpak/com.sergiopesch.voco.metainfo.xml`
-
-This is a starting point for Flathub submission work, not a claimed production-ready Flathub package yet. The next packaging pass should validate sandbox permissions, runtime dependencies, and release build behavior inside `flatpak-builder` before Flathub is treated as an active release target.
-
-## Snap Status
-
-The repo now includes a tracked Snap draft:
-
-- `snap/snapcraft.yaml`
-- `snap/gui/com.sergiopesch.voco.desktop`
-
-Ubuntu App Center work is still a draft path, not a publish-ready channel.
-
-The likely first store submission still uses `classic` confinement on purpose.
-
-Why not strict yet:
-
-- VOCO registers global hotkeys
-- on Wayland it can rely on direct `evdev` keyboard access
-- text insertion shells out to `ydotool`, `xdotool`, `wl-copy`, `wl-paste`, and `xclip`
-- it opens external URLs with `xdg-open`
-- desktop notifications use the session D-Bus service
-- its core user promise is typing into arbitrary host applications, which is exactly where strict confinement becomes unnatural
-
-So the honest first Snap is a classic-confinement review candidate, not a pretend-strict package that quietly breaks VOCO's core workflow.
-
-The next packaging pass should install the built snap locally, verify tray, microphone, hotkey, and insertion behavior in a real desktop session, and then decide whether any future product changes could make stricter confinement realistic.
-
-## Experimental AppImage Packaging
-
-This path is for local packaging research only. It is not part of the release workflow because the
-upstream Tauri/linuxdeploy stages are not yet fully pinned, even though the final `appimagetool`
-fallback itself is checksum-verified.
-
-The repo now includes:
-
-- `scripts/package-appimage.sh`
-
-This helper:
-
-- normalizes the expected lowercase icon name inside `VOCO.AppDir`
-- requires `VOCO_APPIMAGETOOL_PATH` and `VOCO_APPIMAGETOOL_SHA256` for a pre-fetched immutable
-  `appimagetool` binary, and verifies it before execution
-- runs `appimagetool` in extract-and-run mode so it does not require host FUSE 2
-
-Default `npm run build` builds only the locked Debian bundle. After an explicit experimental
-AppImage attempt, this helper can finish an existing AppDir only when both pinned-tool environment
-variables are set. That does not make the earlier linuxdeploy stages release-safe.
-
-Use it manually only after an explicit experimental
-`cargo tauri build --features custom-protocol --bundles appimage` run created the AppDir.
+`setup.sh --install` and `assemble-release.sh` stop when one is missing. The
+worker's Python files, `MODEL-IDENTITY.json` and `NATIVE-BUILD.json` are tracked,
+so the worker code always comes from your checkout. To fetch the pinned runtime:
 
 ```bash
-VOCO_APPIMAGETOOL_PATH=/path/to/pinned/appimagetool \
-VOCO_APPIMAGETOOL_SHA256=<verified-sha256> \
-bash ./scripts/package-appimage.sh
+bash scripts/provision-ci-speech.sh
 ```
 
-## GNOME desktop clipboard dependency
+The script downloads a published VOCO package from GitHub Releases, checks it
+against the SHA-256 written in the script and extracts it with `dpkg-deb`. It
+verifies the speech payload with `scripts/verify-speech-payload.py`, checks that
+the package's `MODEL-IDENTITY.json` and `NATIVE-BUILD.json` equal the checkout's
+copies, and copies `models/`, `lib/` and `libbench_nemo_pool.so` into
+`runtime/speech/`. Any mismatch stops it; it never falls back to another
+download. It needs curl, dpkg-deb, python3 and network access. CI runs it in the
+Rust Check & Test and Application jobs.
 
-The Debian package depends on `xclip`. On GNOME Wayland with `DISPLAY`,
-native desktop paste uses its XWayland clipboard bridge, then `ydotool` for the
-Wayland keyboard gesture. This avoids the locally reproduced `wl-copy` temporary
-focus-surface timeout. Other Wayland desktops retain `wl-copy`. No fallback is
-attempted after a clipboard mutation or uncertain dispatch. See
-[desktop paste verification](testing/desktop-paste.md).
+To rebuild the native libraries instead, follow
+[Native runtime](../runtime/native/README.md). A rebuild replaces `lib/`,
+`libbench_nemo_pool.so` and `NATIVE-BUILD.json` together. The recipe doesn't
+convert the model, so the model always comes from a published package.
 
+## Package checks
 
-Desktop paste sends one Shift+Insert gesture to whatever has keyboard focus. It
-uses no accessibility service and reads no field text or focus metadata. The
-package list still names `gir1.2-atspi-2.0` and `at-spi2-core`, which the removed
-focus helper needed; no application code uses them.
+`verify-deb-package.sh` needs dpkg-deb, desktop-file-validate, appstreamcli,
+python3 and readelf. It checks:
 
-## Bundled NVIDIA runtime
+- the control fields: the name `voco`, the expected version, `amd64`, every
+  dependency with both ABI floors, and Recommends of exactly `ydotool, ydotoold`;
+- one root-owned entry with the expected mode for each fixed path, and no Python
+  caches or test files;
+- the control area, which may hold only `control`, `md5sums` and a `postinst`
+  identical to a fresh render;
+- that `libpulse0` is declared when either executable links libpulse;
+- that the notices, the license text in `copyright`, the service, the launcher,
+  the IBus files, the Chromium files and host manifests, the desktop entry, the
+  metainfo and the icons equal their sources byte for byte;
+- the private daemon, with `scripts/verify-legacy-input-package.py`, and the
+  speech payload, with `verify-speech-payload.py`, which compares every file and
+  link with `MANIFEST.json` and the two identity receipts;
+- that the host manifest allows only the extension ID derived from the
+  extension's key, and that the host refuses any other origin;
+- the AppStream ID, the launchable and the first release entry's version, then
+  `desktop-file-validate`, `appstreamcli validate` and `appstreamcli validate-tree`.
 
-The complete package bundles Nemotron Speech Streaming English 0.6B Q8_0, its
-modified CPU runtime, Python worker and model notices under `/usr/lib/voco/speech`
-and `/usr/share/doc/voco/nvidia`. Ubuntu supplies `python3`, `python3-numpy`,
-`python3-psutil` and `libsentencepiece0`. No Homebrew, virtual environment, network
-access or checkout path is needed at runtime. This is a host-native CPU build for
-the tested laptop, not a portability-qualified public release.
-
-Run the normal Tauri Debian build, then `python3 scripts/package-nvidia.py BASE_DEB
-OUTPUT_DEB` to assemble the complete package with zstd compression. The script
-verifies the fixed model hash, adds a runtime SHA-256 manifest and regenerates the
-Debian file inventory. Install the resulting complete package with apt so declared
-dependencies are resolved. A base Tauri package alone is incomplete for NVIDIA.
-
-Desktop and browser dictation, onboarding and explicit interrupted-audio Retry
-use the bundled Nemotron model. Recovery never automatically replays text into a
-destination. Startup warms the worker before readiness. Product settings do not
-expose enhancement, assistant or alternate recognition modes.
-
-`VOCO_PERFORMANCE_LOG=1` enables private, rotating local metrics. Worker records
-include model/runtime identity, monotonic and wall clocks, hashed stream identity,
-recording/request numbers, queue age, recognition time, CPU/RSS, first hypothesis,
-startup/protocol failures and dropped-event counts. Audio, transcript contents,
-app names and window titles are excluded. The app records matching IPC boundaries,
-slow calls and bounded failure reasons. A bounded background writer isolates disk
-stalls/failures from recognition; loss of coverage produces a content-free warning.
-
-Run `python3 /usr/share/doc/voco/report-speech-performance.py
-~/.local/state/voco` for recognizer/IPC diagnostics, and the adjacent
-`report-performance.py` against `~/.local/state/voco/performance` for capture,
-paste and stop stages. Neither report proves that text appeared in a target field;
-that needs independent field readback. Missing recordings remain unavailable.
-
-## Native Fedora and Arch candidate recipes
-
-`scripts/stage-native-packages.py` stages an RPM spec and Arch PKGBUILD from a
-complete, hash-verified Debian release or local candidate. These are native package-manager wrappers
-around the same prebuilt application/model bytes, not a portable source rebuild.
-They preserve file hashes and relative loader links, disable strip/debug rewriting,
-and declare distro-specific runtime dependencies. Unknown Debian dependency
-constraints or maintainer actions require review rather than silent translation.
-
-```bash
-python3 scripts/stage-native-packages.py COMPLETE.deb FRESH_DIRECTORY \
-  --sha256 EXPECTED_SHA256 \
-  --verifier /absolute/path/to/voco/scripts/verify-deb-package.sh
-```
-
-Final versions such as `2026.0.43` use native package revision `1`. Use
-`--native-release 2` for a packaging-only revision of the same final payload.
-This does not authorize changing application/model bytes under the same version.
-Legacy `+localN` candidates retain their previous native revision mapping; do not
-assume a final revision `1` upgrades a previously installed local revision `N`.
-Unknown versions, dependency constraints and revision overrides are rejected.
-The reviewed Debian ABI floors map to Arch `glibc>=2.39`, `gcc-libs>=13.2.0`
-and RPM `glibc >= 2.39`, `libstdc++ >= 13.2.0` requirements.
-
-Native package signatures are separate from Debian release signatures. Public
-Arch delivery needs a documented trusted signing key and a maintained dependency
-source. Isolated tests may use an explicitly disposable signing key trusted only
-inside the test guest; never ask end users to disable signature verification.
-
-Build the generated `voco.spec` with `rpmbuild` in a disposable Fedora builder, or
-`PKGBUILD` with `makepkg` in a disposable Arch builder. Never run package install or
-removal tests on the owner desktop. `scripts/verify-native-install.py` compares the
-installed payload's bytes, links, application-owned modes, ownership and ELF closure
-against `payload-inventory.json`; `--removed` checks removal of all files/links.
-It requires a disposable Docker environment, or explicit `--isolated-vm` in an
-owned qualification VM verified by `systemd-detect-virt`. Never use the VM override
-on the live user desktop. Shared system directory modes remain
-owned by the distribution. Run `npm run test:native-package` for staging-boundary
-regressions.
-
-Fedora explicitly requires the base/good GStreamer plugins; upstream WebKit's weak
-recommendations do not ensure capture works in a minimal installation. Arch needs
-`gst-plugins-good` and a separately verified SentencePiece package. The cross-Linux
-evidence includes a locally built SentencePiece 0.2.1 support package from pinned
-upstream source with 141 upstream tests passing. It is not an official Arch
-repository or signed public VOCO package. Retain its source, Apache notice and hash
-receipt; do not silently run an arbitrary AUR recipe.
-
-The NVIDIA assembler normalizes staged runtime/docs to 0755 directories and
-0644/0755 files, preserves symlinks without following them and rejects special
-objects. Neither native recipe installs scripts that alter input sources, shortcuts,
-browser profiles or input permissions. Standard distro package-manager hooks still
-apply. Public signing, repositories, source provisioning and default desktop
-acceptance remain separate release work.
-
-For a deliberately network-disabled verification job, set
-`VOCO_PACKAGE_VERIFY_OFFLINE=1` when invoking `scripts/verify-deb-package.sh`. This
-runs local AppStream validation with `--no-net`; it does not validate external URLs.
-Omit the variable for the release job's normal online URL checks.
-
-The [2026-09-19 Omarchy qualification](testing/omarchy-native-2026-09-19.md)
-records the earlier Arch/Hyprland baseline. The [current experiment report](testing/linux-release-2026-09-19.md)
-records the native-capture fixes, tested desktop packages and final artifact checks.
-
-## Distribution-specific RPM profiles
-
-`stage-native-packages.py --rpm-distribution fedora` is the default. Use
-`--rpm-distribution opensuse` for the Tumbleweed dependency profile. Each output
-records its profile in provenance; qualify and sign each native artifact separately.
-Do not rename a Fedora RPM and call it an openSUSE build.
-
-The [SentencePiece companion recipes](../packaging/dependencies/sentencepiece/README.md)
-provide reviewed source builds where no system library package is available.
-RPM recipes mark bundled licenses with `%license`, preserving them on minimal
-`nodocs` installations. Full payload parity requires documents enabled.
-See [the current scope and gates](linux-support.md).
+`VOCO_PACKAGE_VERIFY_OFFLINE=1` runs the AppStream checks with `--no-net`, for a
+job without network access. Release assembly keeps the online checks.

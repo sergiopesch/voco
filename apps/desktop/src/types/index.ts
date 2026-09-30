@@ -1,34 +1,13 @@
-export type InsertionStrategy = "auto" | "clipboard" | "type-simulation";
-export type TranscriptTarget =
-  | "cursor"
-  | "local-agent"
-  | "openclaw-agent"
-  | "openclaw-speech";
-export type TranscriptEnhancement = "off" | "conservative" | "commands-only";
-export type LiveCursorMode =
-  | "stable-cursor-streaming"
-  | "preview-overlay-only"
-  | "final-text-only";
 export type UpdateChannel = "stable" | "beta";
-export type InstallChannel =
-  | "github-release"
-  | "appimage"
-  | "source"
-  | "flatpak"
-  | "snap";
-export type VoiceProfile = "default" | "accent-aware";
+/** Only chooses which update instructions Settings shows. */
+export type InstallChannel = "github-release" | "source";
 
 export interface AppConfig {
   hotkey: string;
   selectedMic: string | null;
-  insertionStrategy: InsertionStrategy;
-  transcriptTarget: TranscriptTarget;
-  liveCursorMode: LiveCursorMode;
-  transcriptEnhancement: TranscriptEnhancement;
   onboardingCompleted: boolean;
   updateChannel: UpdateChannel;
   installChannel: InstallChannel;
-  voiceProfile: VoiceProfile;
 }
 
 export interface ConfigSnapshot {
@@ -38,20 +17,11 @@ export interface ConfigSnapshot {
 
 export type DictationStatus = "idle" | "starting" | "recording" | "processing" | "error";
 
-export interface RecoverableTranscript {
-  id: string;
-  text: string;
-  createdAt: number;
-  reason: "delivery-unconfirmed" | "output-failed";
-  isPartial: boolean;
-}
+export type CursorDeliveryState = "inactive" | "owned";
 
-export type CursorDeliveryState =
-  | "inactive"
-  | "pending"
-  | "owned"
-  | "preview-only"
-  | "unreconciled";
+/** "" means desktop-input diagnostics have not loaded yet; the tray shows its
+ * initializing presentation for it, not setup needed. */
+export type CursorSetupState = "ready" | "not-enabled" | "";
 
 export type AppSurface = "hidden" | "onboarding" | "settings" | "popover" | "review";
 
@@ -95,28 +65,6 @@ export interface InsertionSupport {
   detail: string;
 }
 
-export interface TranscriptionSegment {
-  text: string;
-  startMs: number;
-  endMs: number;
-}
-
-export interface PreviewTranscription {
-  text: string;
-  segments: TranscriptionSegment[];
-}
-
-export interface CanonicalTranscription {
-  canonicalText: string;
-  appendText: string;
-  chunkText: string;
-}
-
-export interface DebugDictationCaptureResult {
-  audioPath: string;
-  timelinePath: string;
-}
-
 export interface ShortcutDiagnostics {
   hotkey: string;
   route: "ibus" | "global-shortcut" | "evdev" | "gnome-panel" | null;
@@ -147,21 +95,29 @@ export interface RuntimeDiagnostics {
   sessionType: string;
   typeSimulation: InsertionSupport;
   clipboard: InsertionSupport;
-  ownedPreedit: OwnedPreeditStatus;
+  ibusShortcut: IbusShortcutStatus;
 }
 
-export interface OwnedPreeditStatus {
+/** The optional IBus input source only takes the dictation shortcut. */
+export interface IbusShortcutStatus {
   available: boolean;
-  ready: boolean;
   setupState:
     | "ready"
-    | "safety-disabled"
     | "not-enabled"
     | "not-installed"
     | "runtime-unavailable"
     | "incompatible"
-    | "error"
-    | "";
+    | "error";
+  detail: string;
+  error: string | null;
+}
+
+/** A Chromium exact-field receipt: only a matching receipt proves that the
+ * field took the text. */
+export interface BrowserFieldStatus {
+  available: boolean;
+  ready: boolean;
+  setupState: "ready" | "safety-disabled";
   detail: string;
   sessionId: number | null;
   engineActive: boolean;
@@ -169,13 +125,7 @@ export interface OwnedPreeditStatus {
   progressiveCommitActive: boolean;
   committedCharacterCount: number;
   ownershipIntact: boolean;
-  finalizationOutcome:
-    | "none"
-    | "committed"
-    | "discarded"
-    | "preserved"
-    | "uncertain"
-    | null;
+  finalizationOutcome: "committed" | "uncertain" | null;
   error: string | null;
 }
 
@@ -185,7 +135,6 @@ export interface RuntimeStatusSnapshot {
   epoch: number;
   revision: number;
   runtimeInitialized: boolean;
-  hasRecoverableTranscript: boolean;
   configurationError: boolean;
   microphoneReady: boolean;
   microphonePermission: MicrophonePermission;
@@ -194,7 +143,5 @@ export interface RuntimeStatusSnapshot {
   dictationSessionId?: number;
   cursorDelivery: CursorDeliveryState;
   cursorRequired: boolean;
-  cursorSetupState: OwnedPreeditStatus["setupState"];
-  manualTranscriptReady: boolean;
-  recoveryAvailable: boolean;
+  cursorSetupState: CursorSetupState;
 }

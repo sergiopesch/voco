@@ -381,6 +381,7 @@ main {
     14px/1.7 GeistMono,
     monospace;
   overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 .lab label {
   display: flex;

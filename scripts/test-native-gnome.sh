@@ -4,10 +4,6 @@ set -euo pipefail
 umask 077
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 if [[ ${1:-} != --inside ]]; then
-  if [[ ${VOCO_GNOME_CAPTURE:-0} == 1 ]]; then
-    echo "The historical manual-Copy capture fixture is retired. Use VOCO_GNOME_ONBOARDING=1 with all three documented audio audit flags." >&2
-    exit 2
-  fi
   : "${VOCO_NATIVE_DEPS:?Set extracted Xvfb root/usr}"
   : "${VOCO_GNOME_EVIDENCE_DIR:?Set fresh evidence directory}"
   [[ ! -e "$VOCO_GNOME_EVIDENCE_DIR" ]] || { echo 'Evidence directory must be fresh' >&2; exit 1; }
@@ -26,7 +22,7 @@ if [[ ${1:-} != --inside ]]; then
   mkdir -p "$run"/{home,runtime,config,cache,data,state,evidence,pulse}
   chmod 700 "$run/runtime" "$run/pulse" "$run/state"
   mkdir -p "$run/evidence/sources"
-  cp "$ROOT/scripts/test-native-gnome.sh" "$ROOT/scripts/test-native-gnome.py" "$ROOT/scripts/test-native-wayland.py" "$ROOT/scripts/test_native_wayland_capture.py" "$ROOT/scripts/test_native_onboarding_capture.py" "$ROOT/scripts/test_native_crash_review.py" "$run/evidence/sources/"
+  cp "$ROOT/scripts/test-native-gnome.sh" "$ROOT/scripts/test-native-gnome.py" "$ROOT/scripts/test-native-wayland.py" "$ROOT/scripts/audio_continuity.py" "$ROOT/scripts/test_native_onboarding_capture.py" "$ROOT/scripts/test_native_crash_review.py" "$run/evidence/sources/"
   mkdir -p "$run/data/gnome-shell/extensions/voco-private-probe@test.invalid"
   cp "$ROOT/scripts/fixtures/gnome-private-probe/"* "$run/data/gnome-shell/extensions/voco-private-probe@test.invalid/"
   cp -a "$ROOT/scripts/fixtures/gnome-private-probe" "$run/evidence/sources/"

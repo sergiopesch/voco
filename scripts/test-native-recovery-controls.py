@@ -16,7 +16,7 @@ ANCHORS = ['Hide to tray', 'Help', 'Microphone']
 # A pasted dictation leaves nothing to copy, review, discard or cancel.
 FORBIDDEN_BUTTONS = {'Copy transcript', 'Discard', 'Discard transcript', 'Keep', 'Cancel dictation'}
 FORBIDDEN_TEXT = ['Transcript ready to copy', 'Dictation saved', 'Transcript needs attention', 'Needs attention', 'Setup needed',
-                  'Settings need attention', 'Text delivery needs setup', 'Microphone setup required', 'Microphone needs permission',
+                  'Settings need attention', 'Desktop setup needed', 'Microphone setup required', 'Microphone needs permission',
                   'Text delivery paused', 'Dictation interrupted', 'Interrupted dictation', 'Recovered transcript', 'Crash recovery',
                   'manual review', 'could not be confirmed', 'copied to clipboard']
 

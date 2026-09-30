@@ -5,8 +5,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-// Actual App, hooks, store and ControlPanel; every native/media boundary is mocked.
-// These checks never request host microphone access or model inference.
+// Native source selection, the onboarding voice test and native/WebKit capture-failure
+// recovery in the actual App, hooks, store and ControlPanel; every native/media boundary
+// is mocked. These checks never request host microphone access or model inference.
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const out = process.env.VOCO_RENDERER_EVIDENCE_DIR;
 if (!out)
@@ -42,7 +43,7 @@ const save = (n, v) => writeFile(path.join(out, n), JSON.stringify(v, null, 2) +
     flag: 'wx'
 });
 const files = [
-    'src/main.tsx', 'src/styles.css', 'src/lib/shortcutPresentation.ts', 'src/lib/windowRemap.ts', 'src/types/index.ts', 'src/App.tsx', 'src/components/ControlPanel.tsx', 'src/components/Onboarding.tsx', 'src/lib/dictationRecording.ts', 'src/lib/benchmarkPhraseQueue.ts', 'src/lib/microphoneRefresh.ts', 'src/lib/audioInput.ts', 'src/store/useStore.ts', 'src/lib/nativeCapture.ts', 'src/lib/nativeCaptureAudit.ts', 'src/lib/captureDescriptor.ts', 'src/lib/tauri.ts', 'src/lib/nativeCaptureSettings.ts', 'src/hooks/useNativeCaptureSettings.ts', 'src/components/NativeMicrophoneSettings.tsx', 'src/hooks/useDictation.ts'
+    'src/main.tsx', 'src/styles.css', 'src/lib/shortcutPresentation.ts', 'src/lib/windowRemap.ts', 'src/types/index.ts', 'src/App.tsx', 'src/components/ControlPanel.tsx', 'src/components/Onboarding.tsx', 'src/lib/dictationRecording.ts', 'src/lib/dictationStream.ts', 'src/lib/microphoneRefresh.ts', 'src/lib/audioInput.ts', 'src/store/useStore.ts', 'src/lib/nativeCapture.ts', 'src/lib/nativeCaptureAudit.ts', 'src/lib/captureDescriptor.ts', 'src/lib/tauri.ts', 'src/lib/nativeCaptureSettings.ts', 'src/hooks/useNativeCaptureSettings.ts', 'src/components/NativeMicrophoneSettings.tsx', 'src/hooks/useDictation.ts'
 ];
 await save('SOURCE.json', Object.fromEntries(await Promise.all(files.map(async (f) => [
     f, createHash('sha256').update(await readFile(path.join(root, 'apps/desktop', f))).digest('hex')
@@ -169,18 +170,9 @@ try {
         window.config = {
             hotkey: 'Alt+D',
             selectedMic: null,
-            insertionStrategy: 'auto',
-            transcriptTarget: 'cursor',
-            liveCursorMode: 'final-text-only',
-            openclawAgent: 'main',
-            openclawPromptPrefix: '',
-            transcriptEnhancement: 'off',
-            localLlmEndpoint: 'http://127.0.0.1:8080/v1/chat/completions',
-            localLlmModel: null,
             onboardingCompleted: false,
             updateChannel: 'stable',
             installChannel: 'github-release',
-            voiceProfile: 'default'
         };
         window.nativeCommands=[];window.auditUploads=[];
         window.captureScenario=new URL(location.href).searchParams.get('scenario')||'enabled';
@@ -192,7 +184,7 @@ try {
           if(name.endsWith('_crash_journal')) return null;
           if(name==='list_crash_recovery') return window.crashEntries??[];
           if(name==='dismiss_crash_recovery') { window.crashEntries=(window.crashEntries??[]).filter(entry=>entry.id!==args.id); return null; }
-          if(name==='benchmark_stream' || name==='recover_stream') {
+          if(name==='speech_stream') {
             const r=args.request;
             if(['quality','diagnostic','cancel'].includes(r.op))return {};
             if(window.recognitionError || window.transcriptionError)throw {message:'Speech engine unavailable for this test.'};
@@ -233,6 +225,12 @@ try {
             if(name==='debugNativeCaptureEnabled')return window.auditEnabled===true&&window.auditUploads.length===0;
             if(name==='getDesktopPasteStatus')return {enabled:true,available:true,streamingEnabled:true,detail:'Desktop input is ready.'};
             if(name==='pasteDesktopText')return {outcome:'dispatched',strategy:'clipboard'};
+            if(name==='copyDesktopText'){
+                if(window.failClipboard)throw {outcome:'no-mutation',message:'Fixture clipboard unavailable',clipboardChanged:false};
+                if(window.holdCopy)await window.holdCopy;
+                window.copiedText=args[0];
+                return;
+            }
             if(name==='saveDebugNativeRetainedSource'){
                 if(!window.stopped||window.ack!==4)throw Error('Retained-source export preceded terminal ACK');
                 window.auditUploads.push(new Uint8Array(args[0]));
@@ -259,7 +257,7 @@ try {
                         available: true,
                         missingCommands: []
                     },
-                    ownedPreedit: {
+                    ibusShortcut: {
                         setupState: 'ready',
                         available: true
                     }
@@ -478,7 +476,7 @@ try {
               const base = await previous(name,args);
               return {...base, desktopInput:{available:true,detail:'Input helpers are ready.'},
                 desktopPaste:{enabled:true,available:false,detail:'Install ydotool and ydotoold.'},
-                ownedPreedit:{...base.ownedPreedit,setupState:'not-installed',available:false}};
+                ibusShortcut:{...base.ibusShortcut,setupState:'not-installed',available:false}};
             }
             return previous(name,args);
           };
@@ -499,9 +497,9 @@ try {
         assert.ok(!calls.includes('pasteDesktopText'));
         assert.ok(!calls.includes('insertText'));
         assert.ok(!calls.includes('copyDesktopText'));
-        assert.ok(!calls.includes('startOwnedPreedit'));
+        assert.ok(!calls.includes('startBrowserField'));
         assert.equal(await page.evaluate(() => window.copiedText),undefined);
-        assert.equal(await page.evaluate(()=>window.nativeCommands.some(c=>c.name==='benchmark_stream'&&c.args.request.op==='quality')),false);
+        assert.equal(await page.evaluate(()=>window.nativeCommands.some(c=>c.name==='speech_stream'&&c.args.request.op==='quality')),false);
       };
       for (const scenario of ['onboarding-toggle', 'dictation-toggle', 'dictation-stop', 'browser-stop']) {
         await loadTest();
@@ -724,6 +722,8 @@ try {
     const record=(name)=>results.push({case:name,passed:true});
     const state=()=>page.evaluate(()=>({mode:window.store.getState().captureBackendMode,ready:window.store.getState().microphoneReady,source:window.store.getState().nativeCaptureSource,streams:window.streamRequests||0,enums:window.enumCount||0,commands:window.nativeCommands}));
     const noCapture=async()=>{const s=await state();assert.equal(s.streams,0);assert.equal(s.enums,0);assert.equal(s.commands.filter(x=>/native_capture_(begin|drain|stop|cancel)$/.test(x.name)).length,0);};
+    // Each transcription opens with one speech_stream start request.
+    const streamStarts=()=>page.evaluate(()=>window.nativeCommands.filter(x=>x.name==='speech_stream'&&x.args.request.op==='start').length);
     const load=async(scenario)=>{
       await page.goto(origin+'/app-microphone-check?scenario='+scenario);
       await page.waitForFunction(()=>window.store && window.nativeCommands.some(x=>x.name==='native_capture_capabilities'));
@@ -827,7 +827,7 @@ try {
         window.store.getState().setSurface('hidden');
         const original = window.nativeCall;
         window.nativeCall = async (name, args) => {
-          if (name !== 'startOwnedPreedit') return original(name, args);
+          if (name !== 'startBrowserField') return original(name, args);
           window.calls.push([name, ...args]);
           if (failure === 'broker') throw Error('Fixture browser connection unavailable');
           return { sessionId: failure === 'lease' ? null : 901,
@@ -852,8 +852,8 @@ try {
         error: window.store.getState().error,
         streamRequests: window.streamRequests || 0,
         nativeBegins: window.nativeCommands.filter(call => call.name === 'native_capture_begin').length,
-        starts: window.calls.filter(call => call[0] === 'startOwnedPreedit'),
-        cancels: window.calls.filter(call => call[0] === 'cancelOwnedPreedit'),
+        starts: window.calls.filter(call => call[0] === 'startBrowserField'),
+        cancels: window.calls.filter(call => call[0] === 'cancelBrowserField'),
         releases: window.calls.filter(call => call[0] === 'releaseBrowserRecording'),
         snapshot: window.calls.filter(call => call[0] === 'syncRuntimeStatus').at(-1)[1],
       }));
@@ -868,7 +868,7 @@ try {
       assert.equal(proof.starts.length, 1);
       assert.ok(proof.starts.every(call => call[2] === 'browser:readiness-fixture'));
       assert.ok(proof.releases.some(call => call[1] === 'browser:readiness-fixture'));
-      assert.deepEqual(proof.cancels, failure === 'ownership' || captureFailure ? [['cancelOwnedPreedit', 901]] : []);
+      assert.deepEqual(proof.cancels, failure === 'ownership' || captureFailure ? [['cancelBrowserField', 901]] : []);
       const name = backend + '-browser-' + failure + '-failure-' + (captureFailure ? 'invalidates' : 'preserves') + '-microphone-readiness';
       expected.push(name);
       const passed = proof.ready === !captureFailure && proof.snapshot.microphoneReady === !captureFailure &&
@@ -945,9 +945,10 @@ try {
     await page.evaluate(()=>window.store.getState().setSurface('hidden'));
     await page.evaluate(()=>window.listeners['voco:toggle-dictation']({payload:null}));
     await page.waitForFunction(()=>window.store.getState().status==='idle'&&window.store.getState().transcript==='');
-    await activate();await page.evaluate(()=>window.unhealthy=true);
+    await activate();assert.equal(await streamStarts(),1);await page.evaluate(()=>window.unhealthy=true);
     await page.waitForFunction(()=>window.store.getState().status==='idle'&&window.store.getState().error);
-    assert.equal(await page.evaluate(()=>window.nativeCommands.filter(x=>x.name==='recover_stream'&&x.args.request.op==='start').length),0);
+    await page.evaluate(()=>new Promise(resolve=>setTimeout(resolve,100)));
+    assert.equal(await streamStarts(),1,'A tail failure must not start another transcription');
     assert.equal((await state()).streams,0);assert.equal((await state()).commands.filter(x=>x.name==='native_capture_begin').length,1);
     expected.push('native-tail-failure-clears-prefix-without-auto-transcription');record(expected.at(-1));
     await load('enabled');await page.getByRole('combobox', { name: 'Microphone', exact: true }).waitFor();
@@ -1010,7 +1011,6 @@ try {
     await page.evaluate(()=>window.listeners['voco:toggle-dictation']({payload:null}));
     await page.waitForFunction(()=>window.nativeCommands.some(x=>x.name==='native_capture_begin')&&window.store.getState().nativeCaptureSource===null);
     assert.equal((await state()).ready,false);assert.equal((await state()).streams,0);assert.equal((await state()).enums,0);
-    assert.equal(await page.evaluate(()=>window.nativeCommands.filter(x=>x.name==='recover_stream'&&x.args.request.op==='start').length),0);
     expected.push('native-start-failure-revokes-grant-without-fallback');record(expected.at(-1));
     await load('enabled');await chooseNative('token-1');
     await page.waitForFunction(()=>window.store.getState().nativeCaptureSource!==null);
@@ -1046,7 +1046,7 @@ try {
     };
     // Transport fault injection: a retained prefix followed by one lost Drain reply.
     // Native queue/lease behavior is tested separately; this fixture isolates renderer ownership.
-    await activate(true);
+    await activate(true);assert.equal(await streamStarts(),1);
     await page.evaluate(()=>{
       const invoke=window.nativeInvoke,identity={...window.captureIdentity};
       const raw=window.issuedFixturePcm.slice(0,35280);
@@ -1067,13 +1067,13 @@ try {
     await page.waitForFunction(()=>window.stallInjected===true);
     await page.waitForFunction(()=>window.store.getState().status==='idle'&&window.store.getState().error,{},{timeout:12000});
     await verifyRetainedWitness('interrupted');
-    assert.equal(await page.evaluate(()=>window.nativeCommands.filter(x=>x.name==='recover_stream'&&x.args.request.op==='start').length),0);
     assert.equal((await state()).source,null);assert.equal((await state()).ready,false);
     await page.evaluate(()=>window.store.getState().setSurface('popover'));
     assert.equal(await page.getByRole('button',{name:'Discard recovery',exact:true}).count(),0);
     assert.equal(await page.locator('vite-error-overlay').count(),0);
     await save('stall-recovery-view.json',{url:page.url(),title:await page.title(),text:await page.locator('body').innerText(),browser:'Browser plugin not available; regular Playwright',viewport:page.viewportSize()});
     await page.screenshot({path:path.join(out,'stall-recovery.png')});
+    assert.equal(await streamStarts(),1,'A drain timeout must not start another transcription');
     expected.push('drain-timeout-clears-content-without-automatic-output');record(expected.at(-1));
     await page.evaluate(()=>window.store.getState().setSurface('settings'));
     await page.getByRole('button',{name:'Settings',exact:true}).click();
@@ -1087,11 +1087,10 @@ try {
     await page.evaluate(()=>new Promise(resolve=>setTimeout(resolve,60)));
     assert.equal((await state()).ready,true);assert.ok((await state()).source);
     assert.equal(await page.evaluate(()=>window.store.getState().recovery),null);
-    assert.equal(await page.evaluate(()=>window.nativeCommands.filter(x=>x.name==='recover_stream'&&x.args.request.op==='start').length),0);
     await page.evaluate(()=>window.listeners['voco:toggle-dictation']({payload:null}));
     await page.waitForFunction(()=>window.store.getState().transcript===''&&window.store.getState().status==='idle');
     const lateProof=await page.evaluate(()=>({released:window.oldDrainReleased,
-      streamSamples:window.nativeCommands.filter(x=>x.name==='benchmark_stream'&&x.args.request.op==='push'&&x.args.request.dictation_session_id===window.captureIdentity.sessionId).reduce((s,x)=>s+x.args.request.audio.length,0),
+      streamSamples:window.nativeCommands.filter(x=>x.name==='speech_stream'&&x.args.request.op==='push'&&x.args.request.dictation_session_id===window.captureIdentity.sessionId).reduce((s,x)=>s+x.args.request.audio.length,0),
       starts:window.nativeCommands.filter(x=>x.name==='native_capture_begin').map(x=>x.args.request),
       uploads:window.auditUploads.length,cancels:window.nativeCommands.filter(x=>x.name==='native_capture_cancel').map(x=>x.args.request)}));
     assert.equal(lateProof.released,true);assert.equal(lateProof.streamSamples,35280);
@@ -1109,7 +1108,6 @@ try {
     await activate(true);await page.evaluate(()=>window.store.getState().setSurface('popover'));await page.getByRole('button',{name:'Cancel dictation',exact:true}).click();
     await verifyRetainedWitness('cancelled');
     await page.waitForFunction(()=>window.store.getState().status==='idle'&&window.store.getState().error);
-    assert.equal(await page.evaluate(()=>window.nativeCommands.filter(x=>x.name==='recover_stream'&&x.args.request.op==='start').length),0);
     expected.push('cancelled-audit-keeps-prefix-and-does-not-claim-healthy');record(expected.at(-1));
     assert.equal(await page.evaluate(()=>window.store.getState().recovery),null);
     assert.equal(await page.evaluate(()=>window.auditUploads.length),1);
@@ -1145,9 +1143,9 @@ try {
     await page.getByText('Shortcut help',{exact:true}).click();
     await page.getByText('No readable keyboard.', { exact: false }).waitFor();
     await captureStyledPanel('shortcut-settings-760x560', page.getByRole('button', { name: 'Record keys', exact: true }), { width: 760, height: 560 });
-    await captureStyledPanel('shortcut-settings-instructions-760x560', page.getByText('To dictate into any app, start dictation from the tray or assign voco --toggle to a shortcut in your desktop settings.', { exact: true }), { width: 760, height: 560 });
+    await captureStyledPanel('shortcut-settings-instructions-760x560', page.getByText('To dictate into other apps, start dictation from the tray or assign voco --toggle to a shortcut in your desktop settings.', { exact: true }), { width: 760, height: 560 });
     await page.evaluate(() => { window.shortcutObservation = { hotkey: 'Alt+D', route: 'ibus', state: 'focus-required', detail: 'Focus a supported input field.' }; });
-    await page.getByText('The optional VOCO Dictation input source handles this shortcut only in supported text fields. To dictate into any app, start dictation from the tray or assign voco --toggle to a shortcut in your desktop settings.', { exact: true }).waitFor();
+    await page.getByText('The optional VOCO Dictation input source handles this shortcut only in supported text fields. To dictate into other apps, start dictation from the tray or assign voco --toggle to a shortcut in your desktop settings.', { exact: true }).waitFor();
     expected.push('settings-shows-current-focus-required-ibus-instructions'); record(expected.at(-1));
 
     await page.evaluate(() => { window.deferDiagnostics = true; });
@@ -1177,7 +1175,10 @@ try {
           const base = await originalCall(name, args);
           const reply = { ...base, shortcut: { hotkey: 'Alt+D', route: 'global-shortcut', state: 'available', detail: 'Verified mock registration' } };
           if (window.holdObserver) return new Promise(resolve => {
-            window.finishObserver = () => resolve({ ...reply, ownedPreedit: { ...base.ownedPreedit, setupState: 'error' } });
+            // Accepting this late reply would flip desktop setup to ready.
+            window.finishObserver = () => resolve({ ...reply,
+              desktopInput: { available: true, detail: 'Desktop input is ready.' },
+              desktopPaste: { enabled: true, available: true, detail: 'Desktop paste is ready.' } });
           });
           return reply;
         };
@@ -1190,7 +1191,7 @@ try {
 
     await prepareDeferredDiagnostics();
     const pendingCalls = await page.evaluate(() => window.observerCalls);
-    await page.getByText('Check shortcut setup in Help.', { exact: true }).waitFor({ timeout: 3000 });
+    await page.getByText('Click where you want the text, then start dictation.', { exact: true }).waitFor({ timeout: 3000 });
     const openStarted = performance.now();
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
     await page.getByRole('button', { name: 'Shortcut', exact: true }).waitFor({ timeout: 3000 });
@@ -1205,7 +1206,7 @@ try {
         await page.getByRole('button', { name: 'Settings', exact: true }).click();
         await page.getByRole('button', { name: 'Shortcut', exact: true }).click();
         await page.getByRole('button', { name: 'Change shortcut', exact: true }).click();
-        await page.getByLabel('Start and stop listening', { exact: true }).fill('Alt+X');
+        await page.getByLabel('Start and stop dictation', { exact: true }).fill('Alt+X');
         await page.getByRole('button', { name: 'Apply shortcut', exact: true }).click();
         await page.waitForFunction(() => window.savePending === true);
       } else if (transition === 'hide') {
@@ -1214,12 +1215,25 @@ try {
       } else {
         await page.evaluate(() => window.reactRoot.unmount());
       }
-      const setupBefore = await page.evaluate(() => window.store.getState().ownedPreeditSetupState);
+      const syncedSetupStates = () => page.evaluate(() =>
+        window.calls.filter(call => call[0] === 'syncRuntimeStatus').map(call => call[1].cursorSetupState));
+      // Unmounted, the App has no effect left to sync from; a late reply
+      // could only publish through the shared store or a native call.
+      const published = () => page.evaluate(() =>
+        ({ calls: window.calls.length, commands: window.nativeCommands.length, store: JSON.stringify(window.store.getState()) }));
+      const setupBefore = await syncedSetupStates();
+      const publishedBefore = await published();
+      assert.equal(setupBefore.at(-1), 'not-enabled');
       await page.evaluate(async () => {
         window.finishObserver();
         await new Promise(resolve => setTimeout(resolve, 50));
       });
-      assert.equal(await page.evaluate(() => window.store.getState().ownedPreeditSetupState), setupBefore, 'Rejected late observer must not publish any diagnostics');
+      if (transition !== 'unmount') {
+        assert.ok((await syncedSetupStates()).slice(setupBefore.length).every(state => state === setupBefore.at(-1)),
+          'Rejected late observer must not publish any diagnostics');
+      } else {
+        assert.deepEqual(await published(), publishedBefore, 'Rejected late observer must not publish after unmount');
+      }
       assert.equal(await page.getByText('Click where you want the text, then use your shortcut.', { exact: true }).count(), 0);
       if (transition === 'save') await page.evaluate(() => window.finishSave());
       await noCapture();
@@ -1242,10 +1256,20 @@ try {
     await page.getByRole('button',{name:'Copy transcript',exact:true}).click();
     await page.getByText('Copy failed. Your text is still available.',{exact:true}).waitFor();
     assert.equal(await page.evaluate(()=>window.crashEntries.length),1);
-    await page.evaluate(()=>{window.failClipboard=false;});
-    await page.getByRole('button',{name:'Copy transcript',exact:true}).click();
+    // A control disabled while focused can drop keyboard focus, so a keyboard
+    // copy keeps Copy focused and enabled while it runs and after it finishes.
+    await page.evaluate(()=>{window.failClipboard=false;window.holdCopy=new Promise(resolve=>{window.releaseCopy=resolve;});});
+    const focused=()=>page.evaluate(()=>({label:document.activeElement?.textContent,disabled:document.activeElement?.disabled}));
+    await page.getByRole('button',{name:'Copy transcript',exact:true}).focus();
+    await page.keyboard.press('Enter');
+    await page.waitForFunction(()=>[...document.querySelectorAll('button')].some(button=>button.textContent==='Discard'&&button.disabled));
+    assert.deepEqual(await focused(),{label:'Copy transcript',disabled:false});
+    await page.evaluate(()=>{window.holdCopy=null;window.releaseCopy();});
     await page.getByText('Copied.',{exact:true}).waitFor();
+    assert.deepEqual(await focused(),{label:'Copy transcript',disabled:false});
     assert.equal(await page.evaluate(()=>window.copiedText),'Synthetic interrupted dictation.');
+    // The desktop command sets CLIPBOARD and PRIMARY.
+    assert.equal(await page.evaluate(()=>window.calls.filter(call=>call[0]==='copyDesktopText').at(-1)?.[1]),'Synthetic interrupted dictation.');
     await page.getByRole('button',{name:'Hide to tray',exact:true}).click();
     await page.waitForFunction(()=>window.store.getState().surface==='hidden');
     assert.equal(await page.evaluate(()=>window.crashEntries.length),1);

@@ -58,11 +58,7 @@ pub mod hotkey;
 mod platform_impl;
 
 pub use self::error::*;
-
 use hotkey::HotKey;
-/// VOCO: scoped X11 shortcut binding; the existing focus/receipt guard is unchanged.
-#[cfg(target_os = "linux")]
-pub use platform_impl::{acquire_focus_lease, FocusLease, FocusLeaseError};
 
 /// Describes the state of the [`HotKey`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]

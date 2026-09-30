@@ -17,7 +17,7 @@ def run_cursor(root, app, pump, native_windows, activate):
     gi.require_version('Gtk', '3.0')
     gi.require_version('Atspi', '2.0')
     from gi.repository import Gtk, Atspi, Gio, GLib
-    from test_native_wayland_capture import capture_continuity, pcm16
+    from audio_continuity import capture_continuity, pcm16
     # This process also owns the target widget. Service AT-SPI immediately like
     # Gtk.main(), without adding a polling sleep to every accessibility request.
     def pump(seconds=0):

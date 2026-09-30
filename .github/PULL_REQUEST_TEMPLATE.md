@@ -1,6 +1,6 @@
 ## Change
 
-Describe the problem and resulting behavior. Link the relevant issue if there is one.
+Describe the problem and resulting behaviour. Link the relevant issue if there is one.
 
 ## Validation
 
@@ -9,5 +9,5 @@ remove personal recordings, transcripts, credentials and local machine paths.
 
 ## Documentation
 
-Update affected setup, behavior or architecture docs. Keep changes focused and
+Update affected setup, behaviour or architecture docs. Keep changes focused and
 preserve the local, minimal dictation contract in [AGENTS.md](https://github.com/sergiopesch/voco/blob/master/AGENTS.md).

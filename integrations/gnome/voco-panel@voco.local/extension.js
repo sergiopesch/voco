@@ -1,6 +1,7 @@
 import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
+import GObject from 'gi://GObject';
 import Meta from 'gi://Meta';
 import Shell from 'gi://Shell';
 import St from 'gi://St';
@@ -16,6 +17,21 @@ const INTERFACE = 'org.voco.Panel1';
 const INPUT_PATH = '/org/voco/PanelInput';
 const INPUT_XML = '<node><interface name="org.voco.PanelInput1"><method name="ModifiersClear"><arg type="b" direction="out"/></method></interface></node>';
 
+// Holds the meter at its natural size against the microphone, so opening and
+// closing uncover it in place: only the pill's outer edge moves.
+const Reveal = GObject.registerClass(class VocoReveal extends St.Widget {
+    vfunc_allocate(box) {
+        this.set_allocation(box);
+        const child = this.get_first_child();
+        if (!child?.visible) return;
+        const [, width] = child.get_preferred_width(-1);
+        const [, height] = child.get_preferred_height(width);
+        const x = this.get_text_direction() === Clutter.TextDirection.RTL ? 0 : Math.floor(box.get_width() - width);
+        const y = Math.floor((box.get_height() - height) / 2);
+        child.allocate(Clutter.ActorBox.new(x, y, x + width, y + height));
+    }
+});
+
 export default class VocoPanel extends Extension {
     enable() {
         this._alive = true;
@@ -23,7 +39,7 @@ export default class VocoPanel extends Extension {
         this._inputGuard.export(Gio.DBus.session, INPUT_PATH);
         this._generation = 0;
         this._target = null;
-        this._previousStatus = null;
+        this._barsKey = null;
         this._state = null;
         this._polling = false;
         this._refreshQueued = false;
@@ -45,15 +61,18 @@ export default class VocoPanel extends Extension {
         this._indicator.can_focus = false;
         this._indicator.add_style_class_name('voco-panel');
         this._indicator.hide();
-        this._box = new St.BoxLayout({style_class: 'voco-panel-box'});
-        this._indicator.add_child(this._box);
-        this._iconButton = new St.Button({style_class: 'voco-panel-button',
-            can_focus: true, accessible_name: 'VOCO settings'});
-        this._iconButton.set_child(new St.Icon({
-            gicon: Gio.FileIcon.new(Gio.File.new_for_path(`${this.path}/voco-symbol.png`)),
-            icon_size: 20, style_class: 'system-status-icon'}));
-        this._iconButton.connect('clicked', () => this._action(this._state?.canStop ? 'stop' : 'open'));
-        this._iconButton.connect('key-press-event', (_actor, event) => {
+        // The button is the pill GNOME highlights on hover, focus and an open
+        // menu, so VOCO's tint and the theme's fills share one shape. A primary
+        // click anywhere on it stops or opens VOCO; other mouse buttons open the menu.
+        this._button = new St.Button({style_class: 'voco-panel-button',
+            can_focus: true, accessible_name: 'VOCO'});
+        this._indicator.add_child(this._button);
+        this._box = new St.BoxLayout();
+        this._button.set_child(this._box);
+        this._button.connect('clicked', () => this._action(this._state?.canStop ? 'stop' : 'open'));
+        this._button.connect('key-focus-in', () => this._indicator?.add_style_pseudo_class('focus'));
+        this._button.connect('key-focus-out', () => this._indicator?.remove_style_pseudo_class('focus'));
+        this._button.connect('key-press-event', (_actor, event) => {
             if (event.get_key_symbol() !== Clutter.KEY_Menu &&
                 !(event.get_key_symbol() === Clutter.KEY_F10 && event.get_state() & Clutter.ModifierType.SHIFT_MASK))
                 return Clutter.EVENT_PROPAGATE;
@@ -69,11 +88,23 @@ export default class VocoPanel extends Extension {
         this._stopItem = new PopupMenu.PopupMenuItem('Stop dictation');
         this._stopItem.connect('activate', () => this._action('stop'));
         this._indicator.menu.addMenuItem(this._stopItem);
-        this._box.add_child(this._iconButton);
-        this._clip = new St.Widget({layout_manager: new Clutter.BinLayout(), clip_to_allocation: true, width: 0});
-        this._detail = new St.BoxLayout({style_class: 'voco-panel-detail'});
+        // The top bar's right side grows leftward, so the microphone comes last
+        // and never moves: the meter opens and closes on its left.
+        this._clip = new Reveal({clip_to_allocation: true, width: 0});
+        // The panel packs fractional widths unevenly, which jolts every indicator
+        // on this side; the meter eases through whole pixels only.
+        this._reveal = new St.Adjustment({actor: this._clip, upper: 1000});
+        this._reveal.connect('notify::value', () => {
+            this._clip.width = Math.round(this._reveal.value);
+            // A fixed-width actor already awaiting layout passes no relayout up,
+            // so widths the panel measured this frame would stay cached.
+            this._box.queue_relayout();
+        });
+        this._detail = new St.BoxLayout({style_class: 'voco-panel-detail', visible: false});
         this._clip.add_child(this._detail);
         this._box.add_child(this._clip);
+        this._box.add_child(new St.Icon({style_class: 'voco-panel-icon', y_align: Clutter.ActorAlign.CENTER,
+            gicon: Gio.FileIcon.new(Gio.File.new_for_path(`${this.path}/voco-symbol.png`)), icon_size: 20}));
         this._wave = new St.BoxLayout({style_class: 'voco-panel-wave', y_align: Clutter.ActorAlign.CENTER});
         this._bars = Array.from({length: 7}, () => {
             const bar = new St.Widget({style_class: 'voco-panel-bar', y_align: Clutter.ActorAlign.CENTER});
@@ -146,7 +177,8 @@ export default class VocoPanel extends Extension {
             this._syncShortcut();
             this._indicator.show();
             this._render();
-            const delay = this._refreshQueued ? 1 : this._state.active ? 50 : 1500;
+            // Only recording streams levels; statuses arrive through Changed.
+            const delay = this._refreshQueued ? 1 : this._state.status === 'recording' ? 50 : 1500;
             this._refreshQueued = false;
             this._timer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, delay, () => {
                 this._timer = 0;
@@ -160,45 +192,62 @@ export default class VocoPanel extends Extension {
         if (!this._state || !this._alive) return;
         const state = this._state;
         const motion = this._settings.get_boolean('enable-animations');
-        this._iconButton.accessible_name = `VOCO: ${state.description}. ${state.canStop ? 'Stop dictation' : 'Open VOCO'}`;
-        this._iconButton.reactive = true;
-        this._label.text = state.label;
-        this._label.visible = !state.active && state.label.length > 0;
-        this._wave.visible = state.active;
+        const action = state.canStop ? 'Stop dictation' : state.canOpen ? 'Open settings' : '';
+        this._button.accessible_name = [state.description, action].filter(Boolean).join('. ');
+        const wave = state.active;
+        const label = !state.active && state.label.length > 0;
+        // A closing meter keeps its last content until the clip hides it.
+        if (wave || label) {
+            this._wave.visible = wave;
+            this._label.visible = label;
+            if (label) this._label.text = state.label;
+        }
         this._settingsItem.setSensitive(state.canOpen);
         this._reviewItem.setSensitive(state.canOpen);
         this._stopItem.visible = state.canStop;
         this._stopItem.setSensitive(state.canStop);
+        // Only new levels, statuses or motion settings move the bars; the
+        // processing pulse runs until the status changes.
+        const processing = state.status === 'processing';
         const scales = barScales(state.level);
-        this._bars.forEach((bar, index) => {
-            if (state.status === 'processing' && this._previousStatus === 'processing' && motion === this._previousMotion) return;
-            bar.remove_all_transitions();
-            const scale = state.status === 'processing' ? 0.35 : scales[index];
-            const duration = scale >= bar.scale_y ? 45 : 100;
-            bar.ease({scale_y: scale, duration: motion ? duration : 0, mode: Clutter.AnimationMode.EASE_OUT_QUAD});
-            // Processing uses a restrained pulse; listening only reflects real levels.
-            bar.opacity = 255;
-            if (state.status === 'processing' && motion)
-                bar.ease({opacity: 90, duration: 700, delay: index * 40,
-                    autoReverse: true, repeatCount: -1, mode: Clutter.AnimationMode.EASE_IN_OUT_SINE});
-        });
-        this._previousStatus = state.status;
-        this._previousMotion = motion;
-        const expanded = state.status !== 'idle';
-        if (expanded) this._box.add_style_class_name('voco-panel-active');
-        else this._box.remove_style_class_name('voco-panel-active');
+        const bars = `${processing}:${motion}:${scales}`;
+        if (bars !== this._barsKey) {
+            this._barsKey = bars;
+            this._bars.forEach((bar, index) => {
+                bar.remove_all_transitions();
+                const scale = processing ? 0.35 : scales[index];
+                const duration = scale >= bar.scale_y ? 45 : 100;
+                bar.ease({scale_y: scale, duration: motion ? duration : 0, mode: Clutter.AnimationMode.EASE_OUT_QUAD});
+                // Processing uses a restrained pulse; listening only reflects real levels.
+                bar.opacity = 255;
+                if (processing && motion)
+                    bar.ease({opacity: 90, duration: 700, delay: index * 40,
+                        autoReverse: true, repeatCount: -1, mode: Clutter.AnimationMode.EASE_IN_OUT_SINE});
+            });
+        }
+        if (state.status !== 'idle') this._button.add_style_class_name('voco-panel-active');
+        else this._button.remove_style_class_name('voco-panel-active');
+        // Open the meter only if the whole right side, meter included, still
+        // fits beside the clock. A crowded panel keeps just the actionable icon.
+        // St styles hidden actors only on request; measure content as it will look.
+        [this._detail, this._wave, this._label].forEach(widget => widget.ensure_style());
         const [, natural] = this._detail.get_preferred_width(-1);
-        // Leave centre and other panel items their space. On a crowded panel,
-        // retain the actionable icon instead of clipping its meter.
-        const right = Main.panel._rightBox;
-        const other = right.get_children().filter(child => child !== this._indicator.container && child !== this._indicator)
-            .reduce((sum, child) => sum + child.get_width(), 0);
-        const budget = Math.max(0, Main.panel.width / 2 - Main.panel._centerBox.width / 2 - other - 48);
-        const target = expanded && natural <= budget ? natural : 0;
+        const [, row] = Main.panel._rightBox.get_preferred_width(-1);
+        const center = Main.panel._centerBox;
+        const space = Main.panel.get_text_direction() === Clutter.TextDirection.RTL
+            ? center.x : Main.panel.width - center.x - center.width;
+        // Capture adds GNOME's privacy microphone to this side; a closed meter
+        // keeps an idle pill's room for it, so it never opens only to close again.
+        const reserve = wave && !this._target ? this._button.get_preferred_width(-1)[1] - this._clip.width : 0;
+        const target = (wave || label) && row - this._clip.width + natural + reserve <= space
+            ? Math.ceil(natural) : 0;
         if (this._target !== target) {
             this._target = target;
-            this._clip.remove_all_transitions();
-            this._clip.ease({width: target, duration: motion ? 220 : 0, mode: Clutter.AnimationMode.EASE_OUT_CUBIC});
+            // Closed content leaves the accessibility tree as well as the view.
+            if (target) this._detail.show();
+            this._reveal.ease(target, {duration: motion && this._clip.mapped ? 220 : 0,
+                mode: Clutter.AnimationMode.EASE_OUT_CUBIC,
+                onComplete: () => { if (!target) this._detail.hide(); }});
         }
     }
 
@@ -283,10 +332,13 @@ export default class VocoPanel extends Extension {
         this._refreshQueued = false;
         if (this._signal) { Gio.DBus.session.signal_unsubscribe(this._signal); this._signal = 0; }
         this._state = null;
-        this._previousStatus = null;
+        this._barsKey = null;
         this._target = null;
         this._bars?.forEach(bar => bar.remove_all_transitions());
-        this._clip?.remove_all_transitions();
+        // Reappear collapsed; a reconnect must not replay a stale expansion.
+        this._reveal?.remove_transition('value');
+        if (this._reveal) { this._reveal.value = 0; this._detail.hide(); }
+        this._button?.remove_style_class_name('voco-panel-active');
         if (this._timer) { GLib.source_remove(this._timer); this._timer = 0; }
         this._indicator?.hide();
     }

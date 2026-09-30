@@ -143,6 +143,7 @@ impl BrowserBroker {
             .map(|s| status(&s))
             .unwrap_or_default()
     }
+    #[cfg(test)]
     pub fn session_status(&self, session_id: u64) -> Result<BrowserStatus, String> {
         let state = self
             .shared
@@ -225,6 +226,7 @@ impl BrowserBroker {
             finalize,
         )
     }
+    #[cfg(test)]
     pub fn commit(&self, session_id: u64, full_text: &str) -> Result<BrowserStatus, String> {
         let state = self
             .shared

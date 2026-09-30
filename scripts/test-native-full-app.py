@@ -3,9 +3,8 @@
 
 A private PulseAudio fixture feeds the real app, which copies each recognized chunk to
 CLIPBOARD and PRIMARY with xclip, then sends xdotool [Space] Shift+Insert to whatever has
-keyboard focus. Final-text-only streams exactly like stable-cursor-streaming: desktop paste
-sessions pin that legacy snapshot and the phrase queue pastes each appended suffix as it
-arrives; Stop pastes only what remains, into the field focused at that moment.
+keyboard focus. Each appended suffix is pasted as it arrives; Stop pastes only what
+remains, into the field focused at that moment.
 
 delivery: A keeps focus and receives the fixture words exactly once; B stays empty.
 focus-switch: the fixture plays with A focused; once A's streamed text settles, focus moves
@@ -53,11 +52,6 @@ REQUIRED = ['dictation_desktop_paste_session_started', 'dictation_desktop_stream
 FATAL = {'dictation_desktop_paste_unavailable', 'dictation_desktop_stream_failed', 'dictation_desktop_remainder_copied',
          'dictation_desktop_remainder_kept', 'dictation_desktop_snapshot_revised', 'recording_script_processor_connected',
          'dictation_capture_health_interrupted', 'dictation_recovery_retained'}
-# IBus is shortcut-only; these would report text mutation through it.
-IBUS_MUTATIONS = {'dictation_owned_preedit_started', 'dictation_owned_preedit_updated', 'dictation_owned_preedit_committed',
-                  'dictation_owned_preedit_progressive_commit', 'dictation_owned_preedit_final_preserved',
-                  'dictation_canonical_checkpoint_committed', 'dictation_live_cursor_insert_updated',
-                  'dictation_live_cursor_insert_finalized'}
 t0 = time.monotonic()
 
 def pump(duration=.05):
@@ -216,7 +210,7 @@ Gio.bus_own_name_on_connection(tray_bus, 'org.kde.StatusNotifierWatcher', Gio.Bu
 pump(.1)
 log = (root / 'evidence/full-app.log').open('w')
 app_hash = hashlib.sha256((root / 'voco').read_bytes()).hexdigest()
-app = subprocess.Popen([str(root / 'voco')], stdout=log, stderr=subprocess.STDOUT, env={**os.environ, 'RUST_LOG': 'info', 'VOCO_DEBUG_CAPTURE_AUDIO': '1', 'VOCO_HOTKEY_TRACE': '1'})
+app = subprocess.Popen([str(root / 'voco')], stdout=log, stderr=subprocess.STDOUT, env={**os.environ, 'RUST_LOG': 'info', 'VOCO_HOTKEY_TRACE': '1'})
 passed, failure, window_id, before_switch = False, None, None, None
 selections, tray_state, popup, popover, diagnostic_errors = {}, None, None, None, []
 try:
@@ -266,7 +260,6 @@ try:
     missing = [event for event in REQUIRED if not c[event]]
     assert not missing, 'Paste session trace lacks ' + ', '.join(missing)
     assert not FATAL.intersection(c), 'Automatic paste stopped: ' + ', '.join(sorted(FATAL.intersection(c)))
-    assert not IBUS_MUTATIONS.intersection(c), 'IBus text mutation was traced: ' + ', '.join(sorted(IBUS_MUTATIONS.intersection(c)))
     assert not any(p['text'] for p in preedits), 'A GTK field showed IBus preedit text'
     changes = [m for m in mutations if m['field'] in ('A', 'B')]
     for label in ('A', 'B'):
@@ -331,7 +324,7 @@ finally:
     c = counts()
     capture = 'webkit-audio-worklet' if c['recording_worklet_connected'] else 'webkit-script-processor' if c['recording_script_processor_connected'] else 'native' if c['recording_state_active'] else None
     report = dict(passed=passed, failure=failure, expectedOutcome='pasted-into-focused-field', case=case,
-                  outputMode=os.environ.get('VOCO_NATIVE_OUTPUT_MODE', 'final-text-only'), buildRole=os.environ.get('VOCO_NATIVE_BUILD_ROLE', 'preflight'),
+                  buildRole=os.environ.get('VOCO_NATIVE_BUILD_ROLE', 'preflight'),
                   callbackTraceInstrumented=os.environ.get('VOCO_NATIVE_TRACE') == '1', expectedWords=expected,
                   text=field.get_text(), otherText=other.get_text(), textBeforeSwitch=before_switch,
                   mutations=[dict(m, t=round(m['t'] - t0, 3)) for m in mutations], preedits=[dict(p, t=round(p['t'] - t0, 3)) for p in preedits],
@@ -346,9 +339,6 @@ finally:
                                        'private PulseAudio fixture', 'Tauri binary IPC', 'pinned Nemotron', 'xclip CLIPBOARD+PRIMARY',
                                        'xdotool Shift+Insert into the focused GTK entry', 'no IBus text mutation', 'private X11 without a window manager']))
     (root / 'evidence/full-app.json').write_text(json.dumps(report, indent=2) + '\n')
-    debug_captures = root / 'state/voco/debug-captures'
-    if debug_captures.exists():
-        shutil.copytree(debug_captures, root / 'evidence/debug-captures', dirs_exist_ok=True)
     if trace_path.exists():
         shutil.copyfile(trace_path, root / 'evidence/full-app-trace.jsonl')
     try:

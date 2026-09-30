@@ -138,41 +138,70 @@ try:
     pointer_env = {**os.environ, 'DISPLAY': ':77'}
     shell_windows = subprocess.check_output(['xdotool', 'search', '--pid', str(shell.pid)], env=pointer_env, text=True).splitlines()
     subprocess.run(['xdotool', 'windowfocus', shell_windows[0]], env=pointer_env, check=True)
-    for i,status in enumerate(['idle','starting','recording','processing','recovery','idle','attention']):
+    def styled(data, name):
+        return [actor for actor in data['actors'] if name in (actor.get('style') or '').split()]
+    def anchors(data):
+        # The microphone and every right-box item on its right, in panel pixels.
+        row = data['rightBox']; own = next(index for index, child in enumerate(row) if child['voco'])
+        return [actor['x'] for actor in styled(data, 'voco-panel-icon')] + \
+            [child['x'] for child in row[own + 1:] if child['visible']]
+    frames = []
+    sequence = ['idle','starting','recording','processing','recovery','idle','attention']
+    for i,status in enumerate(sequence):
+        # Stretch the meter opening and closing so the probe samples many frames.
+        animated = {1: 'expanding', 4: 'collapsing'}.get(i)
+        if animated: call('SlowDown', GLib.Variant('(d)', (8.0,)))
         state.update(token=f'1:{i+1}',status=status,description=status,canStop=status in ('starting','recording'),canOpen=status not in ('starting','recording','processing'),level=.8 if status=='recording' else 0)
         if attached:
             bus.emit_signal(attached[-1], '/org/voco/Panel', 'org.voco.Panel1', 'Changed', None)
-        if i == 1:
-            for _ in range(50):
+        if animated:
+            settled = report['states'][f'{i-1}-{sequence[i-1]}']['indicator']['width']
+            for _ in range(400):
                 pump(.01)
-                frame = inspect()
-                if frame['indicator']['width'] > report['states']['0-idle']['indicator']['width'] + 2 and any(actor['transitions'] for actor in frame['actors']):
-                    report['intermediate'] = frame
-                    screenshot('expanding')
-                    break
-            report['animationProbe'] = inspect()
-            assert 'intermediate' in report, 'No width animation observed'
+                frame = inspect(); frames.append((animated, anchors(frame)))
+                moving = frame['revealing']
+                if animated not in report and moving and abs(frame['indicator']['width'] - settled) > 2:
+                    report[animated] = frame
+                    screenshot(animated)
+                elif animated in report and not moving: break
+            call('SlowDown', GLib.Variant('(d)', (1.0,)))
+            assert animated in report, f'No {animated} width animation observed'
         pump(.4)
         data=inspect(); p=data['panel']; a=data['indicator']
         assert a['y'] >= p['y'] and a['y']+a['height'] <= p['y']+p['height']+.1, data
         assert a['x'] >= p['x'] and a['x']+a['width'] <= p['x']+p['width']+.1, data
+        frames.append((f'{i}-{status}', anchors(data)))
+        # The pill is the theme's highlight area, 3px inside the indicator, so
+        # VOCO's tint and GNOME's hover, focus and menu fills draw as one shape.
+        pill = styled(data, 'voco-panel-button')[0]; mic = styled(data, 'voco-panel-icon')[0]
+        inset = (pill['x'] - a['x'], pill['y'] - a['y'], a['width'] - pill['width'], a['height'] - pill['height'])
+        assert all(abs(value - expected) < .5 for value, expected in zip(inset, (3, 3, 6, 6))), {'pill': pill, 'indicator': a}
+        assert ('voco-panel-active' in pill['style'].split()) == (status != 'idle'), pill
         if status not in ('idle','recovery'):
             content = [actor for actor in data['actors'] if actor['visible'] and
                        actor.get('style') in ('voco-panel-status', 'voco-panel-wave')]
-            right_gap = a['x'] + a['width'] - max(actor['x'] + actor['width'] for actor in content)
-            assert right_gap >= 10, f'Panel right inset is only {right_gap}px'
-            data['rightInset'] = right_gap
+            # The meter opens on the microphone's left. Its content keeps the
+            # glyph's margin from the pill edge, 11px padding plus the glyph's
+            # 4px transparent side, and sits 4px from the icon.
+            insets = (min(actor['x'] for actor in content) - pill['x'],
+                      mic['x'] - max(actor['x'] + actor['width'] for actor in content),
+                      pill['x'] + pill['width'] - mic['x'] - mic['width'])
+            assert all(abs(value - expected) < .5 for value, expected in zip(insets, (15, 4, 11))), f'Meter insets are {insets}px'
+            data['meterInsets'] = insets
         assert data['windows'] == 0, data
+        if status == 'attention':
+            # Content is measured as styled, so a later idle poll never resizes it.
+            pump(1.7)
+            assert abs(inspect()['indicator']['width'] - a['width']) < .5, 'The label resized after opening'
         report['states'][f'{i}-{status}']=data
         screenshot(f'{i}-{status}')
         if status in ('starting', 'recording', 'processing'):
             assert not any(actor['visible'] and actor.get('text') for actor in data['actors']), data
             assert not any(actor.get('style') == 'voco-panel-stop' for actor in data['actors']), data
-        icon = next(actor for actor in data['actors'] if actor.get('style') == 'voco-panel-button')
         subprocess.run(['xdotool', 'mousemove', '400', '300'], env=pointer_env, check=True)
         pump(.1)
-        subprocess.run(['xdotool', 'mousemove', str(round(icon['x'] + icon['width'] / 2)),
-                        str(round(icon['y'] + icon['height'] / 2))], env=pointer_env, check=True)
+        subprocess.run(['xdotool', 'mousemove', str(round(mic['x'] + mic['width'] / 2)),
+                        str(round(mic['y'] + mic['height'] / 2))], env=pointer_env, check=True)
         pump(.1)
         subprocess.run(['xdotool', 'click', '3'], env=pointer_env, check=True)
         pump(.3)
@@ -205,17 +234,43 @@ try:
             report['meterResponds'] = True
             call('Stop'); pump(.2)
             assert actions[-1] == ('stop', state['stopSession']), actions
+            # A primary click anywhere on the pill stops, the meter included.
+            wave = styled(data, 'voco-panel-wave')[0]; before = len(actions)
+            subprocess.run(['xdotool', 'mousemove', str(round(wave['x'] + wave['width'] / 2)),
+                            str(round(wave['y'] + wave['height'] / 2))], env=pointer_env, check=True)
+            pump(.1)
+            subprocess.run(['xdotool', 'click', '1'], env=pointer_env, check=True)
+            pump(.3)
+            assert actions[before:] == [('stop', state['stopSession'])] and not inspect()['menu']['open'], actions[before:]
+            report['meterClickStops'] = True
+    # Keyboard focus shows GNOME's own focus fill on the indicator.
+    subprocess.run(['xdotool', 'mousemove', '400', '300'], env=pointer_env, check=True)
+    call('Focus', GLib.Variant('(b)', (True,))); pump(.4)
+    assert inspect()['indicatorFocus'], 'Keyboard focus did not reach the indicator'
+    screenshot('focus')
+    call('Focus', GLib.Variant('(b)', (False,))); pump(.3)
+    assert not inspect()['indicatorFocus'], 'The indicator kept focus styling'
+    report['focusVisible'] = True
     assert report['states']['2-recording']['indicator']['width'] > report['states']['0-idle']['indicator']['width'] + 20
     assert abs(report['states']['5-idle']['indicator']['width'] - report['states']['0-idle']['indicator']['width']) < 2
     subprocess.run(['gsettings','set','org.gnome.desktop.interface','enable-animations','false'],check=True)
     state.update(status='recording',canStop=True,canOpen=False,level=.4); pump(1.8)
     report['reducedMotion']=inspect(); screenshot('reduced-motion')
-    assert not any(a['transitions'] for a in report['reducedMotion']['actors'])
+    assert not report['reducedMotion']['revealing']
+    frames.append(('reduced-motion', anchors(report['reducedMotion'])))
     call('Crowd', GLib.Variant('(b)', (True,))); pump(.3)
     report['crowded'] = inspect(); screenshot('crowded')
     assert report['crowded']['indicator']['width'] <= report['states']['0-idle']['indicator']['width'] + 2
     call('Crowd', GLib.Variant('(b)', (False,))); pump(.3)
-    assert inspect()['indicator']['width'] > report['crowded']['indicator']['width'] + 20
+    uncrowded = inspect()
+    assert uncrowded['indicator']['width'] > report['crowded']['indicator']['width'] + 20, uncrowded['indicator']
+    frames.append(('uncrowded', anchors(uncrowded)))
+    # Opening and closing the meter never moves the microphone or its neighbours.
+    reference = frames[0][1]
+    moved = [frame for frame in frames if len(frame[1]) != len(reference) or
+             any(abs(value - fixed) > .5 for value, fixed in zip(frame[1], reference))]
+    assert not moved, {'reference': reference, 'moved': moved[:5]}
+    report['fixedMicrophone'] = {'frames': len(frames), 'anchors': reference}
     subprocess.run(['gsettings','set','org.gnome.desktop.interface','gtk-theme','HighContrast'],check=True)
     pump(.5); screenshot('high-contrast')
     fail_next.append(True)
@@ -240,6 +295,7 @@ try:
     assert inspect()['indicator']['visible']
     assert inspect()['indicator']['width'] > report['states']['0-idle']['indicator']['width'] + 20
     report['reenableVisible'] = True
+    detaches = len(detached)
     # Real compositor key delivery to a disposable GTK input. No host devices.
     gi.require_version('Gtk', '3.0'); gi.require_version('Gdk', '3.0')
     os.environ.update(WAYLAND_DISPLAY='voco-panel-test', GDK_BACKEND='wayland')
@@ -269,7 +325,17 @@ try:
     except GLib.Error as error:
         assert 'NotAttached' in str(error), error
     finally: unauthorized.close_sync(None)
-    assert modifiers_clear()
+    # This fixture answers the companion only while it pumps. Loading GTK can
+    # outlast the companion's 1.5-second call timeout; the companion then
+    # detaches and attaches again 2 seconds later, as it would from a stalled app.
+    deadline = time.monotonic() + 5
+    while True:
+        try: ready = modifiers_clear(); break
+        except GLib.Error as error:
+            if 'NotAttached' not in str(error) or time.monotonic() > deadline: raise
+            pump(.05)
+    report['reattachedAfterFixtureStall'] = len(detached) > detaches
+    assert ready
     def wait_for(predicate, seconds):
         end = time.monotonic() + seconds
         while not predicate() and time.monotonic() < end: pump(.01)
@@ -373,7 +439,7 @@ try:
     assert press('alt+shift+d') == consumed, 'enable must regrab'
     shortcut_state('idle', None)
     assert press('alt+shift+d') == released and press('alt+d') == released, 'no supported chord must release the grab'
-    assert not stop_reservations, 'companion v11 must not use the v10 Stop reservation'
+    assert not stop_reservations, 'the companion must not use the v10 Stop reservation'
     assert entry.get_text() == 'Keep my dictated words ', entry.get_text()
     # Super may open the overview; test it only after all focused-field checks.
     for modifier in ('Alt_L', 'Alt_R', 'Control_L', 'Control_R', 'Shift_L', 'Shift_R', 'Super_L', 'Super_R'):
@@ -448,7 +514,8 @@ try:
             return bus.call_sync(service,item_path,'org.freedesktop.DBus.Properties','Get',
                 GLib.Variant('(ss)',('org.kde.StatusNotifierItem',name)),None,Gio.DBusCallFlags.NONE,1500,None).unpack()[0]
         report['fallbackLabel'] = tray_property('XAyatanaLabel')
-        assert report['fallbackLabel'] in ['Starting VOCO', 'Check setup', 'Ready']
+        # Only startup and setup problems carry a label; Ready and dictating share the bare icon.
+        assert report['fallbackLabel'] in ['', 'Starting VOCO', 'Check setup']
         old_icon = Path(tray_property('IconName'))
         assert old_icon.exists()
         pump(2)

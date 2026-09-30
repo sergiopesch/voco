@@ -38,18 +38,13 @@
     ],
     "category": "Utility",
     "shortDescription": "Turn speech into text at your cursor with local dictation",
-    "longDescription": "Your voice, typed. VOCO turns speech into text at your cursor on Linux. Press a shortcut, speak, and press it again to finish. English recognition runs locally on the CPU with no account or subscription. VOCO stays in the tray and offers microphone and shortcut setup. Delivery uses clipboard paste and depends on the desktop session and target field. Interrupted transcripts remain available for recovery.",
+    "longDescription": "Your voice, typed. Built for Linux. Press a shortcut, speak, and VOCO pastes your words into the app you are typing in. Speech is recognized on your computer, with no account, subscription or cloud service. VOCO stays in the system tray, or in the GNOME top bar with live microphone bars. Pasting depends on your desktop session and the app you type in. Words VOCO cannot paste are copied to the clipboard when you stop, and Review recovers dictation after a crash.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png"
     ],
     "linux": {
-      "appimage": {
-        "files": {
-          "/usr/share/metainfo/com.sergiopesch.voco.metainfo.xml": "../../../packaging/tauri/com.sergiopesch.voco.metainfo.xml"
-        }
-      },
       "deb": {
         "desktopTemplate": "../../../packaging/tauri/VOCO.desktop",
         "depends": [
@@ -60,8 +55,6 @@
           "gir1.2-ibus-1.0",
           "python3-gi",
           "xclip",
-          "gir1.2-atspi-2.0",
-          "at-spi2-core",
           "python3-numpy",
           "python3-psutil",
           "procps",
@@ -76,7 +69,6 @@
           "/usr/share/ibus/component/voco.xml": "../../../packaging/ibus/voco.xml",
           "/usr/libexec/voco-ibus-engine": "../../../packaging/ibus/voco-ibus-engine",
           "/usr/lib/voco/ibus/voco_ibus_engine.py": "resources/voco_ibus_engine.py",
-          "/usr/lib/voco/ibus/voco_ibus_ownership.py": "resources/voco_ibus_ownership.py",
           "/usr/lib/voco/ibus/voco_ibus_protocol.py": "resources/voco_ibus_protocol.py",
           "/usr/share/doc/voco/THIRD-PARTY-NOTICES.txt": "../../../vendor/THIRD-PARTY-NOTICES.txt",
           "/etc/opt/chrome/native-messaging-hosts/com.voco.exact_field.json": "../../../packaging/chromium/com.voco.exact_field.json",

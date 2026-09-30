@@ -30,7 +30,6 @@ children = []
 try:
     assert 'DISPLAY' not in os.environ and 'WAYLAND_DISPLAY' not in os.environ
     assert not Path('/dev/input').exists() and not Path('/dev/snd').exists()
-    capture_requested = os.environ.get('VOCO_KDE_CAPTURE') == '1'
     env = {**os.environ, 'PATH': '/tmp/kde-deps/bin:/usr/bin:/bin',
            'LD_LIBRARY_PATH': '/tmp/kde-deps/lib/x86_64-linux-gnu',
            'QT_PLUGIN_PATH': '/tmp/kde-deps/lib/x86_64-linux-gnu/qt5/plugins:/usr/lib/x86_64-linux-gnu/qt5/plugins',
@@ -180,23 +179,6 @@ try:
     os.environ.update(env)
     env['RUST_LOG'] = 'info'
 
-    if capture_requested:
-        env.update(PULSE_SERVER='unix:' + str(root / 'runtime/pulse.sock'),
-                   PULSE_SOURCE='voco_fixture', PULSE_SINK='fixture')
-        os.environ.update(env)
-        pulse = subprocess.Popen([os.environ['VOCO_WAYLAND_PULSEAUDIO'], '--daemonize=no', '--use-pid-file=no',
-                                  '--exit-idle-time=-1', '--disable-shm=true', '-n',
-                                  '--log-target=file:' + str(evidence / 'pulse.log'),
-                                  '-L', 'module-native-protocol-unix socket=' + str(root / 'runtime/pulse.sock') + ' auth-anonymous=1',
-                                  '-L', 'module-null-sink sink_name=fixture rate=48000',
-                                  '-L', 'module-remap-source master=fixture.monitor source_name=voco_fixture'])
-        children.append(pulse)
-        until = time.monotonic() + 5
-        while not (root / 'runtime/pulse.sock').exists() and time.monotonic() < until:
-            assert pulse.poll() is None
-            time.sleep(.02)
-        assert (root / 'runtime/pulse.sock').exists()
-        subprocess.run([os.environ['VOCO_WAYLAND_PACTL'], 'set-default-source', 'voco_fixture'], check=True, timeout=5)
     if (root / 'voco').exists():
         gi.require_version('Atspi', '2.0')
         from gi.repository import Atspi
@@ -299,14 +281,11 @@ try:
                 activate('Open VOCO')
                 visible = wait_for(visible_app)
                 report.setdefault('appNativeGeometry', []).append(geometry(app.pid))
-                if capture_requested and cycle == 0:
-                    from test_native_wayland_capture import run_capture
-                    report['capture'] = run_capture(root, app, pump, activate, geometry_provider=geometry)
 
                 activate('Quit VOCO')
                 assert app.wait(timeout=10) == 0
                 report['application'].append({'cycle': cycle + 1, 'visibleFrame': visible, 'modelCacheOnlyCheck': True,
-                                              'inferenceRequested': capture_requested and cycle == 0, 'trayAction': 'real DBusMenu Event, not pointer activation'})
+                                              'trayAction': 'real DBusMenu Event, not pointer activation'})
             finally:
                 if app.poll() is None:
                     app.terminate()

@@ -14,22 +14,12 @@ pub struct AppConfig {
     pub hotkey: String,
     #[serde(default)]
     pub selected_mic: Option<String>,
-    #[serde(default = "default_insertion_strategy")]
-    pub insertion_strategy: InsertionStrategy,
-    #[serde(default = "default_transcript_target", skip_deserializing)]
-    pub transcript_target: TranscriptTarget,
-    #[serde(default = "default_live_cursor_mode", skip_deserializing)]
-    pub live_cursor_mode: LiveCursorMode,
-    #[serde(default = "default_transcript_enhancement", skip_deserializing)]
-    pub transcript_enhancement: TranscriptEnhancement,
     #[serde(default)]
     pub onboarding_completed: bool,
-    #[serde(default = "default_update_channel")]
+    #[serde(default)]
     pub update_channel: UpdateChannel,
-    #[serde(default = "default_install_channel")]
+    #[serde(default)]
     pub install_channel: InstallChannel,
-    #[serde(default = "default_voice_profile")]
-    pub voice_profile: VoiceProfile,
 }
 
 /// A field-level configuration update sent by the frontend.
@@ -44,15 +34,11 @@ pub struct AppConfigPatch {
     #[serde(default)]
     pub selected_mic: PatchField<Option<String>>,
     #[serde(default)]
-    pub insertion_strategy: PatchField<InsertionStrategy>,
-    #[serde(default)]
     pub onboarding_completed: PatchField<bool>,
     #[serde(default)]
     pub update_channel: PatchField<UpdateChannel>,
     #[serde(default)]
     pub install_channel: PatchField<InstallChannel>,
-    #[serde(default)]
-    pub voice_profile: PatchField<VoiceProfile>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -89,9 +75,6 @@ impl AppConfigPatch {
         if let PatchField::Set(value) = self.selected_mic {
             config.selected_mic = value;
         }
-        if let PatchField::Set(value) = self.insertion_strategy {
-            config.insertion_strategy = value;
-        }
         if let PatchField::Set(value) = self.onboarding_completed {
             config.onboarding_completed = value;
         }
@@ -100,9 +83,6 @@ impl AppConfigPatch {
         }
         if let PatchField::Set(value) = self.install_channel {
             config.install_channel = value;
-        }
-        if let PatchField::Set(value) = self.voice_profile {
-            config.voice_profile = value;
         }
     }
 }
@@ -138,71 +118,6 @@ fn default_hotkey() -> String {
     "Alt+D".to_string()
 }
 
-fn default_insertion_strategy() -> InsertionStrategy {
-    InsertionStrategy::Auto
-}
-
-fn default_transcript_target() -> TranscriptTarget {
-    TranscriptTarget::Cursor
-}
-
-fn default_live_cursor_mode() -> LiveCursorMode {
-    LiveCursorMode::StableCursorStreaming
-}
-
-fn default_transcript_enhancement() -> TranscriptEnhancement {
-    TranscriptEnhancement::Off
-}
-
-fn default_update_channel() -> UpdateChannel {
-    UpdateChannel::Stable
-}
-
-fn default_install_channel() -> InstallChannel {
-    InstallChannel::GithubRelease
-}
-
-fn default_voice_profile() -> VoiceProfile {
-    VoiceProfile::Default
-}
-
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum InsertionStrategy {
-    #[default]
-    Auto,
-    Clipboard,
-    TypeSimulation,
-}
-
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum TranscriptTarget {
-    #[default]
-    Cursor,
-    LocalAgent,
-    OpenclawAgent,
-    OpenclawSpeech,
-}
-
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum LiveCursorMode {
-    #[default]
-    StableCursorStreaming,
-    PreviewOverlayOnly,
-    FinalTextOnly,
-}
-
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum TranscriptEnhancement {
-    #[default]
-    Off,
-    Conservative,
-    CommandsOnly,
-}
-
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum UpdateChannel {
@@ -211,23 +126,15 @@ pub enum UpdateChannel {
     Beta,
 }
 
+/// Only chooses which update instructions Settings shows. VOCO no longer
+/// publishes AppImage, Flatpak or Snap builds, so those read as GitHub Release.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum InstallChannel {
     #[default]
+    #[serde(alias = "appimage", alias = "flatpak", alias = "snap")]
     GithubRelease,
-    Appimage,
     Source,
-    Flatpak,
-    Snap,
-}
-
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum VoiceProfile {
-    #[default]
-    Default,
-    AccentAware,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -246,14 +153,9 @@ impl Default for AppConfig {
         Self {
             hotkey: default_hotkey(),
             selected_mic: None,
-            insertion_strategy: InsertionStrategy::Auto,
-            transcript_target: default_transcript_target(),
-            live_cursor_mode: default_live_cursor_mode(),
-            transcript_enhancement: default_transcript_enhancement(),
             onboarding_completed: false,
-            update_channel: default_update_channel(),
-            install_channel: default_install_channel(),
-            voice_profile: default_voice_profile(),
+            update_channel: UpdateChannel::default(),
+            install_channel: InstallChannel::default(),
         }
     }
 }
@@ -294,14 +196,14 @@ impl AppConfig {
             secure_private_regular_file(&path)?;
             let content = fs::read_to_string(&path)?;
             let config: Self = serde_json::from_str(&content)?;
-            // Removed modes are ignored on read and omitted on the next save.
-            // Preserve microphone, shortcut and other supported preferences.
+            // Retired settings are ignored on read and dropped by this save;
+            // the microphone, shortcut and other current settings are kept.
             if serde_json::to_value(&config)?
                 != serde_json::from_str::<serde_json::Value>(&content)?
             {
                 if let Err(error) = config.save() {
                     warn!(
-                        "Loaded legacy VOCO settings, but could not persist the optional default migration: {error}"
+                        "Loaded VOCO settings, but could not save them in the current format: {error}"
                     );
                 }
             }
@@ -527,57 +429,24 @@ mod tests {
     }
 
     #[test]
-    fn insertion_strategy_serializes_kebab_case() {
-        let json = serde_json::to_string(&InsertionStrategy::TypeSimulation).unwrap();
-        assert_eq!(json, r#""type-simulation""#);
-
-        let json = serde_json::to_string(&InsertionStrategy::Auto).unwrap();
-        assert_eq!(json, r#""auto""#);
-    }
-
-    #[test]
-    fn transcript_target_serializes_kebab_case() {
-        let json = serde_json::to_string(&TranscriptTarget::LocalAgent).unwrap();
-        assert_eq!(json, r#""local-agent""#);
-
-        let json = serde_json::to_string(&TranscriptTarget::OpenclawAgent).unwrap();
-        assert_eq!(json, r#""openclaw-agent""#);
-
-        let json = serde_json::to_string(&TranscriptTarget::OpenclawSpeech).unwrap();
-        assert_eq!(json, r#""openclaw-speech""#);
-    }
-
-    #[test]
-    fn live_cursor_mode_serializes_kebab_case() {
-        let json = serde_json::to_string(&LiveCursorMode::StableCursorStreaming).unwrap();
-        assert_eq!(json, r#""stable-cursor-streaming""#);
-
-        let json = serde_json::to_string(&LiveCursorMode::PreviewOverlayOnly).unwrap();
-        assert_eq!(json, r#""preview-overlay-only""#);
-
-        let json = serde_json::to_string(&LiveCursorMode::FinalTextOnly).unwrap();
-        assert_eq!(json, r#""final-text-only""#);
-    }
-
-    #[test]
-    fn transcript_enhancement_serializes_kebab_case() {
-        let json = serde_json::to_string(&TranscriptEnhancement::CommandsOnly).unwrap();
-        assert_eq!(json, r#""commands-only""#);
-
-        let json = serde_json::to_string(&TranscriptEnhancement::Conservative).unwrap();
-        assert_eq!(json, r#""conservative""#);
-    }
-
-    #[test]
     fn update_channel_serializes_kebab_case() {
         let json = serde_json::to_string(&UpdateChannel::Stable).unwrap();
         assert_eq!(json, r#""stable""#);
     }
 
     #[test]
-    fn voice_profile_serializes_kebab_case() {
-        let json = serde_json::to_string(&VoiceProfile::AccentAware).unwrap();
-        assert_eq!(json, r#""accent-aware""#);
+    fn install_channel_reads_retired_package_formats_as_github_release() {
+        assert_eq!(
+            serde_json::to_string(&InstallChannel::GithubRelease).unwrap(),
+            r#""github-release""#
+        );
+        for retired in ["appimage", "flatpak", "snap"] {
+            let channel: InstallChannel =
+                serde_json::from_value(serde_json::json!(retired)).unwrap();
+            assert!(matches!(channel, InstallChannel::GithubRelease));
+        }
+        let source: InstallChannel = serde_json::from_str(r#""source""#).unwrap();
+        assert!(matches!(source, InstallChannel::Source));
     }
 
     #[test]
@@ -776,12 +645,14 @@ mod tests {
     }
 
     #[test]
-    fn retired_options_migrate_to_direct_dictation_without_losing_preferences() {
+    fn retired_settings_are_dropped_without_losing_current_ones() {
         let config: AppConfig = serde_json::from_str(
             r#"{
             "hotkey":"Super+D", "selectedMic":"usb-mic", "onboardingCompleted":true,
-            "transcriptTarget":"openclaw-speech", "liveCursorMode":"final-text-only",
-            "transcriptEnhancement":"conservative", "localLlmEndpoint":"http://localhost:8080",
+            "updateChannel":"beta", "installChannel":"appimage",
+            "insertionStrategy":"clipboard", "transcriptTarget":"openclaw-speech",
+            "liveCursorMode":"final-text-only", "transcriptEnhancement":"conservative",
+            "voiceProfile":"accent-aware", "localLlmEndpoint":"http://localhost:8080",
             "openclawAgent":"old-agent"
         }"#,
         )
@@ -789,26 +660,31 @@ mod tests {
         assert_eq!(config.hotkey, "Super+D");
         assert_eq!(config.selected_mic.as_deref(), Some("usb-mic"));
         assert!(config.onboarding_completed);
-        assert!(matches!(config.transcript_target, TranscriptTarget::Cursor));
+        assert!(matches!(config.update_channel, UpdateChannel::Beta));
         assert!(matches!(
-            config.live_cursor_mode,
-            LiveCursorMode::StableCursorStreaming
+            config.install_channel,
+            InstallChannel::GithubRelease
         ));
-        assert!(matches!(
-            config.transcript_enhancement,
-            TranscriptEnhancement::Off
-        ));
-        let value = serde_json::to_value(config).unwrap();
-        assert!(value.get("localLlmEndpoint").is_none());
-        assert!(value.get("openclawAgent").is_none());
+        assert_eq!(
+            serde_json::to_value(config).unwrap(),
+            serde_json::json!({
+                "hotkey": "Super+D",
+                "selectedMic": "usb-mic",
+                "onboardingCompleted": true,
+                "updateChannel": "beta",
+                "installChannel": "github-release",
+            })
+        );
     }
 
     #[test]
     fn patches_reject_retired_modes_and_preserve_omitted_preferences() {
         for field in [
+            "insertionStrategy",
             "transcriptTarget",
             "liveCursorMode",
             "transcriptEnhancement",
+            "voiceProfile",
             "openclawAgent",
             "localLlmModel",
         ] {

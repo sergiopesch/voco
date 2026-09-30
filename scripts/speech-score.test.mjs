@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { buildSpeechReplayRequests, scoreTranscript, validateSpeechFixtureWav, validateSpeechManifest, validateSpeechReplayResults, words } from "./speech-score.mjs";
+import { scoreTranscript, validateSpeechFixtureWav, validateSpeechManifest, words } from "./speech-score.mjs";
 
 assert.deepEqual(words("Don’t drop Café 42."), ["don't", "drop", "café", "42"]);
 assert.equal(scoreTranscript("One two three", "one two three.").wer, 0);
@@ -43,22 +43,6 @@ for (const change of [
 }
 for (const value of [null, [], undefined]) {
   assert.throws(() => validateSpeechManifest(value), /Invalid speech manifest/u);
-}
-assert.deepEqual(buildSpeechReplayRequests(20 * 16_000).map(({ mode }) => mode), ["full", "canonical", "preview"]);
-assert.deepEqual(buildSpeechReplayRequests(20 * 16_000 + 1).map(({ mode }) => mode), ["full", "canonical"]);
-assert.deepEqual(buildSpeechReplayRequests(30 * 16_000, "Preserve this.").map(({ mode }) => mode), ["full", "canonical"]);
-assert.deepEqual(buildSpeechReplayRequests(0.7 * 16_000 - 1).map(({ mode }) => mode), ["full", "canonical"]);
-assert.equal(buildSpeechReplayRequests(16_000, "Preserve this.")[1].request.previousCanonicalText, "Preserve this.");
-for (const samples of [0, -1, NaN, Infinity, 1.5, 30 * 16_000 + 1]) {
-  assert.throws(() => buildSpeechReplayRequests(samples));
-}
-const requests = buildSpeechReplayRequests(16_000);
-const responses = [{ text: "Hello" }, { canonicalText: "Hello", appendText: "Hello", chunkText: "Hello" }, { text: "Hello", segments: [] }];
-assert.deepEqual(Object.keys(validateSpeechReplayResults(requests, responses)), ["full", "canonical", "preview"]);
-for (const values of [[], responses.slice(0, 2), [...responses, {}], [null, ...responses.slice(1)],
-  [responses[0], responses[1], null], [responses[0], responses[1], { text: "" }],
-  [responses[0], { canonicalText: "partial" }, responses[2]]]) {
-  assert.throws(() => validateSpeechReplayResults(requests, values), /Replay worker returned/u);
 }
 const corpus = new URL("../tests/fixtures/speech/", import.meta.url);
 const checkedManifest = validateSpeechManifest(JSON.parse(fs.readFileSync(new URL("manifest.json", corpus), "utf8")));

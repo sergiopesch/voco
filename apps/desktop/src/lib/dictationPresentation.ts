@@ -1,30 +1,36 @@
 import type {
-  CursorDeliveryState,
+  CursorSetupState,
   DictationStatus,
   MicrophonePermission,
-  OwnedPreeditStatus,
 } from "@/types";
 
 interface StatusLabelInput {
   configurationError: boolean;
-  hasRecovery?: boolean;
-  manualTranscriptReady?: boolean;
-  hasRecoverableTranscript?: boolean;
-  cursorDeliveryState: CursorDeliveryState;
   cursorRequired: boolean;
-  cursorSetupState: OwnedPreeditStatus["setupState"];
+  cursorSetupState: CursorSetupState;
   dictationStatus: DictationStatus;
   microphonePermission: MicrophonePermission;
   nativeMicrophoneReady?: boolean | null;
   microphoneReady: boolean;
 }
 
+/** Desktop input setup for the tray: "" until the first diagnostics load, which the
+ * tray presents as initializing. A failed launch check reports not enabled. */
+export function deriveCursorSetupState({
+  desktopInputReady,
+  diagnosticsLoaded,
+  diagnosticsFailed,
+}: {
+  desktopInputReady: boolean;
+  diagnosticsLoaded: boolean;
+  diagnosticsFailed: boolean;
+}): CursorSetupState {
+  if (desktopInputReady) return "ready";
+  return diagnosticsLoaded || diagnosticsFailed ? "not-enabled" : "";
+}
+
 export function deriveStatusLabel({
   configurationError,
-  hasRecovery = false,
-  manualTranscriptReady = false,
-  hasRecoverableTranscript = false,
-  cursorDeliveryState,
   cursorRequired,
   cursorSetupState,
   dictationStatus,
@@ -36,27 +42,13 @@ export function deriveStatusLabel({
     return "Starting microphone";
   }
   if (dictationStatus === "recording") {
-    if (cursorDeliveryState === "pending") {
-      return "Listening — verifying original field";
-    }
-    return cursorDeliveryState === "preview-only"
-      ? "Listening — preview only"
-      : "Listening";
+    return "Listening";
   }
   if (dictationStatus === "processing") {
     return "Processing";
   }
-  if (hasRecovery) {
-    return manualTranscriptReady ? "Transcript ready to copy" : "Dictation saved";
-  }
-  if (cursorDeliveryState === "unreconciled") {
-    return "Transcript needs attention";
-  }
   if (configurationError) {
     return "Settings need attention";
-  }
-  if (hasRecoverableTranscript) {
-    return "Transcript needs attention";
   }
   if (dictationStatus === "error") {
     return "Needs attention";
@@ -66,7 +58,9 @@ export function deriveStatusLabel({
     return "Microphone needs permission";
   }
   // Recording refuses to start without desktop input, so there is no copy fallback.
-  if (cursorRequired && cursorSetupState !== "ready") return "Text delivery needs setup";
+  // cursorRequired already means desktop input is not ready; while its diagnostics
+  // are pending, mirror the tray's initializing state instead of setup needed.
+  if (cursorRequired) return cursorSetupState === "" ? "Initializing…" : "Desktop setup needed";
   if (!microphoneReady) {
     return "Ready — microphone checks on first use";
   }

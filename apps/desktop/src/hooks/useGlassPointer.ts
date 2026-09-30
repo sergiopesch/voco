@@ -21,7 +21,6 @@ export function useGlassPointer<T extends HTMLElement = HTMLButtonElement>(): Gl
       const element = event.currentTarget;
       const canTrack = event.pointerType === "mouse" &&
         !element.matches(":disabled") && element.getAttribute("aria-disabled") !== "true" &&
-        !element.closest('[data-visual-effects="reduced"]') &&
         typeof window !== "undefined" && typeof window.matchMedia === "function" &&
         window.matchMedia("(hover: hover) and (pointer: fine)").matches &&
         !window.matchMedia("(prefers-reduced-motion: reduce)").matches &&

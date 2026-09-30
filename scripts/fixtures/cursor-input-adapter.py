@@ -47,7 +47,7 @@ if sys.argv[1:] == ['key', '--help']:
     sys.exit(0)
 assert sys.argv[1:6] == ['key', '--delay', '24', '--key-delay', '12'], sys.argv
 chords = sys.argv[6:]
-# The legacy client form of the one universal paste gesture.
+# The legacy client form of the one paste gesture.
 assert chords in (['shift+insert'], [' ', 'shift+insert']), chords
 state = json.loads(call('GetInputState')[0])
 with (root / 'evidence/cursor-input-dispatch.jsonl').open('a') as out:

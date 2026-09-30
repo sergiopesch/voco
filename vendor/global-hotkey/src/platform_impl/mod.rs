@@ -31,6 +31,3 @@ mod platform;
 mod platform;
 
 pub(crate) use self::platform::*;
-
-#[cfg(target_os = "linux")]
-pub use self::platform::{acquire_focus_lease, FocusLease, FocusLeaseError};

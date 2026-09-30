@@ -1,121 +1,234 @@
-# VOCO development guide
+# VOCO agent guide
 
-VOCO is a local English dictation app for Linux. Keep it small, fast and clear.
-Read [README](README.md), [the code map](docs/architecture/code-map.md) and
-[release status](docs/release-candidate.md) before making changes.
+VOCO is local English dictation for Linux: press a shortcut, speak, and the words
+are pasted into whichever app has keyboard focus. This guide is for coding agents
+and maintainers. Before changing code, read the [README](README.md), the
+[architecture overview](docs/architecture/README.md) and the
+[code map](docs/architecture/code-map.md). [CONTRIBUTING](CONTRIBUTING.md) covers
+setup and pull requests.
 
 ## Product contract
 
-- No account, subscription, telemetry or cloud transcription.
-- One normal output path: streaming dictation into whatever app has keyboard focus.
-- No assistant, OpenClaw, realtime conversation, enhancement or appearance settings.
-- Preserve the tray-first interface and system accessibility preferences.
-- Keep microphone and shortcut configuration; recover interrupted dictation explicitly.
-- Clipboard paste replaces the clipboard and primary selection and never sends
-  Enter. Never replay output whose paste is uncertain; copy it for the user instead.
+- No account, subscription, telemetry or cloud transcription. Update checks read
+  GitHub's public releases API and never download or install anything.
+- One output path: streaming dictation pasted into whatever has keyboard focus.
+  The optional Chromium exact field uses the same recognizer with its own delivery.
+- No assistant, conversation, enhancement, appearance or per-app settings.
+- Tray first. Respect system accessibility preferences such as reduced motion.
+- Settings are the microphone, the shortcut and the update channel. Onboarding
+  state and the installation method are stored alongside them.
+- A normal session keeps nothing. Review only holds text that survived a crash, or
+  that a Stop could neither paste nor copy.
 
 ## Architecture
 
-The production path is `runtime/speech/` → Rust `benchmark_stream.rs` →
-`benchmarkPhraseQueue.ts` → `insertion.rs`. Despite their historical names,
-these are production modules. The selected runtime is NVIDIA Nemotron English
-0.6B Q8 CPU. Keep the default worker count capped to at most four threads, leaving one CPU
-from process affinity for desktop work (minimum one worker); preserve explicit research overrides and record actual counts. Desktop, Chromium exact-field dictation and local recovery all use this one recognizer.
-Browser field ownership is a delivery concern, independent of recognition. Research model adapters are not selectable products.
+The production path is `runtime/speech/` → Rust `speech_stream.rs` →
+`dictationStream.ts` → `insertion.rs`. The recognizer is NVIDIA Nemotron English 0.6B Q8 on the CPU.
+The default worker count is at most four threads and leaves one CPU of the process
+affinity free for the desktop (minimum one); keep explicit research overrides and
+record the actual count. Desktop and Chromium exact-field dictation share this
+recognizer; browser field ownership is a delivery concern.
 
-Rust owns OS integration, files, processes, packaging and validation. React owns
-presentation and recording orchestration. Keep both typed and state-driven.
-Comment invariants and non-obvious decisions; avoid narrating every line.
+Rust owns OS integration, files, processes, the tray, packaging and validation.
+React owns presentation and recording orchestration. Keep both typed and
+state-driven. Comment invariants and non-obvious decisions; don't narrate lines.
 
-Development and CI use Node 24 LTS (`.nvmrc`). Maintain Vite 8 and React plugin 6
-together, preserve explicit output targets, and keep root renderer fixtures on
-the desktop's Vite resolution. Qualify both dev rendering and packaged WebKit.
+Capture is native Pulse/PipeWire on Wayland and a WebKit AudioWorklet on X11
+(`VOCO_DEV_NATIVE_CAPTURE=1` selects native capture for development). A hidden
+window really hides with native capture; WebKit capture needs a mapped webview, so
+its hidden surface is a 1 px window off-screen.
 
-Configuration deserialization ignores retired output choices and returns cursor,
-stable streaming and enhancement off. Patches reject removed fields. These fixed
-snapshot fields remain for the legacy dictation engine contract; they are not
-settings. Preserve microphone, shortcut and onboarding state during migration.
+Development and CI use Node 24 LTS (`.nvmrc`) and the Rust toolchain named by
+`rust-version` in `Cargo.toml`; `scripts/check-devops.sh` fails if CI's toolchain
+differs. `.editorconfig` sets the formatting basics. Keep Vite 8 and the React plugin 6
+together, keep explicit output targets, and keep root renderer fixtures on the
+desktop's Vite resolution. Check both dev rendering and packaged WebKit.
 
-glib 0.18.5 is vendored with the exact upstream RUSTSEC-2024-0429 fix. Keep
-all GTK/WebKit consumers on that single patched copy. Verify source provenance
-and optimized iterator regression before accepting a dependency change; adding
-glib 0.20 directly leaves the GTK dependency behind. [Backport](vendor/glib/VOCO-PATCH.md).
+The config (`config.rs`) holds the shortcut, the microphone, onboarding state,
+the update channel and the installation method. Retired keys are ignored on read
+and dropped on the next save, and patches that name them are rejected. Retired
+package channels read as GitHub Release. VOCO never overwrites a config it cannot
+read: Settings shows a recovery panel, and only Reset renames the file to a
+`config.recovery-backup-*` copy before writing defaults.
 
-## Delivery invariants
+VOCO vendors narrow patches ([vendor/README.md](vendor/README.md)): glib 0.18.5
+with the exact upstream RUSTSEC-2024-0429 fix ([backport](vendor/glib/VOCO-PATCH.md)),
+global-hotkey, tray-icon, and a private legacy ydotoold. Keep every GTK/WebKit
+consumer on the single patched glib; adding glib 0.20 directly leaves GTK behind.
+Verify source provenance and the optimized iterator regression before accepting a
+dependency change.
 
-- Warm the selected worker before reporting readiness. Imports do not start it.
-- Flush Stop audio into the same live stream before finish; do not copy/replay a
-  whole recording. Recover a dead worker only at a safe session boundary.
-- Keep bounded queues, deadlines, sequence/sample accounting and recovery.
-  Production worker IPC groups 100 ms of audio; Stop flushes the partial packet.
-  Preserve the three-second backlog bound and verify every retained sample.
-- Native Pulse ticks must drain ready transport events within bounded work/time.
-  Recording drops are not covered by Pulse's playback overflow callback. Preserve
-  the bounded duration-deficit guard and separate complete-reference waveform
-  tests; healthy local ACKs alone do not prove source continuity.
-- Unverified ScriptProcessor fallback cannot enter automatic NVIDIA delivery.
-- Explicit NVIDIA recovery uses `recover_stream` and the bundled runtime, with no
-  destination callback or alternate recognizer. Preserve source samples/rate; publish
-  only a completed result. Cancel keeps audio and stale cleanup is session-bound.
-- The private legacy input daemon is selected only for the qualified system client.
-  Keep `/usr/bin/ydotool` consistent between probing and dispatch. Migrate only
-  VOCO's unmodified user unit while holding its single-instance guard, before
-  recording can start. Package hooks must not restart desktop session services.
-- Legacy ydotool requires a literal space argument, not `space`. Its paste delay
-  is 24 ms; modern ydotool takes numeric key events.
-- Completed IBus authority and a poll in flight differ. Consuming X11 callbacks
-  proceed through debounce; passive evdev retains its duplicate guard.
-- IBus protocol 6 is dictation-shortcut-only; older helpers must reconnect after upgrade. Never restore text mutation there.
-- Each chunk pastes into whatever has keyboard focus when it is ready. There is
-  no destination token, focus probe, terminal classification or per-app route.
-  Copy CLIPBOARD, then PRIMARY (best effort; failure only warns), then send
+## Invariants
+
+### Recognition and capture
+
+- Warm the selected worker before reporting readiness; imports don't start it.
+- Flush Stop audio into the same live stream before finishing; never copy or
+  replay a whole recording. Recreate a dead worker only at a session boundary.
+- Keep bounded queues, deadlines and sequence/sample accounting. Worker IPC groups
+  100 ms of audio and Stop flushes the partial packet. Keep the three-second
+  backlog bound and account for every sample.
+- Native Pulse ticks drain ready transport events within bounded work and time.
+  Pulse's playback overflow callback doesn't report recording drops, so keep the
+  bounded duration-deficit guard and the complete-reference waveform tests;
+  healthy local ACKs alone don't prove source continuity.
+- Audio from the unverified ScriptProcessor fallback never enters automatic
+  delivery.
+- VOCO never recognizes audio a second time. A failed recording notifies and
+  returns to idle; the voice test's "Test again" records anew.
+- Select the default microphone automatically only on an explicit Start test or
+  recording when no microphone is chosen. No idle recording, and no silent device
+  switching during capture.
+
+### Delivery
+
+- Each chunk pastes into whatever has keyboard focus when it is ready. There is no
+  destination token, focus probe, terminal detection or per-app route. Desktop
+  setup checks the input helpers, never a caret or an app.
+- Copy CLIPBOARD, then PRIMARY (best effort; a failure only warns), then send one
   Shift+Insert: toolkits paste CLIPBOARD and terminals paste PRIMARY. A leading
-  joining space is its own Space key because Chromium's address bar trims pasted
-  leading whitespace. ASCII controls become spaces; never send Enter.
-- Wayland helpers emit raw key events, so wait at most 1.5 seconds for released
-  shortcut modifiers (evdev, else the companion's `ModifiersClear`). Unknown
-  state does not block; a timeout sends no keys. On X11 the passive grab takes
-  every key while the chord is held, so a paste waits for its release, at most
-  1.5 seconds after the press. Wayland paste needs a running `ydotoold`
-  (`pgrep -x`; the private daemon is not on PATH); desktop setup reports it.
-- Only a `no-mutation` failure, which typed nothing, keeps its text pending for
-  the next chunk or bounded Stop retries. An uncertain or rejected paste stops
-  automatic delivery. Stop copies the undelivered remainder, joining space
-  included, with `copy_desktop_text`, then notifies; it never replays that text
-  as keys. When that copy fails too, `keep_crash_journal` moves the session's
-  text into tray Review; only if the journal cannot keep it does Stop report an
-  interruption. A Chromium exact-field session whose field stopped taking text
-  ends the same way.
-- The GNOME Wayland companion is recommended, not required: without it the
-  focused app also receives Alt+D (browsers focus the address bar, terminals
-  delete a word). Companion v11 grabs the configured Alt+D or Alt+Shift+D at
-  every status, idle included, and each press sends `Action('shortcut', '')`.
-  `ReserveShortcut` holds a 2.5-second lease for the exact `shortcutAccelerator`;
-  only the authenticated Shell can renew it, about once a second. While it is
-  fresh, passive evdev ignores the chord and the action toggles through the
-  `gnome_panel` backend; otherwise the action is refused and evdev toggles.
-  Release the grab on rejection, disconnect or disable; late replies about an
-  earlier grab must not act on a newer one. v10 `ReserveStopShortcut` remains
-  only for compatibility. Users re-run panel setup, then sign out and back in to
-  load v11. An evdev toggle while the chord leaks sends one notification per
-  launch with the panel's remedy, which Settings also shows.
+  joining space is its own Space key, because Chromium's address bar trims pasted
+  leading whitespace. ASCII controls become spaces. Never send Enter and never
+  restore the previous clipboard.
+- Wayland helpers emit raw key events, so wait at most 1.5 s for the shortcut's
+  modifiers to be released (evdev, else the companion's `ModifiersClear`). Unknown
+  state doesn't block; a timeout sends no keys. On X11 the passive grab takes every
+  key while the chord is held, so a paste waits for its release, at most 1.5 s
+  after the press.
+- Wayland paste needs a running `ydotoold` (`pgrep -x`; the private daemon isn't on
+  PATH), and desktop setup reports it. The launcher selects VOCO's private legacy
+  daemon only for the system client recorded in `packaging/ydotool/qualified-client.json`.
+  Keep `/usr/bin/ydotool` consistent between probing and dispatch. Migrate only
+  VOCO's unmodified user unit, while holding its single-instance guard and before
+  recording can start. Package hooks never restart desktop session services.
+- Legacy ydotool needs a literal space argument, not `space`, and a 24 ms paste
+  delay; modern ydotool takes numeric key events.
+- Start is refused while paste is unavailable, and when `VOCO_DESKTOP_PASTE=0` or
+  `VOCO_DESKTOP_STREAM=0` is set.
+- Only a `no-mutation` failure, which typed nothing, keeps its text pending for the
+  next chunk or for Stop's bounded retries (three, 250 ms apart). A rejected or
+  uncertain paste stops automatic delivery; recognition keeps running until Stop.
+  A paste rejection keeps microphone readiness; only a capture failure clears it.
+- Stop copies the undelivered remainder, joining space included, with
+  `copy_desktop_text`, then notifies. It never replays that text as keys. If the
+  copy fails too, `keep_crash_journal` moves the text into Review; only if the
+  journal can't keep it does Stop report an interruption. A Chromium exact-field
+  session whose field stopped taking text ends the same way.
 - Closing or navigating an enabled browser tab, or losing its native connection,
-  stops that tab's active recording. Ordinary field focus loss revokes delivery
-  but preserves the original session's explicit Stop; stale tokens cannot stop
-  a newer session.
-- Logs are optional, private and bounded. No dictated text, audio, clipboard values,
-  URLs or window titles in performance logs. Reject unsafe log/socket targets.
+  stops that tab's recording. Field focus loss revokes delivery but keeps the
+  session's explicit Stop; stale tokens can't stop a newer session.
+
+### Shortcut
+
+- Toggles are debounced for 120 ms (`TOGGLE_DEBOUNCE_MS`).
+- The GNOME Wayland companion is recommended, not required. Without it the focused
+  app also receives Alt+D (browsers focus the address bar, terminals delete a
+  word), and an evdev toggle while the chord leaks sends one notification per
+  launch with the panel remedy, which Settings also shows.
+- The companion grabs the configured Alt+D or Alt+Shift+D at every status, idle
+  included; each press sends `Action('shortcut', '')`. `ReserveShortcut` holds a
+  2.5 s lease for the exact `shortcutAccelerator` that only the authenticated Shell
+  can renew, about once a second. While it is fresh, passive evdev ignores the
+  chord and the action toggles through the `gnome_panel` backend; otherwise the
+  action is refused and evdev toggles. Release the grab on rejection, disconnect or
+  disable; late replies about an earlier grab never act on a newer one.
+  `ReserveStopShortcut` remains for older loaded companions.
+- A completed IBus decision differs from a poll in flight. Consuming X11 callbacks
+  go through the debounce; passive evdev keeps its duplicate guard. The listener
+  posts fallback arbitration only when the config revision or the decision changes,
+  otherwise once a second, and the main-thread closure re-checks its inputs.
+- IBus protocol 6 is shortcut-only; older helpers must reconnect after an upgrade. Never
+  restore text mutation there.
+- `voco --toggle` connects once to the owner-only socket. Don't add retries or
+  launch/focus side effects; it doesn't prove a compositor binding exists. Document
+  modifier-independent Hyprland bindings, or explicitly checked Ctrl/Shift variants
+  on other compositors, and never silently overwrite desktop shortcuts.
+
+### GNOME companion and tray
+
+- The Debian package bundles the GNOME 46 companion. Enable it only through the
+  user-run setup (`voco --setup-panel`); package hooks never change enabled
+  extensions. Keep "sign out and back in" feedback distinct from active status.
+- Bump the companion metadata and the setup contract together when loaded code
+  must change, and compare GNOME's loaded metadata so an in-place upgrade can't
+  report old code as current. After an upgrade, users re-run panel setup and sign
+  out and back in.
+- The diagnostics poll, the setup input check and the once-per-launch shortcut
+  notice may reuse a companion check for up to 20 s, or 2 s after a failed or
+  unavailable check. Attach, Detach, name loss and explicit enabling clear it;
+  explicit setup status always re-checks.
+- While the companion is attached, VOCO hides its fallback tray icon. The
+  companion's menu is Settings, Review and Stop dictation.
+- Active presentation is the microphone plus waves only. Stop lives in the context
+  menu and in the icon and shortcut actions; Settings and Review are explicit menu
+  destinations.
+- VOCO's own layout never moves the microphone when dictation starts or stops: the
+  companion's meter opens on its left, and the fallback tray shows no label at
+  Ready or while dictating. Only startup and setup labels add width.
+- GNOME's privacy microphone indicator appears while the capture stream exists and
+  shifts the indicators on its left, VOCO included. Never hide it or hold a stream
+  open to avoid that.
+- Keep tray PNG paths immutable for the process lifetime, and keep explicit Stop
+  actions.
+
+### Onboarding
+
+- The voice test uses the production recognition queue with local-only output.
+  Never paste or copy onboarding output. The test keeps its local retry.
+- Finish must flush capture and recognition successfully. Check the desktop input
+  prerequisites without sending keys or changing the clipboard; only then save
+  completion. Done returns straight to the hidden tray surface without presenting
+  or focusing a Ready window.
+
+### Review and the crash journal
+
+- Normal completion and handled failures clear text and audio and delete the
+  active checkpoint; they never expose a saved transcript.
+- Only an earlier unexpected exit, or a Stop that could neither paste nor copy its
+  remainder, puts text into Review. Review never opens, pastes or retries by itself.
+- The journal is owner-only, bounded, local and text only, never audio. Keep
+  earlier entries until the user discards them: at most five, the oldest evicted
+  by a sixth. Without a checkpoint dictation continues and notifies.
+
+### Privacy and logs
+
+- Logs are optional, private and bounded. Performance logs never contain dictated
+  text, audio, clipboard values, URLs or window titles. Reject unsafe log and
+  socket targets.
+- The developer capture audit needs all three flags (`VOCO_DEV_NATIVE_CAPTURE`,
+  `VOCO_DEBUG_CAPTURE_AUDIO`, `VOCO_DEBUG_NATIVE_CAPTURE`) and completed private
+  bundles; wait for their COMMIT receipts before ending an audited test process.
+
+### Installer and packages
+
+- The guided installer installs the local package with APT and explicitly requires
+  the Wayland ydotool client and daemon on Wayland. A successful install alone is
+  not desktop readiness.
+- After setup succeeds, request one detached launch as the invoking desktop user;
+  never launch a GUI from root or package hooks. Distinguish a launch request from
+  readiness and keep the manual guidance when launching fails. The installer checks
+  `/usr/bin/voco`, not an earlier PATH entry.
+- Source excludes model weights and compiled runtime payloads. Follow
+  [runtime provisioning](docs/linux-packaging.md#runtime-provisioning) and never
+  replace missing pinned artifacts with mutable downloads. A base Tauri `.deb` is
+  incomplete: assemble and verify the NVIDIA payload before calling it installable.
 
 ## Working practices
 
 Inspect first, make a concrete plan, and change only what the task requires.
-Preserve unrelated dirty worktrees and frozen evidence. User instructions authorize
-product changes; otherwise discuss significant behavior, security, privacy or stack
-tradeoffs first. Do not add dependencies without a concrete need.
+Preserve unrelated uncommitted work. User instructions authorize product changes;
+otherwise discuss significant behaviour, security, privacy or stack tradeoffs
+first. Don't add dependencies without a concrete need.
 
-Keep product docs concise and written for people using VOCO. Release/test history
-belongs in scoped records, not the README. Update setup, operation, architecture and
-agent guidance whenever behavior changes. Historical tests retain dates and scope.
+Documentation describes how VOCO works now. Update it in the same change as the
+behaviour: user-visible behaviour in the README, `docs/everyday-use.md` and
+`docs/troubleshooting.md`; setup in `docs/install.md` and `docs/platform/README.md`;
+internals in `docs/architecture/`; security in `docs/security/README.md`; packaging
+and releases in `docs/linux-packaging.md` and `docs/release-process.md`. Keep dates,
+run IDs, superseded designs and test narratives out of the docs; they belong in pull
+request descriptions. Summarize each release in `CHANGELOG.md` and
+`docs/releases/<version>.md`. The [code guide](docs/guide/README.md) is pinned to a
+commit; re-pin and regenerate it when the code it cites changes.
 
 ## Validation
 
@@ -123,6 +236,7 @@ Run focused checks first, then the relevant wider gates:
 
 ```bash
 npm run verify:versions
+npm run verify:devops
 npm run check
 npm run lint
 npm test
@@ -132,111 +246,53 @@ npm run test:native-capture-renderer
 npm run test:chromium-exact-field
 npm run test:browser-delivery
 npm run test:application-delivery
+cargo fmt --check --manifest-path apps/desktop/src-tauri/Cargo.toml
+npm --workspace @voco/desktop run build:frontend
+cargo clippy --locked --all-targets --all-features --manifest-path apps/desktop/src-tauri/Cargo.toml -- -D warnings
 python3 scripts/verify-glib-backport.py
-python3 scripts/test-glib-variant.py --output /tmp/voco-glib-check
-cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml
-cargo clippy --locked --manifest-path apps/desktop/src-tauri/Cargo.toml -- -D warnings
+python3 scripts/test-glib-variant.py --output "$(mktemp -d)/voco-glib-check"
+cargo test --locked --all-targets --manifest-path apps/desktop/src-tauri/Cargo.toml
 npm run build
 ```
 
-Use isolated audio, input, clipboard and desktop fixtures. Do not inject test
-speech into a live user session. Python worker tests require NumPy and psutil;
-protocol tests also require the pinned model/runtime. Record unavailable checks
-as unavailable, never passed. Preserve failures and attempted-trial denominators.
+`npm test` (`scripts/test-unit.sh`) runs the checks that need no microphone, speech
+model or desktop session. `verify:devops` checks the CI gates, installer sync and a
+release rehearsal.
 
-For optimization work follow [the TypeSafe evaluation protocol](docs/testing/typesafe-evaluation.md).
-Keep deterministic timing/accuracy separate from optional semantic judgments. The
-TypeSafe client is research tooling only: explicit public/synthetic text, never
-personal speech or live delivery. Preserve baseline/candidate identities, missing
-measurements and rejected experiments; run `npm run test:dictation-evaluation`.
+- Use isolated audio, input, clipboard and desktop fixtures. Never inject test
+  speech into a live user session.
+- Use public or synthetic fixtures only; keep personal audio, transcripts and
+  private raw evidence out of the repository and out of CI logs.
+- Python worker tests need NumPy and psutil; protocol tests also need the pinned
+  model and runtime (`scripts/provision-ci-speech.sh`).
+- Record unavailable checks as unavailable, never passed. Report failures and
+  attempted-trial denominators, not just successes.
+- Keep diagnostic DOM logging separate from latency measurements in browser tests:
+  repeatedly copying a growing transcript can stall the recipient.
+- For optimization work, follow [the TypeSafe evaluation protocol](docs/testing/typesafe-evaluation.md).
+  Keep deterministic timing and accuracy separate from optional semantic judgments.
+  The TypeSafe client is research tooling: explicit public or synthetic text, never
+  personal speech or live delivery. Keep baseline and candidate identities, missing
+  measurements and rejected experiments, and run `npm run test:dictation-evaluation`.
 
-Source excludes model weights and compiled runtime payloads. Follow
-[runtime provisioning](docs/linux-packaging.md#runtime-provisioning); never replace
-missing pinned artifacts with mutable downloads. A base Tauri `.deb` is incomplete:
-assemble and verify the NVIDIA payload before calling it installable.
+## Release
 
-For Crabbox, run `crabbox doctor` first. `local-container` provides local userspace
-isolation, not a remote VM or proof of a distribution's default desktop.
-
-## Release and evidence
-
-Source version: **2026.0.60**. Recorded public Ubuntu/Debian version: **2026.0.59**. Verify the current public release on GitHub and
-installed version from the package manager; do not infer either from source.
-The .43 package and desktop evidence is recorded in
-[the support matrix](docs/linux-support.md); preserve per-artifact receipts and
-complete signatures, final CI and downloaded-asset verification before publication. Publication status is authoritative on GitHub Releases;
-a version in source alone is not proof of a published or installed package.
-Frozen .39 and earlier cuts remain immutable. New product bytes need a new version,
-fresh checks and artifact receipts.
-
-Pass all CI gates, including the pinned Nemotron accuracy and continuity checks. No waiver is authorized. Keep a
-clean commit, exact package/source hashes, licenses, checksums and release notes.
-The hosted Release workflow must not assemble NVIDIA installers. Userspace checks,
-native install/remove, physical audio and compositor/application behavior are
-distinct evidence levels. Never claim fastest, most accurate, universal
-compatibility or stability from a limited test corpus.
-
-Native packages share the qualified application/model, but use explicit distro
-dependency mappings, including the native package for `notify-send`. Keep RPM licenses installed under nodocs policies. Companion
-SentencePiece recipes must use SPM_BUILD_TEST and fail when no tests run.
-Document modifier-independent Hyprland bindings or explicitly checked Ctrl/Shift
-variants on other compositors; do not silently overwrite desktop shortcuts.
-Browser qualification must keep diagnostic DOM logging separate from latency
-measurements: repeatedly copying a growing transcript can stall the recipient.
-The control CLI connects once to the owner-only socket; do not add retries or
-launch/focus side effects. It does not prove a compositor keybinding exists.
-The .43 candidate uses native capture on Wayland and WebKit capture on X11.
-The Wayland change is approved and has installed-VM evidence. Keep
-automatic default microphone selection on explicit Start test/recording actions
-when no approved microphone is selected,
-with no idle recording or silent device switching during capture. Onboarding
-uses the production recognition queue with local-only transcript output. Never
-paste, copy or use preedit output for the onboarding test. Finish must flush
-capture and recognition successfully. Check desktop input prerequisites without
-sending keys or changing the clipboard. Only then save completion.
-Done returns directly to the hidden tray surface without presenting or focusing a
-Ready window. A delivery interruption disables insertion but leaves healthy
-recognition running through Stop. Normal cursor completion and handled failures clear
-text/audio and delete the active crash checkpoint; they never expose a saved transcript.
-Only a previous unexpected process exit, or a Stop that could neither paste nor copy
-its remainder, promotes text into explicit tray Review.
-The approved journal is owner-only, bounded, local text only, never audio; retain
-prior crash entries until explicit discard (maximum five, oldest evicted by a sixth crash).
-The crash journal never blocks dictation: without a checkpoint, dictation continues
-and notifies. Review must never auto-open, paste or retry output. Onboarding keeps its local test retry.
-Active tray presentation is microphone plus waves only; keep Stop in the context
-menu and icon/shortcut actions. Settings and Review are explicit menu destinations.
-The guided installer must use APT to install the local package and explicitly require
-the Wayland client and daemon on Wayland. Successful package installation alone is
-not desktop readiness. After successful setup, request one detached launch as the
-invoking desktop user; never launch a GUI from root or package hooks. Distinguish
-launch request from readiness and retain manual guidance when launching fails.
-Cursor dictation checks its input helpers, never a verified caret or app route.
-A paste rejection must preserve microphone readiness; only a capture-stage failure
-may invalidate it. Native capture permits real window hiding. Preserve the
-failed WebKit hidden-start experiment and independently verify audio retention.
-The debug audit needs all three explicit flags and completed private bundles;
-wait for their COMMIT receipts before terminating an audited test process.
-
-The [20 September refresh](docs/testing/linux-release-2026-09-20.md) distinguishes
-exact refreshed-binary package/smoke checks from the prior engine build's long and
-recovery evidence. Preserve both identities; documentation-only edits do not require
-rebuilding the qualified application. Bundled docs retain their assembly snapshot.
-
-## Public benchmark assets
-
-The [release-assets index](docs/release-assets/README.md) links GitHub-rendered galleries.
-Keep each metric tied to its original corpus, configuration, aggregation and date;
-never fill missing scores using another cohort or count failed trials as completed.
-When editing a collection, verify its numeric exports, relative links and checksums.
-Public assets contain numeric summaries only; keep personal audio, transcripts and
-private raw evidence outside the repository. Historical media does not requalify a release.
-
-The recorded public installer version is `packaging/published-release.json`. Keep
-README pinned to that version until publication is verified, then update both.
-The guided installer checks `/usr/bin/voco`, not an older PATH override. Bundle the GNOME 46 panel in the complete Debian candidate. Enable it only through
-the explicit user-run setup flow; never change enabled extensions in package hooks.
-Keep session restart feedback distinct from active presentation. Bump the companion
-metadata and setup contract together when loaded code must change; compare GNOME
-loaded metadata so an in-place upgrade cannot report old code as current. Preserve immutable
-tray PNG paths for the process lifetime and explicit Stop actions. Preserve screenshot proof outside build caches.
+- Source version: **2026.0.60**. Latest published Ubuntu/Debian release: **2026.0.59**.
+  GitHub Releases is authoritative for publication and the package manager for the
+  installed version; a version in source proves neither.
+- `packaging/published-release.json` records the published version. Keep the README
+  install command pinned to it until a new publication is verified, then update both.
+- New product bytes need a new version and fresh checks. Pass every CI gate,
+  including the pinned Nemotron accuracy and continuity checks; no waiver is
+  authorized. Keep a clean commit, exact package and source hashes, licenses,
+  checksums and release notes.
+- CI's `application` job tests the release build of both executables in isolated
+  desktops, but hosted CI never packages the NVIDIA runtime or signs anything;
+  `check-devops.sh` enforces this. On the maintainer's Linux machine,
+  `scripts/assemble-release.sh` builds, verifies and signs a signed tag's release.
+  The assets go to a draft release, which is published only after the downloaded
+  assets verify. See the [release process](docs/release-process.md).
+- Userspace checks, native install and removal, physical audio and
+  compositor/application behaviour are distinct evidence levels. Never claim
+  fastest, most accurate, universal compatibility or stability from a limited test
+  corpus.

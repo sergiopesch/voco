@@ -58,27 +58,3 @@ export function scoreSpeechIntegrity(reference, hypothesis, requirements) {
   }
   return { accuracy, integrityPassed: Object.values(checks).every(Boolean), checks, details };
 }
-
-export function evaluateIntegrityReport(plan, report) {
-  require(plan !== null && typeof plan === 'object' && Array.isArray(plan.cases) && plan.cases.length > 0, 'plan requires cases');
-  require(report !== null && typeof report === 'object' && Array.isArray(report.results), 'report requires results');
-  require(report.results.length === plan.cases.length && report.completedCases === plan.cases.length, 'report must complete every planned case');
-  require(report.workerExitCode === 0, 'worker must exit successfully');
-  require(typeof report.passed === 'boolean', 'original gate result must be boolean');
-  require(report.modelSha256 === plan.modelSha256 && /^[a-f0-9]{64}$/u.test(plan.modelSha256), 'model identities must match');
-  require(!report.failure, 'report contains a worker or scoring error');
-  for (const row of [...plan.cases, ...report.results]) require(row !== null && typeof row === 'object' && typeof row.id === 'string' && row.id.trim().length > 0, 'case IDs must be nonempty strings');
-  const responseIds = new Set(report.results.map(row => row.id));
-  const planIds = new Set(plan.cases.map(row => row.id));
-  require(responseIds.size === report.results.length && planIds.size === plan.cases.length && [...responseIds].every(id => planIds.has(id)), 'case IDs must be unique and match exactly');
-  const results = plan.cases.map(entry => {
-    const observed = report.results.find(row => row.id === entry.id);
-    require(observed.response !== null && typeof observed.response === 'object', `${entry.id}: response missing`);
-    require(Number.isFinite(entry.maxWer) && entry.maxWer >= 0, `${entry.id}: maxWer must be finite and nonnegative`);
-    const scored = scoreSpeechIntegrity(entry.reference, observed.response.chunkText, entry.integrityRequirements);
-    return { id: entry.id, ...scored, originalCaseWerPassed: scored.accuracy.wer <= entry.maxWer };
-  });
-  return { passed: report.passed && results.every(row => row.integrityPassed && row.originalCaseWerPassed),
-    originalSuitePassed: report.passed, integrityPassed: results.every(row => row.integrityPassed),
-    totalCases: results.length, passingIntegrityCases: results.filter(row => row.integrityPassed).length, results };
-}
