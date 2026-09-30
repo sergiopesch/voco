@@ -5,7 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 cd "${ROOT_DIR}"
 
-for command in node npm python3 rg; do
+for command in git node npm python3; do
   if ! command -v "${command}" >/dev/null 2>&1; then
     echo "Required DevOps preflight command is unavailable: ${command}" >&2
     exit 1
@@ -27,33 +27,11 @@ JS
 
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-check-shell-syntax.py
 
-bash scripts/check-shell-syntax.sh \
-  install \
-  scripts/setup.sh \
-  scripts/build-desktop.sh \
-  scripts/render-release-body.sh \
-  scripts/rehearse-release.sh \
-  scripts/test-install-common.sh \
-  scripts/test-private-ibus-engine.sh \
-  scripts/test-private-ibus-engine-hosted.sh \
-  scripts/test-native-desktop.sh \
-  scripts/test-application-delivery.sh \
-  scripts/test-native-wayland.sh \
-  scripts/test-native-gnome.sh \
-  scripts/test-native-kde.sh \
-  scripts/provision-ci-speech.sh \
-  scripts/report-linux-runtime.sh \
-  scripts/test-browser-full-app.sh \
-  scripts/test-browser-toolbar-app.sh \
-  scripts/verify-deb-package.sh \
-  scripts/verify-release.sh \
-  scripts/sign-release-checksums.sh \
-  scripts/setup-release-signing.sh \
-  scripts/test-verify-release.sh \
-  scripts/lib/install-common.sh
+# Every tracked shell script, including the extensionless installer and IBus launcher.
+git ls-files -z -- install packaging/ibus/voco-ibus-engine '*.sh' \
+  | xargs -0 bash scripts/check-shell-syntax.sh
 
 python3 scripts/sync-installer-ui.py --check
-bash -n scripts/lib/install-ui.sh
 
 bash scripts/test-verify-release.sh
 
@@ -106,46 +84,17 @@ PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-physical-speech-session.py
 
 PYTHONDONTWRITEBYTECODE=1 python3 - <<'PY'
 import ast
-from pathlib import Path
+import subprocess
 
-for path in (
-    Path("scripts/generate-icons.py"),
-    Path("scripts/test-application-delivery.py"),
-    Path("scripts/fixtures/cursor-input-adapter.py"),
-    Path("scripts/fixtures/delivery-native.py"),
-    Path("scripts/fixtures/focused-paste.py"),
-    Path("scripts/fixtures/nested-ydotool.py"),
-    Path("scripts/test-private-ibus-engine.py"),
-    Path("scripts/test-native-desktop.py"),
-    Path("scripts/test-native-wayland.py"),
-    Path("scripts/test-native-gnome.py"),
-    Path("scripts/test-native-kde.py"),
-    Path("scripts/audio_continuity.py"),
-    Path("scripts/test_native_crash_review.py"),
-    Path("scripts/test_native_cursor_capture.py"),
-    Path("scripts/test_native_onboarding_capture.py"),
-    Path("scripts/test-speech-worker.py"),
-    Path("scripts/prepare-physical-speech-session.py"),
-    Path("scripts/test-physical-speech-session.py"),
-    Path("scripts/speech_worker.py"),
-    Path("scripts/test-native-atspi.py"),
-    Path("scripts/test-native-full-app.py"),
-    Path("scripts/test-native-recovery-controls.py"),
-    Path("scripts/test-browser-toolbar-action.py"),
-):
-    ast.parse(path.read_text())
-print("Repository Python helper syntax is valid.")
-PY
-PYTHONDONTWRITEBYTECODE=1 python3 - <<'PY'
-import ast
-from pathlib import Path
-
-for path in (
-    Path("apps/desktop/src-tauri/resources/voco_ibus_engine.py"),
-    Path("apps/desktop/src-tauri/resources/voco_ibus_protocol.py"),
-):
-    ast.parse(path.read_text())
-print("IBus Python syntax is valid.")
+tracked = subprocess.run(
+    ["git", "ls-files", "-z", "--", "*.py", "packaging/ydotool/voco-ydotool-launcher"],
+    check=True, capture_output=True, text=True,
+).stdout.split("\0")
+paths = [path for path in tracked if path]
+for path in paths:
+    with open(path, encoding="utf-8") as source:
+        ast.parse(source.read(), filename=path)
+print(f"Python syntax is valid in {len(paths)} tracked files.")
 PY
 
 PYTHONDONTWRITEBYTECODE=1 python3 - <<'PY'
@@ -241,69 +190,49 @@ PYTHONDONTWRITEBYTECODE=1 python3 - <<'PY'
 import re
 from pathlib import Path
 
-release_workflow = Path(".github/workflows/release.yml").read_text()
-if "--bundles appimage" in release_workflow or "linuxdeploy" in release_workflow:
-    raise SystemExit("Release workflow must not execute the unpinned AppImage toolchain")
-if release_workflow.count("actions/checkout@") != 1 or release_workflow.count("persist-credentials: false") != 1:
-    raise SystemExit("Release build must use one checkout with credential persistence disabled")
-if "\n  create-draft:\n" not in release_workflow:
-    raise SystemExit("Release workflow is missing the isolated draft-release job")
-draft_job = release_workflow.split("\n  create-draft:\n", 1)[1]
-if "actions/checkout@" in draft_job:
-    raise SystemExit("Release-write job must not checkout or execute repository code")
-if not re.search(r"actions/upload-artifact@[0-9a-f]{40}", release_workflow):
-    raise SystemExit("Verified release payload upload action must be commit-pinned")
-if not re.search(r"actions/download-artifact@[0-9a-f]{40}", release_workflow):
-    raise SystemExit("Verified release payload download action must be commit-pinned")
-
-hosted_ibus_command = "run: bash scripts/test-private-ibus-engine-hosted.sh"
-native_ibus_command = hosted_ibus_command + " --native-desktop"
-full_application_command = hosted_ibus_command + " --full-application"
-browser_application_command = hosted_ibus_command + " --browser-application"
-release_commands = [line.strip() for line in release_workflow.splitlines()]
-for required_export in ("VOCO_NATIVE_APP_BINARY=${CANDIDATE_DIR}/usr/bin/voco", "VOCO_BROWSER_HOST_BINARY=${CANDIDATE_DIR}/usr/libexec/voco-browser-host", "VOCO_BROWSER_EXTENSION_DIR=${CANDIDATE_DIR}/usr/share/voco/chromium"):
-    if required_export not in release_workflow:
-        raise SystemExit(f"Release must export extracted candidate identity: {required_export}")
-if release_commands.count(browser_application_command) != 1:
-    raise SystemExit("Release must verify the packaged browser application path exactly once")
-if "run: bash scripts/build-desktop.sh" not in release_commands:
-    raise SystemExit("Release must build the native browser host before packaging")
-if release_workflow.index(browser_application_command) < release_workflow.index("- name: Verify Debian bundle"):
-    raise SystemExit("Browser full application gate must use the extracted package")
-if release_commands.count(full_application_command) != 1:
-    raise SystemExit("Release must test the built application capture-to-delivery path exactly once")
-if release_workflow.index(full_application_command) < release_workflow.index("- name: Build Debian bundle"):
-    raise SystemExit("Full application verification must use the newly built candidate")
-locked_rust_audit_install = 'cargo install cargo-audit --version "0.22.2" --locked'
-for workflow_path, workflow in (
-    (Path(".github/workflows/ci.yml"), Path(".github/workflows/ci.yml").read_text()),
-    (Path(".github/workflows/release.yml"), release_workflow),
-):
-    commands = [line.strip() for line in workflow.splitlines()]
-    if commands.count(hosted_ibus_command) != 1 or commands.count(native_ibus_command) != 1:
-        raise SystemExit(
-            f"{workflow_path} must run each isolated headless and native IBus gate exactly once"
-        )
-    if commands.count("run: npm run test:chromium-exact-field") != 1:
-        raise SystemExit(f"{workflow_path} must run the Chromium recipient and background lifecycle gates")
-    if not all(re.search(rf"\s{helper}\s", workflow) for helper in ("xdotool", "xclip")):
-        raise SystemExit(f"{workflow_path} must install the X11 paste helpers its desktop gates use")
-    if "run: npm run test:private-ibus" in workflow:
-        raise SystemExit(f"{workflow_path} bypasses the hosted IBus namespace wrapper")
-    if "rustsec/audit-check@" in workflow:
-        raise SystemExit(f"{workflow_path} uses the non-reproducible Node audit action")
-    if workflow.count(locked_rust_audit_install) != 1:
-        raise SystemExit(
-            f"{workflow_path} must install one lockfile-pinned cargo-audit tool"
-        )
-    if workflow.count("\n          cargo audit\n") != 1:
-        raise SystemExit(f"{workflow_path} must run one Rust dependency audit")
-    if "checks: write" in workflow:
-        raise SystemExit(f"{workflow_path} grants unnecessary checks write permission")
-print("Release workflow privilege and artifact boundaries are valid.")
+workflow_path = Path(".github/workflows/ci.yml")
+workflow = workflow_path.read_text()
+commands = [line.strip() for line in workflow.splitlines()]
+if sorted(path.name for path in Path(".github/workflows").iterdir()) != ["ci.yml"]:
+    raise SystemExit("CI is the only workflow; releases are assembled locally")
+if "\npermissions:\n  contents: read\n" not in workflow or "checks: write" in workflow:
+    raise SystemExit(f"{workflow_path} must stay read-only")
+unpinned = [action for action in re.findall(r"uses: (\S+)", workflow)
+            if not re.fullmatch(r"[\w.-]+/[\w.-]+@[0-9a-f]{40}", action)]
+if unpinned:
+    raise SystemExit(f"{workflow_path} actions must be pinned to full commit SHAs: {unpinned}")
+if workflow.count("actions/checkout@") != workflow.count("persist-credentials: false"):
+    raise SystemExit(f"{workflow_path} checkouts must not persist credentials")
+steps = "\n".join(line for line in workflow.splitlines() if not line.lstrip().startswith("#"))
+for forbidden in ("package-nvidia.py", "sign-release-checksums", "assemble-release", "secrets."):
+    if forbidden in steps:
+        raise SystemExit(f"Hosted CI must not assemble or sign releases: {forbidden}")
+hosted = "run: bash scripts/test-private-ibus-engine-hosted.sh"
+for suite in ("", " --native-desktop", " --full-application", " --browser-application", " --browser-toolbar"):
+    if commands.count(hosted + suite) != 1:
+        raise SystemExit(f"{workflow_path} must run the isolated gate `{hosted}{suite}` exactly once")
+if "\n  application:\n" not in workflow:
+    raise SystemExit(f"{workflow_path} is missing the release-build application job")
+application = workflow.split("\n  application:\n", 1)[1]
+release_build = "cargo build --locked --release --features custom-protocol --bin voco --bin voco-browser-host"
+if release_build not in application or application.index(release_build) > application.index("--full-application"):
+    raise SystemExit("The application job must test the release build of both executables")
+if commands.count("run: npm run test:chromium-exact-field") != 1:
+    raise SystemExit(f"{workflow_path} must run the Chromium recipient and background lifecycle gates")
+if not all(re.search(rf"\s{helper}\s", workflow) for helper in ("xdotool", "xclip")):
+    raise SystemExit(f"{workflow_path} must install the X11 paste helpers its desktop gates use")
+if "run: npm run test:private-ibus" in workflow:
+    raise SystemExit(f"{workflow_path} bypasses the hosted IBus namespace wrapper")
+if "rustsec/audit-check@" in workflow:
+    raise SystemExit(f"{workflow_path} uses the non-reproducible Node audit action")
+if workflow.count('cargo install cargo-audit --version "0.22.2" --locked') != 1:
+    raise SystemExit(f"{workflow_path} must install one lockfile-pinned cargo-audit tool")
+if workflow.count("\n          cargo audit\n") != 1:
+    raise SystemExit(f"{workflow_path} must run one Rust dependency audit")
+print("CI workflow gates, pins and permissions are valid.")
 PY
 
-if rg -n 'set_global_engine|register_component|delete_surrounding_text|get_surrounding_text' \
+if grep -En 'set_global_engine|register_component|delete_surrounding_text|get_surrounding_text' \
   apps/desktop/src-tauri/resources/voco_ibus_engine.py; then
   echo "Persistent IBus engine contains a forbidden global or destructive API." >&2
   exit 1

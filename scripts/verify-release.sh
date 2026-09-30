@@ -90,6 +90,7 @@ fi
 
 homedir="$(mktemp -d "${TMPDIR:-/tmp}/voco-verify-gnupg.XXXXXX")"
 cleanup() {
+  gpgconf --homedir "$homedir" --kill all >/dev/null 2>&1 || true
   rm -rf -- "$homedir"
 }
 trap cleanup EXIT

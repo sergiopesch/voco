@@ -35,6 +35,12 @@ case "${1:-}" in
     : "${VOCO_BROWSER_EVIDENCE_DIR:?Set a directory for browser application evidence}"
     TEST_SCRIPT="test-browser-full-app.sh"
     ;;
+  --browser-toolbar)
+    : "${VOCO_NATIVE_APP_BINARY:?Set the built candidate executable}"
+    : "${VOCO_BROWSER_HOST_BINARY:?Set the built native host executable}"
+    : "${VOCO_BROWSER_EVIDENCE_DIR:?Set a fresh directory for toolbar evidence}"
+    TEST_SCRIPT="test-browser-toolbar-app.sh"
+    ;;
   --full-application)
     : "${VOCO_NATIVE_APP_BINARY:?Set the built candidate executable}"
 

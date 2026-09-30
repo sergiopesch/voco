@@ -15,7 +15,7 @@ METAINFO_PATH="/usr/share/metainfo/com.sergiopesch.voco.metainfo.xml"
 TAURI_DESKTOP_SOURCE="${ROOT_DIR}/packaging/tauri/VOCO.desktop"
 TAURI_METAINFO_SOURCE="${ROOT_DIR}/packaging/tauri/com.sergiopesch.voco.metainfo.xml"
 
-for command in dpkg-deb desktop-file-validate appstreamcli python3 rg readelf; do
+for command in dpkg-deb desktop-file-validate appstreamcli python3 readelf; do
   if ! command -v "${command}" >/dev/null 2>&1; then
     echo "Required package verification command is unavailable: ${command}" >&2
     exit 1
@@ -110,7 +110,7 @@ assert_entry /usr/share/icons/hicolor/32x32/apps/voco.png -rw-r--r--
 assert_entry /usr/share/icons/hicolor/128x128/apps/voco.png -rw-r--r--
 assert_entry /usr/share/icons/hicolor/256x256@2/apps/voco.png -rw-r--r--
 
-if awk '{ print $NF }' <<<"${PACKAGE_LISTING}" | rg -q '(__pycache__|\.pyc$|_test\.py$)'; then
+if awk '$NF ~ /(__pycache__|\.pyc$|_test\.py$)/ { found = 1 } END { exit !found }' <<<"${PACKAGE_LISTING}"; then
   echo "Debian package contains a Python cache or test artifact." >&2
   exit 1
 fi
@@ -127,8 +127,8 @@ python3 "${ROOT_DIR}/scripts/debian_maintainer.py" "${EXTRACT_ROOT}/DEBIAN" "${E
 # incidental transitive installation to satisfy that runtime dependency.
 for executable in /usr/bin/voco /usr/libexec/voco-browser-host; do
   dynamic_dependencies="$(readelf -d "${EXTRACT_ROOT}${executable}")"
-  if rg -q 'NEEDED.*\[libpulse\.so\.0\]' <<<"${dynamic_dependencies}" \
-    && ! rg -q '(^|, )libpulse0( \([^)]*\))?(,|$)' <<<"${PACKAGE_DEPENDS}"; then
+  if grep -Eq 'NEEDED.*\[libpulse\.so\.0\]' <<<"${dynamic_dependencies}" \
+    && ! grep -Eq '(^|, )libpulse0( \([^)]*\))?(,|$)' <<<"${PACKAGE_DEPENDS}"; then
     echo "Debian package links libpulse.so.0 but does not declare libpulse0." >&2
     exit 1
   fi

@@ -17,6 +17,16 @@ VENDORED_NOTICES = {
     "global-hotkey": ("VOCO-PATCH.md", "VOCO-UPSTREAM.json", "LICENSE-APACHE", "LICENSE-MIT", "LICENSE.spdx"),
     "glib": ("VOCO-PATCH.md", "VOCO-UPSTREAM.json", "upstream-fix.patch", "LICENSE", "COPYRIGHT"),
 }
+# The guide site, test evidence and graphics stay in the source repository.
+UNPACKAGED_DOCS = {"guide", "release-assets", "testing"}
+
+
+def packaged_docs_ignore(directory, names):
+    """Skip caches everywhere and developer-only folders at the top of docs/."""
+    ignored = shutil.ignore_patterns("__pycache__", "*.pyc")(directory, names)
+    if Path(directory) == ROOT / "docs":
+        ignored |= UNPACKAGED_DOCS & set(names)
+    return ignored
 
 
 def digest(path, algorithm="sha256"):
@@ -155,8 +165,7 @@ def main():
             shutil.copy2(ROOT / "scripts" / name, doc / name)
         for name in ("README.md", "AGENTS.md"):
             shutil.copy2(ROOT / name, doc / name)
-        shutil.copytree(ROOT / "docs", doc / "docs", dirs_exist_ok=True,
-                        ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+        shutil.copytree(ROOT / "docs", doc / "docs", dirs_exist_ok=True, ignore=packaged_docs_ignore)
         copy_vendored_notices(ROOT, doc)
         stage_legacy_input(stage, Path(directory) / "legacy-input-build")
         identity = {"version": package_version, "application_version": version,

@@ -149,7 +149,7 @@ APT_PACKAGES=(pkg-config libglib2.0-dev libsoup-3.0-dev
   libayatana-appindicator3-dev libpulse-dev clang mold
   ibus gir1.2-ibus-1.0 python3-gi)
 # Assembly compiles the private input helper, then the package verifier runs.
-PACKAGE_TOOLS=(g++ patch binutils desktop-file-utils appstream ripgrep)
+PACKAGE_TOOLS=(g++ patch binutils desktop-file-utils appstream)
 if $INSTALL_MODE; then APT_PACKAGES+=("${PACKAGE_TOOLS[@]}"); fi
 
 if command -v apt &>/dev/null; then
@@ -194,7 +194,7 @@ if [[ "$INSTALL_MODE" == true ]]; then
 
   step "Build"
 
-  # The same pin as the release workflow.
+  # The same pin as scripts/assemble-release.sh.
   cargo tauri --version &>/dev/null || run_step "Tauri CLI 2.10.1" cargo install tauri-cli --version "2.10.1" --locked
 
   # Remove stale bundle artifacts so install picks the package from this build only.
@@ -202,8 +202,9 @@ if [[ "$INSTALL_MODE" == true ]]; then
   rm -rf apps/desktop/src-tauri/target/release/bundle/voco-complete
 
   # Maximize parallelism
-  export CMAKE_BUILD_PARALLEL_LEVEL=$(nproc)
-  export CARGO_BUILD_JOBS=$(nproc)
+  CMAKE_BUILD_PARALLEL_LEVEL="$(nproc)"
+  CARGO_BUILD_JOBS="${CMAKE_BUILD_PARALLEL_LEVEL}"
+  export CMAKE_BUILD_PARALLEL_LEVEL CARGO_BUILD_JOBS
 
   # Use mold linker if available (much faster linking)
   if command -v mold &>/dev/null && command -v clang &>/dev/null; then
