@@ -1,206 +1,198 @@
-<!-- markdownlint-disable MD031 MD032 MD060 -->
-# Platform Support
+# Platform support
 
-## Supported Platforms
-
-VOCO targets Linux x86-64. The [Linux support matrix](../linux-support.md) records
-package families, runtime floors and qualification limits. The recorded public
-Ubuntu/Debian release is 2026.0.59 (see [release status](../release-candidate.md));
-Fedora, openSUSE and Arch/Omarchy packages remain at 2026.0.43. Consult GitHub
-Releases for the exact published assets.
-macOS and Windows are outside the current scope.
+VOCO runs on x86-64 Linux desktops, in Wayland and X11 sessions. This page
+covers what the computer needs, how VOCO pastes and receives its shortcut, and
+how to set up the Wayland input service. [Install VOCO](../install.md) covers
+installation, and [Architecture](../architecture/README.md) follows a recording.
 
 ## Requirements
 
-- Tauri runtime dependencies: libwebkit2gtk-4.1, libgtk-3, libayatana-appindicator3
-- Node.js 24 LTS (`.nvmrc`) or newer and Rust (for building from source)
-- PulseAudio or PipeWire for microphone access
-- Complete NVIDIA package for local CPU streaming; ordinary desktop output pastes into whatever has keyboard focus with Shift+Insert
-- Optional exact-field Chromium extension/native host provides a separate supported-field contract
-- xdotool + xclip (X11); ydotool plus xclip on the GNOME XWayland bridge or wl-copy elsewhere (Wayland) for native desktop delivery
-- No root privileges needed for normal operation
+| Area | Requirement |
+| --- | --- |
+| Processor | x86-64 with AVX2, FMA and F16C. VOCO doesn't check for them, and recognition can't run without them. |
+| System | Ubuntu 24.04 or later, or another Debian-based system with glibc 2.39 or later. The package needs `libc6 (>= 2.39)` and `libstdc++6 (>= 13.2.0)`. |
+| Audio | PulseAudio, or PipeWire with its PulseAudio service. |
+| Session | Wayland or X11. The reference desktop is Ubuntu 24.04 with GNOME 46. |
+| Wayland paste | `ydotool`, a running `ydotoold`, and write access to `/dev/uinput` for your login. |
 
-## Session Detection
+To check the processor, run this command. It must print all three names.
 
-The app detects session type via `XDG_SESSION_TYPE`. Native delivery uses the selected
-desktop helpers and copies undelivered text to the clipboard at Stop. Session type alone establishes no
-target identity or delivery proof. Browser output has an independent exact-element
-contract. Helper selection includes:
+```bash
+grep -o -w -E 'avx2|fma|f16c' /proc/cpuinfo | sort -u
+```
 
-- `x11` -> use xdotool for native desktop insertion
-- `wayland` -> use ydotool for native desktop insertion, including its clipboard paste gesture
-- Desktop environment detected via `XDG_CURRENT_DESKTOP`
+The package pulls in the clipboard, key, notification and IBus helpers VOCO
+uses. It recommends `ydotool` and `ydotoold`, which the guided installer adds on
+Wayland. VOCO runs as your login and never changes groups, device permissions,
+or a service that someone else set up.
 
-Hotkey backend selection:
+## Session types
 
-- Selected, eligible IBus context -> consuming shortcut backend with expiring registration
-- GNOME Wayland with the VOCO panel -> the Shell consumes `Alt+D` / `Alt+Shift+D` and forwards it to VOCO
-- Wayland + `Alt+D` / `Alt+Shift+D` -> passive evdev fallback, suppressed while IBus is armed or the panel holds the shortcut; the focused app also receives the chord, and VOCO explains the fix in one notification per launch
-- Other combinations -> Tauri global-shortcut fallback
-- Runtime hotkey changes update backend preference immediately
-- Settings → Help → Technical details shows the detected session and whether insertion helpers are currently available. Presence is a prerequisite, not proof of delivery to a target.
-- The evdev fallback tracks left/right Alt, Shift, Control, and Super independently for each open keyboard. Extra Control/Super modifiers reject the default matches; repeats do not retrigger. Disconnect clears only that device's state, and reopening revalidates capabilities and the virtual-device exclusion before synchronizing currently held keys. Dropped kernel events suppress activation until the stream has been resynchronized; synthetic recovery never triggers a hotkey.
-- Native IBus, global-shortcut, evdev and external socket triggers all use the same desktop paste: clipboard and primary selection, then one Shift+Insert.
-  Protocol-v6 IBus is shortcut-only; older helpers must reconnect after upgrade.
-- The browser extension uses `Alt+Shift+V` after the user enables it in a tab. It addresses the
-  captured plain-text DOM element; no global shortcut grab or IBus insertion is used for this route.
-- Native GTK/WebKit tests demonstrated a shared-context wrong-target failure, including controls
-  with identical cursor rectangles. Earlier successful GTK delivery tests do not authorize broad
-  application support. IBus mutation-rejection tests still require zero toolkit mutations; the separately
-  enabled native paste fixture asserts its own intended delivery.
-- Physical-key matching does not establish support for desktop remapping, AltGr layouts, lock/unlock, or every compositor. These require candidate-specific desktop evidence.
+| | Wayland | X11 |
+| --- | --- | --- |
+| Microphone | Rust records through libpulse | WebKit records through an AudioWorklet |
+| Clipboard | `wl-copy`, or `xclip` through XWayland on GNOME | `xclip` |
+| Paste keys | `ydotool`, through `ydotoold` | `xdotool` |
+| Shortcut | GNOME companion, passive evdev, IBus or `voco --toggle` | VOCO's key grab, IBus or `voco --toggle` |
 
-## Compatibility Helper Caveats on Wayland
+## Paste helpers
 
-Native desktop paste needs working input/clipboard helpers; the exact-field browser
-adapter and explicit Copy use different contracts. Do not add broad input privileges
-merely to copy a transcript. Physical microphone and compositor coverage remain scoped to the support matrix.
+VOCO copies each new phrase to the clipboard and the primary selection, then
+sends Shift+Insert to the app that has keyboard focus. Each clipboard or key
+helper gets 5 seconds. VOCO never restores the earlier clipboard, and a
+clipboard manager may keep dictated text in its history.
 
-- ydotool works via uinput (kernel-level, compositor-independent)
-- Device/daemon access depends on host setup; evdev access commonly uses the `input` group. Membership grants broad keyboard-device access and is not required just for explicit Copy
-- Desktop paste copies each chunk to the clipboard and primary selection with wl-copy (xclip through XWayland on GNOME), then sends Shift+Insert with ydotool. It replaces both selections and leaves the text there; helper APIs cannot safely restore clipboard ownership or all MIME formats.
-- Behaviour may vary by compositor (GNOME, KDE, Sway)
+Only `/usr/bin/ydotool` counts, and `ydotoold` counts only while
+`pgrep -x ydotoold` finds it. VOCO runs `ydotool key --help`, with a 2-second
+limit, to learn the key syntax: Ubuntu 24.04's client takes key names
+(`shift+insert`), newer clients take key codes (`42:1 110:1 110:0 42:0`), and
+VOCO refuses any other client. On X11, VOCO runs
+`xdotool key --clearmodifiers shift+Insert`. On GNOME under Wayland with
+`DISPLAY` set, the clipboard goes through `xclip` and XWayland, because GNOME
+lacks the data-control protocol and `wl-copy` would need a temporary window that
+takes focus.
+
+Desktop dictation starts only when the helpers are ready. Otherwise VOCO
+notifies "Dictation setup incomplete" with the reason, the tray tooltip reads
+"VOCO — Desktop setup needed", and nothing is recorded. The
+[Chromium extension](../../integrations/chromium/README.md) needs none of them.
+
+### Check the helpers
+
+`voco --check-desktop-input` checks the helpers without recording, copying or
+typing, and exits 1 when something is missing. VOCO's Help page shows the same
+message under **My words are not appearing**.
+
+| Message | Meaning |
+| --- | --- |
+| Desktop input helpers are ready. VOCO pastes into whichever app has keyboard focus. | Every helper VOCO can check is in place. |
+| Pasting on Wayland requires: ydotoold. Start VOCO's input service with … | No `ydotoold` runs. Set up the [input service](#ydotoold-ydotool-daemon). |
+| Pasting on … requires: … | A helper program is missing. Install its package. |
+| The desktop paste helper cannot reach its input service. … | A `ydotoold` runs, but `ydotool` can't use its socket, for example because another login owns it. |
+| The desktop paste helper could not connect to its input service. | `ydotool key --help` failed. |
+| The desktop paste helper did not answer its compatibility check. | `ydotool` didn't answer within 2 seconds. |
+| The installed ydotool key interface is unsupported; … | The client's help text matches neither known syntax. |
+| Desktop paste is not enabled. | `VOCO_DESKTOP_PASTE=0` is set in VOCO's environment. |
 
 ### ydotoold (ydotool daemon)
 
-VOCO requires a running `ydotoold` for automatic Wayland paste, including when
-using the legacy 0.1.x client. The persistent virtual device avoids per-command
-creation delays. Modern clients also require access to the daemon socket. Until a
-daemon runs, desktop setup reports paste unavailable and dictation does not start.
+On Wayland, `ydotool` sends keys through `ydotoold`, a daemon that holds one
+virtual keyboard open on `/dev/uinput`, and VOCO pastes only while a `ydotoold`
+runs for your login. X11 needs neither. The package installs the user service
+`/usr/lib/systemd/user/voco-ydotoold.service`, which installing doesn't start.
+It runs as you with your graphical session, only when `/dev/uinput` exists, and
+restarts 3 seconds after a failure, with `UMask=0077`, `NoNewPrivileges=yes` and
+`RestrictAddressFamilies=AF_UNIX`. It runs `/usr/libexec/voco/ydotool-launcher`,
+which picks the daemon:
 
-Ubuntu 24.04 provides the client and daemon separately:
+- If `/usr/bin/ydotool` is Ubuntu 24.04's `ydotool` 0.1.8-3build1 for amd64,
+  checked by SHA-256 and with `dpkg-query`, it runs VOCO's private build of
+  `ydotoold` 0.1.8 from `/usr/libexec/voco/ydotool-legacy/`, after checking the
+  binary against its build manifest. That build closes finished connections and
+  retries interrupted calls ([source and patches](../../vendor/ydotool-legacy/README.md)).
+  It listens on `/tmp/.ydotool_socket`, mode 0600 and owned by your login, so it
+  serves one login at a time.
+- With any other client, it runs the system `/usr/bin/ydotoold`.
+
+The launcher trusts only files and directories that root owns and that group
+and others can't write. Never widen a daemon socket's permissions: any process
+that can write to it can type into your session. To set the service up by hand,
+quit VOCO, then run:
 
 ```bash
 sudo apt install ydotool ydotoold
-```
-
-This installs the tools; it does not guarantee an active service. Check without
-injecting keys into the current application:
-
-```bash
-command -v ydotool ydotoold
-pgrep -x ydotoold
-systemctl --user status ydotoold
-# In .47 and later:
-voco --check-desktop-input
-```
-
-The package includes `voco-ydotoold.service`, a service for your login.
-From .55, this unit uses a private corrected daemon for the exact qualified
-Ubuntu 24.04 legacy client, avoiding descriptor exhaustion after repeated use.
-Other client generations retain the distribution daemon. The installer and
-installed app can migrate only an unmodified VOCO unit while VOCO is closed.
-A custom service or another daemon remains under its owner's control.
-The guided installer reuses a working daemon. Otherwise, when your login already
-has write access to `/dev/uinput`, it enables and starts this service, then checks
-that the client can use it. The service runs as you, uses a private socket umask,
-and stops with your graphical session. It is not started by package installation
-alone. For a manual package install with existing device access, quit VOCO first:
-
-```bash
 voco --setup-desktop-input
 systemctl --user enable --now voco-ydotoold.service
 voco --check-desktop-input
 ```
 
-If your login lacks device access, or another daemon is running but inaccessible,
-the installer reports incomplete setup and exits with status 2. It does not change
-`input` group membership, device permissions or an administrator's service.
-Device access must follow the machine owner's policy. The Ubuntu 0.1.x client
-uses a fixed owner-only socket in `/tmp`; do not start competing daemons for
-different logins or make the socket world-writable.
+`voco --setup-desktop-input` points an unmodified VOCO service at the launcher,
+reloads systemd's copy of the unit, and restarts the service if it runs a
+different daemon, but never starts a stopped one. It acts only for the installed
+`/usr/bin/voco` in a Wayland session while VOCO is closed. It changes nothing,
+and says why, if the unit is overridden, has drop-ins or differs from the
+packaged file, if the service runs a custom command or belongs to another login,
+if another `ydotoold` runs, or if your login can't write to `/dev/uinput`.
 
-Desktop input readiness does not establish shortcut availability. On a fresh GNOME
-account without keyboard-device access, use the documented
-[compositor shortcut](../install.md#wayland-compositor-shortcuts), or configure
-the optional IBus recording source. Neither requires granting raw keyboard access
-just to invoke `voco --toggle`.
+VOCO runs the same step at each start, where a refusal only logs a warning. When
+the service is changing state, a restart can't be confirmed, or the step takes
+over 5 seconds, VOCO notifies "VOCO could not start" and exits.
 
-Use your distribution's packaged service when available and its documented socket
-permissions. VOCO's session must be able to reach that socket; an arbitrary daemon
-running as another user is not proof of access. Where no service exists, the daemon
-needs narrowly scoped access to `/dev/uinput` and a service managed for your login.
-Do not add it blindly to shell startup files or grant all keyboard-device access.
-The package deliberately does not change system device permissions.
+The guided installer runs the step too and keeps any `ydotoold` that already
+works. Otherwise it needs write access to `/dev/uinput`, refuses to replace a
+`ydotoold` it can't reach, then starts the service and checks again. If setup
+still fails, it prints the reason and a link to this section, then exits with
+status 2.
 
-`Permission denied` indicates device/socket access needs configuration. `Socket
-not found` indicates an unavailable daemon or a mismatched socket path. After
-setup, use a disposable text field to verify actual delivery. Settings diagnostics
-check prerequisites; only that destination test proves the complete path.
+#### Access to /dev/uinput
 
-A failed or timed-out helper may already have typed a prefix. VOCO copies uncertain
-output to the clipboard at Stop, or keeps it in tray Review when that copy fails, and
-never retries it automatically.
+Grant your login write access to `/dev/uinput` as your system's policy allows.
+Two common udev rules follow; VOCO neither installs nor tests them. Put one in
+`/etc/udev/rules.d/60-voco-uinput.rules`, then restart the computer.
 
-## Compatibility Helpers on X11
+```text
+# Option 1: the user of the active local session gets access.
+KERNEL=="uinput", SUBSYSTEM=="misc", TAG+="uaccess", OPTIONS+="static_node=uinput"
 
-- xdotool works via X11 protocol (compositor-independent)
-- No special group membership needed
-- Desktop paste copies each chunk to the clipboard and primary selection with xclip, then sends Shift+Insert with xdotool, with the same no-restoration policy as Wayland.
-- While the shortcut is held, VOCO's passive grab receives every key, the paste keys included, so a paste waits for the shortcut's release, at most 1.5 seconds after the press.
+# Option 2: members of a dedicated group get access.
+KERNEL=="uinput", SUBSYSTEM=="misc", GROUP="uinput", MODE="0660", OPTIONS+="static_node=uinput"
+```
 
-## Known Limitations
+For option 2, create the group with `sudo groupadd --system uinput` and join it
+with `sudo usermod -aG uinput "$USER"` before you restart. Don't use the `input`
+group, which lets every program you run read all keyboards, or make
+`/dev/uinput` world-writable, which lets any account type into your session.
 
-- Native desktop paste and the separately authorized Chromium exact-field adapter have different target contracts; neither establishes support for every application
-- Rich editors, password controls and recognized sensitive metadata, selected ranges and unsupported frames are not browser adapter targets
-- Direct captured-element mutation may not participate in native browser undo history
-- Native Wayland, broad browser/app compatibility and physical microphone journeys require their own current evidence; isolated X11 tests do not prove them
-- Deadline checks assume a shared trustworthy host clock; arbitrary wall-clock rollback is outside their guarantee
-- Flatpak is not a published or qualified distribution format
-- Some Wayland compositors block simulated input used by the compatibility helpers
-- Complete NVIDIA packages bundle the selected model for offline dictation. The
-  separately selected legacy Whisper path may download its own model.
-- AppImage publication is paused because Tauri/linuxdeploy still uses mutable helper downloads;
-  local experiments require an explicitly supplied, checksum-verified final appimagetool
+## Shortcuts by desktop
 
-## Packaging
+VOCO's shortcut combines Alt, Control or Super with a key, Alt+D by default.
 
-The complete Debian package is the common payload source. Explicit dependency
-profiles produce separate Fedora and openSUSE RPMs and an Arch pacman package.
-All packages include the desktop notification command through their native
-`libnotify` package mapping. See [packaging](../linux-packaging.md) for assembly,
-SentencePiece companion packages, verification and release requirements.
-AppImage remains a local experiment until its complete toolchain is pinned;
-Flatpak and Snap are not published.
+| Desktop | How the shortcut reaches VOCO |
+| --- | --- |
+| GNOME 46 on Wayland, [companion](../../integrations/gnome/README.md) attached | Shell grabs Alt+D or Alt+Shift+D, so the focused app never sees it. |
+| Wayland with Alt+D or Alt+Shift+D, no companion | Passive evdev. The focused app also acts on the chord. |
+| Wayland with any other shortcut | A desktop keybinding that runs `voco --toggle`. |
+| X11 | VOCO's root-window grab, for any shortcut it accepts. It toggles on release, so the paste keys reach the app. |
+| Any session, VOCO Dictation selected | The IBus engine consumes the chord in eligible fields. |
 
-## Data Locations
+With passive evdev, browsers move the cursor to the address bar on Alt+D and
+terminals delete a word. VOCO notifies "Your shortcut also reached the app" once
+per launch, with the fix for your desktop.
 
-| Data   | Path                                                                           |
-| ------ | ------------------------------------------------------------------------------ |
-| Config | `~/.config/voco/config.json`                                                   |
-| Bundled NVIDIA models | `/usr/lib/voco/speech/models/`                                                  |
-| Optional legacy models | `~/.local/share/voco/models/` |
-| State  | `${XDG_STATE_HOME:-$HOME/.local/state}/voco/`                                  |
-| Socket | `$XDG_RUNTIME_DIR/voco.sock` or `${TMPDIR:-/tmp}/voco-$(id -u)/voco.sock`       |
-| Browser broker | `$XDG_RUNTIME_DIR/voco-browser/exact-field.sock` |
+`voco --toggle` connects once to VOCO's owner-only socket,
+`$XDG_RUNTIME_DIR/voco.sock`; the connection is the request. It never launches
+VOCO, doesn't report whether recording started, and exits 1 with "Could not
+reach VOCO's private control socket" when VOCO isn't running. VOCO briefly holds
+Shift while it pastes, so bind the key with modifiers ignored, or add a second
+binding with Shift, such as F8 and Shift+F8. [Install VOCO](../install.md) lists
+the settings for common desktops.
 
-## Helper delivery outcomes
+### IBus input source
 
-`paste_desktop_text` pastes into whatever has keyboard focus. It returns `outcome: dispatched`
-only after its helper exits successfully; that confirms command completion, not consumption by the
-focused application. Errors distinguish `no-mutation` (no key was sent: a helper was unavailable or
-the Wayland modifier wait timed out), `rejected` (a prerequisite failed) and `uncertain` (a helper
-started and delivery may have happened). `clipboardChanged` reports a replaced clipboard. Only
-`no-mutation` text is retried, with the next chunk or at Stop. After `rejected` or `uncertain`,
-automatic delivery stops and Stop copies the remainder to the clipboard without sending keys.
-If that copy fails, the dictation moves into tray Review instead.
+While the **VOCO Dictation** input source is selected, its engine arms VOCO's
+shortcut for 1 second at a time, renewed while VOCO keeps asking, in a focused
+field that supports preedit, reports a known and current content type, isn't
+for a password, PIN or terminal, and has no private or hidden-text hint. While
+armed, it consumes the chord and tells VOCO to toggle, passive evdev ignores the
+chord, and VOCO releases its X11 grab. The engine never edits text.
 
-Clipboard write and paste helpers each have a five-second deadline. Stdin writes are nonblocking
-under the same deadline; failed supervision kills and reaps the helper process group. No transcript
-is written to diagnostic output. Text that was not typed is copied to the clipboard at Stop; it is
-never replayed as keys.
+### Keyboard access for evdev
 
-Clipboard restoration is deliberately unavailable with the current command-line helpers. A fixed
-sleep does not prove the target consumed the clipboard, and reading it before restoring cannot
-atomically exclude a concurrent copy. Explicit clipboard use replaces existing text and non-text
-formats; clipboard managers may retain the transcript under their own policies. VOCO never restores
-an earlier snapshot over a newer selection.
+Passive evdev reads keyboards under `/dev/input`, which usually takes the
+`input` group. That group lets every program you run read every keystroke,
+passwords included, so prefer the GNOME companion, a `voco --toggle` binding or
+the IBus input source. VOCO finds keyboards as they appear, through inotify or
+polling, and keeps watching when none is readable at startup.
 
-## Browser integration packaging
+## Known limits
 
-The Debian package includes the native host, static Chrome/Chromium registration manifests,
-and unpacked extension sources. It does not install or activate a browser extension in a profile.
-See [installation](../install.md) for explicit setup. Native messaging uses a private same-user
-Unix socket and no network service. The bounded protocol and acceptance limits are documented in
-[broker acceptance](../testing/browser-broker.md); no best-in-world or universal app claim follows
-from those tests.
+- Recognition is English only.
+- Text reaches only apps that paste on Shift+Insert. A passing helper check
+  can't show that an app accepts it, and VOCO can't tell whether a paste landed.
+- On GNOME, apps that inhibit system shortcuts, such as virtual machines and
+  remote desktops, receive the companion's chord. In Shell menus and dialogs it
+  does nothing.
+- The companion supports GNOME 46 only. Elsewhere VOCO uses the tray, which on
+  GNOME needs an AppIndicator extension.
+- Automated tests use synthetic audio in private X11, Wayland, GNOME and
+  Chromium sessions, not physical microphones, other desktops or other apps.

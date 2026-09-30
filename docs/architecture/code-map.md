@@ -1,257 +1,353 @@
-# VOCO code map
+# Code map
 
-This is the reading path for humans and agents working on the Linux dictation
-application. Names containing `benchmark` are historical: the files below run in the
-production NVIDIA path.
+This page gives one line per file or small group of files, and paths in each
+section are relative to that section's directory. The [architecture overview](README.md) explains how
+the parts fit together.
 
-## Installer presentation
+The production path is `runtime/speech/` → `speech_stream.rs` →
+`dictationStream.ts` → `insertion.rs`.
 
-`install` remains a standalone Bash download. `scripts/lib/install-ui.sh` owns
-bounded terminal rendering and the optional APT wrapper;
-`scripts/lib/install-apt-ui.py` observes separate status/output streams using only
-Python's standard library. `scripts/lib/install-brand.json` owns the shared terminal glyphs and palette.
-`scripts/sync-installer-ui.py` generates the brand constants in both renderers and
-embeds them into `install`; run it after editing the brand or either source. `--check` is part of the DevOps gate. Shared
-installation/readiness behavior stays in `scripts/lib/install-common.sh`, with
-its existing exact-copy check. Presentation never owns package success or readiness.
-See the [performance report](../testing/installer-performance-2026-09-22.md) for
-the bounded tests, benchmark and disposable-container APT prompt check.
+## Desktop shell: `apps/desktop/src-tauri/src/`
 
-## Before recording
+- `lib.rs` — App setup and most Tauri commands: startup order, shortcut routes, `admit_toggle` and its 120 ms debounce, the evdev listener and the CLI checks.
+- `main.rs` — Command-line entry point; see [Command line](#command-line).
+- `speech_stream.rs` — The speech worker process and the `speech_stream` command: NDJSON requests, deadlines, size limits and restarting a dead idle worker.
+- `insertion.rs` — Desktop paste and copy: helper checks, the clipboard transaction, Shift+Insert and the three failure outcomes.
+- `config.rs` — Settings file, field-level updates, the copy from the legacy `voice` directory and the update cache.
+- `crash_recovery.rs` — Text-only crash journal and the Review store.
+- `tray.rs` — Tray icon, menu, tooltips and meter animation.
+- `tray_icons.rs` — Writes the state icons and 64 meter frames once, to paths that stay valid for the process lifetime.
+- `panel.rs` — GNOME companion bridge on D-Bus (`org.voco.Panel1`), its shortcut leases and the `ModifiersClear` call.
+- `panel_setup.rs` — Bounded companion check and setup; a check is reused for 20 seconds, or 2 seconds after a failure.
+- `ibus_shortcut.rs` — Client for the optional IBus engine's private socket (protocol 6).
+- `shortcut_arbitration.rs` — Tells confirmed IBus authority apart from an unanswered poll, and guards evdev and X11 toggles.
+- `shortcut_readiness.rs` — Shortcut status observations and their text; it never registers or admits a shortcut.
+- `hotkey_state.rs` — Physical key state per evdev device for the passive shortcut listener.
+- `hotkey_trace.rs` — Opt-in shortcut timing trace, enabled with `VOCO_HOTKEY_TRACE=1`.
+- `trigger_socket.rs` — Owner-only trigger socket `voco.sock`, with its `voice.sock` alias, that `voco --toggle` connects to.
+- `activation.rs` — Owner-only launcher socket `voco-activate.sock`; it presents the window and never toggles capture.
+- `single_instance.rs` — Process lock that allows one VOCO per user.
+- `desktop_input_setup.rs` — Migrates VOCO's packaged input service at startup and for `--setup-desktop-input`.
+- `desktop_notifications.rs` — Notifications that keep their D-Bus sender for the app's lifetime, because GNOME removes notifications whose sender disappears.
+- `performance.rs` — Opt-in performance metadata log, enabled with `VOCO_PERFORMANCE_LOG=1`.
+- `process_runner.rs` — Bounded helper processes: timeouts, output limits and reaping.
+- `digest_hex.rs` — Lowercase hex for SHA-256 digests.
+- `native_capture_commands.rs` — Tauri commands for native capture, callable only from VOCO's main page.
+- `native_capture/mod.rs` — Native capture manager: the capture worker, the 5 ms pump, the 5-second drain lease and retained audio.
+- `native_capture/pulse.rs` — Rust side of the libpulse shim; libpulse types stay in C.
+- `native_capture/protocol.rs` — Packets and acknowledgements between native capture and the renderer.
+- `native_capture/audit.rs` — Opt-in, one-shot capture audit for debugging.
+- `native_capture/retained.rs` — Opt-in record of the audio the renderer retained, for the same audit.
+- `native_capture/private_bundle.rs` — Writes private audit bundles after capture ends.
+- `native_capture/tests.rs` — Native capture unit tests.
+- `browser_broker.rs` — Chromium exact-field broker: claims, sessions, appends and receipts. Only a matching receipt proves a field changed.
+- `browser_event_delivery.rs` — Delivers browser Start and Stop to the renderer, so a Stop survives a briefly unresponsive renderer without turning into a toggle.
+- `browser_protocol.rs` — Bounded, versioned messages shared by the broker and the native host.
+- `browser_socket.rs` — Same-user transport under `$XDG_RUNTIME_DIR/voco-browser/`, checked with `SO_PEERCRED`.
+- `bin/voco-browser-host.rs` — Chromium native messaging host that relays framed messages between the extension and VOCO.
 
-Backend startup warms the bundled Nemotron worker. Readiness requires its successful
-model load and warmup; importing the queue does not start inference. The same
-recognizer serves desktop, browser and onboarding sessions. See
-[startup](README.md#startup-and-recognizer-selection).
+## Renderer: `apps/desktop/src/`
 
-## Follow one recording
+### Top level
 
-1. `apps/desktop/src/App.tsx` mounts the thin UI and dictation hook. The store in
-   `src/store/useStore.ts` represents preferences and visible state; it does not
-   own native input authority.
-2. `src/hooks/useDictation.ts` wires capture and delivery. Start/Stop/Cancel
-   and shortcut boundaries live in `src/lib/dictationRecording.ts`. Capture admission
-   keeps unverified ScriptProcessor input out of automatic delivery.
-   `desktopCaptureTail.ts` retains each source sample and forwards the Stop tail once.
-   `browserStreamDelivery.ts` separately owns an explicit browser field lease,
-   verifies each append receipt and never retries uncertain output. Tab departure or
-   native connection loss stops that browser recording; ordinary field focus loss
-   revokes its recipient without discarding the session's Stop control.
-3. `src/lib/benchmarkPhraseQueue.ts` serializes bounded NVIDIA requests. Recording
-   capture continues while a paste is in flight. A newer append-only hypothesis
-   can supersede pending output; already dispatched text cannot be blindly replayed.
-   A `no-mutation` paste typed nothing, so its text stays pending for the next
-   hypothesis or bounded Stop retries. An uncertain or rejected paste disables
-   insertion while recognition continues through Stop, which copies the
-   undelivered remainder to the clipboard and notifies; if that copy fails,
-   `CrashJournal.keep` moves the session's text into Review. A Chromium
-   exact-field session whose field stopped taking text ends the same way. Recognition/transport
-   failure still stops queue admission. Handled cursor failures notify, clear
-   text/audio at Stop and return to a nonblocking idle state. Onboarding retains
-   its local test retry path.
-   The worker owns acoustic boundaries, so this path needs no second phrase segmenter.
-4. `src-tauri/src/benchmark_stream.rs` supervises one local Python process, frames
-   bounded JSON, checks session/sequence responses and reaps failures. Start/warmup
-   may replace a confirmed-dead idle worker. Push/finish may never restart and replay.
-   It moves audio requests into the I/O channel while retaining only bounded
-   diagnostic and response-identity fields.
-5. `runtime/speech/stream_worker.py` enters `worker_main.py`, which keeps native-library
-   stdout away from protocol stdout and validates identity/sequence/operation and emits sanitized
-   metadata. `streaming.py` owns the sample gate and streaming lifecycle;
-   `adapters.py::Nemotron` owns native recognizer/stream/result handles.
-6. `src-tauri/src/insertion.rs` copies each chunk to CLIPBOARD and PRIMARY, then
-   sends Shift+Insert to whatever has keyboard focus. A successful key command is
-   not proof that a recipient displayed the text.
-7. At Stop, the hook drains capture, forwards only retained samples not yet offered
-   to the queue, then finishes recognition and pending delivery. Successful cursor
-   dictation clears all transcript/audio state. `crashRecovery.ts` serializes text-only
-   checkpoints to `src-tauri/src/crash_recovery.rs`, which owns private atomic files
-   under the user's state directory. Clean completion removes the active checkpoint;
-   startup promotes an unfinished prior checkpoint into Review, and
-   `keep_crash_journal` does the same for a Stop that could neither paste nor copy. No audio
-   is persisted. `CrashReview.tsx` opens only on explicit `voco:open-review`, with
-   copy and discard but no delivery/retranscription action. Copy uses
-   `copy_desktop_text` (CLIPBOARD and PRIMARY), falling back to the WebView
-   clipboard. Cancelled or old callbacks cannot update a replacement session.
+- `App.tsx` — Root component: startup, window surfaces, update checks and runtime diagnostics.
+- `main.tsx` — Renderer entry point.
+- `store/useStore.ts` — Zustand store for app state and the current surface.
+- `types/index.ts` — Shared renderer types.
+- `styles.css` — Base styles and window surfaces.
+- `preferences.css` — Settings window layout.
+- `motion.css` — Shared motion styles.
+- `vite-env.d.ts` — Vite type references.
 
-Paths in steps 2–7 are relative to `apps/desktop` unless prefixed with `runtime/`.
-See [architecture](README.md) and [desktop paste](../testing/desktop-paste.md)
-for delivery and recipient limitations.
+### Components: `components/`
 
-## Component ownership
+- `ControlPanel.tsx` — Settings window with the Settings, Microphone, Shortcut, Updates and Help sections.
+- `ControlPanel.test.tsx` — Settings guidance and controls.
+- `Onboarding.tsx` — First-run voice test and desktop setup check. Its text stays in the window.
+- `Onboarding.test.tsx` — Onboarding states.
+- `CrashReview.tsx` — Review window: copy or discard interrupted dictations.
+- `crashReview.css` — Review styles.
+- `ConfigRecoveryPanel.tsx` — Shown when the settings file can't be read: Retry, Open and Reset.
+- `ConfigRecoveryPanel.test.tsx` — Recovery panel actions.
+- `PanelSetup.tsx` — GNOME companion status and setup button.
+- `NativeMicrophoneSettings.tsx` — Microphone list for native capture.
+- `DeviceSelect.tsx` — Accessible device picker.
+- `VoiceSignal.tsx` — Level display for the microphone signal.
+- `StatusMark.tsx` — Status glyph.
+- `Tooltip.tsx` — Tooltip.
+- `SettingsIcon.tsx` — Settings navigation icons.
 
-There is one production recognition queue, `BenchmarkPhraseQueue`. Its latest
-accepted hypothesis and successfully dispatched prefix are different facts: a
-slow or rejected paste must not stop healthy recognition or cause a replay.
-`DesktopPhraseQueue`, its preview/segmentation helpers and `liveCommitPolicy` were
-unused legacy implementations and have been removed. The pinned historical code
-guide retains its original source snapshot.
+### Hooks: `hooks/`
 
-| Transcript fact | Owner |
-| --- | --- |
-| Completed native phrases and current recognizer output | `runtime/speech/adapters.py::Nemotron` |
-| Accepted append-only hypothesis and dispatched prefix | `benchmarkPhraseQueue.ts` |
-| Paste dispatch, or exact-field receipt for explicit browser delivery | Native insertion or explicit browser delivery |
-| Visible transcript and voice-test failure reason | Dictation hook/store, mirroring recognition |
+- `useDictation.ts` — Recording lifecycle: capture, the dictation stream, Stop, crash journal and notifications.
+- `useDictation.desktopLifecycle.test.ts` — Start, Stop and cancel against a delayed paste.
+- `useDictation.desktopTail.test.ts` — Stop tail accounting with deterministic capture and worker IPC.
+- `useGlobalShortcut.ts` — Receives toggles and browser triggers from Rust and reports renderer readiness.
+- `useNativeCaptureSettings.ts` — Native microphone list and selection.
+- `useGlassPointer.ts` — Pointer highlight on buttons.
+- `useGlassPointer.test.ts` — Pointer highlight.
 
-Do not merge these facts into one success flag. IBus owns shortcut authority,
-not text delivery. Future personalisation is a [separate gated plan](personalisation-plan.md),
-not another live recognizer or queue.
+### Library: `lib/`
 
-| Area | Implementation | Responsibility / constraint |
+- `dictationStream.ts` — `DictationStream`: 100 ms packets, one request at a time, append-only results, paste outcomes and Stop retries.
+- `dictationStream.test.ts` — Append-only results, backlog limit and delivery outcomes.
+- `dictationStream.startup.test.ts` — Importing the module leaves model warmup to Rust.
+- `dictationRecording.ts` — Start and Stop for one recording: delivery callbacks, the Stop copy and notifications.
+- `dictationRecording.test.ts` — Start and Stop ordering and cleanup.
+- `desktopCaptureTail.ts` — `DictationStreamInput`, the 600-second limit, the Stop tail and capture teardown.
+- `audioCaptureBuffer.ts` — In-memory audio for the current recording; `collectAudioSamplesRange` is its only reader.
+- `audioCaptureBuffer.test.ts` — Buffer bounds and ranges.
+- `audioCaptureFlush.ts` — AudioWorklet flush acknowledgement with an 80 ms timeout.
+- `audioCaptureFlush.test.ts` — Flush acknowledgement.
+- `captureHealth.ts` — WebKit capture liveness: ended track, 3-second system mute and 5-second sample gap.
+- `captureHealth.test.ts` — Capture liveness.
+- `captureDescriptor.ts` — Capture backend selection and the retained audio format.
+- `captureDescriptor.test.ts` — Retained audio format.
+- `audioInput.ts` — Opens the WebKit microphone stream and picks the device.
+- `audioLevel.ts` — Level meter values for the tray and companion.
+- `nativeCapture.ts` — Renderer side of native capture: sources, packets and acknowledgements.
+- `nativeCapture.test.ts` — Native capture protocol and ownership.
+- `nativeCaptureSettings.ts` — Native capture availability and source selection commands.
+- `nativeCaptureAudit.ts` — Renderer half of the opt-in capture audit.
+- `nativeCaptureAudit.test.ts` — Audit records.
+- `browserStreamDelivery.ts` — Chromium exact-field delivery; a missing receipt is never retried.
+- `browserStreamDelivery.test.ts` — Browser delivery and Stop.
+- `crashRecovery.ts` — `CrashJournal` and the Review commands.
+- `crashRecovery.test.ts` — Journal updates and failures.
+- `dictationRecovery.ts` — Capture sample limit and error text helpers.
+- `dictationRecovery.test.ts` — Recovery helpers.
+- `dictationSession.ts` — Session state machine and a queued Stop.
+- `dictationSession.test.ts` — Session state machine.
+- `dictationTrigger.ts` — Rules for which triggers may start or stop a recording.
+- `dictationTrigger.test.ts` — Browser trigger rules.
+- `dictationDelivery.ts` — Delivery ownership state.
+- `dictationDelivery.test.ts` — Delivery ownership state.
+- `dictationPresentation.ts` — Status labels and desktop setup state.
+- `dictationPresentation.test.ts` — Status labels.
+- `dictationAsyncGuards.ts` — Ignores results from a capture source that has been replaced.
+- `dictationAsyncGuards.test.ts` — Async guards.
+- `activityMode.ts` — Whether dictation is active and whether a toggle is allowed.
+- `activityMode.test.ts` — Activity rules.
+- `shortcutPresentation.ts` — Shortcut and microphone labels, and time limits for diagnostics requests.
+- `shortcutPresentation.test.ts` — Presentation helpers.
+- `microphoneRefresh.ts` — Orders device list refreshes against explicit access requests.
+- `microphoneRefresh.test.ts` — Refresh ordering.
+- `configSnapshot.ts` — When to apply a settings snapshot from Rust.
+- `configSnapshot.test.ts` — Snapshot rules.
+- `updates.ts` — GitHub release check, version comparison and the update cache.
+- `updates.test.ts` — Versions and channel selection.
+- `updateCheckCoordinator.ts` — Runs update checks, keeps only the latest request's result and notifies about a new release.
+- `updateCheckCoordinator.test.ts` — Coordinator behaviour.
+- `windowRemap.ts` — Shows interactive windows on Wayland without treating the remap as a blur.
+- `windowRemap.test.ts` — Window remap.
+- `popoverPlacement.ts` — Places windows near the tray inside the work area.
+- `popoverPlacement.test.ts` — Placement.
+- `animationFrameLease.ts` — Shared animation-frame scheduling.
+- `animationFrameLease.test.ts` — Frame scheduling.
+- `tauri.ts` — Typed wrappers for Tauri commands.
+
+### Tests: `__tests__/`
+
+- `audioInput.test.ts` — Microphone device selection.
+- `audioLevel.test.ts` — Companion level updates.
+- `globalShortcutReadiness.test.ts` — Shortcut readiness handshake.
+- `nativeIpcCsp.test.ts` — The content security policy allows Tauri's native IPC.
+- `store.test.ts` — Store behaviour.
+- `windowSurfacePermissions.test.ts` — Window capabilities grant only the window commands VOCO uses.
+
+## Desktop build and resources: `apps/desktop/`
+
+- `package.json` — Workspace scripts: `dev`, `dev:frontend`, `build`, `build:frontend`, `check`, `lint` and `test`.
+- `index.html`, `vite.config.ts`, `tsconfig.json`, `eslint.config.js` — Renderer build and lint configuration.
+- `public/audio-processor.js` — AudioWorklet that captures WebKit audio on X11 and confirms each flush.
+- `public/tray/*.png` — Tray state icons.
+- `public/icons/`, `public/textures/`, `public/favicon.png` — Interface icons and textures, with their licences.
+- `tests/brand-motion.html`, `tests/brand-motion.tsx` — Isolated presentation fixture for the motion test.
+- `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock` — Rust dependencies. `native-capture` is the default feature, and `[patch.crates-io]` points glib, global-hotkey and tray-icon at `vendor/`.
+- `src-tauri/build.rs` — Compiles the libpulse shim when `native-capture` is on.
+- `src-tauri/native/native_capture_pulse.c`, `.h` — C shim that owns the libpulse record stream.
+- `src-tauri/tauri.conf.json` — Window, bundle and content security policy settings.
+- `src-tauri/capabilities/default.json` — Tauri permissions for the main window.
+- `src-tauri/resources/voco_ibus_engine.py` — The IBus engine that takes the dictation shortcut.
+- `src-tauri/resources/voco_ibus_protocol.py` — The engine's private socket protocol.
+- `src-tauri/resources/voco_ibus_engine_test.py`, `voco_ibus_protocol_test.py` — Engine and protocol tests.
+- `src-tauri/resources/voco_gnome_panel.py` — Companion check and setup through GNOME Shell's D-Bus API.
+- `src-tauri/tests/glib_variant_iter.rs` — Regression test for the glib variant iterator fix.
+- `src-tauri/tests/desktop_notifications/mod.rs` — Notification tests on a private bus.
+- `src-tauri/examples/browser_broker_fixture.rs` — Test-only broker driver, never packaged.
+- `src-tauri/icons/*` — Application icons.
+
+## Speech worker: `runtime/speech/`
+
+- `stream_worker.py` — Worker entry point; keeps native library output away from the JSON protocol.
+- `worker_main.py` — Protocol loop: ready line, request size limit, default thread count and request dispatch.
+- `streaming.py` — Streaming session: sample-rate checks, silence gate, frame batching and the opt-in timing log.
+- `adapters.py` — Loads the native library and the model, and checks the model's SHA-256.
+- `nemo_bridge.cpp` — C++ bridge between the worker and NeMo-Speech.cpp.
+- `MODEL-IDENTITY.json` — Model source, revision, hash and CPU requirement.
+- `NATIVE-BUILD.json` — Build receipt for the pinned native library.
+- `test_cpu_threads.py` — Default thread count.
+- `test_diagnostics.py` — Protocol framing, diagnostics and private metrics logs.
+- `test_streaming.py` — Silence gate accounting and log privacy.
+- `test_timing.py` — Timing instrumentation keeps sample order and transcripts.
+- `test_worker_protocol.py` — Protocol and lifecycle checks against the real model.
+
+## Native runtime and notices: `runtime/`
+
+- `native/build.py` — Builds the pinned, patched NeMo-Speech.cpp libraries and the bridge.
+- `native/README.md` — [Native runtime guide](../../runtime/native/README.md): what ships, the patches and how to rebuild.
+- `native/first-chunk.patch`, `native/thread-pool.patch` — Patches applied to the pinned upstream source.
+- `notices/*` — Licences and notices for the model, ggml and third-party code.
+
+## GNOME companion: `integrations/gnome/`
+
+- `voco-panel@voco.local/extension.js` — Panel pill, meter, menu, shortcut grab and the D-Bus client.
+- `voco-panel@voco.local/model.js` — Presentation model shared with the Node tests.
+- `voco-panel@voco.local/metadata.json` — Extension metadata for GNOME Shell 46.
+- `voco-panel@voco.local/stylesheet.css` — Pill and meter styles.
+- `voco-panel@voco.local/voco-symbol.png` — Microphone symbol.
+- `package.json` — Marks the directory as ES modules for the tests.
+- `README.md` — [Companion guide](../../integrations/gnome/README.md).
+
+## Chromium extension: `integrations/chromium/`
+
+- `manifest.json` — Manifest V3 extension "VOCO Exact Field".
+- `background.js` — Toolbar action, per-tab enablement and the native messaging port.
+- `content.js` — Field eligibility, `Alt+Shift+V`, appends and receipts.
+- `README.md` — [Extension guide](../../integrations/chromium/README.md).
+
+## Packaging: `packaging/`
+
+- `systemd/voco-ydotoold.service` — User unit that runs VOCO's input service.
+- `ydotool/voco-ydotool-launcher` — Chooses the private or the system `ydotoold` and migrates the unit.
+- `ydotool/*.json` — Identity of the Ubuntu 24.04 `ydotool` client that the private daemon pairs with.
+- `ibus/voco.xml`, `ibus/voco-ibus-engine` — IBus component and engine launcher.
+- `chromium/com.voco.exact_field.json` — Native messaging host manifest.
+- `tauri/VOCO.desktop`, `tauri/com.sergiopesch.voco.metainfo.xml` — Desktop entry and AppStream metadata.
+- `debian/postinst.py.in` — The package's only maintainer action: repairs group-writable VOCO directories to 0755.
+- `published-release.json` — The version the README installs.
+
+## Scripts: `scripts/`
+
+### Build and packaging
+
+- `setup.sh` — Prepares a development checkout; `--install` builds, packages and installs the complete package.
+- `build-desktop.sh` — Builds the renderer, the browser host and the base Debian bundle.
+- `package-nvidia.py` — Turns the base package into the complete one: speech runtime, private `ydotoold` and its launcher, notices, documentation and the maintainer script.
+- `package-gnome-panel.py` — Builds a reproducible companion zip.
+- `build-legacy-ydotool.py` — Builds the private `ydotoold` from `vendor/ydotool-legacy`.
+- `provision-ci-speech.sh` — Copies the speech payload of a checksum-pinned published package into `runtime/speech/` for CI.
+- `debian_maintainer.py` — Generates and checks the maintainer script.
+- `sync-installer-ui.py`, `lib/install-ui.sh`, `lib/install-apt-ui.py`, `lib/install-brand.json` — Installer interface sources embedded in `install`.
+- `lib/install-common.sh` — Install steps for `setup.sh --install`, with its own test.
+- `lib/test-speech-runtime.sh` — Speech runtime setup for disposable test desktops.
+
+### Checks
+
+- `test-unit.sh` — `npm test`: fast checks that need no microphone, speech model or desktop session.
+- `check-devops.sh`, `check-shell-syntax.sh`, `check-version-consistency.mjs` — Repository, shell and version checks.
+- `verify-deb-package.sh`, `verify-speech-payload.py`, `verify-legacy-input-package.py` — Package contents.
+- `verify-speech-engine.py` — Checks that shipping source and dependency metadata don't reference the retired Whisper recognizer.
+- `verify-glib-backport.py`, `verify-shortcut-backport.py`, `verify-tray-backport.py` — Vendored crate provenance and resolution.
+- `verify-native-capture-audit.py` — Checks a capture audit bundle.
+
+### Release
+
+- `assemble-release.sh` — Packages, verifies and signs one release from a signed tag on the maintainer's Linux computer. It uploads nothing.
+- `sign-release-checksums.sh` — Detached, armored signatures for checksum lists, on the maintainer's computer.
+- `verify-release.sh` — Offline checksum and signature verification.
+- `test-verify-release.sh` — Signs and verifies with a throwaway key.
+- `rehearse-release.sh`, `render-release-body.sh` — Local release checks, and the GitHub release notes.
+
+### Speech evaluation
+
+- `test-speech-baseline.mjs` — Accuracy and continuity gate on the public corpus.
+- `evaluate-dictation-worker.py` — Replays the public fixtures through the worker with chosen settings.
+- `speech-score.mjs`, `speech-integrity.mjs`, `score-dictation-worker.mjs` — Word error rate and integrity scoring.
+- `dictation-quality.mjs`, `dictation-quality-cli.mjs`, `comparative-dictation.mjs` — Extra quality metrics and comparisons.
+- `test-speech-continuity.mjs`, `audio_continuity.py` — Continuity checks for lost audio.
+- `browser-long-accuracy.mjs`, `browser-capture-lifecycle.mjs` — Long-recording helpers for the browser tests.
+- `speech_worker.py` — Bounded JSON framing for evaluation workers.
+- `typesafe-evaluate.py`, `prepare-physical-speech-session.py` — Research tooling; see the [evaluation protocol](../testing/typesafe-evaluation.md).
+- `*.test.mjs` next to these files — Their unit tests.
+
+### Reports
+
+- `report-performance.py`, `report-speech-performance.py`, `report-dictation-quality-events.py`, `report-typesafe-evaluation.py`, `report-linux-runtime.sh` — Summaries of the opt-in logs and runtime state.
+
+### Desktop and integration tests
+
+- `test-private-ibus-engine-hosted.sh` — Entry point for the private desktop suites in CI.
+- `test-private-ibus-engine.py`, `test-private-ibus-engine.sh` — IBus engine on a headless IBus daemon.
+- `test-gnome-panel.py`, `test-gnome-panel.sh`, `test-panel-model.mjs`, `test-panel-setup.py` — GNOME companion.
+- `test-application-delivery.py`, `test-application-delivery.sh` — Paste into real applications on a private desktop.
+- `test-browser-delivery.mjs`, `test-browser-full-app.mjs`, `test-browser-full-app.sh`, `test-browser-toolbar-app.mjs`, `test-browser-toolbar-app.sh`, `test-browser-toolbar-action.py` — Chromium paste, exact field and toolbar.
+- `test-chromium-exact-field.mjs`, `chromium-background.test.cjs`, `chromium-content-lifecycle.test.cjs` — Extension scripts.
+- `test-native-desktop.py`, `test-native-desktop.sh`, `test-native-full-app.py`, `test-native-atspi.py`, `test-native-recovery-controls.py` — GTK and WebKit fields in a private X11 session.
+- `test-native-wayland.py`, `test-native-wayland.sh` — Wayland toolkit and lifecycle checks.
+- `test-native-gnome.py`, `test-native-gnome.sh`, `test_native_crash_review.py`, `test_native_cursor_capture.py`, `test_native_onboarding_capture.py` — The packaged app in a private GNOME session.
+- `test-native-kde.py`, `test-native-kde.sh`, `test-native-kde-identity.py` — KWin and Plasma in a private session.
+- `test-native-capture-callbacks.py`, `test-native-capture-pulse-latency.py`, `native-capture-lifecycle.test.c`, `test-native-capture-renderer.mjs`, `test_verify_native_capture_audit.py` — Native capture.
+- `test-dictation-renderer.mjs`, `test-microphone-app-renderer.mjs`, `test-brand-motion.mjs`, `audio-worklet-capture.test.mjs` — Renderer and AudioWorklet.
+- `test-ydotool-service.py`, `test-legacy-ydotool.py`, `test-legacy-ydotool-daemon.py` — Input service selection and the private daemon.
+- `test-speech-package.py`, `test-speech-worker.py`, `test-audio-continuity.py`, `test-physical-speech-session.py` — Speech packaging and worker pipes.
+- `test-install-apt.py`, `test-install-common.sh`, `test-install-journey.py`, `test-install-launch.py`, `test-install-performance.py`, `test-install-prefetch.py`, `test-install-presentation.py` — Installer.
+- `test-glib-variant.py`, `test-debian-maintainer.py`, `test-check-shell-syntax.py`, `test-report-dictation-quality-events.py`, `test-report-performance.py`, `test-report-speech-timing.py`, `test-typesafe-evaluation.py` — Other checks.
+- `fixtures/*` — Test-only helpers: synthetic fields, a nested `ydotool`, probe extensions and a syscall shim. None is installed.
+
+### Brand
+
+- `generate-icons.py`, `generate-brand-banner.py`, `prepare-brand-masters.py` — Icons, the README banner and brand masters.
+
+## Test fixtures: `tests/`
+
+- `fixtures/speech/*` — Public development speech corpus; see its [README](../../tests/fixtures/speech/README.md).
+- `fixtures/speech/adversarial/*` — Held-out speakers; see its [README](../../tests/fixtures/speech/adversarial/README.md).
+- `fixtures/installer/*` — Installer test fixtures.
+- `fixtures/typesafe/calibration.json` — Synthetic calibration cases for the evaluation tooling.
+
+## Vendored code: `vendor/`
+
+- `glib/`, `global-hotkey/`, `tray-icon/` — Patched crates, each with a `VOCO-PATCH.md`; see [Security](../security/README.md#dependency-policy).
+- `ydotool-legacy/` — Source of the private `ydotoold` and libuInputPlus.
+- `provenance/`, `README.md`, `THIRD-PARTY-NOTICES.txt` — Provenance and notices.
+
+## Brand assets: `assets/`
+
+- `voco-logo.png` — Square primary logo, the source of the larger app icons.
+- `voco-symbol.png` — Simplified symbol, the source of icons up to 64 px.
+- `voco-symbol-ui.png` — 128 px symbol that the window and the GNOME companion show.
+- `voco-readme-banner.svg` — README banner, written by `scripts/generate-brand-banner.py`.
+- `brand-sources/*` — Source images for the logo, the symbol and the two window textures, with notes on the textures. [Branding](../branding.md) covers their use.
+
+## Repository root
+
+- `README.md`, `AGENTS.md`, `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`, `LICENSE` — Overview, agent and contributor guides, security policy, code of conduct and licence.
+- `install` — Guided installer for the signed release package.
+- `KEYS` — Release signing key.
+- `package.json` — Root npm scripts, including `npm test`, `test:ibus`, `test:speech-baseline`, `verify:security` and `verify:devops`.
+- `package-lock.json`, `.nvmrc` — Pinned npm dependencies, and Node 24.
+- `.editorconfig`, `.gitattributes`, `.gitignore` — Editor settings, LF line endings with byte-exact vendored files and notices, and ignored paths.
+- `.github/workflows/ci.yml` — CI on pull requests and pushes to the default branch.
+- `.github/dependabot.yml` — Weekly Cargo, npm and GitHub Actions updates.
+- `.github/CODEOWNERS`, `.github/PULL_REQUEST_TEMPLATE.md`, `.github/ISSUE_TEMPLATE/*` — Review owner, pull request template and issue forms.
+- `docs/` — Documentation; the [index](../README.md) lists every guide.
+
+## Command line
+
+`voco` with no arguments starts VOCO, or presents the running instance. If it
+can't start, it prints "VOCO could not start: …", shows a notification and
+exits 1.
+
+| Option | Behaviour | Exit status |
 | --- | --- | --- |
-| App orchestration and native IPC | `apps/desktop/src-tauri/src/lib.rs` | Command registration, startup, model readiness, cursor delivery and shared limits. Keep platform authority in Rust. |
-| UI | `apps/desktop/src/components/`, `src/store/` | Tray-associated controls, status, setup and recovery. No model inference or OS simulation in React. |
-| Capture | `apps/desktop/src/lib/audioInput.ts`, `audioCaptureBuffer.ts`, `audioCaptureFlush.ts`, `nativeCapture.ts`; `src-tauri/src/native_capture/` | The .43 candidate selects native capture on Wayland and browser capture on X11. The .44 candidate resolves and grants the default source on an explicit Start Test/recording action; manual selection remains available in settings. Preserve sample ownership and drain ordering. |
-| Desktop capture tail | `src/lib/desktopCaptureTail.ts` | Append-only sample accounting and Stop-tail forwarding into the NVIDIA queue. Do not recopy an already streamed recording. |
-| Speech runtime | `runtime/speech/` | Selected pinned CPU runtime, bounded local protocol, content-free metrics. Model/native artifacts are provisioned separately from Git. |
-| Desktop paste | `src-tauri/src/insertion.rs` | One Shift+Insert gesture into whatever has focus, bounded helpers, no uncertain automatic retry. |
-| Desktop input service | `src-tauri/src/desktop_input_setup.rs`, `packaging/ydotool/`, `vendor/ydotool-legacy/` | One installed system client; exact legacy identity selects the private daemon. Only the installed Wayland app can migrate its unmodified service while holding the single-instance guard. No package-hook session mutation. |
-| Desktop notifications | `src-tauri/src/desktop_notifications.rs` | Retain the session D-Bus sender for VOCO's lifetime so GNOME can display registered-app notifications. Use the VOCO icon, normal desktop notification policy, bounded requests and finite error events; service acceptance does not prove banner visibility. |
-| Shortcuts | `src-tauri/src/hotkey_state.rs`, `shortcut_arbitration.rs`, `shortcut_readiness.rs`, `owned_preedit.rs` and IBus resources | Admit one trigger. The optional IBus component does not authorize generic text mutation or switch the owner's input source. |
-| Shortcut arbitration | `src-tauri/src/shortcut_arbitration.rs`; registration/readiness and `suppress_passive_shortcut` in `lib.rs` | Completed IBus authority controls registration. Passive evdev also guards pending polls; an already-consuming X11 callback keeps shared debounce without that passive suppression. X11 global callbacks admit a matched press/release pair on release, after the temporary root keyboard grab; stale bindings and backend changes cancel the pending pair. |
-| X11 actor wakeup | `vendor/global-hotkey/src/platform_impl/x11/{mod.rs,wake.rs}` | Wait on X fd and queued-command signal; drain buffered events before sleeping. No 50 ms periodic idle wakeup. Preserve error health. Paths are repository-relative. |
-| Renderer replacement | `src-tauri/src/lib.rs` PageLoad Started, `crash_recovery.rs` | Increment the renderer epoch so the previous renderer's journal writes become stale, and close the IBus channel so the engine drops the previous renderer's armed shortcut before the replacement renderer starts. |
-| Explicit browser field | `integrations/chromium/`, `src-tauri/src/browser_{broker,protocol,socket}.rs`, `src-tauri/src/bin/voco-browser-host.rs` | Explicit tab/field authorization, private same-user transport, ordered bounded receipts. Separate from ordinary desktop paste. |
-| Audio transport | `src-tauri/src/native_capture_commands.rs`, `native_capture/retained.rs` | Validate binary headers, sample counts and finite values before retaining. |
-| Config and process lifecycle | `src-tauri/src/config.rs`, `single_instance.rs`, `trigger_socket.rs`, `process_runner.rs` | Private state, exclusive process ownership, bounded helper execution and reaping. |
-| Diagnostics | `src-tauri/src/performance.rs`, `runtime/speech/streaming.py::Metrics`, `scripts/report-*.py` | Bounded local logs; failures cannot stall dictation. Reports distinguish successful events, failures and unavailable evidence. |
-| Read-only setup checks | `src-tauri/src/main.rs`, `lib.rs` | `--check-desktop-input` verifies input prerequisites; `--check-panel` checks the GNOME companion. Neither records, changes the clipboard or sends keys. |
-| Build/package | `scripts/build-desktop.sh`, `package-nvidia.py`, `verify-deb-package.sh`, `verify-speech-payload.py`, `packaging/` | Build matching application/host; require pinned complete payload; validate before publishing an artifact. |
-| Quality evidence | `scripts/test-*`, `scripts/dictation-quality*`, `tests/fixtures/`, `docs/testing/` | Tests/reports, not application features. Keep public fixtures separate from private owner recordings. |
+| `--toggle` | Asks the VOCO running in this session to start or stop. It doesn't launch VOCO, change focus or confirm the recording state. | 1 if VOCO's socket can't be reached |
+| `--check-desktop-input` | Checks the input helpers without launching VOCO or sending keys. | 1 on failure |
+| `--setup-desktop-input` | Updates VOCO's packaged input service. VOCO must be closed. | 1 on failure |
+| `--check-panel` | Checks the GNOME companion without changing settings. | 2 unless the companion is active, the desktop isn't GNOME, or GNOME isn't version 46; 1 on error |
+| `--setup-panel` | Enables the packaged GNOME 46 companion for this user. It may need a sign-out and never restarts Shell. | As for `--check-panel` |
+| `--version` | Prints `VOCO` and the version. | 0 |
+| `--help`, `-h` | Prints usage. | 0 |
 
-Unprefixed `src-tauri/` and `src/` paths in the table are under `apps/desktop/`.
-The repository also contains package-channel experiments, static brand assets,
-vendored native dependencies and historical specifications. Follow current release
-gates; a draft file is not evidence that its channel or feature is shipped.
-
-## GNOME panel presentation
-
-`integrations/gnome/` contains the GNOME 46 panel extension, bundled in the Debian package.
-`src-tauri/src/panel.rs` owns its leased session-bus connection; `tray.rs` derives
-state from the same authoritative snapshot as the native tray. `App.tsx` forwards
-only the normalized meter level during recording. No transcript or audio samples
-are sent to the panel. See the [integration contract](../../integrations/gnome/README.md).
-
-## Where to put a change
-
-Keep changes in the component that owns the invariant. Do not add parallel frontend
-state for a fact already owned by the queue or worker. Before deleting apparently
-unused code, check the browser delivery and gated capture routes.
-Avoid changing model, context, thread count or gate parameters without matched
-accuracy and latency evidence. Do not equate fewer lines with less runtime work.
-
-Comments should explain boundaries, ordering, ownership and reasons a simpler-looking
-alternative is unsafe. Name the current behavior directly; avoid narrating obvious
-syntax or leaving obsolete migration stories. Tests should exercise consequences:
-Stop-tail retention, late callbacks, worker recovery, malformed transport, protected
-files and uncertain delivery. Preserve original failing evidence and rerun into a
-fresh output directory after a fix.
-
-## Verification path
-
-Run focused regression tests for changed components, then typecheck, lint, full
-frontend/Python tests, Rust tests/Clippy and production package verification. For
-release candidates run the exact packaged binary with a private virtual microphone,
-controlled destination and independent field readback. Distribution userspace,
-package-manager integration and actual compositor/physical-device tests are separate
-coverage levels. See [testing](../testing/README.md), [packaging](../linux-packaging.md)
-and [release gates](../release-candidate.md).
-The current strict Stop matrix selects 34 passing cases from 35 attempts; preserve
-its excluded coverage-precondition failure and exact fixture identities. Final
-Debian/RPM/Arch qualification uses external per-artifact install/parity/remove
-receipts, including executable/runtime parity with validation C. Packaged source
-docs describe the contract; they do not contain a self-referential package hash.
-For userspace fixtures, assert the route actually owning the shortcut: Ubuntu/Debian
-used root X11 restoration; Fedora/Mint/Omarchy used verified IBus retriggering.
-All five selected cases passed from eight attempts. An inappropriate universal
-root-binding assertion is a fixture failure, not proof an IBus shortcut is broken.
-
-Native Fedora/Arch candidate metadata is generated by `scripts/stage-native-packages.py`;
-`scripts/test-native-staging.py` checks translation boundaries and
-`scripts/verify-native-install.py` verifies exact payload identity inside disposable containers.
-These do not change the recognition or delivery pipeline.
-
-The glib 0.18.5 dependency is pinned under `vendor/glib` with an upstream iterator
-safety backport. `verify-glib-backport.py` checks its full source and resolution;
-`test-glib-variant.py` runs the optimized regression without launching the app.
-
-The .43 candidate adds `voco --toggle` in `src-tauri/src/main.rs`, calling the
-existing owner-only trigger transport. It uses one nonblocking connection; no
-retry, GUI startup or recording-state acknowledgment is implied. Native packaging
-selects Fedora/openSUSE dependency profiles explicitly and preserves license files
-when RPM excludes ordinary documentation. See [Linux support](../linux-support.md).
-
-### Onboarding recognition
-
-`Onboarding.tsx` presents the default devices, input meter and test transcript.
-The `onboarding:test` trigger reuses `dictationRecording.ts` and
-`BenchmarkPhraseQueue` with an output callback that never touches another app.
-Capture and final recognition must complete before onboarding is saved.
-VOCO then calls `get_desktop_input_status`: a fresh, bounded input-helper
-check with no key injection or clipboard mutation. For Alt+D and Alt+Shift+D on
-GNOME Wayland, a missing or outdated companion adds a recommendation
-(`setupArea: "panel"`) from a companion check that may be reused for up to 20
-seconds. It never blocks: without the companion, the focused app also
-receives the shortcut. `get_desktop_paste_status` reports the same recording
-prerequisites when normal dictation begins; each paste then targets whatever has
-focus. `voco --check-desktop-input` checks input helpers only, without launching
-the GUI.
-
-Setup failures happen before capture. They preserve the approved microphone's
-readiness; only an attempted capture startup can invalidate it, with the existing
-native generation/selection ownership checks.
-
-### Desktop paste
-
-`insertion.rs::desktop_paste` copies each chunk to CLIPBOARD, then PRIMARY (best
-effort), and sends one Shift+Insert gesture to whatever has keyboard focus. A
-single leading joining space is its own Space key, and ASCII controls become
-spaces, so no chunk can press Enter. On Wayland it first waits at most 1.5 seconds
-for released shortcut modifiers, from evdev or the GNOME companion's
-`ModifiersClear`; unknown state does not block and a timeout sends no keys.
-`copy_desktop_text` sets both selections without keys for the Stop remainder.
-[Desktop paste](../testing/desktop-paste.md) describes the X11 application and
-Chromium suites. The dated [application matrix](../testing/application-delivery-2026-09-22.md)
-records the retired focus-verified route.
-
-### Transcript diagnostics and microphone feedback
-
-`benchmarkPhraseQueue.ts::textLengths` counts UTF-16 units, UTF-8 bytes and Unicode
-scalars without temporary full-transcript arrays. Quality fields are evaluated
-only when diagnostics are enabled and admitted by the existing bounded queue.
-`audioLevel.ts` maps centered RMS into a visual speech range; this never changes
-captured samples, recognition gain or model parameters. The same signal display
-serves onboarding and recording, preserving system motion/contrast preferences.
-
-### Panel setup and launcher handoff (.50)
-
-`panel_setup.rs` supervises the bounded `voco_gnome_panel.py` helper. Read-only
-checks distinguish missing, disabled, blocked, active and pending session restart.
-Only an explicit setup command changes this extension's activation; Debian hooks
-never change a user profile. `PanelSetup.tsx` presents the same result in setup/Help.
-
-`activation.rs` owns a separate private launcher socket; connections cannot toggle
-capture. Pending activation survives renderer initialization, then `App.tsx`
-presents idle UI through the existing guarded window transition. Starting,
-recording and processing refuse activation focus changes. The legacy `--toggle`
-transport retains its single-attempt contract.
-
-`tray_icons.rs` retains four state PNGs and 64 pre-rendered audio-meter PNGs in a
-private process directory. Worker updates release the state lock before dispatching
-GTK presentation on the main thread, so Shell requests cannot deadlock with it.
-A recording-only GLib timer smooths measured volume
-with a fast attack and short release, selects an existing frame, and stops at the
-recording boundary. Stale samples settle to silence; reduced motion uses direct
-level changes. No audio update writes another image or opens a window.
-The additive vendored tray-icon path API selects these without deleting older
-advertised paths. `tray.rs` suppresses equivalent presentation updates and exposes
-a menu status row; its adjacent label appears only for startup and setup problems
-and clears while dictating, so starting or stopping dictation from Ready never
-resizes the icon. State-token publication stays
-independent from native icon deduplication. Native Stop uses an explicit stop action.
-
-Onboarding swaps microphone selection into the existing setup canvas rather than
-stacking the form above the test. A successful explicit selection returns to the
-test; failed grants remain visible. Long device lists scroll only inside their
-selector, while setup controls fit the supported desktop canvas.
+Any other argument prints "Unknown arguments. Run voco --help for usage." and
+exits 2.

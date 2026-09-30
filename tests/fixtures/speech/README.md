@@ -1,54 +1,92 @@
-# Speech regression fixtures
+# Speech fixtures
 
-Eight untrimmed utterances from [LibriSpeech dev-clean](https://www.openslr.org/12/),
-copyright 2014 Vassil Panayotov, licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
-Reader names, original paths, references, and checksums are in `manifest.json`.
-Original corpus notice: `LICENSE.txt`. Audio was decoded losslessly from FLAC to
-16 kHz mono PCM16 WAV; words, timing, and samples were not edited.
+Eight clips of read English from
+[LibriSpeech dev-clean](https://www.openslr.org/12/), 71.01 seconds from eight
+readers. `npm run test:speech-baseline` streams them through the speech worker
+and the pinned Nemotron model to catch large recognition regressions, and
+desktop tests play some of them into a virtual microphone. Four clips from other
+speakers are in [adversarial/](adversarial/README.md).
 
-Selection was fixed before inference: first four speaker IDs numerically in each
-F/M category supplied by the corpus, then the first lexicographic utterance for
-each. This covers eight readers and 71.01 seconds, but only read English speech.
-It is a small smoke/regression corpus, **not** an independently representative
-dictation benchmark, demographic assessment, or evidence of category leadership.
-The reference comes from the corpus, never VOCO's output. Normalized WER ignores
-case/punctuation, retains lexical negation and digits, and reports S/D/I counts.
+## Source
 
-Predeclared smoke bounds: aggregate WER <=25%; each utterance <=50%; no empty
-speech results. The current gate uses the production Nemotron streaming worker
-with 100 ms packets and a final Stop flush. It also checks 18 repeated utterances
-for continuity, empty output for 10, 20 and 30 seconds of digital silence, and
-quiet speech, leading/trailing silence and a partial Stop packet. Retained
-canonical and preview settings in the manifest belong to historical decoder tests;
-the current runner does not exercise those retired modes.
-These deliberately broad bounds detect major regressions;
-they are not the desired accuracy target for the product. Extend the independent
-corpus with consented conversational speech, accents, quiet/noisy microphones,
-technical vocabulary, numbers, long pauses, and chunk boundaries before choosing
-any stronger model. Do not tune recognition to these eight clips.
+LibriSpeech is by Vassil Panayotov and is licensed under
+[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/); `LICENSE.txt` keeps
+the corpus notice. The selection is fixed: the first four speaker IDs, in
+numeric order, in each of the corpus's F and M categories, and each speaker's
+first utterance in lexicographic order, chosen before any recognition ran. Each
+WAV holds the corpus FLAC's samples, untrimmed, as mono 16-bit PCM at 16 kHz.
+The references are the corpus transcripts, in capitals without sentence
+punctuation, never VOCO's output. `manifest.json` records the archive, its MD5,
+the selection rule and `maxAggregateWer`, and for each clip the reader, speaker
+ID, category, archive member, FLAC and WAV SHA-256, reference, length and
+`maxWer`.
 
-Provision the [pinned Nemotron model and native payload](../../../docs/linux-packaging.md#runtime-provisioning),
-then run `npm run test:speech-baseline`. The default model path is
-`runtime/speech/models/nemotron-speech-streaming-en-0.6b.q8_0.gguf`;
-`VOCO_NEMOTRON_MODEL` may point to another absolute path containing the same
-SHA-256-pinned bytes. No model is changed or downloaded by the test. The runner
-uses `/usr/bin/python3` by default (`VOCO_PYTHON` can select another interpreter)
-and requires NumPy and psutil as well as the native runtime dependencies.
+## Speech baseline
 
-The runner accepts `--report /path/to/new-report.json` and refuses to overwrite
-existing evidence. CI uses `scripts/provision-ci-speech.sh` to extract the exact
-checksum-verified versioned release payload, then runs this gate and
-`runtime/speech/test_worker_protocol.py`. Ordinary `npm test` runs the source-level
-scorer, signal-gate, diagnostics and session-policy tests; Python unittest discovery
-does not execute the real-model protocol script. Rust tests are a separate gate.
+`scripts/test-speech-baseline.mjs` needs a provisioned `runtime/speech/`, as
+[runtime provisioning](../../../docs/linux-packaging.md#runtime-provisioning)
+describes, and never downloads a model. It stops unless
+`runtime/speech/models/nemotron-speech-streaming-en-0.6b.q8_0.gguf`, or the
+absolute path in `VOCO_NEMOTRON_MODEL`, matches the SHA-256 in
+`runtime/speech/MODEL-IDENTITY.json`. It runs `runtime/speech/stream_worker.py`
+with `/usr/bin/python3`, or the interpreter in `VOCO_PYTHON`, which needs NumPy
+and psutil.
 
-The gate rejects unknown manifest schemas, empty/duplicate fixture sets, unsafe
-paths, malformed checksums, invalid/missing limits, and references without words.
-Reports include the model, fixture manifest, worker entry script and native-build
-manifest SHA-256; checkout HEAD and dirty state at report time; per-clip transcripts,
-WER, sample and hypothesis counts, elapsed times; and continuity, silence and
-variant results. The entry-script hash does not cover its imported Python modules,
-and the native-build manifest hash does not independently verify native binaries;
-payload verification and the recorded source identity provide that context.
-These are direct recognition-engine checks. Native Tauri IPC, microphone capture,
-and target delivery require separate integration evidence.
+The runner checks the manifest's form, and each clip's SHA-256, that its path
+stays in this folder, and that it is a complete mono 16 kHz PCM16 WAV of
+`seconds` × 16,000 samples. It streams each clip in 100 ms packets, then asks
+for the final transcript. The worker must answer each request within 120
+seconds and only ever extend the text it has returned. The run passes when:
+
+- each clip returns words, with a word error rate of at most its `maxWer`, 0.5;
+- the rate over all clips together is at most `maxAggregateWer`, 0.25;
+- `84-121123-0000`, repeated 18 times with 250 ms of silence after each, comes
+  back word for word as 18 copies of its phrase;
+- 10, 20 and 30 seconds of digital silence return no text;
+- `84-121123-0000` still meets 0.5 at a tenth of its volume, and with one second
+  of silence before or after it;
+- the worker exits with status 0.
+
+The word error rate counts substituted, deleted and inserted words against the
+number of reference words, ignoring case and punctuation, as
+`scripts/speech-score.mjs` computes it. Every clip ends with a packet shorter
+than 100 ms, so each run covers the partial packet at Stop; the
+`partial-stop-packet` variant repeats the short clip unchanged.
+
+```bash
+npm run test:speech-baseline -- --report /tmp/voco-speech-baseline.json
+```
+
+`--report` writes a new file and refuses an existing one. The report records
+the SHA-256 of the model, the manifest, `stream_worker.py` and
+`NATIVE-BUILD.json`, the Git commit and whether the tree had changes, and each
+transcript, score, sample count and elapsed time. CI provisions the runtime
+with `scripts/provision-ci-speech.sh`, runs the baseline with `--report` and
+keeps the report for 7 days in the `speech-regression-evidence` artifact.
+
+## Other tests
+
+- `npm test` checks the manifest and the format and length of every WAV here,
+  without a model, in `scripts/speech-score.test.mjs`, and uses
+  `84-121123-0000.wav` in other tests.
+- Desktop tests play `84-121123-0000.wav`, and `1462-170138-0000.wav` for longer
+  recordings. With `VOCO_BROWSER_LONG_CAPTURE=1`, the browser tests join clips in
+  manifest order to at least 37 seconds, with 250 ms of silence after each, and
+  hold the typed text to `maxAggregateWer`.
+- `scripts/evaluate-dictation-worker.py` replays these clips by default, as
+  [TypeSafe evaluation](../../../docs/testing/typesafe-evaluation.md) describes.
+  [Testing](../../../docs/testing/README.md) lists every suite.
+
+## Known limits
+
+- Eight clean clips of read English catch large regressions. They don't measure
+  dictation accuracy, and say nothing about accents, noise, microphones,
+  conversation, numbers or technical words.
+- The bounds are broad on purpose and stay fixed, like the clips. Don't tune
+  recognition to them.
+- The references are in capitals without sentence punctuation, so nothing here
+  scores case or punctuation.
+- The baseline tests the worker alone, not capture, Tauri IPC or paste.
+- The runner checks only the form of the manifest's `modelSha256`; the model's
+  hash comes from `MODEL-IDENTITY.json`. The worker hash in the report covers
+  `stream_worker.py`, not the modules it imports.
