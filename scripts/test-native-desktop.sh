@@ -60,12 +60,7 @@ TRACE
 
     chmod 755 "${TEST_ROOT}/data/voco/models"
 
-    output_mode=${VOCO_NATIVE_OUTPUT_MODE:-final-text-only}
-    case "$output_mode" in
-      final-text-only|stable-cursor-streaming|preview-overlay-only) ;;
-      *) echo "Unsupported native test output mode: $output_mode" >&2; exit 1 ;;
-    esac
-    printf '{"onboardingCompleted":true,"liveCursorMode":"%s","transcriptTarget":"cursor","transcriptEnhancement":"off","hotkey":"Alt+D"}\n' "$output_mode" >"${TEST_ROOT}/config/voco/config.json"
+    printf '%s\n' '{"onboardingCompleted":true,"hotkey":"Alt+D"}' >"${TEST_ROOT}/config/voco/config.json"
     export VOCO_NATIVE_AUDIO=1
   fi
   if [[ "${VOCO_NATIVE_AUDIO:-}" == 1 ]]; then

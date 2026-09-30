@@ -132,7 +132,6 @@ try {
   if (process.env.VOCO_BROWSER_TOOLBAR_PROBE_ONLY !== '1') {
   for (const reject of (process.env.VOCO_BROWSER_LONG_CAPTURE === '1' ? [] : [false, true])) await shortCase(reject);
   if (process.env.VOCO_BROWSER_LONG_CAPTURE === '1') {
-    assert.equal(process.env.VOCO_NATIVE_OUTPUT_MODE, 'stable-cursor-streaming');
     await page.reload(); await page.bringToFront();
     await activateToolbar();
     await worker.evaluate(() => { if (!globalThis.observedNativePorts) globalThis.observedNativePorts = new WeakSet(); if (!globalThis.observedNativePorts.has(native)) { globalThis.observedNativePorts.add(native); native.onMessage.addListener(m => { if (['claim', 'append', 'cancel'].includes(m.type)) globalThis.nativeRequestMetadata.push({type:m.type,sequence:m.sequence,expectedCommittedCharacters:m.expectedCommittedCharacters,textCharacters:typeof m.text==='string'?Array.from(m.text).length:null,final:m.final}); }); } });
@@ -148,16 +147,16 @@ try {
     await page.locator('#b').focus();
     const prefix=await page.locator('#a').inputValue(); assert.ok(prefix.length>0);
     assert.equal(await played,0); await delay(600); await page.keyboard.press('Alt+Shift+v');
-    await until(async()=> (await traces()).slice(traceStart).some(t=>t.event==='dictation_desktop_remainder_copied'),'canonical focus-loss remainder copied',45_000);
-    await until(async()=> (await traces()).slice(traceStart).some(t=>t.event==='dictation_stop_to_idle'),'canonical finalization returns idle');
+    await until(async()=> (await traces()).slice(traceStart).some(t=>t.event==='dictation_desktop_remainder_copied'),'long focus-loss remainder copied',45_000);
+    await until(async()=> (await traces()).slice(traceStart).some(t=>t.event==='dictation_stop_to_idle'),'long dictation returns idle');
     assert.equal(await page.locator('#a').inputValue(),prefix); assert.equal(await page.locator('#b').inputValue(),'');
     const copied = execFileSync('xclip', ['-selection', 'clipboard', '-o'], {encoding: 'utf8', timeout: 5000});
     const report = scoreLongDelivery(longPlan, prefix, copied);
     await fs.writeFile(`${root}/evidence/long-accuracy.json`, JSON.stringify({plan: longPlan, prefix, copied, ...report}, null, 2));
     assert.ok(report.passed, `The kept prefix plus the copied remainder must meet the frozen full-reference WER and repetition checks: ${report.failures.join('; ')}`);
     results.push({case:'full-reference-long-accuracy', passed:report.passed, maxWer:longPlan.maxWer, score:report.score});
-    results.push({case:'canonical-checkpoint-focus-loss',passed:true,checkpointCharacters:Array.from(prefix).length,events:(await traces()).slice(traceStart).map(t=>t.event)});
-    await page.screenshot({path:`${root}/evidence/canonical-focus-loss.png`});
+    results.push({case:'long-focus-loss',passed:true,prefixCharacters:Array.from(prefix).length,events:(await traces()).slice(traceStart).map(t=>t.event)});
+    await page.screenshot({path:`${root}/evidence/long-focus-loss.png`});
   }
 
   // Nothing waits in VOCO after focus loss, so the next recording starts directly.
@@ -171,7 +170,7 @@ try {
 } finally {
   await fs.writeFile(`${root}/evidence/playback.json`, JSON.stringify(playbacks.map(p=>p.record),null,2));
   if (longCapture) await fs.copyFile(`${root}/long.wav`,`${root}/evidence/playback-long.wav`).catch(()=>{});
-  await fs.writeFile(`${root}/evidence/result.json`,JSON.stringify({appSha256:await hash(`${root}/voco`),hostSha256:await hash(`${root}/voco-browser-host`),modelSha256:await hash(`${root}/speech/models/nemotron-speech-streaming-en-0.6b.q8_0.gguf`),extensionHashes, outputMode: process.env.VOCO_NATIVE_OUTPUT_MODE || "final-text-only", tests:results, failure, harnessOnlyHostGrant:null, shippedManifestPreserved:await hash(`${extension}/manifest.json`)===extensionHashes['manifest.json']},null,2));
+  await fs.writeFile(`${root}/evidence/result.json`,JSON.stringify({appSha256:await hash(`${root}/voco`),hostSha256:await hash(`${root}/voco-browser-host`),modelSha256:await hash(`${root}/speech/models/nemotron-speech-streaming-en-0.6b.q8_0.gguf`),extensionHashes, tests:results, failure, harnessOnlyHostGrant:null, shippedManifestPreserved:await hash(`${extension}/manifest.json`)===extensionHashes['manifest.json']},null,2));
   if (worker) await fs.writeFile(`${root}/evidence/native-request-metadata.json`, JSON.stringify(await worker.evaluate(()=>globalThis.nativeRequestMetadata).catch(()=>[]), null, 2));
   await fs.copyFile(`${root}/state/voco/hotkey-trace.jsonl`,`${root}/evidence/hotkey-trace.jsonl`).catch(()=>{});
   if (browser) await browser.pages().at(-1)?.screenshot({path:`${root}/evidence/final-browser.png`}).catch(()=>{});

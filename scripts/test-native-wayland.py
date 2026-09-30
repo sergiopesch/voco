@@ -20,7 +20,7 @@ if len(sys.argv) > 2 and sys.argv[2] == '--manifest':
         'finishedAt': datetime.datetime.now(datetime.timezone.utc).isoformat(),
         'exitCode': int(sys.argv[3]),
         'files': {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(evidence.iterdir()) if p.is_file()},
-        'sourceHashes': {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in [Path(__file__), Path(__file__).with_suffix('.sh'), Path(__file__).with_name('test_native_wayland_capture.py')]},
+        'sourceHashes': {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in [Path(__file__), Path(__file__).with_suffix('.sh')]},
     }, indent=2) + '\n')
     sys.exit(0)
 if len(sys.argv) > 2:
@@ -104,29 +104,6 @@ try:
             report['clipboardProbe']['stderr'] = probe.stderr.read()
         if report['backend'] == 'nested-x11':
             assert report['clipboardProbe']['crossProcessReadbackVerified'], 'Nested Wayland clipboard round trip failed'
-    capture_requested = os.environ.get('VOCO_WAYLAND_CAPTURE') == '1'
-    pulse = None
-    if capture_requested:
-        assert report['backend'] == 'nested-x11' and report['clipboardProbe']['crossProcessReadbackVerified']
-        assert (root / 'voco').exists() and (root / 'speech/models/nemotron-speech-streaming-en-0.6b.q8_0.gguf').exists()
-        # Native capture connects only to the per-user socket and requires a
-        # PipeWire source serial, so the synthetic source declares one.
-        pulse_socket = Path(f'/run/user/{os.getuid()}/pulse/native')
-        os.environ.update(PULSE_SERVER='unix:' + str(pulse_socket),
-                          PULSE_SOURCE='voco_fixture', PULSE_SINK='fixture')
-        pulse = subprocess.Popen([os.environ['VOCO_WAYLAND_PULSEAUDIO'], '--daemonize=no', '--use-pid-file=no',
-                                  '--exit-idle-time=-1', '--disable-shm=true', '-n',
-                                  '--log-target=file:' + str(root / 'evidence/pulse.log'),
-                                  '-L', 'module-native-protocol-unix socket=' + str(pulse_socket) + ' auth-anonymous=1',
-                                  '-L', 'module-null-sink sink_name=fixture rate=48000',
-                                  '-L', 'module-remap-source master=fixture.monitor source_name=voco_fixture source_properties=object.serial=1'])
-        deadline = time.monotonic() + 5
-        while not pulse_socket.exists() and time.monotonic() < deadline:
-            assert pulse.poll() is None, 'Private PulseAudio exited'
-            time.sleep(.02)
-        assert pulse_socket.exists(), 'Private audio socket missing'
-        subprocess.run([os.environ['VOCO_WAYLAND_PACTL'], 'set-default-source', 'voco_fixture'], check=True, timeout=5)
-        (root / 'evidence/pulse-sources.txt').write_text(subprocess.check_output([os.environ['VOCO_WAYLAND_PACTL'], 'list', 'short', 'sources'], text=True, timeout=5))
     if (root / 'voco').exists():
         import gi
         gi.require_version('Atspi', '2.0')
@@ -168,7 +145,7 @@ try:
             call(name, menu, 'com.canonical.dbusmenu', 'Event', GLib.Variant('(isvu)', (item, 'clicked', GLib.Variant('s', ''), 0)))
         pump(.2)
         model = root / 'speech/models/nemotron-speech-streaming-en-0.6b.q8_0.gguf'
-        report['model'] = {'provided': model.exists(), 'decoderLoaded': False}
+        report['model'] = {'provided': model.exists()}
         if model.exists():
             report['model']['sha256'] = hashlib.sha256(model.read_bytes()).hexdigest()
         def visible_app(pid):
@@ -188,7 +165,7 @@ try:
             items.clear()
             with (root / f'evidence/app-{cycle}.log').open('w') as log:
                 app = subprocess.Popen([str(root / 'voco')], stdout=log, stderr=subprocess.STDOUT,
-                                       env={**os.environ, 'RUST_LOG': 'info', **({'VOCO_HOTKEY_TRACE': '1'} if capture_requested else {})})
+                                       env={**os.environ, 'RUST_LOG': 'info'})
                 try:
                     deadline = time.monotonic() + 15
                     while time.monotonic() < deadline and app.poll() is None and not (root / 'runtime/voco.sock').exists():
@@ -209,23 +186,14 @@ try:
                         pump(.1)
                         visible = visible_app(app.pid)
                     assert visible is not None, 'Tray Open did not expose a visible application window'
-                    if capture_requested and cycle == 0:
-                        from test_native_wayland_capture import run_capture
-                        report['capture'] = run_capture(root, app, pump, activate)
-                        report['model']['decoderLoaded'] = True
                     activate('Quit VOCO')
                     assert app.wait(timeout=10) == 0, 'Tray Quit was not clean'
-                    report['application'].append({'cycle': cycle + 1, 'startup': True, 'trayOpenInvoked': True, 'visibleWindow': visible, 'modelCacheReady': model.exists(), 'trayQuitExitCode': 0, 'recordingRequested': capture_requested and cycle == 0})
+                    report['application'].append({'cycle': cycle + 1, 'startup': True, 'trayOpenInvoked': True, 'visibleWindow': visible, 'modelCacheReady': model.exists(), 'trayQuitExitCode': 0})
                 finally:
                     if app.poll() is None:
                         app.terminate()
                     app.wait(timeout=10)
             # Do not remove stale sockets: the next launch must handle its own state.
-    if capture_requested:
-        assert report.get('capture', {}).get('passed'), 'Requested capture was not verified'
     report['passed'] = True
 finally:
-    if locals().get('pulse') is not None:
-        pulse.terminate()
-        pulse.wait(timeout=5)
     (root / 'evidence/results.json').write_text(json.dumps(report, indent=2) + '\n')

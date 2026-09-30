@@ -3,6 +3,10 @@
 set -euo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 if [[ ${1:-} != --inside ]]; then
+  if [[ ${VOCO_WAYLAND_CAPTURE:-0} == 1 ]]; then
+    echo "VOCO_WAYLAND_CAPTURE is retired: this harness checks the toolkit and tray lifecycle only. scripts/test-application-delivery.sh covers delivery." >&2
+    exit 2
+  fi
   : "${VOCO_WAYLAND_DEPS:?Set extracted Weston root/usr}"
   : "${VOCO_WAYLAND_EVIDENCE_DIR:?Set evidence directory}"
   backend=${VOCO_WAYLAND_BACKEND:-headless}
@@ -10,25 +14,12 @@ if [[ ${1:-} != --inside ]]; then
   if [[ "$backend" == nested-x11 ]]; then
     : "${VOCO_NATIVE_DEPS:?Nested backend requires extracted Xvfb dependencies}"
   fi
-  if [[ ${VOCO_WAYLAND_CAPTURE:-0} == 1 ]]; then
-    [[ "$backend" == nested-x11 ]] || { echo "Capture requires the private nested seat" >&2; exit 1; }
-    : "${VOCO_WAYLAND_APP_BINARY:?Capture requires an application}"
-
-    for helper in pulseaudio pactl paplay wl-copy wl-paste; do command -v "$helper" >/dev/null; done
-    export VOCO_WAYLAND_PULSEAUDIO="$(command -v pulseaudio)"
-    export VOCO_WAYLAND_PACTL="$(command -v pactl)"
-    export VOCO_WAYLAND_PAPLAY="$(command -v paplay)"
-  fi
   run=$(mktemp -d)
   trap 'status=$?; /usr/bin/python3 "$ROOT/scripts/test-native-wayland.py" "$run" --manifest "$status"; mkdir -p "$VOCO_WAYLAND_EVIDENCE_DIR"; cp -a "$run/evidence/." "$VOCO_WAYLAND_EVIDENCE_DIR/"; rm -rf "$run"; exit "$status"' EXIT
   mkdir -p "$run"/{home,runtime,config,cache,data,state,evidence,pulse}
   chmod 700 "$run/runtime" "$run/pulse"
   mkdir -p "$run/data/voco/models"
   chmod 755 "$run/data/voco" "$run/data/voco/models"
-  if [[ ${VOCO_WAYLAND_CAPTURE:-0} == 1 ]]; then
-    mkdir -p "$run/config/voco"
-    printf '%s\n' '{"onboardingCompleted":true,"liveCursorMode":"final-text-only","transcriptTarget":"cursor","transcriptEnhancement":"off","hotkey":"Alt+D"}' >"$run/config/voco/config.json"
-  fi
   if [[ -n ${VOCO_WAYLAND_APP_BINARY:-} ]]; then
     [[ -f "$VOCO_WAYLAND_APP_BINARY" && -x "$VOCO_WAYLAND_APP_BINARY" ]] || { echo "App must be an executable file" >&2; exit 1; }
     cp "$VOCO_WAYLAND_APP_BINARY" "$run/voco"

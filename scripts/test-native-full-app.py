@@ -3,9 +3,8 @@
 
 A private PulseAudio fixture feeds the real app, which copies each recognized chunk to
 CLIPBOARD and PRIMARY with xclip, then sends xdotool [Space] Shift+Insert to whatever has
-keyboard focus. Final-text-only streams exactly like stable-cursor-streaming: desktop paste
-sessions pin that legacy snapshot and the phrase queue pastes each appended suffix as it
-arrives; Stop pastes only what remains, into the field focused at that moment.
+keyboard focus. Each appended suffix is pasted as it arrives; Stop pastes only what
+remains, into the field focused at that moment.
 
 delivery: A keeps focus and receives the fixture words exactly once; B stays empty.
 focus-switch: the fixture plays with A focused; once A's streamed text settles, focus moves
@@ -325,7 +324,7 @@ finally:
     c = counts()
     capture = 'webkit-audio-worklet' if c['recording_worklet_connected'] else 'webkit-script-processor' if c['recording_script_processor_connected'] else 'native' if c['recording_state_active'] else None
     report = dict(passed=passed, failure=failure, expectedOutcome='pasted-into-focused-field', case=case,
-                  outputMode=os.environ.get('VOCO_NATIVE_OUTPUT_MODE', 'final-text-only'), buildRole=os.environ.get('VOCO_NATIVE_BUILD_ROLE', 'preflight'),
+                  buildRole=os.environ.get('VOCO_NATIVE_BUILD_ROLE', 'preflight'),
                   callbackTraceInstrumented=os.environ.get('VOCO_NATIVE_TRACE') == '1', expectedWords=expected,
                   text=field.get_text(), otherText=other.get_text(), textBeforeSwitch=before_switch,
                   mutations=[dict(m, t=round(m['t'] - t0, 3)) for m in mutations], preedits=[dict(p, t=round(p['t'] - t0, 3)) for p in preedits],

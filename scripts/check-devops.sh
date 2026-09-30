@@ -122,7 +122,7 @@ for path in (
     Path("scripts/test-native-wayland.py"),
     Path("scripts/test-native-gnome.py"),
     Path("scripts/test-native-kde.py"),
-    Path("scripts/test_native_wayland_capture.py"),
+    Path("scripts/audio_continuity.py"),
     Path("scripts/test_native_crash_review.py"),
     Path("scripts/test_native_cursor_capture.py"),
     Path("scripts/test_native_onboarding_capture.py"),

@@ -14,7 +14,7 @@ import wave
 
 def run_onboarding(root, app, pump, native_windows):
     from gi.repository import Atspi
-    from test_native_wayland_capture import capture_continuity, pcm16
+    from audio_continuity import capture_continuity, pcm16
 
     assert __debug__ and 'DISPLAY' not in os.environ
     assert os.environ['PULSE_SERVER'] == f'unix:/run/user/{os.getuid()}/pulse/native'

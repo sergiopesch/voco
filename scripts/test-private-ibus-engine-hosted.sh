@@ -76,11 +76,9 @@ fi
 
 if [[ "${1:-}" == --browser-application ]]; then
   browser_evidence="${VOCO_BROWSER_EVIDENCE_DIR}"
-  VOCO_NATIVE_OUTPUT_MODE=final-text-only VOCO_BROWSER_LONG_CAPTURE=0 \
-    VOCO_BROWSER_EVIDENCE_DIR="${browser_evidence}/final-text-only" \
+  VOCO_BROWSER_LONG_CAPTURE=0 VOCO_BROWSER_EVIDENCE_DIR="${browser_evidence}/short" \
     bash "${ROOT_DIR}/scripts/${TEST_SCRIPT}"
-  VOCO_NATIVE_OUTPUT_MODE=stable-cursor-streaming VOCO_BROWSER_LONG_CAPTURE=1 \
-    VOCO_BROWSER_EVIDENCE_DIR="${browser_evidence}/canonical-checkpoint" \
+  VOCO_BROWSER_LONG_CAPTURE=1 VOCO_BROWSER_EVIDENCE_DIR="${browser_evidence}/long" \
     bash "${ROOT_DIR}/scripts/${TEST_SCRIPT}"
 elif [[ "${1:-}" == --native-pulse-latency ]]; then
   mkdir -m 700 "${VOCO_NATIVE_PULSE_EVIDENCE_DIR}"
@@ -100,14 +98,10 @@ elif [[ "${1:-}" == --legacy-ydotool ]]; then
     --output "${VOCO_LEGACY_INPUT_EVIDENCE_DIR}"
 elif [[ "${1:-}" == --full-application ]]; then
   application_evidence="${VOCO_NATIVE_EVIDENCE_DIR}"
-  for output_mode in final-text-only stable-cursor-streaming; do
-    VOCO_NATIVE_APP_CASE=delivery VOCO_NATIVE_OUTPUT_MODE="${output_mode}" \
-      VOCO_NATIVE_EVIDENCE_DIR="${application_evidence}/${output_mode}" \
+  for app_case in delivery focus-switch; do
+    VOCO_NATIVE_APP_CASE="${app_case}" VOCO_NATIVE_EVIDENCE_DIR="${application_evidence}/${app_case}" \
       PYTHONDONTWRITEBYTECODE=1 bash "${ROOT_DIR}/scripts/${TEST_SCRIPT}"
   done
-  VOCO_NATIVE_APP_CASE=focus-switch VOCO_NATIVE_OUTPUT_MODE=final-text-only \
-    VOCO_NATIVE_EVIDENCE_DIR="${application_evidence}/focus-switch" \
-    PYTHONDONTWRITEBYTECODE=1 bash "${ROOT_DIR}/scripts/${TEST_SCRIPT}"
 else
   PYTHONDONTWRITEBYTECODE=1 bash "${ROOT_DIR}/scripts/${TEST_SCRIPT}"
 fi

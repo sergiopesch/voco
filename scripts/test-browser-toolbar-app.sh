@@ -39,9 +39,7 @@ MANIFEST
 
   chmod 755 "$test_root/data/voco/models"
 
-  output_mode=${VOCO_NATIVE_OUTPUT_MODE:-final-text-only}
-  case "$output_mode" in final-text-only|stable-cursor-streaming) ;; *) echo 'Unsupported browser output mode' >&2; exit 1;; esac
-  printf '{"onboardingCompleted":true,"liveCursorMode":"%s","transcriptTarget":"cursor","transcriptEnhancement":"off","hotkey":"Alt+D"}\n' "$output_mode" > "$test_root/config/voco/config.json"
+  printf '%s\n' '{"onboardingCompleted":true,"hotkey":"Alt+D"}' > "$test_root/config/voco/config.json"
   if [[ ${VOCO_BROWSER_LONG_CAPTURE:-0} == 1 ]]; then
     /usr/bin/python3 - "$repo/tests/fixtures/speech/manifest.json" "$test_root/long.wav" "$test_root/evidence/playback-manifest.json" "${VOCO_BROWSER_LONG_FIXTURE:-natural}" <<'PYWAV'
 import hashlib, json, pathlib, sys, wave
