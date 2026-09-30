@@ -9,8 +9,8 @@ ROOT=Path(__file__).resolve().parent
 class Nemotron:
     def __init__(self,context=1):
         backend=os.environ.get('VOCO_NEMO_BACKEND','pool')
-        if backend not in ('openmp','pool'):raise ValueError('unsupported backend')
-        self.lib=c.CDLL(str(ROOT/f'libbench_nemo_{backend}.so')); lib=self.lib
+        if backend != 'pool':raise ValueError('unsupported backend')
+        self.lib=c.CDLL(str(ROOT/'libbench_nemo_pool.so')); lib=self.lib
         def fn(name,args,result):
             f=getattr(lib,name); f.argtypes=args; f.restype=result; return f
         self.error=fn('nemo_speech_asr_last_error',[],c.c_char_p)
