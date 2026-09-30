@@ -20,14 +20,9 @@ vi.mock("@/store/useStore", async (importOriginal) => {
 const config: AppConfig = {
   hotkey: "Alt+D",
   selectedMic: null,
-  insertionStrategy: "auto",
-  transcriptTarget: "cursor",
-  liveCursorMode: "stable-cursor-streaming",
-  transcriptEnhancement: "off",
   onboardingCompleted: true,
   updateChannel: "stable",
   installChannel: "github-release",
-  voiceProfile: "default",
 };
 
 afterEach(() => {

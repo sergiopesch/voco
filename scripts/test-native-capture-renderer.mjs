@@ -169,18 +169,9 @@ try {
         window.config = {
             hotkey: 'Alt+D',
             selectedMic: null,
-            insertionStrategy: 'auto',
-            transcriptTarget: 'cursor',
-            liveCursorMode: 'final-text-only',
-            openclawAgent: 'main',
-            openclawPromptPrefix: '',
-            transcriptEnhancement: 'off',
-            localLlmEndpoint: 'http://127.0.0.1:8080/v1/chat/completions',
-            localLlmModel: null,
             onboardingCompleted: false,
             updateChannel: 'stable',
             installChannel: 'github-release',
-            voiceProfile: 'default'
         };
         window.nativeCommands=[];window.auditUploads=[];
         window.captureScenario=new URL(location.href).searchParams.get('scenario')||'enabled';

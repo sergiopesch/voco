@@ -40,7 +40,6 @@ import {
 } from "@/lib/tauri";
 import { useStore } from "@/store/useStore";
 import type {
-  AppConfig,
   CursorDeliveryState,
   DictationStatus
 } from "@/types";
@@ -90,7 +89,6 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
   const primedStreamPromiseRef = useRef<Promise<MediaStream> | null>(null);
   const audioBufferRef = useRef(createAudioCaptureBuffer());
   const sessionRef = useRef(createDictationSessionState());
-  const sessionConfigRef = useRef<AppConfig | null>(null);
   const phaseRef = useRef<DictationPhase>("idle");
   const workletModuleLoadedRef = useRef(false);
   const smoothedAudioLevelRef = useRef(0);
@@ -468,7 +466,6 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
       desktopPhrasePasteCountRef,
       activeTriggerIdRef,
       recoverySessionIdRef,
-      sessionConfigRef,
       nativeCaptureRef,
       captureDescriptorRef,
       captureSelectionRef,

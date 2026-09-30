@@ -83,7 +83,7 @@ const {useStore} = await import(storeImport);
 for (const weight of [400,500,600,700]) await import('/@fs/' + ${JSON.stringify(root)} + '/node_modules/@fontsource/geist/latin-' + weight + '.css');
 await import('/src/styles.css');
 window.store = useStore;
-const config = {hotkey:'Alt+D',selectedMic:null,insertionStrategy:'auto',transcriptTarget:'cursor',liveCursorMode:'final-text-only',transcriptEnhancement:'off',onboardingCompleted:true,updateChannel:'stable',installChannel:'github-release',voiceProfile:'default'};
+const config = {hotkey:'Alt+D',selectedMic:null,onboardingCompleted:true,updateChannel:'stable',installChannel:'github-release'};
 useStore.getState().setConfig(config); useStore.getState().setSurface('popover');
 const noop = async () => {};
 function Harness() {

@@ -32,7 +32,7 @@ function Fixture() {
   const [status, setStatus] = useState<DictationStatus>(["starting", "recording", "processing", "error"].includes(initial) ? initial as DictationStatus : "idle");
   const [selected, setSelected] = useState<NativeCaptureSource | null>(params.get("surface") === "popover" ? sources[0] ?? null : null);
   const [section, setSection] = useState<ComponentProps<typeof ControlPanel>["requestedSection"]>("Audio");
-  const [config, setConfig] = useState<ComponentProps<typeof ControlPanel>["config"]>({ hotkey: "Alt+D", selectedMic: null, insertionStrategy: "auto", transcriptTarget: "cursor", liveCursorMode: "stable-cursor-streaming", transcriptEnhancement: "off", onboardingCompleted: false, updateChannel: "stable", installChannel: "github-release", voiceProfile: "default" });
+  const [config, setConfig] = useState<ComponentProps<typeof ControlPanel>["config"]>({ hotkey: "Alt+D", selectedMic: null, onboardingCompleted: false, updateChannel: "stable", installChannel: "github-release" });
   return <ControlPanel surface={surface} config={config} dictationStatus={status}
     statusLabel={status === "recording" ? "Listening" : status === "starting" ? "Getting ready" : status === "processing" ? "Finishing" : status === "error" ? "Needs attention" : "Ready to listen"}
     errorMessage={initial === "error" ? "The test could not finish. Try again when your microphone is ready." : null}

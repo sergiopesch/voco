@@ -43,7 +43,7 @@ function harness() {
   const queue = ref<{ finish(): Promise<{ undelivered: string; uncertain?: boolean }>; cancel(): void } | null>(null);
   const pasteSession = ref(false);
   const state = {
-    config: { transcriptTarget: "cursor", transcriptEnhancement: "off" },
+    config: { hotkey: "Alt+D" },
     recovery: null as unknown, transcript: "", setCaptureNotice: vi.fn(),
     setSurface: vi.fn(),
     setRecovery: vi.fn((value: unknown) => { state.recovery = value; }),
@@ -74,7 +74,6 @@ function harness() {
     desktopPhrasePasteCountRef: ref(0),
     activeTriggerIdRef: ref<string | undefined>(undefined),
     recoverySessionIdRef: ref<string | null>(null),
-    sessionConfigRef: ref(null),
     nativeCaptureRef: ref(null),
     captureDescriptorRef: ref(null),
     captureSelectionRef: ref(captureSelection),

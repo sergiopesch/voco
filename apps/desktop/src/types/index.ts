@@ -1,34 +1,13 @@
-export type InsertionStrategy = "auto" | "clipboard" | "type-simulation";
-export type TranscriptTarget =
-  | "cursor"
-  | "local-agent"
-  | "openclaw-agent"
-  | "openclaw-speech";
-export type TranscriptEnhancement = "off" | "conservative" | "commands-only";
-export type LiveCursorMode =
-  | "stable-cursor-streaming"
-  | "preview-overlay-only"
-  | "final-text-only";
 export type UpdateChannel = "stable" | "beta";
-export type InstallChannel =
-  | "github-release"
-  | "appimage"
-  | "source"
-  | "flatpak"
-  | "snap";
-export type VoiceProfile = "default" | "accent-aware";
+/** Only chooses which update instructions Settings shows. */
+export type InstallChannel = "github-release" | "source";
 
 export interface AppConfig {
   hotkey: string;
   selectedMic: string | null;
-  insertionStrategy: InsertionStrategy;
-  transcriptTarget: TranscriptTarget;
-  liveCursorMode: LiveCursorMode;
-  transcriptEnhancement: TranscriptEnhancement;
   onboardingCompleted: boolean;
   updateChannel: UpdateChannel;
   installChannel: InstallChannel;
-  voiceProfile: VoiceProfile;
 }
 
 export interface ConfigSnapshot {

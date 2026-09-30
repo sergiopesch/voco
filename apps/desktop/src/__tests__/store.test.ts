@@ -76,14 +76,9 @@ describe("useStore", () => {
     const config = {
       hotkey: "Alt+D",
       selectedMic: null,
-      insertionStrategy: "auto" as const,
-      transcriptTarget: "cursor" as const,
-      liveCursorMode: "stable-cursor-streaming" as const,
-      transcriptEnhancement: "off" as const,
       onboardingCompleted: false,
       updateChannel: "stable" as const,
       installChannel: "github-release" as const,
-      voiceProfile: "default" as const,
     };
     useStore.getState().setConfig(config);
     expect(useStore.getState().config).toEqual(config);
@@ -94,14 +89,9 @@ describe("useStore", () => {
     const config = {
       hotkey: "Alt+D",
       selectedMic: null,
-      insertionStrategy: "auto" as const,
-      transcriptTarget: "cursor" as const,
-      liveCursorMode: "stable-cursor-streaming" as const,
-      transcriptEnhancement: "off" as const,
       onboardingCompleted: true,
       updateChannel: "stable" as const,
       installChannel: "github-release" as const,
-      voiceProfile: "default" as const,
     };
 
     useStore.setState({
@@ -121,14 +111,9 @@ describe("useStore", () => {
     const previousConfig = {
       hotkey: "Alt+D",
       selectedMic: null,
-      insertionStrategy: "auto" as const,
-      transcriptTarget: "cursor" as const,
-      liveCursorMode: "stable-cursor-streaming" as const,
-      transcriptEnhancement: "off" as const,
       onboardingCompleted: false,
       updateChannel: "stable" as const,
       installChannel: "github-release" as const,
-      voiceProfile: "default" as const,
     };
 
     expect(

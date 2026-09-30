@@ -210,20 +210,9 @@ export function ControlPanel({
   const shortcut = shortcutPresentation(config.hotkey, runtimeDiagnostics?.shortcut, desktopInput);
   // The tray tooltip keeps any readiness detail; the popover heading stays short.
   const statusHeading = desktopSetupError ? "Setup needed" : statusLabel.startsWith("Ready") ? "Ready" : statusLabel;
-  const updateInstallCopy = useMemo(() => {
-    switch (config.installChannel) {
-      case "appimage":
-        return "AppImage publication is paused while its packaging toolchain is being pinned. Choose the native package for your distribution on GitHub Releases, or rebuild from source for updates.";
-      case "source":
-        return "This build is treated as self-managed from source. Pull the repo and rebuild when you want to update.";
-      case "flatpak":
-        return "Flatpak distribution is not currently verified. Choose GitHub Release or Source for accurate update instructions.";
-      case "snap":
-        return "Snap distribution is not currently verified. Choose GitHub Release or Source for accurate update instructions.";
-      default:
-        return "This build is treated as a GitHub Release install. Download the native package for your distribution and install the next release manually.";
-    }
-  }, [config.installChannel]);
+  const updateInstallCopy = config.installChannel === "source"
+    ? "You build VOCO from source. To update, check out the newer release tag and rebuild."
+    : "VOCO only checks for updates; it never downloads or installs them. To update, run the newer release's installer from its release page.";
   const updateStatusCopy = useMemo(() => {
     switch (updateState.status) {
       case "checking":
@@ -243,18 +232,9 @@ export function ControlPanel({
       return null;
     }
 
-    switch (config.installChannel) {
-      case "appimage":
-        return `AppImage publication is paused. Choose the ${updateState.latestRelease.version} native package for your distribution on GitHub Releases, or rebuild that tag from source.`;
-      case "source":
-        return `Pull the repo, checkout ${updateState.latestRelease.version} or newer, and rebuild locally.`;
-      case "flatpak":
-        return "This legacy Flatpak setting is not a verified update path. Use the GitHub release instead.";
-      case "snap":
-        return "This legacy Snap setting is not a verified update path. Use the GitHub release instead.";
-      default:
-        return `Download the ${updateState.latestRelease.version} native package for your distribution from GitHub and install it over your current build.`;
-    }
+    return config.installChannel === "source"
+      ? `Check out voco.${updateState.latestRelease.version} and rebuild.`
+      : `Run the ${updateState.latestRelease.version} installer from its release page. It upgrades VOCO in place and keeps your settings.`;
   }, [config.installChannel, updateState.latestRelease, updateState.status]);
   const lastCheckedLabel = useMemo(() => {
     if (!updateState.lastCheckedAt) {
@@ -582,7 +562,7 @@ export function ControlPanel({
     try {
       const passed = onFinishTest ? await onFinishTest() : testPassed;
       if (!passed || !(await checkDesktopSetup())) return;
-      const result = await savePatch({ onboardingCompleted: true, voiceProfile: "default" });
+      const result = await savePatch({ onboardingCompleted: true });
       if (result.ok) {
         useStore.getState().clearTranscript();
         useStore.getState().setDictationPurpose("cursor");
@@ -842,11 +822,10 @@ export function ControlPanel({
                   <details className="voco-preferences__card voco-preferences__disclosure"><summary>Update settings</summary>
                     <div className="voco-preferences__form">
                       <label className="voco-field voco-preferences__field-row"><span>Installation method for update instructions</span><select value={config.installChannel} onChange={(event) => void savePatch({ installChannel: event.target.value as AppConfig["installChannel"] })}>
-                        <option value="github-release">GitHub Release</option>{config.installChannel === "appimage" ? <option value="appimage" disabled>AppImage (legacy, publication paused)</option> : null}<option value="source">Source build</option>{config.installChannel === "flatpak" ? <option value="flatpak" disabled>Flatpak (legacy, unverified)</option> : null}{config.installChannel === "snap" ? <option value="snap" disabled>Snap (legacy, unverified)</option> : null}
+                        <option value="github-release">GitHub Release</option><option value="source">Source build</option>
                       </select></label>
-                      <p className="voco-preferences__helper">Choose the Debian, Fedora, openSUSE, or Arch package for your distribution from the published GitHub Release. Omarchy uses the Arch package. AppImage, Flatpak, and Snap are not current published release channels.</p>
-                      <label className="voco-field voco-preferences__field-row"><span>Update channel</span><select value={config.updateChannel} onChange={(event) => void savePatch({ updateChannel: event.target.value as AppConfig["updateChannel"] })}><option value="stable">Stable</option><option value="beta">Beta</option></select></label>
                       <p className="voco-preferences__helper">{updateInstallCopy}</p>
+                      <label className="voco-field voco-preferences__field-row"><span>Update channel</span><select value={config.updateChannel} onChange={(event) => void savePatch({ updateChannel: event.target.value as AppConfig["updateChannel"] })}><option value="stable">Stable</option><option value="beta">Beta</option></select></label>
                       <p className="voco-preferences__helper">{config.updateChannel === "beta" ? "Beta releases change more often." : "Recommended for everyday use."}</p>
                       <p><strong>Last checked:</strong> {lastCheckedLabel}</p>
                       {updateState.latestRelease ? <p><strong>Latest release:</strong> <code>{updateState.latestRelease.version}</code></p> : null}

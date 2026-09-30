@@ -26,7 +26,7 @@ import {
 import { beginNativeCapture,type NativeCaptureSession } from "@/lib/nativeCapture";
 import type { HotkeyTraceFields,pasteDesktopText } from "@/lib/tauri";
 import type { useStore as appStore } from "@/store/useStore";
-import type { AppConfig,DesktopPasteStatus,DictationStatus } from "@/types";
+import type { DesktopPasteStatus,DictationStatus } from "@/types";
 import { BrowserStreamDelivery } from "./browserStreamDelivery";
 
 export type Ref<T> = { current: T };
@@ -66,7 +66,6 @@ export interface DictationRecordingEnv {
   desktopPhrasePasteCountRef: Ref<number>;
   activeTriggerIdRef: Ref<string | undefined>;
   recoverySessionIdRef: Ref<string | null>;
-  sessionConfigRef: Ref<AppConfig | null>;
   nativeCaptureRef: Ref<NativeCaptureSession | null>;
   captureDescriptorRef: Ref<CaptureDescriptor | null>;
   captureSelectionRef: Ref<(() => CaptureSelection) | undefined>;
@@ -132,7 +131,6 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     desktopPhrasePasteCountRef,
     activeTriggerIdRef,
     recoverySessionIdRef,
-    sessionConfigRef,
     nativeCaptureRef,
     captureDescriptorRef,
     captureSelectionRef,
@@ -326,10 +324,6 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     sessionRef.current = startSession(sessionRef.current);
     const startingSessionId = sessionRef.current.sessionId;
     recoverySessionIdRef.current = crypto.randomUUID();
-    sessionConfigRef.current = useStore.getState().config;
-    if (onboardingTest && sessionConfigRef.current) {
-      sessionConfigRef.current = { ...sessionConfigRef.current, liveCursorMode: "final-text-only" };
-    }
     phaseRef.current = "starting";
     traceDictationEvent("recording_state_requested").catch(() => {});
     let nativeAttempt: { generation: number; selectionToken: string } | null = null;
@@ -351,7 +345,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       // never blocks a new dictation.
       await finishJournal().catch(() => { journal = null; });
       assertOutputAllowed(startingSessionId);
-      if (!onboardingTest && !triggerId?.startsWith("browser:") && sessionConfigRef.current?.transcriptTarget === "cursor") {
+      if (!onboardingTest && !triggerId?.startsWith("browser:") && useStore.getState().config) {
         const paste = await getDesktopPasteStatus();
         assertOutputAllowed(startingSessionId);
         // The only desktop prerequisites; each paste goes to whatever has focus.
@@ -370,8 +364,6 @@ export function createDictationRecording(env: DictationRecordingEnv) {
           throw new Error("Streaming dictation is disabled in the desktop environment.");
         }
         desktopPasteSessionRef.current = true;
-        // Retain the fixed compatibility snapshot; the queue owns streaming.
-        sessionConfigRef.current = { ...sessionConfigRef.current, liveCursorMode: "final-text-only" };
         traceDictationEvent("dictation_desktop_paste_session_started").catch(() => {});
       }
       if (!onboardingTest && !triggerId?.startsWith("browser:") && !desktopPasteSessionRef.current) {

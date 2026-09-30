@@ -137,18 +137,9 @@ try {
         window.config = {
             hotkey: 'Alt+D',
             selectedMic: null,
-            insertionStrategy: 'auto',
-            transcriptTarget: 'cursor',
-            liveCursorMode: 'final-text-only',
-
-
-            transcriptEnhancement: 'off',
-
-
             onboardingCompleted: false,
             updateChannel: 'stable',
             installChannel: 'github-release',
-            voiceProfile: 'default'
         };
         window.nativeCall = async (name, args) => {
             window.calls.push([

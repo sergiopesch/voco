@@ -42,7 +42,6 @@ import { CrashReview } from "@/components/CrashReview";
 import { StatusMark } from "@/components/StatusMark";
 import vocoBrandImage from "../../../assets/voco-symbol-ui.png";
 import { ConfigRecoveryPanel } from "@/components/ConfigRecoveryPanel";
-import { requiresVerifiedTextTarget } from "@/lib/dictationOutputPlan";
 import { probeMicrophoneAccess } from "@/lib/audioInput";
 import { MicrophoneRefresh, queryMicrophonePermission, microphoneAccessFailure } from "@/lib/microphoneRefresh";
 import {
@@ -304,10 +303,10 @@ export function App() {
   );
   // Text goes to whichever app has focus, so the desktop input helpers are the
   // only delivery setup. IBus and the GNOME panel companion never gate it.
-  const desktopInputReady = config?.transcriptTarget === "cursor" &&
+  const desktopInputReady = config !== null &&
     Boolean(runtimeDiagnostics?.desktopPaste?.enabled &&
       (runtimeDiagnostics.desktopInput?.available ?? runtimeDiagnostics.desktopPaste.available));
-  const cursorRequired = requiresVerifiedTextTarget(config) && !desktopInputReady;
+  const cursorRequired = config !== null && !desktopInputReady;
   const cursorSetupState = deriveCursorSetupState({
     desktopInputReady,
     diagnosticsLoaded: runtimeDiagnostics !== null,
