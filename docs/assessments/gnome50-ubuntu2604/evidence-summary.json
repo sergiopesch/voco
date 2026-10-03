@@ -1,0 +1,315 @@
+{
+  "schema_version": 1,
+  "assessment_date": "2026-10-03",
+  "source_commit": "2045dd7391ece5815d70a5fd42e1cb6fd14ae2a6",
+  "installed_package": "2026.0.60+pr87.20260929.1",
+  "installed_source_commit": "f8883ec3a3d62177229ad142ce1e2eb9e6fd46e1",
+  "public_release": "voco.2026.0.59",
+  "os": "Ubuntu 26.04.1 LTS",
+  "kernel": "6.17.0-1032-oem",
+  "session": "Wayland",
+  "cpu": "AMD Ryzen 7 PRO 8840HS",
+  "logical_cpus": 16,
+  "packages": {
+    "gir1.2-mutter-18": "50.1-0ubuntu2.4",
+    "gjs": "1.88.0-1",
+    "gnome-shell": "50.1-0ubuntu1.3",
+    "libc6": "2.43-2ubuntu2.4",
+    "libgtk-3-0t64": "3.24.52-0ubuntu1",
+    "libmutter-18-0": "50.1-0ubuntu2.4",
+    "libsentencepiece0": "0.2.1-1build1",
+    "libwebkit2gtk-4.1-0": "2.52.6-0ubuntu0.26.04.1",
+    "pipewire": "1.6.2-1ubuntu1.2",
+    "pipewire-pulse": "1.6.2-1ubuntu1.2",
+    "python3": "3.14.3-0ubuntu2",
+    "python3-numpy": "1:2.3.5+ds-3ubuntu1",
+    "python3-psutil": "7.1.0-1ubuntu1",
+    "python3.14": "3.14.4-1ubuntu0.2",
+    "wireplumber": "0.5.13-1ubuntu1",
+    "xdg-desktop-portal": "1.21.1+ds-1ubuntu3.1",
+    "xdg-desktop-portal-gnome": "50.0-0ubuntu1",
+    "xwayland": "2:24.1.10-1",
+    "ydotool": "1.0.4-3"
+  },
+  "installed_payload_dpkg_verify": "passed, empty output",
+  "gnome_panel": {
+    "installed_version": 12,
+    "candidate_version": 13,
+    "loaded_state": "OUT OF DATE",
+    "candidate_supported_shell_versions": [
+      "46"
+    ],
+    "missing_installed_meta18_api": "Meta.is_wayland_compositor"
+  },
+  "input_services": {
+    "distribution_unit": "ydotool.service",
+    "distribution_state": "active/running",
+    "voco_state": "activating/auto-restart",
+    "observed_voco_restarts": 1012,
+    "socket_collision_observed": true,
+    "readonly_require_settled_result": "MigrationInFlight",
+    "voco_check_desktop_input": "ready (installed PR87 binary, not candidate)",
+    "apt_simulation": "failed: separate ydotoold has no installation candidate"
+  },
+  "checks": [
+    {
+      "name": "panel-setup",
+      "argv": [
+        "/usr/bin/python3",
+        "scripts/test-panel-setup.py"
+      ],
+      "exit": 0,
+      "seconds": 0.04,
+      "assessment_result": "passed"
+    },
+    {
+      "name": "input-service-fixtures",
+      "argv": [
+        "/usr/bin/python3",
+        "scripts/test-ydotool-service.py"
+      ],
+      "exit": 0,
+      "seconds": 0.09,
+      "assessment_result": "passed"
+    },
+    {
+      "name": "installer-fixtures",
+      "argv": [
+        "bash",
+        "scripts/test-install-common.sh"
+      ],
+      "exit": 0,
+      "seconds": 0.81,
+      "assessment_result": "passed"
+    },
+    {
+      "name": "panel-model",
+      "argv": [
+        "node",
+        "--test",
+        "scripts/test-panel-model.mjs"
+      ],
+      "exit": 0,
+      "seconds": 0.07,
+      "assessment_result": "passed"
+    },
+    {
+      "name": "speech-runtime-unit",
+      "argv": [
+        "/usr/bin/python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "runtime/speech",
+        "-p",
+        "test_*.py"
+      ],
+      "exit": 0,
+      "seconds": 1.19,
+      "assessment_result": "passed"
+    },
+    {
+      "name": "native-callbacks",
+      "argv": [
+        "/usr/bin/python3",
+        "scripts/test-native-capture-callbacks.py",
+        "--report",
+        "PRIVATE_EVIDENCE/native-callbacks.json"
+      ],
+      "exit": 1,
+      "seconds": 0.05,
+      "assessment_result": "environment-blocked"
+    },
+    {
+      "name": "version-consistency",
+      "argv": [
+        "node",
+        "scripts/check-version-consistency.mjs"
+      ],
+      "exit": 0,
+      "seconds": 0.03,
+      "assessment_result": "passed"
+    },
+    {
+      "name": "glib-provenance",
+      "argv": [
+        "/usr/bin/python3",
+        "scripts/verify-glib-backport.py"
+      ],
+      "exit": 0,
+      "seconds": 0.72,
+      "assessment_result": "passed"
+    },
+    {
+      "name": "candidate-worker-protocol",
+      "assessment_result": "passed",
+      "passed": 13,
+      "attempted": 13
+    }
+  ],
+  "upstream_ci": {
+    "url": "https://github.com/sergiopesch/voco/actions/runs/36696756805",
+    "head": "2045dd7391ece5815d70a5fd42e1cb6fd14ae2a6",
+    "conclusion": "success",
+    "runner": "ubuntu-24.04",
+    "not_gnome50_qualification": true
+  },
+  "crabbox": "doctor passed local-container only; no lease created; no remote VM qualification",
+  "not_run": [
+    "candidate app build/clippy/full Rust tests (host lacks native development pkg-config dependencies)",
+    "GNOME 50 extension render/accelerator tests",
+    "real modern ydotool key injection",
+    "native capture waveform and long continuity on PipeWire 1.6",
+    "packaged WebKit and native install/remove",
+    "physical microphone and owner-session app delivery",
+    "full pinned speech baseline continuity/variants gate",
+    "matched performance baseline comparison"
+  ],
+  "worker": {
+    "boundary": "real_worker_json_protocol_no_capture_or_destination",
+    "config": {
+      "context": 1,
+      "threads": 4,
+      "packetMs": 100,
+      "gate": "zero",
+      "paced": false,
+      "repeats": 1,
+      "split": "development"
+    },
+    "summary": {
+      "attempted": 8,
+      "completed": 8,
+      "failed": 0,
+      "referenceWords": 160,
+      "errors": 4,
+      "wer": 0.025,
+      "substitutions": 3,
+      "deletions": 1,
+      "insertions": 0,
+      "exactLexicalCases": 6,
+      "startAckMs": {
+        "n": 8,
+        "median": 0.1419159998476971,
+        "p95": 1.1237280000386818,
+        "max": 1.1237280000386818,
+        "tailQualified": false,
+        "note": "Descriptive nearest-rank; repeated fixtures are not independent speakers."
+      },
+      "finishAckMs": {
+        "n": 8,
+        "median": 75.03323700029796,
+        "p95": 100.32826499991643,
+        "max": 100.32826499991643,
+        "tailQualified": false,
+        "note": "Descriptive nearest-rank; repeated fixtures are not independent speakers."
+      },
+      "firstHypothesisMs": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "max": null,
+        "tailQualified": false,
+        "note": "Descriptive nearest-rank; repeated fixtures are not independent speakers."
+      },
+      "serviceRtf": {
+        "n": 8,
+        "median": 0.2354457746010527,
+        "p95": 0.24905935358837655,
+        "max": 0.24905935358837655,
+        "tailQualified": false,
+        "note": "Descriptive nearest-rank; repeated fixtures are not independent speakers."
+      },
+      "maxSampledWorkerRssBytes": 1011441664
+    },
+    "model_sha256": "d9a01898d2a611c8764e23a1c2f45e70bbd5a425dc4de93692ac951dd603812d",
+    "native_files_verified_against_candidate_receipt": 6,
+    "python_sources": "candidate copied into a private staging directory",
+    "native_payload": "installed payload, hashes matched candidate NATIVE-BUILD.json",
+    "runtime_source_hashes": {
+      "adapters.py": "c62a92f4504ebff9e97c847243f7718d6bdb5aefb81d0546cd53258ae8ed6502",
+      "stream_worker.py": "d49c824b1d5707e89552d6f31bd081b8436b694d2c39c1c967230ebcbfa54c2a",
+      "streaming.py": "621719a364c8947d26e4646823a40307b669c8035937b2ae97eafc56594b0adb",
+      "test_cpu_threads.py": "a3bb749c448fcd9476f9931fe2bf3bef86014e4ac3ed5ff89596c4c2a8516ecb",
+      "test_diagnostics.py": "180b8dae5f894c7a4efc5036a78fbcac8c5b436b5b75e431fa56e12359d3d0e1",
+      "test_streaming.py": "f9db51a92734619d2d2b5bc44f0d909e4f11c0f5f603e2a4e6b259b7d4e3794d",
+      "test_timing.py": "53a100406a07618cbf21dc76ddf60f6e6525c29fb25f784ec3e334a44ba506ef",
+      "test_worker_protocol.py": "ae2ff03964bdc6d4371247d64178a0dca3c45775b20930713b15705eed04b014",
+      "worker_main.py": "ca029110856cec5bf4e6f9b979abfeed983c6729670bb88f0b6d33cb799dfdbc"
+    },
+    "native_hashes": {
+      "lib/libggml-base.so.0.12.0": "cf2ed93612bb438f6c12d64c7bbaf695f4f7e27e9a3f416e5f9d5a7fec45a4d4",
+      "lib/libggml-cpu.so.0.12.0": "9078ee18c22ad59905251efb2a319a8043d04fa3365c2d8ac049a6a3d124bcd5",
+      "lib/libggml.so.0.12.0": "ce15f1736da73b49a489eea3d65585997edb5281b1aecea7b1bf9e2283690ac2",
+      "lib/libnemo_speech_asr.so": "a7005f4be3d2a03d66457b9724f7cedfd08fd16f0424b56c57f14cec6f6bad38",
+      "lib/libnemo_speech_asr_c.so.1": "92510f5ea8ddb27aab987a0a4e11c0912015f2e9b517cd02a36f0cfb5a32d0a6",
+      "libbench_nemo_pool.so": "88e6655521f41ba85613dbfbd29c87efdce652865113f8aafeac7b6751d308ac"
+    },
+    "limits": "One unpaced development-corpus pass; no microphone, capture, renderer, shortcut or recipient. Not a matched OS comparison or full speech-continuity release gate.",
+    "harness_sha256": "7fd761af7863751284ce0eadea42dbb86a5fdb7343a9ccc42704a1136d2d3e0e",
+    "corpus_manifest_sha256": "fbf95be8d092d58c49297f2188051dc61356f1003d04b146a2f0d6071a8b4953",
+    "score_harness_sha256": "fc488dedb40685520ff5ceb230e4a1efad5a6193ebdea6891425510378472941",
+    "native_receipt_sha256": "b68bdfb782fa86543d29d4f37215417efbbe96141e42fea5cea23914bc69d2f6",
+    "protocol_harness_sha256": "ae2ff03964bdc6d4371247d64178a0dca3c45775b20930713b15705eed04b014",
+    "launch_to_ready_ms": 1149.0533019996292,
+    "fixtures": [
+      {
+        "id": "84-121123-0000",
+        "sha256": "6e8353d85498a02b0e06c0107e81f48b2020615b541d13a13440b41effbac0ff",
+        "seconds": 2.09,
+        "split": "development",
+        "rate": 16000
+      },
+      {
+        "id": "1462-170138-0000",
+        "sha256": "ba4ee8747cef66c2b7c4dd24ca07fba1a1fa0b2303719084f94345b5defb4861",
+        "seconds": 14.55,
+        "split": "development",
+        "rate": 16000
+      },
+      {
+        "id": "1673-143396-0000",
+        "sha256": "d6caba430847ce6cb23e678b80dbd9b2255507bea0e6b0a20dedd18ed4415c2f",
+        "seconds": 14.675,
+        "split": "development",
+        "rate": 16000
+      },
+      {
+        "id": "1919-142785-0000",
+        "sha256": "5ee4500b59e981faca5d894974dee7569b131e0f23e3d13c368bcc25112200ac",
+        "seconds": 2.66,
+        "split": "development",
+        "rate": 16000
+      },
+      {
+        "id": "174-168635-0000",
+        "sha256": "6cc2d2aa5a57b9f575958faec0d050738d27106f876d454abd3b4405d365a195",
+        "seconds": 4.53,
+        "split": "development",
+        "rate": 16000
+      },
+      {
+        "id": "251-118436-0000",
+        "sha256": "c5f8772ff51dae47cbe8f65181049c9b0ce027ffb28645fb968190e63ff82994",
+        "seconds": 6.26,
+        "split": "development",
+        "rate": 16000
+      },
+      {
+        "id": "422-122949-0000",
+        "sha256": "f14939f24b0d2b18c8e50cda0a6ffd6bf17747b27f8fee7314222b2a1a2eae8f",
+        "seconds": 20.22,
+        "split": "development",
+        "rate": 16000
+      },
+      {
+        "id": "652-129742-0000",
+        "sha256": "36d235117cd4917aad50062f5550a3637fa01692931331d74b9f22a9ac5e98be",
+        "seconds": 6.025,
+        "split": "development",
+        "rate": 16000
+      }
+    ]
+  },
+  "installed_binary_sha256": "75a276769afb4351062b967f53611c8054362d1d1d4694a7cdc7d0507f7a5d1b"
+}
