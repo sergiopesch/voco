@@ -1112,77 +1112,54 @@ fn start_ibus_shortcut_listener(app_handle: tauri::AppHandle) {
             let observation_started = shortcut_monotonic_ms();
             SHORTCUT_OBSERVATIONS.begin_poll(observation_ticket);
             IBUS_SHORTCUT_LEASE.begin_poll();
-            match state.poll_trigger(&snapshot.config.hotkey) {
-                Ok(poll) => {
-                    SHORTCUT_OBSERVATIONS.poll(
-                        observation_ticket,
-                        snapshot.revision,
-                        &snapshot.config.hotkey,
-                        observation_started,
-                        if poll.armed {
-                            shortcut_readiness::Poll::Armed
-                        } else {
-                            shortcut_readiness::Poll::Disarmed
-                        },
-                    );
-                    IBUS_SHORTCUT_LEASE.finish_poll(
-                        shortcut_monotonic_ms(),
-                        if poll.armed {
-                            shortcut_arbitration::PollOutcome::Armed
-                        } else {
-                            shortcut_arbitration::PollOutcome::Disarmed
-                        },
-                    );
-                    schedule_shortcut_arbitration(&app_handle, snapshot, &mut arbitration_posts);
-                    if CONFIG_REVISION.load(Ordering::SeqCst) != snapshot.revision {
-                        continue;
-                    }
-                    let Some(trigger) = poll.trigger else {
-                        continue;
-                    };
-                    let (event, last_toggle) = match trigger.mode.as_str() {
-                        "dictation" => (TOGGLE_DICTATION_EVENT, &LAST_TOGGLE_MS),
-                        _ => continue,
-                    };
-                    if !shortcut_arbitration::admit_toggle(
-                        last_toggle,
-                        shortcut_monotonic_ms(),
-                        TOGGLE_DEBOUNCE_MS,
-                    ) {
-                        continue;
-                    }
-                    if let Err(error) = app_handle.emit_to("main", event, &trigger) {
-                        error!("Failed to deliver owned IBus shortcut: {error}");
-                    } else {
-                        trace_hotkey_event("owned_shortcut_event_emitted", Some("ibus"));
-                    }
-                }
-                Err(error) => {
-                    SHORTCUT_OBSERVATIONS.poll(
-                        observation_ticket,
-                        snapshot.revision,
-                        &snapshot.config.hotkey,
-                        observation_started,
-                        if error.may_have_armed {
-                            shortcut_readiness::Poll::Uncertain
-                        } else {
-                            shortcut_readiness::Poll::Unavailable
-                        },
-                    );
-                    IBUS_SHORTCUT_LEASE.finish_poll(
-                        shortcut_monotonic_ms(),
-                        if error.may_have_armed {
-                            shortcut_arbitration::PollOutcome::Uncertain
-                        } else {
-                            shortcut_arbitration::PollOutcome::Unavailable
-                        },
-                    );
-                    schedule_shortcut_arbitration(&app_handle, snapshot, &mut arbitration_posts);
-                    std::thread::sleep(std::time::Duration::from_millis(450));
-                }
+            let result = state.poll_trigger(&snapshot.config.hotkey);
+            let outcome = ibus_poll_outcome(&result);
+            SHORTCUT_OBSERVATIONS.poll(
+                observation_ticket,
+                snapshot.revision,
+                &snapshot.config.hotkey,
+                observation_started,
+                outcome,
+            );
+            IBUS_SHORTCUT_LEASE.finish_poll(shortcut_monotonic_ms(), outcome);
+            schedule_shortcut_arbitration(&app_handle, snapshot, &mut arbitration_posts);
+            let Ok(poll) = result else {
+                std::thread::sleep(std::time::Duration::from_millis(450));
+                continue;
+            };
+            if CONFIG_REVISION.load(Ordering::SeqCst) != snapshot.revision {
+                continue;
+            }
+            let Some(trigger) = poll.trigger.filter(|trigger| trigger.mode == "dictation") else {
+                continue;
+            };
+            if !shortcut_arbitration::admit_toggle(
+                &LAST_TOGGLE_MS,
+                shortcut_monotonic_ms(),
+                TOGGLE_DEBOUNCE_MS,
+            ) {
+                continue;
+            }
+            if let Err(error) = app_handle.emit_to("main", TOGGLE_DICTATION_EVENT, &trigger) {
+                error!("Failed to deliver owned IBus shortcut: {error}");
+            } else {
+                trace_hotkey_event("owned_shortcut_event_emitted", Some("ibus"));
             }
         }
     });
+}
+
+/// A failed poll is uncertain only when its request may have reached the engine.
+fn ibus_poll_outcome(
+    result: &Result<ibus_shortcut::ShortcutPoll, ibus_shortcut::ShortcutPollFailure>,
+) -> shortcut_arbitration::PollOutcome {
+    use shortcut_arbitration::PollOutcome;
+    match result {
+        Ok(poll) if poll.armed => PollOutcome::Armed,
+        Ok(_) => PollOutcome::Disarmed,
+        Err(failure) if failure.may_have_armed => PollOutcome::Uncertain,
+        Err(_) => PollOutcome::Unavailable,
+    }
 }
 
 // --- Toggle dictation via window event ---
@@ -2335,6 +2312,24 @@ mod tests {
         assert!(!should_register_shortcut_fallback(false, true));
         assert!(!should_register_shortcut_fallback(true, true));
         assert!(!should_register_shortcut_fallback(true, false));
+    }
+
+    #[test]
+    fn ibus_poll_failure_is_uncertain_only_when_the_poll_may_have_armed() {
+        use shortcut_arbitration::PollOutcome;
+        let poll = |armed| -> Result<_, ibus_shortcut::ShortcutPollFailure> {
+            Ok(ibus_shortcut::ShortcutPoll {
+                armed,
+                trigger: None,
+            })
+        };
+        let failure = |may_have_armed| -> Result<ibus_shortcut::ShortcutPoll, _> {
+            Err(ibus_shortcut::ShortcutPollFailure { may_have_armed })
+        };
+        assert_eq!(ibus_poll_outcome(&poll(true)), PollOutcome::Armed);
+        assert_eq!(ibus_poll_outcome(&poll(false)), PollOutcome::Disarmed);
+        assert_eq!(ibus_poll_outcome(&failure(true)), PollOutcome::Uncertain);
+        assert_eq!(ibus_poll_outcome(&failure(false)), PollOutcome::Unavailable);
     }
 
     #[test]

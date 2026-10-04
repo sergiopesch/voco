@@ -1,4 +1,5 @@
 //! Observations only: none of these methods registers, arms, or admits a shortcut.
+use crate::shortcut_arbitration::{PollOutcome, ENGINE_ARM_MS};
 use serde::Serialize;
 use std::sync::Mutex;
 
@@ -11,19 +12,11 @@ pub(crate) struct Status {
     pub detail: &'static str,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Poll {
-    Armed,
-    Disarmed,
-    Uncertain,
-    Unavailable,
-}
-
 struct PollObservation {
     revision: u64,
     hotkey: String,
     at: i64,
-    outcome: Poll,
+    outcome: PollOutcome,
 }
 
 #[derive(Default)]
@@ -67,7 +60,7 @@ impl Observations {
         }
     }
 
-    pub fn poll(&self, ticket: u64, revision: u64, hotkey: &str, at: i64, outcome: Poll) {
+    pub fn poll(&self, ticket: u64, revision: u64, hotkey: &str, at: i64, outcome: PollOutcome) {
         if let Ok(mut poll) = self.poll.lock() {
             if poll.0 == ticket {
                 poll.1 = Some(PollObservation {
@@ -127,17 +120,17 @@ impl Observations {
             p.revision == snapshot.revision
                 && p.hotkey == snapshot.hotkey
                 && snapshot.now >= p.at
-                && snapshot.now.saturating_sub(p.at) < 1000
+                && snapshot.now.saturating_sub(p.at) < ENGINE_ARM_MS
         });
-        if current.is_some_and(|p| p.outcome == Poll::Armed) {
+        if current.is_some_and(|p| p.outcome == PollOutcome::Armed) {
             return status(
                 Some("ibus"),
                 "available",
                 "VOCO Dictation has armed this shortcut in the current input context.",
             );
         }
-        // The admission lease also covers uncertain replies and in-flight polls.
-        // Its existence is a reason to withhold passive readiness, never proof of success.
+        // The admission lease also covers uncertain replies. Its existence is a
+        // reason to withhold passive readiness, never proof of success.
         if snapshot.consuming_lease {
             return status(
                 None,
@@ -185,7 +178,8 @@ impl Observations {
         // An idle bridge has no insertion session, so its engineActive field
         // cannot describe shortcut focus. A current disarmed reply and a live
         // connection support setup guidance, never shortcut availability.
-        if snapshot.bridge_available && current.is_some_and(|p| p.outcome == Poll::Disarmed) {
+        if snapshot.bridge_available && current.is_some_and(|p| p.outcome == PollOutcome::Disarmed)
+        {
             return status(
                 Some("ibus"),
                 "focus-required",
@@ -283,7 +277,7 @@ mod tests {
     #[test]
     fn armed_poll_requires_current_config_and_fresh_heartbeat() {
         let o = Observations::default();
-        o.poll(o.ticket(), 1, "Alt+D", 100, Poll::Armed);
+        o.poll(o.ticket(), 1, "Alt+D", 100, PollOutcome::Armed);
         assert_eq!(o.status(snapshot()).route, Some("ibus"));
         let mut s = snapshot();
         s.revision = 2;
@@ -304,7 +298,7 @@ mod tests {
     fn uncertain_lease_does_not_prove_ready_or_enable_passive_route() {
         let o = Observations::default();
         let _device = o.device(true, true);
-        for outcome in [Poll::Uncertain, Poll::Unavailable] {
+        for outcome in [PollOutcome::Uncertain, PollOutcome::Unavailable] {
             o.poll(o.ticket(), 1, "Alt+D", 100, outcome);
             let mut s = snapshot();
             s.consuming_lease = true;
@@ -317,7 +311,7 @@ mod tests {
         let o = Observations::default();
         let ticket = o.ticket();
         o.clear_poll();
-        o.poll(ticket, 1, "Alt+D", 100, Poll::Armed);
+        o.poll(ticket, 1, "Alt+D", 100, PollOutcome::Armed);
         assert_ne!(o.status(snapshot()).state, "available");
     }
     #[test]
@@ -354,7 +348,7 @@ mod tests {
             ..snapshot()
         };
         assert_eq!(o.status(connected()).state, "unavailable");
-        o.poll(o.ticket(), 1, "Alt+D", 100, Poll::Disarmed);
+        o.poll(o.ticket(), 1, "Alt+D", 100, PollOutcome::Disarmed);
         assert_eq!(o.status(snapshot()).state, "unavailable");
         let status = o.status(connected());
         assert_eq!(status.state, "focus-required");
@@ -375,11 +369,11 @@ mod tests {
         ] {
             assert_eq!(o.status(s).state, "unavailable");
         }
-        for outcome in [Poll::Uncertain, Poll::Unavailable] {
+        for outcome in [PollOutcome::Uncertain, PollOutcome::Unavailable] {
             o.poll(o.ticket(), 1, "Alt+D", 100, outcome);
             assert_eq!(o.status(connected()).state, "unavailable");
         }
-        o.poll(o.ticket(), 1, "Alt+D", 100, Poll::Armed);
+        o.poll(o.ticket(), 1, "Alt+D", 100, PollOutcome::Armed);
         assert_eq!(o.status(connected()).state, "available");
     }
 }
