@@ -8,8 +8,6 @@ import assert from 'node:assert/strict';
 // Renderer-only regression tests: all microphone, clipboard and native operations
 // below are explicit mocks. This never exercises the user's desktop input devices.
 const root = process.env.VOCO_RENDERER_SOURCE_ROOT ?? path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const gapOnly = process.env.VOCO_RENDERER_GAP_ONLY === '1';
-const baselineGap = process.env.VOCO_RENDERER_GAP_BASELINE === '1';
 const evidence = process.env.VOCO_RENDERER_EVIDENCE_DIR;
 if (evidence) await mkdir(evidence, { recursive: true });
 let server;

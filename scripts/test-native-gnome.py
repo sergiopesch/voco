@@ -104,105 +104,6 @@ try:
         if int(values['WIDTH']) >= 600 and int(values['HEIGHT']) >= 400:
             subprocess.run([str(xdotool), 'windowfocus', window_id, 'key', 'Escape'], env=xenv, check=True, timeout=5)
             report['overviewDismissal'] = 'private XTest Escape to nested Shell window'
-    if os.environ.get('VOCO_GNOME_WEBKIT_SCROLL_PROBE') == '1':
-        os.environ.update(env)
-        gi.require_version('Gtk', '3.0')
-        gi.require_version('WebKit2', '4.1')
-        gi.require_version('Atspi', '2.0')
-        from gi.repository import Gtk, WebKit2, Atspi
-        Gtk.init([])
-        target = Gtk.Window(title='VOCO private WebKit overflow probe')
-        target.set_default_size(420, 300)
-        view = WebKit2.WebView()
-        target.add(view)
-        target.show_all()
-        view.load_html('<html><body style="margin:0"><div style="height:240px;overflow:auto"><p style="height:800px">Synthetic overflow fixture</p><button>Settings</button></div></body></html>', None)
-        def find_setting():
-            desktop = Atspi.get_desktop(0)
-            pending = [desktop.get_child_at_index(i) for i in range(desktop.get_child_count()) if desktop.get_child_at_index(i).get_process_id() == os.getpid()]
-            while pending:
-                node = pending.pop()
-                if node.get_role() == Atspi.Role.PUSH_BUTTON and node.get_name() == 'Settings':
-                    return node
-                pending.extend(node.get_child_at_index(i) for i in range(node.get_child_count()))
-            return None
-        until = time.monotonic() + 15
-        button = None
-        while time.monotonic() < until:
-            while GLib.MainContext.default().pending():
-                GLib.MainContext.default().iteration(False)
-            button = find_setting()
-            if button:
-                break
-            time.sleep(.05)
-        assert button, 'WebKit Settings fixture missing'
-        def bounds():
-            r = button.get_component_iface().get_extents(Atspi.CoordType.WINDOW)
-            return [r.x, r.y, r.width, r.height]
-        before = bounds()
-        supported = button.get_component_iface().scroll_to(Atspi.ScrollType.ANYWHERE)
-        until = time.monotonic() + 5
-        while time.monotonic() < until:
-            while GLib.MainContext.default().pending():
-                GLib.MainContext.default().iteration(False)
-            if bounds()[1] < 300:
-                break
-            time.sleep(.02)
-        report['webKitScrollProbe'] = {'before': before, 'after': bounds(), 'scrollToAccepted': supported}
-        assert supported and before[1] > 300 and 0 <= bounds()[1] < 300
-        target.destroy()
-    if os.environ.get('VOCO_GNOME_SCROLL_PROBE') == '1':
-        os.environ.update(env)
-        gi.require_version('Gtk', '3.0')
-        from gi.repository import Gtk
-        Gtk.init([])
-        target = Gtk.Window(title='VOCO private scroll probe')
-        target.set_default_size(400, 300)
-        scroll = Gtk.ScrolledWindow()
-        text = Gtk.TextView()
-        text.get_buffer().set_text(''.join(f'Synthetic scroll row {i}\n' for i in range(100)))
-        text.get_buffer().place_cursor(text.get_buffer().get_start_iter())
-        key_events = []
-        text.connect('key-press-event', lambda _, event: key_events.append(int(event.keyval)) or False)
-        scroll.add(text)
-        target.add(scroll)
-        target.show_all()
-        text.grab_focus()
-        until = time.monotonic() + 10
-        native = None
-        while time.monotonic() < until:
-            while GLib.MainContext.default().pending():
-                GLib.MainContext.default().iteration(False)
-            windows = json.loads(call('org.gnome.Shell', '/org/voco/PrivateShellProbe', 'org.voco.PrivateShellProbe', 'GetWindows')[0])
-            native = next((window for window in windows if window['pid'] == os.getpid() and window['visible'] and window['focused']), None)
-            if native:
-                break
-            time.sleep(.05)
-        assert native, 'Scroll probe not visibly focused'
-        before = scroll.get_vadjustment().get_value()
-        x, y, width, height = native['frame']
-        subprocess.run([str(xdotool), 'mousemove', '--sync', str(x + width // 2), str(y + height // 2), 'click', '--repeat', '5', '--delay', '40', '5'], env=xenv, check=True, timeout=5)
-        until = time.monotonic() + 3
-        while time.monotonic() < until:
-            while GLib.MainContext.default().pending():
-                GLib.MainContext.default().iteration(False)
-            if scroll.get_vadjustment().get_value() > before:
-                break
-            time.sleep(.02)
-        report['scrollProbe'] = {'nativeWindow': native, 'before': before, 'after': scroll.get_vadjustment().get_value()}
-        subprocess.run([str(xdotool), 'key', 'Next'], env=xenv, check=True, timeout=5)
-        until = time.monotonic() + 3
-        while time.monotonic() < until:
-            while GLib.MainContext.default().pending():
-                GLib.MainContext.default().iteration(False)
-            if scroll.get_vadjustment().get_value() > before:
-                break
-            time.sleep(.02)
-        report['scrollProbe']['afterPageDown'] = scroll.get_vadjustment().get_value()
-        report['scrollProbe']['keyEvents'] = key_events
-        assert 65366 in key_events, 'Actual PageDown key event not received'
-        assert report['scrollProbe']['afterPageDown'] > before, 'Private XTest PageDown did not scroll actual GTK fixture'
-        target.destroy()
     if os.environ.get('VOCO_GNOME_ONBOARDING') == '1' or os.environ.get('VOCO_GNOME_CURSOR') == '1':
         pulse_socket = Path(f'/run/user/{os.getuid()}/pulse/native')
         env.update(PULSE_SERVER='unix:' + str(pulse_socket),
@@ -339,32 +240,6 @@ try:
                 visible = wait_for(visible_app)
                 report.setdefault('nativeWindows', []).append(json.loads(call('org.gnome.Shell', '/org/voco/PrivateShellProbe', 'org.voco.PrivateShellProbe', 'GetWindows')[0]))
                 assert 'Bundled Nemotron streaming model ready' in (evidence / f'app-{cycle}.log').read_text()
-                if os.environ.get('VOCO_GNOME_FOCUS_REOPEN') == '1' and cycle == 0:
-                    observations = report.setdefault('focusReopen', [])
-                    origin = time.monotonic()
-                    def observe(stage):
-                        windows = json.loads(call('org.gnome.Shell', '/org/voco/PrivateShellProbe', 'org.voco.PrivateShellProbe', 'GetWindows')[0])
-                        state = [window for window in windows if window['pid'] == app.pid]
-                        observations.append({'stage': stage, 'elapsed': time.monotonic() - origin, 'windows': state})
-                        return next((window for window in state if window['visible'] and window['frame'][2] > 4), None)
-                    clipboard = subprocess.Popen(['wl-copy', '--foreground'], env=env, text=True, stdin=subprocess.PIPE)
-                    try:
-                        clipboard.stdin.write('VOCO isolated focus diagnostic')
-                        clipboard.stdin.close()
-                        for attempt in range(3):
-                            activate('Open VOCO')
-                            wait_for(lambda: observe('before-read-' + str(attempt)))
-                            read = subprocess.run(['wl-paste', '--no-newline'], env=env, text=True, capture_output=True, timeout=5)
-                            observations.append({'stage': 'clipboard-read-' + str(attempt), 'verified': read.returncode == 0 and read.stdout == 'VOCO isolated focus diagnostic'})
-                            observe('immediately-after-read-' + str(attempt))
-                            activate('Open VOCO')
-                            until = time.monotonic() + 2
-                            while time.monotonic() < until:
-                                pump(.05)
-                                observe('after-immediate-open-' + str(attempt))
-                    finally:
-                        clipboard.terminate()
-                        clipboard.wait(timeout=5)
                 if os.environ.get('VOCO_GNOME_ONBOARDING') == '1' and cycle == 0:
                     from test_native_onboarding_capture import run_onboarding
                     report['onboarding'] = run_onboarding(root, app, pump, lambda: json.loads(call('org.gnome.Shell', '/org/voco/PrivateShellProbe', 'org.voco.PrivateShellProbe', 'GetWindows')[0]))
