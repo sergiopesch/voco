@@ -17,6 +17,12 @@ export interface NativeCaptureSourceList {
   defaultSelectionToken: string | null;
 }
 
+/** The system default microphone, if it is one VOCO can record from. */
+export function defaultNativeSource(list: NativeCaptureSourceList | null): NativeCaptureSource | null {
+  return list?.sources.find((source) =>
+    source.selectionToken === list.defaultSelectionToken && source.objectSerial && !source.isMonitor) ?? null;
+}
+
 function checkedSource(value: unknown): NativeCaptureSource {
   if (!value || typeof value !== "object") throw new Error("Invalid native microphone response.");
   const source = value as NativeCaptureSource;

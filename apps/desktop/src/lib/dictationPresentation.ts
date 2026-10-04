@@ -14,6 +14,25 @@ interface StatusLabelInput {
   microphoneReady: boolean;
 }
 
+/** Microphone readiness for the tray and labels. null means VOCO picks the
+ * microphone at Start: WebKit asks for permission then, and native capture with
+ * no microphone chosen uses the system default (only on an explicit Start). */
+export function deriveNativeMicrophoneReady({
+  mode,
+  selected,
+  microphoneReady,
+  defaultAvailable,
+}: {
+  mode: "pending" | "webkit" | "native";
+  selected: boolean;
+  microphoneReady: boolean;
+  defaultAvailable: boolean;
+}): boolean | null {
+  if (mode === "webkit") return null;
+  if (mode === "native" && !selected && defaultAvailable) return null;
+  return mode === "native" && selected && microphoneReady;
+}
+
 /** Desktop input setup for the tray: "" until the first diagnostics load, which the
  * tray presents as initializing. A failed launch check reports not enabled. */
 export function deriveCursorSetupState({

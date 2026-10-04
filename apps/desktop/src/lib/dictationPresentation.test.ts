@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   deriveCursorSetupState,
+  deriveNativeMicrophoneReady,
   deriveStatusLabel,
 } from "@/lib/dictationPresentation";
 
@@ -75,5 +76,35 @@ describe("status label presentation", () => {
         microphoneReady: false,
       }),
     ).toBe("Microphone needs permission");
+  });
+});
+
+describe("native microphone readiness", () => {
+  const idle = {
+    configurationError: false,
+    cursorRequired: false,
+    cursorSetupState: "ready" as const,
+    dictationStatus: "idle" as const,
+    microphonePermission: "unknown" as const,
+  };
+
+  it("lets Start pick the system default when no microphone is chosen", () => {
+    const unchosen = deriveNativeMicrophoneReady({ mode: "native", selected: false, microphoneReady: false, defaultAvailable: true });
+    expect(unchosen).toBeNull();
+    expect(deriveStatusLabel({ ...idle, nativeMicrophoneReady: unchosen, microphoneReady: false }))
+      .toBe("Ready — microphone checks on first use");
+  });
+
+  it("asks for setup only when there is no usable microphone", () => {
+    const none = deriveNativeMicrophoneReady({ mode: "native", selected: false, microphoneReady: false, defaultAvailable: false });
+    expect(none).toBe(false);
+    expect(deriveStatusLabel({ ...idle, nativeMicrophoneReady: none, microphoneReady: false })).toBe("Microphone setup required");
+    expect(deriveNativeMicrophoneReady({ mode: "pending", selected: false, microphoneReady: false, defaultAvailable: true })).toBe(false);
+  });
+
+  it("is ready with a chosen microphone and leaves WebKit to its permission prompt", () => {
+    expect(deriveNativeMicrophoneReady({ mode: "native", selected: true, microphoneReady: true, defaultAvailable: false })).toBe(true);
+    expect(deriveNativeMicrophoneReady({ mode: "native", selected: true, microphoneReady: false, defaultAvailable: true })).toBe(false);
+    expect(deriveNativeMicrophoneReady({ mode: "webkit", selected: false, microphoneReady: false, defaultAvailable: false })).toBeNull();
   });
 });

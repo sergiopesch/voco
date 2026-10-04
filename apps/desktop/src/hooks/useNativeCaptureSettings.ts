@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useStore } from "@/store/useStore";
 import { errorMessage } from "@/lib/dictationRecovery";
 import {
+  defaultNativeSource,
   listNativeCaptureSources,
   nativeCaptureEnabled,
   selectNativeCaptureSource,
@@ -112,7 +113,7 @@ export function useNativeCaptureSettings(): NativeMicrophoneControls {
       const next = await listNativeCaptureSources();
       assertCurrent();
       setSources(next);
-      const source = next.sources.find(source => source.selectionToken === next.defaultSelectionToken && source.objectSerial && !source.isMonitor);
+      const source = defaultNativeSource(next);
       if (!source) throw new Error("No default microphone is available. Connect a microphone or choose one in Microphone settings.");
       const selection = await selectNativeCaptureSource(source.selectionToken);
       assertCurrent();

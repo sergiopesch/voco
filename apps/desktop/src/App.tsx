@@ -46,8 +46,10 @@ import { probeMicrophoneAccess } from "@/lib/audioInput";
 import { MicrophoneRefresh, queryMicrophonePermission, microphoneAccessFailure } from "@/lib/microphoneRefresh";
 import {
   deriveCursorSetupState,
+  deriveNativeMicrophoneReady,
   deriveStatusLabel,
 } from "@/lib/dictationPresentation";
+import { defaultNativeSource } from "@/lib/nativeCaptureSettings";
 import { canStopOnboardingTest, cancelsPendingStart, isBrowserTrigger, type DictationTriggerAction } from "@/lib/dictationTrigger";
 import {
   shouldApplyConfigSnapshot,
@@ -171,8 +173,12 @@ export function App() {
   const availableDevices = useStore((state) => state.availableDevices);
   const microphonePermission = useStore((state) => state.microphonePermission);
   const microphoneReady = useStore((state) => state.microphoneReady);
-  const nativeMicrophoneReady = nativeMicrophone.mode === "webkit" ? null
-    : nativeMicrophone.mode === "native" && Boolean(nativeMicrophone.selected) && microphoneReady;
+  const nativeMicrophoneReady = deriveNativeMicrophoneReady({
+    mode: nativeMicrophone.mode,
+    selected: Boolean(nativeMicrophone.selected),
+    microphoneReady,
+    defaultAvailable: Boolean(defaultNativeSource(nativeMicrophone.sources)),
+  });
   const config = useStore((state) => state.config);
   const setConfig = useStore((state) => state.setConfig);
   const setError = useStore((state) => state.setError);
