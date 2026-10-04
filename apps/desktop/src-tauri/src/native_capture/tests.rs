@@ -69,7 +69,7 @@ impl CaptureBackend for Fake {
             .map(|s| s.selection_token.clone());
         Ok((self.catalog_revision.max(1), sources, default))
     }
-    fn begin(&mut self, _: &Source, _: u64) -> Result<(), String> {
+    fn begin(&mut self, _: &Source) -> Result<(), String> {
         self.begin_calls += 1;
         thread::sleep(self.startup_delay);
         if self.fail_start {
@@ -127,7 +127,6 @@ fn active() -> Worker<Fake> {
             ..Fake::default()
         }),
         sources: vec![source()],
-        revision: 1,
         epoch: 1,
         approved: Some(source().selection_token),
         session: Some(session()),

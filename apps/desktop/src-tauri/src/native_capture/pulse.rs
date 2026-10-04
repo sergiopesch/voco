@@ -47,7 +47,7 @@ unsafe extern "C" {
     fn vc_new(socket: *const c_char) -> *mut std::ffi::c_void;
     fn vc_free(p: *mut std::ffi::c_void);
     fn vc_enumerate(p: *mut std::ffi::c_void, out: *mut Catalog) -> c_int;
-    fn vc_begin(p: *mut std::ffi::c_void, source: *const RawSource, revision: u64) -> c_int;
+    fn vc_begin(p: *mut std::ffi::c_void, source: *const RawSource) -> c_int;
     fn vc_tick(p: *mut std::ffi::c_void);
     fn vc_stop(p: *mut std::ffi::c_void);
     fn vc_cancel(p: *mut std::ffi::c_void);
@@ -158,13 +158,13 @@ impl CaptureBackend for Pulse {
         self.catalog = Some(catalog);
         Ok((revision, sources, default_token))
     }
-    fn begin(&mut self, source: &Source, revision: u64) -> Result<(), String> {
+    fn begin(&mut self, source: &Source) -> Result<(), String> {
         let catalog = self.catalog.as_ref().ok_or("No native catalog")?;
         let raw = catalog.sources[..catalog.count as usize]
             .iter()
             .find(|s| raw_matches(s, source))
             .ok_or("Source not in catalog")?;
-        if unsafe { vc_begin(self.ptr.as_ptr(), raw, revision) } != 0 {
+        if unsafe { vc_begin(self.ptr.as_ptr(), raw) } != 0 {
             return Err(self
                 .status()
                 .error

@@ -215,7 +215,7 @@ trait CaptureBackend {
     where
         Self: Sized;
     fn enumerate(&mut self, epoch: u64) -> Result<(u64, Vec<Source>, Option<String>), String>;
-    fn begin(&mut self, source: &Source, revision: u64) -> Result<(), String>;
+    fn begin(&mut self, source: &Source) -> Result<(), String>;
     fn tick(&mut self);
     fn stop(&mut self);
     fn cancel(&mut self);
@@ -226,7 +226,6 @@ trait CaptureBackend {
 struct Worker<B: CaptureBackend> {
     pulse: Option<B>,
     sources: Vec<Source>,
-    revision: u64,
     epoch: u64,
     approved: Option<String>,
     session: Option<Session>,
@@ -240,7 +239,6 @@ impl<B: CaptureBackend> Worker<B> {
         Self {
             pulse: None,
             sources: Vec::new(),
-            revision: 0,
             epoch: 0,
             approved: None,
             session: None,
@@ -378,7 +376,6 @@ impl<B: CaptureBackend> Worker<B> {
                             return Err(error);
                         }
                     };
-                self.revision = revision;
                 self.sources = sources.clone();
                 // Catalog refresh does not grant a newly returned selection token.
                 if self
@@ -431,8 +428,7 @@ impl<B: CaptureBackend> Worker<B> {
                 } else {
                     None
                 };
-                let revision = self.revision;
-                if let Err(error) = self.pulse()?.begin(&source, revision) {
+                if let Err(error) = self.pulse()?.begin(&source) {
                     self.pulse()?.cancel();
                     self.pulse = None;
                     self.approved = None;
