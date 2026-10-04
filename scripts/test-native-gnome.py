@@ -123,49 +123,13 @@ try:
         subprocess.run([os.environ['VOCO_WAYLAND_PACTL'], 'set-default-source', 'voco_fixture'], check=True, timeout=5)
     if (root / 'voco').exists():
         gi.require_version('Atspi', '2.0')
-        from gi.repository import Atspi
-        model = root / 'speech/models/nemotron-speech-streaming-en-0.6b.q8_0.gguf'
-        assert model.exists(), 'Lifecycle acceptance requires pinned model cache'
-        model_hash = hashlib.sha256(model.read_bytes()).hexdigest()
-        pinned_model = Path(__file__).resolve().parent.parent / 'runtime/speech/MODEL-IDENTITY.json'
-        assert model_hash == json.loads(pinned_model.read_text())['model_sha256'], 'Model differs from pinned runtime identity'
-        (evidence / 'sources/MODEL-IDENTITY.json').write_bytes(pinned_model.read_bytes())
-        report['modelSha256'] = model_hash
+        import native_tray_app as tray
+        report['modelSha256'] = tray.pinned_model(root, evidence)
         report['appSha256'] = hashlib.sha256((root / 'voco').read_bytes()).hexdigest()
         report['application'] = []
-        def pump(seconds=0):
-            end = time.monotonic() + seconds
-            while True:
-                while GLib.MainContext.default().pending():
-                    GLib.MainContext.default().iteration(False)
-                if time.monotonic() >= end:
-                    break
-                time.sleep(.01)
-        def wait_for(fn, seconds=20):
-            until = time.monotonic() + seconds
-            while time.monotonic() < until:
-                pump()
-                value = fn()
-                if value:
-                    return value
-                time.sleep(.05)
-            raise AssertionError('Timed out waiting for ' + fn.__name__)
+        pump, wait_for = tray.pump, tray.wait_for
         def visible_app():
-            desktop = Atspi.get_desktop(0)
-            for i in range(desktop.get_child_count()):
-                node = desktop.get_child_at_index(i)
-                if node is not None and node.get_process_id() == app.pid:
-                    for j in range(node.get_child_count()):
-                        frame = node.get_child_at_index(j)
-                        if frame is None:
-                            continue  # A restarting accessibility tree may shrink between queries.
-                        states = frame.get_state_set()
-                        if states.contains(Atspi.StateType.SHOWING) and states.contains(Atspi.StateType.VISIBLE):
-                            rect = frame.get_extents(Atspi.CoordType.WINDOW)
-                            report['lastVisibleFrame'] = {'name': frame.get_name(), 'bounds': [rect.x, rect.y, rect.width, rect.height]}
-                            if rect.width >= 300 and rect.height >= 300:
-                                return {'name': frame.get_name(), 'bounds': [rect.x, rect.y, rect.width, rect.height]}
-            return None
+            return tray.visible_app(app, report)
         review_mode = os.environ.get('VOCO_GNOME_CRASH_REVIEW') == '1'
         if review_mode:
             assert os.environ.get('VOCO_GNOME_ONBOARDING') != '1', 'Crash review needs completed onboarding'
@@ -177,56 +141,10 @@ try:
             with (evidence / f'app-{cycle}.log').open('w') as log:
                 app = subprocess.Popen([str(root / 'voco')], env={**env, 'VOCO_HOTKEY_TRACE': '1'}, stdout=log, stderr=subprocess.STDOUT)
             try:
-                def registered():
-                    assert app.poll() is None, 'App exited before tray registration'
-                    values = call('org.kde.StatusNotifierWatcher', '/StatusNotifierWatcher',
-                                  'org.freedesktop.DBus.Properties', 'Get',
-                                  GLib.Variant('(ss)', ('org.kde.StatusNotifierWatcher', 'RegisteredStatusNotifierItems')))[0]
-                    matching = []
-                    for identifier in values:
-                        candidate = identifier.split('@', 1)[0].split('/', 1)[0]
-                        try:
-                            owner_pid = call('org.freedesktop.DBus', '/org/freedesktop/DBus', 'org.freedesktop.DBus', 'GetConnectionUnixProcessID', GLib.Variant('(s)', (candidate,)))[0]
-                            if owner_pid == app.pid:
-                                matching.append(identifier)
-                        except GLib.Error:
-                            pass
-                    return matching if matching else None
-                values = wait_for(registered)
-                report['registeredItems'] = list(values)
-                identifier = values[-1]
-                if '@/' in identifier:
-                    service, item_path = identifier.split('@', 1)
-                elif '/' in identifier:
-                    service, item_path = identifier.split('/', 1)
-                    item_path = '/' + item_path
-                else:
-                    service, item_path = identifier, '/StatusNotifierItem'
-                assert Gio.dbus_is_name(service), identifier
-                menu = call(service, item_path, 'org.freedesktop.DBus.Properties', 'Get',
-                            GLib.Variant('(ss)', ('org.kde.StatusNotifierItem', 'Menu')))[0]
+                service, menu = tray.tray_menu(call, app, report)
                 def activate(label):
-                    layout = call(service, menu, 'com.canonical.dbusmenu', 'GetLayout',
-                                  GLib.Variant('(iias)', (0, -1, ['label'])))[1]
-                    def find(node):
-                        if node[1].get('label') == label:
-                            return node[0]
-                        for child in node[2]:
-                            value = find(child)
-                            if value is not None:
-                                return value
-                    item = find(layout)
-                    assert item is not None, label
-                    call(service, menu, 'com.canonical.dbusmenu', 'Event',
-                         GLib.Variant('(isvu)', (item, 'clicked', GLib.Variant('s', ''), 0)))
-                def cache_ready():
-                    assert app.poll() is None
-                    return 'Bundled Nemotron streaming model ready' in (evidence / f'app-{cycle}.log').read_text()
-                wait_for(cache_ready)
-                def frontend_ready():
-                    trace = root / 'state/voco/hotkey-trace.jsonl'
-                    return trace.exists() and trace.read_text().count('frontend_hotkey_handler_ready') > previous_ready_count
-                wait_for(frontend_ready)
+                    tray.dbusmenu_activate(call, service, menu, label)
+                tray.wait_ready(app, evidence / f'app-{cycle}.log', trace, previous_ready_count)
                 if review_mode:
                     report.setdefault('crashReview', []).append(run_review(root, app, pump, activate,
                         lambda: json.loads(call('org.gnome.Shell', '/org/voco/PrivateShellProbe', 'org.voco.PrivateShellProbe', 'GetWindows')[0]), env, cycle))
