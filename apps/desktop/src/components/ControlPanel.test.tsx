@@ -295,10 +295,15 @@ describe("guided dictation and settings journeys", () => {
 
 describe("shortcut recording", () => {
   type Press = { key: string; code: string; ctrlKey?: boolean; altKey?: boolean; shiftKey?: boolean; metaKey?: boolean; altGraph?: boolean };
-  const press = ({ altGraph = false, ...event }: Press) => shortcutFromKeyboardEvent({
-    ctrlKey: false, altKey: false, shiftKey: false, metaKey: false,
-    getModifierState: (modifier: string) => modifier === "AltGraph" && altGraph, ...event,
-  });
+  const press = ({ altGraph = false, ...keys }: Press) => {
+    const event = {
+      ctrlKey: false, altKey: false, shiftKey: false, metaKey: false, ...keys, nativeEvent: { altGraph },
+      // Like React's synthetic event, this reads the native event through `this`,
+      // so calling it apart from its event throws.
+      getModifierState(modifier: string) { return modifier === "AltGraph" && this.nativeEvent.altGraph; },
+    };
+    return shortcutFromKeyboardEvent(event);
+  };
   // lib.rs checks that Rust's parser accepts exactly the recordings marked accepted.
   it.each(recordedShortcuts)("records $shortcut", ({ event, shortcut }) => {
     expect(press(event)).toBe(shortcut);

@@ -95,12 +95,14 @@ const US_SHIFTED_CODES: Record<string, string> = {
 /** A shifted symbol or a non-Latin letter names its physical key, which the
  * desktop resolves through the layout. Any other key stays as typed, for Rust to
  * accept or reject: another layout's symbol position could bind a different key. */
-function shortcutKey({ key, code, getModifierState }: ShortcutKeyEvent): string {
+function shortcutKey(event: ShortcutKeyEvent): string {
+  const { key, code } = event;
   if (key === " ") return "Space";
   if (key.length !== 1) return key;
   if (PARSER_CHARACTERS.test(key)) return key.toUpperCase();
   // AltGr chose the character; the physical key alone is a different chord.
-  if (!getModifierState("AltGraph")) {
+  // Call it on the event: React's getModifierState reads the event through `this`.
+  if (!event.getModifierState("AltGraph")) {
     if (/^(?:Key[A-Z]|Digit[0-9])$/.test(code)) return code.slice(-1);
     if (code.startsWith("Numpad") || US_SHIFTED_CODES[key] === code) return code;
   }

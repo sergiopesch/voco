@@ -215,6 +215,15 @@ try {
       await page.getByRole('button',{name:'Apply shortcut',exact:true}).click();
       await page.getByRole('button',{name:'Change shortcut',exact:true}).waitFor();
       assert.equal(await page.locator('.voco-preferences__shortcut-summary kbd').innerText(),'Ctrl+Alt+K');
+      // Shift+1 types "!", so the recorder names the key through React's own event.
+      await page.locator('.voco-preferences__content').evaluate(el => el.scrollTop=0);
+      await page.getByRole('button',{name:'Change shortcut',exact:true}).click();
+      await page.getByRole('button',{name:'Record keys',exact:true}).click();
+      await shortcutInput.press('Control+Shift+Digit1');
+      assert.equal(await shortcutInput.inputValue(),'Ctrl+Shift+1');
+      await page.getByRole('button',{name:'Apply shortcut',exact:true}).click();
+      await page.getByRole('button',{name:'Change shortcut',exact:true}).waitFor();
+      assert.equal(await page.locator('.voco-preferences__shortcut-summary kbd').innerText(),'Ctrl+Shift+1');
       await page.locator('.voco-preferences__content').evaluate(el => el.scrollTop=0);
       await page.getByRole('button',{name:'Change shortcut',exact:true}).click();
       await shortcutInput.fill('Alt+D');
