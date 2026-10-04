@@ -83,7 +83,7 @@ Suites that type through VOCO's virtual keyboard also need the
 | Wrapper option | Script | What runs |
 | --- | --- | --- |
 | None | `test-private-ibus-engine.sh` | VOCO's IBus engine against a private IBus daemon, with no display or session bus |
-| `--gnome-panel` | `test-gnome-panel.sh` | GNOME Shell with the [companion](../../integrations/gnome/README.md#files-and-tests) and synthetic app status; with `VOCO_PANEL_APP_BINARY`, the app's tray bridge |
+| `--gnome-panel` | `test-gnome-panel.sh` | GNOME Shell with the [companion](../../integrations/gnome/README.md#files-and-tests) and synthetic app status; with `VOCO_PANEL_APP_BINARY`, the app's tray bridge too, or only the bridge with `VOCO_PANEL_SUITE=bridge` |
 | `--native-desktop` | `test-native-desktop.sh` | Real GTK and WebKit widgets with private X11, D-Bus and IBus |
 | `--native-wayland` | `test-native-wayland.sh` | Real Wayland surfaces in headless Weston; with `VOCO_WAYLAND_APP_BINARY`, the app starting, opening and quitting from its tray |
 | `--native-pulse-latency` | `test-native-capture-pulse-latency.py` | VOCO's C capture from a private PulseAudio whose fixture source carries the `object.serial` PipeWire would set: a short clip, a long clip, and a starved run that must fail with `capture-duration-deficit` |

@@ -5,6 +5,11 @@ ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 : "${VOCO_PANEL_EVIDENCE_DIR:?Set a fresh evidence directory}"
 if [[ ${1:-} != --inside ]]; then
   [[ ! -e "$VOCO_PANEL_EVIDENCE_DIR" ]] || { echo 'Evidence directory exists' >&2; exit 1; }
+  # bridge skips the synthetic cases and checks only the app's tray bridge.
+  suite=${VOCO_PANEL_SUITE:-full}
+  [[ $suite == full || $suite == bridge ]] || { echo "Unknown VOCO_PANEL_SUITE: $suite" >&2; exit 1; }
+  [[ $suite == full || -n ${VOCO_PANEL_APP_BINARY:-}${VOCO_PANEL_PACKAGE_ROOT:-} ]] \
+    || { echo 'VOCO_PANEL_SUITE=bridge needs VOCO_PANEL_APP_BINARY or VOCO_PANEL_PACKAGE_ROOT' >&2; exit 1; }
   # GNOME 49 removed the nested backend. GNOME 46 and 48 nest in a private
   # Xvfb; later Shells run headless on a virtual monitor instead.
   shell_version=$(gnome-shell --version)
@@ -50,17 +55,10 @@ if [[ ${1:-} != --inside ]]; then
     package_mounts=(--bind "$run/system-extensions" /usr/share/gnome-shell/extensions
       --ro-bind "$VOCO_PANEL_PACKAGE_ROOT/usr/lib/voco/speech" /usr/lib/voco/speech)
   fi
-  bwrap --die-with-parent --new-session --unshare-ipc --unshare-net --unshare-pid --unshare-uts \
-    --ro-bind / / --dev /dev --proc /proc --tmpfs /tmp --tmpfs /run/user --tmpfs /run/dbus \
-    --bind "$run" "$run" "${native_mounts[@]}" "${apparmor_mounts[@]}" \
-    "${package_mounts[@]}" \
-    --setenv HOME "$run/home" --setenv XDG_RUNTIME_DIR "$run/runtime" \
-    --setenv XDG_CONFIG_HOME "$run/config" --setenv XDG_CACHE_HOME "$run/cache" \
-    --setenv XDG_DATA_HOME "$run/data" --setenv XDG_STATE_HOME "$run/state" \
-    --setenv VOCO_PANEL_SHELL_MODE "$shell_mode" \
-    --unsetenv DISPLAY --unsetenv WAYLAND_DISPLAY --unsetenv DBUS_SESSION_BUS_ADDRESS \
-    --unsetenv DBUS_SYSTEM_BUS_ADDRESS --unsetenv IBUS_ADDRESS --unsetenv XAUTHORITY --unsetenv PULSE_SERVER \
-    bash "${BASH_SOURCE[0]}" --inside "$run"
+  source "$ROOT/scripts/lib/test-sandbox.sh"
+  voco_bwrap "$run" "${native_mounts[@]}" "${apparmor_mounts[@]}" "${package_mounts[@]}" \
+    --setenv VOCO_PANEL_SHELL_MODE "$shell_mode" --setenv VOCO_PANEL_SUITE "$suite" \
+    -- bash "${BASH_SOURCE[0]}" --inside "$run"
   exit
 fi
 run=${2:?}

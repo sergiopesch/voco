@@ -12,7 +12,7 @@ if [[ ${1:-} != --inside ]]; then
   chmod 700 "$run/runtime" "$run/pulse"
   cp -a "$VOCO_KDE_DEPS/../etc/xdg/." "$run/config/"
   mkdir -p "$run/evidence/sources"
-  cp "$ROOT/scripts/test-native-kde.sh" "$ROOT/scripts/test-native-kde.py" "$ROOT/scripts/test-native-wayland.py" "$run/evidence/sources/"
+  cp "$ROOT/scripts/test-native-kde.sh" "$ROOT/scripts/test-native-kde.py" "$ROOT/scripts/test-native-wayland.py" "$ROOT/scripts/native_tray_app.py" "$run/evidence/sources/"
   if [[ -n ${VOCO_KDE_APP_BINARY:-} ]]; then
     [[ -f "$VOCO_KDE_APP_BINARY" && -x "$VOCO_KDE_APP_BINARY" ]]
     cp "$VOCO_KDE_APP_BINARY" "$run/voco"

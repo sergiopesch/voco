@@ -22,7 +22,7 @@ if [[ ${1:-} != --inside ]]; then
   mkdir -p "$run"/{home,runtime,config,cache,data,state,evidence,pulse}
   chmod 700 "$run/runtime" "$run/pulse" "$run/state"
   mkdir -p "$run/evidence/sources"
-  cp "$ROOT/scripts/test-native-gnome.sh" "$ROOT/scripts/test-native-gnome.py" "$ROOT/scripts/test-native-wayland.py" "$ROOT/scripts/audio_continuity.py" "$ROOT/scripts/test_native_onboarding_capture.py" "$ROOT/scripts/test_native_crash_review.py" "$run/evidence/sources/"
+  cp "$ROOT/scripts/test-native-gnome.sh" "$ROOT/scripts/test-native-gnome.py" "$ROOT/scripts/test-native-wayland.py" "$ROOT/scripts/audio_continuity.py" "$ROOT/scripts/test_native_onboarding_capture.py" "$ROOT/scripts/test_native_crash_review.py" "$ROOT/scripts/native_tray_app.py" "$run/evidence/sources/"
   mkdir -p "$run/data/gnome-shell/extensions/voco-private-probe@test.invalid"
   cp "$ROOT/scripts/fixtures/gnome-private-probe/"* "$run/data/gnome-shell/extensions/voco-private-probe@test.invalid/"
   cp -a "$ROOT/scripts/fixtures/gnome-private-probe" "$run/evidence/sources/"

@@ -14,25 +14,17 @@ if [[ ${1:-} != --inside ]]; then
   trap 'status=$?; /usr/bin/python3 "$ROOT/scripts/test-native-wayland.py" "$run" --manifest "$status"; mkdir -p "$VOCO_WAYLAND_EVIDENCE_DIR"; cp -a "$run/evidence/." "$VOCO_WAYLAND_EVIDENCE_DIR/"; rm -rf "$run"; exit "$status"' EXIT
   mkdir -p "$run"/{home,runtime,config,cache,data,state,evidence,pulse}
   chmod 700 "$run/runtime" "$run/pulse"
-  mkdir -p "$run/data/voco/models"
-  chmod 755 "$run/data/voco" "$run/data/voco/models"
   if [[ -n ${VOCO_WAYLAND_APP_BINARY:-} ]]; then
     [[ -f "$VOCO_WAYLAND_APP_BINARY" && -x "$VOCO_WAYLAND_APP_BINARY" ]] || { echo "App must be an executable file" >&2; exit 1; }
     cp "$VOCO_WAYLAND_APP_BINARY" "$run/voco"
     source "$(dirname "${BASH_SOURCE[0]}")/lib/test-speech-runtime.sh"
     voco_stage_test_speech "$run"
   fi
-  bwrap --die-with-parent --new-session --unshare-ipc --unshare-net --unshare-pid --unshare-uts \
-    --ro-bind / / --dev /dev --proc /proc --tmpfs /tmp --tmpfs /run/user --tmpfs /run/dbus \
-    --bind "$run" "$run" --ro-bind "$VOCO_WAYLAND_DEPS" /tmp/wayland-deps \
+  source "$(dirname "${BASH_SOURCE[0]}")/lib/test-sandbox.sh"
+  voco_bwrap "$run" --ro-bind "$VOCO_WAYLAND_DEPS" /tmp/wayland-deps \
     --ro-bind "${VOCO_NATIVE_DEPS:-/usr}" /tmp/native-deps \
     --dir "/run/user/$(id -u)" --bind "$run/pulse" "/run/user/$(id -u)/pulse" \
-    --setenv HOME "$run/home" --setenv XDG_RUNTIME_DIR "$run/runtime" \
-    --setenv XDG_CONFIG_HOME "$run/config" --setenv XDG_CACHE_HOME "$run/cache" \
-    --setenv XDG_DATA_HOME "$run/data" --setenv XDG_STATE_HOME "$run/state" \
-    --unsetenv DISPLAY --unsetenv WAYLAND_DISPLAY --unsetenv DBUS_SESSION_BUS_ADDRESS \
-    --unsetenv IBUS_ADDRESS --unsetenv XAUTHORITY --unsetenv PULSE_SERVER \
-    bash "${BASH_SOURCE[0]}" --inside "$run"
+    -- bash "${BASH_SOURCE[0]}" --inside "$run"
   exit
 fi
 run=${2:?}

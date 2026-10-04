@@ -1,179 +1,34 @@
-import { chromium } from 'playwright';
-import { createServer } from 'vite';
-import { readFile, writeFile, mkdir, realpath } from 'node:fs/promises';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { prepareEvidence, productionShell, openRenderer, routeTauriModules, routeAppShell, installRendererMocks } from './renderer-fixture.mjs';
 // Native source selection, the onboarding voice test and native/WebKit capture-failure
 // recovery in the actual App, hooks, store and ControlPanel; every native/media boundary
 // is mocked. These checks never request host microphone access or model inference.
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const out = process.env.VOCO_RENDERER_EVIDENCE_DIR;
-if (!out)
-    throw Error('Exclusive VOCO_RENDERER_EVIDENCE_DIR required');
-await mkdir(out, {
-    recursive: false
-});
-await writeFile(path.join(out, 'harness.mjs'), await readFile(fileURLToPath(import.meta.url)), {
-    flag: 'wx'
-});
+const { out, save } = await prepareEvidence(import.meta.url, [
+    'src/main.tsx', 'src/styles.css', 'src/lib/shortcutPresentation.ts', 'src/lib/windowRemap.ts', 'src/types/index.ts', 'src/App.tsx', 'src/components/ControlPanel.tsx', 'src/components/Onboarding.tsx', 'src/lib/dictationRecording.ts', 'src/lib/dictationStream.ts', 'src/lib/microphoneRefresh.ts', 'src/lib/audioInput.ts', 'src/store/useStore.ts', 'src/lib/nativeCapture.ts', 'src/lib/nativeCaptureAudit.ts', 'src/lib/captureDescriptor.ts', 'src/lib/tauri.ts', 'src/lib/nativeCaptureSettings.ts', 'src/hooks/useNativeCaptureSettings.ts', 'src/components/NativeMicrophoneSettings.tsx', 'src/hooks/useDictation.ts'
+]);
 // Mirror the production entry point's CSS imports, including its packaged fonts.
-const mainEntry = await readFile(path.join(root, 'apps/desktop/src/main.tsx'), 'utf8');
-const pageShell = await readFile(path.join(root, 'apps/desktop/index.html'), 'utf8');
-assert.equal(pageShell.match(/<script type="module" src="\/src\/main\.tsx"><\/script>/g)?.length, 1);
-const styleSpecifiers = [...mainEntry.matchAll(/import\s+["']([^"']+\.css)["'];/g)].map(match => match[1]);
-assert.ok(styleSpecifiers.includes('./styles.css') && styleSpecifiers.some(name => name.startsWith('@fontsource/geist/')));
-const styleBindings = {};
-for (const name of styleSpecifiers) {
-    const file = name.startsWith('./') ? path.join(root, 'apps/desktop/src', name) : path.join(root, 'node_modules', name);
-    styleBindings[name] = { path: await realpath(file), sha256: createHash('sha256').update(await readFile(file)).digest('hex') };
-}
-// This HTML is intercepted after Vite's HTML import rewriting. Request CSS as
-// stylesheets so the browser does not attempt to execute raw CSS as JavaScript.
-const styleLinks = Object.values(styleBindings).map(binding => `<link rel="stylesheet" href="${encodeURI('/@fs' + binding.path)}?direct">`).join('\n');
-await writeFile(path.join(out, 'STYLE-SOURCE.json'), JSON.stringify({ mainSha256: createHash('sha256').update(mainEntry).digest('hex'), imports: styleBindings }, null, 2) + '\n', { flag: 'wx' });
+const shell = await productionShell(out);
 const results = [], errors = [], consoleWarnings = [];
-let server, browser, page;
+let server, browser, page, origin;
 const chooseNative = async value => {
     await page.getByRole('combobox', { name: 'Microphone', exact: true }).click();
     await page.getByRole('listbox', { name: 'Microphone', exact: true }).locator(`[data-value="${value}"]`).click();
 };
-const save = (n, v) => writeFile(path.join(out, n), JSON.stringify(v, null, 2) + '\n', {
-    flag: 'wx'
-});
-const files = [
-    'src/main.tsx', 'src/styles.css', 'src/lib/shortcutPresentation.ts', 'src/lib/windowRemap.ts', 'src/types/index.ts', 'src/App.tsx', 'src/components/ControlPanel.tsx', 'src/components/Onboarding.tsx', 'src/lib/dictationRecording.ts', 'src/lib/dictationStream.ts', 'src/lib/microphoneRefresh.ts', 'src/lib/audioInput.ts', 'src/store/useStore.ts', 'src/lib/nativeCapture.ts', 'src/lib/nativeCaptureAudit.ts', 'src/lib/captureDescriptor.ts', 'src/lib/tauri.ts', 'src/lib/nativeCaptureSettings.ts', 'src/hooks/useNativeCaptureSettings.ts', 'src/components/NativeMicrophoneSettings.tsx', 'src/hooks/useDictation.ts'
-];
-await save('SOURCE.json', Object.fromEntries(await Promise.all(files.map(async (f) => [
-    f, createHash('sha256').update(await readFile(path.join(root, 'apps/desktop', f))).digest('hex')
-]))));
 try {
-    server = await createServer({
-        configFile: path.join(root, 'apps/desktop/vite.config.ts'),
-        root: path.join(root, 'apps/desktop'),
-        logLevel: 'warn',
-        server: {
-            host: '127.0.0.1',
-            port: Number(process.env.VOCO_RENDERER_PORT ?? 0),
-            hmr: false,
-            fs: {
-                allow: [
-                    root, await realpath(path.join(root, 'node_modules'))
-                ]
-            }
-        }
-    });
-    await server.listen();
-    const origin = server.resolvedUrls.local[0].replace(/\/$/, '');
-    browser = await chromium.launch({
-        headless: true
-    });
-    const context = await browser.newContext({
-        viewport: {
-            width: 1100,
-            height: 800
-        }
-    });
-    await context.grantPermissions([
-        'local-network-access'
-    ], {
-        origin
-    });
-    page = await context.newPage();
-    page.setDefaultTimeout(8000);
-    page.on('pageerror', e => errors.push(e.message));
+    ({ server, browser, page, origin } = await openRenderer(errors));
     page.on('console', message => { if (['warning', 'error'].includes(message.type())) consoleWarnings.push({ type: message.type(), text: message.text() }); });
-    const tauri = await readFile(path.join(root, 'apps/desktop/src/lib/tauri.ts'), 'utf8');
-    const names = [
-        ...tauri.matchAll(/export (?:async )?function (\w+)/g)
-    ].map(x => x[1]);
-    const native = names.map(n => `export const ${n} = async (...args) => window.nativeCall(${JSON.stringify(n)},args);`).join('\n');
-    await page.route('**/src/lib/tauri.ts*', r => r.fulfill({
-        contentType: 'application/javascript',
-        body: native
-    }));
-    await page.route('**/@tauri-apps_api_core.js*', r => r.fulfill({contentType:'application/javascript',body:'export const invoke=(name,args)=>window.nativeInvoke(name,args); export class Channel {}'}));
-    await page.route('**/@tauri-apps_api_app.js*', r => r.fulfill({
-        contentType: 'application/javascript',
-        body: 'export const getVersion=async()=>"2026.0.21";'
-    }));
-    await page.route('**/@tauri-apps_api_window.js*', r => r.fulfill({
-        contentType: 'application/javascript',
-        body: `
-          const windowHandle = new Proxy({}, {
-            get: (_, name) => {
-              if (name === 'listen') return async (event, callback) => {
-                window.listeners[event] = callback;
-                return () => delete window.listeners[event];
-              };
-              if (name === 'onFocusChanged') return async callback => {
-                window.focusListeners.add(callback);
-                return () => window.focusListeners.delete(callback);
-              };
-              if (name.startsWith('on')) return async () => () => {};
-              if (name === 'scaleFactor') return async () => 1;
-              if (name === 'isFocused') return async () => {
-                if (window.deferFocusRead) return new Promise(resolve => window.focusReads.push(resolve));
-                return window.focused;
-              };
-              return async () => { window.calls.push(['window:' + name]); };
-            }
-          });
-          export const getCurrentWindow = () => windowHandle;
-          export const currentMonitor = async () => null;
-          export const availableMonitors = async () => [];
-        `
-    }));
-    await page.route('https://api.github.com/**', r => r.fulfill({
-        json: []
-    }));
-    await page.route('**/app-microphone-check*', r => r.fulfill({
-        contentType: 'text/html',
-        body: `
-          ${pageShell.split('<script type="module" src="/src/main.tsx"></script>')[0]}
-          ${styleLinks}
-          <script type="module">
-            import React from '/node_modules/.vite/deps/react.js';
-            import ReactDOM from '/node_modules/.vite/deps/react-dom_client.js';
-            import { App } from '/src/App.tsx';
-            import { useStore } from '/src/store/useStore.ts';
-            window.store = useStore;
-            window.reactRoot = ReactDOM.createRoot(document.getElementById('root'));
-            window.reactRoot.render(React.createElement(App));
-          </script>
-          ${pageShell.split('<script type="module" src="/src/main.tsx"></script>')[1]}
-        `
-    }));
-    // Install deterministic device, permission and audio mocks before App imports.
+    await routeTauriModules(page, 'export const invoke=(name,args)=>window.nativeInvoke(name,args); export class Channel {}');
+    await routeAppShell(page, shell);
+    await installRendererMocks(page, { worklet: true });
     await page.addInitScript(() => {
-        window.listeners = {};
-        window.focusListeners = new Set();
-        window.focusReads = [];
-        window.focused = true;
         Object.defineProperty(navigator, 'clipboard', { configurable: true, value: {
             writeText: async text => {
                 if (window.failClipboard) throw Error('Fixture clipboard unavailable');
                 window.copiedText = text;
             }
         } });
-        window.calls = [];
-        window.tracks = [];
-        window.enums = [];
-        window.probes = [];
-        window.deferEnums = false;
-        window.deferProbe = false;
-        window.permissionMode = 'missing';
-        window.contexts = [];
-        window.pendingResumes = [];
-        window.resumeMode = 'normal';
-        window.config = {
-            hotkey: 'Alt+D',
-            selectedMic: null,
-            onboardingCompleted: false,
-            updateChannel: 'stable',
-            installChannel: 'github-release',
-        };
         window.nativeCommands=[];window.auditUploads=[];
         window.captureScenario=new URL(location.href).searchParams.get('scenario')||'enabled';
         window.source={selectionToken:'token-1',name:'fixture-source',label:'Public fixture source',index:62,objectSerial:'62',isMonitor:false};
@@ -218,185 +73,28 @@ try {
           if(name==='native_capture_cancel')return null;
           throw Error('Unexpected native capture call '+name);
         };
-        window.nativeCall = async (name, args) => {
-            window.calls.push([
-                name, ...args
-            ]);
-            if(name==='debugNativeCaptureEnabled')return window.auditEnabled===true&&window.auditUploads.length===0;
-            if(name==='getDesktopPasteStatus')return {enabled:true,available:true,streamingEnabled:true,detail:'Desktop input is ready.'};
-            if(name==='pasteDesktopText')return {outcome:'dispatched'};
-            if(name==='copyDesktopText'){
+        window.nativeHandlers = {
+            debugNativeCaptureEnabled: () => window.auditEnabled===true&&window.auditUploads.length===0,
+            getDesktopPasteStatus: () => ({enabled:true,available:true,streamingEnabled:true,detail:'Desktop input is ready.'}),
+            pasteDesktopText: () => ({outcome:'dispatched'}),
+            copyDesktopText: async args => {
                 if(window.failClipboard)throw {outcome:'no-mutation',message:'Fixture clipboard unavailable',clipboardChanged:false};
                 if(window.holdCopy)await window.holdCopy;
                 window.copiedText=args[0];
-                return;
-            }
-            if(name==='saveDebugNativeRetainedSource'){
+            },
+            saveDebugNativeRetainedSource: args => {
                 if(!window.stopped||window.ack!==4)throw Error('Retained-source export preceded terminal ACK');
                 window.auditUploads.push(new Uint8Array(args[0]));
                 return '/mock-private-renderer/COMMIT.json';
-            }
-            if (name === 'getConfig' && window.captureScenario === 'config-error') throw new Error('Fixture settings file is malformed.');
-            if (name === 'getConfig')
-                return {
-                    revision: 1,
-                    config: window.config
-                };
-            if (name === 'getPanelSetupStatus') return window.panelSetupStatus ?? {status:'active', detail:'Live panel bars and Stop are active.',canEnable:false};
-            if (name === 'enableGnomePanel') { window.panelSetupStatus={status:'restart',detail:'Panel enabled. Sign out and back in to load it.',canEnable:false}; return window.panelSetupStatus; }
-            if (name === 'takeLauncherActivation') { const pending=window.activationPending;window.activationPending=false;return pending; }
-            if (name === 'getDesktopInputStatus') return {available:true,detail:'Desktop input is ready.'};
-            if (name === 'getRuntimeDiagnostics')
-                return {
-                    sessionType: 'wayland',
-                    typeSimulation: {
-                        available: true,
-                        missingCommands: []
-                    },
-                    clipboard: {
-                        available: true,
-                        missingCommands: []
-                    },
-                    ibusShortcut: {
-                        setupState: 'ready',
-                        available: true
-                    }
-                };
-            if (name === 'beginRuntimeStatusSession')
-                return 1;
-            if (name === 'loadCachedUpdateState')
-                return null;
-            if (name === 'createRealtimeClientSecret')
-                return new Promise(() => {
-                });
-            return false;
-        };
-        const media = new EventTarget();
-        media.enumerateDevices = () => {
-            window.enumCount = (window.enumCount || 0) + 1;
-            return window.deferEnums ? new Promise(resolve => window.enums.push(resolve)) : Promise.resolve([
-                {
-                    kind: 'audioinput',
-                    deviceId: window.enumDevice || 'mic-a',
-                    label: 'Mic A'
-                }
-            ]);
-        };
-        const stream = () => {
-            const track = new EventTarget();
-            track.readyState = 'live';
-            track.stop = () => {
-                track.readyState = 'ended';
-                track.stops = (track.stops || 0) + 1;
-            };
-            window.tracks.push(track);
-            return {
-                getTracks: () => [
-                    track
-                ],
-                getAudioTracks: () => [
-                    track
-                ]
-            };
-        };
-        media.getUserMedia = async () => {
-            window.streamRequests = (window.streamRequests || 0) + 1;
-            if (window.failNextStream) {
-                window.failNextStream = false;
-                throw new DOMException("Initial preview failure", "NotReadableError");
-            }
-            if (window.deferProbe)
-                return new Promise((resolve, reject) => window.probes.push({
-                    resolve: () => resolve(stream()),
-                    reject
-                }));
-            return stream();
-        };
-        Object.defineProperty(navigator, 'mediaDevices', {
-            configurable: true,
-            value: media
-        });
-        window.setPermission = mode => {
-            window.permissionMode = mode;
-            Object.defineProperty(navigator, 'permissions', {
-                configurable: true,
-                value: mode === 'missing' ? undefined : {
-                    query: () => {
-                        if (mode === 'pending')
-                            return new Promise(resolve => window.resolvePermission = resolve);
-                        if (mode === 'throw')
-                            throw Error('unsupported');
-                        if (mode === 'reject')
-                            return Promise.reject(Error('unsupported'));
-                        return Promise.resolve({
-                            state: mode
-                        });
-                    }
-                }
-            });
-        };
-        window.setPermission('missing');
-        class Node {
-            connect() { return this;
-            }
-            disconnect() { return this;
-            }
-        }
-        window.AudioWorkletNode = class extends Node {
-          constructor() {
-            super(); window.captureWorklet = this;
-            this.port = {onmessage:null,postMessage:()=>queueMicrotask(()=>this.port.onmessage?.({data:{type:'flushed',complete:true}})),close(){}};
-          }
-        };
-        window.AudioContext = class {
-            constructor() { window.contexts.push(this); }
-            sourceConnections = 0;
-            resumeCalls = 0;
-            closeCalls = 0;
-            state = 'suspended';
-            sampleRate = 16000;
-            destination = {};
-            audioWorklet = {
-                addModule: async () => { window.workletLoads=(window.workletLoads||0)+1;
-                }
-            };
-            resume() {
-                this.resumeCalls += 1;
-                if (window.resumeMode === 'reject') return Promise.reject(new Error('Preview resume rejected'));
-                if (window.resumeMode === 'pending') return new Promise((resolve, reject) => {
-                    window.pendingResumes.push({
-                        context: this,
-                        resolve: () => { if (this.state !== 'closed') this.state = 'running'; resolve(); },
-                        reject,
-                    });
-                });
-                if (window.resumeMode !== 'stays-suspended') this.state = 'running';
-                return Promise.resolve();
-            }
-            close() {
-                this.closeCalls += 1;
-                this.state = 'closed';
-                return Promise.resolve();
-            }
-            currentTime = 0;
-            createOscillator() {
-                const node = Object.assign(new Node(), { frequency: { value: 0 }, start() { window.speakerTests = (window.speakerTests || 0) + 1; }, stop() { queueMicrotask(() => node.onended?.()); } });
-                return node;
-            }
-            createGain() { return Object.assign(new Node(), { gain: { setValueAtTime() {}, linearRampToValueAtTime() {} } }); }
-            createMediaStreamSource() {
-                this.sourceConnections += 1;
-                return new Node();
-            }
-            createAnalyser() {
-                return Object.assign(new Node(), {
-                    fftSize: 512,
-                    getFloatTimeDomainData: a => {
-                        for (let i = 0; i < a.length; i++)
-                            a[i] = this.state === 'running' ? Math.sin(i / 8) * .2 : 0;
-                    }
-                });
-            }
+            },
+            getConfig: () => {
+                if (window.captureScenario === 'config-error') throw new Error('Fixture settings file is malformed.');
+                return { revision: 1, config: window.config };
+            },
+            getPanelSetupStatus: () => window.panelSetupStatus ?? {status:'active', detail:'Live panel bars and Stop are active.',canEnable:false},
+            enableGnomePanel: () => { window.panelSetupStatus={status:'restart',detail:'Panel enabled. Sign out and back in to load it.',canEnable:false}; return window.panelSetupStatus; },
+            takeLauncherActivation: () => { const pending=window.activationPending;window.activationPending=false;return pending; },
+            getDesktopInputStatus: () => ({available:true,detail:'Desktop input is ready.'}),
         };
     });
     const captureStyledPanel = async (name, target, viewport) => {

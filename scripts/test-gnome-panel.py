@@ -13,9 +13,12 @@ from gi.repository import Gio, GLib
 root = Path(sys.argv[1]); evidence = root / 'evidence'
 # test-gnome-panel.sh chooses the mode from the Shell's major version.
 mode = os.environ['VOCO_PANEL_SHELL_MODE']; assert mode in ('nested', 'headless'), mode
+# bridge skips the synthetic cases and checks only the app's tray bridge.
+suite = os.environ['VOCO_PANEL_SUITE']; assert suite in ('full', 'bridge'), suite
 headless = mode == 'headless'
 shell_version = subprocess.check_output(['gnome-shell', '--version'], text=True).split()[-1]
-report = {'passed': False, 'scope': f'GNOME {shell_version.split(".")[0]} {mode} Wayland, synthetic app service',
+report = {'passed': False, 'suite': suite, 'scope': f'GNOME {shell_version.split(".")[0]} {mode} Wayland, ' +
+          ('synthetic app service' if suite == 'full' else "the app's tray bridge, without the synthetic cases"),
           'shellVersion': shell_version, 'states': {}}
 state = dict(version=1, token='1:1', stopSession='1:1', status='idle', description='Ready', canStop=False, canOpen=True, level=0)
 actions = []; attached = []; detached = []; fail_next = []; stalled = []; stall_state = []
@@ -204,6 +207,89 @@ try:
         checked = subprocess.run([str(root/'voco'), '--check-panel'], capture_output=True, text=True, timeout=6)
         assert checked.returncode == 0 and 'active' in checked.stdout, checked
         report['freshPanelSetup']['afterSessionRestart'] = checked.stdout
+    def native_bridge():
+        # The real app takes over org.voco.Panel from the synthetic service.
+        global owner, app
+        Gio.bus_unown_name(owner); owner=None; pump(.3)
+        assert not inspect()['indicator']['visible'], 'The synthetic service stayed attached'
+        # Startup clears the icons an earlier VOCO left; a second launch never touches them.
+        stale = root / 'runtime/voco/tray-1-0'
+        stale.parent.mkdir(mode=0o700, exist_ok=True); stale.mkdir(mode=0o700)
+        (stale / 'ready.png').write_bytes(b'')
+        app_log = (evidence / 'app.log').open('w')
+        app_env = {**os.environ, 'WAYLAND_DISPLAY':'voco-panel-test', 'GDK_BACKEND':'wayland',
+            'WEBKIT_DISABLE_COMPOSITING_MODE':'1'}
+        app = subprocess.Popen([str(root / 'voco')], env=app_env, stdout=app_log, stderr=subprocess.STDOUT)
+        for _ in range(150):
+            pump(.1)
+            assert app.poll() is None, 'Application exited during bridge startup'
+            if inspect()['indicator']['visible']: break
+        else: raise AssertionError('Native application bridge did not attach')
+        assert not stale.exists(), 'Startup kept the icons an earlier VOCO left behind'
+        report['staleTrayIconsRemoved'] = True
+        native = json.loads(call('NativeState').unpack()[0])
+        assert native['version'] == 1 and not native['canStop'], native
+        assert native.get('shortcutAccelerator') == '<Alt>d' and native.get('stopShortcutToken') is None, native
+        report['nativeBridgeState'] = native
+        try:
+            bus.call_sync('org.voco.Panel','/org/voco/Panel','org.voco.Panel1','GetState',None,None,Gio.DBusCallFlags.NONE,1500,None)
+            raise AssertionError('Unattached client read native panel state')
+        except GLib.Error as error:
+            assert 'NotAttached' in str(error), error
+        report['unattachedClientRejected'] = True
+        for name, params in (('ReserveShortcut', GLib.Variant('(s)', ('<Alt>d',))),
+                             ('ReserveStopShortcut', GLib.Variant('(s)', (native['token'],))),
+                             ('Action', GLib.Variant('(ss)', ('shortcut', '')))):
+            try:
+                bus.call_sync('org.voco.Panel','/org/voco/Panel','org.voco.Panel1',name,params,None,Gio.DBusCallFlags.NONE,1500,None)
+                raise AssertionError(f'Unattached client called {name}')
+            except GLib.Error as error:
+                assert 'NotAttached' in str(error), error
+        report['unattachedShortcutReservationRejected'] = True
+        attach = bus.call_sync('org.voco.Panel','/org/voco/Panel','org.voco.Panel1','Attach',None,None,Gio.DBusCallFlags.NONE,1500,None).unpack()[0]
+        assert attach is False
+        report['nonShellAttachRejected'] = True
+        screenshot('native-bridge')
+        values = bus.call_sync('org.kde.StatusNotifierWatcher','/StatusNotifierWatcher',
+            'org.freedesktop.DBus.Properties','Get',GLib.Variant('(ss)',
+            ('org.kde.StatusNotifierWatcher','RegisteredStatusNotifierItems')),None,Gio.DBusCallFlags.NONE,1500,None).unpack()[0]
+        assert len(values) == 1, values
+        identifier = values[0]
+        if '@/' in identifier: service, item_path = identifier.split('@',1)
+        elif '/' in identifier:
+            service, item_path = identifier.split('/',1); item_path = '/' + item_path
+        else: service, item_path = identifier, '/StatusNotifierItem'
+        def tray_status():
+            return bus.call_sync(service,item_path,'org.freedesktop.DBus.Properties','Get',
+                GLib.Variant('(ss)',('org.kde.StatusNotifierItem','Status')),None,Gio.DBusCallFlags.NONE,1500,None).unpack()[0]
+        assert tray_status() == 'Passive', tray_status()
+        subprocess.run(['gnome-extensions','disable','voco-panel@voco.local'],check=True)
+        pump(.4)
+        assert tray_status() == 'Active', tray_status()
+        report['nativeTrayRestoredOnDisable'] = True
+        def tray_property(name):
+            return bus.call_sync(service,item_path,'org.freedesktop.DBus.Properties','Get',
+                GLib.Variant('(ss)',('org.kde.StatusNotifierItem',name)),None,Gio.DBusCallFlags.NONE,1500,None).unpack()[0]
+        report['fallbackLabel'] = tray_property('XAyatanaLabel')
+        # Only startup and setup problems carry a label; Ready and dictating share the bare icon.
+        assert report['fallbackLabel'] in ['', 'Starting VOCO', 'Check setup']
+        old_icon = Path(tray_property('IconName'))
+        assert old_icon.exists()
+        pump(2)
+        assert old_icon.exists(), 'Advertised icon deleted while delayed reader still needs it'
+        icon_files = list(old_icon.parent.glob('*.png'))
+        assert len(icon_files) == 68, icon_files  # three states, 64 meter frames, library initial image
+        gi.require_version('GdkPixbuf','2.0')
+        from gi.repository import GdkPixbuf
+        for icon in icon_files: GdkPixbuf.Pixbuf.new_from_file(str(icon))
+        report['retainedIconFiles'] = len(icon_files)
+        second = subprocess.run([str(root/'voco')], env=app_env, capture_output=True, text=True, timeout=5)
+        assert second.returncode == 0, second.stderr
+        assert old_icon.exists(), 'A second launch removed the running icons'
+        report['secondLaunchAccepted'] = True
+    if suite == 'bridge':
+        native_bridge(); report['passed'] = True
+        sys.exit()  # finally still writes the results and stops the Shell
     report['compositorAnimationsInitially'] = inspect()['animations']
     report['forceAnimationsForSoftwareRenderer'] = True
     assert inspect()['animations']
@@ -558,83 +644,7 @@ try:
     report['actions']=actions
     report['modifierGuard'] = {'callerAuthenticated': True, 'allEightModifiers': True,
         'heldStreamingSeparatorBlocked': True, 'releasePreservedText': True}
-    if (root / 'voco').exists():
-        Gio.bus_unown_name(owner); owner=None; pump(.3)
-        # Startup clears the icons an earlier VOCO left; a second launch never touches them.
-        stale = root / 'runtime/voco/tray-1-0'
-        stale.parent.mkdir(mode=0o700, exist_ok=True); stale.mkdir(mode=0o700)
-        (stale / 'ready.png').write_bytes(b'')
-        app_log = (evidence / 'app.log').open('w')
-        app = subprocess.Popen([str(root / 'voco')], env={**os.environ,
-            'WAYLAND_DISPLAY':'voco-panel-test', 'GDK_BACKEND':'wayland',
-            'WEBKIT_DISABLE_COMPOSITING_MODE':'1'}, stdout=app_log, stderr=subprocess.STDOUT)
-        for _ in range(150):
-            pump(.1)
-            assert app.poll() is None, 'Application exited during bridge startup'
-            if inspect()['indicator']['visible']: break
-        else: raise AssertionError('Native application bridge did not attach')
-        assert not stale.exists(), 'Startup kept the icons an earlier VOCO left behind'
-        report['staleTrayIconsRemoved'] = True
-        native = json.loads(call('NativeState').unpack()[0])
-        assert native['version'] == 1 and not native['canStop'], native
-        assert native.get('shortcutAccelerator') == '<Alt>d' and native.get('stopShortcutToken') is None, native
-        report['nativeBridgeState'] = native
-        try:
-            bus.call_sync('org.voco.Panel','/org/voco/Panel','org.voco.Panel1','GetState',None,None,Gio.DBusCallFlags.NONE,1500,None)
-            raise AssertionError('Unattached client read native panel state')
-        except GLib.Error as error:
-            assert 'NotAttached' in str(error), error
-        report['unattachedClientRejected'] = True
-        for name, params in (('ReserveShortcut', GLib.Variant('(s)', ('<Alt>d',))),
-                             ('ReserveStopShortcut', GLib.Variant('(s)', (native['token'],))),
-                             ('Action', GLib.Variant('(ss)', ('shortcut', '')))):
-            try:
-                bus.call_sync('org.voco.Panel','/org/voco/Panel','org.voco.Panel1',name,params,None,Gio.DBusCallFlags.NONE,1500,None)
-                raise AssertionError(f'Unattached client called {name}')
-            except GLib.Error as error:
-                assert 'NotAttached' in str(error), error
-        report['unattachedShortcutReservationRejected'] = True
-        attach = bus.call_sync('org.voco.Panel','/org/voco/Panel','org.voco.Panel1','Attach',None,None,Gio.DBusCallFlags.NONE,1500,None).unpack()[0]
-        assert attach is False
-        report['nonShellAttachRejected'] = True
-        screenshot('native-bridge')
-        values = bus.call_sync('org.kde.StatusNotifierWatcher','/StatusNotifierWatcher',
-            'org.freedesktop.DBus.Properties','Get',GLib.Variant('(ss)',
-            ('org.kde.StatusNotifierWatcher','RegisteredStatusNotifierItems')),None,Gio.DBusCallFlags.NONE,1500,None).unpack()[0]
-        assert len(values) == 1, values
-        identifier = values[0]
-        if '@/' in identifier: service, item_path = identifier.split('@',1)
-        elif '/' in identifier:
-            service, item_path = identifier.split('/',1); item_path = '/' + item_path
-        else: service, item_path = identifier, '/StatusNotifierItem'
-        def tray_status():
-            return bus.call_sync(service,item_path,'org.freedesktop.DBus.Properties','Get',
-                GLib.Variant('(ss)',('org.kde.StatusNotifierItem','Status')),None,Gio.DBusCallFlags.NONE,1500,None).unpack()[0]
-        assert tray_status() == 'Passive', tray_status()
-        subprocess.run(['gnome-extensions','disable','voco-panel@voco.local'],check=True)
-        pump(.4)
-        assert tray_status() == 'Active', tray_status()
-        report['nativeTrayRestoredOnDisable'] = True
-        def tray_property(name):
-            return bus.call_sync(service,item_path,'org.freedesktop.DBus.Properties','Get',
-                GLib.Variant('(ss)',('org.kde.StatusNotifierItem',name)),None,Gio.DBusCallFlags.NONE,1500,None).unpack()[0]
-        report['fallbackLabel'] = tray_property('XAyatanaLabel')
-        # Only startup and setup problems carry a label; Ready and dictating share the bare icon.
-        assert report['fallbackLabel'] in ['', 'Starting VOCO', 'Check setup']
-        old_icon = Path(tray_property('IconName'))
-        assert old_icon.exists()
-        pump(2)
-        assert old_icon.exists(), 'Advertised icon deleted while delayed reader still needs it'
-        icon_files = list(old_icon.parent.glob('*.png'))
-        assert len(icon_files) == 68, icon_files  # three states, 64 meter frames, library initial image
-        gi.require_version('GdkPixbuf','2.0')
-        from gi.repository import GdkPixbuf
-        for icon in icon_files: GdkPixbuf.Pixbuf.new_from_file(str(icon))
-        report['retainedIconFiles'] = len(icon_files)
-        second = subprocess.run([str(root/'voco')], capture_output=True, text=True, timeout=5)
-        assert second.returncode == 0, second.stderr
-        assert old_icon.exists(), 'A second launch removed the running icons'
-        report['secondLaunchAccepted'] = True
+    if (root / 'voco').exists(): native_bridge()
     report['passed']=True
 finally:
     (evidence/'results.json').write_text(json.dumps(report,indent=2))
