@@ -142,6 +142,9 @@ try:
     enabled = ['ubuntu-appindicators@ubuntu.com', 'voco-panel-probe@test.invalid']
     if not installed_mode: enabled.append('voco-panel@voco.local')
     settings = [('org.gnome.shell','enabled-extensions',str(enabled)),('org.gnome.shell','disable-user-extensions','false'),('org.gnome.desktop.interface','enable-animations','true')]
+    # Some distributions, Fedora among them, open GNOME's first-login tour as a
+    # modal dialog over the panel.
+    settings.append(('org.gnome.shell','welcome-dialog-last-shown-version',shell_version))
     if headless:
         # A headless Shell starts its pointer on the hot corner, where relative
         # motion presses the corner's barriers and could open the overview.
@@ -630,4 +633,9 @@ finally:
     (evidence/'results.json').write_text(json.dumps(report,indent=2))
     if app: app.terminate(); app.wait(timeout=10)
     if shell: shell.terminate(); shell.wait(timeout=10)
-    if system: system.terminate(); system.wait(timeout=5)
+    if system:
+        # GTK can hold GIO's shared system-bus connection, which by default
+        # raises SIGTERM in this process once that bus goes away.
+        try: Gio.bus_get_sync(Gio.BusType.SYSTEM, None).set_exit_on_close(False)
+        except GLib.Error: pass
+        system.terminate(); system.wait(timeout=5)
