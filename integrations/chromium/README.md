@@ -33,7 +33,9 @@ with no host permissions and no automatic content script.
    built-in `setRangeText`, dispatches `input`, and answers `applied`,
    `rejected` or `uncertain` with the new count. VOCO waits 2 seconds for it.
 5. **Stop.** `Alt+Shift+V` anywhere in the tab, VOCO's shortcut or **Stop** ends
-   the recording, and a final empty append closes the session. Words the field
+   the recording, and VOCO releases the field, which closes the session. Each
+   append already had its receipt, so VOCO doesn't check the field again after
+   the last one, just as it never checks a desktop paste. Words the field
    didn't take go to the clipboard, or to Review if the copy fails.
 
 ## When the field stops taking text

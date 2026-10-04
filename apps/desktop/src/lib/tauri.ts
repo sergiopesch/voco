@@ -115,13 +115,6 @@ export async function appendBrowserField(
   });
 }
 
-export async function finishBrowserField(
-  sessionId: number,
-  expectedCommittedText: string,
-): Promise<BrowserFieldStatus> {
-  return invoke<BrowserFieldStatus>("finish_browser_field", { sessionId, expectedCommittedText });
-}
-
 export async function cancelBrowserField(sessionId: number): Promise<BrowserFieldStatus> {
   return invoke<BrowserFieldStatus>("cancel_browser_field", { sessionId });
 }

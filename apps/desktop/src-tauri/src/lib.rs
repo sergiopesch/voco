@@ -857,20 +857,6 @@ fn append_browser_field(
 }
 
 #[tauri::command(async)]
-fn finish_browser_field(
-    browser: tauri::State<'_, BrowserIntegration>,
-    session_id: u64,
-    expected_committed_text: String,
-) -> Result<browser_broker::BrowserStatus, String> {
-    browser.session(session_id).ok_or(NO_BROWSER_FIELD)?.append(
-        session_id,
-        &expected_committed_text,
-        "",
-        true,
-    )
-}
-
-#[tauri::command(async)]
 fn cancel_browser_field(
     browser: tauri::State<'_, BrowserIntegration>,
     session_id: u64,
@@ -2130,7 +2116,6 @@ pub fn run() -> Result<(), String> {
             refresh_shortcut_heartbeat,
             ack_browser_stop,
             append_browser_field,
-            finish_browser_field,
             cancel_browser_field,
             release_browser_recording,
             begin_runtime_status_session,

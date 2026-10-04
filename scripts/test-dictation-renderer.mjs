@@ -59,7 +59,6 @@ export const cancelBrowserField = async (...args) => { calls.push(['cancelBrowse
 export const releaseBrowserRecording = async (triggerId) => { calls.push(['releaseBrowserRecording',triggerId]); };
 export const ackBrowserStop = async (triggerId) => { calls.push(['ackBrowserStop',triggerId]); };
 export const appendBrowserField = async (id,prefix,text) => { calls.push(['appendBrowserField',id,prefix,text]); if(window.deferCheckpoint) await new Promise(resolve=>window.resolveCheckpoint=resolve); return {...state(), focusLost:Boolean(window.focusChanged), committedCharacterCount:Array.from(prefix+text).length}; };
-export const finishBrowserField = async (id,prefix) => { calls.push(['finishBrowserField',id,prefix]); return {...state(), focusLost:Boolean(window.focusChanged), committedCharacterCount:Array.from(prefix).length}; };
 export const debugNativeCaptureEnabled = async () => false;
 export const saveDebugNativeRetainedSource = async () => null;
 export const traceHotkeyEvent = async (...args) => {(window.traceEvents??=[]).push(args);};
@@ -203,9 +202,22 @@ await page.evaluate(()=>window.hook.toggle('browser:fixture','stop'));
 await page.waitForFunction(()=>window.store.getState().status==='idle');
 await page.waitForFunction(()=>window.hook.cursorDeliveryState==='inactive');
 assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='appendBrowserField').map(c=>c.slice(2))),[['','Recovered words'],['Recovered words',' for manual review.']]);
-assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='finishBrowserField').map(c=>c.slice(2))),[['Recovered words for manual review.']]);
+// Each append had its receipt, so Stop only releases the lease.
+assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='cancelBrowserField').map(c=>c.slice(1))),[[101]]);
 assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>['pasteDesktopText','copyDesktopText','insertText'].includes(c[0]))),false);
-results.push('Browser recording streams Nemotron suffixes through its exact field lease and finalizes without replay.');
+results.push('Browser recording streams Nemotron suffixes through its exact field lease and releases it without replay.');
+
+await load();await page.evaluate(()=>{window.lease=true;window.streamFinalText='Recovered words';window.hook.toggle('browser:fixture','start');});
+await page.waitForFunction(()=>window.store.getState().status==='recording');
+await page.evaluate(()=>window.samples(1));
+await page.waitForFunction(()=>window.nativeCalls.some(c=>c[0]==='appendBrowserField'));
+// Focus moves after the last word landed, and Stop adds no words.
+await page.evaluate(()=>{window.focusChanged=true;window.hook.toggle('browser:fixture','stop');});
+await page.waitForFunction(()=>window.store.getState().status==='idle');
+assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='appendBrowserField').length),1);
+assert.equal(await page.evaluate(()=>window.store.getState().error),null);
+assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>['copyDesktopText','showNotification'].includes(c[0]))),false);
+results.push('A browser field that took every word ends cleanly at Stop, even after focus moved away.');
 
 await load();await page.evaluate(()=>{window.lease=true;window.focusChanged=true;window.hook.toggle('browser:fixture','start');});
 await page.waitForFunction(()=>window.store.getState().status==='recording');
@@ -214,7 +226,6 @@ await page.waitForFunction(()=>window.nativeCalls.some(c=>c[0]==='appendBrowserF
 await page.evaluate(()=>window.hook.toggle('browser:fixture','stop'));
 await page.waitForFunction(()=>window.store.getState().status==='idle',null,{timeout:6000});
 assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='appendBrowserField').length),1);
-assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>c[0]==='finishBrowserField')),false);
 // As after a failed paste, Stop copies the words the field may not have taken.
 assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='copyDesktopText').map(c=>c[1])),['Recovered words for manual review.']);
 assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>c[0]==='showNotification'&&c[1]==='Dictation copied to clipboard')),true);

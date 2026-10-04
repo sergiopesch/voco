@@ -673,11 +673,10 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       assertOutputAllowed(stoppingSessionId);
       const browser = browserDeliveryRef.current;
       browserDeliveryRef.current = null;
-      // A browser field that stopped taking text is handled like a failed
-      // paste: its lease is released and the rest is copied below.
-      if (undelivered) void browser?.cancel();
-      else await browser?.finish();
-      assertOutputAllowed(stoppingSessionId);
+      // Every append already had its exact receipt, so Stop only releases the
+      // lease, as a desktop paste is never checked again. A field that stopped
+      // taking text is handled like a failed paste: the rest is copied below.
+      void browser?.cancel();
       traceDictationEvent("dictation_desktop_stream_flush_completed", { durationMs: Math.round(performance.now() - started) }).catch(() => {});
       if (stopRequestedAtMs !== null) traceDictationEvent("dictation_stop_to_final_transcript", { durationMs: Math.round(performance.now() - stopRequestedAtMs) }).catch(() => {});
       dictationStreamRef.current = null;

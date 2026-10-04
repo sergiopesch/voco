@@ -483,14 +483,13 @@ it("takes the interrupted path when neither the clipboard nor Review can keep th
   expect(h.current.current.phase).toBe("idle");
 });
 
-it("copies the rest when a browser field stops taking text, without finishing its lease", async () => {
+it("copies the rest when a browser field stops taking text, releasing its lease", async () => {
   const h = harness();
   h.recordingWith(async () => ({ undelivered: " the rest.", uncertain: true }));
   h.pasteSession.current = false;
-  const browser = { finish: vi.fn(async () => {}), cancel: vi.fn(async () => {}) };
+  const browser = { cancel: vi.fn(async () => {}) };
   (h.env.browserDeliveryRef as { current: unknown }).current = browser;
   await h.stopRecording();
-  expect(browser.finish).not.toHaveBeenCalled();
   expect(browser.cancel).toHaveBeenCalled();
   expect(h.copy).toHaveBeenCalledExactlyOnceWith(" the rest.");
   expect(h.trace).toHaveBeenCalledWith("dictation_desktop_remainder_copied");
@@ -499,15 +498,23 @@ it("copies the rest when a browser field stops taking text, without finishing it
   expect(h.current.current.phase).toBe("idle");
 });
 
-it("finishes a browser field that took every word", async () => {
+it("ends cleanly when a browser field took every word, even if it changed afterwards", async () => {
   const h = harness();
   h.recordingWith(async () => ({ undelivered: "" }));
   h.pasteSession.current = false;
-  const browser = { finish: vi.fn(async () => {}), cancel: vi.fn(async () => {}) };
+  // A second check of the field would now fail: focus moved after the last receipt.
+  const browser = {
+    finish: vi.fn(async () => { throw new Error("The browser field didn't confirm the exact text. Check the field."); }),
+    cancel: vi.fn(async () => {}),
+  };
   (h.env.browserDeliveryRef as { current: unknown }).current = browser;
   await h.stopRecording();
-  expect(browser.finish).toHaveBeenCalledOnce();
+  expect(browser.finish).not.toHaveBeenCalled();
+  expect(browser.cancel).toHaveBeenCalledOnce();
   expect(h.copy).not.toHaveBeenCalled();
+  expect(h.notify).not.toHaveBeenCalled();
+  expect(h.setError).not.toHaveBeenCalledWith(expect.any(String));
+  expect(h.trace).toHaveBeenCalledWith("dictation_stop_to_idle", expect.anything());
   expect(h.current.current.phase).toBe("idle");
 });
 
