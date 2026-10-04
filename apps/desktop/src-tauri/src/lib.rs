@@ -395,10 +395,6 @@ fn prefers_evdev_hotkey(session_is_wayland: bool, hotkey: &str) -> bool {
     session_is_wayland && hotkey_to_evdev_mode(hotkey) != 255
 }
 
-fn should_register_global_shortcut(use_evdev_hotkey: bool) -> bool {
-    !use_evdev_hotkey
-}
-
 fn validate_dictation_hotkey(hotkey: &str) -> Result<(), String> {
     let shortcut = hotkey
         .parse::<tauri_plugin_global_shortcut::Shortcut>()
@@ -1026,8 +1022,12 @@ fn refresh_shortcut_config(
     Ok(())
 }
 
-fn should_register_shortcut_fallback(use_evdev: bool, consuming_context: bool) -> bool {
-    should_register_global_shortcut(use_evdev) && !consuming_context
+/// The global-shortcut plugin grabs keys through X11, where XWayland would see
+/// them only over X11 apps. So it registers only outside Wayland, and only while
+/// no IBus engine consumes the chord; a Wayland chord other than the evdev
+/// presets needs a desktop shortcut for `voco --toggle`.
+fn should_register_shortcut_fallback(session_is_wayland: bool, consuming_context: bool) -> bool {
+    !session_is_wayland && !consuming_context
 }
 
 fn schedule_shortcut_arbitration(
@@ -1036,7 +1036,7 @@ fn schedule_shortcut_arbitration(
     posts: &mut shortcut_arbitration::ArbitrationPosts,
 ) {
     let fallback = should_register_shortcut_fallback(
-        USE_EVDEV_HOTKEY.load(Ordering::SeqCst),
+        is_wayland_session(),
         IBUS_SHORTCUT_LEASE.has_authority(shortcut_monotonic_ms()),
     );
     if !posts.should_post(snapshot.revision, fallback, shortcut_monotonic_ms()) {
@@ -1055,7 +1055,7 @@ fn schedule_shortcut_arbitration(
             return;
         }
         let enable_plugin = should_register_shortcut_fallback(
-            USE_EVDEV_HOTKEY.load(Ordering::SeqCst),
+            is_wayland_session(),
             IBUS_SHORTCUT_LEASE.has_authority(shortcut_monotonic_ms()),
         );
         let result = sync_global_shortcut_binding(&handle, &hotkey, enable_plugin);
@@ -1317,7 +1317,7 @@ fn register_global_shortcut_listener(app: &tauri::AppHandle, hotkey: &str) -> Re
     let gesture = shortcut_arbitration::PluginGesture::new();
     // A root X11 passive grab sends keyboard input to VOCO while the chord is
     // held. Toggle on release so the following paste keys reach the focused app.
-    let complete_on_release = cfg!(target_os = "linux") && !is_wayland_session();
+    let complete_on_release = cfg!(target_os = "linux");
 
     app.global_shortcut()
         .on_shortcut(shortcut, move |_app, _shortcut, event| {
@@ -1390,7 +1390,8 @@ fn apply_hotkey_runtime_state(
     new_hotkey: &str,
     notify: bool,
 ) -> Result<(), String> {
-    let use_evdev_hotkey = prefers_evdev_hotkey(is_wayland_session(), new_hotkey);
+    let session_is_wayland = is_wayland_session();
+    let use_evdev_hotkey = prefers_evdev_hotkey(session_is_wayland, new_hotkey);
 
     #[cfg(target_os = "linux")]
     if use_evdev_hotkey {
@@ -1398,7 +1399,7 @@ fn apply_hotkey_runtime_state(
     }
 
     let enable_plugin = should_register_shortcut_fallback(
-        use_evdev_hotkey,
+        session_is_wayland,
         IBUS_SHORTCUT_LEASE.has_authority(shortcut_monotonic_ms()),
     );
     sync_global_shortcut_binding(app, new_hotkey, enable_plugin)?;
@@ -1412,6 +1413,8 @@ fn apply_hotkey_runtime_state(
         "Hotkey runtime backend preference: {}",
         if use_evdev_hotkey {
             "evdev"
+        } else if session_is_wayland {
+            "voco --toggle"
         } else {
             "global-shortcut"
         }
@@ -2135,16 +2138,19 @@ pub fn run() -> Result<(), String> {
                 let _ = hide_overlay_window(&window);
             }
 
+            // No IBus engine has answered yet, so only the session decides.
             if let Err(e) = sync_global_shortcut_binding(
                 &app_handle,
                 &hotkey,
-                should_register_global_shortcut(use_evdev_hotkey),
+                should_register_shortcut_fallback(wayland_session, false),
             ) {
                 warn!("{e}");
             }
 
             if use_evdev_hotkey {
                 info!("evdev hotkey backend selected for {hotkey}");
+            } else if wayland_session {
+                info!("{hotkey} on Wayland needs a desktop shortcut for voco --toggle");
             } else {
                 info!("global shortcut backend selected for {hotkey}");
             }
@@ -2454,9 +2460,18 @@ mod tests {
     }
 
     #[test]
-    fn global_shortcut_registration_depends_on_backend_selection() {
-        assert!(should_register_global_shortcut(false));
-        assert!(!should_register_global_shortcut(true));
+    fn the_x11_grab_registers_only_outside_wayland() {
+        let backends = |wayland, hotkey| {
+            (
+                prefers_evdev_hotkey(wayland, hotkey),
+                should_register_shortcut_fallback(wayland, false),
+            )
+        };
+        assert_eq!(backends(true, "Alt+D"), (true, false));
+        // VOCO registers nothing: it needs a desktop shortcut for voco --toggle.
+        assert_eq!(backends(true, "Ctrl+Shift+V"), (false, false));
+        assert_eq!(backends(false, "Ctrl+Shift+V"), (false, true));
+        assert_eq!(backends(false, "Alt+D"), (false, true));
     }
 
     #[cfg(target_os = "linux")]
