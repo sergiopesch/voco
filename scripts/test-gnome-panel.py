@@ -560,6 +560,10 @@ try:
         'heldStreamingSeparatorBlocked': True, 'releasePreservedText': True}
     if (root / 'voco').exists():
         Gio.bus_unown_name(owner); owner=None; pump(.3)
+        # Startup clears the icons an earlier VOCO left; a second launch never touches them.
+        stale = root / 'runtime/voco/tray-1-0'
+        stale.parent.mkdir(mode=0o700, exist_ok=True); stale.mkdir(mode=0o700)
+        (stale / 'ready.png').write_bytes(b'')
         app_log = (evidence / 'app.log').open('w')
         app = subprocess.Popen([str(root / 'voco')], env={**os.environ,
             'WAYLAND_DISPLAY':'voco-panel-test', 'GDK_BACKEND':'wayland',
@@ -569,6 +573,8 @@ try:
             assert app.poll() is None, 'Application exited during bridge startup'
             if inspect()['indicator']['visible']: break
         else: raise AssertionError('Native application bridge did not attach')
+        assert not stale.exists(), 'Startup kept the icons an earlier VOCO left behind'
+        report['staleTrayIconsRemoved'] = True
         native = json.loads(call('NativeState').unpack()[0])
         assert native['version'] == 1 and not native['canStop'], native
         assert native.get('shortcutAccelerator') == '<Alt>d' and native.get('stopShortcutToken') is None, native
@@ -627,6 +633,7 @@ try:
         report['retainedIconFiles'] = len(icon_files)
         second = subprocess.run([str(root/'voco')], capture_output=True, text=True, timeout=5)
         assert second.returncode == 0, second.stderr
+        assert old_icon.exists(), 'A second launch removed the running icons'
         report['secondLaunchAccepted'] = True
     report['passed']=True
 finally:

@@ -2072,9 +2072,9 @@ pub fn run() -> Result<(), String> {
     }
     native_capture_commands::initialize();
 
-    // Written before Tauri starts, so a full or unwritable runtime directory
-    // takes the ordinary startup-failure path.
-    let tray_icons = tray_icons::TrayIcons::new()
+    // Written before Tauri starts, in the directory this process has locked, so
+    // a full or unwritable one takes the ordinary startup-failure path.
+    let tray_icons = tray_icons::TrayIcons::new(single_instance_guard.directory())
         .map_err(|error| format!("could not write the tray icons: {error}"))?;
 
     tauri::Builder::default()

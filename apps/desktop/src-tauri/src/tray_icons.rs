@@ -88,8 +88,21 @@ fn meter_rgba(frame: usize) -> Vec<u8> {
 }
 
 impl TrayIcons {
-    pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
-        let root = crate::single_instance::runtime_directory()?;
+    /// Runs once, in the runtime directory whose single-instance lock this
+    /// process holds. Managed state is never dropped, so every earlier VOCO
+    /// left its icons there, and none of them can still be advertised.
+    pub fn new(root: &Path) -> Result<Self, Box<dyn std::error::Error>> {
+        if let Ok(entries) = fs::read_dir(root) {
+            for entry in entries.flatten() {
+                // Best effort: a directory that stays only moves this launch to
+                // the next name.
+                if entry.file_name().to_string_lossy().starts_with("tray-")
+                    && entry.file_type().is_ok_and(|kind| kind.is_dir())
+                {
+                    let _ = fs::remove_dir_all(entry.path());
+                }
+            }
+        }
         for sequence in 0..100 {
             let path = root.join(format!("tray-{}-{sequence}", std::process::id()));
             match fs::DirBuilder::new().mode(0o700).create(&path) {
@@ -136,6 +149,7 @@ impl TrayIcons {
     }
 }
 
+// Runs only when startup fails; the next launch removes what an exit leaves.
 impl Drop for TrayIcons {
     fn drop(&mut self) {
         let _ = fs::remove_dir_all(&self.0);
@@ -204,6 +218,45 @@ mod tests {
         }
         let startup = startup_icon().expect("generated tray icon should decode");
         assert_eq!(startup.dimensions(), (32, 32));
+    }
+
+    #[test]
+    fn startup_replaces_earlier_icons_and_keeps_their_neighbours() {
+        use std::os::unix::fs::{symlink, PermissionsExt};
+        let root = std::env::temp_dir().join(format!(
+            "voco-tray-icons-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::DirBuilder::new().mode(0o700).create(&root).unwrap();
+        let stale = root.join("tray-1-0");
+        fs::create_dir(&stale).unwrap();
+        fs::write(stale.join("ready.png"), b"").unwrap();
+        fs::write(root.join("instance.lock"), b"").unwrap();
+        let outside = root.join("outside");
+        fs::create_dir(&outside).unwrap();
+        symlink(&outside, root.join("tray-2-0")).unwrap();
+
+        let icons = TrayIcons::new(&root).unwrap();
+        assert!(!stale.exists());
+        assert!(root.join("instance.lock").exists());
+        assert!(root.join("tray-2-0").is_symlink() && outside.is_dir());
+        let directory = icons.directory().to_path_buf();
+        let mode = |path: &Path| fs::metadata(path).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode(&directory), 0o700);
+        let files: Vec<_> = fs::read_dir(&directory)
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .collect();
+        assert_eq!(files.len(), STATE_ICONS.len() + METER_FRAMES);
+        assert!(files.iter().all(|file| mode(file) == 0o600));
+        // A failed startup drops the icons together with their directory.
+        drop(icons);
+        assert!(!directory.exists());
+        fs::remove_dir_all(&root).unwrap();
     }
 
     #[test]

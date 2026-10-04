@@ -172,9 +172,10 @@ Shortcut status text comes from `shortcut_readiness.rs`.
 The tray menu shows the status, then Open VOCO, Start dictation, Stop dictation,
 Settings, Review, Change shortcut and Quit VOCO. `tray_icons.rs` writes the state
 icons and 64 meter frames once, to paths that stay valid for the process
-lifetime, and the meter advances every 90 ms. The tray icon is an AppIndicator,
-which GNOME shows only through an AppIndicator extension: Ubuntu turns one on,
-Debian 13 and Fedora 44 don't.
+lifetime, and the meter advances every 90 ms. Each launch first removes the
+icons an earlier VOCO left behind, since an exit leaves them in place. The tray
+icon is an AppIndicator, which GNOME shows only through an AppIndicator
+extension: Ubuntu turns one on, Debian 13 and Fedora 44 don't.
 
 The companion loads on GNOME 46, 48 and 50, the majors in its metadata, and
 `voco_gnome_panel.py` reports any other as unsupported. GNOME 50 has no X11
