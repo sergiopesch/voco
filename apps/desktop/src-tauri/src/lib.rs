@@ -505,7 +505,7 @@ fn reset_config_to_defaults(app: tauri::AppHandle) -> Result<ConfigSnapshot, Str
 
 #[tauri::command]
 fn open_config_directory() -> Result<(), String> {
-    let directory = AppConfig::config_dir_for_recovery().map_err(|error| error.to_string())?;
+    let directory = AppConfig::config_dir_without_migration().map_err(|error| error.to_string())?;
     process_runner::spawn_desktop_launcher(process_runner::command("xdg-open").arg(&directory))
         .map_err(|error| format!("Failed to open {}: {error}", directory.display()))?;
     Ok(())

@@ -161,7 +161,9 @@ impl Default for AppConfig {
 }
 
 impl AppConfig {
-    fn config_dir_without_migration() -> Result<PathBuf, Box<dyn std::error::Error>> {
+    /// The private settings directory, without copying a legacy `voice` config
+    /// into it. The recovery panel's Open and Reset use it.
+    pub fn config_dir_without_migration() -> Result<PathBuf, Box<dyn std::error::Error>> {
         let base_dir =
             dirs::config_dir().ok_or("Cannot find config directory (XDG_CONFIG_HOME)")?;
         let config_dir = base_dir.join(APP_DIR_NAME);
@@ -176,10 +178,6 @@ impl AppConfig {
         let config_dir = Self::config_dir_without_migration()?;
         migrate_legacy_config(&base_dir, &config_dir)?;
         Ok(config_dir)
-    }
-
-    pub fn config_dir_for_recovery() -> Result<PathBuf, Box<dyn std::error::Error>> {
-        Self::config_dir_without_migration()
     }
 
     pub fn config_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
@@ -223,7 +221,7 @@ impl AppConfig {
     }
 
     pub fn reset_to_defaults() -> Result<Self, Box<dyn std::error::Error>> {
-        let path = Self::config_dir_for_recovery()?.join("config.json");
+        let path = Self::config_dir_without_migration()?.join("config.json");
         reset_config_file(&path)
     }
 }
@@ -344,40 +342,26 @@ fn atomic_write(path: &std::path::Path, content: &str) -> Result<(), std::io::Er
 }
 
 fn secure_private_directory(path: &std::path::Path) -> Result<(), std::io::Error> {
-    let metadata = fs::symlink_metadata(path)?;
-    if metadata.file_type().is_symlink() || !metadata.is_dir() {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
-            format!("{} must be a real directory", path.display()),
-        ));
-    }
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::{MetadataExt, PermissionsExt};
-        if metadata.uid() != unsafe { libc::geteuid() } {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::PermissionDenied,
-                format!("{} is not owned by the current user", path.display()),
-            ));
-        }
-        fs::set_permissions(path, fs::Permissions::from_mode(0o700))?;
-        let secured = fs::symlink_metadata(path)?;
-        if secured.uid() != unsafe { libc::geteuid() } || secured.mode() & 0o777 != 0o700 {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::PermissionDenied,
-                format!("{} could not be secured to mode 0700", path.display()),
-            ));
-        }
-    }
-    Ok(())
+    secure_private_entry(path, true)
 }
 
 fn secure_private_regular_file(path: &std::path::Path) -> Result<(), std::io::Error> {
+    secure_private_entry(path, false)
+}
+
+/// Accepts only a directory or regular file that this user owns; lstat reports a
+/// symbolic link as neither.
+fn secure_private_entry(path: &std::path::Path, directory: bool) -> Result<(), std::io::Error> {
     let metadata = fs::symlink_metadata(path)?;
-    if metadata.file_type().is_symlink() || !metadata.is_file() {
+    let (expected_type, kind, private_mode) = if directory {
+        (metadata.is_dir(), "a real directory", 0o700)
+    } else {
+        (metadata.is_file(), "a regular file", 0o600)
+    };
+    if !expected_type {
         return Err(std::io::Error::new(
             std::io::ErrorKind::InvalidData,
-            format!("{} must be a regular file", path.display()),
+            format!("{} must be {kind}", path.display()),
         ));
     }
     #[cfg(unix)]
@@ -389,12 +373,21 @@ fn secure_private_regular_file(path: &std::path::Path) -> Result<(), std::io::Er
                 format!("{} is not owned by the current user", path.display()),
             ));
         }
-        fs::set_permissions(path, fs::Permissions::from_mode(0o600))?;
+        // Settings load every second while a window is open, so change the mode
+        // only when it is wrong. All 12 bits count: chmod also clears setuid,
+        // setgid and sticky.
+        if metadata.mode() & 0o7777 == private_mode {
+            return Ok(());
+        }
+        fs::set_permissions(path, fs::Permissions::from_mode(private_mode))?;
         let secured = fs::symlink_metadata(path)?;
-        if secured.uid() != unsafe { libc::geteuid() } || secured.mode() & 0o777 != 0o600 {
+        if secured.uid() != unsafe { libc::geteuid() } || secured.mode() & 0o777 != private_mode {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::PermissionDenied,
-                format!("{} could not be secured to mode 0600", path.display()),
+                format!(
+                    "{} could not be secured to mode {private_mode:04o}",
+                    path.display()
+                ),
             ));
         }
     }
@@ -608,6 +601,63 @@ mod tests {
         let linked_path = directory.join("linked.json");
         symlink(&config_path, &linked_path).unwrap();
         assert!(secure_private_regular_file(&linked_path).is_err());
+
+        let _ = fs::remove_dir_all(test_root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn settings_paths_of_another_type_are_rejected_and_private_ones_are_left_alone() {
+        use std::os::unix::fs::{MetadataExt, PermissionsExt};
+
+        let test_root = std::env::temp_dir().join(format!(
+            "voco-config-private-test-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        ));
+        let directory = test_root.join("voco");
+        fs::create_dir_all(&directory).unwrap();
+        let config_path = directory.join("config.json");
+        fs::write(&config_path, "{}").unwrap();
+        let socket_path = directory.join("config.sock");
+        let _socket = std::os::unix::net::UnixListener::bind(&socket_path).unwrap();
+
+        // The recovery panel shows these messages.
+        assert_eq!(
+            secure_private_directory(&config_path)
+                .unwrap_err()
+                .to_string(),
+            format!("{} must be a real directory", config_path.display())
+        );
+        assert_eq!(
+            secure_private_regular_file(&directory)
+                .unwrap_err()
+                .to_string(),
+            format!("{} must be a regular file", directory.display())
+        );
+        assert!(secure_private_directory(&socket_path).is_err());
+        assert!(secure_private_regular_file(&socket_path).is_err());
+
+        fs::set_permissions(&directory, fs::Permissions::from_mode(0o1700)).unwrap();
+        fs::set_permissions(&config_path, fs::Permissions::from_mode(0o4600)).unwrap();
+        secure_private_directory(&directory).unwrap();
+        secure_private_regular_file(&config_path).unwrap();
+        assert_eq!(fs::metadata(&directory).unwrap().mode() & 0o7777, 0o700);
+        assert_eq!(fs::metadata(&config_path).unwrap().mode() & 0o7777, 0o600);
+
+        // A chmod, even to the same mode, would move the inode change time.
+        let changed = |path: &std::path::Path| {
+            let metadata = fs::metadata(path).unwrap();
+            (metadata.ctime(), metadata.ctime_nsec())
+        };
+        let before = (changed(&directory), changed(&config_path));
+        std::thread::sleep(std::time::Duration::from_millis(50));
+        secure_private_directory(&directory).unwrap();
+        secure_private_regular_file(&config_path).unwrap();
+        assert_eq!((changed(&directory), changed(&config_path)), before);
 
         let _ = fs::remove_dir_all(test_root);
     }
