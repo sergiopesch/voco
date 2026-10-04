@@ -293,7 +293,11 @@ fn current_tray_presentation(app: &tauri::AppHandle) -> Option<TrayPresentation>
         .map(|state| derive_tray_presentation(&state.runtime))
 }
 
-pub fn setup_tray(app: &tauri::App, hotkey_label: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn setup_tray(
+    app: &tauri::App,
+    hotkey_label: &str,
+    icons: crate::tray_icons::TrayIcons,
+) -> Result<(), Box<dyn std::error::Error>> {
     let status_item = MenuItemBuilder::with_id("status", "VOCO — Initializing…")
         .enabled(false)
         .build(app)?;
@@ -340,7 +344,6 @@ pub fn setup_tray(app: &tauri::App, hotkey_label: &str) -> Result<(), Box<dyn st
     let (width, height) = startup.dimensions();
     let icon = tauri::image::Image::new_owned(startup.into_raw(), width, height);
 
-    let icons = crate::tray_icons::TrayIcons::new()?;
     let tray = TrayIconBuilder::new()
         .temp_dir_path(icons.directory())
         .title("Starting VOCO")
