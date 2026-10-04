@@ -71,6 +71,16 @@ export default class VocoPanel extends Extension {
         this._button = new St.Button({style_class: 'voco-panel-button',
             can_focus: true, accessible_name: 'VOCO'});
         this._indicator.add_child(this._button);
+        // GNOME 50's panel button opens its menu from a click gesture that wins
+        // any press, which would cancel the pill's own primary click. Leave
+        // primary presses and touches to the pill. Earlier Shells open the menu
+        // from the press event, which the pill already stops.
+        for (const gesture of this._indicator.get_actions()) {
+            if (Clutter.ClickGesture && gesture instanceof Clutter.ClickGesture) {
+                gesture.connect('should-handle-sequence', (_gesture, event) =>
+                    event.type() !== Clutter.EventType.TOUCH_BEGIN && event.get_button() !== Clutter.BUTTON_PRIMARY);
+            }
+        }
         this._box = new St.BoxLayout();
         this._button.set_child(this._box);
         this._button.connect('clicked', () => this._action(this._state?.canStop ? 'stop' : 'open'));

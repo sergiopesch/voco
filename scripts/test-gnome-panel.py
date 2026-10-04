@@ -91,7 +91,8 @@ class RemoteInput:
     """Real compositor input through Mutter's RemoteDesktop API, the path GNOME Remote Desktop uses."""
     # Evdev key and button codes.
     KEYS = {'alt': 56, 'Alt_L': 56, 'Alt_R': 100, 'shift': 42, 'Shift_L': 42, 'Shift_R': 54,
-            'Control_L': 29, 'Control_R': 97, 'Super_L': 125, 'Super_R': 126, 'd': 32, 'space': 57}
+            'Control_L': 29, 'Control_R': 97, 'Super_L': 125, 'Super_R': 126, 'd': 32, 'space': 57,
+            'Menu': 127, 'F10': 68}
     BUTTONS = {1: 0x110, 2: 0x112, 3: 0x111}
     def __init__(self):
         self.path = bus.call_sync('org.gnome.Mutter.RemoteDesktop', '/org/gnome/Mutter/RemoteDesktop',
@@ -208,12 +209,14 @@ try:
         report['remoteDesktopInput'] = True
         def mousemove(x, y): remote.move(x, y)
         def click(button): remote.click(button)
+        def keys(*args): remote.keys(*args)
     else:
         pointer_env = {**os.environ, 'DISPLAY': ':77'}
         shell_windows = subprocess.check_output(['xdotool', 'search', '--pid', str(shell.pid)], env=pointer_env, text=True).splitlines()
         subprocess.run(['xdotool', 'windowfocus', shell_windows[0]], env=pointer_env, check=True)
         def mousemove(x, y): subprocess.run(['xdotool', 'mousemove', str(x), str(y)], env=pointer_env, check=True)
         def click(button): subprocess.run(['xdotool', 'click', str(button)], env=pointer_env, check=True)
+        def keys(*args): subprocess.run(['xdotool', *args], env=pointer_env, check=True, timeout=3)
     def styled(data, name):
         return [actor for actor in data['actors'] if name in (actor.get('style') or '').split()]
     def anchors(data):
@@ -299,6 +302,16 @@ try:
             assert actions[-1] == ('stop', state['stopSession']), actions
             call('Menu'); pump(.1)
         call('Menu'); pump(.2)
+        if status == 'idle':
+            # A primary click on an idle pill opens Settings; the middle button
+            # opens the menu like the secondary one.
+            before = len(actions)
+            click(1); pump(.3)
+            assert actions[before:] == [('open', state['token'])] and not inspect()['menu']['open'], actions[before:]
+            click(2); pump(.3)
+            assert inspect()['menu']['open'] and actions[before + 1:] == [], actions[before:]
+            call('Menu'); pump(.2)
+            report['idleClickRouting'] = {'primaryOpens': True, 'middleOpensMenu': True}
         if status=='recording':
             state['level'] = 0; pump(.2)
             quiet = inspect()
@@ -322,6 +335,14 @@ try:
     call('Focus', GLib.Variant('(b)', (True,))); pump(.4)
     assert inspect()['indicatorFocus'], 'Keyboard focus did not reach the indicator'
     screenshot('focus')
+    # The Menu key and Shift+F10 open the menu from the focused pill.
+    for combo in ('Menu', 'shift+F10'):
+        before = len(actions)
+        keys('key', combo); pump(.3)
+        assert inspect()['menu']['open'] and actions[before:] == [], {'key': combo, 'actions': actions[before:]}
+        call('Menu'); pump(.2)
+        call('Focus', GLib.Variant('(b)', (True,))); pump(.2)
+    report['keyboardMenu'] = ['Menu', 'Shift+F10']
     call('Focus', GLib.Variant('(b)', (False,))); pump(.3)
     assert not inspect()['indicatorFocus'], 'The indicator kept focus styling'
     report['focusVisible'] = True
@@ -383,9 +404,7 @@ try:
         return False
     entry.connect('key-press-event', on_key)
     window.show_all(); entry.grab_focus(); window.present(); pump(.6)
-    if headless:
-        def keys(*args): remote.keys(*args)
-    else:
+    if not headless:
         xenv={**os.environ, 'DISPLAY':':77', 'GDK_BACKEND':'x11'}
         ids=subprocess.check_output(['xdotool','search','--pid',str(shell.pid)],env=xenv,text=True).splitlines()
         subprocess.run(['xdotool','windowfocus',ids[0]],env=xenv,check=True)
