@@ -925,7 +925,6 @@ export function App() {
       }
       if (surface === "hidden") {
         await currentWindow.setAlwaysOnTop(true).catch(() => {});
-        await currentWindow.setDecorations(false).catch(() => {});
         await currentWindow.setSkipTaskbar(true).catch(() => {});
         await currentWindow.setResizable(false).catch(() => {});
         await currentWindow.setMinSize(null).catch(() => {});
@@ -946,7 +945,6 @@ export function App() {
       if (surface === "popover") {
         await currentWindow.setIgnoreCursorEvents(false).catch(() => {});
         await currentWindow.setAlwaysOnTop(true).catch(() => {});
-        await currentWindow.setDecorations(false).catch(() => {});
         await currentWindow.setSkipTaskbar(false).catch(() => {});
         await currentWindow.setResizable(false).catch(() => {});
         await currentWindow.setMinSize(null).catch(() => {});
@@ -998,7 +996,6 @@ export function App() {
 
       await currentWindow.setIgnoreCursorEvents(false).catch(() => {});
       await currentWindow.setAlwaysOnTop(false).catch(() => {});
-      await currentWindow.setDecorations(false).catch(() => {});
       await currentWindow.setSkipTaskbar(false).catch(() => {});
       await currentWindow.setMinSize(PANEL_MIN_SIZE).catch(() => {});
       await currentWindow.setResizable(true).catch(() => {});

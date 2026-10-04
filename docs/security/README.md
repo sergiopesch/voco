@@ -127,10 +127,10 @@ interfaces; they keep other accounts out, not your own programs.
 VOCO's interface is a local web page in WebKitGTK. Its content security policy
 loads scripts only from the app, allows network connections only to VOCO's own
 IPC and `api.github.com`, and allows media only from the app and microphone
-streams. Tauri's capability file gives the page Tauri's core defaults, a short
-list of window controls and global-shortcut registration, plus VOCO's own
-commands. VOCO grants microphone requests that ask for audio only, and denies
-any request that includes a camera.
+streams. Tauri's capability file gives the page Tauri's core defaults and a
+short list of window controls, plus VOCO's own commands; Rust registers the
+global shortcut itself. VOCO grants microphone requests that ask for audio
+only, and denies any request that includes a camera.
 
 The window opens two kinds of link through `xdg-open`: release pages under
 `https://github.com/sergiopesch/voco/releases/tag/`, and the
