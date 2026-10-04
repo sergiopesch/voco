@@ -312,4 +312,5 @@ online checks.
 tests the file list, the spec, the header policy and both parity checks, and
 builds a small RPM when `rpmbuild` is installed. `npm run verify:devops` keeps
 the spec in step with the dependency map, and fails unless the spec builds
-nothing, runs only `packaging/rpm/post.sh` and stays x86_64 release 1.
+nothing, runs only `packaging/rpm/post.sh` and stays x86_64 release 1. It also
+keeps the guided installer's glibc floor equal to both packages'.

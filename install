@@ -129,6 +129,29 @@ voco_detect_package_manager() {
   fi
 }
 
+voco_check_platform_floors() {
+  # Both packages need glibc_floor (check-devops.sh keeps it equal to theirs), and
+  # the speech engine is built for AVX2, FMA and F16C with no fallback. Refuse only
+  # a version or flag list that was read and falls short; leave anything unreadable
+  # to the package manager.
+  local cpuinfo="${1:-/proc/cpuinfo}" glibc_floor=2.39 version flags feature missing=""
+  VOCO_PLATFORM_ERROR=""
+  version="$(getconf GNU_LIBC_VERSION 2>/dev/null)" || version=""
+  if [[ "${version}" =~ ^glibc\ ([0-9]+)\.([0-9]+) ]] &&
+    (( 10#${BASH_REMATCH[1]} * 1000 + 10#${BASH_REMATCH[2]} < ${glibc_floor%.*} * 1000 + ${glibc_floor#*.} )); then
+    VOCO_PLATFORM_ERROR="VOCO needs glibc ${glibc_floor} or later, as on Ubuntu 24.04 and 26.04, Debian 13 and Fedora 44; this system has ${version}."
+    return 1
+  fi
+  flags="$(grep -m 1 '^flags' "${cpuinfo}" 2>/dev/null)" || return 0
+  for feature in avx2 fma f16c; do
+    [[ " ${flags#*:} " == *" ${feature} "* ]] || missing+="${missing:+, }${feature^^}"
+  done
+  if [[ -n "${missing}" ]]; then
+    VOCO_PLATFORM_ERROR="VOCO's speech recognition needs a processor with AVX2, FMA and F16C; this one lacks ${missing}. In a virtual machine, pass the host CPU through."
+    return 1
+  fi
+}
+
 voco_verify_installed_rpm() {
   local expected_version="$1"
   local expected_architecture="$2"
@@ -895,6 +918,8 @@ fi
 for prerequisite in wget sha256sum base64 gpgv stat sudo "${PACKAGE_TOOLS[@]}"; do
   command -v "$prerequisite" >/dev/null 2>&1 || err "$prerequisite is required before downloading VOCO."
 done
+# Stop before the download on a system VOCO can't run on.
+voco_check_platform_floors || err "$VOCO_PLATFORM_ERROR"
 ok "Linux · x86_64"
 
 # APT or DNF resolves package dependencies in the install stage. Readiness is

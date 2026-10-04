@@ -174,6 +174,11 @@ if requires != rpm_package.FEDORA_REQUIRES:
 for floor in ("glibc >= 2.39", "libstdc++ >= 13.2"):
     if floor not in requires:
         raise SystemExit(f"{spec_path} is missing the verified ABI floor {floor}")
+# The guided installer refuses an older glibc before downloading either package.
+installer_floor = re.findall(r"glibc_floor=([0-9.]+)", Path("scripts/lib/install-common.sh").read_text())
+if len(installer_floor) != 1 or f"libc6 (>= {installer_floor[0]})" not in depends \
+        or f"glibc >= {installer_floor[0]}" not in requires:
+    raise SystemExit("The installer's glibc_floor must equal the packages' libc6 and glibc floors")
 extra = re.findall(r"^(Recommends|Suggests|Supplements|Enhances|Conflicts|Obsoletes|Provides|"
                    r"BuildRequires|Source\d*|Patch\d*|Epoch|BuildArch):", spec, re.M | re.I)
 if extra:

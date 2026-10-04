@@ -221,4 +221,36 @@ for tools in "" "apt-get" "dnf" "dpkg-query rpm"; do
   [[ -z "${VOCO_PACKAGE_MANAGER}" ]] || fail "Detection left a package manager for '${tools}'"
 done
 export PATH="${ORIGINAL_PATH}"
+
+# Platform floors refuse only a glibc version or processor flag list that was
+# read and falls short; anything unreadable is left to the package manager.
+PLATFORM_BIN="${TEST_ROOT}/platform-bin"
+mkdir -p "${PLATFORM_BIN}"
+cat > "${PLATFORM_BIN}/getconf" <<'SH'
+#!/usr/bin/env bash
+[[ "$*" == GNU_LIBC_VERSION && -n "${MOCK_GLIBC}" ]] || exit 1
+printf '%s\n' "${MOCK_GLIBC}"
+SH
+chmod 0700 "${PLATFORM_BIN}/getconf"
+printf 'processor\t: 0\nflags\t\t: fpu sse2 avx avx2 fma f16c bmi2\n\nprocessor\t: 1\nflags\t\t: fpu sse2 avx avx2 fma f16c bmi2\n' \
+  > "${TEST_ROOT}/cpuinfo"
+printf 'flags\t\t: fpu sse2 avx avx2 fma4 f16c\n' > "${TEST_ROOT}/cpuinfo-fma4"
+printf 'flags\t\t: fpu sse2 avx fma\n' > "${TEST_ROOT}/cpuinfo-old"
+printf 'processor\t: 0\n' > "${TEST_ROOT}/cpuinfo-no-flags"
+platform_floors() {
+  hash -r
+  MOCK_GLIBC="$1" PATH="${PLATFORM_BIN}:${ORIGINAL_PATH}" voco_check_platform_floors "${2:-${TEST_ROOT}/cpuinfo}"
+}
+for glibc in 'glibc 2.39' 'glibc 2.43' 'glibc 2.43.9000' 'glibc 3.0' '' 'musl libc' 'glibc stable'; do
+  platform_floors "${glibc}" || fail "Platform check refused '${glibc}': ${VOCO_PLATFORM_ERROR}"
+done
+if platform_floors 'glibc 2.36'; then fail "glibc 2.36 was accepted"; fi
+[[ "${VOCO_PLATFORM_ERROR}" == *'glibc 2.39 or later'*'glibc 2.36.' ]] || fail "Old glibc returned an unclear error"
+if platform_floors 'glibc 2.39' "${TEST_ROOT}/cpuinfo-fma4"; then fail "FMA4 was taken for FMA"; fi
+[[ "${VOCO_PLATFORM_ERROR}" == *'lacks FMA.'* ]] || fail "Missing FMA returned an unclear error"
+if platform_floors 'glibc 2.39' "${TEST_ROOT}/cpuinfo-old"; then fail "A processor without AVX2 or F16C was accepted"; fi
+[[ "${VOCO_PLATFORM_ERROR}" == *'lacks AVX2, F16C.'* ]] || fail "Missing flags were not all named"
+for cpuinfo in "${TEST_ROOT}/missing-cpuinfo" "${TEST_ROOT}/cpuinfo-no-flags"; do
+  platform_floors 'glibc 2.39' "${cpuinfo}" || fail "Unreadable processor flags blocked the install"
+done
 echo "Installer helper behavior is valid."

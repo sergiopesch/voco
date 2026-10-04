@@ -47,6 +47,8 @@ you set it, and only your account can read it.
 | --- | --- |
 | `VOCO installs with APT on Ubuntu and Debian, or with DNF on Fedora. Neither was found.` | Run the installer on one of the [supported systems](platform/README.md#supported-systems). |
 | `… is required before downloading VOCO.` | Install the named tool with `sudo apt install`, or `sudo dnf install` on Fedora, then run the installer again. |
+| `VOCO needs glibc 2.39 or later, …` | The system is older than the [supported systems](platform/README.md#supported-systems). Install VOCO on one of them. |
+| `VOCO's speech recognition needs a processor with AVX2, FMA and F16C; …` | VOCO can't run on this processor. In a virtual machine, pass the host CPU through, for example with QEMU's `-cpu host`, then run the installer again. |
 | `sudo is required before downloading VOCO.`, or `… is not in the sudoers file` | Your account can't use `sudo` yet, as on a Debian system installed with a root password. As root (`su -`), run `apt install sudo` and `adduser <your user name> sudo`, sign out and back in, then run the installer again. |
 | `The download stopped.` | Check your connection and run the installer again. If the release file is unavailable, check that the release exists. |
 | A key, signature, signer or checksum error | Nothing was installed. Run the installer again. If the check fails again, don't install the file another way, and report it as described in [SECURITY.md](../SECURITY.md). |
