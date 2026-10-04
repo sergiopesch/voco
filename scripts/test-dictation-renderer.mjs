@@ -91,7 +91,7 @@ function Harness() {
  useGlobalShortcut(hook.toggle,()=>true,Boolean(window.shortcutReady),0,()=>{});
  return React.createElement(React.Fragment,null,
 
- React.createElement(ControlPanel,{surface:state.surface,config:state.config,errorMessage:state.error,statusLabel:deriveStatusLabel({configurationError:false,cursorRequired:false,cursorSetupState:'ready',dictationStatus:state.status,microphonePermission:'granted',microphoneReady:true,}),updateState:state.updateState,runtimeDiagnostics:null,dictationStatus:state.status,captureNotice:state.captureNotice,canCancelDictation:hook.canCancel,cancellationPending:hook.cancellationPending,onCancelDictation:()=>void hook.cancelRecording(),requestedSection:'General',requestedSectionRequestId:0,selectedDeviceId:null,availableDevices:[],microphonePermission:'granted',onSurfaceChange:surface=>state.setSurface(surface),onConfigChange:noop,onRefreshDevices:noop,onRequestMicrophoneAccess:noop,onCheckForUpdates:noop,onOpenReleasePage:noop,onRefreshRuntimeDiagnostics:noop,onOpenSettings:noop}));
+ React.createElement(ControlPanel,{surface:state.surface,config:state.config,errorMessage:state.error,statusLabel:deriveStatusLabel({configurationError:false,cursorRequired:false,cursorSetupState:'ready',dictationStatus:state.status,microphonePermission:'granted',microphoneReady:true,}),updateState:state.updateState,runtimeDiagnostics:null,dictationStatus:state.status,captureNotice:state.captureNotice,requestedSection:'General',requestedSectionRequestId:0,selectedDeviceId:null,availableDevices:[],microphonePermission:'granted',onSurfaceChange:surface=>state.setSurface(surface),onConfigChange:noop,onRefreshDevices:noop,onRequestMicrophoneAccess:noop,onCheckForUpdates:noop,onOpenReleasePage:noop,onRefreshRuntimeDiagnostics:noop,onOpenSettings:noop}));
 }
 window.reactRoot = createRoot(document.getElementById('root')); window.reactRoot.render(React.createElement(React.StrictMode,null,React.createElement(Harness)));
 window.remountHarness = () => { window.reactRoot = createRoot(document.getElementById('root')); window.reactRoot.render(React.createElement(React.StrictMode,null,React.createElement(Harness))); };
@@ -290,10 +290,10 @@ results.push('Progressive native dictation pastes before Stop, flushes only the 
 await load();await page.evaluate(()=>{window.desktopPaste=true;window.desktopStream=true;window.deferInference=true;});
 await start();await page.evaluate(()=>window.captureWorklet.port.onmessage({data:{type:'samples',data:new Float32Array(16000)}}));
 await page.waitForFunction(()=>Boolean(window.resolveInference));
-await page.evaluate(()=>{void window.hook.cancelRecording();});await page.evaluate(()=>window.resolveInference());
+await page.evaluate(()=>window.captureWorklet.port.onmessage({data:{type:'capture-interrupted'}}));await page.evaluate(()=>window.resolveInference());
 await page.waitForFunction(()=>window.speechRequests.some(r=>r.op==='cancel'));
 assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length),0);
-results.push('Cancellation while a progressive worker request is in flight drains the cancel command and suppresses its late paste.');
+results.push('A capture interruption while a progressive worker request is in flight drains the cancel command and suppresses its late paste.');
 for (const [failCopy, failKeep] of [[false, false], [true, false], [true, true]]) {
   await load();await page.evaluate(([failCopy,failKeep])=>{window.desktopPaste=true;window.desktopStream=true;window.failPaste=true;window.failCopy=failCopy;window.failKeep=failKeep;},[failCopy,failKeep]);
   await start();await page.evaluate(()=>window.captureWorklet.port.onmessage({data:{type:'samples',data:new Float32Array(16000)}}));
@@ -421,7 +421,7 @@ await page.evaluate(()=>{window.failPaste=false;window.hook.toggle();});
 await page.waitForFunction(()=>window.store.getState().status==='recording');
 assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='showNotification'&&c[1]==='Previous transcript available').length),0);
 assert.equal(await page.evaluate(()=>window.speechRequests.filter(r=>r.op==='start').length),2);
-await page.evaluate(()=>window.hook.cancelRecording());
+await page.evaluate(()=>window.hook.toggle());await page.waitForFunction(()=>window.store.getState().status==='idle',null,{timeout:6000});
 results.push('Delivery interrupted at two minutes still recognizes five minutes plus partial Stop tail, never retries insertion, copies only the untyped words and admits next recording.');
 
 

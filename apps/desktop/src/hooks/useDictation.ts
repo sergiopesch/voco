@@ -49,8 +49,6 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
   const setAudioLevel = useStore((state) => state.setAudioLevel);
   const setMicrophoneReadyState = useStore((state) => state.setMicrophoneReady);
   const clearTranscript = useStore((state) => state.clearTranscript);
-  const [cancellationPending, setCancellationPending] = useState(false);
-  const [canCancel, setCanCancel] = useState(false);
   const disposedRef = useRef(false);
   const lifecycleEpochRef = useRef(0);
   const cancelledRef = useRef<string | null>(null);
@@ -447,8 +445,6 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
       copyDesktopText,
       traceDictationEvent,
       showNotification,
-      setCancellationPending,
-      setCanCancel,
       setStatus,
       setTranscript,
       setError,
@@ -487,9 +483,15 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
     return recording.isCurrentSession(sessionId);
   }
 
-  function discardRecovery() {
+  // Start publishes "starting" only after its checks; until then only the
+  // session knows a dictation began.
+  const dictationInProgress = useCallback(() => {
     const { phase } = sessionRef.current;
-    if (phase !== "idle" && phase !== "error") return;
+    return phase !== "idle" && phase !== "error";
+  }, []);
+
+  function discardRecovery() {
+    if (dictationInProgress()) return;
     const native = nativeCaptureRef.current;
     nativeCaptureRef.current = null;
     void native?.cancel().catch(() => {});
@@ -557,9 +559,7 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
     prepareAudioEngine,
     primeRecordingStream,
     cursorDeliveryState,
-    canCancel,
-    cancellationPending,
-    cancelRecording,
+    dictationInProgress,
     discardRecovery,
     finishOnboardingTest,
     toggle,

@@ -91,8 +91,6 @@ function harness() {
     copyDesktopText: copy,
     traceDictationEvent: trace,
     showNotification: notify,
-    setCancellationPending: noop,
-    setCanCancel: noop,
     setStatus: noop,
     setTranscript: noop,
     setError,
@@ -376,7 +374,7 @@ it.each([
   expect(h.env.setMicrophoneReadyState).toHaveBeenCalledExactlyOnceWith(true);
   vi.mocked(h.env.resetAudioLevel).mockClear();
   if (kind === "cancellation") {
-    await h.cancelRecording();
+    await h.cancelRecording("Recording cancelled.");
     connecting.resolve();
   } else {
     connecting.reject(new Error("Audio graph initialization failed"));

@@ -76,8 +76,6 @@ export interface DictationRecordingEnv {
   copyDesktopText: (text: string) => Promise<void>;
   traceDictationEvent: (event: string, fields?: HotkeyTraceFields | null) => Promise<void>;
   showNotification: (title: string, body: string) => Promise<void>;
-  setCancellationPending: (value: boolean) => void;
-  setCanCancel: (value: boolean) => void;
   setStatus: (status: DictationStatus) => void;
   setTranscript: (text: string) => void;
   setError: (error: string | null) => void;
@@ -133,8 +131,6 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     copyDesktopText,
     traceDictationEvent,
     showNotification,
-    setCancellationPending,
-    setCanCancel,
     setStatus,
     setTranscript,
     setError,
@@ -223,8 +219,6 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       current.setCaptureNotice(null);
       current.setSurface("hidden");
       sessionRef.current = finishSessionIdle(sessionRef.current);
-      setCanCancel(false);
-      setCancellationPending(false);
       setStatus("idle");
       setError(reason);
       setCursorDelivery("inactive");
@@ -245,8 +239,6 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     clearCapturedAudio();
     useStore.getState().setRecovery({ reason });
     sessionRef.current = failSession(sessionRef.current);
-    setCanCancel(false);
-    setCancellationPending(false);
     setStatus("error");
     setError(reason);
     useStore.getState().setSurface("onboarding");
@@ -262,8 +254,6 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       clearTranscript();
     }
     releaseRecordingOrigin();
-    setCanCancel(false);
-    setCancellationPending(false);
     nativeCaptureRef.current = null;
     clearCapturedAudio();
     if (stopRequestedAtMs !== null) {
@@ -299,8 +289,6 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     browserDeliveryRef.current = null;
     desktopStreamedSampleCountRef.current = 0;
     cancelledRef.current = null;
-    setCancellationPending(false);
-    setCanCancel(true);
     sessionRef.current = startSession(sessionRef.current);
     const startingSessionId = sessionRef.current.sessionId;
     traceDictationEvent("recording_state_requested").catch(() => {});
@@ -570,8 +558,6 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       void browserDeliveryRef.current?.cancel();
       if (!isCurrentSession(startingSessionId)) return;
       releaseRecordingOrigin(triggerId);
-      setCanCancel(false);
-      setCancellationPending(false);
       // Invalidate a failed WebKit capture before retained audio takes the
       // recovery path. Cancellation and pre-capture destination rejection do
       // not revoke readiness; native selection invalidation is guarded above.
@@ -720,7 +706,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     }
   }
 
-  async function cancelRecording(reason = "Recording cancelled.") {
+  async function cancelRecording(reason: string) {
     const { phase } = sessionRef.current;
     if (phase === "idle" || phase === "error" || cancelledRef.current) return;
     cancelledRef.current = reason;
@@ -729,8 +715,6 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     if (interruptionNotifiedSession === sessionRef.current.sessionId) interruptionNotifiedSession = null;
     dictationStreamRef.current?.cancel();
     void browserDeliveryRef.current?.cancel();
-    setCancellationPending(true);
-    setCanCancel(false);
     captureHealthRef.current?.dispose();
     captureHealthRef.current = null;
     if (sessionRef.current.phase === "recording") {

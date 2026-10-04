@@ -1,6 +1,5 @@
 import { DeviceSelect } from "./DeviceSelect";
 import { StatusMark } from "./StatusMark";
-import { RecordingVoiceSignal } from "./VoiceSignal";
 import { Tooltip } from "./Tooltip";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent, PointerEvent } from "react";
@@ -43,9 +42,6 @@ interface ControlPanelProps {
   runtimeDiagnostics: RuntimeDiagnostics | null;
   dictationStatus: DictationStatus;
   captureNotice?: string | null;
-  canCancelDictation?: boolean;
-  cancellationPending?: boolean;
-  onCancelDictation?: () => void;
   onPrepareDictation?: () => void;
   onDraftStateChange?: (dirty: boolean) => void;
   onShortcutCaptureChange?: (active: boolean) => void;
@@ -106,9 +102,6 @@ export function ControlPanel({
   runtimeDiagnostics,
   dictationStatus,
   captureNotice,
-  canCancelDictation,
-  cancellationPending,
-  onCancelDictation,
   onPrepareDictation,
   onDraftStateChange,
   onShortcutCaptureChange,
@@ -661,28 +654,20 @@ export function ControlPanel({
         </div>
 
         {isPopover ? (
-          <section className="voco-popover" data-priority={dictationBusy || statusHeading.length > 30 ? "status" : undefined}>
-            <div className="voco-lens" data-recording={dictationStatus === "recording"}>
+          <section className="voco-popover" data-priority={statusHeading.length > 30 ? "status" : undefined}>
+            <div className="voco-lens">
               <img src={vocoBrandImage} alt="" />
-              <span className="voco-lens__signal"><RecordingVoiceSignal active={dictationStatus === "recording"} /></span>
             </div>
             <div className="voco-popover__state">
               <div className="voco-popover__state-main">
-                <strong role="status" aria-live="polite"><StatusMark state={desktopSetupError || dictationStatus === "error" ? "attention" : dictationStatus === "recording" ? "listening" : dictationBusy ? "working" : "idle"} />{statusHeading}</strong>
+                <strong role="status" aria-live="polite"><StatusMark state={desktopSetupError || dictationStatus === "error" ? "attention" : "idle"} />{statusHeading}</strong>
                 <kbd className="voco-glass voco-shortcut">{config.hotkey}</kbd>
               </div>
-              {dictationBusy ?
-                <p>{dictationStatus === "starting" ? "Wait for Listening before speaking." : dictationStatus === "recording" ? `Press ${config.hotkey} to finish.` : "Finishing your dictation…"}</p> :
-                <p>{desktopSetupError ? "Open Help to finish desktop setup." : shortcut.available ? "Click where you want the text, then use your shortcut." : shortcut.unavailable ? "Check shortcut setup in Help." : "Click where you want the text, then start dictation."}</p>}
+              <p>{desktopSetupError ? "Open Help to finish desktop setup." : shortcut.available ? "Click where you want the text, then use your shortcut." : shortcut.unavailable ? "Check shortcut setup in Help." : "Click where you want the text, then start dictation."}</p>
             </div>
             {captureNotice ? <div className="voco-inline-note" role="status">{captureNotice}</div> : null}
-            {(canCancelDictation || cancellationPending) ? (
-              <button className="voco-button voco-button--secondary" type="button" onClick={onCancelDictation} disabled={!canCancelDictation}>
-                {cancellationPending ? "Cancelling output…" : "Cancel dictation"}
-              </button>
-            ) : null}
             <div className="voco-popover__actions">
-              <button {...glassPointer} className="voco-button voco-glass voco-glass--primary" disabled={saving || dictationBusy}
+              <button {...glassPointer} className="voco-button voco-glass voco-glass--primary" disabled={saving}
                 onClick={prepareDictation}>Hide to tray</button>
             </div>
             <div className="voco-popover__footer">
