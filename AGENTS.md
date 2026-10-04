@@ -161,9 +161,13 @@ change.
 
 ### GNOME companion and tray
 
-- The Debian package bundles the GNOME 46 companion. Enable it only through the
-  user-run setup (`voco --setup-panel`); package hooks never change enabled
-  extensions. Keep "sign out and back in" feedback distinct from active status.
+- Both packages bundle the companion for GNOME 46, 48 and 50. Its metadata's
+  `shell-version` and `SUPPORTED_SHELLS` in `voco_gnome_panel.py` name the same
+  majors, and setup reports any other as `unsupported`; admit a major only after
+  testing it. A Shell without `Meta.is_wayland_compositor()` (GNOME 50) is
+  Wayland-only. Enable the companion only through the user-run setup
+  (`voco --setup-panel`); package hooks never change enabled extensions. Keep
+  "sign out and back in" feedback distinct from active status.
 - Bump the companion metadata and the setup contract together when loaded code
   must change, and compare GNOME's loaded metadata so an in-place upgrade can't
   report old code as current. After an upgrade, users re-run panel setup and sign
@@ -173,7 +177,13 @@ change.
   unavailable check. Attach, Detach, name loss and explicit enabling clear it;
   explicit setup status always re-checks.
 - While the companion is attached, VOCO hides its fallback tray icon. The
-  companion's menu is Settings, Review and Stop dictation.
+  companion's menu is Settings, Review and Stop dictation. On every supported
+  Shell a primary click on the pill stops or opens Settings, and other buttons,
+  Menu and Shift+F10 open the menu: GNOME 50's panel click gesture must leave
+  primary presses and touches to the pill.
+- On GNOME the fallback tray needs an AppIndicator extension. Ubuntu turns one
+  on; Debian 13 and Fedora 44 don't, so there the companion is VOCO's only
+  top-bar presence.
 - Active presentation is the microphone plus waves only. Stop lives in the context
   menu and in the icon and shortcut actions; Settings and Review are explicit menu
   destinations.
@@ -216,8 +226,11 @@ change.
 
 ### Installer and packages
 
-- The guided installer installs only the local package with APT, then runs
-  `voco --check-desktop-input`. A successful install alone is not desktop
+- The guided installer installs only the verified local package: the `.deb` with
+  APT when `apt-get` and `dpkg-query` exist, otherwise the RPM with DNF (`dnf`
+  and `rpm`). Both are checked against the same signed `voco_checksums.txt`,
+  and the package manager must then report exactly that release, once. Then it
+  runs `voco --check-desktop-input`. A successful install alone is not desktop
   readiness.
 - After setup succeeds, request one detached launch as the invoking desktop user;
   never launch a GUI from root or package hooks. Distinguish a launch request from
@@ -227,6 +240,16 @@ change.
   [runtime provisioning](docs/linux-packaging.md#runtime-provisioning) and never
   replace missing pinned artifacts with mutable downloads. A base Tauri `.deb` is
   incomplete: assemble and verify the NVIDIA payload before calling it installable.
+- One staged tree becomes both packages (`package-nvidia.py --rpm`), so they
+  carry the same files; `verify-rpm-package.sh` proves it against the `.deb`.
+  Every Debian dependency needs its Fedora name in `DEBIAN_TO_FEDORA`
+  (`scripts/rpm_package.py`), and the spec requires exactly those. The RPM's
+  only scriptlet is `packaging/rpm/post.sh`, the same best-effort rule
+  application as the Debian `postinst`. It owns only VOCO's folders and the
+  shared ones no dependency creates, declares no weak dependencies or
+  configuration files, and keeps automatic requires and provides off for the
+  private speech runtime. `check-devops.sh` checks the spec and the mapping, and
+  `verify-rpm-package.sh` the built package.
 
 ## Working practices
 
@@ -307,7 +330,14 @@ release rehearsal.
   `scripts/assemble-release.sh` builds, verifies and signs a signed tag's release.
   The assets go to a draft release, which is published only after the downloaded
   assets verify. See the [release process](docs/release-process.md).
+- The signing machine runs Ubuntu 24.04, whose glibc 2.39 and GCC 13 set both
+  packages' floors, with `rpmbuild` from the `rpm` package. Each release carries
+  the RPM and `voco_latest_x86_64.rpm` with their own checksum lists, signed
+  like the Debian ones; `voco_checksums.txt` lists the RPM too, and
+  `voco_latest_checksums.txt` stays Debian-only. The RPM itself isn't
+  OpenPGP-signed: the signed checksums authenticate it. The validation record
+  doesn't cover DNF, so try the RPM on Fedora 44 before publishing.
 - Userspace checks, native install and removal, physical audio and
-  compositor/application behaviour are distinct evidence levels. Never claim
-  fastest, most accurate, universal compatibility or stability from a limited test
-  corpus.
+  compositor/application behaviour are distinct evidence levels, and each covers
+  only the system and GNOME version it ran on. Never claim fastest, most
+  accurate, universal compatibility or stability from a limited test corpus.

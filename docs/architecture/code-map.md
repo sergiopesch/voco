@@ -203,7 +203,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 
 - `voco-panel@voco.local/extension.js` — Panel pill, meter, menu, shortcut grab and the D-Bus client.
 - `voco-panel@voco.local/model.js` — Presentation model shared with the Node tests.
-- `voco-panel@voco.local/metadata.json` — Extension metadata for GNOME Shell 46.
+- `voco-panel@voco.local/metadata.json` — Extension metadata for GNOME Shell 46, 48 and 50.
 - `voco-panel@voco.local/stylesheet.css` — Pill and meter styles.
 - `voco-panel@voco.local/voco-symbol.png` — Microphone symbol.
 - `package.json` — Marks the directory as ES modules for the tests.
@@ -223,21 +223,24 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `ibus/voco.xml`, `ibus/voco-ibus-engine` — IBus component and engine launcher.
 - `chromium/com.voco.exact_field.json` — Native messaging host manifest.
 - `tauri/VOCO.desktop`, `tauri/com.sergiopesch.voco.metainfo.xml` — Desktop entry and AppStream metadata.
-- `debian/postinst.py.in` — The package's only maintainer action: repairs group-writable VOCO directories to 0755 and applies the `/dev/uinput` rule.
+- `debian/postinst.py.in` — The Debian package's only maintainer action: repairs group-writable VOCO directories to 0755 and applies the `/dev/uinput` rule.
+- `rpm/voco.spec.in` — The Fedora RPM's spec template: the Fedora requirements, no build stages, and the payload and dependency-generator settings.
+- `rpm/post.sh` — The RPM's only scriptlet: applies the `/dev/uinput` rule, as the Debian `postinst` does.
 - `published-release.json` — The version the README installs.
 
 ## Scripts: `scripts/`
 
 ### Build and packaging
 
-- `setup.sh` — Prepares a development checkout; `--install` builds, packages and installs the complete package.
+- `setup.sh` — Prepares a development checkout; `--install` builds, packages and installs the complete Debian package.
 - `build-desktop.sh` — Builds the renderer, the browser host and the base Debian bundle.
-- `package-nvidia.py` — Turns the base package into the complete one: speech runtime, notices, documentation and the maintainer script.
+- `package-nvidia.py` — Turns the base package into the complete one: speech runtime, notices, documentation and the maintainer script. With `--rpm`, it also builds the Fedora RPM from the same staged tree.
+- `rpm_package.py` — Renders the RPM spec for the staged tree and runs rpmbuild, and holds the RPM checks: scriptlets, folder ownership, requirements, and file and dependency parity with the Debian package.
 - `package-gnome-panel.py` — Builds a reproducible companion zip.
 - `provision-ci-speech.sh` — Copies the speech payload of a checksum-pinned published package into `runtime/speech/` for CI.
 - `debian_maintainer.py` — Generates and checks the maintainer script.
 - `sync-installer-ui.py`, `lib/install-ui.sh`, `lib/install-apt-ui.py`, `lib/install-brand.json` — Installer interface sources embedded in `install`.
-- `lib/install-common.sh` — Install steps for `setup.sh --install`, with its own test.
+- `lib/install-common.sh` — Install steps that `setup.sh --install` sources and `install` carries copies of: package manager detection, the APT and DNF installs and their checks, the desktop input check and the shortcut. `check-devops.sh` keeps the copies identical, and `test-install-common.sh` tests them.
 - `lib/test-speech-runtime.sh` — Speech runtime setup for disposable test desktops.
 - `lib/uinput-bridge.sh` — Starts and stops the uinput bridge for disposable test desktops.
 
@@ -246,13 +249,14 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `test-unit.sh` — `npm test`: fast checks that need no microphone, speech model or desktop session.
 - `check-devops.sh`, `check-shell-syntax.sh`, `check-version-consistency.mjs` — Repository, shell and version checks.
 - `verify-deb-package.sh`, `verify-speech-payload.py` — Package contents.
+- `verify-rpm-package.sh` — The RPM's contents and policy; given the Debian package, it also proves that both carry the same files and dependencies.
 - `verify-speech-engine.py` — Checks that shipping source and dependency metadata don't reference the retired Whisper recognizer.
 - `verify-glib-backport.py`, `verify-shortcut-backport.py`, `verify-tray-backport.py` — Vendored crate provenance and resolution.
 - `verify-native-capture-audit.py` — Checks a capture audit bundle.
 
 ### Release
 
-- `assemble-release.sh` — Packages, verifies and signs one release from a signed tag on the maintainer's Linux computer. It uploads nothing.
+- `assemble-release.sh` — Builds the Debian package and the RPM, verifies them and signs one release from a signed tag on the maintainer's Linux computer. It uploads nothing.
 - `sign-release-checksums.sh` — Detached, armored signatures for checksum lists, on the maintainer's computer.
 - `verify-release.sh` — Offline checksum and signature verification.
 - `test-verify-release.sh` — Signs and verifies with a throwaway key.
@@ -289,6 +293,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `test-native-capture-callbacks.py`, `test-native-capture-pulse-latency.py`, `native-capture-lifecycle.test.c`, `test-native-capture-renderer.mjs`, `test_verify_native_capture_audit.py` — Native capture.
 - `test-dictation-renderer.mjs`, `test-microphone-app-renderer.mjs`, `test-brand-motion.mjs`, `audio-worklet-capture.test.mjs` — Renderer and AudioWorklet.
 - `test-speech-package.py`, `test-speech-worker.py`, `test-audio-continuity.py` — Speech packaging and worker pipes.
+- `test-rpm-package.py` — The RPM's file list, spec, header policy and parity checks; with rpmbuild installed, a real build.
 - `test-install-apt.py`, `test-install-common.sh`, `test-install-journey.py`, `test-install-launch.py`, `test-install-performance.py`, `test-install-presentation.py` — Installer.
 - `test-glib-variant.py`, `test-debian-maintainer.py`, `test-check-shell-syntax.py`, `test-report-dictation-quality-events.py`, `test-report-performance.py`, `test-report-speech-timing.py`, `test-typesafe-evaluation.py` — Other checks.
 - `fixtures/*` — Test-only helpers: synthetic fields, probe extensions, a `wl-copy` and an input-state relay through the private Shell probe, and the [uinput bridge](../testing/README.md#the-uinput-bridge) that replays VOCO's virtual keyboard on a private Xvfb. None is installed.
@@ -320,7 +325,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 ## Repository root
 
 - `README.md`, `AGENTS.md`, `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`, `LICENSE` — Overview, agent and contributor guides, security policy, code of conduct and licence.
-- `install` — Guided installer for the signed release package.
+- `install` — Guided installer for the signed release: the Debian package with APT, or the RPM with DNF.
 - `KEYS` — Release signing key.
 - `package.json` — Root npm scripts, including `npm test`, `test:ibus`, `test:speech-baseline`, `verify:security` and `verify:devops`.
 - `package-lock.json`, `.nvmrc` — Pinned npm dependencies, and Node 24.
@@ -340,8 +345,8 @@ exits 1.
 | --- | --- | --- |
 | `--toggle` | Asks the VOCO running in this session to start or stop. It doesn't launch VOCO, change focus or confirm the recording state. | 1 if VOCO's socket can't be reached |
 | `--check-desktop-input` | Checks the paste prerequisites: the clipboard helper, plus `xdotool` on X11 or access to `/dev/uinput` on Wayland. It doesn't launch VOCO, create a keyboard or send keys. | 1 on failure |
-| `--check-panel` | Checks the GNOME companion without changing settings. | 2 unless the companion is active, the desktop isn't GNOME, or GNOME isn't version 46; 1 on error |
-| `--setup-panel` | Enables the packaged GNOME 46 companion for this user. It may need a sign-out and never restarts Shell. | As for `--check-panel` |
+| `--check-panel` | Checks the GNOME companion without changing settings. | 2 unless the companion is active, the desktop isn't GNOME, or GNOME isn't 46, 48 or 50; 1 on error |
+| `--setup-panel` | Enables the packaged GNOME companion for this user, on GNOME 46, 48 or 50. It may need a sign-out and never restarts Shell. | As for `--check-panel` |
 | `--version` | Prints `VOCO` and the version. | 0 |
 | `--help`, `-h` | Prints usage. | 0 |
 

@@ -1,42 +1,55 @@
 # Linux packaging
 
-VOCO ships as one Debian package, `voco`, for Ubuntu and Debian on amd64. It
-holds the app, the speech worker, the Nemotron model, the native CPU runtime,
-the optional desktop integrations and their license notices, so dictation needs
-no download at run time. The CPU needs AVX2, FMA and F16C, and the system needs
-glibc 2.39 or later. [Install](install.md) covers installing the package; this
-page covers how it is built and what it contains.
+VOCO ships as two packages named `voco`, built from one staged tree: a Debian
+package, `voco_<version>_amd64.deb`, for Ubuntu and Debian, and an RPM,
+`voco-<version>-1.x86_64.rpm`, for Fedora. Both hold the same files: the app,
+the speech worker, the Nemotron model, the native CPU runtime, the optional
+desktop integrations and their license notices, so dictation needs no download
+at run time. The CPU needs AVX2, FMA and F16C, and the system needs glibc 2.39
+or later. [Install](install.md) covers installing the packages; this page covers
+how they are built and what they contain.
 
-## How the package is built
+## How the packages are built
 
-Three scripts turn a checkout into a package:
+Three steps turn a checkout into packages:
 
 1. `scripts/build-desktop.sh`, which `npm run build` runs, builds the interface
    and `voco-browser-host`, then runs `cargo tauri build --bundles deb`. The
    result is a base package in `apps/desktop/src-tauri/target/release/bundle/deb/`.
    It holds the app and the integration files but no speech runtime, so it can't
    dictate and is never installed on its own.
-2. `python3 scripts/package-nvidia.py BASE.deb OUTPUT.deb` adds the speech
-   runtime, the documentation and the licenses, and writes the complete package.
-3. `bash scripts/verify-deb-package.sh OUTPUT.deb [VERSION]` checks the result.
+2. `python3 scripts/package-nvidia.py BASE.deb OUTPUT.deb [--rpm OUTPUT.rpm]`
+   stages the complete tree once: the base package plus the speech runtime, the
+   documentation and the licenses. It builds the Debian package from that tree
+   and, with `--rpm`, [the RPM](#the-rpm) from a copy of it.
+3. `bash scripts/verify-deb-package.sh OUTPUT.deb [VERSION]` and
+   `bash scripts/verify-rpm-package.sh OUTPUT.rpm [VERSION] [OUTPUT.deb]` check
+   the results. Given the Debian package, the RPM check also proves that both
+   carry the same files and dependencies.
 
-`bash scripts/setup.sh --install` runs all three and installs the package with
-APT. `scripts/assemble-release.sh` runs them for a release, as the
-[release process](release-process.md) describes. Both need the
-[provisioned runtime](#runtime-provisioning).
+`bash scripts/setup.sh --install` runs the Debian steps and installs the package
+with APT. `scripts/assemble-release.sh` builds and checks both packages for a
+release, as the [release process](release-process.md) describes. Both need the
+[provisioned runtime](#runtime-provisioning). The packages are built on an APT
+system: `package-nvidia.py` unpacks the base package with `dpkg-deb`, and the
+RPM needs `rpmbuild`, which Ubuntu's `rpm` package provides.
 
 `package-nvidia.py` stops unless the base package's version equals the one in
 `package.json`. `--debian-version` may only extend that version with a `+suffix`,
-and the output file must not exist yet. The script checks that the base package
-holds the `voco` and `voco-browser-host` executables, runs
-`scripts/verify-glib-backport.py`, and refuses a model whose SHA-256 differs from
-`runtime/speech/MODEL-IDENTITY.json`. It then writes `MANIFEST.json`, an
-inventory of every speech file and link with its SHA-256, sets directories to
-0755 and files to 0644 or 0755, generates the maintainer script and rewrites the
-control file's version, installed size and checksums. It builds the package with
-Zstandard at level 9 and prints its path, version, size and SHA-256.
+which must also be a valid RPM version when `--rpm` is given, and neither output
+file may exist yet. The script checks that the base package holds the `voco` and
+`voco-browser-host` executables, runs `scripts/verify-glib-backport.py`, and
+refuses a model whose SHA-256 differs from `runtime/speech/MODEL-IDENTITY.json`.
+It then writes `MANIFEST.json`, an inventory of every speech file and link with
+its SHA-256, sets directories to 0755 and files to 0644 or 0755, generates the
+maintainer script and rewrites the control file's version, installed size and
+checksums. It builds the Debian package with Zstandard at level 9 and, if asked,
+the RPM, and writes them to their outputs only when both are complete. It prints
+the version and each package's path, size and SHA-256.
 
 ## Contents
+
+Both packages install these paths:
 
 | Path | Contents |
 | --- | --- |
@@ -54,7 +67,7 @@ Zstandard at level 9 and prints its path, version, size and SHA-256.
 | `/usr/share/icons/hicolor/*/apps/voco.png` | Icons at 32, 128 and 256 pixels |
 | `/usr/share/doc/voco/` | [Documentation and licenses](#documentation-and-licenses) |
 
-Installing the package applies its `/dev/uinput` rule and turns nothing else on.
+Installing either package applies its `/dev/uinput` rule and turns nothing else on.
 The GNOME companion stays off until the guided installer or you enable it, and
 the IBus input source and the Chromium extension stay off until you add them.
 
@@ -75,19 +88,66 @@ the IBus input source and the Chromium extension stay off until you add them.
 - `report-performance.py` and `report-speech-performance.py`, which summarize
   the opt-in [performance logs](troubleshooting.md#performance-logs).
 
+The RPM marks `copyright`, `THIRD-PARTY-NOTICES.txt`, `nvidia/` and `vendor/` as
+licenses, so they stay installed when DNF skips documentation, and the rest of
+the folder as documentation.
+
 ## Dependencies
 
-| Used by | Packages |
-| --- | --- |
-| The app | `libpulse0` for Wayland capture, `libnotify-bin` for the startup failure notice, `libc6 (>= 2.39)`, `libstdc++6 (>= 13.2.0)` |
-| Speech worker | `python3`, `python3-numpy`, `python3-psutil`, `libsentencepiece0` |
-| Paste | `xdotool`, `xclip`, `wl-clipboard` |
-| IBus engine | `ibus`, `gir1.2-ibus-1.0`, `python3-gi` |
+| Used by | Debian package | RPM |
+| --- | --- | --- |
+| The app | `libpulse0` for Wayland capture, `libnotify-bin` for the startup failure notice, `libc6 (>= 2.39)`, `libstdc++6 (>= 13.2.0)` | `pulseaudio-libs`, `libnotify`, `glibc >= 2.39`, `libstdc++ >= 13.2` |
+| WebKitGTK, GTK and the tray icon | `libwebkit2gtk-4.1-0`, `libgtk-3-0`, `libayatana-appindicator3-1` | `webkit2gtk4.1`, `gtk3`, `libayatana-appindicator-gtk3` |
+| Speech worker | `python3`, `python3-numpy`, `python3-psutil`, `libsentencepiece0` | `python3`, `python3-numpy`, `python3-psutil`, `sentencepiece-libs` |
+| Paste | `xdotool`, `xclip`, `wl-clipboard` | `xdotool`, `xclip`, `wl-clipboard` |
+| IBus engine | `ibus`, `gir1.2-ibus-1.0`, `python3-gi` | `ibus`, `ibus-libs`, `python3-gobject` |
 
-The package recommends nothing. VOCO presses the Wayland paste keys through its
-own virtual keyboard, so the helpers that either session needs are all
-dependencies. The guided installer and `setup.sh --install` give APT only the
-VOCO package.
+`tauri.conf.json` lists the Debian dependencies, and Tauri adds the WebKitGTK,
+GTK and AppIndicator libraries itself. `DEBIAN_TO_FEDORA` in
+`scripts/rpm_package.py` names the Fedora 44 package that provides the same
+files for each one, and `packaging/rpm/voco.spec.in` requires exactly those;
+`npm run verify:devops` fails when the three disagree.
+
+Neither package recommends anything. VOCO presses the Wayland paste keys through
+its own virtual keyboard, so the helpers that either session needs are all
+dependencies. The guided installer gives APT or DNF only the VOCO package, and
+`setup.sh --install` gives APT only the Debian package.
+
+## The RPM
+
+`scripts/rpm_package.py` fills in `packaging/rpm/voco.spec.in` for the staged
+tree: the version, release 1, the summary and description from the staged
+Debian control file, the scriptlet and the file list. Then it runs
+`rpmbuild -bb` for x86_64 on a copy of the tree, with `HOME` set to its work
+folder so that a personal `~/.rpmmacros` can't change the package. The spec has
+no prep, build or install stage, because nothing is compiled or downloaded.
+
+- **Payload.** The files go in exactly as staged: no stripping,
+  byte-compiling, build-ID links or debug packages. The payload is Zstandard at
+  level 9 with SHA-256 file digests, and the build host reads `voco-release`.
+  With `SOURCE_DATE_EPOCH` set, as release assembly sets it, the build time and
+  every newer file time become the commit time.
+- **Requirements.** The RPM requires the [Fedora names](#dependencies) of the
+  Debian dependencies. Automatic requirements and provides are off for the
+  private speech runtime in `/usr/lib/voco/speech`, which offers no libraries
+  to the system, and the documentation adds no requirements. The app binaries
+  keep their generated library requirements.
+- **Scriptlet.** The only scriptlet is `%post`, from `packaging/rpm/post.sh`,
+  which applies the `/dev/uinput` rule as the Debian package does (see
+  [Package scripts](#package-scripts)). There are no triggers.
+- **Folders.** The RPM owns VOCO's folders: `/usr/lib/voco`, `/usr/share/voco`,
+  `/usr/share/doc/voco` and the companion's folder. It also owns the shared
+  folders that no VOCO dependency creates on Fedora 44, the Chrome and Chromium
+  host folders under `/etc` and `/usr/share/gnome-shell` with its `extensions`
+  folder, so removal leaves no empty folder. It never owns the system folders
+  that `filesystem`, `systemd-udev`, `hicolor-icon-theme` or `ibus` own, and a
+  folder that neither list names stops the build.
+- **Signature.** The RPM carries no OpenPGP signature. The release's signed
+  checksum lists authenticate it, so DNF warns that it skipped OpenPGP checks
+  when it installs the file.
+
+Like the Debian package, the RPM declares no configuration files, and no weak
+dependencies, conflicts or obsoletes.
 
 ## Wayland paste keys
 
@@ -102,8 +162,8 @@ files instead:
 - `/usr/lib/modules-load.d/voco-uinput.conf` loads the `uinput` module at boot,
   so the device exists before the first login.
 
-The [maintainer script](#maintainer-script) asks udev to apply the rule at once,
-so the active local session usually has access straight away; otherwise signing
+The [package scripts](#package-scripts) ask udev to apply the rule at once, so
+the active local session usually has access straight away; otherwise signing
 out and back in once applies it.
 [Access to /dev/uinput](platform/README.md#access-to-devuinput) covers checking
 the access and replacing the rule.
@@ -113,12 +173,15 @@ in `scripts/lib/install-common.sh`, which runs
 `/usr/bin/voco --check-desktop-input`; when it fails, both exit with status 2.
 Package hooks never start, stop or restart user services.
 
-## Maintainer script
+## Package scripts
 
-The package has one maintainer script, `postinst`. `scripts/debian_maintainer.py`
-generates it from `packaging/debian/postinst.py.in` with the list of every
-directory the package owns under `/usr/lib/voco`, `/usr/share/voco` and
-`/usr/share/doc/voco`.
+Each package runs one script as root when it is installed or upgraded, and none
+at removal.
+
+The Debian package has one maintainer script, `postinst`.
+`scripts/debian_maintainer.py` generates it from `packaging/debian/postinst.py.in`
+with the list of every directory the package owns under `/usr/lib/voco`,
+`/usr/share/voco` and `/usr/share/doc/voco`.
 
 On `configure`, the script changes a listed directory's mode only when it is
 0775, to 0755. It opens each path component without following links and fails
@@ -132,15 +195,19 @@ each with a 10-second limit, and ignores their failures, because containers and
 chroots have no udev to ask. It doesn't touch user files, services, sessions,
 input sources or GNOME extensions.
 
+The RPM's `%post`, `packaging/rpm/post.sh`, runs the same three commands with
+the same limit and ignores their failures. It contains no rpm macros, and the
+spec runs nothing else.
+
 ## Upgrade and removal
 
-An upgrade replaces the package's files. The package declares no configuration
-files and has no removal scripts, so `apt remove voco` deletes every file it
-installed, including the host manifests in `/etc` and the udev rule. Nothing
-re-applies udev rules on removal, so the `/dev/uinput` access the rule gave
-lasts until the computer restarts. Package operations change nothing in your
-home folder: settings and Review stay, as
-[What VOCO keeps](everyday-use.md#what-voco-keeps) lists.
+An upgrade replaces the package's files. Neither package declares
+configuration files or has removal scripts, so `apt remove voco` or
+`dnf remove voco` deletes every file the package installed, including the host
+manifests in `/etc` and the udev rule. Nothing re-applies udev rules on
+removal, so the `/dev/uinput` access the rule gave lasts until the computer
+restarts. Package operations change nothing in your home folder: settings and
+Review stay, as [What VOCO keeps](everyday-use.md#what-voco-keeps) lists.
 
 Quit VOCO before you upgrade ([Upgrade](install.md#upgrade)). When a release
 changes the GNOME companion, run `voco --setup-panel` again, then sign out and
@@ -209,5 +276,37 @@ python3 and readelf. It checks:
 - the AppStream ID, the launchable and the first release entry's version, then
   `desktop-file-validate`, `appstreamcli validate` and `appstreamcli validate-tree`.
 
-`VOCO_PACKAGE_VERIFY_OFFLINE=1` runs the AppStream checks with `--no-net`, for a
-job without network access. Release assembly keeps the online checks.
+`verify-rpm-package.sh` runs on the Ubuntu build computer and on Fedora. It
+needs rpm, rpm2cpio, cpio, desktop-file-validate, appstreamcli, python3 and
+readelf, and dpkg-deb when it is given a Debian package. It checks:
+
+- the header: the name `voco`, the expected version, release 1, no epoch,
+  `x86_64`, the license expression, the build host `voco-release`, the
+  Zstandard payload and the file name `voco-<version>-1.x86_64.rpm`;
+- every Fedora requirement with both ABI floors, and no weak dependencies,
+  conflicts, obsoletes or configuration files;
+- one root-owned entry with the expected mode for each fixed path; no Python
+  caches, test files, build-ID links, Debian control files or retired
+  `ydotoold` files; and the license marking of the notices and the NVIDIA texts;
+- with `rpm_package.py verify-package`: only the reviewed `%post` and no
+  triggers, plain root-owned modes, the reviewed folder ownership and license
+  and documentation flags, requirements that cover each system library the
+  private runtime needs, the app binaries' generated requirements, nothing
+  private provided or required, and no binary that needs a `GLIBC`, `GLIBCXX`
+  or `CXXABI` symbol version newer than Ubuntu 24.04 provides;
+- the same byte-for-byte comparisons with the sources, the host manifest and
+  origin checks, the speech payload and the AppStream checks as the Debian
+  verifier;
+- given a Debian package, with `rpm_package.py same-package`: that both
+  packages hold the same files and links with the same modes and SHA-256
+  digests, and that every Debian dependency is required under its Fedora name.
+
+In both verifiers, `VOCO_PACKAGE_VERIFY_OFFLINE=1` runs the AppStream checks
+with `--no-net`, for a job without network access. Release assembly keeps the
+online checks.
+
+`npm run test:speech-package` includes `scripts/test-rpm-package.py`, which
+tests the file list, the spec, the header policy and both parity checks, and
+builds a small RPM when `rpmbuild` is installed. `npm run verify:devops` keeps
+the spec in step with the dependency map, and fails unless the spec builds
+nothing, runs only `packaging/rpm/post.sh` and stays x86_64 release 1.

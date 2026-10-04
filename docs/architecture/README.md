@@ -19,9 +19,10 @@ and [Security](../security/README.md) covers trust boundaries and data handling.
 | Speech worker | `runtime/speech/` | Python process with a C++ bridge to the native recognizer. One warm worker serves every recording. |
 | Native runtime | `runtime/native/` | Pinned, patched build of NeMo-Speech.cpp and ggml for x86-64 with AVX2, FMA and F16C. |
 | Virtual keyboard | `apps/desktop/src-tauri/src/virtual_keyboard.rs`, `packaging/udev/` | VOCO's own uinput keyboard sends the Wayland paste keys. The package's udev rule gives the user of the active local session access to `/dev/uinput`. |
-| GNOME companion | `integrations/gnome/` | Optional GNOME 46 extension: panel pill, live meter, Stop and a shortcut grab on Wayland. |
+| GNOME companion | `integrations/gnome/` | Optional extension for GNOME 46, 48 and 50: panel pill, live meter, Stop and a shortcut grab on Wayland. |
 | IBus engine | `apps/desktop/src-tauri/resources/`, `packaging/ibus/` | Optional input source that consumes the shortcut in IBus-aware fields. It never edits text. |
 | Chromium extension | `integrations/chromium/` | Optional delivery into one plain text field of an enabled tab, through `voco-browser-host`. |
+| Packages | `packaging/`, `scripts/package-nvidia.py`, `scripts/rpm_package.py` | One staged tree becomes the Debian package and the Fedora RPM, with the same files; see [Linux packaging](../linux-packaging.md). |
 
 ## Production path
 
@@ -153,7 +154,7 @@ it is.
 
 | Route | When | Behaviour |
 | --- | --- | --- |
-| GNOME companion | GNOME 46 on Wayland with the companion attached | Shell grabs Alt+D or Alt+Shift+D at every status and calls `Action('shortcut', '')`. The focused app never sees the chord. |
+| GNOME companion | GNOME 46, 48 or 50 on Wayland with the companion attached | Shell grabs Alt+D or Alt+Shift+D at every status and calls `Action('shortcut', '')`. The focused app never sees the chord. |
 | Passive evdev | Wayland with Alt+D or Alt+Shift+D | Reads keyboards in `/dev/input` and needs read access to them. The focused app also receives the chord. |
 | X11 grab | X11, any valid shortcut | A root-window key grab consumes the chord and toggles on release, so the paste keys reach the app. |
 | IBus engine | The VOCO Dictation input source is selected | Protocol 6. Consumes the chord in IBus-aware fields and changes no text. |
@@ -171,7 +172,16 @@ Shortcut status text comes from `shortcut_readiness.rs`.
 The tray menu shows the status, then Open VOCO, Start dictation, Stop dictation,
 Settings, Review, Change shortcut and Quit VOCO. `tray_icons.rs` writes the state
 icons and 64 meter frames once, to paths that stay valid for the process
-lifetime, and the meter advances every 90 ms.
+lifetime, and the meter advances every 90 ms. The tray icon is an AppIndicator,
+which GNOME shows only through an AppIndicator extension: Ubuntu turns one on,
+Debian 13 and Fedora 44 don't.
+
+The companion loads on GNOME 46, 48 and 50, the majors in its metadata, and
+`voco_gnome_panel.py` reports any other as unsupported. GNOME 50 has no X11
+session and no `Meta.is_wayland_compositor()`, so the companion treats a Shell
+without it as Wayland. A primary click on the pill stops or opens Settings, and
+other buttons, Menu and Shift+F10 open the menu; on GNOME 50 the panel button's
+click gesture leaves primary presses and touches to the pill.
 
 The companion talks to `org.voco.Panel1` on the session bus at `/org/voco/Panel`.
 `Attach` succeeds only for the current owner of `org.gnome.Shell` and hides the

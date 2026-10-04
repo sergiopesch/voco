@@ -92,6 +92,20 @@ the group grants the same access to everything else you run. The GNOME
 companion, the IBus input source and a `voco --toggle` binding need no such
 access.
 
+## Package scripts
+
+Each package runs one script as root when it is installed or upgraded: it loads
+the `uinput` module, reloads the udev rules and re-triggers `/dev/uinput`, each
+step limited to 10 seconds, and ignores their failures. The Debian script also
+changes VOCO's own directories from 0775 to 0755. Neither package runs anything
+at removal, declares configuration files, or changes users, groups, services,
+GNOME extensions or files in a home folder.
+
+The RPM ships no SELinux policy and changes no labels, so its files keep the
+default labels for their paths. On Fedora 44 in enforcing mode, installing and
+removing the RPM, `voco --check-desktop-input` and the speech worker raise no
+denials.
+
 ## Local interfaces
 
 | Interface | Used by | Checks |
@@ -182,7 +196,7 @@ reseeds. rand 0.7.3 runs only in the build script of `selectors`, through
 `phf_codegen` and `phf_generator` 0.8.0, whose generator uses a seeded
 `SmallRng`, and VOCO has no such logger. Check both again when the lockfile
 changes. A clean audit doesn't show that every dependency is maintained or free
-of defects. The package installs the third-party notices in `/usr/share/doc/voco/`.
+of defects. Both packages install the third-party notices in `/usr/share/doc/voco/`.
 
 ## Release signing
 
@@ -195,14 +209,20 @@ B33C7C6AAEC8C20433A7A837540796453D8E3865
 Confirm this fingerprint through a channel you trust other than the clone
 itself. Each release has an annotated, signed `voco.<version>` tag and signed
 checksum manifests, each with a detached `.asc` signature. `voco_checksums.txt`
-lists the release files, including the package, the installer and KEYS, and
-`voco_<version>_debian_checksums.txt` lists only the package.
+lists the release files, including both packages, the installer and KEYS.
+`voco_<version>_debian_checksums.txt` lists only the Debian package, and
+`voco_<version>_rpm_checksums.txt` only the RPM.
 
 The guided installer carries its own copy of the key and the fingerprint. It
 downloads the package, `voco_checksums.txt` and its signature, and checks the
 signature with `gpgv` against that key alone, requiring a valid signature from
-that fingerprint. Then it checks the package's SHA-256 before APT sees the
-file. If either check fails, it installs nothing.
+that fingerprint. Then it checks the package's SHA-256 before APT or DNF sees
+the file. If either check fails, it installs nothing.
+
+The RPM itself carries no OpenPGP signature, so DNF warns that it skipped
+OpenPGP checks when it installs the file. The signed checksum lists are what
+authenticate it, which is why the guided installer and the
+[manual install](../install.md#fedora) check them before DNF runs.
 
 To check downloaded files by hand, put a manifest, its signature and the files
 it lists in one directory. Then, from a clone, run
