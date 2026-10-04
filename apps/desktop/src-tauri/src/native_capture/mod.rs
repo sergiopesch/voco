@@ -301,13 +301,11 @@ impl<B: CaptureBackend> Worker<B> {
         }
         Ok(())
     }
+    /// Call this before cancelling: `vc_cancel` zeroes the status the receipt reads.
     fn finish_audit(&mut self, reason: &'static str) {
         if let Some(session) = self.session.as_mut() {
-            let receipt = self
-                .pulse
-                .as_ref()
-                .map(|pulse| session.receipt(&pulse.status()));
             if let Some(audit) = session.audit.take() {
+                let receipt = self.pulse.as_ref().map(|p| session.receipt(&p.status()));
                 audit.finish(reason, receipt);
             }
         }
@@ -525,7 +523,7 @@ impl<B: CaptureBackend> Worker<B> {
                                 replay,
                             );
                         }
-                        if terminal {
+                        if terminal && session.audit.is_some() {
                             let healthy = session.receipt(&pulse.status()).health.healthy;
                             self.finish_audit(if healthy { "complete" } else { "failure" });
                         }
@@ -588,15 +586,9 @@ impl<B: CaptureBackend> Worker<B> {
                     .as_ref()
                     .ok_or("No active native capture")?
                     .check(&identity)?;
-                let audit_receipt = self
-                    .session
-                    .as_ref()
-                    .map(|s| s.receipt(&self.pulse.as_ref().expect("checked capture").status()));
                 let failed = self.session.as_ref().is_some_and(|s| s.failure.is_some());
+                self.finish_audit("cancel");
                 self.pulse()?.cancel();
-                if let Some(audit) = self.session.as_mut().and_then(|s| s.audit.take()) {
-                    audit.finish("cancel", audit_receipt);
-                }
                 if failed || self.pulse()?.status().error.is_some() {
                     self.pulse = None;
                     self.approved = None;
@@ -606,22 +598,13 @@ impl<B: CaptureBackend> Worker<B> {
                 Ok(Response::Empty)
             }
             Request::ResetRenderer | Request::Shutdown => {
-                let audit_receipt = self
-                    .session
-                    .as_ref()
-                    .and_then(|s| self.pulse.as_ref().map(|p| s.receipt(&p.status())));
+                self.finish_audit(if matches!(request, Request::Shutdown) {
+                    "shutdown"
+                } else {
+                    "reset"
+                });
                 if let Some(pulse) = self.pulse.as_mut() {
                     pulse.cancel();
-                }
-                if let Some(audit) = self.session.as_mut().and_then(|s| s.audit.take()) {
-                    audit.finish(
-                        if matches!(request, Request::Shutdown) {
-                            "shutdown"
-                        } else {
-                            "reset"
-                        },
-                        audit_receipt,
-                    );
                 }
                 self.pulse = None;
                 self.session = None;
