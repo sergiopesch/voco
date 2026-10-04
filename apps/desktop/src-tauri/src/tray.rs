@@ -3,8 +3,8 @@ use serde::Deserialize;
 use std::sync::Mutex;
 use tauri::{
     menu::{MenuBuilder, MenuItem, MenuItemBuilder, PredefinedMenuItem, Submenu, SubmenuBuilder},
-    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    Emitter, Manager, Position, Size,
+    tray::TrayIconBuilder,
+    Emitter, Manager,
 };
 
 const HOTKEY_PRESETS: &[&str] = &["Alt+D", "Alt+Shift+D"];
@@ -148,13 +148,6 @@ struct TrayPresentation {
 enum TrayDictationAction {
     Toggle,
     Stop,
-    Ignore,
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-enum TrayLeftClickAction {
-    StopDictation,
-    ShowPopover,
     Ignore,
 }
 
@@ -336,22 +329,6 @@ fn derive_tray_presentation(snapshot: &RuntimeStatusSnapshot) -> TrayPresentatio
     }
 }
 
-fn derive_tray_left_click_action(snapshot: &RuntimeStatusSnapshot) -> TrayLeftClickAction {
-    match snapshot.dictation_status {
-        DictationStatus::Starting | DictationStatus::Recording => {
-            TrayLeftClickAction::StopDictation
-        }
-        DictationStatus::Processing => TrayLeftClickAction::Ignore,
-        DictationStatus::Idle | DictationStatus::Error => {
-            if derive_tray_presentation(snapshot).popover_enabled {
-                TrayLeftClickAction::ShowPopover
-            } else {
-                TrayLeftClickAction::Ignore
-            }
-        }
-    }
-}
-
 fn tray_debug_enabled() -> bool {
     std::env::var("VOCO_TRAY_DEBUG")
         .or_else(|_| std::env::var("VOICE_TRAY_DEBUG"))
@@ -475,44 +452,8 @@ pub fn setup_tray(app: &tauri::App, hotkey_label: &str) -> Result<(), Box<dyn st
         .icon(icon)
         .menu(&menu)
         .tooltip("VOCO — Initializing…")
-        .on_tray_icon_event(|tray, event| {
-            if let TrayIconEvent::Click {
-                button: MouseButton::Left,
-                button_state: MouseButtonState::Up,
-                rect,
-                ..
-            } = event
-            {
-                let anchor = match (rect.position, rect.size) {
-                    (Position::Physical(position), Size::Physical(size)) => {
-                        crate::TrayPopoverAnchor {
-                            rect_position_x: position.x,
-                            rect_position_y: position.y,
-                            rect_width: size.width,
-                            rect_height: size.height,
-                        }
-                    }
-                    // Tauri does not expose the monitor scale associated with a logical tray
-                    // rectangle. A zero anchor deliberately selects the centered fallback instead
-                    // of guessing at 1× and placing the popover on the wrong monitor.
-                    _ => crate::TrayPopoverAnchor::default(),
-                };
-                let app = tray.app_handle();
-                let action = {
-                    let state = app.state::<TrayMutex>();
-                    state.lock().ok().map(|state| {
-                        derive_tray_left_click_action(&runtime_snapshot_from_tray_state(&state))
-                    })
-                };
-                match action {
-                    Some(TrayLeftClickAction::StopDictation) => request_stop(app),
-                    Some(TrayLeftClickAction::ShowPopover) => {
-                        let _ = app.emit_to("main", "voco:toggle-popover", anchor);
-                    }
-                    Some(TrayLeftClickAction::Ignore) | None => {}
-                }
-            }
-        })
+        // Linux's AppIndicator backend reports no icon clicks, so the menu holds
+        // every fallback tray action.
         .on_menu_event(move |app, event| {
             let id = event.id().as_ref();
             match id {
@@ -1348,10 +1289,6 @@ mod tests {
         assert!(!presentation.popover_enabled);
         assert!(!presentation.settings_enabled);
         assert!(!presentation.hotkey_menu_enabled);
-        assert_eq!(
-            derive_tray_left_click_action(&snapshot),
-            TrayLeftClickAction::StopDictation
-        );
     }
 
     #[test]
@@ -1685,36 +1622,6 @@ mod tests {
         assert_eq!(
             from_startup_failure.tooltip,
             "VOCO — Settings need attention"
-        );
-    }
-
-    #[test]
-    fn left_click_uses_the_same_safe_popover_gate() {
-        let initializing = RuntimeStatusSnapshot::default();
-        assert_eq!(
-            derive_tray_left_click_action(&initializing),
-            TrayLeftClickAction::Ignore
-        );
-
-        let mut config_error = ready_snapshot();
-        config_error.configuration_error = true;
-        assert_eq!(
-            derive_tray_left_click_action(&config_error),
-            TrayLeftClickAction::Ignore
-        );
-
-        let mut recording = ready_snapshot();
-        recording.dictation_status = DictationStatus::Recording;
-        assert_eq!(
-            derive_tray_left_click_action(&recording),
-            TrayLeftClickAction::StopDictation
-        );
-
-        let mut processing = ready_snapshot();
-        processing.dictation_status = DictationStatus::Processing;
-        assert_eq!(
-            derive_tray_left_click_action(&processing),
-            TrayLeftClickAction::Ignore
         );
     }
 

@@ -187,8 +187,9 @@ change.
   on; Debian 13 and Fedora 44 don't, so there the companion is VOCO's only
   top-bar presence. When 20 s after startup neither the companion is attached nor
   a StatusNotifier host owns its name, VOCO notifies once with the remedy.
-- Active presentation is the microphone plus waves only. Stop lives in the context
-  menu and in the icon and shortcut actions; Settings and Review are explicit menu
+- Active presentation is the microphone plus waves only. Stop lives in the menus,
+  the companion pill's primary click and the shortcut (the fallback tray's
+  AppIndicator reports no clicks); Settings and Review are explicit menu
   destinations.
 - VOCO's own layout never moves the microphone when dictation starts or stops: the
   companion's meter opens on its left, and the fallback tray shows no label at

@@ -42,8 +42,7 @@ VOCO saves the text in [Review](#review) and shows **Dictation saved in Review**
 | Control | What it does |
 | --- | --- |
 | Shortcut | Starts and stops dictation. It is `Alt+D` unless you change it. |
-| Tray icon | Click to stop while you dictate, or to open the VOCO popover. |
-| Tray menu | **Open VOCO**, **Start dictation** or **Stop dictation**, **Settings**, **Review**, **Change shortcut** and **Quit VOCO** |
+| Tray menu | Open the tray icon's menu for **Open VOCO**, **Start dictation** or **Stop dictation**, **Settings**, **Review**, **Change shortcut** and **Quit VOCO**. |
 | GNOME panel | Seven bars move with your voice. Click to stop while you dictate, or to open Settings. |
 | GNOME panel menu | Right-click or middle-click the panel, or press Menu or Shift+F10 on it, for **Settings**, **Review** and **Stop dictation**. |
 | Popover | Shows VOCO's status, your shortcut and your microphone, with **Help** and **Hide to tray**. |
