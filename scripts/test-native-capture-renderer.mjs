@@ -706,6 +706,7 @@ try {
       await page.waitForFunction(()=>window.captureWorklet?.port.onmessage && window.store.getState().status==='recording');
       await page.evaluate(()=>window.captureWorklet.port.onmessage({data:{type:'samples',data:Float32Array.from({length:16000},(_,i)=>Math.sin(i/20)*.2)}}));
       await page.getByRole('region',{name:'Test transcript'}).getByText('This is my voice test',{exact:true}).waitFor();
+      assert.ok(Number(await page.getByRole('meter',{name:'Microphone signal'}).getAttribute('aria-valuenow'))>0);
       if (await page.getByRole('button',{name:'Finish test',exact:true}).count()) { await page.getByRole('button',{name:'Finish test',exact:true}).click(); await page.waitForFunction(()=>window.store.getState().onboardingTestPassed); }
         await page.getByRole('button',{name:'Done',exact:true}).click();
       await assertOnboardingHidden();

@@ -104,7 +104,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `captureDescriptor.ts` — Capture backend selection and the retained audio format.
 - `captureDescriptor.test.ts` — Retained audio format.
 - `audioInput.ts` — Opens the WebKit microphone stream and picks the device.
-- `audioLevel.ts` — Level meter values for the tray and companion.
+- `audioLevel.ts` — Level meter values for every capture path, shown in the window, the tray and the companion.
 - `nativeCapture.ts` — Renderer side of native capture: sources, packets and acknowledgements.
 - `nativeCapture.test.ts` — Native capture protocol and ownership.
 - `nativeCaptureSettings.ts` — Native capture availability and source selection commands.

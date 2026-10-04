@@ -292,9 +292,10 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
         // Ignore audio from a replaced node or an earlier recording.
         if (workletRef.current !== createdWorklet || sessionRef.current.sessionId !== sourceSessionId) return;
         if (e.data.type === "samples") {
-          appendRecordingSamples(e.data.data as Float32Array);
-        } else if (e.data.type === "level") {
-          updateAudioLevel(e.data.data as number);
+          // The meter reads these batches too, so every capture path shares audioLevel.ts.
+          const samples = e.data.data as Float32Array;
+          appendRecordingSamples(samples);
+          updateAudioLevel(calculateVisualAudioLevelFromSamples(samples));
         } else if (e.data.type === "capture-interrupted") {
           // The producer reports the gap before its buffered prefix. Invalidate
           // automatic output before accepting those final received samples.

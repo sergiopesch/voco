@@ -163,6 +163,9 @@ async function load() {
 }
 async function start(seconds=1) { await page.evaluate(()=>window.hook.toggle()); await page.waitForFunction(()=>window.captureReady()); await page.evaluate(seconds => window.samples(seconds),seconds); }
 async function stop() {await page.evaluate(()=>window.hook.toggle());}
+// One second of the 0.2 sine fixture (-17 dBFS): audioLevel.ts gives 0.92, and the
+// first meter update from silence moves 68% of the way there.
+const assertMeterLevel = level => assert.ok(Math.abs(level - 0.625) < 0.01, `meter level ${level}`);
 async function interrupted() {
  await page.waitForFunction(()=>window.store.getState().status==='idle'&&Boolean(window.store.getState().error),null,{timeout:6000});
  assert.equal(await page.evaluate(()=>window.store.getState().recovery),null);
@@ -244,6 +247,7 @@ for (const failure of ['module', 'construction']) {
   },failure);
   await start(1);
   assert.equal(await page.evaluate(()=>Boolean(window.processor?.onaudioprocess)),true);
+  assertMeterLevel(await page.evaluate(()=>window.store.getState().audioLevel));
   assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>c[0]==='showNotification'&&c[1]==="Dictation won't be typed")),true);
   assert.equal(await page.evaluate(()=>window.store.getState().captureNotice),null);
   assert.equal(await page.evaluate(()=>window.speechRequests.some(r=>['start','push'].includes(r.op))),false);
@@ -261,6 +265,7 @@ for (const failure of ['module', 'construction']) {
 
 await load(); await page.evaluate(()=>{window.desktopPaste=true;window.desktopStream=true;});
 await start();
+assertMeterLevel(await page.evaluate(()=>window.store.getState().audioLevel));
 await page.evaluate(()=>window.captureWorklet.port.onmessage({data:{type:'samples',data:new Float32Array(16000)}}));
 await page.waitForFunction(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length===1);
 assert.equal(await page.evaluate(()=>window.store.getState().status),'recording');
