@@ -177,7 +177,8 @@ when the panel needs a step.
 
 On Debian 13 and Fedora 44, VOCO's tray icon needs an AppIndicator extension,
 which they don't turn on, so until the panel loads VOCO has no icon in the top
-bar. Open VOCO from your app menu in the meantime.
+bar, and shortly after it starts VOCO says **VOCO has no icon in the top bar**.
+Open VOCO from your app menu in the meantime, and turn on the panel as above.
 
 While you dictate, GNOME's microphone privacy indicator appears and moves the
 VOCO panel to the left. This is expected.

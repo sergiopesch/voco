@@ -185,7 +185,8 @@ change.
   primary presses and touches to the pill.
 - On GNOME the fallback tray needs an AppIndicator extension. Ubuntu turns one
   on; Debian 13 and Fedora 44 don't, so there the companion is VOCO's only
-  top-bar presence.
+  top-bar presence. When 20 s after startup neither the companion is attached nor
+  a StatusNotifier host owns its name, VOCO notifies once with the remedy.
 - Active presentation is the microphone plus waves only. Stop lives in the context
   menu and in the icon and shortcut actions; Settings and Review are explicit menu
   destinations.

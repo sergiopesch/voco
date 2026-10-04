@@ -1952,6 +1952,51 @@ fn ensure_evdev_hotkey_listener(app_handle: &tauri::AppHandle) {
     }
 }
 
+/// Without the companion or a StatusNotifier host, which stock Debian and
+/// Fedora GNOME both lack, VOCO has nothing in the top bar. After the panel's
+/// usual attach time, say so once and how to add one.
+#[cfg(target_os = "linux")]
+fn notify_missing_top_bar_presence() {
+    std::thread::spawn(|| {
+        std::thread::sleep(std::time::Duration::from_secs(20));
+        if panel::is_attached() || status_notifier_host_present() != Some(false) {
+            return;
+        }
+        let gnome = std::env::var("XDG_CURRENT_DESKTOP")
+            .unwrap_or_default()
+            .split(':')
+            .any(|desktop| desktop.eq_ignore_ascii_case("gnome"));
+        let detail = if gnome {
+            "Open VOCO from the app menu, choose Enable live panel in Help, then sign out and back in."
+        } else {
+            "Your desktop shows no tray icons. Open VOCO from the app menu for Settings and Review."
+        };
+        send_notification("VOCO has no icon in the top bar", detail);
+    });
+}
+
+/// Whether a tray host owns the StatusNotifierWatcher name; None when unknown.
+#[cfg(target_os = "linux")]
+fn status_notifier_host_present() -> Option<bool> {
+    use glib::variant::ToVariant;
+    use webkit2gtk::gio;
+    let bus = gio::bus_get_sync(gio::BusType::Session, gio::Cancellable::NONE).ok()?;
+    bus.call_sync(
+        Some("org.freedesktop.DBus"),
+        "/org/freedesktop/DBus",
+        "org.freedesktop.DBus",
+        "NameHasOwner",
+        Some(&("org.kde.StatusNotifierWatcher",).to_variant()),
+        None,
+        gio::DBusCallFlags::NONE,
+        500,
+        gio::Cancellable::NONE,
+    )
+    .ok()?
+    .get::<(bool,)>()
+    .map(|(owned,)| owned)
+}
+
 /// VOCO 2026.0.60 and earlier pasted through `voco-ydotoold.service`. After the
 /// upgrade its unit file is gone, but this login's enablement link remains and
 /// an instance can keep running or restarting until sign-out. Retire only
@@ -2015,6 +2060,8 @@ pub fn run() -> Result<(), String> {
             warn!("{detail}");
         }
     }
+    #[cfg(target_os = "linux")]
+    notify_missing_top_bar_presence();
 
     #[cfg(target_os = "linux")]
     install_socket_cleanup_signal_handler();
