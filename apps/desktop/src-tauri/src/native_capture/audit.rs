@@ -31,7 +31,7 @@ pub(super) struct Audit {
     packet_limit: usize,
     event_limit: usize,
     #[cfg(test)]
-    terminal_observer: Option<std::sync::mpsc::SyncSender<&'static str>>,
+    terminal_observer: Option<std::sync::mpsc::SyncSender<(&'static str, Option<StopReceipt>)>>,
 }
 impl Audit {
     #[cfg(test)]
@@ -39,7 +39,10 @@ impl Audit {
         Self::with_limits(65536, 32).unwrap()
     }
     #[cfg(test)]
-    pub(super) fn observe_terminal(&mut self, sender: std::sync::mpsc::SyncSender<&'static str>) {
+    pub(super) fn observe_terminal(
+        &mut self,
+        sender: std::sync::mpsc::SyncSender<(&'static str, Option<StopReceipt>)>,
+    ) {
         self.terminal_observer = Some(sender);
     }
     #[cfg(test)]
@@ -233,7 +236,7 @@ impl Audit {
     pub fn finish(self, reason: &'static str, receipt: Option<StopReceipt>) {
         #[cfg(test)]
         if let Some(observer) = &self.terminal_observer {
-            let _ = observer.try_send(reason);
+            let _ = observer.try_send((reason, receipt));
             return;
         }
         let identity = self.descriptor["descriptor"].clone();
@@ -378,6 +381,14 @@ mod tests {
         audit.drain(&request(1), 0, 1, &empty, false);
         let prepared = audit.prepare("complete", Some(&receipt(true, 1))).unwrap();
         assert!(prepared.complete);
+        assert_eq!(
+            prepared.journal["events"][0]["request"],
+            json!({"captureId":"native-1-1","sessionId":1,"generation":0,"ackThroughSequence":0})
+        );
+        assert_eq!(
+            prepared.descriptor["optIn"],
+            json!({"nativeCaptureDev":true,"debugCaptureAudio":true,"debugNativeCapture":true})
+        );
         assert_eq!(prepared.spans.len(), 1);
         let (offset, length) = prepared.spans[0];
         assert_eq!(&prepared.packets[offset..offset + length], &[1, 2, 3, 4]);

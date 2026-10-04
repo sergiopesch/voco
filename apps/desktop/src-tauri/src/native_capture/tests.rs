@@ -179,6 +179,29 @@ fn packet_contains_exact_stereo_bytes_and_contiguous_offsets() {
     assert_eq!(&packet[4 + length..], &[1, 2, 3, 4, 1, 2, 3, 4]);
 }
 #[test]
+fn packet_keeps_block_order_offsets_and_exact_bytes() {
+    let mut delivery = Delivery::default();
+    let blocks = [
+        block(1, 0),
+        Block {
+            sequence: 2,
+            frame_start: 1,
+            bytes: (5..=12).collect(),
+        },
+    ];
+    let receipt = session().receipt(&Status::default());
+    let packet = delivery.issue(&identity(), &blocks, &receipt).unwrap();
+    let length = u32::from_le_bytes(packet[..4].try_into().unwrap()) as usize;
+    let header: serde_json::Value = serde_json::from_slice(&packet[4..4 + length]).unwrap();
+    for (index, (offset, bytes, frames)) in [(0, 4, 1), (4, 8, 2)].into_iter().enumerate() {
+        assert_eq!(header["blocks"][index]["byteOffset"], offset);
+        assert_eq!(header["blocks"][index]["byteLength"], bytes);
+        assert_eq!(header["blocks"][index]["frames"], frames);
+    }
+    assert_eq!(packet[4 + length..], (1..=12).collect::<Vec<u8>>());
+    assert_eq!(delivery.replay(), Some(packet));
+}
+#[test]
 fn stop_does_not_ack_audio_and_next_begin_waits_for_complete_delivery() {
     let mut worker = active();
     worker.handle(Request::Stop(identity())).unwrap();
@@ -654,16 +677,56 @@ fn audited_orphan_and_renderer_reset_terminate_once_without_active_disk_work() {
         if reset {
             worker.handle(Request::ResetRenderer).unwrap();
             assert!(worker.pulse.is_none());
-            assert_eq!(receive.try_recv().unwrap(), "reset");
+            assert_eq!(receive.try_recv().unwrap().0, "reset");
         } else {
             worker.abandon_begin(&identity());
             assert!(worker.pulse.as_ref().unwrap().cancelled);
-            assert_eq!(receive.try_recv().unwrap(), "cancel");
+            assert_eq!(receive.try_recv().unwrap().0, "cancel");
         }
         assert!(worker.session.is_none());
         assert!(worker.audit_attempted);
         assert!(receive.try_recv().is_err());
     }
+}
+
+#[test]
+fn cancel_reset_and_shutdown_audit_the_receipt_from_before_cancel() {
+    for (request, reason) in [
+        (Request::Cancel(identity()), "cancel"),
+        (Request::ResetRenderer, "reset"),
+        (Request::Shutdown, "shutdown"),
+    ] {
+        let mut worker = active();
+        let (send, receive) = mpsc::sync_channel(1);
+        let mut audit = audit::Audit::for_test();
+        audit.observe_terminal(send);
+        worker.session.as_mut().unwrap().audit = Some(audit);
+        worker.handle(request).unwrap();
+        // Cancel zeroes the status, so only a receipt taken first keeps the counts.
+        let (observed, receipt) = receive.try_recv().unwrap();
+        let receipt = receipt.expect("receipt");
+        assert_eq!(observed, reason);
+        assert_eq!(receipt.state, "stopping");
+        assert_eq!(receipt.produced_frames, 2);
+        assert_eq!(receipt.last_sequence, 2);
+    }
+}
+
+#[test]
+fn delivered_stop_finishes_the_audit_once_as_complete() {
+    let mut worker = active();
+    let (send, receive) = mpsc::sync_channel(2);
+    let mut audit = audit::Audit::for_test();
+    audit.observe_terminal(send);
+    worker.session.as_mut().unwrap().audit = Some(audit);
+    worker.handle(Request::Stop(identity())).unwrap();
+    worker.handle(drain(0)).unwrap();
+    assert!(receive.try_recv().is_err());
+    worker.handle(drain(2)).unwrap();
+    assert_eq!(receive.try_recv().unwrap().0, "complete");
+    worker.release_complete().unwrap();
+    assert!(worker.session.is_none());
+    assert!(receive.try_recv().is_err());
 }
 
 #[test]
