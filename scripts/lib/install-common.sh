@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Install steps that setup.sh sources, embedded into the standalone installer
+# by sync-installer-ui.py.
 
 voco_verify_installed_package() {
   local expected_version="$1"
