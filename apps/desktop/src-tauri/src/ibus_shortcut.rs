@@ -249,10 +249,26 @@ impl IbusShortcutService {
         }
     }
 
-    pub fn poll_trigger(&self, hotkey: &str) -> Result<ShortcutPoll, ShortcutPollFailure> {
+    /// `sending` runs just before the poll-trigger request goes out. Only that
+    /// request can arm the engine, so a failed connect or hello never calls it.
+    pub fn poll_trigger(
+        &self,
+        hotkey: &str,
+        sending: impl FnOnce(),
+    ) -> Result<ShortcutPoll, ShortcutPollFailure> {
+        self.poll_trigger_from(SocketBridge::connect, hotkey, sending)
+    }
+
+    fn poll_trigger_from(
+        &self,
+        connect: impl FnOnce() -> Result<SocketBridge, String>,
+        hotkey: &str,
+        sending: impl FnOnce(),
+    ) -> Result<ShortcutPoll, ShortcutPollFailure> {
         let mut may_have_armed = false;
-        self.with_bridge(|bridge| {
+        self.with_bridge_from(connect, |bridge| {
             may_have_armed = true;
+            sending();
             let result = bridge.send(&mut json!({"operation": "poll-trigger", "hotkey": hotkey}));
             if matches!(result, Err(BridgeCommandError::Rejected(_))) {
                 may_have_armed = false;
@@ -274,12 +290,21 @@ impl IbusShortcutService {
         &self,
         operation: impl FnOnce(&mut SocketBridge) -> Result<T, BridgeCommandError>,
     ) -> Result<T, String> {
+        self.with_bridge_from(SocketBridge::connect, operation)
+    }
+
+    /// Tests pass their own connector, so they never reach the session's engine.
+    fn with_bridge_from<T>(
+        &self,
+        connect: impl FnOnce() -> Result<SocketBridge, String>,
+        operation: impl FnOnce(&mut SocketBridge) -> Result<T, BridgeCommandError>,
+    ) -> Result<T, String> {
         let mut guard = self
             .bridge
             .lock()
             .map_err(|_| "VOCO input method state is unavailable.".to_string())?;
         if guard.is_none() {
-            *guard = Some(SocketBridge::connect()?);
+            *guard = Some(connect()?);
         }
         match operation(guard.as_mut().expect("bridge initialized above")) {
             Ok(result) => Ok(result),
@@ -797,5 +822,78 @@ mod tests {
         fs::remove_file(&socket_path).expect("remove fake socket");
         fs::remove_dir(socket_path.parent().expect("socket parent"))
             .expect("remove fake directory");
+    }
+
+    #[test]
+    fn an_unreachable_engine_is_never_polled() {
+        let socket_path = temporary_socket_path("absent");
+        let service = IbusShortcutService::default();
+        let failure = service
+            .poll_trigger_from(
+                || SocketBridge::connect_to(&socket_path),
+                "Alt+D",
+                || panic!("no poll-trigger was sent"),
+            )
+            .expect_err("no engine is listening");
+        assert!(!failure.may_have_armed);
+        fs::remove_dir(socket_path.parent().expect("socket parent"))
+            .expect("remove fake directory");
+    }
+
+    #[test]
+    fn only_a_poll_trigger_request_is_announced_as_sending() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::sync::Arc;
+        let socket_path = temporary_socket_path("poll-window");
+        let listener = UnixListener::bind(&socket_path).expect("bind fake engine");
+        fs::set_permissions(&socket_path, fs::Permissions::from_mode(0o600)).unwrap();
+        let sent = Arc::new(AtomicUsize::new(0));
+        let engine_view = Arc::clone(&sent);
+        let server = thread::spawn(move || {
+            let (stream, _) = listener.accept().unwrap();
+            let mut reader = BufReader::new(stream.try_clone().unwrap());
+            let mut writer = stream;
+            // The client waits for each reply, so the count shows what it announced first.
+            for (announced, operation, accept) in [
+                (0, "hello", true),
+                (1, "poll-trigger", true),
+                (2, "poll-trigger", false),
+            ] {
+                let mut line = String::new();
+                reader.read_line(&mut line).unwrap();
+                let request: Value = serde_json::from_str(&line).unwrap();
+                assert_eq!(request["operation"], operation);
+                assert_eq!(engine_view.load(Ordering::SeqCst), announced, "{operation}");
+                let id = request["id"].as_u64().unwrap();
+                let reply = match (operation, accept) {
+                    ("hello", _) => engine_status_response(id, PROTOCOL_VERSION),
+                    (_, true) => json!({
+                        "version": PROTOCOL_VERSION, "id": id, "ok": true,
+                        "result": { "armed": false, "trigger": null }
+                    }),
+                    _ => json!({
+                        "version": PROTOCOL_VERSION, "id": id, "ok": false,
+                        "error": "a valid modified dictation hotkey is required"
+                    }),
+                };
+                write_response(&mut writer, &reply);
+            }
+        });
+        let service = IbusShortcutService::default();
+        let connect = || SocketBridge::connect_to(&socket_path);
+        let announce = || {
+            sent.fetch_add(1, Ordering::SeqCst);
+        };
+        let disarmed = service.poll_trigger_from(connect, "Alt+D", announce);
+        let rejected = service.poll_trigger_from(connect, "Alt+D", announce);
+        server
+            .join()
+            .expect("each request was announced at the right time");
+        assert!(!disarmed.expect("the engine replied").armed);
+        // An ordered rejection means the engine did not arm the shortcut.
+        assert!(!rejected.expect_err("the engine refused").may_have_armed);
+        service.shutdown();
+        fs::remove_file(&socket_path).unwrap();
+        fs::remove_dir(socket_path.parent().unwrap()).unwrap();
     }
 }

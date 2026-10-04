@@ -1111,8 +1111,9 @@ fn start_ibus_shortcut_listener(app_handle: tauri::AppHandle) {
             let state = app_handle.state::<ibus_shortcut::IbusShortcutService>();
             let observation_started = shortcut_monotonic_ms();
             SHORTCUT_OBSERVATIONS.begin_poll(observation_ticket);
-            IBUS_SHORTCUT_LEASE.begin_poll();
-            let result = state.poll_trigger(&snapshot.config.hotkey);
+            let result = state.poll_trigger(&snapshot.config.hotkey, || {
+                IBUS_SHORTCUT_LEASE.begin_poll();
+            });
             let outcome = ibus_poll_outcome(&result);
             SHORTCUT_OBSERVATIONS.poll(
                 observation_ticket,

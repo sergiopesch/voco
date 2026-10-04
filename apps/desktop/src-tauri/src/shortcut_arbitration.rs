@@ -61,6 +61,9 @@ impl ConsumingLease {
         }
     }
 
+    /// Call just before sending a request that can arm the engine, today only
+    /// poll-trigger. A connect or hello that fails first cannot have armed it,
+    /// so it must not hold back evdev.
     pub fn begin_poll(&self) {
         // The engine can process a chord before its poll reply reaches us.
         self.polling.store(true, Ordering::SeqCst);
