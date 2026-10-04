@@ -72,15 +72,10 @@ function harness() {
     desktopPasteSessionRef: pasteSession,
     desktopStreamedSampleCountRef: ref(0),
     activeTriggerIdRef: ref<string | undefined>(undefined),
-    recoverySessionIdRef: ref<string | null>(null),
     nativeCaptureRef: ref(null),
     captureDescriptorRef: ref(null),
     captureSelectionRef: ref(captureSelection),
-    captureGenerationRef: ref(0),
-    recordingStartedAtMsRef: ref<number | null>(null),
-    stopRequestedAtMsRef: ref<number | null>(null),
     firstHotkeyPressMsRef: ref<number | null>(null),
-    initialHotkeyLatencyLoggedRef: ref(false),
     debugNativeCaptureEnabledRef: ref(false),
     audioBufferRef: ref(audioBuffer),
     lifecycleEpochRef: ref(0),
@@ -446,7 +441,7 @@ it("keeps the dictation in Review when the Stop clipboard copy fails", async () 
   h.copy.mockRejectedValue({ outcome: "no-mutation", message: "Clipboard helper is unavailable.", clipboardChanged: false });
   await h.stopRecording();
   expect(h.copy).toHaveBeenCalledOnce();
-  expect(journalCalls("keep_crash_journal")).toEqual([h.env.recoverySessionIdRef.current]);
+  expect(journalCalls("keep_crash_journal")).toEqual(journalCalls("begin_crash_journal"));
   expect(journalDeletions()).toEqual([]);
   expect(h.trace).toHaveBeenCalledWith("dictation_desktop_remainder_kept");
   expect(h.notify).toHaveBeenLastCalledWith("Dictation saved in Review", expect.stringContaining("Review in VOCO's menu"));

@@ -35,7 +35,7 @@ beforeEach(() => {
 it.each(["cancelled", "restarted"])("keeps late native success out of the %s session UI while preserving stream evidence", async stage => {
   let currentSession = 1;
   const cancelledRef = { current: null as string | null };
-  const recordingStartedAtMsRef = { current: performance.now() };
+  let recordingStartedAtMs = performance.now();
   const trace = vi.fn<(event: string, detail?: unknown) => Promise<void>>().mockResolvedValue(undefined);
   const metrics = vi.fn();
   let release!: () => void;
@@ -46,7 +46,7 @@ it.each(["cancelled", "restarted"])("keeps late native success out of the %s ses
   const create = (startingSessionId: number) => {
     const { paste, preview } = callbacks({ onboardingTest: false,
       startingSessionId, cancelledRef, browserDeliveryRef: { current: null },
-      recordingStartedAtMsRef, firstPhraseDispatched: false,
+      recordingStartedAtMs, firstPhraseDispatched: false,
       isCurrentSession: (id: number) => id === currentSession,
       assertOutputAllowed: (id: number) => { if (id !== currentSession || cancelledRef.current) throw new Error("cancelled or replaced"); },
       pasteDesktopText: nativePaste, traceDictationEvent: trace, traceDesktopPasteMetrics: metrics,
@@ -62,7 +62,7 @@ it.each(["cancelled", "restarted"])("keeps late native success out of the %s ses
   if (stage === "restarted") {
     // Discard resets cancellation; the next Start replaces session-bound refs.
     cancelledRef.current = null; currentSession = 2;
-    recordingStartedAtMsRef.current = performance.now();
+    recordingStartedAtMs = performance.now();
     newQueue = create(2);
   }
   trace.mockClear(); metrics.mockClear();

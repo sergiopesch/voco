@@ -64,15 +64,10 @@ export interface DictationRecordingEnv {
   desktopPasteSessionRef: Ref<boolean>;
   desktopStreamedSampleCountRef: Ref<number>;
   activeTriggerIdRef: Ref<string | undefined>;
-  recoverySessionIdRef: Ref<string | null>;
   nativeCaptureRef: Ref<NativeCaptureSession | null>;
   captureDescriptorRef: Ref<CaptureDescriptor | null>;
   captureSelectionRef: Ref<(() => CaptureSelection) | undefined>;
-  captureGenerationRef: Ref<number>;
-  recordingStartedAtMsRef: Ref<number | null>;
-  stopRequestedAtMsRef: Ref<number | null>;
   firstHotkeyPressMsRef: Ref<number | null>;
-  initialHotkeyLatencyLoggedRef: Ref<boolean>;
   debugNativeCaptureEnabledRef: Ref<boolean>;
   audioBufferRef: Ref<AudioCaptureBuffer>;
   lifecycleEpochRef: Ref<number>;
@@ -128,15 +123,10 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     desktopPasteSessionRef,
     desktopStreamedSampleCountRef,
     activeTriggerIdRef,
-    recoverySessionIdRef,
     nativeCaptureRef,
     captureDescriptorRef,
     captureSelectionRef,
-    captureGenerationRef,
-    recordingStartedAtMsRef,
-    stopRequestedAtMsRef,
     firstHotkeyPressMsRef,
-    initialHotkeyLatencyLoggedRef,
     debugNativeCaptureEnabledRef,
     audioBufferRef,
     lifecycleEpochRef,
@@ -185,6 +175,11 @@ export function createDictationRecording(env: DictationRecordingEnv) {
   let interruptionNotifiedSession: number | null = null;
   let journal: CrashJournal | null = null;
   let journalCleanup: Promise<void> = Promise.resolve();
+  // Start, Stop and the stream callbacks share these across recordings.
+  let captureGeneration = 0;
+  let recordingStartedAtMs: number | null = null;
+  let stopRequestedAtMs: number | null = null;
+  let initialHotkeyLatencyLogged = false;
   async function finishJournal() {
     const owned = journal;
     if (owned) journalCleanup = owned.finish().finally(() => {
@@ -284,12 +279,11 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     setCancellationPending(false);
     nativeCaptureRef.current = null;
     clearCapturedAudio();
-    const stopRequestedAtMs = stopRequestedAtMsRef.current;
     if (stopRequestedAtMs !== null) {
       traceDictationEvent("dictation_stop_to_idle", {
         durationMs: Math.round(performance.now() - stopRequestedAtMs),
       }).catch(() => {});
-      stopRequestedAtMsRef.current = null;
+      stopRequestedAtMs = null;
     }
 
     sessionRef.current = finishSessionIdle(sessionRef.current);
@@ -323,7 +317,6 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     setCanCancel(true);
     sessionRef.current = startSession(sessionRef.current);
     const startingSessionId = sessionRef.current.sessionId;
-    recoverySessionIdRef.current = crypto.randomUUID();
     phaseRef.current = "starting";
     traceDictationEvent("recording_state_requested").catch(() => {});
     let nativeAttempt: { generation: number; selectionToken: string } | null = null;
@@ -331,7 +324,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     let destinationSetupFailure = false;
     const invalidateNativeSelection = () => {
       if (!nativeAttempt || !isCurrentSession(startingSessionId) ||
-          captureGenerationRef.current !== nativeAttempt.generation) return;
+          captureGeneration !== nativeAttempt.generation) return;
       const state = useStore.getState();
       if (state.captureBackendMode === "native" &&
           state.nativeCaptureSource?.selectionToken === nativeAttempt.selectionToken) {
@@ -380,11 +373,11 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       }
       resetAudioLevel();
       clearCapturedAudio();
-      recordingStartedAtMsRef.current = null;
-      stopRequestedAtMsRef.current = null;
+      recordingStartedAtMs = null;
+      stopRequestedAtMs = null;
       transitionCursorDelivery("session-reset");
-      captureGenerationRef.current += 1;
-      const generation = captureGenerationRef.current;
+      captureGeneration += 1;
+      const generation = captureGeneration;
       let audioContext: AudioContext | null = null;
       debugNativeCaptureEnabledRef.current = false;
       // Field admission must not start capture or revoke an approved microphone.
@@ -396,7 +389,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
         transitionCursorDelivery("ownership-established");
       }
       if (!onboardingTest) {
-        const owned = new CrashJournal(recoverySessionIdRef.current!);
+        const owned = new CrashJournal(crypto.randomUUID());
         journal = owned;
         const opened = await owned.begin().then(() => true, () => false);
         assertOutputAllowed(startingSessionId);
@@ -423,7 +416,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
           },
           onInterrupted: (reason) => {
             invalidateNativeSelection();
-            if (isCurrentSession(startingSessionId) && captureGenerationRef.current === generation) {
+            if (isCurrentSession(startingSessionId) && captureGeneration === generation) {
               void cancelRecording(reason);
             }
           },
@@ -473,12 +466,12 @@ export function createDictationRecording(env: DictationRecordingEnv) {
         streamRef.current = stream;
         setMicrophoneReadyState(true);
         console.info("Recording started");
-        recordingStartedAtMsRef.current = performance.now();
+        recordingStartedAtMs = performance.now();
         if (
           firstHotkeyPressMsRef.current !== null &&
-          !initialHotkeyLatencyLoggedRef.current
+          !initialHotkeyLatencyLogged
         ) {
-          initialHotkeyLatencyLoggedRef.current = true;
+          initialHotkeyLatencyLogged = true;
           console.info(
             `[timing] first hotkey press -> recording starts: ${Math.round(
               performance.now() - firstHotkeyPressMsRef.current,
@@ -518,7 +511,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
         });
       } else {
         setMicrophoneReadyState(true);
-        recordingStartedAtMsRef.current = performance.now();
+        recordingStartedAtMs = performance.now();
       }
 
       sessionRef.current = markRecording(sessionRef.current);
@@ -544,9 +537,9 @@ export function createDictationRecording(env: DictationRecordingEnv) {
           if (!isCurrentSession(startingSessionId) || cancelledRef.current) return;
           traceDesktopPasteMetrics(result);
           traceDictationEvent("dictation_desktop_paste_dispatched", { durationMs: Math.round(performance.now() - started) }).catch(() => {});
-          if (!firstPhraseDispatched && recordingStartedAtMsRef.current !== null) {
+          if (!firstPhraseDispatched && recordingStartedAtMs !== null) {
             firstPhraseDispatched = true;
-            traceDictationEvent("dictation_desktop_first_phrase_dispatched", { durationMs: Math.round(performance.now() - recordingStartedAtMsRef.current) }).catch(() => {});
+            traceDictationEvent("dictation_desktop_first_phrase_dispatched", { durationMs: Math.round(performance.now() - recordingStartedAtMs) }).catch(() => {});
           }
         }, (text) => {
           if (!isCurrentSession(startingSessionId)) return;
@@ -654,10 +647,10 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     const stoppingSessionId = sessionRef.current.sessionId;
     phaseRef.current = "stopping";
     traceDictationEvent("dictation_recording_stopped").catch(() => {});
-    stopRequestedAtMsRef.current = performance.now();
-    if (recordingStartedAtMsRef.current !== null) {
+    stopRequestedAtMs = performance.now();
+    if (recordingStartedAtMs !== null) {
       traceDictationEvent("dictation_recording_duration", {
-        durationMs: Math.round(stopRequestedAtMsRef.current - recordingStartedAtMsRef.current),
+        durationMs: Math.round(stopRequestedAtMs - recordingStartedAtMs),
       }).catch(() => {});
     }
     sessionRef.current = requestSessionStop(sessionRef.current);
@@ -704,7 +697,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       else await browser?.finish();
       assertOutputAllowed(stoppingSessionId);
       traceDictationEvent("dictation_desktop_stream_flush_completed", { durationMs: Math.round(performance.now() - started) }).catch(() => {});
-      if (stopRequestedAtMsRef.current !== null) traceDictationEvent("dictation_stop_to_final_transcript", { durationMs: Math.round(performance.now() - stopRequestedAtMsRef.current) }).catch(() => {});
+      if (stopRequestedAtMs !== null) traceDictationEvent("dictation_stop_to_final_transcript", { durationMs: Math.round(performance.now() - stopRequestedAtMs) }).catch(() => {});
       dictationStreamRef.current = null;
       if (undelivered.trim() && (desktopPasteSessionRef.current || browser)) {
         // Text the app did not take (or may not have taken) is never replayed;

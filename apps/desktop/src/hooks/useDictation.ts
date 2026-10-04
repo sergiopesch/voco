@@ -66,7 +66,6 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
   const lifecycleEpochRef = useRef(0);
   const cancelledRef = useRef<string | null>(null);
   const captureHealthRef = useRef<ReturnType<typeof monitorCaptureHealth> | null>(null);
-  const recoverySessionIdRef = useRef<string | null>(null);
   const [cursorDeliveryState, setCursorDeliveryState] =
     useState<CursorDeliveryState>("inactive");
 
@@ -76,7 +75,6 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
 
   const captureDescriptorRef = useRef<CaptureDescriptor | null>(null);
   const nativeCaptureRef = useRef<NativeCaptureSession | null>(null);
-  const captureGenerationRef = useRef(0);
   const audioContextRef = useRef<AudioContext | null>(null);
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const workletRef = useRef<AudioWorkletNode | null>(null);
@@ -94,9 +92,6 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
   const smoothedAudioLevelRef = useRef(0);
   const firstHotkeyPressMsRef = useRef<number | null>(null);
   const initialHotkeyPressLoggedRef = useRef(false);
-  const initialHotkeyLatencyLoggedRef = useRef(false);
-  const recordingStartedAtMsRef = useRef<number | null>(null);
-  const stopRequestedAtMsRef = useRef<number | null>(null);
   const browserDeliveryRef = useRef<BrowserStreamDelivery | null>(null);
   const activeTriggerIdRef = useRef<string | undefined>(undefined);
   const desktopPasteSessionRef = useRef(false);
@@ -463,15 +458,10 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
       desktopPasteSessionRef,
       desktopStreamedSampleCountRef,
       activeTriggerIdRef,
-      recoverySessionIdRef,
       nativeCaptureRef,
       captureDescriptorRef,
       captureSelectionRef,
-      captureGenerationRef,
-      recordingStartedAtMsRef,
-      stopRequestedAtMsRef,
       firstHotkeyPressMsRef,
-      initialHotkeyLatencyLoggedRef,
       debugNativeCaptureEnabledRef,
       audioBufferRef,
       lifecycleEpochRef,
