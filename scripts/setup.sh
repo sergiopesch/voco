@@ -150,9 +150,26 @@ APT_PACKAGES=(pkg-config libglib2.0-dev libsoup-3.0-dev
 PACKAGE_TOOLS=(binutils desktop-file-utils appstream)
 if $INSTALL_MODE; then APT_PACKAGES+=("${PACKAGE_TOOLS[@]}"); fi
 
-if command -v apt &>/dev/null; then
-  run_step "System libraries + build tools (apt)" \
-    bash -c 'sudo apt update -qq 2>/dev/null && sudo apt install -y -qq "$@" 2>/dev/null' _ "${APT_PACKAGES[@]}"
+# True when dpkg reports every package installed ("ii"); it fails for an unknown one.
+apt_packages_installed() {
+  local status
+  status="$(dpkg-query -W -f='${db:Status-Abbrev}\n' "$@" 2>/dev/null)" || return 1
+  ! grep -qv '^ii' <<<"${status}"
+}
+
+if command -v apt-get &>/dev/null; then
+  # --install always refreshes APT's lists: the package's own install needs them.
+  if ! $INSTALL_MODE && apt_packages_installed "${APT_PACKAGES[@]}"; then
+    ok "System libraries + build tools (installed)"
+  else
+    # Ask before the spinner starts, which would draw over a password prompt.
+    if ! sudo -n -v 2>/dev/null; then
+      dim "APT needs your password to install the build libraries."
+      sudo -v || { err "sudo failed, so APT could not install the build libraries"; exit 1; }
+    fi
+    run_step "System libraries + build tools (apt)" \
+      bash -c 'sudo -n apt-get update -qq && sudo -n apt-get install -y -qq "$@"' _ "${APT_PACKAGES[@]}"
+  fi
 else
   warn "Not using apt — install manually: gcc pkg-config libglib2.0-dev libsoup-3.0-dev"
   warn "libjavascriptcoregtk-4.1-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev libpulse-dev"
@@ -258,7 +275,9 @@ if [[ "$INSTALL_MODE" == true ]]; then
   # A base Tauri bundle has no speech runtime; install only the verified complete package.
   DEB="apps/desktop/src-tauri/target/release/bundle/voco-complete/voco_${EXPECTED_VERSION}_amd64.deb"
   run_step "Assemble NVIDIA package" python3 scripts/package-nvidia.py "$BASE_DEB" "$DEB" --debian-version "$EXPECTED_VERSION"
-  run_step "Verify package" bash scripts/verify-deb-package.sh "$DEB" "$EXPECTED_VERSION"
+  # CI validates the metainfo's URLs online, and release assembly checks them again.
+  run_step "Verify package (AppStream URLs not checked)" \
+    env VOCO_PACKAGE_VERIFY_OFFLINE=1 bash scripts/verify-deb-package.sh "$DEB" "$EXPECTED_VERSION"
   DEB_SIZE=$(du -h "$DEB" | cut -f1)
   printf "    ${DIM}Package: %s (%s)${NC}\n" "$(basename "$DEB")" "$DEB_SIZE"
   if voco_install_deb_package "$DEB" "$EXPECTED_VERSION" "amd64"; then
