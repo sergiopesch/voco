@@ -34,14 +34,6 @@ export type Ref<T> = { current: T };
 /** Unverified capture is never typed; Stop explains that with this sentence. */
 const UNVERIFIED_CAPTURE_REASON = "VOCO couldn't confirm it received all of your audio, so it didn't type this recording. Try again.";
 
-export type DictationRecordingPhase =
-  | "idle"
-  | "starting"
-  | "recording"
-  | "stopping"
-  | "processing"
-  | "finalizing"
-  | "error";
 type CaptureAdmission = "pending" | "automatic" | "manual-review";
 
 /**
@@ -50,7 +42,6 @@ type CaptureAdmission = "pending" | "automatic" | "manual-review";
  * that read .current.
  */
 export interface DictationRecordingEnv {
-  phaseRef: Ref<DictationRecordingPhase | string>;
   sessionRef: Ref<DictationSessionState>;
   disposedRef: Ref<boolean>;
   cancelledRef: Ref<string | null>;
@@ -114,7 +105,6 @@ export interface DictationRecordingEnv {
 
 export function createDictationRecording(env: DictationRecordingEnv) {
   const {
-    phaseRef,
     sessionRef,
     disposedRef,
     cancelledRef,
@@ -233,7 +223,6 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       current.setRecovery(null);
       current.setCaptureNotice(null);
       current.setSurface("hidden");
-      phaseRef.current = "idle";
       sessionRef.current = finishSessionIdle(sessionRef.current);
       setCanCancel(false);
       setCancellationPending(false);
@@ -256,7 +245,6 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     // Nothing retries a failed voice test's audio; Test again records anew.
     clearCapturedAudio();
     useStore.getState().setRecovery({ reason });
-    phaseRef.current = "error";
     sessionRef.current = failSession(sessionRef.current);
     setCanCancel(false);
     setCancellationPending(false);
@@ -288,13 +276,12 @@ export function createDictationRecording(env: DictationRecordingEnv) {
 
     sessionRef.current = finishSessionIdle(sessionRef.current);
     activeTriggerIdRef.current = undefined;
-    phaseRef.current = "idle";
     setStatus("idle");
     transitionCursorDelivery("session-idle");
   }
 
   async function startRecording(triggerId?: string) {
-    const phase = phaseRef.current;
+    const phase = sessionRef.current.phase;
     if (phase !== "idle" && phase !== "error") {
       return;
     }
@@ -317,7 +304,6 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     setCanCancel(true);
     sessionRef.current = startSession(sessionRef.current);
     const startingSessionId = sessionRef.current.sessionId;
-    phaseRef.current = "starting";
     traceDictationEvent("recording_state_requested").catch(() => {});
     let nativeAttempt: { generation: number; selectionToken: string } | null = null;
     let webkitCaptureAttempted = false;
@@ -515,7 +501,6 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       }
 
       sessionRef.current = markRecording(sessionRef.current);
-      phaseRef.current = "recording";
       if (captureAdmission === "automatic") {
         const rate = recordingSampleRate();
         let firstPhraseDispatched = false;
@@ -549,7 +534,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
           if (!isCurrentSession(startingSessionId) || cancelledRef.current) return;
           traceDictationEvent("dictation_desktop_stream_failed").catch(() => {});
           if (onboardingTest) setError(`Voice test paused: ${sentence(error.message)} Finish test, then try again.`);
-          else if (phaseRef.current === "recording") {
+          else if (sessionRef.current.phase === "recording") {
             // A delivery failure stops typing; healthy recognition runs through Stop.
             if (kind === "recognition") interruptionNotifiedSession = startingSessionId;
             void (kind === "delivery"
@@ -620,7 +605,6 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       }
       setStatus("error");
       sessionRef.current = failSession(sessionRef.current);
-      phaseRef.current = "error";
       showNotification(
         startFailureTitle,
         errorMessage(err),
@@ -643,9 +627,9 @@ export function createDictationRecording(env: DictationRecordingEnv) {
   }
 
   async function stopRecording() {
-    if (phaseRef.current !== "recording") return;
+    if (sessionRef.current.phase !== "recording") return;
     const stoppingSessionId = sessionRef.current.sessionId;
-    phaseRef.current = "stopping";
+    sessionRef.current = requestSessionStop(sessionRef.current);
     traceDictationEvent("dictation_recording_stopped").catch(() => {});
     stopRequestedAtMs = performance.now();
     if (recordingStartedAtMs !== null) {
@@ -653,7 +637,6 @@ export function createDictationRecording(env: DictationRecordingEnv) {
         durationMs: Math.round(stopRequestedAtMs - recordingStartedAtMs),
       }).catch(() => {});
     }
-    sessionRef.current = requestSessionStop(sessionRef.current);
     setStatus("processing");
     try {
       try {
@@ -740,7 +723,8 @@ export function createDictationRecording(env: DictationRecordingEnv) {
   }
 
   async function cancelRecording(reason = "Recording cancelled.") {
-    if (phaseRef.current === "idle" || phaseRef.current === "error" || phaseRef.current === "finalizing" || cancelledRef.current) return;
+    const { phase } = sessionRef.current;
+    if (phase === "idle" || phase === "error" || cancelledRef.current) return;
     cancelledRef.current = reason;
     // The session now ends without the Stop a live notice asked for, so the
     // interruption still notifies.
@@ -751,7 +735,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     setCanCancel(false);
     captureHealthRef.current?.dispose();
     captureHealthRef.current = null;
-    if (phaseRef.current === "recording") {
+    if (sessionRef.current.phase === "recording") {
       await stopRecording();
     }
   }
@@ -763,7 +747,6 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     void browserDeliveryRef.current?.cancel();
     releaseRecordingOrigin();
     lifecycleEpochRef.current += 1;
-    phaseRef.current = "idle";
     sessionRef.current = {
       ...finishSessionIdle(sessionRef.current),
       sessionId: sessionRef.current.sessionId + 1,

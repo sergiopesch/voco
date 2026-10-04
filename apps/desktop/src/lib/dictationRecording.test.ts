@@ -37,7 +37,6 @@ function deferred<T = void>() {
 function harness() {
   const ref = <T>(current: T) => ({ current });
   const noop = vi.fn();
-  const phase = ref("idle");
   const current = ref(session.createDictationSessionState());
   const cancelled = ref<string | null>(null);
   const queue = ref<{ finish(): Promise<{ undelivered: string; uncertain?: boolean }>; cancel(): void } | null>(null);
@@ -63,7 +62,6 @@ function harness() {
   const notify = vi.fn(async (_summary: string, _body: string) => {});
   const audioBuffer = createAudioCaptureBuffer();
   const env = {
-    phaseRef: phase,
     sessionRef: current,
     disposedRef: ref(false),
     cancelledRef: cancelled,
@@ -122,8 +120,7 @@ function harness() {
   // Puts the harness in a live desktop recording that Stop can finish.
   const recordingWith = (finish: () => Promise<{ undelivered: string; uncertain?: boolean }>) => {
     pasteSession.current = true;
-    phase.current = "recording";
-    current.current = session.startSession(current.current);
+    current.current = session.markRecording(session.startSession(current.current));
     queue.current = { finish: vi.fn(finish), cancel: vi.fn() };
   };
   return {
@@ -131,7 +128,7 @@ function harness() {
     env,
     unmount: recording.dispose,
     recordingWith,
-    state, phase, current, cancelled, queue, pasteSession, status,
+    state, current, cancelled, queue, pasteSession, status,
     pasteStatus, captureSelection, copy, trace, setError, notify,
   };
 }
@@ -148,7 +145,7 @@ async function journaledRecording(h: ReturnType<typeof harness>, finish: () => P
     descriptor: {}, cancel: vi.fn(async () => {}), startDelivery: vi.fn(),
   } as unknown as NativeCaptureSession);
   await h.startRecording();
-  expect(h.phase.current).toBe("recording");
+  expect(h.current.current.phase).toBe("recording");
   h.queue.current?.cancel();
   h.queue.current = { finish: vi.fn(finish), cancel: vi.fn() };
 }
@@ -162,7 +159,7 @@ it.each([
   Object.assign(h.status, change);
   await h.startRecording();
   expect(h.captureSelection).not.toHaveBeenCalled();
-  expect(h.phase.current).toBe("idle");
+  expect(h.current.current.phase).toBe("idle");
   expect(h.state.setCaptureNotice).toHaveBeenCalledWith(notice);
   expect(h.notify).toHaveBeenCalledExactlyOnceWith(title, notice);
   expect(h.setError).toHaveBeenCalledWith(null);
@@ -192,7 +189,7 @@ it("notifies a live recognition failure once, not again at Stop", async () => {
   await vi.waitFor(() => expect(interrupted()).toHaveLength(1));
   expect(interrupted()[0]![1]).toBe("Some words may be missing. Stop dictation and check your text field.");
   await h.stopRecording();
-  expect(h.phase.current).toBe("idle");
+  expect(h.current.current.phase).toBe("idle");
   expect(h.setError).toHaveBeenLastCalledWith("read-only filesystem.");
   expect(interrupted()).toHaveLength(1);
   // Live failures notify instead of setting a notice the popover cannot show.
@@ -210,12 +207,12 @@ it("notifies an unverified desktop recording once, at start", async () => {
   } as unknown as MediaStream);
   vi.mocked(h.env.connectWorklet).mockResolvedValue(false);
   await h.startRecording();
-  expect(h.phase.current).toBe("recording");
+  expect(h.current.current.phase).toBe("recording");
   expect(h.notify).toHaveBeenCalledExactlyOnceWith("Dictation won't be typed",
     "VOCO can't confirm it is receiving all of your audio, so it won't type this recording. Stop and try again.");
   appendAudioSamples(h.env.audioBufferRef.current, new Float32Array([0.125, -0.25]));
   await h.stopRecording();
-  expect(h.phase.current).toBe("idle");
+  expect(h.current.current.phase).toBe("idle");
   expect(h.setError).toHaveBeenLastCalledWith("VOCO couldn't confirm it received all of your audio, so it didn't type this recording. Try again.");
   expect(h.notify).toHaveBeenCalledOnce();
 });
@@ -234,7 +231,7 @@ it("keeps the start notice as the only one when Stop cannot flush unverified aud
   await h.startRecording();
   appendAudioSamples(h.env.audioBufferRef.current, new Float32Array([0.125, -0.25]));
   await h.stopRecording();
-  expect(h.phase.current).toBe("idle");
+  expect(h.current.current.phase).toBe("idle");
   expect(h.setError).toHaveBeenLastCalledWith("VOCO couldn't confirm it received all of your audio, so it didn't type this recording. Try again.");
   expect(h.notify).toHaveBeenCalledExactlyOnceWith("Dictation won't be typed", expect.any(String));
 });
@@ -253,12 +250,29 @@ it("still notifies when an interruption ends a noticed session before Stop", asy
   expect(h.notify).toHaveBeenCalledExactlyOnceWith("Dictation won't be typed", expect.any(String));
   appendAudioSamples(h.env.audioBufferRef.current, new Float32Array([0.125, -0.25]));
   await h.cancelRecording("The microphone disconnected or stopped capturing audio.");
-  expect(h.phase.current).toBe("idle");
+  expect(h.current.current.phase).toBe("idle");
   expect(h.setError).toHaveBeenLastCalledWith("The microphone disconnected or stopped capturing audio.");
   // Without this, the next shortcut press would start a new recording
   // while the user still expects it to stop this one.
   expect(h.notify).toHaveBeenLastCalledWith("Dictation interrupted", "Nothing was typed. The microphone disconnected or stopped capturing audio.");
   expect(h.notify).toHaveBeenCalledTimes(2);
+});
+
+it("runs a Stop queued during startup once the recording is live", async () => {
+  const h = harness(), beginning = deferred<NativeCaptureSession>();
+  h.env.captureSelectionRef.current = () => ({ backend: "native", selectionToken: "fixture-source" });
+  vi.mocked(h.env.beginNativeCapture).mockReturnValue(beginning.promise);
+  const starting = h.startRecording();
+  await vi.waitFor(() => expect(h.env.beginNativeCapture).toHaveBeenCalledOnce());
+  expect(h.current.current.phase).toBe("starting");
+  // As useDictation.toggle does for a toggle that arrives during startup.
+  h.current.current = session.requestToggle(h.current.current).state;
+  beginning.resolve({ descriptor: {}, cancel: vi.fn(async () => {}), startDelivery: vi.fn() } as unknown as NativeCaptureSession);
+  await starting;
+  await vi.waitFor(() => expect(h.current.current.phase).toBe("idle"));
+  expect(h.trace).toHaveBeenCalledWith("dictation_recording_stopped");
+  expect(h.env.teardownAudioGraph).toHaveBeenCalledOnce();
+  expect(h.queue.current).toBeNull();
 });
 
 it("says some words may be missing only when words were recognized", async () => {
@@ -289,14 +303,14 @@ it("records without a crash checkpoint when the journal cannot open, notifying o
   } as unknown as NativeCaptureSession);
   await h.startRecording();
   expect(ipc).toHaveBeenCalledWith("begin_crash_journal", expect.anything());
-  expect(h.phase.current).toBe("recording");
+  expect(h.current.current.phase).toBe("recording");
   expect(h.queue.current).not.toBeNull();
   expect(h.setError).not.toHaveBeenCalled();
   expect(h.notify).toHaveBeenCalledExactlyOnceWith("Crash recovery unavailable", "Dictation continues, but VOCO can't recover it if VOCO exits unexpectedly.");
   await h.stopRecording();
-  expect(h.phase.current).toBe("idle");
+  expect(h.current.current.phase).toBe("idle");
   await h.startRecording();
-  expect(h.phase.current).toBe("recording");
+  expect(h.current.current.phase).toBe("recording");
   expect(h.notify).toHaveBeenCalledOnce();
   h.unmount();
   expect(journalDeletions()).toEqual([]);
@@ -331,7 +345,7 @@ it.each(["capture-error", "captured-prefix", "cancelled"])("prioritizes journal 
   await h.startRecording();
   expect(h.setError).toHaveBeenLastCalledWith(expect.stringContaining("could not be deleted"));
   expect(h.notify).toHaveBeenLastCalledWith("Dictation interrupted", expect.stringContaining("could not be deleted"));
-  expect(h.phase.current).toBe("idle");
+  expect(h.current.current.phase).toBe("idle");
   expect(h.state.recovery).toBeNull();
   expect(h.env.audioBufferRef.current.sampleCount).toBe(0);
 });
@@ -374,7 +388,7 @@ it.each([
   );
   expect(h.state.recovery).toBeNull();
   expect(h.env.audioBufferRef.current.chunks).toEqual([]);
-  expect(h.phase.current).toBe("idle");
+  expect(h.current.current.phase).toBe("idle");
   expect(h.env.audioBufferRef.current.sampleCount).toBe(0);
   expect(h.queue.current).toBeNull();
   expect(h.env.pasteDesktopText).not.toHaveBeenCalled();
@@ -402,7 +416,7 @@ it("copies words the focused app did not take to the clipboard as a handled Stop
   // Deferred text is still being retried; nothing is copied before finish.
   await vi.waitFor(() => expect(h.queue.current!.finish).toHaveBeenCalledOnce());
   expect(h.copy).not.toHaveBeenCalled();
-  expect(h.phase.current).toBe("stopping");
+  expect(h.current.current.phase).toBe("stopping");
   finished.resolve({ undelivered: " and the rest." });
   await stopping;
   // The joining space stays, so pasting after "Typed words" keeps them apart.
@@ -410,7 +424,7 @@ it("copies words the focused app did not take to the clipboard as a handled Stop
   expect(h.trace).toHaveBeenCalledWith("dictation_desktop_remainder_copied");
   expect(h.notify).toHaveBeenCalledExactlyOnceWith("Dictation copied to clipboard", "VOCO couldn't paste into the focused app. Press Shift+Insert or Ctrl+V to paste it.");
   expect(h.env.pasteDesktopText).not.toHaveBeenCalled();
-  expect(h.phase.current).toBe("idle");
+  expect(h.current.current.phase).toBe("idle");
   expect(h.state.recovery).toBeNull();
   expect(h.state.transcript).toBe("");
   expect(h.env.audioBufferRef.current.sampleCount).toBe(0);
@@ -424,7 +438,7 @@ it("does not replace the clipboard for a remainder with no words", async () => {
   await h.stopRecording();
   expect(h.copy).not.toHaveBeenCalled();
   expect(h.notify).not.toHaveBeenCalled();
-  expect(h.phase.current).toBe("idle");
+  expect(h.current.current.phase).toBe("idle");
 });
 
 it("asks the user to check the app first when a chunk may already be there", async () => {
@@ -447,7 +461,7 @@ it("keeps the dictation in Review when the Stop clipboard copy fails", async () 
   expect(h.notify).toHaveBeenLastCalledWith("Dictation saved in Review", expect.stringContaining("Review in VOCO's menu"));
   expect(h.setError).not.toHaveBeenCalledWith(expect.any(String));
   expect(h.state.recovery).toBeNull();
-  expect(h.phase.current).toBe("idle");
+  expect(h.current.current.phase).toBe("idle");
   // The kept session is not deleted when the next dictation starts.
   await h.startRecording();
   expect(journalDeletions()).toEqual([]);
@@ -466,7 +480,7 @@ it("takes the interrupted path when neither the clipboard nor Review can keep th
   expect(h.setError).toHaveBeenCalledWith("VOCO couldn't paste, copy or save this dictation.");
   expect(h.state.transcript).toBe("");
   expect(h.state.recovery).toBeNull();
-  expect(h.phase.current).toBe("idle");
+  expect(h.current.current.phase).toBe("idle");
 });
 
 it("copies the rest when a browser field stops taking text, without finishing its lease", async () => {
@@ -482,7 +496,7 @@ it("copies the rest when a browser field stops taking text, without finishing it
   expect(h.trace).toHaveBeenCalledWith("dictation_desktop_remainder_copied");
   expect(h.notify).toHaveBeenCalledExactlyOnceWith("Dictation copied to clipboard", expect.stringContaining("Some words may already be in the app"));
   expect(h.env.browserDeliveryRef.current).toBeNull();
-  expect(h.phase.current).toBe("idle");
+  expect(h.current.current.phase).toBe("idle");
 });
 
 it("finishes a browser field that took every word", async () => {
@@ -494,7 +508,7 @@ it("finishes a browser field that took every word", async () => {
   await h.stopRecording();
   expect(browser.finish).toHaveBeenCalledOnce();
   expect(h.copy).not.toHaveBeenCalled();
-  expect(h.phase.current).toBe("idle");
+  expect(h.current.current.phase).toBe("idle");
 });
 
 it("never uses the clipboard outside a desktop paste session", async () => {
@@ -503,7 +517,7 @@ it("never uses the clipboard outside a desktop paste session", async () => {
   h.pasteSession.current = false;
   await h.stopRecording();
   expect(h.copy).not.toHaveBeenCalled();
-  expect(h.phase.current).toBe("idle");
+  expect(h.current.current.phase).toBe("idle");
 });
 
 it("controlled recognition failure clears private content and permits the next recording without Review", async () => {
@@ -535,10 +549,10 @@ it("handled unmount resets cursor store content and state", () => {
   const h = harness();
   h.state.transcript = "Synthetic in-flight text.";
   h.state.recovery = { reason: "Voice test stopped." };
-  h.phase.current = "recording";
+  h.current.current = session.markRecording(session.startSession(h.current.current));
   h.unmount();
   expect(h.state.transcript).toBe("");
   expect(h.state.recovery).toBeNull();
-  expect(h.phase.current).toBe("idle");
+  expect(h.current.current.phase).toBe("idle");
   expect(h.env.setStatus).toHaveBeenCalledWith("idle");
 });

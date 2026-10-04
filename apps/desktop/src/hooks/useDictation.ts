@@ -39,10 +39,7 @@ import {
   traceHotkeyEvent
 } from "@/lib/tauri";
 import { useStore } from "@/store/useStore";
-import type {
-  CursorDeliveryState,
-  DictationStatus
-} from "@/types";
+import type { CursorDeliveryState } from "@/types";
 import { useCallback,useEffect,useRef,useState } from "react";
 import { DictationStream } from '../lib/dictationStream';
 
@@ -50,7 +47,6 @@ const AUDIO_LEVEL_ATTACK = 0.68;
 const AUDIO_LEVEL_RELEASE = 0.24;
 const AUDIO_LEVEL_FLOOR = 0.01;
 
-type DictationPhase = DictationStatus | "stopping" | "finalizing";
 export function useDictation(options: { getCaptureSelection?: () => CaptureSelection } = {}) {
   const captureSelectionRef = useRef(options.getCaptureSelection);
   captureSelectionRef.current = options.getCaptureSelection;
@@ -87,7 +83,6 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
   const primedStreamPromiseRef = useRef<Promise<MediaStream> | null>(null);
   const audioBufferRef = useRef(createAudioCaptureBuffer());
   const sessionRef = useRef(createDictationSessionState());
-  const phaseRef = useRef<DictationPhase>("idle");
   const workletModuleLoadedRef = useRef(false);
   const smoothedAudioLevelRef = useRef(0);
   const firstHotkeyPressMsRef = useRef<number | null>(null);
@@ -249,7 +244,7 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
       audioBufferRef,
       dictationStreamRef,
       desktopStreamedSampleCountRef,
-      phaseRef,
+      isRecording: () => sessionRef.current.phase === "recording",
       captureHealthRef,
       nativeCaptureRef,
       cancelledRef,
@@ -449,7 +444,6 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
 
   if (recordingRef.current === null) {
     recordingRef.current = createDictationRecording({
-      phaseRef,
       sessionRef,
       disposedRef,
       cancelledRef,
@@ -520,7 +514,8 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
   }
 
   function discardRecovery() {
-    if (phaseRef.current !== "idle" && phaseRef.current !== "error") return;
+    const { phase } = sessionRef.current;
+    if (phase !== "idle" && phase !== "error") return;
     const native = nativeCaptureRef.current;
     nativeCaptureRef.current = null;
     void native?.cancel().catch(() => {});
@@ -556,7 +551,7 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
     switch (toggleRequest.action) {
       case "start":
         void startRecording(triggerId);
-        return phaseRef.current === "starting";
+        return sessionRef.current.phase === "starting";
       case "stop":
         void stopRecording();
         return true;

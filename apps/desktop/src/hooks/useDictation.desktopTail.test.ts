@@ -24,7 +24,7 @@ function harness(rate = 16000, limitSeconds = 600) {
   const fns = createDesktopCaptureTail({
     recordingSampleRate: () => rate, maxAudioSeconds: limitSeconds,
     captureHealthRef: { current: null },
-    phaseRef: phase, audioBufferRef: { current: buffer },
+    isRecording: () => phase.current === "recording", audioBufferRef: { current: buffer },
     dictationStreamRef: { current: queue },
     desktopStreamedSampleCountRef: sent,
     traceDictationEvent: vi.fn(async () => {}), stopRecording: vi.fn(),

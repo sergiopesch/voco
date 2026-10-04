@@ -21,7 +21,7 @@ export interface DesktopCaptureTailEnv {
   audioBufferRef: Ref<AudioCaptureBuffer>;
   dictationStreamRef: Ref<DictationStreamInput | null>;
   desktopStreamedSampleCountRef: Ref<number>;
-  phaseRef: Ref<string>;
+  isRecording: () => boolean;
   captureHealthRef: Ref<{ samplesReceived(): void; dispose(): void } | null>;
   nativeCaptureRef: Ref<NativeCaptureSession | null>;
   cancelledRef: Ref<string | null>;
@@ -78,19 +78,16 @@ export function createDesktopCaptureTail(env: DesktopCaptureTailEnv) {
       samples,
       maxSamples,
     );
-    // The production worker owns streaming boundaries; queue existence is the
-    // only live-delivery gate. Stop-drained samples are forwarded at finalization.
+    // The production worker owns streaming boundaries. Live samples reach the
+    // queue only while recording; Stop forwards its drained tail at finalization.
     const queue = env.dictationStreamRef.current;
-    if (queue && env.phaseRef.current === "recording") {
+    if (queue && env.isRecording()) {
       const accepted = samples.subarray(0, appendResult.appendedSampleCount);
       queue.pushAudio(accepted, sampleRate);
       env.desktopStreamedSampleCountRef.current += accepted.length;
     }
 
-    if (
-      env.phaseRef.current === "recording" &&
-      appendResult.reachedLimit
-    ) {
+    if (env.isRecording() && appendResult.reachedLimit) {
       env.traceDictationEvent("dictation_recording_limit_reached", {
         durationMs: maxAudioSeconds * 1000,
       }).catch(() => {});

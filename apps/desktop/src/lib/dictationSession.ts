@@ -3,8 +3,6 @@ export type DictationSessionPhase =
   | "starting"
   | "recording"
   | "stopping"
-  | "processing"
-  | "finalizing"
   | "error";
 
 export type DictationQueuedAction = "stop" | null;
@@ -60,8 +58,6 @@ export function requestToggle(
     case "recording":
       return { state, action: "stop" };
     case "stopping":
-    case "processing":
-    case "finalizing":
       return { state: { ...state, queuedAction: null }, action: "none" };
   }
 }
