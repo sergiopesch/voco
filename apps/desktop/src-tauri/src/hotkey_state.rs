@@ -4,18 +4,31 @@ use evdev::{EventSummary, InputEvent, KeyCode, SynchronizationCode};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
+/// An open, synchronized keyboard: the keys it holds, and whether it has a
+/// Shift key for Alt+Shift+D.
+struct Keyboard {
+    keys: HashSet<KeyCode>,
+    shift: bool,
+}
+
 #[derive(Default)]
 pub(crate) struct HotkeyState {
-    devices: HashMap<PathBuf, HashSet<KeyCode>>,
+    devices: HashMap<PathBuf, Keyboard>,
     resynchronizing: HashSet<PathBuf>,
 }
 
 impl HotkeyState {
     /// Synchronize a newly opened device without treating already-held keys as
     /// fresh presses. Replacement devices never inherit the previous state.
-    pub(crate) fn attach(&mut self, device: &Path, keys: impl IntoIterator<Item = KeyCode>) {
+    pub(crate) fn attach(
+        &mut self,
+        device: &Path,
+        keys: impl IntoIterator<Item = KeyCode>,
+        shift: bool,
+    ) {
+        let keys = keys.into_iter().collect();
         self.devices
-            .insert(device.to_path_buf(), keys.into_iter().collect());
+            .insert(device.to_path_buf(), Keyboard { keys, shift });
         self.resynchronizing.remove(device);
     }
 
@@ -24,12 +37,22 @@ impl HotkeyState {
         self.resynchronizing.remove(device);
     }
 
+    /// Open, synchronized keyboards that can type the chord of an evdev mode
+    /// (0 Alt+D, 1 Alt+Shift+D), not discovered paths. One that is
+    /// resynchronizing doesn't count, and never hides the others.
+    pub(crate) fn keyboards_for(&self, evdev_mode: u8) -> usize {
+        self.devices
+            .values()
+            .filter(|keyboard| evdev_mode == 0 || keyboard.shift)
+            .count()
+    }
+
     /// Unknown until every watched keyboard is synchronized.
     pub(crate) fn modifiers_held(&self) -> Option<bool> {
         if self.devices.is_empty() || !self.resynchronizing.is_empty() {
             return None;
         }
-        Some(self.devices.values().any(|keys| {
+        Some(self.devices.values().any(|keyboard| {
             [
                 KeyCode::KEY_LEFTALT,
                 KeyCode::KEY_RIGHTALT,
@@ -41,7 +64,7 @@ impl HotkeyState {
                 KeyCode::KEY_RIGHTMETA,
             ]
             .iter()
-            .any(|modifier| keys.contains(modifier))
+            .any(|modifier| keyboard.keys.contains(modifier))
         }))
     }
 
@@ -93,7 +116,7 @@ impl HotkeyState {
         value: i32,
         dictation_mode: u8,
     ) -> bool {
-        let Some(keys) = self.devices.get_mut(device) else {
+        let Some(Keyboard { keys, .. }) = self.devices.get_mut(device) else {
             return false;
         };
         match value {
@@ -113,7 +136,7 @@ impl HotkeyState {
         let held = |left, right| {
             self.devices
                 .values()
-                .any(|keys| keys.contains(&left) || keys.contains(&right))
+                .any(|keyboard| keyboard.keys.contains(&left) || keyboard.keys.contains(&right))
         };
         let alt = held(KeyCode::KEY_LEFTALT, KeyCode::KEY_RIGHTALT);
         let shift = held(KeyCode::KEY_LEFTSHIFT, KeyCode::KEY_RIGHTSHIFT);
@@ -132,8 +155,8 @@ mod tests {
 
     fn state() -> HotkeyState {
         let mut state = HotkeyState::default();
-        state.attach(Path::new("first"), []);
-        state.attach(Path::new("second"), []);
+        state.attach(Path::new("first"), [], true);
+        state.attach(Path::new("second"), [], true);
         state
     }
 
@@ -230,7 +253,11 @@ mod tests {
             0,
         )];
         assert_eq!(state.batch(Path::new("first"), &report, 0), (0, true));
-        state.attach(Path::new("first"), [KeyCode::KEY_LEFTALT, KeyCode::KEY_D]);
+        state.attach(
+            Path::new("first"),
+            [KeyCode::KEY_LEFTALT, KeyCode::KEY_D],
+            true,
+        );
         assert!(!key(&mut state, "first", KeyCode::KEY_D, 1, 0));
         key(&mut state, "first", KeyCode::KEY_D, 0, 0);
         assert!(key(&mut state, "first", KeyCode::KEY_D, 1, 0));
@@ -254,18 +281,43 @@ mod tests {
         )];
         state.batch(Path::new("first"), &dropped, 0);
         assert_eq!(state.modifiers_held(), None);
-        state.attach(Path::new("first"), [KeyCode::KEY_LEFTSHIFT]);
+        state.attach(Path::new("first"), [KeyCode::KEY_LEFTSHIFT], true);
         assert_eq!(state.modifiers_held(), Some(true));
+    }
+
+    #[test]
+    fn only_open_synchronized_keyboards_count_for_their_chord() {
+        let mut state = HotkeyState::default();
+        let counts = |state: &HotkeyState| (state.keyboards_for(0), state.keyboards_for(1));
+        assert_eq!(counts(&state), (0, 0));
+        state.attach(Path::new("full"), [], true);
+        state.attach(Path::new("no-shift"), [], false);
+        assert_eq!(counts(&state), (2, 1));
+        let dropped = [InputEvent::new(
+            evdev::EventType::SYNCHRONIZATION.0,
+            SynchronizationCode::SYN_DROPPED.0,
+            0,
+        )];
+        state.batch(Path::new("full"), &dropped, 0);
+        assert_eq!(counts(&state), (1, 0));
+        state.attach(Path::new("full"), [], true);
+        assert_eq!(counts(&state), (2, 1));
+        state.detach(Path::new("no-shift"));
+        assert_eq!(counts(&state), (1, 1));
     }
 
     #[test]
     fn reconnect_is_fresh_and_initial_held_key_does_not_toggle() {
         let mut state = state();
-        state.attach(Path::new("first"), [KeyCode::KEY_LEFTALT, KeyCode::KEY_D]);
+        state.attach(
+            Path::new("first"),
+            [KeyCode::KEY_LEFTALT, KeyCode::KEY_D],
+            true,
+        );
         assert!(!key(&mut state, "first", KeyCode::KEY_D, 1, 0));
         state.detach(Path::new("first"));
         assert!(!key(&mut state, "first", KeyCode::KEY_LEFTALT, 1, 0));
-        state.attach(Path::new("first"), []);
+        state.attach(Path::new("first"), [], true);
         assert!(!key(&mut state, "first", KeyCode::KEY_D, 1, 0));
     }
 }

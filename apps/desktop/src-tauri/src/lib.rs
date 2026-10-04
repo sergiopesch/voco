@@ -799,6 +799,7 @@ fn shortcut_runtime_status(
         return unknown();
     };
     let now = shortcut_monotonic_ms();
+    let evdev_mode = EVDEV_HOTKEY_MODE.load(Ordering::SeqCst);
     SHORTCUT_OBSERVATIONS.status(shortcut_readiness::Snapshot {
         hotkey: &config.hotkey,
         revision: CONFIG_REVISION.load(Ordering::SeqCst),
@@ -811,7 +812,8 @@ fn shortcut_runtime_status(
         consuming_lease: IBUS_SHORTCUT_LEASE.has_authority(now),
         plugin_hotkey: plugin.as_deref(),
         use_evdev: USE_EVDEV_HOTKEY.load(Ordering::SeqCst),
-        evdev_mode: EVDEV_HOTKEY_MODE.load(Ordering::SeqCst),
+        evdev_mode,
+        evdev_keyboards: evdev_keyboards_for(evdev_mode),
         configured_evdev_mode: hotkey_to_evdev_mode(&config.hotkey),
         bridge_available,
         panel_reserved,
@@ -1588,11 +1590,23 @@ fn spawn_supported_evdev_device_workers(app_handle: &tauri::AppHandle) -> usize 
 fn spawn_evdev_device_worker(app_handle: tauri::AppHandle, path: std::path::PathBuf) {
     use evdev::raw_stream::RawDevice;
 
+    // However the worker ends, even by panicking, its keys go with it: they must
+    // never count as a live keyboard or a held modifier.
+    struct Detach<'a>(&'a std::path::Path);
+    impl Drop for Detach<'_> {
+        fn drop(&mut self) {
+            if let Ok(mut state) = EVDEV_KEYS.lock() {
+                state.detach(self.0);
+            }
+        }
+    }
+
     std::thread::spawn(move || {
+        let _detach = Detach(&path);
         let mut reopen_logged = false;
 
         loop {
-            let mut dev = match RawDevice::open(&path) {
+            let (mut dev, shift) = match RawDevice::open(&path) {
                 Ok(device) => {
                     // event paths are reused after unplug. Recheck capabilities
                     // and the virtual-device exclusion on every open.
@@ -1603,6 +1617,10 @@ fn spawn_evdev_device_worker(app_handle: tauri::AppHandle, path: std::path::Path
                         std::thread::sleep(std::time::Duration::from_secs(2));
                         continue;
                     }
+                    let shift = device.supported_keys().is_some_and(|keys| {
+                        keys.contains(evdev::KeyCode::KEY_LEFTSHIFT)
+                            || keys.contains(evdev::KeyCode::KEY_RIGHTSHIFT)
+                    });
                     let held_keys = match device.get_key_state() {
                         Ok(keys) => keys,
                         Err(error) => {
@@ -1612,7 +1630,7 @@ fn spawn_evdev_device_worker(app_handle: tauri::AppHandle, path: std::path::Path
                         }
                     };
                     if let Ok(mut state) = EVDEV_KEYS.lock() {
-                        state.attach(&path, held_keys.iter());
+                        state.attach(&path, held_keys.iter(), shift);
                     } else {
                         error!("Failed to lock evdev keyboard state");
                         return;
@@ -1621,7 +1639,7 @@ fn spawn_evdev_device_worker(app_handle: tauri::AppHandle, path: std::path::Path
                         info!("Reconnected evdev keyboard at {}", path.display());
                         reopen_logged = false;
                     }
-                    device
+                    (device, shift)
                 }
                 Err(e) => {
                     if !reopen_logged {
@@ -1642,14 +1660,6 @@ fn spawn_evdev_device_worker(app_handle: tauri::AppHandle, path: std::path::Path
                 path.display()
             );
             trace_hotkey_event("evdev_device_worker_started", Some("evdev"));
-            let keys = dev.supported_keys();
-            let mut readiness = SHORTCUT_OBSERVATIONS.device(
-                keys.is_some_and(|keys| keys.contains(evdev::KeyCode::KEY_D)),
-                keys.is_some_and(|keys| {
-                    keys.contains(evdev::KeyCode::KEY_LEFTSHIFT)
-                        || keys.contains(evdev::KeyCode::KEY_RIGHTSHIFT)
-                }),
-            );
 
             loop {
                 // RawDevice exposes SYN_DROPPED. The synchronized wrapper can
@@ -1661,18 +1671,6 @@ fn spawn_evdev_device_worker(app_handle: tauri::AppHandle, path: std::path::Path
                 };
                 match events {
                     Ok(events) => {
-                        if events.iter().any(|event| {
-                            matches!(
-                                event.destructure(),
-                                evdev::EventSummary::Synchronization(
-                                    _,
-                                    evdev::SynchronizationCode::SYN_DROPPED,
-                                    _
-                                )
-                            )
-                        }) {
-                            readiness.unsynchronized();
-                        }
                         let (toggles, synchronize_after_batch) = match EVDEV_KEYS.lock() {
                             Ok(mut state) => state.batch(
                                 &path,
@@ -1692,8 +1690,7 @@ fn spawn_evdev_device_worker(app_handle: tauri::AppHandle, path: std::path::Path
                             match dev.get_key_state() {
                                 Ok(keys) => {
                                     if let Ok(mut state) = EVDEV_KEYS.lock() {
-                                        state.attach(&path, keys.iter());
-                                        readiness.synchronized();
+                                        state.attach(&path, keys.iter(), shift);
                                     }
                                 }
                                 Err(error) => {
@@ -1719,7 +1716,6 @@ fn spawn_evdev_device_worker(app_handle: tauri::AppHandle, path: std::path::Path
                 }
             }
 
-            drop(readiness);
             std::thread::sleep(std::time::Duration::from_millis(500));
         }
     });
@@ -1821,6 +1817,18 @@ pub(crate) fn evdev_modifiers_held() -> Option<bool> {
     None
 }
 
+/// Open, synchronized keyboards that can type an evdev mode's chord; None when
+/// the key state is unavailable.
+#[cfg(target_os = "linux")]
+fn evdev_keyboards_for(evdev_mode: u8) -> Option<usize> {
+    Some(EVDEV_KEYS.lock().ok()?.keyboards_for(evdev_mode))
+}
+
+#[cfg(not(target_os = "linux"))]
+fn evdev_keyboards_for(_evdev_mode: u8) -> Option<usize> {
+    Some(0)
+}
+
 /// One discovery supervisor per process; it keeps watching /dev/input itself.
 #[cfg(target_os = "linux")]
 fn ensure_evdev_hotkey_listener(app_handle: &tauri::AppHandle) {
@@ -1859,7 +1867,7 @@ fn notify_unreachable_shortcut(app: &tauri::AppHandle) {
     let mode = EVDEV_HOTKEY_MODE.load(Ordering::SeqCst);
     let unreachable = USE_EVDEV_HOTKEY.load(Ordering::SeqCst)
         && mode <= 1
-        && SHORTCUT_OBSERVATIONS.keyboards_for(mode) == Some(0)
+        && evdev_keyboards_for(mode) == Some(0)
         && !panel::is_attached()
         && !app
             .state::<ibus_shortcut::IbusShortcutService>()

@@ -22,8 +22,6 @@ struct PollObservation {
 #[derive(Default)]
 pub(crate) struct Observations {
     poll: Mutex<(u64, Option<PollObservation>)>,
-    // Counts reflect open, synchronized devices, not discovered paths.
-    devices: Mutex<[usize; 2]>,
 }
 
 pub(crate) struct Snapshot<'a> {
@@ -35,6 +33,8 @@ pub(crate) struct Snapshot<'a> {
     pub plugin_hotkey: Option<&'a str>,
     pub use_evdev: bool,
     pub evdev_mode: u8,
+    /// Keyboards that can type the `evdev_mode` chord; None when unknown.
+    pub evdev_keyboards: Option<usize>,
     pub configured_evdev_mode: u8,
     pub bridge_available: bool,
     pub panel_reserved: bool,
@@ -71,28 +71,6 @@ impl Observations {
                 });
             }
         }
-    }
-
-    /// Open, synchronized keyboards that can report the chord of an evdev mode
-    /// (0 Alt+D, 1 Alt+Shift+D); None when the observations are unavailable.
-    pub fn keyboards_for(&self, evdev_mode: u8) -> Option<usize> {
-        let devices = self.devices.lock().ok()?;
-        Some(if evdev_mode == 0 {
-            devices[0].saturating_add(devices[1])
-        } else {
-            devices[1]
-        })
-    }
-
-    pub fn device(&self, dictation: bool, shift: bool) -> Device<'_> {
-        let mut device = Device {
-            owner: self,
-            index: usize::from(shift),
-            capable: dictation,
-            active: false,
-        };
-        device.synchronized();
-        device
     }
 
     pub fn status(&self, snapshot: Snapshot<'_>) -> Status {
@@ -157,7 +135,7 @@ impl Observations {
             && snapshot.evdev_mode <= 1
             && snapshot.evdev_mode == snapshot.configured_evdev_mode
         {
-            match self.keyboards_for(snapshot.evdev_mode) {
+            match snapshot.evdev_keyboards {
                 Some(0) => {}
                 Some(_) => {
                     return status(
@@ -190,38 +168,6 @@ impl Observations {
     }
 }
 
-pub(crate) struct Device<'a> {
-    owner: &'a Observations,
-    index: usize,
-    capable: bool,
-    active: bool,
-}
-
-impl Device<'_> {
-    pub fn unsynchronized(&mut self) {
-        if self.active {
-            if let Ok(mut devices) = self.owner.devices.lock() {
-                devices[self.index] = devices[self.index].saturating_sub(1);
-            }
-            self.active = false;
-        }
-    }
-
-    pub fn synchronized(&mut self) {
-        if self.capable && !self.active {
-            if let Ok(mut devices) = self.owner.devices.lock() {
-                devices[self.index] += 1;
-                self.active = true;
-            }
-        }
-    }
-}
-impl Drop for Device<'_> {
-    fn drop(&mut self) {
-        self.unsynchronized();
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -235,41 +181,39 @@ mod tests {
             plugin_hotkey: None,
             use_evdev: true,
             evdev_mode: 0,
+            evdev_keyboards: Some(0),
             configured_evdev_mode: 0,
             bridge_available: false,
             panel_reserved: false,
         }
     }
     #[test]
-    fn only_live_synchronized_dictation_devices_count() {
+    fn only_a_live_keyboard_for_the_chord_makes_evdev_available() {
         let o = Observations::default();
-        let _realtime_only = o.device(false, true);
         assert_eq!(o.status(snapshot()).state, "unavailable");
-        let mut first = o.device(true, true);
-        let second = o.device(true, false);
-        first.unsynchronized();
-        drop(second);
-        assert_eq!(o.status(snapshot()).state, "unavailable");
-        first.synchronized();
-        assert_eq!(o.status(snapshot()).route, Some("evdev"));
-        drop(first);
-        assert_eq!(o.status(snapshot()).state, "unavailable");
-    }
-    #[test]
-    fn shift_requires_a_capable_live_device() {
-        let o = Observations::default();
-        let _device = o.device(true, false);
-        let mut s = snapshot();
-        s.hotkey = "Alt+Shift+D";
-        s.evdev_mode = 1;
-        s.configured_evdev_mode = 1;
-        assert_eq!(o.status(s).state, "unavailable");
+        let live = || Snapshot {
+            evdev_keyboards: Some(1),
+            ..snapshot()
+        };
+        assert_eq!(o.status(live()).route, Some("evdev"));
+        let unknown = o.status(Snapshot {
+            evdev_keyboards: None,
+            ..snapshot()
+        });
+        assert_eq!(unknown.state, "unknown");
+        let detail = "Keyboard observations are unavailable. Start dictation from the tray.";
+        assert_eq!(unknown.detail, detail);
+        let other_route = Snapshot {
+            use_evdev: false,
+            ..live()
+        };
+        assert_eq!(o.status(other_route).state, "unavailable");
     }
     #[test]
     fn old_runtime_mode_cannot_advertise_new_config() {
         let o = Observations::default();
-        let _device = o.device(true, true);
         let mut s = snapshot();
+        s.evdev_keyboards = Some(1);
         s.hotkey = "Alt+Shift+D";
         s.configured_evdev_mode = 1;
         assert_eq!(o.status(s).state, "unavailable");
@@ -297,10 +241,10 @@ mod tests {
     #[test]
     fn uncertain_lease_does_not_prove_ready_or_enable_passive_route() {
         let o = Observations::default();
-        let _device = o.device(true, true);
         for outcome in [PollOutcome::Uncertain, PollOutcome::Unavailable] {
             o.poll(o.ticket(), 1, "Alt+D", 100, outcome);
             let mut s = snapshot();
+            s.evdev_keyboards = Some(1);
             s.consuming_lease = true;
             s.bridge_available = true;
             assert_eq!(o.status(s).state, "unknown");
