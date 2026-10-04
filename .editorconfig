@@ -12,9 +12,6 @@ indent_size = 2
 [*.{rs,py,c,h,in}]
 indent_size = 4
 
-[packaging/ydotool/voco-ydotool-launcher]
-indent_size = 4
-
 # Blank context lines in a patch end with a space.
 [*.patch]
 trim_trailing_whitespace = false

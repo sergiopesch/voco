@@ -30,8 +30,8 @@ wget -qO voco-install https://raw.githubusercontent.com/sergiopesch/voco/voco.20
 ```
 
 The installer checks the release signature against its built-in VOCO key and
-verifies the package checksum, then installs VOCO and its desktop helpers with
-APT and opens VOCO. To verify by hand, upgrade or remove VOCO, see
+verifies the package checksum, then installs VOCO with APT, checks desktop input
+and opens VOCO. To verify by hand, upgrade or remove VOCO, see
 [Install VOCO](docs/install.md).
 
 ## Your first dictation
@@ -54,7 +54,8 @@ Text goes to whichever window has keyboard focus. See
 - A 64-bit Intel or AMD processor with AVX2, FMA and F16C
 - Ubuntu 24.04 or later, or another Debian-based system with glibc 2.39 or later
 - An X11 or Wayland desktop session and a microphone
-- On Wayland, write access to `/dev/uinput` for VOCO's input service
+- On Wayland, access to `/dev/uinput`, which the package gives the user of the
+  active local session
 - On Wayland desktops other than GNOME 46, a desktop keyboard shortcut that runs
   `voco --toggle`
 

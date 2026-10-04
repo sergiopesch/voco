@@ -154,7 +154,8 @@ rm -rf ~/.config/voco ~/.local/state/voco ~/.local/share/com.sergiopesch.voco
 - VOCO only adds text. It can't correct words after it pastes them.
 - If recognition falls more than three seconds behind, or revises words it has
   already given, VOCO stops transcribing and shows **Dictation interrupted**.
-- On Wayland, typing needs `ydotoold`. Outside GNOME 46, the shortcut also
+- On Wayland, typing needs access to `/dev/uinput`, which the package gives only
+  the user of the active local session. Outside GNOME 46, the shortcut also
   needs a desktop binding.
 - Apps that remap Shift+Insert, remote desktops and virtual machines may not
   accept the paste.

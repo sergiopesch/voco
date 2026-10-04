@@ -17,8 +17,7 @@ Three scripts turn a checkout into a package:
    It holds the app and the integration files but no speech runtime, so it can't
    dictate and is never installed on its own.
 2. `python3 scripts/package-nvidia.py BASE.deb OUTPUT.deb` adds the speech
-   runtime, the documentation, the licenses and the private input daemon, and
-   writes the complete package.
+   runtime, the documentation and the licenses, and writes the complete package.
 3. `bash scripts/verify-deb-package.sh OUTPUT.deb [VERSION]` checks the result.
 
 `bash scripts/setup.sh --install` runs all three and installs the package with
@@ -43,8 +42,8 @@ Zstandard at level 9 and prints its path, version, size and SHA-256.
 | --- | --- |
 | `/usr/bin/voco` | The app |
 | `/usr/lib/voco/speech/` | The worker (`stream_worker.py` and its modules), the model in `models/`, the native libraries in `lib/`, `libbench_nemo_pool.so`, the two identity receipts and `MANIFEST.json` |
-| `/usr/libexec/voco/ydotool-launcher`, `/usr/libexec/voco/ydotool-legacy/` | The [Wayland input helper](#wayland-input-helper) launcher and VOCO's private `ydotoold` |
-| `/usr/lib/systemd/user/voco-ydotoold.service` | The per-login input service, off until it is enabled |
+| `/usr/lib/udev/rules.d/70-voco-uinput.rules` | The [`/dev/uinput` rule](#wayland-paste-keys) for the active local session |
+| `/usr/lib/modules-load.d/voco-uinput.conf` | Loads the `uinput` module at boot |
 | `/usr/libexec/voco-browser-host` | The native messaging host for the [Chromium extension](../integrations/chromium/README.md) |
 | `/usr/share/voco/chromium/` | The extension's `manifest.json`, `background.js` and `content.js` |
 | `/etc/opt/chrome/native-messaging-hosts/`, `/etc/chromium/native-messaging-hosts/` | `com.voco.exact_field.json`, which lets the extension start the host |
@@ -55,9 +54,9 @@ Zstandard at level 9 and prints its path, version, size and SHA-256.
 | `/usr/share/icons/hicolor/*/apps/voco.png` | Icons at 32, 128 and 256 pixels |
 | `/usr/share/doc/voco/` | [Documentation and licenses](#documentation-and-licenses) |
 
-Installing the package turns nothing on. The input service and the GNOME
-companion stay off until the guided installer or you enable them, and the IBus
-input source and the Chromium extension stay off until you add them.
+Installing the package applies its `/dev/uinput` rule and turns nothing else on.
+The GNOME companion stays off until the guided installer or you enable it, and
+the IBus input source and the Chromium extension stay off until you add them.
 
 ## Documentation and licenses
 
@@ -66,13 +65,12 @@ input source and the Chromium extension stay off until you add them.
 - `copyright`: a short preface followed by VOCO's MIT License. The preface says
   that the speech runtime, the model and the helper programs keep their own
   licenses, and points to the files below.
-- `THIRD-PARTY-NOTICES.txt`: a summary of the vendored glib, tray-icon,
-  global-hotkey and ydotool sources, their licenses and VOCO's changes, from
+- `THIRD-PARTY-NOTICES.txt`: a summary of the vendored glib, tray-icon and
+  global-hotkey sources, their licenses and VOCO's changes, from
   `vendor/THIRD-PARTY-NOTICES.txt`.
 - `nvidia/`: the model license and card and the runtime notices, from
   `runtime/notices/`.
-- `vendor/`: the license, patch and upstream record of each vendored crate, and
-  the notices of the private `ydotoold` build.
+- `vendor/`: the license, patch and upstream record of each vendored crate.
 - `README.md`, `AGENTS.md` and `docs/`, without `docs/guide/` and `docs/testing/`.
 - `report-performance.py` and `report-speech-performance.py`, which summarize
   the opt-in [performance logs](troubleshooting.md#performance-logs).
@@ -83,75 +81,79 @@ input source and the Chromium extension stay off until you add them.
 | --- | --- |
 | The app | `libpulse0` for Wayland capture, `libnotify-bin` for the startup failure notice, `libc6 (>= 2.39)`, `libstdc++6 (>= 13.2.0)` |
 | Speech worker | `python3`, `python3-numpy`, `python3-psutil`, `libsentencepiece0` |
-| Paste | `xdotool`, `xclip`, `wl-clipboard`, and `procps` for the `pgrep` check that `ydotoold` runs |
+| Paste | `xdotool`, `xclip`, `wl-clipboard` |
+| Quitting VOCO from a terminal | `procps`, for `pkill -x voco` |
 | IBus engine | `ibus`, `gir1.2-ibus-1.0`, `python3-gi` |
 
-The package recommends `ydotool` and `ydotoold`. Only Wayland needs them, so an
-X11 system can install VOCO without them. On Wayland the guided installer and
-`setup.sh --install` ask APT for both.
+The package recommends nothing. VOCO presses the Wayland paste keys through its
+own virtual keyboard, so the helpers that either session needs are all
+dependencies. The guided installer and `setup.sh --install` give APT only the
+VOCO package.
 
-## Wayland input helper
+## Wayland paste keys
 
-`voco-ydotoold.service` runs `ydotoold` for one login, so that paste keys reach
-apps on Wayland. It starts with the graphical session only when `/dev/uinput`
-exists, runs with `NoNewPrivileges=yes`, a 0077 umask and Unix sockets only, and
-restarts 3 seconds after a failure. [Install](install.md#wayland-input-service)
-shows how to enable it, and
-[Platform support](platform/README.md#access-to-devuinput) covers device access.
+On Wayland, VOCO presses the paste keys through its own virtual keyboard on
+`/dev/uinput`, so the package ships no input daemon or service. It installs two
+files instead:
 
-The service starts `/usr/libexec/voco/ydotool-launcher`, which picks the daemon:
+- `/usr/lib/udev/rules.d/70-voco-uinput.rules` tags `/dev/uinput` with
+  `uaccess`, so logind gives the user of the active local session read and write
+  access through an ACL. No group is involved. Other accounts, users signed in
+  only remotely and system services get no access.
+- `/usr/lib/modules-load.d/voco-uinput.conf` loads the `uinput` module at boot,
+  so the device exists before the first login.
 
-- When `/usr/bin/ydotool` is Ubuntu 24.04's ydotool 0.1.8-3build1 for amd64,
-  matched by its SHA-256 and its dpkg owner, the launcher runs VOCO's private
-  `ydotoold` from `/usr/libexec/voco/ydotool-legacy/`, after checking it against
-  that folder's `MANIFEST.json`. It is built from the vendored ydotool and
-  libuInputPlus sources, as [its notes](../vendor/ydotool-legacy/README.md)
-  describe. The identity of the Ubuntu client is recorded in `packaging/ydotool/`.
-- Otherwise it runs the system's `/usr/bin/ydotoold`.
+The [maintainer script](#maintainer-script) asks udev to apply the rule at once,
+so the active local session usually has access straight away; otherwise signing
+out and back in once applies it.
+[Access to /dev/uinput](platform/README.md#access-to-devuinput) covers checking
+the access and replacing the rule.
 
-The launcher trusts only files owned by root whose own and parent directories'
-modes give no write access to group or others. `ydotool-launcher --select`
-prints the chosen daemon without starting it. With `--migrate`, it reloads
-VOCO's unit and, when the running service uses another daemon, restarts it on
-the chosen one. It acts only on VOCO's unmodified unit and refuses when the unit
-has edits or drop-ins. Before a restart it also refuses when another `ydotoold`
-runs or the login can't write `/dev/uinput`. The installed app runs the
-migration at startup on Wayland, before recording can begin, and
-`voco --setup-desktop-input` runs it on demand.
-
-The guided installer and `setup.sh --install` share `voco_start_wayland_service`
-in `scripts/lib/install-common.sh`. On Wayland it runs
-`voco --setup-desktop-input` and stops there if `voco --check-desktop-input`
-passes. Otherwise it needs write access to `/dev/uinput` and no other running
-`ydotoold`, runs `systemctl --user enable --now voco-ydotoold.service`, and
-checks the helpers again. Package hooks never start, stop or restart user
-services.
+The guided installer and `setup.sh --install` share `voco_verify_desktop_input`
+in `scripts/lib/install-common.sh`, which runs
+`/usr/bin/voco --check-desktop-input`; when it fails, both exit with status 2.
+Package hooks never start, stop or restart user services.
 
 ## Maintainer script
 
 The package has one maintainer script, `postinst`. `scripts/debian_maintainer.py`
 generates it from `packaging/debian/postinst.py.in` with the list of every
-directory the package owns under `/usr/lib/voco`, `/usr/libexec/voco`,
-`/usr/share/voco` and `/usr/share/doc/voco`.
+directory the package owns under `/usr/lib/voco`, `/usr/share/voco` and
+`/usr/share/doc/voco`.
 
 On `configure`, the script changes a listed directory's mode only when it is
 0775, to 0755. It opens each path component without following links and fails
 if one isn't owned by root. It skips directories that `dpkg-statoverride` lists
-and directories that a dpkg `path-exclude` rule left out. It doesn't touch user
-files, services, input sources or GNOME extensions.
+and directories that a dpkg `path-exclude` rule left out.
+
+Then it applies the `/dev/uinput` rule. It runs `modprobe uinput`,
+`udevadm control --reload-rules` and
+`udevadm trigger --action=change --subsystem-match=misc --sysname-match=uinput`,
+each with a 10-second limit, and ignores their failures, because containers and
+chroots have no udev to ask. It doesn't touch user files, services, sessions,
+input sources or GNOME extensions.
 
 ## Upgrade and removal
 
 An upgrade replaces the package's files. The package declares no configuration
 files and has no removal scripts, so `apt remove voco` deletes every file it
-installed, including the host manifests in `/etc`. Nothing in your home folder
-changes: settings and Review stay, as [What VOCO keeps](everyday-use.md#what-voco-keeps)
-lists.
+installed, including the host manifests in `/etc` and the udev rule. Nothing
+re-applies udev rules on removal, so the `/dev/uinput` access the rule gave
+lasts until the computer restarts. Package operations change nothing in your
+home folder: settings and Review stay, as
+[What VOCO keeps](everyday-use.md#what-voco-keeps) lists.
 
 Quit VOCO before you upgrade ([Upgrade](install.md#upgrade)). When a release
 changes the GNOME companion, run `voco --setup-panel` again, then sign out and
-back in. Before you remove the package, disable the input service
-([Remove](install.md#remove)).
+back in.
+
+After an upgrade from a version that pasted through `voco-ydotoold.service`,
+the app's first start in a Wayland session retires that unit for the login. It
+removes the enablement link
+`$XDG_CONFIG_HOME/systemd/user/graphical-session.target.wants/voco-ydotoold.service`,
+then stops the unit and reloads the user's service manager. It acts only when
+the link points at `/usr/lib/systemd/user/voco-ydotoold.service` and that file
+is gone, so it never touches a unit that someone else installed.
 
 ## Runtime provisioning
 
@@ -190,18 +192,19 @@ convert the model, so the model always comes from a published package.
 python3 and readelf. It checks:
 
 - the control fields: the name `voco`, the expected version, `amd64`, every
-  dependency with both ABI floors, and Recommends of exactly `ydotool, ydotoold`;
+  dependency with both ABI floors, and no Recommends;
 - one root-owned entry with the expected mode for each fixed path, and no Python
   caches or test files;
 - the control area, which may hold only `control`, `md5sums` and a `postinst`
   identical to a fresh render;
 - that `libpulse0` is declared when either executable links libpulse;
-- that the notices, the license text in `copyright`, the service, the launcher,
-  the IBus files, the Chromium files and host manifests, the desktop entry, the
-  metainfo and the icons equal their sources byte for byte;
-- the private daemon, with `scripts/verify-legacy-input-package.py`, and the
-  speech payload, with `verify-speech-payload.py`, which compares every file and
-  link with `MANIFEST.json` and the two identity receipts;
+- that the notices, the license text in `copyright`, the udev rule, the
+  `modules-load.d` file, the IBus files, the Chromium files and host manifests,
+  the desktop entry, the metainfo and the icons equal their sources byte for
+  byte, and that neither `/usr/libexec/voco/` nor `voco-ydotoold.service` is
+  shipped;
+- the speech payload, with `verify-speech-payload.py`, which compares every file
+  and link with `MANIFEST.json` and the two identity receipts;
 - that the host manifest allows only the extension ID derived from the
   extension's key, and that the host refuses any other origin;
 - the AppStream ID, the launchable and the first release entry's version, then

@@ -12,7 +12,7 @@ VOCO needs no downloads after installation.
 | System | Ubuntu 24.04 or later, or another Debian-based system with glibc 2.39 or later |
 | Desktop | An X11 or Wayland session. The reference desktop is Ubuntu 24.04 with GNOME 46. |
 | Audio | A microphone, with PulseAudio or PipeWire's PulseAudio service (Ubuntu includes it) |
-| Wayland typing | Write access to `/dev/uinput` for your login (see [Wayland input service](#wayland-input-service)) |
+| Wayland typing | Access to `/dev/uinput`, which the package gives the user of the active local session (see [Wayland paste keys](#wayland-paste-keys)) |
 | Wayland shortcut | Outside GNOME 46, a desktop shortcut that runs `voco --toggle` (see [Wayland compositor shortcuts](#wayland-compositor-shortcuts)) |
 
 To check the processor, run this command. It must print all three names.
@@ -37,10 +37,9 @@ The installer:
    to three times.
 3. Checks the list's signature with the release key built into the installer,
    then the package's checksum. If a check fails, it installs nothing.
-4. Installs the package with APT, plus `ydotool` and `ydotoold` on Wayland.
+4. Installs the package with APT.
 5. Keeps your saved shortcut, or sets `Alt+D` if VOCO has no settings yet.
-6. On Wayland, sets up the [input service](#wayland-input-service). Then it runs
-   `voco --check-desktop-input`.
+6. Runs `voco --check-desktop-input` to check [desktop input](#desktop-input).
 7. On GNOME 46, turns on the [VOCO panel](#gnome-panel) for your account.
 8. Opens VOCO for a short voice test. As root or over SSH it skips this, so
    open VOCO from your desktop.
@@ -51,10 +50,11 @@ The installer:
 | 1 | The installer stopped. It prints the reason and, when it keeps one, the path of a private log. |
 | 2 | VOCO is installed, but desktop input needs one more step. |
 
-After status 2, fix the problem the installer names, usually the
-[Wayland input service](#wayland-input-service), until
-`voco --check-desktop-input` passes. The installer stops before panel setup, so
-on GNOME 46 also run `voco --setup-panel`. Then open VOCO.
+After status 2, fix the problem the installer names until
+`voco --check-desktop-input` passes. On Wayland it's usually
+[access to `/dev/uinput`](#wayland-paste-keys): sign out and back in once. The
+installer stops before panel setup, so on GNOME 46 also run `voco --setup-panel`.
+Then open VOCO.
 [Troubleshooting](troubleshooting.md#the-installer-stops) explains the common messages.
 
 ### Install a specific release
@@ -110,9 +110,8 @@ The release key's fingerprint is `B33C7C6AAEC8C20433A7A837540796453D8E3865`.
 It also appears in [KEYS](../KEYS) and on each release page. Compare it with a
 copy you trust before you rely on it.
 
-A manual install doesn't set up desktop input or the panel. APT installs the
-recommended `ydotool` and `ydotoold` unless you turned recommended packages
-off. Follow [Wayland input service](#wayland-input-service) and
+A manual install doesn't check desktop input or turn on the panel. Run
+`voco --check-desktop-input` (see [Desktop input](#desktop-input)), follow
 [GNOME panel](#gnome-panel), then open VOCO from your app menu.
 
 ### Verify with the repository script
@@ -144,43 +143,29 @@ To dictate, click where you want the text, press `Alt+D` and speak. Press
 ## Desktop input
 
 VOCO types by pasting. It puts each phrase on the clipboard and presses
-Shift+Insert in the app that has keyboard focus. Helper programs send the keys
-and set the clipboard:
+Shift+Insert in the app that has keyboard focus. Helper programs set the
+clipboard. On X11 `xdotool` presses the keys; on Wayland VOCO presses them
+itself, through its own virtual keyboard:
 
 | Session | Keys | Clipboard | Setup |
 | --- | --- | --- | --- |
 | X11 | `xdotool` | `xclip` | None; the package depends on both |
-| Wayland | `ydotool` with `ydotoold` | `wl-copy`, or `xclip` on GNOME | The [input service](#wayland-input-service) |
+| Wayland | VOCO's virtual keyboard | `wl-copy`, or `xclip` on GNOME | [Access to `/dev/uinput`](#wayland-paste-keys), from the package's udev rule |
 
-To check the helpers, run `voco --check-desktop-input`. It doesn't record, copy
-or type anything.
+To check, run `voco --check-desktop-input`. It doesn't record, copy or type
+anything.
 
-### Wayland input service
+### Wayland paste keys
 
-On Wayland, `ydotoold` sends key presses through `/dev/uinput`, the kernel's
-virtual input device. VOCO's user service, `voco-ydotoold.service`, runs it for
-your login while your graphical session is open. With Ubuntu 24.04's
-`ydotool`, the service runs a matching `ydotoold` that VOCO bundles; otherwise
-it runs the system `ydotoold`.
+On Wayland, VOCO sends the paste keys through a virtual keyboard it creates on
+`/dev/uinput`, the kernel's interface for virtual input devices. No daemon,
+service or group is involved. The package installs a udev rule that gives the
+user of the active local session access to `/dev/uinput`, and applies it as it
+installs, so your session usually has access straight away.
 
-Your account needs write access to `/dev/uinput`. VOCO never changes device
-permissions or group membership. Set up access as your system's policy allows;
-[Platform support](platform/README.md#ydotoold-ydotool-daemon) explains the
-options.
-
-If `voco --check-desktop-input` already passes, for example because your
-system runs its own `ydotoold`, you are done. Otherwise quit VOCO and run:
-
-```bash
-sudo apt install ydotool ydotoold
-voco --setup-desktop-input
-systemctl --user enable --now voco-ydotoold.service
-voco --check-desktop-input
-```
-
-`voco --setup-desktop-input` updates VOCO's service to match the installed
-package. It won't change a VOCO service you edited or replace another running
-`ydotoold`. In those cases it reports the problem instead.
+If `voco --check-desktop-input` says VOCO can't open `/dev/uinput`, sign out and
+back in once, then check again. [Access to /dev/uinput](platform/README.md#access-to-devuinput)
+explains the rule, how to check it and how to use a different policy.
 
 ## GNOME panel
 
@@ -260,12 +245,14 @@ and back in.
 
 ## Remove
 
-Quit VOCO, then turn off its input service and remove the package:
+Quit VOCO, then remove the package:
 
 ```bash
-systemctl --user disable --now voco-ydotoold.service
 sudo apt remove voco
 ```
+
+This also removes the package's `/dev/uinput` rule, but the access the rule
+gave lasts until you restart the computer.
 
 On GNOME, also turn off the VOCO panel in the Extensions app, or run
 `gnome-extensions disable voco-panel@voco.local`. Remove the

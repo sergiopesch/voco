@@ -12,7 +12,7 @@ VOCO runs as your login, with your permissions. Its boundary is your user
 account: its files and sockets are private to you, and each socket checks that
 the process at the other end runs as you. VOCO doesn't defend against a program
 that already runs as you. Such a program can read VOCO's files, start and stop
-dictation, and send keys through the same helpers VOCO uses.
+dictation, and send keys the same way VOCO does.
 
 VOCO has no account, telemetry or cloud service. Recognition runs in a local
 worker process, and audio and transcripts stay on the computer. The only network
@@ -58,21 +58,36 @@ weren't typed go to the clipboard, or to Review if the copy fails.
 
 ## Input devices
 
-On Wayland, paste keys go through `ydotoold`, which holds a virtual keyboard on
-`/dev/uinput`. Any process that can write to the daemon's socket, or to
-`/dev/uinput`, can type into your session. VOCO's user service runs the daemon
-as you, with `UMask=0077`, `NoNewPrivileges=yes` and Unix sockets only. VOCO's
-own build of the daemon listens on `/tmp/.ydotool_socket` with mode 0600. VOCO
-never changes groups, udev rules or device permissions;
-[Access to /dev/uinput](../platform/README.md#access-to-devuinput) lists the
-choices.
+On Wayland, VOCO sends its paste keys through its own virtual keyboard on
+`/dev/uinput`, the kernel's interface for creating input devices. It is the only
+device VOCO creates: it has only Shift, Insert and Space, and VOCO keeps it while
+it runs. No daemon, socket or service stands between VOCO and the kernel.
+
+The package's udev rule tags `/dev/uinput` with `uaccess`, so logind gives the
+user of the active local session read and write access through an ACL, and
+moves it when another user's session becomes active. Other accounts, users
+signed in only remotely and system services get none, and no group is involved.
+The access belongs to your user, not to VOCO or to one session: while your local
+session is active, any program that runs as you, even over SSH or as a user
+service, can create its own keyboard or mouse and type into whichever app has
+focus, terminals too. Access is checked when a program opens the device, so a
+program that already holds a virtual device, as VOCO does, keeps it after the
+ACL moves, and its keys reach whichever session is then active.
+
+A typing daemon that runs as you needs this same access, and adds a socket that
+every program running as you can write to. The `input` group grants far more:
+every program you run, in any of your sessions, can read every keystroke on
+every keyboard, passwords included. Access to `/dev/uinput` lets a program
+create devices, not read other keyboards. To use another policy, see
+[Access to /dev/uinput](../platform/README.md#access-to-devuinput).
 
 Passive evdev reads keyboards under `/dev/input`, which usually takes the
 `input` group. Membership lets every program you run read every keystroke,
 passwords included. VOCO uses those events only to detect its shortcut and to
-wait for modifier keys to be released, but the group grants the same access to
-everything else you run. The GNOME companion, the IBus input source and a
-`voco --toggle` binding need no such access.
+wait for modifier keys to be released, and ignores its own virtual keyboard, but
+the group grants the same access to everything else you run. The GNOME
+companion, the IBus input source and a `voco --toggle` binding need no such
+access.
 
 ## Local interfaces
 
@@ -102,7 +117,7 @@ any request that includes a camera.
 
 The window opens two kinds of link through `xdg-open`: release pages under
 `https://github.com/sergiopesch/voco/releases/tag/`, and the
-[ydotoold section](../platform/README.md#ydotoold-ydotool-daemon) of the
+[Wayland paste keys section](../platform/README.md#wayland-paste-keys) of the
 platform guide, on GitHub. It refuses every other address.
 
 ## Release check
@@ -145,15 +160,14 @@ repeats text the field didn't confirm. The
 ## Dependency policy
 
 `apps/desktop/src-tauri/Cargo.lock` and `package-lock.json` pin every
-dependency. VOCO patches three Rust crates and builds one helper from vendored
-source, as [vendor/](../../vendor/README.md) records:
+dependency. VOCO patches three Rust crates, as [vendor/](../../vendor/README.md)
+records:
 
 | Component | Change | Check |
 | --- | --- | --- |
 | glib 0.18.5 | [Backport](../../vendor/glib/VOCO-PATCH.md) of the RUSTSEC-2024-0429 fix | `scripts/verify-glib-backport.py`, in CI and packaging |
 | global-hotkey 0.8.0 | [Event-driven X11 key grab](../../vendor/global-hotkey/VOCO-PATCH.md) | `scripts/verify-shortcut-backport.py`, in `npm test` |
 | tray-icon 0.24.2 | [Fixed, caller-owned icon paths](../../vendor/tray-icon/VOCO-PATCH.md) | `scripts/verify-tray-backport.py`, in `npm test` |
-| ydotool 0.1.8, libuInputPlus 0.1.4 | [Private daemon for Ubuntu 24.04's client](../../vendor/ydotool-legacy/README.md) | `scripts/build-legacy-ydotool.py --verify-only`, in `npm run verify:devops` |
 
 CI runs `cargo audit` on the Rust lockfile and `npm run verify:security`, which
 is `npm audit` at the moderate level. Scanners that match only version numbers
@@ -208,7 +222,7 @@ commit passed CI, then uploads it as a draft to check before publishing.
 ## Known limits
 
 - Programs that run as you share VOCO's access, including its sockets, its
-  files and the paste helpers.
+  files, the paste helpers and `/dev/uinput`.
 - Pasted text goes to whatever has focus when the paste happens, and VOCO
   can't tell whether it landed.
 - On X11, every client in the session can read the selections and observe
