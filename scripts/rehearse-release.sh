@@ -6,6 +6,8 @@ VERSION="$(node -p "require('${ROOT_DIR}/package.json').version")"
 TAG_NAME="voco.${VERSION}"
 DEB_NAME="voco_${VERSION}_amd64.deb"
 LATEST_DEB_NAME="voco_latest_amd64.deb"
+RPM_NAME="voco-${VERSION}-1.x86_64.rpm"
+LATEST_RPM_NAME="voco_latest_x86_64.rpm"
 TMP_DIR="$(mktemp -d)"
 
 cleanup() {
@@ -18,6 +20,8 @@ echo "  version: ${VERSION}"
 echo "  tag: ${TAG_NAME}"
 echo "  deb: ${DEB_NAME}"
 echo "  latest deb: ${LATEST_DEB_NAME}"
+echo "  rpm: ${RPM_NAME}"
+echo "  latest rpm: ${LATEST_RPM_NAME}"
 
 (
   cd "${ROOT_DIR}"
@@ -42,11 +46,16 @@ echo "  latest deb: ${LATEST_DEB_NAME}"
   grep -Fx "wget -qO voco-install https://raw.githubusercontent.com/sergiopesch/voco/voco.${PUBLISHED_VERSION}/install && bash voco-install" README.md > /dev/null
   grep -F 'sha256sum -c voco_latest_checksums.txt' docs/install.md > /dev/null
   grep -F 'gh release create ${TAG} --draft --verify-tag' scripts/assemble-release.sh > /dev/null
+  # Both packages come from one staged tree, and the RPM is verified against the .deb.
+  grep -F -- '--rpm "${ASSETS}/${RPM}"' scripts/assemble-release.sh > /dev/null
+  grep -F 'bash scripts/verify-rpm-package.sh "${ASSETS}/${RPM}" "${VERSION}" "${ASSETS}/${DEB}"' scripts/assemble-release.sh > /dev/null
   bash ./scripts/render-release-body.sh "${VERSION}" "${TAG_NAME}" > "${TMP_DIR}/release-body.md"
   for expected in \
     'voco_checksums.txt' \
     "wget -qO voco-install https://raw.githubusercontent.com/sergiopesch/voco/${TAG_NAME}/install && bash voco-install" \
-    "gpg --verify voco_${VERSION}_debian_checksums.txt.asc voco_${VERSION}_debian_checksums.txt && sha256sum --check --strict voco_${VERSION}_debian_checksums.txt"; do
+    "gpg --verify voco_${VERSION}_debian_checksums.txt.asc voco_${VERSION}_debian_checksums.txt && sha256sum --check --strict voco_${VERSION}_debian_checksums.txt" \
+    "gpg --verify voco_${VERSION}_rpm_checksums.txt.asc voco_${VERSION}_rpm_checksums.txt && sha256sum --check --strict voco_${VERSION}_rpm_checksums.txt" \
+    "sudo dnf install ./${RPM_NAME}"; do
     grep -F -- "${expected}" "${TMP_DIR}/release-body.md" > /dev/null
   done
 )
