@@ -92,6 +92,12 @@ def wait_for(predicate, description, timeout=20):
         pump(.05)
     raise AssertionError('Timed out waiting for %s; last trace events: %s' % (description, [x.get('event') for x in traces()[-8:]]))
 
+def app_ready():
+    # The renderer takes shortcuts and the worker is warm; a failed warm-up fails at once.
+    output = (root / 'evidence/full-app.log').read_text()
+    assert 'Selected speech model startup failed' not in output, 'Speech model startup failed; see full-app.log'
+    return 'Bundled Nemotron streaming model ready' in output and counts()['frontend_hotkey_handler_ready'] > 0
+
 def play(description):
     player = subprocess.Popen([os.environ['VOCO_NATIVE_PAPLAY'], '--device=fixture', str(sound)])
     wait_for(lambda: player.poll() is not None, description)
@@ -216,7 +222,7 @@ selections, tray_state, popup, popover, diagnostic_errors = {}, None, None, None
 try:
     assert shutil.which('xclip') and shutil.which('xdotool'), 'X11 paste needs xclip and xdotool on PATH'
     wait_for(lambda: (root / 'runtime/voco.sock').exists(), 'application control socket')
-    pump(6)
+    wait_for(app_ready, 'frontend and model readiness', timeout=30)
     window.present()
     window_id = subprocess.check_output(['xdotool', 'search', '--name', '^VOCO private full application acceptance$'], text=True).strip().splitlines()[0]
     subprocess.run(['xdotool', 'windowfocus', '--sync', window_id], check=True)

@@ -31,9 +31,11 @@ await fs.writeFile(`${profile}/NativeMessagingHosts/com.voco.exact_field.json`, 
 const server = http.createServer((_q,r) => r.end('<!doctype html><title>VOCO exact recipient</title><textarea id="a"></textarea><textarea id="b"></textarea>'));
 await new Promise(r=>server.listen(0,'127.0.0.1',r));
 const log = await fs.open(`${root}/evidence/app.log`, 'w');
-const app = spawn(`${root}/voco`, [], {env: {...process.env, VOCO_HOTKEY_TRACE: '1'}, stdio:['ignore',log.fd,log.fd]});
+const app = spawn(`${root}/voco`, [], {env: {...process.env, RUST_LOG: 'info', VOCO_HOTKEY_TRACE: '1'}, stdio:['ignore',log.fd,log.fd]});
 const delay = ms=>new Promise(r=>setTimeout(r,ms));
 const traces = async()=> (await fs.readFile(`${root}/state/voco/hotkey-trace.jsonl`,'utf8').catch(()=>'' )).split('\n').flatMap(line=>{try{return [JSON.parse(line)];}catch{return [];}});
+// Ready once the renderer takes shortcuts and the worker is warm; a failed warm-up fails at once.
+async function appReady() {const appLog=await fs.readFile(`${root}/evidence/app.log`,'utf8');if(appLog.includes('Selected speech model startup failed'))throw Error('Speech model startup failed; see app.log');return appLog.includes('Bundled Nemotron streaming model ready')&&(await traces()).some(t=>t.event==='frontend_hotkey_handler_ready');}
 async function until(fn, label, ms=30_000) {const deadline=Date.now()+ms;while(Date.now()<deadline){if(await fn())return;if(playbacks.some(p=>p.record.error || p.record.timedOut || (p.record.exitCode !== undefined && p.record.exitCode !== 0)))throw Error('Fixture playback failed; see playback.json');if(app.exitCode!==null)throw Error(`App exited: ${label}`);await delay(50);}throw Error(`Timed out: ${label}`);}
 let browser, page, worker, failure; const results=[], playbacks=[];
 async function playFixture(file) {
@@ -52,7 +54,7 @@ async function playFixture(file) {
 }
 try {
   await until(()=>fs.stat(`${root}/runtime/voco-browser/exact-field.sock`).then(()=>true).catch(()=>false),'broker socket');
-  await delay(6000);
+  await until(appReady,'frontend and model readiness');
   // Chromium exposes its toolbar over AT-SPI only when it is told an assistive
   // technology is running; the renderer flag alone covers just the page.
   browser = await chromium.launchPersistentContext(profile, {executablePath:'/tmp/browser/chrome',headless:false,env:{...process.env,ACCESSIBILITY_ENABLED:'1'},args:['--force-renderer-accessibility=complete',`--disable-extensions-except=${extension}`,`--load-extension=${extension}`]});
