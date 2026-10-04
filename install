@@ -9,7 +9,7 @@ set -euo pipefail
 #   wget https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.60/install -O voco-install
 #   bash voco-install
 
-VERSION="2026.0.60"
+VERSION="2026.0.61"
 RELEASE_TAG="voco.${VERSION}"
 DEB_URL="https://github.com/sergiopesch/voco/releases/download/${RELEASE_TAG}/voco_${VERSION}_amd64.deb"
 RPM_URL="https://github.com/sergiopesch/voco/releases/download/${RELEASE_TAG}/voco-${VERSION}-1.x86_64.rpm"

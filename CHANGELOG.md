@@ -6,14 +6,33 @@ use Semantic Versioning: a version has the form `YYYY.0.N`, the year and then a
 number that grows with each release, and its signed Git tag is `voco.<version>`.
 The [release process](docs/release-process.md) describes how a release is made.
 
-## [2026.0.60] - 2026-09-30
+## [2026.0.61] - 2026-10-04
 
-Dictation pastes into the app that has keyboard focus, and Review keeps a dictation
-VOCO couldn't finish. The [release notes](docs/releases/2026.0.60.md) explain how
-to upgrade.
+VOCO types on Wayland through its own virtual keyboard and supports Ubuntu 24.04
+and 26.04, Debian 13 and Fedora 44. This release also brings the changes prepared
+for 2026.0.60, which wasn't published: dictation pastes into the focused app, and
+Review keeps a dictation VOCO couldn't finish. The
+[release notes](docs/releases/2026.0.61.md) explain how to upgrade.
 
 ### Added
 
+- Fedora 44 support: `voco-<version>-1.x86_64.rpm`, built from the same files as
+  the Debian package and covered by the same signed checksums. The guided
+  installer installs it with DNF.
+- Ubuntu 26.04 and Debian 13 support, alongside Ubuntu 24.04.
+- VOCO's own virtual keyboard for Wayland paste keys, "VOCO virtual keyboard".
+  The package installs a udev rule that gives the person at the computer access
+  to `/dev/uinput`, so there is no input service, daemon or group to set up.
+- Paste keys are sent only while your desktop session is the active one, so a
+  dictation left running after a user switch can't type into another session.
+- **Your shortcut can't reach VOCO yet**, once per launch on Wayland, when no
+  keyboard is readable and neither the GNOME panel nor the IBus input source
+  takes Alt+D. It names the fix.
+- **VOCO has no icon in the top bar**, once per launch, when neither the GNOME
+  panel nor a tray host is running, as on stock Debian 13 and Fedora 44 GNOME.
+- CI runs the companion regression on GNOME 50, the speech runtime, IBus and
+  worker tests and the speech baseline in Debian 13 and Fedora 44 containers,
+  and both GNOME Wayland delivery suites through the real virtual keyboard.
 - **Review**, in the tray menu and the GNOME panel menu. While you dictate, VOCO
   keeps a private copy of the text and deletes it when the dictation ends normally.
   After an unexpected exit, the next start lists it as an **Interrupted dictation**
@@ -28,12 +47,11 @@ to upgrade.
   keeps the words it took, and Stop copies the rest the same way.
 - **Crash recovery unavailable**, once per launch, when VOCO can't keep its copy of
   the text. Dictation continues.
-- On Wayland, desktop setup reports a missing `ydotoold`, so Start can name the fix.
 - **Your shortcut also reached the app**, once per launch on Wayland, when Alt+D or
   Alt+Shift+D also acted in the app you were typing in. It names the fix: enable or
   reconnect the GNOME panel, or bind another shortcut to `voco --toggle`.
 - `/usr/share/doc/voco/copyright` in the package: VOCO's MIT License, with a pointer
-  to the runtime, model and helper notices beside it.
+  to the runtime, model and patched-library notices beside it.
 - A CI job, Application, that runs the release build of `voco` and
   `voco-browser-host` with the speech runtime through the GNOME panel,
   full-application, Wayland, Chromium field and toolbar suites. The delivery suites
@@ -44,18 +62,24 @@ to upgrade.
 
 - Dictation pastes into the app that has keyboard focus. VOCO puts each phrase on
   the clipboard and the primary selection and presses Shift+Insert, with `xdotool`
-  on X11 and `ydotool` on Wayland, so terminals, browsers and native text fields
-  take the same path and text follows focus. A paste VOCO can't confirm stops live
-  typing and is never replayed as keys.
+  on X11 and its own virtual keyboard on Wayland, so terminals, browsers and native
+  text fields take the same path and text follows focus. A paste VOCO can't
+  confirm stops live typing and is never replayed as keys.
+- GNOME companion 15, for GNOME 46, 48 and 50. It is one pill that shares GNOME's
+  hover, focus and open-menu highlight and carries VOCO's tint, with even margins
+  in both text directions. A primary click anywhere on it stops dictation or opens
+  Settings; other buttons, the Menu key and Shift+F10 open the menu. On Wayland it
+  keeps Alt+D and Alt+Shift+D out of the focused app at every status, idle
+  included, and it is recommended rather than required. After upgrading, run
+  `voco --setup-panel` again, then sign out and back in.
+- The guided installer installs only the VOCO package, with APT or DNF, then
+  checks the paste prerequisites without sending keys.
+- A recording that stops before any words were recognized says **Nothing was
+  typed** and why, instead of that some words may be missing. VOCO logs the reason
+  capture stopped.
 - Before it pastes, VOCO waits up to 1.5 seconds for the shortcut's keys to be
   released, so a held Alt can't turn Shift+Insert into another shortcut. On X11 the
   shortcut acts when you release it.
-- GNOME companion 13. It is one pill that shares GNOME's hover, focus and open-menu
-  highlight and carries VOCO's tint, with even margins in both text directions. A
-  primary click anywhere on it stops dictation or opens Settings; other buttons open
-  the menu. On Wayland it keeps Alt+D and Alt+Shift+D out of the focused app at
-  every status, idle included, and it is recommended rather than required. After
-  upgrading, run `voco --setup-panel` again, then sign out and back in.
 - At launch the tray reads "VOCO — Initializing…" with the busy icon until the
   first desktop check finishes, instead of flashing a setup warning. If that check
   fails, the tray reads "VOCO — Desktop setup needed" and VOCO checks once more
@@ -87,8 +111,8 @@ to upgrade.
 - `apt show voco` describes VOCO as the AppStream listing does.
 - Releases are assembled, verified and signed on the maintainer's computer with
   `scripts/assemble-release.sh`, from a signed tag whose commit passed CI. It writes
-  provenance and validation records and five signed checksum manifests, and uploads
-  nothing.
+  provenance and validation records and signed checksum manifests for both
+  packages, and uploads nothing.
 - `bash scripts/setup.sh --install` checks the provisioned speech runtime, never
   downloading one, then builds, assembles, verifies and installs the complete
   package with APT. Setup installs the worker's NumPy and psutil, installs Tauri
@@ -99,13 +123,18 @@ to upgrade.
   1.94.0, CI's toolchain.
 - Tauri 2.11.6 and Vite 8.3.1.
 - The third-party notices name the vendored tray-icon 0.24.2 and global-hotkey
-  0.8.0, and the private `ydotoold` built from ydotool 0.1.8 and libuInputPlus 0.1.4.
+  0.8.0.
 
 ### Removed
 
-- The Flatpak, Snap, AppImage, RPM and Arch recipes and the SentencePiece companion
-  recipes. The Ubuntu/Debian package is the only one, and it keeps its
-  libsentencepiece0 dependency.
+- Wayland paste through ydotool: `voco-ydotoold.service`, its launcher and
+  migration, the private legacy `ydotoold`, `voco --setup-desktop-input`, and the
+  `ydotool` and `ydotoold` package recommendations. On its first Wayland launch
+  after the upgrade, VOCO removes its own old service's enablement and stops it.
+- The `procps` dependency, which nothing uses any more.
+- The Flatpak, Snap, AppImage and Arch recipes, the previous RPM recipe and the
+  SentencePiece companion recipes. VOCO ships the Debian package and the Fedora
+  RPM, both from one staged tree, and keeps its libsentencepiece0 dependency.
 - The hosted release workflow and the signing wizard. `ci.yml` is the only
   workflow, and it never assembles or signs a release.
 - The output settings `insertionStrategy`, `transcriptTarget`, `liveCursorMode`,
@@ -122,12 +151,20 @@ to upgrade.
 - AT-SPI from the package dependencies, and `docs/guide`, `docs/testing` and
   `docs/release-assets` from the package.
 - The dated test reports, audits, decision records and benchmark assets in `docs/`,
-  and the release notes before 2026.0.60. Each release's tag keeps the documents
+  and the release notes before 2026.0.61. Each release's tag keeps the documents
   its notes link to.
 - ripgrep from CI and the scripts.
 
 ### Fixed
 
+- After an upgrade to Ubuntu 26.04, whose `ydotool` package starts its own
+  `ydotool.service`, VOCO's input service could restart in a loop and VOCO
+  refused to start, saying the service had a pending transition. VOCO no longer
+  uses that service.
+- With no microphone chosen, the tray and the GNOME panel said **Microphone setup
+  required** and the tray disabled Start until you chose one, although Start
+  uses the system default microphone. VOCO now reads **Ready · microphone checks
+  on first use**.
 - In the GNOME top bar, the microphone stays still when the live bars open or close,
   and the tint fades in and out. GNOME's own privacy indicator can still shift the
   icons.
@@ -146,6 +183,6 @@ to upgrade.
 ## Earlier releases
 
 The [GitHub releases](https://github.com/sergiopesch/voco/releases) page lists the
-releases before 2026.0.60, each with its signed tag and assets.
+releases before 2026.0.61, each with its signed tag and assets.
 
-[2026.0.60]: https://github.com/sergiopesch/voco/compare/voco.2026.0.59...voco.2026.0.60
+[2026.0.61]: https://github.com/sergiopesch/voco/compare/voco.2026.0.59...voco.2026.0.61
