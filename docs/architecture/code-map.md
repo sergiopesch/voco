@@ -43,7 +43,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `browser_broker.rs` — Chromium exact-field broker: claims, sessions, appends and receipts. Only a matching receipt proves a field changed.
 - `browser_event_delivery.rs` — Delivers browser Start and Stop to the renderer, so a Stop survives a briefly unresponsive renderer without turning into a toggle.
 - `browser_protocol.rs` — Bounded, versioned messages shared by the broker and the native host.
-- `browser_socket.rs` — Same-user transport under `$XDG_RUNTIME_DIR/voco-browser/`, checked with `SO_PEERCRED`.
+- `browser_socket.rs` — Same-user transport under `$XDG_RUNTIME_DIR/voco-browser/`, and the `SO_PEERCRED` peer check that the trigger, activation and IBus sockets share.
 - `bin/voco-browser-host.rs` — Chromium native messaging host that relays framed messages between the extension and VOCO.
 
 ## Renderer: `apps/desktop/src/`
@@ -339,8 +339,8 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 ## Command line
 
 `voco` with no arguments starts VOCO, or presents the running instance. If it
-can't start, it prints "VOCO could not start: …", shows a notification and
-exits 1.
+can't take its single-instance lock or reach the running instance, it prints
+"VOCO could not start: …", shows a notification and exits 1.
 
 | Option | Behaviour | Exit status |
 | --- | --- | --- |

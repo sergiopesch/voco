@@ -1,4 +1,5 @@
 //! Owner-only dictation trigger sockets. Paths preserve the documented XDG/TMPDIR layout.
+use crate::browser_socket::{effective_uid, peer_uid};
 use std::fs::{self, DirBuilder};
 use std::io;
 use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
@@ -10,11 +11,6 @@ use std::sync::{LazyLock, Mutex};
 
 static SOCKETS: LazyLock<SocketRegistry> = LazyLock::new(SocketRegistry::default);
 
-fn current_uid() -> u32 {
-    // SAFETY: geteuid has no preconditions.
-    unsafe { libc::geteuid() }
-}
-
 fn rejected(message: &'static str) -> io::Error {
     io::Error::new(io::ErrorKind::PermissionDenied, message)
 }
@@ -25,7 +21,7 @@ fn private_directory(path: &Path) -> io::Result<()> {
     }
     let metadata = fs::symlink_metadata(path)?;
     if !metadata.is_dir()
-        || metadata.uid() != current_uid()
+        || metadata.uid() != effective_uid()
         || metadata.mode() & 0o077 != 0
         || metadata.mode() & 0o300 != 0o300
     {
@@ -110,14 +106,14 @@ fn resolve_paths(
             let metadata = fs::symlink_metadata(temporary)?;
             let mode = metadata.mode();
             let private =
-                metadata.uid() == current_uid() && mode & 0o077 == 0 && mode & 0o300 == 0o300;
+                metadata.uid() == effective_uid() && mode & 0o077 == 0 && mode & 0o300 == 0o300;
             let shared = metadata.uid() == 0 && mode & 0o1000 != 0 && mode & 0o002 != 0;
             if !metadata.is_dir() || !(private || shared) {
                 return Err(rejected(
                     "Trigger temporary root must be private or root-owned and sticky",
                 ));
             }
-            let directory = temporary.join(format!("voco-{}", current_uid()));
+            let directory = temporary.join(format!("voco-{}", effective_uid()));
             match DirBuilder::new().mode(0o700).create(&directory) {
                 Ok(()) => {}
                 Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {}
@@ -140,7 +136,7 @@ struct SocketIdentity {
 impl SocketIdentity {
     fn at(path: &Path) -> io::Result<Self> {
         let metadata = fs::symlink_metadata(path)?;
-        if !metadata.file_type().is_socket() || metadata.uid() != current_uid() {
+        if !metadata.file_type().is_socket() || metadata.uid() != effective_uid() {
             return Err(rejected(
                 "Trigger path is not an owned socket; preserving it",
             ));
@@ -256,29 +252,12 @@ pub fn shutdown() -> io::Result<()> {
 }
 
 pub fn validate_peer(stream: &UnixStream) -> io::Result<()> {
-    let mut credentials = libc::ucred {
-        pid: 0,
-        uid: 0,
-        gid: 0,
-    };
-    let mut length = std::mem::size_of::<libc::ucred>() as libc::socklen_t;
-    // SAFETY: the live descriptor and fixed-size output buffer remain valid for getsockopt.
-    let result = unsafe {
-        libc::getsockopt(
-            stream.as_raw_fd(),
-            libc::SOL_SOCKET,
-            libc::SO_PEERCRED,
-            (&mut credentials as *mut libc::ucred).cast(),
-            &mut length,
-        )
-    };
-    if result != 0 {
-        return Err(io::Error::last_os_error());
+    match peer_uid(stream) {
+        Ok(uid) if uid == effective_uid() => Ok(()),
+        // A failed getsockopt keeps its OS error for the log.
+        Err(error) if error.raw_os_error().is_some() => Err(error),
+        _ => Err(rejected("Trigger connection is not from the current user")),
     }
-    if length as usize != std::mem::size_of::<libc::ucred>() || credentials.uid != current_uid() {
-        return Err(rejected("Trigger connection is not from the current user"));
-    }
-    Ok(())
 }
 
 #[cfg(test)]
@@ -352,7 +331,7 @@ mod tests {
         let fallback = resolve_paths(None, &root.0).unwrap();
         assert_eq!(
             fallback[0],
-            root.0.join(format!("voco-{}/voco.sock", current_uid()))
+            root.0.join(format!("voco-{}/voco.sock", effective_uid()))
         );
         assert_eq!(
             fs::metadata(fallback[0].parent().unwrap()).unwrap().mode() & 0o777,
@@ -383,7 +362,7 @@ mod tests {
     #[test]
     fn existing_unsafe_fallback_is_preserved_without_chmod() {
         let root = Directory::new();
-        let fallback = root.0.join(format!("voco-{}", current_uid()));
+        let fallback = root.0.join(format!("voco-{}", effective_uid()));
         DirBuilder::new().mode(0o755).create(&fallback).unwrap();
         fs::set_permissions(&fallback, fs::Permissions::from_mode(0o755)).unwrap();
         assert!(resolve_paths(None, &root.0).is_err());
@@ -439,6 +418,16 @@ mod tests {
         let (peer, _) = listener.accept().unwrap();
         validate_peer(&peer).unwrap();
         registry.shutdown().unwrap();
+    }
+
+    #[test]
+    fn unverifiable_peer_is_rejected_with_its_os_error() {
+        // getsockopt fails with ENOTSOCK on a descriptor that isn't a socket.
+        let file = UnixStream::from(OwnedFd::from(fs::File::open("/dev/null").unwrap()));
+        assert_eq!(
+            validate_peer(&file).unwrap_err().raw_os_error(),
+            Some(libc::ENOTSOCK)
+        );
     }
 
     #[test]

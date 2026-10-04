@@ -1,8 +1,4 @@
 //! Chromium Native Messaging executable. stdout contains framed protocol data only.
-#[cfg(test)]
-#[path = "../browser_broker.rs"]
-#[allow(dead_code)]
-mod browser_broker;
 #[path = "../browser_protocol.rs"]
 #[allow(dead_code)]
 mod browser_protocol;

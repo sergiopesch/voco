@@ -110,6 +110,7 @@ console.log('Chromium content lifecycle regression passed');
   assert.equal(observation.active, true, 'claim retains security observation');
   assert.equal(receive({ ...common, type: 'append', sequence: 1, text: '', final: true }).outcome, 'applied');
   assert.equal(observation.active, false, 'successful finalization releases document observation');
-  assert.equal(receive({ ...common, type: 'query', sequence: 1 }).outcome, 'applied', 'finished receipts remain queryable');
+  assert.equal(receive({ ...common, type: 'append', sequence: 1, text: '', final: true }).outcome, 'applied',
+    'a repeated final request gets its first receipt');
 }
 console.log('Chromium mutation observer lifecycle regressions passed');
