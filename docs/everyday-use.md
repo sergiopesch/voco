@@ -92,7 +92,7 @@ If your saved shortcut isn't valid, VOCO sets it back to `Alt+D` and shows
 On Wayland without the panel, VOCO can still watch for `Alt+D` and
 `Alt+Shift+D` if your account can read keyboard devices, but the key press also
 reaches your app. See
-[The shortcut also reaches your app](troubleshooting.md#the-shortcut-also-reaches-your-app)
+[The shortcut also reaches your app, or does nothing](troubleshooting.md#the-shortcut-also-reaches-your-app-or-does-nothing)
 for fixes.
 
 ## Browser fields

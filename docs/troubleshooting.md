@@ -96,12 +96,14 @@ If `voco --toggle` prints `Could not reach VOCO's private control socket`, VOCO
 isn't running in this desktop session. Open VOCO, then try again. To record key
 events for a bug report, see [Shortcut traces](#shortcut-traces).
 
-## The shortcut also reaches your app
+## The shortcut also reaches your app, or does nothing
 
 On Wayland without the GNOME panel, VOCO watches for `Alt+D` and `Alt+Shift+D`
 but can't stop your app from receiving them. Browsers jump to the address bar,
 so your words land there, and terminals delete a word. VOCO warns once per
-launch with **Your shortcut also reached the app**. Fix it one of these ways:
+launch with **Your shortcut also reached the app**. If VOCO can't read any
+keyboard either, the shortcut does nothing, and shortly after VOCO starts it
+says **Your shortcut can't reach VOCO yet**. Fix either one of these ways:
 
 - On GNOME 46, 48 or 50, choose **Enable live panel** on the **Help** page, or
   run `voco --setup-panel`. Then sign out and back in.

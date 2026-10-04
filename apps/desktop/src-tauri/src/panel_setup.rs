@@ -52,16 +52,35 @@ pub fn stop_shortcut_setup_detail(
             "VOCO cannot confirm that GNOME keeps {hotkey} out of the app you are dictating into. Check the VOCO panel in Help."
         ));
     };
-    let remedy = match panel.status.as_str() {
-        "active" if attached => return None,
-        "active" => "VOCO's GNOME panel is enabled but not connected yet. Reopen VOCO, or sign out and back in.".into(),
-        "disabled" => "Enable the VOCO panel in Help to keep the shortcut out of other apps.".into(),
-        "other-desktop" | "unsupported" => "To avoid that, choose another shortcut in VOCO and assign `voco --toggle` to it in your desktop's keyboard settings.".into(),
-        _ => panel.detail,
-    };
+    let remedy = shortcut_remedy(panel, attached)?;
     Some(format!(
         "{hotkey} also reaches the app you are dictating into: browsers move the cursor to the address bar, so your words land there, and terminals delete a word. {remedy}"
     ))
+}
+
+/// The same chords when no keyboard is readable and nothing consumes them: they
+/// do nothing at all. Same remedy as above.
+pub fn unreachable_shortcut_detail(
+    hotkey: &str,
+    status: Result<PanelSetupStatus, String>,
+    attached: bool,
+) -> Option<String> {
+    let remedy = match status {
+        Ok(panel) => shortcut_remedy(panel, attached)?,
+        Err(_) => "Check the VOCO panel in Help, or assign `voco --toggle` to a shortcut in your desktop's keyboard settings.".into(),
+    };
+    Some(format!("{hotkey} doesn't reach VOCO yet. {remedy}"))
+}
+
+/// What makes VOCO's Wayland chord reliable here; None once the panel holds it.
+fn shortcut_remedy(panel: PanelSetupStatus, attached: bool) -> Option<String> {
+    Some(match panel.status.as_str() {
+        "active" if attached => return None,
+        "active" => "VOCO's GNOME panel is enabled but not connected yet. Reopen VOCO, or sign out and back in.".into(),
+        "disabled" => "Enable the VOCO panel in Help, then sign out and back in.".into(),
+        "other-desktop" | "unsupported" => "Choose another shortcut in VOCO and assign `voco --toggle` to it in your desktop's keyboard settings.".into(),
+        _ => panel.detail,
+    })
 }
 
 pub fn check(enable: bool) -> Result<PanelSetupStatus, String> {
@@ -173,6 +192,25 @@ mod tests {
             stop_shortcut_setup_detail("wayland", "Control+Space", panel("restart"), false)
                 .is_none()
         );
+    }
+
+    #[test]
+    fn unreachable_shortcut_names_the_same_remedy() {
+        let disabled = unreachable_shortcut_detail("Alt+D", panel("disabled"), false).unwrap();
+        assert!(disabled.starts_with("Alt+D doesn't reach VOCO yet."));
+        assert!(disabled.contains("Enable the VOCO panel in Help"));
+        for status in ["other-desktop", "unsupported"] {
+            assert!(
+                unreachable_shortcut_detail("Alt+Shift+D", panel(status), false)
+                    .is_some_and(|detail| detail.contains("voco --toggle"))
+            );
+        }
+        assert!(
+            unreachable_shortcut_detail("Alt+D", Err("bus".into()), false)
+                .is_some_and(|detail| detail.contains("voco --toggle"))
+        );
+        // An attached panel consumes the chord, so there is nothing to report.
+        assert!(unreachable_shortcut_detail("Alt+D", panel("active"), true).is_none());
     }
 
     #[test]

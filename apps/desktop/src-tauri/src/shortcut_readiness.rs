@@ -80,6 +80,17 @@ impl Observations {
         }
     }
 
+    /// Open, synchronized keyboards that can report the chord of an evdev mode
+    /// (0 Alt+D, 1 Alt+Shift+D); None when the observations are unavailable.
+    pub fn keyboards_for(&self, evdev_mode: u8) -> Option<usize> {
+        let devices = self.devices.lock().ok()?;
+        Some(if evdev_mode == 0 {
+            devices[0].saturating_add(devices[1])
+        } else {
+            devices[1]
+        })
+    }
+
     pub fn device(&self, dictation: bool, shift: bool) -> Device<'_> {
         let mut device = Device {
             owner: self,
@@ -153,25 +164,22 @@ impl Observations {
             && snapshot.evdev_mode <= 1
             && snapshot.evdev_mode == snapshot.configured_evdev_mode
         {
-            if let Ok(devices) = self.devices.lock() {
-                let count = if snapshot.evdev_mode == 0 {
-                    devices[0].saturating_add(devices[1])
-                } else {
-                    devices[1]
-                };
-                if count > 0 {
+            match self.keyboards_for(snapshot.evdev_mode) {
+                Some(0) => {}
+                Some(_) => {
                     return status(
                         Some("evdev"),
                         "available",
                         "A live synchronized keyboard supports the configured shortcut.",
-                    );
+                    )
                 }
-            } else {
-                return status(
-                    None,
-                    "unknown",
-                    "Keyboard observations are unavailable. Start dictation from the tray.",
-                );
+                None => {
+                    return status(
+                        None,
+                        "unknown",
+                        "Keyboard observations are unavailable. Start dictation from the tray.",
+                    )
+                }
             }
         }
         // An idle bridge has no insertion session, so its engineActive field

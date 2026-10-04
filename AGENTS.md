@@ -139,7 +139,9 @@ change.
 - The GNOME Wayland companion is recommended, not required. Without it the focused
   app also receives Alt+D (browsers focus the address bar, terminals delete a
   word), and an evdev toggle while the chord leaks sends one notification per
-  launch with the panel remedy, which Settings also shows.
+  launch with the panel remedy, which Settings also shows. When no keyboard is
+  readable and neither the panel nor IBus takes the chord, it does nothing at
+  all: 20 s after the listener starts, VOCO notifies once with the same remedy.
 - The companion grabs the configured Alt+D or Alt+Shift+D at every status, idle
   included; each press sends `Action('shortcut', '')`. `ReserveShortcut` holds a
   2.5 s lease for the exact `shortcutAccelerator` that only the authenticated Shell

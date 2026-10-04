@@ -190,7 +190,10 @@ VOCO's shortcut combines Alt, Control or Super with a key, Alt+D by default.
 
 With passive evdev, browsers move the cursor to the address bar on Alt+D and
 terminals delete a word. VOCO notifies "Your shortcut also reached the app" once
-per launch, with the fix for your desktop.
+per launch, with the fix for your desktop. When VOCO can read no keyboard and no
+companion or input source takes the chord, the shortcut does nothing: shortly
+after VOCO starts it notifies "Your shortcut can't reach VOCO yet" once, with
+the same fix.
 
 `voco --toggle` connects once to VOCO's owner-only socket,
 `$XDG_RUNTIME_DIR/voco.sock`; the connection is the request. It never launches

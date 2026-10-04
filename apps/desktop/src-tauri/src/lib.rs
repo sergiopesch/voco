@@ -1893,7 +1893,7 @@ fn start_hotkey_listener(app_handle: tauri::AppHandle) -> bool {
     let initial_discovered = spawn_supported_evdev_device_workers(&app_handle, &key_state);
     if initial_discovered == 0 {
         warn!(
-            "No keyboard found for evdev at startup. Add user to 'input' group if needed; VOCO will keep watching for devices."
+            "No readable keyboard for the passive shortcut at startup; VOCO keeps watching. The GNOME panel or a desktop shortcut for voco --toggle needs no keyboard access."
         );
     } else {
         info!(
@@ -1905,9 +1905,37 @@ fn start_hotkey_listener(app_handle: tauri::AppHandle) -> bool {
     info!("evdev device discovery supervisor started");
     trace_hotkey_event("evdev_listener_started", Some("evdev"));
 
-    spawn_evdev_device_watcher(app_handle, key_state);
+    spawn_evdev_device_watcher(app_handle.clone(), key_state);
+    // Without a readable keyboard, the panel or IBus, the chord does nothing at
+    // all. Give the panel its usual time to attach, then say how to fix it.
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_secs(20));
+        notify_unreachable_shortcut(&app_handle);
+    });
 
     true
+}
+
+#[cfg(target_os = "linux")]
+fn notify_unreachable_shortcut(app: &tauri::AppHandle) {
+    let mode = EVDEV_HOTKEY_MODE.load(Ordering::SeqCst);
+    let unreachable = USE_EVDEV_HOTKEY.load(Ordering::SeqCst)
+        && mode <= 1
+        && SHORTCUT_OBSERVATIONS.keyboards_for(mode) == Some(0)
+        && !panel::is_attached()
+        && !app
+            .state::<ibus_shortcut::IbusShortcutService>()
+            .status()
+            .available;
+    if !unreachable {
+        return;
+    }
+    let hotkey = if mode == 0 { "Alt+D" } else { "Alt+Shift+D" };
+    if let Some(detail) =
+        panel_setup::unreachable_shortcut_detail(hotkey, panel_setup::cached_check(), false)
+    {
+        send_notification("Your shortcut can't reach VOCO yet", &detail);
+    }
 }
 
 #[cfg(target_os = "linux")]
