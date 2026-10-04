@@ -16,20 +16,23 @@ interface StatusLabelInput {
 
 /** Microphone readiness for the tray and labels. null means VOCO picks the
  * microphone at Start: WebKit asks for permission then, and native capture with
- * no microphone chosen uses the system default (only on an explicit Start). */
+ * no microphone chosen uses the system default (only on an explicit Start). A
+ * chosen microphone that failed or disappeared stays not ready until a new choice. */
 export function deriveNativeMicrophoneReady({
   mode,
   selected,
+  lost,
   microphoneReady,
   defaultAvailable,
 }: {
   mode: "pending" | "webkit" | "native";
   selected: boolean;
+  lost: boolean;
   microphoneReady: boolean;
   defaultAvailable: boolean;
 }): boolean | null {
   if (mode === "webkit") return null;
-  if (mode === "native" && !selected && defaultAvailable) return null;
+  if (mode === "native" && !selected && !lost && defaultAvailable) return null;
   return mode === "native" && selected && microphoneReady;
 }
 

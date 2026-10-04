@@ -47,7 +47,7 @@ export function useNativeCaptureSettings(): NativeMicrophoneControls {
       setSources(next);
       const previous = useStore.getState().nativeCaptureSource;
       if (previous && !next.sources.some((source) => source.selectionToken === previous.selectionToken)) {
-        useStore.getState().setNativeCaptureSource(null);
+        useStore.getState().loseNativeCaptureSource();
         setError("The microphone list changed. Choose a microphone again.");
       } else setError(null);
     } catch (cause) {

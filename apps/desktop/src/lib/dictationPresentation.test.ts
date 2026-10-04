@@ -89,22 +89,28 @@ describe("native microphone readiness", () => {
   };
 
   it("lets Start pick the system default when no microphone is chosen", () => {
-    const unchosen = deriveNativeMicrophoneReady({ mode: "native", selected: false, microphoneReady: false, defaultAvailable: true });
+    const unchosen = deriveNativeMicrophoneReady({ mode: "native", selected: false, lost: false, microphoneReady: false, defaultAvailable: true });
     expect(unchosen).toBeNull();
     expect(deriveStatusLabel({ ...idle, nativeMicrophoneReady: unchosen, microphoneReady: false }))
       .toBe("Ready — microphone checks on first use");
   });
 
   it("asks for setup only when there is no usable microphone", () => {
-    const none = deriveNativeMicrophoneReady({ mode: "native", selected: false, microphoneReady: false, defaultAvailable: false });
+    const none = deriveNativeMicrophoneReady({ mode: "native", selected: false, lost: false, microphoneReady: false, defaultAvailable: false });
     expect(none).toBe(false);
     expect(deriveStatusLabel({ ...idle, nativeMicrophoneReady: none, microphoneReady: false })).toBe("Microphone setup required");
-    expect(deriveNativeMicrophoneReady({ mode: "pending", selected: false, microphoneReady: false, defaultAvailable: true })).toBe(false);
+    expect(deriveNativeMicrophoneReady({ mode: "pending", selected: false, lost: false, microphoneReady: false, defaultAvailable: true })).toBe(false);
+  });
+
+  it("keeps a chosen microphone that failed or disappeared not ready until a new choice", () => {
+    const lost = deriveNativeMicrophoneReady({ mode: "native", selected: false, lost: true, microphoneReady: false, defaultAvailable: true });
+    expect(lost).toBe(false);
+    expect(deriveStatusLabel({ ...idle, nativeMicrophoneReady: lost, microphoneReady: false })).toBe("Microphone setup required");
   });
 
   it("is ready with a chosen microphone and leaves WebKit to its permission prompt", () => {
-    expect(deriveNativeMicrophoneReady({ mode: "native", selected: true, microphoneReady: true, defaultAvailable: false })).toBe(true);
-    expect(deriveNativeMicrophoneReady({ mode: "native", selected: true, microphoneReady: false, defaultAvailable: true })).toBe(false);
-    expect(deriveNativeMicrophoneReady({ mode: "webkit", selected: false, microphoneReady: false, defaultAvailable: false })).toBeNull();
+    expect(deriveNativeMicrophoneReady({ mode: "native", selected: true, lost: false, microphoneReady: true, defaultAvailable: false })).toBe(true);
+    expect(deriveNativeMicrophoneReady({ mode: "native", selected: true, lost: false, microphoneReady: false, defaultAvailable: true })).toBe(false);
+    expect(deriveNativeMicrophoneReady({ mode: "webkit", selected: false, lost: true, microphoneReady: false, defaultAvailable: false })).toBeNull();
   });
 });

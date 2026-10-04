@@ -338,7 +338,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       const state = useStore.getState();
       if (state.captureBackendMode === "native" &&
           state.nativeCaptureSource?.selectionToken === nativeAttempt.selectionToken) {
-        state.setNativeCaptureSource?.(null);
+        state.loseNativeCaptureSource?.();
       }
     };
 

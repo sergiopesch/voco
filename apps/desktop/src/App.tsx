@@ -173,9 +173,11 @@ export function App() {
   const availableDevices = useStore((state) => state.availableDevices);
   const microphonePermission = useStore((state) => state.microphonePermission);
   const microphoneReady = useStore((state) => state.microphoneReady);
+  const nativeCaptureSourceLost = useStore((state) => state.nativeCaptureSourceLost);
   const nativeMicrophoneReady = deriveNativeMicrophoneReady({
     mode: nativeMicrophone.mode,
     selected: Boolean(nativeMicrophone.selected),
+    lost: nativeCaptureSourceLost,
     microphoneReady,
     defaultAvailable: Boolean(defaultNativeSource(nativeMicrophone.sources)),
   });
