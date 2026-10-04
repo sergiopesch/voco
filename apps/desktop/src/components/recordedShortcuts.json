@@ -12,5 +12,6 @@
   { "event": { "key": "+", "code": "NumpadAdd", "ctrlKey": true }, "shortcut": "Ctrl+NumpadAdd", "accepted": true },
   { "event": { "key": "ß", "code": "Minus", "ctrlKey": true, "altKey": true }, "shortcut": "Ctrl+Alt+SS", "accepted": false },
   { "event": { "key": "*", "code": "BracketRight", "ctrlKey": true, "shiftKey": true }, "shortcut": "Ctrl+Shift+*", "accepted": false },
+  { "event": { "key": "+", "code": "Equal", "ctrlKey": true }, "shortcut": "Ctrl++", "accepted": false },
   { "event": { "key": "@", "code": "KeyQ", "ctrlKey": true, "altGraph": true }, "shortcut": "Ctrl+@", "accepted": false }
 ]

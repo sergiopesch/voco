@@ -104,7 +104,11 @@ function shortcutKey(event: ShortcutKeyEvent): string {
   // Call it on the event: React's getModifierState reads the event through `this`.
   if (!event.getModifierState("AltGraph")) {
     if (/^(?:Key[A-Z]|Digit[0-9])$/.test(code)) return code.slice(-1);
-    if (code.startsWith("Numpad") || US_SHIFTED_CODES[key] === code) return code;
+    if (code.startsWith("Numpad")) return code;
+    // US layouts type these only with Shift. Unshifted, another layout typed it,
+    // and the key's name can bind a different key there: Croatian types "+" on
+    // Equal, but X11 looks Equal up by "=", which Croatian puts on 0.
+    if (event.shiftKey && US_SHIFTED_CODES[key] === code) return code;
   }
   return key.toUpperCase();
 }
