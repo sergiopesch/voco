@@ -147,20 +147,6 @@ jobs:
           VOCO_DELIVERY_EVIDENCE_DIR: ${{ runner.temp }}/voco-application-delivery
         run: bash scripts/test-private-ibus-engine-hosted.sh --application-delivery
 
-      - name: Browser delivery on GNOME Wayland
-        timeout-minutes: 3
-        env:
-          VOCO_DELIVERY_PLATFORM: gnome-wayland
-          VOCO_DELIVERY_EVIDENCE_DIR: ${{ runner.temp }}/voco-browser-delivery-gnome-wayland
-        run: bash scripts/test-private-ibus-engine-hosted.sh --browser-delivery
-
-      - name: Application delivery on GNOME Wayland
-        timeout-minutes: 3
-        env:
-          VOCO_DELIVERY_PLATFORM: gnome-wayland
-          VOCO_DELIVERY_EVIDENCE_DIR: ${{ runner.temp }}/voco-application-delivery-gnome-wayland
-        run: bash scripts/test-private-ibus-engine-hosted.sh --application-delivery
-
       - name: Private headless IBus lifecycle
         run: bash scripts/test-private-ibus-engine-hosted.sh
 
@@ -185,8 +171,6 @@ jobs:
           path: |
             ${{ runner.temp }}/voco-browser-delivery/
             ${{ runner.temp }}/voco-application-delivery/
-            ${{ runner.temp }}/voco-browser-delivery-gnome-wayland/
-            ${{ runner.temp }}/voco-application-delivery-gnome-wayland/
             ${{ runner.temp }}/voco-native-desktop/
             ${{ runner.temp }}/voco-native-wayland/
             ${{ runner.temp }}/voco-dictation-renderer/
@@ -230,7 +214,7 @@ jobs:
             pkg-config libglib2.0-dev libsoup-3.0-dev \
             libjavascriptcoregtk-4.1-dev libwebkit2gtk-4.1-dev \
             libayatana-appindicator3-dev libpulse-dev cmake python3-numpy python3-psutil libsentencepiece0 \
-            pulseaudio pulseaudio-utils bubblewrap g++-13 patch binutils ydotool
+            pulseaudio pulseaudio-utils bubblewrap g++-13 patch binutils
 
       - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # master, 2026-09-12
         with:
@@ -269,13 +253,6 @@ jobs:
       - name: Native capture C callback lifecycle (no audio server)
         run: npm run test:native-capture-callbacks
 
-      - name: Private legacy input lifecycle and resource regression
-        timeout-minutes: 3
-        env:
-          CXX: g++-13
-          VOCO_LEGACY_INPUT_EVIDENCE_DIR: ${{ runner.temp }}/voco-legacy-input
-        run: bash scripts/test-private-ibus-engine-hosted.sh --legacy-ydotool
-
       - name: Native capture source latency and complete audio
         timeout-minutes: 3
         env:
@@ -298,7 +275,6 @@ jobs:
           path: |
             ${{ runner.temp }}/voco-glib-regression/result.json
             ${{ runner.temp }}/voco-native-pulse-latency/
-            ${{ runner.temp }}/voco-legacy-input/
             ${{ runner.temp }}/voco-worker-protocol/*.json
             ${{ runner.temp }}/voco-speech-*.json
           if-no-files-found: ignore
@@ -331,6 +307,7 @@ jobs:
             xvfb xdotool xclip gir1.2-gtk-3.0 gir1.2-webkit2-4.1 gir1.2-atspi-2.0 at-spi2-core \
             weston libweston-13-0 wayland-utils gir1.2-gtk-4.0 gir1.2-webkit-6.0 \
             gnome-shell gnome-shell-extension-appindicator xwayland \
+            gnome-text-editor gnome-terminal nano acl \
             libsentencepiece0 pulseaudio pulseaudio-utils
 
       - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # master, 2026-09-12
@@ -383,6 +360,43 @@ jobs:
           VOCO_NATIVE_EVIDENCE_DIR: ${{ runner.temp }}/voco-application-native
         run: bash scripts/test-private-ibus-engine-hosted.sh --full-application
 
+      # The virtual keyboard delivery steps paste through insertion.rs's ignored
+      # fixture test, built from the same release dependencies.
+      - name: Build the production paste test
+        working-directory: apps/desktop/src-tauri
+        run: |
+          binary=$(cargo test --locked --release --features custom-protocol --lib --no-run --message-format=json \
+            | jq -r 'select(.profile.test == true) | .executable')
+          [[ -x "${binary}" ]]
+          echo "VOCO_FIXTURE_PASTE_BINARY=${binary}" >> "${GITHUB_ENV}"
+
+      # Only the next two steps give their namespace /dev/uinput, and the bridge
+      # outside reads and grabs each VOCO keyboard. Both grants are for the runner
+      # alone; nothing becomes world-writable.
+      - name: Grant the runner VOCO's virtual keyboards
+        run: |
+          sudo modprobe uinput
+          sudo setfacl -m "u:${USER}:rw" /dev/uinput
+          printf 'SUBSYSTEM=="input", KERNEL=="event*", ATTRS{name}=="VOCO virtual keyboard", RUN+="/usr/bin/setfacl -m u:%s:r $devnode"\n' "${USER}" \
+            | sudo tee /etc/udev/rules.d/99-voco-uinput-bridge.rules
+          sudo udevadm control --reload-rules
+
+      - name: Application delivery through the virtual keyboard on GNOME Wayland
+        timeout-minutes: 5
+        env:
+          VOCO_DELIVERY_PLATFORM: gnome-wayland
+          VOCO_UINPUT_BRIDGE: "1"
+          VOCO_DELIVERY_EVIDENCE_DIR: ${{ runner.temp }}/voco-application-delivery-gnome-wayland
+        run: bash scripts/test-private-ibus-engine-hosted.sh --application-delivery
+
+      - name: Browser delivery through the virtual keyboard on GNOME Wayland
+        timeout-minutes: 5
+        env:
+          VOCO_DELIVERY_PLATFORM: gnome-wayland
+          VOCO_UINPUT_BRIDGE: "1"
+          VOCO_DELIVERY_EVIDENCE_DIR: ${{ runner.temp }}/voco-browser-delivery-gnome-wayland
+        run: bash scripts/test-private-ibus-engine-hosted.sh --browser-delivery
+
       - name: Application Wayland lifecycle and model cache readiness
         timeout-minutes: 3
         env:
@@ -410,6 +424,8 @@ jobs:
           path: |
             ${{ runner.temp }}/voco-application-panel/
             ${{ runner.temp }}/voco-application-native/
+            ${{ runner.temp }}/voco-application-delivery-gnome-wayland/
+            ${{ runner.temp }}/voco-browser-delivery-gnome-wayland/
             ${{ runner.temp }}/voco-application-wayland/
             ${{ runner.temp }}/voco-application-browser/
             ${{ runner.temp }}/voco-application-toolbar/

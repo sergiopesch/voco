@@ -470,12 +470,12 @@ try {
             }
             if (name === 'getDesktopPasteStatus') {
               window.calls.push([name,...args]);
-              return {enabled:true,available:false,streamingEnabled:true,detail:'Install ydotool and ydotoold.'};
+              return {enabled:true,available:false,streamingEnabled:true,detail:'Pasting on Wayland requires: wl-copy.'};
             }
             if (name === 'getRuntimeDiagnostics') {
               const base = await previous(name,args);
               return {...base, desktopInput:{available:true,detail:'Input helpers are ready.'},
-                desktopPaste:{enabled:true,available:false,detail:'Install ydotool and ydotoold.'},
+                desktopPaste:{enabled:true,available:false,detail:'Pasting on Wayland requires: wl-copy.'},
                 ibusShortcut:{...base.ibusShortcut,setupState:'not-installed',available:false}};
             }
             return previous(name,args);
@@ -535,7 +535,7 @@ try {
         await noOutput();
         results.push({case:scenario+'-cancels-pending-microphone-setup',passed:true});
       }
-      for (const problem of ['missing-helper', 'stopped-daemon', 'probe-failed', 'probe-timeout']) {
+      for (const problem of ['missing-helper', 'no-uinput-access', 'probe-failed', 'probe-timeout']) {
         await loadTest();
         await page.evaluate(problem => {
           const previous = window.nativeCall;
@@ -549,8 +549,8 @@ try {
               if (problem === 'probe-failed') throw new Error('Input check unavailable');
               if (problem === 'probe-timeout') return new Promise(()=>{});
               return {available:false,detail:problem === 'missing-helper'
-                ? 'Install ydotool and ydotoold, then retry setup.'
-                : 'Start the ydotoold desktop input service before dictating.'};
+                ? 'Pasting on Wayland requires: wl-copy.'
+                : "VOCO can't open /dev/uinput, so it can't send the paste keys. Sign out and back in once after installing VOCO; if that doesn't help, see Platform support: Access to /dev/uinput."};
             }
             return previous(name,args);
           };
@@ -695,7 +695,7 @@ try {
       await page.evaluate(()=>window.store.getState().setSurface('hidden'));
       // Use the app's actual registered global-shortcut event.
       await page.evaluate(()=>window.listeners['voco:toggle-dictation']?.({payload:null}));
-      await page.waitForFunction(()=>window.calls.some(c=>c[0]==='showNotification'&&c[1]==='Dictation setup incomplete'&&c[2]==='Install ydotool and ydotoold.'));
+      await page.waitForFunction(()=>window.calls.some(c=>c[0]==='showNotification'&&c[1]==='Dictation setup incomplete'&&c[2]==='Pasting on Wayland requires: wl-copy.'));
       assert.equal(await page.evaluate(()=>window.nativeCommands.some(c=>c.name==='native_capture_begin')),false);
       assert.equal(await page.evaluate(()=>window.store.getState().surface),'hidden');
       results.push({case:'missing-input-helper-notifies-without-capture-or-focus-steal',passed:true});
