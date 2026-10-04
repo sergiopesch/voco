@@ -18,6 +18,15 @@ mod linux {
     #[derive(Debug)]
     pub struct SingleInstanceGuard {
         _lock_file: File,
+        directory: PathBuf,
+    }
+
+    impl SingleInstanceGuard {
+        /// The runtime directory whose lock this process holds; no other VOCO
+        /// uses it until this one exits.
+        pub fn directory(&self) -> &Path {
+            &self.directory
+        }
     }
 
     impl Drop for SingleInstanceGuard {
@@ -278,6 +287,10 @@ mod linux {
 
         Ok(SingleInstanceGuard {
             _lock_file: lock_file,
+            directory: lock_path
+                .parent()
+                .map(Path::to_path_buf)
+                .unwrap_or_default(),
         })
     }
 
@@ -402,7 +415,7 @@ mod linux {
 }
 
 #[cfg(target_os = "linux")]
-pub use linux::{acquire, runtime_directory, SingleInstanceError};
+pub use linux::{acquire, SingleInstanceError};
 
 #[cfg(not(target_os = "linux"))]
 #[derive(Debug)]

@@ -11,6 +11,24 @@ pub struct TrayIcons(PathBuf);
 
 pub const METER_FRAMES: usize = 64;
 
+const PROCESSING: &[u8] = include_bytes!("../../public/tray/processing.png");
+/// A badge for every visual state but listening, which the meter frames show.
+/// Status belongs to the badge; the microphone stays silver in every state.
+const STATE_ICONS: [(&str, &[u8]); 3] = [
+    (
+        "not-ready",
+        include_bytes!("../../public/tray/not-ready.png"),
+    ),
+    ("ready", include_bytes!("../../public/tray/ready.png")),
+    ("processing", PROCESSING),
+];
+
+/// The image the tray library writes for itself before VOCO selects a state icon.
+pub fn startup_icon() -> image::ImageResult<image::RgbaImage> {
+    image::load_from_memory_with_format(PROCESSING, image::ImageFormat::Png)
+        .map(|icon| icon.to_rgba8())
+}
+
 /// Fast attack and a short release smooth measured volume without inventing activity.
 #[derive(Default)]
 pub struct MeterEnvelope(f64);
@@ -70,31 +88,27 @@ fn meter_rgba(frame: usize) -> Vec<u8> {
 }
 
 impl TrayIcons {
-    pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
-        let root = crate::single_instance::runtime_directory()?;
+    /// Runs once, in the runtime directory whose single-instance lock this
+    /// process holds. Managed state is never dropped, so every earlier VOCO
+    /// left its icons there, and none of them can still be advertised.
+    pub fn new(root: &Path) -> Result<Self, Box<dyn std::error::Error>> {
+        if let Ok(entries) = fs::read_dir(root) {
+            for entry in entries.flatten() {
+                // Best effort: a directory that stays only moves this launch to
+                // the next name.
+                if entry.file_name().to_string_lossy().starts_with("tray-")
+                    && entry.file_type().is_ok_and(|kind| kind.is_dir())
+                {
+                    let _ = fs::remove_dir_all(entry.path());
+                }
+            }
+        }
         for sequence in 0..100 {
             let path = root.join(format!("tray-{}-{sequence}", std::process::id()));
             match fs::DirBuilder::new().mode(0o700).create(&path) {
                 Ok(()) => {
                     let icons = Self(path);
-                    for (name, bytes) in [
-                        (
-                            "not-ready",
-                            include_bytes!("../../public/tray/not-ready.png").as_slice(),
-                        ),
-                        (
-                            "ready",
-                            include_bytes!("../../public/tray/ready.png").as_slice(),
-                        ),
-                        (
-                            "recording",
-                            include_bytes!("../../public/tray/recording.png").as_slice(),
-                        ),
-                        (
-                            "processing",
-                            include_bytes!("../../public/tray/processing.png").as_slice(),
-                        ),
-                    ] {
+                    for (name, bytes) in STATE_ICONS {
                         fs::OpenOptions::new()
                             .write(true)
                             .create_new(true)
@@ -135,6 +149,7 @@ impl TrayIcons {
     }
 }
 
+// Runs only when startup fails; the next launch removes what an exit leaves.
 impl Drop for TrayIcons {
     fn drop(&mut self) {
         let _ = fs::remove_dir_all(&self.0);
@@ -159,6 +174,89 @@ mod tests {
         assert_eq!(meter.step(0.0, 0.033, true), 0);
         assert_eq!(meter.step(f64::NAN, 1.0, false), 0);
         assert_eq!(meter.step(4.0, 0.0, false), 63);
+    }
+
+    #[test]
+    fn tray_assets_are_square_and_keep_the_microphone_stable() {
+        // Panels scale the 32 px badges down; every state must stay apart.
+        for size in [16, 24, 32] {
+            let icons: Vec<_> = STATE_ICONS
+                .iter()
+                .map(|(_, bytes)| {
+                    let icon = image::load_from_memory_with_format(bytes, image::ImageFormat::Png)
+                        .expect("generated tray icon should decode");
+                    assert_eq!((icon.width(), icon.height()), (32, 32));
+                    icon.resize(size, size, image::imageops::FilterType::Lanczos3)
+                        .to_rgba8()
+                        .into_raw()
+                })
+                .collect();
+            for (index, pixels) in icons.iter().enumerate() {
+                assert_eq!(pixels.len(), (size * size * 4) as usize);
+                assert!(pixels.chunks_exact(4).any(|pixel| pixel[3] == 0));
+                assert!(pixels.chunks_exact(4).any(|pixel| pixel[3] == 255));
+                for prior in &icons[..index] {
+                    assert_ne!(
+                        pixels, prior,
+                        "Every tray state must remain visually distinct"
+                    );
+                    assert!(
+                        pixels
+                            .chunks_exact(4)
+                            .zip(prior.chunks_exact(4))
+                            .any(|(pixel, other)| pixel[3] != other[3]),
+                        "State outlines must differ independently of color"
+                    );
+                }
+                // Lanczos resampling spreads the lower-right badge boundary.
+                // Compare the upper microphone, safely outside that filter support.
+                assert_eq!(
+                    &pixels[..(size * (size * 2 / 5) * 4) as usize],
+                    &icons[0][..(size * (size * 2 / 5) * 4) as usize]
+                );
+            }
+        }
+        let startup = startup_icon().expect("generated tray icon should decode");
+        assert_eq!(startup.dimensions(), (32, 32));
+    }
+
+    #[test]
+    fn startup_replaces_earlier_icons_and_keeps_their_neighbours() {
+        use std::os::unix::fs::{symlink, PermissionsExt};
+        let root = std::env::temp_dir().join(format!(
+            "voco-tray-icons-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::DirBuilder::new().mode(0o700).create(&root).unwrap();
+        let stale = root.join("tray-1-0");
+        fs::create_dir(&stale).unwrap();
+        fs::write(stale.join("ready.png"), b"").unwrap();
+        fs::write(root.join("instance.lock"), b"").unwrap();
+        let outside = root.join("outside");
+        fs::create_dir(&outside).unwrap();
+        symlink(&outside, root.join("tray-2-0")).unwrap();
+
+        let icons = TrayIcons::new(&root).unwrap();
+        assert!(!stale.exists());
+        assert!(root.join("instance.lock").exists());
+        assert!(root.join("tray-2-0").is_symlink() && outside.is_dir());
+        let directory = icons.directory().to_path_buf();
+        let mode = |path: &Path| fs::metadata(path).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode(&directory), 0o700);
+        let files: Vec<_> = fs::read_dir(&directory)
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .collect();
+        assert_eq!(files.len(), STATE_ICONS.len() + METER_FRAMES);
+        assert!(files.iter().all(|file| mode(file) == 0o600));
+        // A failed startup drops the icons together with their directory.
+        drop(icons);
+        assert!(!directory.exists());
+        fs::remove_dir_all(&root).unwrap();
     }
 
     #[test]

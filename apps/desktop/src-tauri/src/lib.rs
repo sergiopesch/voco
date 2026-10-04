@@ -1975,6 +1975,11 @@ pub fn run() -> Result<(), String> {
     }
     native_capture_commands::initialize();
 
+    // Written before Tauri starts, in the directory this process has locked, so
+    // a full or unwritable one takes the ordinary startup-failure path.
+    let tray_icons = tray_icons::TrayIcons::new(single_instance_guard.directory())
+        .map_err(|error| format!("could not write the tray icons: {error}"))?;
+
     tauri::Builder::default()
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .manage(single_instance_guard)
@@ -2134,9 +2139,9 @@ pub fn run() -> Result<(), String> {
                 ensure_evdev_hotkey_listener(&app_handle);
             }
 
-            if let Err(e) = tray::setup_tray(app, &hotkey) {
-                error!("Failed to setup tray: {e}");
-            }
+            // The renderer, the model thread and the companion all assume the
+            // tray state exists, so a VOCO without it stops here.
+            tray::setup_tray(app, &hotkey, tray_icons)?;
             #[cfg(target_os = "linux")]
             panel::setup(app.handle());
             if let Some((title, notice)) = configured_hotkey.notice {

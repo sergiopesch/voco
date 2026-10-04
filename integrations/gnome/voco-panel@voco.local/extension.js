@@ -136,12 +136,8 @@ export default class VocoPanel extends Extension {
         this._watch = Gio.bus_watch_name(Gio.BusType.SESSION, NAME, Gio.BusNameWatcherFlags.NONE,
             (_connection, _name, owner) => {
                 this._owner = owner;
-                const generation = ++this._generation;
-                this._call('Attach', null, (result) => {
-                    if (generation !== this._generation) return;
-                    this._attached = result.deep_unpack()[0] === true;
-                    if (this._attached) this._beginPolling();
-                });
+                this._generation++;
+                this._attach();
             }, () => { this._owner = null; this._disconnect(); });
     }
 
@@ -161,6 +157,7 @@ export default class VocoPanel extends Extension {
 
     _call(method, parameters, done, failed = () => this._retry()) {
         // Pin calls to the unique owner; an in-flight request cannot hit a replacement app.
+        // A reply from an earlier attachment generation is dropped here, before done.
         const cancellable = this._cancellable;
         const generation = this._generation;
         Gio.DBus.session.call(this._owner, PATH, INTERFACE, method, parameters, null,
@@ -169,6 +166,13 @@ export default class VocoPanel extends Extension {
                 try { done?.(connection.call_finish(result)); }
                 catch (error) { failed(error); }
             });
+    }
+
+    _attach() {
+        this._call('Attach', null, result => {
+            this._attached = result.deep_unpack()[0] === true;
+            if (this._attached) this._beginPolling();
+        });
     }
 
     _beginPolling() {
@@ -183,9 +187,8 @@ export default class VocoPanel extends Extension {
         if (this._polling) { this._refreshQueued = true; return; }
         this._polling = true;
         if (this._timer) { GLib.source_remove(this._timer); this._timer = 0; }
-        const generation = this._generation;
         this._call('GetState', null, result => {
-            if (generation !== this._generation || !this._attached) return;
+            if (!this._attached) return;
             this._polling = false;
             this._state = presentation(JSON.parse(result.deep_unpack()[0]));
             this._syncShortcut();
@@ -328,12 +331,7 @@ export default class VocoPanel extends Extension {
         if (!this._alive || !this._owner) return;
         this._timer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 2000, () => {
             this._timer = 0;
-            const generation = this._generation;
-            this._call('Attach', null, result => {
-                if (generation !== this._generation) return;
-                this._attached = result.deep_unpack()[0] === true;
-                if (this._attached) this._beginPolling();
-            });
+            this._attach();
             return GLib.SOURCE_REMOVE;
         });
     }

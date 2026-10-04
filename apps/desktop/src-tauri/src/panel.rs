@@ -173,8 +173,8 @@ pub fn update_level(app: &tauri::AppHandle, epoch: u64, value: f64) {
     let Ok(state) = state.lock() else {
         return;
     };
-    if state.runtime_epoch != epoch
-        || state.dictation_status != crate::tray::DictationStatus::Recording
+    if state.runtime.epoch != epoch
+        || state.runtime.dictation_status != crate::tray::DictationStatus::Recording
     {
         return;
     }

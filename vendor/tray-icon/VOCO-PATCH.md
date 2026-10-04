@@ -7,7 +7,7 @@ dependency in `apps/desktop/src-tauri/Cargo.toml` and `Cargo.lock`.
 `src/platform_impl/gtk/mod.rs` change.
 
 The additive Linux `set_icon_path` API selects a caller-owned PNG without deleting
-any prior path. VOCO creates four state icons and 64 meter frames in a private
+any prior path. VOCO creates three state icons and 64 meter frames in a private
 per-process directory and retains them for its lifetime. Delayed AppIndicator readers can still
 open any previously advertised filename. No icon cache or unbounded update history
 is introduced; the upstream image API and other platforms are unchanged.

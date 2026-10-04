@@ -91,8 +91,9 @@ takes focus.
 
 Desktop dictation starts only when [desktop input](#check-desktop-input) is
 ready. Otherwise VOCO notifies "Dictation setup incomplete" with the reason, the
-tray tooltip reads "VOCO — Desktop setup needed", and nothing is recorded. The
-[Chromium extension](../../integrations/chromium/README.md) needs none of this.
+tray menu's status line reads "VOCO — Desktop setup needed", and nothing is
+recorded. The [Chromium extension](../../integrations/chromium/README.md) needs
+none of this.
 
 ### Check desktop input
 
