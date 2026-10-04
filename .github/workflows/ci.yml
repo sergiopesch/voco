@@ -431,3 +431,85 @@ jobs:
             ${{ runner.temp }}/voco-application-toolbar/
           if-no-files-found: ignore
           retention-days: 7
+
+  gnome-50:
+    name: GNOME 50 Companion
+    timeout-minutes: 15
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          persist-credentials: false
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            bubblewrap dbus-bin dbus-daemon libglib2.0-bin python3 python3-gi gir1.2-gtk-3.0 \
+            gnome-shell gnome-shell-ubuntu-extensions
+
+      # GNOME 50 has no nested mode; the harness runs Shell headless and sends
+      # keys and clicks through a private RemoteDesktop session.
+      - name: GNOME 50 companion shortcut and lifecycle regression
+        timeout-minutes: 3
+        env:
+          VOCO_NATIVE_DEPS: /usr
+          VOCO_PANEL_EVIDENCE_DIR: ${{ runner.temp }}/voco-panel-gnome50
+        run: bash scripts/test-private-ibus-engine-hosted.sh --gnome-panel
+
+      - name: Retain GNOME 50 companion evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: gnome50-panel-evidence
+          path: ${{ runner.temp }}/voco-panel-gnome50/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  distro-runtime:
+    name: ${{ matrix.name }} Runtime
+    timeout-minutes: 30
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Debian 13
+            image: debian:13@sha256:9cc080028c43b27d2074d63a5f9caf7166d731494965616c1a6d2827a004585c
+            tools: apt-get update && apt-get install -y --no-install-recommends git ca-certificates curl python3 nodejs dpkg
+          - name: Fedora 44
+            image: registry.fedoraproject.org/fedora:44@sha256:7011f51bd8089d345be42d41f0aa3190d258823528852a5e7ec976fe2fd20f53
+            tools: dnf install -y git curl python3 nodejs dpkg
+    container:
+      image: ${{ matrix.image }}
+    steps:
+      - name: Install checkout and provisioning tools
+        run: ${{ matrix.tools }}
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          persist-credentials: false
+
+      # The package's dependencies by this distribution's names: a renamed or
+      # missing package fails here, before a release does.
+      - name: Install VOCO's package dependencies
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          if command -v apt-get >/dev/null; then
+            apt-get install -y --no-install-recommends $(python3 scripts/distro-dependencies.py debian)
+          else
+            dnf install -y $(python3 scripts/distro-dependencies.py fedora)
+          fi
+
+      - name: Provision checksum-pinned Nemotron runtime
+        run: bash scripts/provision-ci-speech.sh
+
+      - name: Speech runtime, IBus and worker protocol on this distribution's Python
+        run: |
+          PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -m unittest discover -s runtime/speech -p "test_*.py"
+          PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 apps/desktop/src-tauri/resources/voco_ibus_protocol_test.py
+          PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 apps/desktop/src-tauri/resources/voco_ibus_engine_test.py
+          /usr/bin/python3 runtime/speech/test_worker_protocol.py --output-dir "$RUNNER_TEMP/voco-worker-protocol"
+
+      - name: Nemotron accuracy and continuity baseline
+        run: node scripts/test-speech-baseline.mjs --report "$RUNNER_TEMP/voco-speech-baseline.json"
