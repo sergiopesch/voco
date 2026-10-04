@@ -60,14 +60,8 @@ done < "$CHECKSUMS"
 echo "Checking file integrity with $file"
 (cd "$dir" && sha256sum -c --strict "$file")
 
-sig=""
-if [[ -f "$dir/$file.asc" ]]; then
-  sig="$dir/$file.asc"
-elif [[ -f "$dir/$file.sig" ]]; then
-  sig="$dir/$file.sig"
-fi
-
-if [[ -z "$sig" ]]; then
+sig="$dir/$file.asc"
+if [[ ! -f "$sig" ]]; then
   echo "Checksums matched. No $file.asc signature; this release is unsigned." >&2
   echo "Integrity is not publisher identity." >&2
   exit 2

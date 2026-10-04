@@ -30,19 +30,12 @@ printf 'sudo\t%s\n' "$*" >> "${MOCK_PACKAGE_LOG:?}"
 exec "$@"
 SH
 
+# The installer never runs dpkg itself; this only records an attempt.
 cat > "${MOCK_BIN}/dpkg" <<'SH'
 #!/usr/bin/env bash
 set -euo pipefail
 printf 'dpkg\t%s\n' "$*" >> "${MOCK_PACKAGE_LOG:?}"
-[[ "${1:-}" == "-i" ]] || exit 64
-if [[ "${MOCK_DPKG_INSTALL_EXIT:-0}" == "0" ]]; then
-  printf 'install ok installed\t%s\t%s\n' \
-    "${MOCK_EXPECTED_VERSION:?}" "${MOCK_EXPECTED_ARCHITECTURE:?}" > "${MOCK_PACKAGE_STATE:?}"
-  exit 0
-fi
-printf 'install ok unpacked\t%s\t%s\n' \
-  "${MOCK_EXPECTED_VERSION:?}" "${MOCK_EXPECTED_ARCHITECTURE:?}" > "${MOCK_PACKAGE_STATE:?}"
-exit "${MOCK_DPKG_INSTALL_EXIT}"
+exit 64
 SH
 
 cat > "${MOCK_BIN}/apt-get" <<'SH'
@@ -94,7 +87,6 @@ export MOCK_EXPECTED_ARCHITECTURE="amd64"
 
 reset_mock_package_case() {
   rm -f -- "${MOCK_PACKAGE_STATE}" "${MOCK_PACKAGE_LOG}"
-  export MOCK_DPKG_INSTALL_EXIT=0
   export MOCK_APT_EXIT=0
   export MOCK_APT_OUTCOME=installed
 }

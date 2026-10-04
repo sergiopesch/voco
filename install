@@ -22,21 +22,17 @@ VOCO_RELEASE_KEY_FINGERPRINT='B33C7C6AAEC8C20433A7A837540796453D8E3865'
 VOCO_RELEASE_KEY_BASE64='mDMEaq1NqxYJKwYBBAHaRw8BAQdAIcImavoX/+NqEo8iX/ETdvQQ7f0mDfyTqCOm0K4LiT+0N1NlcmdpbyBQZXNjaGllcmEgKFZPQ08gcmVsZWFzZXMpIDxzcGVzY2hpZXJhQGdtYWlsLmNvbT6ImQQTFgoAQRYhBLM8fGquyMIEM6eoN1QHlkU9jjhlBQJqrU2rAhsDBQkDwmcABQsJCAcCAiICBhUKCQgLAgQWAgMBAh4HAheAAAoJEFQHlkU9jjhlCIsBAKoU2eWKTm6mdHLtzT2PKcQSUK1AM11FdLlOw1zpVRsHAP9HIYd/NZgSY+EXy/e+tcN9fD9Oqige9hJtQkhMxgYeDA=='
 
 # ─── Colors ─────────────────────────────────────────────
-BOLD='\033[1m'
 DIM='\033[2m'
-GRAPHITE='\033[38;2;122;128;138m'
-GRAPHITE_SOFT='\033[38;2;199;204;212m'
 GREEN='\033[32m'
 YELLOW='\033[33m'
 RED='\033[31m'
-WHITE='\033[37m'
 NC='\033[0m'
 
 VOCO_TERMINAL_MOTION=false
 if [[ -t 1 && "${TERM:-dumb}" != dumb && -z "${NO_COLOR+x}" && "${VOCO_INSTALL_PLAIN:-0}" != 1 && "${BASH_VERSINFO[0]}" -ge 5 ]]; then
   VOCO_TERMINAL_MOTION=true
 else
-  BOLD='' DIM='' GRAPHITE='' GRAPHITE_SOFT='' GREEN='' YELLOW='' RED='' WHITE='' NC=''
+  DIM='' GREEN='' YELLOW='' RED='' NC=''
 fi
 
 ok() {
@@ -227,7 +223,7 @@ voco_ui_configure() {
   local columns="${VOCO_TERMINAL_COLUMNS:-80}" rows="${VOCO_TERMINAL_ROWS:-24}"
   if [[ "${VOCO_INSTALL_PLAIN:-0}" == 1 || ! "$columns" =~ ^[0-9]+$ || "$columns" -lt 64 || ! "$rows" =~ ^[0-9]+$ || "$rows" -lt 12 ]]; then
     VOCO_TERMINAL_MOTION=false
-    BOLD='' DIM='' GRAPHITE='' GRAPHITE_SOFT='' GREEN='' YELLOW='' RED='' WHITE='' NC=''
+    DIM='' GREEN='' YELLOW='' RED='' NC=''
   fi
   if [[ "${VOCO_INSTALL_NO_MOTION:-0}" == 1 ]]; then
     VOCO_UI_NO_MOTION=true
@@ -362,9 +358,9 @@ voco_ui_release() {
 voco_ui_download_observer() {
   trap - EXIT
   trap 'exit 0' TERM INT
-  local destination="$1" initial="$2" start="$3" bytes="$2" now delta rate elapsed tick=0 mark detail shine
+  local destination="$1" start="$2" bytes=0 now delta rate elapsed tick=0 mark detail shine
   local glyphs=(▁ ▂ ▃ ▄ ▅ ▆ ▇ █) value
-  VOCO_UI_LAST_BYTES=$initial
+  VOCO_UI_LAST_BYTES=0
   VOCO_UI_LAST_TIME=${EPOCHREALTIME/./}
   while :; do
     # Sample at 4 Hz; the short entry sweep uses only shell builtins between samples.
@@ -379,7 +375,7 @@ voco_ui_download_observer() {
       elapsed=$((SECONDS-start))
       voco_ui_size "$bytes"; detail="$VOCO_UI_SIZE received"
       if (( elapsed > 0 )); then
-        voco_ui_size "$(((bytes>initial?bytes-initial:0)/elapsed))"; detail+=" · $VOCO_UI_SIZE/s avg"
+        voco_ui_size "$((bytes/elapsed))"; detail+=" · $VOCO_UI_SIZE/s avg"
       fi
       mark=''
       if [[ "$VOCO_UI_NO_MOTION" == true ]]; then mark='↓'; else
@@ -672,12 +668,13 @@ VOCO_INSTALL_LOG=""
 VOCO_KEEP_LOG=false
 voco_download() {
   local label="$1" destination="$2" url="$3"
-  local started=$SECONDS bytes elapsed detail initial_bytes result=0
-  initial_bytes=$(stat -c %s "$destination" 2>/dev/null || printf '0')
+  local started=$SECONDS bytes elapsed detail result=0
   if [[ -z "$VOCO_INSTALL_LOG" ]]; then
     VOCO_INSTALL_LOG=$(mktemp "${TMPDIR:-/tmp}/voco-install.XXXXXX.log")
   fi
   # Suppress wget's per-chunk dot log; retain its response summary and errors.
+  # Keep --continue: without it Fedora's wget2 restarts a failed transfer and
+  # appends the whole file to the partial one.
   wget --no-verbose --continue --tries=3 --waitretry=2 --timeout=30 -O "$destination" "$url" >> "$VOCO_INSTALL_LOG" 2>&1 &
   DOWNLOAD_PID=$!
   if [[ "$VOCO_TERMINAL_MOTION" == true ]]; then
@@ -686,7 +683,7 @@ voco_download() {
     if [[ "$VOCO_TERMINAL_MOTION" == true ]]; then
       # Inherit the log descriptor at fork, including the pre-trap shutdown window.
       {
-        voco_ui_download_observer "$destination" "$initial_bytes" "$started" &
+        voco_ui_download_observer "$destination" "$started" &
         VOCO_UI_PID=$!
       } 2>> "$VOCO_INSTALL_LOG"
     fi

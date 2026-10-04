@@ -23,7 +23,7 @@ for checksums in "$@"; do
   [[ -f "$checksums" ]] || { echo "Missing $checksums" >&2; exit 1; }
   base="$(basename -- "$checksums")"
   case "$base" in
-    *checksums.txt|SHA256SUMS) ;;
+    *checksums.txt) ;;
     *)
       echo "Refusing to sign unexpected filename: $base" >&2
       exit 1

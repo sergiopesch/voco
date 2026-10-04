@@ -278,7 +278,7 @@ VOCO_DOWNLOAD_DIR=$(mktemp -d)
 voco_ui_init
 voco_ui_begin test detail
 printf x > "$VOCO_DOWNLOAD_DIR/data"
-voco_ui_download_observer "$VOCO_DOWNLOAD_DIR/data" 0 "$SECONDS" &
+voco_ui_download_observer "$VOCO_DOWNLOAD_DIR/data" "$SECONDS" &
 VOCO_UI_PID=$!
 sleep .3
 voco_ui_pause

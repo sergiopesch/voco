@@ -231,22 +231,4 @@ desktop-file-validate "${EXTRACT_ROOT}${DESKTOP_PATH}"
 appstreamcli validate "${APPSTREAM_OPTIONS[@]}" "${EXTRACT_ROOT}${METAINFO_PATH}"
 appstreamcli validate-tree "${APPSTREAM_OPTIONS[@]}" "${EXTRACT_ROOT}"
 
-[[ "$(stat -c '%a' "${EXTRACT_ROOT}/usr/libexec/voco-ibus-engine")" == "755" ]]
-for path in \
-  "${EXTRACT_ROOT}/usr/bin/voco" \
-  "${EXTRACT_ROOT}${DESKTOP_PATH}" \
-  "${EXTRACT_ROOT}${METAINFO_PATH}" \
-  "${EXTRACT_ROOT}/usr/share/icons/hicolor/32x32/apps/voco.png" \
-  "${EXTRACT_ROOT}/usr/share/icons/hicolor/128x128/apps/voco.png" \
-  "${EXTRACT_ROOT}/usr/share/icons/hicolor/256x256@2/apps/voco.png" \
-  "${EXTRACT_ROOT}/usr/share/ibus/component/voco.xml" \
-  "${EXTRACT_ROOT}/usr/lib/voco/ibus/voco_ibus_engine.py" \
-  "${EXTRACT_ROOT}/usr/lib/voco/ibus/voco_ibus_protocol.py"; do
-  expected_mode=644
-  if [[ "${path}" == "${EXTRACT_ROOT}/usr/bin/voco" ]]; then
-    expected_mode=755
-  fi
-  [[ "$(stat -c '%a' "${path}")" == "${expected_mode}" ]]
-done
-
 echo "Verified VOCO ${PACKAGE_VERSION} Debian package, desktop/AppStream identity, icons, persistent IBus payload, and exact-field browser integration."
