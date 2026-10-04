@@ -259,3 +259,13 @@ voco_run_apt() {
   fi
   return "$result"
 }
+
+voco_run_dnf() {
+  # DNF keeps its own presentation, prompts included; VOCO only hands it a
+  # clear terminal and says who is asking for the password.
+  voco_ui_release
+  if ! sudo -n -v >/dev/null 2>&1; then
+    dim 'VOCO · Fedora needs your permission to install.'
+  fi
+  sudo dnf install -y -- "$@"
+}

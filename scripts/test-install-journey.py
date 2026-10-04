@@ -3,6 +3,7 @@
 import importlib.util
 import base64
 import hashlib
+import json
 import os
 from pathlib import Path
 import re
@@ -101,17 +102,21 @@ voco_ui_close
             self.assertIn('Final stage', screen)
             self.assertNotIn('Interrupted frame', screen)
 
-    def run_journey(self, mode, signature_case='valid', install_case='ready', launch_case='started'):
+    def run_journey(self, mode, signature_case='valid', install_case='ready', launch_case='started',
+                    manager='apt'):
         source = (ROOT / 'install').read_text()
         prefix, body = source.split('# ─── Header', 1)
         # The signed .54 manifest includes KEYS. Use that small real release asset
         # as the synthetic package to exercise the production signature and hash gate.
-        package_assignment = 'DEB_FILE="${VOCO_DOWNLOAD_DIR}/voco_${VERSION}_amd64.deb"'
+        package_assignment = 'PACKAGE_FILE="${VOCO_DOWNLOAD_DIR}/${PACKAGE_NAME}"'
         self.assertIn(package_assignment, body)
-        body = body.replace(package_assignment, 'DEB_FILE="${VOCO_DOWNLOAD_DIR}/KEYS"', 1)
+        body = body.replace(package_assignment, 'PACKAGE_FILE="${VOCO_DOWNLOAD_DIR}/KEYS"', 1)
         with tempfile.TemporaryDirectory(prefix='voco-journey-') as folder:
             root = Path(folder)
             (root / 'sudo').write_text('#!/bin/bash\n[[ "$1" == -v || "$1" == -n ]] && exit 0\nexec "$@"\n')
+            # Fedora's DNF keeps its own output; the fixture records what it was asked.
+            (root / 'dnf').write_text('#!/bin/bash\nprintf "%s\\n" "$*" > "$FIXTURE_DNF_CALL"\n[[ "$FIXTURE_INSTALL_CASE" == package-failure ]] && exit 1\nprintf "Installing voco (fixture) ...\\n"\n')
+            (root / 'rpm').write_text('#!/bin/bash\nexit 0\n')
             (root / 'apt-get').write_text('#!/bin/bash\nprintf called > "$FIXTURE_APT_CALL"\n[[ "$FIXTURE_INSTALL_CASE" == package-failure ]] && exit 42\nprintf "pmstatus:voco:80:Setting up\\n" >&3\nprintf "Setting up voco (fixture) ...\\n"\nsleep .15\n')
             if mode == 'password':
                 (root / 'sudo').write_text('#!/bin/bash\nif [[ "$1" == -n && "$2" == -v ]]; then exit 1; fi\nif [[ "$1" == -v ]]; then printf "Fixture password: "; read -r answer; [[ "$answer" == fixture ]]; exit $?; fi\n[[ "$1" == -n ]] && exit 0\nexec "$@"\n')
@@ -125,9 +130,9 @@ voco_ui_close
               VOCO_RELEASE_KEY_FINGERPRINT=0000000000000000000000000000000000000000
             fi
             wget() {
-              local target
+              local target url
               while (( $# )); do
-                if [[ "$1" == -O ]]; then target="$2"; shift; fi
+                if [[ "$1" == -O ]]; then target="$2"; shift; else url="$1"; fi
                 shift
               done
               case "$target" in
@@ -146,6 +151,7 @@ voco_ui_close
                   fi
                   ;;
                 *)
+                  printf '%s\n' "$url" > "$FIXTURE_PACKAGE_URL"
                   if [[ "$FIXTURE_SIGNATURE_CASE" == swapped || "$FIXTURE_SIGNATURE_CASE" == checksum-mismatch ]]; then
                     printf replacement > "$target"
                   else
@@ -154,7 +160,9 @@ voco_ui_close
                   ;;
               esac
             }
+            voco_detect_package_manager() { VOCO_PACKAGE_MANAGER="$FIXTURE_MANAGER"; }
             voco_verify_installed_package() { return 0; }
+            voco_verify_installed_rpm() { return 0; }
             # Like the real check, always set the error the installer prints.
             voco_verify_desktop_input() {
               VOCO_INPUT_ERROR="VOCO can't open /dev/uinput, so it can't send the paste keys."
@@ -177,14 +185,27 @@ voco_ui_close
                    'FIXTURE_SIGNATURE_CASE': signature_case, 'FIXTURE_SIGNATURE': str(SIGNED_SIGNATURE),
                    'FIXTURE_INSTALL_CASE': install_case, 'FIXTURE_LAUNCH_CASE': launch_case,
                    'FIXTURE_MANIFEST': str(SIGNED_MANIFEST), 'FIXTURE_PACKAGE': str(ROOT / 'KEYS'),
-                   'FIXTURE_APT_CALL': str(root / 'apt-called'), 'FIXTURE_LAUNCH_CALL': str(root / 'launch-called')}
+                   'FIXTURE_APT_CALL': str(root / 'apt-called'), 'FIXTURE_LAUNCH_CALL': str(root / 'launch-called'),
+                   'FIXTURE_MANAGER': manager, 'FIXTURE_DNF_CALL': str(root / 'dnf-called'),
+                   'FIXTURE_PACKAGE_URL': str(root / 'package-url')}
             env.pop('NO_COLOR', None)
             if mode == 'plain':
                 env['VOCO_INSTALL_PLAIN'] = '1'
             code, raw = fixture.terminal(['bash', '-c', prefix + stubs + '# ─── Header' + body], env, columns=40 if mode == 'narrow' else 80, rows=8 if mode == 'short' else 24, reply={'prompt': (b'Fixture choice [y/N]: ', b'yes\n'), 'password': (b'Fixture password: ', b'fixture\n')}.get(mode))
             expected_code = 1 if signature_case != 'valid' or install_case == 'package-failure' else 2 if install_case == 'readiness-failure' else 0
             self.assertEqual(code, expected_code, raw.decode(errors='replace'))
-            self.assertEqual((root / 'apt-called').exists(), signature_case == 'valid')
+            installer = 'dnf-called' if manager == 'dnf' else 'apt-called'
+            self.assertEqual((root / installer).exists(), signature_case == 'valid')
+            self.assertFalse((root / ('apt-called' if manager == 'dnf' else 'dnf-called')).exists())
+            # Each package manager downloads its own package from this release.
+            version = json.loads((ROOT / 'package.json').read_text())['version']
+            expected_package = (f'voco-{version}-1.x86_64.rpm' if manager == 'dnf'
+                                else f'voco_{version}_amd64.deb')
+            self.assertEqual((root / 'package-url').read_text().strip(),
+                             f'https://github.com/sergiopesch/voco/releases/download/voco.{version}/{expected_package}')
+            if manager == 'dnf' and signature_case == 'valid':
+                call = (root / 'dnf-called').read_text().strip()
+                self.assertTrue(call.startswith('install -y -- /') and call.endswith('/KEYS'), call)
             launched = root / 'launch-called'
             self.assertEqual(launched.read_text() if launched.exists() else '', 'launch\n' if expected_code == 0 else '')
             if signature_case != 'valid':
@@ -194,6 +215,9 @@ voco_ui_close
                 self.assertNotIn('Opening VOCO', raw.decode(errors='replace'))
                 if install_case == 'readiness-failure':
                     self.assertIn("can't open /dev/uinput", raw.decode(errors='replace'))
+                if install_case == 'package-failure':
+                    self.assertIn('DNF could not install' if manager == 'dnf' else 'APT could not install',
+                                  raw.decode(errors='replace'))
                 return
             screen = visible_terminal(raw, width=40 if mode == 'narrow' else 80)
             if directory := os.environ.get('VOCO_JOURNEY_EVIDENCE_DIR'):
@@ -262,6 +286,17 @@ voco_ui_close
         for signature_case in ('swapped', 'missing', 'invalid', 'wrong-fingerprint', 'checksum-mismatch'):
             with self.subTest(signature_case=signature_case):
                 self.run_journey('plain', signature_case)
+
+    def test_fedora_journey_installs_the_rpm_with_dnf(self):
+        for mode in ('animated', 'plain', 'narrow'):
+            with self.subTest(mode=mode):
+                self.run_journey(mode, manager='dnf')
+        for case in ('package-failure', 'readiness-failure'):
+            with self.subTest(case=case):
+                self.run_journey('plain', install_case=case, manager='dnf')
+        for signature_case in ('swapped', 'wrong-fingerprint', 'checksum-mismatch'):
+            with self.subTest(signature_case=signature_case):
+                self.run_journey('plain', signature_case, manager='dnf')
 
     def test_complete_journey_has_one_final_canvas(self):
         for mode in ('animated', 'no-motion', 'password', 'prompt', 'plain', 'narrow', 'short'):
