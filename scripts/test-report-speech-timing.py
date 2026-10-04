@@ -55,13 +55,15 @@ class ReportTests(unittest.TestCase):
 
     def test_explicit_failure_events_remain_counted(self):
         rows = [{'event':'speech_exchange', 'outcome':'response_timeout'},
+                {'event':'speech_exchange', 'outcome':'output_eof'},
+                {'event':'speech_exchange', 'outcome':'worker_eof'},
                 {'event':'speech_queue_failed', 'reason':'insertion_failed'},
                 {'event':'speech_quality', 'stage':'delivery_failed'},
                 {'event':'speech_quality', 'stage':'terminal', 'outcome':'failed'},
                 {'event':'speech_quality', 'stage':'native_dispatch', 'outcome':'rejected'}]
         report = self.report({}, backend=rows)
-        self.assertEqual(report['app_failures'], {'response_timeout':1, 'insertion_failed':1,
-                         'delivery_failed':1, 'terminal_failed':1, 'native_rejected':1})
+        self.assertEqual(report['app_failures'], {'response_timeout':1, 'output_eof':1, 'worker_eof':1,
+                         'insertion_failed':1, 'delivery_failed':1, 'terminal_failed':1, 'native_rejected':1})
         self.assertEqual(report['app_unclassified_records'], 0)
 
     def test_cancelled_and_uncertain_are_outcomes_not_assumed_failures(self):
