@@ -336,8 +336,9 @@ pub fn setup_tray(app: &tauri::App, hotkey_label: &str) -> Result<(), Box<dyn st
         .item(&quit)
         .build()?;
 
-    let icon_rgba = create_mic_icon(32, TrayVisualState::Processing);
-    let icon = tauri::image::Image::new_owned(icon_rgba, 32, 32);
+    let startup = crate::tray_icons::startup_icon()?;
+    let (width, height) = startup.dimensions();
+    let icon = tauri::image::Image::new_owned(startup.into_raw(), width, height);
 
     let icons = crate::tray_icons::TrayIcons::new()?;
     let tray = TrayIconBuilder::new()
@@ -490,10 +491,12 @@ fn apply_tray_state(app: &tauri::AppHandle, tray_state: &mut TrayState) {
 
     if let Some(tray) = app.tray_by_id(&tray_state.tray_id) {
         if tray_state.applied_visual != Some(state) {
-            let path = if tray_state.runtime.dictation_status == DictationStatus::Recording {
-                tray_state.icons.meter_path(0)
-            } else {
-                tray_state.icons.path(tray_state_label(state))
+            // Listening shows the meter, from silence until its first tick.
+            let path = match state {
+                TrayVisualState::Recording => tray_state.icons.meter_path(0),
+                TrayVisualState::NotReady
+                | TrayVisualState::Ready
+                | TrayVisualState::Processing => tray_state.icons.path(tray_state_label(state)),
             };
             match tray.with_inner_tray_icon(move |inner| {
                 inner.set_icon_path(path).map_err(|error| error.to_string())
@@ -700,32 +703,6 @@ pub fn update_model_download_status(app: &tauri::AppHandle, status: ModelDownloa
     tray_state.runtime.model_download_status = status;
     drop(tray_state);
     refresh_tray(app);
-}
-
-fn create_mic_icon(size: u32, state: TrayVisualState) -> Vec<u8> {
-    // The frontend legend and native tray use the same optical-size assets.
-    // Status belongs to the badge; the microphone stays silver in every state.
-    let icon_bytes = match state {
-        TrayVisualState::NotReady => include_bytes!("../../public/tray/not-ready.png").as_slice(),
-        TrayVisualState::Ready => include_bytes!("../../public/tray/ready.png").as_slice(),
-        TrayVisualState::Recording => include_bytes!("../../public/tray/recording.png").as_slice(),
-        TrayVisualState::Processing => {
-            include_bytes!("../../public/tray/processing.png").as_slice()
-        }
-    };
-
-    let fitted = image::load_from_memory_with_format(icon_bytes, image::ImageFormat::Png)
-        .expect("generated tray icon should decode")
-        .resize(size, size, image::imageops::FilterType::Lanczos3)
-        .to_rgba8();
-    let mut canvas = image::RgbaImage::new(size, size);
-    image::imageops::overlay(
-        &mut canvas,
-        &fitted,
-        i64::from((size - fitted.width()) / 2),
-        i64::from((size - fitted.height()) / 2),
-    );
-    canvas.into_raw()
 }
 
 /// Only presentation state crosses the panel bus: never transcript or audio.
@@ -960,46 +937,6 @@ mod tests {
         ] {
             assert_eq!(panel_accelerator(true, hotkey), accelerator, "{hotkey}");
             assert_eq!(panel_accelerator(false, hotkey), None, "{hotkey}");
-        }
-    }
-
-    #[test]
-    fn tray_assets_are_square_and_keep_the_microphone_stable() {
-        let states = [
-            TrayVisualState::NotReady,
-            TrayVisualState::Ready,
-            TrayVisualState::Recording,
-            TrayVisualState::Processing,
-        ];
-        for size in [16, 24, 32] {
-            let icons: Vec<_> = states
-                .iter()
-                .map(|state| create_mic_icon(size, *state))
-                .collect();
-            for (index, pixels) in icons.iter().enumerate() {
-                assert_eq!(pixels.len(), (size * size * 4) as usize);
-                assert!(pixels.chunks_exact(4).any(|pixel| pixel[3] == 0));
-                assert!(pixels.chunks_exact(4).any(|pixel| pixel[3] == 255));
-                for prior in &icons[..index] {
-                    assert_ne!(
-                        pixels, prior,
-                        "Every tray state must remain visually distinct"
-                    );
-                    assert!(
-                        pixels
-                            .chunks_exact(4)
-                            .zip(prior.chunks_exact(4))
-                            .any(|(pixel, other)| pixel[3] != other[3]),
-                        "State outlines must differ independently of color"
-                    );
-                }
-                // Lanczos resampling spreads the lower-right badge boundary.
-                // Compare the upper microphone, safely outside that filter support.
-                assert_eq!(
-                    &pixels[..(size * (size * 2 / 5) * 4) as usize],
-                    &icons[0][..(size * (size * 2 / 5) * 4) as usize]
-                );
-            }
         }
     }
 

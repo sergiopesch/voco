@@ -126,9 +126,7 @@ shape and colour both change, or as live level bars, and text always says it too
 the microphone with a badge at its lower right: `ready.png` has a green check in a
 shield, `processing.png` an amber hourglass in a diamond and `not-ready.png` an
 amber exclamation mark in a triangle. While VOCO listens, the icon is five silver
-level bars instead, redrawn every 90 ms from 64 frames the app draws at launch. The
-script also draws `recording.png`, a red dot in a circle, which the app never
-shows because the bars take its place.
+level bars instead, redrawn every 90 ms from 64 frames the app draws at launch.
 
 | Status line, after "VOCO — " | Icon | Label |
 | --- | --- | --- |

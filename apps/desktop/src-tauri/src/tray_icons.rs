@@ -11,6 +11,24 @@ pub struct TrayIcons(PathBuf);
 
 pub const METER_FRAMES: usize = 64;
 
+const PROCESSING: &[u8] = include_bytes!("../../public/tray/processing.png");
+/// A badge for every visual state but listening, which the meter frames show.
+/// Status belongs to the badge; the microphone stays silver in every state.
+const STATE_ICONS: [(&str, &[u8]); 3] = [
+    (
+        "not-ready",
+        include_bytes!("../../public/tray/not-ready.png"),
+    ),
+    ("ready", include_bytes!("../../public/tray/ready.png")),
+    ("processing", PROCESSING),
+];
+
+/// The image the tray library writes for itself before VOCO selects a state icon.
+pub fn startup_icon() -> image::ImageResult<image::RgbaImage> {
+    image::load_from_memory_with_format(PROCESSING, image::ImageFormat::Png)
+        .map(|icon| icon.to_rgba8())
+}
+
 /// Fast attack and a short release smooth measured volume without inventing activity.
 #[derive(Default)]
 pub struct MeterEnvelope(f64);
@@ -77,24 +95,7 @@ impl TrayIcons {
             match fs::DirBuilder::new().mode(0o700).create(&path) {
                 Ok(()) => {
                     let icons = Self(path);
-                    for (name, bytes) in [
-                        (
-                            "not-ready",
-                            include_bytes!("../../public/tray/not-ready.png").as_slice(),
-                        ),
-                        (
-                            "ready",
-                            include_bytes!("../../public/tray/ready.png").as_slice(),
-                        ),
-                        (
-                            "recording",
-                            include_bytes!("../../public/tray/recording.png").as_slice(),
-                        ),
-                        (
-                            "processing",
-                            include_bytes!("../../public/tray/processing.png").as_slice(),
-                        ),
-                    ] {
+                    for (name, bytes) in STATE_ICONS {
                         fs::OpenOptions::new()
                             .write(true)
                             .create_new(true)
@@ -159,6 +160,50 @@ mod tests {
         assert_eq!(meter.step(0.0, 0.033, true), 0);
         assert_eq!(meter.step(f64::NAN, 1.0, false), 0);
         assert_eq!(meter.step(4.0, 0.0, false), 63);
+    }
+
+    #[test]
+    fn tray_assets_are_square_and_keep_the_microphone_stable() {
+        // Panels scale the 32 px badges down; every state must stay apart.
+        for size in [16, 24, 32] {
+            let icons: Vec<_> = STATE_ICONS
+                .iter()
+                .map(|(_, bytes)| {
+                    let icon = image::load_from_memory_with_format(bytes, image::ImageFormat::Png)
+                        .expect("generated tray icon should decode");
+                    assert_eq!((icon.width(), icon.height()), (32, 32));
+                    icon.resize(size, size, image::imageops::FilterType::Lanczos3)
+                        .to_rgba8()
+                        .into_raw()
+                })
+                .collect();
+            for (index, pixels) in icons.iter().enumerate() {
+                assert_eq!(pixels.len(), (size * size * 4) as usize);
+                assert!(pixels.chunks_exact(4).any(|pixel| pixel[3] == 0));
+                assert!(pixels.chunks_exact(4).any(|pixel| pixel[3] == 255));
+                for prior in &icons[..index] {
+                    assert_ne!(
+                        pixels, prior,
+                        "Every tray state must remain visually distinct"
+                    );
+                    assert!(
+                        pixels
+                            .chunks_exact(4)
+                            .zip(prior.chunks_exact(4))
+                            .any(|(pixel, other)| pixel[3] != other[3]),
+                        "State outlines must differ independently of color"
+                    );
+                }
+                // Lanczos resampling spreads the lower-right badge boundary.
+                // Compare the upper microphone, safely outside that filter support.
+                assert_eq!(
+                    &pixels[..(size * (size * 2 / 5) * 4) as usize],
+                    &icons[0][..(size * (size * 2 / 5) * 4) as usize]
+                );
+            }
+        }
+        let startup = startup_icon().expect("generated tray icon should decode");
+        assert_eq!(startup.dimensions(), (32, 32));
     }
 
     #[test]
