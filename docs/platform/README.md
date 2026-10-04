@@ -50,7 +50,7 @@ describes the suites.
 | --- | --- |
 | Processor | x86-64 with AVX2, FMA and F16C. VOCO doesn't check for them, and recognition can't run without them. |
 | System | One of the [supported systems](#supported-systems). The Debian package needs `libc6 (>= 2.39)` and `libstdc++6 (>= 13.2.0)`, and the RPM `glibc >= 2.39` and `libstdc++ >= 13.2`. |
-| Audio | PulseAudio, or PipeWire with its PulseAudio service. |
+| Audio | On Wayland, PipeWire with its PulseAudio service (`pipewire-pulse`). VOCO names each microphone by PipeWire's object serial, which PulseAudio itself doesn't provide. On X11, either. |
 | Session | Wayland or X11. GNOME 50 has no X11 session, so on Ubuntu 26.04 and Fedora 44 VOCO runs on Wayland. |
 | Wayland paste | Read and write access to `/dev/uinput`, which the package gives the user of the active local session. |
 

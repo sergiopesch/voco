@@ -86,7 +86,7 @@ Suites that type through VOCO's virtual keyboard also need the
 | `--gnome-panel` | `test-gnome-panel.sh` | GNOME Shell with the [companion](../../integrations/gnome/README.md#files-and-tests) and synthetic app status; with `VOCO_PANEL_APP_BINARY`, the app's tray bridge |
 | `--native-desktop` | `test-native-desktop.sh` | Real GTK and WebKit widgets with private X11, D-Bus and IBus |
 | `--native-wayland` | `test-native-wayland.sh` | Real Wayland surfaces in headless Weston; with `VOCO_WAYLAND_APP_BINARY`, the app starting, opening and quitting from its tray |
-| `--native-pulse-latency` | `test-native-capture-pulse-latency.py` | VOCO's C capture from a private PulseAudio: a short clip, a long clip, and a starved run that must fail with `capture-duration-deficit` |
+| `--native-pulse-latency` | `test-native-capture-pulse-latency.py` | VOCO's C capture from a private PulseAudio whose fixture source carries the `object.serial` PipeWire would set: a short clip, a long clip, and a starved run that must fail with `capture-duration-deficit` |
 | `--application-delivery`, `--browser-delivery` | `test-application-delivery.sh` | Paste into desktop programs and into Chromium, below |
 | `--full-application` | `test-native-desktop.sh` with `VOCO_NATIVE_APP_BINARY` | The app capturing a clip from a private PulseAudio and pasting into GTK fields |
 | `--browser-application`, `--browser-toolbar` | `test-browser-full-app.sh`, `test-browser-toolbar-app.sh` | The app, extension and host dictating into an exact Chromium field, started with Alt+Shift+V or the toolbar button |
