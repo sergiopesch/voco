@@ -155,7 +155,10 @@ voco_ui_close
               esac
             }
             voco_verify_installed_package() { return 0; }
-            voco_verify_desktop_input() { [[ "$FIXTURE_INSTALL_CASE" != readiness-failure ]]; }
+            voco_verify_desktop_input() {
+              VOCO_INPUT_ERROR='Sign out and back in once after installing VOCO.'
+              [[ "$FIXTURE_INSTALL_CASE" != readiness-failure ]]
+            }
             fixture_panel() { printf 'Panel enabled. Sign out and back in to load it; saving your work first is recommended.\n'; return 1; }
             voco_launch_installed_app() {
               printf 'launch\n' >> "$FIXTURE_LAUNCH_CALL"
