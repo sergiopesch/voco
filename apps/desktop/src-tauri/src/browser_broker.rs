@@ -70,7 +70,7 @@ struct Pending {
     sequence: u64,
     expected: usize,
     appended: usize,
-    receipt: Option<(String, usize)>,
+    receipt: Option<String>,
 }
 #[derive(Default)]
 struct State {
@@ -356,7 +356,7 @@ impl BrowserBroker {
         }
         let deadline = Instant::now() + RECEIPT_TIMEOUT;
         loop {
-            if let Some((outcome, count)) = state.pending.as_ref().and_then(|p| p.receipt.clone()) {
+            if let Some(outcome) = state.pending.as_ref().and_then(|p| p.receipt.clone()) {
                 state.pending = None;
                 let session = state
                     .session
@@ -365,17 +365,13 @@ impl BrowserBroker {
                     .ok_or("Browser session changed.")?;
                 if outcome == "applied" {
                     // The receipt proves this exact mutation even if a subsequent
-                    // focus invalidation arrived before this waiter woke.
+                    // focus invalidation arrived before this waiter woke. receive()
+                    // accepted it only with the exact new committed count.
                     session.uncertain = false;
                     session.committed.push_str(text);
                     session.sequence = sequence;
                     session.claimed = true;
                     session.finalized = finalize;
-                    if count != session.committed.chars().count() {
-                        session.valid = false;
-                        session.uncertain = true;
-                        return Err("Browser receipt count mismatch.".into());
-                    }
                     return Ok(status(&state));
                 }
                 session.valid = false;
@@ -738,7 +734,7 @@ fn receive(
             if !valid_count {
                 return Err(());
             }
-            p.receipt = Some((outcome, committed_characters));
+            p.receipt = Some(outcome);
             Ok(None)
         }
         _ => Err(()),
