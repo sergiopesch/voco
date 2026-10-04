@@ -8,6 +8,7 @@ import numpy as np
 ROOT=Path(__file__).resolve().parent
 class Nemotron:
     def __init__(self,context=1):
+        self.stream=None
         backend=os.environ.get('VOCO_NEMO_BACKEND','pool')
         if backend != 'pool':raise ValueError('unsupported backend')
         self.lib=c.CDLL(str(ROOT/'libbench_nemo_pool.so')); lib=self.lib
@@ -30,17 +31,20 @@ class Nemotron:
             digest=hashlib.file_digest(model_file,'sha256').hexdigest()
         if digest != 'd9a01898d2a611c8764e23a1c2f45e70bbd5a425dc4de93692ac951dd603812d':
             raise ValueError('Model integrity mismatch')
+        self.sha256=digest
         self.recognizer=create(str(model_path).encode(),context)
         if not self.recognizer: raise RuntimeError(self.error())
-    def close(self):
-        if getattr(self, 'stream', None):
+    def release_stream(self):
+        if self.stream:
             self.close_stream(self.stream); self.stream=None
+    def close(self):
+        self.release_stream()
         if self.recognizer:
             self.destroy_recognizer(self.recognizer); self.recognizer=None
     def check(self,code):
         if code: raise RuntimeError(self.error())
     def start(self):
-        if getattr(self,"stream",None):self.close_stream(self.stream)
+        self.release_stream()
         self.stream=self.open(self.recognizer); self.done='';self.last=''
         if not self.stream:raise RuntimeError(self.error())
     def drain(self):
@@ -62,4 +66,4 @@ class Nemotron:
         self.metrics={'recognizer_push_ms':(pushed-started)*1000,'result_drain_ms':(time.monotonic()-pushed)*1000}
         return result
     def finish(self):
-        self.check(self.finish_f(self.stream));self.drain();self.close_stream(self.stream);self.stream=None;return self.last
+        self.check(self.finish_f(self.stream));self.drain();self.release_stream();return self.last

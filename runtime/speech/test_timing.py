@@ -5,8 +5,9 @@ import numpy as np
 import streaming
 
 class Model:
-    def __init__(self, *_): self.frames=[];self.metrics={}
+    def __init__(self, *_): self.frames=[];self.metrics={};self.released=0
     def start(self): self.frames=[]
+    def release_stream(self): self.released+=1
     def push(self,audio,rate):
         self.frames.append(audio.copy());self.metrics={'recognizer_push_ms':2.,'result_drain_ms':.25}
         return 'fixture'
@@ -33,6 +34,11 @@ class TimingTests(unittest.TestCase):
         self.assertEqual(self.session.metrics['recognizer_push_ms'],2)
         self.assertEqual(self.session.metrics['result_drain_ms'],.25)
         self.assertAlmostEqual(self.session.first_nonzero_audio_s,.1+100/16000)
+    def test_cancel_releases_the_stream_and_clears_metrics(self):
+        self.session.push(np.ones(320),16000);self.assertTrue(self.session.metrics)
+        self.session.cancel()
+        self.assertFalse(self.session.active);self.assertEqual(self.session.metrics,{})
+        self.assertEqual(self.session.model.released,1)
     def test_new_session_clears_onset(self):
         self.session.push(np.ones(320),16000);self.session.finish();self.session.start()
         self.assertIsNone(self.session.first_nonzero_audio_s)

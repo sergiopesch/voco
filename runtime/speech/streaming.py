@@ -86,8 +86,8 @@ class StreamingSession:
             self.warmup_ms = (time.monotonic()-started)*1000
     def start(self):
         self.model.start(); self.gate = SilenceGate(self.mode)
-        self.rate = None; self.audio_s = 0.; self.last = ''; self.active = True
-        self.metrics = {}; self.chunks = 0; self.first_nonzero_audio_s = None
+        self.rate = None; self.audio_s = 0.; self.active = True
+        self.metrics = {}; self.first_nonzero_audio_s = None
     def push(self, data, rate):
         if not self.active: raise ValueError('inactive session')
         if type(rate) is not int or rate < 8000 or rate > 96000 or (self.rate and self.rate != rate): raise ValueError('sample rate')
@@ -96,7 +96,7 @@ class StreamingSession:
         if self.first_nonzero_audio_s is None:
             nonzero = np.flatnonzero(data)
             if len(nonzero): self.first_nonzero_audio_s = self.audio_s + int(nonzero[0])/rate
-        self.rate = rate; self.audio_s += len(data)/rate; self.chunks += 1
+        self.rate = rate; self.audio_s += len(data)/rate
         started = time.monotonic(); frames = self.gate.push(data, rate)
         gate_ms = (time.monotonic()-started)*1000
         started = time.monotonic(); text = None
@@ -113,19 +113,16 @@ class StreamingSession:
                         'recognizer_push_calls': len(frames),
                         'gate_released_frames': source_frame_count,
                         'first_nonzero_audio_s': self.first_nonzero_audio_s}
-        if text is not None: self.last = text
         return text
     def finish(self):
         if not self.active: raise ValueError('inactive session')
         started = time.monotonic()
         for frame in coalesce_frames(self.gate.finish(self.rate or 16000), self.rate or 16000): self.model.push(frame, self.rate)
-        text = self.model.finish(); self.active = False; self.last = text
+        text = self.model.finish(); self.active = False
         self.metrics = {'asr_ms': (time.monotonic()-started)*1000, 'gate_ms': 0.}
         return text
     def cancel(self):
-        if getattr(self.model, 'stream', None):
-            self.model.close_stream(self.model.stream); self.model.stream = None
-        self.active = False
+        self.model.release_stream(); self.active = False; self.metrics = {}
 
     def close(self):
         self.cancel()

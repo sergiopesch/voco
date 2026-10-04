@@ -38,11 +38,15 @@ def run(output):
                 exchange('start','three',0)
                 check('duplicate sequence rejected','error' in exchange('push','three',0,audio=[0.]*800,rate=16000))
                 check('invalid rate rejected','error' in exchange('push','three',1,audio=[0.]*800,rate=0))
-                exchange('cancel','three',2)
+                check('active cancel','error' not in exchange('cancel','three',2))
                 child.stdin.close();child.wait(timeout=10)
                 check('EOF exits and reaps',child.returncode==0)
                 logs=[json.loads(x) for x in (Path(state)/'voco/stream-performance/worker.jsonl').read_text().splitlines()]
                 check('warmup logged',any(row.get('event')=='worker_ready' and row['warmup_ms']>0 for row in logs))
+                identity=json.loads((ROOT/'MODEL-IDENTITY.json').read_text())
+                check('ready logs the verified model and thread count',any(row.get('event')=='worker_ready'
+                      and row['model_sha256']==identity['model_sha256'] and type(row['cpu_threads']) is int
+                      and 1<=row['cpu_threads']<=16 for row in logs))
                 check('content-free logs',all(not ({'audio','text','transcript','app_name'} & x.keys()) for x in logs))
                 (output/'worker-protocol-metrics.json').write_text(json.dumps(logs,indent=2)+'\n')
             finally:
