@@ -63,7 +63,6 @@ export interface DictationRecordingEnv {
   } | null>;
   desktopPasteSessionRef: Ref<boolean>;
   desktopStreamedSampleCountRef: Ref<number>;
-  desktopPhrasePasteCountRef: Ref<number>;
   activeTriggerIdRef: Ref<string | undefined>;
   recoverySessionIdRef: Ref<string | null>;
   nativeCaptureRef: Ref<NativeCaptureSession | null>;
@@ -128,7 +127,6 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     dictationStreamRef,
     desktopPasteSessionRef,
     desktopStreamedSampleCountRef,
-    desktopPhrasePasteCountRef,
     activeTriggerIdRef,
     recoverySessionIdRef,
     nativeCaptureRef,
@@ -320,7 +318,6 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     void browserDeliveryRef.current?.cancel();
     browserDeliveryRef.current = null;
     desktopStreamedSampleCountRef.current = 0;
-    desktopPhrasePasteCountRef.current = 0;
     cancelledRef.current = null;
     setCancellationPending(false);
     setCanCancel(true);
@@ -535,12 +532,10 @@ export function createDictationRecording(env: DictationRecordingEnv) {
           if (onboardingTest) return;
           const browser = browserDeliveryRef.current;
           if (browser) {
-            desktopPhrasePasteCountRef.current++;
             await browser.append(text);
             return;
           }
           const started = performance.now();
-          desktopPhrasePasteCountRef.current++;
           traceDictationEvent("dictation_desktop_paste_requested").catch(() => {});
           const result = await pasteDesktopText(text, correlation);
           if (result.outcome !== "dispatched") throw new Error("Desktop phrase paste was not dispatched.");

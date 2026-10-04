@@ -102,7 +102,6 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
   const desktopPasteSessionRef = useRef(false);
   const dictationStreamRef = useRef<DictationStream | null>(null);
   const desktopStreamedSampleCountRef = useRef(0);
-  const desktopPhrasePasteCountRef = useRef(0);
   const debugNativeCaptureEnabledRef = useRef(false);
 
   function traceDictationEvent(
@@ -463,7 +462,6 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
       dictationStreamRef,
       desktopPasteSessionRef,
       desktopStreamedSampleCountRef,
-      desktopPhrasePasteCountRef,
       activeTriggerIdRef,
       recoverySessionIdRef,
       nativeCaptureRef,

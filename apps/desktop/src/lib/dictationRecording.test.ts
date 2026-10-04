@@ -71,7 +71,6 @@ function harness() {
     dictationStreamRef: queue,
     desktopPasteSessionRef: pasteSession,
     desktopStreamedSampleCountRef: ref(0),
-    desktopPhrasePasteCountRef: ref(0),
     activeTriggerIdRef: ref<string | undefined>(undefined),
     recoverySessionIdRef: ref<string | null>(null),
     nativeCaptureRef: ref(null),
