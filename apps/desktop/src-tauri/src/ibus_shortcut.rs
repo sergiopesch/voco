@@ -14,7 +14,7 @@ const COMPONENT_PATH: &str = "/usr/share/ibus/component/voco.xml";
 const SOCKET_DIRECTORY_NAME: &str = "voco";
 const SOCKET_FILE_NAME: &str = "ibus-engine.sock";
 const IPC_TIMEOUT: Duration = Duration::from_millis(1_000);
-const MAX_REQUEST_BYTES: usize = 4_000_000;
+const MAX_REQUEST_BYTES: usize = 65_536;
 const MAX_RESPONSE_BYTES: usize = 64_000;
 const CONNECTED_DETAIL: &str = "The VOCO Dictation input source is running. It takes the dictation shortcut in IBus-aware fields; dictation does not need it.";
 
@@ -164,7 +164,9 @@ impl SocketBridge {
         })?;
         encoded.push(b'\n');
         if encoded.len() > MAX_REQUEST_BYTES {
-            return Err(BridgeCommandError::Uncertain(
+            // Nothing was sent, so the engine cannot have acted on it, and a
+            // poll VOCO refuses never renews the IBus lease.
+            return Err(BridgeCommandError::Rejected(
                 "VOCO input method command exceeds the safety limit.".to_string(),
             ));
         }
@@ -312,7 +314,8 @@ impl IbusShortcutService {
             Err(BridgeCommandError::Uncertain(error)) => {
                 // Drop an uncertain connection rather than reuse it. Closing
                 // the socket makes the engine disarm the shortcut and drop a
-                // pending trigger. An ordered engine rejection is safe to keep.
+                // pending trigger. An ordered engine rejection, or a request
+                // VOCO refused to send, is safe to keep.
                 guard.take();
                 Err(error)
             }
@@ -892,6 +895,47 @@ mod tests {
         assert!(!disarmed.expect("the engine replied").armed);
         // An ordered rejection means the engine did not arm the shortcut.
         assert!(!rejected.expect_err("the engine refused").may_have_armed);
+        service.shutdown();
+        fs::remove_file(&socket_path).unwrap();
+        fs::remove_dir(socket_path.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn a_poll_too_large_to_send_cannot_have_armed_and_keeps_the_connection() {
+        let socket_path = temporary_socket_path("oversized");
+        let listener = UnixListener::bind(&socket_path).expect("bind fake engine");
+        fs::set_permissions(&socket_path, fs::Permissions::from_mode(0o600)).unwrap();
+        let server = thread::spawn(move || {
+            let (stream, _) = listener.accept().unwrap();
+            let mut reader = BufReader::new(stream.try_clone().unwrap());
+            let mut writer = stream;
+            for operation in ["hello", "poll-trigger"] {
+                let mut line = String::new();
+                reader.read_line(&mut line).unwrap();
+                let request: Value = serde_json::from_str(&line).unwrap();
+                assert_eq!(request["operation"], operation);
+                let id = request["id"].as_u64().unwrap();
+                let reply = if operation == "hello" {
+                    engine_status_response(id, PROTOCOL_VERSION)
+                } else {
+                    // The oversized poll never arrived; this is the next one.
+                    assert_eq!(request["hotkey"], "Alt+D");
+                    json!({
+                        "version": PROTOCOL_VERSION, "id": id, "ok": true,
+                        "result": { "armed": true, "trigger": null }
+                    })
+                };
+                write_response(&mut writer, &reply);
+            }
+        });
+        let service = IbusShortcutService::default();
+        let connect = || SocketBridge::connect_to(&socket_path);
+        let oversized = "Alt+".repeat(MAX_REQUEST_BYTES / 4) + "D";
+        let refused = service.poll_trigger_from(connect, &oversized, || {});
+        assert!(!refused.expect_err("VOCO refuses to send it").may_have_armed);
+        let poll = service.poll_trigger_from(connect, "Alt+D", || {});
+        server.join().expect("the engine saw only the small poll");
+        assert!(poll.expect("the same connection still polls").armed);
         service.shutdown();
         fs::remove_file(&socket_path).unwrap();
         fs::remove_dir(socket_path.parent().unwrap()).unwrap();

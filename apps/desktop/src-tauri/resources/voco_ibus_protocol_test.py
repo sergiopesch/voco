@@ -37,6 +37,13 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual(int(rust_match.group(1)), PROTOCOL_VERSION)
         self.assertEqual(int(smoke_match.group(1)), PROTOCOL_VERSION)
 
+    def test_request_bound_matches_the_rust_client(self) -> None:
+        repository_root = Path(__file__).resolve().parents[4]
+        rust_client = (repository_root / "apps/desktop/src-tauri/src/ibus_shortcut.rs").read_text()
+        rust_match = re.search(r"const MAX_REQUEST_BYTES: usize = ([\d_]+);", rust_client)
+        self.assertIsNotNone(rust_match)
+        self.assertEqual(int(rust_match.group(1)), MAX_REQUEST_BYTES)
+
     def test_runtime_path_requires_an_absolute_xdg_runtime_directory(self) -> None:
         with self.assertRaises(ProtocolError):
             runtime_socket_path({})

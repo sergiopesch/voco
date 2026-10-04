@@ -18,7 +18,8 @@ from typing import Any, Mapping, Optional
 PROTOCOL_VERSION = 6
 SOCKET_DIRECTORY_NAME = "voco"
 SOCKET_FILE_NAME = "ibus-engine.sock"
-MAX_REQUEST_BYTES = 4_000_000
+# Bounds buffered request bytes: one receive's worth, far above any shortcut poll.
+MAX_REQUEST_BYTES = 65_536
 MAX_RESPONSE_BYTES = 64_000
 
 
@@ -84,8 +85,7 @@ def encode_message(payload: Mapping[str, Any], maximum_bytes: int) -> bytes:
 
 
 def decode_request(line: bytes) -> dict[str, Any]:
-    if not line or len(line) > MAX_REQUEST_BYTES:
-        raise ProtocolError("protocol request exceeds the safety limit")
+    # JsonLineBuffer has already bounded the line and refused an empty one.
     try:
         decoded = line.decode("utf-8")
         payload = json.loads(decoded)
