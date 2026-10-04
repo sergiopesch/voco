@@ -49,7 +49,7 @@ bash scripts/setup.sh
 
 `scripts/setup.sh` checks Node.js and Rust, then installs the build libraries with
 APT: pkg-config, the GLib, libsoup, JavaScriptCore and WebKitGTK 4.1 development
-packages, libayatana-appindicator3-dev, libpulse-dev, clang, mold, ibus,
+packages, libayatana-appindicator3-dev, libpulse-dev, gcc, ibus,
 gir1.2-ibus-1.0, python3-gi, python3-numpy and python3-psutil. It checks the
 IBus bindings, reports what your session lacks for pasting, such as a helper or
 access to `/dev/uinput`, and runs `npm install`.

@@ -144,7 +144,7 @@ step "System dependencies"
 
 APT_PACKAGES=(pkg-config libglib2.0-dev libsoup-3.0-dev
   libjavascriptcoregtk-4.1-dev libwebkit2gtk-4.1-dev
-  libayatana-appindicator3-dev libpulse-dev clang mold
+  libayatana-appindicator3-dev libpulse-dev gcc
   ibus gir1.2-ibus-1.0 python3-gi python3-numpy python3-psutil)
 # The package verifier needs readelf, desktop-file-validate and appstreamcli.
 PACKAGE_TOOLS=(binutils desktop-file-utils appstream)
@@ -154,7 +154,7 @@ if command -v apt &>/dev/null; then
   run_step "System libraries + build tools (apt)" \
     bash -c 'sudo apt update -qq 2>/dev/null && sudo apt install -y -qq "$@" 2>/dev/null' _ "${APT_PACKAGES[@]}"
 else
-  warn "Not using apt — install manually: pkg-config libglib2.0-dev libsoup-3.0-dev"
+  warn "Not using apt — install manually: gcc pkg-config libglib2.0-dev libsoup-3.0-dev"
   warn "libjavascriptcoregtk-4.1-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev libpulse-dev"
   warn "For IBus shortcut integration, install IBus, its GI bindings, and system Python 3"
   warn "The speech worker needs system Python 3 with NumPy and psutil"
@@ -199,22 +199,6 @@ if [[ "$INSTALL_MODE" == true ]]; then
   # Remove stale bundle artifacts so install picks the package from this build only.
   rm -rf apps/desktop/src-tauri/target/release/bundle/deb
   rm -rf apps/desktop/src-tauri/target/release/bundle/voco-complete
-
-  # Maximize parallelism
-  CMAKE_BUILD_PARALLEL_LEVEL="$(nproc)"
-  CARGO_BUILD_JOBS="${CMAKE_BUILD_PARALLEL_LEVEL}"
-  export CMAKE_BUILD_PARALLEL_LEVEL CARGO_BUILD_JOBS
-
-  # Use mold linker if available (much faster linking)
-  if command -v mold &>/dev/null && command -v clang &>/dev/null; then
-    mkdir -p apps/desktop/src-tauri/.cargo
-    cat > apps/desktop/src-tauri/.cargo/config.toml <<'TOML'
-[target.x86_64-unknown-linux-gnu]
-linker = "clang"
-rustflags = ["-C", "link-arg=-fuse-ld=mold"]
-TOML
-    ok "mold linker enabled"
-  fi
 
   # Show live build progress by tailing cargo output
   BUILD_START=$SECONDS
