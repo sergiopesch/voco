@@ -21,19 +21,7 @@ pub struct TrayState {
     pub hotkey_menu: Submenu<tauri::Wry>,
     pub current_hotkey: String,
     pub hotkey_items: Vec<(String, MenuItem<tauri::Wry>)>,
-    pub dictation_status: DictationStatus,
-    pub dictation_session_id: u64,
-    pub microphone_ready: bool,
-    pub microphone_permission: MicrophonePermission,
-    pub native_microphone_ready: Option<bool>,
-    pub cursor_delivery: CursorDeliveryState,
-    pub cursor_required: bool,
-    pub cursor_setup_state: String,
-    pub configuration_error: bool,
-    pub model_download_status: ModelDownloadStatus,
-    pub runtime_initialized: bool,
-    pub runtime_epoch: u64,
-    pub runtime_revision: u64,
+    pub runtime: RuntimeStatusSnapshot,
     icons: crate::tray_icons::TrayIcons,
     applied_presentation: Option<TrayPresentation>,
     applied_visual: Option<TrayVisualState>,
@@ -48,9 +36,10 @@ pub struct TrayState {
 
 pub type TrayMutex = Mutex<TrayState>;
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Default, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum DictationStatus {
+    #[default]
     Idle,
     Starting,
     Recording,
@@ -58,9 +47,10 @@ pub enum DictationStatus {
     Error,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Default, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum CursorDeliveryState {
+    #[default]
     Inactive,
     Owned,
 }
@@ -82,7 +72,9 @@ pub enum ModelDownloadStatus {
     Failed,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+/// The renderer's runtime status as the tray last accepted it; the default is
+/// the launch state.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RuntimeStatusSnapshot {
     pub epoch: u64,
@@ -99,28 +91,10 @@ pub struct RuntimeStatusSnapshot {
     pub cursor_delivery: CursorDeliveryState,
     pub cursor_required: bool,
     pub cursor_setup_state: String,
+    // Rust's startup thread owns model readiness. A renderer snapshot always
+    // arrives as Checking, so both runtime transitions keep this field.
     #[serde(skip)]
     model_download_status: ModelDownloadStatus,
-}
-
-impl Default for RuntimeStatusSnapshot {
-    fn default() -> Self {
-        Self {
-            epoch: 0,
-            revision: 0,
-            runtime_initialized: false,
-            configuration_error: false,
-            microphone_ready: false,
-            microphone_permission: MicrophonePermission::Unknown,
-            native_microphone_ready: None,
-            dictation_status: DictationStatus::Idle,
-            dictation_session_id: 0,
-            cursor_delivery: CursorDeliveryState::Inactive,
-            cursor_required: false,
-            cursor_setup_state: String::new(),
-            model_download_status: ModelDownloadStatus::Checking,
-        }
-    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -311,30 +285,12 @@ fn tray_state_label(state: TrayVisualState) -> &'static str {
     }
 }
 
-fn runtime_snapshot_from_tray_state(tray_state: &TrayState) -> RuntimeStatusSnapshot {
-    RuntimeStatusSnapshot {
-        epoch: tray_state.runtime_epoch,
-        revision: tray_state.runtime_revision,
-        runtime_initialized: tray_state.runtime_initialized,
-        configuration_error: tray_state.configuration_error,
-        microphone_ready: tray_state.microphone_ready,
-        microphone_permission: tray_state.microphone_permission,
-        native_microphone_ready: tray_state.native_microphone_ready,
-        dictation_status: tray_state.dictation_status,
-        dictation_session_id: tray_state.dictation_session_id,
-        cursor_delivery: tray_state.cursor_delivery,
-        cursor_required: tray_state.cursor_required,
-        cursor_setup_state: tray_state.cursor_setup_state.clone(),
-        model_download_status: tray_state.model_download_status,
-    }
-}
-
 fn current_tray_presentation(app: &tauri::AppHandle) -> Option<TrayPresentation> {
     let state = app.state::<TrayMutex>();
     state
         .lock()
         .ok()
-        .map(|state| derive_tray_presentation(&runtime_snapshot_from_tray_state(&state)))
+        .map(|state| derive_tray_presentation(&state.runtime))
 }
 
 pub fn setup_tray(app: &tauri::App, hotkey_label: &str) -> Result<(), Box<dyn std::error::Error>> {
@@ -446,19 +402,7 @@ pub fn setup_tray(app: &tauri::App, hotkey_label: &str) -> Result<(), Box<dyn st
         hotkey_menu,
         current_hotkey: hotkey_label.to_string(),
         hotkey_items,
-        dictation_status: DictationStatus::Idle,
-        dictation_session_id: 0,
-        microphone_ready: false,
-        microphone_permission: MicrophonePermission::Unknown,
-        native_microphone_ready: None,
-        cursor_delivery: CursorDeliveryState::Inactive,
-        cursor_required: false,
-        cursor_setup_state: String::new(),
-        configuration_error: false,
-        model_download_status: ModelDownloadStatus::Checking,
-        runtime_initialized: false,
-        runtime_epoch: 0,
-        runtime_revision: 0,
+        runtime: RuntimeStatusSnapshot::default(),
         icons,
         applied_presentation: None,
         applied_visual: None,
@@ -506,25 +450,9 @@ pub fn update_runtime_status(app: &tauri::AppHandle, snapshot: RuntimeStatusSnap
         return;
     };
 
-    let active_epoch = tray_state.runtime_epoch;
-    if !accept_runtime_snapshot(
-        active_epoch,
-        &mut tray_state.runtime_revision,
-        snapshot.epoch,
-        snapshot.revision,
-    ) {
+    if !apply_runtime_snapshot(&mut tray_state.runtime, snapshot) {
         return;
     }
-    tray_state.microphone_ready = snapshot.microphone_ready;
-    tray_state.microphone_permission = snapshot.microphone_permission;
-    tray_state.native_microphone_ready = snapshot.native_microphone_ready;
-    tray_state.dictation_status = snapshot.dictation_status;
-    tray_state.dictation_session_id = snapshot.dictation_session_id;
-    tray_state.cursor_delivery = snapshot.cursor_delivery;
-    tray_state.cursor_required = snapshot.cursor_required;
-    tray_state.cursor_setup_state = snapshot.cursor_setup_state;
-    tray_state.configuration_error = snapshot.configuration_error;
-    tray_state.runtime_initialized = snapshot.runtime_initialized;
     drop(tray_state);
     refresh_tray(app);
 }
@@ -551,8 +479,7 @@ fn apply_tray_state(app: &tauri::AppHandle, tray_state: &mut TrayState) {
         let mark = if mode == configured { '✓' } else { ' ' };
         let _ = item.set_text(format!("{mark} {preset}"));
     }
-    let snapshot = runtime_snapshot_from_tray_state(tray_state);
-    let presentation = derive_tray_presentation(&snapshot);
+    let presentation = derive_tray_presentation(&tray_state.runtime);
     // Even equivalent presentation updates carry a new action token to Shell.
     #[cfg(target_os = "linux")]
     crate::panel::publish();
@@ -563,7 +490,7 @@ fn apply_tray_state(app: &tauri::AppHandle, tray_state: &mut TrayState) {
 
     if let Some(tray) = app.tray_by_id(&tray_state.tray_id) {
         if tray_state.applied_visual != Some(state) {
-            let path = if tray_state.dictation_status == DictationStatus::Recording {
+            let path = if tray_state.runtime.dictation_status == DictationStatus::Recording {
                 tray_state.icons.meter_path(0)
             } else {
                 tray_state.icons.path(tray_state_label(state))
@@ -582,8 +509,8 @@ fn apply_tray_state(app: &tauri::AppHandle, tray_state: &mut TrayState) {
         debug!(
             "Tray update -> state={}, recording={}, microphone_ready={}, status='{}'",
             tray_state_label(state),
-            matches!(tray_state.dictation_status, DictationStatus::Recording),
-            tray_state.microphone_ready,
+            tray_state.runtime.dictation_status == DictationStatus::Recording,
+            tray_state.runtime.microphone_ready,
             presentation.status_text
         );
     }
@@ -629,14 +556,14 @@ fn meter_swap(applied: Option<usize>, frame: usize) -> bool {
 }
 
 fn sync_meter_timer(app: &tauri::AppHandle, state: &mut TrayState) {
-    let recording = state.dictation_status == DictationStatus::Recording;
+    let recording = state.runtime.dictation_status == DictationStatus::Recording;
     if state.meter_recording != recording {
         // Levels belong to one recording, whichever meter shows them.
         state.meter_recording = recording;
         crate::panel::reset_level();
         state.meter = crate::tray_icons::MeterEnvelope::default();
     }
-    if !meter_timer_wanted(state.dictation_status, state.fallback_visible) {
+    if !meter_timer_wanted(state.runtime.dictation_status, state.fallback_visible) {
         if let Some(timer) = state.meter_timer.take() {
             timer.remove();
         }
@@ -659,10 +586,10 @@ fn sync_meter_timer(app: &tauri::AppHandle, state: &mut TrayState) {
         let now = std::time::Instant::now();
         let elapsed = now.duration_since(previous).as_secs_f64();
         previous = now;
-        if !meter_timer_wanted(state.dictation_status, state.fallback_visible) {
+        if !meter_timer_wanted(state.runtime.dictation_status, state.fallback_visible) {
             return glib::ControlFlow::Continue;
         }
-        let level = crate::panel::level(state.runtime_epoch, state.dictation_status);
+        let level = crate::panel::level(state.runtime.epoch, state.runtime.dictation_status);
         let frame = state.meter.step(level, elapsed, meter_animations_enabled());
         if !meter_swap(state.applied_meter, frame) {
             return glib::ControlFlow::Continue;
@@ -720,26 +647,45 @@ fn accept_runtime_snapshot(
     true
 }
 
+/// Accept the renderer's next snapshot for the current epoch.
+fn apply_runtime_snapshot(
+    current: &mut RuntimeStatusSnapshot,
+    incoming: RuntimeStatusSnapshot,
+) -> bool {
+    if !accept_runtime_snapshot(
+        current.epoch,
+        &mut current.revision,
+        incoming.epoch,
+        incoming.revision,
+    ) {
+        return false;
+    }
+    *current = RuntimeStatusSnapshot {
+        model_download_status: current.model_download_status,
+        ..incoming
+    };
+    true
+}
+
+/// A renderer load starts the next epoch from the launch state.
+fn begin_runtime_session(current: &mut RuntimeStatusSnapshot) -> u64 {
+    *current = RuntimeStatusSnapshot {
+        epoch: current.epoch.saturating_add(1),
+        model_download_status: current.model_download_status,
+        ..RuntimeStatusSnapshot::default()
+    };
+    current.epoch
+}
+
 pub fn begin_runtime_status_session(app: &tauri::AppHandle) -> Result<u64, String> {
     let state = app.state::<TrayMutex>();
     let mut tray_state = state
         .lock()
         .map_err(|_| "Failed to lock tray state".to_string())?;
-    tray_state.runtime_epoch = tray_state.runtime_epoch.saturating_add(1).max(1);
-    tray_state.runtime_revision = 0;
+    let epoch = begin_runtime_session(&mut tray_state.runtime);
+    // A shortcut lease proven for the previous renderer never carries over.
     #[cfg(target_os = "linux")]
     crate::panel::clear_shortcut();
-    tray_state.microphone_ready = false;
-    tray_state.microphone_permission = MicrophonePermission::Unknown;
-    tray_state.native_microphone_ready = None;
-    tray_state.dictation_status = DictationStatus::Idle;
-    tray_state.dictation_session_id = 0;
-    tray_state.cursor_delivery = CursorDeliveryState::Inactive;
-    tray_state.cursor_required = false;
-    tray_state.cursor_setup_state.clear();
-    tray_state.configuration_error = false;
-    tray_state.runtime_initialized = false;
-    let epoch = tray_state.runtime_epoch;
     drop(tray_state);
     refresh_tray(app);
     Ok(epoch)
@@ -751,7 +697,7 @@ pub fn update_model_download_status(app: &tauri::AppHandle, status: ModelDownloa
         error!("Failed to lock tray state while updating model download status");
         return;
     };
-    tray_state.model_download_status = status;
+    tray_state.runtime.model_download_status = status;
     drop(tray_state);
     refresh_tray(app);
 }
@@ -787,8 +733,7 @@ fn create_mic_icon(size: u32, state: TrayVisualState) -> Vec<u8> {
 pub fn panel_snapshot(app: &tauri::AppHandle) -> Option<serde_json::Value> {
     let state = app.try_state::<TrayMutex>()?;
     let state = state.lock().ok()?;
-    let snapshot = runtime_snapshot_from_tray_state(&state);
-    let mut presentation = panel_presentation(&snapshot);
+    let mut presentation = panel_presentation(&state.runtime);
     let accelerator = panel_accelerator(crate::is_wayland_session(), &state.current_hotkey);
     // The companion grabs shortcutAccelerator whenever attached; an older companion still
     // loaded in the Shell reads only the Stop fields until the session restarts.
@@ -1480,6 +1425,65 @@ mod tests {
         assert!(!accept_runtime_snapshot(active_epoch, &mut current, 4, 0));
         assert!(accept_runtime_snapshot(active_epoch, &mut current, 4, 9));
         assert_eq!(current, 9);
+    }
+
+    #[test]
+    fn renderer_snapshots_and_reloads_keep_rust_model_readiness() {
+        let mut first = RuntimeStatusSnapshot::default();
+        assert_eq!(begin_runtime_session(&mut first), 1);
+        for model in [ModelDownloadStatus::Ready, ModelDownloadStatus::Failed] {
+            let mut current = RuntimeStatusSnapshot {
+                epoch: 4,
+                revision: 8,
+                model_download_status: model,
+                ..ready_snapshot()
+            };
+            let before = current.clone();
+            let incoming = RuntimeStatusSnapshot {
+                epoch: 4,
+                revision: 9,
+                runtime_initialized: true,
+                configuration_error: true,
+                microphone_permission: MicrophonePermission::Denied,
+                native_microphone_ready: Some(false),
+                dictation_status: DictationStatus::Recording,
+                dictation_session_id: 2,
+                cursor_delivery: CursorDeliveryState::Owned,
+                cursor_required: true,
+                cursor_setup_state: "not-enabled".to_string(),
+                ..RuntimeStatusSnapshot::default()
+            };
+            // Stale, repeated, unrevised and foreign snapshots change nothing.
+            for (epoch, revision) in [(4, 7), (4, 8), (4, 0), (3, 9), (5, 9)] {
+                let stale = RuntimeStatusSnapshot {
+                    epoch,
+                    revision,
+                    ..incoming.clone()
+                };
+                assert!(!apply_runtime_snapshot(&mut current, stale));
+                assert_eq!(current, before);
+            }
+            // An accepted snapshot replaces every renderer field; the renderer's
+            // Checking never overrides Rust's model readiness.
+            assert!(apply_runtime_snapshot(&mut current, incoming.clone()));
+            assert_eq!(
+                current,
+                RuntimeStatusSnapshot {
+                    model_download_status: model,
+                    ..incoming
+                }
+            );
+            // A renderer load starts the next epoch from the launch state.
+            assert_eq!(begin_runtime_session(&mut current), 5);
+            assert_eq!(
+                current,
+                RuntimeStatusSnapshot {
+                    epoch: 5,
+                    model_download_status: model,
+                    ..RuntimeStatusSnapshot::default()
+                }
+            );
+        }
     }
 
     #[test]
