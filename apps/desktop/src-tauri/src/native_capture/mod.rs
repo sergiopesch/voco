@@ -223,35 +223,6 @@ trait CaptureBackend {
     fn blocks(&self) -> Result<Vec<protocol::Block>, String>;
     fn ack(&mut self, count: usize) -> Result<(), String>;
 }
-impl CaptureBackend for Pulse {
-    fn connect() -> Result<Self, String> {
-        Pulse::connect()
-    }
-    fn enumerate(&mut self, epoch: u64) -> Result<(u64, Vec<Source>, Option<String>), String> {
-        Pulse::enumerate(self, epoch)
-    }
-    fn begin(&mut self, source: &Source, revision: u64) -> Result<(), String> {
-        Pulse::begin(self, source, revision)
-    }
-    fn tick(&mut self) {
-        Pulse::tick(self)
-    }
-    fn stop(&mut self) {
-        Pulse::stop(self)
-    }
-    fn cancel(&mut self) {
-        Pulse::cancel(self)
-    }
-    fn status(&self) -> Status {
-        Pulse::status(self)
-    }
-    fn blocks(&self) -> Result<Vec<protocol::Block>, String> {
-        Pulse::blocks(self)
-    }
-    fn ack(&mut self, count: usize) -> Result<(), String> {
-        Pulse::ack(self, count)
-    }
-}
 struct Worker<B: CaptureBackend> {
     pulse: Option<B>,
     sources: Vec<Source>,
