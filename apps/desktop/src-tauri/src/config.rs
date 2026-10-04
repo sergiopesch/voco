@@ -702,6 +702,105 @@ mod tests {
         let _ = fs::remove_dir_all(test_root);
     }
 
+    // The guided installer leaves settings to VOCO, so this copy is the only one.
+    #[cfg(unix)]
+    #[test]
+    fn legacy_migration_copies_a_regular_config_privately_and_never_replaces_one() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let test_root = std::env::temp_dir().join(format!(
+            "voco-config-migration-test-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        ));
+        let legacy_dir = test_root.join(LEGACY_APP_DIR_NAME);
+        let config_dir = test_root.join(APP_DIR_NAME);
+        fs::create_dir_all(&legacy_dir).unwrap();
+        fs::create_dir_all(&config_dir).unwrap();
+        let legacy = legacy_dir.join("config.json");
+        let legacy_settings = r#"{"hotkey":"Super+F12","selectedMic":"legacy-device"}"#;
+        fs::write(&legacy, legacy_settings).unwrap();
+        fs::set_permissions(&legacy, fs::Permissions::from_mode(0o644)).unwrap();
+
+        migrate_legacy_config(&test_root, &config_dir).unwrap();
+
+        let destination = config_dir.join("config.json");
+        assert_eq!(fs::read_to_string(&destination).unwrap(), legacy_settings);
+        assert_eq!(
+            fs::symlink_metadata(&destination)
+                .unwrap()
+                .permissions()
+                .mode()
+                & 0o777,
+            0o600
+        );
+        assert_eq!(fs::read_to_string(&legacy).unwrap(), legacy_settings);
+
+        // Settings VOCO already has always win over a legacy file.
+        fs::write(&legacy, r#"{"hotkey":"Ctrl+Shift+V"}"#).unwrap();
+        migrate_legacy_config(&test_root, &config_dir).unwrap();
+        assert_eq!(fs::read_to_string(&destination).unwrap(), legacy_settings);
+        let _ = fs::remove_dir_all(test_root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn legacy_migration_refuses_a_linked_or_special_legacy_config_without_opening_it() {
+        use std::os::unix::fs::{symlink, PermissionsExt};
+
+        let test_root = std::env::temp_dir().join(format!(
+            "voco-config-migration-refusal-test-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        ));
+        let legacy_dir = test_root.join(LEGACY_APP_DIR_NAME);
+        let config_dir = test_root.join(APP_DIR_NAME);
+        fs::create_dir_all(&legacy_dir).unwrap();
+        fs::create_dir_all(&config_dir).unwrap();
+        let legacy = legacy_dir.join("config.json");
+        let destination = config_dir.join("config.json");
+
+        let target = test_root.join("linked-settings.json");
+        fs::write(&target, r#"{"hotkey":"Super+F12"}"#).unwrap();
+        fs::set_permissions(&target, fs::Permissions::from_mode(0o644)).unwrap();
+        symlink(&target, &legacy).unwrap();
+        assert!(migrate_legacy_config(&test_root, &config_dir).is_err());
+        assert!(fs::symlink_metadata(&destination).is_err());
+        assert_eq!(
+            fs::read_to_string(&target).unwrap(),
+            r#"{"hotkey":"Super+F12"}"#
+        );
+        assert_eq!(
+            fs::metadata(&target).unwrap().permissions().mode() & 0o777,
+            0o644
+        );
+
+        // Opening a FIFO would wait for a writer; the check must reject it first.
+        fs::remove_file(&legacy).unwrap();
+        assert!(std::process::Command::new("mkfifo")
+            .arg(&legacy)
+            .status()
+            .unwrap()
+            .success());
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let (root, directory) = (test_root.clone(), config_dir.clone());
+        std::thread::spawn(move || {
+            let _ = sender.send(migrate_legacy_config(&root, &directory).is_err());
+        });
+        assert_eq!(
+            receiver.recv_timeout(std::time::Duration::from_secs(5)),
+            Ok(true)
+        );
+        assert!(fs::symlink_metadata(&destination).is_err());
+        let _ = fs::remove_dir_all(test_root);
+    }
+
     #[test]
     fn retired_settings_are_dropped_without_losing_current_ones() {
         let config: AppConfig = serde_json::from_str(

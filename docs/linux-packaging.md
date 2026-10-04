@@ -305,11 +305,12 @@ readelf, and dpkg-deb when it is given a Debian package. It checks:
   digests, and that every Debian dependency is required under its Fedora name.
 
 In both verifiers, `VOCO_PACKAGE_VERIFY_OFFLINE=1` runs the AppStream checks
-with `--no-net`, for a job without network access. Release assembly keeps the
-online checks.
+with `--no-net`, for a job without network access; `setup.sh --install` sets it.
+Release assembly keeps the online checks.
 
 `npm run test:speech-package` includes `scripts/test-rpm-package.py`, which
 tests the file list, the spec, the header policy and both parity checks, and
 builds a small RPM when `rpmbuild` is installed. `npm run verify:devops` keeps
 the spec in step with the dependency map, and fails unless the spec builds
-nothing, runs only `packaging/rpm/post.sh` and stays x86_64 release 1.
+nothing, runs only `packaging/rpm/post.sh` and stays x86_64 release 1. It also
+keeps the guided installer's glibc floor equal to both packages'.

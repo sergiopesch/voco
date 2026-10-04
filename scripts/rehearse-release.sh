@@ -37,8 +37,8 @@ contains() {
     scripts/assemble-release.sh scripts/render-release-body.sh scripts/lib/install-common.sh \
     scripts/test-install-common.sh
   bash scripts/test-install-common.sh
-  if grep -En 'Examples:.*Alt\+Shift\+R|Downloading VOCO.*~5 MB' install scripts/lib/install-common.sh; then
-    echo "Installer still advertises a reserved hotkey or stale package size"
+  if grep -En 'Downloading VOCO.*~5 MB' install scripts/lib/install-common.sh; then
+    echo "Installer still advertises a stale package size"
     exit 1
   fi
   if grep -RInE 'raw.githubusercontent.com/.*/master/install|bash <\(curl|curl -s .*install' README.md docs install; then

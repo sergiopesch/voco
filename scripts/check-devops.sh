@@ -31,43 +31,10 @@ PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-check-shell-syntax.py
 git ls-files -z -- install packaging/ibus/voco-ibus-engine '*.sh' \
   | xargs -0 bash scripts/check-shell-syntax.sh
 
+# The installer embeds the shared install steps and its UI byte for byte.
 python3 scripts/sync-installer-ui.py --check
 
 bash scripts/test-verify-release.sh
-
-PYTHONDONTWRITEBYTECODE=1 python3 - <<'PY'
-import re
-from pathlib import Path
-
-function_names = (
-    "voco_escape_json_string",
-    "voco_trim",
-    "voco_canonical_hotkey_key",
-    "voco_validate_hotkey",
-    "voco_read_configured_hotkey",
-    "voco_migrate_legacy_config",
-    "voco_verify_installed_package",
-    "voco_install_deb_package",
-    "voco_detect_package_manager",
-    "voco_verify_installed_rpm",
-    "voco_install_rpm_package",
-    "voco_verify_desktop_input",
-    "voco_write_default_config",
-    "voco_run_hotkey_setup",
-)
-functions = {name: [] for name in function_names}
-for path in (Path("install"), Path("scripts/lib/install-common.sh")):
-    contents = path.read_text()
-    for name in function_names:
-        match = re.search(rf"{name}\(\) \{{.*?^\}}", contents, re.S | re.M)
-        if match is None:
-            raise SystemExit(f"Missing {name} function in {path}")
-        functions[name].append(match.group(0))
-for name, copies in functions.items():
-    if copies[0] != copies[1]:
-        raise SystemExit(f"Standalone and source installer {name} function have drifted")
-print("Standalone and source installer helpers are in sync.")
-PY
 
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-install-presentation.py
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-install-performance.py
@@ -207,6 +174,11 @@ if requires != rpm_package.FEDORA_REQUIRES:
 for floor in ("glibc >= 2.39", "libstdc++ >= 13.2"):
     if floor not in requires:
         raise SystemExit(f"{spec_path} is missing the verified ABI floor {floor}")
+# The guided installer refuses an older glibc before downloading either package.
+installer_floor = re.findall(r"glibc_floor=([0-9.]+)", Path("scripts/lib/install-common.sh").read_text())
+if len(installer_floor) != 1 or f"libc6 (>= {installer_floor[0]})" not in depends \
+        or f"glibc >= {installer_floor[0]}" not in requires:
+    raise SystemExit("The installer's glibc_floor must equal the packages' libc6 and glibc floors")
 extra = re.findall(r"^(Recommends|Suggests|Supplements|Enhances|Conflicts|Obsoletes|Provides|"
                    r"BuildRequires|Source\d*|Patch\d*|Epoch|BuildArch):", spec, re.M | re.I)
 if extra:

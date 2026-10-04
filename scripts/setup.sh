@@ -144,17 +144,34 @@ step "System dependencies"
 
 APT_PACKAGES=(pkg-config libglib2.0-dev libsoup-3.0-dev
   libjavascriptcoregtk-4.1-dev libwebkit2gtk-4.1-dev
-  libayatana-appindicator3-dev libpulse-dev clang mold
+  libayatana-appindicator3-dev libpulse-dev gcc
   ibus gir1.2-ibus-1.0 python3-gi python3-numpy python3-psutil)
 # The package verifier needs readelf, desktop-file-validate and appstreamcli.
 PACKAGE_TOOLS=(binutils desktop-file-utils appstream)
 if $INSTALL_MODE; then APT_PACKAGES+=("${PACKAGE_TOOLS[@]}"); fi
 
-if command -v apt &>/dev/null; then
-  run_step "System libraries + build tools (apt)" \
-    bash -c 'sudo apt update -qq 2>/dev/null && sudo apt install -y -qq "$@" 2>/dev/null' _ "${APT_PACKAGES[@]}"
+# True when dpkg reports every package installed ("ii"); it fails for an unknown one.
+apt_packages_installed() {
+  local status
+  status="$(dpkg-query -W -f='${db:Status-Abbrev}\n' "$@" 2>/dev/null)" || return 1
+  ! grep -qv '^ii' <<<"${status}"
+}
+
+if command -v apt-get &>/dev/null; then
+  # --install always refreshes APT's lists: the package's own install needs them.
+  if ! $INSTALL_MODE && apt_packages_installed "${APT_PACKAGES[@]}"; then
+    ok "System libraries + build tools (installed)"
+  else
+    # Ask before the spinner starts, which would draw over a password prompt.
+    if ! sudo -n -v 2>/dev/null; then
+      dim "APT needs your password to install the build libraries."
+      sudo -v || { err "sudo failed, so APT could not install the build libraries"; exit 1; }
+    fi
+    run_step "System libraries + build tools (apt)" \
+      bash -c 'sudo -n apt-get update -qq && sudo -n apt-get install -y -qq "$@"' _ "${APT_PACKAGES[@]}"
+  fi
 else
-  warn "Not using apt — install manually: pkg-config libglib2.0-dev libsoup-3.0-dev"
+  warn "Not using apt — install manually: gcc pkg-config libglib2.0-dev libsoup-3.0-dev"
   warn "libjavascriptcoregtk-4.1-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev libpulse-dev"
   warn "For IBus shortcut integration, install IBus, its GI bindings, and system Python 3"
   warn "The speech worker needs system Python 3 with NumPy and psutil"
@@ -199,22 +216,6 @@ if [[ "$INSTALL_MODE" == true ]]; then
   # Remove stale bundle artifacts so install picks the package from this build only.
   rm -rf apps/desktop/src-tauri/target/release/bundle/deb
   rm -rf apps/desktop/src-tauri/target/release/bundle/voco-complete
-
-  # Maximize parallelism
-  CMAKE_BUILD_PARALLEL_LEVEL="$(nproc)"
-  CARGO_BUILD_JOBS="${CMAKE_BUILD_PARALLEL_LEVEL}"
-  export CMAKE_BUILD_PARALLEL_LEVEL CARGO_BUILD_JOBS
-
-  # Use mold linker if available (much faster linking)
-  if command -v mold &>/dev/null && command -v clang &>/dev/null; then
-    mkdir -p apps/desktop/src-tauri/.cargo
-    cat > apps/desktop/src-tauri/.cargo/config.toml <<'TOML'
-[target.x86_64-unknown-linux-gnu]
-linker = "clang"
-rustflags = ["-C", "link-arg=-fuse-ld=mold"]
-TOML
-    ok "mold linker enabled"
-  fi
 
   # Show live build progress by tailing cargo output
   BUILD_START=$SECONDS
@@ -274,7 +275,9 @@ TOML
   # A base Tauri bundle has no speech runtime; install only the verified complete package.
   DEB="apps/desktop/src-tauri/target/release/bundle/voco-complete/voco_${EXPECTED_VERSION}_amd64.deb"
   run_step "Assemble NVIDIA package" python3 scripts/package-nvidia.py "$BASE_DEB" "$DEB" --debian-version "$EXPECTED_VERSION"
-  run_step "Verify package" bash scripts/verify-deb-package.sh "$DEB" "$EXPECTED_VERSION"
+  # CI validates the metainfo's URLs online, and release assembly checks them again.
+  run_step "Verify package (AppStream URLs not checked)" \
+    env VOCO_PACKAGE_VERIFY_OFFLINE=1 bash scripts/verify-deb-package.sh "$DEB" "$EXPECTED_VERSION"
   DEB_SIZE=$(du -h "$DEB" | cut -f1)
   printf "    ${DIM}Package: %s (%s)${NC}\n" "$(basename "$DEB")" "$DEB_SIZE"
   if voco_install_deb_package "$DEB" "$EXPECTED_VERSION" "amd64"; then
@@ -289,9 +292,6 @@ TOML
     dim "See docs/platform/README.md before dictating."
     exit 2
   fi
-  voco_run_hotkey_setup "Alt+D"
-  HOTKEY="${VOCO_SELECTED_HOTKEY}"
-  CONFIG_FILE="${VOCO_CONFIG_FILE}"
 
   # ─── Done ─────────────────────────────────────────────
   ELAPSED=$SECONDS
@@ -308,10 +308,9 @@ TOML
   echo -e "  ${WHITE}${BOLD}▸${NC} Or run: ${GRAPHITE_SOFT}voco${NC}"
   echo
   echo -e "  ${DIM}Speech uses the pinned runtime bundled in the package.${NC}"
-  echo -e "  ${DIM}Click where you want the text, then press ${BOLD}${HOTKEY}${NC}${DIM} to dictate!${NC}"
+  echo -e "  ${DIM}Click where you want the text, then press ${BOLD}Alt+D${NC}${DIM}, or your saved shortcut, to dictate!${NC}"
   echo
-  echo -e "  ${DIM}Change the shortcut on the Shortcut page of VOCO's Settings,${NC}"
-  echo -e "  ${DIM}or edit ${CONFIG_FILE}${NC}"
+  echo -e "  ${DIM}Change the shortcut on the Shortcut page of VOCO's Settings.${NC}"
   echo
 
 else

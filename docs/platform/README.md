@@ -48,7 +48,7 @@ describes the suites.
 
 | Area | Requirement |
 | --- | --- |
-| Processor | x86-64 with AVX2, FMA and F16C. VOCO doesn't check for them, and recognition can't run without them. |
+| Processor | x86-64 with AVX2, FMA and F16C. Recognition can't run without them. The guided installer refuses a processor that lacks one, but APT and DNF don't check. |
 | System | One of the [supported systems](#supported-systems). The Debian package needs `libc6 (>= 2.39)` and `libstdc++6 (>= 13.2.0)`, and the RPM `glibc >= 2.39` and `libstdc++ >= 13.2`. |
 | Audio | On Wayland, PipeWire with its PulseAudio service (`pipewire-pulse`). VOCO names each microphone by PipeWire's object serial, which PulseAudio itself doesn't provide. On X11, either. |
 | Session | Wayland or X11. GNOME 50 has no X11 session, so on Ubuntu 26.04 and Fedora 44 VOCO runs on Wayland. |

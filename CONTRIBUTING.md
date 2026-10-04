@@ -47,12 +47,13 @@ cd voco
 bash scripts/setup.sh
 ```
 
-`scripts/setup.sh` checks Node.js and Rust, then installs the build libraries with
-APT: pkg-config, the GLib, libsoup, JavaScriptCore and WebKitGTK 4.1 development
-packages, libayatana-appindicator3-dev, libpulse-dev, clang, mold, ibus,
-gir1.2-ibus-1.0, python3-gi, python3-numpy and python3-psutil. It checks the
-IBus bindings, reports what your session lacks for pasting, such as a helper or
-access to `/dev/uinput`, and runs `npm install`.
+`scripts/setup.sh` checks Node.js and Rust, then installs any missing build
+libraries with APT, asking for your password first: pkg-config, the GLib,
+libsoup, JavaScriptCore and WebKitGTK 4.1 development packages,
+libayatana-appindicator3-dev, libpulse-dev, gcc, ibus, gir1.2-ibus-1.0,
+python3-gi, python3-numpy and python3-psutil. It checks the IBus bindings,
+reports what your session lacks for pasting, such as a helper or access to
+`/dev/uinput`, and runs `npm install`.
 
 Start the app in development mode:
 
@@ -73,7 +74,8 @@ VOCO_STREAM_WORKER="$PWD/runtime/speech/stream_worker.py" npm run dev
 
 `bash scripts/setup.sh --install` builds the release app, assembles the complete
 package with the provisioned runtime, verifies it and installs it with APT. It
-then runs `voco --check-desktop-input` and sets up the Alt+D shortcut. It adds
+then runs `voco --check-desktop-input`. Its package check leaves the AppStream
+URLs to CI and release assembly. It refreshes APT's package lists, adds
 binutils, desktop-file-utils and appstream to the APT list, installs
 Tauri CLI 2.10.1 when no Tauri CLI is installed and warns about any other
 version, and exits with status 2 when desktop input still needs setup.

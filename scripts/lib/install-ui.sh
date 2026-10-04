@@ -31,7 +31,7 @@ voco_ui_configure() {
   local columns="${VOCO_TERMINAL_COLUMNS:-80}" rows="${VOCO_TERMINAL_ROWS:-24}"
   if [[ "${VOCO_INSTALL_PLAIN:-0}" == 1 || ! "$columns" =~ ^[0-9]+$ || "$columns" -lt 64 || ! "$rows" =~ ^[0-9]+$ || "$rows" -lt 12 ]]; then
     VOCO_TERMINAL_MOTION=false
-    BOLD='' DIM='' GRAPHITE='' GRAPHITE_SOFT='' GREEN='' YELLOW='' RED='' WHITE='' NC=''
+    DIM='' GREEN='' YELLOW='' RED='' NC=''
   fi
   if [[ "${VOCO_INSTALL_NO_MOTION:-0}" == 1 ]]; then
     VOCO_UI_NO_MOTION=true
@@ -166,9 +166,9 @@ voco_ui_release() {
 voco_ui_download_observer() {
   trap - EXIT
   trap 'exit 0' TERM INT
-  local destination="$1" initial="$2" start="$3" bytes="$2" now delta rate elapsed tick=0 mark detail shine
+  local destination="$1" start="$2" bytes=0 now delta rate elapsed tick=0 mark detail shine
   local glyphs=(▁ ▂ ▃ ▄ ▅ ▆ ▇ █) value
-  VOCO_UI_LAST_BYTES=$initial
+  VOCO_UI_LAST_BYTES=0
   VOCO_UI_LAST_TIME=${EPOCHREALTIME/./}
   while :; do
     # Sample at 4 Hz; the short entry sweep uses only shell builtins between samples.
@@ -183,7 +183,7 @@ voco_ui_download_observer() {
       elapsed=$((SECONDS-start))
       voco_ui_size "$bytes"; detail="$VOCO_UI_SIZE received"
       if (( elapsed > 0 )); then
-        voco_ui_size "$(((bytes>initial?bytes-initial:0)/elapsed))"; detail+=" · $VOCO_UI_SIZE/s avg"
+        voco_ui_size "$((bytes/elapsed))"; detail+=" · $VOCO_UI_SIZE/s avg"
       fi
       mark=''
       if [[ "$VOCO_UI_NO_MOTION" == true ]]; then mark='↓'; else
