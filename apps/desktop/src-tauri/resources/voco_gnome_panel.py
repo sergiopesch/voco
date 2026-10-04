@@ -1,6 +1,5 @@
 """Explicit GNOME panel setup. Checking never changes desktop preferences."""
 import json
-import os
 from pathlib import Path
 import sys
 import time
@@ -42,8 +41,7 @@ def check(enable=False):
     import gi
     gi.require_version('Gio', '2.0')
     from gi.repository import Gio, GLib
-    if not any(item.lower() == 'gnome' for item in os.environ.get('XDG_CURRENT_DESKTOP', '').split(':')):
-        return result('other-desktop', 'Use the VOCO tray menu for status and Stop. Labels depend on your desktop.')
+    # VOCO answers other-desktop itself before starting this helper.
     bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
 
     def call(interface, method, parameters):

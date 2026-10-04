@@ -78,6 +78,24 @@ fn shortcut_remedy(panel: PanelSetupStatus, attached: bool) -> Option<String> {
 }
 
 pub fn check(enable: bool) -> Result<PanelSetupStatus, String> {
+    check_on(&crate::current_desktop(), || run_helper(enable))
+}
+
+/// Only GNOME can load the companion, so elsewhere VOCO doesn't start python3
+/// and GI to learn that.
+fn check_on(desktop: &str, helper: impl FnOnce() -> CheckResult) -> CheckResult {
+    if !crate::is_gnome_desktop(desktop) {
+        return Ok(PanelSetupStatus {
+            status: "other-desktop".into(),
+            detail: "Use the VOCO tray menu for status and Stop. Labels depend on your desktop."
+                .into(),
+            can_enable: false,
+        });
+    }
+    helper()
+}
+
+fn run_helper(enable: bool) -> CheckResult {
     let child = crate::process_runner::command("/usr/bin/python3")
         .args([
             "-I",
@@ -197,6 +215,31 @@ mod tests {
         );
         // An attached panel consumes the chord, so there is nothing to report.
         assert!(unreachable_shortcut_detail("Alt+D", panel("active"), true).is_none());
+    }
+
+    #[test]
+    fn only_gnome_starts_the_companion_helper() {
+        let runs = Cell::new(0);
+        let helper = || {
+            runs.set(runs.get() + 1);
+            panel("active")
+        };
+        for desktop in ["KDE", "", "X-Cinnamon"] {
+            let status = check_on(desktop, helper).unwrap();
+            assert_eq!(
+                (status.status.as_str(), status.can_enable),
+                ("other-desktop", false)
+            );
+            assert_eq!(
+                status.detail,
+                "Use the VOCO tray menu for status and Stop. Labels depend on your desktop."
+            );
+        }
+        assert_eq!(runs.get(), 0);
+        for desktop in ["ubuntu:GNOME", "GNOME", "GNOME-Flashback:GNOME"] {
+            assert_eq!(check_on(desktop, helper).unwrap().status, "active");
+        }
+        assert_eq!(runs.get(), 3);
     }
 
     #[test]

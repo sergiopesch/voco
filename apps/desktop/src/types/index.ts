@@ -92,7 +92,7 @@ export interface RuntimeDiagnostics {
   desktopInput?: DesktopInputStatus;
   desktopPaste?: { enabled: boolean; available: boolean; detail: string };
   shortcut: ShortcutDiagnostics;
-  sessionType: string;
+  sessionType: "wayland" | "x11-or-other";
   typeSimulation: InsertionSupport;
   clipboard: InsertionSupport;
   ibusShortcut: IbusShortcutStatus;

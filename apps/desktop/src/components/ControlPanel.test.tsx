@@ -116,7 +116,7 @@ describe("ControlPanel", () => {
       desktopInput: { available: true, setupArea: "panel" as const, detail: "Alt+D also reaches the app you are dictating into. Enable the VOCO panel in Help to keep the shortcut out of other apps." },
       desktopPaste: { enabled: true, available: true, detail: "Ready" },
       shortcut: { hotkey: "Alt+D", route: "evdev" as const, state: "available" as const, detail: "Keyboard ready" },
-      sessionType: "wayland", typeSimulation: support, clipboard: support,
+      sessionType: "wayland" as const, typeSimulation: support, clipboard: support,
       ibusShortcut: { available: false, setupState: "not-enabled" as const, detail: "Not enabled", error: null },
     };
     const settings = renderPanel({ surface: "settings", runtimeDiagnostics });
@@ -125,6 +125,10 @@ describe("ControlPanel", () => {
     const popover = renderPanel({ runtimeDiagnostics });
     expect(popover).toContain("Click where you want the text, then use your shortcut.");
     expect(popover).not.toContain("Open Help to finish desktop setup.");
+    // Wayland also explains binding voco --toggle in the desktop's own settings.
+    expect(renderPanel({ surface: "settings", requestedSection: "Hotkeys", runtimeDiagnostics })).toContain("Desktop shortcut");
+    expect(renderPanel({ surface: "settings", requestedSection: "Hotkeys",
+      runtimeDiagnostics: { ...runtimeDiagnostics, sessionType: "x11-or-other" } })).not.toContain("Desktop shortcut");
     const advanced = renderPanel({ surface: "settings", requestedSection: "Advanced", runtimeDiagnostics });
     expect(advanced).toContain("Panel setup");
     expect(advanced).not.toContain("Setup needed");

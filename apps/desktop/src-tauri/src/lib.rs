@@ -141,7 +141,9 @@ fn hotkey_trace_path() -> std::path::PathBuf {
     xdg_state_home().join("voco").join("hotkey-trace.jsonl")
 }
 
-fn session_type_label() -> &'static str {
+/// The trace and performance logs' session label. RuntimeDiagnostics reports
+/// insertion.rs's "wayland" or "x11-or-other" instead.
+fn trace_session_label() -> &'static str {
     match std::env::var("XDG_SESSION_TYPE") {
         Ok(value) if value.eq_ignore_ascii_case("wayland") => "Wayland",
         Ok(value) if value.eq_ignore_ascii_case("x11") => "X11",
@@ -180,7 +182,7 @@ fn trace_hotkey_event_with_fields(
         "event": event,
         "t_ms": monotonic_trace_ms(),
         "backend_used": backend,
-        "session_type": session_type_label(),
+        "session_type": trace_session_label(),
     });
     if let Some(fields) = frontend_fields {
         if let Some(selected_device_configured) = fields.selected_device_configured {
@@ -431,6 +433,19 @@ fn is_wayland_session() -> bool {
     std::env::var("XDG_SESSION_TYPE")
         .map(|value| value.eq_ignore_ascii_case("wayland"))
         .unwrap_or(false)
+}
+
+fn current_desktop() -> String {
+    std::env::var_os("XDG_CURRENT_DESKTOP")
+        .map(|value| value.to_string_lossy().into_owned())
+        .unwrap_or_default()
+}
+
+/// Whether an XDG_CURRENT_DESKTOP value names GNOME, alone or as in "ubuntu:GNOME".
+fn is_gnome_desktop(desktop: &str) -> bool {
+    desktop
+        .split(':')
+        .any(|name| name.eq_ignore_ascii_case("gnome"))
 }
 
 /// On Wayland, the preset passive evdev observes and the companion grabs. X11's
@@ -1882,11 +1897,7 @@ fn notify_missing_top_bar_presence() {
         if panel::is_attached() || status_notifier_host_present() != Some(false) {
             return;
         }
-        let gnome = std::env::var("XDG_CURRENT_DESKTOP")
-            .unwrap_or_default()
-            .split(':')
-            .any(|desktop| desktop.eq_ignore_ascii_case("gnome"));
-        let detail = if gnome {
+        let detail = if is_gnome_desktop(&current_desktop()) {
             "Open VOCO from the app menu, choose Enable live panel in Help, then sign out and back in."
         } else {
             "Your desktop shows no tray icons. Open VOCO from the app menu for Settings and Review."

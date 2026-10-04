@@ -26,6 +26,7 @@ import { NativeMicrophoneSettings } from "@/components/NativeMicrophoneSettings"
 import type { NativeMicrophoneControls } from "@/hooks/useNativeCaptureSettings";
 import { SettingsIcon } from "@/components/SettingsIcon";
 import { useGlassPointer } from "@/hooks/useGlassPointer";
+import { isWaylandSession } from "@/lib/windowRemap";
 import vocoBrandImage from "../../../../assets/voco-symbol-ui.png";
 
 interface ControlPanelProps {
@@ -162,7 +163,7 @@ export function ControlPanel({
   const [hotkeyDraft, setHotkeyDraft] = useState(config.hotkey);
   const [hotkeyError, setHotkeyError] = useState<string | null>(null);
   const nativePreviewDisabled = Boolean(nativeMicrophone && nativeMicrophone.mode !== "webkit");
-  const waylandDesktop = runtimeDiagnostics?.sessionType.toLowerCase() === "wayland";
+  const waylandDesktop = isWaylandSession(runtimeDiagnostics?.sessionType ?? null);
   const [inputReadiness, setInputReadiness] = useState<DesktopInputStatus | null>(null);
   const [checkingInput, setCheckingInput] = useState(false);
   const inputCheckRequest = useRef(0);
