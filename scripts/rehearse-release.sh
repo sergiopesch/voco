@@ -23,6 +23,13 @@ echo "  latest deb: ${LATEST_DEB_NAME}"
 echo "  rpm: ${RPM_NAME}"
 echo "  latest rpm: ${LATEST_RPM_NAME}"
 
+# Name the missing text instead of failing with grep's silent status.
+contains() {
+  local file="$1" text="$2"
+  shift 2
+  grep -Fq "$@" -- "${text}" "${file}" || { echo "${file} must contain: ${text}" >&2; exit 1; }
+}
+
 (
   cd "${ROOT_DIR}"
   npm run verify:versions
@@ -38,17 +45,16 @@ echo "  latest rpm: ${LATEST_RPM_NAME}"
     echo "Unsafe installer reference found in docs or helper comments"
     exit 1
   fi
-  grep -F 'sha256sum -c' docs/install.md > /dev/null
-  grep -F 'wget "$BASE/$TAG/install" -O voco-install' docs/install.md > /dev/null
-  grep -F "raw.githubusercontent.com/sergiopesch/voco/${TAG_NAME}/install" install > /dev/null
+  contains docs/install.md 'sha256sum -c'
+  contains docs/install.md 'wget "$BASE/$TAG/install" -O voco-install'
   # README installs the published release, not the version this source tree would release.
   PUBLISHED_VERSION="$(node -p "require('./packaging/published-release.json').version")"
-  grep -Fx "wget -qO voco-install https://raw.githubusercontent.com/sergiopesch/voco/voco.${PUBLISHED_VERSION}/install && bash voco-install" README.md > /dev/null
-  grep -F 'sha256sum -c voco_latest_checksums.txt' docs/install.md > /dev/null
-  grep -F 'gh release create ${TAG} --draft --verify-tag' scripts/assemble-release.sh > /dev/null
+  contains README.md "wget -qO voco-install https://raw.githubusercontent.com/sergiopesch/voco/voco.${PUBLISHED_VERSION}/install && bash voco-install" -x
+  contains docs/install.md 'sha256sum -c voco_latest_checksums.txt'
+  contains scripts/assemble-release.sh 'gh release create ${TAG} --draft --verify-tag'
   # Both packages come from one staged tree, and the RPM is verified against the .deb.
-  grep -F -- '--rpm "${ASSETS}/${RPM}"' scripts/assemble-release.sh > /dev/null
-  grep -F 'bash scripts/verify-rpm-package.sh "${ASSETS}/${RPM}" "${VERSION}" "${ASSETS}/${DEB}"' scripts/assemble-release.sh > /dev/null
+  contains scripts/assemble-release.sh '--rpm "${ASSETS}/${RPM}"'
+  contains scripts/assemble-release.sh 'bash scripts/verify-rpm-package.sh "${ASSETS}/${RPM}" "${VERSION}" "${ASSETS}/${DEB}"'
   bash ./scripts/render-release-body.sh "${VERSION}" "${TAG_NAME}" > "${TMP_DIR}/release-body.md"
   for expected in \
     'voco_checksums.txt' \
@@ -56,7 +62,7 @@ echo "  latest rpm: ${LATEST_RPM_NAME}"
     "gpg --verify voco_${VERSION}_debian_checksums.txt.asc voco_${VERSION}_debian_checksums.txt && sha256sum --check --strict voco_${VERSION}_debian_checksums.txt" \
     "gpg --verify voco_${VERSION}_rpm_checksums.txt.asc voco_${VERSION}_rpm_checksums.txt && sha256sum --check --strict voco_${VERSION}_rpm_checksums.txt" \
     "sudo dnf install ./${RPM_NAME}"; do
-    grep -F -- "${expected}" "${TMP_DIR}/release-body.md" > /dev/null
+    contains "${TMP_DIR}/release-body.md" "${expected}"
   done
 )
 
