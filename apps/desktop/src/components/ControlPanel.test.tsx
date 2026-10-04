@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   ControlPanel,
+  saveErrorMessage,
   shouldOpenMicrophonePreview,
   shortcutFromKeyboardEvent,
 } from "@/components/ControlPanel";
@@ -312,6 +313,17 @@ describe("shortcut recording", () => {
     expect(press({ key: "a", code: "KeyA" })).toBeNull();
     expect(press({ key: "A", code: "KeyA", shiftKey: true })).toBeNull();
     expect(press({ key: "Control", code: "ControlLeft", ctrlKey: true })).toBeNull();
+  });
+});
+
+describe("settings save errors", () => {
+  it("show the reason the native save gave, which Tauri passes as a string", () => {
+    const reason = "Dictation hotkey must include Alt, Control, or Super in addition to the main key";
+    expect(saveErrorMessage(reason)).toBe(reason);
+    expect(saveErrorMessage(new Error("Disk full"))).toBe("Disk full");
+    for (const unknown of ["", undefined, { outcome: "uncertain" }]) {
+      expect(saveErrorMessage(unknown)).toBe("VOCO could not save those settings.");
+    }
   });
 });
 

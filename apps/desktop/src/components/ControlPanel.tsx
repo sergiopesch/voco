@@ -119,6 +119,12 @@ export function shortcutFromKeyboardEvent(event: ShortcutKeyEvent): string | nul
   return event.ctrlKey || event.altKey || event.metaKey ? [...modifiers, shortcutKey(event)].join("+") : null;
 }
 
+/** Why a settings save failed. A Tauri command rejects with its error text. */
+export function saveErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return typeof error === "string" && error ? error : "VOCO could not save those settings.";
+}
+
 export function ControlPanel({
   nativeMicrophone,
   onStartTest,
@@ -467,11 +473,7 @@ export function ControlPanel({
     } catch (error) {
       setSaveFeedback("Changes could not be saved. Review the error and try again.");
       setSaveOutcome("attention");
-      return {
-        ok: false,
-        message:
-          error instanceof Error ? error.message : "VOCO could not save those settings.",
-      };
+      return { ok: false, message: saveErrorMessage(error) };
     } finally {
       setSavingCount((count) => Math.max(0, count - 1));
     }
