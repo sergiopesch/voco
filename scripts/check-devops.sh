@@ -40,20 +40,12 @@ import re
 from pathlib import Path
 
 function_names = (
-    "voco_escape_json_string",
-    "voco_trim",
-    "voco_canonical_hotkey_key",
-    "voco_validate_hotkey",
-    "voco_read_configured_hotkey",
-    "voco_migrate_legacy_config",
     "voco_verify_installed_package",
     "voco_install_deb_package",
     "voco_detect_package_manager",
     "voco_verify_installed_rpm",
     "voco_install_rpm_package",
     "voco_verify_desktop_input",
-    "voco_write_default_config",
-    "voco_run_hotkey_setup",
 )
 functions = {name: [] for name in function_names}
 for path in (Path("install"), Path("scripts/lib/install-common.sh")):

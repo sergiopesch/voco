@@ -236,7 +236,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `provision-ci-speech.sh` — Copies the speech payload of a checksum-pinned published package into `runtime/speech/` for CI.
 - `debian_maintainer.py` — Generates and checks the maintainer script.
 - `sync-installer-ui.py`, `lib/install-ui.sh`, `lib/install-apt-ui.py`, `lib/install-brand.json` — Installer interface sources embedded in `install`.
-- `lib/install-common.sh` — Install steps that `setup.sh --install` sources and `install` carries copies of: package manager detection, the APT and DNF installs and their checks, the desktop input check and the shortcut. `check-devops.sh` keeps the copies identical, and `test-install-common.sh` tests them.
+- `lib/install-common.sh` — Install steps that `setup.sh --install` sources and `install` carries copies of: package manager detection, the APT and DNF installs and their checks, and the desktop input check. `check-devops.sh` keeps the copies identical, and `test-install-common.sh` tests them.
 - `lib/test-speech-runtime.sh` — Speech runtime setup for disposable test desktops.
 - `lib/uinput-bridge.sh` — Starts and stops the uinput bridge for disposable test desktops.
 

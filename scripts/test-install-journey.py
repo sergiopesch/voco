@@ -103,7 +103,7 @@ voco_ui_close
             self.assertNotIn('Interrupted frame', screen)
 
     def run_journey(self, mode, signature_case='valid', install_case='ready', launch_case='started',
-                    manager='apt'):
+                    manager='apt', settings=None):
         source = (ROOT / 'install').read_text()
         prefix, body = source.split('# ─── Header', 1)
         # The signed .54 manifest includes KEYS. Use that small real release asset
@@ -125,6 +125,11 @@ voco_ui_close
                     script.write('printf "Fixture choice [y/N]: "\nread -r answer\n[[ "$answer" == yes ]] || exit 55\nprintf "\\nChoice accepted\\n"\n')
             for path in root.iterdir():
                 path.chmod(0o755)
+            # VOCO's own settings, or a legacy Voice config it copies at first launch.
+            saved = root / 'config' / (settings or 'voco') / 'config.json'
+            if settings:
+                saved.parent.mkdir(parents=True)
+                saved.write_text('{"hotkey":"Super+F12"}\n')
             stubs = r'''
             if [[ "$FIXTURE_SIGNATURE_CASE" == wrong-fingerprint ]]; then
               VOCO_RELEASE_KEY_FINGERPRINT=0000000000000000000000000000000000000000
@@ -194,6 +199,11 @@ voco_ui_close
             code, raw = fixture.terminal(['bash', '-c', prefix + stubs + '# ─── Header' + body], env, columns=40 if mode == 'narrow' else 80, rows=8 if mode == 'short' else 24, reply={'prompt': (b'Fixture choice [y/N]: ', b'yes\n'), 'password': (b'Fixture password: ', b'fixture\n')}.get(mode))
             expected_code = 1 if signature_case != 'valid' or install_case == 'package-failure' else 2 if install_case == 'readiness-failure' else 0
             self.assertEqual(code, expected_code, raw.decode(errors='replace'))
+            # VOCO writes its settings at first launch; the installer never does.
+            if settings:
+                self.assertEqual(saved.read_text(), '{"hotkey":"Super+F12"}\n')
+            else:
+                self.assertFalse(saved.parent.exists())
             installer = 'dnf-called' if manager == 'dnf' else 'apt-called'
             self.assertEqual((root / installer).exists(), signature_case == 'valid')
             self.assertFalse((root / ('apt-called' if manager == 'dnf' else 'dnf-called')).exists())
@@ -241,7 +251,11 @@ voco_ui_close
             self.assertNotIn('[1/3]', screen)
             self.assertIn("Installed. Let's try your voice.", screen)
             self.assertIn('sign out', screen.lower())
-            self.assertIn('Alt+D', screen)
+            if settings:
+                self.assertIn('unchanged', screen)
+                self.assertNotIn('Alt+D', screen)
+            else:
+                self.assertIn('Alt+D', screen)
             if launch_case == 'started':
                 self.assertIn('Opening VOCO', screen)
                 self.assertNotIn('Open VOCO →', screen)
@@ -259,6 +273,12 @@ voco_ui_close
             for case in ('skipped', 'failed'):
                 with self.subTest(mode=mode, case=case):
                     self.run_journey(mode, launch_case=case)
+
+    def test_saved_settings_are_left_to_voco(self):
+        for settings in ('voco', 'voice'):
+            for mode in ('animated', 'plain'):
+                with self.subTest(settings=settings, mode=mode):
+                    self.run_journey(mode, settings=settings)
 
     def test_pinned_key_verifies_published_release_manifest(self):
         source = (ROOT / 'install').read_text()

@@ -73,7 +73,7 @@ VOCO_STREAM_WORKER="$PWD/runtime/speech/stream_worker.py" npm run dev
 
 `bash scripts/setup.sh --install` builds the release app, assembles the complete
 package with the provisioned runtime, verifies it and installs it with APT. It
-then runs `voco --check-desktop-input` and sets up the Alt+D shortcut. It adds
+then runs `voco --check-desktop-input`. It adds
 binutils, desktop-file-utils and appstream to the APT list, installs
 Tauri CLI 2.10.1 when no Tauri CLI is installed and warns about any other
 version, and exits with status 2 when desktop input still needs setup.

@@ -192,7 +192,10 @@ VOCO pauses dictation and shows **VOCO settings need attention** when it can't
 safely load `~/.config/voco/config.json`. This happens when the file isn't
 valid JSON or has a value VOCO doesn't accept, or when the file or its folder
 is a symbolic link or belongs to another user. VOCO fixes their permissions
-itself. A **Dictation paused** notification may ask you to open VOCO.
+itself. On a first start VOCO copies an older `~/.config/voice/config.json` if
+it finds one, and shows the panel when that file is a symbolic link, isn't a
+regular file or belongs to another user. A **Dictation paused** notification
+may ask you to open VOCO.
 
 - **Retry loading settings** tries again after you correct the file.
 - **Open config directory** opens `~/.config/voco/`.

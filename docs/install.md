@@ -42,12 +42,14 @@ The installer:
    then the package's checksum. If a check fails, it installs nothing.
 4. Installs the package with APT or DNF, then checks that exactly this release
    is installed.
-5. Keeps your saved shortcut, or sets `Alt+D` if VOCO has no settings yet.
-6. Runs `voco --check-desktop-input` to check [desktop input](#desktop-input).
-7. Runs `voco --setup-panel`, which on GNOME 46, 48 and 50 turns on the
+5. Runs `voco --check-desktop-input` to check [desktop input](#desktop-input).
+6. Runs `voco --setup-panel`, which on GNOME 46, 48 and 50 turns on the
    [VOCO panel](#gnome-panel) for your account.
-8. Opens VOCO for a short voice test. As root or over SSH it skips this, so
+7. Opens VOCO for a short voice test. As root or over SSH it skips this, so
    open VOCO from your desktop.
+
+The installer doesn't touch your settings. VOCO keeps a saved shortcut, and
+uses `Alt+D` when it starts without one.
 
 | Exit status | Meaning |
 | --- | --- |

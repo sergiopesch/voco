@@ -273,9 +273,6 @@ if [[ "$INSTALL_MODE" == true ]]; then
     dim "See docs/platform/README.md before dictating."
     exit 2
   fi
-  voco_run_hotkey_setup "Alt+D"
-  HOTKEY="${VOCO_SELECTED_HOTKEY}"
-  CONFIG_FILE="${VOCO_CONFIG_FILE}"
 
   # ─── Done ─────────────────────────────────────────────
   ELAPSED=$SECONDS
@@ -292,10 +289,9 @@ if [[ "$INSTALL_MODE" == true ]]; then
   echo -e "  ${WHITE}${BOLD}▸${NC} Or run: ${GRAPHITE_SOFT}voco${NC}"
   echo
   echo -e "  ${DIM}Speech uses the pinned runtime bundled in the package.${NC}"
-  echo -e "  ${DIM}Click where you want the text, then press ${BOLD}${HOTKEY}${NC}${DIM} to dictate!${NC}"
+  echo -e "  ${DIM}Click where you want the text, then press ${BOLD}Alt+D${NC}${DIM}, or your saved shortcut, to dictate!${NC}"
   echo
-  echo -e "  ${DIM}Change the shortcut on the Shortcut page of VOCO's Settings,${NC}"
-  echo -e "  ${DIM}or edit ${CONFIG_FILE}${NC}"
+  echo -e "  ${DIM}Change the shortcut on the Shortcut page of VOCO's Settings.${NC}"
   echo
 
 else
