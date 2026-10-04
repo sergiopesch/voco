@@ -264,7 +264,7 @@ impl Prepared {
     fn write(self) -> Result<std::path::PathBuf, String> {
         let metadata = json!({"complete":self.complete,"guiPid":std::process::id(),"captureId":self.metadata["captureId"],
             "sessionId":self.metadata["sessionId"],"generation":self.metadata["generation"]});
-        super::private_bundle::write_bundle_streaming("native", metadata, |writer| {
+        super::private_bundle::write_bundle("native", metadata, |writer| {
             writer.write_file(
                 "descriptor.json",
                 &serde_json::to_vec_pretty(&self.descriptor).map_err(|e| e.to_string())?,

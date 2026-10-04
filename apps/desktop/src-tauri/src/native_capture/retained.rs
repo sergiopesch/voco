@@ -130,11 +130,10 @@ pub(crate) fn save(
     envelope["guiPid"] = json!(std::process::id());
     envelope["optIn"] = super::audit::opt_in();
     let encoded = serde_json::to_vec_pretty(&envelope).map_err(|e| e.to_string())?;
-    let path = private_bundle::write_bundle(
-        "renderer",
-        &[("source.f32le", pcm), ("renderer.json", encoded.as_slice())],
-        commit,
-    )?;
+    let path = private_bundle::write_bundle("renderer", commit, |writer| {
+        writer.write_file("source.f32le", pcm)?;
+        writer.write_file("renderer.json", &encoded)
+    })?;
     Ok(Some(path.to_string_lossy().into_owned()))
 }
 
