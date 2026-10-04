@@ -88,7 +88,7 @@ Run these before you open a pull request:
 | `npm run check` | The TypeScript check, `tsc --noEmit`, in `apps/desktop` |
 | `npm run lint` | ESLint on `apps/desktop/src/` |
 | `npm run verify:versions` | The version matches in every file that carries it |
-| `npm run verify:devops` | Shell and Python syntax, package metadata, CI workflow rules, installer sync and tests, and a release rehearsal |
+| `npm run verify:devops` | Shell, Python and Node syntax, package metadata, CI workflow rules, installer sync and tests, and a release rehearsal |
 
 `npm test` covers source provenance, speech reports, the package assembler, the
 speech runtime, capture and desktop integration, and the dictation scoring tools.

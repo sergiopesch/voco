@@ -74,10 +74,8 @@ PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-install-performance.py
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-install-launch.py
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-install-journey.py
 
-node --check scripts/comparative-dictation.mjs
-node --check scripts/comparative-dictation.test.mjs
-node --check scripts/test-browser-delivery.mjs
-node --test scripts/comparative-dictation.test.mjs
+# Every tracked Node script; node --check reads only its first argument.
+git ls-files -z -- '*.mjs' '*.cjs' | xargs -0 -n1 node --check --
 
 PYTHONDONTWRITEBYTECODE=1 python3 - <<'PY'
 import ast
@@ -286,5 +284,4 @@ if grep -En 'set_global_engine|register_component|delete_surrounding_text|get_su
   exit 1
 fi
 
-bash -n packaging/ibus/voco-ibus-engine
 npm run rehearse:release
