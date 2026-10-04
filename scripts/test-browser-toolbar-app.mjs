@@ -10,7 +10,6 @@ const longCapture = process.env.VOCO_BROWSER_LONG_CAPTURE === '1';
 const root = process.env.VOCO_BROWSER_TEST_ROOT;
 assert.ok(root && process.env.XDG_RUNTIME_DIR === `${root}/runtime` && process.env.DISPLAY === ':0');
 const hash = async p => crypto.createHash('sha256').update(await fs.readFile(p)).digest('hex');
-assert.equal(await hash(`${root}/speech/models/nemotron-speech-streaming-en-0.6b.q8_0.gguf`), 'd9a01898d2a611c8764e23a1c2f45e70bbd5a425dc4de93692ac951dd603812d');
 let longPlan;
 if (longCapture) {
   const manifestBytes = await fs.readFile('tests/fixtures/speech/manifest.json');

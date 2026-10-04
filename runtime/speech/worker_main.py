@@ -6,6 +6,9 @@ import os
 import sys
 import time
 
+# The pinned NeMo-Speech.cpp commit of NATIVE-BUILD.json; test_model_identity.py checks it.
+RUNTIME_REVISION = 'a5b6953+voco-installed-v1'
+
 
 def configure_cpu_threads():
     if 'NEMO_SPEECH_CPU_THREADS' in os.environ:
@@ -156,7 +159,7 @@ def main(protocol):
             return 1
         metrics.emit('worker_ready', model=f'nemotron-0.6b-q8-context{model.context}',
                      cpu_threads=int(os.environ['NEMO_SPEECH_CPU_THREADS']),
-                     backend=os.environ.get('VOCO_NEMO_BACKEND', 'pool'), runtime_revision='a5b6953+voco-installed-v1',
+                     backend=os.environ.get('VOCO_NEMO_BACKEND', 'pool'), runtime_revision=RUNTIME_REVISION,
                      model_sha256=model.model.sha256,
                      parent_pid=os.getppid(), load_ms=model.load_ms, warmup_ms=model.warmup_ms, gate=model.mode)
         return serve(protocol, sys.stdin.buffer, model, metrics)

@@ -184,6 +184,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `NATIVE-BUILD.json` — Build receipt for the pinned native library.
 - `test_cpu_threads.py` — Default thread count.
 - `test_diagnostics.py` — Protocol framing, diagnostics and private metrics logs.
+- `test_model_identity.py` — The model integrity check, the worker's native revision and the NVIDIA notice match the pinned identity files.
 - `test_streaming.py` — Silence gate accounting and log privacy.
 - `test_timing.py` — Timing instrumentation keeps sample order and transcripts.
 - `test_worker_protocol.py` — Protocol and lifecycle checks against the real model.

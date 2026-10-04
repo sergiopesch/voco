@@ -38,7 +38,6 @@ case = os.environ.get('VOCO_NATIVE_APP_CASE', 'delivery')
 assert case in ['delivery', 'focus-switch'], 'Unsupported native application case'
 trace_path = root / 'state/voco/hotkey-trace.jsonl'
 model = root / 'speech/models/nemotron-speech-streaming-en-0.6b.q8_0.gguf'
-assert hashlib.sha256(model.read_bytes()).hexdigest() == 'd9a01898d2a611c8764e23a1c2f45e70bbd5a425dc4de93692ac951dd603812d'
 sound = repo / 'tests/fixtures/speech/84-121123-0000.wav'
 EXPECTED = ['go', 'do', 'you', 'hear']
 # focus-switch speaks the fixture once per field.
