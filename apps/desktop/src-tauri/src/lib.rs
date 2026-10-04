@@ -1559,7 +1559,7 @@ fn supports_evdev_hotkey_parts(
     };
     let has_alt =
         keys.contains(evdev::KeyCode::KEY_LEFTALT) || keys.contains(evdev::KeyCode::KEY_RIGHTALT);
-    has_alt && (keys.contains(evdev::KeyCode::KEY_D) || keys.contains(evdev::KeyCode::KEY_R))
+    has_alt && keys.contains(evdev::KeyCode::KEY_D)
 }
 
 #[cfg(target_os = "linux")]
@@ -1690,7 +1690,7 @@ fn spawn_evdev_device_worker(
                         }) {
                             readiness.unsynchronized();
                         }
-                        let (actions, synchronize_after_batch) = match key_state.lock() {
+                        let (toggles, synchronize_after_batch) = match key_state.lock() {
                             Ok(mut state) => state.batch(
                                 &path,
                                 &events,
@@ -1701,16 +1701,9 @@ fn spawn_evdev_device_worker(
                                 return;
                             }
                         };
-                        for action in actions {
-                            match action {
-                                hotkey_state::HotkeyAction::Dictation => {
-                                    trace_hotkey_event(
-                                        "hotkey_event_received_evdev",
-                                        Some("evdev"),
-                                    );
-                                    eval_toggle_with_backend(&app_handle, "evdev");
-                                }
-                            }
+                        for _ in 0..toggles {
+                            trace_hotkey_event("hotkey_event_received_evdev", Some("evdev"));
+                            eval_toggle_with_backend(&app_handle, "evdev");
                         }
                         if synchronize_after_batch {
                             match dev.get_key_state() {
@@ -2493,6 +2486,30 @@ mod tests {
         assert!(should_start_evdev_listener(true, false));
         assert!(!should_start_evdev_listener(true, true));
         assert!(!should_start_evdev_listener(false, false));
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn evdev_watches_only_real_keyboards_that_can_type_alt_d() {
+        use evdev::{AttributeSet, KeyCode};
+        let keys = |codes: &[KeyCode]| codes.iter().copied().collect::<AttributeSet<KeyCode>>();
+        let alt_d = keys(&[KeyCode::KEY_LEFTALT, KeyCode::KEY_D]);
+        let right_alt_d = keys(&[KeyCode::KEY_RIGHTALT, KeyCode::KEY_D]);
+        assert!(supports_evdev_hotkey_parts(
+            Some("AT Translated Set 2 keyboard"),
+            Some(&*alt_d)
+        ));
+        assert!(supports_evdev_hotkey_parts(None, Some(&*right_alt_d)));
+        for unable in [
+            keys(&[KeyCode::KEY_LEFTALT, KeyCode::KEY_R]),
+            keys(&[KeyCode::KEY_D]),
+        ] {
+            assert!(!supports_evdev_hotkey_parts(None, Some(&*unable)));
+        }
+        assert!(!supports_evdev_hotkey_parts(None, None));
+        for synthetic in ["VOCO virtual keyboard", "ydotoold virtual device"] {
+            assert!(!supports_evdev_hotkey_parts(Some(synthetic), Some(&*alt_d)));
+        }
     }
 
     #[cfg(target_os = "linux")]

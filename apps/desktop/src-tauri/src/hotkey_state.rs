@@ -4,11 +4,6 @@ use evdev::{EventSummary, InputEvent, KeyCode, SynchronizationCode};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum HotkeyAction {
-    Dictation,
-}
-
 #[derive(Default)]
 pub(crate) struct HotkeyState {
     devices: HashMap<PathBuf, HashSet<KeyCode>>,
@@ -50,15 +45,16 @@ impl HotkeyState {
         }))
     }
 
-    /// Discard an incomplete kernel event batch and require a fresh state query
-    /// after SYN_REPORT. Resynchronization never creates activation events.
+    /// Count the batch's dictation toggles, or discard an incomplete kernel batch
+    /// and require a fresh state query after SYN_REPORT. Resynchronization never
+    /// creates activation events.
     pub(crate) fn batch(
         &mut self,
         device: &Path,
         events: &[InputEvent],
         dictation_mode: u8,
-    ) -> (Vec<HotkeyAction>, bool) {
-        let mut actions = Vec::new();
+    ) -> (usize, bool) {
+        let mut toggles = 0;
         let mut needs_sync = false;
         for event in events {
             if matches!(
@@ -67,7 +63,7 @@ impl HotkeyState {
             ) {
                 self.devices.remove(device);
                 self.resynchronizing.insert(device.to_path_buf());
-                actions.clear();
+                toggles = 0;
                 needs_sync = false;
                 continue;
             }
@@ -81,35 +77,38 @@ impl HotkeyState {
                 continue;
             }
             if let EventSummary::Key(_, key, value) = event.destructure() {
-                if let Some(action) = self.event(device, key, value, dictation_mode) {
-                    actions.push(action);
+                if self.event(device, key, value, dictation_mode) {
+                    toggles += 1;
                 }
             }
         }
-        (actions, needs_sync)
+        (toggles, needs_sync)
     }
 
+    /// Whether this key event completes the dictation chord.
     pub(crate) fn event(
         &mut self,
         device: &Path,
         key: KeyCode,
         value: i32,
         dictation_mode: u8,
-    ) -> Option<HotkeyAction> {
-        let keys = self.devices.get_mut(device)?;
+    ) -> bool {
+        let Some(keys) = self.devices.get_mut(device) else {
+            return false;
+        };
         match value {
             0 => {
                 keys.remove(&key);
-                return None;
+                return false;
             }
             1 if keys.insert(key) => {}
             // Repeats must neither toggle nor release held modifiers.
-            _ => return None,
+            _ => return false,
         }
         // Until every connected stream is synchronized, an unseen Control or
         // Super key could make a nominal Alt chord inexact.
         if !self.resynchronizing.is_empty() {
-            return None;
+            return false;
         }
         let held = |left, right| {
             self.devices
@@ -121,14 +120,9 @@ impl HotkeyState {
         let ctrl = held(KeyCode::KEY_LEFTCTRL, KeyCode::KEY_RIGHTCTRL);
         let meta = held(KeyCode::KEY_LEFTMETA, KeyCode::KEY_RIGHTMETA);
         if !alt || ctrl || meta {
-            return None;
+            return false;
         }
-        match key {
-            KeyCode::KEY_D if (dictation_mode == 0 && !shift) || (dictation_mode == 1 && shift) => {
-                Some(HotkeyAction::Dictation)
-            }
-            _ => None,
-        }
+        key == KeyCode::KEY_D && ((dictation_mode == 0 && !shift) || (dictation_mode == 1 && shift))
     }
 }
 
@@ -143,13 +137,7 @@ mod tests {
         state
     }
 
-    fn key(
-        state: &mut HotkeyState,
-        device: &str,
-        key: KeyCode,
-        value: i32,
-        mode: u8,
-    ) -> Option<HotkeyAction> {
+    fn key(state: &mut HotkeyState, device: &str, key: KeyCode, value: i32, mode: u8) -> bool {
         state.event(Path::new(device), key, value, mode)
     }
 
@@ -164,13 +152,10 @@ mod tests {
             let mut state = state();
             key(&mut state, "first", KeyCode::KEY_LEFTALT, 1, 0);
             key(&mut state, "second", extra, 1, 0);
-            assert_eq!(key(&mut state, "first", KeyCode::KEY_D, 1, 0), None);
+            assert!(!key(&mut state, "first", KeyCode::KEY_D, 1, 0));
             key(&mut state, "first", KeyCode::KEY_D, 0, 0);
             key(&mut state, "second", extra, 0, 0);
-            assert_eq!(
-                key(&mut state, "first", KeyCode::KEY_D, 1, 0),
-                Some(HotkeyAction::Dictation)
-            );
+            assert!(key(&mut state, "first", KeyCode::KEY_D, 1, 0));
         }
     }
 
@@ -180,10 +165,7 @@ mod tests {
         key(&mut state, "first", KeyCode::KEY_LEFTALT, 1, 0);
         key(&mut state, "first", KeyCode::KEY_RIGHTALT, 1, 0);
         key(&mut state, "first", KeyCode::KEY_LEFTALT, 0, 0);
-        assert_eq!(
-            key(&mut state, "first", KeyCode::KEY_D, 1, 0),
-            Some(HotkeyAction::Dictation)
-        );
+        assert!(key(&mut state, "first", KeyCode::KEY_D, 1, 0));
     }
 
     #[test]
@@ -192,13 +174,10 @@ mod tests {
         key(&mut state, "first", KeyCode::KEY_LEFTALT, 1, 0);
         key(&mut state, "second", KeyCode::KEY_LEFTALT, 1, 0);
         key(&mut state, "first", KeyCode::KEY_LEFTALT, 0, 0);
-        assert_eq!(
-            key(&mut state, "first", KeyCode::KEY_D, 1, 0),
-            Some(HotkeyAction::Dictation)
-        );
+        assert!(key(&mut state, "first", KeyCode::KEY_D, 1, 0));
         key(&mut state, "first", KeyCode::KEY_D, 0, 0);
         state.detach(Path::new("second"));
-        assert_eq!(key(&mut state, "first", KeyCode::KEY_D, 1, 0), None);
+        assert!(!key(&mut state, "first", KeyCode::KEY_D, 1, 0));
     }
 
     #[test]
@@ -206,30 +185,26 @@ mod tests {
         let mut state = state();
         key(&mut state, "first", KeyCode::KEY_LEFTALT, 1, 0);
         key(&mut state, "first", KeyCode::KEY_LEFTALT, 2, 0);
-        assert_eq!(
-            key(&mut state, "first", KeyCode::KEY_D, 1, 0),
-            Some(HotkeyAction::Dictation)
-        );
-        assert_eq!(key(&mut state, "first", KeyCode::KEY_D, 1, 0), None);
-        assert_eq!(key(&mut state, "first", KeyCode::KEY_D, 2, 0), None);
+        assert!(key(&mut state, "first", KeyCode::KEY_D, 1, 0));
+        assert!(!key(&mut state, "first", KeyCode::KEY_D, 1, 0));
+        assert!(!key(&mut state, "first", KeyCode::KEY_D, 2, 0));
     }
 
     #[test]
-    fn modes_and_realtime_require_exact_shift_state() {
+    fn modes_require_exact_shift_state() {
         let mut state = state();
         key(&mut state, "first", KeyCode::KEY_LEFTALT, 1, 1);
-        assert_eq!(key(&mut state, "first", KeyCode::KEY_D, 1, 1), None);
+        assert!(!key(&mut state, "first", KeyCode::KEY_D, 1, 1));
         key(&mut state, "first", KeyCode::KEY_D, 0, 1);
         key(&mut state, "first", KeyCode::KEY_LEFTSHIFT, 1, 1);
         key(&mut state, "first", KeyCode::KEY_RIGHTSHIFT, 1, 1);
         key(&mut state, "first", KeyCode::KEY_LEFTSHIFT, 0, 1);
-        assert_eq!(
-            key(&mut state, "first", KeyCode::KEY_D, 1, 1),
-            Some(HotkeyAction::Dictation)
-        );
+        assert!(key(&mut state, "first", KeyCode::KEY_D, 1, 1));
         key(&mut state, "first", KeyCode::KEY_D, 0, 0);
-        assert_eq!(key(&mut state, "first", KeyCode::KEY_D, 1, 0), None);
-        assert_eq!(key(&mut state, "first", KeyCode::KEY_R, 1, 255), None);
+        assert!(!key(&mut state, "first", KeyCode::KEY_D, 1, 0));
+        // Evdev never toggles a custom shortcut, even with Alt+Shift held.
+        key(&mut state, "first", KeyCode::KEY_D, 0, 255);
+        assert!(!key(&mut state, "first", KeyCode::KEY_D, 1, 255));
     }
 
     #[test]
@@ -246,22 +221,19 @@ mod tests {
             ),
             InputEvent::new(EventType::KEY.0, KeyCode::KEY_D.code(), 1),
         ];
-        assert_eq!(state.batch(Path::new("first"), &events, 0), (vec![], false));
+        assert_eq!(state.batch(Path::new("first"), &events, 0), (0, false));
         key(&mut state, "second", KeyCode::KEY_LEFTALT, 1, 0);
-        assert_eq!(key(&mut state, "second", KeyCode::KEY_D, 1, 0), None);
+        assert!(!key(&mut state, "second", KeyCode::KEY_D, 1, 0));
         let report = [InputEvent::new(
             EventType::SYNCHRONIZATION.0,
             SynchronizationCode::SYN_REPORT.0,
             0,
         )];
-        assert_eq!(state.batch(Path::new("first"), &report, 0), (vec![], true));
+        assert_eq!(state.batch(Path::new("first"), &report, 0), (0, true));
         state.attach(Path::new("first"), [KeyCode::KEY_LEFTALT, KeyCode::KEY_D]);
-        assert_eq!(key(&mut state, "first", KeyCode::KEY_D, 1, 0), None);
+        assert!(!key(&mut state, "first", KeyCode::KEY_D, 1, 0));
         key(&mut state, "first", KeyCode::KEY_D, 0, 0);
-        assert_eq!(
-            key(&mut state, "first", KeyCode::KEY_D, 1, 0),
-            Some(HotkeyAction::Dictation)
-        );
+        assert!(key(&mut state, "first", KeyCode::KEY_D, 1, 0));
     }
 
     #[test]
@@ -290,10 +262,10 @@ mod tests {
     fn reconnect_is_fresh_and_initial_held_key_does_not_toggle() {
         let mut state = state();
         state.attach(Path::new("first"), [KeyCode::KEY_LEFTALT, KeyCode::KEY_D]);
-        assert_eq!(key(&mut state, "first", KeyCode::KEY_D, 1, 0), None);
+        assert!(!key(&mut state, "first", KeyCode::KEY_D, 1, 0));
         state.detach(Path::new("first"));
-        assert_eq!(key(&mut state, "first", KeyCode::KEY_LEFTALT, 1, 0), None);
+        assert!(!key(&mut state, "first", KeyCode::KEY_LEFTALT, 1, 0));
         state.attach(Path::new("first"), []);
-        assert_eq!(key(&mut state, "first", KeyCode::KEY_D, 1, 0), None);
+        assert!(!key(&mut state, "first", KeyCode::KEY_D, 1, 0));
     }
 }
