@@ -3,9 +3,11 @@
 //! An X11 grab callback already consumed its chord and uses shared debounce only.
 use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 
-// Matches the engine's monotonic poll-trigger arm lifetime. Start this bound
-// when a response/error arrives, conservatively later than engine processing.
-const ENGINE_ARM_MS: i64 = 1_000;
+// The engine arms the shortcut for 1 s from each poll-trigger it handles
+// (voco_ibus_engine.py). The lease starts this bound when the reply or error
+// arrives, so it outlasts the engine's arm; readiness starts it before the
+// request, so an Armed status never does.
+pub const ENGINE_ARM_MS: i64 = 1_000;
 // Retries an arbitration pass the main thread skipped for a concurrent writer.
 const ARBITRATION_REFRESH_MS: i64 = 1_000;
 
@@ -38,6 +40,7 @@ impl PluginGesture {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PollOutcome {
     Armed,
     Disarmed,
@@ -58,6 +61,9 @@ impl ConsumingLease {
         }
     }
 
+    /// Call just before sending a request that can arm the engine, today only
+    /// poll-trigger. A connect or hello that fails first cannot have armed it,
+    /// so it must not hold back evdev.
     pub fn begin_poll(&self) {
         // The engine can process a chord before its poll reply reaches us.
         self.polling.store(true, Ordering::SeqCst);

@@ -23,7 +23,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `ibus_shortcut.rs` — Client for the optional IBus engine's private socket (protocol 6).
 - `shortcut_arbitration.rs` — Tells confirmed IBus authority apart from an unanswered poll, and guards evdev and X11 toggles.
 - `shortcut_readiness.rs` — Shortcut status observations and their text; it never registers or admits a shortcut.
-- `hotkey_state.rs` — Physical key state per evdev device for the passive shortcut listener.
+- `hotkey_state.rs` — Physical key state per evdev device for the passive shortcut listener, and the count of live keyboards that shortcut status reports.
 - `hotkey_trace.rs` — Opt-in shortcut timing trace, enabled with `VOCO_HOTKEY_TRACE=1`.
 - `trigger_socket.rs` — Owner-only trigger socket `voco.sock`, with its `voice.sock` alias, that `voco --toggle` connects to.
 - `activation.rs` — Owner-only launcher socket `voco-activate.sock`; it presents the window and never toggles capture.

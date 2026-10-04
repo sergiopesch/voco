@@ -232,28 +232,9 @@ class VocoCoordinator:
             self.consumed_shortcut_keys.clear()
             self.focused_engine = None
 
-    def disable_engine(self, engine: "VocoEngine") -> None:
-        self.deactivate_engine(engine)
-
     def disconnect_client(self) -> None:
         self.shortcut_armed_until = 0.0
         self.trigger_to_deliver = None
-
-    def status(self) -> dict[str, Any]:
-        # Protocol 6 has no insertion session. Keep every key that the app's
-        # EngineStatus decoder requires.
-        return {
-            "ready": True,
-            "setupState": "ready",
-            "sessionId": None,
-            "engineActive": False,
-            "focusLost": self.focus_lost,
-            "progressiveCommitActive": False,
-            "committedCharacterCount": 0,
-            "ownershipIntact": False,
-            "finalizationOutcome": None,
-            "error": "",
-        }
 
 
 class VocoEngine(IBus.Engine):
@@ -380,7 +361,7 @@ class VocoEngine(IBus.Engine):
 
     def do_disable(self) -> None:
         self._leave_focus()
-        self.coordinator.disable_engine(self)
+        self.coordinator.deactivate_engine(self)
 
     def do_destroy(self) -> None:
         if self._voco_destroyed:
@@ -637,10 +618,21 @@ def dispatch_command(
     if operation == "poll-trigger":
         return coordinator.poll_trigger(command.get("hotkey"))
     if operation in {"hello", "status"}:
-        status = coordinator.status()
-        status.update(ready=False, setupState="safety-disabled", ownershipIntact=False,
-                      error=EXACT_FIELD_REQUIRED)
-        return status
+        # Protocol 6 has no insertion session. Earlier protocol 6 apps decode
+        # these keys and require ready, engineActive and focusLost; this app
+        # reads only ready.
+        return {
+            "ready": False,
+            "setupState": "safety-disabled",
+            "sessionId": None,
+            "engineActive": False,
+            "focusLost": coordinator.focus_lost,
+            "progressiveCommitActive": False,
+            "committedCharacterCount": 0,
+            "ownershipIntact": False,
+            "finalizationOutcome": None,
+            "error": EXACT_FIELD_REQUIRED,
+        }
     raise ValueError("unsupported operation")
 
 
