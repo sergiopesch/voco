@@ -12,13 +12,6 @@ import { BrowserStreamDelivery } from "@/lib/browserStreamDelivery";
 import { retainedSampleRate,type CaptureDescriptor,type CaptureSelection } from "@/lib/captureDescriptor";
 import { monitorCaptureHealth } from "@/lib/captureHealth";
 import { createDesktopCaptureTail } from "@/lib/desktopCaptureTail";
-import {
-  isCurrentAudioCaptureSource,
-} from "@/lib/dictationAsyncGuards";
-import {
-  nextCursorDeliveryState,
-  type CursorDeliveryEvent,
-} from "@/lib/dictationDelivery";
 import { createDictationRecording } from "@/lib/dictationRecording";
 import {
   createDictationSessionState,
@@ -32,6 +25,7 @@ import {
   copyDesktopText,
   debugNativeCaptureEnabled,
   getDesktopPasteStatus,
+  getDiagnosticLogging,
   pasteDesktopText,
   releaseBrowserRecording,
   saveDebugNativeRetainedSource,
@@ -39,10 +33,7 @@ import {
   traceHotkeyEvent
 } from "@/lib/tauri";
 import { useStore } from "@/store/useStore";
-import type {
-  CursorDeliveryState,
-  DictationStatus
-} from "@/types";
+import type { CursorDeliveryState } from "@/types";
 import { useCallback,useEffect,useRef,useState } from "react";
 import { DictationStream } from '../lib/dictationStream';
 
@@ -50,7 +41,6 @@ const AUDIO_LEVEL_ATTACK = 0.68;
 const AUDIO_LEVEL_RELEASE = 0.24;
 const AUDIO_LEVEL_FLOOR = 0.01;
 
-type DictationPhase = DictationStatus | "stopping" | "finalizing";
 export function useDictation(options: { getCaptureSelection?: () => CaptureSelection } = {}) {
   const captureSelectionRef = useRef(options.getCaptureSelection);
   captureSelectionRef.current = options.getCaptureSelection;
@@ -60,23 +50,15 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
   const setAudioLevel = useStore((state) => state.setAudioLevel);
   const setMicrophoneReadyState = useStore((state) => state.setMicrophoneReady);
   const clearTranscript = useStore((state) => state.clearTranscript);
-  const [cancellationPending, setCancellationPending] = useState(false);
-  const [canCancel, setCanCancel] = useState(false);
   const disposedRef = useRef(false);
   const lifecycleEpochRef = useRef(0);
   const cancelledRef = useRef<string | null>(null);
   const captureHealthRef = useRef<ReturnType<typeof monitorCaptureHealth> | null>(null);
-  const recoverySessionIdRef = useRef<string | null>(null);
   const [cursorDeliveryState, setCursorDeliveryState] =
     useState<CursorDeliveryState>("inactive");
 
-  function transitionCursorDelivery(event: CursorDeliveryEvent) {
-    setCursorDeliveryState(nextCursorDeliveryState(event));
-  }
-
   const captureDescriptorRef = useRef<CaptureDescriptor | null>(null);
   const nativeCaptureRef = useRef<NativeCaptureSession | null>(null);
-  const captureGenerationRef = useRef(0);
   const audioContextRef = useRef<AudioContext | null>(null);
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const workletRef = useRef<AudioWorkletNode | null>(null);
@@ -89,26 +71,24 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
   const primedStreamPromiseRef = useRef<Promise<MediaStream> | null>(null);
   const audioBufferRef = useRef(createAudioCaptureBuffer());
   const sessionRef = useRef(createDictationSessionState());
-  const phaseRef = useRef<DictationPhase>("idle");
   const workletModuleLoadedRef = useRef(false);
   const smoothedAudioLevelRef = useRef(0);
   const firstHotkeyPressMsRef = useRef<number | null>(null);
   const initialHotkeyPressLoggedRef = useRef(false);
-  const initialHotkeyLatencyLoggedRef = useRef(false);
-  const recordingStartedAtMsRef = useRef<number | null>(null);
-  const stopRequestedAtMsRef = useRef<number | null>(null);
   const browserDeliveryRef = useRef<BrowserStreamDelivery | null>(null);
   const activeTriggerIdRef = useRef<string | undefined>(undefined);
   const desktopPasteSessionRef = useRef(false);
   const dictationStreamRef = useRef<DictationStream | null>(null);
   const desktopStreamedSampleCountRef = useRef(0);
-  const desktopPhrasePasteCountRef = useRef(0);
   const debugNativeCaptureEnabledRef = useRef(false);
+  // Until Rust answers, send everything: a dropped trace costs less than a missing one.
+  const diagnosticLoggingRef = useRef({ trace: true, performance: true });
 
   function traceDictationEvent(
     event: string,
     fields: HotkeyTraceFields | null = null,
   ): Promise<void> {
+    if (!diagnosticLoggingRef.current.trace) return Promise.resolve();
     const sessionId = sessionRef.current.sessionId;
     if (sessionId <= 0) {
       return traceHotkeyEvent(event, fields);
@@ -255,7 +235,7 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
       audioBufferRef,
       dictationStreamRef,
       desktopStreamedSampleCountRef,
-      phaseRef,
+      isRecording: () => sessionRef.current.phase === "recording",
       captureHealthRef,
       nativeCaptureRef,
       cancelledRef,
@@ -311,20 +291,13 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
         void cancelRecording(CAPTURE_INPUT_INTERRUPTED);
       };
       createdWorklet.port.onmessage = (e) => {
-        if (
-          !isCurrentAudioCaptureSource(
-            createdWorklet,
-            sourceSessionId,
-            workletRef.current,
-            sessionRef.current.sessionId,
-          )
-        ) {
-          return;
-        }
+        // Ignore audio from a replaced node or an earlier recording.
+        if (workletRef.current !== createdWorklet || sessionRef.current.sessionId !== sourceSessionId) return;
         if (e.data.type === "samples") {
-          appendRecordingSamples(e.data.data as Float32Array);
-        } else if (e.data.type === "level") {
-          updateAudioLevel(e.data.data as number);
+          // The meter reads these batches too, so every capture path shares audioLevel.ts.
+          const samples = e.data.data as Float32Array;
+          appendRecordingSamples(samples);
+          updateAudioLevel(calculateVisualAudioLevelFromSamples(samples));
         } else if (e.data.type === "capture-interrupted") {
           // The producer reports the gap before its buffered prefix. Invalidate
           // automatic output before accepting those final received samples.
@@ -369,16 +342,8 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
     const processor = audioContext.createScriptProcessor(4096, 1, 1);
     const sourceSessionId = sessionRef.current.sessionId;
     processor.onaudioprocess = (e) => {
-      if (
-        !isCurrentAudioCaptureSource(
-          processor,
-          sourceSessionId,
-          processorRef.current,
-          sessionRef.current.sessionId,
-        )
-      ) {
-        return;
-      }
+      // Ignore audio from a replaced node or an earlier recording.
+      if (processorRef.current !== processor || sessionRef.current.sessionId !== sourceSessionId) return;
       const input = e.inputBuffer.getChannelData(0);
       appendRecordingSamples(new Float32Array(input));
       updateAudioLevel(calculateVisualAudioLevelFromSamples(input));
@@ -455,7 +420,6 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
 
   if (recordingRef.current === null) {
     recordingRef.current = createDictationRecording({
-      phaseRef,
       sessionRef,
       disposedRef,
       cancelledRef,
@@ -463,17 +427,11 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
       dictationStreamRef,
       desktopPasteSessionRef,
       desktopStreamedSampleCountRef,
-      desktopPhrasePasteCountRef,
       activeTriggerIdRef,
-      recoverySessionIdRef,
       nativeCaptureRef,
       captureDescriptorRef,
       captureSelectionRef,
-      captureGenerationRef,
-      recordingStartedAtMsRef,
-      stopRequestedAtMsRef,
       firstHotkeyPressMsRef,
-      initialHotkeyLatencyLoggedRef,
       debugNativeCaptureEnabledRef,
       audioBufferRef,
       lifecycleEpochRef,
@@ -491,8 +449,6 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
       copyDesktopText,
       traceDictationEvent,
       showNotification,
-      setCancellationPending,
-      setCanCancel,
       setStatus,
       setTranscript,
       setError,
@@ -501,7 +457,7 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
       resetAudioLevel,
       updateAudioLevel,
       clearCapturedAudio,
-      transitionCursorDelivery,
+      setCursorDelivery: setCursorDeliveryState,
       recordingSampleRate,
       appendRecordingSamples,
       enqueueDesktopPhrase,
@@ -512,6 +468,7 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
       connectWorklet,
       connectScriptProcessor,
       traceDesktopPasteMetrics,
+      performanceLogMayBeOn: () => diagnosticLoggingRef.current.performance,
       debugNativeCaptureEnabled,
       beginNativeCapture,
       releaseBrowserRecording,
@@ -531,8 +488,15 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
     return recording.isCurrentSession(sessionId);
   }
 
+  // Start publishes "starting" only after its checks; until then only the
+  // session knows a dictation began.
+  const dictationInProgress = useCallback(() => {
+    const { phase } = sessionRef.current;
+    return phase !== "idle" && phase !== "error";
+  }, []);
+
   function discardRecovery() {
-    if (phaseRef.current !== "idle" && phaseRef.current !== "error") return;
+    if (dictationInProgress()) return;
     const native = nativeCaptureRef.current;
     nativeCaptureRef.current = null;
     void native?.cancel().catch(() => {});
@@ -541,13 +505,17 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
     useStore.getState().setCaptureNotice(null);
     clearTranscript();
     cancelledRef.current = null;
-    transitionCursorDelivery("session-reset");
     finalizeIdleState();
   }
 
   useEffect(() => {
     disposedRef.current = false;
     lifecycleEpochRef.current += 1;
+    void getDiagnosticLogging().then((logging) => {
+      if (typeof logging?.trace === "boolean" && typeof logging.performance === "boolean") {
+        diagnosticLoggingRef.current = logging;
+      }
+    }).catch(() => {});
     return () => {
       recordingRef.current?.dispose();
     };
@@ -568,7 +536,7 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
     switch (toggleRequest.action) {
       case "start":
         void startRecording(triggerId);
-        return phaseRef.current === "starting";
+        return sessionRef.current.phase === "starting";
       case "stop":
         void stopRecording();
         return true;
@@ -601,9 +569,7 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
     prepareAudioEngine,
     primeRecordingStream,
     cursorDeliveryState,
-    canCancel,
-    cancellationPending,
-    cancelRecording,
+    dictationInProgress,
     discardRecovery,
     finishOnboardingTest,
     toggle,

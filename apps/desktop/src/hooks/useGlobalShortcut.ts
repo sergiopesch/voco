@@ -61,8 +61,8 @@ export function useGlobalShortcut(
         onHotkeyPressedRef.current();
         const { triggerId, action, stopSession } = event.payload ?? {};
         if (!shouldProcessHotkeyEvent(shouldHandleHotkeyRef.current(), triggerId, action, stopSession)) {
-          if (event.payload?.action === "start" && event.payload.triggerId?.startsWith("browser:")) {
-            void releaseBrowserRecording(event.payload.triggerId).catch(() => {});
+          if (action === "start" && isBrowserTrigger(triggerId)) {
+            void releaseBrowserRecording(triggerId).catch(() => {});
           }
           return;
         }

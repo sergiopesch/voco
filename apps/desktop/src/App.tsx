@@ -51,10 +51,7 @@ import {
 } from "@/lib/dictationPresentation";
 import { defaultNativeSource } from "@/lib/nativeCaptureSettings";
 import { canStopOnboardingTest, cancelsPendingStart, isBrowserTrigger, type DictationTriggerAction } from "@/lib/dictationTrigger";
-import {
-  shouldApplyConfigSnapshot,
-  shouldBlockRuntimeForConfigErrors,
-} from "@/lib/configSnapshot";
+import { shouldApplyConfigSnapshot } from "@/lib/configSnapshot";
 import { placeTrayPopover } from "@/lib/popoverPlacement";
 import { showInteractiveWindow, WindowRemapFocusGuard, isWaylandSession } from "@/lib/windowRemap";
 import {
@@ -209,9 +206,7 @@ export function App() {
     prepareAudioEngine,
     primeRecordingStream,
     cursorDeliveryState,
-    canCancel,
-    cancellationPending,
-    cancelRecording,
+    dictationInProgress,
     discardRecovery,
     finishOnboardingTest,
     toggle,
@@ -264,8 +259,6 @@ export function App() {
   const diagnosticsExpiryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const runtimeStatusRevisionRef = useRef(0);
   const microphoneRefreshRef = useRef(new MicrophoneRefresh());
-  const dictationStatusRef = useRef(status);
-  dictationStatusRef.current = status;
   const applyAuthoritativeConfig = useCallback(
     (snapshot: ConfigSnapshot): boolean => {
       if (
@@ -320,10 +313,9 @@ export function App() {
     diagnosticsLoaded: runtimeDiagnostics !== null,
     diagnosticsFailed: runtimeDiagnosticsFailed,
   });
-  const runtimeConfigurationError = shouldBlockRuntimeForConfigErrors(
-    startupConfigError,
-    settingsError,
-  );
+  // Only an unreadable startup config pauses dictation. A failed save keeps the
+  // previous config in force: Rust restores the old shortcut and emits no snapshot.
+  const runtimeConfigurationError = startupConfigError !== null;
   const canHandleHotkey =
     initComplete && config !== null && !runtimeConfigurationError;
   const handleToggleRequest = useCallback(async (triggerId?: string, action?: DictationTriggerAction, stopSession?: string) => {
@@ -379,7 +371,7 @@ export function App() {
       return true;
     }
 
-    const dictationActive = isDictationActive(dictationStatusRef.current);
+    const dictationActive = isDictationActive(currentState.status);
     if (!dictationActive && action === "stop") return true;
     const captureState = useStore.getState();
     if (!dictationActive && captureState.captureBackendMode !== "webkit") {
@@ -401,7 +393,7 @@ export function App() {
     if (
       captureState.captureBackendMode === "webkit" &&
       !canToggleDictationWithPermission(
-        dictationStatusRef.current,
+        currentState.status,
         useStore.getState().microphonePermission,
       )
     ) {
@@ -531,8 +523,7 @@ export function App() {
     const deviceId = useStore.getState().selectedDeviceId;
     const inactive = () => {
       const state = useStore.getState();
-      return current() && !isDictationActive(state.status) && state.selectedDeviceId === deviceId &&
-        state.status !== "recording" && state.status !== "processing";
+      return current() && !isDictationActive(state.status) && state.selectedDeviceId === deviceId;
     };
     if (!inactive()) return false;
     try {
@@ -676,15 +667,13 @@ export function App() {
   const openSettings = useCallback(async (section: PanelSection = "General") => {
     const requestVersion = panelRequestVersionRef.current + 1;
     panelRequestVersionRef.current = requestVersion;
-    const currentStatus = useStore.getState().status;
-    if (isDictationActive(currentStatus)) {
+    if (isDictationActive(useStore.getState().status) || dictationInProgress()) {
       return;
     }
     await refreshPanelState();
-    const latestStatus = useStore.getState().status;
     if (
       panelRequestVersionRef.current !== requestVersion ||
-      isDictationActive(latestStatus)
+      isDictationActive(useStore.getState().status) || dictationInProgress()
     ) {
       return;
     }
@@ -693,7 +682,7 @@ export function App() {
       id: current.id + 1,
     }));
     setSurface("settings");
-  }, [refreshPanelState, setSurface]);
+  }, [dictationInProgress, refreshPanelState, setSurface]);
 
   const showPopover = useCallback(
     async (anchor: TrayPopoverAnchor, toggleVisibility: boolean) => {
@@ -704,7 +693,7 @@ export function App() {
         setCloseRequestId((request) => request + 1);
         return;
       }
-      if (isDictationActive(state.status)) {
+      if (isDictationActive(state.status) || dictationInProgress()) {
         return;
       }
       trayPopoverAnchorRef.current = anchor;
@@ -716,13 +705,13 @@ export function App() {
       const latestState = useStore.getState();
       if (
         panelRequestVersionRef.current !== requestVersion ||
-        isDictationActive(latestState.status)
+        isDictationActive(latestState.status) || dictationInProgress()
       ) {
         return;
       }
       setSurface("popover");
     },
-    [dismissInteractiveSurface, refreshPanelState, setSurface],
+    [dictationInProgress, dismissInteractiveSurface, refreshPanelState, setSurface],
   );
 
   const applyConfigPatch = useCallback(
@@ -932,7 +921,6 @@ export function App() {
       }
       if (surface === "hidden") {
         await currentWindow.setAlwaysOnTop(true).catch(() => {});
-        await currentWindow.setDecorations(false).catch(() => {});
         await currentWindow.setSkipTaskbar(true).catch(() => {});
         await currentWindow.setResizable(false).catch(() => {});
         await currentWindow.setMinSize(null).catch(() => {});
@@ -953,7 +941,6 @@ export function App() {
       if (surface === "popover") {
         await currentWindow.setIgnoreCursorEvents(false).catch(() => {});
         await currentWindow.setAlwaysOnTop(true).catch(() => {});
-        await currentWindow.setDecorations(false).catch(() => {});
         await currentWindow.setSkipTaskbar(false).catch(() => {});
         await currentWindow.setResizable(false).catch(() => {});
         await currentWindow.setMinSize(null).catch(() => {});
@@ -1005,7 +992,6 @@ export function App() {
 
       await currentWindow.setIgnoreCursorEvents(false).catch(() => {});
       await currentWindow.setAlwaysOnTop(false).catch(() => {});
-      await currentWindow.setDecorations(false).catch(() => {});
       await currentWindow.setSkipTaskbar(false).catch(() => {});
       await currentWindow.setMinSize(PANEL_MIN_SIZE).catch(() => {});
       await currentWindow.setResizable(true).catch(() => {});
@@ -1080,14 +1066,14 @@ export function App() {
     return cleanupDeferredListener(
       getCurrentWindow().listen("voco:open-review", () => {
         const state = useStore.getState();
-        if (startRequestRef.current || isDictationActive(state.status)) return;
+        if (startRequestRef.current || isDictationActive(state.status) || dictationInProgress()) return;
         if (!dismissInteractiveSurface()) return;
         setSurface("review");
         setActivationRequest(value => value + 1);
       }),
       "review event listener",
     );
-  }, [dismissInteractiveSurface, setSurface]);
+  }, [dictationInProgress, dismissInteractiveSurface, setSurface]);
 
   useEffect(() => {
     if (!initComplete) return;
@@ -1095,7 +1081,7 @@ export function App() {
     const activate = async () => {
       if (!(await takeLauncherActivation().catch(() => false)) || !alive) return;
       const state = useStore.getState();
-      if (startRequestRef.current || isDictationActive(state.status)) {
+      if (startRequestRef.current || isDictationActive(state.status) || dictationInProgress()) {
         void traceHotkeyEvent("launcher_activation_preserved_capture").catch(() => {});
         return;
       }
@@ -1107,7 +1093,7 @@ export function App() {
       void activate();
     }).then(unlisten => { if (alive) void activate(); return unlisten; }), "launcher activation listener");
     return () => { alive = false; cleanup(); };
-  }, [initComplete, setSurface]);
+  }, [dictationInProgress, initComplete, setSurface]);
 
   useEffect(() => {
     return cleanupDeferredListener(
@@ -1226,9 +1212,6 @@ export function App() {
         runtimeDiagnostics={runtimeDiagnostics}
         dictationStatus={status}
         captureNotice={captureNotice}
-        canCancelDictation={canCancel}
-        cancellationPending={cancellationPending}
-        onCancelDictation={() => void cancelRecording()}
         onPrepareDictation={() => void handlePrepareDictation()}
         onDraftStateChange={handleDraftStateChange}
         onShortcutCaptureChange={handleShortcutCaptureChange}

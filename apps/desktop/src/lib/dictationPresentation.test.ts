@@ -15,14 +15,6 @@ describe("status label presentation", () => {
     microphoneReady: true,
   };
 
-  it("shows startup without claiming the microphone is listening", () => {
-    expect(deriveStatusLabel({ ...ready, dictationStatus: "starting" })).toBe("Starting microphone");
-  });
-
-  it("shows one listening label for every recording", () => {
-    expect(deriveStatusLabel({ ...ready, dictationStatus: "recording" })).toBe("Listening");
-  });
-
   it("keeps desktop setup pending until the first diagnostics settle", () => {
     const pending = deriveCursorSetupState({ desktopInputReady: false, diagnosticsLoaded: false, diagnosticsFailed: false });
     const failed = deriveCursorSetupState({ desktopInputReady: false, diagnosticsLoaded: false, diagnosticsFailed: true });

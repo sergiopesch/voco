@@ -1,11 +1,5 @@
 const LABEL_PREFIX = "label:";
 
-export interface AudioInputProcessingOptions {
-  echoCancellation?: boolean;
-  noiseSuppression?: boolean;
-  autoGainControl?: boolean;
-}
-
 export type AudioInputFallbackStage =
   | "none"
   | "minimal-constraints"
@@ -89,16 +83,13 @@ async function resolvePreferredAudioInputDeviceId(
   return resolvedDeviceId;
 }
 
-export function buildAudioConstraints(
-  deviceId: string | null,
-  processing: AudioInputProcessingOptions = {},
-): MediaTrackConstraints {
+export function buildAudioConstraints(deviceId: string | null): MediaTrackConstraints {
   return {
     deviceId: deviceId ? { exact: deviceId } : undefined,
     channelCount: { ideal: 1 },
-    echoCancellation: { ideal: processing.echoCancellation ?? false },
-    noiseSuppression: { ideal: processing.noiseSuppression ?? false },
-    autoGainControl: { ideal: processing.autoGainControl ?? false },
+    echoCancellation: { ideal: false },
+    noiseSuppression: { ideal: false },
+    autoGainControl: { ideal: false },
   };
 }
 
@@ -120,24 +111,18 @@ function isConstraintFailure(error: unknown): boolean {
   );
 }
 
-export async function openMicrophoneStream(
-  deviceId: string | null,
-  processing?: AudioInputProcessingOptions,
-): Promise<MediaStream> {
-  return openMicrophoneStreamWithDiagnostics(deviceId, processing).then(
-    (result) => result.stream,
-  );
+export async function openMicrophoneStream(deviceId: string | null): Promise<MediaStream> {
+  return openMicrophoneStreamWithDiagnostics(deviceId).then((result) => result.stream);
 }
 
 export async function openMicrophoneStreamWithDiagnostics(
   deviceId: string | null,
-  processing?: AudioInputProcessingOptions,
 ): Promise<OpenMicrophoneStreamResult> {
   const resolvedDeviceId = await resolvePreferredAudioInputDeviceId(deviceId);
   const selectedDeviceConfigured = Boolean(deviceId);
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
-      audio: buildAudioConstraints(resolvedDeviceId, processing),
+      audio: buildAudioConstraints(resolvedDeviceId),
     });
     return { fallbackStage: "none", selectedDeviceConfigured, stream };
   } catch (error) {

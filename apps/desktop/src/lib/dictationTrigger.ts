@@ -2,7 +2,7 @@ import type { DictationSessionPhase } from "./dictationSession";
 
 export type DictationTriggerAction = "start" | "stop";
 
-export function isBrowserTrigger(triggerId?: string): triggerId is string {
+export function isBrowserTrigger(triggerId?: string): triggerId is `browser:${string}` {
   return triggerId?.startsWith("browser:") ?? false;
 }
 
@@ -32,7 +32,7 @@ export function admitsDictationTrigger(
   if (triggerId === "tray:stop") {
     return action === "stop" && (phase === "starting" || phase === "recording");
   }
-  if (triggerId !== "onboarding:test" && !triggerId?.startsWith("browser:")) return false;
+  if (triggerId !== "onboarding:test" && !isBrowserTrigger(triggerId)) return false;
   if (action === "start") return phase === "idle" || phase === "error";
   return triggerId === activeTriggerId && (phase === "starting" || phase === "recording");
 }

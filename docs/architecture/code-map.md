@@ -94,7 +94,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `dictationStream.startup.test.ts` — Importing the module leaves model warmup to Rust.
 - `dictationRecording.ts` — Start and Stop for one recording: delivery callbacks, the Stop copy and notifications.
 - `dictationRecording.test.ts` — Start and Stop ordering and cleanup.
-- `desktopCaptureTail.ts` — `DictationStreamInput`, the 600-second limit, the Stop tail and capture teardown.
+- `desktopCaptureTail.ts` — `DictationStreamInput`, the recording sample cap, the Stop tail and capture teardown.
 - `audioCaptureBuffer.ts` — In-memory audio for the current recording; `collectAudioSamplesRange` is its only reader.
 - `audioCaptureBuffer.test.ts` — Buffer bounds and ranges.
 - `audioCaptureFlush.ts` — AudioWorklet flush acknowledgement with an 80 ms timeout.
@@ -104,7 +104,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `captureDescriptor.ts` — Capture backend selection and the retained audio format.
 - `captureDescriptor.test.ts` — Retained audio format.
 - `audioInput.ts` — Opens the WebKit microphone stream and picks the device.
-- `audioLevel.ts` — Level meter values for the tray and companion.
+- `audioLevel.ts` — Level meter values for every capture path, shown in the window, the tray and the companion.
 - `nativeCapture.ts` — Renderer side of native capture: sources, packets and acknowledgements.
 - `nativeCapture.test.ts` — Native capture protocol and ownership.
 - `nativeCaptureSettings.ts` — Native capture availability and source selection commands.
@@ -114,18 +114,14 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `browserStreamDelivery.test.ts` — Browser delivery and Stop.
 - `crashRecovery.ts` — `CrashJournal` and the Review commands.
 - `crashRecovery.test.ts` — Journal updates and failures.
-- `dictationRecovery.ts` — Capture sample limit and error text helpers.
+- `dictationRecovery.ts` — The 600-second recording limit, the capture sample limit and error text helpers.
 - `dictationRecovery.test.ts` — Recovery helpers.
 - `dictationSession.ts` — Session state machine and a queued Stop.
 - `dictationSession.test.ts` — Session state machine.
 - `dictationTrigger.ts` — Rules for which triggers may start or stop a recording.
 - `dictationTrigger.test.ts` — Browser trigger rules.
-- `dictationDelivery.ts` — Delivery ownership state.
-- `dictationDelivery.test.ts` — Delivery ownership state.
 - `dictationPresentation.ts` — Status labels and desktop setup state.
 - `dictationPresentation.test.ts` — Status labels.
-- `dictationAsyncGuards.ts` — Ignores results from a capture source that has been replaced.
-- `dictationAsyncGuards.test.ts` — Async guards.
 - `activityMode.ts` — Whether dictation is active and whether a toggle is allowed.
 - `activityMode.test.ts` — Activity rules.
 - `shortcutPresentation.ts` — Shortcut and microphone labels, and time limits for diagnostics requests.

@@ -236,6 +236,9 @@ dictated text, audio or window titles:
 - `VOCO_HOTKEY_TRACE=1` writes `$XDG_STATE_HOME/voco/hotkey-trace.jsonl`
   (8 MiB, then one previous file).
 
+With both off, the renderer sends no dictation traces or delivery quality
+records, and Rust builds no records to drop.
+
 ## Design decisions
 
 - **Tauri.** Rust holds OS authority (processes, sockets, files, D-Bus), while

@@ -240,9 +240,6 @@ try {
       await load('surface=popover');
       await capture('popover-ready');
       assert.equal(await page.evaluate(() => document.documentElement.scrollHeight <= innerHeight),true);
-      await load('surface=popover&state=recording');
-      await page.setViewportSize({ width: 420, height: 380 });
-      await capture('popover-listening');
       const picker = page.getByRole('button', { name: /^Microphone:/ });
       const box = await picker.boundingBox();
       assert.ok(box && box.width > 40, 'Microphone button must retain its hit area');

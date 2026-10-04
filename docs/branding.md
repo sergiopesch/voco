@@ -91,18 +91,14 @@ shortcut, and one cue:
 
 | When | Cue |
 | --- | --- |
-| Starting microphone | Wait for Listening before speaking. |
-| Listening | Press {shortcut} to finish. |
-| Processing | Finishing your dictation… |
 | Setup needed | Open Help to finish desktop setup. |
 | The shortcut works | Click where you want the text, then use your shortcut. |
 | The shortcut is unavailable | Check shortcut setup in Help. |
 | Otherwise | Click where you want the text, then start dictation. |
 
-Until a dictation starts finishing, Cancel dictation appears; after a click it
-reads Cancelling output…. The main button is Hide to tray, and the footer holds
-the microphone, which opens microphone settings, and Help. Escape hides the
-popover.
+The popover never opens during a dictation. The main button is Hide to tray,
+and the footer holds the microphone, which opens microphone settings, and
+Help. Escape hides the popover.
 
 **Settings** is 1040 × 760 and at least 760 × 560. Its sidebar has two groups:
 Settings and Shortcut, then Updates and Help. The microphone controls are on the

@@ -3,10 +3,9 @@ import { StatusMark } from "./StatusMark";
 import { useEffect, useRef } from "react";
 import type { NativeMicrophoneControls } from "@/hooks/useNativeCaptureSettings";
 
-export function NativeMicrophoneSettings({ controls, disabled, showError = true, onSelected }: {
+export function NativeMicrophoneSettings({ controls, disabled, onSelected }: {
   controls: NativeMicrophoneControls;
   disabled: boolean;
-  showError?: boolean;
   onSelected?: () => void;
 }) {
   const pending = useRef(false);
@@ -29,7 +28,7 @@ export function NativeMicrophoneSettings({ controls, disabled, showError = true,
 
   if (controls.mode === "pending") {
     return <div className="voco-inline-note" role="status">
-      <p>{controls.error ? showError ? controls.error : "Choose Retry capture setup to check microphone access." : "Checking the capture backend…"}</p>
+      <p>{controls.error || "Checking the capture backend…"}</p>
       <button type="button" className="voco-button voco-button--secondary" disabled={controls.busy || disabled}
         onClick={() => { void controls.initialize().catch(() => {}); }}>Retry capture setup</button>
     </div>;
@@ -54,6 +53,6 @@ export function NativeMicrophoneSettings({ controls, disabled, showError = true,
     {controls.selected ? <p className="voco-motion-feedback" role="status"><StatusMark state="success" />Selected: {controls.selected.label || controls.selected.name}.</p> : null}
     <details className="voco-preferences__disclosure"><summary>Microphone access details</summary><p>Selecting a microphone allows access for this app session. VOCO records through your system’s sound server, outside the browser permission prompt. Access lasts until VOCO closes or the device identity changes.</p><p>No audio is captured by this setup panel. If the microphone changes or disconnects during dictation, VOCO stops and notifies you.</p>
     </details>
-    {showError && controls.error ? <div role="alert" className="voco-inline-note voco-inline-note--error">{controls.error}</div> : null}
+    {controls.error ? <div role="alert" className="voco-inline-note voco-inline-note--error">{controls.error}</div> : null}
   </div>;
 }

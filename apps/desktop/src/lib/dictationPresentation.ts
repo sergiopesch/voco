@@ -60,15 +60,7 @@ export function deriveStatusLabel({
   nativeMicrophoneReady,
   microphoneReady,
 }: StatusLabelInput): string {
-  if (dictationStatus === "starting") {
-    return "Starting microphone";
-  }
-  if (dictationStatus === "recording") {
-    return "Listening";
-  }
-  if (dictationStatus === "processing") {
-    return "Processing";
-  }
+  // Only the popover shows this label, and it never opens during a dictation.
   if (configurationError) {
     return "Settings need attention";
   }

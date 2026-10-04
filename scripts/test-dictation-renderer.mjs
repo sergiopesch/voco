@@ -53,16 +53,16 @@ export const takeLauncherActivation = async () => false;
 export const getDesktopPasteStatus = async () => ({enabled:Boolean(window.desktopPaste),streamingEnabled:Boolean(window.desktopStream),available:!window.pasteUnavailable,detail:'Paste helper unavailable'});
 // Model the native paste and clipboard contract; no desktop input is touched.
 const bytes = text => new TextEncoder().encode(text).length;
-export const pasteDesktopText = async (text) => { calls.push(['pasteDesktopText',text]); if(window.failPaste) throw {outcome:window.pasteOutcome ?? 'uncertain',message:'Uncertain paste dispatch',clipboardChanged:true}; return {strategy:'clipboard',outcome:'dispatched',pasteMetrics:{preflightMs:5,settleMs:0,modifierWaitMs:12,clipboardMs:8,keyboardMs:350,leadingSeparator:false,routedUtf8Bytes:bytes(text),payloadUtf8Bytes:bytes(text),payloadUnicodeScalars:Array.from(text).length,payloadUtf16Units:text.length}}; };
+export const pasteDesktopText = async (text) => { calls.push(['pasteDesktopText',text]); if(window.failPaste) throw {outcome:window.pasteOutcome ?? 'uncertain',message:'Uncertain paste dispatch',clipboardChanged:true}; return {outcome:'dispatched',pasteMetrics:{preflightMs:5,settleMs:0,modifierWaitMs:12,clipboardMs:8,keyboardMs:350,leadingSeparator:false,routedUtf8Bytes:bytes(text),payloadUtf8Bytes:bytes(text),payloadUnicodeScalars:Array.from(text).length,payloadUtf16Units:text.length}}; };
 export const copyDesktopText = async (text) => { calls.push(['copyDesktopText',text]); if(window.failCopy) throw {outcome:'uncertain',message:'Clipboard helper failed',clipboardChanged:false}; };
 export const cancelBrowserField = async (...args) => { calls.push(['cancelBrowserField',...args]); return state(); };
 export const releaseBrowserRecording = async (triggerId) => { calls.push(['releaseBrowserRecording',triggerId]); };
 export const ackBrowserStop = async (triggerId) => { calls.push(['ackBrowserStop',triggerId]); };
 export const appendBrowserField = async (id,prefix,text) => { calls.push(['appendBrowserField',id,prefix,text]); if(window.deferCheckpoint) await new Promise(resolve=>window.resolveCheckpoint=resolve); return {...state(), focusLost:Boolean(window.focusChanged), committedCharacterCount:Array.from(prefix+text).length}; };
-export const finishBrowserField = async (id,prefix) => { calls.push(['finishBrowserField',id,prefix]); return {...state(), focusLost:Boolean(window.focusChanged), committedCharacterCount:Array.from(prefix).length}; };
 export const debugNativeCaptureEnabled = async () => false;
 export const saveDebugNativeRetainedSource = async () => null;
 export const traceHotkeyEvent = async (...args) => {(window.traceEvents??=[]).push(args);};
+export const getDiagnosticLogging = async () => sessionStorage.getItem('diagnosticLogging') === 'off' ? {trace:false,performance:false} : {trace:true,performance:true};
 export const refreshShortcutHeartbeat = async (ready) => {calls.push(['refreshShortcutHeartbeat',ready]);};
 export const showNotification = async (...args) => { calls.push(['showNotification',...args]); };
 export const insertText = async () => { calls.push(['insertText']); throw new Error('Unsafe generic delivery attempted'); };
@@ -92,7 +92,7 @@ function Harness() {
  useGlobalShortcut(hook.toggle,()=>true,Boolean(window.shortcutReady),0,()=>{});
  return React.createElement(React.Fragment,null,
 
- React.createElement(ControlPanel,{surface:state.surface,config:state.config,errorMessage:state.error,statusLabel:deriveStatusLabel({configurationError:false,cursorRequired:false,cursorSetupState:'ready',dictationStatus:state.status,microphonePermission:'granted',microphoneReady:true,}),updateState:state.updateState,runtimeDiagnostics:null,dictationStatus:state.status,captureNotice:state.captureNotice,canCancelDictation:hook.canCancel,cancellationPending:hook.cancellationPending,onCancelDictation:()=>void hook.cancelRecording(),requestedSection:'General',requestedSectionRequestId:0,selectedDeviceId:null,availableDevices:[],microphonePermission:'granted',onSurfaceChange:surface=>state.setSurface(surface),onConfigChange:noop,onRefreshDevices:noop,onRequestMicrophoneAccess:noop,onCheckForUpdates:noop,onOpenReleasePage:noop,onRefreshRuntimeDiagnostics:noop,onOpenSettings:noop}));
+ React.createElement(ControlPanel,{surface:state.surface,config:state.config,errorMessage:state.error,statusLabel:deriveStatusLabel({configurationError:false,cursorRequired:false,cursorSetupState:'ready',dictationStatus:state.status,microphonePermission:'granted',microphoneReady:true,}),updateState:state.updateState,runtimeDiagnostics:null,dictationStatus:state.status,captureNotice:state.captureNotice,requestedSection:'General',requestedSectionRequestId:0,selectedDeviceId:null,availableDevices:[],microphonePermission:'granted',onSurfaceChange:surface=>state.setSurface(surface),onConfigChange:noop,onRefreshDevices:noop,onRequestMicrophoneAccess:noop,onCheckForUpdates:noop,onOpenReleasePage:noop,onRefreshRuntimeDiagnostics:noop,onOpenSettings:noop}));
 }
 window.reactRoot = createRoot(document.getElementById('root')); window.reactRoot.render(React.createElement(React.StrictMode,null,React.createElement(Harness)));
 window.remountHarness = () => { window.reactRoot = createRoot(document.getElementById('root')); window.reactRoot.render(React.createElement(React.StrictMode,null,React.createElement(Harness))); };
@@ -163,6 +163,9 @@ async function load() {
 }
 async function start(seconds=1) { await page.evaluate(()=>window.hook.toggle()); await page.waitForFunction(()=>window.captureReady()); await page.evaluate(seconds => window.samples(seconds),seconds); }
 async function stop() {await page.evaluate(()=>window.hook.toggle());}
+// One second of the 0.2 sine fixture (-17 dBFS): audioLevel.ts gives 0.92, and the
+// first meter update from silence moves 68% of the way there.
+const assertMeterLevel = level => assert.ok(Math.abs(level - 0.625) < 0.01, `meter level ${level}`);
 async function interrupted() {
  await page.waitForFunction(()=>window.store.getState().status==='idle'&&Boolean(window.store.getState().error),null,{timeout:6000});
  assert.equal(await page.evaluate(()=>window.store.getState().recovery),null);
@@ -192,14 +195,30 @@ results.push('Unavailable cursor delivery fails closed before capture; no manual
 
 await load();await page.evaluate(()=>{window.lease=true;window.hook.toggle('browser:fixture','start');});
 await page.waitForFunction(()=>window.store.getState().status==='recording');
+// The tray says "Listening · browser field" only while the field is owned.
+await page.waitForFunction(()=>window.hook.cursorDeliveryState==='owned');
 await page.evaluate(()=>window.samples(1));
 await page.waitForFunction(()=>window.nativeCalls.some(c=>c[0]==='appendBrowserField'));
 await page.evaluate(()=>window.hook.toggle('browser:fixture','stop'));
 await page.waitForFunction(()=>window.store.getState().status==='idle');
+await page.waitForFunction(()=>window.hook.cursorDeliveryState==='inactive');
 assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='appendBrowserField').map(c=>c.slice(2))),[['','Recovered words'],['Recovered words',' for manual review.']]);
-assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='finishBrowserField').map(c=>c.slice(2))),[['Recovered words for manual review.']]);
+// Each append had its receipt, so Stop only releases the lease.
+assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='cancelBrowserField').map(c=>c.slice(1))),[[101]]);
 assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>['pasteDesktopText','copyDesktopText','insertText'].includes(c[0]))),false);
-results.push('Browser recording streams Nemotron suffixes through its exact field lease and finalizes without replay.');
+results.push('Browser recording streams Nemotron suffixes through its exact field lease and releases it without replay.');
+
+await load();await page.evaluate(()=>{window.lease=true;window.streamFinalText='Recovered words';window.hook.toggle('browser:fixture','start');});
+await page.waitForFunction(()=>window.store.getState().status==='recording');
+await page.evaluate(()=>window.samples(1));
+await page.waitForFunction(()=>window.nativeCalls.some(c=>c[0]==='appendBrowserField'));
+// Focus moves after the last word landed, and Stop adds no words.
+await page.evaluate(()=>{window.focusChanged=true;window.hook.toggle('browser:fixture','stop');});
+await page.waitForFunction(()=>window.store.getState().status==='idle');
+assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='appendBrowserField').length),1);
+assert.equal(await page.evaluate(()=>window.store.getState().error),null);
+assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>['copyDesktopText','showNotification'].includes(c[0]))),false);
+results.push('A browser field that took every word ends cleanly at Stop, even after focus moved away.');
 
 await load();await page.evaluate(()=>{window.lease=true;window.focusChanged=true;window.hook.toggle('browser:fixture','start');});
 await page.waitForFunction(()=>window.store.getState().status==='recording');
@@ -208,7 +227,6 @@ await page.waitForFunction(()=>window.nativeCalls.some(c=>c[0]==='appendBrowserF
 await page.evaluate(()=>window.hook.toggle('browser:fixture','stop'));
 await page.waitForFunction(()=>window.store.getState().status==='idle',null,{timeout:6000});
 assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='appendBrowserField').length),1);
-assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>c[0]==='finishBrowserField')),false);
 // As after a failed paste, Stop copies the words the field may not have taken.
 assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='copyDesktopText').map(c=>c[1])),['Recovered words for manual review.']);
 assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>c[0]==='showNotification'&&c[1]==='Dictation copied to clipboard')),true);
@@ -241,6 +259,7 @@ for (const failure of ['module', 'construction']) {
   },failure);
   await start(1);
   assert.equal(await page.evaluate(()=>Boolean(window.processor?.onaudioprocess)),true);
+  assertMeterLevel(await page.evaluate(()=>window.store.getState().audioLevel));
   assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>c[0]==='showNotification'&&c[1]==="Dictation won't be typed")),true);
   assert.equal(await page.evaluate(()=>window.store.getState().captureNotice),null);
   assert.equal(await page.evaluate(()=>window.speechRequests.some(r=>['start','push'].includes(r.op))),false);
@@ -258,6 +277,7 @@ for (const failure of ['module', 'construction']) {
 
 await load(); await page.evaluate(()=>{window.desktopPaste=true;window.desktopStream=true;});
 await start();
+assertMeterLevel(await page.evaluate(()=>window.store.getState().audioLevel));
 await page.evaluate(()=>window.captureWorklet.port.onmessage({data:{type:'samples',data:new Float32Array(16000)}}));
 await page.waitForFunction(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length===1);
 assert.equal(await page.evaluate(()=>window.store.getState().status),'recording');
@@ -267,14 +287,24 @@ assert.equal(await page.evaluate(()=>window.speechRequests.filter(r=>['start','p
 assert.equal(await page.evaluate(()=>window.traceEvents.filter(c=>c[0]==='dictation_desktop_first_phrase_dispatched').length),1);
 assert.equal(await page.evaluate(()=>window.traceEvents.filter(c=>c[0]==='dictation_desktop_modifier_wait_completed').length),2);
 assert.equal(await page.evaluate(()=>window.traceEvents.find(c=>c[0]==='dictation_desktop_keyboard_dispatch_completed')[1].durationMs),350);
+assert.equal(await page.evaluate(()=>window.speechRequests.some(r=>r.op==='quality'&&r.event==='delivery_dispatched')),true);
 results.push('Progressive native dictation pastes before Stop, flushes only the tail, reports paste stages and never repastes the complete transcript.');
+await page.evaluate(()=>sessionStorage.setItem('diagnosticLogging','off'));
+await load();await page.evaluate(()=>{window.desktopPaste=true;window.desktopStream=true;});
+await start();await page.waitForFunction(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length===1);
+await stop();await page.waitForFunction(()=>window.store.getState().status==='idle');
+assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length),2);
+assert.deepEqual(await page.evaluate(()=>(window.traceEvents??[]).filter(c=>/^(dictation|recording)_/.test(c[0]))),[]);
+assert.equal(await page.evaluate(()=>window.speechRequests.some(r=>r.op==='quality')),false);
+await page.evaluate(()=>sessionStorage.removeItem('diagnosticLogging'));
+results.push('With both opt-in logs off, dictation pastes as before and sends no dictation traces or quality records.');
 await load();await page.evaluate(()=>{window.desktopPaste=true;window.desktopStream=true;window.deferInference=true;});
 await start();await page.evaluate(()=>window.captureWorklet.port.onmessage({data:{type:'samples',data:new Float32Array(16000)}}));
 await page.waitForFunction(()=>Boolean(window.resolveInference));
-await page.evaluate(()=>{void window.hook.cancelRecording();});await page.evaluate(()=>window.resolveInference());
+await page.evaluate(()=>window.captureWorklet.port.onmessage({data:{type:'capture-interrupted'}}));await page.evaluate(()=>window.resolveInference());
 await page.waitForFunction(()=>window.speechRequests.some(r=>r.op==='cancel'));
 assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length),0);
-results.push('Cancellation while a progressive worker request is in flight drains the cancel command and suppresses its late paste.');
+results.push('A capture interruption while a progressive worker request is in flight drains the cancel command and suppresses its late paste.');
 for (const [failCopy, failKeep] of [[false, false], [true, false], [true, true]]) {
   await load();await page.evaluate(([failCopy,failKeep])=>{window.desktopPaste=true;window.desktopStream=true;window.failPaste=true;window.failCopy=failCopy;window.failKeep=failKeep;},[failCopy,failKeep]);
   await start();await page.evaluate(()=>window.captureWorklet.port.onmessage({data:{type:'samples',data:new Float32Array(16000)}}));
@@ -402,7 +432,7 @@ await page.evaluate(()=>{window.failPaste=false;window.hook.toggle();});
 await page.waitForFunction(()=>window.store.getState().status==='recording');
 assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='showNotification'&&c[1]==='Previous transcript available').length),0);
 assert.equal(await page.evaluate(()=>window.speechRequests.filter(r=>r.op==='start').length),2);
-await page.evaluate(()=>window.hook.cancelRecording());
+await page.evaluate(()=>window.hook.toggle());await page.waitForFunction(()=>window.store.getState().status==='idle',null,{timeout:6000});
 results.push('Delivery interrupted at two minutes still recognizes five minutes plus partial Stop tail, never retries insertion, copies only the untyped words and admits next recording.');
 
 

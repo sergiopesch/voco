@@ -1,3 +1,5 @@
+import { MAX_RECORDING_SECONDS } from "@/lib/dictationRecovery";
+
 /** Capture liveness is independent of signal loudness: silence is valid audio. */
 export interface CaptureHealthOptions {
   stream: Pick<MediaStream, "getAudioTracks">;
@@ -14,7 +16,7 @@ export function monitorCaptureHealth({
   onInterrupted,
   onDurationLimit,
   now = () => performance.now(),
-  maximumDurationMs = 600_000,
+  maximumDurationMs = MAX_RECORDING_SECONDS * 1000,
   sampleTimeoutMs = 5_000,
   muteTimeoutMs = 3_000,
 }: CaptureHealthOptions): { samplesReceived: () => void; dispose: () => void } {

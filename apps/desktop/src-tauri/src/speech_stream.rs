@@ -496,6 +496,65 @@ mod tests {
     }
 
     #[test]
+    fn worker_errors_map_to_their_log_codes() {
+        let (tx, rx) = mpsc::channel::<Result<Value, String>>();
+        let push = serde_json::json!({"op":"push", "session":"fixture", "seq":1});
+        let lost = exchange_with_worker(push.clone(), &mut None, || panic!("no restart"));
+        let mut errors = vec![
+            (read_response(&mut &b""[..]).unwrap_err(), "output_eof"),
+            (
+                read_response(&mut &b"\xff\n"[..]).unwrap_err(),
+                "read_failed",
+            ),
+            (
+                read_response(&mut &b"{\"ready\":true}"[..]).unwrap_err(),
+                "response_bounds",
+            ),
+            (
+                read_response(&mut &b"garbage\n"[..]).unwrap_err(),
+                "response_invalid",
+            ),
+            (
+                receive_response(&rx, Duration::ZERO, true).unwrap_err(),
+                "startup_timeout",
+            ),
+            (
+                receive_response(&rx, Duration::ZERO, false).unwrap_err(),
+                "response_timeout",
+            ),
+            (lost.unwrap_err(), "worker_lost"),
+        ];
+        drop(tx);
+        let disconnected = receive_response(&rx, Duration::ZERO, false);
+        errors.push((disconnected.unwrap_err(), "channel_disconnected"));
+        for (response, expected) in [
+            (
+                serde_json::json!({"session":"wrong", "seq":1}),
+                "identity_mismatch",
+            ),
+            (
+                serde_json::json!({"session":"fixture", "seq":1, "error":"fixture"}),
+                "request_rejected",
+            ),
+        ] {
+            let mut slot = Some(live_worker(Default::default(), false));
+            let (sender, responses) = mpsc::channel();
+            sender.send(Ok(response)).unwrap();
+            slot.as_mut().unwrap().responses = responses;
+            let result = exchange_with_worker(push.clone(), &mut slot, || panic!("no restart"));
+            errors.push((result.unwrap_err(), expected));
+        }
+        // Codes come from the producers, so a reworded message can't fall back unnoticed.
+        for (error, expected) in errors {
+            assert_eq!(
+                crate::performance::worker_error_code(&error),
+                expected,
+                "{error}"
+            );
+        }
+    }
+
+    #[test]
     fn response_requires_complete_bounded_json() {
         assert!(read_response(&mut &b"{\"ready\":true}\n"[..]).is_ok());
         assert!(read_response(&mut &b"{\"ready\":true}"[..]).is_err());

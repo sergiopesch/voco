@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useStore } from "@/store/useStore";
+import { isDictationActive } from "@/lib/activityMode";
 import { errorMessage } from "@/lib/dictationRecovery";
 import {
   defaultNativeSource,
@@ -81,7 +82,7 @@ export function useNativeCaptureSettings(): NativeMicrophoneControls {
 
   const select = useCallback(async (token: string) => {
     const state = useStore.getState();
-    if (state.captureBackendMode !== "native" || ["starting", "recording", "processing"].includes(state.status)) return false;
+    if (state.captureBackendMode !== "native" || isDictationActive(state.status)) return false;
     const id = ++request.current;
     setBusy(true);
     // A change must never leave the previous grant looking like the new choice.

@@ -277,6 +277,14 @@ fn trace_frontend_hotkey_event(
     }
 }
 
+/// Both logs are opt-in. The renderer asks once, so it can skip the dictation
+/// traces and quality records Rust would only drop.
+#[tauri::command]
+fn diagnostic_logging() -> serde_json::Value {
+    let performance = performance::enabled();
+    serde_json::json!({"trace": TRACE_MODES.0 || performance, "performance": performance})
+}
+
 fn is_supported_dictation_trace_event(event: &str) -> bool {
     matches!(
         event,
@@ -818,20 +826,6 @@ fn append_browser_field(
         &expected_committed_text,
         &append_text,
         false,
-    )
-}
-
-#[tauri::command(async)]
-fn finish_browser_field(
-    browser: tauri::State<'_, BrowserIntegration>,
-    session_id: u64,
-    expected_committed_text: String,
-) -> Result<browser_broker::BrowserStatus, String> {
-    browser.session(session_id).ok_or(NO_BROWSER_FIELD)?.append(
-        session_id,
-        &expected_committed_text,
-        "",
-        true,
     )
 }
 
@@ -2038,13 +2032,13 @@ pub fn run() -> Result<(), String> {
             refresh_shortcut_heartbeat,
             ack_browser_stop,
             append_browser_field,
-            finish_browser_field,
             cancel_browser_field,
             release_browser_recording,
             begin_runtime_status_session,
             sync_runtime_status,
             sync_panel_level,
             trace_frontend_hotkey_event,
+            diagnostic_logging,
             has_pending_hotkey_toggle,
             hide_status_overlay,
             show_notification,

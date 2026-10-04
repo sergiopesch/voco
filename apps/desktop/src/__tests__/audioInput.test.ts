@@ -71,28 +71,13 @@ describe("audio input device selection", () => {
     expect(chooseAudioInputDeviceId(null, DEVICES)).toBeNull();
   });
 
-  it("keeps raw capture processing disabled unless requested", () => {
+  it("keeps raw capture processing disabled", () => {
     expect(buildAudioConstraints("mic-1")).toMatchObject({
       deviceId: { exact: "mic-1" },
       channelCount: { ideal: 1 },
       echoCancellation: { ideal: false },
       noiseSuppression: { ideal: false },
       autoGainControl: { ideal: false },
-    });
-  });
-
-  it("allows realtime capture to request echo control", () => {
-    expect(
-      buildAudioConstraints("mic-1", {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
-      }),
-    ).toMatchObject({
-      deviceId: { exact: "mic-1" },
-      echoCancellation: { ideal: true },
-      noiseSuppression: { ideal: true },
-      autoGainControl: { ideal: true },
     });
   });
 

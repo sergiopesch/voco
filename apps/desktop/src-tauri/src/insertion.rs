@@ -63,7 +63,7 @@ pub fn correlated_desktop_paste(
 ) -> Result<InsertionResult, InsertionError> {
     let started = Instant::now();
     let result = desktop_paste(text);
-    if let Some(correlation) = correlation {
+    if let Some(correlation) = correlation.filter(|_| crate::performance::enabled()) {
         let mut record = serde_json::json!({"event":"native_dispatch", "session":correlation.session,
             "dictation_session_id":correlation.dictation_session_id,
             "delivery_seq":correlation.delivery_seq, "hypothesis_seq":correlation.hypothesis_seq,
@@ -449,12 +449,8 @@ fn is_executable(path: &Path) -> bool {
     }
 }
 
+/// Looks a bare helper name up on PATH; every caller passes a bare name.
 fn command_available(command: &str) -> bool {
-    let candidate = Path::new(command);
-    if candidate.components().count() > 1 {
-        return is_executable(candidate);
-    }
-
     std::env::var_os("PATH")
         .map(|path_env| {
             std::env::split_paths(&path_env).any(|dir| {
@@ -906,6 +902,23 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn helper_lookup_needs_an_executable_file_on_path() {
+        use std::os::unix::fs::PermissionsExt;
+        assert!(command_available("sh"));
+        assert!(!command_available("voco-missing-helper"));
+        let directory = scratch_directory("helper-lookup");
+        let helper = directory.join("helper");
+        std::fs::write(&helper, b"#!/bin/sh\n").unwrap();
+        std::fs::set_permissions(&helper, std::fs::Permissions::from_mode(0o644)).unwrap();
+        assert!(!is_executable(&helper));
+        std::fs::set_permissions(&helper, std::fs::Permissions::from_mode(0o755)).unwrap();
+        assert!(is_executable(&helper));
+        assert!(!is_executable(&directory));
+        assert!(!is_executable(&directory.join("missing")));
+        std::fs::remove_dir_all(directory).unwrap();
     }
 
     #[test]

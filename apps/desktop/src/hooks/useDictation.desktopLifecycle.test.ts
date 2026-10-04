@@ -35,20 +35,18 @@ beforeEach(() => {
 it.each(["cancelled", "restarted"])("keeps late native success out of the %s session UI while preserving stream evidence", async stage => {
   let currentSession = 1;
   const cancelledRef = { current: null as string | null };
-  const desktopPhrasePasteCountRef = { current: 0 };
-  const recordingStartedAtMsRef = { current: performance.now() };
+  let recordingStartedAtMs = performance.now();
   const trace = vi.fn<(event: string, detail?: unknown) => Promise<void>>().mockResolvedValue(undefined);
   const metrics = vi.fn();
   let release!: () => void;
   const nativePaste = vi.fn(async () => {
     if (nativePaste.mock.calls.length === 1) await new Promise<void>(resolve => { release = resolve; });
-    return { strategy: "clipboard", outcome: "dispatched" };
+    return { outcome: "dispatched" };
   });
   const create = (startingSessionId: number) => {
     const { paste, preview } = callbacks({ onboardingTest: false,
-      startingSessionId, cancelledRef, desktopPhrasePasteCountRef,
-      manualCopyRequestedRef: { current: false }, browserDeliveryRef: { current: null },
-      recordingStartedAtMsRef, firstPhraseDispatched: false,
+      startingSessionId, cancelledRef, browserDeliveryRef: { current: null },
+      recordingStartedAtMs, firstPhraseDispatched: false,
       isCurrentSession: (id: number) => id === currentSession,
       assertOutputAllowed: (id: number) => { if (id !== currentSession || cancelledRef.current) throw new Error("cancelled or replaced"); },
       pasteDesktopText: nativePaste, traceDictationEvent: trace, traceDesktopPasteMetrics: metrics,
@@ -64,22 +62,20 @@ it.each(["cancelled", "restarted"])("keeps late native success out of the %s ses
   if (stage === "restarted") {
     // Discard resets cancellation; the next Start replaces session-bound refs.
     cancelledRef.current = null; currentSession = 2;
-    desktopPhrasePasteCountRef.current = 0;
-    recordingStartedAtMsRef.current = performance.now();
+    recordingStartedAtMs = performance.now();
     newQueue = create(2);
   }
-  const countBeforeCompletion = desktopPhrasePasteCountRef.current;
   trace.mockClear(); metrics.mockClear();
   release(); await oldQueue.finish();
   expect(trace).not.toHaveBeenCalled(); expect(metrics).not.toHaveBeenCalled();
-  expect(desktopPhrasePasteCountRef.current).toBe(countBeforeCompletion);
+  // The cancelled queue never requests another paste.
+  expect(nativePaste).toHaveBeenCalledOnce();
   const terminal = transport.mock.calls.map(c => c[1].request)
     .find(r => r.op === "quality" && r.event === "terminal" && r.dictation_session_id === 1);
   expect(terminal).toMatchObject({ outcome: "cancelled", dispatched_count: 1 });
   if (newQueue) {
     newQueue.pushAudio(new Float32Array(1600),16000);newQueue.enqueue();await newQueue.finish();
     expect(trace.mock.calls.filter(c => c[0] === "dictation_desktop_live_prefix_dispatched")).toHaveLength(1);
-    expect(desktopPhrasePasteCountRef.current).toBe(1);
     expect(metrics).toHaveBeenCalledOnce();
     expect(trace.mock.calls.some(c => c[0] === "dictation_desktop_first_phrase_dispatched")).toBe(true);
     expect(nativePaste.mock.calls).toHaveLength(2);

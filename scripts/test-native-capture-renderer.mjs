@@ -224,7 +224,7 @@ try {
             ]);
             if(name==='debugNativeCaptureEnabled')return window.auditEnabled===true&&window.auditUploads.length===0;
             if(name==='getDesktopPasteStatus')return {enabled:true,available:true,streamingEnabled:true,detail:'Desktop input is ready.'};
-            if(name==='pasteDesktopText')return {outcome:'dispatched',strategy:'clipboard'};
+            if(name==='pasteDesktopText')return {outcome:'dispatched'};
             if(name==='copyDesktopText'){
                 if(window.failClipboard)throw {outcome:'no-mutation',message:'Fixture clipboard unavailable',clipboardChanged:false};
                 if(window.holdCopy)await window.holdCopy;
@@ -470,6 +470,7 @@ try {
             }
             if (name === 'getDesktopPasteStatus') {
               window.calls.push([name,...args]);
+              if (window.holdPasteStatus) await window.holdPasteStatus;
               return {enabled:true,available:false,streamingEnabled:true,detail:'Pasting on Wayland requires: wl-copy.'};
             }
             if (name === 'getRuntimeDiagnostics') {
@@ -640,6 +641,17 @@ try {
         assert.equal(await page.evaluate(()=>window.store.getState().surface),'hidden');
       }
       await page.evaluate(()=>window.store.getState().setStatus('idle'));
+      // Start shows "starting" only after its paste check; the launcher must not open over it before then.
+      const pasteChecks = await page.evaluate(()=>window.calls.filter(c=>c[0]==='getDesktopPasteStatus').length);
+      await page.evaluate(()=>{window.holdPasteStatus=new Promise(resolve=>{window.releasePasteStatus=resolve;});window.store.getState().setSurface('hidden');window.listeners['voco:toggle-dictation']({payload:null});});
+      await page.waitForFunction(count=>window.calls.filter(c=>c[0]==='getDesktopPasteStatus').length>count,pasteChecks);
+      assert.equal(await page.evaluate(()=>window.store.getState().status),'idle');
+      await page.evaluate(()=>{window.activationPending=true;window.listeners['voco:activate']({payload:null});});
+      await page.waitForFunction(()=>window.activationPending===false);
+      assert.equal(await page.evaluate(()=>window.store.getState().surface),'hidden');
+      await page.evaluate(()=>{window.holdPasteStatus=null;window.releasePasteStatus();});
+      await page.waitForFunction(()=>window.calls.some(c=>c[0]==='showNotification'&&c[1]==='Dictation setup incomplete'));
+      assert.equal(await page.evaluate(()=>window.store.getState().surface),'hidden');
       results.push({case:'launcher-reopens-idle-and-preserves-capture-focus',passed:true});
       await page.setViewportSize({width:1100,height:800});
       await loadTest();
@@ -706,6 +718,7 @@ try {
       await page.waitForFunction(()=>window.captureWorklet?.port.onmessage && window.store.getState().status==='recording');
       await page.evaluate(()=>window.captureWorklet.port.onmessage({data:{type:'samples',data:Float32Array.from({length:16000},(_,i)=>Math.sin(i/20)*.2)}}));
       await page.getByRole('region',{name:'Test transcript'}).getByText('This is my voice test',{exact:true}).waitFor();
+      assert.ok(Number(await page.getByRole('meter',{name:'Microphone signal'}).getAttribute('aria-valuenow'))>0);
       if (await page.getByRole('button',{name:'Finish test',exact:true}).count()) { await page.getByRole('button',{name:'Finish test',exact:true}).click(); await page.waitForFunction(()=>window.store.getState().onboardingTestPassed); }
         await page.getByRole('button',{name:'Done',exact:true}).click();
       await assertOnboardingHidden();
@@ -927,12 +940,6 @@ try {
     assert.equal((await state()).streams,0);assert.equal((await state()).commands.filter(x=>x.name==='native_capture_begin').length,1);
     expected.push('native-recognition-failure-clears-content-without-review');record(expected.at(-1));
     assert.equal(await page.getByRole('button',{name:'Retry transcription',exact:true}).count(),0);
-    await activate();await page.evaluate(()=>window.store.getState().setSurface('popover'));await page.getByRole('button',{name:'Cancel dictation',exact:true}).click();
-    await page.waitForFunction(()=>window.store.getState().status==='idle'&&window.store.getState().error);
-    assert.ok((await state()).commands.some(x=>x.name==='native_capture_stop'));assert.equal((await state()).streams,0);
-    assert.equal((await state()).ready,true);assert.ok((await state()).source);assert.equal((await state()).commands.filter(x=>x.name==='native_capture_cancel').length,1);
-    assert.equal(await page.evaluate(()=>window.store.getState().recovery),null);
-    expected.push('native-user-cancel-clears-audio');record(expected.at(-1));
     await activate();await page.evaluate(()=>window.store.getState().setSurface('settings'));
     await page.getByRole('button',{name:'Settings',exact:true}).click();
     await page.getByRole('combobox', { name: 'Microphone', exact: true }).waitFor();assert.equal(await page.getByRole('combobox', { name: 'Microphone', exact: true }).isDisabled(),true);
@@ -1105,13 +1112,6 @@ try {
     await verifyRetainedWitness('healthy-stop');
     await page.waitForFunction(()=>window.store.getState().status==='idle'&&window.store.getState().transcript==='');
     expected.push('opt-in-audit-retains-exact-source-before-dc-and-resampling');record(expected.at(-1));
-    await activate(true);await page.evaluate(()=>window.store.getState().setSurface('popover'));await page.getByRole('button',{name:'Cancel dictation',exact:true}).click();
-    await verifyRetainedWitness('cancelled');
-    await page.waitForFunction(()=>window.store.getState().status==='idle'&&window.store.getState().error);
-    expected.push('cancelled-audit-keeps-prefix-and-does-not-claim-healthy');record(expected.at(-1));
-    assert.equal(await page.evaluate(()=>window.store.getState().recovery),null);
-    assert.equal(await page.evaluate(()=>window.auditUploads.length),1);
-    expected.push('controlled-cancellation-does-not-recover-or-export-source-again');record(expected.at(-1));
     // Real App observation wiring at actual desktop panel sizes. No native capture begins.
     await load('enabled');
     await page.evaluate(() => {

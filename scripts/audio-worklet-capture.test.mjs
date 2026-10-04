@@ -30,7 +30,7 @@ function capture() {
     flush() { processor.port.onmessage({ data: { type: 'flush' } }); },
     bytes() { return Buffer.concat(messages.filter(m => m.type === 'samples')
       .map(m => Buffer.from(m.data.buffer, m.data.byteOffset, m.data.byteLength))); },
-    types() { return messages.filter(m => m.type !== 'level').map(m => m.type); },
+    types() { return messages.map(m => m.type); },
   };
 }
 const samples = count => Float32Array.from({ length: count }, (_, i) => (i % 127 - 63) / 128);
@@ -86,4 +86,6 @@ test('variable quanta and duplicate values do not infer loss', () => {
   c.flush();
   assert.deepEqual(c.bytes(), Buffer.concat(parts.map(bytes)));
   assert.equal(c.messages.some(m => m.type === 'capture-interrupted'), false);
+  // The renderer derives the meter level from the sample batches.
+  assert.deepEqual(new Set(c.types()), new Set(['samples', 'flushed']));
 });

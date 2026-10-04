@@ -1,18 +1,18 @@
 import { invoke } from "@tauri-apps/api/core";
 import { createCaptureDescriptor, type CaptureDescriptor } from "@/lib/captureDescriptor";
+import type { NativeCaptureSource } from "@/lib/nativeCaptureSettings";
 
 export interface NativeCaptureIdentity { captureId: string; sessionId: number; generation: number }
-export interface NativeCaptureSource {
-  selectionToken: string; name: string; label: string; index: number; objectSerial: string; isMonitor: boolean;
-}
+// Rust's protocol::MAX_FRAMES; parseBegin rejects a capture that reports another value.
+export const MAX_FRAMES = 26_460_000;
 export interface NativeCaptureReceipt {
   state: "stopping" | "stopped"; producedFrames: number; lastSequence: number;
   corkAcknowledged: boolean; barrierAcknowledged: boolean; limitReached: boolean;
   acknowledgedSequence: number; health: { healthy: boolean; reason: string | null };
 }
 interface BeginReply extends NativeCaptureIdentity {
-  source: NativeCaptureSource; format: "s16le"; sampleRate: 44100; channels: 2;
-  channelMap: ["front-left", "front-right"]; frameBytes: 4; maxFrames: 26460000;
+  source: NativeCaptureSource & { objectSerial: string }; format: "s16le"; sampleRate: 44100; channels: 2;
+  channelMap: ["front-left", "front-right"]; frameBytes: 4; maxFrames: typeof MAX_FRAMES;
 }
 interface Block { sequence: number; frameStart: number; frames: number; byteOffset: number; byteLength: number }
 export interface NativeCaptureApi {
@@ -27,7 +27,6 @@ export const nativeCaptureApi: NativeCaptureApi = {
   stop: (request) => invoke("native_capture_stop", { request }),
   cancel: (request) => invoke("native_capture_cancel", { request }),
 };
-const MAX_FRAMES = 26460000;
 function object(value: unknown, keys: string[]): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value) ||
       Object.keys(value).sort().join() !== [...keys].sort().join()) throw new Error("Invalid native capture fields");
