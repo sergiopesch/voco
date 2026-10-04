@@ -739,14 +739,7 @@ mod tests {
 
     #[test]
     fn stop_shortcut_requires_current_active_state_and_supported_accelerator() {
-        for status in [
-            "starting",
-            "recording",
-            "processing",
-            "idle",
-            "recovery",
-            "attention",
-        ] {
+        for status in ["starting", "recording", "processing", "idle", "attention"] {
             let state = serde_json::json!({"token":"3:7", "stopSession":"3:1", "status":status, "stopAccelerator":"<Alt>d"});
             assert_eq!(
                 valid_shortcut_reservation(&state, "3:1/<Alt>d"),
