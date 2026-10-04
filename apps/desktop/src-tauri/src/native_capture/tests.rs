@@ -293,22 +293,58 @@ fn select_requires_acknowledgement_and_supported_exact_token() {
 }
 #[test]
 fn startup_failure_closes_backend_and_revokes_selection() {
+    let begin = |selection_token| {
+        Request::Begin(BeginRequest {
+            session_id: 1,
+            generation: 0,
+            selection_token,
+        })
+    };
+    let mut worker = Worker::<Fake>::new();
+    worker.handle(Request::List).unwrap();
+    let old = source().selection_token;
+    worker.handle(Request::Select(old.clone(), true)).unwrap();
+    worker.pulse.as_mut().unwrap().fail_start = true;
+    assert!(worker.handle(begin(old.clone())).is_err());
+    assert!(worker.pulse.is_none());
+    assert!(worker.approved.is_none());
+    assert!(worker.session.is_none());
+    // The closed connection's catalog can't grant its tokens again.
+    assert!(worker.sources.is_empty());
+    assert!(worker.handle(Request::Select(old.clone(), true)).is_err());
+    assert!(worker.approved.is_none());
+    worker.handle(Request::List).unwrap();
+    let current = worker.sources[0].selection_token.clone();
+    assert_ne!(current, old);
+    worker
+        .handle(Request::Select(current.clone(), true))
+        .unwrap();
+    worker.handle(begin(current)).unwrap();
+    assert!(worker.session.is_some());
+}
+#[test]
+fn startup_error_wins_over_an_expired_deadline_and_closes_the_backend() {
     let mut worker = Worker::<Fake>::new();
     worker.handle(Request::List).unwrap();
     worker
         .handle(Request::Select(source().selection_token, true))
         .unwrap();
-    worker.pulse.as_mut().unwrap().fail_start = true;
-    assert!(worker
-        .handle(Request::Begin(BeginRequest {
+    let backend = worker.pulse.as_mut().unwrap();
+    backend.startup_delay = Duration::from_millis(5);
+    backend.status.error = Some("source-removed".into());
+    let result = worker.dispatch(
+        Request::Begin(BeginRequest {
             session_id: 1,
             generation: 0,
-            selection_token: source().selection_token
-        }))
-        .is_err());
+            selection_token: source().selection_token,
+        }),
+        Instant::now() + Duration::from_millis(1),
+    );
+    assert_eq!(result.err().as_deref(), Some("source-removed"));
     assert!(worker.pulse.is_none());
     assert!(worker.approved.is_none());
     assert!(worker.session.is_none());
+    assert!(worker.sources.is_empty());
 }
 #[test]
 fn invalid_native_blocks_fail_before_pending_delivery() {

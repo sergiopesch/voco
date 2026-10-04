@@ -235,6 +235,37 @@ impl<B: CaptureBackend> Worker<B> {
             .as_mut()
             .ok_or_else(|| "Native source must be explicitly selected".into())
     }
+    /// A catalog, and any grant from it, never outlives the connection that listed it.
+    fn disconnect(&mut self) {
+        self.pulse = None;
+        self.approved = None;
+        self.sources.clear();
+    }
+    /// Starts capture and waits at most 5 s for it. An error wins over the deadline,
+    /// and the deadline over a late ready.
+    fn start(
+        pulse: &mut B,
+        source: &Source,
+        request_deadline: Option<Instant>,
+    ) -> Result<(), String> {
+        pulse.begin(source)?;
+        let limit = Instant::now() + Duration::from_secs(5);
+        let deadline = request_deadline.unwrap_or(limit).min(limit);
+        loop {
+            pulse.tick();
+            let status = pulse.status();
+            if let Some(error) = status.error {
+                return Err(error);
+            }
+            if Instant::now() >= deadline {
+                return Err("Native startup deadline exceeded".into());
+            }
+            if status.ready {
+                return Ok(());
+            }
+            thread::sleep(Duration::from_millis(1));
+        }
+    }
     fn pump_interval(&self) -> Option<Duration> {
         let status = self.pulse.as_ref()?.status();
         let live = self.session.as_ref().is_some_and(|session| {
@@ -338,8 +369,7 @@ impl<B: CaptureBackend> Worker<B> {
                     .as_ref()
                     .is_some_and(|p| p.status().error.is_some())
                 {
-                    self.pulse = None;
-                    self.approved = None;
+                    self.disconnect();
                 }
                 if self.pulse.is_none() {
                     self.pulse = Some(B::connect()?);
@@ -350,9 +380,7 @@ impl<B: CaptureBackend> Worker<B> {
                     match self.pulse()?.enumerate(epoch) {
                         Ok(catalog) => catalog,
                         Err(error) => {
-                            self.pulse = None;
-                            self.approved = None;
-                            self.sources.clear();
+                            self.disconnect();
                             return Err(error);
                         }
                     };
@@ -408,45 +436,16 @@ impl<B: CaptureBackend> Worker<B> {
                 } else {
                     None
                 };
-                if let Err(error) = self.pulse()?.begin(&source) {
-                    self.pulse()?.cancel();
-                    self.pulse = None;
-                    self.approved = None;
+                let request_deadline = self.request_deadline;
+                if let Err(error) = Self::start(self.pulse()?, &source, request_deadline) {
+                    if let Some(pulse) = self.pulse.as_mut() {
+                        pulse.cancel();
+                    }
+                    self.disconnect();
                     if let Some(audit) = pending_audit.take() {
                         audit.finish("failure", None);
                     }
                     return Err(error);
-                }
-                let deadline = self
-                    .request_deadline
-                    .unwrap_or_else(|| Instant::now() + Duration::from_secs(5))
-                    .min(Instant::now() + Duration::from_secs(5));
-                loop {
-                    let pulse = self.pulse()?;
-                    pulse.tick();
-                    let status = pulse.status();
-                    if let Some(error) = status.error {
-                        pulse.cancel();
-                        self.pulse = None;
-                        self.approved = None;
-                        if let Some(audit) = pending_audit.take() {
-                            audit.finish("failure", None);
-                        }
-                        return Err(error);
-                    }
-                    if Instant::now() >= deadline {
-                        pulse.cancel();
-                        self.pulse = None;
-                        self.approved = None;
-                        if let Some(audit) = pending_audit.take() {
-                            audit.finish("failure", None);
-                        }
-                        return Err("Native startup deadline exceeded".into());
-                    }
-                    if status.ready {
-                        break;
-                    }
-                    thread::sleep(Duration::from_millis(1));
                 }
                 self.next_capture += 1;
                 let identity = Identity {
@@ -590,9 +589,7 @@ impl<B: CaptureBackend> Worker<B> {
                 self.finish_audit("cancel");
                 self.pulse()?.cancel();
                 if failed || self.pulse()?.status().error.is_some() {
-                    self.pulse = None;
-                    self.approved = None;
-                    self.sources.clear();
+                    self.disconnect();
                 }
                 self.session = None;
                 Ok(Response::Empty)
@@ -606,10 +603,8 @@ impl<B: CaptureBackend> Worker<B> {
                 if let Some(pulse) = self.pulse.as_mut() {
                     pulse.cancel();
                 }
-                self.pulse = None;
+                self.disconnect();
                 self.session = None;
-                self.sources.clear();
-                self.approved = None;
                 Ok(Response::Empty)
             }
         }
