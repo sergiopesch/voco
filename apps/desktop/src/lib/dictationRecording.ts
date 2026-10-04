@@ -28,8 +28,7 @@ import type { HotkeyTraceFields,pasteDesktopText } from "@/lib/tauri";
 import type { useStore as appStore } from "@/store/useStore";
 import type { CursorDeliveryState,DesktopPasteStatus,DictationStatus } from "@/types";
 import { BrowserStreamDelivery } from "./browserStreamDelivery";
-
-export type Ref<T> = { current: T };
+import type { Ref } from "./desktopCaptureTail";
 
 /** Unverified capture is never typed; Stop explains that with this sentence. */
 const UNVERIFIED_CAPTURE_REASON = "VOCO couldn't confirm it received all of your audio, so it didn't type this recording. Try again.";

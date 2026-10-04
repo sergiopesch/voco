@@ -6,7 +6,7 @@ class Track extends EventTarget {
   readyState = "live";
 }
 
-function monitor(track = new Track(), maximumDurationMs = 600_000) {
+function monitor(track = new Track(), maximumDurationMs?: number) {
   const interrupted = vi.fn();
   const limit = vi.fn();
   const health = monitorCaptureHealth({
@@ -44,6 +44,20 @@ describe("capture liveness", () => {
     }
     expect(interrupted).not.toHaveBeenCalled();
     expect(limit).toHaveBeenCalledOnce();
+  });
+
+  it("stops a recording normally after 600 seconds", () => {
+    vi.useFakeTimers();
+    const { interrupted, limit, health } = monitor();
+    for (let second = 1; second < 600; second++) {
+      health.samplesReceived();
+      vi.advanceTimersByTime(1_000);
+    }
+    expect(limit).not.toHaveBeenCalled();
+    health.samplesReceived();
+    vi.advanceTimersByTime(1_000);
+    expect(limit).toHaveBeenCalledOnce();
+    expect(interrupted).not.toHaveBeenCalled();
   });
 
   it("tolerates a brief mute but stops a prolonged system mute", () => {

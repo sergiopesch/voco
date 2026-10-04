@@ -3,12 +3,10 @@ import {
   collectAudioSamplesRange,
   type AudioCaptureBuffer,
 } from "@/lib/audioCaptureBuffer";
-import { captureSampleLimit } from "@/lib/dictationRecovery";
+import { captureSampleLimit, MAX_RECORDING_SECONDS } from "@/lib/dictationRecovery";
 import { AudioCaptureFlushError } from "@/lib/audioCaptureFlush";
 import type { NativeCaptureSession } from "@/lib/nativeCapture";
 import type { NativeCaptureTerminalOutcome } from "@/lib/nativeCaptureAudit";
-
-export const MAX_AUDIO_SECONDS = 600;
 
 export type Ref<T> = { current: T };
 
@@ -47,7 +45,7 @@ export interface DesktopCaptureTailEnv {
  * retained tail that live delivery has not already offered.
  */
 export function createDesktopCaptureTail(env: DesktopCaptureTailEnv) {
-  const maxAudioSeconds = env.maxAudioSeconds ?? MAX_AUDIO_SECONDS;
+  const maxAudioSeconds = env.maxAudioSeconds ?? MAX_RECORDING_SECONDS;
   const collectRange = env.collectAudioSamplesRange ?? collectAudioSamplesRange;
 
   function enqueueDesktopPhrase(end: number) {

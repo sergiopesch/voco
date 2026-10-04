@@ -1,8 +1,7 @@
 import { createCaptureDescriptor, type CaptureDescriptor } from "./captureDescriptor";
-import type { NativeCaptureIdentity } from "./nativeCapture";
+import { MAX_FRAMES, type NativeCaptureIdentity } from "./nativeCapture";
 
 export type NativeCaptureTerminalOutcome = "healthy-stop" | "interrupted" | "cancelled";
-export const MAX_NATIVE_SOURCE_SAMPLES = 26_460_000;
 
 /** Snapshot the renderer's retained source, before any DC removal or resampling. */
 export function encodeNativeRetainedSource(
@@ -15,7 +14,8 @@ export function encodeNativeRetainedSource(
   if (descriptor.backend !== "native" || descriptor.sourceSampleRate !== 44100 ||
       identity.sessionId !== descriptor.sessionId || identity.generation !== descriptor.generation ||
       typeof identity.captureId !== "string" || !identity.captureId || identity.captureId.length > 256 ||
-      samples.length > MAX_NATIVE_SOURCE_SAMPLES ||
+      // One retained mono sample per native frame.
+      samples.length > MAX_FRAMES ||
       !["healthy-stop", "interrupted", "cancelled"].includes(terminalOutcome)) {
     throw new Error("Invalid native retained-source evidence");
   }

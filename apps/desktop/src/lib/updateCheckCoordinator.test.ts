@@ -90,7 +90,9 @@ describe("UpdateCheckCoordinator", () => {
       "VOCO 2026.0.22-beta.1 is available on the beta channel.",
     ]);
     expect(coordinator.lastCheckedChannel).toBe("beta");
-    expect(coordinator.lastNotifiedReleaseVersion).toBe("2026.0.22-beta.1");
+    // A later check that finds the same release does not notify again.
+    await coordinator.run("beta", undefined, true);
+    expect(notifications).toHaveLength(1);
   });
 
   it("ignores an older same-channel request that resolves out of order", async () => {
@@ -140,7 +142,6 @@ describe("UpdateCheckCoordinator", () => {
     expect(writes).toEqual([secondState]);
     expect(notifications).toEqual([]);
     expect(coordinator.lastCheckedChannel).toBe("stable");
-    expect(coordinator.lastNotifiedReleaseVersion).toBeNull();
   });
 
   it("drops a completion when the selected channel changes before a new check starts", async () => {
@@ -178,6 +179,5 @@ describe("UpdateCheckCoordinator", () => {
     expect(writeCachedState).not.toHaveBeenCalled();
     expect(showNotification).not.toHaveBeenCalled();
     expect(coordinator.lastCheckedChannel).toBeNull();
-    expect(coordinator.lastNotifiedReleaseVersion).toBeNull();
   });
 });

@@ -94,7 +94,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `dictationStream.startup.test.ts` — Importing the module leaves model warmup to Rust.
 - `dictationRecording.ts` — Start and Stop for one recording: delivery callbacks, the Stop copy and notifications.
 - `dictationRecording.test.ts` — Start and Stop ordering and cleanup.
-- `desktopCaptureTail.ts` — `DictationStreamInput`, the 600-second limit, the Stop tail and capture teardown.
+- `desktopCaptureTail.ts` — `DictationStreamInput`, the recording sample cap, the Stop tail and capture teardown.
 - `audioCaptureBuffer.ts` — In-memory audio for the current recording; `collectAudioSamplesRange` is its only reader.
 - `audioCaptureBuffer.test.ts` — Buffer bounds and ranges.
 - `audioCaptureFlush.ts` — AudioWorklet flush acknowledgement with an 80 ms timeout.
@@ -114,7 +114,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `browserStreamDelivery.test.ts` — Browser delivery and Stop.
 - `crashRecovery.ts` — `CrashJournal` and the Review commands.
 - `crashRecovery.test.ts` — Journal updates and failures.
-- `dictationRecovery.ts` — Capture sample limit and error text helpers.
+- `dictationRecovery.ts` — The 600-second recording limit, the capture sample limit and error text helpers.
 - `dictationRecovery.test.ts` — Recovery helpers.
 - `dictationSession.ts` — Session state machine and a queued Stop.
 - `dictationSession.test.ts` — Session state machine.
