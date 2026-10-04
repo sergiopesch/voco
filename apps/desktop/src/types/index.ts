@@ -125,7 +125,7 @@ export interface BrowserFieldStatus {
   progressiveCommitActive: boolean;
   committedCharacterCount: number;
   ownershipIntact: boolean;
-  finalizationOutcome: "committed" | "uncertain" | null;
+  finalizationOutcome: "uncertain" | null;
   error: string | null;
 }
 

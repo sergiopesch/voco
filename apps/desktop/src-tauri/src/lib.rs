@@ -867,7 +867,6 @@ fn append_browser_field(
         session_id,
         &expected_committed_text,
         &append_text,
-        false,
     )
 }
 
