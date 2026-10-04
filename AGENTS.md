@@ -104,6 +104,9 @@ change.
   exists before the clipboard copy, so a missing device is a `no-mutation`
   failure; after an emit error, release Shift and drop it so the next paste
   recreates it.
+- Keys reach whichever session owns the seat, so send them only while logind
+  reports this user's graphical session active: check before the clipboard copy
+  (`no-mutation`) and again just before the keys. Unknown state doesn't block.
 - The paste check opens `/dev/uinput`; it never creates the device, sends keys or
   starts a process. The evdev listener ignores the virtual keyboard by name (and
   another tool's `ydotoold virtual device`), so its keys never count as the

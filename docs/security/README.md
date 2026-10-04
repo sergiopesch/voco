@@ -72,7 +72,10 @@ session is active, any program that runs as you, even over SSH or as a user
 service, can create its own keyboard or mouse and type into whichever app has
 focus, terminals too. Access is checked when a program opens the device, so a
 program that already holds a virtual device, as VOCO does, keeps it after the
-ACL moves, and its keys reach whichever session is then active.
+ACL moves, and its keys reach whichever session is then active. VOCO therefore
+asks logind before every paste whether your graphical session is the active one,
+and sends no keys while it is in the background; when logind can't answer, VOCO
+pastes as usual.
 
 A typing daemon that runs as you needs this same access, and adds a socket that
 every program running as you can write to. The `input` group grants far more:
