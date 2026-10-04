@@ -20,8 +20,12 @@ spec.loader.exec_module(fixture)
 spec = importlib.util.spec_from_file_location('panel_setup', ROOT / 'apps/desktop/src-tauri/resources/voco_gnome_panel.py')
 panel = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(panel)
-# The installer matches what `voco --setup-panel` prints after enabling the panel.
-PANEL_ENABLED = panel.classify('46.0', True, {}, True, False)['detail']
+# The installer matches the two results after which `voco --setup-panel` asks for a
+# sign-out: setup just enabled the panel, or an upgrade left GNOME running an older one.
+PANEL_RESTARTS = {
+    'enabled': panel.classify('46.0', True, {}, True, False),
+    'updated': panel.classify('46.0', True, {'state': 1, 'version': panel.COMPANION_VERSION - 1}, True, False),
+}
 
 
 def visible_terminal(data, width=80):
@@ -108,7 +112,7 @@ voco_ui_close
             self.assertNotIn('Interrupted frame', screen)
 
     def run_journey(self, mode, signature_case='valid', install_case='ready', launch_case='started',
-                    manager='apt'):
+                    manager='apt', panel_result='enabled'):
         source = (ROOT / 'install').read_text()
         prefix, body = source.split('# ─── Header', 1)
         # The signed .54 manifest includes KEYS. Use that small real release asset
@@ -192,7 +196,7 @@ voco_ui_close
                    'FIXTURE_MANIFEST': str(SIGNED_MANIFEST), 'FIXTURE_PACKAGE': str(ROOT / 'KEYS'),
                    'FIXTURE_APT_CALL': str(root / 'apt-called'), 'FIXTURE_LAUNCH_CALL': str(root / 'launch-called'),
                    'FIXTURE_MANAGER': manager, 'FIXTURE_DNF_CALL': str(root / 'dnf-called'),
-                   'FIXTURE_PACKAGE_URL': str(root / 'package-url'), 'FIXTURE_PANEL_DETAIL': PANEL_ENABLED}
+                   'FIXTURE_PACKAGE_URL': str(root / 'package-url'), 'FIXTURE_PANEL_DETAIL': PANEL_RESTARTS[panel_result]['detail']}
             env.pop('NO_COLOR', None)
             if mode == 'plain':
                 env['VOCO_INSTALL_PLAIN'] = '1'
@@ -310,6 +314,12 @@ voco_ui_close
         for mode in ('animated', 'no-motion', 'password', 'prompt', 'plain', 'narrow', 'short'):
             with self.subTest(mode=mode):
                 self.run_journey(mode)
+
+    def test_upgrade_that_needs_a_sign_out_gets_the_same_note(self):
+        self.assertEqual({result['status'] for result in PANEL_RESTARTS.values()}, {'restart'})
+        for mode in ('animated', 'plain'):
+            with self.subTest(mode=mode):
+                self.run_journey(mode, panel_result='updated')
 
 
 if __name__ == '__main__':
