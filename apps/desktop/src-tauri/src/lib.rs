@@ -428,11 +428,41 @@ fn validate_loaded_config(config: &AppConfig) -> Result<(), String> {
     validate_dictation_hotkey(&config.hotkey)
 }
 
+fn config_writer() -> Result<std::sync::MutexGuard<'static, ()>, String> {
+    CONFIG_WRITE_LOCK
+        .lock()
+        .map_err(|_| "VOCO configuration writer is unavailable".to_string())
+}
+
+/// Call only after a committed write, while still holding `config_writer()`, so
+/// the config and its revision come from the same write.
+fn publish_config(app: &tauri::AppHandle, config: AppConfig, kind: &str) -> ConfigSnapshot {
+    let snapshot = ConfigSnapshot {
+        revision: CONFIG_REVISION.fetch_add(1, Ordering::SeqCst) + 1,
+        config,
+    };
+    if let Err(error) = app.emit_to("main", CONFIG_CHANGED_EVENT, snapshot.clone()) {
+        warn!("Failed to emit {kind} configuration update: {error}");
+    }
+    snapshot
+}
+
+/// Rebinds `previous` after a failed change and returns the error to report. It
+/// restores only the runtime binding; config.rs keeps or restores the file.
+fn restore_hotkey(
+    previous: &str,
+    error: String,
+    rebind: impl FnOnce(&str) -> Result<(), String>,
+) -> String {
+    match rebind(previous) {
+        Ok(()) => error,
+        Err(rollback) => format!("{error}; restoring {previous} also failed: {rollback}"),
+    }
+}
+
 #[tauri::command]
 fn get_config() -> Result<ConfigSnapshot, String> {
-    let _guard = CONFIG_WRITE_LOCK
-        .lock()
-        .map_err(|_| "VOCO configuration writer is unavailable".to_string())?;
+    let _guard = config_writer()?;
     let config = AppConfig::load().map_err(|error| error.to_string())?;
     validate_loaded_config(&config)?;
     Ok(ConfigSnapshot {
@@ -443,74 +473,34 @@ fn get_config() -> Result<ConfigSnapshot, String> {
 
 #[tauri::command]
 fn reload_config_from_disk(app: tauri::AppHandle) -> Result<ConfigSnapshot, String> {
-    let _guard = CONFIG_WRITE_LOCK
-        .lock()
-        .map_err(|_| "VOCO configuration writer is unavailable".to_string())?;
+    let _guard = config_writer()?;
     let previous_hotkey = tray::current_hotkey(&app)?;
     let config = AppConfig::load().map_err(|error| error.to_string())?;
     validate_loaded_config(&config)?;
-    if let Err(error) = apply_hotkey_runtime_state(&app, &config.hotkey, false) {
-        let rollback = apply_hotkey_runtime_state(&app, &previous_hotkey, false);
-        return match rollback {
-            Ok(()) => Err(format!(
-                "Could not apply the repaired hotkey {}: {error}",
-                config.hotkey
-            )),
-            Err(rollback_error) => Err(format!(
-                "Could not apply the repaired hotkey {}: {error}; restoring {previous_hotkey} also failed: {rollback_error}",
-                config.hotkey
-            )),
-        };
-    }
-
-    let snapshot = ConfigSnapshot {
-        revision: CONFIG_REVISION.fetch_add(1, Ordering::SeqCst) + 1,
-        config,
-    };
-    if let Err(error) = app.emit_to("main", CONFIG_CHANGED_EVENT, snapshot.clone()) {
-        warn!("Failed to emit reloaded configuration update: {error}");
-    }
-    Ok(snapshot)
+    apply_hotkey_runtime_state(&app, &config.hotkey).map_err(|error| {
+        let error = format!(
+            "Could not apply the repaired hotkey {}: {error}",
+            config.hotkey
+        );
+        restore_hotkey(&previous_hotkey, error, |hotkey| {
+            apply_hotkey_runtime_state(&app, hotkey)
+        })
+    })?;
+    Ok(publish_config(&app, config, "reloaded"))
 }
 
 #[tauri::command]
 fn reset_config_to_defaults(app: tauri::AppHandle) -> Result<ConfigSnapshot, String> {
-    let _guard = CONFIG_WRITE_LOCK
-        .lock()
-        .map_err(|_| "VOCO configuration writer is unavailable".to_string())?;
+    let _guard = config_writer()?;
     let previous_hotkey = tray::current_hotkey(&app)?;
-    let default_hotkey = AppConfig::default().hotkey;
-    if let Err(error) = apply_hotkey_runtime_state(&app, &default_hotkey, false) {
-        let rollback = apply_hotkey_runtime_state(&app, &previous_hotkey, false);
-        return match rollback {
-            Ok(()) => Err(format!(
-                "Could not bind the default hotkey before resetting settings: {error}"
-            )),
-            Err(rollback_error) => Err(format!(
-                "Could not bind the default hotkey before resetting settings: {error}; restoring {previous_hotkey} also failed: {rollback_error}"
-            )),
-        };
-    }
-    let config = match AppConfig::reset_to_defaults() {
-        Ok(config) => config,
-        Err(error) => {
-            let rollback = apply_hotkey_runtime_state(&app, &previous_hotkey, false);
-            return match rollback {
-                Ok(()) => Err(error.to_string()),
-                Err(rollback_error) => Err(format!(
-                    "{error}; restoring the previous hotkey also failed: {rollback_error}"
-                )),
-            };
-        }
-    };
-    let snapshot = ConfigSnapshot {
-        revision: CONFIG_REVISION.fetch_add(1, Ordering::SeqCst) + 1,
-        config,
-    };
-    if let Err(error) = app.emit_to("main", CONFIG_CHANGED_EVENT, snapshot.clone()) {
-        warn!("Failed to emit recovered configuration update: {error}");
-    }
-    Ok(snapshot)
+    let rebind = |hotkey: &str| apply_hotkey_runtime_state(&app, hotkey);
+    apply_hotkey_runtime_state(&app, &AppConfig::default().hotkey).map_err(|error| {
+        let error = format!("Could not bind the default hotkey before resetting settings: {error}");
+        restore_hotkey(&previous_hotkey, error, rebind)
+    })?;
+    let config = AppConfig::reset_to_defaults()
+        .map_err(|error| restore_hotkey(&previous_hotkey, error.to_string(), rebind))?;
+    Ok(publish_config(&app, config, "recovered"))
 }
 
 #[tauri::command]
@@ -526,45 +516,28 @@ fn persist_config_patch(
     patch: AppConfigPatch,
     notify_hotkey_change: bool,
 ) -> Result<ConfigSnapshot, String> {
-    let _guard = CONFIG_WRITE_LOCK
-        .lock()
-        .map_err(|_| "VOCO configuration writer is unavailable".to_string())?;
+    let _guard = config_writer()?;
     let previous = AppConfig::load().map_err(|error| error.to_string())?;
     let mut config = previous.clone();
     patch.apply_to(&mut config);
     let hotkey_changed = previous.hotkey != config.hotkey;
+    let rebind = |hotkey: &str| apply_hotkey_runtime_state(app, hotkey);
 
     if hotkey_changed {
         validate_dictation_hotkey(&config.hotkey)?;
-        if let Err(error) = apply_hotkey_runtime_state(app, &config.hotkey, false) {
-            let rollback = apply_hotkey_runtime_state(app, &previous.hotkey, false);
-            return match rollback {
-                Ok(()) => Err(error),
-                Err(rollback_error) => Err(format!(
-                    "{error}; restoring the previous hotkey also failed: {rollback_error}"
-                )),
-            };
-        }
+        apply_hotkey_runtime_state(app, &config.hotkey)
+            .map_err(|error| restore_hotkey(&previous.hotkey, error, rebind))?;
     }
 
     if let Err(error) = config.save() {
-        if hotkey_changed {
-            if let Err(rollback_error) = apply_hotkey_runtime_state(app, &previous.hotkey, false) {
-                return Err(format!(
-                    "{error}; restoring the previous hotkey also failed: {rollback_error}"
-                ));
-            }
-        }
-        return Err(error.to_string());
+        return Err(if hotkey_changed {
+            restore_hotkey(&previous.hotkey, error.to_string(), rebind)
+        } else {
+            error.to_string()
+        });
     }
 
-    let snapshot = ConfigSnapshot {
-        revision: CONFIG_REVISION.fetch_add(1, Ordering::SeqCst) + 1,
-        config,
-    };
-    if let Err(error) = app.emit_to("main", CONFIG_CHANGED_EVENT, snapshot.clone()) {
-        warn!("Failed to emit authoritative configuration update: {error}");
-    }
+    let snapshot = publish_config(app, config, "authoritative");
     if hotkey_changed && notify_hotkey_change {
         send_notification(
             "Shortcut preference saved",
@@ -1424,11 +1397,7 @@ fn sync_global_shortcut_binding(
     Ok(())
 }
 
-fn apply_hotkey_runtime_state(
-    app: &tauri::AppHandle,
-    new_hotkey: &str,
-    notify: bool,
-) -> Result<(), String> {
+fn apply_hotkey_runtime_state(app: &tauri::AppHandle, new_hotkey: &str) -> Result<(), String> {
     let use_evdev_hotkey = prefers_evdev_hotkey(is_wayland_session(), new_hotkey);
 
     #[cfg(target_os = "linux")]
@@ -1458,13 +1427,6 @@ fn apply_hotkey_runtime_state(
             "global-shortcut"
         }
     );
-
-    if notify {
-        send_notification(
-            "Shortcut preference saved",
-            &format!("Preferred shortcut: {new_hotkey}"),
-        );
-    }
 
     Ok(())
 }
@@ -2488,6 +2450,25 @@ mod tests {
             ..AppConfig::default()
         };
         assert!(validate_loaded_config(&valid).is_ok());
+    }
+
+    #[test]
+    fn hotkey_rollback_rebinds_the_previous_hotkey_and_names_a_failed_restore() {
+        let mut rebound = Vec::new();
+        let restored = restore_hotkey("Alt+D", "save failed".into(), |hotkey| {
+            rebound.push(hotkey.to_string());
+            Ok(())
+        });
+        assert_eq!(restored, "save failed");
+        let failed = restore_hotkey("Alt+D", "save failed".into(), |hotkey| {
+            rebound.push(hotkey.to_string());
+            Err("grab refused".into())
+        });
+        assert_eq!(
+            failed,
+            "save failed; restoring Alt+D also failed: grab refused"
+        );
+        assert_eq!(rebound, ["Alt+D", "Alt+D"]);
     }
 
     #[test]
