@@ -45,10 +45,12 @@ you set it, and only your account can read it.
 
 | Message | What to do |
 | --- | --- |
-| `… is required before downloading VOCO.` | Install the named tool with `sudo apt install`, then run the installer again. |
+| `VOCO installs with APT on Ubuntu and Debian, or with DNF on Fedora. Neither was found.` | Run the installer on one of the [supported systems](platform/README.md#supported-systems). |
+| `… is required before downloading VOCO.` | Install the named tool with `sudo apt install`, or `sudo dnf install` on Fedora, then run the installer again. |
+| `sudo is required before downloading VOCO.`, or `… is not in the sudoers file` | Your account can't use `sudo` yet, as on a Debian system installed with a root password. As root (`su -`), run `apt install sudo` and `adduser <your user name> sudo`, sign out and back in, then run the installer again. |
 | `The download stopped.` | Check your connection and run the installer again. If the release file is unavailable, check that the release exists. |
 | A key, signature, signer or checksum error | Nothing was installed. Run the installer again. If the check fails again, don't install the file another way, and report it as described in [SECURITY.md](../SECURITY.md). |
-| `Installation failed:` | APT couldn't install the package. Fix the APT error it shows, then run the installer again. |
+| `Installation failed:` | APT or DNF couldn't install the package. Fix the error it shows, then run the installer again. |
 
 Exit status 2 means VOCO is installed but can't paste yet. The installer names
 the problem. The most common ones are:
@@ -59,7 +61,15 @@ the problem. The most common ones are:
 | `Pasting on … requires: …` | Install the package that provides the named program, such as `wl-clipboard` for `wl-copy`. |
 
 When `voco --check-desktop-input` passes, run `voco --setup-panel` on GNOME 46,
-then open VOCO. See [Wayland paste keys](install.md#wayland-paste-keys).
+48 or 50, then open VOCO. See [Wayland paste keys](install.md#wayland-paste-keys).
+
+## DNF says it skipped OpenPGP checks
+
+On Fedora, DNF warns that it skipped OpenPGP checks when it installs VOCO. This
+is expected: the RPM carries no OpenPGP signature of its own. The guided
+installer checked the release's signed checksum list, and the package against
+it, before DNF started. After a manual install, the checks in
+[Manual install](install.md#fedora) do the same.
 
 ## Dictation won't start
 
@@ -79,8 +89,8 @@ then open VOCO. See [Wayland paste keys](install.md#wayland-paste-keys).
    dictation starts, the problem is the shortcut.
 3. Open **Help**, then **My shortcut is not working**. It says how the shortcut
    reaches VOCO and whether that works.
-4. On Wayland outside GNOME 46, bind a key to `voco --toggle`, as described in
-   [Wayland compositor shortcuts](install.md#wayland-compositor-shortcuts).
+4. On Wayland outside GNOME 46, 48 and 50, bind a key to `voco --toggle`, as
+   described in [Wayland compositor shortcuts](install.md#wayland-compositor-shortcuts).
 
 If `voco --toggle` prints `Could not reach VOCO's private control socket`, VOCO
 isn't running in this desktop session. Open VOCO, then try again. To record key
@@ -93,8 +103,8 @@ but can't stop your app from receiving them. Browsers jump to the address bar,
 so your words land there, and terminals delete a word. VOCO warns once per
 launch with **Your shortcut also reached the app**. Fix it one of these ways:
 
-- On GNOME 46, choose **Enable live panel** on the **Help** page, or run
-  `voco --setup-panel`. Then sign out and back in.
+- On GNOME 46, 48 or 50, choose **Enable live panel** on the **Help** page, or
+  run `voco --setup-panel`. Then sign out and back in.
 - Elsewhere, choose another shortcut in VOCO and bind it to `voco --toggle` in
   your desktop's keyboard settings.
 - Add the [VOCO Dictation input source](install.md#ibus-input-source). It keeps
@@ -150,8 +160,9 @@ is in [Review](everyday-use.md#review).
 
 ## The GNOME panel doesn't appear
 
-The panel shows only while VOCO is running. Run `voco --check-panel` and follow
-the line it prints. It exits with status 2 when the panel needs a step.
+The panel works on GNOME 46, 48 and 50, and shows only while VOCO is running.
+Run `voco --check-panel` and follow the line it prints. It exits with status 2
+when the panel needs a step.
 
 - If the panel isn't enabled, choose **Enable live panel** on the **Help** page,
   or run `voco --setup-panel`. Then save your work and sign out and back in.
@@ -159,7 +170,12 @@ the line it prints. It exits with status 2 when the panel needs a step.
 - If GNOME extensions are turned off, turn them on in the Extensions app. If a
   policy blocks them, ask your administrator.
 - If the panel files are missing, reinstall the VOCO package.
-- On other GNOME versions and other desktops, use the tray menu.
+- On other GNOME versions, `voco --check-panel` says that the panel supports
+  GNOME 46, 48 and 50. There and on other desktops, use the tray menu.
+
+On Debian 13 and Fedora 44, VOCO's tray icon needs an AppIndicator extension,
+which they don't turn on, so until the panel loads VOCO has no icon in the top
+bar. Open VOCO from your app menu in the meantime.
 
 While you dictate, GNOME's microphone privacy indicator appears and moves the
 VOCO panel to the left. This is expected.

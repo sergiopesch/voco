@@ -45,8 +45,12 @@ VOCO saves the text in [Review](#review) and shows **Dictation saved in Review**
 | Tray icon | Click to stop while you dictate, or to open the VOCO popover. |
 | Tray menu | **Open VOCO**, **Start dictation** or **Stop dictation**, **Settings**, **Review**, **Change shortcut** and **Quit VOCO** |
 | GNOME panel | Seven bars move with your voice. Click to stop while you dictate, or to open Settings. |
-| GNOME panel menu | Right-click the panel, or press Menu or Shift+F10 on it, for **Settings**, **Review** and **Stop dictation**. |
+| GNOME panel menu | Right-click or middle-click the panel, or press Menu or Shift+F10 on it, for **Settings**, **Review** and **Stop dictation**. |
 | Popover | Shows VOCO's status, your shortcut and your microphone, with **Help** and **Hide to tray**. |
+
+On GNOME the tray icon needs an AppIndicator extension. Ubuntu includes one;
+Debian 13 and Fedora 44 don't turn one on, so there the GNOME panel is VOCO's
+place in the top bar.
 
 Settings has four pages: **Settings** for your microphone, **Shortcut**,
 **Updates** and **Help**, which has setup steps and runtime checks. Opening
@@ -82,7 +86,7 @@ If your saved shortcut isn't valid, VOCO sets it back to `Alt+D` and shows
 | Desktop | How the shortcut reaches VOCO |
 | --- | --- |
 | X11 | VOCO registers the shortcut with the desktop. |
-| GNOME 46 on Wayland | The [VOCO panel](install.md#gnome-panel) handles an `Alt+D` or `Alt+Shift+D` shortcut and keeps it from the app you are typing in. |
+| GNOME 46, 48 or 50 on Wayland | The [VOCO panel](install.md#gnome-panel) handles an `Alt+D` or `Alt+Shift+D` shortcut and keeps it from the app you are typing in. |
 | Other Wayland desktops | Bind a key to `voco --toggle`, as described in [Wayland compositor shortcuts](install.md#wayland-compositor-shortcuts). |
 
 On Wayland without the panel, VOCO can still watch for `Alt+D` and
@@ -155,7 +159,7 @@ rm -rf ~/.config/voco ~/.local/state/voco ~/.local/share/com.sergiopesch.voco
 - If recognition falls more than three seconds behind, or revises words it has
   already given, VOCO stops transcribing and shows **Dictation interrupted**.
 - On Wayland, typing needs access to `/dev/uinput`, which the package gives only
-  the user of the active local session. Outside GNOME 46, the shortcut also
-  needs a desktop binding.
+  the user of the active local session. Outside GNOME 46, 48 and 50, the
+  shortcut also needs a desktop binding.
 - Apps that remap Shift+Insert, remote desktops and virtual machines may not
   accept the paste.

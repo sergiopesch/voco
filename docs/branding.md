@@ -145,11 +145,11 @@ dictation reads Stop after microphone starts.
 
 ### GNOME companion
 
-On GNOME 46 the [companion](../integrations/gnome/README.md) replaces the tray
-icon. It is one pill (3 px vertical margin, 11 px side padding, fully rounded) that
-shares GNOME's hover, focus and open-menu highlight, tinted
-`rgba(190, 198, 208, 0.14)` whenever VOCO isn't idle. The 20 px microphone comes
-last and never moves:
+On GNOME 46, 48 and 50 the [companion](../integrations/gnome/README.md)
+replaces the tray icon. It is one pill (3 px vertical margin, 11 px side
+padding, fully rounded) that shares GNOME's hover, focus and open-menu
+highlight, tinted `rgba(190, 198, 208, 0.14)` whenever VOCO isn't idle. The
+20 px microphone comes last and never moves:
 
 - From the moment the microphone starts until the text is ready, seven 2 × 14 px
   bars in `#dfe3e9` open on its left over 220 ms, in whole pixels, and only if
@@ -182,7 +182,8 @@ The canvas marks stages with ✓ in green when done, › in amber while active a
 begins, a brighter silver passes across the block letters, one every 125 ms. Downloads
 sample four times a second and show seven bars on a fixed log scale, the bytes
 received and the average rate, without a percentage or time estimate. APT output
-repaints at most every 0.1 s. `VOCO_INSTALL_NO_MOTION=1`, or GNOME's animations
+repaints at most every 0.1 s; DNF keeps its own output, and the canvas clears
+before it starts. `VOCO_INSTALL_NO_MOTION=1`, or GNOME's animations
 turned off, keeps the canvas still. The canvas gives way to plain text before any
 password or package question.
 

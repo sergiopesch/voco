@@ -30,9 +30,9 @@ wget -qO voco-install https://raw.githubusercontent.com/sergiopesch/voco/voco.20
 ```
 
 The installer checks the release signature against its built-in VOCO key and
-verifies the package checksum, then installs VOCO with APT, checks desktop input
-and opens VOCO. To verify by hand, upgrade or remove VOCO, see
-[Install VOCO](docs/install.md).
+verifies the package checksum. Then it installs VOCO with APT, or with DNF on
+Fedora, checks desktop input, turns on the GNOME panel and opens VOCO. To verify
+by hand, upgrade or remove VOCO, see [Install VOCO](docs/install.md).
 
 ## Your first dictation
 
@@ -51,15 +51,21 @@ Text goes to whichever window has keyboard focus. See
 
 ## Requirements
 
-- A 64-bit Intel or AMD processor with AVX2, FMA and F16C
-- Ubuntu 24.04 or later, or another Debian-based system with glibc 2.39 or later
-- An X11 or Wayland desktop session and a microphone
-- On Wayland, access to `/dev/uinput`, which the package gives the user of the
-  active local session
-- On Wayland desktops other than GNOME 46, a desktop keyboard shortcut that runs
-  `voco --toggle`
+VOCO supports these systems on 64-bit Intel and AMD processors with AVX2, FMA
+and F16C:
 
-The reference desktop is Ubuntu 24.04 with GNOME 46.
+| System | Desktop | Sessions | Package |
+| --- | --- | --- | --- |
+| Ubuntu 24.04 LTS | GNOME 46 | Wayland, X11 | Debian package, with APT |
+| Ubuntu 26.04 LTS | GNOME 50 | Wayland | Debian package, with APT |
+| Debian 13 | GNOME 48 | Wayland, X11 | Debian package, with APT |
+| Fedora 44 Workstation | GNOME 50 | Wayland | RPM, with DNF |
+
+You also need a microphone. On Wayland, VOCO needs access to `/dev/uinput`,
+which the package gives the user of the active local session. On GNOME 46, 48
+and 50 the VOCO panel handles the shortcut; on other Wayland desktops, bind a
+keyboard shortcut to `voco --toggle`. [Platform support](docs/platform/README.md)
+covers each system and how it is tested.
 
 ## Privacy
 

@@ -10,8 +10,8 @@ VOCO is a private dictation app for Linux. Start with the
 | [Install VOCO](install.md) | Requirements, guided and manual install, desktop setup, upgrade and removal |
 | [Everyday use](everyday-use.md) | Dictating, controls, shortcuts, Review, what VOCO keeps, limits |
 | [Troubleshooting](troubleshooting.md) | Diagnostics, fixes by symptom, logs and bug reports |
-| [Platform support](platform/README.md) | Desktops, sessions and input helpers |
-| [GNOME panel](../integrations/gnome/README.md) | The optional GNOME 46 top-bar companion |
+| [Platform support](platform/README.md) | Supported systems and how they are tested, sessions and input helpers |
+| [GNOME panel](../integrations/gnome/README.md) | The optional top-bar companion for GNOME 46, 48 and 50 |
 | [Chromium extension](../integrations/chromium/README.md) | The optional browser extension for single text fields |
 
 ## Contributing
@@ -24,7 +24,7 @@ VOCO is a private dictation app for Linux. Start with the
 | [Code map](architecture/code-map.md) | Where each feature lives in the source |
 | [Inside VOCO](guide/README.md) | A visual tour from spoken word to source code |
 | [Testing](testing/README.md) | Automated and manual checks |
-| [Linux packaging](linux-packaging.md) | Building and assembling the Debian package |
+| [Linux packaging](linux-packaging.md) | Building the Debian package and the Fedora RPM |
 | [Release process](release-process.md) | Signing and publishing a release |
 | [Security model](security/README.md) | Threat model, permissions and local data |
 | [Branding](branding.md) | Visual identity and writing style |

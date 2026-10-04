@@ -1,18 +1,54 @@
 # Platform support
 
 VOCO runs on x86-64 Linux desktops, in Wayland and X11 sessions. This page
-covers what the computer needs, how VOCO pastes and receives its shortcut, and
-what Wayland paste keys need. [Install VOCO](../install.md) covers installation,
-and [Architecture](../architecture/README.md) follows a recording.
+covers the systems VOCO supports and how they are tested, what the computer
+needs, how VOCO pastes and receives its shortcut, and what Wayland paste keys
+need. [Install VOCO](../install.md) covers installation, and
+[Architecture](../architecture/README.md) follows a recording.
+
+## Supported systems
+
+| System | Desktop | Sessions | Package | Without the panel |
+| --- | --- | --- | --- | --- |
+| Ubuntu 24.04 LTS | GNOME 46 | Wayland, X11 | `voco_<version>_amd64.deb`, with APT | Tray icon, through Ubuntu's AppIndicator extension |
+| Ubuntu 26.04 LTS | GNOME 50 | Wayland | `voco_<version>_amd64.deb`, with APT | Tray icon, through Ubuntu's AppIndicator extension |
+| Debian 13 | GNOME 48 | Wayland, X11 | `voco_<version>_amd64.deb`, with APT | No top-bar icon unless you add an AppIndicator extension |
+| Fedora 44 Workstation | GNOME 50 | Wayland | `voco-<version>-1.x86_64.rpm`, with DNF | No top-bar icon unless you add an AppIndicator extension |
+
+The [GNOME panel](../install.md#gnome-panel) works on all four, and the guided
+installer turns it on; after you sign out and back in, it replaces the tray icon
+while VOCO runs. Without the panel or a tray icon, open VOCO from your app menu.
+
+The two packages hold the same files and need glibc 2.39 or later: they are
+built on Ubuntu 24.04, whose glibc 2.39 and GCC 13 runtime set their floors.
+Other systems that meet the package dependencies may run VOCO, but nothing here
+tests them, and other GNOME versions use the tray instead of the panel.
+
+## How VOCO is tested
+
+Each kind of check shows something different, and a check covers only the
+system and GNOME version it ran on.
+
+| Evidence | What runs | Where |
+| --- | --- | --- |
+| Source and package checks | Unit tests; the package scripts' tests; the installer's APT and DNF steps against stand-in package managers; the package verifiers | Hosted CI on Ubuntu 24.04, for every change. For each release, both verifiers run on the signing computer, the RPM's against the Debian package. |
+| Isolated desktop sessions | The app, the GNOME companion and real apps in private Xvfb, headless Weston and nested GNOME Shell 46 sessions, with synthetic audio and no input devices | Hosted CI on Ubuntu 24.04. The companion's harness also runs GNOME 48 nested and GNOME 50 headless on a computer that has them. |
+| Native installation | Installing the package with APT or DNF, then `voco --check-desktop-input`. On Fedora 44 also the speech worker and removal, with SELinux enforcing; none of these steps raises a denial. | For each release, the Debian package on the signing computer and the RPM on Fedora 44 |
+| Physical audio and real sessions | The [manual acceptance](../testing/README.md#manual-acceptance) check: a physical microphone, dictation into real apps, the tray or the panel | A Linux desktop, before each release |
+
+Isolated sessions have no input devices, so only a real computer exercises
+VOCO's virtual keyboard on `/dev/uinput`. Each release's validation record,
+`voco_<version>_validation.json`, lists the checks that release passed and what
+they don't cover. [Testing](../testing/README.md) describes the suites.
 
 ## Requirements
 
 | Area | Requirement |
 | --- | --- |
 | Processor | x86-64 with AVX2, FMA and F16C. VOCO doesn't check for them, and recognition can't run without them. |
-| System | Ubuntu 24.04 or later, or another Debian-based system with glibc 2.39 or later. The package needs `libc6 (>= 2.39)` and `libstdc++6 (>= 13.2.0)`. |
+| System | One of the [supported systems](#supported-systems). The Debian package needs `libc6 (>= 2.39)` and `libstdc++6 (>= 13.2.0)`, and the RPM `glibc >= 2.39` and `libstdc++ >= 13.2`. |
 | Audio | PulseAudio, or PipeWire with its PulseAudio service. |
-| Session | Wayland or X11. The reference desktop is Ubuntu 24.04 with GNOME 46. |
+| Session | Wayland or X11. GNOME 50 has no X11 session, so on Ubuntu 26.04 and Fedora 44 VOCO runs on Wayland. |
 | Wayland paste | Read and write access to `/dev/uinput`, which the package gives the user of the active local session. |
 
 To check the processor, run this command. It must print all three names.
@@ -21,7 +57,7 @@ To check the processor, run this command. It must print all three names.
 grep -o -w -E 'avx2|fma|f16c' /proc/cpuinfo | sort -u
 ```
 
-The package pulls in the clipboard, key, notification and IBus helpers VOCO
+Either package pulls in the clipboard, key, notification and IBus helpers VOCO
 uses, and installs the udev rule that gives the active local session access to
 `/dev/uinput` ([Access to /dev/uinput](#access-to-devuinput)). VOCO runs as your
 login. Apart from that rule, it never changes groups or device permissions, and
@@ -143,7 +179,7 @@ VOCO's shortcut combines Alt, Control or Super with a key, Alt+D by default.
 
 | Desktop | How the shortcut reaches VOCO |
 | --- | --- |
-| GNOME 46 on Wayland, [companion](../../integrations/gnome/README.md) attached | Shell grabs Alt+D or Alt+Shift+D, so the focused app never sees it. |
+| GNOME 46, 48 or 50 on Wayland, [companion](../../integrations/gnome/README.md) attached | Shell grabs Alt+D or Alt+Shift+D, so the focused app never sees it. |
 | Wayland with Alt+D or Alt+Shift+D, no companion | Passive evdev. The focused app also acts on the chord. |
 | Wayland with any other shortcut | A desktop keybinding that runs `voco --toggle`. |
 | X11 | VOCO's root-window grab, for any shortcut it accepts. It toggles on release, so the paste keys reach the app. |
@@ -189,7 +225,11 @@ polling, and keeps watching when none is readable at startup.
 - On GNOME, apps that inhibit system shortcuts, such as virtual machines and
   remote desktops, receive the companion's chord. In Shell menus and dialogs it
   does nothing.
-- The companion supports GNOME 46 only. Elsewhere VOCO uses the tray, which on
-  GNOME needs an AppIndicator extension.
+- The companion supports GNOME 46, 48 and 50, and `voco --check-panel` reports
+  other versions as unsupported. Elsewhere VOCO uses the tray, which on GNOME
+  needs an AppIndicator extension. Debian 13 and Fedora 44 don't turn one on.
 - Automated tests use synthetic audio in private X11, Wayland, GNOME and
   Chromium sessions, not physical microphones, other desktops or other apps.
+  Hosted CI runs them only on Ubuntu 24.04 with GNOME 46.
+- The RPM carries no OpenPGP signature of its own; the release's signed checksum
+  lists authenticate it, as [Install VOCO](../install.md#fedora) shows.
