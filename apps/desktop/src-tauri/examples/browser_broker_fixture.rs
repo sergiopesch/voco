@@ -1,4 +1,7 @@
 //! Test-only synthetic acceptance driver; never included in application packages.
+// The library's unit tests already run these modules' tests; `cargo test
+// --all-targets` would otherwise run them again in this example.
+#![cfg(not(test))]
 #[path = "../src/browser_broker.rs"]
 #[allow(dead_code)]
 mod browser_broker;
