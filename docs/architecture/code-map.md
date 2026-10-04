@@ -289,7 +289,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `test-native-gnome.py`, `test-native-gnome.sh`, `test_native_crash_review.py`, `test_native_cursor_capture.py`, `test_native_onboarding_capture.py` — The packaged app in a private GNOME session.
 - `test-native-kde.py`, `test-native-kde.sh`, `test-native-kde-identity.py` — KWin and Plasma in a private session.
 - `test-native-capture-callbacks.py`, `test-native-capture-pulse-latency.py`, `native-capture-lifecycle.test.c`, `test-native-capture-renderer.mjs`, `test_verify_native_capture_audit.py` — Native capture.
-- `test-dictation-renderer.mjs`, `test-microphone-app-renderer.mjs`, `test-brand-motion.mjs`, `audio-worklet-capture.test.mjs` — Renderer and AudioWorklet.
+- `test-dictation-renderer.mjs`, `test-microphone-app-renderer.mjs`, `renderer-fixture.mjs`, `test-brand-motion.mjs`, `audio-worklet-capture.test.mjs` — Renderer and AudioWorklet.
 - `test-speech-package.py`, `test-speech-worker.py`, `test-audio-continuity.py` — Speech packaging and worker pipes.
 - `test-rpm-package.py` — The RPM's file list, spec, header policy and parity checks; with rpmbuild installed, a real build.
 - `test-install-apt.py`, `test-install-common.sh`, `test-install-journey.py`, `test-install-launch.py`, `test-install-performance.py`, `test-install-presentation.py` — Installer.

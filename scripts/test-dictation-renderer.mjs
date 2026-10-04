@@ -2,7 +2,6 @@ import { chromium } from 'playwright';
 import { createServer } from 'vite';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createServer as createPortProbe } from 'node:net';
 import { writeFile, mkdir, realpath } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 // Renderer-only regression tests: all microphone, clipboard and native operations
@@ -13,15 +12,11 @@ if (evidence) await mkdir(evidence, { recursive: true });
 let server;
 let browser;
 try {
-const portProbe = createPortProbe();
-await new Promise((resolve, reject) => { portProbe.once('error', reject); portProbe.listen(0, '127.0.0.1', resolve); });
-const port = portProbe.address().port;
-await new Promise((resolve, reject) => portProbe.close(error => error ? reject(error) : resolve()));
 server = await createServer({
   configFile: path.join(root, 'apps/desktop/vite.config.ts'),
   root: path.join(root, 'apps/desktop'),
   logLevel: 'warn',
-  server: { host: '127.0.0.1', port, strictPort: true, hmr: false,
+  server: { host: '127.0.0.1', port: 0, hmr: false,
     fs: { allow: [root, await realpath(path.join(root, 'node_modules'))] } },
 });
 await server.listen();
