@@ -62,6 +62,7 @@ export const appendBrowserField = async (id,prefix,text) => { calls.push(['appen
 export const debugNativeCaptureEnabled = async () => false;
 export const saveDebugNativeRetainedSource = async () => null;
 export const traceHotkeyEvent = async (...args) => {(window.traceEvents??=[]).push(args);};
+export const getDiagnosticLogging = async () => sessionStorage.getItem('diagnosticLogging') === 'off' ? {trace:false,performance:false} : {trace:true,performance:true};
 export const refreshShortcutHeartbeat = async (ready) => {calls.push(['refreshShortcutHeartbeat',ready]);};
 export const showNotification = async (...args) => { calls.push(['showNotification',...args]); };
 export const insertText = async () => { calls.push(['insertText']); throw new Error('Unsafe generic delivery attempted'); };
@@ -286,7 +287,17 @@ assert.equal(await page.evaluate(()=>window.speechRequests.filter(r=>['start','p
 assert.equal(await page.evaluate(()=>window.traceEvents.filter(c=>c[0]==='dictation_desktop_first_phrase_dispatched').length),1);
 assert.equal(await page.evaluate(()=>window.traceEvents.filter(c=>c[0]==='dictation_desktop_modifier_wait_completed').length),2);
 assert.equal(await page.evaluate(()=>window.traceEvents.find(c=>c[0]==='dictation_desktop_keyboard_dispatch_completed')[1].durationMs),350);
+assert.equal(await page.evaluate(()=>window.speechRequests.some(r=>r.op==='quality'&&r.event==='delivery_dispatched')),true);
 results.push('Progressive native dictation pastes before Stop, flushes only the tail, reports paste stages and never repastes the complete transcript.');
+await page.evaluate(()=>sessionStorage.setItem('diagnosticLogging','off'));
+await load();await page.evaluate(()=>{window.desktopPaste=true;window.desktopStream=true;});
+await start();await page.waitForFunction(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length===1);
+await stop();await page.waitForFunction(()=>window.store.getState().status==='idle');
+assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length),2);
+assert.deepEqual(await page.evaluate(()=>(window.traceEvents??[]).filter(c=>/^(dictation|recording)_/.test(c[0]))),[]);
+assert.equal(await page.evaluate(()=>window.speechRequests.some(r=>r.op==='quality')),false);
+await page.evaluate(()=>sessionStorage.removeItem('diagnosticLogging'));
+results.push('With both opt-in logs off, dictation pastes as before and sends no dictation traces or quality records.');
 await load();await page.evaluate(()=>{window.desktopPaste=true;window.desktopStream=true;window.deferInference=true;});
 await start();await page.evaluate(()=>window.captureWorklet.port.onmessage({data:{type:'samples',data:new Float32Array(16000)}}));
 await page.waitForFunction(()=>Boolean(window.resolveInference));

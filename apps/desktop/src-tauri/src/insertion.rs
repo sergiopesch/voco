@@ -63,7 +63,7 @@ pub fn correlated_desktop_paste(
 ) -> Result<InsertionResult, InsertionError> {
     let started = Instant::now();
     let result = desktop_paste(text);
-    if let Some(correlation) = correlation {
+    if let Some(correlation) = correlation.filter(|_| crate::performance::enabled()) {
         let mut record = serde_json::json!({"event":"native_dispatch", "session":correlation.session,
             "dictation_session_id":correlation.dictation_session_id,
             "delivery_seq":correlation.delivery_seq, "hypothesis_seq":correlation.hypothesis_seq,

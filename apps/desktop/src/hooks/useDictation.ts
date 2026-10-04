@@ -25,6 +25,7 @@ import {
   copyDesktopText,
   debugNativeCaptureEnabled,
   getDesktopPasteStatus,
+  getDiagnosticLogging,
   pasteDesktopText,
   releaseBrowserRecording,
   saveDebugNativeRetainedSource,
@@ -80,11 +81,14 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
   const dictationStreamRef = useRef<DictationStream | null>(null);
   const desktopStreamedSampleCountRef = useRef(0);
   const debugNativeCaptureEnabledRef = useRef(false);
+  // Until Rust answers, send everything: a dropped trace costs less than a missing one.
+  const diagnosticLoggingRef = useRef({ trace: true, performance: true });
 
   function traceDictationEvent(
     event: string,
     fields: HotkeyTraceFields | null = null,
   ): Promise<void> {
+    if (!diagnosticLoggingRef.current.trace) return Promise.resolve();
     const sessionId = sessionRef.current.sessionId;
     if (sessionId <= 0) {
       return traceHotkeyEvent(event, fields);
@@ -464,6 +468,7 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
       connectWorklet,
       connectScriptProcessor,
       traceDesktopPasteMetrics,
+      performanceLogMayBeOn: () => diagnosticLoggingRef.current.performance,
       debugNativeCaptureEnabled,
       beginNativeCapture,
       releaseBrowserRecording,
@@ -506,6 +511,11 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
   useEffect(() => {
     disposedRef.current = false;
     lifecycleEpochRef.current += 1;
+    void getDiagnosticLogging().then((logging) => {
+      if (typeof logging?.trace === "boolean" && typeof logging.performance === "boolean") {
+        diagnosticLoggingRef.current = logging;
+      }
+    }).catch(() => {});
     return () => {
       recordingRef.current?.dispose();
     };

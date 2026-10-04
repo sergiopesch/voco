@@ -95,6 +95,8 @@ export interface DictationRecordingEnv {
   connectWorklet: (audioContext: AudioContext, source: MediaStreamAudioSourceNode) => Promise<boolean>;
   connectScriptProcessor: (audioContext: AudioContext, source: MediaStreamAudioSourceNode) => void;
   traceDesktopPasteMetrics: (result: Awaited<ReturnType<typeof pasteDesktopText>>) => void;
+  /** False only once Rust reports that the performance log is off. */
+  performanceLogMayBeOn: () => boolean;
   debugNativeCaptureEnabled: () => Promise<boolean>;
   beginNativeCapture: typeof beginNativeCapture;
   releaseBrowserRecording: (triggerId: string) => Promise<void>;
@@ -150,6 +152,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     connectWorklet,
     connectScriptProcessor,
     traceDesktopPasteMetrics,
+    performanceLogMayBeOn,
     debugNativeCaptureEnabled,
     beginNativeCapture,
     releaseBrowserRecording,
@@ -534,7 +537,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
             : event === "deferred" ? "dictation_desktop_paste_deferred"
             : `dictation_desktop_snapshot_${event}`;
           traceDictationEvent(name, durationMs === undefined ? null : { durationMs }).catch(() => {});
-        }, startingSessionId, !onboardingTest);
+        }, startingSessionId, !onboardingTest && performanceLogMayBeOn());
         // Audio can arrive while the worklet is starting. Keep planner offsets
         // aligned with the complete retained source, including that prefix.
         const prefix = collectAudioSamplesRange(audioBufferRef.current, 0, audioBufferRef.current.sampleCount);

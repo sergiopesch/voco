@@ -279,6 +279,14 @@ fn trace_frontend_hotkey_event(
     }
 }
 
+/// Both logs are opt-in. The renderer asks once, so it can skip the dictation
+/// traces and quality records Rust would only drop.
+#[tauri::command]
+fn diagnostic_logging() -> serde_json::Value {
+    let performance = performance::enabled();
+    serde_json::json!({"trace": TRACE_MODES.0 || performance, "performance": performance})
+}
+
 fn is_supported_dictation_trace_event(event: &str) -> bool {
     matches!(
         event,
@@ -2122,6 +2130,7 @@ pub fn run() -> Result<(), String> {
             sync_runtime_status,
             sync_panel_level,
             trace_frontend_hotkey_event,
+            diagnostic_logging,
             has_pending_hotkey_toggle,
             hide_status_overlay,
             show_notification,

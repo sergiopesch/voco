@@ -52,6 +52,11 @@ fn start(directory: &Path) -> io::Result<()> {
     Ok(())
 }
 
+/// Whether the opt-in recorder started; every record is dropped otherwise.
+pub(crate) fn enabled() -> bool {
+    RECORDER.get().is_some()
+}
+
 fn emit(mut value: Value) {
     if let Some(recorder) = RECORDER.get() {
         value["t_us"] = json!(recorder.start.elapsed().as_micros() as u64);
@@ -62,7 +67,7 @@ fn emit(mut value: Value) {
 }
 
 pub fn lifecycle(record: &Value) {
-    if RECORDER.get().is_none() {
+    if !enabled() {
         return;
     }
     if let Some(safe) = lifecycle_payload(record) {
@@ -143,6 +148,10 @@ pub fn native_speech_quality(request: &Value) -> Result<(), String> {
 }
 
 fn record_speech_quality(request: &Value) -> Result<(), String> {
+    // Callers check provenance first; without a recorder there is nothing to build.
+    if !enabled() {
+        return Ok(());
+    }
     emit(speech_quality_payload(request).ok_or("Invalid speech quality metadata")?);
     Ok(())
 }
@@ -281,7 +290,7 @@ fn speech_quality_payload(request: &Value) -> Option<Value> {
 
 /// Correlate IPC with worker records without exporting request content.
 pub fn speech_exchange(request: &Value, result: &Result<Value, String>, elapsed: Duration) {
-    if RECORDER.get().is_none() {
+    if !enabled() {
         return;
     }
     let op = request["op"]
@@ -311,7 +320,7 @@ pub fn speech_exchange(request: &Value, result: &Result<Value, String>, elapsed:
 
 /// Natural process status, with a finite reason vocabulary; never stderr or text.
 pub fn speech_worker_failure(stage: &str, error: &str, status: Option<std::process::ExitStatus>) {
-    if RECORDER.get().is_none() {
+    if !enabled() {
         return;
     }
     if let Some(record) = speech_worker_failure_payload(stage, error, status) {

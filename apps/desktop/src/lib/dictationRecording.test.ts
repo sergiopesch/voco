@@ -110,6 +110,7 @@ function harness() {
     connectWorklet: vi.fn(async () => true),
     connectScriptProcessor: noop,
     traceDesktopPasteMetrics: noop,
+    performanceLogMayBeOn: () => true,
     debugNativeCaptureEnabled: vi.fn(async () => false),
     beginNativeCapture: vi.fn(),
     releaseBrowserRecording: vi.fn(async () => {}),

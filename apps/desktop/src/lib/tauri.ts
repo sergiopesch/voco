@@ -149,6 +149,12 @@ export async function traceHotkeyEvent(
   return invoke("trace_frontend_hotkey_event", { event, fields });
 }
 
+/** Which opt-in logs are recording. Rust drops dictation traces and quality
+ * records unless one is, so the renderer need not send them. */
+export async function getDiagnosticLogging(): Promise<{ trace: boolean; performance: boolean }> {
+  return invoke("diagnostic_logging");
+}
+
 export async function hasPendingHotkeyToggle(): Promise<boolean> {
   return invoke<boolean>("has_pending_hotkey_toggle");
 }
