@@ -155,15 +155,7 @@ voco_ui_close
               esac
             }
             voco_verify_installed_package() { return 0; }
-            /usr/bin/voco() { [[ "$*" == --setup-desktop-input ]]; }
-            voco_start_helper_prefetch() { :; }
-            voco_verify_desktop_input() {
-              [[ "$FIXTURE_INSTALL_CASE" != readiness-failure ]] && (( fixture_checks++ > 0 ))
-            }
-            fixture_checks=0
-            voco_wayland_device_access() { return 0; }
-            pgrep() { return 1; }
-            systemctl() { printf 'Created symlink /synthetic/voco-ydotoold.service\n'; }
+            voco_verify_desktop_input() { [[ "$FIXTURE_INSTALL_CASE" != readiness-failure ]]; }
             fixture_panel() { printf 'Panel enabled. Sign out and back in to load it; saving your work first is recommended.\n'; return 1; }
             voco_launch_installed_app() {
               printf 'launch\n' >> "$FIXTURE_LAUNCH_CALL"

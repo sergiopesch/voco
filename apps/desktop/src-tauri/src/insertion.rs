@@ -12,7 +12,6 @@ static DELIVERY: Mutex<Option<Instant>> = Mutex::new(None);
 const PASTE_SETTLE: Duration = Duration::from_millis(150);
 const MODIFIER_RELEASE_TIMEOUT: Duration = Duration::from_millis(1500);
 const TEXT_MIME: &str = "text/plain;charset=utf-8";
-const DAEMON_SETUP: &str = "Start VOCO's input service with `systemctl --user enable --now voco-ydotoold.service`, then check desktop setup again.";
 
 // An X11 passive grab sends every key to VOCO while the dictation shortcut is
 // held, the paste helper's keys included. The value is when the chord was
@@ -205,25 +204,18 @@ fn paste_disabled_status() -> DesktopInputStatus {
 }
 
 fn input_status_with(preflight: &InputPreflight) -> DesktopInputStatus {
+    // The clipboard check covers the whole paste path: its helper, plus the key
+    // helper on X11 or the virtual keyboard on Wayland.
     let support = &preflight.diagnostics.clipboard;
-    let compatibility = if !support.available {
-        Err(InsertionError::rejected(support.detail.clone()))
-    } else if matches!(preflight.session, SessionKind::Wayland) {
-        wayland_paste_arguments().map(|_| ())
-    } else {
-        Ok(())
-    };
-    match compatibility {
-        Ok(()) => DesktopInputStatus {
-            available: true,
-            detail: "Desktop input helpers are ready. VOCO pastes into whichever app has keyboard focus.".into(),
-            setup_area: None,
+    DesktopInputStatus {
+        available: support.available,
+        detail: if support.available {
+            "Desktop input helpers are ready. VOCO pastes into whichever app has keyboard focus."
+                .into()
+        } else {
+            support.detail.clone()
         },
-        Err(error) => DesktopInputStatus {
-            available: false,
-            detail: error.message,
-            setup_area: None,
-        },
+        setup_area: None,
     }
 }
 
@@ -302,34 +294,36 @@ pub fn desktop_paste(text: &str) -> Result<InsertionResult, InsertionError> {
         ));
     }
     let wayland = matches!(preflight.session, SessionKind::Wayland);
+    // Create the keyboard before replacing clipboard contents, so a missing
+    // device can never leave the clipboard changed with nothing typed.
+    if wayland {
+        ensure_virtual_keyboard().map_err(InsertionError::no_mutation)?;
+    }
     let routed = paste_text(text);
     let (payload, leading_separator) = desktop_paste_payload(&routed);
-    // Detect the installed CLI before replacing clipboard contents. Ubuntu's
-    // legacy ydotool takes chord names; newer releases take keycode events.
-    let keys = if wayland {
-        wayland_clipboard_arguments(wayland_paste_arguments()?, leading_separator)
-    } else {
-        x11_paste_arguments(leading_separator)
-    };
-    let mut paste = process_runner::command(if wayland { SYSTEM_YDOTOOL } else { "xdotool" });
-    paste.args(&keys);
     let (mut clipboard, mut primary) = copy_commands();
     let preflight_ms = elapsed_ms(started);
     let settle_ms = settle(*last_paste);
     let mut modifier_wait_ms = 0;
-    // Wayland helpers emit raw key events: a still-held shortcut modifier would
-    // turn Shift+Insert into another chord. xdotool clears modifiers itself, but
+    // Wayland keys are raw events: a still-held shortcut modifier would turn
+    // Shift+Insert into another chord. xdotool clears modifiers itself, but
     // X11 delivers its keys to VOCO's grab until the shortcut is released.
     let held: fn() -> Option<bool> = if wayland {
         shortcut_modifiers_held
     } else {
         x11_shortcut_held
     };
-    let result = clipboard_transaction(payload, &mut clipboard, &mut primary, &mut paste, || {
-        modifier_wait_ms = wait_for_modifier_release(MODIFIER_RELEASE_TIMEOUT, held)?;
-        Ok(())
-    });
-    // Also after an uncertain failure: the helper may have sent the keys.
+    let result = clipboard_transaction(
+        payload,
+        &mut clipboard,
+        &mut primary,
+        || {
+            modifier_wait_ms = wait_for_modifier_release(MODIFIER_RELEASE_TIMEOUT, held)?;
+            Ok(())
+        },
+        || send_paste_keys(wayland, leading_separator),
+    );
+    // Also after an uncertain failure: some keys may have been sent.
     *last_paste = Some(Instant::now());
     let (clipboard_ms, keyboard_ms) = result?;
     Ok(InsertionResult {
@@ -456,11 +450,6 @@ fn is_executable(path: &Path) -> bool {
 }
 
 fn command_available(command: &str) -> bool {
-    // Daemon selection qualifies this same distro client. A PATH override may
-    // use an incompatible protocol and must not talk to the private helper.
-    if command == "ydotool" {
-        return is_executable(Path::new(SYSTEM_YDOTOOL));
-    }
     let candidate = Path::new(command);
     if candidate.components().count() > 1 {
         return is_executable(candidate);
@@ -476,12 +465,40 @@ fn command_available(command: &str) -> bool {
         .unwrap_or(false)
 }
 
-const SYSTEM_YDOTOOL: &str = "/usr/bin/ydotool";
+#[cfg(target_os = "linux")]
+fn ensure_virtual_keyboard() -> Result<(), String> {
+    crate::virtual_keyboard::ensure()
+}
 
-fn process_running(process_name: &str) -> bool {
-    let mut command = process_runner::command("pgrep");
-    command.args(["-x", process_name]);
-    run_helper(&mut command, None, Duration::from_secs(1)).is_ok()
+#[cfg(not(target_os = "linux"))]
+fn ensure_virtual_keyboard() -> Result<(), String> {
+    Err("Wayland paste keys need Linux.".into())
+}
+
+#[cfg(target_os = "linux")]
+fn virtual_keyboard_access() -> Result<(), String> {
+    crate::virtual_keyboard::check_access()
+}
+
+#[cfg(not(target_os = "linux"))]
+fn virtual_keyboard_access() -> Result<(), String> {
+    Err("Wayland paste keys need Linux.".into())
+}
+
+/// Shift+Insert through VOCO's virtual keyboard on Wayland, or xdotool on X11.
+fn send_paste_keys(wayland: bool, leading_separator: bool) -> Result<(), InsertionError> {
+    if wayland {
+        #[cfg(target_os = "linux")]
+        return crate::virtual_keyboard::paste(leading_separator)
+            .map_err(InsertionError::uncertain);
+        #[cfg(not(target_os = "linux"))]
+        return Err(InsertionError::no_mutation(
+            "Wayland paste keys need Linux.",
+        ));
+    }
+    let mut paste = process_runner::command("xdotool");
+    paste.args(x11_paste_arguments(leading_separator));
+    run_helper(&mut paste, None, Duration::from_secs(5))
 }
 
 fn build_support(
@@ -518,38 +535,43 @@ fn runtime_diagnostics_with<F>(
     session: SessionKind,
     clipboard_program: &str,
     command_is_available: F,
+    keyboard: &Result<(), String>,
 ) -> RuntimeDiagnostics
 where
     F: Fn(&str) -> bool + Copy,
 {
-    // One paste path: the clipboard helper copies, then the key helper sends
-    // Shift+Insert. Wayland's key helper works only through its ydotoold service.
+    // One paste path: the clipboard helper copies, then the keys go out as
+    // Shift+Insert, through VOCO's own virtual keyboard on Wayland.
     let (session_name, keys): (&str, &[&str]) = match session {
-        SessionKind::Wayland => ("Wayland", &["ydotool", "ydotoold"]),
+        SessionKind::Wayland => ("Wayland", &[]),
         SessionKind::X11OrOther => ("X11-like sessions", &["xdotool"]),
     };
     let requires = |missing: &[String]| {
-        let mut detail = format!(
+        format!(
             "Pasting on {session_name} requires: {}.",
             missing.join(", ")
-        );
-        if missing.iter().any(|command| command == "ydotoold") {
-            detail = format!("{detail} {DAEMON_SETUP}");
-        }
-        detail
+        )
     };
-    let type_simulation = build_support(
+    let mut type_simulation = build_support(
         keys,
         "Paste keys are ready. VOCO pastes into whichever app has keyboard focus.",
         requires,
         command_is_available,
     );
-    let clipboard = build_support(
+    let mut clipboard = build_support(
         &[&[clipboard_program], keys].concat(),
         "Clipboard paste replaces the clipboard and primary selection with the transcript and leaves it there. Automatic restoration is unavailable because these helpers cannot verify ownership or preserve all formats.",
         requires,
         command_is_available,
     );
+    if let (SessionKind::Wayland, Err(detail)) = (session, keyboard) {
+        for support in [&mut type_simulation, &mut clipboard] {
+            support.available = false;
+            if support.missing_commands.is_empty() {
+                support.detail = detail.clone();
+            }
+        }
+    }
 
     RuntimeDiagnostics {
         session_type: session_type_label(session).to_string(),
@@ -609,19 +631,14 @@ fn input_preflight_with(
     session: SessionKind,
     clipboard_helper: &str,
     available: impl Fn(&str) -> bool + Copy,
-    probe_daemon: impl FnOnce() -> bool,
+    probe_keyboard: impl FnOnce() -> Result<(), String>,
 ) -> InputPreflight {
-    // Sample the daemon once for this operation and again on the next one. Only
-    // a running daemon counts: the packaged service's private ydotoold is not on
-    // PATH, and an installed daemon that is not running cannot paste.
-    let daemon_running = matches!(session, SessionKind::Wayland) && probe_daemon();
-    let diagnostics = runtime_diagnostics_with(session, clipboard_helper, |command| {
-        if command == "ydotoold" {
-            daemon_running
-        } else {
-            available(command)
-        }
-    });
+    // Sample keyboard access once for this operation and again on the next one.
+    let keyboard = match session {
+        SessionKind::Wayland => probe_keyboard(),
+        SessionKind::X11OrOther => Ok(()),
+    };
+    let diagnostics = runtime_diagnostics_with(session, clipboard_helper, available, &keyboard);
     InputPreflight {
         session,
         diagnostics,
@@ -633,7 +650,7 @@ fn input_preflight() -> InputPreflight {
         session_kind(),
         desktop_clipboard_helper(),
         command_available,
-        || process_running("ydotoold"),
+        virtual_keyboard_access,
     )
 }
 
@@ -685,81 +702,6 @@ fn x11_paste_arguments(leading_separator: bool) -> Vec<&'static str> {
     args
 }
 
-fn wayland_clipboard_arguments(
-    mut args: Vec<&'static str>,
-    leading_separator: bool,
-) -> Vec<&'static str> {
-    if leading_separator {
-        if args.last() == Some(&"shift+insert") {
-            // ydotool 0.1.x treats unknown key names as their first character:
-            // "space" emits KEY_S. A literal space emits KEY_SPACE. xdotool
-            // uses a different parser and still requires its "space" keysym.
-            args.insert(args.len() - 1, " ");
-        } else {
-            args.splice(1..1, ["57:1", "57:0"]);
-        }
-    }
-    args
-}
-
-fn paste_arguments_from_help(help: &str) -> Result<Vec<&'static str>, InsertionError> {
-    if help.contains("Each key sequence") && help.contains("ctrl+Backspace") {
-        // Legacy ydotool defaults to 100 ms and also uses --delay for key
-        // spacing (ignoring --key-delay internally). Keep a nonzero 24 ms
-        // delay so the chord retains 6–12 ms between key events.
-        Ok(vec![
-            "key",
-            "--delay",
-            "24",
-            "--key-delay",
-            "12",
-            "shift+insert",
-        ])
-    } else if help.contains("Syntax: <keycode>:<pressed>") {
-        // KEY_LEFTSHIFT down, KEY_INSERT down and up, KEY_LEFTSHIFT up.
-        Ok(vec!["key", "42:1", "110:1", "110:0", "42:0"])
-    } else {
-        Err(InsertionError::rejected("The installed ydotool key interface is unsupported; no clipboard or keyboard action was performed."))
-    }
-}
-
-/// Callers check first that ydotoold is running.
-fn wayland_paste_arguments() -> Result<Vec<&'static str>, InsertionError> {
-    let child = process_runner::command(SYSTEM_YDOTOOL)
-        .args(["key", "--help"])
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|_| InsertionError::rejected("The desktop paste helper is unavailable."))?;
-    let output = process_runner::wait_with_output(child, Duration::from_secs(2), 16 * 1024)
-        .map_err(|_| {
-            InsertionError::rejected(
-                "The desktop paste helper did not answer its compatibility check.",
-            )
-        })?;
-    if !output.status.success() {
-        return Err(InsertionError::rejected(
-            "The desktop paste helper could not connect to its input service.",
-        ));
-    }
-    let help = format!(
-        "{}\n{}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
-    );
-    paste_arguments_from_probe(&help)
-}
-
-fn paste_arguments_from_probe(help: &str) -> Result<Vec<&'static str>, InsertionError> {
-    // Legacy clients can exit successfully after falling back to direct uinput.
-    // A daemon owned by a different login must not produce a false ready result.
-    if help.contains("ydotoold backend unavailable") {
-        return Err(InsertionError::rejected("The desktop paste helper cannot reach its input service. Start ydotoold for this login, then check desktop setup again."));
-    }
-    paste_arguments_from_help(help)
-}
-
 /// GUI toolkits paste CLIPBOARD on Shift+Insert and terminals paste PRIMARY.
 /// PRIMARY is best effort because some compositors do not provide it.
 fn copy_selections(
@@ -781,8 +723,8 @@ fn clipboard_transaction(
     text: &str,
     clipboard: &mut Command,
     primary: &mut Command,
-    paste: &mut Command,
     before_paste: impl FnOnce() -> Result<(), InsertionError>,
+    send_keys: impl FnOnce() -> Result<(), InsertionError>,
 ) -> Result<(u64, u64), InsertionError> {
     let copy_started = Instant::now();
     copy_selections(text, clipboard, primary)?;
@@ -792,9 +734,9 @@ fn clipboard_transaction(
         error
     })?;
     let paste_started = Instant::now();
-    run_helper(paste, None, Duration::from_secs(5)).map_err(|mut error| {
-        // Clipboard mutation already happened, even if the paste helper could
-        // not start. No automatic retry or restoration is safe here.
+    send_keys().map_err(|mut error| {
+        // Clipboard mutation already happened, even if no key was sent. No
+        // automatic retry or restoration is safe here.
         error.outcome = DeliveryOutcome::Uncertain;
         error.clipboard_changed = true;
         error.message.push_str(
@@ -907,7 +849,11 @@ mod tests {
         let scans = Cell::new(0);
         let probe = || {
             scans.set(scans.get() + 1);
-            scans.get() == 1
+            if scans.get() == 1 {
+                Ok(())
+            } else {
+                Err("No access to /dev/uinput.".to_string())
+            }
         };
         let first = input_preflight_with(SessionKind::Wayland, "xclip", |_| true, probe);
         assert_eq!(scans.get(), 1);
@@ -915,27 +861,15 @@ mod tests {
         assert!(first.diagnostics.type_simulation.available);
         let second = input_preflight_with(SessionKind::Wayland, "xclip", |_| true, probe);
         assert_eq!(scans.get(), 2);
-        // Paste cannot work without the daemon, so readiness must not claim it.
+        // Paste cannot work without the keyboard, so readiness must not claim it.
         for support in [
             &second.diagnostics.clipboard,
             &second.diagnostics.type_simulation,
         ] {
             assert!(!support.available);
-            assert_eq!(support.missing_commands, ["ydotoold"]);
-            assert!(support
-                .detail
-                .contains("systemctl --user enable --now voco-ydotoold.service"));
+            assert!(support.missing_commands.is_empty());
+            assert_eq!(support.detail, "No access to /dev/uinput.");
         }
-    }
-
-    #[test]
-    fn legacy_client_fallback_is_not_desktop_readiness() {
-        let help = "Each key sequence ctrl+Backspace";
-        assert!(paste_arguments_from_probe(help).is_ok());
-        let fallback = format!(
-            "{help}\nydotool: notice: ydotoold backend unavailable (may have latency+delay issues)"
-        );
-        assert!(paste_arguments_from_probe(&fallback).is_err());
     }
 
     #[test]
@@ -944,29 +878,27 @@ mod tests {
             SessionKind::X11OrOther,
             "xclip",
             |_| true,
-            || panic!("X11 must not query the Wayland daemon"),
+            || panic!("X11 must not open the Wayland virtual keyboard"),
         );
         assert!(x11.diagnostics.clipboard.available);
         assert_eq!(
             x11.diagnostics.clipboard.required_commands,
             ["xclip", "xdotool"]
         );
-        for missing in ["xclip", "ydotool", "ydotoold"] {
-            for daemon_running in [false, true] {
+        for missing in ["xclip", "none"] {
+            for keyboard in [Ok(()), Err("No access to /dev/uinput.".to_string())] {
                 let actual = input_preflight_with(
                     SessionKind::Wayland,
                     "xclip",
                     |name| name != missing,
-                    || daemon_running,
+                    || keyboard.clone(),
                 );
-                // The packaged daemon is not on PATH: only whether it runs counts.
-                let expected = runtime_diagnostics_with(SessionKind::Wayland, "xclip", |name| {
-                    if name == "ydotoold" {
-                        daemon_running
-                    } else {
-                        name != missing
-                    }
-                });
+                let expected = runtime_diagnostics_with(
+                    SessionKind::Wayland,
+                    "xclip",
+                    |name| name != missing,
+                    &keyboard,
+                );
                 assert_eq!(
                     serde_json::to_value(actual.diagnostics).unwrap(),
                     serde_json::to_value(expected).unwrap()
@@ -997,15 +929,15 @@ mod tests {
             clipboard_helper_for(SessionKind::X11OrOther, "GNOME", true),
             "xclip"
         );
-        let missing = runtime_diagnostics_with(SessionKind::Wayland, "xclip", |c| c != "xclip");
+        let missing =
+            runtime_diagnostics_with(SessionKind::Wayland, "xclip", |c| c != "xclip", &Ok(()));
         assert!(!missing.clipboard.available);
         assert_eq!(missing.clipboard.missing_commands, vec!["xclip"]);
-        let ready = runtime_diagnostics_with(SessionKind::Wayland, "xclip", |c| c != "wl-copy");
+        let ready =
+            runtime_diagnostics_with(SessionKind::Wayland, "xclip", |c| c != "wl-copy", &Ok(()));
         assert!(ready.clipboard.available);
-        assert_eq!(
-            ready.clipboard.required_commands,
-            vec!["xclip", "ydotool", "ydotoold"]
-        );
+        assert_eq!(ready.clipboard.required_commands, vec!["xclip"]);
+        assert!(ready.type_simulation.required_commands.is_empty());
     }
 
     #[test]
@@ -1022,45 +954,6 @@ mod tests {
         assert_eq!(
             copy_arguments("wl-copy", true),
             &["--primary", "--type", TEXT_MIME]
-        );
-    }
-
-    #[test]
-    fn clipboard_gesture_matches_installed_ydotool_generation() {
-        assert_eq!(
-            paste_arguments_from_help("Each key sequence ctrl+Backspace").unwrap(),
-            vec!["key", "--delay", "24", "--key-delay", "12", "shift+insert"]
-        );
-        assert_eq!(
-            paste_arguments_from_help("Syntax: <keycode>:<pressed>").unwrap(),
-            vec!["key", "42:1", "110:1", "110:0", "42:0"]
-        );
-        let error = paste_arguments_from_help("unknown helper").unwrap_err();
-        assert_eq!(error.outcome, DeliveryOutcome::Rejected);
-        assert!(!error.clipboard_changed);
-    }
-
-    #[test]
-    fn wayland_separator_matches_both_helper_interfaces() {
-        let legacy = || paste_arguments_from_help("Each key sequence ctrl+Backspace").unwrap();
-        assert_eq!(wayland_clipboard_arguments(legacy(), false), legacy());
-        assert_eq!(
-            wayland_clipboard_arguments(legacy(), true),
-            [
-                "key",
-                "--delay",
-                "24",
-                "--key-delay",
-                "12",
-                " ",
-                "shift+insert"
-            ]
-        );
-        let modern = || paste_arguments_from_help("Syntax: <keycode>:<pressed>").unwrap();
-        assert_eq!(wayland_clipboard_arguments(modern(), false), modern());
-        assert_eq!(
-            wayland_clipboard_arguments(modern(), true),
-            ["key", "57:1", "57:0", "42:1", "110:1", "110:0", "42:0"]
         );
     }
 
@@ -1126,8 +1019,8 @@ mod tests {
             "intended transcript\n",
             &mut copy_to(&clipboard),
             &mut copy_to(&primary),
-            &mut paste,
             || Ok(()),
+            || run_helper(&mut paste, None, Duration::from_secs(5)),
         )
         .unwrap();
         assert_eq!(std::fs::read(&consumed).unwrap(), b"intended transcript\n");
@@ -1150,8 +1043,8 @@ mod tests {
             "Synthetic phrase.",
             &mut copy_to(&clipboard),
             &mut process_runner::command("/definitely-missing-voco-test-helper"),
-            &mut paste,
             || Ok(()),
+            || run_helper(&mut paste, None, Duration::from_secs(5)),
         );
         let delivered = std::fs::read(&consumed);
         std::fs::remove_dir_all(directory).unwrap();
@@ -1173,11 +1066,11 @@ mod tests {
             "Synthetic phrase.",
             &mut copy_to(&clipboard),
             &mut copy_to(&directory.join("primary")),
-            &mut paste,
             || {
                 assert_eq!(std::fs::read(&clipboard).unwrap(), b"Synthetic phrase.");
                 wait_for_modifier_release(Duration::ZERO, || Some(true)).map(|_| ())
             },
+            || run_helper(&mut paste, None, Duration::from_secs(5)),
         );
         let keyboard_was_dispatched = consumed.exists();
         std::fs::remove_dir_all(directory).unwrap();
@@ -1196,8 +1089,8 @@ mod tests {
             "transcript",
             &mut clipboard,
             &mut primary,
-            &mut paste,
             || Ok(()),
+            || run_helper(&mut paste, None, Duration::from_secs(5)),
         )
         .unwrap_err();
         assert_eq!(error.outcome, DeliveryOutcome::Uncertain);
@@ -1206,18 +1099,20 @@ mod tests {
 
     #[test]
     fn diagnostics_distinguish_helpers_from_verified_delivery_and_no_restore() {
-        let diagnostics = runtime_diagnostics_with(SessionKind::Wayland, "wl-copy", |command| {
-            matches!(command, "ydotool" | "ydotoold" | "wl-copy")
-        });
+        let diagnostics =
+            runtime_diagnostics_with(SessionKind::Wayland, "wl-copy", |c| c == "wl-copy", &Ok(()));
         assert!(diagnostics.clipboard.available);
         assert!(diagnostics.clipboard.detail.contains("leaves it there"));
         assert!(diagnostics
             .clipboard
             .detail
             .contains("cannot verify ownership"));
-        let diagnostics = runtime_diagnostics_with(SessionKind::X11OrOther, "xclip", |command| {
-            command == "xdotool"
-        });
+        let diagnostics = runtime_diagnostics_with(
+            SessionKind::X11OrOther,
+            "xclip",
+            |command| command == "xdotool",
+            &Ok(()),
+        );
         assert!(!diagnostics.clipboard.available);
         assert_eq!(
             diagnostics.clipboard.missing_commands,

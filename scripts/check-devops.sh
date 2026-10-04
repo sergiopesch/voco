@@ -49,8 +49,6 @@ function_names = (
     "voco_verify_installed_package",
     "voco_install_deb_package",
     "voco_verify_desktop_input",
-    "voco_wayland_device_access",
-    "voco_start_wayland_service",
     "voco_write_default_config",
     "voco_run_hotkey_setup",
 )
@@ -68,10 +66,7 @@ for name, copies in functions.items():
 print("Standalone and source installer helpers are in sync.")
 PY
 
-PYTHONDONTWRITEBYTECODE=1 python3 scripts/build-legacy-ydotool.py --verify-only
-PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-ydotool-service.py
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-install-presentation.py
-PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-install-prefetch.py
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-install-performance.py
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-install-launch.py
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-install-journey.py
@@ -86,7 +81,7 @@ import ast
 import subprocess
 
 tracked = subprocess.run(
-    ["git", "ls-files", "-z", "--", "*.py", "packaging/ydotool/voco-ydotool-launcher"],
+    ["git", "ls-files", "-z", "--", "*.py"],
     check=True, capture_output=True, text=True,
 ).stdout.split("\0")
 paths = [path for path in tracked if path]
@@ -171,8 +166,10 @@ required_dependencies = {"ibus", "python3", "python3-gi", "gir1.2-ibus-1.0",
                          "libc6 (>= 2.39)", "libstdc++6 (>= 13.2.0)"}
 if not required_dependencies.issubset(deb.get("depends", [])):
     raise SystemExit("Debian IBus runtime dependencies are incomplete")
-if deb.get("recommends") != ["ydotool", "ydotoold"]:
-    raise SystemExit("Wayland-only ydotool and ydotoold must be recommended, not an X11 install blocker")
+if "recommends" in deb:
+    raise SystemExit("VOCO pastes through its own virtual keyboard; the package recommends nothing")
+if deb.get("files", {}).get("/usr/lib/udev/rules.d/70-voco-uinput.rules") != "../../../packaging/udev/70-voco-uinput.rules":
+    raise SystemExit("The package must ship the /dev/uinput access rule")
 required_files = {
     "/usr/share/metainfo/com.sergiopesch.voco.metainfo.xml",
     "/usr/share/ibus/component/voco.xml",

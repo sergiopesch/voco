@@ -64,7 +64,7 @@ interface ControlPanelProps {
   onOpenSettings: (section?: PanelSection) => Promise<void>;
 }
 
-const DESKTOP_SETUP_GUIDE = "https://github.com/sergiopesch/voco/blob/master/docs/platform/README.md#ydotoold-ydotool-daemon";
+const DESKTOP_SETUP_GUIDE = "https://github.com/sergiopesch/voco/blob/master/docs/platform/README.md#wayland-paste-keys";
 
 export type PanelSection = "General" | "Audio" | "Hotkeys" | "Updates" | "Advanced";
 
@@ -256,9 +256,12 @@ export function ControlPanel({
     if (!runtimeDiagnostics) {
       return "Runtime checks unavailable.";
     }
-    return runtimeDiagnostics.typeSimulation.available
-      ? "Ready"
-      : `Missing: ${runtimeDiagnostics.typeSimulation.missingCommands.join(", ")}`;
+    const keys = runtimeDiagnostics.typeSimulation;
+    if (keys.available) {
+      return "Ready";
+    }
+    // Wayland's virtual keyboard is not a command, so it reports a reason instead.
+    return keys.missingCommands.length > 0 ? `Missing: ${keys.missingCommands.join(", ")}` : keys.detail;
   }, [runtimeDiagnostics]);
   const clipboardLabel = useMemo(() => {
     if (!runtimeDiagnostics || !desktopInput) {

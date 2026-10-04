@@ -179,7 +179,7 @@ common = {
     "packageSha256": digest(deb),
     "publisherKeyFingerprint": fingerprint,
 }
-payload = ["usr/bin/voco", "usr/libexec/voco-browser-host", "usr/libexec/voco/ydotool-legacy/ydotoold",
+payload = ["usr/bin/voco", "usr/libexec/voco-browser-host", "usr/lib/udev/rules.d/70-voco-uinput.rules",
            "usr/lib/voco/speech/MANIFEST.json",
            "usr/share/gnome-shell/extensions/voco-panel@voco.local/extension.js",
            "usr/share/gnome-shell/extensions/voco-panel@voco.local/metadata.json"]

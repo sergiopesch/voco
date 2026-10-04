@@ -11,8 +11,6 @@ mod browser_socket;
 mod config;
 mod crash_recovery;
 #[cfg(target_os = "linux")]
-mod desktop_input_setup;
-#[cfg(target_os = "linux")]
 mod desktop_notifications;
 mod digest_hex;
 #[cfg(target_os = "linux")]
@@ -32,6 +30,8 @@ mod single_instance;
 mod speech_stream;
 mod tray_icons;
 mod trigger_socket;
+#[cfg(target_os = "linux")]
+mod virtual_keyboard;
 
 /// Check input prerequisites without launching a window or sending keys.
 pub fn check_desktop_input() -> Result<String, String> {
@@ -41,19 +41,6 @@ pub fn check_desktop_input() -> Result<String, String> {
     } else {
         Err(status.detail)
     }
-}
-
-/// Set up the packaged helper only while this process owns the app's idle boundary.
-pub fn setup_desktop_input() -> Result<String, String> {
-    #[cfg(target_os = "linux")]
-    {
-        let guard = single_instance::acquire().map_err(|error| {
-            format!("Close VOCO before updating its desktop input service: {error}")
-        })?;
-        desktop_input_setup::migrate(&guard).map_err(|error| error.detail)
-    }
-    #[cfg(not(target_os = "linux"))]
-    Ok("Desktop input setup is only needed on Linux.".into())
 }
 
 /// Request one toggle from the running application without launching a window.
@@ -980,7 +967,7 @@ fn grant_webview_permissions(app: &tauri::App) {
 // --- Bundled speech-runtime readiness ---
 
 fn is_allowed_external_url(url: &str) -> bool {
-    url == "https://github.com/sergiopesch/voco/blob/master/docs/platform/README.md#ydotoold-ydotool-daemon"
+    url == "https://github.com/sergiopesch/voco/blob/master/docs/platform/README.md#wayland-paste-keys"
         || url
             .strip_prefix("https://github.com/sergiopesch/voco/releases/tag/")
             .is_some_and(|tag| !tag.is_empty() && !tag.contains(['\r', '\n', '\\']))
@@ -1579,10 +1566,13 @@ fn start_socket_listener(app_handle: tauri::AppHandle) {
 
 // --- evdev hotkey listener (passive Wayland shortcut) ---
 
+/// Synthetic keyboards: VOCO's own paste keys, and another tool's ydotoold, must
+/// never count as the person holding a shortcut or a modifier.
 #[cfg(target_os = "linux")]
 fn is_ignored_evdev_device_name(name: &str) -> bool {
     let normalized = name.to_ascii_lowercase();
-    normalized.contains("ydotoold virtual device")
+    normalized == virtual_keyboard::DEVICE_NAME.to_ascii_lowercase()
+        || normalized.contains("ydotoold virtual device")
 }
 
 #[cfg(target_os = "linux")]
@@ -1934,6 +1924,46 @@ fn ensure_evdev_hotkey_listener(app_handle: &tauri::AppHandle) {
     }
 }
 
+/// VOCO 2026.0.60 and earlier pasted through `voco-ydotoold.service`. After the
+/// upgrade its unit file is gone, but this login's enablement link remains and
+/// an instance can keep running or restarting until sign-out. Retire only
+/// VOCO's own unit: the link must point at the file the old package shipped.
+#[cfg(target_os = "linux")]
+fn retire_legacy_input_service() {
+    const UNIT: &str = "voco-ydotoold.service";
+    let Some(config) = dirs::config_dir() else {
+        return;
+    };
+    let link = config
+        .join("systemd/user/graphical-session.target.wants")
+        .join(UNIT);
+    let ours = std::fs::read_link(&link)
+        .is_ok_and(|target| target == std::path::Path::new("/usr/lib/systemd/user").join(UNIT));
+    if !ours
+        || std::path::Path::new("/usr/lib/systemd/user")
+            .join(UNIT)
+            .exists()
+    {
+        return;
+    }
+    if let Err(error) = std::fs::remove_file(&link) {
+        warn!("Could not remove the retired input service link: {error}");
+        return;
+    }
+    // Off the startup path; the manager may no longer know the unit at all.
+    std::thread::spawn(|| {
+        for arguments in [
+            ["--user", "stop", UNIT].as_slice(),
+            ["--user", "daemon-reload"].as_slice(),
+        ] {
+            let _ = process_runner::command("systemctl")
+                .args(arguments)
+                .status();
+        }
+        info!("Retired VOCO's previous Wayland input service");
+    });
+}
+
 pub fn run() -> Result<(), String> {
     let single_instance_guard = match single_instance::acquire() {
         Ok(guard) => guard,
@@ -1949,13 +1979,13 @@ pub fn run() -> Result<(), String> {
         .init();
 
     #[cfg(target_os = "linux")]
-    if let Err(error) = desktop_input_setup::migrate(&single_instance_guard) {
-        if error.service_may_change {
-            return Err(error.detail);
+    if is_wayland_session() {
+        retire_legacy_input_service();
+        // Created now so the compositor has added the device long before the
+        // first paste; a failure stays visible through desktop setup status.
+        if let Err(detail) = virtual_keyboard::ensure() {
+            warn!("{detail}");
         }
-        // A desktop setup failure must remain visible, but browser dictation and
-        // explicit local recovery can still work without this optional helper.
-        warn!("{}", error.detail);
     }
 
     #[cfg(target_os = "linux")]
@@ -2176,7 +2206,7 @@ mod tests {
     #[test]
     fn external_url_allowlist_accepts_voco_releases_and_exact_setup_guide() {
         assert!(is_allowed_external_url(
-            "https://github.com/sergiopesch/voco/blob/master/docs/platform/README.md#ydotoold-ydotool-daemon"
+            "https://github.com/sergiopesch/voco/blob/master/docs/platform/README.md#wayland-paste-keys"
         ));
         assert!(!is_allowed_external_url(
             "https://github.com/sergiopesch/voco/blob/master/docs/platform/README.md?redirect=elsewhere"
@@ -2408,7 +2438,8 @@ mod tests {
 
     #[cfg(target_os = "linux")]
     #[test]
-    fn evdev_hotkey_ignores_ydotool_virtual_device() {
+    fn evdev_hotkey_ignores_synthetic_keyboards() {
+        assert!(is_ignored_evdev_device_name("VOCO virtual keyboard"));
         assert!(is_ignored_evdev_device_name("ydotoold virtual device"));
         assert!(is_ignored_evdev_device_name("YDOTOOLD Virtual Device"));
         assert!(!is_ignored_evdev_device_name(

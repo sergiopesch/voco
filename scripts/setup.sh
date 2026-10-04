@@ -169,8 +169,7 @@ fi
 
 SESSION="${XDG_SESSION_TYPE:-x11}"
 if [[ "$SESSION" == "wayland" ]]; then
-  command -v ydotool &>/dev/null && ok "ydotool" || dim "Wayland paste helper missing: install ydotool and configure its input service"
-  command -v ydotoold &>/dev/null && ok "ydotoold" || dim "Wayland input daemon missing: Ubuntu packages ydotoold separately"
+  [[ -w /dev/uinput ]] && ok "/dev/uinput" || dim "Wayland paste keys need /dev/uinput; the VOCO package's udev rule grants it at sign-in"
   command -v wl-copy &>/dev/null && ok "wl-clipboard" || dim "wl-clipboard missing: required on supported wlroots desktops; GNOME uses xclip"
   dim "Wayland needs a configured input daemon; follow docs/platform/README.md for scoped device/socket access"
 else
@@ -286,7 +285,7 @@ TOML
     exit 1
   fi
 
-  if ! voco_start_wayland_service || ! voco_verify_desktop_input; then
+  if ! voco_verify_desktop_input; then
     warn "VOCO is installed, but desktop input setup is incomplete: ${VOCO_INPUT_ERROR}"
     dim "See docs/platform/README.md before dictating."
     exit 2

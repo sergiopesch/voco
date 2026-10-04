@@ -320,19 +320,6 @@ voco_install_deb_package() {
   VOCO_INSTALL_ERROR=""
   deb_file="$(realpath -- "${deb_file}")" || return 1
   packages=("${deb_file}")
-  # These are optional in package metadata so X11-only distributions can install.
-  # Wayland needs both, even when APT recommendations are disabled by the owner.
-  if [[ "${XDG_SESSION_TYPE:-x11}" == wayland ]]; then
-    packages+=(ydotool ydotoold)
-    # APT downloaded and checked these in parallel with VOCO. Supplying the local
-    # archives lets the final dependency transaction reuse them without root cache writes.
-    if [[ -n "${4:-}" ]]; then
-      local helper_deb
-      for helper_deb in "$4"/ydotool_*.deb "$4"/ydotoold_*.deb; do
-        [[ -f "$helper_deb" && ! -L "$helper_deb" ]] && packages+=("$helper_deb")
-      done
-    fi
-  fi
   local -a install_command=(sudo apt-get install -y --)
   if declare -F voco_run_apt >/dev/null; then install_command=(voco_run_apt); fi
   if ! "${install_command[@]}" "${packages[@]}"; then
@@ -347,46 +334,6 @@ voco_verify_desktop_input() {
   if ! VOCO_INPUT_ERROR="$(/usr/bin/voco --check-desktop-input 2>&1)"; then
     return 1
   fi
-}
-
-voco_wayland_device_access() {
-  [[ -c /dev/uinput && -w /dev/uinput ]]
-}
-
-voco_start_wayland_service() {
-  [[ "${XDG_SESSION_TYPE:-x11}" == wayland ]] || return 0
-  # The application holds its instance lock across the owned-service migration.
-  # An open app must be closed explicitly; package hooks never restart a session.
-  if ! VOCO_INPUT_ERROR="$(/usr/bin/voco --setup-desktop-input 2>&1)"; then
-    return 1
-  fi
-  # Reuse a working service, including a distribution/admin-managed daemon.
-  voco_verify_desktop_input && return 0
-  if ! voco_wayland_device_access; then
-    VOCO_INPUT_ERROR="This login cannot access /dev/uinput. Complete the Wayland device-permission setup before starting the input service."
-    return 1
-  fi
-  if pgrep -x ydotoold >/dev/null 2>&1; then
-    VOCO_INPUT_ERROR="An existing ydotoold is running but is unavailable to this login. Check its socket permissions; VOCO will not replace that service."
-    return 1
-  fi
-  local service_detail service_status=0
-  service_detail="$(systemctl --user enable --now voco-ydotoold.service 2>&1)" || service_status=$?
-  if [[ -n "${VOCO_INSTALL_LOG:-}" ]]; then
-    printf '%s\n' "$service_detail" >> "$VOCO_INSTALL_LOG"
-  elif (( service_status != 0 )); then
-    printf '%s\n' "$service_detail" >&2
-  fi
-  if (( service_status != 0 )); then
-    VOCO_INPUT_ERROR="Could not start the VOCO input service. Check: systemctl --user status voco-ydotoold.service"
-    return 1
-  fi
-  local attempt
-  for attempt in {1..10}; do
-    if voco_verify_desktop_input; then return 0; fi
-    sleep 0.2
-  done
-  return 1
 }
 
 voco_write_default_config() {

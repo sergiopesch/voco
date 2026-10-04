@@ -402,7 +402,7 @@ mod linux {
 }
 
 #[cfg(target_os = "linux")]
-pub use linux::{acquire, runtime_directory, SingleInstanceError, SingleInstanceGuard};
+pub use linux::{acquire, runtime_directory, SingleInstanceError};
 
 #[cfg(not(target_os = "linux"))]
 #[derive(Debug)]

@@ -381,21 +381,15 @@ reset_mock_package_case() {
   export MOCK_APT_OUTCOME=installed
 }
 
-# APT must receive the local package and the Wayland helpers in one transaction,
-# even when all hard package dependencies are already installed.
+# APT receives only the local package, in both sessions: VOCO pastes through its
+# own virtual keyboard, so no session needs an extra input package.
 for session in x11 wayland; do
   reset_mock_package_case
   export XDG_SESSION_TYPE="$session"
   voco_install_deb_package "${MOCK_DEB}" "${MOCK_EXPECTED_VERSION}" "${MOCK_EXPECTED_ARCHITECTURE}" ||
     fail "APT install was rejected: ${VOCO_INSTALL_ERROR}"
-  grep -Fq "install -y -- ${MOCK_DEB}" "${MOCK_PACKAGE_LOG}" ||
-    fail "installer did not ask APT to resolve the local package through APT"
-  if [[ "$session" == wayland ]]; then
-    grep -Fq "${MOCK_DEB} ydotool ydotoold" "${MOCK_PACKAGE_LOG}" ||
-      fail "Wayland helpers were not explicitly installed"
-  elif grep -q 'ydotool' "${MOCK_PACKAGE_LOG}"; then
-    fail "X11 installation required Wayland-only packages"
-  fi
+  grep -Eq "install -y -- ${MOCK_DEB}\$" "${MOCK_PACKAGE_LOG}" ||
+    fail "installer did not ask APT to resolve exactly the local package"
   if grep -q '^dpkg\s' "${MOCK_PACKAGE_LOG}"; then
     fail "installer bypassed APT dependency resolution"
   fi
@@ -417,12 +411,8 @@ fi
 [[ "$VOCO_INSTALL_ERROR" == *APT* ]] || fail "APT failure returned an unclear error"
 cat > "${MOCK_BIN}/voco" <<'SH'
 #!/usr/bin/env bash
-if [[ "$*" == --setup-desktop-input ]]; then
-  if [[ "${MOCK_APP_RUNNING:-false}" == true ]]; then echo 'Close VOCO before updating desktop input.' >&2; exit 1; fi
-  exit 0
-fi
 [[ "$*" == --check-desktop-input ]] || exit 64
-if [[ "${MOCK_INPUT_READY}" != true && ! -f "${MOCK_INPUT_READY_FILE:-/nonexistent}" ]]; then echo "Start ydotoold for this login." >&2; exit 1; fi
+if [[ "${MOCK_INPUT_READY}" != true ]]; then echo "VOCO can't open /dev/uinput. Sign out and back in once." >&2; exit 1; fi
 echo "Desktop input is ready."
 SH
 chmod 0700 "${MOCK_BIN}/voco"
@@ -431,47 +421,8 @@ chmod 0700 "${MOCK_BIN}/voco"
 voco() { fail "Readiness used a PATH VOCO instead of the verified package"; }
 export MOCK_INPUT_READY=false
 if voco_verify_desktop_input; then fail "Installer accepted incomplete desktop setup"; fi
-[[ "$VOCO_INPUT_ERROR" == 'Start ydotoold for this login.' ]] || fail "Lost the actionable input error"
+[[ "$VOCO_INPUT_ERROR" == *'/dev/uinput'* ]] || fail "Lost the actionable input error"
 export MOCK_INPUT_READY=true
-voco_verify_desktop_input || fail "Installer rejected repaired input setup"
-export MOCK_INPUT_READY_FILE="${TEST_ROOT}/input-ready"
-cat > "${MOCK_BIN}/systemctl" <<'SH'
-#!/usr/bin/env bash
-printf 'systemctl\t%s\n' "$*" >> "${MOCK_PACKAGE_LOG:?}"
-[[ "${MOCK_SERVICE_FAIL:-false}" == false ]] || exit 1
-touch "${MOCK_INPUT_READY_FILE}"
-SH
-cat > "${MOCK_BIN}/pgrep" <<'SH'
-#!/usr/bin/env bash
-[[ "${MOCK_DAEMON_RUNNING:-false}" == true ]]
-SH
-chmod 0700 "${MOCK_BIN}/systemctl" "${MOCK_BIN}/pgrep"
-voco_wayland_device_access() { [[ "${MOCK_DEVICE_ACCESS:-false}" == true ]]; }
-export XDG_SESSION_TYPE=wayland MOCK_INPUT_READY=false MOCK_DEVICE_ACCESS=false MOCK_DAEMON_RUNNING=false
-: > "$MOCK_PACKAGE_LOG"
-export MOCK_APP_RUNNING=true
-if voco_start_wayland_service; then fail "Setup bypassed the running application guard"; fi
-[[ "$VOCO_INPUT_ERROR" == *'Close VOCO'* ]] || fail "Lost running application guidance"
-[[ ! -s "$MOCK_PACKAGE_LOG" ]] || fail "Running application setup changed services"
-export MOCK_APP_RUNNING=false
-if voco_start_wayland_service; then fail "Service started without device access"; fi
-[[ "$VOCO_INPUT_ERROR" == *'/dev/uinput'* ]] || fail "Missing device guidance"
-[[ ! -s "$MOCK_PACKAGE_LOG" ]] || fail "Missing access changed services"
-export MOCK_DEVICE_ACCESS=true MOCK_DAEMON_RUNNING=true
-if voco_start_wayland_service; then fail "Replaced an inaccessible existing daemon"; fi
-[[ ! -s "$MOCK_PACKAGE_LOG" ]] || fail "Existing daemon changed services"
-export MOCK_DAEMON_RUNNING=false MOCK_SERVICE_FAIL=true
-if voco_start_wayland_service; then fail "Accepted a failed service start"; fi
-export MOCK_SERVICE_FAIL=false
-voco_start_wayland_service || fail "Could not start service with existing device access"
-grep -Fq 'enable --now voco-ydotoold.service' "$MOCK_PACKAGE_LOG" || fail "Wrong service activation"
-: > "$MOCK_PACKAGE_LOG"
-export MOCK_DEVICE_ACCESS=false
-voco_start_wayland_service || fail "Working existing daemon was not reused"
-[[ ! -s "$MOCK_PACKAGE_LOG" ]] || fail "Working daemon was reconfigured"
-rm -f "$MOCK_INPUT_READY_FILE"
-export XDG_SESSION_TYPE=x11
-voco_start_wayland_service || fail "X11 tried to configure Wayland service"
-[[ ! -s "$MOCK_PACKAGE_LOG" ]] || fail "X11 changed Wayland services"
+voco_verify_desktop_input || fail "Installer rejected ready desktop input"
 export PATH="${ORIGINAL_PATH}"
 echo "Installer helper behavior is valid."

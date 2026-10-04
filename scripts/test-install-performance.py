@@ -215,22 +215,6 @@ voco_finish_release_metadata_downloads
             server.shutdown()
             server.server_close()
 
-    def test_slow_optional_prefetch_does_not_hold_up_install(self):
-        with tempfile.TemporaryDirectory() as folder:
-            body = '''
-VOCO_DOWNLOAD_DIR=$(mktemp -d)
-sleep 20 &
-HELPER_DOWNLOAD_PID=$!
-pid=$HELPER_DOWNLOAD_PID
-voco_finish_helper_prefetch
-[[ -z "$HELPER_DOWNLOAD_READY" && -z "$HELPER_DOWNLOAD_PID" ]]
-! kill -0 "$pid" 2>/dev/null
-'''
-            start = time.monotonic()
-            run = subprocess.run(['bash', '-c', PREFIX + body], env={**os.environ, 'TMPDIR': folder}, capture_output=True, timeout=2)
-            self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
-            self.assertLess(time.monotonic() - start, .5)
-
     def test_apt_keeps_stdin_prompts_and_failure_status(self):
         for outcome in (0, 100):
             with self.subTest(outcome=outcome), tempfile.TemporaryDirectory() as folder:

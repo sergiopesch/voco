@@ -1,0 +1,5 @@
+# VOCO pastes on Wayland through its own virtual keyboard on /dev/uinput.
+# uaccess grants that only to the user of the active local session, through an
+# ACL logind moves with seat changes: no group membership, and no access for
+# other accounts, remote sessions or services.
+KERNEL=="uinput", SUBSYSTEM=="misc", TAG+="uaccess", OPTIONS+="static_node=uinput"

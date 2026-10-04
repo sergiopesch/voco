@@ -161,7 +161,7 @@ async function journaledRecording(h: ReturnType<typeof harness>, finish: () => P
 
 it.each([
   { change: { enabled: false }, title: "Dictation could not start", notice: "Desktop dictation is unavailable. Complete desktop input setup before recording." },
-  { change: { available: false, detail: "Install ydotool, then restart VOCO." }, title: "Dictation setup incomplete", notice: "Install ydotool, then restart VOCO." },
+  { change: { available: false, detail: "Sign out and back in once after installing VOCO." }, title: "Dictation setup incomplete", notice: "Sign out and back in once after installing VOCO." },
   { change: { streamingEnabled: false }, title: "Dictation could not start", notice: "Streaming dictation is disabled in the desktop environment." },
 ])("explains missing desktop input before capture without an error screen: $notice", async ({ change, title, notice }) => {
   const h = harness();

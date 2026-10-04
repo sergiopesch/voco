@@ -1,5 +1,5 @@
 #!/usr/bin/python3 -I
-"""Repair legacy VOCO directory modes without traversing links or user data."""
+"""Repair legacy VOCO directory modes and apply the packaged /dev/uinput rule."""
 from contextlib import contextmanager
 import os
 import stat
@@ -44,6 +44,19 @@ def repair_directories(root_fd, directories, overrides):
             os.close(fd)
 
 
+def apply_uinput_rule():
+    """Give the active session its /dev/uinput access now rather than at the next
+    boot. Best effort: containers and chroots have no udev to ask."""
+    for command in (['/usr/sbin/modprobe', 'uinput'],
+                    ['/usr/bin/udevadm', 'control', '--reload-rules'],
+                    ['/usr/bin/udevadm', 'trigger', '--action=change',
+                     '--subsystem-match=misc', '--sysname-match=uinput']):
+        try:
+            subprocess.run(command, check=False, capture_output=True, timeout=10)
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+
+
 if __name__ == '__main__' and len(sys.argv) > 1 and sys.argv[1] == 'configure':
     result = subprocess.run(['/usr/bin/dpkg-statoverride', '--list'],
                             check=False, capture_output=True, text=True)
@@ -52,3 +65,4 @@ if __name__ == '__main__' and len(sys.argv) > 1 and sys.argv[1] == 'configure':
     overrides = {line.split(None, 3)[3] for line in result.stdout.splitlines()}
     with root_directory('/') as root_fd:
         repair_directories(root_fd, DIRECTORIES, overrides)
+    apply_uinput_rule()

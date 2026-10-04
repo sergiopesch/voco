@@ -27,13 +27,8 @@ fn main() {
             }
             return;
         }
-        [arg] if arg == "--check-desktop-input" || arg == "--setup-desktop-input" => {
-            let result = if arg == "--setup-desktop-input" {
-                voco_lib::setup_desktop_input()
-            } else {
-                voco_lib::check_desktop_input()
-            };
-            match result {
+        [arg] if arg == "--check-desktop-input" => {
+            match voco_lib::check_desktop_input() {
                 Ok(detail) => println!("{detail}"),
                 Err(detail) => {
                     eprintln!("{detail}");
@@ -47,7 +42,7 @@ fn main() {
             return;
         }
         [arg] if arg == "--help" || arg == "-h" => {
-            println!("Usage: voco [--toggle | --check-desktop-input | --setup-desktop-input | --check-panel | --setup-panel | --version | --help]\n\nWithout arguments, launch VOCO or present the existing idle app.\n--toggle  Request Start/Stop from VOCO already running in this desktop session.\n          Does not change focus, launch VOCO, or confirm recording state.\n--check-desktop-input  Check input helpers without launching VOCO or sending keys.\n--setup-desktop-input  Update VOCO's packaged input service while VOCO is closed.\n--check-panel  Check the GNOME companion without changing settings.\n--setup-panel  Enable the packaged GNOME 46 companion for this user.\n               May require signing out and back in; does not restart Shell.");
+            println!("Usage: voco [--toggle | --check-desktop-input | --check-panel | --setup-panel | --version | --help]\n\nWithout arguments, launch VOCO or present the existing idle app.\n--toggle  Request Start/Stop from VOCO already running in this desktop session.\n          Does not change focus, launch VOCO, or confirm recording state.\n--check-desktop-input  Check paste prerequisites without launching VOCO or sending keys.\n--check-panel  Check the GNOME companion without changing settings.\n--setup-panel  Enable the packaged GNOME 46 companion for this user.\n               May require signing out and back in; does not restart Shell.");
             return;
         }
         _ => {
