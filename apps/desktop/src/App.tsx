@@ -685,7 +685,7 @@ export function App() {
   }, [dictationInProgress, refreshPanelState, setSurface]);
 
   const showPopover = useCallback(
-    async (anchor: TrayPopoverAnchor, toggleVisibility: boolean) => {
+    async (anchor: TrayPopoverAnchor) => {
       const requestVersion = panelRequestVersionRef.current + 1;
       panelRequestVersionRef.current = requestVersion;
       const state = useStore.getState();
@@ -697,10 +697,6 @@ export function App() {
         return;
       }
       trayPopoverAnchorRef.current = anchor;
-      if (toggleVisibility && state.surface === "popover") {
-        dismissInteractiveSurface();
-        return;
-      }
       await refreshPanelState();
       const latestState = useStore.getState();
       if (
@@ -711,7 +707,7 @@ export function App() {
       }
       setSurface("popover");
     },
-    [dictationInProgress, dismissInteractiveSurface, refreshPanelState, setSurface],
+    [dictationInProgress, refreshPanelState, setSurface],
   );
 
   const applyConfigPatch = useCallback(
@@ -1107,21 +1103,9 @@ export function App() {
   useEffect(() => {
     return cleanupDeferredListener(
       getCurrentWindow().listen<TrayPopoverAnchor>(
-        "voco:toggle-popover",
-        (event) => {
-        void showPopover(event.payload, true);
-        },
-      ),
-      "tray popover toggle listener",
-    );
-  }, [showPopover]);
-
-  useEffect(() => {
-    return cleanupDeferredListener(
-      getCurrentWindow().listen<TrayPopoverAnchor>(
         "voco:show-popover",
         (event) => {
-        void showPopover(event.payload, false);
+        void showPopover(event.payload);
         },
       ),
       "tray popover show listener",

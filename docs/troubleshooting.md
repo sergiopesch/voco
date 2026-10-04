@@ -157,7 +157,9 @@ is in [Review](everyday-use.md#review).
 | **Microphone could not be read; it may be busy.** | Close other programs that use the microphone, or choose another one. |
 | **Microphone changed** | Your chosen microphone is missing, so VOCO uses the system default. Choose it again when it's connected. |
 | `VOCO requires a microphone sample rate from 8 to 96 kHz.` | Choose a supported format in your sound settings, then restart VOCO. |
-| **No default microphone is available.** | Connect a microphone, or choose one on the **Settings** page. If your system's default input is a speaker monitor, choose a microphone instead. |
+| **Microphone setup required**, with **No default microphone is available.** | Connect a microphone, or choose one on the **Settings** page. If your system's default input is a speaker monitor, choose a microphone instead. |
+| **Microphone setup required** after a microphone failed or was unplugged | VOCO stopped using the microphone you chose. Choose one again on the **Settings** page. |
+| **Source selection is stale** | The microphone list changed since Settings showed it. Choose **Refresh devices**, then pick the microphone again. |
 | Every microphone in the list ends with **— identity unavailable** | On Wayland, VOCO needs PipeWire's PulseAudio service. `pactl info` shows `Server Name: PulseAudio (on PipeWire …)` when it runs; if it shows only `pulseaudio`, switch to PipeWire's service, `pipewire-pulse`, then sign out and back in, or use an X11 session. Until then the voice test can't pass. |
 | Missing or wrong words | Set the input level in your sound settings so your voice is clear but not distorted, and reduce background noise. |
 
@@ -234,6 +236,7 @@ gives the reason:
 | Reason | What to do |
 | --- | --- |
 | `VOCO is running but could not receive the launcher request` | The running VOCO didn't answer. This can happen with a copy started before an upgrade. Use its tray or panel menu, or quit it with `pkill -x voco` and open VOCO again. |
+| `could not write the tray icons: …` | VOCO keeps its tray icons in `$XDG_RUNTIME_DIR/voco`, which is usually a small memory-backed folder. Free space there, or sign out and back in, then open VOCO again. |
 
 ## Performance logs
 

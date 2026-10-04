@@ -136,7 +136,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `updateCheckCoordinator.test.ts` — Coordinator behaviour.
 - `windowRemap.ts` — Shows interactive windows on Wayland without treating the remap as a blur.
 - `windowRemap.test.ts` — Window remap.
-- `popoverPlacement.ts` — Places windows near the tray inside the work area.
+- `popoverPlacement.ts` — Places the popover inside the work area, centred, because the tray never reports where its icon is.
 - `popoverPlacement.test.ts` — Placement.
 - `animationFrameLease.ts` — Shared animation-frame scheduling.
 - `animationFrameLease.test.ts` — Frame scheduling.

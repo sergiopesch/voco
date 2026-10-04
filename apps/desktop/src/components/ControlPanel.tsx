@@ -199,7 +199,7 @@ export function ControlPanel({
     ...availableDevices.map((device) => ({ value: device.deviceId, label: device.label })),
   ], [availableDevices]);
   const shortcut = shortcutPresentation(config.hotkey, runtimeDiagnostics?.shortcut, desktopInput);
-  // The tray tooltip keeps any readiness detail; the popover heading stays short.
+  // The popover heading stays short; the tray menu's status line carries the full label.
   const statusHeading = desktopSetupError ? "Setup needed" : statusLabel.startsWith("Ready") ? "Ready" : statusLabel;
   const updateInstallCopy = config.installChannel === "source"
     ? "You build VOCO from source. To update, check out the newer release tag and rebuild."
