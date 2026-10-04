@@ -238,6 +238,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `sync-installer-ui.py`, `lib/install-ui.sh`, `lib/install-apt-ui.py`, `lib/install-brand.json` — Installer interface sources embedded in `install`.
 - `lib/install-common.sh` — Install steps that `setup.sh --install` sources and `install` carries copies of: package manager detection, the APT and DNF installs and their checks, the desktop input check and the shortcut. `check-devops.sh` keeps the copies identical, and `test-install-common.sh` tests them.
 - `lib/test-speech-runtime.sh` — Speech runtime setup for disposable test desktops.
+- `lib/browser-app-sandbox.sh` — The private desktop the two Chromium application launchers share.
 - `lib/uinput-bridge.sh` — Starts and stops the uinput bridge for disposable test desktops.
 
 ### Checks
@@ -281,7 +282,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `test-private-ibus-engine.py`, `test-private-ibus-engine.sh` — IBus engine on a headless IBus daemon.
 - `test-gnome-panel.py`, `test-gnome-panel.sh`, `test-panel-model.mjs`, `test-panel-setup.py` — GNOME companion.
 - `test-application-delivery.py`, `test-application-delivery.sh` — Paste into real applications on a private desktop.
-- `test-browser-delivery.mjs`, `test-browser-full-app.mjs`, `test-browser-full-app.sh`, `test-browser-toolbar-app.mjs`, `test-browser-toolbar-app.sh`, `test-browser-toolbar-action.py` — Chromium paste, exact field and toolbar.
+- `test-browser-delivery.mjs`, `test-browser-full-app.mjs`, `test-browser-full-app.sh`, `test-browser-toolbar-app.mjs`, `test-browser-toolbar-app.sh`, `test-browser-toolbar-action.py`, `browser-app-harness.mjs` — Chromium paste, exact field and toolbar.
 - `test-chromium-exact-field.mjs`, `chromium-background.test.cjs`, `chromium-content-lifecycle.test.cjs` — Extension scripts.
 - `test-native-desktop.py`, `test-native-desktop.sh`, `test-native-full-app.py`, `test-native-atspi.py`, `test-native-recovery-controls.py` — GTK and WebKit fields in a private X11 session.
 - `test-native-wayland.py`, `test-native-wayland.sh` — Wayland toolkit and lifecycle checks.
