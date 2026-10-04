@@ -13,7 +13,9 @@ import queue
 import threading
 import numpy as np
 import psutil
-from adapters import Nemotron, ROOT
+from adapters import Nemotron
+
+GATE_MODES = ('off', 'zero')
 
 def coalesce_frames(frames, rate):
     """Batch released preroll without changing samples or exceeding one second."""
@@ -26,12 +28,11 @@ def coalesce_frames(frames, rate):
 class SilenceGate:
     """Skip only long quiet interiors; preserve 640ms onset and 1.5s tail.
 
-    Digital-zero mode is the default. Acoustic VAD is opt-in and needs onnxruntime
-    and vad/silero_vad.onnx, which the package does not ship. Original audio is
-    retained by the desktop.
+    Digital-zero mode is the default, and 'off' passes every sample through.
+    Original audio is retained by the desktop.
     """
     def __init__(self, mode='zero'):
-        if mode not in ('off', 'zero', 'vad'): raise ValueError('gate mode')
+        if mode not in GATE_MODES: raise ValueError('gate mode')
         self.mode = mode
         self.pending = collections.deque()
         self.pending_n = 0
@@ -39,56 +40,9 @@ class SilenceGate:
         self.active = False
         self.skipped_s = 0.
         self.processed_s = 0.
-        self.vad_ms = 0.
-        self.vad_buffer = np.empty(0, np.float32)
-        self.resample_count = 0
-        self.resample_next = 0.
-        self.resample_last = None
-        self.state = np.zeros((2, 1, 128), np.float32)
-        self.context = np.zeros((1, 64), np.float32)
-        self.probability = 1.
-        self.session = None
-        if mode == 'vad':
-            import onnxruntime as ort
-            opts = ort.SessionOptions()
-            opts.inter_op_num_threads = opts.intra_op_num_threads = 1
-            self.session = ort.InferenceSession(str(ROOT/'vad/silero_vad.onnx'), opts, providers=['CPUExecutionProvider'])
-
-    def quiet(self, data, rate):
-        if self.mode == 'off': return False
-        if self.mode == 'zero': return not np.any(data)
-        started = time.monotonic()
-        # Interpolate only the VAD sidechain, preserving fractional phase across
-        # transport blocks. The recognizer always receives original samples.
-        start = self.resample_count
-        end = start + len(data) - 1
-        if self.resample_last is None:
-            values, positions = data, np.arange(start, end+1)
-        else:
-            values = np.concatenate(([self.resample_last], data))
-            positions = np.arange(start-1, end+1)
-        points = np.arange(self.resample_next, end + 1e-8, rate / 16000.)
-        if len(points):
-            self.resample_next = points[-1] + rate / 16000.
-            self.vad_buffer = np.concatenate((self.vad_buffer, np.interp(points, positions, values).astype(np.float32)))
-        self.resample_count += len(data)
-        self.resample_last = data[-1]
-        maximum = 0.
-        evaluated = False
-        while len(self.vad_buffer) >= 512:
-            frame, self.vad_buffer = self.vad_buffer[:512], self.vad_buffer[512:]
-            x = np.concatenate((self.context, frame[None, :]), axis=1)
-            out, self.state = self.session.run(None, {'input': x, 'state': self.state, 'sr': np.array(16000, np.int64)})
-            self.context = x[:, -64:]
-            self.probability = float(out[0, 0])
-            maximum = max(maximum, self.probability)
-            evaluated = True
-        self.vad_ms += (time.monotonic()-started)*1000
-        # Avoid dismissing audible sounds or a frame that has not yet been scored.
-        return evaluated and maximum < .05 and float(np.sqrt(np.mean(data.astype(np.float64)**2))) < .008
 
     def push(self, data, rate):
-        quiet = self.quiet(data, rate)
+        quiet = self.mode == 'zero' and not np.any(data)
         self.quiet_s = self.quiet_s + len(data)/rate if quiet else 0.
         if not quiet or (self.active and self.quiet_s < 1.5):
             frames = list(self.pending) + [data]
@@ -115,6 +69,8 @@ class SilenceGate:
 
 class StreamingSession:
     def __init__(self, gate='zero', warmup=True):
+        # Reject the mode before loading the model, so a bad value never reports ready.
+        if gate not in GATE_MODES: raise ValueError('gate mode')
         self.mode = gate
         started = time.monotonic()
         self.context = int(os.environ.get('VOCO_NEMOTRON_CONTEXT', '1'))
@@ -141,7 +97,6 @@ class StreamingSession:
             nonzero = np.flatnonzero(data)
             if len(nonzero): self.first_nonzero_audio_s = self.audio_s + int(nonzero[0])/rate
         self.rate = rate; self.audio_s += len(data)/rate; self.chunks += 1
-        before_vad = self.gate.vad_ms
         started = time.monotonic(); frames = self.gate.push(data, rate)
         gate_ms = (time.monotonic()-started)*1000
         started = time.monotonic(); text = None
@@ -153,7 +108,7 @@ class StreamingSession:
             push_ms += self.model.metrics['recognizer_push_ms']
             drain_ms += self.model.metrics['result_drain_ms']
             if value is not None: text = value
-        self.metrics = {'asr_ms': (time.monotonic()-started)*1000, 'gate_ms': gate_ms, 'vad_ms': self.gate.vad_ms-before_vad,
+        self.metrics = {'asr_ms': (time.monotonic()-started)*1000, 'gate_ms': gate_ms,
                         'recognizer_push_ms': push_ms, 'result_drain_ms': drain_ms,
                         'recognizer_push_calls': len(frames),
                         'gate_released_frames': source_frame_count,
@@ -165,7 +120,7 @@ class StreamingSession:
         started = time.monotonic()
         for frame in coalesce_frames(self.gate.finish(self.rate or 16000), self.rate or 16000): self.model.push(frame, self.rate)
         text = self.model.finish(); self.active = False; self.last = text
-        self.metrics = {'asr_ms': (time.monotonic()-started)*1000, 'gate_ms': 0., 'vad_ms': 0.}
+        self.metrics = {'asr_ms': (time.monotonic()-started)*1000, 'gate_ms': 0.}
         return text
     def cancel(self):
         if getattr(self.model, 'stream', None):

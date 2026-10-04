@@ -25,6 +25,7 @@ def error_code(error):
         'audio shape': 'invalid_audio', 'inactive session': 'inactive_session',
         'Model integrity mismatch': 'model_integrity', 'unsupported context': 'invalid_context',
         'unsupported backend': 'invalid_backend', 'Model path must be absolute': 'invalid_model_path',
+        'gate mode': 'invalid_gate',
     }
     if str(error) in known:
         return known[str(error)]

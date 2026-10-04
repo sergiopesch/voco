@@ -45,7 +45,10 @@ class TimingTests(unittest.TestCase):
         self.assertIsNone(self.session.first_nonzero_audio_s)
     def test_metrics_have_no_audio_or_text(self):
         self.session.push(np.ones(320),16000)
-        self.assertEqual(set(self.session.metrics),{'asr_ms','gate_ms','vad_ms','recognizer_push_ms','result_drain_ms','recognizer_push_calls','first_nonzero_audio_s','gate_released_frames'})
+        self.assertEqual(set(self.session.metrics),{'asr_ms','gate_ms','recognizer_push_ms','result_drain_ms','recognizer_push_calls','first_nonzero_audio_s','gate_released_frames'})
+    def test_unknown_gate_fails_before_the_model_loads(self):
+        with patch.object(streaming,'Nemotron',side_effect=AssertionError('model loaded')):
+            with self.assertRaisesRegex(ValueError,'gate mode'):streaming.StreamingSession('vad',warmup=False)
 
     def test_coalescing_preserves_samples_and_one_second_limit_at_all_rates(self):
         for rate in (8000, 16000, 44100, 48000, 96000):
