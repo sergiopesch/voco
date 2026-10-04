@@ -239,6 +239,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `lib/install-common.sh` — Install steps that `setup.sh --install` sources and `install` carries copies of: package manager detection, the APT and DNF installs and their checks, the desktop input check and the shortcut. `check-devops.sh` keeps the copies identical, and `test-install-common.sh` tests them.
 - `lib/test-speech-runtime.sh` — Speech runtime setup for disposable test desktops.
 - `lib/browser-app-sandbox.sh` — The private desktop the two Chromium application launchers share.
+- `lib/test-sandbox.sh` — `voco_bwrap`, the Bubblewrap namespace the CI desktop suites run in.
 - `lib/uinput-bridge.sh` — Starts and stops the uinput bridge for disposable test desktops.
 
 ### Checks

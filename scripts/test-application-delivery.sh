@@ -45,17 +45,11 @@ if [[ ${1:-} != --inside && ${1:-} != --session ]]; then
     cp "$ROOT_DIR/scripts/fixtures/gnome-private-probe/"* "$probe/"
   fi
   status=0
-  bwrap --die-with-parent --new-session --unshare-ipc --unshare-net --unshare-pid --unshare-uts \
-    --ro-bind / / --dev /dev --proc /proc --tmpfs /tmp --tmpfs /run/user --tmpfs /run/dbus \
-    --bind "$fixture" "$fixture" --ro-bind "$deps" /tmp/native-deps "${production_paste[@]}" \
-    --setenv HOME "$fixture/home" --setenv XDG_RUNTIME_DIR "$fixture/runtime" \
-    --setenv XDG_CONFIG_HOME "$fixture/config" --setenv XDG_CACHE_HOME "$fixture/cache" \
-    --setenv XDG_DATA_HOME "$fixture/data" --setenv XDG_STATE_HOME "$fixture/state" \
+  source "$(dirname "${BASH_SOURCE[0]}")/lib/test-sandbox.sh"
+  voco_bwrap "$fixture" --ro-bind "$deps" /tmp/native-deps "${production_paste[@]}" \
     --setenv PLAYWRIGHT_BROWSERS_PATH "$browsers" \
     --setenv VOCO_DELIVERY_NODE "$node_binary" \
-    --unsetenv DISPLAY --unsetenv WAYLAND_DISPLAY --unsetenv DBUS_SESSION_BUS_ADDRESS \
-    --unsetenv AT_SPI_BUS_ADDRESS --unsetenv IBUS_ADDRESS --unsetenv XAUTHORITY \
-    bash "${BASH_SOURCE[0]}" --inside "$fixture" || status=$?
+    -- bash "${BASH_SOURCE[0]}" --inside "$fixture" || status=$?
   if $bridged && ! voco_stop_uinput_bridge; then
     echo 'The uinput bridge rejected or lost paste keys; see uinput-bridge.jsonl' >&2
     (( status )) || status=1

@@ -20,7 +20,7 @@ if len(sys.argv) > 2 and sys.argv[2] == '--manifest':
         'finishedAt': datetime.datetime.now(datetime.timezone.utc).isoformat(),
         'exitCode': int(sys.argv[3]),
         'files': {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(evidence.iterdir()) if p.is_file()},
-        'sourceHashes': {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in [Path(__file__), Path(__file__).with_suffix('.sh')]},
+        'sourceHashes': {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in [Path(__file__), Path(__file__).with_suffix('.sh'), Path(__file__).with_name('lib') / 'test-sandbox.sh']},
     }, indent=2) + '\n')
     sys.exit(0)
 if len(sys.argv) > 2:

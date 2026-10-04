@@ -55,17 +55,10 @@ if [[ ${1:-} != --inside ]]; then
     package_mounts=(--bind "$run/system-extensions" /usr/share/gnome-shell/extensions
       --ro-bind "$VOCO_PANEL_PACKAGE_ROOT/usr/lib/voco/speech" /usr/lib/voco/speech)
   fi
-  bwrap --die-with-parent --new-session --unshare-ipc --unshare-net --unshare-pid --unshare-uts \
-    --ro-bind / / --dev /dev --proc /proc --tmpfs /tmp --tmpfs /run/user --tmpfs /run/dbus \
-    --bind "$run" "$run" "${native_mounts[@]}" "${apparmor_mounts[@]}" \
-    "${package_mounts[@]}" \
-    --setenv HOME "$run/home" --setenv XDG_RUNTIME_DIR "$run/runtime" \
-    --setenv XDG_CONFIG_HOME "$run/config" --setenv XDG_CACHE_HOME "$run/cache" \
-    --setenv XDG_DATA_HOME "$run/data" --setenv XDG_STATE_HOME "$run/state" \
+  source "$ROOT/scripts/lib/test-sandbox.sh"
+  voco_bwrap "$run" "${native_mounts[@]}" "${apparmor_mounts[@]}" "${package_mounts[@]}" \
     --setenv VOCO_PANEL_SHELL_MODE "$shell_mode" --setenv VOCO_PANEL_SUITE "$suite" \
-    --unsetenv DISPLAY --unsetenv WAYLAND_DISPLAY --unsetenv DBUS_SESSION_BUS_ADDRESS \
-    --unsetenv DBUS_SYSTEM_BUS_ADDRESS --unsetenv IBUS_ADDRESS --unsetenv XAUTHORITY --unsetenv PULSE_SERVER \
-    bash "${BASH_SOURCE[0]}" --inside "$run"
+    -- bash "${BASH_SOURCE[0]}" --inside "$run"
   exit
 fi
 run=${2:?}

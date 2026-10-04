@@ -30,9 +30,9 @@ MANIFEST
     exit "$status"
   }
   trap cleanup EXIT
-  mkdir -p "$test_root"/{home,runtime,config/voco,data/voco/models,cache,state,evidence}
+  mkdir -p "$test_root"/{home,runtime,config/voco,data,cache,state,evidence}
   mkdir -p "$test_root/evidence/runner-snapshots"
-  cp "$0" "${BASH_SOURCE[0]}" "$repo/scripts/lib/test-speech-runtime.sh" "$repo/scripts/$runner" "$repo/scripts/browser-app-harness.mjs" \
+  cp "$0" "${BASH_SOURCE[0]}" "$repo/scripts/lib/test-speech-runtime.sh" "$repo/scripts/lib/test-sandbox.sh" "$repo/scripts/$runner" "$repo/scripts/browser-app-harness.mjs" \
     "$repo/scripts/test-browser-toolbar-action.py" "$repo/scripts/browser-long-accuracy.mjs" "$repo/scripts/browser-capture-lifecycle.mjs" \
     "$repo/scripts/speech-score.mjs" "$repo/scripts/test-speech-continuity.mjs" "$repo/scripts/speech-integrity.mjs" "$test_root/evidence/runner-snapshots/"
   chmod 700 "$test_root/runtime"
@@ -40,8 +40,6 @@ MANIFEST
   source "$repo/scripts/lib/test-speech-runtime.sh"
   voco_stage_test_speech "$test_root"
   cp --reflink=auto "${VOCO_BROWSER_HOST_BINARY:-${CARGO_TARGET_DIR:-$repo/apps/desktop/src-tauri/target}/debug/voco-browser-host}" "$test_root/voco-browser-host"
-
-  chmod 755 "$test_root/data/voco/models"
 
   printf '%s\n' '{"onboardingCompleted":true,"hotkey":"Alt+D"}' > "$test_root/config/voco/config.json"
   if [[ ${VOCO_BROWSER_LONG_CAPTURE:-0} == 1 ]]; then
@@ -79,16 +77,11 @@ PYWAV
   export VOCO_BROWSER_PACTL=$(command -v pactl)
   browser_binary=${CHROMIUM_PATH:-$(node --input-type=module -e 'import { chromium } from "playwright"; console.log(chromium.executablePath())')}
   browser_dir=$(dirname "$browser_binary")
-  bwrap --die-with-parent --new-session --unshare-ipc --unshare-net --unshare-pid --unshare-uts \
-    --ro-bind / / --dev /dev --proc /proc --tmpfs /tmp --tmpfs /run/user --tmpfs /run/dbus \
-    --bind "$test_root" "$test_root" --ro-bind "$browser_dir" /tmp/browser \
+  source "$repo/scripts/lib/test-sandbox.sh"
+  voco_bwrap "$test_root" --ro-bind "$browser_dir" /tmp/browser \
     --ro-bind "$(readlink -f "$VOCO_BROWSER_NODE")" /tmp/voco-node \
     --ro-bind "${VOCO_NATIVE_DEPS:-/usr}" /tmp/native-deps \
-    --setenv HOME "$test_root/home" --setenv XDG_RUNTIME_DIR "$test_root/runtime" \
-    --setenv XDG_CONFIG_HOME "$test_root/config" --setenv XDG_DATA_HOME "$test_root/data" \
-    --setenv XDG_CACHE_HOME "$test_root/cache" --setenv XDG_STATE_HOME "$test_root/state" \
-    --unsetenv DISPLAY --unsetenv WAYLAND_DISPLAY --unsetenv DBUS_SESSION_BUS_ADDRESS --unsetenv IBUS_ADDRESS --unsetenv XAUTHORITY \
-    bash "$0" --inside "$test_root"
+    -- bash "$0" --inside "$test_root"
   exit
 fi
 export VOCO_BROWSER_TEST_ROOT=${2:?}

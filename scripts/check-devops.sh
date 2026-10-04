@@ -31,6 +31,26 @@ PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-check-shell-syntax.py
 git ls-files -z -- install packaging/ibus/voco-ibus-engine '*.sh' \
   | xargs -0 bash scripts/check-shell-syntax.sh
 
+# Every desktop test sandbox starts from the same namespaces, private mounts and
+# cleared session variables; a suite's own arguments only follow them.
+(
+  bwrap() { printf '%s\n' "$@"; }
+  source scripts/lib/test-sandbox.sh
+  voco_bwrap /fixture --ro-bind /deps /tmp/deps --setenv SUITE 1 -- run --inside
+) | PYTHONDONTWRITEBYTECODE=1 python3 -c '
+import sys
+expected = """--die-with-parent --new-session --unshare-ipc --unshare-net --unshare-pid --unshare-uts
+  --ro-bind / / --dev /dev --proc /proc --tmpfs /tmp --tmpfs /run/user --tmpfs /run/dbus --bind /fixture /fixture
+  --setenv HOME /fixture/home --setenv XDG_RUNTIME_DIR /fixture/runtime --setenv XDG_CONFIG_HOME /fixture/config
+  --setenv XDG_CACHE_HOME /fixture/cache --setenv XDG_DATA_HOME /fixture/data --setenv XDG_STATE_HOME /fixture/state
+  --unsetenv DISPLAY --unsetenv WAYLAND_DISPLAY --unsetenv XAUTHORITY --unsetenv DBUS_SESSION_BUS_ADDRESS
+  --unsetenv DBUS_SYSTEM_BUS_ADDRESS --unsetenv AT_SPI_BUS_ADDRESS --unsetenv IBUS_ADDRESS --unsetenv PULSE_SERVER
+  --unsetenv PYTHONOPTIMIZE --ro-bind /deps /tmp/deps --setenv SUITE 1 run --inside""".split()
+if sys.stdin.read().split() != expected:
+    raise SystemExit("scripts/lib/test-sandbox.sh no longer builds the isolated desktop sandbox")
+print("Desktop test sandboxes are isolated.")
+'
+
 python3 scripts/sync-installer-ui.py --check
 
 bash scripts/test-verify-release.sh
