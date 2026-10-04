@@ -5,6 +5,7 @@ import {
   shouldOpenMicrophonePreview,
   shortcutFromKeyboardEvent,
 } from "@/components/ControlPanel";
+import { isDictationActive } from "@/lib/activityMode";
 import { deriveStatusLabel } from "@/lib/dictationPresentation";
 import { useStore } from "@/store/useStore";
 import type { AppConfig } from "@/types";
@@ -281,8 +282,8 @@ describe("guided dictation and settings journeys", () => {
 
   it("never opens audio preview while dictation is starting or running", () => {
     for (const status of ["starting", "recording", "processing"] as const) {
-      expect(shouldOpenMicrophonePreview("onboarding", "General", status)).toBe(false);
-      expect(shouldOpenMicrophonePreview("settings", "Audio", status)).toBe(false);
+      expect(shouldOpenMicrophonePreview("onboarding", "General", isDictationActive(status))).toBe(false);
+      expect(shouldOpenMicrophonePreview("settings", "Audio", isDictationActive(status))).toBe(false);
     }
   });
 });

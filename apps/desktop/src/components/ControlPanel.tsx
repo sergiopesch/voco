@@ -14,6 +14,7 @@ import type {
   RuntimeDiagnostics,
   UpdateCheckState,
 } from "@/types";
+import { isDictationActive } from "@/lib/activityMode";
 import { calculateVisualAudioLevelFromSamples } from "@/lib/audioLevel";
 import { openMicrophoneStream } from "@/lib/audioInput";
 import { createAnimationFrameLease } from "@/lib/animationFrameLease";
@@ -71,12 +72,9 @@ export type PanelSection = "General" | "Audio" | "Hotkeys" | "Updates" | "Advanc
 export function shouldOpenMicrophonePreview(
   surface: ControlPanelProps["surface"],
   activeSection: PanelSection,
-  dictationStatus: DictationStatus = "idle",
+  dictationBusy = false,
 ): boolean {
-  if (dictationStatus === "starting" || dictationStatus === "recording" || dictationStatus === "processing") {
-    return false;
-  }
-  return surface === "settings" && activeSection === "Audio";
+  return !dictationBusy && surface === "settings" && activeSection === "Audio";
 }
 
 const PANEL_SECTION_LABELS: Record<PanelSection, string> = {
@@ -182,7 +180,7 @@ export function ControlPanel({
   const testPassed = useStore(state => state.onboardingTestPassed);
   const testPurpose = useStore(state => state.dictationPurpose);
   const hotkeyDirty = hotkeyDraft !== config.hotkey;
-  const dictationBusy = dictationStatus === "starting" || dictationStatus === "recording" || dictationStatus === "processing";
+  const dictationBusy = isDictationActive(dictationStatus);
   // The live level goes straight to the meter; a state update per animation
   // frame would re-render the whole panel.
   const meterFillRef = useRef<HTMLDivElement>(null);
@@ -339,11 +337,7 @@ export function ControlPanel({
   }, [config.hotkey]);
 
   useEffect(() => {
-    const shouldPreview = shouldOpenMicrophonePreview(
-      surface,
-      activeSection,
-      dictationBusy ? "recording" : "idle",
-    );
+    const shouldPreview = shouldOpenMicrophonePreview(surface, activeSection, dictationBusy);
     if (!shouldPreview || nativePreviewDisabled) {
       setPreviewLevel(0);
       setPreviewError(null);

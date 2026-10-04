@@ -22,6 +22,7 @@ import {
   startSession,
   type DictationSessionState,
 } from "@/lib/dictationSession";
+import { isBrowserTrigger } from "@/lib/dictationTrigger";
 import { beginNativeCapture,type NativeCaptureSession } from "@/lib/nativeCapture";
 import type { HotkeyTraceFields,pasteDesktopText } from "@/lib/tauri";
 import type { useStore as appStore } from "@/store/useStore";
@@ -196,7 +197,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
   }
 
   function releaseRecordingOrigin(triggerId = activeTriggerIdRef.current) {
-    if (!triggerId?.startsWith("browser:")) return;
+    if (!isBrowserTrigger(triggerId)) return;
     if (activeTriggerIdRef.current === triggerId) activeTriggerIdRef.current = undefined;
     void releaseBrowserRecording(triggerId).catch(() => {});
   }
@@ -323,7 +324,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       // never blocks a new dictation.
       await finishJournal().catch(() => { journal = null; });
       assertOutputAllowed(startingSessionId);
-      if (!onboardingTest && !triggerId?.startsWith("browser:") && useStore.getState().config) {
+      if (!onboardingTest && !isBrowserTrigger(triggerId) && useStore.getState().config) {
         const paste = await getDesktopPasteStatus();
         assertOutputAllowed(startingSessionId);
         // The only desktop prerequisites; each paste goes to whatever has focus.
@@ -344,7 +345,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
         desktopPasteSessionRef.current = true;
         traceDictationEvent("dictation_desktop_paste_session_started").catch(() => {});
       }
-      if (!onboardingTest && !triggerId?.startsWith("browser:") && !desktopPasteSessionRef.current) {
+      if (!onboardingTest && !isBrowserTrigger(triggerId) && !desktopPasteSessionRef.current) {
         destinationSetupFailure = true;
         throw new Error("Desktop dictation is unavailable. Complete desktop input setup before recording.");
       }
@@ -366,7 +367,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       let audioContext: AudioContext | null = null;
       debugNativeCaptureEnabledRef.current = false;
       // Field admission must not start capture or revoke an approved microphone.
-      if (triggerId?.startsWith("browser:")) {
+      if (isBrowserTrigger(triggerId)) {
         const delivery = new BrowserStreamDelivery(() => isCurrentSession(startingSessionId) && !cancelledRef.current);
         browserDeliveryRef.current = delivery;
         await delivery.start(startingSessionId, triggerId);

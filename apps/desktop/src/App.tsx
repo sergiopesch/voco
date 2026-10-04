@@ -261,8 +261,6 @@ export function App() {
   const diagnosticsExpiryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const runtimeStatusRevisionRef = useRef(0);
   const microphoneRefreshRef = useRef(new MicrophoneRefresh());
-  const dictationStatusRef = useRef(status);
-  dictationStatusRef.current = status;
   const applyAuthoritativeConfig = useCallback(
     (snapshot: ConfigSnapshot): boolean => {
       if (
@@ -375,7 +373,7 @@ export function App() {
       return true;
     }
 
-    const dictationActive = isDictationActive(dictationStatusRef.current);
+    const dictationActive = isDictationActive(currentState.status);
     if (!dictationActive && action === "stop") return true;
     const captureState = useStore.getState();
     if (!dictationActive && captureState.captureBackendMode !== "webkit") {
@@ -397,7 +395,7 @@ export function App() {
     if (
       captureState.captureBackendMode === "webkit" &&
       !canToggleDictationWithPermission(
-        dictationStatusRef.current,
+        currentState.status,
         useStore.getState().microphonePermission,
       )
     ) {
@@ -527,8 +525,7 @@ export function App() {
     const deviceId = useStore.getState().selectedDeviceId;
     const inactive = () => {
       const state = useStore.getState();
-      return current() && !isDictationActive(state.status) && state.selectedDeviceId === deviceId &&
-        state.status !== "recording" && state.status !== "processing";
+      return current() && !isDictationActive(state.status) && state.selectedDeviceId === deviceId;
     };
     if (!inactive()) return false;
     try {
