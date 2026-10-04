@@ -15,8 +15,6 @@ const XML: &str = r#"<node><interface name="org.voco.Panel1">
 <method name="Action"><arg type="s" direction="in"/><arg type="s" direction="in"/><arg type="b" direction="out"/></method>
 <method name="Detach"/><signal name="Changed"/>
 </interface></node>"#;
-/// The chords passive Wayland evdev also observes; Shell can reserve no other.
-const ACCELERATORS: [&str; 2] = ["<Alt>d", "<Alt><Shift>d"];
 /// ReserveShortcut: the companion holds its grab at every status and renews it about
 /// once a second.
 const SHORTCUT_LEASE: Duration = Duration::from_millis(2500);
@@ -66,7 +64,14 @@ fn reserve(key: &str, lease: Duration) {
 fn shortcut_accelerator(state: &serde_json::Value) -> Option<&str> {
     state["shortcutAccelerator"]
         .as_str()
-        .filter(|value| ACCELERATORS.contains(value))
+        .filter(|value| is_preset_accelerator(value))
+}
+
+/// The chords passive Wayland evdev also observes; Shell can reserve no other.
+fn is_preset_accelerator(value: &str) -> bool {
+    crate::Preset::ALL
+        .iter()
+        .any(|preset| preset.accelerator() == value)
 }
 
 fn reserve_shortcut(state: &serde_json::Value, accelerator: &str) -> bool {
@@ -148,7 +153,7 @@ pub(crate) fn stop_shortcut_token(state: &serde_json::Value) -> Option<String> {
         .filter(|value| !value.is_empty())?;
     let accelerator = state["stopAccelerator"]
         .as_str()
-        .filter(|value| ACCELERATORS.contains(value))?;
+        .filter(|value| is_preset_accelerator(value))?;
     Some(format!("{session}/{accelerator}"))
 }
 

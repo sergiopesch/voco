@@ -7,8 +7,6 @@ use tauri::{
     Emitter, Manager,
 };
 
-const HOTKEY_PRESETS: &[&str] = &["Alt+D", "Alt+Shift+D"];
-
 /// Holds the tray icon ID and toggle menu item for runtime updates
 pub struct TrayState {
     pub tray_id: String,
@@ -20,7 +18,7 @@ pub struct TrayState {
     pub review_item: MenuItem<tauri::Wry>,
     pub hotkey_menu: Submenu<tauri::Wry>,
     pub current_hotkey: String,
-    pub hotkey_items: Vec<(String, MenuItem<tauri::Wry>)>,
+    pub hotkey_items: Vec<(crate::Preset, MenuItem<tauri::Wry>)>,
     pub runtime: RuntimeStatusSnapshot,
     icons: crate::tray_icons::TrayIcons,
     applied_presentation: Option<TrayPresentation>,
@@ -312,13 +310,14 @@ pub fn setup_tray(
 
     // Build hotkey submenu with presets
     let mut hotkey_submenu = SubmenuBuilder::with_id(app, "hotkey_menu", "Change shortcut");
-    let mut hotkey_items: Vec<(String, MenuItem<tauri::Wry>)> = Vec::new();
+    let mut hotkey_items = Vec::new();
 
     // apply_tray_state marks the configured preset before the menu can show.
-    for &preset in HOTKEY_PRESETS {
-        let item = MenuItemBuilder::with_id(format!("hotkey:{preset}"), preset).build(app)?;
+    for preset in crate::Preset::ALL {
+        let label = preset.label();
+        let item = MenuItemBuilder::with_id(format!("hotkey:{label}"), label).build(app)?;
         hotkey_submenu = hotkey_submenu.item(&item);
-        hotkey_items.push((preset.to_string(), item));
+        hotkey_items.push((preset, item));
     }
 
     hotkey_submenu = hotkey_submenu.separator();
@@ -473,11 +472,10 @@ fn refresh_tray(app: &tauri::AppHandle) {
 
 fn apply_tray_state(app: &tauri::AppHandle, tray_state: &mut TrayState) {
     sync_meter_timer(app, tray_state);
-    // HOTKEY_PRESETS lists the presets in evdev mode order.
-    let configured = crate::hotkey_to_evdev_mode(&tray_state.current_hotkey);
-    for (mode, (preset, item)) in (0u8..).zip(&tray_state.hotkey_items) {
-        let mark = if mode == configured { '✓' } else { ' ' };
-        let _ = item.set_text(format!("{mark} {preset}"));
+    let current = crate::Preset::of(&tray_state.current_hotkey);
+    for (preset, item) in &tray_state.hotkey_items {
+        let mark = if current == Some(*preset) { '✓' } else { ' ' };
+        let _ = item.set_text(format!("{mark} {}", preset.label()));
     }
     let presentation = derive_tray_presentation(&tray_state.runtime);
     // Even equivalent presentation updates carry a new action token to Shell.
@@ -724,14 +722,7 @@ pub fn panel_snapshot(app: &tauri::AppHandle) -> Option<serde_json::Value> {
 /// Wayland evdev also observes, so the focused application never receives them.
 #[cfg(target_os = "linux")]
 fn panel_accelerator(wayland: bool, hotkey: &str) -> Option<&'static str> {
-    if !wayland {
-        return None;
-    }
-    match crate::hotkey_to_evdev_mode(hotkey) {
-        0 => Some("<Alt>d"),
-        1 => Some("<Alt><Shift>d"),
-        _ => None,
-    }
+    crate::wayland_preset(wayland, hotkey).map(crate::Preset::accelerator)
 }
 
 #[cfg(target_os = "linux")]
@@ -1156,15 +1147,6 @@ mod tests {
         assert!(!presentation.popover_enabled);
         assert!(!presentation.settings_enabled);
         assert!(!presentation.hotkey_menu_enabled);
-    }
-
-    #[test]
-    fn hotkey_preset_checkmarks_follow_the_configured_evdev_mode() {
-        // A preset's position is the mode its check mark matches.
-        for (mode, preset) in (0u8..).zip(HOTKEY_PRESETS) {
-            assert_eq!(crate::hotkey_to_evdev_mode(preset), mode, "{preset}");
-        }
-        assert_eq!(crate::hotkey_to_evdev_mode("not a shortcut"), 255);
     }
 
     #[test]

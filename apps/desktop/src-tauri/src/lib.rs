@@ -59,7 +59,7 @@ use config::{
 };
 use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
-use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, AtomicU8, Ordering};
 use std::sync::{LazyLock, Mutex};
 use std::time::Instant;
 use tauri::{Emitter, Manager};
@@ -72,8 +72,8 @@ static RENDERER_EPOCH: AtomicU64 = AtomicU64::new(1);
 // without eating legitimate quick user toggles.
 static LAST_TOGGLE_MS: AtomicI64 = AtomicI64::new(-1);
 
-// Evdev hotkey mode: 0 = Alt+D, 1 = Alt+Shift+D, 255 = custom (disabled)
-static EVDEV_HOTKEY_MODE: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
+// The evdev listener's preset, encoded by `Preset::encode`; a custom shortcut disables it.
+static EVDEV_PRESET: AtomicU8 = AtomicU8::new(Preset::AltD as u8);
 static USE_EVDEV_HOTKEY: AtomicBool = AtomicBool::new(false);
 static SHORTCUT_OBSERVATIONS: LazyLock<shortcut_readiness::Observations> =
     LazyLock::new(shortcut_readiness::Observations::default);
@@ -365,23 +365,66 @@ fn has_pending_hotkey_toggle() -> bool {
         .unwrap_or(false)
 }
 
-fn hotkey_to_evdev_mode(hotkey: &str) -> u8 {
-    let Ok(shortcut) = hotkey.parse::<tauri_plugin_global_shortcut::Shortcut>() else {
-        return 255;
-    };
-    if "Alt+D"
-        .parse::<tauri_plugin_global_shortcut::Shortcut>()
-        .is_ok_and(|candidate| candidate == shortcut)
-    {
-        0
-    } else if "Alt+Shift+D"
-        .parse::<tauri_plugin_global_shortcut::Shortcut>()
-        .is_ok_and(|candidate| candidate == shortcut)
-    {
-        1
-    } else {
-        255
+/// The two shortcuts passive Wayland evdev observes and the GNOME companion grabs,
+/// in tray menu order. Every other shortcut is custom.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Preset {
+    AltD,
+    AltShiftD,
+}
+
+impl Preset {
+    const ALL: [Self; 2] = [Self::AltD, Self::AltShiftD];
+
+    /// The preset a shortcut names, in any spelling the parser accepts.
+    fn of(hotkey: &str) -> Option<Self> {
+        let shortcut = hotkey
+            .parse::<tauri_plugin_global_shortcut::Shortcut>()
+            .ok()?;
+        Self::ALL.into_iter().find(|preset| {
+            preset
+                .label()
+                .parse::<tauri_plugin_global_shortcut::Shortcut>()
+                .is_ok_and(|candidate| candidate == shortcut)
+        })
     }
+
+    fn label(self) -> &'static str {
+        match self {
+            Self::AltD => "Alt+D",
+            Self::AltShiftD => "Alt+Shift+D",
+        }
+    }
+
+    /// The GTK accelerator the companion grabs.
+    #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+    fn accelerator(self) -> &'static str {
+        match self {
+            Self::AltD => "<Alt>d",
+            Self::AltShiftD => "<Alt><Shift>d",
+        }
+    }
+
+    /// Whether the chord holds Shift; evdev matches the Shift state exactly.
+    #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+    fn shift(self) -> bool {
+        self == Self::AltShiftD
+    }
+
+    /// A preset is stored as its position in ALL; anything else means custom.
+    fn encode(preset: Option<Self>) -> u8 {
+        preset.map_or(u8::MAX, |preset| preset as u8)
+    }
+
+    fn decode(value: u8) -> Option<Self> {
+        Self::ALL.get(usize::from(value)).copied()
+    }
+}
+
+/// Read at every use: a shortcut change takes effect without restarting the
+/// evdev device workers.
+fn evdev_preset() -> Option<Preset> {
+    Preset::decode(EVDEV_PRESET.load(Ordering::SeqCst))
 }
 
 fn is_wayland_session() -> bool {
@@ -390,8 +433,10 @@ fn is_wayland_session() -> bool {
         .unwrap_or(false)
 }
 
-fn prefers_evdev_hotkey(session_is_wayland: bool, hotkey: &str) -> bool {
-    session_is_wayland && hotkey_to_evdev_mode(hotkey) != 255
+/// On Wayland, the preset passive evdev observes and the companion grabs. X11's
+/// grab already consumes every valid shortcut.
+fn wayland_preset(session_is_wayland: bool, hotkey: &str) -> Option<Preset> {
+    Preset::of(hotkey).filter(|_| session_is_wayland)
 }
 
 fn validate_dictation_hotkey(hotkey: &str) -> Result<(), String> {
@@ -651,21 +696,12 @@ fn get_desktop_paste_status() -> insertion::DesktopPasteStatus {
 
 fn stop_shortcut_setup_issue(app: &tauri::AppHandle) -> Option<String> {
     let hotkey = tray::current_hotkey(app).unwrap_or_else(|_| "Alt+D".into());
-    let session_type = std::env::var("XDG_SESSION_TYPE").unwrap_or_default();
-    if prefers_evdev_hotkey(session_type.eq_ignore_ascii_case("wayland"), &hotkey) {
-        let chord = if hotkey_to_evdev_mode(&hotkey) == 0 {
-            "Alt+D"
-        } else {
-            "Alt+Shift+D"
-        };
-        return panel_setup::stop_shortcut_setup_detail(
-            &session_type,
-            chord,
-            panel_setup::cached_check(),
-            panel::is_attached(),
-        );
-    }
-    None
+    let preset = wayland_preset(is_wayland_session(), &hotkey)?;
+    panel_setup::stop_shortcut_setup_detail(
+        preset.label(),
+        panel_setup::cached_check(),
+        panel::is_attached(),
+    )
 }
 
 #[tauri::command(async)]
@@ -768,7 +804,7 @@ fn shortcut_runtime_status(
         return unknown();
     };
     let now = shortcut_monotonic_ms();
-    let evdev_mode = EVDEV_HOTKEY_MODE.load(Ordering::SeqCst);
+    let evdev_preset = evdev_preset();
     SHORTCUT_OBSERVATIONS.status(shortcut_readiness::Snapshot {
         hotkey: &config.hotkey,
         revision: CONFIG_REVISION.load(Ordering::SeqCst),
@@ -781,9 +817,9 @@ fn shortcut_runtime_status(
         consuming_lease: IBUS_SHORTCUT_LEASE.has_authority(now),
         plugin_hotkey: plugin.as_deref(),
         use_evdev: USE_EVDEV_HOTKEY.load(Ordering::SeqCst),
-        evdev_mode,
-        evdev_keyboards: evdev_keyboards_for(evdev_mode),
-        configured_evdev_mode: hotkey_to_evdev_mode(&config.hotkey),
+        evdev_preset,
+        evdev_keyboards: evdev_preset.and_then(evdev_keyboards_for),
+        configured_preset: Preset::of(&config.hotkey),
         bridge_available,
         panel_reserved,
     })
@@ -1346,7 +1382,7 @@ fn sync_global_shortcut_binding(
 
 fn apply_hotkey_runtime_state(app: &tauri::AppHandle, new_hotkey: &str) -> Result<(), String> {
     let session_is_wayland = is_wayland_session();
-    let use_evdev_hotkey = prefers_evdev_hotkey(session_is_wayland, new_hotkey);
+    let use_evdev_hotkey = wayland_preset(session_is_wayland, new_hotkey).is_some();
 
     #[cfg(target_os = "linux")]
     if use_evdev_hotkey {
@@ -1360,7 +1396,7 @@ fn apply_hotkey_runtime_state(app: &tauri::AppHandle, new_hotkey: &str) -> Resul
     sync_global_shortcut_binding(app, new_hotkey, enable_plugin)?;
 
     USE_EVDEV_HOTKEY.store(use_evdev_hotkey, Ordering::SeqCst);
-    EVDEV_HOTKEY_MODE.store(hotkey_to_evdev_mode(new_hotkey), Ordering::SeqCst);
+    EVDEV_PRESET.store(Preset::encode(Preset::of(new_hotkey)), Ordering::SeqCst);
 
     tray::update_hotkey_display(app, new_hotkey);
     info!("Hotkey changed to {new_hotkey}");
@@ -1623,11 +1659,7 @@ fn spawn_evdev_device_worker(app_handle: tauri::AppHandle, path: std::path::Path
                 match events {
                     Ok(events) => {
                         let (toggles, synchronize_after_batch) = match EVDEV_KEYS.lock() {
-                            Ok(mut state) => state.batch(
-                                &path,
-                                &events,
-                                EVDEV_HOTKEY_MODE.load(Ordering::SeqCst),
-                            ),
+                            Ok(mut state) => state.batch(&path, &events, evdev_preset()),
                             Err(_) => {
                                 error!("Failed to lock evdev keyboard state");
                                 return;
@@ -1773,15 +1805,15 @@ pub(crate) fn evdev_modifiers_held() -> Option<bool> {
     None
 }
 
-/// Open, synchronized keyboards that can type an evdev mode's chord; None when
-/// the key state is unavailable.
+/// Open, synchronized keyboards that can type a preset's chord; None when the
+/// key state is unavailable.
 #[cfg(target_os = "linux")]
-fn evdev_keyboards_for(evdev_mode: u8) -> Option<usize> {
-    Some(EVDEV_KEYS.lock().ok()?.keyboards_for(evdev_mode))
+fn evdev_keyboards_for(preset: Preset) -> Option<usize> {
+    Some(EVDEV_KEYS.lock().ok()?.keyboards_for(preset))
 }
 
 #[cfg(not(target_os = "linux"))]
-fn evdev_keyboards_for(_evdev_mode: u8) -> Option<usize> {
+fn evdev_keyboards_for(_preset: Preset) -> Option<usize> {
     Some(0)
 }
 
@@ -1820,10 +1852,11 @@ fn ensure_evdev_hotkey_listener(app_handle: &tauri::AppHandle) {
 
 #[cfg(target_os = "linux")]
 fn notify_unreachable_shortcut(app: &tauri::AppHandle) {
-    let mode = EVDEV_HOTKEY_MODE.load(Ordering::SeqCst);
+    let Some(preset) = evdev_preset() else {
+        return;
+    };
     let unreachable = USE_EVDEV_HOTKEY.load(Ordering::SeqCst)
-        && mode <= 1
-        && evdev_keyboards_for(mode) == Some(0)
+        && evdev_keyboards_for(preset) == Some(0)
         && !panel::is_attached()
         && !app
             .state::<ibus_shortcut::IbusShortcutService>()
@@ -1832,9 +1865,8 @@ fn notify_unreachable_shortcut(app: &tauri::AppHandle) {
     if !unreachable {
         return;
     }
-    let hotkey = if mode == 0 { "Alt+D" } else { "Alt+Shift+D" };
     if let Some(detail) =
-        panel_setup::unreachable_shortcut_detail(hotkey, panel_setup::cached_check(), false)
+        panel_setup::unreachable_shortcut_detail(preset.label(), panel_setup::cached_check(), false)
     {
         send_notification("Your shortcut can't reach VOCO yet", &detail);
     }
@@ -2067,9 +2099,9 @@ pub fn run() -> Result<(), String> {
             let configured_hotkey = configured_hotkey();
             let hotkey = configured_hotkey.hotkey;
             let app_handle = app.handle().clone();
-            EVDEV_HOTKEY_MODE.store(hotkey_to_evdev_mode(&hotkey), Ordering::SeqCst);
+            EVDEV_PRESET.store(Preset::encode(Preset::of(&hotkey)), Ordering::SeqCst);
             let wayland_session = is_wayland_session();
-            let use_evdev_hotkey = prefers_evdev_hotkey(wayland_session, &hotkey);
+            let use_evdev_hotkey = wayland_preset(wayland_session, &hotkey).is_some();
             USE_EVDEV_HOTKEY.store(use_evdev_hotkey, Ordering::SeqCst);
             trace_hotkey_event(
                 "hotkey_backend_selected",
@@ -2336,12 +2368,35 @@ mod tests {
     }
 
     #[test]
-    fn hotkey_modes() {
-        assert_eq!(hotkey_to_evdev_mode("Alt+D"), 0);
-        assert_eq!(hotkey_to_evdev_mode("Alt+Shift+D"), 1);
-        assert_eq!(hotkey_to_evdev_mode("alt + d"), 0);
-        assert_eq!(hotkey_to_evdev_mode("SHIFT+ALT+KEYD"), 1);
-        assert_eq!(hotkey_to_evdev_mode("Ctrl+Shift+V"), 255);
+    fn hotkey_presets() {
+        assert_eq!(Preset::of("Alt+D"), Some(Preset::AltD));
+        assert_eq!(Preset::of("Alt+Shift+D"), Some(Preset::AltShiftD));
+        assert_eq!(Preset::of("alt + d"), Some(Preset::AltD));
+        assert_eq!(Preset::of("SHIFT+ALT+KEYD"), Some(Preset::AltShiftD));
+        assert_eq!(Preset::of("Ctrl+Shift+V"), None);
+        assert_eq!(Preset::of("not a shortcut"), None);
+    }
+
+    #[test]
+    fn presets_keep_their_labels_accelerators_and_shift_state() {
+        let pinned = [
+            (Preset::AltD, "Alt+D", "<Alt>d", false),
+            (Preset::AltShiftD, "Alt+Shift+D", "<Alt><Shift>d", true),
+        ];
+        assert_eq!(Preset::ALL, pinned.map(|(preset, ..)| preset));
+        for (preset, label, accelerator, shift) in pinned {
+            assert_eq!(
+                (preset.label(), preset.accelerator(), preset.shift()),
+                (label, accelerator, shift)
+            );
+            assert_eq!(Preset::of(label), Some(preset));
+        }
+        for preset in [None, Some(Preset::AltD), Some(Preset::AltShiftD)] {
+            assert_eq!(Preset::decode(Preset::encode(preset)), preset);
+        }
+        assert_eq!(Preset::encode(Some(Preset::AltD)), 0);
+        assert_eq!(Preset::decode(2), None);
+        assert_eq!(Preset::decode(u8::MAX), None);
     }
 
     #[test]
@@ -2425,17 +2480,19 @@ mod tests {
 
     #[test]
     fn evdev_hotkey_backend_only_handles_supported_wayland_shortcuts() {
-        assert!(prefers_evdev_hotkey(true, "Alt+D"));
-        assert!(prefers_evdev_hotkey(true, "Alt+Shift+D"));
-        assert!(!prefers_evdev_hotkey(true, "Ctrl+Shift+V"));
-        assert!(!prefers_evdev_hotkey(false, "Alt+D"));
+        assert_eq!(wayland_preset(true, "Alt+D"), Some(Preset::AltD));
+        assert_eq!(wayland_preset(true, "Alt+Shift+D"), Some(Preset::AltShiftD));
+        assert_eq!(wayland_preset(true, "Ctrl+Shift+V"), None);
+        assert_eq!(wayland_preset(true, "Control+Space"), None);
+        assert_eq!(wayland_preset(false, "Alt+D"), None);
+        assert_eq!(wayland_preset(false, "Alt+Shift+D"), None);
     }
 
     #[test]
     fn the_x11_grab_registers_only_outside_wayland() {
         let backends = |wayland, hotkey| {
             (
-                prefers_evdev_hotkey(wayland, hotkey),
+                wayland_preset(wayland, hotkey).is_some(),
                 should_register_shortcut_fallback(wayland, false),
             )
         };

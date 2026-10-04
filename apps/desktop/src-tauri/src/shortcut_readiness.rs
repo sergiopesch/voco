@@ -1,5 +1,6 @@
 //! Observations only: none of these methods registers, arms, or admits a shortcut.
 use crate::shortcut_arbitration::{PollOutcome, ENGINE_ARM_MS};
+use crate::Preset;
 use serde::Serialize;
 use std::sync::Mutex;
 
@@ -32,10 +33,12 @@ pub(crate) struct Snapshot<'a> {
     pub consuming_lease: bool,
     pub plugin_hotkey: Option<&'a str>,
     pub use_evdev: bool,
-    pub evdev_mode: u8,
-    /// Keyboards that can type the `evdev_mode` chord; None when unknown.
+    /// The evdev listener's preset; None for a custom shortcut.
+    pub evdev_preset: Option<Preset>,
+    /// Keyboards that can type the `evdev_preset` chord; None when unknown or
+    /// without a preset.
     pub evdev_keyboards: Option<usize>,
-    pub configured_evdev_mode: u8,
+    pub configured_preset: Option<Preset>,
     pub bridge_available: bool,
     pub panel_reserved: bool,
 }
@@ -132,8 +135,8 @@ impl Observations {
             );
         }
         if snapshot.use_evdev
-            && snapshot.evdev_mode <= 1
-            && snapshot.evdev_mode == snapshot.configured_evdev_mode
+            && snapshot.evdev_preset.is_some()
+            && snapshot.evdev_preset == snapshot.configured_preset
         {
             match snapshot.evdev_keyboards {
                 Some(0) => {}
@@ -180,9 +183,9 @@ mod tests {
             consuming_lease: false,
             plugin_hotkey: None,
             use_evdev: true,
-            evdev_mode: 0,
+            evdev_preset: Some(Preset::AltD),
             evdev_keyboards: Some(0),
-            configured_evdev_mode: 0,
+            configured_preset: Some(Preset::AltD),
             bridge_available: false,
             panel_reserved: false,
         }
@@ -215,7 +218,7 @@ mod tests {
         let mut s = snapshot();
         s.evdev_keyboards = Some(1);
         s.hotkey = "Alt+Shift+D";
-        s.configured_evdev_mode = 1;
+        s.configured_preset = Some(Preset::AltShiftD);
         assert_eq!(o.status(s).state, "unavailable");
     }
     #[test]
