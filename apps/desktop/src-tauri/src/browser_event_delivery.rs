@@ -83,8 +83,6 @@ mod tests {
     fn trigger(token: &str, action: &str) -> BrowserTrigger {
         BrowserTrigger {
             trigger_id: format!("browser:{token}"),
-            mode: "dictation".into(),
-            provider: "chromium".into(),
             action: action.into(),
         }
     }

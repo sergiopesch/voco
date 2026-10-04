@@ -19,8 +19,6 @@ const RECEIPT_TIMEOUT: Duration = Duration::from_secs(2);
 #[serde(rename_all = "camelCase")]
 pub struct BrowserTrigger {
     pub trigger_id: String,
-    pub mode: String,
-    pub provider: String,
     pub action: String,
 }
 #[derive(Debug, Clone, Default, Serialize)]
@@ -595,8 +593,6 @@ fn disconnect(
         // The connection is gone, but each unreleased token still owns its Stop.
         let _ = callback(BrowserTrigger {
             trigger_id: format!("browser:{token}"),
-            mode: "dictation".into(),
-            provider: "chromium".into(),
             action: "stop".into(),
         });
     }
@@ -639,8 +635,6 @@ fn receive(
             }
             let event = BrowserTrigger {
                 trigger_id: format!("browser:{token}"),
-                mode,
-                provider: "chromium".into(),
                 action: "start".into(),
             };
             state.last_trigger = Some((token.clone(), document_id.clone(), false));
@@ -671,12 +665,11 @@ fn receive(
                 {
                     *stopped = true;
                 }
-            } else if let Some((last_token, last_document, stopped)) = state
+            } else if let Some((_, _, stopped)) = state
                 .last_trigger
                 .as_mut()
                 .filter(|(t, d, _)| t == &token && d == &document_id)
             {
-                let _ = (last_token, last_document);
                 if *stopped {
                     return Ok(None);
                 }
@@ -688,8 +681,6 @@ fn receive(
             }
             Ok(Some(BrowserTrigger {
                 trigger_id: format!("browser:{token}"),
-                mode: "dictation".into(),
-                provider: "chromium".into(),
                 action: "stop".into(),
             }))
         }
@@ -1015,6 +1006,20 @@ mod tests {
         assert_eq!(read(&mut browser)["type"], "cancel");
         assert!(broker.start(7, &id).is_err());
         assert!(broker.get_status().available);
+    }
+    #[test]
+    fn trigger_for_another_mode_closes_the_connection_without_a_start() {
+        let (broker, mut browser, rx) = fixture();
+        send(&mut browser, &json!({"protocol":1,"type":"trigger","token":"a".repeat(48),"documentId":"b".repeat(48),"mode":"other"})).unwrap();
+        assert!(protocol::read_frame(&mut browser).is_err());
+        for _ in 0..100 {
+            if !broker.get_status().available {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        assert!(!broker.get_status().available);
+        assert!(rx.try_recv().is_err());
     }
     #[test]
     fn competing_new_tab_is_canceled_without_revoking_active_owner() {

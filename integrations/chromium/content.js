@@ -64,7 +64,7 @@
       claimed: false, invalid: false, finished: false, committed: 0, bytes: 0, next: 0, journal: new Map()};
     // Observe before asynchronous claim/start work, and only while this field can receive text.
     observer.observe(document, {subtree: true, childList: true, attributes: true, attributeFilter: ['type', 'readonly', 'disabled', 'autocomplete', 'data-voco-private', 'inert']});
-    send({type: 'trigger', token: session.token, mode: 'dictation'});
+    send({type: 'trigger', token: session.token});
   }, true);
   chrome.runtime.onMessage.addListener((message, _sender, respond) => {
     if (message.type === 'arm') { armed = true; respond({documentId}); return; }
