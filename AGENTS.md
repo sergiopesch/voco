@@ -249,7 +249,9 @@ change.
   shared ones no dependency creates, declares no weak dependencies or
   configuration files, and keeps automatic requires and provides off for the
   private speech runtime. `check-devops.sh` checks the spec and the mapping, and
-  `verify-rpm-package.sh` the built package.
+  `verify-rpm-package.sh` the built package. CI's Debian 13 and Fedora 44 jobs
+  install the dependencies by those names (`scripts/distro-dependencies.py`) and
+  run the speech runtime there; hosted CI never builds a package.
 
 ## Working practices
 

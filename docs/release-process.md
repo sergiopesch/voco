@@ -167,7 +167,11 @@ and push to `master`, with read-only permissions, actions pinned to commit SHAs
 and checkouts that keep no credentials. Its Application job runs the release
 executables in isolated desktops, as [Testing](testing/README.md) describes. The
 signing computer rebuilds them from the same commit, so the released files
-aren't byte-identical to the ones CI ran; the validation record says so.
+aren't byte-identical to the ones CI ran; the validation record says so. Its
+GNOME 50 Companion job runs the companion on Ubuntu 26.04, and its Debian 13 and
+Fedora 44 Runtime jobs install the packages' dependencies by those systems'
+names and run the speech runtime there. No job builds a package, and the
+assembler requires every job to have passed.
 
 `npm run verify:devops` runs `scripts/check-devops.sh`, which fails when another
 workflow file appears or when `ci.yml` mentions `package-nvidia.py`,

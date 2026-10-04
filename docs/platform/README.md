@@ -32,14 +32,17 @@ system and GNOME version it ran on.
 | Evidence | What runs | Where |
 | --- | --- | --- |
 | Source and package checks | Unit tests; the package scripts' tests; the installer's APT and DNF steps against stand-in package managers; the package verifiers | Hosted CI on Ubuntu 24.04, for every change. For each release, both verifiers run on the signing computer, the RPM's against the Debian package. |
-| Isolated desktop sessions | The app, the GNOME companion and real apps in private Xvfb, headless Weston and nested GNOME Shell 46 sessions, with synthetic audio and no input devices | Hosted CI on Ubuntu 24.04. The companion's harness also runs GNOME 48 nested and GNOME 50 headless on a computer that has them. |
+| Dependencies and speech runtime | VOCO's package dependencies, installed by the system's own package names, then the speech runtime, IBus and worker protocol tests and the Nemotron accuracy baseline on that system's Python | Hosted CI, in Debian 13 and Fedora 44 containers, for every change. No package is built or installed there. |
+| Isolated desktop sessions | The app, the GNOME companion and real apps in private Xvfb, headless Weston and GNOME Shell sessions, with synthetic audio | Hosted CI, for every change: nested GNOME 46 on Ubuntu 24.04, and the companion on headless GNOME 50 on Ubuntu 26.04. The companion's harness also runs GNOME 48 nested on a computer that has it. |
 | Native installation | Installing the package with APT or DNF, then `voco --check-desktop-input`. On Fedora 44 also the speech worker and removal, with SELinux enforcing; none of these steps raises a denial. | For each release, the Debian package on the signing computer and the RPM on Fedora 44 |
 | Physical audio and real sessions | The [manual acceptance](../testing/README.md#manual-acceptance) check: a physical microphone, dictation into real apps, the tray or the panel | A Linux desktop, before each release |
 
-Isolated sessions have no input devices, so only a real computer exercises
-VOCO's virtual keyboard on `/dev/uinput`. Each release's validation record,
-`voco_<version>_validation.json`, lists the checks that release passed and what
-they don't cover. [Testing](../testing/README.md) describes the suites.
+In CI, the GNOME Wayland delivery suites paste through VOCO's real virtual
+keyboard: the [uinput bridge](../testing/README.md#the-uinput-bridge) replays its
+keys into the private session, so none reach a real desktop. Each release's
+validation record, `voco_<version>_validation.json`, lists the checks that
+release passed and what they don't cover. [Testing](../testing/README.md)
+describes the suites.
 
 ## Requirements
 
@@ -230,6 +233,8 @@ polling, and keeps watching when none is readable at startup.
   needs an AppIndicator extension. Debian 13 and Fedora 44 don't turn one on.
 - Automated tests use synthetic audio in private X11, Wayland, GNOME and
   Chromium sessions, not physical microphones, other desktops or other apps.
-  Hosted CI runs them only on Ubuntu 24.04 with GNOME 46.
+  Hosted CI runs the desktop suites on Ubuntu 24.04 with GNOME 46, and only the
+  companion on GNOME 50. On Debian 13 and Fedora 44 it checks the dependencies
+  and the speech runtime, not a desktop.
 - The RPM carries no OpenPGP signature of its own; the release's signed checksum
   lists authenticate it, as [Install VOCO](../install.md#fedora) shows.

@@ -250,6 +250,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `check-devops.sh`, `check-shell-syntax.sh`, `check-version-consistency.mjs` — Repository, shell and version checks.
 - `verify-deb-package.sh`, `verify-speech-payload.py` — Package contents.
 - `verify-rpm-package.sh` — The RPM's contents and policy; given the Debian package, it also proves that both carry the same files and dependencies.
+- `distro-dependencies.py` — Prints the packages' dependencies by Debian or Fedora names, for CI's Debian 13 and Fedora 44 runtime jobs.
 - `verify-speech-engine.py` — Checks that shipping source and dependency metadata don't reference the retired Whisper recognizer.
 - `verify-glib-backport.py`, `verify-shortcut-backport.py`, `verify-tray-backport.py` — Vendored crate provenance and resolution.
 - `verify-native-capture-audit.py` — Checks a capture audit bundle.

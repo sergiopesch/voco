@@ -106,7 +106,10 @@ the folder as documentation.
 GTK and AppIndicator libraries itself. `DEBIAN_TO_FEDORA` in
 `scripts/rpm_package.py` names the Fedora 44 package that provides the same
 files for each one, and `packaging/rpm/voco.spec.in` requires exactly those;
-`npm run verify:devops` fails when the three disagree.
+`npm run verify:devops` fails when the three disagree. CI installs both lists,
+which `scripts/distro-dependencies.py` prints by Debian or Fedora names, in
+Debian 13 and Fedora 44 containers, so a renamed or missing package fails there
+before a release does.
 
 Neither package recommends anything. VOCO presses the Wayland paste keys through
 its own virtual keyboard, so the helpers that either session needs are all
