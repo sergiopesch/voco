@@ -8,6 +8,9 @@ UUID = 'voco-panel@voco.local'
 # Bump with behavior changes that require reloading the running Shell companion.
 COMPANION_VERSION = 15
 PACKAGE = Path('/usr/share/gnome-shell/extensions') / UUID
+# Every runtime file of the companion, as packaged; scripts/test-panel-setup.py
+# compares it with the source directory and the Debian file map.
+FILES = ('extension.js', 'metadata.json', 'model.js', 'stylesheet.css', 'voco-symbol.png')
 
 
 def result(status, detail, can_enable=False):
@@ -56,8 +59,7 @@ def check(enable=False):
     info = {key: value.unpack() if isinstance(value, GLib.Variant) else value for key, value in info.items()}
     settings = Gio.Settings.new('org.gnome.shell')
     enabled = list(settings.get_strv('enabled-extensions'))
-    installed = all((PACKAGE / name).is_file() for name in
-                    ('metadata.json', 'extension.js', 'model.js', 'stylesheet.css', 'voco-symbol.png'))
+    installed = all((PACKAGE / name).is_file() for name in FILES)
     status = classify(version, installed, info, UUID in enabled,
                       settings.get_boolean('disable-user-extensions'))
     if enable and status['canEnable']:

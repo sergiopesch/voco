@@ -17,6 +17,11 @@ SIGNED_SIGNATURE = ROOT / 'tests/fixtures/installer/voco.2026.0.54_checksums.txt
 spec = importlib.util.spec_from_file_location('performance', ROOT / 'scripts/test-install-performance.py')
 fixture = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(fixture)
+spec = importlib.util.spec_from_file_location('panel_setup', ROOT / 'apps/desktop/src-tauri/resources/voco_gnome_panel.py')
+panel = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(panel)
+# The installer matches what `voco --setup-panel` prints after enabling the panel.
+PANEL_ENABLED = panel.classify('46.0', True, {}, True, False)['detail']
 
 
 def visible_terminal(data, width=80):
@@ -168,7 +173,7 @@ voco_ui_close
               VOCO_INPUT_ERROR="VOCO can't open /dev/uinput, so it can't send the paste keys."
               [[ "$FIXTURE_INSTALL_CASE" != readiness-failure ]]
             }
-            fixture_panel() { printf 'Panel enabled. Sign out and back in to load it; saving your work first is recommended.\n'; return 1; }
+            fixture_panel() { printf '%s\n' "$FIXTURE_PANEL_DETAIL"; return 1; }
             voco_launch_installed_app() {
               printf 'launch\n' >> "$FIXTURE_LAUNCH_CALL"
               case "$FIXTURE_LAUNCH_CASE" in
@@ -187,7 +192,7 @@ voco_ui_close
                    'FIXTURE_MANIFEST': str(SIGNED_MANIFEST), 'FIXTURE_PACKAGE': str(ROOT / 'KEYS'),
                    'FIXTURE_APT_CALL': str(root / 'apt-called'), 'FIXTURE_LAUNCH_CALL': str(root / 'launch-called'),
                    'FIXTURE_MANAGER': manager, 'FIXTURE_DNF_CALL': str(root / 'dnf-called'),
-                   'FIXTURE_PACKAGE_URL': str(root / 'package-url')}
+                   'FIXTURE_PACKAGE_URL': str(root / 'package-url'), 'FIXTURE_PANEL_DETAIL': PANEL_ENABLED}
             env.pop('NO_COLOR', None)
             if mode == 'plain':
                 env['VOCO_INSTALL_PLAIN'] = '1'
@@ -241,6 +246,9 @@ voco_ui_close
             self.assertNotIn('[1/3]', screen)
             self.assertIn("Installed. Let's try your voice.", screen)
             self.assertIn('sign out', screen.lower())
+            # The installer's own note, not the generic warning for other setup results.
+            self.assertIn('Panel: sign out', screen)
+            self.assertNotIn('check again', screen)
             self.assertIn('Alt+D', screen)
             if launch_case == 'started':
                 self.assertIn('Opening VOCO', screen)

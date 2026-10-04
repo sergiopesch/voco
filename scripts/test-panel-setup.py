@@ -49,11 +49,17 @@ class PanelSetupTests(unittest.TestCase):
 
     def test_debian_maps_every_runtime_extension_file(self):
         import json
+        import subprocess
+        source = f'integrations/gnome/{panel.UUID}/'
+        tracked = subprocess.check_output(['git', 'ls-files', '-z', '--', source], cwd=ROOT).decode()
+        self.assertEqual(sorted(name.removeprefix(source) for name in tracked.split('\0') if name), sorted(panel.FILES))
         config = json.loads((ROOT / 'apps/desktop/src-tauri/tauri.conf.json').read_text())
         files = config['bundle']['linux']['deb']['files']
-        for name in ['extension.js', 'metadata.json', 'model.js', 'stylesheet.css', 'voco-symbol.png']:
-            target = f'/usr/share/gnome-shell/extensions/{panel.UUID}/{name}'
-            self.assertEqual((ROOT / 'apps/desktop/src-tauri' / files[target]).resolve(),
+        installed = f'/usr/share/gnome-shell/extensions/{panel.UUID}/'
+        self.assertEqual(sorted(target.removeprefix(installed) for target in files if target.startswith(installed)),
+                         sorted(panel.FILES))
+        for name in panel.FILES:
+            self.assertEqual((ROOT / 'apps/desktop/src-tauri' / files[installed + name]).resolve(),
                              ROOT / 'integrations/gnome' / panel.UUID / name)
 
 
