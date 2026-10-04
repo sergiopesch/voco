@@ -2252,7 +2252,7 @@ pub fn run() -> Result<(), String> {
             Ok(())
         })
         .build(tauri::generate_context!())
-        .expect("error while building tauri application")
+        .map_err(|error| error.to_string())?
         .run(|app, event| {
             if let tauri::RunEvent::Exit = event {
                 crash_recovery::clean_exit();
