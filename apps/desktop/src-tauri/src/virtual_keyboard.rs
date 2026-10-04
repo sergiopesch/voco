@@ -7,12 +7,16 @@
 //!
 //! The package's udev rule gives the user of the active local session write
 //! access to `/dev/uinput`; nothing else is needed: no daemon, socket or group.
+//! A uinput device types into whichever session is active on the seat, so keys
+//! are sent only while this user's graphical session is the active one.
 
 use std::sync::{Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
 use evdev::uinput::VirtualDevice;
 use evdev::{AttributeSet, BusType, EventType, InputEvent, InputId, KeyCode};
+use glib::variant::{ObjectPath, ToVariant};
+use webkit2gtk::gio;
 
 pub const DEVICE_NAME: &str = "VOCO virtual keyboard";
 /// Each event gets its own report this far apart, so every toolkit sees the
@@ -71,6 +75,53 @@ pub fn ensure() -> Result<(), String> {
     Ok(())
 }
 
+pub const INACTIVE_SESSION: &str =
+    "This desktop session isn't the active one, so VOCO sent no paste keys.";
+
+/// Whether logind reports this user's graphical session as in the background.
+/// Unknown state, such as no logind or no graphical session, never blocks.
+fn session_in_background() -> bool {
+    let Ok(bus) = gio::bus_get_sync(gio::BusType::System, gio::Cancellable::NONE) else {
+        return false;
+    };
+    let property = |path: &str, interface: &str, name: &str| {
+        bus.call_sync(
+            Some("org.freedesktop.login1"),
+            path,
+            "org.freedesktop.DBus.Properties",
+            "Get",
+            Some(&(interface, name).to_variant()),
+            None,
+            gio::DBusCallFlags::NONE,
+            250,
+            gio::Cancellable::NONE,
+        )
+        .ok()
+        .and_then(|reply| reply.get::<(glib::Variant,)>())
+        .map(|(value,)| value)
+    };
+    let Some((_, session)) = property(
+        "/org/freedesktop/login1/user/self",
+        "org.freedesktop.login1.User",
+        "Display",
+    )
+    .and_then(|display| display.get::<(String, ObjectPath)>()) else {
+        return false;
+    };
+    property(session.as_str(), "org.freedesktop.login1.Session", "Active")
+        .and_then(|active| active.get::<bool>())
+        == Some(false)
+}
+
+/// Refuse paste keys while another session owns the seat's input.
+pub fn require_active_session() -> Result<(), String> {
+    if session_in_background() {
+        Err(INACTIVE_SESSION.into())
+    } else {
+        Ok(())
+    }
+}
+
 /// Whether this login may create input devices, without creating one. For
 /// processes that only check setup, such as `voco --check-desktop-input`.
 pub fn check_access() -> Result<(), String> {
@@ -114,6 +165,9 @@ pub fn paste(leading_space: bool) -> Result<(), String> {
     if !young.is_zero() {
         std::thread::sleep(young);
     }
+    // Checked again after the copy and the modifier wait: the session may
+    // have switched since the caller's check.
+    require_active_session()?;
     for (index, (key, value)) in paste_steps(leading_space).into_iter().enumerate() {
         if index > 0 {
             std::thread::sleep(KEY_GAP);

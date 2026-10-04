@@ -467,6 +467,7 @@ fn command_available(command: &str) -> bool {
 
 #[cfg(target_os = "linux")]
 fn ensure_virtual_keyboard() -> Result<(), String> {
+    crate::virtual_keyboard::require_active_session()?;
     crate::virtual_keyboard::ensure()
 }
 
