@@ -966,8 +966,13 @@ fn grant_webview_permissions(app: &tauri::App) {
 
 // --- Bundled speech-runtime readiness ---
 
+/// Help's desktop setup link. The renderer and the installer carry the same URL,
+/// and its anchor names a heading of docs/platform/README.md; a test checks both.
+const DESKTOP_SETUP_GUIDE: &str =
+    "https://github.com/sergiopesch/voco/blob/master/docs/platform/README.md#wayland-paste-keys";
+
 fn is_allowed_external_url(url: &str) -> bool {
-    url == "https://github.com/sergiopesch/voco/blob/master/docs/platform/README.md#wayland-paste-keys"
+    url == DESKTOP_SETUP_GUIDE
         || url
             .strip_prefix("https://github.com/sergiopesch/voco/releases/tag/")
             .is_some_and(|tag| !tag.is_empty() && !tag.contains(['\r', '\n', '\\']))
@@ -2218,9 +2223,7 @@ mod tests {
 
     #[test]
     fn external_url_allowlist_accepts_voco_releases_and_exact_setup_guide() {
-        assert!(is_allowed_external_url(
-            "https://github.com/sergiopesch/voco/blob/master/docs/platform/README.md#wayland-paste-keys"
-        ));
+        assert!(is_allowed_external_url(DESKTOP_SETUP_GUIDE));
         assert!(!is_allowed_external_url(
             "https://github.com/sergiopesch/voco/blob/master/docs/platform/README.md?redirect=elsewhere"
         ));
@@ -2236,6 +2239,44 @@ mod tests {
         assert!(!is_allowed_external_url(
             "http://github.com/sergiopesch/voco/releases/tag/voco.2026.0.16"
         ));
+    }
+
+    #[test]
+    fn desktop_setup_guide_matches_the_renderer_the_installer_and_the_docs() {
+        let renderer = include_str!("../../src/components/ControlPanel.tsx");
+        assert!(renderer.contains(&format!(
+            "const DESKTOP_SETUP_GUIDE = \"{DESKTOP_SETUP_GUIDE}\";"
+        )));
+        let installer = include_str!("../../../../install");
+        assert!(installer.contains(&format!("Setup instructions: {DESKTOP_SETUP_GUIDE}\"")));
+        let (path, anchor) = DESKTOP_SETUP_GUIDE
+            .strip_prefix("https://github.com/sergiopesch/voco/blob/master/")
+            .and_then(|page| page.split_once('#'))
+            .expect("a section of a page on master");
+        assert_eq!(path, "docs/platform/README.md");
+        // GitHub's heading anchors, outside fenced code.
+        let mut fenced = false;
+        let anchors: Vec<String> = include_str!("../../../../docs/platform/README.md")
+            .lines()
+            .filter(|line| {
+                fenced ^= line.starts_with("```");
+                !fenced && line.starts_with('#')
+            })
+            .map(|heading| {
+                let title = heading.trim_start_matches('#').trim().to_lowercase();
+                title
+                    .chars()
+                    .filter_map(|c| match c {
+                        ' ' => Some('-'),
+                        c if c.is_alphanumeric() || c == '-' || c == '_' => Some(c),
+                        _ => None,
+                    })
+                    .collect()
+            })
+            .collect();
+        assert!(anchors.iter().any(|known| known == anchor), "{anchor}");
+        let security = include_str!("../../../../docs/security/README.md");
+        assert!(security.contains(&format!("(../platform/README.md#{anchor})")));
     }
 
     #[test]
