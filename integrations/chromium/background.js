@@ -22,7 +22,7 @@ function connect() {
     if (native !== port || message.protocol !== 1) return;
     if (message.type === 'ready') { ready = message.capabilities?.includes('plain-text-atomic-v1') === true; return; }
     const route = routes.get(message.token);
-    if (!route || route.documentId !== message.documentId || !['claim', 'append', 'query', 'revoke', 'cancel'].includes(message.type)) return;
+    if (!route || route.documentId !== message.documentId || !['claim', 'append', 'revoke', 'cancel'].includes(message.type)) return;
     try {
       const receipt = await chrome.tabs.sendMessage(route.tabId, message, {documentId: route.browserDocumentId});
       if (receipt?.type === 'receipt' && native === port && ready) port.postMessage(receipt);
