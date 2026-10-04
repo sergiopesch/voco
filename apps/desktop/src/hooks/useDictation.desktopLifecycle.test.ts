@@ -41,7 +41,7 @@ it.each(["cancelled", "restarted"])("keeps late native success out of the %s ses
   let release!: () => void;
   const nativePaste = vi.fn(async () => {
     if (nativePaste.mock.calls.length === 1) await new Promise<void>(resolve => { release = resolve; });
-    return { strategy: "clipboard", outcome: "dispatched" };
+    return { outcome: "dispatched" };
   });
   const create = (startingSessionId: number) => {
     const { paste, preview } = callbacks({ onboardingTest: false,

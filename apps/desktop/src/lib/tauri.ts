@@ -86,7 +86,7 @@ export interface DesktopPasteMetrics {
 }
 
 /** Pastes into whatever has focus now; rejects with an InsertionError. */
-export async function pasteDesktopText(text: string, correlation: PasteCorrelation): Promise<{ strategy: "clipboard"; outcome: "dispatched"; pasteMetrics: DesktopPasteMetrics }> {
+export async function pasteDesktopText(text: string, correlation: PasteCorrelation): Promise<{ outcome: "dispatched"; pasteMetrics: DesktopPasteMetrics }> {
   return invoke("paste_desktop_text", { text, correlation });
 }
 

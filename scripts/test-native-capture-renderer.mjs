@@ -224,7 +224,7 @@ try {
             ]);
             if(name==='debugNativeCaptureEnabled')return window.auditEnabled===true&&window.auditUploads.length===0;
             if(name==='getDesktopPasteStatus')return {enabled:true,available:true,streamingEnabled:true,detail:'Desktop input is ready.'};
-            if(name==='pasteDesktopText')return {outcome:'dispatched',strategy:'clipboard'};
+            if(name==='pasteDesktopText')return {outcome:'dispatched'};
             if(name==='copyDesktopText'){
                 if(window.failClipboard)throw {outcome:'no-mutation',message:'Fixture clipboard unavailable',clipboardChanged:false};
                 if(window.holdCopy)await window.holdCopy;

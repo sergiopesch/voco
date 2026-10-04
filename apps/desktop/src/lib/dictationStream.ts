@@ -113,7 +113,6 @@ export class DictationStream {
       max_queue_age_ms: this.maxQueueAgeMs, finish_responded: this.finishResponded,
       accepted_equals_dispatched: this.latest === this.committed,
       ...textLengths(this.latest, "accepted"), ...textLengths(this.committed, "dispatched"),
-      destination_content_observation: "unavailable",
     }));
   }
 
@@ -245,15 +244,13 @@ export class DictationStream {
             delivery_seq: deliverySeq, hypothesis_seq: hypothesisSeq,
             duration_ms: performance.now() - started,
             ...textLengths(this.committed, "committed"),
-            destination_content_observation: "unavailable",
           }));
           this.activeDeliverySeq = null;
           this.onPreview("appended");
         }
       } catch (error) {
         const outcome = insertionOutcome(error);
-        this.quality("delivery_failed", { delivery_seq: this.activeDeliverySeq, outcome,
-          destination_content_observation: "unavailable" });
+        this.quality("delivery_failed", { delivery_seq: this.activeDeliverySeq, outcome });
         if (outcome === "no-mutation") {
           // Nothing was typed, so the whole suffix stays pending for the next
           // hypothesis or Stop. Text that may have been typed is never replayed.
