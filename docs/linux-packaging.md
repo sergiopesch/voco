@@ -98,7 +98,7 @@ the folder as documentation.
 | --- | --- | --- |
 | The app | `libpulse0` for Wayland capture, `libnotify-bin` for the startup failure notice, `libc6 (>= 2.39)`, `libstdc++6 (>= 13.2.0)` | `pulseaudio-libs`, `libnotify`, `glibc >= 2.39`, `libstdc++ >= 13.2` |
 | WebKitGTK, GTK and the tray icon | `libwebkit2gtk-4.1-0`, `libgtk-3-0`, `libayatana-appindicator3-1` | `webkit2gtk4.1`, `gtk3`, `libayatana-appindicator-gtk3` |
-| Speech worker | `python3`, `python3-numpy`, `python3-psutil`, `libsentencepiece0` | `python3`, `python3-numpy`, `python3-psutil`, `sentencepiece-libs` |
+| Speech worker | `python3`, `python3-numpy`, `libsentencepiece0` | `python3`, `python3-numpy`, `sentencepiece-libs` |
 | Paste | `xdotool`, `xclip`, `wl-clipboard` | `xdotool`, `xclip`, `wl-clipboard` |
 | IBus engine | `ibus`, `gir1.2-ibus-1.0`, `python3-gi` | `ibus`, `ibus-libs`, `python3-gobject` |
 

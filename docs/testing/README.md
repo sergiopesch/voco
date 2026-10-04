@@ -21,7 +21,7 @@ or desktop session and stops at the first failure:
 | The desktop app | Vitest, as `vitest run` in `apps/desktop` |
 
 Names with a colon are npm scripts; the others are in `scripts/`. The worker's
-tests run under `/usr/bin/python3` with NumPy and psutil, and `test:ibus` needs
+tests run under `/usr/bin/python3` with NumPy, and `test:ibus` needs
 python3-gi and gir1.2-ibus-1.0. The evaluation tests make no network requests.
 
 ## Types, lint and Rust

@@ -209,12 +209,12 @@ class HeaderPolicyTests(unittest.TestCase):
 
 class DependencyParityTests(unittest.TestCase):
     DEPENDS = ("libpulse0, libnotify-bin, ibus, python3, gir1.2-ibus-1.0, python3-gi, xclip, "
-               "python3-numpy, python3-psutil, libsentencepiece0, xdotool, wl-clipboard, "
+               "python3-numpy, libsentencepiece0, xdotool, wl-clipboard, "
                "libc6 (>= 2.39), libstdc++6 (>= 13.2.0), libayatana-appindicator3-1, "
                "libwebkit2gtk-4.1-0, libgtk-3-0")
 
     def test_the_real_debian_dependencies_map_to_the_rpm_requirements(self):
-        self.assertEqual(rpm.verify_same_dependencies(self.DEPENDS, set(rpm.FEDORA_REQUIRES)), 17)
+        self.assertEqual(rpm.verify_same_dependencies(self.DEPENDS, set(rpm.FEDORA_REQUIRES)), 16)
 
     def test_a_new_or_dropped_dependency_is_named(self):
         with self.assertRaisesRegex(ValueError, "without a reviewed Fedora name.*libnew0"):

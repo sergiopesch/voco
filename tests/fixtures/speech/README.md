@@ -29,8 +29,7 @@ describes, and never downloads a model. It stops unless
 `runtime/speech/models/nemotron-speech-streaming-en-0.6b.q8_0.gguf`, or the
 absolute path in `VOCO_NEMOTRON_MODEL`, matches the SHA-256 in
 `runtime/speech/MODEL-IDENTITY.json`. It runs `runtime/speech/stream_worker.py`
-with `/usr/bin/python3`, or the interpreter in `VOCO_PYTHON`, which needs NumPy
-and psutil.
+with `/usr/bin/python3`, or the interpreter in `VOCO_PYTHON`, which needs NumPy.
 
 The runner checks the manifest's form, and each clip's SHA-256, that its path
 stays in this folder, and that it is a complete mono 16 kHz PCM16 WAV of

@@ -4,6 +4,8 @@ import tempfile
 import os
 import json
 from pathlib import Path
+import subprocess
+import sys
 import numpy as np
 from streaming import SilenceGate, Metrics, state_home
 class GateTests(unittest.TestCase):
@@ -59,9 +61,15 @@ class GateTests(unittest.TestCase):
             os.environ['VOCO_PERFORMANCE_LOG']='1';prior=os.environ.get('XDG_STATE_HOME');os.environ['XDG_STATE_HOME']=directory
             metrics=Metrics();metrics.emit('check',audio_s=1.,asr_ms=20.);metrics.close()
             row=json.loads((Path(directory)/'voco/stream-performance/worker.jsonl').read_text().splitlines()[0])
-            self.assertGreater(row['rss_bytes'],0);self.assertIn('cpu_user_s',row)
+            self.assertIsInstance(row['rss_bytes'],int);self.assertGreater(row['rss_bytes'],0)
+            for key in ('cpu_user_s','cpu_system_s'):
+                self.assertIsInstance(row[key],float);self.assertGreaterEqual(row[key],0)
             self.assertFalse({'audio','text','transcript','app_name'} & row.keys())
             for handler in metrics.logger.handlers:handler.close()
             if prior is None:del os.environ['XDG_STATE_HOME']
             else:os.environ['XDG_STATE_HOME']=prior
+    def test_worker_imports_no_optional_metrics_dependency(self):
+        # Only the opt-in log reads process usage, from the standard library.
+        check="import sys, streaming; sys.exit('psutil' in sys.modules)"
+        subprocess.run([sys.executable,'-c',check],cwd=Path(__file__).resolve().parent,check=True)
 if __name__=='__main__':unittest.main()

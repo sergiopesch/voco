@@ -66,7 +66,7 @@ for floor in 'glibc >= 2.39' 'libstdc++ >= 13.2'; do
   fi
 done
 for dependency in webkit2gtk4.1 gtk3 libayatana-appindicator-gtk3 pulseaudio-libs libnotify ibus \
-  ibus-libs python3 python3-gobject python3-numpy python3-psutil sentencepiece-libs xclip \
+  ibus-libs python3 python3-gobject python3-numpy sentencepiece-libs xclip \
   xdotool wl-clipboard; do
   if ! grep -Fxq -- "${dependency}" <<<"${PACKAGE_REQUIRES}"; then
     echo "RPM is missing dependency: ${dependency}" >&2
