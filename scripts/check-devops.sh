@@ -182,6 +182,50 @@ if not required_files.issubset(deb.get("files", {})):
 print("Persistent IBus package metadata is valid.")
 PY
 
+# The Fedora RPM is built from the Debian package's staged tree, so Tauri keeps
+# bundling only the .deb; these are the RPM's own source gates.
+PYTHONDONTWRITEBYTECODE=1 python3 - <<'PY'
+import json
+import re
+import sys
+from pathlib import Path
+
+sys.path.insert(0, "scripts")
+import rpm_package
+
+spec_path = Path("packaging/rpm/voco.spec.in")
+spec = spec_path.read_text()
+depends = json.loads(Path("apps/desktop/src-tauri/tauri.conf.json").read_text())["bundle"]["linux"]["deb"]["depends"]
+if set(depends) | set(rpm_package.TAURI_IMPLIED_DEPENDS) != set(rpm_package.DEBIAN_TO_FEDORA):
+    raise SystemExit("Every Debian dependency needs its Fedora name in scripts/rpm_package.py DEBIAN_TO_FEDORA")
+requires = tuple(re.findall(r"^Requires:\s+(.+?)\s*$", spec, re.M))
+if requires != rpm_package.FEDORA_REQUIRES:
+    raise SystemExit(f"{spec_path} must require exactly the mapped Fedora names: {requires}")
+for floor in ("glibc >= 2.39", "libstdc++ >= 13.2"):
+    if floor not in requires:
+        raise SystemExit(f"{spec_path} is missing the verified ABI floor {floor}")
+extra = re.findall(r"^(Recommends|Suggests|Supplements|Enhances|Conflicts|Obsoletes|Provides|"
+                   r"BuildRequires|Source\d*|Patch\d*|Epoch|BuildArch):", spec, re.M | re.I)
+if extra:
+    raise SystemExit(f"{spec_path} declares {extra}; VOCO's RPM recommends, provides and downloads nothing")
+sections = {"prep", "build", "install", "check", "clean", "conf", "generate_buildrequires", "pre",
+            "post", "preun", "postun", "pretrans", "posttrans", "preuntrans", "postuntrans",
+            "verifyscript", "triggerprein", "triggerin", "triggerun", "triggerpostun",
+            "filetriggerin", "filetriggerun", "filetriggerpostun", "transfiletriggerin",
+            "transfiletriggerun", "transfiletriggerpostun"}
+if [name for name in re.findall(r"^%(\w+)", spec, re.M) if name in sections] != ["post"] \
+        or "\n%post\n@POST@\n\n%files\n" not in spec:
+    raise SystemExit(f"{spec_path} may run only packaging/rpm/post.sh, and it builds nothing")
+if not re.search(r"^ExclusiveArch:\s+x86_64$", spec, re.M) or rpm_package.RELEASE != "1":
+    raise SystemExit(f"{spec_path} must stay x86_64 release 1, the installer's voco-<version>-1.x86_64.rpm")
+if "%" in Path("packaging/rpm/post.sh").read_text():
+    raise SystemExit("packaging/rpm/post.sh must not contain rpm macros")
+for macro in ("__provides_exclude_from ^/usr/lib/voco/speech/", "_build_id_links none", "__os_install_post %{nil}"):
+    if f"%global {macro}" not in spec:
+        raise SystemExit(f"{spec_path} must keep %global {macro}")
+print("Fedora RPM packaging metadata is valid.")
+PY
+
 PYTHONDONTWRITEBYTECODE=1 python3 - <<'PY'
 import re
 from pathlib import Path
