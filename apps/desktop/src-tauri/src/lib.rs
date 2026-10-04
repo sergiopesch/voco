@@ -1130,20 +1130,8 @@ fn start_ibus_shortcut_listener(app_handle: tauri::AppHandle) {
             if CONFIG_REVISION.load(Ordering::SeqCst) != snapshot.revision {
                 continue;
             }
-            let Some(trigger) = poll.trigger.filter(|trigger| trigger.mode == "dictation") else {
-                continue;
-            };
-            if !shortcut_arbitration::admit_toggle(
-                &LAST_TOGGLE_MS,
-                shortcut_monotonic_ms(),
-                TOGGLE_DEBOUNCE_MS,
-            ) {
-                continue;
-            }
-            if let Err(error) = app_handle.emit_to("main", TOGGLE_DICTATION_EVENT, &trigger) {
-                error!("Failed to deliver owned IBus shortcut: {error}");
-            } else {
-                trace_hotkey_event("owned_shortcut_event_emitted", Some("ibus"));
+            if poll.trigger.is_some_and(|t| t.mode == "dictation") {
+                eval_toggle_with_backend(&app_handle, "ibus");
             }
         }
     });

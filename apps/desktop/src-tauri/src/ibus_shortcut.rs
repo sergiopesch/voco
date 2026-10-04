@@ -60,10 +60,13 @@ pub(crate) struct ShortcutPoll {
     pub trigger: Option<ShortcutTrigger>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+/// VOCO toggles the same way for every route, so it never reads the engine's
+/// trigger ID; the field stays declared because unknown fields are refused.
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct ShortcutTrigger {
-    pub trigger_id: String,
+    #[serde(rename = "triggerId")]
+    _trigger_id: String,
     pub mode: String,
 }
 
@@ -444,6 +447,23 @@ mod tests {
         for malformed in [Value::Null, json!({}), json!({ "ready": "yes" })] {
             assert!(serde_json::from_value::<EngineStatus>(malformed).is_err());
         }
+    }
+
+    #[test]
+    fn decodes_the_engine_trigger_and_rejects_unknown_trigger_fields() {
+        let trigger = json!({ "triggerId": "0123abcd", "mode": "dictation" });
+        let poll: ShortcutPoll =
+            serde_json::from_value(json!({ "armed": true, "trigger": trigger })).unwrap();
+        assert!(poll.armed);
+        assert_eq!(poll.trigger.unwrap().mode, "dictation");
+        let idle: ShortcutPoll =
+            serde_json::from_value(json!({ "armed": false, "trigger": null })).unwrap();
+        assert!(idle.trigger.is_none());
+        let extended = json!({ "triggerId": "0123abcd", "mode": "dictation", "text": "x" });
+        assert!(serde_json::from_value::<ShortcutPoll>(
+            json!({ "armed": true, "trigger": extended })
+        )
+        .is_err());
     }
 
     #[test]
