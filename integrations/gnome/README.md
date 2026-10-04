@@ -123,13 +123,18 @@ writes a reproducible archive of the five files, attached to each release.
   bounds and accelerator filtering.
 - `python3 scripts/test-panel-setup.py`, part of `npm test`, checks the setup
   statuses and that the two version numbers match.
-- `scripts/test-gnome-panel.sh` runs GNOME Shell 46 nested on Wayland in
+- `scripts/test-gnome-panel.sh` runs the installed GNOME Shell on Wayland in
   bubblewrap, with its own D-Bus, XDG directories and display, against a
-  synthetic VOCO service. Set `VOCO_PANEL_EVIDENCE_DIR` to a new directory and
-  `VOCO_NATIVE_DEPS` to a root with `bin/Xvfb`. `VOCO_PANEL_APP_BINARY` adds a
-  real `voco`, and `VOCO_PANEL_PACKAGE_ROOT`, an extracted package, adds setup
-  and an upgrade. CI runs it with the `--gnome-panel` option of
-  `scripts/test-private-ibus-engine-hosted.sh`, which runs only on GitHub Actions.
+  synthetic VOCO service. GNOME 46 and 48 run nested in a private Xvfb, driven
+  with `xdotool`. GNOME 50, which has no nested mode, runs headless on a virtual
+  monitor of the same 800×600 size, driven through Mutter's RemoteDesktop API
+  and captured with GNOME's own screenshot API; its panel also shows GNOME's
+  screen-sharing indicator. Set `VOCO_PANEL_EVIDENCE_DIR` to a new directory
+  and, for the nested mode, `VOCO_NATIVE_DEPS` to a root with `bin/Xvfb`.
+  `VOCO_PANEL_APP_BINARY` adds a real `voco`, and `VOCO_PANEL_PACKAGE_ROOT`, an
+  extracted package, adds setup and an upgrade. CI runs it with the
+  `--gnome-panel` option of `scripts/test-private-ibus-engine-hosted.sh`, which
+  runs only on GitHub Actions.
 
 ## Known limits
 
@@ -137,5 +142,5 @@ writes a reproducible archive of the five files, attached to each release.
   GNOME needs an AppIndicator extension.
 - The grab covers Alt+D and Alt+Shift+D only. Apps that inhibit system
   shortcuts, such as virtual machines and remote desktops, receive the chord.
-- The tests use a synthetic VOCO service in a nested session, not other themes,
-  other panel extensions or physical displays.
+- The tests use a synthetic VOCO service in a nested or headless session, not
+  other themes, other panel extensions or physical displays.
