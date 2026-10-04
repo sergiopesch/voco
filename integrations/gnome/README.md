@@ -1,7 +1,7 @@
 # GNOME companion
 
-`voco-panel@voco.local` is an optional GNOME Shell extension for GNOME 46, and
-the VOCO package installs it. While VOCO runs, the companion replaces VOCO's
+`voco-panel@voco.local` is an optional GNOME Shell extension for GNOME 46, 48
+and 50, and the VOCO packages install it. While VOCO runs, the companion replaces VOCO's
 tray icon with a pill in the top bar that shows a live microphone meter while
 you dictate. In a Wayland session it also consumes VOCO's shortcut, so the
 focused app never receives it. It keeps no recording state: VOCO decides, and
@@ -50,7 +50,7 @@ that changes the companion, Shell keeps the loaded copy until you do the same.
 | Status | Meaning | Exit status |
 | --- | --- | --- |
 | `active` | Loaded and current. | 0 |
-| `other-desktop`, `unsupported` | Not GNOME, or not GNOME 46. VOCO uses its tray. | 0 |
+| `other-desktop`, `unsupported` | Not GNOME, or a GNOME other than 46, 48 or 50. VOCO uses its tray. | 0 |
 | `disabled`, `restart` | Off, or turned on or upgraded but not loaded yet. | 2 |
 | `missing`, `blocked`, `error`, `pending`, `unavailable` | Files missing, extensions off or forbidden, a load failure, activation in progress, or no answer. The message says which. | 2 |
 
@@ -138,8 +138,8 @@ writes a reproducible archive of the five files, attached to each release.
 
 ## Known limits
 
-- Only GNOME 46 loads the companion. Elsewhere VOCO uses its tray, which on
-  GNOME needs an AppIndicator extension.
+- Only GNOME 46, 48 and 50 load the companion. Elsewhere VOCO uses its tray,
+  which on GNOME needs an AppIndicator extension.
 - The grab covers Alt+D and Alt+Shift+D only. Apps that inhibit system
   shortcuts, such as virtual machines and remote desktops, receive the chord.
 - The tests use a synthetic VOCO service in a nested or headless session, not

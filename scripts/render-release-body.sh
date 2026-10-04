@@ -68,9 +68,10 @@ the GNOME panel, upgrades and removal.
 ## Scope
 
 The packages require x86-64 with AVX2, FMA and F16C, and glibc 2.39 or later.
-The Debian package is for Ubuntu 24.04 or later and the RPM for Fedora 44. On
-Fedora's GNOME 50 the VOCO panel isn't available, and the tray icon needs an
-AppIndicator extension, which Fedora doesn't turn on by default.
+The Debian package is for Ubuntu 24.04 and 26.04 LTS and Debian 13, and the RPM
+for Fedora 44. The GNOME panel supports GNOME 46, 48 and 50; Debian and Fedora
+don't turn on an AppIndicator extension, so there the panel is VOCO's place in
+the top bar.
 Pasting replaces the clipboard's text. The bundled model is English only.
 Protected fields, custom editors, other compositors and physical microphones
 need their own testing. The attached validation record lists exactly what was

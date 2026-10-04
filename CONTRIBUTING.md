@@ -74,7 +74,7 @@ VOCO_STREAM_WORKER="$PWD/runtime/speech/stream_worker.py" npm run dev
 `bash scripts/setup.sh --install` builds the release app, assembles the complete
 package with the provisioned runtime, verifies it and installs it with APT. It
 then runs `voco --check-desktop-input` and sets up the Alt+D shortcut. It adds
-g++, patch, binutils, desktop-file-utils and appstream to the APT list, installs
+binutils, desktop-file-utils and appstream to the APT list, installs
 Tauri CLI 2.10.1 when no Tauri CLI is installed and warns about any other
 version, and exits with status 2 when desktop input still needs setup.
 
@@ -174,7 +174,7 @@ Tests and bug reports follow the same rules:
 
 - [Code map](docs/architecture/code-map.md): every source file and script.
 - [Inside VOCO](docs/guide/README.md): a guided tour from spoken word to source.
-- [Linux packaging](docs/linux-packaging.md): how the Debian package is built.
+- [Linux packaging](docs/linux-packaging.md): how the Debian package and the RPM are built.
 - [Branding](docs/branding.md): the visual identity and the voice of the copy.
 - [GNOME companion](integrations/gnome/README.md) and
   [Chromium extension](integrations/chromium/README.md): the optional integrations.

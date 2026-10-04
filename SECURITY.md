@@ -46,7 +46,7 @@ temporary keyring. It exits with 0 when every listed file matches and a key in
 KEYS signed the manifest, 1 when a file is missing or differs, an entry is unsafe
 or the signature is bad, and 2 when the files match but the signature is missing
 or can't be checked. The guided installer carries its own copy of the key and
-checks the signature with `gpgv` before APT sees the package.
+checks the signature with `gpgv` before APT or DNF sees the package.
 
 ## Scope
 
