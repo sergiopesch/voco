@@ -351,6 +351,8 @@ jobs:
         env:
           VOCO_NATIVE_DEPS: /usr
           VOCO_PANEL_EVIDENCE_DIR: ${{ runner.temp }}/voco-application-panel
+          # Frontend Checks runs the synthetic companion cases on this Shell.
+          VOCO_PANEL_SUITE: bridge
         run: VOCO_PANEL_APP_BINARY="${VOCO_NATIVE_APP_BINARY}" bash scripts/test-private-ibus-engine-hosted.sh --gnome-panel
 
       - name: Application capture and paste into the focused field

@@ -133,7 +133,8 @@ writes a reproducible archive of the five files, attached to each release.
   screen-sharing indicator. Set `VOCO_PANEL_EVIDENCE_DIR` to a new directory
   and, for the nested mode, `VOCO_NATIVE_DEPS` to a root with `bin/Xvfb`.
   `VOCO_PANEL_APP_BINARY` adds a real `voco`, and `VOCO_PANEL_PACKAGE_ROOT`, an
-  extracted package, adds setup and an upgrade. CI runs it with the
+  extracted package, adds setup and an upgrade; with either,
+  `VOCO_PANEL_SUITE=bridge` skips the synthetic cases. CI runs it with the
   `--gnome-panel` option of `scripts/test-private-ibus-engine-hosted.sh`, which
   runs only on GitHub Actions.
 
