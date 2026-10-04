@@ -15,10 +15,11 @@ voco --check-panel
 ```
 
 They show the installed version, whether your session is `x11` or `wayland`,
-whether VOCO can paste or which helper is missing, and what the GNOME panel
-needs. The two checks send no keys, leave the clipboard alone and change no
-settings. On Wayland, `systemctl --user status voco-ydotoold.service` shows
-whether the input service is running.
+whether VOCO can paste or what is missing, and what the GNOME panel needs. The
+two checks send no keys, leave the clipboard alone and change no settings. On
+Wayland, `getfacl /dev/uinput` shows whether your login may use `/dev/uinput`,
+which VOCO needs to press the paste keys; see
+[Access to /dev/uinput](platform/README.md#access-to-devuinput).
 
 In VOCO, open **Settings** and choose **Help**. The sections
 **My microphone is not working**, **My shortcut is not working** and
@@ -54,12 +55,11 @@ the problem. The most common ones are:
 
 | Message | What to do |
 | --- | --- |
-| `This login cannot access /dev/uinput.` | Give your login write access to `/dev/uinput`. [Platform support](platform/README.md#ydotoold-ydotool-daemon) explains the options. |
-| `An existing ydotoold is running but is unavailable to this login.` | Another `ydotoold` is running. Check its socket permissions. VOCO doesn't replace it. |
-| `Could not start the VOCO input service.` | Run `systemctl --user status voco-ydotoold.service` to see why. |
+| `VOCO can't open /dev/uinput, so it can't send the paste keys. …` | Sign out and back in once, then run `voco --check-desktop-input`. If it still fails, follow [Access to /dev/uinput](platform/README.md#access-to-devuinput). |
+| `Pasting on … requires: …` | Install the package that provides the named program, such as `wl-clipboard` for `wl-copy`. |
 
 When `voco --check-desktop-input` passes, run `voco --setup-panel` on GNOME 46,
-then open VOCO. See [Wayland input service](install.md#wayland-input-service).
+then open VOCO. See [Wayland paste keys](install.md#wayland-paste-keys).
 
 ## Dictation won't start
 
@@ -108,8 +108,8 @@ launch with **Your shortcut also reached the app**. Fix it one of these ways:
 - Let go of the shortcut and other modifier keys, such as Alt, Ctrl and Super,
   while VOCO types. VOCO waits up to 1.5 seconds for them before it pastes,
   then stops typing.
-- If VOCO reports that the paste helper can't reach its input service, run
-  `systemctl --user enable --now voco-ydotoold.service` and check again.
+- On Wayland, if VOCO reports that it can't open `/dev/uinput`, sign out and
+  back in once, then check again.
 - Apps that remap Shift+Insert, remote desktops and virtual machines may ignore
   the paste, and VOCO can't tell when they do.
 
@@ -214,7 +214,6 @@ gives the reason:
 | Reason | What to do |
 | --- | --- |
 | `VOCO is running but could not receive the launcher request` | The running VOCO didn't answer. This can happen with a copy started before an upgrade. Use its tray or panel menu, or quit it with `pkill -x voco` and open VOCO again. |
-| Starts with `Desktop input setup` | VOCO couldn't confirm that its input service is up to date. Check `systemctl --user status voco-ydotoold.service`, then open VOCO again. If it keeps failing, run `voco --setup-desktop-input` to see why. |
 
 ## Performance logs
 

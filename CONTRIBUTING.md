@@ -51,8 +51,8 @@ bash scripts/setup.sh
 APT: pkg-config, the GLib, libsoup, JavaScriptCore and WebKitGTK 4.1 development
 packages, libayatana-appindicator3-dev, libpulse-dev, clang, mold, ibus,
 gir1.2-ibus-1.0, python3-gi, python3-numpy and python3-psutil. It checks the
-IBus bindings, reports missing paste helpers for your session and runs
-`npm install`.
+IBus bindings, reports what your session lacks for pasting, such as a helper or
+access to `/dev/uinput`, and runs `npm install`.
 
 Start the app in development mode:
 
@@ -73,10 +73,10 @@ VOCO_STREAM_WORKER="$PWD/runtime/speech/stream_worker.py" npm run dev
 
 `bash scripts/setup.sh --install` builds the release app, assembles the complete
 package with the provisioned runtime, verifies it and installs it with APT. It
-then sets up desktop input and the Alt+D shortcut. It adds g++, patch, binutils,
-desktop-file-utils and appstream to the APT list, installs Tauri CLI 2.10.1 when
-no Tauri CLI is installed and warns about any other version, and exits with
-status 2 when desktop input still needs setup.
+then runs `voco --check-desktop-input` and sets up the Alt+D shortcut. It adds
+g++, patch, binutils, desktop-file-utils and appstream to the APT list, installs
+Tauri CLI 2.10.1 when no Tauri CLI is installed and warns about any other
+version, and exits with status 2 when desktop input still needs setup.
 
 ## Checks
 
@@ -88,7 +88,7 @@ Run these before you open a pull request:
 | `npm run check` | The TypeScript check, `tsc --noEmit`, in `apps/desktop` |
 | `npm run lint` | ESLint on `apps/desktop/src/` |
 | `npm run verify:versions` | The version matches in every file that carries it |
-| `npm run verify:devops` | Shell and Python syntax, package metadata, CI workflow rules, installer sync and tests, the vendored input helper and a release rehearsal |
+| `npm run verify:devops` | Shell and Python syntax, package metadata, CI workflow rules, installer sync and tests, and a release rehearsal |
 
 `npm test` covers source provenance, speech reports, the package assembler, the
 speech runtime, capture and desktop integration, and the dictation scoring tools.
@@ -113,9 +113,9 @@ runs it.
 
 `.editorconfig` sets UTF-8, LF line endings, a final newline and no trailing
 whitespace. Indent with two spaces, or four in Rust, Python, C and `.in` template
-files and in the ydotool launcher. Files under `vendor/` and `runtime/notices/`
-are pinned third-party source and notices, and stay byte for byte as they are.
-`npm run lint` and `cargo fmt --check` enforce the rest.
+files. Files under `vendor/` and `runtime/notices/` are pinned third-party
+source and notices, and stay byte for byte as they are. `npm run lint` and
+`cargo fmt --check` enforce the rest.
 
 ## Dependencies
 

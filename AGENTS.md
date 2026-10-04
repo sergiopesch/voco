@@ -53,10 +53,10 @@ read: Settings shows a recovery panel, and only Reset renames the file to a
 
 VOCO vendors narrow patches ([vendor/README.md](vendor/README.md)): glib 0.18.5
 with the exact upstream RUSTSEC-2024-0429 fix ([backport](vendor/glib/VOCO-PATCH.md)),
-global-hotkey, tray-icon, and a private legacy ydotoold. Keep every GTK/WebKit
-consumer on the single patched glib; adding glib 0.20 directly leaves GTK behind.
-Verify source provenance and the optimized iterator regression before accepting a
-dependency change.
+global-hotkey and tray-icon. Keep every GTK/WebKit consumer on the single
+patched glib; adding glib 0.20 directly leaves GTK behind. Verify source
+provenance and the optimized iterator regression before accepting a dependency
+change.
 
 ## Invariants
 
@@ -84,25 +84,37 @@ dependency change.
 
 - Each chunk pastes into whatever has keyboard focus when it is ready. There is no
   destination token, focus probe, terminal detection or per-app route. Desktop
-  setup checks the input helpers, never a caret or an app.
+  setup checks the paste prerequisites, never a caret or an app.
 - Copy CLIPBOARD, then PRIMARY (best effort; a failure only warns), then send one
   Shift+Insert: toolkits paste CLIPBOARD and terminals paste PRIMARY. A leading
   joining space is its own Space key, because Chromium's address bar trims pasted
   leading whitespace. ASCII controls become spaces. Never send Enter and never
   restore the previous clipboard.
-- Wayland helpers emit raw key events, so wait at most 1.5 s for the shortcut's
+- Wayland paste keys are raw key events, so wait at most 1.5 s for the shortcut's
   modifiers to be released (evdev, else the companion's `ModifiersClear`). Unknown
   state doesn't block; a timeout sends no keys. On X11 the passive grab takes every
   key while the chord is held, so a paste waits for its release, at most 1.5 s
   after the press.
-- Wayland paste needs a running `ydotoold` (`pgrep -x`; the private daemon isn't on
-  PATH), and desktop setup reports it. The launcher selects VOCO's private legacy
-  daemon only for the system client recorded in `packaging/ydotool/qualified-client.json`.
-  Keep `/usr/bin/ydotool` consistent between probing and dispatch. Migrate only
-  VOCO's unmodified user unit, while holding its single-instance guard and before
-  recording can start. Package hooks never restart desktop session services.
-- Legacy ydotool needs a literal space argument, not `space`, and a 24 ms paste
-  delay; modern ydotool takes numeric key events.
+- Wayland keys go through VOCO's own uinput device, "VOCO virtual keyboard"
+  (`virtual_keyboard.rs`); X11 keeps `xdotool`. Keep one device per process,
+  created at startup and reused for the process lifetime, never one per paste:
+  the compositor adds a new device late and could lose its first keys, so a
+  device younger than 500 ms waits before its first key. It declares only Shift,
+  Insert and Space and sends each event in its own report, 12 ms apart. Ensure it
+  exists before the clipboard copy, so a missing device is a `no-mutation`
+  failure; after an emit error, release Shift and drop it so the next paste
+  recreates it.
+- The paste check opens `/dev/uinput`; it never creates the device, sends keys or
+  starts a process. The evdev listener ignores the virtual keyboard by name (and
+  another tool's `ydotoold virtual device`), so its keys never count as the
+  shortcut or a held modifier.
+- `/dev/uinput` access comes only from the packaged `uaccess` udev rule: the user
+  of the active local session, with no group, daemon, socket or service. Package
+  hooks apply it only by loading `uinput` and reloading and re-triggering udev;
+  they never touch users, groups or session services.
+- At a Wayland start, retire only VOCO's own `voco-ydotoold.service` enablement:
+  remove the link only if it points at the old packaged unit and that file is
+  gone, then stop the unit and reload the user manager off the startup path.
 - Start is refused while paste is unavailable, and when `VOCO_DESKTOP_PASTE=0` or
   `VOCO_DESKTOP_STREAM=0` is set.
 - Only a `no-mutation` failure, which typed nothing, keeps its text pending for the
@@ -201,9 +213,9 @@ dependency change.
 
 ### Installer and packages
 
-- The guided installer installs the local package with APT and explicitly requires
-  the Wayland ydotool client and daemon on Wayland. A successful install alone is
-  not desktop readiness.
+- The guided installer installs only the local package with APT, then runs
+  `voco --check-desktop-input`. A successful install alone is not desktop
+  readiness.
 - After setup succeeds, request one detached launch as the invoking desktop user;
   never launch a GUI from root or package hooks. Distinguish a launch request from
   readiness and keep the manual guidance when launching fails. The installer checks

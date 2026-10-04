@@ -9,10 +9,11 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 
 ## Desktop shell: `apps/desktop/src-tauri/src/`
 
-- `lib.rs` — App setup and most Tauri commands: startup order, shortcut routes, `admit_toggle` and its 120 ms debounce, the evdev listener and the CLI checks.
+- `lib.rs` — App setup and most Tauri commands: startup order (on Wayland, warming the virtual keyboard and retiring the old `voco-ydotoold.service` link), shortcut routes, `admit_toggle` and its 120 ms debounce, the evdev listener and the CLI checks.
 - `main.rs` — Command-line entry point; see [Command line](#command-line).
 - `speech_stream.rs` — The speech worker process and the `speech_stream` command: NDJSON requests, deadlines, size limits and restarting a dead idle worker.
-- `insertion.rs` — Desktop paste and copy: helper checks, the clipboard transaction, Shift+Insert and the three failure outcomes.
+- `insertion.rs` — Desktop paste and copy: helper and `/dev/uinput` checks, the clipboard transaction, Shift+Insert and the three failure outcomes.
+- `virtual_keyboard.rs` — VOCO's uinput keyboard for Wayland paste keys: one device per process, Shift+Insert led by an optional joining Space, 12 ms between key events.
 - `config.rs` — Settings file, field-level updates, the copy from the legacy `voice` directory and the update cache.
 - `crash_recovery.rs` — Text-only crash journal and the Review store.
 - `tray.rs` — Tray icon, menu, tooltips and meter animation.
@@ -27,7 +28,6 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `trigger_socket.rs` — Owner-only trigger socket `voco.sock`, with its `voice.sock` alias, that `voco --toggle` connects to.
 - `activation.rs` — Owner-only launcher socket `voco-activate.sock`; it presents the window and never toggles capture.
 - `single_instance.rs` — Process lock that allows one VOCO per user.
-- `desktop_input_setup.rs` — Migrates VOCO's packaged input service at startup and for `--setup-desktop-input`.
 - `desktop_notifications.rs` — Notifications that keep their D-Bus sender for the app's lifetime, because GNOME removes notifications whose sender disappears.
 - `performance.rs` — Opt-in performance metadata log, enabled with `VOCO_PERFORMANCE_LOG=1`.
 - `process_runner.rs` — Bounded helper processes: timeouts, output limits and reaping.
@@ -218,13 +218,12 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 
 ## Packaging: `packaging/`
 
-- `systemd/voco-ydotoold.service` — User unit that runs VOCO's input service.
-- `ydotool/voco-ydotool-launcher` — Chooses the private or the system `ydotoold` and migrates the unit.
-- `ydotool/*.json` — Identity of the Ubuntu 24.04 `ydotool` client that the private daemon pairs with.
+- `udev/70-voco-uinput.rules` — The `uaccess` rule that gives the user of the active local session access to `/dev/uinput`.
+- `udev/voco-uinput.conf` — Loads the `uinput` module at boot, from `/usr/lib/modules-load.d/`.
 - `ibus/voco.xml`, `ibus/voco-ibus-engine` — IBus component and engine launcher.
 - `chromium/com.voco.exact_field.json` — Native messaging host manifest.
 - `tauri/VOCO.desktop`, `tauri/com.sergiopesch.voco.metainfo.xml` — Desktop entry and AppStream metadata.
-- `debian/postinst.py.in` — The package's only maintainer action: repairs group-writable VOCO directories to 0755.
+- `debian/postinst.py.in` — The package's only maintainer action: repairs group-writable VOCO directories to 0755 and applies the `/dev/uinput` rule.
 - `published-release.json` — The version the README installs.
 
 ## Scripts: `scripts/`
@@ -233,9 +232,8 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 
 - `setup.sh` — Prepares a development checkout; `--install` builds, packages and installs the complete package.
 - `build-desktop.sh` — Builds the renderer, the browser host and the base Debian bundle.
-- `package-nvidia.py` — Turns the base package into the complete one: speech runtime, private `ydotoold` and its launcher, notices, documentation and the maintainer script.
+- `package-nvidia.py` — Turns the base package into the complete one: speech runtime, notices, documentation and the maintainer script.
 - `package-gnome-panel.py` — Builds a reproducible companion zip.
-- `build-legacy-ydotool.py` — Builds the private `ydotoold` from `vendor/ydotool-legacy`.
 - `provision-ci-speech.sh` — Copies the speech payload of a checksum-pinned published package into `runtime/speech/` for CI.
 - `debian_maintainer.py` — Generates and checks the maintainer script.
 - `sync-installer-ui.py`, `lib/install-ui.sh`, `lib/install-apt-ui.py`, `lib/install-brand.json` — Installer interface sources embedded in `install`.
@@ -246,7 +244,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 
 - `test-unit.sh` — `npm test`: fast checks that need no microphone, speech model or desktop session.
 - `check-devops.sh`, `check-shell-syntax.sh`, `check-version-consistency.mjs` — Repository, shell and version checks.
-- `verify-deb-package.sh`, `verify-speech-payload.py`, `verify-legacy-input-package.py` — Package contents.
+- `verify-deb-package.sh`, `verify-speech-payload.py` — Package contents.
 - `verify-speech-engine.py` — Checks that shipping source and dependency metadata don't reference the retired Whisper recognizer.
 - `verify-glib-backport.py`, `verify-shortcut-backport.py`, `verify-tray-backport.py` — Vendored crate provenance and resolution.
 - `verify-native-capture-audit.py` — Checks a capture audit bundle.
@@ -289,11 +287,10 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `test-native-kde.py`, `test-native-kde.sh`, `test-native-kde-identity.py` — KWin and Plasma in a private session.
 - `test-native-capture-callbacks.py`, `test-native-capture-pulse-latency.py`, `native-capture-lifecycle.test.c`, `test-native-capture-renderer.mjs`, `test_verify_native_capture_audit.py` — Native capture.
 - `test-dictation-renderer.mjs`, `test-microphone-app-renderer.mjs`, `test-brand-motion.mjs`, `audio-worklet-capture.test.mjs` — Renderer and AudioWorklet.
-- `test-ydotool-service.py`, `test-legacy-ydotool.py`, `test-legacy-ydotool-daemon.py` — Input service selection and the private daemon.
 - `test-speech-package.py`, `test-speech-worker.py`, `test-audio-continuity.py` — Speech packaging and worker pipes.
-- `test-install-apt.py`, `test-install-common.sh`, `test-install-journey.py`, `test-install-launch.py`, `test-install-performance.py`, `test-install-prefetch.py`, `test-install-presentation.py` — Installer.
+- `test-install-apt.py`, `test-install-common.sh`, `test-install-journey.py`, `test-install-launch.py`, `test-install-performance.py`, `test-install-presentation.py` — Installer.
 - `test-glib-variant.py`, `test-debian-maintainer.py`, `test-check-shell-syntax.py`, `test-report-dictation-quality-events.py`, `test-report-performance.py`, `test-report-speech-timing.py`, `test-typesafe-evaluation.py` — Other checks.
-- `fixtures/*` — Test-only helpers: synthetic fields, a nested `ydotool`, probe extensions and a syscall shim. None is installed.
+- `fixtures/*` — Test-only helpers: synthetic fields, stand-in paste helpers, probe extensions and a syscall shim. None is installed.
 
 ### Brand
 
@@ -309,7 +306,6 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 ## Vendored code: `vendor/`
 
 - `glib/`, `global-hotkey/`, `tray-icon/` — Patched crates, each with a `VOCO-PATCH.md`; see [Security](../security/README.md#dependency-policy).
-- `ydotool-legacy/` — Source of the private `ydotoold` and libuInputPlus.
 - `provenance/`, `README.md`, `THIRD-PARTY-NOTICES.txt` — Provenance and notices.
 
 ## Brand assets: `assets/`
@@ -342,8 +338,7 @@ exits 1.
 | Option | Behaviour | Exit status |
 | --- | --- | --- |
 | `--toggle` | Asks the VOCO running in this session to start or stop. It doesn't launch VOCO, change focus or confirm the recording state. | 1 if VOCO's socket can't be reached |
-| `--check-desktop-input` | Checks the input helpers without launching VOCO or sending keys. | 1 on failure |
-| `--setup-desktop-input` | Updates VOCO's packaged input service. VOCO must be closed. | 1 on failure |
+| `--check-desktop-input` | Checks the paste prerequisites: the clipboard helper, plus `xdotool` on X11 or access to `/dev/uinput` on Wayland. It doesn't launch VOCO, create a keyboard or send keys. | 1 on failure |
 | `--check-panel` | Checks the GNOME companion without changing settings. | 2 unless the companion is active, the desktop isn't GNOME, or GNOME isn't version 46; 1 on error |
 | `--setup-panel` | Enables the packaged GNOME 46 companion for this user. It may need a sign-out and never restarts Shell. | As for `--check-panel` |
 | `--version` | Prints `VOCO` and the version. | 0 |
