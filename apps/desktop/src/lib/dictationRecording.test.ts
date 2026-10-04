@@ -101,7 +101,7 @@ function harness() {
     resetAudioLevel: vi.fn(),
     updateAudioLevel: noop,
     clearCapturedAudio: vi.fn(() => clearAudioCaptureBuffer(audioBuffer)),
-    transitionCursorDelivery: noop,
+    setCursorDelivery: noop,
     recordingSampleRate: () => 16000,
     appendRecordingSamples: () => 0,
     enqueueDesktopPhrase: noop,

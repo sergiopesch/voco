@@ -192,10 +192,13 @@ results.push('Unavailable cursor delivery fails closed before capture; no manual
 
 await load();await page.evaluate(()=>{window.lease=true;window.hook.toggle('browser:fixture','start');});
 await page.waitForFunction(()=>window.store.getState().status==='recording');
+// The tray says "Listening · browser field" only while the field is owned.
+await page.waitForFunction(()=>window.hook.cursorDeliveryState==='owned');
 await page.evaluate(()=>window.samples(1));
 await page.waitForFunction(()=>window.nativeCalls.some(c=>c[0]==='appendBrowserField'));
 await page.evaluate(()=>window.hook.toggle('browser:fixture','stop'));
 await page.waitForFunction(()=>window.store.getState().status==='idle');
+await page.waitForFunction(()=>window.hook.cursorDeliveryState==='inactive');
 assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='appendBrowserField').map(c=>c.slice(2))),[['','Recovered words'],['Recovered words',' for manual review.']]);
 assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='finishBrowserField').map(c=>c.slice(2))),[['Recovered words for manual review.']]);
 assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>['pasteDesktopText','copyDesktopText','insertText'].includes(c[0]))),false);

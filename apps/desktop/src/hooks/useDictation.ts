@@ -12,13 +12,6 @@ import { BrowserStreamDelivery } from "@/lib/browserStreamDelivery";
 import { retainedSampleRate,type CaptureDescriptor,type CaptureSelection } from "@/lib/captureDescriptor";
 import { monitorCaptureHealth } from "@/lib/captureHealth";
 import { createDesktopCaptureTail } from "@/lib/desktopCaptureTail";
-import {
-  isCurrentAudioCaptureSource,
-} from "@/lib/dictationAsyncGuards";
-import {
-  nextCursorDeliveryState,
-  type CursorDeliveryEvent,
-} from "@/lib/dictationDelivery";
 import { createDictationRecording } from "@/lib/dictationRecording";
 import {
   createDictationSessionState,
@@ -64,10 +57,6 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
   const captureHealthRef = useRef<ReturnType<typeof monitorCaptureHealth> | null>(null);
   const [cursorDeliveryState, setCursorDeliveryState] =
     useState<CursorDeliveryState>("inactive");
-
-  function transitionCursorDelivery(event: CursorDeliveryEvent) {
-    setCursorDeliveryState(nextCursorDeliveryState(event));
-  }
 
   const captureDescriptorRef = useRef<CaptureDescriptor | null>(null);
   const nativeCaptureRef = useRef<NativeCaptureSession | null>(null);
@@ -300,16 +289,8 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
         void cancelRecording(CAPTURE_INPUT_INTERRUPTED);
       };
       createdWorklet.port.onmessage = (e) => {
-        if (
-          !isCurrentAudioCaptureSource(
-            createdWorklet,
-            sourceSessionId,
-            workletRef.current,
-            sessionRef.current.sessionId,
-          )
-        ) {
-          return;
-        }
+        // Ignore audio from a replaced node or an earlier recording.
+        if (workletRef.current !== createdWorklet || sessionRef.current.sessionId !== sourceSessionId) return;
         if (e.data.type === "samples") {
           appendRecordingSamples(e.data.data as Float32Array);
         } else if (e.data.type === "level") {
@@ -358,16 +339,8 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
     const processor = audioContext.createScriptProcessor(4096, 1, 1);
     const sourceSessionId = sessionRef.current.sessionId;
     processor.onaudioprocess = (e) => {
-      if (
-        !isCurrentAudioCaptureSource(
-          processor,
-          sourceSessionId,
-          processorRef.current,
-          sessionRef.current.sessionId,
-        )
-      ) {
-        return;
-      }
+      // Ignore audio from a replaced node or an earlier recording.
+      if (processorRef.current !== processor || sessionRef.current.sessionId !== sourceSessionId) return;
       const input = e.inputBuffer.getChannelData(0);
       appendRecordingSamples(new Float32Array(input));
       updateAudioLevel(calculateVisualAudioLevelFromSamples(input));
@@ -483,7 +456,7 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
       resetAudioLevel,
       updateAudioLevel,
       clearCapturedAudio,
-      transitionCursorDelivery,
+      setCursorDelivery: setCursorDeliveryState,
       recordingSampleRate,
       appendRecordingSamples,
       enqueueDesktopPhrase,
@@ -524,7 +497,6 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
     useStore.getState().setCaptureNotice(null);
     clearTranscript();
     cancelledRef.current = null;
-    transitionCursorDelivery("session-reset");
     finalizeIdleState();
   }
 

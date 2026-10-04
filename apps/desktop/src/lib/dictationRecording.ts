@@ -12,7 +12,6 @@ import {
   type CaptureSelection,
 } from "@/lib/captureDescriptor";
 import { monitorCaptureHealth } from "@/lib/captureHealth";
-import type { CursorDeliveryEvent } from "@/lib/dictationDelivery";
 import { errorMessage,sentence } from "@/lib/dictationRecovery";
 import {
   consumeQueuedStop,
@@ -26,7 +25,7 @@ import {
 import { beginNativeCapture,type NativeCaptureSession } from "@/lib/nativeCapture";
 import type { HotkeyTraceFields,pasteDesktopText } from "@/lib/tauri";
 import type { useStore as appStore } from "@/store/useStore";
-import type { DesktopPasteStatus,DictationStatus } from "@/types";
+import type { CursorDeliveryState,DesktopPasteStatus,DictationStatus } from "@/types";
 import { BrowserStreamDelivery } from "./browserStreamDelivery";
 
 export type Ref<T> = { current: T };
@@ -87,7 +86,7 @@ export interface DictationRecordingEnv {
   resetAudioLevel: () => void;
   updateAudioLevel: (level: number) => void;
   clearCapturedAudio: () => void;
-  transitionCursorDelivery: (event: CursorDeliveryEvent) => void;
+  setCursorDelivery: (state: CursorDeliveryState) => void;
   recordingSampleRate: () => number;
   appendRecordingSamples: (samples: Float32Array) => number;
   enqueueDesktopPhrase: (end: number) => void;
@@ -144,7 +143,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     resetAudioLevel,
     updateAudioLevel,
     clearCapturedAudio,
-    transitionCursorDelivery,
+    setCursorDelivery,
     recordingSampleRate,
     appendRecordingSamples,
     enqueueDesktopPhrase,
@@ -228,7 +227,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       setCancellationPending(false);
       setStatus("idle");
       setError(reason);
-      transitionCursorDelivery("session-idle");
+      setCursorDelivery("inactive");
       traceDictationEvent("dictation_interrupted").catch(() => {});
       const body = reason === new CrashJournalCleanupError().message ? reason
         : alreadyNotified ? null
@@ -277,7 +276,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     sessionRef.current = finishSessionIdle(sessionRef.current);
     activeTriggerIdRef.current = undefined;
     setStatus("idle");
-    transitionCursorDelivery("session-idle");
+    setCursorDelivery("inactive");
   }
 
   async function startRecording(triggerId?: string) {
@@ -361,7 +360,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       clearCapturedAudio();
       recordingStartedAtMs = null;
       stopRequestedAtMs = null;
-      transitionCursorDelivery("session-reset");
+      setCursorDelivery("inactive");
       captureGeneration += 1;
       const generation = captureGeneration;
       let audioContext: AudioContext | null = null;
@@ -372,7 +371,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
         browserDeliveryRef.current = delivery;
         await delivery.start(startingSessionId, triggerId);
         assertOutputAllowed(startingSessionId);
-        transitionCursorDelivery("ownership-established");
+        setCursorDelivery("owned");
       }
       if (!onboardingTest) {
         const owned = new CrashJournal(crypto.randomUUID());
