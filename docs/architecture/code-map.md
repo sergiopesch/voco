@@ -241,6 +241,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `sync-installer-ui.py`, `lib/install-ui.sh`, `lib/install-apt-ui.py`, `lib/install-brand.json` — Installer interface sources embedded in `install`.
 - `lib/install-common.sh` — Install steps for `setup.sh --install`, with its own test.
 - `lib/test-speech-runtime.sh` — Speech runtime setup for disposable test desktops.
+- `lib/uinput-bridge.sh` — Starts and stops the uinput bridge for disposable test desktops.
 
 ### Checks
 
@@ -293,7 +294,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `test-speech-package.py`, `test-speech-worker.py`, `test-audio-continuity.py` — Speech packaging and worker pipes.
 - `test-install-apt.py`, `test-install-common.sh`, `test-install-journey.py`, `test-install-launch.py`, `test-install-performance.py`, `test-install-prefetch.py`, `test-install-presentation.py` — Installer.
 - `test-glib-variant.py`, `test-debian-maintainer.py`, `test-check-shell-syntax.py`, `test-report-dictation-quality-events.py`, `test-report-performance.py`, `test-report-speech-timing.py`, `test-typesafe-evaluation.py` — Other checks.
-- `fixtures/*` — Test-only helpers: synthetic fields, a nested `ydotool`, probe extensions and a syscall shim. None is installed.
+- `fixtures/*` — Test-only helpers: synthetic fields, probe extensions, a `wl-copy` and an input-state relay through the private Shell probe, and the [uinput bridge](../testing/README.md#the-uinput-bridge) that replays VOCO's virtual keyboard on a private Xvfb. None is installed.
 
 ### Brand
 

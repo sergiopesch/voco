@@ -27,7 +27,8 @@ def seed_crash(root):
 
 def run_review(root, app, pump, activate, native_windows, env, cycle):
     from gi.repository import Atspi
-    assert not any(Path(path).exists() for path in ('/dev/input', '/dev/snd', '/dev/uinput'))
+    assert not any(Path(path).exists() for path in ('/dev/input', '/dev/snd'))
+    assert Path('/dev/uinput').is_char_device() == (os.environ.get('VOCO_GNOME_CURSOR') == '1')
     result = {'passed': False, 'cycle': cycle + 1, 'syntheticTranscript': True,
               'activation': 'registered DBusMenu Event; controls use actual AT-SPI actions'}
     result['renderingOverrides'] = {key: os.environ[key] for key in

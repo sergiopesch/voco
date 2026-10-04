@@ -19,7 +19,9 @@ delete keyboard.XAUTHORITY;
 assert.equal(keyboard.DISPLAY, ':0');
 if (wayland) assert.equal(process.env.WAYLAND_DISPLAY, 'voco-delivery');
 else assert.equal(process.env.DISPLAY, ':0');
-assert.ok(!existsSync('/dev/input') && !existsSync('/dev/uinput'), 'Private fixture display required');
+// Only production paste on Wayland types, through VOCO's real virtual keyboard.
+const uinput = wayland && Boolean(process.env.VOCO_FIXTURE_PASTE_BINARY);
+assert.ok(!existsSync('/dev/input') && existsSync('/dev/uinput') === uinput, 'Private fixture display required');
 const output = process.argv[2];
 const helper = fileURLToPath(new URL('fixtures/focused-paste.py', import.meta.url));
 const paste = text => execFileSync('/usr/bin/python3', [helper, text], { stdio: ['ignore', 'inherit', 'inherit'], timeout: 40_000 });

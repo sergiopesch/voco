@@ -77,6 +77,8 @@ so nothing reaches your session. CI runs them through
 `scripts/test-private-ibus-engine-hosted.sh`, which works only on GitHub Actions,
 where it relaxes Ubuntu's AppArmor limit on unprivileged user namespaces for the
 test and then restores it. Locally, run the named script with the same variables.
+Suites that type through VOCO's virtual keyboard also need the
+[uinput bridge](#the-uinput-bridge), which runs only on a disposable machine.
 
 | Wrapper option | Script | What runs |
 | --- | --- | --- |
@@ -85,7 +87,6 @@ test and then restores it. Locally, run the named script with the same variables
 | `--native-desktop` | `test-native-desktop.sh` | Real GTK and WebKit widgets with private X11, D-Bus and IBus |
 | `--native-wayland` | `test-native-wayland.sh` | Real Wayland surfaces in headless Weston; with `VOCO_WAYLAND_APP_BINARY`, the app starting, opening and quitting from its tray |
 | `--native-pulse-latency` | `test-native-capture-pulse-latency.py` | VOCO's C capture from a private PulseAudio: a short clip, a long clip, and a starved run that must fail with `capture-duration-deficit` |
-| `--legacy-ydotool` | `test-legacy-ydotool-daemon.py` | VOCO's `ydotoold`, built fresh, with no input devices and its uinput calls redirected to a file |
 | `--application-delivery`, `--browser-delivery` | `test-application-delivery.sh` | Paste into desktop programs and into Chromium, below |
 | `--full-application` | `test-native-desktop.sh` with `VOCO_NATIVE_APP_BINARY` | The app capturing a clip from a private PulseAudio and pasting into GTK fields |
 | `--browser-application`, `--browser-toolbar` | `test-browser-full-app.sh`, `test-browser-toolbar-app.sh` | The app, extension and host dictating into an exact Chromium field, started with Alt+Shift+V or the toolbar button |
@@ -110,7 +111,7 @@ recording and, with `VOCO_BROWSER_LONG_CAPTURE=1`, a long one.
 `test-application-delivery.sh` pastes into real programs as VOCO does, with the
 clipboard, the primary selection and Shift+Insert, and reads the result back from
 the program. `VOCO_DELIVERY_PLATFORM` is `x11`, a private Xvfb and the default, or
-`gnome-wayland`, a nested GNOME Shell with XWayland and no input devices.
+`gnome-wayland`, a nested GNOME Shell with XWayland and no `/dev/input`.
 `VOCO_DELIVERY_SUITE` picks the cases:
 
 - `applications`, the default: GTK 3, GTK 4 and WebKit fields, GNOME Text Editor,
@@ -123,7 +124,42 @@ the program. `VOCO_DELIVERY_PLATFORM` is `x11`, a private Xvfb and the default, 
 
 A replica of VOCO's paste commands runs unless `VOCO_FIXTURE_PASTE_BINARY` names
 the `voco` library test executable, which pastes through the production code.
-`VOCO_DELIVERY_EVIDENCE_DIR` receives `results.json` and failure screenshots.
+On `gnome-wayland` that code types through VOCO's real virtual keyboard, which
+the [uinput bridge](#the-uinput-bridge) replays, so it needs
+`VOCO_UINPUT_BRIDGE=1`. CI runs `gnome-wayland` only this way, with a release
+build of the test executable. `VOCO_DELIVERY_EVIDENCE_DIR` receives `results.json`,
+the bridge's `uinput-bridge.jsonl` and failure screenshots.
+
+### The uinput bridge
+
+On Wayland VOCO pastes through its own uinput keyboard, which a compositor reads
+from `/dev/input`. The bridged suites, the `gnome-wayland` delivery suites with
+the production paste and the GNOME cursor journey, give their namespace
+`/dev/uinput` and still no `/dev/input` or `/dev/snd`, so nothing inside can read
+that keyboard. `scripts/fixtures/uinput-bridge.py` runs outside the namespace. It
+grabs each kernel device named exactly "VOCO virtual keyboard" as it appears, so
+its keys reach no compositor or console, and replays every press and release in
+order, with VOCO's gaps between them, as XTest on the private Xvfb, reached
+through the namespace's shared `/tmp/.X11-unix`. The nested GNOME Shell passes
+them to its focused window. Keyboards come and go with each VOCO process. Only
+Shift+Insert, optionally led by one Space, is accepted. Any other key, a dropped
+event, or a keyboard that leaves before its grab or in the middle of a paste is
+rejected; the bridge then replays nothing more and the suite fails.
+
+The bridge refuses to run without `VOCO_UINPUT_BRIDGE=1`, or while `DISPLAY`,
+`WAYLAND_DISPLAY` or a logind graphical session exists, because a keyboard it
+missed would type into that desktop. Set it only on a disposable machine. The user
+running the suite needs read and write access to `/dev/uinput` and read access to
+VOCO's event nodes: CI loads `uinput`, gives the runner an ACL on `/dev/uinput`,
+and adds a udev rule that gives it one on each VOCO event node.
+
+`uinput-bridge.jsonl` uses `CLOCK_MONOTONIC` times. It records each grab and
+removal, each key with when VOCO sent it and when it was replayed, and a
+`dispatch` and a `completed` record for each gesture. In the cursor journey those
+two records also hold the Shell's modifiers and whether its window menu is open,
+just before the first key and after the last, which `shell-probe-input-state.py`
+relays from inside the namespace. There `wl-copy` is `shell-probe-wl-copy.py`,
+which sets each selection through the private Shell probe.
 
 ## Speech suites
 
@@ -168,9 +204,8 @@ for the host it ran on. Where you don't run them, record them as unavailable.
 
 | Script | What runs | Needs |
 | --- | --- | --- |
-| `test-native-gnome.sh` | GNOME Shell with Ubuntu's AppIndicator extension on a private Xvfb seat. `VOCO_GNOME_APP_BINARY` adds the app and its tray, and `VOCO_GNOME_CRASH_REVIEW=1`, `VOCO_GNOME_ONBOARDING=1` or `VOCO_GNOME_CURSOR=1` adds Review, the voice test or dictation into a field | `VOCO_NATIVE_DEPS` and a new `VOCO_GNOME_EVIDENCE_DIR`. The voice test and dictation also need `VOCO_DEV_NATIVE_CAPTURE`, `VOCO_DEBUG_CAPTURE_AUDIO` and `VOCO_DEBUG_NATIVE_CAPTURE` set to 1 |
+| `test-native-gnome.sh` | GNOME Shell with Ubuntu's AppIndicator extension on a private Xvfb seat. `VOCO_GNOME_APP_BINARY` adds the app and its tray, and `VOCO_GNOME_CRASH_REVIEW=1`, `VOCO_GNOME_ONBOARDING=1` or `VOCO_GNOME_CURSOR=1` adds Review, the voice test or dictation into a field | `VOCO_NATIVE_DEPS` and a new `VOCO_GNOME_EVIDENCE_DIR`. The voice test and dictation also need `VOCO_DEV_NATIVE_CAPTURE`, `VOCO_DEBUG_CAPTURE_AUDIO` and `VOCO_DEBUG_NATIVE_CAPTURE` set to 1, and dictation the [uinput bridge](#the-uinput-bridge) |
 | `test-native-kde.sh` | KWin and Plasma on a private Xvfb seat. `VOCO_KDE_APP_BINARY` adds the app | `VOCO_NATIVE_DEPS`, `VOCO_KDE_DEPS`, the extracted KDE `usr` directory, and a new `VOCO_KDE_EVIDENCE_DIR` |
-| `test-legacy-ydotool.py` | A system ydotool 0.1.x sending VOCO's paste keys to a private socket, never to a device | Bubblewrap and ydotool 0.1.x |
 | `test-install-apt.py --allow-container-package-changes` | The installer's APT step with a fixture package: a maintainer script's prompt, then a configuration-file prompt that must keep the owner's edit | A disposable Docker container, because it installs and purges the fixture |
 
 ## CI jobs
@@ -182,9 +217,9 @@ pull requests into it. Evidence artifacts upload even after a failure and stay 7
 | --- | --- | --- |
 | Code Guide | The [Inside VOCO](../guide/README.md) guide's server, catalog and lesson tests | None |
 | RustSec Audit | `cargo audit` with cargo-audit 0.22.2 | None |
-| Frontend Checks | `verify:devops`, `verify:security`, `check`, `lint` and `npm test`; the renderer suites, the panel model and the exact-field suite; the GNOME companion; both delivery suites on `x11` and on `gnome-wayland`; the IBus engine, native desktop and native Wayland suites; the frontend build, and desktop entry and AppStream validation | `native-desktop-evidence` |
-| Rust Check & Test | `cargo fmt`, Clippy, the glib checks, `cargo test`, the C callbacks, the private `ydotoold` and native capture latency; then it provisions the runtime and runs the speech baseline and the worker protocol | `speech-regression-evidence` |
-| Application | The release build of `voco` and `voco-browser-host` with the runtime, then the tray bridge on GNOME, `--full-application`, the Wayland lifecycle, `--browser-application` and `--browser-toolbar` | `application-evidence` |
+| Frontend Checks | `verify:devops`, `verify:security`, `check`, `lint` and `npm test`; the renderer suites, the panel model and the exact-field suite; the GNOME companion; both delivery suites on `x11`; the IBus engine, native desktop and native Wayland suites; the frontend build, and desktop entry and AppStream validation | `native-desktop-evidence` |
+| Rust Check & Test | `cargo fmt`, Clippy, the glib checks, `cargo test`, the C callbacks and native capture latency; then it provisions the runtime and runs the speech baseline and the worker protocol | `speech-regression-evidence` |
+| Application | The release build of `voco` and `voco-browser-host` with the runtime, then the tray bridge on GNOME, `--full-application`, both delivery suites on `gnome-wayland` through the release build's production paste and the uinput bridge, the Wayland lifecycle, `--browser-application` and `--browser-toolbar` | `application-evidence` |
 
 ## Manual acceptance
 

@@ -18,10 +18,6 @@ case "${1:-}" in
     : "${VOCO_NATIVE_PULSE_EVIDENCE_DIR:?Set a fresh directory for native Pulse evidence}"
     TEST_SCRIPT="test-native-capture-pulse-latency.py"
     ;;
-  --legacy-ydotool)
-    : "${VOCO_LEGACY_INPUT_EVIDENCE_DIR:?Set a fresh directory for legacy input evidence}"
-    TEST_SCRIPT="test-legacy-ydotool-daemon.py"
-    ;;
   --native-wayland)
     : "${VOCO_WAYLAND_DEPS:?Set the installed or extracted Weston root/usr}"
     : "${VOCO_WAYLAND_EVIDENCE_DIR:?Set a directory for Wayland evidence}"
@@ -97,9 +93,6 @@ elif [[ "${1:-}" == --native-pulse-latency ]]; then
   fi
   python3 -c 'import json,sys; result=json.load(open(sys.argv[1])); assert result.get("error") == "capture-duration-deficit" and result["passed"] is False; print("PASS: starved capture rejected missing audio")' \
     "${VOCO_NATIVE_PULSE_EVIDENCE_DIR}/starved/result.json"
-elif [[ "${1:-}" == --legacy-ydotool ]]; then
-  PYTHONDONTWRITEBYTECODE=1 python3 "${ROOT_DIR}/scripts/${TEST_SCRIPT}" \
-    --output "${VOCO_LEGACY_INPUT_EVIDENCE_DIR}"
 elif [[ "${1:-}" == --full-application ]]; then
   application_evidence="${VOCO_NATIVE_EVIDENCE_DIR}"
   for app_case in delivery focus-switch; do

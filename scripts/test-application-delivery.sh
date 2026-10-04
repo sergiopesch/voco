@@ -3,7 +3,9 @@
 # applications (default) or browser. VOCO_DELIVERY_PLATFORM picks x11 (default),
 # the bare private Xvfb, or gnome-wayland, a nested GNOME Shell with XWayland on
 # that Xvfb. VOCO_FIXTURE_PASTE_BINARY, when set, is the voco library test
-# executable that pastes through production desktop_paste.
+# executable that pastes through production desktop_paste. On gnome-wayland it
+# types through VOCO's real virtual keyboard, which needs VOCO_UINPUT_BRIDGE=1
+# on a disposable machine (scripts/fixtures/uinput-bridge.py).
 set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 if [[ ${1:-} != --inside && ${1:-} != --session ]]; then
@@ -20,14 +22,21 @@ if [[ ${1:-} != --inside && ${1:-} != --session ]]; then
   browsers=${PLAYWRIGHT_BROWSERS_PATH:-$HOME/.cache/ms-playwright}
   node_binary=$(command -v node || true)
   production_paste=()
+  bridged=false
   if [[ -n ${VOCO_FIXTURE_PASTE_BINARY:-} ]]; then
     production_paste=(--ro-bind "$(realpath "$VOCO_FIXTURE_PASTE_BINARY")" /tmp/voco-fixture-paste
       --setenv VOCO_FIXTURE_PASTE_BINARY /tmp/voco-fixture-paste)
     if [[ $VOCO_DELIVERY_PLATFORM == gnome-wayland ]]; then
-      # Production pastes on Wayland with /usr/bin/ydotool. The installed file
-      # is only the mount point for the test-only adapter; no real daemon runs.
-      [[ -f /usr/bin/ydotool ]] || { echo 'Install ydotool for the /usr/bin/ydotool mount point' >&2; exit 1; }
-      production_paste+=(--ro-bind "$ROOT_DIR/scripts/fixtures/nested-ydotool.py" /usr/bin/ydotool)
+      # Production pastes on Wayland through VOCO's own uinput keyboard. The
+      # namespace gets /dev/uinput, still no /dev/input, and shares its X socket
+      # directory, so the bridge outside grabs each VOCO keyboard and replays its
+      # keys on the private Xvfb. Like /tmp/.X11-unix, which mutter checks, the
+      # directory is sticky and world-writable, inside the owner-only fixture.
+      mkdir -m 1777 "$fixture/x11"
+      production_paste+=(--dev-bind /dev/uinput /dev/uinput --bind "$fixture/x11" /tmp/.X11-unix)
+      source "$ROOT_DIR/scripts/lib/uinput-bridge.sh"
+      voco_start_uinput_bridge "$fixture/evidence/uinput-bridge.jsonl" --display "$fixture/x11/X0"
+      bridged=true
     fi
   fi
   if [[ $VOCO_DELIVERY_PLATFORM == gnome-wayland ]]; then
@@ -47,6 +56,10 @@ if [[ ${1:-} != --inside && ${1:-} != --session ]]; then
     --unsetenv DISPLAY --unsetenv WAYLAND_DISPLAY --unsetenv DBUS_SESSION_BUS_ADDRESS \
     --unsetenv AT_SPI_BUS_ADDRESS --unsetenv IBUS_ADDRESS --unsetenv XAUTHORITY \
     bash "${BASH_SOURCE[0]}" --inside "$fixture" || status=$?
+  if $bridged && ! voco_stop_uinput_bridge; then
+    echo 'The uinput bridge rejected or lost paste keys; see uinput-bridge.jsonl' >&2
+    (( status )) || status=1
+  fi
   if [[ -n ${VOCO_DELIVERY_EVIDENCE_DIR:-} ]]; then
     mkdir -p "$VOCO_DELIVERY_EVIDENCE_DIR"
     cp -a "$fixture/evidence/." "$VOCO_DELIVERY_EVIDENCE_DIR/"
@@ -56,7 +69,8 @@ fi
 fixture=${2:?}
 if [[ ${1:-} == --session ]]; then
   if [[ $VOCO_DELIVERY_PLATFORM == gnome-wayland ]]; then
-    [[ ! -e /dev/input && ! -e /dev/uinput ]]
+    [[ ! -e /dev/input ]]
+    if [[ -n ${VOCO_FIXTURE_PASTE_BINARY:-} ]]; then [[ -c /dev/uinput ]]; else [[ ! -e /dev/uinput ]]; fi
     log=$fixture/evidence/gnome-shell.log
     export LIBGL_ALWAYS_SOFTWARE=1 XDG_SESSION_TYPE=wayland XDG_CURRENT_DESKTOP=ubuntu:GNOME
     export GNOME_SHELL_SESSION_MODE=user
@@ -121,11 +135,6 @@ if [[ ${1:-} == --session ]]; then
     export WAYLAND_DISPLAY=voco-delivery GDK_BACKEND=wayland DISPLAY=$xwayland XAUTHORITY=$auth
     dbus-update-activation-environment DISPLAY XAUTHORITY WAYLAND_DISPLAY GDK_BACKEND \
       XDG_SESSION_TYPE XDG_CURRENT_DESKTOP DBUS_SYSTEM_BUS_ADDRESS LIBGL_ALWAYS_SOFTWARE
-    if [[ -n ${VOCO_FIXTURE_PASTE_BINARY:-} ]]; then
-      # Production requires a running ydotoold; the adapter takes that name.
-      /usr/bin/ydotool --fixture-daemon &
-      until_ready 100 pgrep -x ydotoold
-    fi
   fi
   case ${VOCO_DELIVERY_SUITE:-applications} in
     applications) exec /usr/bin/python3 "$ROOT_DIR/scripts/test-application-delivery.py" "$fixture" ;;

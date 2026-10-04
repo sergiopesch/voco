@@ -20,7 +20,9 @@ system_bus = None
 pulse = None
 try:
     assert 'DISPLAY' not in os.environ and 'WAYLAND_DISPLAY' not in os.environ
-    assert not any(Path(path).exists() for path in ('/dev/input', '/dev/snd', '/dev/uinput'))
+    assert not any(Path(path).exists() for path in ('/dev/input', '/dev/snd'))
+    # Only the cursor journey types, through the app's real virtual keyboard.
+    assert Path('/dev/uinput').is_char_device() == (os.environ.get('VOCO_GNOME_CURSOR') == '1')
     assert os.environ['HOME'] == str(root / 'home')
     system_address = 'unix:path=' + str(root / 'runtime/system-test-bus')
     system_bus = subprocess.Popen(['dbus-daemon', '--session', '--nofork', '--address=' + system_address], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
