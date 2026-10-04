@@ -1,0 +1,66 @@
+# VOCO's Fedora package. scripts/rpm_package.py fills in this template and runs
+# rpmbuild on the staged tree that also becomes the Debian package
+# (scripts/package-nvidia.py --rpm), so both packages carry the same files.
+# There is no prep, build or install stage: nothing is compiled or downloaded.
+Name:           voco
+Version:        @VERSION@
+Release:        @RELEASE@
+Summary:        @SUMMARY@
+# VOCO, ggml and glib are MIT. NeMo-Speech.cpp is Apache-2.0, and the vendored
+# tray-icon and global-hotkey crates are MIT or Apache-2.0. The Nemotron model
+# is under the NVIDIA Open Model License. The texts are the license files in
+# /usr/share/doc/voco.
+License:        MIT AND Apache-2.0 AND LicenseRef-NVIDIA-Open-Model-License
+URL:            https://github.com/sergiopesch/voco
+ExclusiveArch:  x86_64
+
+# The Debian package's dependencies under their Fedora names. The binaries are
+# built on Ubuntu 24.04, which sets the glibc and libstdc++ floors.
+Requires:       glibc >= 2.39
+Requires:       libstdc++ >= 13.2
+Requires:       webkit2gtk4.1
+Requires:       gtk3
+Requires:       libayatana-appindicator-gtk3
+Requires:       pulseaudio-libs
+Requires:       libnotify
+Requires:       ibus
+Requires:       ibus-libs
+Requires:       python3
+Requires:       python3-gobject
+Requires:       python3-numpy
+Requires:       python3-psutil
+Requires:       sentencepiece-libs
+Requires:       xclip
+Requires:       xdotool
+Requires:       wl-clipboard
+
+# Package the staged tree exactly as it is: no stripping, byte-compiling,
+# build-id links or debug packages. Zstandard level 9 as in the Debian package,
+# SHA-256 file digests, and never the name of the computer that built it. With
+# SOURCE_DATE_EPOCH set, as release assembly sets it, the build time and every
+# newer file time are that commit time, so a rebuild gives identical bytes.
+%global __os_install_post %{nil}
+%global debug_package %{nil}
+%global _build_id_links none
+%global _binary_payload w9.zstdio
+%global _binary_filedigest_algorithm 8
+%global _buildhost voco-release
+%global use_source_date_epoch_as_buildtime 1
+%global clamp_mtime_to_source_date_epoch 1
+# The speech runtime is private to VOCO. It provides no libraries to the system,
+# and the explicit requirements above cover what it needs. The documentation
+# adds no requirements either. The app binaries keep their generated ones.
+%global __provides_exclude_from ^/usr/lib/voco/speech/.*$
+%global __requires_exclude_from ^/usr/(lib/voco/speech|share/doc/voco)/.*$
+
+%description
+@DESCRIPTION@
+
+%post
+@POST@
+
+%files
+# Files in /etc are the browser host manifests, not settings: like the Debian
+# package, an upgrade replaces them and removal deletes them.
+%defattr(-,root,root,-)
+@FILES@

@@ -12,6 +12,7 @@ set -euo pipefail
 VERSION="2026.0.60"
 RELEASE_TAG="voco.${VERSION}"
 DEB_URL="https://github.com/sergiopesch/voco/releases/download/${RELEASE_TAG}/voco_${VERSION}_amd64.deb"
+RPM_URL="https://github.com/sergiopesch/voco/releases/download/${RELEASE_TAG}/voco-${VERSION}-1.x86_64.rpm"
 CHECKSUMS_URL="https://github.com/sergiopesch/voco/releases/download/${RELEASE_TAG}/voco_checksums.txt"
 SIGNATURE_URL="${CHECKSUMS_URL}.asc"
 
@@ -387,6 +388,71 @@ voco_install_deb_package() {
     return 1
   fi
   voco_verify_installed_package "${expected_version}" "${expected_architecture}"
+}
+
+voco_detect_package_manager() {
+  # Ubuntu and Debian install the .deb with APT, Fedora the RPM with DNF. A
+  # system with both tools keeps APT, as before.
+  VOCO_PACKAGE_MANAGER=""
+  if command -v apt-get >/dev/null 2>&1 && command -v dpkg-query >/dev/null 2>&1; then
+    VOCO_PACKAGE_MANAGER="apt"
+  elif command -v dnf >/dev/null 2>&1 && command -v rpm >/dev/null 2>&1; then
+    VOCO_PACKAGE_MANAGER="dnf"
+  else
+    return 1
+  fi
+}
+
+voco_verify_installed_rpm() {
+  local expected_version="$1"
+  local expected_architecture="$2"
+  local package_record
+  local installed_version
+  local installed_architecture
+  local unexpected_field
+
+  VOCO_INSTALL_ERROR=""
+  # rpm records only completed installations; expected_version is VERSION-RELEASE.
+  if ! package_record="$(LC_ALL=C rpm -q --queryformat '%{VERSION}-%{RELEASE}\t%{ARCH}\n' voco 2>/dev/null)"; then
+    VOCO_INSTALL_ERROR="Package 'voco' is not installed after the package operation."
+    return 1
+  fi
+  if [[ "${package_record}" == *$'\n'* ]]; then
+    VOCO_INSTALL_ERROR="More than one VOCO package is installed. Remove the extra ones with DNF, then run the installer again."
+    return 1
+  fi
+
+  IFS=$'\t' read -r installed_version installed_architecture unexpected_field <<< "${package_record}"
+  if [[ -n "${unexpected_field}" || -z "${installed_version}" || -z "${installed_architecture}" ]]; then
+    VOCO_INSTALL_ERROR="Package manager returned an incomplete VOCO installation record."
+    return 1
+  fi
+  if [[ "${installed_version}" != "${expected_version}" ]]; then
+    VOCO_INSTALL_ERROR="Installed VOCO version is ${installed_version}; expected ${expected_version}."
+    return 1
+  fi
+  if [[ "${installed_architecture}" != "${expected_architecture}" ]]; then
+    VOCO_INSTALL_ERROR="Installed VOCO architecture is ${installed_architecture}; expected ${expected_architecture}."
+    return 1
+  fi
+
+  return 0
+}
+
+voco_install_rpm_package() {
+  local rpm_file="$1"
+  local expected_version="$2"
+  local expected_architecture="$3"
+
+  VOCO_INSTALL_ERROR=""
+  rpm_file="$(realpath -- "${rpm_file}")" || return 1
+  local -a install_command=(sudo dnf install -y --)
+  if declare -F voco_run_dnf >/dev/null; then install_command=(voco_run_dnf); fi
+  if ! "${install_command[@]}" "${rpm_file}"; then
+    VOCO_INSTALL_ERROR="DNF could not install VOCO and its desktop dependencies. Resolve the error above, then run the installer again."
+    return 1
+  fi
+  voco_verify_installed_rpm "${expected_version}" "${expected_architecture}"
 }
 
 voco_verify_desktop_input() {
@@ -773,6 +839,16 @@ voco_run_apt() {
     dim "Installation details: $VOCO_INSTALL_LOG"
   fi
   return "$result"
+}
+
+voco_run_dnf() {
+  # DNF keeps its own presentation, prompts included; VOCO only hands it a
+  # clear terminal and says who is asking for the password.
+  voco_ui_release
+  if ! sudo -n -v >/dev/null 2>&1; then
+    dim 'VOCO · Fedora needs your permission to install.'
+  fi
+  sudo dnf install -y -- "$@"
 }
 
 voco_apt_display() {
@@ -1184,31 +1260,47 @@ if [[ "$(uname)" != "Linux" ]]; then
   err "VOCO only supports Linux. Detected: $(uname)"
 fi
 
-if [[ "$(dpkg --print-architecture 2>/dev/null)" != "amd64" ]]; then
-  err "Only amd64 (x86_64) is supported. Detected: $(dpkg --print-architecture 2>/dev/null || uname -m)"
+if ! voco_detect_package_manager; then
+  err "VOCO installs with APT on Ubuntu and Debian, or with DNF on Fedora. Neither was found."
+fi
+# Each package manager names the architecture its own way.
+if [[ "$VOCO_PACKAGE_MANAGER" == dnf ]]; then
+  PACKAGE_NAME="voco-${VERSION}-1.x86_64.rpm"
+  PACKAGE_URL="$RPM_URL"
+  PACKAGE_TOOLS=(dnf rpm)
+  if [[ "$(uname -m)" != "x86_64" ]]; then
+    err "Only amd64 (x86_64) is supported. Detected: $(uname -m)"
+  fi
+else
+  PACKAGE_NAME="voco_${VERSION}_amd64.deb"
+  PACKAGE_URL="$DEB_URL"
+  PACKAGE_TOOLS=(apt-get dpkg-query)
+  if [[ "$(dpkg --print-architecture 2>/dev/null)" != "amd64" ]]; then
+    err "Only amd64 (x86_64) is supported. Detected: $(dpkg --print-architecture 2>/dev/null || uname -m)"
+  fi
 fi
 
-for prerequisite in wget sha256sum base64 gpgv stat apt-get sudo dpkg-query; do
+for prerequisite in wget sha256sum base64 gpgv stat sudo "${PACKAGE_TOOLS[@]}"; do
   command -v "$prerequisite" >/dev/null 2>&1 || err "$prerequisite is required before downloading VOCO."
 done
 ok "Linux · x86_64"
 
-# APT resolves package dependencies in the install stage. Readiness is checked
-# after installation, when helpers and services can actually be available.
+# APT or DNF resolves package dependencies in the install stage. Readiness is
+# checked after installation, when helpers and services can actually be available.
 dim "Desktop dependencies are checked during installation."
 
 # ─── Download ───────────────────────────────────────────
 voco_ui_stage 1 'Bringing VOCO to your desktop.' 'English speech recognition, on this computer.'
 
 VOCO_DOWNLOAD_DIR=$(mktemp -d)
-DEB_FILE="${VOCO_DOWNLOAD_DIR}/voco_${VERSION}_amd64.deb"
+PACKAGE_FILE="${VOCO_DOWNLOAD_DIR}/${PACKAGE_NAME}"
 CHECKSUM_FILE="${VOCO_DOWNLOAD_DIR}/voco_checksums.txt"
 SIGNATURE_FILE="${CHECKSUM_FILE}.asc"
-DEB_CHECKSUM_FILE="${VOCO_DOWNLOAD_DIR}/voco_${VERSION}_amd64.deb.sha256"
+PACKAGE_CHECKSUM_FILE="${VOCO_DOWNLOAD_DIR}/${PACKAGE_NAME}.sha256"
 
 dim "Includes English speech recognition. Speech stays on this computer."
 voco_start_release_metadata_downloads
-voco_download "VOCO v${VERSION}" "$DEB_FILE" "$DEB_URL" || exit 1
+voco_download "VOCO v${VERSION}" "$PACKAGE_FILE" "$PACKAGE_URL" || exit 1
 voco_ui_stage 2 'Checking your download.' 'Waiting for signed release checksums.'
 if ! voco_finish_release_metadata_downloads; then
   exit 1
@@ -1217,11 +1309,11 @@ voco_ui_sweep 'Checking your download.' 'Checking the publisher signature.'
 voco_verify_release_signature
 voco_ui_sweep 'Checking your download.' 'Checking the package checksum.'
 
-if ! grep -F "  $(basename "$DEB_FILE")" "$CHECKSUM_FILE" > "$DEB_CHECKSUM_FILE"; then
-  err "Could not find a checksum entry for $(basename "$DEB_FILE")"
+if ! grep -F "  $(basename "$PACKAGE_FILE")" "$CHECKSUM_FILE" > "$PACKAGE_CHECKSUM_FILE"; then
+  err "Could not find a checksum entry for $(basename "$PACKAGE_FILE")"
 fi
 
-if (cd "$VOCO_DOWNLOAD_DIR" && sha256sum --check "$(basename "$DEB_CHECKSUM_FILE")" >/dev/null 2>&1); then
+if (cd "$VOCO_DOWNLOAD_DIR" && sha256sum --check "$(basename "$PACKAGE_CHECKSUM_FILE")" >/dev/null 2>&1); then
   voco_ui_pause
   if [[ "$VOCO_TERMINAL_MOTION" == true ]]; then voco_ui_frame 'Your download checks out.' 'Package checksum verified.' '✓'; else ok "Package checksum verified"; fi
 else
@@ -1235,8 +1327,13 @@ voco_ui_stage 3 'Setting up VOCO.' 'Preparing the verified package.'
 # Only this owned staging directory contains public release files. Let APT's
 # unprivileged download user read the verified package without widening user dirs.
 chmod 755 "$VOCO_DOWNLOAD_DIR"
-chmod 644 "$DEB_FILE"
-if voco_install_deb_package "$DEB_FILE" "$VERSION" "amd64"; then
+chmod 644 "$PACKAGE_FILE"
+if [[ "$VOCO_PACKAGE_MANAGER" == dnf ]]; then
+  VOCO_INSTALL_PACKAGE=(voco_install_rpm_package "$PACKAGE_FILE" "${VERSION}-1" "x86_64")
+else
+  VOCO_INSTALL_PACKAGE=(voco_install_deb_package "$PACKAGE_FILE" "$VERSION" "amd64")
+fi
+if "${VOCO_INSTALL_PACKAGE[@]}"; then
   voco_ui_stage 3 'Finishing desktop setup.' 'VOCO is installed. Checking desktop integration.'
 else
   err "Installation failed: ${VOCO_INSTALL_ERROR}"

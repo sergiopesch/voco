@@ -61,4 +61,15 @@ echo tampered > "$workdir/voco_latest_amd64.deb"
 expect_status 1 "a changed package" "$VERIFY" --keys "$workdir/KEYS" "$workdir/voco_latest_checksums.txt"
 (cd "$workdir" && sha256sum voco_latest_amd64.deb > voco_latest_checksums.txt)
 expect_status 1 "a changed manifest" "$VERIFY" --keys "$workdir/KEYS" "$workdir/voco_latest_checksums.txt"
+
+# The RPM's manifests take the same detached signature and verification.
+echo rpm payload > "$workdir/voco_latest_x86_64.rpm"
+(cd "$workdir" && sha256sum voco_latest_x86_64.rpm > voco_latest_rpm_checksums.txt)
+expect_status 2 "unsigned RPM checksums" "$VERIFY" --keys "$workdir/KEYS" "$workdir/voco_latest_rpm_checksums.txt"
+GPG_KEY_FINGERPRINT="$release_key" "$SIGN" "$workdir/voco_latest_rpm_checksums.txt" >/dev/null
+expect_status 0 "signed RPM checksums" "$VERIFY" --keys "$workdir/KEYS" "$workdir/voco_latest_rpm_checksums.txt"
+expect_status 2 "RPM checksums signed by a key outside KEYS" \
+  "$VERIFY" --keys "$workdir/OTHER_KEYS" "$workdir/voco_latest_rpm_checksums.txt"
+echo tampered > "$workdir/voco_latest_x86_64.rpm"
+expect_status 1 "a changed RPM" "$VERIFY" --keys "$workdir/KEYS" "$workdir/voco_latest_rpm_checksums.txt"
 echo "verify-release tests passed"

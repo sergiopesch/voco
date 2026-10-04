@@ -142,7 +142,7 @@ printf 'PROMPT REMAINS VISIBLE\\n'
 
     def test_real_verification_gate_rejects_missing_or_corrupt_checksum(self):
         source = (ROOT / 'install').read_text()
-        start = source.index('if ! grep -F "  $(basename "$DEB_FILE")"')
+        start = source.index('if ! grep -F "  $(basename "$PACKAGE_FILE")"')
         verification = source[start:source.index('# ─── Install', start)]
         for case in ('valid', 'corrupt', 'missing'):
             with self.subTest(case=case), tempfile.TemporaryDirectory() as folder:
@@ -155,9 +155,9 @@ printf 'PROMPT REMAINS VISIBLE\\n'
                 (root / 'checksums').write_bytes(checksum if case != 'missing' else b'')
                 body = '''
 VOCO_DOWNLOAD_DIR="$1"
-DEB_FILE="$1/fixture.deb"
+PACKAGE_FILE="$1/fixture.deb"
 CHECKSUM_FILE="$1/checksums"
-DEB_CHECKSUM_FILE="$1/selected.sha256"
+PACKAGE_CHECKSUM_FILE="$1/selected.sha256"
 '''
                 run = subprocess.run(
                     ['bash', '-c', PREFIX + body + verification + '\nprintf "PASSED INSTALL GATE\\n"', 'test', folder],

@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
-"""Assemble the complete NVIDIA Debian package from a Tauri base package."""
+"""Assemble the complete NVIDIA Debian package, and optionally the Fedora RPM
+from the same staged tree, from a Tauri base package."""
 import argparse
+import errno
 import hashlib
 import json
 import os
@@ -10,6 +12,7 @@ import stat
 import subprocess
 import tempfile
 from debian_maintainer import render_postinst
+import rpm_package
 
 ROOT = Path(__file__).resolve().parents[1]
 VENDORED_NOTICES = {
@@ -115,13 +118,81 @@ def copy_vendored_notices(source_root, doc):
             shutil.copy2(source_root / "vendor" / crate / name, destination / name)
 
 
+def stage_payload(base, stage, version, package_version):
+    """Stage the complete package tree once: the base package plus the speech
+    runtime, documentation and licenses. Both package formats are built from it."""
+    subprocess.run(["dpkg-deb", "-R", str(base), str(stage)], check=True)
+    validate_base_executables(stage)
+    subprocess.run(["python3", str(ROOT / "scripts/verify-glib-backport.py")], check=True)
+    speech = stage / "usr/lib/voco/speech"
+    speech.mkdir(parents=True)
+    source = ROOT / "runtime/speech"
+    for name in ("stream_worker.py", "worker_main.py", "streaming.py", "adapters.py",
+                 "MODEL-IDENTITY.json", "NATIVE-BUILD.json", "libbench_nemo_pool.so"):
+        shutil.copy2(source / name, speech / name)
+    for name in ("lib", "models"):
+        shutil.copytree(source / name, speech / name, symlinks=True)
+    model = speech / "models/nemotron-speech-streaming-en-0.6b.q8_0.gguf"
+    expected = json.loads((speech / "MODEL-IDENTITY.json").read_text())["model_sha256"]
+    if digest(model) != expected:
+        raise ValueError("Packaged model does not match pinned MODEL-IDENTITY.json")
+    doc = stage / "usr/share/doc/voco"
+    shutil.copytree(ROOT / "runtime/notices", doc / "nvidia", dirs_exist_ok=True)
+    for name in ("report-performance.py", "report-speech-performance.py"):
+        shutil.copy2(ROOT / "scripts" / name, doc / name)
+    for name in ("README.md", "AGENTS.md"):
+        shutil.copy2(ROOT / name, doc / name)
+    shutil.copytree(ROOT / "docs", doc / "docs", dirs_exist_ok=True, ignore=packaged_docs_ignore)
+    copy_vendored_notices(ROOT, doc)
+    write_copyright(ROOT, doc)
+    identity = {"version": package_version, "application_version": version,
+                "backend": "CPU native pool", "context": 1, "cpu_threads": 4,
+                "cpu_thread_policy": "At most four, reserving one CPU from process affinity for desktop work (minimum one); explicit research overrides preserved",
+                **payload_inventory(speech)}
+    (speech / "MANIFEST.json").write_text(json.dumps(identity, indent=2) + "\n")
+    normalize_payload_modes(speech)
+    normalize_payload_modes(doc)
+    postinst = stage / 'DEBIAN/postinst'
+    postinst.write_text(render_postinst(stage))
+    postinst.chmod(0o755)
+    control = stage / "DEBIAN/control"
+    lines = [line for line in control.read_text().splitlines()
+             if not line.startswith(("Version:", "Installed-Size:"))]
+    files = [p for p in sorted(stage.rglob("*")) if p.is_file() and not p.is_symlink()
+             and p.relative_to(stage).parts[0] != "DEBIAN"]
+    size = (sum(path.stat().st_size for path in files) + 1023) // 1024
+    control.write_text("\n".join(lines) + f"\nVersion: {package_version}\nInstalled-Size: {size}\n")
+    (stage / "DEBIAN/md5sums").write_text("".join(
+        f"{digest(path, 'md5')}  {path.relative_to(stage)}\n" for path in files))
+
+
+def publish(temporary, destination):
+    """Publish only a completely built archive; an existing file is never replaced."""
+    try:
+        os.link(temporary, destination)
+    except OSError as error:
+        if error.errno != errno.EXDEV:
+            raise
+        with tempfile.TemporaryDirectory(prefix="voco-publish-", dir=destination.parent) as folder:
+            copy = Path(folder) / destination.name
+            shutil.copy2(temporary, copy)
+            os.link(copy, destination)
+
+
+def describe(path):
+    return {"package": str(path), "bytes": path.stat().st_size, "sha256": digest(path)}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("base", type=Path)
     parser.add_argument("output", type=Path)
     parser.add_argument("--debian-version", help="Local revision, e.g. 2026.0.35+local1")
+    parser.add_argument("--rpm", type=Path, metavar="OUTPUT.rpm",
+                        help="Also build the Fedora package from the same staged tree")
     args = parser.parse_args()
     base, output = args.base.resolve(), args.output.resolve()
+    rpm_output = args.rpm.resolve() if args.rpm else None
     version = json.loads((ROOT / "package.json").read_text())["version"]
     package_version = args.debian_version or version
     if package_version != version and not package_version.startswith(version + "+"):
@@ -132,60 +203,29 @@ def main():
         parser.error(f"Base package version {actual} does not match source {version}")
     if output.exists():
         parser.error("Output already exists; choose a new filename")
+    if rpm_output is not None:
+        rpm_package.validate_version(package_version)
+        if rpm_output.exists() or rpm_output == output:
+            parser.error("RPM output already exists; choose a new filename")
+        rpm_output.parent.mkdir(parents=True, exist_ok=True)
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="voco-package-", dir=output.parent) as directory:
         stage = Path(directory) / "stage"
-        subprocess.run(["dpkg-deb", "-R", str(base), str(stage)], check=True)
-        validate_base_executables(stage)
-        subprocess.run(["python3", str(ROOT / "scripts/verify-glib-backport.py")], check=True)
-        speech = stage / "usr/lib/voco/speech"
-        speech.mkdir(parents=True)
-        source = ROOT / "runtime/speech"
-        for name in ("stream_worker.py", "worker_main.py", "streaming.py", "adapters.py",
-                     "MODEL-IDENTITY.json", "NATIVE-BUILD.json", "libbench_nemo_pool.so"):
-            shutil.copy2(source / name, speech / name)
-        for name in ("lib", "models"):
-            shutil.copytree(source / name, speech / name, symlinks=True)
-        model = speech / "models/nemotron-speech-streaming-en-0.6b.q8_0.gguf"
-        expected = json.loads((speech / "MODEL-IDENTITY.json").read_text())["model_sha256"]
-        if digest(model) != expected:
-            raise ValueError("Packaged model does not match pinned MODEL-IDENTITY.json")
-        doc = stage / "usr/share/doc/voco"
-        shutil.copytree(ROOT / "runtime/notices", doc / "nvidia", dirs_exist_ok=True)
-        for name in ("report-performance.py", "report-speech-performance.py"):
-            shutil.copy2(ROOT / "scripts" / name, doc / name)
-        for name in ("README.md", "AGENTS.md"):
-            shutil.copy2(ROOT / name, doc / name)
-        shutil.copytree(ROOT / "docs", doc / "docs", dirs_exist_ok=True, ignore=packaged_docs_ignore)
-        copy_vendored_notices(ROOT, doc)
-        write_copyright(ROOT, doc)
-        identity = {"version": package_version, "application_version": version,
-                    "backend": "CPU native pool", "context": 1, "cpu_threads": 4,
-                    "cpu_thread_policy": "At most four, reserving one CPU from process affinity for desktop work (minimum one); explicit research overrides preserved",
-                    **payload_inventory(speech)}
-        (speech / "MANIFEST.json").write_text(json.dumps(identity, indent=2) + "\n")
-        normalize_payload_modes(speech)
-        normalize_payload_modes(doc)
-        postinst = stage / 'DEBIAN/postinst'
-        postinst.write_text(render_postinst(stage))
-        postinst.chmod(0o755)
-        control = stage / "DEBIAN/control"
-        lines = [line for line in control.read_text().splitlines()
-                 if not line.startswith(("Version:", "Installed-Size:"))]
-        files = [p for p in sorted(stage.rglob("*")) if p.is_file() and not p.is_symlink()
-                 and p.relative_to(stage).parts[0] != "DEBIAN"]
-        size = (sum(path.stat().st_size for path in files) + 1023) // 1024
-        control.write_text("\n".join(lines) + f"\nVersion: {package_version}\nInstalled-Size: {size}\n")
-        (stage / "DEBIAN/md5sums").write_text("".join(
-            f"{digest(path, 'md5')}  {path.relative_to(stage)}\n" for path in files))
+        stage_payload(base, stage, version, package_version)
         temporary_output = Path(directory) / "package.deb"
         subprocess.run(["dpkg-deb", "--root-owner-group", "-Zzstd", "-z9", "--build",
                         str(stage), str(temporary_output)], check=True)
-        # Publish only a completely built archive; an existing file is never replaced.
-        os.link(temporary_output, output)
-    print(json.dumps({"package": str(output), "version": package_version,
-                      "application_version": version, "bytes": output.stat().st_size,
-                      "sha256": digest(output)}))
+        temporary_rpm = None
+        if rpm_output is not None:
+            temporary_rpm = rpm_package.build_rpm(stage, Path(directory) / "rpm", package_version)
+        # Both archives are complete before either is published.
+        publish(temporary_output, output)
+        if temporary_rpm is not None:
+            publish(temporary_rpm, rpm_output)
+    summary = {**describe(output), "version": package_version, "application_version": version}
+    if rpm_output is not None:
+        summary["rpm"] = {**describe(rpm_output), "release": rpm_package.RELEASE}
+    print(json.dumps(summary))
 
 
 if __name__ == "__main__":

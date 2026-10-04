@@ -424,5 +424,91 @@ if voco_verify_desktop_input; then fail "Installer accepted incomplete desktop s
 [[ "$VOCO_INPUT_ERROR" == *'/dev/uinput'* ]] || fail "Lost the actionable input error"
 export MOCK_INPUT_READY=true
 voco_verify_desktop_input || fail "Installer rejected ready desktop input"
+
+# Fedora: DNF installs the local RPM; rpm reports what is installed.
+MOCK_RPM="${TEST_ROOT}/voco-test.rpm"
+: > "${MOCK_RPM}"
+cat > "${MOCK_BIN}/dnf" <<'SH'
+#!/usr/bin/env bash
+set -euo pipefail
+printf 'dnf\t%s\n' "$*" >> "${MOCK_PACKAGE_LOG:?}"
+if [[ "${MOCK_DNF_EXIT:-0}" != "0" ]]; then
+  exit "${MOCK_DNF_EXIT}"
+fi
+case "${MOCK_DNF_OUTCOME:-installed}" in
+  installed) printf '%s\t%s\n' "${MOCK_EXPECTED_VERSION:?}" "${MOCK_EXPECTED_ARCHITECTURE:?}" > "${MOCK_PACKAGE_STATE:?}" ;;
+  removed) rm -f -- "${MOCK_PACKAGE_STATE:?}" ;;
+  wrong-version) printf '2026.0.20-1\t%s\n' "${MOCK_EXPECTED_ARCHITECTURE:?}" > "${MOCK_PACKAGE_STATE:?}" ;;
+  wrong-architecture) printf '%s\taarch64\n' "${MOCK_EXPECTED_VERSION:?}" > "${MOCK_PACKAGE_STATE:?}" ;;
+  two-installed)
+    printf '%s\t%s\n2026.0.20-1\t%s\n' "${MOCK_EXPECTED_VERSION:?}" "${MOCK_EXPECTED_ARCHITECTURE:?}" \
+      "${MOCK_EXPECTED_ARCHITECTURE:?}" > "${MOCK_PACKAGE_STATE:?}"
+    ;;
+  *) exit 65 ;;
+esac
+SH
+cat > "${MOCK_BIN}/rpm" <<'SH'
+#!/usr/bin/env bash
+set -euo pipefail
+printf 'rpm\t%s\n' "$*" >> "${MOCK_PACKAGE_LOG:?}"
+# The installer must ask for VERSION-RELEASE and the architecture of voco only.
+[[ "$*" == "-q --queryformat %{VERSION}-%{RELEASE}\t%{ARCH}\n voco" ]] || exit 64
+if [[ ! -f "${MOCK_PACKAGE_STATE:?}" ]]; then
+  echo "package voco is not installed"
+  exit 1
+fi
+cat -- "${MOCK_PACKAGE_STATE}"
+SH
+chmod 0700 "${MOCK_BIN}/dnf" "${MOCK_BIN}/rpm"
+export MOCK_EXPECTED_VERSION="2026.0.21-1"
+export MOCK_EXPECTED_ARCHITECTURE="x86_64"
+
+reset_mock_rpm_case() {
+  rm -f -- "${MOCK_PACKAGE_STATE}" "${MOCK_PACKAGE_LOG}"
+  export MOCK_DNF_EXIT=0
+  export MOCK_DNF_OUTCOME=installed
+}
+
+reset_mock_rpm_case
+voco_install_rpm_package "${MOCK_RPM}" "${MOCK_EXPECTED_VERSION}" "${MOCK_EXPECTED_ARCHITECTURE}" ||
+  fail "DNF install was rejected: ${VOCO_INSTALL_ERROR}"
+grep -Fxq $'dnf\tinstall -y -- '"${MOCK_RPM}" "${MOCK_PACKAGE_LOG}" ||
+  fail "installer did not ask DNF to resolve exactly the local RPM"
+if grep -Eq $'^rpm\t(-i|-U|--install|--upgrade)' "${MOCK_PACKAGE_LOG}"; then
+  fail "installer bypassed DNF dependency resolution"
+fi
+for outcome in removed wrong-version wrong-architecture two-installed; do
+  reset_mock_rpm_case
+  export MOCK_DNF_OUTCOME="$outcome"
+  if voco_install_rpm_package "${MOCK_RPM}" "${MOCK_EXPECTED_VERSION}" "${MOCK_EXPECTED_ARCHITECTURE}"; then
+    fail "DNF result $outcome was incorrectly accepted"
+  fi
+  [[ -n "$VOCO_INSTALL_ERROR" ]] || fail "Missing RPM verification error"
+done
+reset_mock_rpm_case
+export MOCK_DNF_EXIT=1
+if voco_install_rpm_package "${MOCK_RPM}" "${MOCK_EXPECTED_VERSION}" "${MOCK_EXPECTED_ARCHITECTURE}"; then
+  fail "Failed DNF installation was accepted"
+fi
+[[ "$VOCO_INSTALL_ERROR" == *DNF* ]] || fail "DNF failure returned an unclear error"
+
+# The package manager decides the format; APT wins where both exist.
+DETECT_BIN="${TEST_ROOT}/detect-bin"
+mkdir -p "${DETECT_BIN}"
+detect_with() {
+  rm -f -- "${DETECT_BIN}"/*
+  local tool
+  for tool in "$@"; do ln -s "${MOCK_BIN}/sudo" "${DETECT_BIN}/${tool}"; done
+  hash -r
+  PATH="${DETECT_BIN}" voco_detect_package_manager
+}
+detect_with apt-get dpkg-query && [[ "${VOCO_PACKAGE_MANAGER}" == apt ]] || fail "APT system not detected"
+detect_with dnf rpm && [[ "${VOCO_PACKAGE_MANAGER}" == dnf ]] || fail "DNF system not detected"
+detect_with apt-get dpkg-query dnf rpm && [[ "${VOCO_PACKAGE_MANAGER}" == apt ]] ||
+  fail "A system with both package managers must keep APT"
+for tools in "" "apt-get" "dnf" "dpkg-query rpm"; do
+  if detect_with ${tools}; then fail "Incomplete package tools '${tools}' were accepted"; fi
+  [[ -z "${VOCO_PACKAGE_MANAGER}" ]] || fail "Detection left a package manager for '${tools}'"
+done
 export PATH="${ORIGINAL_PATH}"
 echo "Installer helper behavior is valid."
