@@ -2,7 +2,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::fs;
 use std::io::{BufRead, BufReader, Read, Write};
-use std::os::fd::AsRawFd;
 use std::os::unix::fs::{FileTypeExt, MetadataExt, PermissionsExt};
 use std::os::unix::net::UnixStream;
 use std::path::{Path, PathBuf};
@@ -341,30 +340,11 @@ fn validate_private_directory(path: &Path, label: &str) -> Result<(), String> {
 }
 
 fn validate_peer(stream: &UnixStream) -> Result<(), String> {
-    let mut credentials = libc::ucred {
-        pid: 0,
-        uid: 0,
-        gid: 0,
-    };
-    let mut length = std::mem::size_of::<libc::ucred>() as libc::socklen_t;
-    // SAFETY: `credentials` and `length` are valid writable buffers for the
-    // kernel's fixed-size SO_PEERCRED result, and the stream fd stays open.
-    let result = unsafe {
-        libc::getsockopt(
-            stream.as_raw_fd(),
-            libc::SOL_SOCKET,
-            libc::SO_PEERCRED,
-            (&mut credentials as *mut libc::ucred).cast(),
-            &mut length,
-        )
-    };
-    if result != 0 || length as usize != std::mem::size_of::<libc::ucred>() {
-        return Err("Could not verify the VOCO input method peer.".to_string());
+    match crate::browser_socket::peer_uid(stream) {
+        Ok(uid) if uid == current_euid() => Ok(()),
+        Ok(_) => Err("VOCO input method peer is owned by another user.".to_string()),
+        Err(_) => Err("Could not verify the VOCO input method peer.".to_string()),
     }
-    if credentials.uid != current_euid() {
-        return Err("VOCO input method peer is owned by another user.".to_string());
-    }
-    Ok(())
 }
 
 fn current_euid() -> u32 {
@@ -659,6 +639,18 @@ mod tests {
         fs::remove_file(&socket_path).expect("remove fake socket");
         fs::remove_dir(socket_path.parent().expect("socket parent"))
             .expect("remove fake directory");
+    }
+
+    #[test]
+    fn unverifiable_engine_peer_is_rejected() {
+        // getsockopt fails with ENOTSOCK on a descriptor that isn't a socket.
+        let file = UnixStream::from(std::os::fd::OwnedFd::from(
+            fs::File::open("/dev/null").expect("open /dev/null"),
+        ));
+        assert_eq!(
+            validate_peer(&file).expect_err("peer rejected"),
+            "Could not verify the VOCO input method peer."
+        );
     }
 
     #[test]
