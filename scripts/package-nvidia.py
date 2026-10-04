@@ -21,7 +21,7 @@ VENDORED_NOTICES = {
 UNPACKAGED_DOCS = {"guide", "testing"}
 COPYRIGHT_PREFACE = """\
 VOCO is distributed under the MIT License below. The speech runtime, speech
-model and helper programs in this package keep their own licenses and notices:
+model and patched libraries in this package keep their own licenses and notices:
 see nvidia/, vendor/ and THIRD-PARTY-NOTICES.txt in this folder.
 
 """

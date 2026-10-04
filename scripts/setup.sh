@@ -146,8 +146,8 @@ APT_PACKAGES=(pkg-config libglib2.0-dev libsoup-3.0-dev
   libjavascriptcoregtk-4.1-dev libwebkit2gtk-4.1-dev
   libayatana-appindicator3-dev libpulse-dev clang mold
   ibus gir1.2-ibus-1.0 python3-gi python3-numpy python3-psutil)
-# Assembly compiles the private input helper, then the package verifier runs.
-PACKAGE_TOOLS=(g++ patch binutils desktop-file-utils appstream)
+# The package verifier needs readelf, desktop-file-validate and appstreamcli.
+PACKAGE_TOOLS=(binutils desktop-file-utils appstream)
 if $INSTALL_MODE; then APT_PACKAGES+=("${PACKAGE_TOOLS[@]}"); fi
 
 if command -v apt &>/dev/null; then
@@ -171,7 +171,6 @@ SESSION="${XDG_SESSION_TYPE:-x11}"
 if [[ "$SESSION" == "wayland" ]]; then
   [[ -w /dev/uinput ]] && ok "/dev/uinput" || dim "Wayland paste keys need /dev/uinput; the VOCO package's udev rule grants it at sign-in"
   command -v wl-copy &>/dev/null && ok "wl-clipboard" || dim "wl-clipboard missing: required on supported wlroots desktops; GNOME uses xclip"
-  dim "Wayland needs a configured input daemon; follow docs/platform/README.md for scoped device/socket access"
 else
   command -v xdotool &>/dev/null && ok "xdotool" || dim "X11 paste helper missing: install xdotool"
   command -v xclip &>/dev/null && ok "xclip" || dim "X11 clipboard helper missing: install xclip"

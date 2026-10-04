@@ -234,7 +234,7 @@ fn paste_status_for(input: DesktopInputStatus) -> (DesktopInputStatus, DesktopPa
 }
 
 /// Helper diagnostics plus input and paste status from a single helper scan,
-/// so each diagnostics poll probes the daemon once.
+/// so each diagnostics poll checks keyboard access once.
 pub fn runtime_input_diagnostics() -> (RuntimeDiagnostics, DesktopInputStatus, DesktopPasteStatus) {
     let preflight = input_preflight();
     let input = if desktop_paste_enabled() {

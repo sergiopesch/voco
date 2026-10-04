@@ -63,7 +63,7 @@ the IBus input source and the Chromium extension stay off until you add them.
 `/usr/share/doc/voco/` holds:
 
 - `copyright`: a short preface followed by VOCO's MIT License. The preface says
-  that the speech runtime, the model and the helper programs keep their own
+  that the speech runtime, the model and the patched libraries keep their own
   licenses, and points to the files below.
 - `THIRD-PARTY-NOTICES.txt`: a summary of the vendored glib, tray-icon and
   global-hotkey sources, their licenses and VOCO's changes, from
@@ -82,7 +82,6 @@ the IBus input source and the Chromium extension stay off until you add them.
 | The app | `libpulse0` for Wayland capture, `libnotify-bin` for the startup failure notice, `libc6 (>= 2.39)`, `libstdc++6 (>= 13.2.0)` |
 | Speech worker | `python3`, `python3-numpy`, `python3-psutil`, `libsentencepiece0` |
 | Paste | `xdotool`, `xclip`, `wl-clipboard` |
-| Quitting VOCO from a terminal | `procps`, for `pkill -x voco` |
 | IBus engine | `ibus`, `gir1.2-ibus-1.0`, `python3-gi` |
 
 The package recommends nothing. VOCO presses the Wayland paste keys through its
