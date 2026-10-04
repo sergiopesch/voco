@@ -16,7 +16,7 @@ use protocol::{Delivery, Health, MAX_FRAMES};
 use pulse::{Pulse, Status};
 use std::sync::{
     mpsc::{self, Receiver, SyncSender},
-    Arc, Mutex,
+    Mutex,
 };
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
@@ -52,25 +52,11 @@ struct Envelope {
     request: Request,
     reply: Reply,
 }
-struct Shared {
+/// Lives in a static and is never dropped; `shutdown()` is the joined teardown.
+/// The worker owns every resource, and a disconnected channel also shuts it down.
+pub struct NativeCaptureService {
     commands: SyncSender<Envelope>,
     thread: Mutex<Option<JoinHandle<()>>>,
-}
-impl Drop for Shared {
-    fn drop(&mut self) {
-        let (reply, _) = mpsc::sync_channel(1);
-        let _ = self.commands.try_send(Envelope {
-            deadline: Instant::now() + CALL_TIMEOUT,
-            request: Request::Shutdown,
-            reply,
-        });
-        // The worker owns all resources, observes channel disconnection/lease expiry,
-        // and never references this object. Explicit shutdown provides a joined result.
-    }
-}
-#[derive(Clone)]
-pub struct NativeCaptureService {
-    shared: Arc<Shared>,
 }
 impl NativeCaptureService {
     pub fn new() -> Result<Self, String> {
@@ -80,16 +66,13 @@ impl NativeCaptureService {
             .spawn(move || worker(incoming))
             .map_err(|e| e.to_string())?;
         Ok(Self {
-            shared: Arc::new(Shared {
-                commands,
-                thread: Mutex::new(Some(worker)),
-            }),
+            commands,
+            thread: Mutex::new(Some(worker)),
         })
     }
     fn call(&self, request: Request) -> Result<Response, String> {
         let (reply, result) = mpsc::sync_channel(1);
-        self.shared
-            .commands
+        self.commands
             .try_send(Envelope {
                 deadline: Instant::now() + CALL_TIMEOUT,
                 request,
@@ -156,7 +139,6 @@ impl NativeCaptureService {
     pub fn shutdown(&self) -> Result<(), String> {
         self.call(Request::Shutdown)?;
         let thread = self
-            .shared
             .thread
             .lock()
             .map_err(|_| "Native worker join poisoned")?
