@@ -109,6 +109,9 @@ message under **My words are not appearing**.
 | Pasting on … requires: … | A helper program is missing. Install its package. |
 | Desktop paste is not enabled. | `VOCO_DESKTOP_PASTE=0` is set in VOCO's environment. |
 
+<!-- VOCO 2026.0.59 and earlier link here by this anchor. -->
+<a id="ydotoold-ydotool-daemon"></a>
+
 ### Wayland paste keys
 
 On Wayland, VOCO presses the paste keys through its own virtual keyboard, a

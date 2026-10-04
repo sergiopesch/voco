@@ -52,6 +52,8 @@ Review keeps a dictation VOCO couldn't finish. The
   reconnect the GNOME panel, or bind another shortcut to `voco --toggle`.
 - `/usr/share/doc/voco/copyright` in the package: VOCO's MIT License, with a pointer
   to the runtime, model and patched-library notices beside it.
+- CI installs its packages without Recommends, and the application suites
+  start as soon as VOCO reports ready rather than after a fixed wait.
 - A CI job, Application, that runs the release build of `voco` and
   `voco-browser-host` with the speech runtime through the GNOME panel,
   full-application, Wayland, Chromium field and toolbar suites. The delivery suites
@@ -73,7 +75,11 @@ Review keeps a dictation VOCO couldn't finish. The
   included, and it is recommended rather than required. After upgrading, run
   `voco --setup-panel` again, then sign out and back in.
 - The guided installer installs only the VOCO package, with APT or DNF, then
-  checks the paste prerequisites without sending keys.
+  checks the paste prerequisites without sending keys. It no longer writes or
+  migrates VOCO's settings: VOCO creates `~/.config/voco/config.json` at first
+  launch and copies an older `~/.config/voice/config.json` then. Before it
+  downloads anything, it refuses glibc older than 2.39 or a processor without
+  AVX2, FMA or F16C, and names what is missing.
 - A recording that stops before any words were recognized says **Nothing was
   typed** and why, instead of that some words may be missing. VOCO logs the reason
   capture stopped.
@@ -108,9 +114,10 @@ Review keeps a dictation VOCO couldn't finish. The
 - VOCO wakes less often. Each speech request reaches the worker in one write
   rather than thousands of small ones, and with `VOCO_PERFORMANCE_LOG` and
   `VOCO_HOTKEY_TRACE` unset the window no longer sends diagnostics that VOCO
-  discarded. Idle native capture polls the sound server every 250 ms
+  discarded. Each paste notices its clipboard and key helpers exit within 1 ms
+  rather than 5 ms. Idle native capture polls the sound server every 250 ms
   rather than 5 ms; the desktop check reuses a GNOME companion check for up to
-  20 seconds, or 2 seconds after a failure; the tray meter ticks every 90 ms rather
+  20 seconds, or 2 seconds after a failure, and isn't run at all outside GNOME; the tray meter ticks every 90 ms rather
   than 33 ms, and only while the tray icon is visible; and the window doesn't
   re-render for each audio level, recognition update or unchanged status poll.
 - Settings → Updates gives instructions for GitHub Release and Source installs. An
@@ -122,9 +129,12 @@ Review keeps a dictation VOCO couldn't finish. The
   packages, and uploads nothing.
 - `bash scripts/setup.sh --install` checks the provisioned speech runtime, never
   downloading one, then builds, assembles, verifies and installs the complete
-  package with APT. Setup installs the worker's NumPy and psutil, installs Tauri
-  CLI 2.10.1 when it is missing and warns about any other version, and names
-  rustup rather than piping its installer into a shell.
+  package with APT. Setup installs the worker's NumPy and the C compiler the build
+  needs, installs Tauri CLI 2.10.1 when it is missing and warns about any other
+  version, and names rustup rather than piping its installer into a shell. It asks
+  for the sudo password before its progress line, shows APT's errors when APT
+  fails, skips APT when nothing is missing in development mode, and no longer
+  writes a linker override into the checkout.
 - `npm test` runs `scripts/test-unit.sh`. `package.json` and `Cargo.toml` declare
   the MIT license and the repository, and `Cargo.toml` sets `rust-version` to
   1.94.0, CI's toolchain.
@@ -146,7 +156,8 @@ Review keeps a dictation VOCO couldn't finish. The
   migration, the private legacy `ydotoold`, `voco --setup-desktop-input`, and the
   `ydotool` and `ydotoold` package recommendations. On its first Wayland launch
   after the upgrade, VOCO removes its own old service's enablement and stops it.
-- The `procps` dependency, which nothing uses any more.
+- The `procps` and `python3-psutil` dependencies. The speech worker's opt-in
+  performance log reads CPU and memory use from the kernel.
 - The Flatpak, Snap, AppImage and Arch recipes, the previous RPM recipe and the
   SentencePiece companion recipes. VOCO ships the Debian package and the Fedora
   RPM, both from one staged tree, and keeps its libsentencepiece0 dependency.
@@ -226,6 +237,15 @@ Review keeps a dictation VOCO couldn't finish. The
   **Source selection is stale**.
 - When restoring the previous shortcut also failed, the error said "the previous
   hotkey" instead of naming it.
+- **Record keys** in Settings saved a shifted digit or symbol, or a letter on a
+  non-Latin layout, as the typed character, which the shortcut check rejects. It
+  now records the key you press, such as Ctrl+Shift+1 or Ctrl+Alt+D on a
+  Cyrillic layout.
+- When a shortcut or microphone couldn't be saved, Settings said only that VOCO
+  could not save those settings. It now gives VOCO's reason under the field.
+- After an upgrade from 2026.0.59 with the GNOME panel on, the installer showed a
+  generic warning that said the tray menu remains available, which isn't true on
+  Debian 13 or Fedora 44. It now says to sign out and back in to load the panel.
 - The docs said plain PulseAudio is enough. On Wayland VOCO needs PipeWire's
   PulseAudio service, `pipewire-pulse`, which all four supported systems use by
   default.
