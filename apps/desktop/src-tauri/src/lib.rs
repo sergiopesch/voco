@@ -112,15 +112,6 @@ fn trace_modes(hotkey: Option<&str>, performance: Option<&str>) -> (bool, bool) 
     (hotkey == Some("1"), performance == Some("1"))
 }
 
-#[derive(Debug, Clone, Copy, Default, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct TrayPopoverAnchor {
-    pub rect_position_x: i32,
-    pub rect_position_y: i32,
-    pub rect_width: u32,
-    pub rect_height: u32,
-}
-
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ConfigSnapshot {

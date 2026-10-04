@@ -88,13 +88,6 @@ type ResizeDirection =
   | "SouthWest"
   | "West";
 
-type TrayPopoverAnchor = {
-  rectPositionX: number;
-  rectPositionY: number;
-  rectWidth: number;
-  rectHeight: number;
-};
-
 function cleanupDeferredListener(
   registration: Promise<() => void>,
   label: string,
@@ -241,7 +234,6 @@ export function App() {
   const appStartMsRef = useRef(performance.now());
   const initStartedRef = useRef(false);
   const appMountedLoggedRef = useRef(false);
-  const trayPopoverAnchorRef = useRef<TrayPopoverAnchor | null>(null);
   const panelSizeRef = useRef<LogicalSize>(PANEL_SIZE);
   const configSaveQueueRef = useRef<Promise<void>>(Promise.resolve());
   const configSavePendingCountRef = useRef(0);
@@ -685,7 +677,7 @@ export function App() {
   }, [dictationInProgress, refreshPanelState, setSurface]);
 
   const showPopover = useCallback(
-    async (anchor: TrayPopoverAnchor) => {
+    async () => {
       const requestVersion = panelRequestVersionRef.current + 1;
       panelRequestVersionRef.current = requestVersion;
       const state = useStore.getState();
@@ -696,7 +688,6 @@ export function App() {
       if (isDictationActive(state.status) || dictationInProgress()) {
         return;
       }
-      trayPopoverAnchorRef.current = anchor;
       await refreshPanelState();
       const latestState = useStore.getState();
       if (
@@ -943,24 +934,12 @@ export function App() {
         if (!isCurrentRequest()) {
           return;
         }
-        const anchor = trayPopoverAnchorRef.current;
-        const hasAnchor = anchor && (anchor.rectWidth > 0 || anchor.rectHeight > 0);
-        const monitors = await availableMonitors().catch(() => []);
-        const targetMonitor = (hasAnchor
-          ? monitors.find((monitor) =>
-            anchor.rectPositionX >= monitor.position.x &&
-            anchor.rectPositionX < monitor.position.x + monitor.size.width &&
-            anchor.rectPositionY >= monitor.position.y &&
-            anchor.rectPositionY < monitor.position.y + monitor.size.height)
-          : await currentMonitor().catch(() => null)) ?? monitors[0];
+        const targetMonitor = await currentMonitor().catch(() => null) ??
+          (await availableMonitors().catch(() => []))[0];
         const scaleFactor = targetMonitor?.scaleFactor ??
           await currentWindow.scaleFactor().catch(() => window.devicePixelRatio || 1);
         const workArea = targetMonitor?.workArea;
         const placement = placeTrayPopover(
-          hasAnchor ? {
-            x: anchor.rectPositionX, y: anchor.rectPositionY,
-            width: anchor.rectWidth, height: anchor.rectHeight,
-          } : null,
           {
             x: workArea?.position.x ?? targetMonitor?.position.x ?? 0,
             y: workArea?.position.y ?? targetMonitor?.position.y ?? 0,
@@ -1102,12 +1081,9 @@ export function App() {
 
   useEffect(() => {
     return cleanupDeferredListener(
-      getCurrentWindow().listen<TrayPopoverAnchor>(
-        "voco:show-popover",
-        (event) => {
-        void showPopover(event.payload);
-        },
-      ),
+      getCurrentWindow().listen("voco:show-popover", () => {
+        void showPopover();
+      }),
       "tray popover show listener",
     );
   }, [showPopover]);

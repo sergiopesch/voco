@@ -365,11 +365,7 @@ pub fn setup_tray(
             };
             match id {
                 "open_panel" if presentation.popover_enabled => {
-                    let _ = app.emit_to(
-                        "main",
-                        "voco:show-popover",
-                        crate::TrayPopoverAnchor::default(),
-                    );
+                    let _ = app.emit_to("main", "voco:show-popover", ());
                 }
                 "toggle" if presentation.dictation_action == TrayDictationAction::Toggle => {
                     crate::eval_toggle(app)
