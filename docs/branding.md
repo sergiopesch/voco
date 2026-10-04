@@ -130,7 +130,7 @@ level bars instead, redrawn every 90 ms from 64 frames the app draws at launch. 
 script also draws `recording.png`, a red dot in a circle, which the app never
 shows because the bars take its place.
 
-| Tooltip, after "VOCO — " | Icon | Label |
+| Status line, after "VOCO — " | Icon | Label |
 | --- | --- | --- |
 | Initializing…, Checking speech model… | Processing | Starting VOCO |
 | Ready to listen, Ready · microphone checks on first use | Ready | None |

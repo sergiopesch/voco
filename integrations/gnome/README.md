@@ -96,11 +96,12 @@ bus name.
 
 `GetState` returns `version` (1), `status` (`initializing`, `starting`,
 `recording`, `processing`, `attention` or `idle`), `description` (the tray
-tooltip), `token`, `stopSession`, `canStop`, `canOpen`, `level` (0 to 1, only
-while recording, 0 after 250 ms without a new level), `shortcutAccelerator`,
-`stopAccelerator` and `stopShortcutToken`. The accelerators are `<Alt>d`,
-`<Alt><Shift>d` or null, and null on X11. The companion polls every 50 ms
-while recording, every 1.5 seconds otherwise, and at each `Changed`.
+menu's status line), `token`, `stopSession`, `canStop`, `canOpen`, `level` (0
+to 1, only while recording, 0 after 250 ms without a new level),
+`shortcutAccelerator`, `stopAccelerator` and `stopShortcutToken`. The
+accelerators are `<Alt>d`, `<Alt><Shift>d` or null, and null on X11. The
+companion polls every 50 ms while recording, every 1.5 seconds otherwise, and
+at each `Changed`.
 
 The companion serves `org.voco.PanelInput1` at `/org/voco/PanelInput`. When
 VOCO can't read the keyboards before a Wayland paste, it calls
