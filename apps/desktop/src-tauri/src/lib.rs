@@ -556,12 +556,13 @@ fn save_config_patch(
     persist_config_patch(&app, patch, false)
 }
 
-#[tauri::command]
+// Off the GTK main thread: the save syncs a file and its directory.
+#[tauri::command(async)]
 fn load_cached_update_state() -> Result<Option<CachedUpdateCheck>, String> {
     load_cached_update_check().map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn save_cached_update_state(cache: CachedUpdateCheck) -> Result<(), String> {
     save_cached_update_check(&cache).map_err(|e| e.to_string())
 }

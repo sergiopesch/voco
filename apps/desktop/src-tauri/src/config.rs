@@ -162,7 +162,8 @@ impl Default for AppConfig {
 
 impl AppConfig {
     /// The private settings directory, without copying a legacy `voice` config
-    /// into it. The recovery panel's Open and Reset use it.
+    /// into it. The recovery panel's Open and Reset use it, and so does the update
+    /// cache, which is read and written without the config lock.
     pub fn config_dir_without_migration() -> Result<PathBuf, Box<dyn std::error::Error>> {
         let base_dir =
             dirs::config_dir().ok_or("Cannot find config directory (XDG_CONFIG_HOME)")?;
@@ -185,7 +186,7 @@ impl AppConfig {
     }
 
     pub fn update_cache_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
-        Ok(Self::config_dir()?.join("update-cache.json"))
+        Ok(Self::config_dir_without_migration()?.join("update-cache.json"))
     }
 
     pub fn load() -> Result<Self, Box<dyn std::error::Error>> {
