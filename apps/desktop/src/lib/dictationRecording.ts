@@ -229,6 +229,8 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       // slot keeps the reason.
       const alreadyNotified = interruptionNotifiedSession === sessionRef.current.sessionId;
       interruptionNotifiedSession = null;
+      // Typed text is part of the transcript: without one nothing is missing.
+      const typedNothing = !current.transcript;
       const native = nativeCaptureRef.current;
       nativeCaptureRef.current = null;
       void native?.cancel().catch(() => {});
@@ -249,6 +251,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       const body = reason === new CrashJournalCleanupError().message ? reason
         : alreadyNotified ? null
         : reason === UNVERIFIED_CAPTURE_REASON ? reason
+        : typedNothing ? `Nothing was typed. ${sentence(reason)}`
         : "Some words may be missing. Check your text field before starting again.";
       if (body) void showNotification("Dictation interrupted", body).catch(() => {});
       return;

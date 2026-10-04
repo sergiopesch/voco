@@ -30,6 +30,7 @@ fn session() -> Session {
         delivery: Delivery::default(),
         lease: Instant::now(),
         failure: None,
+        failure_logged: false,
         audit: None,
         audit_requested: false,
     }

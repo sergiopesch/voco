@@ -172,6 +172,9 @@ struct Session {
     delivery: Delivery,
     lease: Instant,
     failure: Option<String>,
+    /// The first unhealthy receipt is logged once; its reason names no audio,
+    /// text or device identity.
+    failure_logged: bool,
     audit: Option<audit::Audit>,
     audit_requested: bool,
 }
@@ -522,6 +525,7 @@ impl<B: CaptureBackend> Worker<B> {
                     delivery: Delivery::default(),
                     lease: Instant::now(),
                     failure: None,
+                    failure_logged: false,
                     audit_requested: pending_audit.is_some(),
                     audit: pending_audit,
                 });
@@ -545,6 +549,15 @@ impl<B: CaptureBackend> Worker<B> {
                         return Ok((bytes, true, false));
                     }
                     let receipt = session.receipt(&pulse.status());
+                    if let Some(reason) = receipt.health.reason.as_deref() {
+                        if !session.failure_logged {
+                            session.failure_logged = true;
+                            log::warn!(
+                                "Native capture interrupted after {} frames: {reason}",
+                                receipt.produced_frames
+                            );
+                        }
+                    }
                     let blocks = pulse.blocks()?;
                     let terminal = blocks.is_empty()
                         && receipt.state == "stopped"

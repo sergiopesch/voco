@@ -263,8 +263,20 @@ it("still notifies when an interruption ends a noticed session before Stop", asy
   expect(h.setError).toHaveBeenLastCalledWith("The microphone disconnected or stopped capturing audio.");
   // Without this, the next shortcut press would start a new recording
   // while the user still expects it to stop this one.
-  expect(h.notify).toHaveBeenLastCalledWith("Dictation interrupted", "Some words may be missing. Check your text field before starting again.");
+  expect(h.notify).toHaveBeenLastCalledWith("Dictation interrupted", "Nothing was typed. The microphone disconnected or stopped capturing audio.");
   expect(h.notify).toHaveBeenCalledTimes(2);
+});
+
+it("says some words may be missing only when words were recognized", async () => {
+  const h = harness();
+  await journaledRecording(h, async () => ({ undelivered: "" }));
+  h.state.transcript = "Recognized fixture words";
+  await h.cancelRecording("Native microphone capture interrupted");
+  expect(h.notify).toHaveBeenLastCalledWith("Dictation interrupted", "Some words may be missing. Check your text field before starting again.");
+  const quiet = harness();
+  await journaledRecording(quiet, async () => ({ undelivered: "" }));
+  await quiet.cancelRecording("Native microphone capture interrupted");
+  expect(quiet.notify).toHaveBeenLastCalledWith("Dictation interrupted", "Nothing was typed. Native microphone capture interrupted.");
 });
 
 it("does not query desktop input for an explicit browser recording", async () => {
@@ -450,6 +462,7 @@ it("keeps the dictation in Review when the Stop clipboard copy fails", async () 
 it("takes the interrupted path when neither the clipboard nor Review can keep the words", async () => {
   const h = harness();
   await journaledRecording(h, async () => ({ undelivered: "Uncopied fixture words." }));
+  h.state.transcript = "Uncopied fixture words.";
   failing.add("keep_crash_journal");
   h.copy.mockRejectedValue({ outcome: "no-mutation", message: "Clipboard helper is unavailable.", clipboardChanged: false });
   await h.stopRecording();
