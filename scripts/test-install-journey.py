@@ -155,7 +155,10 @@ voco_ui_close
               esac
             }
             voco_verify_installed_package() { return 0; }
-            voco_verify_desktop_input() { [[ "$FIXTURE_INSTALL_CASE" != readiness-failure ]]; }
+            voco_verify_desktop_input() {
+              VOCO_INPUT_ERROR=""
+              [[ "$FIXTURE_INSTALL_CASE" != readiness-failure ]] || { VOCO_INPUT_ERROR="VOCO can't open /dev/uinput."; return 1; }
+            }
             fixture_panel() { printf 'Panel enabled. Sign out and back in to load it; saving your work first is recommended.\n'; return 1; }
             voco_launch_installed_app() {
               printf 'launch\n' >> "$FIXTURE_LAUNCH_CALL"
@@ -188,6 +191,8 @@ voco_ui_close
                 return
             if install_case != 'ready':
                 self.assertNotIn('Opening VOCO', raw.decode(errors='replace'))
+                if install_case == 'readiness-failure':
+                    self.assertIn("VOCO can't open /dev/uinput.", raw.decode(errors='replace'))
                 return
             screen = visible_terminal(raw, width=40 if mode == 'narrow' else 80)
             if directory := os.environ.get('VOCO_JOURNEY_EVIDENCE_DIR'):
