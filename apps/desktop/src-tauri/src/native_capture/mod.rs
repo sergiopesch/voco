@@ -16,7 +16,7 @@ use protocol::{Delivery, Health, MAX_FRAMES};
 use pulse::{Pulse, Status};
 use std::sync::{
     mpsc::{self, Receiver, SyncSender},
-    Arc, Mutex,
+    Mutex,
 };
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
@@ -52,25 +52,11 @@ struct Envelope {
     request: Request,
     reply: Reply,
 }
-struct Shared {
+/// Lives in a static and is never dropped; `shutdown()` is the joined teardown.
+/// The worker owns every resource, and a disconnected channel also shuts it down.
+pub struct NativeCaptureService {
     commands: SyncSender<Envelope>,
     thread: Mutex<Option<JoinHandle<()>>>,
-}
-impl Drop for Shared {
-    fn drop(&mut self) {
-        let (reply, _) = mpsc::sync_channel(1);
-        let _ = self.commands.try_send(Envelope {
-            deadline: Instant::now() + CALL_TIMEOUT,
-            request: Request::Shutdown,
-            reply,
-        });
-        // The worker owns all resources, observes channel disconnection/lease expiry,
-        // and never references this object. Explicit shutdown provides a joined result.
-    }
-}
-#[derive(Clone)]
-pub struct NativeCaptureService {
-    shared: Arc<Shared>,
 }
 impl NativeCaptureService {
     pub fn new() -> Result<Self, String> {
@@ -80,16 +66,13 @@ impl NativeCaptureService {
             .spawn(move || worker(incoming))
             .map_err(|e| e.to_string())?;
         Ok(Self {
-            shared: Arc::new(Shared {
-                commands,
-                thread: Mutex::new(Some(worker)),
-            }),
+            commands,
+            thread: Mutex::new(Some(worker)),
         })
     }
     fn call(&self, request: Request) -> Result<Response, String> {
         let (reply, result) = mpsc::sync_channel(1);
-        self.shared
-            .commands
+        self.commands
             .try_send(Envelope {
                 deadline: Instant::now() + CALL_TIMEOUT,
                 request,
@@ -156,7 +139,6 @@ impl NativeCaptureService {
     pub fn shutdown(&self) -> Result<(), String> {
         self.call(Request::Shutdown)?;
         let thread = self
-            .shared
             .thread
             .lock()
             .map_err(|_| "Native worker join poisoned")?
@@ -215,7 +197,7 @@ trait CaptureBackend {
     where
         Self: Sized;
     fn enumerate(&mut self, epoch: u64) -> Result<(u64, Vec<Source>, Option<String>), String>;
-    fn begin(&mut self, source: &Source, revision: u64) -> Result<(), String>;
+    fn begin(&mut self, source: &Source) -> Result<(), String>;
     fn tick(&mut self);
     fn stop(&mut self);
     fn cancel(&mut self);
@@ -223,39 +205,9 @@ trait CaptureBackend {
     fn blocks(&self) -> Result<Vec<protocol::Block>, String>;
     fn ack(&mut self, count: usize) -> Result<(), String>;
 }
-impl CaptureBackend for Pulse {
-    fn connect() -> Result<Self, String> {
-        Pulse::connect()
-    }
-    fn enumerate(&mut self, epoch: u64) -> Result<(u64, Vec<Source>, Option<String>), String> {
-        Pulse::enumerate(self, epoch)
-    }
-    fn begin(&mut self, source: &Source, revision: u64) -> Result<(), String> {
-        Pulse::begin(self, source, revision)
-    }
-    fn tick(&mut self) {
-        Pulse::tick(self)
-    }
-    fn stop(&mut self) {
-        Pulse::stop(self)
-    }
-    fn cancel(&mut self) {
-        Pulse::cancel(self)
-    }
-    fn status(&self) -> Status {
-        Pulse::status(self)
-    }
-    fn blocks(&self) -> Result<Vec<protocol::Block>, String> {
-        Pulse::blocks(self)
-    }
-    fn ack(&mut self, count: usize) -> Result<(), String> {
-        Pulse::ack(self, count)
-    }
-}
 struct Worker<B: CaptureBackend> {
     pulse: Option<B>,
     sources: Vec<Source>,
-    revision: u64,
     epoch: u64,
     approved: Option<String>,
     session: Option<Session>,
@@ -269,7 +221,6 @@ impl<B: CaptureBackend> Worker<B> {
         Self {
             pulse: None,
             sources: Vec::new(),
-            revision: 0,
             epoch: 0,
             approved: None,
             session: None,
@@ -283,6 +234,37 @@ impl<B: CaptureBackend> Worker<B> {
         self.pulse
             .as_mut()
             .ok_or_else(|| "Native source must be explicitly selected".into())
+    }
+    /// A catalog, and any grant from it, never outlives the connection that listed it.
+    fn disconnect(&mut self) {
+        self.pulse = None;
+        self.approved = None;
+        self.sources.clear();
+    }
+    /// Starts capture and waits at most 5 s for it. An error wins over the deadline,
+    /// and the deadline over a late ready.
+    fn start(
+        pulse: &mut B,
+        source: &Source,
+        request_deadline: Option<Instant>,
+    ) -> Result<(), String> {
+        pulse.begin(source)?;
+        let limit = Instant::now() + Duration::from_secs(5);
+        let deadline = request_deadline.unwrap_or(limit).min(limit);
+        loop {
+            pulse.tick();
+            let status = pulse.status();
+            if let Some(error) = status.error {
+                return Err(error);
+            }
+            if Instant::now() >= deadline {
+                return Err("Native startup deadline exceeded".into());
+            }
+            if status.ready {
+                return Ok(());
+            }
+            thread::sleep(Duration::from_millis(1));
+        }
     }
     fn pump_interval(&self) -> Option<Duration> {
         let status = self.pulse.as_ref()?.status();
@@ -350,13 +332,11 @@ impl<B: CaptureBackend> Worker<B> {
         }
         Ok(())
     }
+    /// Call this before cancelling: `vc_cancel` zeroes the status the receipt reads.
     fn finish_audit(&mut self, reason: &'static str) {
         if let Some(session) = self.session.as_mut() {
-            let receipt = self
-                .pulse
-                .as_ref()
-                .map(|pulse| session.receipt(&pulse.status()));
             if let Some(audit) = session.audit.take() {
+                let receipt = self.pulse.as_ref().map(|p| session.receipt(&p.status()));
                 audit.finish(reason, receipt);
             }
         }
@@ -389,8 +369,7 @@ impl<B: CaptureBackend> Worker<B> {
                     .as_ref()
                     .is_some_and(|p| p.status().error.is_some())
                 {
-                    self.pulse = None;
-                    self.approved = None;
+                    self.disconnect();
                 }
                 if self.pulse.is_none() {
                     self.pulse = Some(B::connect()?);
@@ -401,13 +380,10 @@ impl<B: CaptureBackend> Worker<B> {
                     match self.pulse()?.enumerate(epoch) {
                         Ok(catalog) => catalog,
                         Err(error) => {
-                            self.pulse = None;
-                            self.approved = None;
-                            self.sources.clear();
+                            self.disconnect();
                             return Err(error);
                         }
                     };
-                self.revision = revision;
                 self.sources = sources.clone();
                 // Catalog refresh does not grant a newly returned selection token.
                 if self
@@ -460,46 +436,16 @@ impl<B: CaptureBackend> Worker<B> {
                 } else {
                     None
                 };
-                let revision = self.revision;
-                if let Err(error) = self.pulse()?.begin(&source, revision) {
-                    self.pulse()?.cancel();
-                    self.pulse = None;
-                    self.approved = None;
+                let request_deadline = self.request_deadline;
+                if let Err(error) = Self::start(self.pulse()?, &source, request_deadline) {
+                    if let Some(pulse) = self.pulse.as_mut() {
+                        pulse.cancel();
+                    }
+                    self.disconnect();
                     if let Some(audit) = pending_audit.take() {
                         audit.finish("failure", None);
                     }
                     return Err(error);
-                }
-                let deadline = self
-                    .request_deadline
-                    .unwrap_or_else(|| Instant::now() + Duration::from_secs(5))
-                    .min(Instant::now() + Duration::from_secs(5));
-                loop {
-                    let pulse = self.pulse()?;
-                    pulse.tick();
-                    let status = pulse.status();
-                    if let Some(error) = status.error {
-                        pulse.cancel();
-                        self.pulse = None;
-                        self.approved = None;
-                        if let Some(audit) = pending_audit.take() {
-                            audit.finish("failure", None);
-                        }
-                        return Err(error);
-                    }
-                    if Instant::now() >= deadline {
-                        pulse.cancel();
-                        self.pulse = None;
-                        self.approved = None;
-                        if let Some(audit) = pending_audit.take() {
-                            audit.finish("failure", None);
-                        }
-                        return Err("Native startup deadline exceeded".into());
-                    }
-                    if status.ready {
-                        break;
-                    }
-                    thread::sleep(Duration::from_millis(1));
                 }
                 self.next_capture += 1;
                 let identity = Identity {
@@ -576,7 +522,7 @@ impl<B: CaptureBackend> Worker<B> {
                                 replay,
                             );
                         }
-                        if terminal {
+                        if terminal && session.audit.is_some() {
                             let healthy = session.receipt(&pulse.status()).health.healthy;
                             self.finish_audit(if healthy { "complete" } else { "failure" });
                         }
@@ -639,45 +585,26 @@ impl<B: CaptureBackend> Worker<B> {
                     .as_ref()
                     .ok_or("No active native capture")?
                     .check(&identity)?;
-                let audit_receipt = self
-                    .session
-                    .as_ref()
-                    .map(|s| s.receipt(&self.pulse.as_ref().expect("checked capture").status()));
                 let failed = self.session.as_ref().is_some_and(|s| s.failure.is_some());
+                self.finish_audit("cancel");
                 self.pulse()?.cancel();
-                if let Some(audit) = self.session.as_mut().and_then(|s| s.audit.take()) {
-                    audit.finish("cancel", audit_receipt);
-                }
                 if failed || self.pulse()?.status().error.is_some() {
-                    self.pulse = None;
-                    self.approved = None;
-                    self.sources.clear();
+                    self.disconnect();
                 }
                 self.session = None;
                 Ok(Response::Empty)
             }
             Request::ResetRenderer | Request::Shutdown => {
-                let audit_receipt = self
-                    .session
-                    .as_ref()
-                    .and_then(|s| self.pulse.as_ref().map(|p| s.receipt(&p.status())));
+                self.finish_audit(if matches!(request, Request::Shutdown) {
+                    "shutdown"
+                } else {
+                    "reset"
+                });
                 if let Some(pulse) = self.pulse.as_mut() {
                     pulse.cancel();
                 }
-                if let Some(audit) = self.session.as_mut().and_then(|s| s.audit.take()) {
-                    audit.finish(
-                        if matches!(request, Request::Shutdown) {
-                            "shutdown"
-                        } else {
-                            "reset"
-                        },
-                        audit_receipt,
-                    );
-                }
-                self.pulse = None;
+                self.disconnect();
                 self.session = None;
-                self.sources.clear();
-                self.approved = None;
                 Ok(Response::Empty)
             }
         }

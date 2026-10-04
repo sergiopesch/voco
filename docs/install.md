@@ -12,7 +12,7 @@ downloads after installation.
 | Processor | 64-bit Intel or AMD (x86-64) with AVX2, FMA and F16C |
 | System | Ubuntu 24.04 LTS, Ubuntu 26.04 LTS or Debian 13, which install the Debian package with APT, or Fedora 44 Workstation, which installs the RPM with DNF. [Supported systems](platform/README.md#supported-systems) lists their desktops. |
 | Desktop | A Wayland or X11 session. GNOME 50 has no X11 session, so on Ubuntu 26.04 and Fedora 44 VOCO runs on Wayland. |
-| Audio | A microphone, with PulseAudio or PipeWire's PulseAudio service, which the supported systems include |
+| Audio | A microphone, with PipeWire's PulseAudio service (`pipewire-pulse`), which the supported systems include. PulseAudio itself works only on X11 (see [Microphone problems](troubleshooting.md#microphone-problems)) |
 | Wayland typing | Access to `/dev/uinput`, which the package gives the user of the active local session (see [Wayland paste keys](#wayland-paste-keys)) |
 | Wayland shortcut | Outside GNOME 46, 48 and 50, a desktop shortcut that runs `voco --toggle` (see [Wayland compositor shortcuts](#wayland-compositor-shortcuts)) |
 

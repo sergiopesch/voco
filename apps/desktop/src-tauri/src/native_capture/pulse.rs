@@ -1,4 +1,5 @@
 use super::protocol::{Block, Source, BATCH_BLOCKS, BLOCK_BYTES};
+use super::CaptureBackend;
 use std::{
     ffi::{c_char, c_int, CString},
     ptr::NonNull,
@@ -46,7 +47,7 @@ unsafe extern "C" {
     fn vc_new(socket: *const c_char) -> *mut std::ffi::c_void;
     fn vc_free(p: *mut std::ffi::c_void);
     fn vc_enumerate(p: *mut std::ffi::c_void, out: *mut Catalog) -> c_int;
-    fn vc_begin(p: *mut std::ffi::c_void, source: *const RawSource, revision: u64) -> c_int;
+    fn vc_begin(p: *mut std::ffi::c_void, source: *const RawSource) -> c_int;
     fn vc_tick(p: *mut std::ffi::c_void);
     fn vc_stop(p: *mut std::ffi::c_void);
     fn vc_cancel(p: *mut std::ffi::c_void);
@@ -98,8 +99,8 @@ pub struct Pulse {
     // Keep the bounded device table out of the capture worker's stack frames.
     catalog: Option<Box<Catalog>>,
 }
-impl Pulse {
-    pub fn connect() -> Result<Self, String> {
+impl CaptureBackend for Pulse {
+    fn connect() -> Result<Self, String> {
         // Never consult PULSE_SERVER or autospawn: use this process user's existing socket.
         let uid = unsafe { libc::getuid() };
         let path = format!("/run/user/{uid}/pulse/native");
@@ -114,7 +115,7 @@ impl Pulse {
             .ok_or("Native Pulse allocation failed")?;
         Ok(Self { ptr, catalog: None })
     }
-    pub fn enumerate(&mut self, epoch: u64) -> Result<(u64, Vec<Source>, Option<String>), String> {
+    fn enumerate(&mut self, epoch: u64) -> Result<(u64, Vec<Source>, Option<String>), String> {
         let mut catalog = empty_catalog();
         if unsafe { vc_enumerate(self.ptr.as_ptr(), &mut *catalog) } != 0 {
             return Err(self
@@ -157,13 +158,13 @@ impl Pulse {
         self.catalog = Some(catalog);
         Ok((revision, sources, default_token))
     }
-    pub fn begin(&mut self, source: &Source, revision: u64) -> Result<(), String> {
+    fn begin(&mut self, source: &Source) -> Result<(), String> {
         let catalog = self.catalog.as_ref().ok_or("No native catalog")?;
         let raw = catalog.sources[..catalog.count as usize]
             .iter()
             .find(|s| raw_matches(s, source))
             .ok_or("Source not in catalog")?;
-        if unsafe { vc_begin(self.ptr.as_ptr(), raw, revision) } != 0 {
+        if unsafe { vc_begin(self.ptr.as_ptr(), raw) } != 0 {
             return Err(self
                 .status()
                 .error
@@ -171,16 +172,16 @@ impl Pulse {
         }
         Ok(())
     }
-    pub fn tick(&mut self) {
+    fn tick(&mut self) {
         unsafe { vc_tick(self.ptr.as_ptr()) }
     }
-    pub fn stop(&mut self) {
+    fn stop(&mut self) {
         unsafe { vc_stop(self.ptr.as_ptr()) }
     }
-    pub fn cancel(&mut self) {
+    fn cancel(&mut self) {
         unsafe { vc_cancel(self.ptr.as_ptr()) }
     }
-    pub fn status(&self) -> Status {
+    fn status(&self) -> Status {
         let mut raw: RawStatus = unsafe { std::mem::zeroed() };
         unsafe { vc_get_status(self.ptr.as_ptr(), &mut raw) };
         let error = text(&raw.error).unwrap_or_else(|_| "Invalid native error metadata".into());
@@ -195,7 +196,7 @@ impl Pulse {
             error: if error.is_empty() { None } else { Some(error) },
         }
     }
-    pub fn blocks(&self) -> Result<Vec<Block>, String> {
+    fn blocks(&self) -> Result<Vec<Block>, String> {
         let mut blocks = Vec::new();
         for offset in 0..BATCH_BLOCKS {
             let (mut data, mut len, mut sequence, mut frame_start) = (std::ptr::null(), 0, 0, 0);
@@ -224,7 +225,7 @@ impl Pulse {
         }
         Ok(blocks)
     }
-    pub fn ack(&mut self, count: usize) -> Result<(), String> {
+    fn ack(&mut self, count: usize) -> Result<(), String> {
         if count > BATCH_BLOCKS || unsafe { vc_ack(self.ptr.as_ptr(), count as u32) } != 0 {
             return Err("Native ACK extent invalid".into());
         }

@@ -47,7 +47,7 @@ impl BeginRequest {
         Ok(())
     }
 }
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct DrainRequest {
     pub capture_id: String,
@@ -161,7 +161,7 @@ impl Delivery {
             return Err("Native batch exceeds block bound".into());
         }
         let mut headers = Vec::with_capacity(blocks.len());
-        let mut bytes = Vec::new();
+        let mut offset = 0;
         let mut next = self.acknowledged + 1;
         let mut frames = self.frames;
         for block in blocks {
@@ -182,10 +182,10 @@ impl Delivery {
                 sequence: next,
                 frame_start: block.frame_start,
                 frames: count,
-                byte_offset: bytes.len(),
+                byte_offset: offset,
                 byte_length: block.bytes.len(),
             });
-            bytes.extend_from_slice(&block.bytes);
+            offset += block.bytes.len();
             next += 1;
         }
         let json = serde_json::to_vec(&Header {
@@ -198,10 +198,12 @@ impl Delivery {
         if json.len() > 65_536 {
             return Err("Native header exceeds bound".into());
         }
-        let mut packet = Vec::with_capacity(4 + json.len() + bytes.len());
+        let mut packet = Vec::with_capacity(4 + json.len() + offset);
         packet.extend_from_slice(&(json.len() as u32).to_le_bytes());
         packet.extend_from_slice(&json);
-        packet.extend_from_slice(&bytes);
+        for block in blocks {
+            packet.extend_from_slice(&block.bytes);
+        }
         if !blocks.is_empty() {
             self.frames = frames;
             self.pending = Some((next - 1, blocks.len(), packet.clone()));

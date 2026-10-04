@@ -31,6 +31,11 @@ class GateTests(unittest.TestCase):
                 self.assertEqual(state_home(), Path.home()/'.local/state')
         with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {'XDG_STATE_HOME':directory}):
             self.assertEqual(state_home(), Path(directory))
+    def test_off_gate_passes_digital_silence_and_vad_is_not_a_mode(self):
+        gate=SilenceGate('off');silence=np.zeros(800,np.float32)
+        for _ in range(100):self.assertEqual(sum(map(len,gate.push(silence,16000))),800)
+        self.assertEqual(gate.skipped_s,0);self.assertAlmostEqual(gate.processed_s,5)
+        with self.assertRaisesRegex(ValueError,'gate mode'):SilenceGate('vad')
     def test_zero_gate_does_not_discard_nonzero_quiet_speech(self):
         gate=SilenceGate();speech=np.full(800,1e-7,np.float32)
         self.assertEqual(sum(map(len,gate.push(speech,16000))),800)

@@ -39,6 +39,16 @@ fn read_response(output: &mut impl BufRead) -> Result<Value, String> {
     }
     serde_json::from_str(&line).map_err(|_| "invalid worker response".into())
 }
+// ChildStdin is unbuffered, and serializing into it costs one write(2) per JSON
+// token, about two per audio sample. Build the line, then send it in one write.
+fn write_request(input: &mut impl Write, request: &Value) -> Result<(), String> {
+    let mut line = serde_json::to_vec(request).map_err(|_| "worker write failed")?;
+    line.push(b'\n');
+    input
+        .write_all(&line)
+        .and_then(|()| input.flush())
+        .map_err(|_| "worker write failed".into())
+}
 fn configured_path(name: &str) -> Result<PathBuf, String> {
     let default = match name {
         "VOCO_STREAM_PYTHON" => "/usr/bin/python3",
@@ -92,15 +102,8 @@ impl Worker {
                 return;
             }
             for request in request_rx {
-                let result = (|| {
-                    serde_json::to_writer(&mut input, &request)
-                        .map_err(|_| "worker write failed")?;
-                    input
-                        .write_all(b"\n")
-                        .and_then(|_| input.flush())
-                        .map_err(|_| "worker write failed")?;
-                    read_response(&mut output)
-                })();
+                let result =
+                    write_request(&mut input, &request).and_then(|()| read_response(&mut output));
                 let failed = result.is_err();
                 if response_tx.send(result).is_err() || failed {
                     return;
@@ -435,6 +438,43 @@ mod tests {
         assert_eq!(creates.get(), 1);
         assert_eq!(seen.lock().unwrap().as_slice(), &[request]);
         assert!(slot.is_none());
+    }
+
+    #[test]
+    fn a_request_reaches_the_worker_in_one_write() {
+        struct Writes(Vec<Vec<u8>>);
+        impl Write for Writes {
+            fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+                self.0.push(bytes.to_vec());
+                Ok(bytes.len())
+            }
+            fn flush(&mut self) -> std::io::Result<()> {
+                Ok(())
+            }
+        }
+        struct Closed;
+        impl Write for Closed {
+            fn write(&mut self, _: &[u8]) -> std::io::Result<usize> {
+                Err(std::io::ErrorKind::BrokenPipe.into())
+            }
+            fn flush(&mut self) -> std::io::Result<()> {
+                Ok(())
+            }
+        }
+        // One 100 ms packet of 44.1 kHz capture, as the renderer sends it.
+        let audio: Vec<f32> = (0..4410).map(|n| (n - 2205) as f32 / 65536.0).collect();
+        let request = serde_json::json!({
+            "op":"push", "session":"fixture", "seq":1, "audio":audio, "rate":44100,
+        });
+        let mut writes = Writes(Vec::new());
+        write_request(&mut writes, &request).unwrap();
+        let mut line = serde_json::to_vec(&request).unwrap();
+        line.push(b'\n');
+        assert_eq!(writes.0, [line]);
+        assert_eq!(
+            write_request(&mut Closed, &request).unwrap_err(),
+            "worker write failed"
+        );
     }
 
     #[test]

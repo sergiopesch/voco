@@ -27,7 +27,7 @@ typedef struct {
 vc_pulse *vc_new(const char *socket_path);
 void vc_free(vc_pulse *p);
 int vc_enumerate(vc_pulse *p, vc_catalog *out);
-int vc_begin(vc_pulse *p, const vc_source *source, uint64_t revision);
+int vc_begin(vc_pulse *p, const vc_source *source);
 void vc_tick(vc_pulse *p);
 void vc_stop(vc_pulse *p);
 void vc_cancel(vc_pulse *p);

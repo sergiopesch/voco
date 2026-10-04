@@ -69,7 +69,7 @@ impl CaptureBackend for Fake {
             .map(|s| s.selection_token.clone());
         Ok((self.catalog_revision.max(1), sources, default))
     }
-    fn begin(&mut self, _: &Source, _: u64) -> Result<(), String> {
+    fn begin(&mut self, _: &Source) -> Result<(), String> {
         self.begin_calls += 1;
         thread::sleep(self.startup_delay);
         if self.fail_start {
@@ -127,7 +127,6 @@ fn active() -> Worker<Fake> {
             ..Fake::default()
         }),
         sources: vec![source()],
-        revision: 1,
         epoch: 1,
         approved: Some(source().selection_token),
         session: Some(session()),
@@ -177,6 +176,29 @@ fn packet_contains_exact_stereo_bytes_and_contiguous_offsets() {
     assert_eq!(header["blocks"][1]["byteOffset"], 4);
     assert_eq!(header["blocks"][1]["frameStart"], 1);
     assert_eq!(&packet[4 + length..], &[1, 2, 3, 4, 1, 2, 3, 4]);
+}
+#[test]
+fn packet_keeps_block_order_offsets_and_exact_bytes() {
+    let mut delivery = Delivery::default();
+    let blocks = [
+        block(1, 0),
+        Block {
+            sequence: 2,
+            frame_start: 1,
+            bytes: (5..=12).collect(),
+        },
+    ];
+    let receipt = session().receipt(&Status::default());
+    let packet = delivery.issue(&identity(), &blocks, &receipt).unwrap();
+    let length = u32::from_le_bytes(packet[..4].try_into().unwrap()) as usize;
+    let header: serde_json::Value = serde_json::from_slice(&packet[4..4 + length]).unwrap();
+    for (index, (offset, bytes, frames)) in [(0, 4, 1), (4, 8, 2)].into_iter().enumerate() {
+        assert_eq!(header["blocks"][index]["byteOffset"], offset);
+        assert_eq!(header["blocks"][index]["byteLength"], bytes);
+        assert_eq!(header["blocks"][index]["frames"], frames);
+    }
+    assert_eq!(packet[4 + length..], (1..=12).collect::<Vec<u8>>());
+    assert_eq!(delivery.replay(), Some(packet));
 }
 #[test]
 fn stop_does_not_ack_audio_and_next_begin_waits_for_complete_delivery() {
@@ -271,22 +293,58 @@ fn select_requires_acknowledgement_and_supported_exact_token() {
 }
 #[test]
 fn startup_failure_closes_backend_and_revokes_selection() {
+    let begin = |selection_token| {
+        Request::Begin(BeginRequest {
+            session_id: 1,
+            generation: 0,
+            selection_token,
+        })
+    };
+    let mut worker = Worker::<Fake>::new();
+    worker.handle(Request::List).unwrap();
+    let old = source().selection_token;
+    worker.handle(Request::Select(old.clone(), true)).unwrap();
+    worker.pulse.as_mut().unwrap().fail_start = true;
+    assert!(worker.handle(begin(old.clone())).is_err());
+    assert!(worker.pulse.is_none());
+    assert!(worker.approved.is_none());
+    assert!(worker.session.is_none());
+    // The closed connection's catalog can't grant its tokens again.
+    assert!(worker.sources.is_empty());
+    assert!(worker.handle(Request::Select(old.clone(), true)).is_err());
+    assert!(worker.approved.is_none());
+    worker.handle(Request::List).unwrap();
+    let current = worker.sources[0].selection_token.clone();
+    assert_ne!(current, old);
+    worker
+        .handle(Request::Select(current.clone(), true))
+        .unwrap();
+    worker.handle(begin(current)).unwrap();
+    assert!(worker.session.is_some());
+}
+#[test]
+fn startup_error_wins_over_an_expired_deadline_and_closes_the_backend() {
     let mut worker = Worker::<Fake>::new();
     worker.handle(Request::List).unwrap();
     worker
         .handle(Request::Select(source().selection_token, true))
         .unwrap();
-    worker.pulse.as_mut().unwrap().fail_start = true;
-    assert!(worker
-        .handle(Request::Begin(BeginRequest {
+    let backend = worker.pulse.as_mut().unwrap();
+    backend.startup_delay = Duration::from_millis(5);
+    backend.status.error = Some("source-removed".into());
+    let result = worker.dispatch(
+        Request::Begin(BeginRequest {
             session_id: 1,
             generation: 0,
-            selection_token: source().selection_token
-        }))
-        .is_err());
+            selection_token: source().selection_token,
+        }),
+        Instant::now() + Duration::from_millis(1),
+    );
+    assert_eq!(result.err().as_deref(), Some("source-removed"));
     assert!(worker.pulse.is_none());
     assert!(worker.approved.is_none());
     assert!(worker.session.is_none());
+    assert!(worker.sources.is_empty());
 }
 #[test]
 fn invalid_native_blocks_fail_before_pending_delivery() {
@@ -654,16 +712,56 @@ fn audited_orphan_and_renderer_reset_terminate_once_without_active_disk_work() {
         if reset {
             worker.handle(Request::ResetRenderer).unwrap();
             assert!(worker.pulse.is_none());
-            assert_eq!(receive.try_recv().unwrap(), "reset");
+            assert_eq!(receive.try_recv().unwrap().0, "reset");
         } else {
             worker.abandon_begin(&identity());
             assert!(worker.pulse.as_ref().unwrap().cancelled);
-            assert_eq!(receive.try_recv().unwrap(), "cancel");
+            assert_eq!(receive.try_recv().unwrap().0, "cancel");
         }
         assert!(worker.session.is_none());
         assert!(worker.audit_attempted);
         assert!(receive.try_recv().is_err());
     }
+}
+
+#[test]
+fn cancel_reset_and_shutdown_audit_the_receipt_from_before_cancel() {
+    for (request, reason) in [
+        (Request::Cancel(identity()), "cancel"),
+        (Request::ResetRenderer, "reset"),
+        (Request::Shutdown, "shutdown"),
+    ] {
+        let mut worker = active();
+        let (send, receive) = mpsc::sync_channel(1);
+        let mut audit = audit::Audit::for_test();
+        audit.observe_terminal(send);
+        worker.session.as_mut().unwrap().audit = Some(audit);
+        worker.handle(request).unwrap();
+        // Cancel zeroes the status, so only a receipt taken first keeps the counts.
+        let (observed, receipt) = receive.try_recv().unwrap();
+        let receipt = receipt.expect("receipt");
+        assert_eq!(observed, reason);
+        assert_eq!(receipt.state, "stopping");
+        assert_eq!(receipt.produced_frames, 2);
+        assert_eq!(receipt.last_sequence, 2);
+    }
+}
+
+#[test]
+fn delivered_stop_finishes_the_audit_once_as_complete() {
+    let mut worker = active();
+    let (send, receive) = mpsc::sync_channel(2);
+    let mut audit = audit::Audit::for_test();
+    audit.observe_terminal(send);
+    worker.session.as_mut().unwrap().audit = Some(audit);
+    worker.handle(Request::Stop(identity())).unwrap();
+    worker.handle(drain(0)).unwrap();
+    assert!(receive.try_recv().is_err());
+    worker.handle(drain(2)).unwrap();
+    assert_eq!(receive.try_recv().unwrap().0, "complete");
+    worker.release_complete().unwrap();
+    assert!(worker.session.is_none());
+    assert!(receive.try_recv().is_err());
 }
 
 #[test]

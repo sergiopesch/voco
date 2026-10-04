@@ -48,8 +48,10 @@ dictationStream.ts        append-only: only the new suffix moves on
 
 ### Capture
 
-On Wayland, Rust records from PulseAudio through libpulse (PipeWire's Pulse
-service works too) as 16-bit stereo at 44,100 Hz. It pumps the stream every
+On Wayland, Rust records through libpulse from PipeWire's PulseAudio service
+as 16-bit stereo at 44,100 Hz. A microphone choice names one source by its
+PipeWire `object.serial`, which PulseAudio itself doesn't set, so under plain
+PulseAudio VOCO lists every source as unavailable. It pumps the stream every
 5 ms while recording. Capture ends with "Renderer drain lease expired" if the
 renderer stops draining for 5 seconds, and only VOCO's main page may call it.
 On X11 the renderer captures through WebKit with an AudioWorklet. If WebKit

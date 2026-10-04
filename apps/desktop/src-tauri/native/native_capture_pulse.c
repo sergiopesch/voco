@@ -467,8 +467,7 @@ int vc_enumerate(vc_pulse*p,vc_catalog*out) {
     *out=p->catalog;
     return 0;
 }
-int vc_begin(vc_pulse*p,const vc_source*source,uint64_t revision) {
-    (void)revision;
+int vc_begin(vc_pulse*p,const vc_source*source) {
     if(p->active||!p->subscribed||!source->serial[0]||p->status.error[0])return -1;
     memset(&p->status,0,sizeof p->status);
     reset_duration_integrity(p);

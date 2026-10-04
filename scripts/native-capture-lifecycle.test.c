@@ -275,7 +275,7 @@ static void reuse_edge(void) {
     vc_pulse *p=fresh();deliver(p,1);const uint8_t *data;size_t length;uint64_t seq,start;
     assert(vc_peek(p,0,&data,&length,&seq,&start)==1);vc_cancel(p);
     p->subscribed=true;vc_source source={0};strcpy(source.serial,"62");
-    assert(vc_begin(p,&source,0)==-1 && !strcmp(p->status.error,"stream-create-failed"));
+    assert(vc_begin(p,&source)==-1 && !strcmp(p->status.error,"stream-create-failed"));
     assert(p->produced==0 && p->consumed==0 && p->exposed_through==0);
     detach_stream(p);free(p);
 }

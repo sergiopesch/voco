@@ -17,6 +17,7 @@ class FakeMetrics:
     run_id='fixture'
     def __init__(self): self.rows=[]
     def emit(self,event,**fields): self.rows.append(dict(event=event,**fields))
+    def close(self): pass
 
 class DiagnosticsTests(unittest.TestCase):
     def test_boolean_negative_and_unbounded_identity_rejected(self):
@@ -54,6 +55,15 @@ class DiagnosticsTests(unittest.TestCase):
         self.assertEqual(diagnostic['stage'], 'runtime_import')
         self.assertEqual(diagnostic['error_code'], 'runtime_dependency_missing')
         self.assertEqual(set(diagnostic), {'event', 'stage', 'error_type', 'error_code'})
+
+    def test_unknown_silence_gate_fails_startup_before_the_model_loads(self):
+        protocol, metrics = io.StringIO(), FakeMetrics()
+        with patch.dict(os.environ, {'VOCO_SILENCE_GATE': 'vad'}), patch('streaming.Metrics', return_value=metrics), \
+                patch('streaming.Nemotron', side_effect=AssertionError('model loaded')):
+            self.assertEqual(main(protocol), 1)
+        self.assertEqual(json.loads(protocol.getvalue()), {'ready': False, 'error': 'local speech runtime could not initialize'})
+        self.assertEqual(metrics.rows[0]['event'], 'worker_startup_failed')
+        self.assertEqual(metrics.rows[0]['error_code'], 'invalid_gate')
 
     def test_unsafe_metrics_paths_disable_logging_without_touching_targets(self):
         for kind in ('symlink', 'hardlink', 'fifo', 'public_file', 'public_directory', 'directory_link'):

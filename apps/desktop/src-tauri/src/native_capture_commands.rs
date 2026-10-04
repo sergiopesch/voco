@@ -46,6 +46,16 @@ fn state() -> Result<&'static CaptureState, String> {
         .ok_or_else(|| "Capture backend has not initialized".into())
 }
 
+#[cfg(all(target_os = "linux", feature = "native-capture"))]
+fn service() -> Result<&'static crate::native_capture::NativeCaptureService, String> {
+    state()?
+        .service
+        .as_ref()
+        .map_err(Clone::clone)?
+        .as_ref()
+        .ok_or_else(|| "Native capture backend is disabled".into())
+}
+
 fn trusted_origin(label: &str, url: &tauri::Url) -> bool {
     if label != "main" || !url.username().is_empty() || url.password().is_some() {
         return false;
@@ -102,12 +112,7 @@ pub fn save_debug_native_retained_source(
     }
     #[cfg(all(target_os = "linux", feature = "native-capture"))]
     {
-        let service = state()?
-            .service
-            .as_ref()
-            .map_err(Clone::clone)?
-            .as_ref()
-            .ok_or("Native capture backend is disabled")?;
+        let service = service()?;
         crate::native_capture::retained::save(request.body(), |identity| {
             service.verify_stopped(identity)
         })
@@ -146,13 +151,7 @@ async fn perform(window: WebviewWindow, operation: Operation) -> Result<Response
     }
     #[cfg(all(target_os = "linux", feature = "native-capture"))]
     {
-        let service = state()?
-            .service
-            .as_ref()
-            .map_err(Clone::clone)?
-            .as_ref()
-            .ok_or("Native capture backend is disabled")?
-            .clone();
+        let service = service()?;
         tauri::async_runtime::spawn_blocking(move || {
             let decode_error =
                 |e: serde_json::Error| format!("Invalid native capture request: {e}");
@@ -228,7 +227,7 @@ pub async fn native_capture_cancel(
 
 pub fn reset_renderer() {
     #[cfg(all(target_os = "linux", feature = "native-capture"))]
-    if let Some(Ok(Some(service))) = STATE.get().map(|s| &s.service) {
+    if let Ok(service) = service() {
         if let Err(error) = service.reset_renderer() {
             log::warn!("Native capture renderer reset failed: {error}");
         }
@@ -237,7 +236,7 @@ pub fn reset_renderer() {
 
 pub fn shutdown() {
     #[cfg(all(target_os = "linux", feature = "native-capture"))]
-    if let Some(Ok(Some(service))) = STATE.get().map(|s| &s.service) {
+    if let Ok(service) = service() {
         if let Err(error) = service.shutdown() {
             log::warn!("Native capture shutdown failed: {error}");
         }
