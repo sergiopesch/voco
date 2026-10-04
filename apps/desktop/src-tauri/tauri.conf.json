@@ -56,7 +56,6 @@
           "python3-gi",
           "xclip",
           "python3-numpy",
-          "python3-psutil",
           "libsentencepiece0",
           "xdotool",
           "wl-clipboard",

@@ -56,7 +56,7 @@ DEBIAN_TO_FEDORA = {
     "libayatana-appindicator3-1": "libayatana-appindicator-gtk3", "libpulse0": "pulseaudio-libs",
     "libnotify-bin": "libnotify", "ibus": "ibus", "gir1.2-ibus-1.0": "ibus-libs", "python3": "python3",
     "python3-gi": "python3-gobject", "python3-numpy": "python3-numpy",
-    "python3-psutil": "python3-psutil", "libsentencepiece0": "sentencepiece-libs",
+    "libsentencepiece0": "sentencepiece-libs",
     "xclip": "xclip", "xdotool": "xdotool", "wl-clipboard": "wl-clipboard"}
 TAURI_IMPLIED_DEPENDS = ("libwebkit2gtk-4.1-0", "libgtk-3-0", "libayatana-appindicator3-1")
 FEDORA_REQUIRES = tuple(DEBIAN_TO_FEDORA.values())

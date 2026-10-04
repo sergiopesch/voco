@@ -3,6 +3,7 @@
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import shutil
 import sys
@@ -24,7 +25,9 @@ state = dict(version=1, token='1:1', stopSession='1:1', status='idle', descripti
 actions = []; attached = []; detached = []; fail_next = []; stalled = []; stall_state = []
 reservations = []; held = []; hold_reservation = []; fail_reservation = []; stop_reservations = []
 bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
-xml = '''<node><interface name="org.voco.Panel1"><method name="Attach"><arg type="b" direction="out"/></method><method name="GetState"><arg type="s" direction="out"/></method><method name="ReserveShortcut"><arg type="s" direction="in"/><arg type="b" direction="out"/></method><method name="ReserveStopShortcut"><arg type="s" direction="in"/><arg type="b" direction="out"/></method><method name="Action"><arg type="s" direction="in"/><arg type="s" direction="in"/><arg type="b" direction="out"/></method><method name="Detach"/><signal name="Changed"/></interface></node>'''
+# The synthetic service serves the app's own interface, so it can't drift from panel.rs.
+panel_rs = (Path(__file__).resolve().parents[1] / 'apps/desktop/src-tauri/src/panel.rs').read_text()
+xml = re.search(r'const XML: &str = r#"(.*?)"#;', panel_rs, re.S).group(1)
 SUPPORTED = ('<Alt>d', '<Alt><Shift>d')
 def shortcut_token():
     # Stop-only field the native app still publishes for a loaded v10 companion.

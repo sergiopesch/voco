@@ -92,7 +92,7 @@ export interface RuntimeDiagnostics {
   desktopInput?: DesktopInputStatus;
   desktopPaste?: { enabled: boolean; available: boolean; detail: string };
   shortcut: ShortcutDiagnostics;
-  sessionType: string;
+  sessionType: "wayland" | "x11-or-other";
   typeSimulation: InsertionSupport;
   clipboard: InsertionSupport;
   ibusShortcut: IbusShortcutStatus;
@@ -125,7 +125,7 @@ export interface BrowserFieldStatus {
   progressiveCommitActive: boolean;
   committedCharacterCount: number;
   ownershipIntact: boolean;
-  finalizationOutcome: "committed" | "uncertain" | null;
+  finalizationOutcome: "uncertain" | null;
   error: string | null;
 }
 

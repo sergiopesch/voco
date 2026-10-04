@@ -37,16 +37,10 @@ pub struct PanelSetupStatus {
 /// observation alone lets the focused application also act on them (Alt+D
 /// focuses a browser address or deletes a terminal word), moving the cursor.
 pub fn stop_shortcut_setup_detail(
-    session_type: &str,
     hotkey: &str,
     status: Result<PanelSetupStatus, String>,
     attached: bool,
 ) -> Option<String> {
-    if !session_type.eq_ignore_ascii_case("wayland")
-        || !(hotkey.eq_ignore_ascii_case("Alt+D") || hotkey.eq_ignore_ascii_case("Alt+Shift+D"))
-    {
-        return None;
-    }
     let Ok(panel) = status else {
         return Some(format!(
             "VOCO cannot confirm that GNOME keeps {hotkey} out of the app you are dictating into. Check the VOCO panel in Help."
@@ -84,6 +78,24 @@ fn shortcut_remedy(panel: PanelSetupStatus, attached: bool) -> Option<String> {
 }
 
 pub fn check(enable: bool) -> Result<PanelSetupStatus, String> {
+    check_on(&crate::current_desktop(), || run_helper(enable))
+}
+
+/// Only GNOME can load the companion, so elsewhere VOCO doesn't start python3
+/// and GI to learn that.
+fn check_on(desktop: &str, helper: impl FnOnce() -> CheckResult) -> CheckResult {
+    if !crate::is_gnome_desktop(desktop) {
+        return Ok(PanelSetupStatus {
+            status: "other-desktop".into(),
+            detail: "Use the VOCO tray menu for status and Stop. Labels depend on your desktop."
+                .into(),
+            can_enable: false,
+        });
+    }
+    helper()
+}
+
+fn run_helper(enable: bool) -> CheckResult {
     let child = crate::process_runner::command("/usr/bin/python3")
         .args([
             "-I",
@@ -166,32 +178,24 @@ mod tests {
 
     #[test]
     fn default_wayland_shortcut_recommends_live_companion() {
-        let detail = stop_shortcut_setup_detail("wayland", "Alt+D", panel("restart"), false)
+        let detail = stop_shortcut_setup_detail("Alt+D", panel("restart"), false)
             .expect("unloaded companion is recommended");
         assert!(detail.starts_with("Alt+D also reaches the app you are dictating into"));
         assert!(detail.ends_with("Sign out and back in to load the shortcut."));
         assert!(
-            stop_shortcut_setup_detail("wayland", "Alt+Shift+D", panel("disabled"), false)
+            stop_shortcut_setup_detail("Alt+Shift+D", panel("disabled"), false)
                 .is_some_and(|detail| detail.contains("Enable the VOCO panel"))
         );
-        assert!(stop_shortcut_setup_detail("wayland", "alt+d", panel("restart"), false).is_some());
-        assert!(stop_shortcut_setup_detail("wayland", "Alt+D", Err("bus".into()), false).is_some());
-        assert!(stop_shortcut_setup_detail("wayland", "Alt+D", panel("active"), false).is_some());
-        assert!(stop_shortcut_setup_detail("wayland", "Alt+D", panel("active"), true).is_none());
+        assert!(stop_shortcut_setup_detail("Alt+D", Err("bus".into()), false).is_some());
+        assert!(stop_shortcut_setup_detail("Alt+D", panel("active"), false).is_some());
+        assert!(stop_shortcut_setup_detail("Alt+D", panel("active"), true).is_none());
         // Without a companion that can grab the chord, evdev only observes it.
         for status in ["other-desktop", "unsupported"] {
-            assert!(
-                stop_shortcut_setup_detail("wayland", "Alt+D", panel(status), false)
-                    .is_some_and(|detail| detail.contains("voco --toggle"))
-            );
+            assert!(stop_shortcut_setup_detail("Alt+D", panel(status), false)
+                .is_some_and(|detail| detail.contains("voco --toggle")));
         }
         // A previous companion that is still loaded attaches without grabbing Start.
-        assert!(stop_shortcut_setup_detail("wayland", "Alt+D", panel("restart"), true).is_some());
-        assert!(stop_shortcut_setup_detail("x11", "Alt+D", panel("restart"), false).is_none());
-        assert!(
-            stop_shortcut_setup_detail("wayland", "Control+Space", panel("restart"), false)
-                .is_none()
-        );
+        assert!(stop_shortcut_setup_detail("Alt+D", panel("restart"), true).is_some());
     }
 
     #[test]
@@ -211,6 +215,31 @@ mod tests {
         );
         // An attached panel consumes the chord, so there is nothing to report.
         assert!(unreachable_shortcut_detail("Alt+D", panel("active"), true).is_none());
+    }
+
+    #[test]
+    fn only_gnome_starts_the_companion_helper() {
+        let runs = Cell::new(0);
+        let helper = || {
+            runs.set(runs.get() + 1);
+            panel("active")
+        };
+        for desktop in ["KDE", "", "X-Cinnamon"] {
+            let status = check_on(desktop, helper).unwrap();
+            assert_eq!(
+                (status.status.as_str(), status.can_enable),
+                ("other-desktop", false)
+            );
+            assert_eq!(
+                status.detail,
+                "Use the VOCO tray menu for status and Stop. Labels depend on your desktop."
+            );
+        }
+        assert_eq!(runs.get(), 0);
+        for desktop in ["ubuntu:GNOME", "GNOME", "GNOME-Flashback:GNOME"] {
+            assert_eq!(check_on(desktop, helper).unwrap().status, "active");
+        }
+        assert_eq!(runs.get(), 3);
     }
 
     #[test]

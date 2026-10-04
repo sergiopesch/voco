@@ -1,6 +1,5 @@
 """Explicit GNOME panel setup. Checking never changes desktop preferences."""
 import json
-import os
 from pathlib import Path
 import sys
 import time
@@ -9,6 +8,9 @@ UUID = 'voco-panel@voco.local'
 # Bump with behavior changes that require reloading the running Shell companion.
 COMPANION_VERSION = 15
 PACKAGE = Path('/usr/share/gnome-shell/extensions') / UUID
+# Every runtime file of the companion, as packaged; scripts/test-panel-setup.py
+# compares it with the source directory and the Debian file map.
+FILES = ('extension.js', 'metadata.json', 'model.js', 'stylesheet.css', 'voco-symbol.png')
 
 
 def result(status, detail, can_enable=False):
@@ -42,8 +44,7 @@ def check(enable=False):
     import gi
     gi.require_version('Gio', '2.0')
     from gi.repository import Gio, GLib
-    if not any(item.lower() == 'gnome' for item in os.environ.get('XDG_CURRENT_DESKTOP', '').split(':')):
-        return result('other-desktop', 'Use the VOCO tray menu for status and Stop. Labels depend on your desktop.')
+    # VOCO answers other-desktop itself before starting this helper.
     bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
 
     def call(interface, method, parameters):
@@ -58,8 +59,7 @@ def check(enable=False):
     info = {key: value.unpack() if isinstance(value, GLib.Variant) else value for key, value in info.items()}
     settings = Gio.Settings.new('org.gnome.shell')
     enabled = list(settings.get_strv('enabled-extensions'))
-    installed = all((PACKAGE / name).is_file() for name in
-                    ('metadata.json', 'extension.js', 'model.js', 'stylesheet.css', 'voco-symbol.png'))
+    installed = all((PACKAGE / name).is_file() for name in FILES)
     status = classify(version, installed, info, UUID in enabled,
                       settings.get_boolean('disable-user-extensions'))
     if enable and status['canEnable']:

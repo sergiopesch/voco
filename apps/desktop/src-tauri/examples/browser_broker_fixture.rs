@@ -47,7 +47,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .session_id
         .ok_or("claim omitted session identity")?;
     std::thread::sleep(Duration::from_millis(delay));
-    let result = broker.append(session_id, "", "Native café 🦀 你好.", true);
+    let result = broker.append(session_id, "", "Native café 🦀 你好.");
     writeln!(
         file,
         "{}",

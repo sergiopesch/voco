@@ -37,7 +37,7 @@ page.on('console', m => { if (['error', 'warning'].includes(m.type())) consoleMe
 const results = [];
 const nativeMock = `
 export const calls = window.nativeCalls = [];
-const state = () => ({ sessionId: 101, setupState: "ready", engineActive: true, focusLost: false, ownershipIntact: true, finalizationOutcome: "committed", committedCharacterCount: 0 });
+const state = () => ({ sessionId: 101, setupState: "ready", engineActive: true, focusLost: false, ownershipIntact: true, finalizationOutcome: null, committedCharacterCount: 0 });
 export const startBrowserField = async (...args) => { calls.push(['startBrowserField', ...args]); if(window.deferLease) await new Promise(resolve=>window.resolveLease=resolve); if (!window.lease) throw new Error('No eligible original field'); return state(); };
 export const getDesktopInputStatus = async () => ({available:!window.pasteUnavailable,detail:"Paste helper unavailable"});
 export const getPanelSetupStatus = async () => ({status:'other-desktop',detail:'Use the tray menu.',canEnable:false});

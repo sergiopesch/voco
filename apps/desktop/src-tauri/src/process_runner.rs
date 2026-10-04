@@ -9,6 +9,9 @@ use std::sync::{Arc, Condvar, LazyLock, Mutex};
 use std::time::{Duration, Instant};
 
 const IO_BATCH_BYTES: usize = 16 * 1024;
+// How long the wait loop sleeps when nothing progressed. Paste helpers have no
+// output pipes, so their exit is seen only on the next wake: up to this much late.
+const IDLE_POLL: Duration = Duration::from_millis(1);
 
 pub(crate) fn command(program: &str) -> Command {
     let mut command = Command::new(program);
@@ -253,9 +256,7 @@ pub(crate) fn wait_with_input_output(
             }
         }
         if !progressed {
-            std::thread::sleep(
-                Duration::from_millis(5).min(timeout.saturating_sub(started.elapsed())),
-            );
+            std::thread::sleep(IDLE_POLL.min(timeout.saturating_sub(started.elapsed())));
         }
     }
 }

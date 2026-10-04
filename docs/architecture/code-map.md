@@ -63,6 +63,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 
 - `ControlPanel.tsx` — Settings window with the Settings, Microphone, Shortcut, Updates and Help sections.
 - `ControlPanel.test.tsx` — Settings guidance and controls.
+- `recordedShortcuts.json` — Key presses, the shortcut **Record keys** makes of each and whether Rust accepts it; `ControlPanel.test.tsx` and `lib.rs` both check it.
 - `Onboarding.tsx` — First-run voice test and desktop setup check. Its text stays in the window.
 - `Onboarding.test.tsx` — Onboarding states.
 - `CrashReview.tsx` — Review window: copy or discard interrupted dictations.
@@ -184,6 +185,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `NATIVE-BUILD.json` — Build receipt for the pinned native library.
 - `test_cpu_threads.py` — Default thread count.
 - `test_diagnostics.py` — Protocol framing, diagnostics and private metrics logs.
+- `test_model_identity.py` — The model integrity check, the worker's native revision and the NVIDIA notice match the pinned identity files.
 - `test_streaming.py` — Silence gate accounting and log privacy.
 - `test_timing.py` — Timing instrumentation keeps sample order and transcripts.
 - `test_worker_protocol.py` — Protocol and lifecycle checks against the real model.

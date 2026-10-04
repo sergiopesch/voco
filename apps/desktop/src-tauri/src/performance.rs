@@ -406,7 +406,7 @@ fn write_events(
         "desktop_paste_enabled":crate::insertion::desktop_paste_enabled(),
         "desktop_stream_enabled":crate::insertion::desktop_stream_enabled(),
         "desktop_clipboard_helper":crate::insertion::desktop_clipboard_helper(),
-        "session_type":crate::session_type_label(), "logical_cpus":std::thread::available_parallelism().ok().map(|n|n.get()),
+        "session_type":crate::trace_session_label(), "logical_cpus":std::thread::available_parallelism().ok().map(|n|n.get()),
         "resource_scope":"Rust process; excludes speech worker, WebKit and helper processes",
         "started_unix_us":epoch});
     let mut seq = 0u64;

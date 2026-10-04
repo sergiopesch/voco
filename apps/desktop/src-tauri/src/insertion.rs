@@ -415,10 +415,7 @@ enum SessionKind {
 }
 
 fn session_kind() -> SessionKind {
-    if std::env::var("XDG_SESSION_TYPE")
-        .map(|value| value.eq_ignore_ascii_case("wayland"))
-        .unwrap_or(false)
-    {
+    if crate::is_wayland_session() {
         SessionKind::Wayland
     } else {
         SessionKind::X11OrOther
@@ -578,9 +575,7 @@ where
 }
 
 fn clipboard_helper_for(session: SessionKind, desktop: &str, has_x_display: bool) -> &'static str {
-    let gnome = desktop
-        .split(':')
-        .any(|name| name.eq_ignore_ascii_case("gnome"));
+    let gnome = crate::is_gnome_desktop(desktop);
     if matches!(session, SessionKind::Wayland) && !(gnome && has_x_display) {
         "wl-copy"
     } else {
@@ -594,7 +589,7 @@ pub fn desktop_clipboard_helper() -> &'static str {
     // without creating a focus-taking surface. Keyboard delivery remains Wayland.
     clipboard_helper_for(
         session_kind(),
-        &std::env::var("XDG_CURRENT_DESKTOP").unwrap_or_default(),
+        &crate::current_desktop(),
         std::env::var("DISPLAY").is_ok_and(|value| !value.is_empty()),
     )
 }

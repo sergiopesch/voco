@@ -1003,7 +1003,8 @@ ok "Desktop input prerequisites verified"
 dim "Setting up VOCO's live panel for this desktop."
 if VOCO_PANEL_DETAIL="$(/usr/bin/voco --setup-panel 2>&1)"; then
   dim "$VOCO_PANEL_DETAIL"
-elif [[ "$VOCO_PANEL_DETAIL" == *'Panel enabled. Sign out and back in'* ]]; then
+elif [[ "$VOCO_PANEL_DETAIL" == *'Panel enabled. Sign out and back in'* || "$VOCO_PANEL_DETAIL" == *'Panel update installed.'* ]]; then
+  # Setup enabled the panel, or an upgrade left GNOME running the previous one.
   VOCO_UI_NOTE='Panel: sign out and back in to load it. Save your work first.'
   if [[ "$VOCO_TERMINAL_MOTION" != true ]]; then warn "$VOCO_UI_NOTE"; fi
 else

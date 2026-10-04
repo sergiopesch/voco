@@ -307,8 +307,8 @@ release rehearsal.
   speech into a live user session.
 - Use public or synthetic fixtures only; keep personal audio, transcripts and
   private raw evidence out of the repository and out of CI logs.
-- Python worker tests need NumPy and psutil; protocol tests also need the pinned
-  model and runtime (`scripts/provision-ci-speech.sh`).
+- Python worker tests need NumPy; protocol tests also need the pinned model and
+  runtime (`scripts/provision-ci-speech.sh`).
 - Record unavailable checks as unavailable, never passed. Report failures and
   attempted-trial denominators, not just successes.
 - Keep diagnostic DOM logging separate from latency measurements in browser tests:

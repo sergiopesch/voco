@@ -34,8 +34,8 @@ it.
 - Tauri CLI 2.10.1, which `npm run dev` and packaging use:
   `cargo install tauri-cli --version 2.10.1 --locked`.
 - System Python at `/usr/bin/python3`, with python3-gi and gir1.2-ibus-1.0 for
-  the IBus tests, and python3-numpy and python3-psutil for the speech worker.
-  `scripts/setup.sh` installs all four.
+  the IBus tests, python3-numpy for the speech worker, and python3-psutil for
+  its evaluation tool. `scripts/setup.sh` installs all four.
 - Playwright's Chromium for the renderer suites:
   `npx playwright install --with-deps chromium`.
 

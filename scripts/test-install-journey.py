@@ -17,6 +17,15 @@ SIGNED_SIGNATURE = ROOT / 'tests/fixtures/installer/voco.2026.0.54_checksums.txt
 spec = importlib.util.spec_from_file_location('performance', ROOT / 'scripts/test-install-performance.py')
 fixture = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(fixture)
+spec = importlib.util.spec_from_file_location('panel_setup', ROOT / 'apps/desktop/src-tauri/resources/voco_gnome_panel.py')
+panel = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(panel)
+# The installer matches the two results after which `voco --setup-panel` asks for a
+# sign-out: setup just enabled the panel, or an upgrade left GNOME running an older one.
+PANEL_RESTARTS = {
+    'enabled': panel.classify('46.0', True, {}, True, False),
+    'updated': panel.classify('46.0', True, {'state': 1, 'version': panel.COMPANION_VERSION - 1}, True, False),
+}
 
 
 def visible_terminal(data, width=80):
@@ -103,7 +112,7 @@ voco_ui_close
             self.assertNotIn('Interrupted frame', screen)
 
     def run_journey(self, mode, signature_case='valid', install_case='ready', launch_case='started',
-                    manager='apt', settings=None, platform_case='supported'):
+                    manager='apt', settings=None, platform_case='supported', panel_result='enabled'):
         source = (ROOT / 'install').read_text()
         prefix, body = source.split('# ─── Header', 1)
         # The signed .54 manifest includes KEYS. Use that small real release asset
@@ -183,7 +192,7 @@ voco_ui_close
               VOCO_INPUT_ERROR="VOCO can't open /dev/uinput, so it can't send the paste keys."
               [[ "$FIXTURE_INSTALL_CASE" != readiness-failure ]]
             }
-            fixture_panel() { printf 'Panel enabled. Sign out and back in to load it; saving your work first is recommended.\n'; return 1; }
+            fixture_panel() { printf '%s\n' "$FIXTURE_PANEL_DETAIL"; return 1; }
             voco_launch_installed_app() {
               printf 'launch\n' >> "$FIXTURE_LAUNCH_CALL"
               case "$FIXTURE_LAUNCH_CASE" in
@@ -204,7 +213,8 @@ voco_ui_close
                    'FIXTURE_MANAGER': manager, 'FIXTURE_DNF_CALL': str(root / 'dnf-called'),
                    'FIXTURE_PACKAGE_URL': str(root / 'package-url'), 'FIXTURE_CPUINFO': str(root / 'cpuinfo'),
                    'FIXTURE_GLIBC': '2.36' if platform_case == 'old-glibc' else '2.39',
-                   'FIXTURE_DPKG_CALL': str(root / 'dpkg-called')}
+                   'FIXTURE_DPKG_CALL': str(root / 'dpkg-called'),
+                   'FIXTURE_PANEL_DETAIL': PANEL_RESTARTS[panel_result]['detail']}
             env.pop('NO_COLOR', None)
             if mode == 'plain':
                 env['VOCO_INSTALL_PLAIN'] = '1'
@@ -272,6 +282,9 @@ voco_ui_close
             self.assertNotIn('[1/3]', screen)
             self.assertIn("Installed. Let's try your voice.", screen)
             self.assertIn('sign out', screen.lower())
+            # The installer's own note, not the generic warning for other setup results.
+            self.assertIn('Panel: sign out', screen)
+            self.assertNotIn('check again', screen)
             if settings:
                 self.assertIn('unchanged', screen)
                 self.assertNotIn('Alt+D', screen)
@@ -349,6 +362,12 @@ voco_ui_close
         for mode in ('animated', 'no-motion', 'password', 'prompt', 'plain', 'narrow', 'short'):
             with self.subTest(mode=mode):
                 self.run_journey(mode)
+
+    def test_upgrade_that_needs_a_sign_out_gets_the_same_note(self):
+        self.assertEqual({result['status'] for result in PANEL_RESTARTS.values()}, {'restart'})
+        for mode in ('animated', 'plain'):
+            with self.subTest(mode=mode):
+                self.run_journey(mode, panel_result='updated')
 
 
 if __name__ == '__main__':

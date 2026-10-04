@@ -10,9 +10,9 @@ from pathlib import Path
 import time
 import uuid
 import queue
+import resource
 import threading
 import numpy as np
-import psutil
 from adapters import Nemotron
 
 GATE_MODES = ('off', 'zero')
@@ -153,6 +153,13 @@ class PrivateRotatingHandler(RotatingFileHandler):
             os.close(descriptor)
             raise
 
+def process_usage():
+    """This worker's CPU seconds and resident bytes; OSError or ValueError when unreadable."""
+    usage = resource.getrusage(resource.RUSAGE_SELF)
+    with open('/proc/self/statm', 'rb') as statm:
+        _size, resident, *_ = statm.read().split()
+    return usage.ru_utime, usage.ru_stime, int(resident) * resource.getpagesize()
+
 class Metrics:
     """Bounded asynchronous local logging. Disk failures never reject speech."""
     def __init__(self):
@@ -166,7 +173,7 @@ class Metrics:
             return
         try:
             self._initialize()
-        except (OSError, psutil.Error):
+        except (OSError, ValueError):
             self._unavailable()
 
     def _unavailable(self):
@@ -185,7 +192,7 @@ class Metrics:
         self.logger.propagate = False
         self.handler = PrivateRotatingHandler(root/'worker.jsonl', maxBytes=8*1024*1024, backupCount=3)
         self.logger.addHandler(self.handler)
-        self.process = psutil.Process()
+        process_usage()  # Unreadable usage disables metrics before the writer starts.
         self.queue = queue.Queue(maxsize=256)
         self.writer = threading.Thread(target=self._write, name='voco-speech-metrics', daemon=True)
         self.writer.start()
@@ -201,18 +208,18 @@ class Metrics:
                 if self.closed and self.queue.empty():
                     self.logger.info(json.dumps(self._record('metrics_closed', {}), separators=(',', ':')))
                     return
-        except (OSError, ValueError, psutil.Error):
+        except (OSError, ValueError):
             self._unavailable()
         finally:
             self.handler.close()
 
     def _record(self, event, fields):
-        cpu = self.process.cpu_times()
+        cpu_user_s, cpu_system_s, rss_bytes = process_usage()
         self.sequence += 1
         return {'event': event, 'run_id': self.run_id, 'event_seq': self.sequence,
             'dropped_events': self.dropped, 'monotonic_s': time.monotonic(), 'unix_s': time.time(),
-            'pid': os.getpid(), 'cpu_user_s': cpu.user, 'cpu_system_s': cpu.system,
-            'rss_bytes': self.process.memory_info().rss, **fields}
+            'pid': os.getpid(), 'cpu_user_s': cpu_user_s, 'cpu_system_s': cpu_system_s,
+            'rss_bytes': rss_bytes, **fields}
 
     def emit(self, event, **fields):
         if not self.enabled or self.closed:
@@ -221,7 +228,7 @@ class Metrics:
             self.queue.put_nowait(self._record(event, fields))
         except queue.Full:
             self.dropped += 1
-        except (OSError, psutil.Error):
+        except (OSError, ValueError):
             self._unavailable()
 
     def close(self):

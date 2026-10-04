@@ -6,6 +6,8 @@ import hashlib
 import time
 import numpy as np
 ROOT=Path(__file__).resolve().parent
+# MODEL-IDENTITY.json names the same digest; test_model_identity.py keeps them equal.
+MODEL_SHA256='d9a01898d2a611c8764e23a1c2f45e70bbd5a425dc4de93692ac951dd603812d'
 class Nemotron:
     def __init__(self,context=1):
         self.stream=None
@@ -29,7 +31,7 @@ class Nemotron:
         if not model_path.is_absolute(): raise ValueError('Model path must be absolute')
         with model_path.open('rb') as model_file:
             digest=hashlib.file_digest(model_file,'sha256').hexdigest()
-        if digest != 'd9a01898d2a611c8764e23a1c2f45e70bbd5a425dc4de93692ac951dd603812d':
+        if digest != MODEL_SHA256:
             raise ValueError('Model integrity mismatch')
         self.sha256=digest
         self.recognizer=create(str(model_path).encode(),context)

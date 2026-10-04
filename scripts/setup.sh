@@ -174,7 +174,7 @@ else
   warn "Not using apt — install manually: gcc pkg-config libglib2.0-dev libsoup-3.0-dev"
   warn "libjavascriptcoregtk-4.1-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev libpulse-dev"
   warn "For IBus shortcut integration, install IBus, its GI bindings, and system Python 3"
-  warn "The speech worker needs system Python 3 with NumPy and psutil"
+  warn "The speech worker needs system Python 3 with NumPy; its evaluation tool also needs psutil"
   if $INSTALL_MODE; then warn "Package assembly also needs: ${PACKAGE_TOOLS[*]}"; fi
 fi
 

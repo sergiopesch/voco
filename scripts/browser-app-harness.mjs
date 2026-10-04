@@ -28,7 +28,6 @@ export async function start({grantLocalHostPermission}) {
   assert.equal(typeof grantLocalHostPermission, 'boolean');
   grant = grantLocalHostPermission;
   assert.ok(root && process.env.XDG_RUNTIME_DIR === `${root}/runtime` && process.env.DISPLAY === ':0');
-  assert.equal(await hash(model), 'd9a01898d2a611c8764e23a1c2f45e70bbd5a425dc4de93692ac951dd603812d');
   if (longCapture) {
     const manifestBytes = await fs.readFile('tests/fixtures/speech/manifest.json');
     const fixtureManifest = JSON.parse(manifestBytes);

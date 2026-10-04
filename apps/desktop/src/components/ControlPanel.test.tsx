@@ -2,9 +2,11 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   ControlPanel,
+  saveErrorMessage,
   shouldOpenMicrophonePreview,
   shortcutFromKeyboardEvent,
 } from "@/components/ControlPanel";
+import recordedShortcuts from "@/components/recordedShortcuts.json";
 import { isDictationActive } from "@/lib/activityMode";
 import { deriveStatusLabel } from "@/lib/dictationPresentation";
 import { useStore } from "@/store/useStore";
@@ -116,7 +118,7 @@ describe("ControlPanel", () => {
       desktopInput: { available: true, setupArea: "panel" as const, detail: "Alt+D also reaches the app you are dictating into. Enable the VOCO panel in Help to keep the shortcut out of other apps." },
       desktopPaste: { enabled: true, available: true, detail: "Ready" },
       shortcut: { hotkey: "Alt+D", route: "evdev" as const, state: "available" as const, detail: "Keyboard ready" },
-      sessionType: "wayland", typeSimulation: support, clipboard: support,
+      sessionType: "wayland" as const, typeSimulation: support, clipboard: support,
       ibusShortcut: { available: false, setupState: "not-enabled" as const, detail: "Not enabled", error: null },
     };
     const settings = renderPanel({ surface: "settings", runtimeDiagnostics });
@@ -125,6 +127,10 @@ describe("ControlPanel", () => {
     const popover = renderPanel({ runtimeDiagnostics });
     expect(popover).toContain("Click where you want the text, then use your shortcut.");
     expect(popover).not.toContain("Open Help to finish desktop setup.");
+    // Wayland also explains binding voco --toggle in the desktop's own settings.
+    expect(renderPanel({ surface: "settings", requestedSection: "Hotkeys", runtimeDiagnostics })).toContain("Desktop shortcut");
+    expect(renderPanel({ surface: "settings", requestedSection: "Hotkeys",
+      runtimeDiagnostics: { ...runtimeDiagnostics, sessionType: "x11-or-other" } })).not.toContain("Desktop shortcut");
     const advanced = renderPanel({ surface: "settings", requestedSection: "Advanced", runtimeDiagnostics });
     expect(advanced).toContain("Panel setup");
     expect(advanced).not.toContain("Setup needed");
@@ -289,15 +295,35 @@ describe("guided dictation and settings journeys", () => {
 });
 
 describe("shortcut recording", () => {
-  it("records modifier combinations and preserves named keys for native validation", () => {
-    expect(shortcutFromKeyboardEvent({ key: "v", ctrlKey: true, altKey: false, shiftKey: true, metaKey: false })).toBe("Ctrl+Shift+V");
-    expect(shortcutFromKeyboardEvent({ key: " ", ctrlKey: false, altKey: false, shiftKey: false, metaKey: true })).toBe("Super+Space");
-    expect(shortcutFromKeyboardEvent({ key: "ArrowUp", ctrlKey: true, altKey: false, shiftKey: false, metaKey: false })).toBe("Ctrl+ArrowUp");
+  type Press = { key: string; code: string; ctrlKey?: boolean; altKey?: boolean; shiftKey?: boolean; metaKey?: boolean; altGraph?: boolean };
+  const press = ({ altGraph = false, ...keys }: Press) => {
+    const event = {
+      ctrlKey: false, altKey: false, shiftKey: false, metaKey: false, ...keys, nativeEvent: { altGraph },
+      // Like React's synthetic event, this reads the native event through `this`,
+      // so calling it apart from its event throws.
+      getModifierState(modifier: string) { return modifier === "AltGraph" && this.nativeEvent.altGraph; },
+    };
+    return shortcutFromKeyboardEvent(event);
+  };
+  // lib.rs checks that Rust's parser accepts exactly the recordings marked accepted.
+  it.each(recordedShortcuts)("records $shortcut", ({ event, shortcut }) => {
+    expect(press(event)).toBe(shortcut);
   });
   it("does not accept unmodified typing, shift-only typing or a bare modifier", () => {
-    expect(shortcutFromKeyboardEvent({ key: "a", ctrlKey: false, altKey: false, shiftKey: false, metaKey: false })).toBeNull();
-    expect(shortcutFromKeyboardEvent({ key: "A", ctrlKey: false, altKey: false, shiftKey: true, metaKey: false })).toBeNull();
-    expect(shortcutFromKeyboardEvent({ key: "Control", ctrlKey: true, altKey: false, shiftKey: false, metaKey: false })).toBeNull();
+    expect(press({ key: "a", code: "KeyA" })).toBeNull();
+    expect(press({ key: "A", code: "KeyA", shiftKey: true })).toBeNull();
+    expect(press({ key: "Control", code: "ControlLeft", ctrlKey: true })).toBeNull();
+  });
+});
+
+describe("settings save errors", () => {
+  it("show the reason the native save gave, which Tauri passes as a string", () => {
+    const reason = "Dictation hotkey must include Alt, Control, or Super in addition to the main key";
+    expect(saveErrorMessage(reason)).toBe(reason);
+    expect(saveErrorMessage(new Error("Disk full"))).toBe("Disk full");
+    for (const unknown of ["", undefined, { outcome: "uncertain" }]) {
+      expect(saveErrorMessage(unknown)).toBe("VOCO could not save those settings.");
+    }
   });
 });
 

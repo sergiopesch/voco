@@ -79,6 +79,9 @@ To change the shortcut, choose **Change shortcut** in the tray menu, then
 **Alt+D**, **Alt+Shift+D** or **Custom shortcut…**. On the **Shortcut** page,
 choose **Change shortcut**, type a shortcut or choose **Record keys**, then
 choose **Apply shortcut**. A shortcut needs Alt, Ctrl or Super plus another key.
+**Record keys** names the key you press rather than the symbol it types, so
+Ctrl+Shift+1 records as `Ctrl+Shift+1`, and a letter on a non-Latin layout as
+its Latin key.
 If your saved shortcut isn't valid, VOCO sets it back to `Alt+D` and shows
 **Shortcut reset**.
 

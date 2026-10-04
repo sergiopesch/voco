@@ -26,6 +26,7 @@ import { NativeMicrophoneSettings } from "@/components/NativeMicrophoneSettings"
 import type { NativeMicrophoneControls } from "@/hooks/useNativeCaptureSettings";
 import { SettingsIcon } from "@/components/SettingsIcon";
 import { useGlassPointer } from "@/hooks/useGlassPointer";
+import { isWaylandSession } from "@/lib/windowRemap";
 import vocoBrandImage from "../../../../assets/voco-symbol-ui.png";
 
 interface ControlPanelProps {
@@ -81,11 +82,47 @@ const PANEL_SECTION_LABELS: Record<PanelSection, string> = {
   Advanced: "Help",
 };
 
-export function shortcutFromKeyboardEvent(event: Pick<KeyboardEvent, "key" | "altKey" | "ctrlKey" | "shiftKey" | "metaKey">): string | null {
+type ShortcutKeyEvent = Pick<KeyboardEvent, "key" | "code" | "altKey" | "ctrlKey" | "shiftKey" | "metaKey" | "getModifierState">;
+
+// The single characters Rust's shortcut parser accepts as they are.
+const PARSER_CHARACTERS = /^[A-Za-z0-9`\\[\],=\-.';/]$/;
+// A US Shift symbol and the key that types it, which the parser names by code.
+const US_SHIFTED_CODES: Record<string, string> = {
+  "_": "Minus", "+": "Equal", "{": "BracketLeft", "}": "BracketRight", "|": "Backslash", ":": "Semicolon",
+  "\"": "Quote", "<": "Comma", ">": "Period", "?": "Slash", "~": "Backquote",
+};
+
+/** A shifted symbol or a non-Latin letter names its physical key, which the
+ * desktop resolves through the layout. Any other key stays as typed, for Rust to
+ * accept or reject: another layout's symbol position could bind a different key. */
+function shortcutKey(event: ShortcutKeyEvent): string {
+  const { key, code } = event;
+  if (key === " ") return "Space";
+  if (key.length !== 1) return key;
+  if (PARSER_CHARACTERS.test(key)) return key.toUpperCase();
+  // AltGr chose the character; the physical key alone is a different chord.
+  // Call it on the event: React's getModifierState reads the event through `this`.
+  if (!event.getModifierState("AltGraph")) {
+    if (/^(?:Key[A-Z]|Digit[0-9])$/.test(code)) return code.slice(-1);
+    if (code.startsWith("Numpad")) return code;
+    // US layouts type these only with Shift. Unshifted, another layout typed it,
+    // and the key's name can bind a different key there: Croatian types "+" on
+    // Equal, but X11 looks Equal up by "=", which Croatian puts on 0.
+    if (event.shiftKey && US_SHIFTED_CODES[key] === code) return code;
+  }
+  return key.toUpperCase();
+}
+
+export function shortcutFromKeyboardEvent(event: ShortcutKeyEvent): string | null {
   if (["Alt", "Control", "Shift", "Meta"].includes(event.key)) return null;
   const modifiers = [event.ctrlKey && "Ctrl", event.altKey && "Alt", event.shiftKey && "Shift", event.metaKey && "Super"].filter(Boolean);
-  const key = event.key === " " ? "Space" : event.key.length === 1 ? event.key.toUpperCase() : event.key;
-  return event.ctrlKey || event.altKey || event.metaKey ? [...modifiers, key].join("+") : null;
+  return event.ctrlKey || event.altKey || event.metaKey ? [...modifiers, shortcutKey(event)].join("+") : null;
+}
+
+/** Why a settings save failed. A Tauri command rejects with its error text. */
+export function saveErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return typeof error === "string" && error ? error : "VOCO could not save those settings.";
 }
 
 export function ControlPanel({
@@ -162,7 +199,7 @@ export function ControlPanel({
   const [hotkeyDraft, setHotkeyDraft] = useState(config.hotkey);
   const [hotkeyError, setHotkeyError] = useState<string | null>(null);
   const nativePreviewDisabled = Boolean(nativeMicrophone && nativeMicrophone.mode !== "webkit");
-  const waylandDesktop = runtimeDiagnostics?.sessionType.toLowerCase() === "wayland";
+  const waylandDesktop = isWaylandSession(runtimeDiagnostics?.sessionType ?? null);
   const [inputReadiness, setInputReadiness] = useState<DesktopInputStatus | null>(null);
   const [checkingInput, setCheckingInput] = useState(false);
   const inputCheckRequest = useRef(0);
@@ -436,11 +473,7 @@ export function ControlPanel({
     } catch (error) {
       setSaveFeedback("Changes could not be saved. Review the error and try again.");
       setSaveOutcome("attention");
-      return {
-        ok: false,
-        message:
-          error instanceof Error ? error.message : "VOCO could not save those settings.",
-      };
+      return { ok: false, message: saveErrorMessage(error) };
     } finally {
       setSavingCount((count) => Math.max(0, count - 1));
     }
