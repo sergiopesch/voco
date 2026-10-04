@@ -5,6 +5,7 @@ import {
   shouldOpenMicrophonePreview,
   shortcutFromKeyboardEvent,
 } from "@/components/ControlPanel";
+import recordedShortcuts from "@/components/recordedShortcuts.json";
 import { isDictationActive } from "@/lib/activityMode";
 import { deriveStatusLabel } from "@/lib/dictationPresentation";
 import { useStore } from "@/store/useStore";
@@ -293,15 +294,19 @@ describe("guided dictation and settings journeys", () => {
 });
 
 describe("shortcut recording", () => {
-  it("records modifier combinations and preserves named keys for native validation", () => {
-    expect(shortcutFromKeyboardEvent({ key: "v", ctrlKey: true, altKey: false, shiftKey: true, metaKey: false })).toBe("Ctrl+Shift+V");
-    expect(shortcutFromKeyboardEvent({ key: " ", ctrlKey: false, altKey: false, shiftKey: false, metaKey: true })).toBe("Super+Space");
-    expect(shortcutFromKeyboardEvent({ key: "ArrowUp", ctrlKey: true, altKey: false, shiftKey: false, metaKey: false })).toBe("Ctrl+ArrowUp");
+  type Press = { key: string; code: string; ctrlKey?: boolean; altKey?: boolean; shiftKey?: boolean; metaKey?: boolean; altGraph?: boolean };
+  const press = ({ altGraph = false, ...event }: Press) => shortcutFromKeyboardEvent({
+    ctrlKey: false, altKey: false, shiftKey: false, metaKey: false,
+    getModifierState: (modifier: string) => modifier === "AltGraph" && altGraph, ...event,
+  });
+  // lib.rs checks that Rust's parser accepts exactly the recordings marked accepted.
+  it.each(recordedShortcuts)("records $shortcut", ({ event, shortcut }) => {
+    expect(press(event)).toBe(shortcut);
   });
   it("does not accept unmodified typing, shift-only typing or a bare modifier", () => {
-    expect(shortcutFromKeyboardEvent({ key: "a", ctrlKey: false, altKey: false, shiftKey: false, metaKey: false })).toBeNull();
-    expect(shortcutFromKeyboardEvent({ key: "A", ctrlKey: false, altKey: false, shiftKey: true, metaKey: false })).toBeNull();
-    expect(shortcutFromKeyboardEvent({ key: "Control", ctrlKey: true, altKey: false, shiftKey: false, metaKey: false })).toBeNull();
+    expect(press({ key: "a", code: "KeyA" })).toBeNull();
+    expect(press({ key: "A", code: "KeyA", shiftKey: true })).toBeNull();
+    expect(press({ key: "Control", code: "ControlLeft", ctrlKey: true })).toBeNull();
   });
 });
 

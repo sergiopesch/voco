@@ -2423,6 +2423,23 @@ mod tests {
     }
 
     #[test]
+    fn settings_record_keys_produces_shortcuts_this_parser_checks() {
+        // ControlPanel.test.tsx asserts the renderer records exactly these strings.
+        let cases: Vec<serde_json::Value> =
+            serde_json::from_str(include_str!("../../src/components/recordedShortcuts.json"))
+                .expect("recorder cases are JSON");
+        assert!(!cases.is_empty());
+        for case in cases {
+            let shortcut = case["shortcut"].as_str().expect("recorded shortcut");
+            assert_eq!(
+                validate_dictation_hotkey(shortcut).is_ok(),
+                case["accepted"].as_bool().expect("expected outcome"),
+                "{shortcut}"
+            );
+        }
+    }
+
+    #[test]
     fn invalid_persisted_hotkeys_fall_back_without_touching_valid_values() {
         let mut invalid = AppConfig {
             hotkey: "Alt+".to_string(),

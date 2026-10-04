@@ -63,6 +63,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 
 - `ControlPanel.tsx` — Settings window with the Settings, Microphone, Shortcut, Updates and Help sections.
 - `ControlPanel.test.tsx` — Settings guidance and controls.
+- `recordedShortcuts.json` — Key presses, the shortcut **Record keys** makes of each and whether Rust accepts it; `ControlPanel.test.tsx` and `lib.rs` both check it.
 - `Onboarding.tsx` — First-run voice test and desktop setup check. Its text stays in the window.
 - `Onboarding.test.tsx` — Onboarding states.
 - `CrashReview.tsx` — Review window: copy or discard interrupted dictations.

@@ -82,11 +82,35 @@ const PANEL_SECTION_LABELS: Record<PanelSection, string> = {
   Advanced: "Help",
 };
 
-export function shortcutFromKeyboardEvent(event: Pick<KeyboardEvent, "key" | "altKey" | "ctrlKey" | "shiftKey" | "metaKey">): string | null {
+type ShortcutKeyEvent = Pick<KeyboardEvent, "key" | "code" | "altKey" | "ctrlKey" | "shiftKey" | "metaKey" | "getModifierState">;
+
+// The single characters Rust's shortcut parser accepts as they are.
+const PARSER_CHARACTERS = /^[A-Za-z0-9`\\[\],=\-.';/]$/;
+// A US Shift symbol and the key that types it, which the parser names by code.
+const US_SHIFTED_CODES: Record<string, string> = {
+  "_": "Minus", "+": "Equal", "{": "BracketLeft", "}": "BracketRight", "|": "Backslash", ":": "Semicolon",
+  "\"": "Quote", "<": "Comma", ">": "Period", "?": "Slash", "~": "Backquote",
+};
+
+/** A shifted symbol or a non-Latin letter names its physical key, which the
+ * desktop resolves through the layout. Any other key stays as typed, for Rust to
+ * accept or reject: another layout's symbol position could bind a different key. */
+function shortcutKey({ key, code, getModifierState }: ShortcutKeyEvent): string {
+  if (key === " ") return "Space";
+  if (key.length !== 1) return key;
+  if (PARSER_CHARACTERS.test(key)) return key.toUpperCase();
+  // AltGr chose the character; the physical key alone is a different chord.
+  if (!getModifierState("AltGraph")) {
+    if (/^(?:Key[A-Z]|Digit[0-9])$/.test(code)) return code.slice(-1);
+    if (code.startsWith("Numpad") || US_SHIFTED_CODES[key] === code) return code;
+  }
+  return key.toUpperCase();
+}
+
+export function shortcutFromKeyboardEvent(event: ShortcutKeyEvent): string | null {
   if (["Alt", "Control", "Shift", "Meta"].includes(event.key)) return null;
   const modifiers = [event.ctrlKey && "Ctrl", event.altKey && "Alt", event.shiftKey && "Shift", event.metaKey && "Super"].filter(Boolean);
-  const key = event.key === " " ? "Space" : event.key.length === 1 ? event.key.toUpperCase() : event.key;
-  return event.ctrlKey || event.altKey || event.metaKey ? [...modifiers, key].join("+") : null;
+  return event.ctrlKey || event.altKey || event.metaKey ? [...modifiers, shortcutKey(event)].join("+") : null;
 }
 
 export function ControlPanel({
