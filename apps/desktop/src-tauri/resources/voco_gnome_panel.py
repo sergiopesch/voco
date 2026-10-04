@@ -7,7 +7,7 @@ import time
 
 UUID = 'voco-panel@voco.local'
 # Bump with behavior changes that require reloading the running Shell companion.
-COMPANION_VERSION = 13
+COMPANION_VERSION = 14
 PACKAGE = Path('/usr/share/gnome-shell/extensions') / UUID
 
 
@@ -15,9 +15,13 @@ def result(status, detail, can_enable=False):
     return dict(status=status, detail=detail, canEnable=can_enable)
 
 
+# Tested Shell majors; keep in step with the companion's metadata.json.
+SUPPORTED_SHELLS = ('46', '48', '50')
+
+
 def classify(version, installed, info, enabled, globally_disabled):
-    if version.split('.')[0] != '46':
-        return result('unsupported', 'The VOCO panel requires GNOME 46. Dictation still works, but without the panel the focused app also receives Alt+D and Alt+Shift+D. To avoid that, choose another shortcut in VOCO and configure it in your desktop to run voco --toggle.')
+    if version.split('.')[0] not in SUPPORTED_SHELLS:
+        return result('unsupported', 'The VOCO panel supports GNOME 46, 48 and 50. Dictation still works, but without the panel the focused app also receives Alt+D and Alt+Shift+D. To avoid that, choose another shortcut in VOCO and configure it in your desktop to run voco --toggle.')
     if not installed:
         return result('missing', 'The VOCO panel files are missing. Reinstall the complete VOCO package.')
     if globally_disabled:

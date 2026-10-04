@@ -32,7 +32,7 @@ pub struct PanelSetupStatus {
     pub can_enable: bool,
 }
 
-/// On Wayland only the desktop can consume these chords: VOCO's GNOME 46 panel,
+/// On Wayland only the desktop can consume these chords: VOCO's GNOME panel,
 /// or elsewhere a desktop keybinding for `voco --toggle`. Passive evdev
 /// observation alone lets the focused application also act on them (Alt+D
 /// focuses a browser address or deletes a terminal word), moving the cursor.

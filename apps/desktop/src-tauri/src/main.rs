@@ -42,7 +42,7 @@ fn main() {
             return;
         }
         [arg] if arg == "--help" || arg == "-h" => {
-            println!("Usage: voco [--toggle | --check-desktop-input | --check-panel | --setup-panel | --version | --help]\n\nWithout arguments, launch VOCO or present the existing idle app.\n--toggle  Request Start/Stop from VOCO already running in this desktop session.\n          Does not change focus, launch VOCO, or confirm recording state.\n--check-desktop-input  Check paste prerequisites without launching VOCO or sending keys.\n--check-panel  Check the GNOME companion without changing settings.\n--setup-panel  Enable the packaged GNOME 46 companion for this user.\n               May require signing out and back in; does not restart Shell.");
+            println!("Usage: voco [--toggle | --check-desktop-input | --check-panel | --setup-panel | --version | --help]\n\nWithout arguments, launch VOCO or present the existing idle app.\n--toggle  Request Start/Stop from VOCO already running in this desktop session.\n          Does not change focus, launch VOCO, or confirm recording state.\n--check-desktop-input  Check paste prerequisites without launching VOCO or sending keys.\n--check-panel  Check the GNOME companion without changing settings.\n--setup-panel  Enable the packaged GNOME companion (GNOME 46, 48, 50) for this user.\n               May require signing out and back in; does not restart Shell.");
             return;
         }
         _ => {

@@ -11,7 +11,13 @@ spec.loader.exec_module(panel)
 
 class PanelSetupTests(unittest.TestCase):
     def test_supported_fresh_install_can_be_enabled(self):
-        self.assertEqual(panel.classify('46.0', True, {}, False, False)['canEnable'], True)
+        for version in ['46.0', '48.7', '50.1', '50.5']:
+            self.assertEqual(panel.classify(version, True, {}, False, False)['canEnable'], True, version)
+
+    def test_supported_majors_match_the_companion_metadata(self):
+        import json
+        metadata = json.loads((ROOT / 'integrations/gnome' / panel.UUID / 'metadata.json').read_text())
+        self.assertEqual(tuple(metadata['shell-version']), panel.SUPPORTED_SHELLS)
 
     def test_saved_activation_is_not_claimed_as_active_until_shell_loads_it(self):
         self.assertEqual(panel.classify('46.0', True, {}, True, False)['status'], 'restart')
@@ -34,7 +40,7 @@ class PanelSetupTests(unittest.TestCase):
 
     def test_global_policy_and_unsupported_shell_are_preserved(self):
         self.assertEqual(panel.classify('46.0', True, {'state': 1}, True, True)['status'], 'blocked')
-        for version in ['45.9', '47.0', '50.0']:
+        for version in ['45.9', '47.0', '49.2', '51.0']:
             status = panel.classify(version, True, {}, False, False)
             self.assertEqual(status['status'], 'unsupported')
             self.assertFalse(status['canEnable'])

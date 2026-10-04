@@ -16,6 +16,10 @@ const PATH = '/org/voco/Panel';
 const INTERFACE = 'org.voco.Panel1';
 const INPUT_PATH = '/org/voco/PanelInput';
 const INPUT_XML = '<node><interface name="org.voco.PanelInput1"><method name="ModifiersClear"><arg type="b" direction="out"/></method></interface></node>';
+// GNOME 50 removed X11 sessions together with Meta.is_wayland_compositor(). The
+// metadata admits only tested majors, and on each of them a missing function
+// means a Wayland-only Shell.
+const isWayland = () => Meta.is_wayland_compositor?.() ?? true;
 
 // Holds the meter at its natural size against the microphone, so opening and
 // closing uncover it in place: only the pill's outer edge moves.
@@ -254,7 +258,7 @@ export default class VocoPanel extends Extension {
     _syncShortcut() {
         // Consume the chord whenever attached, idle included, so the focused app
         // never also acts on it. X11 keeps VOCO's own exclusive global shortcut.
-        const accelerator = this._attached && Meta.is_wayland_compositor()
+        const accelerator = this._attached && isWayland()
             ? this._state?.shortcutAccelerator ?? null : null;
         if (accelerator === this._accelerator) return;
         this._releaseShortcut();
