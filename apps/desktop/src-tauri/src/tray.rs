@@ -771,7 +771,13 @@ fn panel_presentation(snapshot: &RuntimeStatusSnapshot) -> serde_json::Value {
         DictationStatus::Recording => "recording",
         DictationStatus::Processing => "processing",
         _ if presentation.visual_state == TrayVisualState::NotReady => "attention",
-        _ if desktop_setup_pending(snapshot) => "initializing",
+        // The same waits the fallback tray labels Starting VOCO: an idle pill
+        // reads as ready, and the speech model may still be warming.
+        _ if desktop_setup_pending(snapshot)
+            || snapshot.model_download_status != ModelDownloadStatus::Ready =>
+        {
+            "initializing"
+        }
         _ => "idle",
     };
     serde_json::json!({
@@ -1305,6 +1311,34 @@ mod tests {
         snapshot.cursor_setup_state = String::new();
         snapshot.native_microphone_ready = Some(false);
         assert_eq!(panel_presentation(&snapshot)["status"], "attention");
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn panel_reads_starting_until_the_speech_model_is_ready() {
+        let mut snapshot = ready_snapshot();
+        snapshot.model_download_status = ModelDownloadStatus::Checking;
+        assert_eq!(derive_tray_presentation(&snapshot).title, "Starting VOCO");
+        let warming = panel_presentation(&snapshot);
+        assert_eq!(warming["status"], "initializing");
+        assert_eq!(warming["canOpen"], true);
+        assert_eq!(warming["canStop"], false);
+        // A dictation started during warmup still shows itself and keeps Stop.
+        for (status, panel, can_stop) in [
+            (DictationStatus::Starting, "starting", true),
+            (DictationStatus::Recording, "recording", true),
+            (DictationStatus::Processing, "processing", false),
+        ] {
+            snapshot.dictation_status = status;
+            let active = panel_presentation(&snapshot);
+            assert_eq!(active["status"], panel);
+            assert_eq!(active["canStop"], can_stop);
+        }
+        snapshot.dictation_status = DictationStatus::Idle;
+        snapshot.model_download_status = ModelDownloadStatus::Failed;
+        assert_eq!(panel_presentation(&snapshot)["status"], "attention");
+        snapshot.model_download_status = ModelDownloadStatus::Ready;
+        assert_eq!(panel_presentation(&snapshot)["status"], "idle");
     }
 
     #[test]
