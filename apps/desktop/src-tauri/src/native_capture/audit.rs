@@ -18,9 +18,9 @@ fn flags_enabled(mut get: impl FnMut(&str) -> Option<String>) -> bool {
     .all(|name| get(name).as_deref() == Some("1"))
 }
 
-fn request_json(request: &DrainRequest) -> Value {
-    json!({"captureId":request.capture_id,"sessionId":request.session_id,"generation":request.generation,
-        "ackThroughSequence":request.ack_through_sequence})
+/// Both bundles record the same opt-in; the verifier requires them to match.
+pub(super) fn opt_in() -> Value {
+    json!({"nativeCaptureDev":true,"debugCaptureAudio":true,"debugNativeCapture":true})
 }
 
 pub(super) struct Audit {
@@ -78,8 +78,7 @@ impl Audit {
     }
     pub fn descriptor(&mut self, value: &CaptureDescriptor) {
         self.descriptor = json!({"schemaVersion":1,"guiPid":std::process::id(),
-            "optIn":{"nativeCaptureDev":true,"debugCaptureAudio":true,"debugNativeCapture":true},
-            "descriptor":value});
+            "optIn":opt_in(),"descriptor":value});
     }
     fn incomplete(&mut self, reason: &str) {
         if !self.reasons.iter().any(|r| r == reason) {
@@ -113,11 +112,9 @@ impl Audit {
         }
         let offset = self.packets.len();
         self.packets.extend_from_slice(packet);
-        self.event(
-            json!({"kind":"drain","request":request_json(request),"ackAccepted":true,
+        self.event(json!({"kind":"drain","request":request,"ackAccepted":true,
             "acknowledgedBefore":before,"acknowledgedAfter":after,"packetOffset":offset,
-            "packetBytes":packet.len(),"replay":replay}),
-        );
+            "packetBytes":packet.len(),"replay":replay}));
     }
     pub fn rejected(
         &mut self,
@@ -129,7 +126,7 @@ impl Audit {
     ) {
         self.incomplete("drain-rejected");
         self.event(
-            json!({"kind":"drainRejected","request":request_json(request),"error":error,
+            json!({"kind":"drainRejected","request":request,"error":error,
             "ackAccepted":ack_accepted,"responseIssued":false,"acknowledgedBefore":before,"acknowledgedAfter":after}),
         );
     }
@@ -291,16 +288,23 @@ mod tests {
     use super::*;
     #[test]
     fn flags_require_exact_all_three_values() {
-        assert!(!flags_enabled(|_| None));
-        assert!(!flags_enabled(|_| Some("true".into())));
-        for missing in [
+        assert!(flags_enabled(|_| Some("1".into())));
+        for flag in [
             "VOCO_DEV_NATIVE_CAPTURE",
             "VOCO_DEBUG_CAPTURE_AUDIO",
             "VOCO_DEBUG_NATIVE_CAPTURE",
         ] {
-            assert!(!flags_enabled(|name| (name != missing).then(|| "1".into())));
+            for bad in [None, Some(""), Some("true"), Some("0"), Some(" 1")] {
+                let value = |name: &str| {
+                    if name == flag {
+                        bad.map(String::from)
+                    } else {
+                        Some("1".into())
+                    }
+                };
+                assert!(!flags_enabled(value), "{flag}={bad:?}");
+            }
         }
-        assert!(flags_enabled(|_| Some("1".into())));
     }
     #[test]
     fn reservation_and_event_limits_fail_explicitly() {

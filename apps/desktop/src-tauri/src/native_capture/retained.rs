@@ -6,19 +6,13 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::ipc::InvokeBody;
 
 const MAX_HEADER: usize = 65_536;
-const MAX_PCM: usize = 26_460_000 * 4;
+// The renderer retains one mono f32 sample per native frame.
+const MAX_PCM: usize = super::protocol::MAX_FRAMES as usize * std::mem::size_of::<f32>();
 static ATTEMPTED: AtomicBool = AtomicBool::new(false);
 
-fn flags_enabled(native: Option<&str>, prepared: Option<&str>, raw: Option<&str>) -> bool {
-    native == Some("1") && prepared == Some("1") && raw == Some("1")
-}
-
+/// The witness shares the native audit's three-flag gate.
 pub(crate) fn enabled() -> bool {
-    flags_enabled(
-        std::env::var("VOCO_DEV_NATIVE_CAPTURE").ok().as_deref(),
-        std::env::var("VOCO_DEBUG_CAPTURE_AUDIO").ok().as_deref(),
-        std::env::var("VOCO_DEBUG_NATIVE_CAPTURE").ok().as_deref(),
-    ) && !ATTEMPTED.load(Ordering::SeqCst)
+    super::audit::enabled() && !ATTEMPTED.load(Ordering::SeqCst)
 }
 
 #[derive(Deserialize, Serialize)]
@@ -134,8 +128,7 @@ pub(crate) fn save(
     });
     let mut envelope = serde_json::to_value(&metadata).map_err(|e| e.to_string())?;
     envelope["guiPid"] = json!(std::process::id());
-    envelope["optIn"] =
-        json!({"nativeCaptureDev":true,"debugCaptureAudio":true,"debugNativeCapture":true});
+    envelope["optIn"] = super::audit::opt_in();
     let encoded = serde_json::to_vec_pretty(&envelope).map_err(|e| e.to_string())?;
     let path = private_bundle::write_bundle(
         "renderer",
@@ -160,15 +153,6 @@ mod tests {
         bytes.extend_from_slice(&header);
         bytes.extend_from_slice(pcm);
         InvokeBody::Raw(bytes)
-    }
-    #[test]
-    fn requires_every_exact_opt_in_flag() {
-        assert!(flags_enabled(Some("1"), Some("1"), Some("1")));
-        for bad in [None, Some(""), Some("true"), Some("0"), Some(" 1")] {
-            assert!(!flags_enabled(bad, Some("1"), Some("1")));
-            assert!(!flags_enabled(Some("1"), bad, Some("1")));
-            assert!(!flags_enabled(Some("1"), Some("1"), bad));
-        }
     }
     #[test]
     fn retains_exact_finite_source_bytes_without_audio_conversion() {

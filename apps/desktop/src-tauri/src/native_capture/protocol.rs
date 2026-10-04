@@ -47,7 +47,7 @@ impl BeginRequest {
         Ok(())
     }
 }
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct DrainRequest {
     pub capture_id: String,
