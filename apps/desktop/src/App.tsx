@@ -51,10 +51,7 @@ import {
 } from "@/lib/dictationPresentation";
 import { defaultNativeSource } from "@/lib/nativeCaptureSettings";
 import { canStopOnboardingTest, cancelsPendingStart, isBrowserTrigger, type DictationTriggerAction } from "@/lib/dictationTrigger";
-import {
-  shouldApplyConfigSnapshot,
-  shouldBlockRuntimeForConfigErrors,
-} from "@/lib/configSnapshot";
+import { shouldApplyConfigSnapshot } from "@/lib/configSnapshot";
 import { placeTrayPopover } from "@/lib/popoverPlacement";
 import { showInteractiveWindow, WindowRemapFocusGuard, isWaylandSession } from "@/lib/windowRemap";
 import {
@@ -320,10 +317,9 @@ export function App() {
     diagnosticsLoaded: runtimeDiagnostics !== null,
     diagnosticsFailed: runtimeDiagnosticsFailed,
   });
-  const runtimeConfigurationError = shouldBlockRuntimeForConfigErrors(
-    startupConfigError,
-    settingsError,
-  );
+  // Only an unreadable startup config pauses dictation. A failed save keeps the
+  // previous config in force: Rust restores the old shortcut and emits no snapshot.
+  const runtimeConfigurationError = startupConfigError !== null;
   const canHandleHotkey =
     initComplete && config !== null && !runtimeConfigurationError;
   const handleToggleRequest = useCallback(async (triggerId?: string, action?: DictationTriggerAction, stopSession?: string) => {
