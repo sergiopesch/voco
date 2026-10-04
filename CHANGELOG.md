@@ -101,7 +101,14 @@ Review keeps a dictation VOCO couldn't finish. The
   records a new sample.
 - On Wayland, choosing a microphone in Settings uses it at once, with no separate
   confirmation.
-- VOCO wakes less often. Idle native capture polls the sound server every 250 ms
+- On Wayland, VOCO no longer registers a custom shortcut through XWayland, which
+  reported it as working when the desktop might never deliver it. Bind a custom
+  shortcut to `voco --toggle` in your desktop's keyboard settings; Settings and
+  **Help** say so.
+- VOCO wakes less often. Each speech request reaches the worker in one write
+  rather than thousands of small ones, and with `VOCO_PERFORMANCE_LOG` and
+  `VOCO_HOTKEY_TRACE` unset the window no longer sends diagnostics that VOCO
+  discarded. Idle native capture polls the sound server every 250 ms
   rather than 5 ms; the desktop check reuses a GNOME companion check for up to
   20 seconds, or 2 seconds after a failure; the tray meter ticks every 90 ms rather
   than 33 ms, and only while the tray icon is visible; and the window doesn't
@@ -124,6 +131,14 @@ Review keeps a dictation VOCO couldn't finish. The
 - Tauri 2.11.6 and Vite 8.3.1.
 - The third-party notices name the vendored tray-icon 0.24.2 and global-hotkey
   0.8.0.
+
+- The VOCO window no longer holds global-shortcut and window-decoration
+  permissions it never used, and the VOCO Dictation input source accepts requests
+  of up to 64 KiB rather than 4 MB.
+- `report-speech-performance.py` names speech worker failures with the same codes
+  in both record types, and still counts older logs' codes.
+- `VOCO_SILENCE_GATE` accepts only `off` and `zero`. Any other value stops the
+  speech worker at startup instead of reporting Ready and failing every Start.
 
 ### Removed
 
@@ -154,6 +169,10 @@ Review keeps a dictation VOCO couldn't finish. The
   and the release notes before 2026.0.61. Each release's tag keeps the documents
   its notes link to.
 - ripgrep from CI and the scripts.
+- The undocumented `VOCO_TRAY_DEBUG` and `VOICE_TRAY_DEBUG` variables. The tray's
+  update line is logged at `RUST_LOG=debug`.
+- The popover's Cancel dictation button and in-dictation cues, which no way of
+  opening the popover during a dictation could reach.
 
 ### Fixed
 
@@ -179,6 +198,37 @@ Review keeps a dictation VOCO couldn't finish. The
   the crash journal and logs no longer land in the working directory.
 - The installer keeps its log, and says where it is, when it finishes but desktop
   setup still needs you (exit status 2).
+- On Wayland, the Alt+D shortcut could miss a press while VOCO looked for an IBus
+  input source that wasn't running, or waited for a slow one to answer.
+- Unplugging a keyboard while VOCO resynchronized it could leave the Alt+D
+  shortcut dead on the other keyboards.
+- A shortcut press through the IBus input source while the window reloaded was
+  lost. It now applies once the window is ready, as on every other route.
+- While a VOCO window was open, VOCO reset the permissions of `~/.config/voco` and
+  `config.json` every second, so a private settings folder or file that was
+  read-only failed to load. VOCO now changes a mode only when it isn't private.
+- Saving the update check's cache blocked the tray and the window while the file
+  synced to disk.
+- The GNOME panel looked ready while the speech model was still warming up. It
+  now reads **Starting VOCO** until the model is ready.
+- Each launch left about 70 tray icon files in `$XDG_RUNTIME_DIR/voco` until
+  logout. VOCO now removes the folders earlier runs left there.
+- If VOCO couldn't write its tray icons at startup, it failed later, when its
+  window loaded. It now says **VOCO could not start** with the reason.
+- On X11 the microphone meters read nearly flat for ordinary speech. They now use
+  the same scale as on Wayland.
+- In a Chromium exact field, Stop reported **Dictation interrupted** when every
+  word was typed and the field then lost focus or changed.
+- Opening VOCO from the app menu, the tray or Review just as a dictation started
+  could show a window over it.
+- After a microphone failed to start, choosing a microphone from the old list
+  seemed to work, then the next Start failed. The choice now fails at once with
+  **Source selection is stale**.
+- When restoring the previous shortcut also failed, the error said "the previous
+  hotkey" instead of naming it.
+- The docs said plain PulseAudio is enough. On Wayland VOCO needs PipeWire's
+  PulseAudio service, `pipewire-pulse`, which all four supported systems use by
+  default.
 
 ## Earlier releases
 
