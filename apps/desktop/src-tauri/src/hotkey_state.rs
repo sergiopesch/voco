@@ -286,6 +286,23 @@ mod tests {
     }
 
     #[test]
+    fn a_keyboard_detached_while_resynchronizing_stops_blocking_the_chord() {
+        let mut state = state();
+        let dropped = [InputEvent::new(
+            evdev::EventType::SYNCHRONIZATION.0,
+            SynchronizationCode::SYN_DROPPED.0,
+            0,
+        )];
+        state.batch(Path::new("second"), &dropped, 0);
+        key(&mut state, "first", KeyCode::KEY_LEFTALT, 1, 0);
+        assert!(!key(&mut state, "first", KeyCode::KEY_D, 1, 0));
+        key(&mut state, "first", KeyCode::KEY_D, 0, 0);
+        state.detach(Path::new("second"));
+        assert!(key(&mut state, "first", KeyCode::KEY_D, 1, 0));
+        assert_eq!(state.modifiers_held(), Some(true));
+    }
+
+    #[test]
     fn only_open_synchronized_keyboards_count_for_their_chord() {
         let mut state = HotkeyState::default();
         let counts = |state: &HotkeyState| (state.keyboards_for(0), state.keyboards_for(1));

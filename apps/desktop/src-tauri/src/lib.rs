@@ -1694,6 +1694,11 @@ fn spawn_evdev_device_worker(app_handle: tauri::AppHandle, path: std::path::Path
                                     }
                                 }
                                 Err(error) => {
+                                    // Left resynchronizing, a keyboard that is gone
+                                    // would block the chord on every other one.
+                                    if let Ok(mut state) = EVDEV_KEYS.lock() {
+                                        state.detach(&path);
+                                    }
                                     warn!(
                                         "Failed to resynchronize keyboard {}: {error}",
                                         path.display()
