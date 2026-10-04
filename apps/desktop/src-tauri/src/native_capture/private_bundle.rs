@@ -52,7 +52,7 @@ fn directory_at(parent: &File, component: &CString, create: bool) -> Result<File
 
 fn check_directory(file: &File, private: bool, allow_root: bool) -> Result<(), String> {
     let metadata = file.metadata().map_err(|e| e.to_string())?;
-    let uid = unsafe { libc::geteuid() };
+    let uid = crate::browser_socket::effective_uid();
     if !metadata.is_dir()
         || (metadata.uid() != uid && !(allow_root && metadata.uid() == 0))
         || metadata.mode() & 0o022 != 0
@@ -127,7 +127,7 @@ fn nonce() -> Result<String, String> {
 fn verify_file(file: &File, directory: &File, filename: &str) -> Result<(), String> {
     let metadata = file.metadata().map_err(|e| e.to_string())?;
     if !metadata.is_file()
-        || metadata.uid() != unsafe { libc::geteuid() }
+        || metadata.uid() != crate::browser_socket::effective_uid()
         || metadata.mode() & 0o777 != 0o600
         || metadata.nlink() != 1
     {

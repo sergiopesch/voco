@@ -188,7 +188,7 @@ mod tests {
     }
 
     #[test]
-    fn plugin_other_sessions_keep_pressed_semantics() {
+    fn plugin_non_linux_builds_keep_pressed_semantics() {
         let gesture = PluginGesture::new();
         assert!(gesture.admit(true, false, true));
         assert!(!gesture.admit(false, false, true));

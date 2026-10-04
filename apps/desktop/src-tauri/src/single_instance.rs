@@ -96,13 +96,14 @@ mod linux {
     }
 
     pub fn acquire() -> Result<SingleInstanceGuard, SingleInstanceError> {
-        acquire_at(runtime_directory()?.join(INSTANCE_LOCK_FILENAME), unsafe {
-            libc::geteuid()
-        })
+        acquire_at(
+            runtime_directory()?.join(INSTANCE_LOCK_FILENAME),
+            crate::browser_socket::effective_uid(),
+        )
     }
 
     pub fn runtime_directory() -> Result<PathBuf, SingleInstanceError> {
-        let effective_uid = unsafe { libc::geteuid() };
+        let effective_uid = crate::browser_socket::effective_uid();
         resolve_runtime_directory(
             env::var_os("XDG_RUNTIME_DIR").as_deref(),
             effective_uid,
@@ -325,7 +326,7 @@ mod linux {
         #[test]
         fn lock_is_exclusive_and_released_when_guard_drops() {
             let directory = TestDirectory::new("exclusive");
-            let effective_uid = unsafe { libc::geteuid() };
+            let effective_uid = crate::browser_socket::effective_uid();
             let lock_path = directory.0.join(INSTANCE_LOCK_FILENAME);
 
             let first = acquire_at(lock_path.clone(), effective_uid).unwrap();
@@ -349,7 +350,7 @@ mod linux {
         #[test]
         fn lock_file_is_forced_to_private_permissions() {
             let directory = TestDirectory::new("mode");
-            let effective_uid = unsafe { libc::geteuid() };
+            let effective_uid = crate::browser_socket::effective_uid();
             let lock_path = directory.0.join(INSTANCE_LOCK_FILENAME);
             OpenOptions::new()
                 .create_new(true)
@@ -366,7 +367,7 @@ mod linux {
         #[test]
         fn lock_file_symlinks_are_rejected() {
             let directory = TestDirectory::new("symlink");
-            let effective_uid = unsafe { libc::geteuid() };
+            let effective_uid = crate::browser_socket::effective_uid();
             let target = directory.0.join("target");
             File::create(&target).unwrap();
             let lock_path = directory.0.join(INSTANCE_LOCK_FILENAME);
@@ -382,7 +383,7 @@ mod linux {
         fn valid_xdg_runtime_directory_is_preferred() {
             let directory = TestDirectory::new("xdg");
             let fallback = TestDirectory::new("fallback");
-            let effective_uid = unsafe { libc::geteuid() };
+            let effective_uid = crate::browser_socket::effective_uid();
 
             let selected = resolve_runtime_directory(
                 Some(directory.0.as_os_str()),
@@ -398,7 +399,7 @@ mod linux {
         fn unsafe_xdg_runtime_directory_uses_private_fallback() {
             let directory = TestDirectory::new("unsafe-xdg");
             let fallback = TestDirectory::new("fallback");
-            let effective_uid = unsafe { libc::geteuid() };
+            let effective_uid = crate::browser_socket::effective_uid();
             fs::set_permissions(&directory.0, fs::Permissions::from_mode(0o755)).unwrap();
 
             let selected = resolve_runtime_directory(

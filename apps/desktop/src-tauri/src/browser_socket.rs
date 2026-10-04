@@ -51,6 +51,7 @@ pub fn validate_peer(stream: &UnixStream) -> Result<(), String> {
         _ => Err("Browser transport peer is not the current user.".into()),
     }
 }
+/// This process's effective user ID, the owner every private file and socket must have.
 pub fn effective_uid() -> u32 {
     // SAFETY: geteuid has no preconditions.
     unsafe { libc::geteuid() }

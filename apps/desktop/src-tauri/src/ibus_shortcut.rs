@@ -1,3 +1,4 @@
+use crate::browser_socket::{effective_uid, peer_uid};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::fs;
@@ -346,7 +347,7 @@ fn validate_socket_path(socket_path: &Path) -> Result<(), String> {
     if !metadata.file_type().is_socket() {
         return Err("VOCO input method path is not a Unix socket.".to_string());
     }
-    if metadata.uid() != current_euid() {
+    if metadata.uid() != effective_uid() {
         return Err("VOCO input method socket is owned by another user.".to_string());
     }
     if metadata.permissions().mode() & 0o077 != 0 {
@@ -361,7 +362,7 @@ fn validate_private_directory(path: &Path, label: &str) -> Result<(), String> {
     if !metadata.file_type().is_dir() {
         return Err(format!("{label} is not a directory."));
     }
-    if metadata.uid() != current_euid() {
+    if metadata.uid() != effective_uid() {
         return Err(format!("{label} is owned by another user."));
     }
     if metadata.permissions().mode() & 0o077 != 0 {
@@ -371,16 +372,11 @@ fn validate_private_directory(path: &Path, label: &str) -> Result<(), String> {
 }
 
 fn validate_peer(stream: &UnixStream) -> Result<(), String> {
-    match crate::browser_socket::peer_uid(stream) {
-        Ok(uid) if uid == current_euid() => Ok(()),
+    match peer_uid(stream) {
+        Ok(uid) if uid == effective_uid() => Ok(()),
         Ok(_) => Err("VOCO input method peer is owned by another user.".to_string()),
         Err(_) => Err("Could not verify the VOCO input method peer.".to_string()),
     }
-}
-
-fn current_euid() -> u32 {
-    // SAFETY: geteuid has no preconditions or failure mode.
-    unsafe { libc::geteuid() }
 }
 
 fn unavailable_status(error: String) -> IbusShortcutStatus {

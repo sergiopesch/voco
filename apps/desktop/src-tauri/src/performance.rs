@@ -475,7 +475,7 @@ impl RotatingWriter {
             .create(directory)?;
         let metadata = fs::symlink_metadata(directory)?;
         if !metadata.is_dir()
-            || metadata.uid() != unsafe { libc::geteuid() }
+            || metadata.uid() != crate::browser_socket::effective_uid()
             || metadata.mode() & 0o077 != 0
         {
             return Err(io::Error::other(
@@ -500,7 +500,7 @@ impl RotatingWriter {
             .open(path)?;
         let metadata = file.metadata()?;
         if !metadata.is_file()
-            || metadata.uid() != unsafe { libc::geteuid() }
+            || metadata.uid() != crate::browser_socket::effective_uid()
             || metadata.mode() & 0o077 != 0
             || metadata.nlink() != 1
         {

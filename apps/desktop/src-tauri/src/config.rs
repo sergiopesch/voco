@@ -368,7 +368,7 @@ fn secure_private_entry(path: &std::path::Path, directory: bool) -> Result<(), s
     #[cfg(unix)]
     {
         use std::os::unix::fs::{MetadataExt, PermissionsExt};
-        if metadata.uid() != unsafe { libc::geteuid() } {
+        if metadata.uid() != crate::browser_socket::effective_uid() {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::PermissionDenied,
                 format!("{} is not owned by the current user", path.display()),
@@ -382,7 +382,9 @@ fn secure_private_entry(path: &std::path::Path, directory: bool) -> Result<(), s
         }
         fs::set_permissions(path, fs::Permissions::from_mode(private_mode))?;
         let secured = fs::symlink_metadata(path)?;
-        if secured.uid() != unsafe { libc::geteuid() } || secured.mode() & 0o777 != private_mode {
+        if secured.uid() != crate::browser_socket::effective_uid()
+            || secured.mode() & 0o777 != private_mode
+        {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::PermissionDenied,
                 format!(
@@ -602,6 +604,11 @@ mod tests {
         let linked_path = directory.join("linked.json");
         symlink(&config_path, &linked_path).unwrap();
         assert!(secure_private_regular_file(&linked_path).is_err());
+
+        // A link to a private directory is still a link, never the settings folder.
+        let linked_directory = test_root.join("linked-voco");
+        symlink(&directory, &linked_directory).unwrap();
+        assert!(secure_private_directory(&linked_directory).is_err());
 
         let _ = fs::remove_dir_all(test_root);
     }
