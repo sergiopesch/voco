@@ -23,8 +23,9 @@ Review keeps a dictation VOCO couldn't finish. The
 - VOCO's own virtual keyboard for Wayland paste keys, "VOCO virtual keyboard".
   The package installs a udev rule that gives the person at the computer access
   to `/dev/uinput`, so there is no input service, daemon or group to set up.
-- Paste keys are sent only while your desktop session is the active one, so a
-  dictation left running after a user switch can't type into another session.
+- Before copying and sending Wayland paste keys, VOCO checks its originating
+  desktop session and stops the paste if logind reports it inactive. Unavailable
+  status permits pasting; a switch after the check can still redirect keys.
 - **Your shortcut can't reach VOCO yet**, once per launch on Wayland, when no
   keyboard is readable and neither the GNOME panel nor the IBus input source
   takes Alt+D. It names the fix.

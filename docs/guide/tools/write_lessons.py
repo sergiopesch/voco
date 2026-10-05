@@ -610,8 +610,8 @@ lesson(
             "If a helper is missing, or on Wayland the virtual keyboard can't be used, the recording doesn't start. VOCO shows \"Dictation setup incomplete\" with the reason.",
         ),
         (
-            "Only the active session types",
-            "A virtual keyboard types into whichever login owns the screen. So on Wayland VOCO asks logind before the copy and again just before the keys. When logind reports this session as not active, as after switching to another user, VOCO reports \"This desktop session isn't the active one, so VOCO sent no paste keys.\" If logind can't answer, VOCO doesn't block.",
+            "Checking the originating session",
+            "A virtual keyboard types into whichever login owns the screen. On Wayland VOCO checks the desktop session it started in before the copy and again just before the keys. When logind reports that session as not active, as after switching to another user, VOCO reports \"This desktop session isn't the active local session for VOCO's keyboard, so VOCO sent no paste keys.\" If logind can't answer, VOCO doesn't block. These checks don't lock the session: switching after the last check can still redirect keys.",
         ),
         (
             "VOCO steps aside",
@@ -629,6 +629,7 @@ lesson(
     [
         (B + "insertion.rs", "Checks helpers, copies both selections and presses Shift+Insert."),
         (B + "virtual_keyboard.rs", "VOCO's own keyboard for the Wayland paste keys."),
+        (B + "desktop_session.rs", "Tracks the originating desktop session and asks logind whether it is active."),
         (F + "lib/dictationRecording.ts", "Checks paste readiness before a recording starts."),
         (F + "App.tsx", "Hides VOCO's window before dictation into another app."),
         (F + "lib/dictationStream.ts", "Hands new words to delivery one group at a time."),
@@ -915,7 +916,8 @@ lesson(
         (B + "activation.rs", "Brings the running copy forward."),
         (B + "desktop_notifications.rs", "Notifications over D-Bus."),
         (B + "trigger_socket.rs", "The owner-only sockets behind voco --toggle."),
-        (B + "virtual_keyboard.rs", "The virtual keyboard and the active-session check."),
+        (B + "virtual_keyboard.rs", "Creates the virtual keyboard and sends its keys."),
+        (B + "desktop_session.rs", "The originating desktop session and its active-state check."),
         ("apps/desktop/src-tauri/tauri.conf.json", "The Debian package's dependencies and files."),
         ("packaging/rpm/voco.spec.in", "The Fedora package: the same files, with Fedora's names for the dependencies."),
         ("packaging/udev/70-voco-uinput.rules", "Gives the active session's user access to /dev/uinput."),
@@ -975,7 +977,7 @@ lesson(
         ),
         (
             "Paste keys for one person",
-            "The package's uaccess rule gives /dev/uinput to the user of the active local session alone, with no group, daemon or socket. VOCO's keyboard can press only Shift, Insert and Space, and VOCO sends keys only while its own session is the active one.",
+            "The package's uaccess rule gives /dev/uinput to the user of the active local session alone, with no group, daemon or socket. VOCO's keyboard can press only Shift, Insert and Space. Before copying and before sending keys, VOCO checks its originating session. An inactive result stops the paste; an unavailable result permits it. A switch after the check can still redirect keys.",
         ),
         (
             "Same user, not same program",
@@ -993,7 +995,8 @@ lesson(
         (B + "browser_socket.rs", "The browser host's owner-only socket, and the one helper that reads a caller's user ID."),
         (B + "native_capture/audit.rs", "Debug audio, off unless three variables are set."),
         (B + "native_capture/private_bundle.rs", "Writes the owner-only debug bundle."),
-        (B + "virtual_keyboard.rs", "Three keys only, sent only while this session is active."),
+        (B + "virtual_keyboard.rs", "Creates a keyboard with only Shift, Insert and Space."),
+        (B + "desktop_session.rs", "Checks the originating session, allowing pastes when logind cannot answer."),
         ("packaging/udev/70-voco-uinput.rules", "Who may create input devices."),
         ("integrations/chromium/content.js", "The field rules inside web pages."),
     ],
@@ -1531,8 +1534,8 @@ lesson(
             "The package's udev rule gives the user of the active local session access to /dev/uinput. To check it, voco --check-desktop-input only opens /dev/uinput; it never creates the device or sends keys. Without access it says \"VOCO can't open /dev/uinput, so it can't send the paste keys. Sign out and back in once after installing VOCO; if that doesn't help, see Platform support: Access to /dev/uinput.\"",
         ),
         (
-            "Only this session types",
-            "Keys reach whichever login owns the seat, so VOCO asks logind before the copy and again just before the keys, and sends nothing while logind reports this session as not active.",
+            "Check before the paste",
+            "Keys reach whichever login owns the seat, so VOCO asks logind about its originating desktop session before the copy and again just before the keys. An inactive result stops the paste. If logind can't answer, pasting is allowed. The check doesn't lock the session against a later switch.",
         ),
         (
             "After a key error",
@@ -1545,7 +1548,8 @@ lesson(
     ],
     [
         (B + "insertion.rs", "Chooses the clipboard helper and the paste keys for each session."),
-        (B + "virtual_keyboard.rs", "VOCO's keyboard: three keys, 12 ms apart, only in the active session."),
+        (B + "virtual_keyboard.rs", "VOCO's keyboard: three keys, 12 ms apart."),
+        (B + "desktop_session.rs", "Binds the originating desktop session and checks its active state."),
         (B + "lib.rs", "Shortcut routes for each session, and the keyboard created at startup."),
         ("integrations/gnome/voco-panel@voco.local/extension.js", "The GNOME grab on Wayland."),
         ("packaging/udev/70-voco-uinput.rules", "Gives the active session's user access to /dev/uinput."),
@@ -1567,13 +1571,13 @@ chapters[-1]["comparison"] = {
         [
             "GNOME on Wayland",
             "The companion's Shell grab of Alt+D or Alt+Shift+D when attached; otherwise VOCO reads the keyboards for those presets, and the focused app also sees them; for another chord, a desktop binding that runs voco --toggle",
-            "VOCO virtual keyboard, after the modifier wait, only while this session is active",
+            "VOCO virtual keyboard, after the modifier wait and session check; unavailable session status permits keys",
             "xclip through XWayland when DISPLAY is set, otherwise wl-copy",
         ],
         [
             "Other Wayland desktops",
             "VOCO reads the keyboards for Alt+D and Alt+Shift+D, and the focused app also sees them; for another chord, a desktop binding that runs voco --toggle",
-            "VOCO virtual keyboard, after the modifier wait, only while this session is active",
+            "VOCO virtual keyboard, after the modifier wait and session check; unavailable session status permits keys",
             "wl-copy",
         ],
         [
@@ -1592,7 +1596,7 @@ chapters[-1]["comparison"] = {
     "scope": "Code paths at the commit this guide records. A session whose XDG_SESSION_TYPE isn't wayland takes the X11 path.",
     "limits": "Pasting replaces CLIPBOARD and PRIMARY and leaves the words there. Keys go to whichever app has focus. Each desktop and app still needs its own testing.",
 }
-chapters[-1]["sourceNote"] = "The table follows insertion.rs (helpers and keys), virtual_keyboard.rs (the Wayland keys), lib.rs (shortcut routes) and extension.js (the GNOME grab). It describes code paths, not a compatibility promise."
+chapters[-1]["sourceNote"] = "The table follows insertion.rs (helpers and keys), virtual_keyboard.rs (the Wayland keys), desktop_session.rs (the session check), lib.rs (shortcut routes) and extension.js (the GNOME grab). It describes code paths, not a compatibility promise."
 
 # Fail closed if a lesson cites a path absent from the pinned source.
 root = Path(__file__).resolve().parents[1]

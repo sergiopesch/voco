@@ -12,6 +12,8 @@ mod config;
 mod crash_recovery;
 #[cfg(target_os = "linux")]
 mod desktop_notifications;
+#[cfg(target_os = "linux")]
+mod desktop_session;
 mod digest_hex;
 #[cfg(target_os = "linux")]
 mod hotkey_state;
@@ -1989,6 +1991,10 @@ pub fn run() -> Result<(), String> {
     #[cfg(target_os = "linux")]
     if is_wayland_session() {
         retire_legacy_input_service();
+        // Bind the originating login before another session can become active.
+        if let Err(detail) = desktop_session::require_active() {
+            warn!("{detail}");
+        }
         // Created now so the compositor has added the device long before the
         // first paste; a failure stays visible through desktop setup status.
         if let Err(detail) = virtual_keyboard::ensure() {

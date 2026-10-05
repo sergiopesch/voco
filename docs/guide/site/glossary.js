@@ -1,6 +1,6 @@
 export const glossary = [
   ["ACL", "Access control list: extra permissions for one user on one file. logind keeps one on /dev/uinput for the user of the active local session."],
-  ["Active session", "The login that currently owns a seat’s screen and input. logind reports it, and VOCO sends paste keys only while its own session is active."],
+  ["Active session", "The login that currently owns a seat’s screen and input. VOCO stops a paste when logind reports its originating session inactive; unavailable status permits pasting, and a later session switch can still redirect keys."],
   ["API", "An agreed set of operations one piece of software offers another."],
   ["APT", "The package manager of Ubuntu and Debian. VOCO’s installer uses it to install the Debian package."],
   ["Append-only", "VOCO’s delivery rule: new words may only extend the transcript. If recognition rewrites earlier words, VOCO stops transcribing that recording rather than edit text that is already in an app."],

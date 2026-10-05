@@ -1,9 +1,14 @@
 # Install VOCO
 
-VOCO is published for 64-bit Intel and AMD computers as a Debian package for
-Ubuntu and Debian, and as an RPM for Fedora. Both hold the same files: the
-English speech model and everything needed to run it, so VOCO needs no
-downloads after installation.
+This guide describes the **2026.0.61 candidate**, with a Debian package for
+Ubuntu and Debian and an RPM for Fedora. Both include the English speech model
+and everything needed to run it, so VOCO needs no downloads after installation.
+
+The last verified public release is **2026.0.59**, for Ubuntu 24.04. Its
+[versioned installation guide](https://github.com/sergiopesch/voco/blob/voco.2026.0.59/docs/install.md)
+describes its desktop setup. The newer systems and virtual keyboard described
+below require 2026.0.61; a source tag alone does not mean its packages are
+published.
 
 ## Requirements
 
@@ -25,13 +30,25 @@ grep -o -w -E 'avx2|fma|f16c' /proc/cpuinfo | sort -u
 ## Guided install
 
 Open a terminal in your desktop session and run the installer as your normal
-user. It asks for your password when APT or DNF needs it.
+user. To install the last verified public release, 2026.0.59, on Ubuntu 24.04:
 
 ```bash
 wget -qO voco-install https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.59/install && bash voco-install
 ```
 
-The installer:
+That version installs with APT and uses its older desktop-input setup. It does
+not install an RPM on Fedora.
+
+### Install 2026.0.61 after publication
+
+First check that the [2026.0.61 release page](https://github.com/sergiopesch/voco/releases/tag/voco.2026.0.61)
+has the signed packages. Then run:
+
+```bash
+wget -qO voco-install https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.61/install && bash voco-install
+```
+
+The 2026.0.61 installer asks for your password when APT or DNF needs it, and:
 
 1. Checks that it runs on x86-64 Linux, and picks APT if the system has it,
    otherwise DNF. Then it checks for the other tools it needs, for glibc 2.39
@@ -83,10 +100,14 @@ fingerprint.
 
 ## Manual install
 
-These commands download the latest release, check the release key's
+These commands download the latest published release, check the release key's
 fingerprint and the signature, verify the package checksum and install the
 package. Each block stops at the first command that fails, so the package is
 installed only after every check passes. `gpgv` must report a good signature.
+
+While the latest release is 2026.0.59, these commands install that version on
+Ubuntu 24.04. For Ubuntu 26.04, Debian 13 or Fedora 44, wait until the latest
+release is 2026.0.61 or later. In particular, 2026.0.59 has no RPM download.
 
 The release key's fingerprint is `B33C7C6AAEC8C20433A7A837540796453D8E3865`.
 It also appears in [KEYS](../KEYS) and on each release page. Compare it with a
