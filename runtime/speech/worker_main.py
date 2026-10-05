@@ -6,6 +6,9 @@ import os
 import sys
 import time
 
+# The pinned NeMo-Speech.cpp commit of NATIVE-BUILD.json; test_model_identity.py checks it.
+RUNTIME_REVISION = 'a5b6953+voco-installed-v1'
+
 
 def configure_cpu_threads():
     if 'NEMO_SPEECH_CPU_THREADS' in os.environ:
@@ -25,6 +28,7 @@ def error_code(error):
         'audio shape': 'invalid_audio', 'inactive session': 'inactive_session',
         'Model integrity mismatch': 'model_integrity', 'unsupported context': 'invalid_context',
         'unsupported backend': 'invalid_backend', 'Model path must be absolute': 'invalid_model_path',
+        'gate mode': 'invalid_gate',
     }
     if str(error) in known:
         return known[str(error)]
@@ -96,7 +100,6 @@ def serve(protocol, source, model, metrics):
                 text = None
                 first_text = False
                 session_started = started
-                model.metrics = {}
             else:
                 if session != active or seq <= last_request:
                     raise ValueError('sequence')
@@ -110,7 +113,6 @@ def serve(protocol, source, model, metrics):
                     model.cancel()
                     active = None
                     text = None
-                    model.metrics = {}
             fresh = text is not None and text != emitted_text
             if text is not None and (fresh or op == 'finish'):
                 emitted_text = text
@@ -156,9 +158,9 @@ def main(protocol):
             print(json.dumps({'ready': False, 'error': 'local speech runtime could not initialize'}), file=protocol, flush=True)
             return 1
         metrics.emit('worker_ready', model=f'nemotron-0.6b-q8-context{model.context}',
-                     cpu_threads=int(os.environ.get('NEMO_SPEECH_CPU_THREADS', '4')),
-                     backend=os.environ.get('VOCO_NEMO_BACKEND', 'pool'), runtime_revision='a5b6953+voco-installed-v1',
-                     model_sha256='d9a01898d2a611c8764e23a1c2f45e70bbd5a425dc4de93692ac951dd603812d',
+                     cpu_threads=int(os.environ['NEMO_SPEECH_CPU_THREADS']),
+                     backend=os.environ.get('VOCO_NEMO_BACKEND', 'pool'), runtime_revision=RUNTIME_REVISION,
+                     model_sha256=model.model.sha256,
                      parent_pid=os.getppid(), load_ms=model.load_ms, warmup_ms=model.warmup_ms, gate=model.mode)
         return serve(protocol, sys.stdin.buffer, model, metrics)
     finally:

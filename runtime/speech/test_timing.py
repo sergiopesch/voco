@@ -5,8 +5,9 @@ import numpy as np
 import streaming
 
 class Model:
-    def __init__(self, *_): self.frames=[];self.metrics={}
+    def __init__(self, *_): self.frames=[];self.metrics={};self.released=0
     def start(self): self.frames=[]
+    def release_stream(self): self.released+=1
     def push(self,audio,rate):
         self.frames.append(audio.copy());self.metrics={'recognizer_push_ms':2.,'result_drain_ms':.25}
         return 'fixture'
@@ -33,6 +34,11 @@ class TimingTests(unittest.TestCase):
         self.assertEqual(self.session.metrics['recognizer_push_ms'],2)
         self.assertEqual(self.session.metrics['result_drain_ms'],.25)
         self.assertAlmostEqual(self.session.first_nonzero_audio_s,.1+100/16000)
+    def test_cancel_releases_the_stream_and_clears_metrics(self):
+        self.session.push(np.ones(320),16000);self.assertTrue(self.session.metrics)
+        self.session.cancel()
+        self.assertFalse(self.session.active);self.assertEqual(self.session.metrics,{})
+        self.assertEqual(self.session.model.released,1)
     def test_new_session_clears_onset(self):
         self.session.push(np.ones(320),16000);self.session.finish();self.session.start()
         self.assertIsNone(self.session.first_nonzero_audio_s)
@@ -45,7 +51,10 @@ class TimingTests(unittest.TestCase):
         self.assertIsNone(self.session.first_nonzero_audio_s)
     def test_metrics_have_no_audio_or_text(self):
         self.session.push(np.ones(320),16000)
-        self.assertEqual(set(self.session.metrics),{'asr_ms','gate_ms','vad_ms','recognizer_push_ms','result_drain_ms','recognizer_push_calls','first_nonzero_audio_s','gate_released_frames'})
+        self.assertEqual(set(self.session.metrics),{'asr_ms','gate_ms','recognizer_push_ms','result_drain_ms','recognizer_push_calls','first_nonzero_audio_s','gate_released_frames'})
+    def test_unknown_gate_fails_before_the_model_loads(self):
+        with patch.object(streaming,'Nemotron',side_effect=AssertionError('model loaded')):
+            with self.assertRaisesRegex(ValueError,'gate mode'):streaming.StreamingSession('vad',warmup=False)
 
     def test_coalescing_preserves_samples_and_one_second_limit_at_all_rates(self):
         for rate in (8000, 16000, 44100, 48000, 96000):

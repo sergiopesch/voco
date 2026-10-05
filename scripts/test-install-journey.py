@@ -3,6 +3,7 @@
 import importlib.util
 import base64
 import hashlib
+import json
 import os
 from pathlib import Path
 import re
@@ -16,6 +17,15 @@ SIGNED_SIGNATURE = ROOT / 'tests/fixtures/installer/voco.2026.0.54_checksums.txt
 spec = importlib.util.spec_from_file_location('performance', ROOT / 'scripts/test-install-performance.py')
 fixture = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(fixture)
+spec = importlib.util.spec_from_file_location('panel_setup', ROOT / 'apps/desktop/src-tauri/resources/voco_gnome_panel.py')
+panel = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(panel)
+# The installer matches the two results after which `voco --setup-panel` asks for a
+# sign-out: setup just enabled the panel, or an upgrade left GNOME running an older one.
+PANEL_RESTARTS = {
+    'enabled': panel.classify('46.0', True, {}, True, False),
+    'updated': panel.classify('46.0', True, {'state': 1, 'version': panel.COMPANION_VERSION - 1}, True, False),
+}
 
 
 def visible_terminal(data, width=80):
@@ -101,17 +111,31 @@ voco_ui_close
             self.assertIn('Final stage', screen)
             self.assertNotIn('Interrupted frame', screen)
 
-    def run_journey(self, mode, signature_case='valid', install_case='ready', launch_case='started'):
+    def run_journey(self, mode, signature_case='valid', install_case='ready', launch_case='started',
+                    manager='apt', settings=None, platform_case='supported', panel_result='enabled'):
         source = (ROOT / 'install').read_text()
         prefix, body = source.split('# ─── Header', 1)
         # The signed .54 manifest includes KEYS. Use that small real release asset
         # as the synthetic package to exercise the production signature and hash gate.
-        package_assignment = 'DEB_FILE="${VOCO_DOWNLOAD_DIR}/voco_${VERSION}_amd64.deb"'
+        package_assignment = 'PACKAGE_FILE="${VOCO_DOWNLOAD_DIR}/${PACKAGE_NAME}"'
         self.assertIn(package_assignment, body)
-        body = body.replace(package_assignment, 'DEB_FILE="${VOCO_DOWNLOAD_DIR}/KEYS"', 1)
+        body = body.replace(package_assignment, 'PACKAGE_FILE="${VOCO_DOWNLOAD_DIR}/KEYS"', 1)
+        # The platform check reads a fixture processor, never the host's.
+        floors = 'voco_check_platform_floors ||'
+        self.assertIn(floors, body)
+        body = body.replace(floors, 'voco_check_platform_floors "$FIXTURE_CPUINFO" ||', 1)
         with tempfile.TemporaryDirectory(prefix='voco-journey-') as folder:
             root = Path(folder)
             (root / 'sudo').write_text('#!/bin/bash\n[[ "$1" == -v || "$1" == -n ]] && exit 0\nexec "$@"\n')
+            (root / 'getconf').write_text('#!/bin/bash\nprintf "glibc %s\\n" "$FIXTURE_GLIBC"\n')
+            flags = 'fpu sse2 avx fma f16c' if platform_case == 'no-avx2' else 'fpu sse2 avx avx2 fma f16c'
+            (root / 'cpuinfo').write_text(f'processor\t: 0\nflags\t\t: {flags}\n')
+            if manager == 'dnf':
+                # Fedora has no dpkg; nothing on the DNF path may need it.
+                (root / 'dpkg').write_text('#!/bin/bash\nprintf called > "$FIXTURE_DPKG_CALL"\nexit 127\n')
+            # Fedora's DNF keeps its own output; the fixture records what it was asked.
+            (root / 'dnf').write_text('#!/bin/bash\nprintf "%s\\n" "$*" > "$FIXTURE_DNF_CALL"\n[[ "$FIXTURE_INSTALL_CASE" == package-failure ]] && exit 1\nprintf "Installing voco (fixture) ...\\n"\n')
+            (root / 'rpm').write_text('#!/bin/bash\nexit 0\n')
             (root / 'apt-get').write_text('#!/bin/bash\nprintf called > "$FIXTURE_APT_CALL"\n[[ "$FIXTURE_INSTALL_CASE" == package-failure ]] && exit 42\nprintf "pmstatus:voco:80:Setting up\\n" >&3\nprintf "Setting up voco (fixture) ...\\n"\nsleep .15\n')
             if mode == 'password':
                 (root / 'sudo').write_text('#!/bin/bash\nif [[ "$1" == -n && "$2" == -v ]]; then exit 1; fi\nif [[ "$1" == -v ]]; then printf "Fixture password: "; read -r answer; [[ "$answer" == fixture ]]; exit $?; fi\n[[ "$1" == -n ]] && exit 0\nexec "$@"\n')
@@ -120,14 +144,19 @@ voco_ui_close
                     script.write('printf "Fixture choice [y/N]: "\nread -r answer\n[[ "$answer" == yes ]] || exit 55\nprintf "\\nChoice accepted\\n"\n')
             for path in root.iterdir():
                 path.chmod(0o755)
+            # VOCO's own settings, or a legacy Voice config it copies at first launch.
+            saved = root / 'config' / (settings or 'voco') / 'config.json'
+            if settings:
+                saved.parent.mkdir(parents=True)
+                saved.write_text('{"hotkey":"Super+F12"}\n')
             stubs = r'''
             if [[ "$FIXTURE_SIGNATURE_CASE" == wrong-fingerprint ]]; then
               VOCO_RELEASE_KEY_FINGERPRINT=0000000000000000000000000000000000000000
             fi
             wget() {
-              local target
+              local target url
               while (( $# )); do
-                if [[ "$1" == -O ]]; then target="$2"; shift; fi
+                if [[ "$1" == -O ]]; then target="$2"; shift; else url="$1"; fi
                 shift
               done
               case "$target" in
@@ -146,6 +175,7 @@ voco_ui_close
                   fi
                   ;;
                 *)
+                  printf '%s\n' "$url" > "$FIXTURE_PACKAGE_URL"
                   if [[ "$FIXTURE_SIGNATURE_CASE" == swapped || "$FIXTURE_SIGNATURE_CASE" == checksum-mismatch ]]; then
                     printf replacement > "$target"
                   else
@@ -154,17 +184,15 @@ voco_ui_close
                   ;;
               esac
             }
+            voco_detect_package_manager() { VOCO_PACKAGE_MANAGER="$FIXTURE_MANAGER"; }
             voco_verify_installed_package() { return 0; }
-            /usr/bin/voco() { [[ "$*" == --setup-desktop-input ]]; }
-            voco_start_helper_prefetch() { :; }
+            voco_verify_installed_rpm() { return 0; }
+            # Like the real check, always set the error the installer prints.
             voco_verify_desktop_input() {
-              [[ "$FIXTURE_INSTALL_CASE" != readiness-failure ]] && (( fixture_checks++ > 0 ))
+              VOCO_INPUT_ERROR="VOCO can't open /dev/uinput, so it can't send the paste keys."
+              [[ "$FIXTURE_INSTALL_CASE" != readiness-failure ]]
             }
-            fixture_checks=0
-            voco_wayland_device_access() { return 0; }
-            pgrep() { return 1; }
-            systemctl() { printf 'Created symlink /synthetic/voco-ydotoold.service\n'; }
-            fixture_panel() { printf 'Panel enabled. Sign out and back in to load it; saving your work first is recommended.\n'; return 1; }
+            fixture_panel() { printf '%s\n' "$FIXTURE_PANEL_DETAIL"; return 1; }
             voco_launch_installed_app() {
               printf 'launch\n' >> "$FIXTURE_LAUNCH_CALL"
               case "$FIXTURE_LAUNCH_CASE" in
@@ -181,14 +209,44 @@ voco_ui_close
                    'FIXTURE_SIGNATURE_CASE': signature_case, 'FIXTURE_SIGNATURE': str(SIGNED_SIGNATURE),
                    'FIXTURE_INSTALL_CASE': install_case, 'FIXTURE_LAUNCH_CASE': launch_case,
                    'FIXTURE_MANIFEST': str(SIGNED_MANIFEST), 'FIXTURE_PACKAGE': str(ROOT / 'KEYS'),
-                   'FIXTURE_APT_CALL': str(root / 'apt-called'), 'FIXTURE_LAUNCH_CALL': str(root / 'launch-called')}
+                   'FIXTURE_APT_CALL': str(root / 'apt-called'), 'FIXTURE_LAUNCH_CALL': str(root / 'launch-called'),
+                   'FIXTURE_MANAGER': manager, 'FIXTURE_DNF_CALL': str(root / 'dnf-called'),
+                   'FIXTURE_PACKAGE_URL': str(root / 'package-url'), 'FIXTURE_CPUINFO': str(root / 'cpuinfo'),
+                   'FIXTURE_GLIBC': '2.36' if platform_case == 'old-glibc' else '2.39',
+                   'FIXTURE_DPKG_CALL': str(root / 'dpkg-called'),
+                   'FIXTURE_PANEL_DETAIL': PANEL_RESTARTS[panel_result]['detail']}
             env.pop('NO_COLOR', None)
             if mode == 'plain':
                 env['VOCO_INSTALL_PLAIN'] = '1'
             code, raw = fixture.terminal(['bash', '-c', prefix + stubs + '# ─── Header' + body], env, columns=40 if mode == 'narrow' else 80, rows=8 if mode == 'short' else 24, reply={'prompt': (b'Fixture choice [y/N]: ', b'yes\n'), 'password': (b'Fixture password: ', b'fixture\n')}.get(mode))
-            expected_code = 1 if signature_case != 'valid' or install_case == 'package-failure' else 2 if install_case == 'readiness-failure' else 0
+            refused = platform_case != 'supported' or signature_case != 'valid' or install_case == 'package-failure'
+            expected_code = 1 if refused else 2 if install_case == 'readiness-failure' else 0
             self.assertEqual(code, expected_code, raw.decode(errors='replace'))
-            self.assertEqual((root / 'apt-called').exists(), signature_case == 'valid')
+            # VOCO writes its settings at first launch; the installer never does.
+            if settings:
+                self.assertEqual(saved.read_text(), '{"hotkey":"Super+F12"}\n')
+            else:
+                self.assertFalse(saved.parent.exists())
+            self.assertFalse((root / 'dpkg-called').exists())
+            if platform_case != 'supported':
+                # An unsupported system stops before any download.
+                self.assertIn('glibc 2.39 or later' if platform_case == 'old-glibc' else 'lacks AVX2',
+                              raw.decode(errors='replace'))
+                for call in ('package-url', 'apt-called', 'dnf-called', 'launch-called'):
+                    self.assertFalse((root / call).exists(), call)
+                return
+            installer = 'dnf-called' if manager == 'dnf' else 'apt-called'
+            self.assertEqual((root / installer).exists(), signature_case == 'valid')
+            self.assertFalse((root / ('apt-called' if manager == 'dnf' else 'dnf-called')).exists())
+            # Each package manager downloads its own package from this release.
+            version = json.loads((ROOT / 'package.json').read_text())['version']
+            expected_package = (f'voco-{version}-1.x86_64.rpm' if manager == 'dnf'
+                                else f'voco_{version}_amd64.deb')
+            self.assertEqual((root / 'package-url').read_text().strip(),
+                             f'https://github.com/sergiopesch/voco/releases/download/voco.{version}/{expected_package}')
+            if manager == 'dnf' and signature_case == 'valid':
+                call = (root / 'dnf-called').read_text().strip()
+                self.assertTrue(call.startswith('install -y -- /') and call.endswith('/KEYS'), call)
             launched = root / 'launch-called'
             self.assertEqual(launched.read_text() if launched.exists() else '', 'launch\n' if expected_code == 0 else '')
             if signature_case != 'valid':
@@ -196,6 +254,11 @@ voco_ui_close
                 return
             if install_case != 'ready':
                 self.assertNotIn('Opening VOCO', raw.decode(errors='replace'))
+                if install_case == 'readiness-failure':
+                    self.assertIn("can't open /dev/uinput", raw.decode(errors='replace'))
+                if install_case == 'package-failure':
+                    self.assertIn('DNF could not install' if manager == 'dnf' else 'APT could not install',
+                                  raw.decode(errors='replace'))
                 return
             screen = visible_terminal(raw, width=40 if mode == 'narrow' else 80)
             if directory := os.environ.get('VOCO_JOURNEY_EVIDENCE_DIR'):
@@ -219,7 +282,14 @@ voco_ui_close
             self.assertNotIn('[1/3]', screen)
             self.assertIn("Installed. Let's try your voice.", screen)
             self.assertIn('sign out', screen.lower())
-            self.assertIn('Alt+D', screen)
+            # The installer's own note, not the generic warning for other setup results.
+            self.assertIn('Panel: sign out', screen)
+            self.assertNotIn('check again', screen)
+            if settings:
+                self.assertIn('unchanged', screen)
+                self.assertNotIn('Alt+D', screen)
+            else:
+                self.assertIn('Alt+D', screen)
             if launch_case == 'started':
                 self.assertIn('Opening VOCO', screen)
                 self.assertNotIn('Open VOCO →', screen)
@@ -237,6 +307,18 @@ voco_ui_close
             for case in ('skipped', 'failed'):
                 with self.subTest(mode=mode, case=case):
                     self.run_journey(mode, launch_case=case)
+
+    def test_unsupported_glibc_or_processor_stops_before_downloading(self):
+        for manager in ('apt', 'dnf'):
+            for platform_case in ('old-glibc', 'no-avx2'):
+                with self.subTest(manager=manager, platform_case=platform_case):
+                    self.run_journey('plain', manager=manager, platform_case=platform_case)
+
+    def test_saved_settings_are_left_to_voco(self):
+        for settings in ('voco', 'voice'):
+            for mode in ('animated', 'plain'):
+                with self.subTest(settings=settings, mode=mode):
+                    self.run_journey(mode, settings=settings)
 
     def test_pinned_key_verifies_published_release_manifest(self):
         source = (ROOT / 'install').read_text()
@@ -265,10 +347,27 @@ voco_ui_close
             with self.subTest(signature_case=signature_case):
                 self.run_journey('plain', signature_case)
 
+    def test_fedora_journey_installs_the_rpm_with_dnf(self):
+        for mode in ('animated', 'plain', 'narrow'):
+            with self.subTest(mode=mode):
+                self.run_journey(mode, manager='dnf')
+        for case in ('package-failure', 'readiness-failure'):
+            with self.subTest(case=case):
+                self.run_journey('plain', install_case=case, manager='dnf')
+        for signature_case in ('swapped', 'wrong-fingerprint', 'checksum-mismatch'):
+            with self.subTest(signature_case=signature_case):
+                self.run_journey('plain', signature_case, manager='dnf')
+
     def test_complete_journey_has_one_final_canvas(self):
         for mode in ('animated', 'no-motion', 'password', 'prompt', 'plain', 'narrow', 'short'):
             with self.subTest(mode=mode):
                 self.run_journey(mode)
+
+    def test_upgrade_that_needs_a_sign_out_gets_the_same_note(self):
+        self.assertEqual({result['status'] for result in PANEL_RESTARTS.values()}, {'restart'})
+        for mode in ('animated', 'plain'):
+            with self.subTest(mode=mode):
+                self.run_journey(mode, panel_result='updated')
 
 
 if __name__ == '__main__':

@@ -3,10 +3,13 @@ export interface DictationRecovery {
   reason: string;
 }
 
+/** Both capture paths stop a recording normally after this long. */
+export const MAX_RECORDING_SECONDS = 600;
+
 // Cap source capture independently of device rate, including unusually high-rate devices.
 export const MAX_CAPTURE_SAMPLES = 32 * 1024 * 1024; // 128 MiB of Float32 source audio.
 
-export function captureSampleLimit(sampleRate: number, maximumSeconds = 600): number {
+export function captureSampleLimit(sampleRate: number, maximumSeconds = MAX_RECORDING_SECONDS): number {
   return Math.min(Math.floor(sampleRate * maximumSeconds), MAX_CAPTURE_SAMPLES);
 }
 

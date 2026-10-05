@@ -52,6 +52,11 @@ fn start(directory: &Path) -> io::Result<()> {
     Ok(())
 }
 
+/// Whether the opt-in recorder started; every record is dropped otherwise.
+pub(crate) fn enabled() -> bool {
+    RECORDER.get().is_some()
+}
+
 fn emit(mut value: Value) {
     if let Some(recorder) = RECORDER.get() {
         value["t_us"] = json!(recorder.start.elapsed().as_micros() as u64);
@@ -62,7 +67,7 @@ fn emit(mut value: Value) {
 }
 
 pub fn lifecycle(record: &Value) {
-    if RECORDER.get().is_none() {
+    if !enabled() {
         return;
     }
     if let Some(safe) = lifecycle_payload(record) {
@@ -143,6 +148,10 @@ pub fn native_speech_quality(request: &Value) -> Result<(), String> {
 }
 
 fn record_speech_quality(request: &Value) -> Result<(), String> {
+    // Callers check provenance first; without a recorder there is nothing to build.
+    if !enabled() {
+        return Ok(());
+    }
     emit(speech_quality_payload(request).ok_or("Invalid speech quality metadata")?);
     Ok(())
 }
@@ -281,7 +290,7 @@ fn speech_quality_payload(request: &Value) -> Option<Value> {
 
 /// Correlate IPC with worker records without exporting request content.
 pub fn speech_exchange(request: &Value, result: &Result<Value, String>, elapsed: Duration) {
-    if RECORDER.get().is_none() {
+    if !enabled() {
         return;
     }
     let op = request["op"]
@@ -290,21 +299,10 @@ pub fn speech_exchange(request: &Value, result: &Result<Value, String>, elapsed:
         .unwrap_or("invalid");
     let outcome = match result {
         Ok(_) => "ok",
-        Err(error) if error.contains("warm-up timed out") => "startup_timeout",
-        Err(error) if error.contains("response timed out") => "response_timeout",
-        Err(error) if error.contains("identity mismatch") => "identity_mismatch",
-        Err(error) if error.contains("rejected request") => "request_rejected",
-        Err(error) if error.contains("absolute local file") => "runtime_missing",
-        Err(error) if error.contains("spawn failed") => "spawn_failed",
-        Err(error) if error.contains("worker lost") => "worker_lost",
-        Err(error) if error.contains("ready") => "startup_failed",
-        Err(error) if error == "worker closed output" => "worker_eof",
-        Err(error) if error == "worker disconnected" => "worker_disconnected",
-        Err(error) if error == "worker request channel full" => "request_backlog",
-        Err(_) => "transport_failed",
+        Err(error) => worker_error_code(error),
     };
     // Worker logs retain every decode request; app logs retain boundaries and
-    // slow/error IPC requests so normal 20ms traffic does not double log volume.
+    // slow/error IPC requests so normal 100 ms pushes do not double log volume.
     if op == "push" && outcome == "ok" && elapsed < Duration::from_millis(100) {
         return;
     }
@@ -322,7 +320,7 @@ pub fn speech_exchange(request: &Value, result: &Result<Value, String>, elapsed:
 
 /// Natural process status, with a finite reason vocabulary; never stderr or text.
 pub fn speech_worker_failure(stage: &str, error: &str, status: Option<std::process::ExitStatus>) {
-    if RECORDER.get().is_none() {
+    if !enabled() {
         return;
     }
     if let Some(record) = speech_worker_failure_payload(stage, error, status) {
@@ -339,7 +337,17 @@ fn speech_worker_failure_payload(
     if !matches!(stage, "startup" | "exchange" | "liveness") {
         return None;
     }
-    let reason = match error {
+    Some(
+        json!({"event":"speech_worker_failed", "stage":stage, "reason":worker_error_code(error),
+        "exit_observed":status.is_some(), "exit_code":status.and_then(|value| value.code()),
+        "exit_signal":status.and_then(|value| value.signal())}),
+    )
+}
+
+/// The one finite code for each speech worker error message; an unknown
+/// message is transport_failed and is never echoed.
+pub(crate) fn worker_error_code(error: &str) -> &'static str {
+    match error {
         "worker exited while idle" => "idle_exit",
         "worker closed output" => "output_eof",
         "worker disconnected" => "channel_disconnected",
@@ -353,13 +361,11 @@ fn speech_worker_failure_payload(
         "worker did not become ready" => "ready_invalid",
         "worker response identity mismatch" => "identity_mismatch",
         "worker rejected request" => "request_rejected",
+        "worker spawn failed" => "spawn_failed",
+        "worker lost" => "worker_lost",
+        error if error.ends_with(" must name an absolute local file") => "runtime_missing",
         _ => "transport_failed",
-    };
-    Some(
-        json!({"event":"speech_worker_failed", "stage":stage, "reason":reason,
-        "exit_observed":status.is_some(), "exit_code":status.and_then(|value| value.code()),
-        "exit_signal":status.and_then(|value| value.signal())}),
-    )
+    }
 }
 
 pub fn shutdown() {
@@ -400,7 +406,7 @@ fn write_events(
         "desktop_paste_enabled":crate::insertion::desktop_paste_enabled(),
         "desktop_stream_enabled":crate::insertion::desktop_stream_enabled(),
         "desktop_clipboard_helper":crate::insertion::desktop_clipboard_helper(),
-        "session_type":crate::session_type_label(), "logical_cpus":std::thread::available_parallelism().ok().map(|n|n.get()),
+        "session_type":crate::trace_session_label(), "logical_cpus":std::thread::available_parallelism().ok().map(|n|n.get()),
         "resource_scope":"Rust process; excludes speech worker, WebKit and helper processes",
         "started_unix_us":epoch});
     let mut seq = 0u64;
@@ -469,7 +475,7 @@ impl RotatingWriter {
             .create(directory)?;
         let metadata = fs::symlink_metadata(directory)?;
         if !metadata.is_dir()
-            || metadata.uid() != unsafe { libc::geteuid() }
+            || metadata.uid() != crate::browser_socket::effective_uid()
             || metadata.mode() & 0o077 != 0
         {
             return Err(io::Error::other(
@@ -494,7 +500,7 @@ impl RotatingWriter {
             .open(path)?;
         let metadata = file.metadata()?;
         if !metadata.is_file()
-            || metadata.uid() != unsafe { libc::geteuid() }
+            || metadata.uid() != crate::browser_socket::effective_uid()
             || metadata.mode() & 0o077 != 0
             || metadata.nlink() != 1
         {
@@ -593,6 +599,19 @@ mod tests {
         let private = speech_worker_failure_payload("liveness", "PRIVATE_SENTINEL", None).unwrap();
         assert_eq!(private["reason"], "transport_failed");
         assert!(!private.to_string().contains("PRIVATE_SENTINEL"));
+    }
+
+    #[test]
+    fn worker_error_codes_are_finite_and_never_echo_the_message() {
+        assert_eq!(
+            worker_error_code("VOCO_STREAM_WORKER must name an absolute local file"),
+            "runtime_missing"
+        );
+        assert_eq!(worker_error_code("worker spawn failed"), "spawn_failed");
+        assert_eq!(
+            worker_error_code("PRIVATE_SENTINEL ready"),
+            "transport_failed"
+        );
     }
 
     #[test]

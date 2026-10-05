@@ -10,10 +10,12 @@ from pathlib import Path
 import time
 import uuid
 import queue
+import resource
 import threading
 import numpy as np
-import psutil
-from adapters import Nemotron, ROOT
+from adapters import Nemotron
+
+GATE_MODES = ('off', 'zero')
 
 def coalesce_frames(frames, rate):
     """Batch released preroll without changing samples or exceeding one second."""
@@ -26,12 +28,11 @@ def coalesce_frames(frames, rate):
 class SilenceGate:
     """Skip only long quiet interiors; preserve 640ms onset and 1.5s tail.
 
-    Digital-zero mode is the default. Acoustic VAD is opt-in and needs onnxruntime
-    and vad/silero_vad.onnx, which the package does not ship. Original audio is
-    retained by the desktop.
+    Digital-zero mode is the default, and 'off' passes every sample through.
+    Original audio is retained by the desktop.
     """
     def __init__(self, mode='zero'):
-        if mode not in ('off', 'zero', 'vad'): raise ValueError('gate mode')
+        if mode not in GATE_MODES: raise ValueError('gate mode')
         self.mode = mode
         self.pending = collections.deque()
         self.pending_n = 0
@@ -39,56 +40,9 @@ class SilenceGate:
         self.active = False
         self.skipped_s = 0.
         self.processed_s = 0.
-        self.vad_ms = 0.
-        self.vad_buffer = np.empty(0, np.float32)
-        self.resample_count = 0
-        self.resample_next = 0.
-        self.resample_last = None
-        self.state = np.zeros((2, 1, 128), np.float32)
-        self.context = np.zeros((1, 64), np.float32)
-        self.probability = 1.
-        self.session = None
-        if mode == 'vad':
-            import onnxruntime as ort
-            opts = ort.SessionOptions()
-            opts.inter_op_num_threads = opts.intra_op_num_threads = 1
-            self.session = ort.InferenceSession(str(ROOT/'vad/silero_vad.onnx'), opts, providers=['CPUExecutionProvider'])
-
-    def quiet(self, data, rate):
-        if self.mode == 'off': return False
-        if self.mode == 'zero': return not np.any(data)
-        started = time.monotonic()
-        # Interpolate only the VAD sidechain, preserving fractional phase across
-        # transport blocks. The recognizer always receives original samples.
-        start = self.resample_count
-        end = start + len(data) - 1
-        if self.resample_last is None:
-            values, positions = data, np.arange(start, end+1)
-        else:
-            values = np.concatenate(([self.resample_last], data))
-            positions = np.arange(start-1, end+1)
-        points = np.arange(self.resample_next, end + 1e-8, rate / 16000.)
-        if len(points):
-            self.resample_next = points[-1] + rate / 16000.
-            self.vad_buffer = np.concatenate((self.vad_buffer, np.interp(points, positions, values).astype(np.float32)))
-        self.resample_count += len(data)
-        self.resample_last = data[-1]
-        maximum = 0.
-        evaluated = False
-        while len(self.vad_buffer) >= 512:
-            frame, self.vad_buffer = self.vad_buffer[:512], self.vad_buffer[512:]
-            x = np.concatenate((self.context, frame[None, :]), axis=1)
-            out, self.state = self.session.run(None, {'input': x, 'state': self.state, 'sr': np.array(16000, np.int64)})
-            self.context = x[:, -64:]
-            self.probability = float(out[0, 0])
-            maximum = max(maximum, self.probability)
-            evaluated = True
-        self.vad_ms += (time.monotonic()-started)*1000
-        # Avoid dismissing audible sounds or a frame that has not yet been scored.
-        return evaluated and maximum < .05 and float(np.sqrt(np.mean(data.astype(np.float64)**2))) < .008
 
     def push(self, data, rate):
-        quiet = self.quiet(data, rate)
+        quiet = self.mode == 'zero' and not np.any(data)
         self.quiet_s = self.quiet_s + len(data)/rate if quiet else 0.
         if not quiet or (self.active and self.quiet_s < 1.5):
             frames = list(self.pending) + [data]
@@ -115,6 +69,8 @@ class SilenceGate:
 
 class StreamingSession:
     def __init__(self, gate='zero', warmup=True):
+        # Reject the mode before loading the model, so a bad value never reports ready.
+        if gate not in GATE_MODES: raise ValueError('gate mode')
         self.mode = gate
         started = time.monotonic()
         self.context = int(os.environ.get('VOCO_NEMOTRON_CONTEXT', '1'))
@@ -130,8 +86,8 @@ class StreamingSession:
             self.warmup_ms = (time.monotonic()-started)*1000
     def start(self):
         self.model.start(); self.gate = SilenceGate(self.mode)
-        self.rate = None; self.audio_s = 0.; self.last = ''; self.active = True
-        self.metrics = {}; self.chunks = 0; self.first_nonzero_audio_s = None
+        self.rate = None; self.audio_s = 0.; self.active = True
+        self.metrics = {}; self.first_nonzero_audio_s = None
     def push(self, data, rate):
         if not self.active: raise ValueError('inactive session')
         if type(rate) is not int or rate < 8000 or rate > 96000 or (self.rate and self.rate != rate): raise ValueError('sample rate')
@@ -140,8 +96,7 @@ class StreamingSession:
         if self.first_nonzero_audio_s is None:
             nonzero = np.flatnonzero(data)
             if len(nonzero): self.first_nonzero_audio_s = self.audio_s + int(nonzero[0])/rate
-        self.rate = rate; self.audio_s += len(data)/rate; self.chunks += 1
-        before_vad = self.gate.vad_ms
+        self.rate = rate; self.audio_s += len(data)/rate
         started = time.monotonic(); frames = self.gate.push(data, rate)
         gate_ms = (time.monotonic()-started)*1000
         started = time.monotonic(); text = None
@@ -153,24 +108,21 @@ class StreamingSession:
             push_ms += self.model.metrics['recognizer_push_ms']
             drain_ms += self.model.metrics['result_drain_ms']
             if value is not None: text = value
-        self.metrics = {'asr_ms': (time.monotonic()-started)*1000, 'gate_ms': gate_ms, 'vad_ms': self.gate.vad_ms-before_vad,
+        self.metrics = {'asr_ms': (time.monotonic()-started)*1000, 'gate_ms': gate_ms,
                         'recognizer_push_ms': push_ms, 'result_drain_ms': drain_ms,
                         'recognizer_push_calls': len(frames),
                         'gate_released_frames': source_frame_count,
                         'first_nonzero_audio_s': self.first_nonzero_audio_s}
-        if text is not None: self.last = text
         return text
     def finish(self):
         if not self.active: raise ValueError('inactive session')
         started = time.monotonic()
         for frame in coalesce_frames(self.gate.finish(self.rate or 16000), self.rate or 16000): self.model.push(frame, self.rate)
-        text = self.model.finish(); self.active = False; self.last = text
-        self.metrics = {'asr_ms': (time.monotonic()-started)*1000, 'gate_ms': 0., 'vad_ms': 0.}
+        text = self.model.finish(); self.active = False
+        self.metrics = {'asr_ms': (time.monotonic()-started)*1000, 'gate_ms': 0.}
         return text
     def cancel(self):
-        if getattr(self.model, 'stream', None):
-            self.model.close_stream(self.model.stream); self.model.stream = None
-        self.active = False
+        self.model.release_stream(); self.active = False; self.metrics = {}
 
     def close(self):
         self.cancel()
@@ -201,6 +153,13 @@ class PrivateRotatingHandler(RotatingFileHandler):
             os.close(descriptor)
             raise
 
+def process_usage():
+    """This worker's CPU seconds and resident bytes; OSError or ValueError when unreadable."""
+    usage = resource.getrusage(resource.RUSAGE_SELF)
+    with open('/proc/self/statm', 'rb') as statm:
+        _size, resident, *_ = statm.read().split()
+    return usage.ru_utime, usage.ru_stime, int(resident) * resource.getpagesize()
+
 class Metrics:
     """Bounded asynchronous local logging. Disk failures never reject speech."""
     def __init__(self):
@@ -214,7 +173,7 @@ class Metrics:
             return
         try:
             self._initialize()
-        except (OSError, psutil.Error):
+        except (OSError, ValueError):
             self._unavailable()
 
     def _unavailable(self):
@@ -233,7 +192,7 @@ class Metrics:
         self.logger.propagate = False
         self.handler = PrivateRotatingHandler(root/'worker.jsonl', maxBytes=8*1024*1024, backupCount=3)
         self.logger.addHandler(self.handler)
-        self.process = psutil.Process()
+        process_usage()  # Unreadable usage disables metrics before the writer starts.
         self.queue = queue.Queue(maxsize=256)
         self.writer = threading.Thread(target=self._write, name='voco-speech-metrics', daemon=True)
         self.writer.start()
@@ -249,18 +208,18 @@ class Metrics:
                 if self.closed and self.queue.empty():
                     self.logger.info(json.dumps(self._record('metrics_closed', {}), separators=(',', ':')))
                     return
-        except (OSError, ValueError, psutil.Error):
+        except (OSError, ValueError):
             self._unavailable()
         finally:
             self.handler.close()
 
     def _record(self, event, fields):
-        cpu = self.process.cpu_times()
+        cpu_user_s, cpu_system_s, rss_bytes = process_usage()
         self.sequence += 1
         return {'event': event, 'run_id': self.run_id, 'event_seq': self.sequence,
             'dropped_events': self.dropped, 'monotonic_s': time.monotonic(), 'unix_s': time.time(),
-            'pid': os.getpid(), 'cpu_user_s': cpu.user, 'cpu_system_s': cpu.system,
-            'rss_bytes': self.process.memory_info().rss, **fields}
+            'pid': os.getpid(), 'cpu_user_s': cpu_user_s, 'cpu_system_s': cpu_system_s,
+            'rss_bytes': rss_bytes, **fields}
 
     def emit(self, event, **fields):
         if not self.enabled or self.closed:
@@ -269,7 +228,7 @@ class Metrics:
             self.queue.put_nowait(self._record(event, fields))
         except queue.Full:
             self.dropped += 1
-        except (OSError, psutil.Error):
+        except (OSError, ValueError):
             self._unavailable()
 
     def close(self):

@@ -53,10 +53,10 @@ read: Settings shows a recovery panel, and only Reset renames the file to a
 
 VOCO vendors narrow patches ([vendor/README.md](vendor/README.md)): glib 0.18.5
 with the exact upstream RUSTSEC-2024-0429 fix ([backport](vendor/glib/VOCO-PATCH.md)),
-global-hotkey, tray-icon, and a private legacy ydotoold. Keep every GTK/WebKit
-consumer on the single patched glib; adding glib 0.20 directly leaves GTK behind.
-Verify source provenance and the optimized iterator regression before accepting a
-dependency change.
+global-hotkey and tray-icon. Keep every GTK/WebKit consumer on the single
+patched glib; adding glib 0.20 directly leaves GTK behind. Verify source
+provenance and the optimized iterator regression before accepting a dependency
+change.
 
 ## Invariants
 
@@ -84,25 +84,40 @@ dependency change.
 
 - Each chunk pastes into whatever has keyboard focus when it is ready. There is no
   destination token, focus probe, terminal detection or per-app route. Desktop
-  setup checks the input helpers, never a caret or an app.
+  setup checks the paste prerequisites, never a caret or an app.
 - Copy CLIPBOARD, then PRIMARY (best effort; a failure only warns), then send one
   Shift+Insert: toolkits paste CLIPBOARD and terminals paste PRIMARY. A leading
   joining space is its own Space key, because Chromium's address bar trims pasted
   leading whitespace. ASCII controls become spaces. Never send Enter and never
   restore the previous clipboard.
-- Wayland helpers emit raw key events, so wait at most 1.5 s for the shortcut's
+- Wayland paste keys are raw key events, so wait at most 1.5 s for the shortcut's
   modifiers to be released (evdev, else the companion's `ModifiersClear`). Unknown
   state doesn't block; a timeout sends no keys. On X11 the passive grab takes every
   key while the chord is held, so a paste waits for its release, at most 1.5 s
   after the press.
-- Wayland paste needs a running `ydotoold` (`pgrep -x`; the private daemon isn't on
-  PATH), and desktop setup reports it. The launcher selects VOCO's private legacy
-  daemon only for the system client recorded in `packaging/ydotool/qualified-client.json`.
-  Keep `/usr/bin/ydotool` consistent between probing and dispatch. Migrate only
-  VOCO's unmodified user unit, while holding its single-instance guard and before
-  recording can start. Package hooks never restart desktop session services.
-- Legacy ydotool needs a literal space argument, not `space`, and a 24 ms paste
-  delay; modern ydotool takes numeric key events.
+- Wayland keys go through VOCO's own uinput device, "VOCO virtual keyboard"
+  (`virtual_keyboard.rs`); X11 keeps `xdotool`. Keep one device per process,
+  created at startup and reused for the process lifetime, never one per paste:
+  the compositor adds a new device late and could lose its first keys, so a
+  device younger than 500 ms waits before its first key. It declares only Shift,
+  Insert and Space and sends each event in its own report, 12 ms apart. Ensure it
+  exists before the clipboard copy, so a missing device is a `no-mutation`
+  failure; after an emit error, release Shift and drop it so the next paste
+  recreates it.
+- Keys reach whichever session owns the seat, so send them only while logind
+  reports this user's graphical session active: check before the clipboard copy
+  (`no-mutation`) and again just before the keys. Unknown state doesn't block.
+- The paste check opens `/dev/uinput`; it never creates the device, sends keys or
+  starts a process. The evdev listener ignores the virtual keyboard by name (and
+  another tool's `ydotoold virtual device`), so its keys never count as the
+  shortcut or a held modifier.
+- `/dev/uinput` access comes only from the packaged `uaccess` udev rule: the user
+  of the active local session, with no group, daemon, socket or service. Package
+  hooks apply it only by loading `uinput` and reloading and re-triggering udev;
+  they never touch users, groups or session services.
+- At a Wayland start, retire only VOCO's own `voco-ydotoold.service` enablement:
+  remove the link only if it points at the old packaged unit and that file is
+  gone, then stop the unit and reload the user manager off the startup path.
 - Start is refused while paste is unavailable, and when `VOCO_DESKTOP_PASTE=0` or
   `VOCO_DESKTOP_STREAM=0` is set.
 - Only a `no-mutation` failure, which typed nothing, keeps its text pending for the
@@ -124,7 +139,9 @@ dependency change.
 - The GNOME Wayland companion is recommended, not required. Without it the focused
   app also receives Alt+D (browsers focus the address bar, terminals delete a
   word), and an evdev toggle while the chord leaks sends one notification per
-  launch with the panel remedy, which Settings also shows.
+  launch with the panel remedy, which Settings also shows. When no keyboard is
+  readable and neither the panel nor IBus takes the chord, it does nothing at
+  all: 20 s after the listener starts, VOCO notifies once with the same remedy.
 - The companion grabs the configured Alt+D or Alt+Shift+D at every status, idle
   included; each press sends `Action('shortcut', '')`. `ReserveShortcut` holds a
   2.5 s lease for the exact `shortcutAccelerator` that only the authenticated Shell
@@ -146,9 +163,13 @@ dependency change.
 
 ### GNOME companion and tray
 
-- The Debian package bundles the GNOME 46 companion. Enable it only through the
-  user-run setup (`voco --setup-panel`); package hooks never change enabled
-  extensions. Keep "sign out and back in" feedback distinct from active status.
+- Both packages bundle the companion for GNOME 46, 48 and 50. Its metadata's
+  `shell-version` and `SUPPORTED_SHELLS` in `voco_gnome_panel.py` name the same
+  majors, and setup reports any other as `unsupported`; admit a major only after
+  testing it. A Shell without `Meta.is_wayland_compositor()` (GNOME 50) is
+  Wayland-only. Enable the companion only through the user-run setup
+  (`voco --setup-panel`); package hooks never change enabled extensions. Keep
+  "sign out and back in" feedback distinct from active status.
 - Bump the companion metadata and the setup contract together when loaded code
   must change, and compare GNOME's loaded metadata so an in-place upgrade can't
   report old code as current. After an upgrade, users re-run panel setup and sign
@@ -158,9 +179,17 @@ dependency change.
   unavailable check. Attach, Detach, name loss and explicit enabling clear it;
   explicit setup status always re-checks.
 - While the companion is attached, VOCO hides its fallback tray icon. The
-  companion's menu is Settings, Review and Stop dictation.
-- Active presentation is the microphone plus waves only. Stop lives in the context
-  menu and in the icon and shortcut actions; Settings and Review are explicit menu
+  companion's menu is Settings, Review and Stop dictation. On every supported
+  Shell a primary click on the pill stops or opens Settings, and other buttons,
+  Menu and Shift+F10 open the menu: GNOME 50's panel click gesture must leave
+  primary presses and touches to the pill.
+- On GNOME the fallback tray needs an AppIndicator extension. Ubuntu turns one
+  on; Debian 13 and Fedora 44 don't, so there the companion is VOCO's only
+  top-bar presence. When 20 s after startup neither the companion is attached nor
+  a StatusNotifier host owns its name, VOCO notifies once with the remedy.
+- Active presentation is the microphone plus waves only. Stop lives in the menus,
+  the companion pill's primary click and the shortcut (the fallback tray's
+  AppIndicator reports no clicks); Settings and Review are explicit menu
   destinations.
 - VOCO's own layout never moves the microphone when dictation starts or stops: the
   companion's meter opens on its left, and the fallback tray shows no label at
@@ -201,9 +230,12 @@ dependency change.
 
 ### Installer and packages
 
-- The guided installer installs the local package with APT and explicitly requires
-  the Wayland ydotool client and daemon on Wayland. A successful install alone is
-  not desktop readiness.
+- The guided installer installs only the verified local package: the `.deb` with
+  APT when `apt-get` and `dpkg-query` exist, otherwise the RPM with DNF (`dnf`
+  and `rpm`). Both are checked against the same signed `voco_checksums.txt`,
+  and the package manager must then report exactly that release, once. Then it
+  runs `voco --check-desktop-input`. A successful install alone is not desktop
+  readiness.
 - After setup succeeds, request one detached launch as the invoking desktop user;
   never launch a GUI from root or package hooks. Distinguish a launch request from
   readiness and keep the manual guidance when launching fails. The installer checks
@@ -212,6 +244,18 @@ dependency change.
   [runtime provisioning](docs/linux-packaging.md#runtime-provisioning) and never
   replace missing pinned artifacts with mutable downloads. A base Tauri `.deb` is
   incomplete: assemble and verify the NVIDIA payload before calling it installable.
+- One staged tree becomes both packages (`package-nvidia.py --rpm`), so they
+  carry the same files; `verify-rpm-package.sh` proves it against the `.deb`.
+  Every Debian dependency needs its Fedora name in `DEBIAN_TO_FEDORA`
+  (`scripts/rpm_package.py`), and the spec requires exactly those. The RPM's
+  only scriptlet is `packaging/rpm/post.sh`, the same best-effort rule
+  application as the Debian `postinst`. It owns only VOCO's folders and the
+  shared ones no dependency creates, declares no weak dependencies or
+  configuration files, and keeps automatic requires and provides off for the
+  private speech runtime. `check-devops.sh` checks the spec and the mapping, and
+  `verify-rpm-package.sh` the built package. CI's Debian 13 and Fedora 44 jobs
+  install the dependencies by those names (`scripts/distro-dependencies.py`) and
+  run the speech runtime there; hosted CI never builds a package.
 
 ## Working practices
 
@@ -263,8 +307,8 @@ release rehearsal.
   speech into a live user session.
 - Use public or synthetic fixtures only; keep personal audio, transcripts and
   private raw evidence out of the repository and out of CI logs.
-- Python worker tests need NumPy and psutil; protocol tests also need the pinned
-  model and runtime (`scripts/provision-ci-speech.sh`).
+- Python worker tests need NumPy; protocol tests also need the pinned model and
+  runtime (`scripts/provision-ci-speech.sh`).
 - Record unavailable checks as unavailable, never passed. Report failures and
   attempted-trial denominators, not just successes.
 - Keep diagnostic DOM logging separate from latency measurements in browser tests:
@@ -277,7 +321,7 @@ release rehearsal.
 
 ## Release
 
-- Source version: **2026.0.60**. Latest published Ubuntu/Debian release: **2026.0.59**.
+- Source version: **2026.0.61**. Latest published Ubuntu/Debian release: **2026.0.59**.
   GitHub Releases is authoritative for publication and the package manager for the
   installed version; a version in source proves neither.
 - `packaging/published-release.json` records the published version. Keep the README
@@ -292,7 +336,14 @@ release rehearsal.
   `scripts/assemble-release.sh` builds, verifies and signs a signed tag's release.
   The assets go to a draft release, which is published only after the downloaded
   assets verify. See the [release process](docs/release-process.md).
+- The signing machine runs Ubuntu 24.04, whose glibc 2.39 and GCC 13 set both
+  packages' floors, with `rpmbuild` from the `rpm` package. Each release carries
+  the RPM and `voco_latest_x86_64.rpm` with their own checksum lists, signed
+  like the Debian ones; `voco_checksums.txt` lists the RPM too, and
+  `voco_latest_checksums.txt` stays Debian-only. The RPM itself isn't
+  OpenPGP-signed: the signed checksums authenticate it. The validation record
+  doesn't cover DNF, so try the RPM on Fedora 44 before publishing.
 - Userspace checks, native install and removal, physical audio and
-  compositor/application behaviour are distinct evidence levels. Never claim
-  fastest, most accurate, universal compatibility or stability from a limited test
-  corpus.
+  compositor/application behaviour are distinct evidence levels, and each covers
+  only the system and GNOME version it ran on. Never claim fastest, most
+  accurate, universal compatibility or stability from a limited test corpus.

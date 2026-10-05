@@ -1,4 +1,8 @@
-"""Real cursor dictation in the private GNOME seat with explicit input adapters."""
+"""Real cursor dictation in the private GNOME seat.
+
+The app types through its real virtual keyboard, which the uinput bridge outside
+the namespace replays on the private Xvfb; wl-copy is a private Shell adapter.
+"""
 import hashlib
 import array
 import json
@@ -36,12 +40,14 @@ def run_cursor(root, app, pump, native_windows, activate):
             context.iteration(True)
     assert os.environ.get('VOCO_GNOME_CURSOR') == '1'
     assert 'DISPLAY' not in os.environ
-    assert not any(Path(path).exists() for path in ('/dev/snd', '/dev/input', '/dev/uinput'))
+    assert not any(Path(path).exists() for path in ('/dev/snd', '/dev/input'))
+    assert Path('/dev/uinput').is_char_device()
     assert os.environ['PULSE_SERVER'] == f'unix:/run/user/{os.getuid()}/pulse/native'
     assert all(os.environ.get(flag) == '1' for flag in
                ('VOCO_DEV_NATIVE_CAPTURE', 'VOCO_DEBUG_CAPTURE_AUDIO', 'VOCO_DEBUG_NATIVE_CAPTURE'))
-    result = {'passed': False, 'scope': 'exact app binary, native capture, pinned recognition, GTK cursor, real GNOME Stop; private input/clipboard adapters',
-              'physicalMicrophone': False, 'physicalHotkeyStart': False, 'kernelInputHelperQualified': False,
+    result = {'passed': False, 'scope': 'exact app binary, native capture, pinned recognition, GTK cursor, real GNOME Stop; '
+                                        'real virtual keyboard replayed by the private uinput bridge; private clipboard adapter',
+              'physicalMicrophone': False, 'physicalHotkeyStart': False, 'compositorReadsVirtualKeyboard': False,
               'startTransport': 'owner-only control CLI', 'trials': []}
     baseline = os.environ.get('VOCO_CURSOR_BASELINE') == '1'
     result['audioOnlyBaselineComparison'] = baseline
@@ -55,10 +61,10 @@ def run_cursor(root, app, pump, native_windows, activate):
     evidence = root / 'evidence'
     trace = root / 'state/voco/hotkey-trace.jsonl'
     journal = root / 'state/voco/crash-recovery'
-    dispatch = evidence / 'cursor-input-dispatch.jsonl'
+    bridge_log = evidence / 'uinput-bridge.jsonl'
     bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
     target = None
-    daemon = None
+    relay = None
     player = None
     monitor = None
     reference_capture = None
@@ -66,6 +72,15 @@ def run_cursor(root, app, pump, native_windows, activate):
 
     def rows():
         return [json.loads(line) for line in trace.read_text().splitlines()] if trace.exists() else []
+
+    def bridged(event):
+        records = [json.loads(line) for line in bridge_log.read_text().splitlines()] if bridge_log.exists() else []
+        return [record for record in records if record['event'] == event]
+
+    def dispatches():
+        # The bridge's record of each paste gesture, with the Shell's input state
+        # just before its first key.
+        return bridged('dispatch')
 
     def quality_terminal(session_id):
         performance = root / 'state/voco/performance/performance.jsonl'
@@ -111,7 +126,7 @@ def run_cursor(root, app, pump, native_windows, activate):
         return None
 
     def desktop_input_ready():
-        # Read-only prerequisite check: paste helpers and input service only.
+        # Read-only prerequisite check: paste helpers and /dev/uinput access only.
         # Dictation pastes into whatever has focus; there is no cursor probe.
         probe = subprocess.Popen([str(root / 'voco'), '--check-desktop-input'],
                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
@@ -128,9 +143,12 @@ def run_cursor(root, app, pump, native_windows, activate):
     try:
         monitor = subprocess.Popen(['dbus-monitor', '--session', "type='error'"],
             stdout=(evidence / 'cursor-dbus-errors.log').open('w'), stderr=subprocess.DEVNULL)
-        daemon = subprocess.Popen(['/usr/bin/ydotool', '--fixture-daemon'])
-        wait(lambda: subprocess.run(['pgrep', '-u', str(os.getuid()), '-x', 'ydotoold'],
-             capture_output=True).returncode == 0, 'private input adapter daemon')
+        # The app made its keyboard at startup; the bridge must hold it already.
+        wait(lambda: bridged('grabbed'), "the bridge's grab of the app's virtual keyboard")
+        state_socket = root / 'runtime/voco-input-state.sock'
+        relay = subprocess.Popen(['/usr/bin/python3', str(Path(__file__).resolve().parent / 'fixtures/shell-probe-input-state.py'),
+                                  str(state_socket)])
+        wait(state_socket.exists, 'the input-state relay for the uinput bridge')
         # Open and hide through actual app controls, never compositor focus repair.
         activate('Settings')
         node = wait(lambda: app_button('Hide to tray'), 'settings hide control')
@@ -213,7 +231,7 @@ def run_cursor(root, app, pump, native_windows, activate):
                 failed = any(row.get('event') == 'dictation_desktop_stream_failed'
                              and row.get('dictation_session_id') == trial_index + 1 for row in rows())
                 if modifier_stress and failed:
-                    current = {'text': text(), 'dispatches': len(dispatch.read_text().splitlines())}
+                    current = {'text': text(), 'dispatches': len(dispatches())}
                     if interruption is None:
                         interruption = current
                     else:
@@ -246,7 +264,7 @@ def run_cursor(root, app, pump, native_windows, activate):
             reference_capture = None
             trial['text'] = text()
             if interruption is not None:
-                assert interruption == {'text': text(), 'dispatches': len(dispatch.read_text().splitlines())}, \
+                assert interruption == {'text': text(), 'dispatches': len(dispatches())}, \
                     'Stop replayed an interrupted insertion'
                 terminal = quality_terminal(trial_index + 1)
                 assert terminal['finish_responded'] and terminal['captured_samples'] == terminal['responded_samples'] == terminal['enqueued_samples']
@@ -314,9 +332,10 @@ def run_cursor(root, app, pump, native_windows, activate):
             else:
                 trial['deliveryQualified'] = False
             trial['passed'] = True
-        events = [json.loads(line) for line in dispatch.read_text().splitlines()]
+        assert not bridged('error'), ('The uinput bridge rejected or lost paste keys', bridged('error'))
+        events = dispatches()
         if not baseline:
-            assert any(' ' in event['keys'] for event in events), 'No joining Space dispatch was exercised'
+            assert any('space' in event['keys'] for event in events), 'No joining Space dispatch was exercised'
         assert all(not event['input']['windowMenuOpen'] for event in events)
         assert all((event['input']['modifiers'] & (1 | 4 | 8 | 64 | 128)) == 0 for event in events), \
             'A physical modifier reached a streaming paste dispatch'
@@ -364,9 +383,9 @@ def run_cursor(root, app, pump, native_windows, activate):
         if player is not None and player.poll() is None:
             player.terminate()
             player.wait(timeout=5)
-        if daemon is not None and daemon.poll() is None:
-            daemon.terminate()
-            daemon.wait(timeout=5)
+        if relay is not None and relay.poll() is None:
+            relay.terminate()
+            relay.wait(timeout=5)
         if monitor is not None and monitor.poll() is None:
             monitor.terminate()
             monitor.wait(timeout=5)

@@ -1,5 +1,6 @@
 //! Same-user, private-runtime transport. This is not a boundary against compromised user processes.
 use std::fs;
+use std::io;
 use std::os::fd::AsRawFd;
 use std::os::unix::fs::{FileTypeExt, MetadataExt, PermissionsExt};
 use std::os::unix::net::UnixStream;
@@ -8,7 +9,7 @@ use std::path::{Path, PathBuf};
 pub fn private_directory(path: &Path) -> Result<(), String> {
     let m = fs::symlink_metadata(path)
         .map_err(|_| "Private browser runtime directory is unavailable.")?;
-    if !m.is_dir() || m.uid() != unsafe { libc::geteuid() } || m.mode() & 0o077 != 0 {
+    if !m.is_dir() || m.uid() != effective_uid() || m.mode() & 0o077 != 0 {
         return Err(
             "Browser runtime directory must be a private directory owned by this user.".into(),
         );
@@ -37,7 +38,7 @@ pub fn validate_socket(path: &Path) -> Result<(), String> {
     private_directory(path.parent().ok_or("Invalid browser socket path.")?)?;
     let m = fs::symlink_metadata(path).map_err(|_| "VOCO browser integration is not running.")?;
     if !m.file_type().is_socket()
-        || m.uid() != unsafe { libc::geteuid() }
+        || m.uid() != effective_uid()
         || m.permissions().mode() & 0o077 != 0
     {
         return Err("Browser socket ownership or permissions rejected.".into());
@@ -45,25 +46,45 @@ pub fn validate_socket(path: &Path) -> Result<(), String> {
     Ok(())
 }
 pub fn validate_peer(stream: &UnixStream) -> Result<(), String> {
-    let mut cred: libc::ucred = unsafe { std::mem::zeroed() };
-    let mut len = std::mem::size_of::<libc::ucred>() as libc::socklen_t;
-    // SO_PEERCRED writes a fixed-size credential structure to the live descriptor.
-    let rc = unsafe {
+    match peer_uid(stream) {
+        Ok(uid) if uid == effective_uid() => Ok(()),
+        _ => Err("Browser transport peer is not the current user.".into()),
+    }
+}
+/// This process's effective user ID, the owner every private file and socket must have.
+pub fn effective_uid() -> u32 {
+    // SAFETY: geteuid has no preconditions.
+    unsafe { libc::geteuid() }
+}
+/// The peer's user ID as the kernel recorded it. The trigger, activation and IBus
+/// sockets share this one SO_PEERCRED check; each keeps its own messages.
+pub fn peer_uid(stream: &UnixStream) -> io::Result<u32> {
+    let mut credentials = libc::ucred {
+        pid: 0,
+        uid: 0,
+        gid: 0,
+    };
+    let mut length = std::mem::size_of::<libc::ucred>() as libc::socklen_t;
+    // SAFETY: the live descriptor and fixed-size output buffer remain valid for getsockopt.
+    let result = unsafe {
         libc::getsockopt(
             stream.as_raw_fd(),
             libc::SOL_SOCKET,
             libc::SO_PEERCRED,
-            (&mut cred as *mut libc::ucred).cast(),
-            &mut len,
+            (&mut credentials as *mut libc::ucred).cast(),
+            &mut length,
         )
     };
-    if rc != 0
-        || len as usize != std::mem::size_of::<libc::ucred>()
-        || cred.uid != unsafe { libc::geteuid() }
-    {
-        return Err("Browser transport peer is not the current user.".into());
+    if result != 0 {
+        return Err(io::Error::last_os_error());
     }
-    Ok(())
+    if length as usize != std::mem::size_of::<libc::ucred>() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "Peer credentials were truncated",
+        ));
+    }
+    Ok(credentials.uid)
 }
 
 #[cfg(test)]
@@ -104,5 +125,21 @@ mod tests {
         let (one, two) = UnixStream::pair().unwrap();
         assert!(validate_peer(&one).is_ok());
         assert!(validate_peer(&two).is_ok());
+        assert_eq!(peer_uid(&one).unwrap(), effective_uid());
+    }
+    #[test]
+    fn unverifiable_peer_is_rejected_with_its_os_error() {
+        // getsockopt fails with ENOTSOCK on a descriptor that isn't a socket.
+        let file = UnixStream::from(std::os::fd::OwnedFd::from(
+            fs::File::open("/dev/null").unwrap(),
+        ));
+        assert_eq!(
+            peer_uid(&file).unwrap_err().raw_os_error(),
+            Some(libc::ENOTSOCK)
+        );
+        assert_eq!(
+            validate_peer(&file).unwrap_err(),
+            "Browser transport peer is not the current user."
+        );
     }
 }

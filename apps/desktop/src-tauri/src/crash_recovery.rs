@@ -72,7 +72,7 @@ fn private_child(parent: &File, name: &CStr) -> Result<File, String> {
     let metadata = file
         .metadata()
         .map_err(|_| "Cannot inspect recovery directory")?;
-    if metadata.uid() != unsafe { libc::geteuid() } {
+    if metadata.uid() != crate::browser_socket::effective_uid() {
         return Err("Recovery directory must be owned by you".into());
     }
     // A directory we own may have inherited a loose umask; repair it in place.
@@ -156,7 +156,7 @@ impl Journal {
         let file = unsafe { File::from_raw_fd(fd) };
         let metadata = file.metadata().ok()?;
         if !metadata.is_file()
-            || metadata.uid() != unsafe { libc::geteuid() }
+            || metadata.uid() != crate::browser_socket::effective_uid()
             || metadata.nlink() != 1
             || metadata.len() > MAX_FILE
         {

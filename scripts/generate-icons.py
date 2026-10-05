@@ -18,7 +18,7 @@ ICON_DIR = ROOT / "apps/desktop/src-tauri/icons"
 PUBLIC_DIR = ROOT / "apps/desktop/public"
 TRAY_SIZE = 32
 SUPERSAMPLE = 4
-STATES = ("not-ready", "ready", "recording", "processing")
+STATES = ("not-ready", "ready", "processing")
 
 
 def run_ffmpeg(ffmpeg: str, arguments: list[str], data: bytes | None = None) -> bytes:
@@ -50,8 +50,6 @@ def near_segment(x: float, y: float, start: tuple, end: tuple, width: float) -> 
 
 def badge_mark(x: float, y: float, state: str) -> bool:
     """Recognizable shapes remain different even without their accent colors."""
-    if state == "recording":
-        return math.hypot(x - 25, y - 25) <= 2.6
     if state == "ready":
         segments = [((22, 25), (24, 27)), ((24, 27), (28, 23))]
     elif state == "processing":
@@ -66,8 +64,6 @@ def badge_contains(x: float, y: float, state: str, inset: float = 0) -> bool:
     """Outer silhouettes preserve state distinctions when small glyphs soften."""
     x, y = x - 25, y - 25
     radius = 6.6
-    if state == "recording":
-        return math.hypot(x, y) <= radius - inset
     outlines = {
         "ready": [(-1, -1), (1, -1), (1, 0), (0, 1), (-1, 0)],
         "processing": [(0, -1), (1, 0), (0, 1), (-1, 0)],
@@ -90,7 +86,6 @@ def render_tray_icons(ffmpeg: str) -> None:
     colors = {
         "not-ready": (239, 191, 104, 255),
         "ready": (129, 215, 165, 255),
-        "recording": (250, 121, 127, 255),
         "processing": (239, 191, 104, 255),
     }
     target_dir = PUBLIC_DIR / "tray"

@@ -215,6 +215,15 @@ try {
       await page.getByRole('button',{name:'Apply shortcut',exact:true}).click();
       await page.getByRole('button',{name:'Change shortcut',exact:true}).waitFor();
       assert.equal(await page.locator('.voco-preferences__shortcut-summary kbd').innerText(),'Ctrl+Alt+K');
+      // Shift+1 types "!", so the recorder names the key through React's own event.
+      await page.locator('.voco-preferences__content').evaluate(el => el.scrollTop=0);
+      await page.getByRole('button',{name:'Change shortcut',exact:true}).click();
+      await page.getByRole('button',{name:'Record keys',exact:true}).click();
+      await shortcutInput.press('Control+Shift+Digit1');
+      assert.equal(await shortcutInput.inputValue(),'Ctrl+Shift+1');
+      await page.getByRole('button',{name:'Apply shortcut',exact:true}).click();
+      await page.getByRole('button',{name:'Change shortcut',exact:true}).waitFor();
+      assert.equal(await page.locator('.voco-preferences__shortcut-summary kbd').innerText(),'Ctrl+Shift+1');
       await page.locator('.voco-preferences__content').evaluate(el => el.scrollTop=0);
       await page.getByRole('button',{name:'Change shortcut',exact:true}).click();
       await shortcutInput.fill('Alt+D');
@@ -240,9 +249,6 @@ try {
       await load('surface=popover');
       await capture('popover-ready');
       assert.equal(await page.evaluate(() => document.documentElement.scrollHeight <= innerHeight),true);
-      await load('surface=popover&state=recording');
-      await page.setViewportSize({ width: 420, height: 380 });
-      await capture('popover-listening');
       const picker = page.getByRole('button', { name: /^Microphone:/ });
       const box = await picker.boundingBox();
       assert.ok(box && box.width > 40, 'Microphone button must retain its hit area');

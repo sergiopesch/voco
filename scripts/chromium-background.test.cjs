@@ -35,7 +35,7 @@ vm.runInContext(fs.readFileSync('integrations/chromium/background.js','utf8'),co
  assert.equal(badges.at(-1).tabId,9); assert.equal(badges.at(-1).text,'');
  vm.runInContext("connect(); ready=true; tabs.set(10,'doc10'); tabs.set(11,'doc11'); routes.set('token10',{tabId:10,documentId:'doc10'});",context);
  const disable=vm.runInContext('enableTab({id:10})',context);
- resolveReply({documentId:'doc10',stopToken:'token10'}); await disable;
+ resolveReply({}); await disable;
  assert.equal(vm.runInContext('tabs.has(10)',context),false); assert.equal(vm.runInContext('tabs.has(11)',context),true);
  assert.equal(ports[2].sent.filter(m=>m.type==='stop').length,1); assert.equal(ports[2].sent.find(m=>m.type==='stop').token,'token10');
  const beforeRevoke=messages.length;
@@ -45,6 +45,9 @@ vm.runInContext(fs.readFileSync('integrations/chromium/background.js','utf8'),co
  const routedRevoke=ports[2].onMessage.listeners[0]({protocol:1,type:'revoke',token:'token11',documentId:'doc11'});
  assert.equal(messages.at(-1)[0],11); assert.equal(messages.at(-1)[1].type,'revoke'); assert.equal(messages.at(-1)[2].documentId,'browser11');
  resolveReply({}); await routedRevoke;
+ assert.equal(vm.runInContext("routes.has('token11')",context),true,'delivery revocation keeps the Stop route');
+ chrome.tabs.onRemoved.listeners[0](11);
+ assert.equal(ports[2].sent.at(-1).type,'stop','a revoked tab still stops its recording'); assert.equal(ports[2].sent.at(-1).token,'token11');
  console.log('Chromium background reconnect regression passed');
 })();
 

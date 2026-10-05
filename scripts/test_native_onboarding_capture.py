@@ -18,7 +18,8 @@ def run_onboarding(root, app, pump, native_windows):
 
     assert __debug__ and 'DISPLAY' not in os.environ
     assert os.environ['PULSE_SERVER'] == f'unix:/run/user/{os.getuid()}/pulse/native'
-    assert not any(Path(p).exists() for p in ('/dev/snd', '/dev/input', '/dev/uinput'))
+    assert not any(Path(p).exists() for p in ('/dev/snd', '/dev/input'))
+    assert Path('/dev/uinput').is_char_device() == (os.environ.get('VOCO_GNOME_CURSOR') == '1')
     assert all(os.environ.get(flag) == '1' for flag in ('VOCO_DEV_NATIVE_CAPTURE', 'VOCO_DEBUG_CAPTURE_AUDIO', 'VOCO_DEBUG_NATIVE_CAPTURE'))
     result = {'passed': False, 'scope': 'actual onboarding controls / Wayland application audio / private synthetic PulseAudio / pinned model',
               'physicalMicrophone': False, 'desktopDeliveryQualified': False, 'onboardingCompletionRequested': False}

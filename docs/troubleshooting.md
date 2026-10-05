@@ -15,10 +15,11 @@ voco --check-panel
 ```
 
 They show the installed version, whether your session is `x11` or `wayland`,
-whether VOCO can paste or which helper is missing, and what the GNOME panel
-needs. The two checks send no keys, leave the clipboard alone and change no
-settings. On Wayland, `systemctl --user status voco-ydotoold.service` shows
-whether the input service is running.
+whether VOCO can paste or what is missing, and what the GNOME panel needs. The
+two checks send no keys, leave the clipboard alone and change no settings. On
+Wayland, `getfacl /dev/uinput` shows whether your login may use `/dev/uinput`,
+which VOCO needs to press the paste keys; see
+[Access to /dev/uinput](platform/README.md#access-to-devuinput).
 
 In VOCO, open **Settings** and choose **Help**. The sections
 **My microphone is not working**, **My shortcut is not working** and
@@ -44,22 +45,33 @@ you set it, and only your account can read it.
 
 | Message | What to do |
 | --- | --- |
-| `… is required before downloading VOCO.` | Install the named tool with `sudo apt install`, then run the installer again. |
+| `VOCO installs with APT on Ubuntu and Debian, or with DNF on Fedora. Neither was found.` | Run the installer on one of the [supported systems](platform/README.md#supported-systems). |
+| `… is required before downloading VOCO.` | Install the named tool with `sudo apt install`, or `sudo dnf install` on Fedora, then run the installer again. |
+| `VOCO needs glibc 2.39 or later, …` | The system is older than the [supported systems](platform/README.md#supported-systems). Install VOCO on one of them. |
+| `VOCO's speech recognition needs a processor with AVX2, FMA and F16C; …` | VOCO can't run on this processor. In a virtual machine, pass the host CPU through, for example with QEMU's `-cpu host`, then run the installer again. |
+| `sudo is required before downloading VOCO.`, or `… is not in the sudoers file` | Your account can't use `sudo` yet, as on a Debian system installed with a root password. As root (`su -`), run `apt install sudo` and `adduser <your user name> sudo`, sign out and back in, then run the installer again. |
 | `The download stopped.` | Check your connection and run the installer again. If the release file is unavailable, check that the release exists. |
 | A key, signature, signer or checksum error | Nothing was installed. Run the installer again. If the check fails again, don't install the file another way, and report it as described in [SECURITY.md](../SECURITY.md). |
-| `Installation failed:` | APT couldn't install the package. Fix the APT error it shows, then run the installer again. |
+| `Installation failed:` | APT or DNF couldn't install the package. Fix the error it shows, then run the installer again. |
 
 Exit status 2 means VOCO is installed but can't paste yet. The installer names
 the problem. The most common ones are:
 
 | Message | What to do |
 | --- | --- |
-| `This login cannot access /dev/uinput.` | Give your login write access to `/dev/uinput`. [Platform support](platform/README.md#ydotoold-ydotool-daemon) explains the options. |
-| `An existing ydotoold is running but is unavailable to this login.` | Another `ydotoold` is running. Check its socket permissions. VOCO doesn't replace it. |
-| `Could not start the VOCO input service.` | Run `systemctl --user status voco-ydotoold.service` to see why. |
+| `VOCO can't open /dev/uinput, so it can't send the paste keys. …` | Sign out and back in once, then run `voco --check-desktop-input`. If it still fails, follow [Access to /dev/uinput](platform/README.md#access-to-devuinput). |
+| `Pasting on … requires: …` | Install the package that provides the named program, such as `wl-clipboard` for `wl-copy`. |
 
 When `voco --check-desktop-input` passes, run `voco --setup-panel` on GNOME 46,
-then open VOCO. See [Wayland input service](install.md#wayland-input-service).
+48 or 50, then open VOCO. See [Wayland paste keys](install.md#wayland-paste-keys).
+
+## DNF says it skipped OpenPGP checks
+
+On Fedora, DNF warns that it skipped OpenPGP checks when it installs VOCO. This
+is expected: the RPM carries no OpenPGP signature of its own. The guided
+installer checked the release's signed checksum list, and the package against
+it, before DNF started. After a manual install, the checks in
+[Manual install](install.md#fedora) do the same.
 
 ## Dictation won't start
 
@@ -79,22 +91,24 @@ then open VOCO. See [Wayland input service](install.md#wayland-input-service).
    dictation starts, the problem is the shortcut.
 3. Open **Help**, then **My shortcut is not working**. It says how the shortcut
    reaches VOCO and whether that works.
-4. On Wayland outside GNOME 46, bind a key to `voco --toggle`, as described in
-   [Wayland compositor shortcuts](install.md#wayland-compositor-shortcuts).
+4. On Wayland outside GNOME 46, 48 and 50, bind a key to `voco --toggle`, as
+   described in [Wayland compositor shortcuts](install.md#wayland-compositor-shortcuts).
 
 If `voco --toggle` prints `Could not reach VOCO's private control socket`, VOCO
 isn't running in this desktop session. Open VOCO, then try again. To record key
 events for a bug report, see [Shortcut traces](#shortcut-traces).
 
-## The shortcut also reaches your app
+## The shortcut also reaches your app, or does nothing
 
 On Wayland without the GNOME panel, VOCO watches for `Alt+D` and `Alt+Shift+D`
 but can't stop your app from receiving them. Browsers jump to the address bar,
 so your words land there, and terminals delete a word. VOCO warns once per
-launch with **Your shortcut also reached the app**. Fix it one of these ways:
+launch with **Your shortcut also reached the app**. If VOCO can't read any
+keyboard either, the shortcut does nothing, and shortly after VOCO starts it
+says **Your shortcut can't reach VOCO yet**. Fix either one of these ways:
 
-- On GNOME 46, choose **Enable live panel** on the **Help** page, or run
-  `voco --setup-panel`. Then sign out and back in.
+- On GNOME 46, 48 or 50, choose **Enable live panel** on the **Help** page, or
+  run `voco --setup-panel`. Then sign out and back in.
 - Elsewhere, choose another shortcut in VOCO and bind it to `voco --toggle` in
   your desktop's keyboard settings.
 - Add the [VOCO Dictation input source](install.md#ibus-input-source). It keeps
@@ -108,8 +122,8 @@ launch with **Your shortcut also reached the app**. Fix it one of these ways:
 - Let go of the shortcut and other modifier keys, such as Alt, Ctrl and Super,
   while VOCO types. VOCO waits up to 1.5 seconds for them before it pastes,
   then stops typing.
-- If VOCO reports that the paste helper can't reach its input service, run
-  `systemctl --user enable --now voco-ydotoold.service` and check again.
+- On Wayland, if VOCO reports that it can't open `/dev/uinput`, sign out and
+  back in once, then check again.
 - Apps that remap Shift+Insert, remote desktops and virtual machines may ignore
   the paste, and VOCO can't tell when they do.
 
@@ -145,13 +159,17 @@ is in [Review](everyday-use.md#review).
 | **Microphone could not be read; it may be busy.** | Close other programs that use the microphone, or choose another one. |
 | **Microphone changed** | Your chosen microphone is missing, so VOCO uses the system default. Choose it again when it's connected. |
 | `VOCO requires a microphone sample rate from 8 to 96 kHz.` | Choose a supported format in your sound settings, then restart VOCO. |
-| `Native capture requires a PipeWire source identity` | Check that PipeWire and its PulseAudio service are running. |
+| **Microphone setup required**, with **No default microphone is available.** | Connect a microphone, or choose one on the **Settings** page. If your system's default input is a speaker monitor, choose a microphone instead. |
+| **Microphone setup required** after a microphone failed or was unplugged | VOCO stopped using the microphone you chose. Choose one again on the **Settings** page. |
+| **Source selection is stale** | The microphone list changed since Settings showed it. Choose **Refresh devices**, then pick the microphone again. |
+| Every microphone in the list ends with **— identity unavailable** | On Wayland, VOCO needs PipeWire's PulseAudio service. `pactl info` shows `Server Name: PulseAudio (on PipeWire …)` when it runs; if it shows only `pulseaudio`, switch to PipeWire's service, `pipewire-pulse`, then sign out and back in, or use an X11 session. Until then the voice test can't pass. |
 | Missing or wrong words | Set the input level in your sound settings so your voice is clear but not distorted, and reduce background noise. |
 
 ## The GNOME panel doesn't appear
 
-The panel shows only while VOCO is running. Run `voco --check-panel` and follow
-the line it prints. It exits with status 2 when the panel needs a step.
+The panel works on GNOME 46, 48 and 50, and shows only while VOCO is running.
+Run `voco --check-panel` and follow the line it prints. It exits with status 2
+when the panel needs a step.
 
 - If the panel isn't enabled, choose **Enable live panel** on the **Help** page,
   or run `voco --setup-panel`. Then save your work and sign out and back in.
@@ -159,7 +177,13 @@ the line it prints. It exits with status 2 when the panel needs a step.
 - If GNOME extensions are turned off, turn them on in the Extensions app. If a
   policy blocks them, ask your administrator.
 - If the panel files are missing, reinstall the VOCO package.
-- On other GNOME versions and other desktops, use the tray menu.
+- On other GNOME versions, `voco --check-panel` says that the panel supports
+  GNOME 46, 48 and 50. There and on other desktops, use the tray menu.
+
+On Debian 13 and Fedora 44, VOCO's tray icon needs an AppIndicator extension,
+which they don't turn on, so until the panel loads VOCO has no icon in the top
+bar, and shortly after it starts VOCO says **VOCO has no icon in the top bar**.
+Open VOCO from your app menu in the meantime, and turn on the panel as above.
 
 While you dictate, GNOME's microphone privacy indicator appears and moves the
 VOCO panel to the left. This is expected.
@@ -170,7 +194,10 @@ VOCO pauses dictation and shows **VOCO settings need attention** when it can't
 safely load `~/.config/voco/config.json`. This happens when the file isn't
 valid JSON or has a value VOCO doesn't accept, or when the file or its folder
 is a symbolic link or belongs to another user. VOCO fixes their permissions
-itself. A **Dictation paused** notification may ask you to open VOCO.
+itself. On a first start VOCO copies an older `~/.config/voice/config.json` if
+it finds one, and shows the panel when that file is a symbolic link, isn't a
+regular file or belongs to another user. A **Dictation paused** notification
+may ask you to open VOCO.
 
 - **Retry loading settings** tries again after you correct the file.
 - **Open config directory** opens `~/.config/voco/`.
@@ -214,7 +241,7 @@ gives the reason:
 | Reason | What to do |
 | --- | --- |
 | `VOCO is running but could not receive the launcher request` | The running VOCO didn't answer. This can happen with a copy started before an upgrade. Use its tray or panel menu, or quit it with `pkill -x voco` and open VOCO again. |
-| Starts with `Desktop input setup` | VOCO couldn't confirm that its input service is up to date. Check `systemctl --user status voco-ydotoold.service`, then open VOCO again. If it keeps failing, run `voco --setup-desktop-input` to see why. |
+| `could not write the tray icons: …` | VOCO keeps its tray icons in `$XDG_RUNTIME_DIR/voco`, which is usually a small memory-backed folder. Free space there, or sign out and back in, then open VOCO again. |
 
 ## Performance logs
 

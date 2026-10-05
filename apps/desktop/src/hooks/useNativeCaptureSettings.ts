@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useStore } from "@/store/useStore";
+import { isDictationActive } from "@/lib/activityMode";
 import { errorMessage } from "@/lib/dictationRecovery";
 import {
+  defaultNativeSource,
   listNativeCaptureSources,
   nativeCaptureEnabled,
   selectNativeCaptureSource,
@@ -46,7 +48,7 @@ export function useNativeCaptureSettings(): NativeMicrophoneControls {
       setSources(next);
       const previous = useStore.getState().nativeCaptureSource;
       if (previous && !next.sources.some((source) => source.selectionToken === previous.selectionToken)) {
-        useStore.getState().setNativeCaptureSource(null);
+        useStore.getState().loseNativeCaptureSource();
         setError("The microphone list changed. Choose a microphone again.");
       } else setError(null);
     } catch (cause) {
@@ -80,7 +82,7 @@ export function useNativeCaptureSettings(): NativeMicrophoneControls {
 
   const select = useCallback(async (token: string) => {
     const state = useStore.getState();
-    if (state.captureBackendMode !== "native" || ["starting", "recording", "processing"].includes(state.status)) return false;
+    if (state.captureBackendMode !== "native" || isDictationActive(state.status)) return false;
     const id = ++request.current;
     setBusy(true);
     // A change must never leave the previous grant looking like the new choice.
@@ -112,7 +114,7 @@ export function useNativeCaptureSettings(): NativeMicrophoneControls {
       const next = await listNativeCaptureSources();
       assertCurrent();
       setSources(next);
-      const source = next.sources.find(source => source.selectionToken === next.defaultSelectionToken && source.objectSerial && !source.isMonitor);
+      const source = defaultNativeSource(next);
       if (!source) throw new Error("No default microphone is available. Connect a microphone or choose one in Microphone settings.");
       const selection = await selectNativeCaptureSource(source.selectionToken);
       assertCurrent();

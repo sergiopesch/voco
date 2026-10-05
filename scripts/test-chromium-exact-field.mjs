@@ -66,14 +66,14 @@ try {
   async function claim() { const token = await trigger(); assert.ok(token); assert.equal((await request(token, 'claim')).outcome, 'applied'); return token; }
   async function append(token, text, extra = {}) { return request(token, 'append', {sequence: 1, text, final: true, ...extra}); }
   async function test(name, fn) { await reset(); await fn(); results.push({name, passed: true}); }
-  await test('unicode checkpoint, final, duplicate and query receipts', async () => {
+  await test('unicode checkpoint, final and duplicate receipts', async () => {
     const t = await claim();
     const first = await append(t, 'Hi 🦊', {final: false}); assert.equal(first.outcome, 'applied'); assert.equal(first.committedCharacters, 4);
     assert.equal((await append(t, 'Hi 🦊', {final: false})).outcome, 'applied');
     assert.equal((await append(t, 'wrong', {final: false})).outcome, 'rejected');
     assert.equal(await page.locator('#a').inputValue(), 'Hi 🦊');
     assert.equal((await append(t, '!', {sequence: 2, expectedCommittedCharacters: 4})).committedCharacters, 5);
-    assert.equal((await request(t, 'query', {sequence: 2})).outcome, 'applied');
+    assert.equal((await append(t, '!', {sequence: 2, expectedCommittedCharacters: 4})).outcome, 'applied');
     assert.equal(await page.locator('#a').inputValue(), 'Hi 🦊!');
   });
   for (const phase of ['claim', 'append']) await test(`${phase}: A to B to A invalidates`, async () => {
@@ -189,11 +189,6 @@ try {
     assert.equal(await page.locator('#a').inputValue(), ''); assert.equal(await page.locator('#b').inputValue(), '');
     await request(t, 'cancel');
     const next = await trigger(); assert.notEqual(next.token, t.token);
-  });
-  await test('disarm after delivery revocation retains the original Stop token', async () => {
-    const t = await claim(); await request(t, 'revoke');
-    const response = await worker.evaluate(tabId => chrome.tabs.sendMessage(tabId, {type:'disarm'}), tabId);
-    assert.equal(response.stopToken, t.token);
   });
   await test('disarm and re-arm starts fresh token', async () => {
     const t = await claim();

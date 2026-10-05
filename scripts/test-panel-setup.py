@@ -11,7 +11,13 @@ spec.loader.exec_module(panel)
 
 class PanelSetupTests(unittest.TestCase):
     def test_supported_fresh_install_can_be_enabled(self):
-        self.assertEqual(panel.classify('46.0', True, {}, False, False)['canEnable'], True)
+        for version in ['46.0', '48.7', '50.1', '50.5']:
+            self.assertEqual(panel.classify(version, True, {}, False, False)['canEnable'], True, version)
+
+    def test_supported_majors_match_the_companion_metadata(self):
+        import json
+        metadata = json.loads((ROOT / 'integrations/gnome' / panel.UUID / 'metadata.json').read_text())
+        self.assertEqual(tuple(metadata['shell-version']), panel.SUPPORTED_SHELLS)
 
     def test_saved_activation_is_not_claimed_as_active_until_shell_loads_it(self):
         self.assertEqual(panel.classify('46.0', True, {}, True, False)['status'], 'restart')
@@ -34,7 +40,7 @@ class PanelSetupTests(unittest.TestCase):
 
     def test_global_policy_and_unsupported_shell_are_preserved(self):
         self.assertEqual(panel.classify('46.0', True, {'state': 1}, True, True)['status'], 'blocked')
-        for version in ['45.9', '47.0', '50.0']:
+        for version in ['45.9', '47.0', '49.2', '51.0']:
             status = panel.classify(version, True, {}, False, False)
             self.assertEqual(status['status'], 'unsupported')
             self.assertFalse(status['canEnable'])
@@ -43,11 +49,17 @@ class PanelSetupTests(unittest.TestCase):
 
     def test_debian_maps_every_runtime_extension_file(self):
         import json
+        import subprocess
+        source = f'integrations/gnome/{panel.UUID}/'
+        tracked = subprocess.check_output(['git', 'ls-files', '-z', '--', source], cwd=ROOT).decode()
+        self.assertEqual(sorted(name.removeprefix(source) for name in tracked.split('\0') if name), sorted(panel.FILES))
         config = json.loads((ROOT / 'apps/desktop/src-tauri/tauri.conf.json').read_text())
         files = config['bundle']['linux']['deb']['files']
-        for name in ['extension.js', 'metadata.json', 'model.js', 'stylesheet.css', 'voco-symbol.png']:
-            target = f'/usr/share/gnome-shell/extensions/{panel.UUID}/{name}'
-            self.assertEqual((ROOT / 'apps/desktop/src-tauri' / files[target]).resolve(),
+        installed = f'/usr/share/gnome-shell/extensions/{panel.UUID}/'
+        self.assertEqual(sorted(target.removeprefix(installed) for target in files if target.startswith(installed)),
+                         sorted(panel.FILES))
+        for name in panel.FILES:
+            self.assertEqual((ROOT / 'apps/desktop/src-tauri' / files[installed + name]).resolve(),
                              ROOT / 'integrations/gnome' / panel.UUID / name)
 
 

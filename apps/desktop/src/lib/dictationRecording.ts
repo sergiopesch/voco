@@ -12,7 +12,6 @@ import {
   type CaptureSelection,
 } from "@/lib/captureDescriptor";
 import { monitorCaptureHealth } from "@/lib/captureHealth";
-import type { CursorDeliveryEvent } from "@/lib/dictationDelivery";
 import { errorMessage,sentence } from "@/lib/dictationRecovery";
 import {
   consumeQueuedStop,
@@ -23,25 +22,17 @@ import {
   startSession,
   type DictationSessionState,
 } from "@/lib/dictationSession";
+import { isBrowserTrigger } from "@/lib/dictationTrigger";
 import { beginNativeCapture,type NativeCaptureSession } from "@/lib/nativeCapture";
 import type { HotkeyTraceFields,pasteDesktopText } from "@/lib/tauri";
 import type { useStore as appStore } from "@/store/useStore";
-import type { DesktopPasteStatus,DictationStatus } from "@/types";
+import type { CursorDeliveryState,DesktopPasteStatus,DictationStatus } from "@/types";
 import { BrowserStreamDelivery } from "./browserStreamDelivery";
-
-export type Ref<T> = { current: T };
+import type { Ref } from "./desktopCaptureTail";
 
 /** Unverified capture is never typed; Stop explains that with this sentence. */
 const UNVERIFIED_CAPTURE_REASON = "VOCO couldn't confirm it received all of your audio, so it didn't type this recording. Try again.";
 
-export type DictationRecordingPhase =
-  | "idle"
-  | "starting"
-  | "recording"
-  | "stopping"
-  | "processing"
-  | "finalizing"
-  | "error";
 type CaptureAdmission = "pending" | "automatic" | "manual-review";
 
 /**
@@ -50,7 +41,6 @@ type CaptureAdmission = "pending" | "automatic" | "manual-review";
  * that read .current.
  */
 export interface DictationRecordingEnv {
-  phaseRef: Ref<DictationRecordingPhase | string>;
   sessionRef: Ref<DictationSessionState>;
   disposedRef: Ref<boolean>;
   cancelledRef: Ref<string | null>;
@@ -63,17 +53,11 @@ export interface DictationRecordingEnv {
   } | null>;
   desktopPasteSessionRef: Ref<boolean>;
   desktopStreamedSampleCountRef: Ref<number>;
-  desktopPhrasePasteCountRef: Ref<number>;
   activeTriggerIdRef: Ref<string | undefined>;
-  recoverySessionIdRef: Ref<string | null>;
   nativeCaptureRef: Ref<NativeCaptureSession | null>;
   captureDescriptorRef: Ref<CaptureDescriptor | null>;
   captureSelectionRef: Ref<(() => CaptureSelection) | undefined>;
-  captureGenerationRef: Ref<number>;
-  recordingStartedAtMsRef: Ref<number | null>;
-  stopRequestedAtMsRef: Ref<number | null>;
   firstHotkeyPressMsRef: Ref<number | null>;
-  initialHotkeyLatencyLoggedRef: Ref<boolean>;
   debugNativeCaptureEnabledRef: Ref<boolean>;
   audioBufferRef: Ref<AudioCaptureBuffer>;
   lifecycleEpochRef: Ref<number>;
@@ -92,8 +76,6 @@ export interface DictationRecordingEnv {
   copyDesktopText: (text: string) => Promise<void>;
   traceDictationEvent: (event: string, fields?: HotkeyTraceFields | null) => Promise<void>;
   showNotification: (title: string, body: string) => Promise<void>;
-  setCancellationPending: (value: boolean) => void;
-  setCanCancel: (value: boolean) => void;
   setStatus: (status: DictationStatus) => void;
   setTranscript: (text: string) => void;
   setError: (error: string | null) => void;
@@ -102,7 +84,7 @@ export interface DictationRecordingEnv {
   resetAudioLevel: () => void;
   updateAudioLevel: (level: number) => void;
   clearCapturedAudio: () => void;
-  transitionCursorDelivery: (event: CursorDeliveryEvent) => void;
+  setCursorDelivery: (state: CursorDeliveryState) => void;
   recordingSampleRate: () => number;
   appendRecordingSamples: (samples: Float32Array) => number;
   enqueueDesktopPhrase: (end: number) => void;
@@ -113,6 +95,8 @@ export interface DictationRecordingEnv {
   connectWorklet: (audioContext: AudioContext, source: MediaStreamAudioSourceNode) => Promise<boolean>;
   connectScriptProcessor: (audioContext: AudioContext, source: MediaStreamAudioSourceNode) => void;
   traceDesktopPasteMetrics: (result: Awaited<ReturnType<typeof pasteDesktopText>>) => void;
+  /** False only once Rust reports that the performance log is off. */
+  performanceLogMayBeOn: () => boolean;
   debugNativeCaptureEnabled: () => Promise<boolean>;
   beginNativeCapture: typeof beginNativeCapture;
   releaseBrowserRecording: (triggerId: string) => Promise<void>;
@@ -120,7 +104,6 @@ export interface DictationRecordingEnv {
 
 export function createDictationRecording(env: DictationRecordingEnv) {
   const {
-    phaseRef,
     sessionRef,
     disposedRef,
     cancelledRef,
@@ -128,17 +111,11 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     dictationStreamRef,
     desktopPasteSessionRef,
     desktopStreamedSampleCountRef,
-    desktopPhrasePasteCountRef,
     activeTriggerIdRef,
-    recoverySessionIdRef,
     nativeCaptureRef,
     captureDescriptorRef,
     captureSelectionRef,
-    captureGenerationRef,
-    recordingStartedAtMsRef,
-    stopRequestedAtMsRef,
     firstHotkeyPressMsRef,
-    initialHotkeyLatencyLoggedRef,
     debugNativeCaptureEnabledRef,
     audioBufferRef,
     lifecycleEpochRef,
@@ -156,8 +133,6 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     copyDesktopText,
     traceDictationEvent,
     showNotification,
-    setCancellationPending,
-    setCanCancel,
     setStatus,
     setTranscript,
     setError,
@@ -166,7 +141,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     resetAudioLevel,
     updateAudioLevel,
     clearCapturedAudio,
-    transitionCursorDelivery,
+    setCursorDelivery,
     recordingSampleRate,
     appendRecordingSamples,
     enqueueDesktopPhrase,
@@ -177,6 +152,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     connectWorklet,
     connectScriptProcessor,
     traceDesktopPasteMetrics,
+    performanceLogMayBeOn,
     debugNativeCaptureEnabled,
     beginNativeCapture,
     releaseBrowserRecording,
@@ -187,6 +163,11 @@ export function createDictationRecording(env: DictationRecordingEnv) {
   let interruptionNotifiedSession: number | null = null;
   let journal: CrashJournal | null = null;
   let journalCleanup: Promise<void> = Promise.resolve();
+  // Start, Stop and the stream callbacks share these across recordings.
+  let captureGeneration = 0;
+  let recordingStartedAtMs: number | null = null;
+  let stopRequestedAtMs: number | null = null;
+  let initialHotkeyLatencyLogged = false;
   async function finishJournal() {
     const owned = journal;
     if (owned) journalCleanup = owned.finish().finally(() => {
@@ -214,7 +195,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
   }
 
   function releaseRecordingOrigin(triggerId = activeTriggerIdRef.current) {
-    if (!triggerId?.startsWith("browser:")) return;
+    if (!isBrowserTrigger(triggerId)) return;
     if (activeTriggerIdRef.current === triggerId) activeTriggerIdRef.current = undefined;
     void releaseBrowserRecording(triggerId).catch(() => {});
   }
@@ -229,6 +210,8 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       // slot keeps the reason.
       const alreadyNotified = interruptionNotifiedSession === sessionRef.current.sessionId;
       interruptionNotifiedSession = null;
+      // Typed text is part of the transcript: without one nothing is missing.
+      const typedNothing = !current.transcript;
       const native = nativeCaptureRef.current;
       nativeCaptureRef.current = null;
       void native?.cancel().catch(() => {});
@@ -238,17 +221,15 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       current.setRecovery(null);
       current.setCaptureNotice(null);
       current.setSurface("hidden");
-      phaseRef.current = "idle";
       sessionRef.current = finishSessionIdle(sessionRef.current);
-      setCanCancel(false);
-      setCancellationPending(false);
       setStatus("idle");
       setError(reason);
-      transitionCursorDelivery("session-idle");
+      setCursorDelivery("inactive");
       traceDictationEvent("dictation_interrupted").catch(() => {});
       const body = reason === new CrashJournalCleanupError().message ? reason
         : alreadyNotified ? null
         : reason === UNVERIFIED_CAPTURE_REASON ? reason
+        : typedNothing ? `Nothing was typed. ${sentence(reason)}`
         : "Some words may be missing. Check your text field before starting again.";
       if (body) void showNotification("Dictation interrupted", body).catch(() => {});
       return;
@@ -260,10 +241,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     // Nothing retries a failed voice test's audio; Test again records anew.
     clearCapturedAudio();
     useStore.getState().setRecovery({ reason });
-    phaseRef.current = "error";
     sessionRef.current = failSession(sessionRef.current);
-    setCanCancel(false);
-    setCancellationPending(false);
     setStatus("error");
     setError(reason);
     useStore.getState().setSurface("onboarding");
@@ -279,27 +257,23 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       clearTranscript();
     }
     releaseRecordingOrigin();
-    setCanCancel(false);
-    setCancellationPending(false);
     nativeCaptureRef.current = null;
     clearCapturedAudio();
-    const stopRequestedAtMs = stopRequestedAtMsRef.current;
     if (stopRequestedAtMs !== null) {
       traceDictationEvent("dictation_stop_to_idle", {
         durationMs: Math.round(performance.now() - stopRequestedAtMs),
       }).catch(() => {});
-      stopRequestedAtMsRef.current = null;
+      stopRequestedAtMs = null;
     }
 
     sessionRef.current = finishSessionIdle(sessionRef.current);
     activeTriggerIdRef.current = undefined;
-    phaseRef.current = "idle";
     setStatus("idle");
-    transitionCursorDelivery("session-idle");
+    setCursorDelivery("inactive");
   }
 
   async function startRecording(triggerId?: string) {
-    const phase = phaseRef.current;
+    const phase = sessionRef.current.phase;
     if (phase !== "idle" && phase !== "error") {
       return;
     }
@@ -317,25 +291,20 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     void browserDeliveryRef.current?.cancel();
     browserDeliveryRef.current = null;
     desktopStreamedSampleCountRef.current = 0;
-    desktopPhrasePasteCountRef.current = 0;
     cancelledRef.current = null;
-    setCancellationPending(false);
-    setCanCancel(true);
     sessionRef.current = startSession(sessionRef.current);
     const startingSessionId = sessionRef.current.sessionId;
-    recoverySessionIdRef.current = crypto.randomUUID();
-    phaseRef.current = "starting";
     traceDictationEvent("recording_state_requested").catch(() => {});
     let nativeAttempt: { generation: number; selectionToken: string } | null = null;
     let webkitCaptureAttempted = false;
     let destinationSetupFailure = false;
     const invalidateNativeSelection = () => {
       if (!nativeAttempt || !isCurrentSession(startingSessionId) ||
-          captureGenerationRef.current !== nativeAttempt.generation) return;
+          captureGeneration !== nativeAttempt.generation) return;
       const state = useStore.getState();
       if (state.captureBackendMode === "native" &&
           state.nativeCaptureSource?.selectionToken === nativeAttempt.selectionToken) {
-        state.setNativeCaptureSource?.(null);
+        state.loseNativeCaptureSource?.();
       }
     };
 
@@ -345,7 +314,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       // never blocks a new dictation.
       await finishJournal().catch(() => { journal = null; });
       assertOutputAllowed(startingSessionId);
-      if (!onboardingTest && !triggerId?.startsWith("browser:") && useStore.getState().config) {
+      if (!onboardingTest && !isBrowserTrigger(triggerId) && useStore.getState().config) {
         const paste = await getDesktopPasteStatus();
         assertOutputAllowed(startingSessionId);
         // The only desktop prerequisites; each paste goes to whatever has focus.
@@ -366,7 +335,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
         desktopPasteSessionRef.current = true;
         traceDictationEvent("dictation_desktop_paste_session_started").catch(() => {});
       }
-      if (!onboardingTest && !triggerId?.startsWith("browser:") && !desktopPasteSessionRef.current) {
+      if (!onboardingTest && !isBrowserTrigger(triggerId) && !desktopPasteSessionRef.current) {
         destinationSetupFailure = true;
         throw new Error("Desktop dictation is unavailable. Complete desktop input setup before recording.");
       }
@@ -380,23 +349,23 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       }
       resetAudioLevel();
       clearCapturedAudio();
-      recordingStartedAtMsRef.current = null;
-      stopRequestedAtMsRef.current = null;
-      transitionCursorDelivery("session-reset");
-      captureGenerationRef.current += 1;
-      const generation = captureGenerationRef.current;
+      recordingStartedAtMs = null;
+      stopRequestedAtMs = null;
+      setCursorDelivery("inactive");
+      captureGeneration += 1;
+      const generation = captureGeneration;
       let audioContext: AudioContext | null = null;
       debugNativeCaptureEnabledRef.current = false;
       // Field admission must not start capture or revoke an approved microphone.
-      if (triggerId?.startsWith("browser:")) {
+      if (isBrowserTrigger(triggerId)) {
         const delivery = new BrowserStreamDelivery(() => isCurrentSession(startingSessionId) && !cancelledRef.current);
         browserDeliveryRef.current = delivery;
         await delivery.start(startingSessionId, triggerId);
         assertOutputAllowed(startingSessionId);
-        transitionCursorDelivery("ownership-established");
+        setCursorDelivery("owned");
       }
       if (!onboardingTest) {
-        const owned = new CrashJournal(recoverySessionIdRef.current!);
+        const owned = new CrashJournal(crypto.randomUUID());
         journal = owned;
         const opened = await owned.begin().then(() => true, () => false);
         assertOutputAllowed(startingSessionId);
@@ -423,7 +392,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
           },
           onInterrupted: (reason) => {
             invalidateNativeSelection();
-            if (isCurrentSession(startingSessionId) && captureGenerationRef.current === generation) {
+            if (isCurrentSession(startingSessionId) && captureGeneration === generation) {
               void cancelRecording(reason);
             }
           },
@@ -473,12 +442,12 @@ export function createDictationRecording(env: DictationRecordingEnv) {
         streamRef.current = stream;
         setMicrophoneReadyState(true);
         console.info("Recording started");
-        recordingStartedAtMsRef.current = performance.now();
+        recordingStartedAtMs = performance.now();
         if (
           firstHotkeyPressMsRef.current !== null &&
-          !initialHotkeyLatencyLoggedRef.current
+          !initialHotkeyLatencyLogged
         ) {
-          initialHotkeyLatencyLoggedRef.current = true;
+          initialHotkeyLatencyLogged = true;
           console.info(
             `[timing] first hotkey press -> recording starts: ${Math.round(
               performance.now() - firstHotkeyPressMsRef.current,
@@ -518,11 +487,10 @@ export function createDictationRecording(env: DictationRecordingEnv) {
         });
       } else {
         setMicrophoneReadyState(true);
-        recordingStartedAtMsRef.current = performance.now();
+        recordingStartedAtMs = performance.now();
       }
 
       sessionRef.current = markRecording(sessionRef.current);
-      phaseRef.current = "recording";
       if (captureAdmission === "automatic") {
         const rate = recordingSampleRate();
         let firstPhraseDispatched = false;
@@ -532,12 +500,10 @@ export function createDictationRecording(env: DictationRecordingEnv) {
           if (onboardingTest) return;
           const browser = browserDeliveryRef.current;
           if (browser) {
-            desktopPhrasePasteCountRef.current++;
             await browser.append(text);
             return;
           }
           const started = performance.now();
-          desktopPhrasePasteCountRef.current++;
           traceDictationEvent("dictation_desktop_paste_requested").catch(() => {});
           const result = await pasteDesktopText(text, correlation);
           if (result.outcome !== "dispatched") throw new Error("Desktop phrase paste was not dispatched.");
@@ -546,9 +512,9 @@ export function createDictationRecording(env: DictationRecordingEnv) {
           if (!isCurrentSession(startingSessionId) || cancelledRef.current) return;
           traceDesktopPasteMetrics(result);
           traceDictationEvent("dictation_desktop_paste_dispatched", { durationMs: Math.round(performance.now() - started) }).catch(() => {});
-          if (!firstPhraseDispatched && recordingStartedAtMsRef.current !== null) {
+          if (!firstPhraseDispatched && recordingStartedAtMs !== null) {
             firstPhraseDispatched = true;
-            traceDictationEvent("dictation_desktop_first_phrase_dispatched", { durationMs: Math.round(performance.now() - recordingStartedAtMsRef.current) }).catch(() => {});
+            traceDictationEvent("dictation_desktop_first_phrase_dispatched", { durationMs: Math.round(performance.now() - recordingStartedAtMs) }).catch(() => {});
           }
         }, (text) => {
           if (!isCurrentSession(startingSessionId)) return;
@@ -558,7 +524,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
           if (!isCurrentSession(startingSessionId) || cancelledRef.current) return;
           traceDictationEvent("dictation_desktop_stream_failed").catch(() => {});
           if (onboardingTest) setError(`Voice test paused: ${sentence(error.message)} Finish test, then try again.`);
-          else if (phaseRef.current === "recording") {
+          else if (sessionRef.current.phase === "recording") {
             // A delivery failure stops typing; healthy recognition runs through Stop.
             if (kind === "recognition") interruptionNotifiedSession = startingSessionId;
             void (kind === "delivery"
@@ -571,7 +537,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
             : event === "deferred" ? "dictation_desktop_paste_deferred"
             : `dictation_desktop_snapshot_${event}`;
           traceDictationEvent(name, durationMs === undefined ? null : { durationMs }).catch(() => {});
-        }, startingSessionId, !onboardingTest);
+        }, startingSessionId, !onboardingTest && performanceLogMayBeOn());
         // Audio can arrive while the worklet is starting. Keep planner offsets
         // aligned with the complete retained source, including that prefix.
         const prefix = collectAudioSamplesRange(audioBufferRef.current, 0, audioBufferRef.current.sampleCount);
@@ -595,8 +561,6 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       void browserDeliveryRef.current?.cancel();
       if (!isCurrentSession(startingSessionId)) return;
       releaseRecordingOrigin(triggerId);
-      setCanCancel(false);
-      setCancellationPending(false);
       // Invalidate a failed WebKit capture before retained audio takes the
       // recovery path. Cancellation and pre-capture destination rejection do
       // not revoke readiness; native selection invalidation is guarded above.
@@ -629,7 +593,6 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       }
       setStatus("error");
       sessionRef.current = failSession(sessionRef.current);
-      phaseRef.current = "error";
       showNotification(
         startFailureTitle,
         errorMessage(err),
@@ -652,17 +615,16 @@ export function createDictationRecording(env: DictationRecordingEnv) {
   }
 
   async function stopRecording() {
-    if (phaseRef.current !== "recording") return;
+    if (sessionRef.current.phase !== "recording") return;
     const stoppingSessionId = sessionRef.current.sessionId;
-    phaseRef.current = "stopping";
+    sessionRef.current = requestSessionStop(sessionRef.current);
     traceDictationEvent("dictation_recording_stopped").catch(() => {});
-    stopRequestedAtMsRef.current = performance.now();
-    if (recordingStartedAtMsRef.current !== null) {
+    stopRequestedAtMs = performance.now();
+    if (recordingStartedAtMs !== null) {
       traceDictationEvent("dictation_recording_duration", {
-        durationMs: Math.round(stopRequestedAtMsRef.current - recordingStartedAtMsRef.current),
+        durationMs: Math.round(stopRequestedAtMs - recordingStartedAtMs),
       }).catch(() => {});
     }
-    sessionRef.current = requestSessionStop(sessionRef.current);
     setStatus("processing");
     try {
       try {
@@ -700,13 +662,12 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       assertOutputAllowed(stoppingSessionId);
       const browser = browserDeliveryRef.current;
       browserDeliveryRef.current = null;
-      // A browser field that stopped taking text is handled like a failed
-      // paste: its lease is released and the rest is copied below.
-      if (undelivered) void browser?.cancel();
-      else await browser?.finish();
-      assertOutputAllowed(stoppingSessionId);
+      // Every append already had its exact receipt, so Stop only releases the
+      // lease, as a desktop paste is never checked again. A field that stopped
+      // taking text is handled like a failed paste: the rest is copied below.
+      void browser?.cancel();
       traceDictationEvent("dictation_desktop_stream_flush_completed", { durationMs: Math.round(performance.now() - started) }).catch(() => {});
-      if (stopRequestedAtMsRef.current !== null) traceDictationEvent("dictation_stop_to_final_transcript", { durationMs: Math.round(performance.now() - stopRequestedAtMsRef.current) }).catch(() => {});
+      if (stopRequestedAtMs !== null) traceDictationEvent("dictation_stop_to_final_transcript", { durationMs: Math.round(performance.now() - stopRequestedAtMs) }).catch(() => {});
       dictationStreamRef.current = null;
       if (undelivered.trim() && (desktopPasteSessionRef.current || browser)) {
         // Text the app did not take (or may not have taken) is never replayed;
@@ -748,19 +709,18 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     }
   }
 
-  async function cancelRecording(reason = "Recording cancelled.") {
-    if (phaseRef.current === "idle" || phaseRef.current === "error" || phaseRef.current === "finalizing" || cancelledRef.current) return;
+  async function cancelRecording(reason: string) {
+    const { phase } = sessionRef.current;
+    if (phase === "idle" || phase === "error" || cancelledRef.current) return;
     cancelledRef.current = reason;
     // The session now ends without the Stop a live notice asked for, so the
     // interruption still notifies.
     if (interruptionNotifiedSession === sessionRef.current.sessionId) interruptionNotifiedSession = null;
     dictationStreamRef.current?.cancel();
     void browserDeliveryRef.current?.cancel();
-    setCancellationPending(true);
-    setCanCancel(false);
     captureHealthRef.current?.dispose();
     captureHealthRef.current = null;
-    if (phaseRef.current === "recording") {
+    if (sessionRef.current.phase === "recording") {
       await stopRecording();
     }
   }
@@ -772,7 +732,6 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     void browserDeliveryRef.current?.cancel();
     releaseRecordingOrigin();
     lifecycleEpochRef.current += 1;
-    phaseRef.current = "idle";
     sessionRef.current = {
       ...finishSessionIdle(sessionRef.current),
       sessionId: sessionRef.current.sessionId + 1,

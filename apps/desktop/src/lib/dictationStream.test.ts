@@ -212,7 +212,9 @@ describe('privacy-preserving delivery attribution', () => {
   const requested=events.find(e=>e.event==='delivery_requested');
   expect(paste).toHaveBeenCalledWith('Private_SENTINEL é😀', {session:requested.session,dictationSessionId:17,deliverySeq:1,hypothesisSeq:1});
   const terminal=events.filter(e=>e.event==='terminal');expect(terminal).toHaveLength(1);
-  expect(terminal[0]).toMatchObject({outcome:'finished',accepted_equals_dispatched:true,captured_samples:327,enqueued_samples:327,responded_samples:327,buffered_samples:0,dispatched_count:1,destination_content_observation:'unavailable'});
+  expect(terminal[0]).toMatchObject({outcome:'finished',accepted_equals_dispatched:true,captured_samples:327,enqueued_samples:327,responded_samples:327,buffered_samples:0,dispatched_count:1});
+  // Rust records that a desktop paste never observes the field's content.
+  expect(events.some(e=>'destination_content_observation' in e)).toBe(false);
   expect(JSON.stringify(events)).not.toContain('Private_SENTINEL');
   expect(events.every(e=>e.session===requested.session)).toBe(true);
  });
@@ -230,8 +232,8 @@ describe('privacy-preserving delivery attribution', () => {
   worker.mockImplementation(async (_c,{request:r})=>({...r,mode:'append-only',text:r.op==='start'?null:'secret_SENTINEL'}));
   const queue=new DictationStream(async()=>{throw new Error('secret_SENTINEL /private/path window title');},vi.fn(),vi.fn(),vi.fn());
   queue.pushAudio(new Float32Array(1600),16000);await expect(queue.finish()).resolves.toEqual({undelivered:'secret_SENTINEL',uncertain:true});
-  expect(quality().find(e=>e.event==='delivery_failed')).toMatchObject({delivery_seq:1,outcome:'uncertain',destination_content_observation:'unavailable'});
-  expect(quality()[quality().length-1]).toMatchObject({outcome:'failed',failed_delivery_seq:1,pending_delivery_count:0,dispatched_count:0,accepted_equals_dispatched:false,destination_content_observation:'unavailable'});
+  expect(quality().find(e=>e.event==='delivery_failed')).toMatchObject({delivery_seq:1,outcome:'uncertain'});
+  expect(quality()[quality().length-1]).toMatchObject({outcome:'failed',failed_delivery_seq:1,pending_delivery_count:0,dispatched_count:0,accepted_equals_dispatched:false});
   expect(JSON.stringify(quality())).not.toContain('SENTINEL');
  });
  it('keeps diagnostics rejection independent of successful dictation', async () => {
@@ -283,7 +285,7 @@ describe('exact suffix preservation with attributed diagnostics', () => {
   const queue=new DictationStream(paste,vi.fn(),vi.fn(),vi.fn());queue.pushAudio(new Float32Array(1600),16000);
   await vi.waitFor(()=>expect(release).toBeDefined());queue.cancel();
   expect(quality().some(e=>e.event==='terminal')).toBe(false);release();await queue.finish();
-  expect(quality()[quality().length-1]).toMatchObject({outcome:'cancelled',dispatched_count:1,destination_content_observation:'unavailable'});
+  expect(quality()[quality().length-1]).toMatchObject({outcome:'cancelled',dispatched_count:1});
  });
 });
 

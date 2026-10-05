@@ -3,9 +3,10 @@
 #
 # Hosted CI tests a release build of every master commit, but it never packages
 # the NVIDIA runtime or holds the signing key. This script packages the commit of
-# a signed voco.<version> tag once CI has passed for it on master, verifies the
-# package, writes the release records and checksum manifests, and signs the
-# manifests. It uploads nothing; it ends by printing the publishing commands.
+# a signed voco.<version> tag once CI has passed for it on master, as a Debian
+# package and a Fedora RPM built from the same staged tree, verifies both,
+# writes the release records and checksum manifests, and signs the manifests.
+# It uploads nothing; it ends by printing the publishing commands.
 #
 # Usage: bash scripts/assemble-release.sh OUTPUT_DIR
 set -euo pipefail
@@ -27,7 +28,7 @@ step() {
 [[ $# -eq 1 ]] || { echo "Usage: $0 OUTPUT_DIR" >&2; exit 2; }
 [[ "$(uname -s)/$(uname -m)" == Linux/x86_64 ]] || fail "Releases are assembled on x86-64 Linux."
 for command in git gpg gpgv node npm cargo python3 dpkg dpkg-deb sha256sum base64 realpath readelf \
-  desktop-file-validate appstreamcli; do
+  desktop-file-validate appstreamcli rpm rpmbuild rpm2cpio cpio; do
   command -v "${command}" >/dev/null 2>&1 || fail "Missing required command: ${command}"
 done
 
@@ -44,6 +45,7 @@ VERSION="$(node -p "require('./package.json').version")"
 TAG="voco.${VERSION}"
 COMMIT="$(git rev-parse HEAD)"
 DEB="voco_${VERSION}_amd64.deb"
+RPM="voco-${VERSION}-1.x86_64.rpm"
 
 step "Checking ${TAG} at ${COMMIT}"
 [[ -z "$(git status --porcelain --untracked-files=normal)" ]] \
@@ -133,9 +135,13 @@ shopt -u nullglob
 
 step "Packaging the speech runtime"
 mv -- "${base_packages[0]}" "${WORK}/base.deb"
-python3 scripts/package-nvidia.py "${WORK}/base.deb" "${ASSETS}/${DEB}"
+python3 scripts/package-nvidia.py "${WORK}/base.deb" "${ASSETS}/${DEB}" --rpm "${ASSETS}/${RPM}"
 bash scripts/verify-deb-package.sh "${ASSETS}/${DEB}" "${VERSION}"
+# With the .deb as its third argument, the RPM verifier also proves that both
+# packages carry the same files and dependencies.
+bash scripts/verify-rpm-package.sh "${ASSETS}/${RPM}" "${VERSION}" "${ASSETS}/${DEB}"
 ln -- "${ASSETS}/${DEB}" "${ASSETS}/voco_latest_amd64.deb"
+ln -- "${ASSETS}/${RPM}" "${ASSETS}/voco_latest_x86_64.rpm"
 
 step "Running the packaged speech worker"
 dpkg-deb -x "${ASSETS}/${DEB}" "${WORK}/package"
@@ -171,15 +177,17 @@ def output(*command):
 
 
 deb = assets / f"voco_{version}_amd64.deb"
+rpm = assets / f"voco-{version}-1.x86_64.rpm"
 common = {
     "version": version,
     "repository": f"https://github.com/{repository}",
     "releaseTag": tag,
     "releaseCommit": commit,
     "packageSha256": digest(deb),
+    "rpmPackageSha256": digest(rpm),
     "publisherKeyFingerprint": fingerprint,
 }
-payload = ["usr/bin/voco", "usr/libexec/voco-browser-host", "usr/libexec/voco/ydotool-legacy/ydotoold",
+payload = ["usr/bin/voco", "usr/libexec/voco-browser-host", "usr/lib/udev/rules.d/70-voco-uinput.rules",
            "usr/lib/voco/speech/MANIFEST.json",
            "usr/share/gnome-shell/extensions/voco-panel@voco.local/extension.js",
            "usr/share/gnome-shell/extensions/voco-panel@voco.local/metadata.json"]
@@ -189,6 +197,8 @@ provenance = {
     "sourceArchiveSha256": digest(assets / f"voco_{version}_source.tar.gz"),
     "installerSha256": digest(assets / "install"),
     "packageBytes": deb.stat().st_size,
+    "rpmPackageBytes": rpm.stat().st_size,
+    # Both packages carry these exact files; the RPM verifier checked that.
     "payloadSha256": {path: digest(package / path) for path in payload},
     "buildEnvironment": {
         "os": platform.freedesktop_os_release()["PRETTY_NAME"],
@@ -197,6 +207,7 @@ provenance = {
         "rust": output("rustc", "--version"),
         "tauriCli": output("cargo", "tauri", "--version"),
         "dpkg": output("dpkg-deb", "--version"),
+        "rpmbuild": output("rpmbuild", "--version"),
     },
     "assembledOn": time.strftime("%Y-%m-%d", time.gmtime()),
 }
@@ -210,6 +221,7 @@ validation = {
         "signedTag": "passed",
         "versionConsistency": "passed",
         "packageVerifier": "passed",
+        "rpmPackageVerifier": "passed",
         "packagedWorkerProtocol": {"outcome": "passed", "checks": len(worker)},
     },
     "limits": [
@@ -218,6 +230,8 @@ validation = {
         "same commit on the maintainer's computer, so they are not byte-identical to the ones CI ran.",
         "Physical microphones, default PipeWire setups, other desktops and compositors, and "
         "applications beyond the tested fields are not covered.",
+        "The RPM was checked on the Ubuntu build computer with rpm and against the Debian package's "
+        "files; installing it with dnf on Fedora is not part of this record.",
         "Installation from the published release happens after signing and is not part of this record.",
     ],
 }
@@ -230,15 +244,20 @@ step "Writing and signing the checksum manifests"
   cd "${ASSETS}"
   sha256sum "${DEB}" > "voco_${VERSION}_debian_checksums.txt"
   sha256sum voco_latest_amd64.deb > voco_latest_checksums.txt
+  sha256sum "${RPM}" > "voco_${VERSION}_rpm_checksums.txt"
+  sha256sum voco_latest_x86_64.rpm > voco_latest_rpm_checksums.txt
   sha256sum "voco_${VERSION}_source.tar.gz" > "voco_${VERSION}_source_checksums.txt"
   sha256sum install KEYS voco-panel@voco.local.shell-extension.zip "${DEB}" voco_latest_amd64.deb \
+    "${RPM}" voco_latest_x86_64.rpm \
     "voco_${VERSION}_source.tar.gz" "voco_${VERSION}_provenance.json" "voco_${VERSION}_validation.json" \
-    "voco_${VERSION}_debian_checksums.txt" voco_latest_checksums.txt "voco_${VERSION}_source_checksums.txt" \
+    "voco_${VERSION}_debian_checksums.txt" voco_latest_checksums.txt \
+    "voco_${VERSION}_rpm_checksums.txt" voco_latest_rpm_checksums.txt "voco_${VERSION}_source_checksums.txt" \
     > "voco_${VERSION}_checksums.txt"
   cp "voco_${VERSION}_checksums.txt" voco_checksums.txt
 )
 MANIFESTS=("voco_${VERSION}_checksums.txt" voco_checksums.txt "voco_${VERSION}_debian_checksums.txt"
-  voco_latest_checksums.txt "voco_${VERSION}_source_checksums.txt")
+  voco_latest_checksums.txt "voco_${VERSION}_rpm_checksums.txt" voco_latest_rpm_checksums.txt
+  "voco_${VERSION}_source_checksums.txt")
 GPG_KEY_FINGERPRINT="${FINGERPRINT}" bash scripts/sign-release-checksums.sh "${MANIFESTS[@]/#/${ASSETS}/}"
 for manifest in "${MANIFESTS[@]}"; do
   bash scripts/verify-release.sh --keys KEYS "${ASSETS}/${manifest}" >/dev/null \
@@ -261,9 +280,12 @@ cat <<EOF_NEXT
 
 VOCO ${VERSION} is assembled and signed in ${OUT}. Nothing has been uploaded.
 Package SHA-256: $(sha256sum "${OUT}/assets/${DEB}" | cut -d' ' -f1)
+RPM SHA-256:     $(sha256sum "${OUT}/assets/${RPM}" | cut -d' ' -f1)
 
 1. Try the package on this computer:
      sudo apt install ${OUT}/assets/${DEB}
+   and the RPM on a Fedora 44 computer:
+     sudo dnf install ./${RPM}
 2. Push the tag and create a draft release:
      git push origin ${TAG}
      gh release create ${TAG} --draft --verify-tag --title "VOCO ${VERSION}" \\

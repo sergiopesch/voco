@@ -14,14 +14,13 @@ use std::path::{Component, Path, PathBuf};
 const MAX_FILE_BYTES: u64 = 144 * 1024 * 1024;
 const MAX_BUNDLE_BYTES: u64 = 384 * 1024 * 1024;
 const MAX_METADATA_BYTES: usize = 1024 * 1024;
-const FILE_NAMES: &[&str] = &[
+const NATIVE_FILES: &[&str] = &[
     "descriptor.json",
     "journal.json",
     "packets.bin",
     "raw.s16le",
-    "source.f32le",
-    "renderer.json",
 ];
+const RENDERER_FILES: &[&str] = &["source.f32le", "renderer.json"];
 
 fn error(context: &str) -> String {
     format!("{context}: {}", std::io::Error::last_os_error())
@@ -53,7 +52,7 @@ fn directory_at(parent: &File, component: &CString, create: bool) -> Result<File
 
 fn check_directory(file: &File, private: bool, allow_root: bool) -> Result<(), String> {
     let metadata = file.metadata().map_err(|e| e.to_string())?;
-    let uid = unsafe { libc::geteuid() };
+    let uid = crate::browser_socket::effective_uid();
     if !metadata.is_dir()
         || (metadata.uid() != uid && !(allow_root && metadata.uid() == 0))
         || metadata.mode() & 0o022 != 0
@@ -128,7 +127,7 @@ fn nonce() -> Result<String, String> {
 fn verify_file(file: &File, directory: &File, filename: &str) -> Result<(), String> {
     let metadata = file.metadata().map_err(|e| e.to_string())?;
     if !metadata.is_file()
-        || metadata.uid() != unsafe { libc::geteuid() }
+        || metadata.uid() != crate::browser_socket::effective_uid()
         || metadata.mode() & 0o777 != 0o600
         || metadata.nlink() != 1
     {
@@ -156,6 +155,7 @@ fn verify_file(file: &File, directory: &File, filename: &str) -> Result<(), Stri
 
 pub struct BundleWriter {
     directory: File,
+    allowed: &'static [&'static str],
     files: Map<String, Value>,
     total_bytes: u64,
     failed: bool,
@@ -203,7 +203,7 @@ impl BundleWriter {
         filename: &str,
         chunks: impl IntoIterator<Item = &'a [u8]>,
     ) -> Result<(), String> {
-        if !FILE_NAMES.contains(&filename) || self.files.contains_key(filename) {
+        if !self.allowed.contains(&filename) || self.files.contains_key(filename) {
             return Err("Unknown or duplicate audit filename".into());
         }
         let mut file = self.create_file(filename)?;
@@ -246,10 +246,12 @@ fn write_at(
     commit_metadata: Value,
     write: impl FnOnce(&mut BundleWriter) -> Result<(), String>,
 ) -> Result<PathBuf, String> {
-    if !matches!(kind, "native" | "renderer")
-        || unique.len() != 32
-        || !unique.bytes().all(|c| c.is_ascii_hexdigit())
-    {
+    let allowed = match kind {
+        "native" => NATIVE_FILES,
+        "renderer" => RENDERER_FILES,
+        _ => return Err("Invalid audit bundle kind or identity".into()),
+    };
+    if unique.len() != 32 || !unique.bytes().all(|c| c.is_ascii_hexdigit()) {
         return Err("Invalid audit bundle kind or identity".into());
     }
     let mut metadata = commit_metadata
@@ -277,6 +279,7 @@ fn write_at(
     check_directory(&directory, true, false)?;
     let mut writer = BundleWriter {
         directory,
+        allowed,
         files: Map::new(),
         total_bytes: 0,
         failed: false,
@@ -286,21 +289,8 @@ fn write_at(
     if writer.failed {
         return Err("Failed audit bundle cannot commit".into());
     }
-    let required: &[&str] = if kind == "native" {
-        &[
-            "descriptor.json",
-            "journal.json",
-            "packets.bin",
-            "raw.s16le",
-        ]
-    } else {
-        &["source.f32le", "renderer.json"]
-    };
-    if required.iter().any(|key| !writer.files.contains_key(*key))
-        || writer.files.keys().any(|key| {
-            !(required.contains(&key.as_str()) || (kind == "renderer" && key == "descriptor.json"))
-        })
-    {
+    // Writes take only this kind's files, each once, so this proves the exact set.
+    if allowed.iter().any(|file| !writer.files.contains_key(*file)) {
         return Err("Audit bundle file set does not match its kind".into());
     }
     for (filename, file) in &writer.handles {
@@ -359,26 +349,13 @@ fn write_at(
     Ok(root_path.join(bundle_name))
 }
 
-pub fn write_bundle_streaming(
+pub fn write_bundle(
     kind: &str,
     commit_metadata: Value,
     write: impl FnOnce(&mut BundleWriter) -> Result<(), String>,
 ) -> Result<PathBuf, String> {
     let (path, directory) = root_directory()?;
     write_at(&path, &directory, kind, &nonce()?, commit_metadata, write)
-}
-
-pub fn write_bundle(
-    kind: &str,
-    files: &[(&str, &[u8])],
-    commit_metadata: Value,
-) -> Result<PathBuf, String> {
-    write_bundle_streaming(kind, commit_metadata, |writer| {
-        for (name, bytes) in files {
-            writer.write_file(name, bytes)?;
-        }
-        Ok(())
-    })
 }
 
 #[cfg(test)]
@@ -401,16 +378,26 @@ mod tests {
             File::open(&self.0).unwrap()
         }
         fn bundle(&self) -> PathBuf {
-            self.0.join(format!("renderer-{}", "a".repeat(32)))
+            self.bundle_as("renderer")
+        }
+        fn bundle_as(&self, kind: &str) -> PathBuf {
+            self.0.join(format!("{kind}-{}", "a".repeat(32)))
         }
         fn run(
             &self,
             write: impl FnOnce(&mut BundleWriter) -> Result<(), String>,
         ) -> Result<PathBuf, String> {
+            self.run_as("renderer", write)
+        }
+        fn run_as(
+            &self,
+            kind: &str,
+            write: impl FnOnce(&mut BundleWriter) -> Result<(), String>,
+        ) -> Result<PathBuf, String> {
             write_at(
                 &self.0,
                 &self.root(),
-                "renderer",
+                kind,
                 &"a".repeat(32),
                 json!({"complete":true,"captureId":"native-test"}),
                 write,
@@ -447,6 +434,47 @@ mod tests {
             assert_eq!(metadata.mode() & 0o777, 0o600);
             assert_eq!(metadata.nlink(), 1);
         }
+    }
+
+    #[test]
+    fn native_bundle_commits_exactly_its_four_files() {
+        let names = [
+            "descriptor.json",
+            "journal.json",
+            "packets.bin",
+            "raw.s16le",
+        ];
+        let temp = Temp::new();
+        let bundle = temp
+            .run_as("native", |writer| {
+                names
+                    .iter()
+                    .try_for_each(|file| writer.write_file(file, b"x"))
+            })
+            .unwrap();
+        let commit: Value =
+            serde_json::from_slice(&std::fs::read(bundle.join("COMMIT.json")).unwrap()).unwrap();
+        let files: Vec<_> = commit["files"].as_object().unwrap().keys().collect();
+        assert_eq!(files, names);
+    }
+
+    #[test]
+    fn another_kinds_file_is_refused_before_it_exists() {
+        let temp = Temp::new();
+        assert!(temp
+            .run(|writer| {
+                renderer(writer)?;
+                writer.write_file("descriptor.json", b"{}")
+            })
+            .is_err());
+        assert!(!temp.bundle().join("descriptor.json").exists());
+        assert!(!temp.bundle().join("COMMIT.json").exists());
+        let temp = Temp::new();
+        assert!(temp
+            .run_as("native", |writer| writer.write_file("renderer.json", b"{}"))
+            .is_err());
+        assert!(!temp.bundle_as("native").join("renderer.json").exists());
+        assert!(!temp.bundle_as("native").join("COMMIT.json").exists());
     }
 
     #[test]

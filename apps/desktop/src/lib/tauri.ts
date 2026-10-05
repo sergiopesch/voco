@@ -86,7 +86,7 @@ export interface DesktopPasteMetrics {
 }
 
 /** Pastes into whatever has focus now; rejects with an InsertionError. */
-export async function pasteDesktopText(text: string, correlation: PasteCorrelation): Promise<{ strategy: "clipboard"; outcome: "dispatched"; pasteMetrics: DesktopPasteMetrics }> {
+export async function pasteDesktopText(text: string, correlation: PasteCorrelation): Promise<{ outcome: "dispatched"; pasteMetrics: DesktopPasteMetrics }> {
   return invoke("paste_desktop_text", { text, correlation });
 }
 
@@ -113,13 +113,6 @@ export async function appendBrowserField(
     expectedCommittedText,
     appendText,
   });
-}
-
-export async function finishBrowserField(
-  sessionId: number,
-  expectedCommittedText: string,
-): Promise<BrowserFieldStatus> {
-  return invoke<BrowserFieldStatus>("finish_browser_field", { sessionId, expectedCommittedText });
 }
 
 export async function cancelBrowserField(sessionId: number): Promise<BrowserFieldStatus> {
@@ -154,6 +147,12 @@ export async function traceHotkeyEvent(
   fields: HotkeyTraceFields | null = null,
 ): Promise<void> {
   return invoke("trace_frontend_hotkey_event", { event, fields });
+}
+
+/** Which opt-in logs are recording. Rust drops dictation traces and quality
+ * records unless one is, so the renderer need not send them. */
+export async function getDiagnosticLogging(): Promise<{ trace: boolean; performance: boolean }> {
+  return invoke("diagnostic_logging");
 }
 
 export async function hasPendingHotkeyToggle(): Promise<boolean> {

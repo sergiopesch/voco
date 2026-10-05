@@ -34,10 +34,12 @@ def app_diagnostics(rows):
     A single delivery can produce multiple failure records. Cancellation and
     uncertainty remain outcomes; neither is proof of a transport failure.
     """
+    # worker_eof, worker_disconnected and startup_failed name older logs' codes.
     exchange_failures = {
         'startup_timeout', 'response_timeout', 'identity_mismatch', 'request_rejected',
-        'runtime_missing', 'spawn_failed', 'worker_lost', 'startup_failed', 'worker_eof',
-        'worker_disconnected', 'request_backlog', 'transport_failed',
+        'runtime_missing', 'spawn_failed', 'worker_lost', 'output_eof', 'channel_disconnected',
+        'ready_invalid', 'read_failed', 'write_failed', 'response_bounds', 'response_invalid',
+        'request_backlog', 'transport_failed', 'worker_eof', 'worker_disconnected', 'startup_failed',
     }
     queue_failures = {
         'transport_failed', 'backlog_limit', 'response_invalid', 'prefix_revision',

@@ -28,10 +28,10 @@
   <url type="vcs-browser">https://github.com/sergiopesch/voco</url>
   <content_rating type="oars-1.1" />
   <releases>
-    <release version="2026.0.60" date="2026-09-30">
+    <release version="2026.0.61" date="2026-10-04">
       <description>
-        <p>Dictation now pastes into whatever app has keyboard focus. If pasting stops, VOCO keeps listening and copies the words it could not paste to the clipboard when you stop. Review keeps dictation after a crash.</p>
-        <p>In the GNOME top bar, the live bars open beside a microphone that stays still, inside one pill shared with GNOME's highlight. After upgrading, run panel setup again, then sign out and back in.</p>
+        <p>Dictation pastes into whatever app has keyboard focus. On Wayland VOCO types the paste keys through its own virtual keyboard, so there is no input service to set up. If pasting stops, VOCO keeps listening and copies the words it could not paste when you stop, and Review keeps dictation after a crash.</p>
+        <p>VOCO supports Ubuntu 24.04 and 26.04, Debian 13 and Fedora 44, and its GNOME top-bar panel runs on GNOME 46, 48 and 50. After upgrading, run panel setup again, then sign out and back in.</p>
       </description>
     </release>
     <release version="2026.0.59" date="2026-09-23">

@@ -3,6 +3,7 @@
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import shutil
 import sys
@@ -11,12 +12,22 @@ import gi
 gi.require_version('Gio', '2.0')
 from gi.repository import Gio, GLib
 root = Path(sys.argv[1]); evidence = root / 'evidence'
-report = {'passed': False, 'scope': 'GNOME 46 nested Wayland, synthetic app service', 'states': {}}
+# test-gnome-panel.sh chooses the mode from the Shell's major version.
+mode = os.environ['VOCO_PANEL_SHELL_MODE']; assert mode in ('nested', 'headless'), mode
+# bridge skips the synthetic cases and checks only the app's tray bridge.
+suite = os.environ['VOCO_PANEL_SUITE']; assert suite in ('full', 'bridge'), suite
+headless = mode == 'headless'
+shell_version = subprocess.check_output(['gnome-shell', '--version'], text=True).split()[-1]
+report = {'passed': False, 'suite': suite, 'scope': f'GNOME {shell_version.split(".")[0]} {mode} Wayland, ' +
+          ('synthetic app service' if suite == 'full' else "the app's tray bridge, without the synthetic cases"),
+          'shellVersion': shell_version, 'states': {}}
 state = dict(version=1, token='1:1', stopSession='1:1', status='idle', description='Ready', canStop=False, canOpen=True, level=0)
 actions = []; attached = []; detached = []; fail_next = []; stalled = []; stall_state = []
 reservations = []; held = []; hold_reservation = []; fail_reservation = []; stop_reservations = []
 bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
-xml = '''<node><interface name="org.voco.Panel1"><method name="Attach"><arg type="b" direction="out"/></method><method name="GetState"><arg type="s" direction="out"/></method><method name="ReserveShortcut"><arg type="s" direction="in"/><arg type="b" direction="out"/></method><method name="ReserveStopShortcut"><arg type="s" direction="in"/><arg type="b" direction="out"/></method><method name="Action"><arg type="s" direction="in"/><arg type="s" direction="in"/><arg type="b" direction="out"/></method><method name="Detach"/><signal name="Changed"/></interface></node>'''
+# The synthetic service serves the app's own interface, so it can't drift from panel.rs.
+panel_rs = (Path(__file__).resolve().parents[1] / 'apps/desktop/src-tauri/src/panel.rs').read_text()
+xml = re.search(r'const XML: &str = r#"(.*?)"#;', panel_rs, re.S).group(1)
 SUPPORTED = ('<Alt>d', '<Alt><Shift>d')
 def shortcut_token():
     # Stop-only field the native app still publishes for a loaded v10 companion.
@@ -65,10 +76,69 @@ def call(method, params=None):
     return bus.call_sync('org.gnome.Shell', '/org/voco/PanelProbe', 'org.voco.PanelProbe', method, params, None, Gio.DBusCallFlags.NONE, 1500, None)
 def inspect(): return json.loads(call('Inspect').unpack()[0])
 def screenshot(name):
+    if headless:
+        # No host window to capture; the probe renders the same stage areas.
+        for prefix, height in (('', 600), ('panel-', 32)):
+            bus.call_sync('org.gnome.Shell', '/org/voco/PanelProbe', 'org.voco.PanelProbe', 'Screenshot',
+                GLib.Variant('(siiii)', (str(evidence / (prefix+name+'.png')), 0, 0, 800, height)),
+                None, Gio.DBusCallFlags.NONE, 5000, None)
+        return
     code = "import gi;gi.require_version('Gdk','3.0');from gi.repository import Gdk;Gdk.init([]);p=Gdk.pixbuf_get_from_window(Gdk.get_default_root_window(),0,0,800,600);p.savev(__import__('sys').argv[1],'png',[],[])"
     subprocess.run(['/usr/bin/python3','-c',code,str(evidence / (name+'.png'))], env={**os.environ,'DISPLAY':':77','GDK_BACKEND':'x11'}, check=True)
     panel_code = code.replace('800,600)', '800,32)')
     subprocess.run(['/usr/bin/python3','-c',panel_code,str(evidence / ('panel-'+name+'.png'))], env={**os.environ,'DISPLAY':':77','GDK_BACKEND':'x11'}, check=True)
+def start_shell():
+    if headless:
+        # GNOME 50 has neither --nested nor --sm-disable. The virtual monitor has
+        # the nested window's 800x600, so every geometry check keeps its meaning.
+        return subprocess.Popen(['gnome-shell','--headless','--virtual-monitor','800x600','--wayland','--no-x11','--force-animations','--wayland-display=voco-panel-test'], stdout=log,stderr=subprocess.STDOUT)
+    return subprocess.Popen(['gnome-shell','--nested','--wayland','--no-x11','--force-animations','--wayland-display=voco-panel-test','--sm-disable'], env={**os.environ,'DISPLAY':':77'}, stdout=log,stderr=subprocess.STDOUT)
+class RemoteInput:
+    """Real compositor input through Mutter's RemoteDesktop API, the path GNOME Remote Desktop uses."""
+    # Evdev key and button codes.
+    KEYS = {'alt': 56, 'Alt_L': 56, 'Alt_R': 100, 'shift': 42, 'Shift_L': 42, 'Shift_R': 54,
+            'Control_L': 29, 'Control_R': 97, 'Super_L': 125, 'Super_R': 126, 'd': 32, 'space': 57,
+            'Menu': 127, 'F10': 68}
+    BUTTONS = {1: 0x110, 2: 0x112, 3: 0x111}
+    def __init__(self):
+        self.path = bus.call_sync('org.gnome.Mutter.RemoteDesktop', '/org/gnome/Mutter/RemoteDesktop',
+            'org.gnome.Mutter.RemoteDesktop', 'CreateSession', None, GLib.VariantType('(o)'),
+            Gio.DBusCallFlags.NONE, 3000, None).unpack()[0]
+        # While the session runs, GNOME shows its screen-sharing indicator to the
+        # right of the companion, as it would for any remote desktop client.
+        self.session('Start')
+        # Mutter adds the session's keyboard at its first key press, which a
+        # Wayland client focused before then never receives. A lone Shift tap,
+        # which nothing binds, gives the seat its keyboard before any client.
+        self.keys('key', 'Shift_L')
+        # Absolute motion needs a ScreenCast stream, and a stream needs PipeWire.
+        # Relative motion stops at the monitor's edges, so the bottom-right
+        # corner, where no pointer barrier sits, is an exact origin.
+        self.position = None
+        self.move(799, 599, (1e5, 1e5))
+    def session(self, method, params=None):
+        bus.call_sync('org.gnome.Mutter.RemoteDesktop', self.path, 'org.gnome.Mutter.RemoteDesktop.Session',
+            method, params, None, Gio.DBusCallFlags.NONE, 1500, None)
+    def move(self, x, y, delta=None):
+        delta = delta or (x - self.position[0], y - self.position[1])
+        self.session('NotifyPointerMotionRelative', GLib.Variant('(dd)', delta))
+        deadline = time.monotonic() + 1
+        while (reached := call('Pointer').unpack()[0]) != [x, y] and time.monotonic() < deadline: time.sleep(.005)
+        assert reached == [x, y], {'pointer': reached, 'target': (x, y)}
+        self.position = (x, y)
+    def click(self, button):
+        for pressed in (True, False):
+            self.session('NotifyPointerButton', GLib.Variant('(ib)', (self.BUTTONS[button], pressed)))
+    def keys(self, *args):
+        # The subset of xdotool's key, keydown and keyup syntax the checks use.
+        for arg in args:
+            if arg in ('key', 'keydown', 'keyup'):
+                command = arg; continue
+            codes = [self.KEYS[name] for name in arg.split('+')]
+            if command != 'keyup':
+                for code in codes: self.session('NotifyKeyboardKeycode', GLib.Variant('(ub)', (code, True)))
+            if command != 'keydown':
+                for code in reversed(codes): self.session('NotifyKeyboardKeycode', GLib.Variant('(ub)', (code, False)))
 shell = None; system = None; app = None
 try:
     system_address = 'unix:path=' + str(root / 'runtime/system-test-bus')
@@ -77,10 +147,18 @@ try:
     installed_mode = (root / 'panel-payload').exists()
     enabled = ['ubuntu-appindicators@ubuntu.com', 'voco-panel-probe@test.invalid']
     if not installed_mode: enabled.append('voco-panel@voco.local')
-    for schema,key,value in [('org.gnome.shell','enabled-extensions',str(enabled)),('org.gnome.shell','disable-user-extensions','false'),('org.gnome.desktop.interface','enable-animations','true')]:
+    settings = [('org.gnome.shell','enabled-extensions',str(enabled)),('org.gnome.shell','disable-user-extensions','false'),('org.gnome.desktop.interface','enable-animations','true')]
+    # Some distributions, Fedora among them, open GNOME's first-login tour as a
+    # modal dialog over the panel.
+    settings.append(('org.gnome.shell','welcome-dialog-last-shown-version',shell_version))
+    if headless:
+        # A headless Shell starts its pointer on the hot corner, where relative
+        # motion presses the corner's barriers and could open the overview.
+        settings.append(('org.gnome.desktop.interface','enable-hot-corners','false'))
+    for schema,key,value in settings:
         subprocess.run(['gsettings','set',schema,key,value],check=True)
     log = (evidence / 'shell.log').open('w')
-    shell = subprocess.Popen(['gnome-shell','--nested','--wayland','--no-x11','--force-animations','--wayland-display=voco-panel-test','--sm-disable'], env={**os.environ,'DISPLAY':':77'}, stdout=log,stderr=subprocess.STDOUT)
+    shell = start_shell()
     if installed_mode:
         for _ in range(150):
             pump(.1)
@@ -106,7 +184,7 @@ try:
         previous_metadata = {**current_metadata, 'version': current_metadata['version'] - 1}
         metadata_path.write_text(json.dumps(previous_metadata))
         shell.terminate(); shell.wait(timeout=10); pump(.5)
-        shell = subprocess.Popen(['gnome-shell','--nested','--wayland','--no-x11','--force-animations','--wayland-display=voco-panel-test','--sm-disable'], env={**os.environ,'DISPLAY':':77'}, stdout=log,stderr=subprocess.STDOUT)
+        shell = start_shell()
         for _ in range(150):
             pump(.1)
             try:
@@ -119,7 +197,7 @@ try:
         report['freshPanelSetup']['loadedOldVersionAfterUpgrade'] = upgraded.stdout
         # Recreate the isolated shell session only, as the installer instructs.
         shell.terminate(); shell.wait(timeout=10); pump(.5)
-        shell = subprocess.Popen(['gnome-shell','--nested','--wayland','--no-x11','--force-animations','--wayland-display=voco-panel-test','--sm-disable'], env={**os.environ,'DISPLAY':':77'}, stdout=log,stderr=subprocess.STDOUT)
+        shell = start_shell()
     for _ in range(150):
         pump(.1)
         try:
@@ -132,12 +210,105 @@ try:
         checked = subprocess.run([str(root/'voco'), '--check-panel'], capture_output=True, text=True, timeout=6)
         assert checked.returncode == 0 and 'active' in checked.stdout, checked
         report['freshPanelSetup']['afterSessionRestart'] = checked.stdout
+    def native_bridge():
+        # The real app takes over org.voco.Panel from the synthetic service.
+        global owner, app
+        Gio.bus_unown_name(owner); owner=None; pump(.3)
+        assert not inspect()['indicator']['visible'], 'The synthetic service stayed attached'
+        # Startup clears the icons an earlier VOCO left; a second launch never touches them.
+        stale = root / 'runtime/voco/tray-1-0'
+        stale.parent.mkdir(mode=0o700, exist_ok=True); stale.mkdir(mode=0o700)
+        (stale / 'ready.png').write_bytes(b'')
+        app_log = (evidence / 'app.log').open('w')
+        app_env = {**os.environ, 'WAYLAND_DISPLAY':'voco-panel-test', 'GDK_BACKEND':'wayland',
+            'WEBKIT_DISABLE_COMPOSITING_MODE':'1'}
+        app = subprocess.Popen([str(root / 'voco')], env=app_env, stdout=app_log, stderr=subprocess.STDOUT)
+        for _ in range(150):
+            pump(.1)
+            assert app.poll() is None, 'Application exited during bridge startup'
+            if inspect()['indicator']['visible']: break
+        else: raise AssertionError('Native application bridge did not attach')
+        assert not stale.exists(), 'Startup kept the icons an earlier VOCO left behind'
+        report['staleTrayIconsRemoved'] = True
+        native = json.loads(call('NativeState').unpack()[0])
+        assert native['version'] == 1 and not native['canStop'], native
+        assert native.get('shortcutAccelerator') == '<Alt>d' and native.get('stopShortcutToken') is None, native
+        report['nativeBridgeState'] = native
+        try:
+            bus.call_sync('org.voco.Panel','/org/voco/Panel','org.voco.Panel1','GetState',None,None,Gio.DBusCallFlags.NONE,1500,None)
+            raise AssertionError('Unattached client read native panel state')
+        except GLib.Error as error:
+            assert 'NotAttached' in str(error), error
+        report['unattachedClientRejected'] = True
+        for name, params in (('ReserveShortcut', GLib.Variant('(s)', ('<Alt>d',))),
+                             ('ReserveStopShortcut', GLib.Variant('(s)', (native['token'],))),
+                             ('Action', GLib.Variant('(ss)', ('shortcut', '')))):
+            try:
+                bus.call_sync('org.voco.Panel','/org/voco/Panel','org.voco.Panel1',name,params,None,Gio.DBusCallFlags.NONE,1500,None)
+                raise AssertionError(f'Unattached client called {name}')
+            except GLib.Error as error:
+                assert 'NotAttached' in str(error), error
+        report['unattachedShortcutReservationRejected'] = True
+        attach = bus.call_sync('org.voco.Panel','/org/voco/Panel','org.voco.Panel1','Attach',None,None,Gio.DBusCallFlags.NONE,1500,None).unpack()[0]
+        assert attach is False
+        report['nonShellAttachRejected'] = True
+        screenshot('native-bridge')
+        values = bus.call_sync('org.kde.StatusNotifierWatcher','/StatusNotifierWatcher',
+            'org.freedesktop.DBus.Properties','Get',GLib.Variant('(ss)',
+            ('org.kde.StatusNotifierWatcher','RegisteredStatusNotifierItems')),None,Gio.DBusCallFlags.NONE,1500,None).unpack()[0]
+        assert len(values) == 1, values
+        identifier = values[0]
+        if '@/' in identifier: service, item_path = identifier.split('@',1)
+        elif '/' in identifier:
+            service, item_path = identifier.split('/',1); item_path = '/' + item_path
+        else: service, item_path = identifier, '/StatusNotifierItem'
+        def tray_status():
+            return bus.call_sync(service,item_path,'org.freedesktop.DBus.Properties','Get',
+                GLib.Variant('(ss)',('org.kde.StatusNotifierItem','Status')),None,Gio.DBusCallFlags.NONE,1500,None).unpack()[0]
+        assert tray_status() == 'Passive', tray_status()
+        subprocess.run(['gnome-extensions','disable','voco-panel@voco.local'],check=True)
+        pump(.4)
+        assert tray_status() == 'Active', tray_status()
+        report['nativeTrayRestoredOnDisable'] = True
+        def tray_property(name):
+            return bus.call_sync(service,item_path,'org.freedesktop.DBus.Properties','Get',
+                GLib.Variant('(ss)',('org.kde.StatusNotifierItem',name)),None,Gio.DBusCallFlags.NONE,1500,None).unpack()[0]
+        report['fallbackLabel'] = tray_property('XAyatanaLabel')
+        # Only startup and setup problems carry a label; Ready and dictating share the bare icon.
+        assert report['fallbackLabel'] in ['', 'Starting VOCO', 'Check setup']
+        old_icon = Path(tray_property('IconName'))
+        assert old_icon.exists()
+        pump(2)
+        assert old_icon.exists(), 'Advertised icon deleted while delayed reader still needs it'
+        icon_files = list(old_icon.parent.glob('*.png'))
+        assert len(icon_files) == 68, icon_files  # three states, 64 meter frames, library initial image
+        gi.require_version('GdkPixbuf','2.0')
+        from gi.repository import GdkPixbuf
+        for icon in icon_files: GdkPixbuf.Pixbuf.new_from_file(str(icon))
+        report['retainedIconFiles'] = len(icon_files)
+        second = subprocess.run([str(root/'voco')], env=app_env, capture_output=True, text=True, timeout=5)
+        assert second.returncode == 0, second.stderr
+        assert old_icon.exists(), 'A second launch removed the running icons'
+        report['secondLaunchAccepted'] = True
+    if suite == 'bridge':
+        native_bridge(); report['passed'] = True
+        sys.exit()  # finally still writes the results and stops the Shell
     report['compositorAnimationsInitially'] = inspect()['animations']
     report['forceAnimationsForSoftwareRenderer'] = True
     assert inspect()['animations']
-    pointer_env = {**os.environ, 'DISPLAY': ':77'}
-    shell_windows = subprocess.check_output(['xdotool', 'search', '--pid', str(shell.pid)], env=pointer_env, text=True).splitlines()
-    subprocess.run(['xdotool', 'windowfocus', shell_windows[0]], env=pointer_env, check=True)
+    if headless:
+        remote = RemoteInput()
+        report['remoteDesktopInput'] = True
+        def mousemove(x, y): remote.move(x, y)
+        def click(button): remote.click(button)
+        def keys(*args): remote.keys(*args)
+    else:
+        pointer_env = {**os.environ, 'DISPLAY': ':77'}
+        shell_windows = subprocess.check_output(['xdotool', 'search', '--pid', str(shell.pid)], env=pointer_env, text=True).splitlines()
+        subprocess.run(['xdotool', 'windowfocus', shell_windows[0]], env=pointer_env, check=True)
+        def mousemove(x, y): subprocess.run(['xdotool', 'mousemove', str(x), str(y)], env=pointer_env, check=True)
+        def click(button): subprocess.run(['xdotool', 'click', str(button)], env=pointer_env, check=True)
+        def keys(*args): subprocess.run(['xdotool', *args], env=pointer_env, check=True, timeout=3)
     def styled(data, name):
         return [actor for actor in data['actors'] if name in (actor.get('style') or '').split()]
     def anchors(data):
@@ -198,12 +369,11 @@ try:
         if status in ('starting', 'recording', 'processing'):
             assert not any(actor['visible'] and actor.get('text') for actor in data['actors']), data
             assert not any(actor.get('style') == 'voco-panel-stop' for actor in data['actors']), data
-        subprocess.run(['xdotool', 'mousemove', '400', '300'], env=pointer_env, check=True)
+        mousemove(400, 300)
         pump(.1)
-        subprocess.run(['xdotool', 'mousemove', str(round(mic['x'] + mic['width'] / 2)),
-                        str(round(mic['y'] + mic['height'] / 2))], env=pointer_env, check=True)
+        mousemove(round(mic['x'] + mic['width'] / 2), round(mic['y'] + mic['height'] / 2))
         pump(.1)
-        subprocess.run(['xdotool', 'click', '3'], env=pointer_env, check=True)
+        click(3)
         pump(.3)
         menu = inspect()['menu']
         assert menu['open'], {'menu': menu, 'actions': actions, 'state': status}
@@ -224,6 +394,16 @@ try:
             assert actions[-1] == ('stop', state['stopSession']), actions
             call('Menu'); pump(.1)
         call('Menu'); pump(.2)
+        if status == 'idle':
+            # A primary click on an idle pill opens Settings; the middle button
+            # opens the menu like the secondary one.
+            before = len(actions)
+            click(1); pump(.3)
+            assert actions[before:] == [('open', state['token'])] and not inspect()['menu']['open'], actions[before:]
+            click(2); pump(.3)
+            assert inspect()['menu']['open'] and actions[before + 1:] == [], actions[before:]
+            call('Menu'); pump(.2)
+            report['idleClickRouting'] = {'primaryOpens': True, 'middleOpensMenu': True}
         if status=='recording':
             state['level'] = 0; pump(.2)
             quiet = inspect()
@@ -236,18 +416,25 @@ try:
             assert actions[-1] == ('stop', state['stopSession']), actions
             # A primary click anywhere on the pill stops, the meter included.
             wave = styled(data, 'voco-panel-wave')[0]; before = len(actions)
-            subprocess.run(['xdotool', 'mousemove', str(round(wave['x'] + wave['width'] / 2)),
-                            str(round(wave['y'] + wave['height'] / 2))], env=pointer_env, check=True)
+            mousemove(round(wave['x'] + wave['width'] / 2), round(wave['y'] + wave['height'] / 2))
             pump(.1)
-            subprocess.run(['xdotool', 'click', '1'], env=pointer_env, check=True)
+            click(1)
             pump(.3)
             assert actions[before:] == [('stop', state['stopSession'])] and not inspect()['menu']['open'], actions[before:]
             report['meterClickStops'] = True
     # Keyboard focus shows GNOME's own focus fill on the indicator.
-    subprocess.run(['xdotool', 'mousemove', '400', '300'], env=pointer_env, check=True)
+    mousemove(400, 300)
     call('Focus', GLib.Variant('(b)', (True,))); pump(.4)
     assert inspect()['indicatorFocus'], 'Keyboard focus did not reach the indicator'
     screenshot('focus')
+    # The Menu key and Shift+F10 open the menu from the focused pill.
+    for combo in ('Menu', 'shift+F10'):
+        before = len(actions)
+        keys('key', combo); pump(.3)
+        assert inspect()['menu']['open'] and actions[before:] == [], {'key': combo, 'actions': actions[before:]}
+        call('Menu'); pump(.2)
+        call('Focus', GLib.Variant('(b)', (True,))); pump(.2)
+    report['keyboardMenu'] = ['Menu', 'Shift+F10']
     call('Focus', GLib.Variant('(b)', (False,))); pump(.3)
     assert not inspect()['indicatorFocus'], 'The indicator kept focus styling'
     report['focusVisible'] = True
@@ -309,10 +496,11 @@ try:
         return False
     entry.connect('key-press-event', on_key)
     window.show_all(); entry.grab_focus(); window.present(); pump(.6)
-    xenv={**os.environ, 'DISPLAY':':77', 'GDK_BACKEND':'x11'}
-    ids=subprocess.check_output(['xdotool','search','--pid',str(shell.pid)],env=xenv,text=True).splitlines()
-    subprocess.run(['xdotool','windowfocus',ids[0]],env=xenv,check=True)
-    def keys(*args): subprocess.run(['xdotool',*args],env=xenv,check=True,timeout=3)
+    if not headless:
+        xenv={**os.environ, 'DISPLAY':':77', 'GDK_BACKEND':'x11'}
+        ids=subprocess.check_output(['xdotool','search','--pid',str(shell.pid)],env=xenv,text=True).splitlines()
+        subprocess.run(['xdotool','windowfocus',ids[0]],env=xenv,check=True)
+        def keys(*args): subprocess.run(['xdotool',*args],env=xenv,check=True,timeout=3)
     def modifiers_clear():
         return bus.call_sync('org.gnome.Shell', '/org/voco/PanelInput', 'org.voco.PanelInput1',
             'ModifiersClear', None, None, Gio.DBusCallFlags.NO_AUTO_START, 1500, None).unpack()[0]
@@ -459,79 +647,15 @@ try:
     report['actions']=actions
     report['modifierGuard'] = {'callerAuthenticated': True, 'allEightModifiers': True,
         'heldStreamingSeparatorBlocked': True, 'releasePreservedText': True}
-    if (root / 'voco').exists():
-        Gio.bus_unown_name(owner); owner=None; pump(.3)
-        app_log = (evidence / 'app.log').open('w')
-        app = subprocess.Popen([str(root / 'voco')], env={**os.environ,
-            'WAYLAND_DISPLAY':'voco-panel-test', 'GDK_BACKEND':'wayland',
-            'WEBKIT_DISABLE_COMPOSITING_MODE':'1'}, stdout=app_log, stderr=subprocess.STDOUT)
-        for _ in range(150):
-            pump(.1)
-            assert app.poll() is None, 'Application exited during bridge startup'
-            if inspect()['indicator']['visible']: break
-        else: raise AssertionError('Native application bridge did not attach')
-        native = json.loads(call('NativeState').unpack()[0])
-        assert native['version'] == 1 and not native['canStop'], native
-        assert native.get('shortcutAccelerator') == '<Alt>d' and native.get('stopShortcutToken') is None, native
-        report['nativeBridgeState'] = native
-        try:
-            bus.call_sync('org.voco.Panel','/org/voco/Panel','org.voco.Panel1','GetState',None,None,Gio.DBusCallFlags.NONE,1500,None)
-            raise AssertionError('Unattached client read native panel state')
-        except GLib.Error as error:
-            assert 'NotAttached' in str(error), error
-        report['unattachedClientRejected'] = True
-        for name, params in (('ReserveShortcut', GLib.Variant('(s)', ('<Alt>d',))),
-                             ('ReserveStopShortcut', GLib.Variant('(s)', (native['token'],))),
-                             ('Action', GLib.Variant('(ss)', ('shortcut', '')))):
-            try:
-                bus.call_sync('org.voco.Panel','/org/voco/Panel','org.voco.Panel1',name,params,None,Gio.DBusCallFlags.NONE,1500,None)
-                raise AssertionError(f'Unattached client called {name}')
-            except GLib.Error as error:
-                assert 'NotAttached' in str(error), error
-        report['unattachedShortcutReservationRejected'] = True
-        attach = bus.call_sync('org.voco.Panel','/org/voco/Panel','org.voco.Panel1','Attach',None,None,Gio.DBusCallFlags.NONE,1500,None).unpack()[0]
-        assert attach is False
-        report['nonShellAttachRejected'] = True
-        screenshot('native-bridge')
-        values = bus.call_sync('org.kde.StatusNotifierWatcher','/StatusNotifierWatcher',
-            'org.freedesktop.DBus.Properties','Get',GLib.Variant('(ss)',
-            ('org.kde.StatusNotifierWatcher','RegisteredStatusNotifierItems')),None,Gio.DBusCallFlags.NONE,1500,None).unpack()[0]
-        assert len(values) == 1, values
-        identifier = values[0]
-        if '@/' in identifier: service, item_path = identifier.split('@',1)
-        elif '/' in identifier:
-            service, item_path = identifier.split('/',1); item_path = '/' + item_path
-        else: service, item_path = identifier, '/StatusNotifierItem'
-        def tray_status():
-            return bus.call_sync(service,item_path,'org.freedesktop.DBus.Properties','Get',
-                GLib.Variant('(ss)',('org.kde.StatusNotifierItem','Status')),None,Gio.DBusCallFlags.NONE,1500,None).unpack()[0]
-        assert tray_status() == 'Passive', tray_status()
-        subprocess.run(['gnome-extensions','disable','voco-panel@voco.local'],check=True)
-        pump(.4)
-        assert tray_status() == 'Active', tray_status()
-        report['nativeTrayRestoredOnDisable'] = True
-        def tray_property(name):
-            return bus.call_sync(service,item_path,'org.freedesktop.DBus.Properties','Get',
-                GLib.Variant('(ss)',('org.kde.StatusNotifierItem',name)),None,Gio.DBusCallFlags.NONE,1500,None).unpack()[0]
-        report['fallbackLabel'] = tray_property('XAyatanaLabel')
-        # Only startup and setup problems carry a label; Ready and dictating share the bare icon.
-        assert report['fallbackLabel'] in ['', 'Starting VOCO', 'Check setup']
-        old_icon = Path(tray_property('IconName'))
-        assert old_icon.exists()
-        pump(2)
-        assert old_icon.exists(), 'Advertised icon deleted while delayed reader still needs it'
-        icon_files = list(old_icon.parent.glob('*.png'))
-        assert len(icon_files) == 69, icon_files  # four states, 64 meter frames, library initial image
-        gi.require_version('GdkPixbuf','2.0')
-        from gi.repository import GdkPixbuf
-        for icon in icon_files: GdkPixbuf.Pixbuf.new_from_file(str(icon))
-        report['retainedIconFiles'] = len(icon_files)
-        second = subprocess.run([str(root/'voco')], capture_output=True, text=True, timeout=5)
-        assert second.returncode == 0, second.stderr
-        report['secondLaunchAccepted'] = True
+    if (root / 'voco').exists(): native_bridge()
     report['passed']=True
 finally:
     (evidence/'results.json').write_text(json.dumps(report,indent=2))
     if app: app.terminate(); app.wait(timeout=10)
     if shell: shell.terminate(); shell.wait(timeout=10)
-    if system: system.terminate(); system.wait(timeout=5)
+    if system:
+        # GTK can hold GIO's shared system-bus connection, which by default
+        # raises SIGTERM in this process once that bus goes away.
+        try: Gio.bus_get_sync(Gio.BusType.SYSTEM, None).set_exit_on_close(False)
+        except GLib.Error: pass
+        system.terminate(); system.wait(timeout=5)

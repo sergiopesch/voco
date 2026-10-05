@@ -22,17 +22,25 @@ if [[ ${1:-} != --inside ]]; then
   mkdir -p "$run"/{home,runtime,config,cache,data,state,evidence,pulse}
   chmod 700 "$run/runtime" "$run/pulse" "$run/state"
   mkdir -p "$run/evidence/sources"
-  cp "$ROOT/scripts/test-native-gnome.sh" "$ROOT/scripts/test-native-gnome.py" "$ROOT/scripts/test-native-wayland.py" "$ROOT/scripts/audio_continuity.py" "$ROOT/scripts/test_native_onboarding_capture.py" "$ROOT/scripts/test_native_crash_review.py" "$run/evidence/sources/"
+  cp "$ROOT/scripts/test-native-gnome.sh" "$ROOT/scripts/test-native-gnome.py" "$ROOT/scripts/test-native-wayland.py" "$ROOT/scripts/audio_continuity.py" "$ROOT/scripts/test_native_onboarding_capture.py" "$ROOT/scripts/test_native_crash_review.py" "$ROOT/scripts/native_tray_app.py" "$run/evidence/sources/"
   mkdir -p "$run/data/gnome-shell/extensions/voco-private-probe@test.invalid"
   cp "$ROOT/scripts/fixtures/gnome-private-probe/"* "$run/data/gnome-shell/extensions/voco-private-probe@test.invalid/"
   cp -a "$ROOT/scripts/fixtures/gnome-private-probe" "$run/evidence/sources/"
   cursor_mounts=()
   if [[ ${VOCO_GNOME_CURSOR:-0} == 1 ]]; then
-    cp "$ROOT/scripts/test_native_cursor_capture.py" "$ROOT/scripts/fixtures/cursor-input-adapter.py" "$run/evidence/sources/"
+    cp "$ROOT/scripts/test_native_cursor_capture.py" "$ROOT/scripts/fixtures/uinput-bridge.py" \
+      "$ROOT/scripts/fixtures/shell-probe-input-state.py" "$ROOT/scripts/fixtures/shell-probe-wl-copy.py" \
+      "$run/evidence/sources/"
     cp -a "${VOCO_GNOME_PANEL_SOURCE_DIR:-$ROOT/integrations/gnome/voco-panel@voco.local}" "$run/data/gnome-shell/extensions/voco-panel@voco.local"
     cp -a "$run/data/gnome-shell/extensions/voco-panel@voco.local" "$run/evidence/sources/"
-    cursor_mounts=(--ro-bind "$ROOT/scripts/fixtures/cursor-input-adapter.py" /usr/bin/ydotool
-      --ro-bind "$ROOT/scripts/fixtures/cursor-input-adapter.py" /usr/bin/wl-copy)
+    # The app pastes through its real virtual keyboard: the namespace gets
+    # /dev/uinput, still no /dev/input, and shares its X socket directory, so the
+    # bridge outside grabs each VOCO keyboard and replays its keys on the private
+    # Xvfb. Like /tmp/.X11-unix the directory is sticky and world-writable, inside
+    # the owner-only run directory.
+    mkdir -m 1777 "$run/x11"
+    cursor_mounts=(--dev-bind /dev/uinput /dev/uinput --bind "$run/x11" /tmp/.X11-unix
+      --ro-bind "$ROOT/scripts/fixtures/shell-probe-wl-copy.py" /usr/bin/wl-copy)
   fi
   if [[ -n ${VOCO_GNOME_APP_BINARY:-} ]]; then
     [[ -f "$VOCO_GNOME_APP_BINARY" && -x "$VOCO_GNOME_APP_BINARY" ]]
@@ -44,7 +52,24 @@ if [[ ${1:-} != --inside ]]; then
     [[ ${VOCO_GNOME_ONBOARDING:-0} != 1 ]] || onboarding_completed=false
     printf '{"onboardingCompleted":%s,"hotkey":"Alt+D"}\n' "$onboarding_completed" > "$run/config/voco/config.json"
   fi
-  trap 'status=$?; mkdir -p "$VOCO_GNOME_EVIDENCE_DIR"; cp -a "$run/evidence/." "$VOCO_GNOME_EVIDENCE_DIR/"; printf "%s\n" "$status" > "$VOCO_GNOME_EVIDENCE_DIR/exit-code"; rm -rf "$run"; exit "$status"' EXIT
+  finish() {
+    status=$?
+    if [[ -n ${voco_uinput_bridge:-} ]] && ! voco_stop_uinput_bridge; then
+      echo 'The uinput bridge rejected or lost paste keys; see uinput-bridge.jsonl' >&2
+      (( status )) || status=1
+    fi
+    mkdir -p "$VOCO_GNOME_EVIDENCE_DIR"
+    cp -a "$run/evidence/." "$VOCO_GNOME_EVIDENCE_DIR/"
+    printf '%s\n' "$status" > "$VOCO_GNOME_EVIDENCE_DIR/exit-code"
+    rm -rf "$run"
+    exit "$status"
+  }
+  trap finish EXIT
+  if [[ ${VOCO_GNOME_CURSOR:-0} == 1 ]]; then
+    source "$ROOT/scripts/lib/uinput-bridge.sh"
+    voco_start_uinput_bridge "$run/evidence/uinput-bridge.jsonl" --display "$run/x11/X77" \
+      --input-state "$run/runtime/voco-input-state.sock"
+  fi
   bwrap --die-with-parent --new-session --unshare-ipc --unshare-net --unshare-pid --unshare-uts \
     --ro-bind / / --dev /dev --proc /proc --tmpfs /tmp --tmpfs /run/user --tmpfs /run/dbus \
     --bind "$run" "$run" --ro-bind "$VOCO_NATIVE_DEPS" /tmp/native-deps \

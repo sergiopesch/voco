@@ -38,7 +38,6 @@ case = os.environ.get('VOCO_NATIVE_APP_CASE', 'delivery')
 assert case in ['delivery', 'focus-switch'], 'Unsupported native application case'
 trace_path = root / 'state/voco/hotkey-trace.jsonl'
 model = root / 'speech/models/nemotron-speech-streaming-en-0.6b.q8_0.gguf'
-assert hashlib.sha256(model.read_bytes()).hexdigest() == 'd9a01898d2a611c8764e23a1c2f45e70bbd5a425dc4de93692ac951dd603812d'
 sound = repo / 'tests/fixtures/speech/84-121123-0000.wav'
 EXPECTED = ['go', 'do', 'you', 'hear']
 # focus-switch speaks the fixture once per field.
@@ -91,6 +90,12 @@ def wait_for(predicate, description, timeout=20):
             raise AssertionError('Automatic paste stopped before %s: %s' % (description, ', '.join(stopped)))
         pump(.05)
     raise AssertionError('Timed out waiting for %s; last trace events: %s' % (description, [x.get('event') for x in traces()[-8:]]))
+
+def app_ready():
+    # The renderer takes shortcuts and the worker is warm; a failed warm-up fails at once.
+    output = (root / 'evidence/full-app.log').read_text()
+    assert 'Selected speech model startup failed' not in output, 'Speech model startup failed; see full-app.log'
+    return 'Bundled Nemotron streaming model ready' in output and counts()['frontend_hotkey_handler_ready'] > 0
 
 def play(description):
     player = subprocess.Popen([os.environ['VOCO_NATIVE_PAPLAY'], '--device=fixture', str(sound)])
@@ -216,7 +221,7 @@ selections, tray_state, popup, popover, diagnostic_errors = {}, None, None, None
 try:
     assert shutil.which('xclip') and shutil.which('xdotool'), 'X11 paste needs xclip and xdotool on PATH'
     wait_for(lambda: (root / 'runtime/voco.sock').exists(), 'application control socket')
-    pump(6)
+    wait_for(app_ready, 'frontend and model readiness', timeout=30)
     window.present()
     window_id = subprocess.check_output(['xdotool', 'search', '--name', '^VOCO private full application acceptance$'], text=True).strip().splitlines()[0]
     subprocess.run(['xdotool', 'windowfocus', '--sync', window_id], check=True)

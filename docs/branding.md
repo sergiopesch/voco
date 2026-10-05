@@ -91,18 +91,14 @@ shortcut, and one cue:
 
 | When | Cue |
 | --- | --- |
-| Starting microphone | Wait for Listening before speaking. |
-| Listening | Press {shortcut} to finish. |
-| Processing | Finishing your dictation… |
 | Setup needed | Open Help to finish desktop setup. |
 | The shortcut works | Click where you want the text, then use your shortcut. |
 | The shortcut is unavailable | Check shortcut setup in Help. |
 | Otherwise | Click where you want the text, then start dictation. |
 
-Until a dictation starts finishing, Cancel dictation appears; after a click it
-reads Cancelling output…. The main button is Hide to tray, and the footer holds
-the microphone, which opens microphone settings, and Help. Escape hides the
-popover.
+The popover never opens during a dictation. The main button is Hide to tray,
+and the footer holds the microphone, which opens microphone settings, and
+Help. Escape hides the popover.
 
 **Settings** is 1040 × 760 and at least 760 × 560. Its sidebar has two groups:
 Settings and Shortcut, then Updates and Help. The microphone controls are on the
@@ -126,11 +122,9 @@ shape and colour both change, or as live level bars, and text always says it too
 the microphone with a badge at its lower right: `ready.png` has a green check in a
 shield, `processing.png` an amber hourglass in a diamond and `not-ready.png` an
 amber exclamation mark in a triangle. While VOCO listens, the icon is five silver
-level bars instead, redrawn every 90 ms from 64 frames the app draws at launch. The
-script also draws `recording.png`, a red dot in a circle, which the app never
-shows because the bars take its place.
+level bars instead, redrawn every 90 ms from 64 frames the app draws at launch.
 
-| Tooltip, after "VOCO — " | Icon | Label |
+| Status line, after "VOCO — " | Icon | Label |
 | --- | --- | --- |
 | Initializing…, Checking speech model… | Processing | Starting VOCO |
 | Ready to listen, Ready · microphone checks on first use | Ready | None |
@@ -145,11 +139,11 @@ dictation reads Stop after microphone starts.
 
 ### GNOME companion
 
-On GNOME 46 the [companion](../integrations/gnome/README.md) replaces the tray
-icon. It is one pill (3 px vertical margin, 11 px side padding, fully rounded) that
-shares GNOME's hover, focus and open-menu highlight, tinted
-`rgba(190, 198, 208, 0.14)` whenever VOCO isn't idle. The 20 px microphone comes
-last and never moves:
+On GNOME 46, 48 and 50 the [companion](../integrations/gnome/README.md)
+replaces the tray icon. It is one pill (3 px vertical margin, 11 px side
+padding, fully rounded) that shares GNOME's hover, focus and open-menu
+highlight, tinted `rgba(190, 198, 208, 0.14)` whenever VOCO isn't idle. The
+20 px microphone comes last and never moves:
 
 - From the moment the microphone starts until the text is ready, seven 2 × 14 px
   bars in `#dfe3e9` open on its left over 220 ms, in whole pixels, and only if
@@ -182,7 +176,8 @@ The canvas marks stages with ✓ in green when done, › in amber while active a
 begins, a brighter silver passes across the block letters, one every 125 ms. Downloads
 sample four times a second and show seven bars on a fixed log scale, the bytes
 received and the average rate, without a percentage or time estimate. APT output
-repaints at most every 0.1 s. `VOCO_INSTALL_NO_MOTION=1`, or GNOME's animations
+repaints at most every 0.1 s; DNF keeps its own output, and the canvas clears
+before it starts. `VOCO_INSTALL_NO_MOTION=1`, or GNOME's animations
 turned off, keeps the canvas still. The canvas gives way to plain text before any
 password or package question.
 

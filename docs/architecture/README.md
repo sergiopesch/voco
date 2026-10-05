@@ -18,10 +18,11 @@ and [Security](../security/README.md) covers trust boundaries and data handling.
 | Renderer | `apps/desktop/src/` | React and TypeScript in WebKitGTK. Window, onboarding, settings, recording orchestration and X11 capture. |
 | Speech worker | `runtime/speech/` | Python process with a C++ bridge to the native recognizer. One warm worker serves every recording. |
 | Native runtime | `runtime/native/` | Pinned, patched build of NeMo-Speech.cpp and ggml for x86-64 with AVX2, FMA and F16C. |
-| Input service | `packaging/systemd/`, `packaging/ydotool/` | `voco-ydotoold.service` runs `ydotoold` for the login, so Wayland paste keys reach apps. |
-| GNOME companion | `integrations/gnome/` | Optional GNOME 46 extension: panel pill, live meter, Stop and a shortcut grab on Wayland. |
+| Virtual keyboard | `apps/desktop/src-tauri/src/virtual_keyboard.rs`, `packaging/udev/` | VOCO's own uinput keyboard sends the Wayland paste keys. The package's udev rule gives the user of the active local session access to `/dev/uinput`. |
+| GNOME companion | `integrations/gnome/` | Optional extension for GNOME 46, 48 and 50: panel pill, live meter, Stop and a shortcut grab on Wayland. |
 | IBus engine | `apps/desktop/src-tauri/resources/`, `packaging/ibus/` | Optional input source that consumes the shortcut in IBus-aware fields. It never edits text. |
 | Chromium extension | `integrations/chromium/` | Optional delivery into one plain text field of an enabled tab, through `voco-browser-host`. |
+| Packages | `packaging/`, `scripts/package-nvidia.py`, `scripts/rpm_package.py` | One staged tree becomes the Debian package and the Fedora RPM, with the same files; see [Linux packaging](../linux-packaging.md). |
 
 ## Production path
 
@@ -47,8 +48,10 @@ dictationStream.ts        append-only: only the new suffix moves on
 
 ### Capture
 
-On Wayland, Rust records from PulseAudio through libpulse (PipeWire's Pulse
-service works too) as 16-bit stereo at 44,100 Hz. It pumps the stream every
+On Wayland, Rust records through libpulse from PipeWire's PulseAudio service
+as 16-bit stereo at 44,100 Hz. A microphone choice names one source by its
+PipeWire `object.serial`, which PulseAudio itself doesn't set, so under plain
+PulseAudio VOCO lists every source as unavailable. Rust pumps the stream every
 5 ms while recording. Capture ends with "Renderer drain lease expired" if the
 renderer stops draining for 5 seconds, and only VOCO's main page may call it.
 On X11 the renderer captures through WebKit with an AudioWorklet. If WebKit
@@ -86,11 +89,11 @@ behind, recognition stops for that recording.
 
 Each new suffix goes to `insertion.rs`, one paste at a time:
 
-1. ASCII control characters, including newlines and tabs, become spaces, so a
+1. VOCO checks the clipboard helper, plus `xdotool` on X11 or access to
+   `/dev/uinput` on Wayland. On Wayland it also makes sure its virtual keyboard
+   exists, so a missing device fails before the clipboard changes.
+2. ASCII control characters, including newlines and tabs, become spaces, so a
    terminal never receives Enter.
-2. VOCO checks the helpers. On Wayland only a running `ydotoold` counts, and
-   `ydotool key --help` shows whether the client takes Ubuntu 24.04's chord
-   names or newer keycode events.
 3. It waits until 150 ms have passed after the previous paste, so that app can
    read the clipboard first.
 4. It copies the text to CLIPBOARD, then PRIMARY. PRIMARY is best effort; a
@@ -99,19 +102,32 @@ Each new suffix goes to `insertion.rs`, one paste at a time:
    On Wayland it reads evdev, or asks the GNOME companion through
    `ModifiersClear`; unknown state doesn't block. On X11 VOCO's grab receives
    every key while the chord is held, so the paste waits for the release.
-6. It sends Shift+Insert. Toolkits paste CLIPBOARD and terminals paste PRIMARY.
+6. It sends Shift+Insert, through the virtual keyboard on Wayland and with
+   `xdotool key --clearmodifiers` on X11. Toolkits paste CLIPBOARD and terminals
+   paste PRIMARY.
 
 When a suffix starts with VOCO's single joining space, that space goes out as
 its own Space key before Shift+Insert, because Chromium's address bar strips
 pasted leading whitespace. VOCO never restores the previous clipboard.
 
+`virtual_keyboard.rs` keeps one uinput keyboard per process, "VOCO virtual
+keyboard", with only Shift, Insert and Space. VOCO creates it at startup in a
+Wayland session: the compositor sees a new device only after udev and libinput
+add it, so a device made for each paste could lose its first keys. A keyboard
+created later waits until it is 500 ms old before its first key. Each key event
+goes out in its own report, 12 ms after the one before. If the device stops
+accepting keys, VOCO releases Shift and drops it, and the next paste creates a
+new one. The evdev shortcut listener ignores the device by name, so its keys
+never count as the shortcut or a held modifier. When VOCO exits, the kernel
+removes the device and releases any key it still held.
+
 A failed paste has one of three outcomes:
 
 | Outcome | Meaning | Result |
 | --- | --- | --- |
-| No change | No keys were sent. A helper is missing or not running, or the modifiers stayed held. | The text stays pending for the next result. Stop retries it 3 times, 250 ms apart. |
-| Rejected | VOCO refused before touching the clipboard. Paste is off, the text is outside 1 to 100,000 bytes, or `ydotool` is unsupported or can't reach its service. | Typing stops for this recording. |
-| Uncertain | A helper failed after it started, so the clipboard or the app may already hold the text. | Typing stops, and VOCO never replays that text. |
+| No change | No keys were sent. A helper is missing, VOCO can't open `/dev/uinput` or create its keyboard, or the modifiers stayed held. | The text stays pending for the next result. Stop retries it 3 times, 250 ms apart. |
+| Rejected | VOCO refused before touching the clipboard. Paste is off, or the text is outside 1 to 100,000 bytes. | Typing stops for this recording. |
+| Uncertain | A helper failed after it started, or the virtual keyboard stopped accepting keys, so the clipboard or the app may already hold the text. | Typing stops, and VOCO never replays that text. |
 
 When typing stops, VOCO notifies "VOCO stopped typing" and keeps listening.
 Recognition runs through Stop, so the full transcript is still available.
@@ -140,7 +156,7 @@ it is.
 
 | Route | When | Behaviour |
 | --- | --- | --- |
-| GNOME companion | GNOME 46 on Wayland with the companion attached | Shell grabs Alt+D or Alt+Shift+D at every status and calls `Action('shortcut', '')`. The focused app never sees the chord. |
+| GNOME companion | GNOME 46, 48 or 50 on Wayland with the companion attached | Shell grabs Alt+D or Alt+Shift+D at every status and calls `Action('shortcut', '')`. The focused app never sees the chord. |
 | Passive evdev | Wayland with Alt+D or Alt+Shift+D | Reads keyboards in `/dev/input` and needs read access to them. The focused app also receives the chord. |
 | X11 grab | X11, any valid shortcut | A root-window key grab consumes the chord and toggles on release, so the paste keys reach the app. |
 | IBus engine | The VOCO Dictation input source is selected | Protocol 6. Consumes the chord in IBus-aware fields and changes no text. |
@@ -158,7 +174,17 @@ Shortcut status text comes from `shortcut_readiness.rs`.
 The tray menu shows the status, then Open VOCO, Start dictation, Stop dictation,
 Settings, Review, Change shortcut and Quit VOCO. `tray_icons.rs` writes the state
 icons and 64 meter frames once, to paths that stay valid for the process
-lifetime, and the meter advances every 90 ms.
+lifetime, and the meter advances every 90 ms. Each launch first removes the
+icons an earlier VOCO left behind, since an exit leaves them in place. The tray
+icon is an AppIndicator, which GNOME shows only through an AppIndicator
+extension: Ubuntu turns one on, Debian 13 and Fedora 44 don't.
+
+The companion loads on GNOME 46, 48 and 50, the majors in its metadata, and
+`voco_gnome_panel.py` reports any other as unsupported. GNOME 50 has no X11
+session and no `Meta.is_wayland_compositor()`, so the companion treats a Shell
+without it as Wayland. A primary click on the pill stops or opens Settings, and
+other buttons, Menu and Shift+F10 open the menu; on GNOME 50 the panel button's
+click gesture leaves primary presses and touches to the pill.
 
 The companion talks to `org.voco.Panel1` on the session bus at `/org/voco/Panel`.
 `Attach` succeeds only for the current owner of `org.gnome.Shell` and hides the
@@ -210,6 +236,9 @@ dictated text, audio or window titles:
 - `VOCO_HOTKEY_TRACE=1` writes `$XDG_STATE_HOME/voco/hotkey-trace.jsonl`
   (8 MiB, then one previous file).
 
+With both off, the renderer sends no dictation traces or delivery quality
+records.
+
 ## Design decisions
 
 - **Tauri.** Rust holds OS authority (processes, sockets, files, D-Bus), while
@@ -220,11 +249,14 @@ dictated text, audio or window titles:
 - **Paste instead of typed keys.** One Shift+Insert works across GTK, Qt,
   Chromium, Firefox, Electron and terminals, for any Unicode text. Control
   characters become spaces, so VOCO never submits a form or command.
+- **VOCO's own virtual keyboard on Wayland.** A three-key uinput device in the
+  app needs no daemon, socket or service, and the package's `uaccess` rule
+  limits `/dev/uinput` to the user of the active local session, without a group.
 - **xclip on GNOME's XWayland.** GNOME lacks the wlroots data-control protocol,
   and `wl-copy`'s temporary focus surface can stall under focus-stealing
   prevention. XWayland bridges the clipboard without a focus-taking surface, so
   on GNOME with a `DISPLAY` VOCO sets both selections through xclip. Keys still
-  go through `ydotool`.
+  go through VOCO's virtual keyboard.
 - **No focus probe or per-app routing.** Each chunk goes to whatever has focus
   when it is ready. One path for every app is simpler to reason about than
   guessing a destination.

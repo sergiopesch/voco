@@ -556,6 +556,25 @@ class ConsumingShortcutTests(unittest.TestCase):
         self.assertEqual(status['setupState'], 'safety-disabled')
         self.assertIsNone(status['sessionId'])
 
+    def test_status_reply_bytes_stay_decodable_by_earlier_protocol_6_apps(self):
+        from voco_ibus_engine import dispatch_command
+        from voco_ibus_protocol import MAX_RESPONSE_BYTES, encode_message
+        expected = (
+            '{"ready":false,"setupState":"safety-disabled","sessionId":null,'
+            '"engineActive":false,"focusLost":%s,"progressiveCommitActive":false,'
+            '"committedCharacterCount":0,"ownershipIntact":false,"finalizationOutcome":null,'
+            '"error":"Automatic IBus delivery is disabled because the original text field '
+            'cannot be verified. Recording remains available; review and copy the '
+            'transcript in VOCO."}\n'
+        )
+        for focus_lost in (False, True):
+            self.coordinator.focus_lost = focus_lost
+            for operation in ('hello', 'status'):
+                with self.subTest(operation=operation, focus_lost=focus_lost):
+                    reply = dispatch_command(self.coordinator, {'operation': operation})
+                    self.assertEqual(encode_message(reply, MAX_RESPONSE_BYTES),
+                                     (expected % str(focus_lost).lower()).encode())
+
     def test_registration_change_discards_old_trigger_and_uses_new_chord(self):
         self.trigger()
         self.coordinator.consumed_shortcut_keys.clear()

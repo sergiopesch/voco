@@ -1,9 +1,10 @@
 // Test-only, installed exclusively in a disposable desktop namespace.
 import Gio from 'gi://Gio';
+import Shell from 'gi://Shell';
 import St from 'gi://St';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
-const xml = '<node><interface name="org.voco.PanelProbe"><method name="Inspect"><arg type="s" direction="out"/></method><method name="Stop"/><method name="Menu"/><method name="MenuAction"><arg type="s" direction="in"/></method><method name="Overview"/><method name="NativeState"><arg type="s" direction="out"/></method><method name="Crowd"><arg type="b" direction="in"/></method><method name="SlowDown"><arg type="d" direction="in"/></method><method name="Focus"><arg type="b" direction="in"/></method></interface></node>';
+const xml = '<node><interface name="org.voco.PanelProbe"><method name="Inspect"><arg type="s" direction="out"/></method><method name="Stop"/><method name="Menu"/><method name="MenuAction"><arg type="s" direction="in"/></method><method name="Overview"/><method name="NativeState"><arg type="s" direction="out"/></method><method name="Crowd"><arg type="b" direction="in"/></method><method name="SlowDown"><arg type="d" direction="in"/></method><method name="Focus"><arg type="b" direction="in"/></method><method name="Pointer"><arg type="ad" direction="out"/></method><method name="Screenshot"><arg type="s" direction="in"/><arg type="i" direction="in"/><arg type="i" direction="in"/><arg type="i" direction="in"/><arg type="i" direction="in"/></method></interface></node>';
 function bounds(actor) {
     const [x, y] = actor.get_transformed_position();
     const [width, height] = actor.get_transformed_size();
@@ -68,6 +69,23 @@ export default class Probe extends Extension {
     }
     // Stretches every Shell animation so a poll can sample many of its frames.
     SlowDown(factor) { St.Settings.get().slow_down_factor = factor; }
+    // Where the compositor has put the pointer, so a test moving it by relative
+    // motion can confirm each position before it clicks.
+    Pointer() { return global.get_pointer().slice(0, 2); }
+    // A headless Shell has no host window to capture, so render the stage area
+    // with GNOME's own screenshot path.
+    ScreenshotAsync([path, x, y, width, height], invocation) {
+        const stream = Gio.File.new_for_path(path).replace(null, false, Gio.FileCreateFlags.NONE, null);
+        new Shell.Screenshot().screenshot_area(x, y, width, height, stream, (shooter, result) => {
+            try {
+                shooter.screenshot_area_finish(result);
+                stream.close(null);
+                invocation.return_value(null);
+            } catch (error) {
+                invocation.return_error_literal(Gio.IOErrorEnum, Gio.IOErrorEnum.FAILED, `${error}`);
+            }
+        });
+    }
     NativeState() {
         return Gio.DBus.session.call_sync('org.voco.Panel', '/org/voco/Panel', 'org.voco.Panel1',
             'GetState', null, null, Gio.DBusCallFlags.NO_AUTO_START, 1500, null).deep_unpack()[0];

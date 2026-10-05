@@ -50,16 +50,10 @@ TRACE
     "${TEST_ROOT}/voco_ibus_engine.py"
   cp /usr/share/ibus/component/simple.xml "${TEST_ROOT}/component/"
   if [[ -n "${VOCO_NATIVE_APP_BINARY:-}" ]]; then
-
     cp --reflink=auto "${VOCO_NATIVE_APP_BINARY}" "${TEST_ROOT}/voco"
-
     source "$(dirname "${BASH_SOURCE[0]}")/lib/test-speech-runtime.sh"
-
     voco_stage_test_speech "${TEST_ROOT}"
-    mkdir -p "${TEST_ROOT}/data/voco/models" "${TEST_ROOT}/config/voco"
-
-    chmod 755 "${TEST_ROOT}/data/voco/models"
-
+    mkdir -p "${TEST_ROOT}/config/voco"
     printf '%s\n' '{"onboardingCompleted":true,"hotkey":"Alt+D"}' >"${TEST_ROOT}/config/voco/config.json"
     export VOCO_NATIVE_AUDIO=1
   fi
@@ -69,16 +63,10 @@ TRACE
     export VOCO_NATIVE_PAPLAY="$(command -v paplay)"
   fi
   deps=${VOCO_NATIVE_DEPS:-/usr}
-  bwrap --die-with-parent --new-session --unshare-ipc --unshare-net --unshare-pid --unshare-uts \
-    --ro-bind / / --dev /dev --proc /proc --tmpfs /tmp --tmpfs /run/user --tmpfs /run/dbus \
-    --bind "${TEST_ROOT}" "${TEST_ROOT}" --ro-bind "${deps}" /tmp/native-deps \
+  source "${ROOT_DIR}/scripts/lib/test-sandbox.sh"
+  voco_bwrap "${TEST_ROOT}" --ro-bind "${deps}" /tmp/native-deps \
     --ro-bind "${TEST_ROOT}/component" /usr/share/ibus/component \
-    --setenv HOME "${TEST_ROOT}/home" --setenv XDG_RUNTIME_DIR "${TEST_ROOT}/runtime" \
-    --setenv XDG_CONFIG_HOME "${TEST_ROOT}/config" --setenv XDG_CACHE_HOME "${TEST_ROOT}/cache" \
-    --setenv XDG_DATA_HOME "${TEST_ROOT}/data" --setenv XDG_STATE_HOME "${TEST_ROOT}/state" \
-    --unsetenv DISPLAY --unsetenv WAYLAND_DISPLAY --unsetenv DBUS_SESSION_BUS_ADDRESS \
-    --unsetenv IBUS_ADDRESS --unsetenv XAUTHORITY \
-    bash "${BASH_SOURCE[0]}" --inside "${TEST_ROOT}"
+    -- bash "${BASH_SOURCE[0]}" --inside "${TEST_ROOT}"
   exit
 fi
 TEST_ROOT=${2:?}

@@ -19,8 +19,6 @@ const RECEIPT_TIMEOUT: Duration = Duration::from_secs(2);
 #[serde(rename_all = "camelCase")]
 pub struct BrowserTrigger {
     pub trigger_id: String,
-    pub mode: String,
-    pub provider: String,
     pub action: String,
 }
 #[derive(Debug, Clone, Default, Serialize)]
@@ -59,7 +57,6 @@ struct Session {
     committed: String,
     valid: bool,
     claimed: bool,
-    finalized: bool,
     uncertain: bool,
     stop_seen: bool,
 }
@@ -72,7 +69,7 @@ struct Pending {
     sequence: u64,
     expected: usize,
     appended: usize,
-    receipt: Option<(String, usize)>,
+    receipt: Option<String>,
 }
 #[derive(Default)]
 struct State {
@@ -166,10 +163,7 @@ impl BrowserBroker {
             .map_err(|_| "Browser state unavailable.")?;
         if session_id == 0
             || state.pending.is_some()
-            || state
-                .session
-                .as_ref()
-                .is_some_and(|s| s.valid && !s.finalized)
+            || state.session.as_ref().is_some_and(|s| s.valid)
         {
             return Err("A browser session is already active.".into());
         }
@@ -204,47 +198,19 @@ impl BrowserBroker {
             committed: String::new(),
             valid: true,
             claimed: false,
-            finalized: false,
             uncertain: false,
             stop_seen: false,
         });
         drop(state);
-        self.request(allocated_session_id, "claim", "", "", false)
+        self.request(allocated_session_id, "claim", "", "")
     }
     pub fn append(
         &self,
         session_id: u64,
         expected_committed_text: &str,
         append_text: &str,
-        finalize: bool,
     ) -> Result<BrowserStatus, String> {
-        self.request(
-            session_id,
-            "append",
-            expected_committed_text,
-            append_text,
-            finalize,
-        )
-    }
-    #[cfg(test)]
-    pub fn commit(&self, session_id: u64, full_text: &str) -> Result<BrowserStatus, String> {
-        let state = self
-            .shared
-            .state
-            .lock()
-            .map_err(|_| "Browser state unavailable.")?;
-        let session = state
-            .session
-            .as_ref()
-            .filter(|s| s.id == session_id)
-            .ok_or("Unknown browser session.")?;
-        let prefix = session.committed.clone();
-        let suffix = full_text
-            .strip_prefix(&prefix)
-            .ok_or("Browser committed prefix changed.")?
-            .to_owned();
-        drop(state);
-        self.append(session_id, &prefix, &suffix, true)
+        self.request(session_id, "append", expected_committed_text, append_text)
     }
     /// End the recording's browser authorization, even if its claim never succeeded.
     /// Unknown or stale tokens are idempotent and cannot affect another session.
@@ -283,7 +249,6 @@ impl BrowserBroker {
         kind: &str,
         prefix: &str,
         text: &str,
-        finalize: bool,
     ) -> Result<BrowserStatus, String> {
         if text.len() > protocol::MAX_TEXT {
             return Err("Browser append exceeds size limit.".into());
@@ -302,7 +267,6 @@ impl BrowserBroker {
             .filter(|s| s.id == sid)
             .ok_or("Unknown browser session.")?;
         if !session.valid
-            || session.finalized
             || session.issued.elapsed() > SESSION_TTL
             || session.committed != prefix
             || (kind == "append" && !session.claimed)
@@ -342,7 +306,9 @@ impl BrowserBroker {
             "sequence":sequence,"expectedCommittedCharacters":pending.expected,"expiresAt":expires_at});
         if kind == "append" {
             message["text"] = text.into();
-            message["final"] = finalize.into();
+            // Protocol 1 requires `final`. VOCO ends a session by releasing it at
+            // Stop; content.js still accepts the final append VOCO 2026.0.59 sends.
+            message["final"] = false.into();
         }
         state.pending = Some(pending.clone());
         let sent = state
@@ -358,7 +324,7 @@ impl BrowserBroker {
         }
         let deadline = Instant::now() + RECEIPT_TIMEOUT;
         loop {
-            if let Some((outcome, count)) = state.pending.as_ref().and_then(|p| p.receipt.clone()) {
+            if let Some(outcome) = state.pending.as_ref().and_then(|p| p.receipt.clone()) {
                 state.pending = None;
                 let session = state
                     .session
@@ -367,17 +333,12 @@ impl BrowserBroker {
                     .ok_or("Browser session changed.")?;
                 if outcome == "applied" {
                     // The receipt proves this exact mutation even if a subsequent
-                    // focus invalidation arrived before this waiter woke.
+                    // focus invalidation arrived before this waiter woke. receive()
+                    // accepted it only with the exact new committed count.
                     session.uncertain = false;
                     session.committed.push_str(text);
                     session.sequence = sequence;
                     session.claimed = true;
-                    session.finalized = finalize;
-                    if count != session.committed.chars().count() {
-                        session.valid = false;
-                        session.uncertain = true;
-                        return Err("Browser receipt count mismatch.".into());
-                    }
                     return Ok(status(&state));
                 }
                 session.valid = false;
@@ -449,28 +410,19 @@ fn release_token(state: &mut State, trigger_id: &str) {
 fn status(state: &State) -> BrowserStatus {
     let active = state.session.as_ref();
     let connected = state.connection.is_some();
-    let finalized = active.is_some_and(|s| s.finalized && !s.uncertain);
     let valid = active.is_some_and(|s| s.valid && s.claimed && s.issued.elapsed() <= SESSION_TTL);
     BrowserStatus {
         available: connected,
-        ready: valid || finalized,
+        ready: valid,
         setup_state: if valid { "ready" } else { "safety-disabled" }.into(),
         detail: "Automatic delivery requires a current exact-field browser authorization.".into(),
         session_id: active.map(|s| s.id),
-        engine_active: connected || finalized,
-        focus_lost: !finalized && active.is_some_and(|s| !s.valid),
+        engine_active: connected,
+        focus_lost: active.is_some_and(|s| !s.valid),
         progressive_commit_active: active.is_some_and(|s| !s.committed.is_empty()),
         committed_character_count: active.map_or(0, |s| s.committed.chars().count()),
-        ownership_intact: valid || finalized,
-        finalization_outcome: active.and_then(|s| {
-            if s.uncertain {
-                Some("uncertain".into())
-            } else if s.finalized {
-                Some("committed".into())
-            } else {
-                None
-            }
-        }),
+        ownership_intact: valid,
+        finalization_outcome: active.filter(|s| s.uncertain).map(|_| "uncertain".into()),
         error: None,
     }
 }
@@ -482,9 +434,7 @@ fn invalidate(state: &mut State, uncertain: bool) {
     state.trigger = None;
     if let Some(s) = state.session.as_mut() {
         s.valid = false;
-        if !s.finalized {
-            s.uncertain |= uncertain;
-        }
+        s.uncertain |= uncertain;
     }
 }
 fn connection_loop(
@@ -595,8 +545,6 @@ fn disconnect(
         // The connection is gone, but each unreleased token still owns its Stop.
         let _ = callback(BrowserTrigger {
             trigger_id: format!("browser:{token}"),
-            mode: "dictation".into(),
-            provider: "chromium".into(),
             action: "stop".into(),
         });
     }
@@ -624,11 +572,7 @@ fn receive(
             {
                 return Err(());
             }
-            if state
-                .session
-                .as_ref()
-                .is_some_and(|s| s.valid && !s.finalized)
-            {
+            if state.session.as_ref().is_some_and(|s| s.valid) {
                 if let Some(connection) = state.connection.as_mut() {
                     send(&mut connection.stream, &json!({"protocol":protocol::PROTOCOL,"type":"cancel","token":token,"documentId":document_id})).map_err(|_| ())?;
                 }
@@ -639,8 +583,6 @@ fn receive(
             }
             let event = BrowserTrigger {
                 trigger_id: format!("browser:{token}"),
-                mode,
-                provider: "chromium".into(),
                 action: "start".into(),
             };
             state.last_trigger = Some((token.clone(), document_id.clone(), false));
@@ -671,12 +613,11 @@ fn receive(
                 {
                     *stopped = true;
                 }
-            } else if let Some((last_token, last_document, stopped)) = state
+            } else if let Some((_, _, stopped)) = state
                 .last_trigger
                 .as_mut()
                 .filter(|(t, d, _)| t == &token && d == &document_id)
             {
-                let _ = (last_token, last_document);
                 if *stopped {
                     return Ok(None);
                 }
@@ -688,8 +629,6 @@ fn receive(
             }
             Ok(Some(BrowserTrigger {
                 trigger_id: format!("browser:{token}"),
-                mode: "dictation".into(),
-                provider: "chromium".into(),
                 action: "stop".into(),
             }))
         }
@@ -747,7 +686,7 @@ fn receive(
             if !valid_count {
                 return Err(());
             }
-            p.receipt = Some((outcome, committed_characters));
+            p.receipt = Some(outcome);
             Ok(None)
         }
         _ => Err(()),
@@ -802,30 +741,30 @@ mod tests {
         assert!(thread.join().unwrap().unwrap().ready);
     }
     #[test]
-    fn claim_then_unicode_append_and_final_receipts_are_exact() {
+    fn claim_then_unicode_appends_and_receipts_are_exact() {
         let (broker, mut browser, rx) = fixture();
         assert!(!broker.get_status().ready);
         let id = trigger(&mut browser, &rx);
         claim(&broker, &mut browser, id.clone());
         assert!(broker.start(8, &id).is_err());
         let worker = broker.clone();
-        let t = std::thread::spawn(move || worker.append(1, "", "é🦀", false));
+        let t = std::thread::spawn(move || worker.append(1, "", "é🦀"));
         let request = read(&mut browser);
         assert_eq!(request["sequence"], 1);
+        assert_eq!(request["final"], false);
         send(&mut browser, &receipt(&request, "applied", 2)).unwrap();
         assert_eq!(t.join().unwrap().unwrap().committed_character_count, 2);
-        assert!(broker.append(1, "wrong", "x", false).is_err());
+        assert!(broker.append(1, "wrong", "x").is_err());
         let worker = broker.clone();
-        let t = std::thread::spawn(move || worker.commit(1, "é🦀你好"));
+        let t = std::thread::spawn(move || worker.append(1, "é🦀", "你好"));
         let request = read(&mut browser);
+        assert_eq!(request["sequence"], 2);
         assert_eq!(request["text"], "你好");
-        assert_eq!(request["final"], true);
         send(&mut browser, &receipt(&request, "applied", 4)).unwrap();
         let status = t.join().unwrap().unwrap();
         assert_eq!(status.committed_character_count, 4);
-        assert_eq!(status.finalization_outcome.as_deref(), Some("committed"));
-        assert!(status.engine_active);
-        assert!(broker.append(1, "é🦀你好", "x", false).is_err());
+        assert!(status.engine_active && status.ownership_intact);
+        assert_eq!(status.finalization_outcome, None);
     }
     #[test]
     fn every_receipt_identity_and_count_is_required() {
@@ -843,7 +782,7 @@ mod tests {
             let id = trigger(&mut browser, &rx);
             claim(&broker, &mut browser, id);
             let worker = broker.clone();
-            let t = std::thread::spawn(move || worker.append(1, "", "safe", true));
+            let t = std::thread::spawn(move || worker.append(1, "", "safe"));
             let request = read(&mut browser);
             let mut answer = receipt(&request, "applied", 4);
             answer[field] = if answer[field].is_number() {
@@ -857,7 +796,7 @@ mod tests {
                 broker.session_status(1).unwrap().committed_character_count,
                 0
             );
-            assert!(broker.commit(1, "safe").is_err());
+            assert!(broker.append(1, "", "safe").is_err());
         }
     }
     #[test]
@@ -876,7 +815,7 @@ mod tests {
             "stop"
         );
         assert!(!broker.session_status(1).unwrap().ownership_intact);
-        assert!(broker.commit(1, "no redirect").is_err());
+        assert!(broker.append(1, "", "no redirect").is_err());
         assert!(broker.start(8, &id).is_err());
     }
     #[test]
@@ -894,7 +833,7 @@ mod tests {
         assert_eq!(event.trigger_id, id);
         assert_eq!(event.action, "stop");
         assert!(!broker.session_status(1).unwrap().ownership_intact);
-        assert!(broker.append(1, "", "no redirect", true).is_err());
+        assert!(broker.append(1, "", "no redirect").is_err());
     }
     #[test]
     fn native_disconnect_stops_recording_after_focus_loss_once() {
@@ -970,7 +909,7 @@ mod tests {
         let id = trigger(&mut browser, &rx);
         claim(&broker, &mut browser, id);
         let worker = broker.clone();
-        let t = std::thread::spawn(move || worker.commit(1, "maybe inserted"));
+        let t = std::thread::spawn(move || worker.append(1, "", "maybe inserted"));
         let _request = read(&mut browser);
         drop(browser);
         assert!(t.join().unwrap().unwrap_err().contains("uncertain"));
@@ -982,7 +921,7 @@ mod tests {
                 .as_deref(),
             Some("uncertain")
         );
-        assert!(broker.commit(1, "maybe inserted").is_err());
+        assert!(broker.append(1, "", "maybe inserted").is_err());
     }
     #[test]
     fn unanswered_claim_expires_without_retry() {
@@ -1017,6 +956,20 @@ mod tests {
         assert!(broker.get_status().available);
     }
     #[test]
+    fn trigger_for_another_mode_closes_the_connection_without_a_start() {
+        let (broker, mut browser, rx) = fixture();
+        send(&mut browser, &json!({"protocol":1,"type":"trigger","token":"a".repeat(48),"documentId":"b".repeat(48),"mode":"other"})).unwrap();
+        assert!(protocol::read_frame(&mut browser).is_err());
+        for _ in 0..100 {
+            if !broker.get_status().available {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        assert!(!broker.get_status().available);
+        assert!(rx.try_recv().is_err());
+    }
+    #[test]
     fn competing_new_tab_is_canceled_without_revoking_active_owner() {
         let (broker, mut browser, rx) = fixture();
         let id = trigger(&mut browser, &rx);
@@ -1036,7 +989,7 @@ mod tests {
         broker.cancel(1).unwrap();
         assert_eq!(read(&mut browser)["type"], "revoke");
         assert!(!broker.session_status(1).unwrap().ownership_intact);
-        assert!(broker.append(1, "", "unsafe", true).is_err());
+        assert!(broker.append(1, "", "unsafe").is_err());
         let stop =
             json!({"protocol":1,"type":"stop","token":"a".repeat(48),"documentId":"b".repeat(48)});
         send(&mut browser, &stop).unwrap();
@@ -1071,7 +1024,7 @@ mod tests {
         assert!(rx.recv_timeout(Duration::from_millis(20)).is_err());
         assert!(broker.session_status(2).unwrap().ownership_intact);
         assert!(broker.cancel(1).is_err());
-        assert!(broker.append(1, "", "stale", true).is_err());
+        assert!(broker.append(1, "", "stale").is_err());
         assert!(broker.session_status(1).is_err());
         broker.release(&id).unwrap();
         assert!(broker.session_status(2).unwrap().ownership_intact);
@@ -1108,7 +1061,7 @@ mod tests {
         let id = trigger(&mut browser, &rx);
         claim(&broker, &mut browser, id);
         let worker = broker.clone();
-        let t = std::thread::spawn(move || worker.commit(1, "done"));
+        let t = std::thread::spawn(move || worker.append(1, "", "done"));
         let request = read(&mut browser);
         {
             let mut state = broker.shared.state.lock().unwrap();
@@ -1119,35 +1072,11 @@ mod tests {
             invalidate(&mut state, true);
         }
         broker.shared.changed.notify_all();
+        // The disconnect revoked delivery, yet the receipt proves this append.
         let result = t.join().unwrap().unwrap();
-        assert_eq!(result.finalization_outcome.as_deref(), Some("committed"));
         assert_eq!(result.committed_character_count, 4);
-        assert!(result.engine_active && result.ownership_intact);
-    }
-    #[test]
-    fn acknowledged_final_receipt_survives_later_disconnect() {
-        let (broker, mut browser, rx) = fixture();
-        let id = trigger(&mut browser, &rx);
-        claim(&broker, &mut browser, id);
-        let worker = broker.clone();
-        let t = std::thread::spawn(move || worker.commit(1, "done"));
-        let request = read(&mut browser);
-        send(&mut browser, &receipt(&request, "applied", 4)).unwrap();
-        assert_eq!(
-            t.join().unwrap().unwrap().finalization_outcome.as_deref(),
-            Some("committed")
-        );
-        drop(browser);
-        for _ in 0..100 {
-            if !broker.get_status().available {
-                break;
-            }
-            std::thread::sleep(Duration::from_millis(1));
-        }
-        let result = broker.session_status(1).unwrap();
-        assert_eq!(result.finalization_outcome.as_deref(), Some("committed"));
-        assert_eq!(result.committed_character_count, 4);
-        assert!(result.engine_active && result.ownership_intact);
+        assert_eq!(result.finalization_outcome, None);
+        assert!(!result.ownership_intact);
     }
     #[test]
     fn stale_trigger_rejected_and_competing_live_connection_does_not_replace_owner() {

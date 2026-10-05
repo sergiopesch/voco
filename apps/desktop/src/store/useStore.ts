@@ -33,8 +33,12 @@ export function deriveSurfaceForConfig(
 interface AppState {
   captureBackendMode: CaptureBackendMode;
   nativeCaptureSource: NativeCaptureSource | null;
+  /** VOCO dropped the chosen microphone because it failed or disappeared;
+   * cleared when a microphone is chosen again. */
+  nativeCaptureSourceLost: boolean;
   setCaptureBackendMode: (mode: CaptureBackendMode) => void;
   setNativeCaptureSource: (source: NativeCaptureSource | null) => void;
+  loseNativeCaptureSource: () => void;
   dictationPurpose: "cursor" | "onboarding";
   onboardingTestPassed: boolean;
   setDictationPurpose: (purpose: "cursor" | "onboarding") => void;
@@ -77,9 +81,16 @@ export const useStore = create<AppState>((set) => ({
     microphoneReady: captureBackendMode === "native" ? Boolean(state.nativeCaptureSource)
       : captureBackendMode === "pending" ? false : state.microphoneReady,
   })),
+  nativeCaptureSourceLost: false,
   setNativeCaptureSource: (nativeCaptureSource) => set((state) => ({
     nativeCaptureSource,
+    nativeCaptureSourceLost: nativeCaptureSource ? false : state.nativeCaptureSourceLost,
     microphoneReady: state.captureBackendMode === "native" ? Boolean(nativeCaptureSource) : state.microphoneReady,
+  })),
+  loseNativeCaptureSource: () => set((state) => ({
+    nativeCaptureSource: null,
+    nativeCaptureSourceLost: true,
+    microphoneReady: state.captureBackendMode === "native" ? false : state.microphoneReady,
   })),
   dictationPurpose: "cursor",
   onboardingTestPassed: false,

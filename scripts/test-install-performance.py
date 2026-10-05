@@ -142,7 +142,7 @@ printf 'PROMPT REMAINS VISIBLE\\n'
 
     def test_real_verification_gate_rejects_missing_or_corrupt_checksum(self):
         source = (ROOT / 'install').read_text()
-        start = source.index('if ! grep -F "  $(basename "$DEB_FILE")"')
+        start = source.index('if ! grep -F "  $(basename "$PACKAGE_FILE")"')
         verification = source[start:source.index('# ─── Install', start)]
         for case in ('valid', 'corrupt', 'missing'):
             with self.subTest(case=case), tempfile.TemporaryDirectory() as folder:
@@ -155,9 +155,9 @@ printf 'PROMPT REMAINS VISIBLE\\n'
                 (root / 'checksums').write_bytes(checksum if case != 'missing' else b'')
                 body = '''
 VOCO_DOWNLOAD_DIR="$1"
-DEB_FILE="$1/fixture.deb"
+PACKAGE_FILE="$1/fixture.deb"
 CHECKSUM_FILE="$1/checksums"
-DEB_CHECKSUM_FILE="$1/selected.sha256"
+PACKAGE_CHECKSUM_FILE="$1/selected.sha256"
 '''
                 run = subprocess.run(
                     ['bash', '-c', PREFIX + body + verification + '\nprintf "PASSED INSTALL GATE\\n"', 'test', folder],
@@ -214,22 +214,6 @@ voco_finish_release_metadata_downloads
         finally:
             server.shutdown()
             server.server_close()
-
-    def test_slow_optional_prefetch_does_not_hold_up_install(self):
-        with tempfile.TemporaryDirectory() as folder:
-            body = '''
-VOCO_DOWNLOAD_DIR=$(mktemp -d)
-sleep 20 &
-HELPER_DOWNLOAD_PID=$!
-pid=$HELPER_DOWNLOAD_PID
-voco_finish_helper_prefetch
-[[ -z "$HELPER_DOWNLOAD_READY" && -z "$HELPER_DOWNLOAD_PID" ]]
-! kill -0 "$pid" 2>/dev/null
-'''
-            start = time.monotonic()
-            run = subprocess.run(['bash', '-c', PREFIX + body], env={**os.environ, 'TMPDIR': folder}, capture_output=True, timeout=2)
-            self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
-            self.assertLess(time.monotonic() - start, .5)
 
     def test_apt_keeps_stdin_prompts_and_failure_status(self):
         for outcome in (0, 100):
@@ -294,7 +278,7 @@ VOCO_DOWNLOAD_DIR=$(mktemp -d)
 voco_ui_init
 voco_ui_begin test detail
 printf x > "$VOCO_DOWNLOAD_DIR/data"
-voco_ui_download_observer "$VOCO_DOWNLOAD_DIR/data" 0 "$SECONDS" &
+voco_ui_download_observer "$VOCO_DOWNLOAD_DIR/data" "$SECONDS" &
 VOCO_UI_PID=$!
 sleep .3
 voco_ui_pause

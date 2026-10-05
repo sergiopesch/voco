@@ -31,62 +31,45 @@ PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-check-shell-syntax.py
 git ls-files -z -- install packaging/ibus/voco-ibus-engine '*.sh' \
   | xargs -0 bash scripts/check-shell-syntax.sh
 
+# Every desktop test sandbox starts from the same namespaces, private mounts and
+# cleared session variables; a suite's own arguments only follow them.
+(
+  bwrap() { printf '%s\n' "$@"; }
+  source scripts/lib/test-sandbox.sh
+  voco_bwrap /fixture --ro-bind /deps /tmp/deps --setenv SUITE 1 -- run --inside
+) | PYTHONDONTWRITEBYTECODE=1 python3 -c '
+import sys
+expected = """--die-with-parent --new-session --unshare-ipc --unshare-net --unshare-pid --unshare-uts
+  --ro-bind / / --dev /dev --proc /proc --tmpfs /tmp --tmpfs /run/user --tmpfs /run/dbus --bind /fixture /fixture
+  --setenv HOME /fixture/home --setenv XDG_RUNTIME_DIR /fixture/runtime --setenv XDG_CONFIG_HOME /fixture/config
+  --setenv XDG_CACHE_HOME /fixture/cache --setenv XDG_DATA_HOME /fixture/data --setenv XDG_STATE_HOME /fixture/state
+  --unsetenv DISPLAY --unsetenv WAYLAND_DISPLAY --unsetenv XAUTHORITY --unsetenv DBUS_SESSION_BUS_ADDRESS
+  --unsetenv DBUS_SYSTEM_BUS_ADDRESS --unsetenv AT_SPI_BUS_ADDRESS --unsetenv IBUS_ADDRESS --unsetenv PULSE_SERVER
+  --unsetenv PYTHONOPTIMIZE --ro-bind /deps /tmp/deps --setenv SUITE 1 run --inside""".split()
+if sys.stdin.read().split() != expected:
+    raise SystemExit("scripts/lib/test-sandbox.sh no longer builds the isolated desktop sandbox")
+print("Desktop test sandboxes are isolated.")
+'
+
+# The installer embeds the shared install steps and its UI byte for byte.
 python3 scripts/sync-installer-ui.py --check
 
 bash scripts/test-verify-release.sh
 
-PYTHONDONTWRITEBYTECODE=1 python3 - <<'PY'
-import re
-from pathlib import Path
-
-function_names = (
-    "voco_escape_json_string",
-    "voco_trim",
-    "voco_canonical_hotkey_key",
-    "voco_validate_hotkey",
-    "voco_read_configured_hotkey",
-    "voco_migrate_legacy_config",
-    "voco_verify_installed_package",
-    "voco_install_deb_package",
-    "voco_verify_desktop_input",
-    "voco_wayland_device_access",
-    "voco_start_wayland_service",
-    "voco_write_default_config",
-    "voco_run_hotkey_setup",
-)
-functions = {name: [] for name in function_names}
-for path in (Path("install"), Path("scripts/lib/install-common.sh")):
-    contents = path.read_text()
-    for name in function_names:
-        match = re.search(rf"{name}\(\) \{{.*?^\}}", contents, re.S | re.M)
-        if match is None:
-            raise SystemExit(f"Missing {name} function in {path}")
-        functions[name].append(match.group(0))
-for name, copies in functions.items():
-    if copies[0] != copies[1]:
-        raise SystemExit(f"Standalone and source installer {name} function have drifted")
-print("Standalone and source installer helpers are in sync.")
-PY
-
-PYTHONDONTWRITEBYTECODE=1 python3 scripts/build-legacy-ydotool.py --verify-only
-PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-ydotool-service.py
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-install-presentation.py
-PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-install-prefetch.py
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-install-performance.py
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-install-launch.py
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-install-journey.py
 
-node --check scripts/comparative-dictation.mjs
-node --check scripts/comparative-dictation.test.mjs
-node --check scripts/test-browser-delivery.mjs
-node --test scripts/comparative-dictation.test.mjs
+# Every tracked Node script; node --check reads only its first argument.
+git ls-files -z -- '*.mjs' '*.cjs' | xargs -0 -n1 node --check --
 
 PYTHONDONTWRITEBYTECODE=1 python3 - <<'PY'
 import ast
 import subprocess
 
 tracked = subprocess.run(
-    ["git", "ls-files", "-z", "--", "*.py", "packaging/ydotool/voco-ydotool-launcher"],
+    ["git", "ls-files", "-z", "--", "*.py"],
     check=True, capture_output=True, text=True,
 ).stdout.split("\0")
 paths = [path for path in tracked if path]
@@ -171,8 +154,10 @@ required_dependencies = {"ibus", "python3", "python3-gi", "gir1.2-ibus-1.0",
                          "libc6 (>= 2.39)", "libstdc++6 (>= 13.2.0)"}
 if not required_dependencies.issubset(deb.get("depends", [])):
     raise SystemExit("Debian IBus runtime dependencies are incomplete")
-if deb.get("recommends") != ["ydotool", "ydotoold"]:
-    raise SystemExit("Wayland-only ydotool and ydotoold must be recommended, not an X11 install blocker")
+if "recommends" in deb:
+    raise SystemExit("VOCO pastes through its own virtual keyboard; the package recommends nothing")
+if deb.get("files", {}).get("/usr/lib/udev/rules.d/70-voco-uinput.rules") != "../../../packaging/udev/70-voco-uinput.rules":
+    raise SystemExit("The package must ship the /dev/uinput access rule")
 required_files = {
     "/usr/share/metainfo/com.sergiopesch.voco.metainfo.xml",
     "/usr/share/ibus/component/voco.xml",
@@ -183,6 +168,55 @@ required_files = {
 if not required_files.issubset(deb.get("files", {})):
     raise SystemExit("Debian IBus package mappings are incomplete")
 print("Persistent IBus package metadata is valid.")
+PY
+
+# The Fedora RPM is built from the Debian package's staged tree, so Tauri keeps
+# bundling only the .deb; these are the RPM's own source gates.
+PYTHONDONTWRITEBYTECODE=1 python3 - <<'PY'
+import json
+import re
+import sys
+from pathlib import Path
+
+sys.path.insert(0, "scripts")
+import rpm_package
+
+spec_path = Path("packaging/rpm/voco.spec.in")
+spec = spec_path.read_text()
+depends = json.loads(Path("apps/desktop/src-tauri/tauri.conf.json").read_text())["bundle"]["linux"]["deb"]["depends"]
+if set(depends) | set(rpm_package.TAURI_IMPLIED_DEPENDS) != set(rpm_package.DEBIAN_TO_FEDORA):
+    raise SystemExit("Every Debian dependency needs its Fedora name in scripts/rpm_package.py DEBIAN_TO_FEDORA")
+requires = tuple(re.findall(r"^Requires:\s+(.+?)\s*$", spec, re.M))
+if requires != rpm_package.FEDORA_REQUIRES:
+    raise SystemExit(f"{spec_path} must require exactly the mapped Fedora names: {requires}")
+for floor in ("glibc >= 2.39", "libstdc++ >= 13.2"):
+    if floor not in requires:
+        raise SystemExit(f"{spec_path} is missing the verified ABI floor {floor}")
+# The guided installer refuses an older glibc before downloading either package.
+installer_floor = re.findall(r"glibc_floor=([0-9.]+)", Path("scripts/lib/install-common.sh").read_text())
+if len(installer_floor) != 1 or f"libc6 (>= {installer_floor[0]})" not in depends \
+        or f"glibc >= {installer_floor[0]}" not in requires:
+    raise SystemExit("The installer's glibc_floor must equal the packages' libc6 and glibc floors")
+extra = re.findall(r"^(Recommends|Suggests|Supplements|Enhances|Conflicts|Obsoletes|Provides|"
+                   r"BuildRequires|Source\d*|Patch\d*|Epoch|BuildArch):", spec, re.M | re.I)
+if extra:
+    raise SystemExit(f"{spec_path} declares {extra}; VOCO's RPM recommends, provides and downloads nothing")
+sections = {"prep", "build", "install", "check", "clean", "conf", "generate_buildrequires", "pre",
+            "post", "preun", "postun", "pretrans", "posttrans", "preuntrans", "postuntrans",
+            "verifyscript", "triggerprein", "triggerin", "triggerun", "triggerpostun",
+            "filetriggerin", "filetriggerun", "filetriggerpostun", "transfiletriggerin",
+            "transfiletriggerun", "transfiletriggerpostun"}
+if [name for name in re.findall(r"^%(\w+)", spec, re.M) if name in sections] != ["post"] \
+        or "\n%post\n@POST@\n\n%files\n" not in spec:
+    raise SystemExit(f"{spec_path} may run only packaging/rpm/post.sh, and it builds nothing")
+if not re.search(r"^ExclusiveArch:\s+x86_64$", spec, re.M) or rpm_package.RELEASE != "1":
+    raise SystemExit(f"{spec_path} must stay x86_64 release 1, the installer's voco-<version>-1.x86_64.rpm")
+if "%" in Path("packaging/rpm/post.sh").read_text():
+    raise SystemExit("packaging/rpm/post.sh must not contain rpm macros")
+for macro in ("__provides_exclude_from ^/usr/lib/voco/speech/", "_build_id_links none", "__os_install_post %{nil}"):
+    if f"%global {macro}" not in spec:
+        raise SystemExit(f"{spec_path} must keep %global {macro}")
+print("Fedora RPM packaging metadata is valid.")
 PY
 
 PYTHONDONTWRITEBYTECODE=1 python3 - <<'PY'
@@ -242,5 +276,4 @@ if grep -En 'set_global_engine|register_component|delete_surrounding_text|get_su
   exit 1
 fi
 
-bash -n packaging/ibus/voco-ibus-engine
 npm run rehearse:release

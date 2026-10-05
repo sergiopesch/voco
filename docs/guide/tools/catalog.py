@@ -3,7 +3,7 @@
 from pathlib import Path
 import argparse, hashlib, json, re, subprocess
 
-DEFAULT_COMMIT = "67afa98"
+DEFAULT_COMMIT = "98abe91"
 GROUPS = [
     # First match wins, so specific prefixes come before the areas that contain them.
     ("apps/desktop/src-tauri/native/", "Native audio bridge", "The C shim that opens one PulseAudio or PipeWire recording stream for native capture."),
@@ -27,8 +27,8 @@ GROUPS = [
     ("tests/", "Test fixtures", "Public test inputs such as speech clips and installer fixtures; no personal recordings."),
     ("docs/guide/", "This guide", "Inside VOCO itself: the local server, site, lesson generator and tests."),
     ("docs/", "Documentation", "Written guidance. When a document and the code disagree, the code wins."),
-    ("packaging/", "Linux packages", "Package files: desktop entry, AppStream data, IBus component, input service, browser host manifest, install hook and the published-release record."),
-    ("vendor/", "Borrowed libraries", "Upstream code that VOCO patches or builds, with provenance records; not code written for VOCO."),
+    ("packaging/", "Linux packages", "Package files: desktop entry, AppStream data, IBus component, the /dev/uinput udev rule, the RPM spec, browser host manifests, install hooks and the published-release record."),
+    ("vendor/", "Borrowed libraries", "Upstream code that VOCO patches, with provenance records; not code written for VOCO."),
     (".github/", "GitHub automation", "The CI workflow, issue and pull request templates, and dependency update settings."),
     ("assets/", "Brand identity", "A brand image or its source notes; not application logic."),
     ("install", "Release installer", "The guided installer that downloads a release, checks its signature and checksums, and installs the package."),

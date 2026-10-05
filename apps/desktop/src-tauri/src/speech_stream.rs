@@ -39,6 +39,16 @@ fn read_response(output: &mut impl BufRead) -> Result<Value, String> {
     }
     serde_json::from_str(&line).map_err(|_| "invalid worker response".into())
 }
+// ChildStdin is unbuffered, and serializing into it costs one write(2) per JSON
+// token, about two per audio sample. Build the line, then send it in one write.
+fn write_request(input: &mut impl Write, request: &Value) -> Result<(), String> {
+    let mut line = serde_json::to_vec(request).map_err(|_| "worker write failed")?;
+    line.push(b'\n');
+    input
+        .write_all(&line)
+        .and_then(|()| input.flush())
+        .map_err(|_| "worker write failed".into())
+}
 fn configured_path(name: &str) -> Result<PathBuf, String> {
     let default = match name {
         "VOCO_STREAM_PYTHON" => "/usr/bin/python3",
@@ -92,15 +102,8 @@ impl Worker {
                 return;
             }
             for request in request_rx {
-                let result = (|| {
-                    serde_json::to_writer(&mut input, &request)
-                        .map_err(|_| "worker write failed")?;
-                    input
-                        .write_all(b"\n")
-                        .and_then(|_| input.flush())
-                        .map_err(|_| "worker write failed")?;
-                    read_response(&mut output)
-                })();
+                let result =
+                    write_request(&mut input, &request).and_then(|()| read_response(&mut output));
                 let failed = result.is_err();
                 if response_tx.send(result).is_err() || failed {
                     return;
@@ -438,6 +441,43 @@ mod tests {
     }
 
     #[test]
+    fn a_request_reaches_the_worker_in_one_write() {
+        struct Writes(Vec<Vec<u8>>);
+        impl Write for Writes {
+            fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+                self.0.push(bytes.to_vec());
+                Ok(bytes.len())
+            }
+            fn flush(&mut self) -> std::io::Result<()> {
+                Ok(())
+            }
+        }
+        struct Closed;
+        impl Write for Closed {
+            fn write(&mut self, _: &[u8]) -> std::io::Result<usize> {
+                Err(std::io::ErrorKind::BrokenPipe.into())
+            }
+            fn flush(&mut self) -> std::io::Result<()> {
+                Ok(())
+            }
+        }
+        // One 100 ms packet of 44.1 kHz capture, as the renderer sends it.
+        let audio: Vec<f32> = (0..4410).map(|n| (n - 2205) as f32 / 65536.0).collect();
+        let request = serde_json::json!({
+            "op":"push", "session":"fixture", "seq":1, "audio":audio, "rate":44100,
+        });
+        let mut writes = Writes(Vec::new());
+        write_request(&mut writes, &request).unwrap();
+        let mut line = serde_json::to_vec(&request).unwrap();
+        line.push(b'\n');
+        assert_eq!(writes.0, [line]);
+        assert_eq!(
+            write_request(&mut Closed, &request).unwrap_err(),
+            "worker write failed"
+        );
+    }
+
+    #[test]
     fn closed_output_and_disconnected_channel_are_not_timeouts() {
         assert_eq!(
             read_response(&mut &b""[..]).unwrap_err(),
@@ -453,6 +493,65 @@ mod tests {
             receive_response(&rx, Duration::ZERO, true).unwrap_err(),
             "worker disconnected"
         );
+    }
+
+    #[test]
+    fn worker_errors_map_to_their_log_codes() {
+        let (tx, rx) = mpsc::channel::<Result<Value, String>>();
+        let push = serde_json::json!({"op":"push", "session":"fixture", "seq":1});
+        let lost = exchange_with_worker(push.clone(), &mut None, || panic!("no restart"));
+        let mut errors = vec![
+            (read_response(&mut &b""[..]).unwrap_err(), "output_eof"),
+            (
+                read_response(&mut &b"\xff\n"[..]).unwrap_err(),
+                "read_failed",
+            ),
+            (
+                read_response(&mut &b"{\"ready\":true}"[..]).unwrap_err(),
+                "response_bounds",
+            ),
+            (
+                read_response(&mut &b"garbage\n"[..]).unwrap_err(),
+                "response_invalid",
+            ),
+            (
+                receive_response(&rx, Duration::ZERO, true).unwrap_err(),
+                "startup_timeout",
+            ),
+            (
+                receive_response(&rx, Duration::ZERO, false).unwrap_err(),
+                "response_timeout",
+            ),
+            (lost.unwrap_err(), "worker_lost"),
+        ];
+        drop(tx);
+        let disconnected = receive_response(&rx, Duration::ZERO, false);
+        errors.push((disconnected.unwrap_err(), "channel_disconnected"));
+        for (response, expected) in [
+            (
+                serde_json::json!({"session":"wrong", "seq":1}),
+                "identity_mismatch",
+            ),
+            (
+                serde_json::json!({"session":"fixture", "seq":1, "error":"fixture"}),
+                "request_rejected",
+            ),
+        ] {
+            let mut slot = Some(live_worker(Default::default(), false));
+            let (sender, responses) = mpsc::channel();
+            sender.send(Ok(response)).unwrap();
+            slot.as_mut().unwrap().responses = responses;
+            let result = exchange_with_worker(push.clone(), &mut slot, || panic!("no restart"));
+            errors.push((result.unwrap_err(), expected));
+        }
+        // Codes come from the producers, so a reworded message can't fall back unnoticed.
+        for (error, expected) in errors {
+            assert_eq!(
+                crate::performance::worker_error_code(&error),
+                expected,
+                "{error}"
+            );
+        }
     }
 
     #[test]

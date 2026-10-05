@@ -36,10 +36,6 @@ export class UpdateCheckCoordinator {
     return this.checkedChannel;
   }
 
-  get lastNotifiedReleaseVersion(): string | null {
-    return this.notifiedReleaseVersion;
-  }
-
   async run(
     channel: UpdateChannel,
     currentVersionOverride?: string,

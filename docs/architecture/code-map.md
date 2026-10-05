@@ -9,25 +9,25 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 
 ## Desktop shell: `apps/desktop/src-tauri/src/`
 
-- `lib.rs` — App setup and most Tauri commands: startup order, shortcut routes, `admit_toggle` and its 120 ms debounce, the evdev listener and the CLI checks.
+- `lib.rs` — App setup and most Tauri commands: startup order (on Wayland, warming the virtual keyboard and retiring the old `voco-ydotoold.service` link), shortcut routes, `admit_toggle` and its 120 ms debounce, the evdev listener and the CLI checks.
 - `main.rs` — Command-line entry point; see [Command line](#command-line).
 - `speech_stream.rs` — The speech worker process and the `speech_stream` command: NDJSON requests, deadlines, size limits and restarting a dead idle worker.
-- `insertion.rs` — Desktop paste and copy: helper checks, the clipboard transaction, Shift+Insert and the three failure outcomes.
+- `insertion.rs` — Desktop paste and copy: helper and `/dev/uinput` checks, the clipboard transaction, Shift+Insert and the three failure outcomes.
+- `virtual_keyboard.rs` — VOCO's uinput keyboard for Wayland paste keys: one device per process, Shift+Insert led by an optional joining Space, 12 ms between key events.
 - `config.rs` — Settings file, field-level updates, the copy from the legacy `voice` directory and the update cache.
 - `crash_recovery.rs` — Text-only crash journal and the Review store.
-- `tray.rs` — Tray icon, menu, tooltips and meter animation.
-- `tray_icons.rs` — Writes the state icons and 64 meter frames once, to paths that stay valid for the process lifetime.
+- `tray.rs` — Tray icon, menu, status line and meter animation.
+- `tray_icons.rs` — Writes the state icons and 64 meter frames once, to paths that stay valid for the process lifetime, after removing the ones an earlier VOCO left behind.
 - `panel.rs` — GNOME companion bridge on D-Bus (`org.voco.Panel1`), its shortcut leases and the `ModifiersClear` call.
 - `panel_setup.rs` — Bounded companion check and setup; a check is reused for 20 seconds, or 2 seconds after a failure.
 - `ibus_shortcut.rs` — Client for the optional IBus engine's private socket (protocol 6).
 - `shortcut_arbitration.rs` — Tells confirmed IBus authority apart from an unanswered poll, and guards evdev and X11 toggles.
 - `shortcut_readiness.rs` — Shortcut status observations and their text; it never registers or admits a shortcut.
-- `hotkey_state.rs` — Physical key state per evdev device for the passive shortcut listener.
+- `hotkey_state.rs` — Physical key state per evdev device for the passive shortcut listener, and the count of live keyboards that shortcut status reports.
 - `hotkey_trace.rs` — Opt-in shortcut timing trace, enabled with `VOCO_HOTKEY_TRACE=1`.
 - `trigger_socket.rs` — Owner-only trigger socket `voco.sock`, with its `voice.sock` alias, that `voco --toggle` connects to.
 - `activation.rs` — Owner-only launcher socket `voco-activate.sock`; it presents the window and never toggles capture.
 - `single_instance.rs` — Process lock that allows one VOCO per user.
-- `desktop_input_setup.rs` — Migrates VOCO's packaged input service at startup and for `--setup-desktop-input`.
 - `desktop_notifications.rs` — Notifications that keep their D-Bus sender for the app's lifetime, because GNOME removes notifications whose sender disappears.
 - `performance.rs` — Opt-in performance metadata log, enabled with `VOCO_PERFORMANCE_LOG=1`.
 - `process_runner.rs` — Bounded helper processes: timeouts, output limits and reaping.
@@ -43,7 +43,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `browser_broker.rs` — Chromium exact-field broker: claims, sessions, appends and receipts. Only a matching receipt proves a field changed.
 - `browser_event_delivery.rs` — Delivers browser Start and Stop to the renderer, so a Stop survives a briefly unresponsive renderer without turning into a toggle.
 - `browser_protocol.rs` — Bounded, versioned messages shared by the broker and the native host.
-- `browser_socket.rs` — Same-user transport under `$XDG_RUNTIME_DIR/voco-browser/`, checked with `SO_PEERCRED`.
+- `browser_socket.rs` — Same-user transport under `$XDG_RUNTIME_DIR/voco-browser/`, and the `SO_PEERCRED` peer check that the trigger, activation and IBus sockets share.
 - `bin/voco-browser-host.rs` — Chromium native messaging host that relays framed messages between the extension and VOCO.
 
 ## Renderer: `apps/desktop/src/`
@@ -63,6 +63,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 
 - `ControlPanel.tsx` — Settings window with the Settings, Microphone, Shortcut, Updates and Help sections.
 - `ControlPanel.test.tsx` — Settings guidance and controls.
+- `recordedShortcuts.json` — Key presses, the shortcut **Record keys** makes of each and whether Rust accepts it; `ControlPanel.test.tsx` and `lib.rs` both check it.
 - `Onboarding.tsx` — First-run voice test and desktop setup check. Its text stays in the window.
 - `Onboarding.test.tsx` — Onboarding states.
 - `CrashReview.tsx` — Review window: copy or discard interrupted dictations.
@@ -94,7 +95,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `dictationStream.startup.test.ts` — Importing the module leaves model warmup to Rust.
 - `dictationRecording.ts` — Start and Stop for one recording: delivery callbacks, the Stop copy and notifications.
 - `dictationRecording.test.ts` — Start and Stop ordering and cleanup.
-- `desktopCaptureTail.ts` — `DictationStreamInput`, the 600-second limit, the Stop tail and capture teardown.
+- `desktopCaptureTail.ts` — `DictationStreamInput`, the recording sample cap, the Stop tail and capture teardown.
 - `audioCaptureBuffer.ts` — In-memory audio for the current recording; `collectAudioSamplesRange` is its only reader.
 - `audioCaptureBuffer.test.ts` — Buffer bounds and ranges.
 - `audioCaptureFlush.ts` — AudioWorklet flush acknowledgement with an 80 ms timeout.
@@ -104,7 +105,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `captureDescriptor.ts` — Capture backend selection and the retained audio format.
 - `captureDescriptor.test.ts` — Retained audio format.
 - `audioInput.ts` — Opens the WebKit microphone stream and picks the device.
-- `audioLevel.ts` — Level meter values for the tray and companion.
+- `audioLevel.ts` — Level meter values for every capture path, shown in the window, the tray and the companion.
 - `nativeCapture.ts` — Renderer side of native capture: sources, packets and acknowledgements.
 - `nativeCapture.test.ts` — Native capture protocol and ownership.
 - `nativeCaptureSettings.ts` — Native capture availability and source selection commands.
@@ -114,18 +115,14 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `browserStreamDelivery.test.ts` — Browser delivery and Stop.
 - `crashRecovery.ts` — `CrashJournal` and the Review commands.
 - `crashRecovery.test.ts` — Journal updates and failures.
-- `dictationRecovery.ts` — Capture sample limit and error text helpers.
+- `dictationRecovery.ts` — The 600-second recording limit, the capture sample limit and error text helpers.
 - `dictationRecovery.test.ts` — Recovery helpers.
 - `dictationSession.ts` — Session state machine and a queued Stop.
 - `dictationSession.test.ts` — Session state machine.
 - `dictationTrigger.ts` — Rules for which triggers may start or stop a recording.
 - `dictationTrigger.test.ts` — Browser trigger rules.
-- `dictationDelivery.ts` — Delivery ownership state.
-- `dictationDelivery.test.ts` — Delivery ownership state.
 - `dictationPresentation.ts` — Status labels and desktop setup state.
 - `dictationPresentation.test.ts` — Status labels.
-- `dictationAsyncGuards.ts` — Ignores results from a capture source that has been replaced.
-- `dictationAsyncGuards.test.ts` — Async guards.
 - `activityMode.ts` — Whether dictation is active and whether a toggle is allowed.
 - `activityMode.test.ts` — Activity rules.
 - `shortcutPresentation.ts` — Shortcut and microphone labels, and time limits for diagnostics requests.
@@ -140,7 +137,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `updateCheckCoordinator.test.ts` — Coordinator behaviour.
 - `windowRemap.ts` — Shows interactive windows on Wayland without treating the remap as a blur.
 - `windowRemap.test.ts` — Window remap.
-- `popoverPlacement.ts` — Places windows near the tray inside the work area.
+- `popoverPlacement.ts` — Places the popover inside the work area, centred, because the tray never reports where its icon is.
 - `popoverPlacement.test.ts` — Placement.
 - `animationFrameLease.ts` — Shared animation-frame scheduling.
 - `animationFrameLease.test.ts` — Frame scheduling.
@@ -188,6 +185,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `NATIVE-BUILD.json` — Build receipt for the pinned native library.
 - `test_cpu_threads.py` — Default thread count.
 - `test_diagnostics.py` — Protocol framing, diagnostics and private metrics logs.
+- `test_model_identity.py` — The model integrity check, the worker's native revision and the NVIDIA notice match the pinned identity files.
 - `test_streaming.py` — Silence gate accounting and log privacy.
 - `test_timing.py` — Timing instrumentation keeps sample order and transcripts.
 - `test_worker_protocol.py` — Protocol and lifecycle checks against the real model.
@@ -203,7 +201,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 
 - `voco-panel@voco.local/extension.js` — Panel pill, meter, menu, shortcut grab and the D-Bus client.
 - `voco-panel@voco.local/model.js` — Presentation model shared with the Node tests.
-- `voco-panel@voco.local/metadata.json` — Extension metadata for GNOME Shell 46.
+- `voco-panel@voco.local/metadata.json` — Extension metadata for GNOME Shell 46, 48 and 50.
 - `voco-panel@voco.local/stylesheet.css` — Pill and meter styles.
 - `voco-panel@voco.local/voco-symbol.png` — Microphone symbol.
 - `package.json` — Marks the directory as ES modules for the tests.
@@ -218,42 +216,48 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 
 ## Packaging: `packaging/`
 
-- `systemd/voco-ydotoold.service` — User unit that runs VOCO's input service.
-- `ydotool/voco-ydotool-launcher` — Chooses the private or the system `ydotoold` and migrates the unit.
-- `ydotool/*.json` — Identity of the Ubuntu 24.04 `ydotool` client that the private daemon pairs with.
+- `udev/70-voco-uinput.rules` — The `uaccess` rule that gives the user of the active local session access to `/dev/uinput`.
+- `udev/voco-uinput.conf` — Loads the `uinput` module at boot, from `/usr/lib/modules-load.d/`.
 - `ibus/voco.xml`, `ibus/voco-ibus-engine` — IBus component and engine launcher.
 - `chromium/com.voco.exact_field.json` — Native messaging host manifest.
 - `tauri/VOCO.desktop`, `tauri/com.sergiopesch.voco.metainfo.xml` — Desktop entry and AppStream metadata.
-- `debian/postinst.py.in` — The package's only maintainer action: repairs group-writable VOCO directories to 0755.
+- `debian/postinst.py.in` — The Debian package's only maintainer action: repairs group-writable VOCO directories to 0755 and applies the `/dev/uinput` rule.
+- `rpm/voco.spec.in` — The Fedora RPM's spec template: the Fedora requirements, no build stages, and the payload and dependency-generator settings.
+- `rpm/post.sh` — The RPM's only scriptlet: applies the `/dev/uinput` rule, as the Debian `postinst` does.
 - `published-release.json` — The version the README installs.
 
 ## Scripts: `scripts/`
 
 ### Build and packaging
 
-- `setup.sh` — Prepares a development checkout; `--install` builds, packages and installs the complete package.
+- `setup.sh` — Prepares a development checkout; `--install` builds, packages and installs the complete Debian package.
 - `build-desktop.sh` — Builds the renderer, the browser host and the base Debian bundle.
-- `package-nvidia.py` — Turns the base package into the complete one: speech runtime, private `ydotoold` and its launcher, notices, documentation and the maintainer script.
+- `package-nvidia.py` — Turns the base package into the complete one: speech runtime, notices, documentation and the maintainer script. With `--rpm`, it also builds the Fedora RPM from the same staged tree.
+- `rpm_package.py` — Renders the RPM spec for the staged tree and runs rpmbuild, and holds the RPM checks: scriptlets, folder ownership, requirements, and file and dependency parity with the Debian package.
 - `package-gnome-panel.py` — Builds a reproducible companion zip.
-- `build-legacy-ydotool.py` — Builds the private `ydotoold` from `vendor/ydotool-legacy`.
 - `provision-ci-speech.sh` — Copies the speech payload of a checksum-pinned published package into `runtime/speech/` for CI.
 - `debian_maintainer.py` — Generates and checks the maintainer script.
-- `sync-installer-ui.py`, `lib/install-ui.sh`, `lib/install-apt-ui.py`, `lib/install-brand.json` — Installer interface sources embedded in `install`.
-- `lib/install-common.sh` — Install steps for `setup.sh --install`, with its own test.
+- `sync-installer-ui.py`, `lib/install-ui.sh`, `lib/install-apt-ui.py`, `lib/install-brand.json` — Installer interface sources, and the script that embeds them and the install steps in `install`.
+- `lib/install-common.sh` — Install steps that `setup.sh --install` sources and `sync-installer-ui.py` embeds in `install`: package manager detection, the glibc and processor check, the APT and DNF installs and their checks, and the desktop input check. `test-install-common.sh` tests them.
 - `lib/test-speech-runtime.sh` — Speech runtime setup for disposable test desktops.
+- `lib/browser-app-sandbox.sh` — The private desktop the two Chromium application launchers share.
+- `lib/test-sandbox.sh` — `voco_bwrap`, the Bubblewrap namespace the CI desktop suites run in.
+- `lib/uinput-bridge.sh` — Starts and stops the uinput bridge for disposable test desktops.
 
 ### Checks
 
 - `test-unit.sh` — `npm test`: fast checks that need no microphone, speech model or desktop session.
 - `check-devops.sh`, `check-shell-syntax.sh`, `check-version-consistency.mjs` — Repository, shell and version checks.
-- `verify-deb-package.sh`, `verify-speech-payload.py`, `verify-legacy-input-package.py` — Package contents.
+- `verify-deb-package.sh`, `verify-speech-payload.py` — Package contents.
+- `verify-rpm-package.sh` — The RPM's contents and policy; given the Debian package, it also proves that both carry the same files and dependencies.
+- `distro-dependencies.py` — Prints the packages' dependencies by Debian or Fedora names, for CI's Debian 13 and Fedora 44 runtime jobs.
 - `verify-speech-engine.py` — Checks that shipping source and dependency metadata don't reference the retired Whisper recognizer.
 - `verify-glib-backport.py`, `verify-shortcut-backport.py`, `verify-tray-backport.py` — Vendored crate provenance and resolution.
 - `verify-native-capture-audit.py` — Checks a capture audit bundle.
 
 ### Release
 
-- `assemble-release.sh` — Packages, verifies and signs one release from a signed tag on the maintainer's Linux computer. It uploads nothing.
+- `assemble-release.sh` — Builds the Debian package and the RPM, verifies them and signs one release from a signed tag on the maintainer's Linux computer. It uploads nothing.
 - `sign-release-checksums.sh` — Detached, armored signatures for checksum lists, on the maintainer's computer.
 - `verify-release.sh` — Offline checksum and signature verification.
 - `test-verify-release.sh` — Signs and verifies with a throwaway key.
@@ -281,19 +285,20 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `test-private-ibus-engine.py`, `test-private-ibus-engine.sh` — IBus engine on a headless IBus daemon.
 - `test-gnome-panel.py`, `test-gnome-panel.sh`, `test-panel-model.mjs`, `test-panel-setup.py` — GNOME companion.
 - `test-application-delivery.py`, `test-application-delivery.sh` — Paste into real applications on a private desktop.
-- `test-browser-delivery.mjs`, `test-browser-full-app.mjs`, `test-browser-full-app.sh`, `test-browser-toolbar-app.mjs`, `test-browser-toolbar-app.sh`, `test-browser-toolbar-action.py` — Chromium paste, exact field and toolbar.
+- `test-browser-delivery.mjs`, `test-browser-full-app.mjs`, `test-browser-full-app.sh`, `test-browser-toolbar-app.mjs`, `test-browser-toolbar-app.sh`, `test-browser-toolbar-action.py`, `browser-app-harness.mjs` — Chromium paste, exact field and toolbar.
 - `test-chromium-exact-field.mjs`, `chromium-background.test.cjs`, `chromium-content-lifecycle.test.cjs` — Extension scripts.
 - `test-native-desktop.py`, `test-native-desktop.sh`, `test-native-full-app.py`, `test-native-atspi.py`, `test-native-recovery-controls.py` — GTK and WebKit fields in a private X11 session.
 - `test-native-wayland.py`, `test-native-wayland.sh` — Wayland toolkit and lifecycle checks.
 - `test-native-gnome.py`, `test-native-gnome.sh`, `test_native_crash_review.py`, `test_native_cursor_capture.py`, `test_native_onboarding_capture.py` — The packaged app in a private GNOME session.
+- `native_tray_app.py` — The tray app helpers the GNOME, KDE and Wayland suites share: readiness, the registered tray item and its menu.
 - `test-native-kde.py`, `test-native-kde.sh`, `test-native-kde-identity.py` — KWin and Plasma in a private session.
 - `test-native-capture-callbacks.py`, `test-native-capture-pulse-latency.py`, `native-capture-lifecycle.test.c`, `test-native-capture-renderer.mjs`, `test_verify_native_capture_audit.py` — Native capture.
-- `test-dictation-renderer.mjs`, `test-microphone-app-renderer.mjs`, `test-brand-motion.mjs`, `audio-worklet-capture.test.mjs` — Renderer and AudioWorklet.
-- `test-ydotool-service.py`, `test-legacy-ydotool.py`, `test-legacy-ydotool-daemon.py` — Input service selection and the private daemon.
+- `test-dictation-renderer.mjs`, `test-microphone-app-renderer.mjs`, `renderer-fixture.mjs`, `test-brand-motion.mjs`, `audio-worklet-capture.test.mjs` — Renderer and AudioWorklet.
 - `test-speech-package.py`, `test-speech-worker.py`, `test-audio-continuity.py` — Speech packaging and worker pipes.
-- `test-install-apt.py`, `test-install-common.sh`, `test-install-journey.py`, `test-install-launch.py`, `test-install-performance.py`, `test-install-prefetch.py`, `test-install-presentation.py` — Installer.
+- `test-rpm-package.py` — The RPM's file list, spec, header policy and parity checks; with rpmbuild installed, a real build.
+- `test-install-apt.py`, `test-install-common.sh`, `test-install-journey.py`, `test-install-launch.py`, `test-install-performance.py`, `test-install-presentation.py` — Installer.
 - `test-glib-variant.py`, `test-debian-maintainer.py`, `test-check-shell-syntax.py`, `test-report-dictation-quality-events.py`, `test-report-performance.py`, `test-report-speech-timing.py`, `test-typesafe-evaluation.py` — Other checks.
-- `fixtures/*` — Test-only helpers: synthetic fields, a nested `ydotool`, probe extensions and a syscall shim. None is installed.
+- `fixtures/*` — Test-only helpers: synthetic fields, probe extensions, a `wl-copy` and an input-state relay through the private Shell probe, and the [uinput bridge](../testing/README.md#the-uinput-bridge) that replays VOCO's virtual keyboard on a private Xvfb. None is installed.
 
 ### Brand
 
@@ -309,7 +314,6 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 ## Vendored code: `vendor/`
 
 - `glib/`, `global-hotkey/`, `tray-icon/` — Patched crates, each with a `VOCO-PATCH.md`; see [Security](../security/README.md#dependency-policy).
-- `ydotool-legacy/` — Source of the private `ydotoold` and libuInputPlus.
 - `provenance/`, `README.md`, `THIRD-PARTY-NOTICES.txt` — Provenance and notices.
 
 ## Brand assets: `assets/`
@@ -323,7 +327,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 ## Repository root
 
 - `README.md`, `AGENTS.md`, `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`, `LICENSE` — Overview, agent and contributor guides, security policy, code of conduct and licence.
-- `install` — Guided installer for the signed release package.
+- `install` — Guided installer for the signed release: the Debian package with APT, or the RPM with DNF.
 - `KEYS` — Release signing key.
 - `package.json` — Root npm scripts, including `npm test`, `test:ibus`, `test:speech-baseline`, `verify:security` and `verify:devops`.
 - `package-lock.json`, `.nvmrc` — Pinned npm dependencies, and Node 24.
@@ -336,16 +340,15 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 ## Command line
 
 `voco` with no arguments starts VOCO, or presents the running instance. If it
-can't start, it prints "VOCO could not start: …", shows a notification and
-exits 1.
+can't take its single-instance lock or reach the running instance, it prints
+"VOCO could not start: …", shows a notification and exits 1.
 
 | Option | Behaviour | Exit status |
 | --- | --- | --- |
 | `--toggle` | Asks the VOCO running in this session to start or stop. It doesn't launch VOCO, change focus or confirm the recording state. | 1 if VOCO's socket can't be reached |
-| `--check-desktop-input` | Checks the input helpers without launching VOCO or sending keys. | 1 on failure |
-| `--setup-desktop-input` | Updates VOCO's packaged input service. VOCO must be closed. | 1 on failure |
-| `--check-panel` | Checks the GNOME companion without changing settings. | 2 unless the companion is active, the desktop isn't GNOME, or GNOME isn't version 46; 1 on error |
-| `--setup-panel` | Enables the packaged GNOME 46 companion for this user. It may need a sign-out and never restarts Shell. | As for `--check-panel` |
+| `--check-desktop-input` | Checks the paste prerequisites: the clipboard helper, plus `xdotool` on X11 or access to `/dev/uinput` on Wayland. It doesn't launch VOCO, create a keyboard or send keys. | 1 on failure |
+| `--check-panel` | Checks the GNOME companion without changing settings. | 2 unless the companion is active, the desktop isn't GNOME, or GNOME isn't 46, 48 or 50; 1 on error |
+| `--setup-panel` | Enables the packaged GNOME companion for this user, on GNOME 46, 48 or 50. It may need a sign-out and never restarts Shell. | As for `--check-panel` |
 | `--version` | Prints `VOCO` and the version. | 0 |
 | `--help`, `-h` | Prints usage. | 0 |
 

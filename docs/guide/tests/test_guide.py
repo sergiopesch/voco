@@ -155,18 +155,26 @@ class GuideTests(unittest.TestCase):
         self.assertTrue(all(len(row) == len(comparison["headers"]) for row in comparison["rows"]))
         for key in ("title", "scope", "limits"):
             self.assertTrue(comparison[key])
-        # The table names the helpers the delivery code runs at the recorded commit.
-        path = "apps/desktop/src-tauri/src/insertion.rs"
-        self.assertIn(path, {entry["path"] for entry in chapter["files"]})
-        self.assertIn("insertion.rs", chapter["sourceNote"])
-        source = subprocess.check_output(
-            ["git", "-C", str(self.repo), "show", self.server.catalog["commit"] + ":" + path]
-        ).decode()
+        # The table names the helpers and the keyboard the delivery code uses at
+        # the recorded commit: insertion.rs runs the helpers and hands Wayland
+        # keys to virtual_keyboard.rs, whose device has the name the table gives.
+        def pinned(path):
+            self.assertIn(path, {entry["path"] for entry in chapter["files"]})
+            self.assertIn(Path(path).name, chapter["sourceNote"])
+            return subprocess.check_output(
+                ["git", "-C", str(self.repo), "show", self.server.catalog["commit"] + ":" + path]
+            ).decode()
+
+        insertion = pinned("apps/desktop/src-tauri/src/insertion.rs")
+        keyboard = pinned("apps/desktop/src-tauri/src/virtual_keyboard.rs")
         cells = " ".join(cell for row in comparison["rows"] for cell in row)
-        for helper in ("wl-copy", "xclip", "xdotool", "ydotool"):
+        for helper in ("wl-copy", "xclip", "xdotool"):
             with self.subTest(helper=helper):
-                self.assertIn(helper, source)
+                self.assertIn(helper, insertion)
                 self.assertIn(helper, cells)
+        self.assertIn("virtual_keyboard::paste", insertion)
+        self.assertIn('DEVICE_NAME: &str = "VOCO virtual keyboard"', keyboard)
+        self.assertIn("VOCO virtual keyboard", cells)
         # Lessons teach current behaviour; release history stays out of the prose.
         for lesson in chapters:
             prose = json.dumps({k: v for k, v in lesson.items() if k != "files"})

@@ -1,11 +1,12 @@
 # Release process
 
 A VOCO release is a signed Git tag, `voco.<version>`, and a GitHub release that
-carries the Debian package, the source, the installer, two records and signed
-checksum manifests. The maintainer builds, verifies and signs each release on
-their own Linux computer with `scripts/assemble-release.sh`. Hosted CI tests
-every commit on `master`, including a release build of the app, but it never
-packages the speech runtime, holds the signing key or publishes anything.
+carries the Debian package and the Fedora RPM, the source, the installer, two
+records and signed checksum manifests. The maintainer builds, verifies and signs
+each release on their own Linux computer with `scripts/assemble-release.sh`.
+Hosted CI tests every commit on `master`, including a release build of the app,
+but it never packages the speech runtime, holds the signing key or publishes
+anything.
 
 Versions have the form `YYYY.0.N`: the year, then a number that grows with each
 release. A fix ships as a new version; a published tag or asset is never replaced.
@@ -22,8 +23,11 @@ On the Linux computer that signs releases:
    `git config user.signingkey B33C7C6AAEC8C20433A7A837540796453D8E3865`.
 3. Install what [CONTRIBUTING.md](../CONTRIBUTING.md#prerequisites) lists,
    including Tauri CLI 2.10.1, run `bash scripts/setup.sh`, and add the packaging
-   tools: `sudo apt install g++ patch binutils desktop-file-utils appstream`.
-   The assembler also needs `gpgv`, and the upload needs `gh`.
+   tools: `sudo apt install binutils desktop-file-utils appstream rpm`. The `rpm`
+   package provides `rpmbuild`. The assembler also needs `gpgv` and names any
+   command it can't find; the upload needs `gh`.
+4. Use Ubuntu 24.04. Its glibc 2.39 and GCC 13 runtime set both packages'
+   floors, and the RPM check stops if a binary needs a newer symbol version.
 
 ## Make a release
 
@@ -55,7 +59,7 @@ complete and successful, with every job passed, Application included.
 ### 4. Tag the commit
 
 On the signing computer, check out the merged commit. The tree must be clean,
-with no untracked files. Keep the tag local until the package has been tried.
+with no untracked files. Keep the tag local until both packages have been tried.
 
 ```bash
 git tag -s voco.<version> -m "VOCO <version>"
@@ -71,7 +75,7 @@ bash scripts/provision-ci-speech.sh
 This fills `runtime/speech/` with the pinned model and native libraries, which Git
 ignores; see [runtime provisioning](linux-packaging.md#runtime-provisioning).
 
-### 6. Assemble and try the package
+### 6. Assemble and try the packages
 
 ```bash
 bash scripts/assemble-release.sh ~/voco-release
@@ -82,25 +86,40 @@ script stops unless the tag is annotated, points at `HEAD` and is signed by the
 release key, `KEYS` holds exactly that key, its secret half is present, the
 versions agree, `install` pins the key, the release notes and runtime exist, the
 Tauri CLI is 2.10.1 and CI passed. It builds with `SOURCE_DATE_EPOCH` set to the
-commit time, stops if the build changed a tracked file, assembles and verifies
-the package, and runs the worker protocol checks against the packaged worker.
-Then it writes the assets, signs each manifest and verifies it with
+commit time and stops if the build changed a tracked file. From one staged tree
+it builds the Debian package and the RPM, verifies both, the RPM also against
+the Debian package, and runs the worker protocol checks against the packaged
+worker. Then it writes the assets, signs each manifest and verifies it with
 `verify-release.sh --keys KEYS`, repeats the installer's `gpgv` check with the
 key embedded in `install`, and renders `release-notes.md`. It uploads nothing.
 
 | Asset | Contents |
 | --- | --- |
-| `voco_<version>_amd64.deb`, `voco_latest_amd64.deb` | The package, under its own name and the fixed name the manual install uses |
+| `voco_<version>_amd64.deb`, `voco_latest_amd64.deb` | The Debian package, under its own name and the fixed name the manual install uses |
+| `voco-<version>-1.x86_64.rpm`, `voco_latest_x86_64.rpm` | The RPM, under its own name and the fixed name the manual install uses |
 | `voco_<version>_source.tar.gz` | `git archive` of the tag |
 | `voco-panel@voco.local.shell-extension.zip` | The GNOME companion |
 | `install`, `KEYS` | The guided installer and the public key |
-| `voco_<version>_provenance.json`, `voco_<version>_validation.json` | The source, file hashes and build tools; the CI run, the local checks and their limits |
+| `voco_<version>_provenance.json`, `voco_<version>_validation.json` | The source, the hashes and sizes of both packages and other files, and the build tools; the CI run, the local checks and their limits |
 | `voco_<version>_checksums.txt`, `voco_checksums.txt` | Every other asset except the signatures, under two names |
-| `voco_<version>_debian_checksums.txt`, `voco_latest_checksums.txt`, `voco_<version>_source_checksums.txt` | One file each |
+| `voco_<version>_debian_checksums.txt`, `voco_latest_checksums.txt` | The Debian package's checksum, under its own name and under its fixed name |
+| `voco_<version>_rpm_checksums.txt`, `voco_latest_rpm_checksums.txt` | The RPM's checksum, under its own name and under its fixed name |
+| `voco_<version>_source_checksums.txt` | The source archive's checksum |
 | `*.asc` | A detached signature for each manifest |
 
-Install the package with the `sudo apt install` command the script prints and
-run the [manual acceptance check](testing/README.md#manual-acceptance).
+Install the Debian package with the `sudo apt install` command the script
+prints and run the [manual acceptance check](testing/README.md#manual-acceptance).
+
+The validation record doesn't cover installing the RPM, so try it on a Fedora 44
+computer with SELinux enforcing. Copy `voco-<version>-1.x86_64.rpm` there, then:
+
+1. Install it with `sudo dnf install ./voco-<version>-1.x86_64.rpm`. DNF warns
+   that it skipped OpenPGP checks, because the RPM carries no signature of its
+   own.
+2. Run `voco --check-desktop-input` and `voco --setup-panel`, sign out and back
+   in, and run the voice test.
+3. Remove it with `sudo dnf remove voco`.
+4. Check that `sudo ausearch -m avc -ts today` finds no denial.
 
 ### 7. Push the tag and create a draft
 
@@ -126,7 +145,7 @@ bash scripts/verify-release.sh --keys KEYS ~/voco-draft/voco_checksums.txt
 
 Read the draft's notes on GitHub, publish with
 `gh release edit voco.<version> --draft=false`, then try the guided installer
-from the published tag in a desktop session:
+from the published tag in a desktop session, on Ubuntu or Debian and on Fedora:
 
 ```bash
 wget -qO voco-install https://raw.githubusercontent.com/sergiopesch/voco/voco.<version>/install && bash voco-install
@@ -136,9 +155,10 @@ wget -qO voco-install https://raw.githubusercontent.com/sergiopesch/voco/voco.<v
 
 After publishing, update in one pull request `version` in
 `packaging/published-release.json`, the version and install command in
-[README.md](../README.md), and the guided install command, `TAG` and the `KEYS`
-address in [Install](install.md). Until then they install the previous release,
-and `npm run rehearse:release` fails if the README doesn't match the JSON file.
+[README.md](../README.md), and the guided install command, `TAG` and the two
+`KEYS` addresses in [Install](install.md). Until then they install the previous
+release, and `npm run rehearse:release` fails if the README doesn't match the
+JSON file.
 
 ## What CI checks
 
@@ -147,7 +167,11 @@ and push to `master`, with read-only permissions, actions pinned to commit SHAs
 and checkouts that keep no credentials. Its Application job runs the release
 executables in isolated desktops, as [Testing](testing/README.md) describes. The
 signing computer rebuilds them from the same commit, so the released files
-aren't byte-identical to the ones CI ran; the validation record says so.
+aren't byte-identical to the ones CI ran; the validation record says so. Its
+GNOME 50 Companion job runs the companion on Ubuntu 26.04, and its Debian 13 and
+Fedora 44 Runtime jobs install the packages' dependencies by those systems'
+names and run the speech runtime there. No job builds a package, and the
+assembler requires every job to have passed.
 
 `npm run verify:devops` runs `scripts/check-devops.sh`, which fails when another
 workflow file appears or when `ci.yml` mentions `package-nvidia.py`,
@@ -156,8 +180,13 @@ workflow file appears or when `ci.yml` mentions `package-nvidia.py`,
 the versions, the release scripts and the installer helper tests; that no
 README, doc or installer comment installs from `master` or pipes a download into
 a shell; that the install guide keeps its checksum steps, the installer names
-its own tag, the README installs the published version and the assembler creates
-drafts with `--verify-tag`. Then it prints the release notes it would render.
+its own tag and the README installs the published version; that the assembler
+builds the RPM from the Debian package's staged tree, verifies it against the
+Debian package and creates drafts with `--verify-tag`; and that the release
+notes give both packages' verification commands. Then it prints the release
+notes it would render. `check-devops.sh` also keeps the RPM spec in step with
+the Debian dependencies, as [Linux packaging](linux-packaging.md#package-checks)
+describes.
 
 ## Change the release key
 

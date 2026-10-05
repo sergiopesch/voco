@@ -46,13 +46,12 @@ import { probeMicrophoneAccess } from "@/lib/audioInput";
 import { MicrophoneRefresh, queryMicrophonePermission, microphoneAccessFailure } from "@/lib/microphoneRefresh";
 import {
   deriveCursorSetupState,
+  deriveNativeMicrophoneReady,
   deriveStatusLabel,
 } from "@/lib/dictationPresentation";
+import { defaultNativeSource } from "@/lib/nativeCaptureSettings";
 import { canStopOnboardingTest, cancelsPendingStart, isBrowserTrigger, type DictationTriggerAction } from "@/lib/dictationTrigger";
-import {
-  shouldApplyConfigSnapshot,
-  shouldBlockRuntimeForConfigErrors,
-} from "@/lib/configSnapshot";
+import { shouldApplyConfigSnapshot } from "@/lib/configSnapshot";
 import { placeTrayPopover } from "@/lib/popoverPlacement";
 import { showInteractiveWindow, WindowRemapFocusGuard, isWaylandSession } from "@/lib/windowRemap";
 import {
@@ -88,13 +87,6 @@ type ResizeDirection =
   | "SouthEast"
   | "SouthWest"
   | "West";
-
-type TrayPopoverAnchor = {
-  rectPositionX: number;
-  rectPositionY: number;
-  rectWidth: number;
-  rectHeight: number;
-};
 
 function cleanupDeferredListener(
   registration: Promise<() => void>,
@@ -171,8 +163,14 @@ export function App() {
   const availableDevices = useStore((state) => state.availableDevices);
   const microphonePermission = useStore((state) => state.microphonePermission);
   const microphoneReady = useStore((state) => state.microphoneReady);
-  const nativeMicrophoneReady = nativeMicrophone.mode === "webkit" ? null
-    : nativeMicrophone.mode === "native" && Boolean(nativeMicrophone.selected) && microphoneReady;
+  const nativeCaptureSourceLost = useStore((state) => state.nativeCaptureSourceLost);
+  const nativeMicrophoneReady = deriveNativeMicrophoneReady({
+    mode: nativeMicrophone.mode,
+    selected: Boolean(nativeMicrophone.selected),
+    lost: nativeCaptureSourceLost,
+    microphoneReady,
+    defaultAvailable: Boolean(defaultNativeSource(nativeMicrophone.sources)),
+  });
   const config = useStore((state) => state.config);
   const setConfig = useStore((state) => state.setConfig);
   const setError = useStore((state) => state.setError);
@@ -201,9 +199,7 @@ export function App() {
     prepareAudioEngine,
     primeRecordingStream,
     cursorDeliveryState,
-    canCancel,
-    cancellationPending,
-    cancelRecording,
+    dictationInProgress,
     discardRecovery,
     finishOnboardingTest,
     toggle,
@@ -238,7 +234,6 @@ export function App() {
   const appStartMsRef = useRef(performance.now());
   const initStartedRef = useRef(false);
   const appMountedLoggedRef = useRef(false);
-  const trayPopoverAnchorRef = useRef<TrayPopoverAnchor | null>(null);
   const panelSizeRef = useRef<LogicalSize>(PANEL_SIZE);
   const configSaveQueueRef = useRef<Promise<void>>(Promise.resolve());
   const configSavePendingCountRef = useRef(0);
@@ -256,8 +251,6 @@ export function App() {
   const diagnosticsExpiryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const runtimeStatusRevisionRef = useRef(0);
   const microphoneRefreshRef = useRef(new MicrophoneRefresh());
-  const dictationStatusRef = useRef(status);
-  dictationStatusRef.current = status;
   const applyAuthoritativeConfig = useCallback(
     (snapshot: ConfigSnapshot): boolean => {
       if (
@@ -312,10 +305,9 @@ export function App() {
     diagnosticsLoaded: runtimeDiagnostics !== null,
     diagnosticsFailed: runtimeDiagnosticsFailed,
   });
-  const runtimeConfigurationError = shouldBlockRuntimeForConfigErrors(
-    startupConfigError,
-    settingsError,
-  );
+  // Only an unreadable startup config pauses dictation. A failed save keeps the
+  // previous config in force: Rust restores the old shortcut and emits no snapshot.
+  const runtimeConfigurationError = startupConfigError !== null;
   const canHandleHotkey =
     initComplete && config !== null && !runtimeConfigurationError;
   const handleToggleRequest = useCallback(async (triggerId?: string, action?: DictationTriggerAction, stopSession?: string) => {
@@ -371,7 +363,7 @@ export function App() {
       return true;
     }
 
-    const dictationActive = isDictationActive(dictationStatusRef.current);
+    const dictationActive = isDictationActive(currentState.status);
     if (!dictationActive && action === "stop") return true;
     const captureState = useStore.getState();
     if (!dictationActive && captureState.captureBackendMode !== "webkit") {
@@ -393,7 +385,7 @@ export function App() {
     if (
       captureState.captureBackendMode === "webkit" &&
       !canToggleDictationWithPermission(
-        dictationStatusRef.current,
+        currentState.status,
         useStore.getState().microphonePermission,
       )
     ) {
@@ -523,8 +515,7 @@ export function App() {
     const deviceId = useStore.getState().selectedDeviceId;
     const inactive = () => {
       const state = useStore.getState();
-      return current() && !isDictationActive(state.status) && state.selectedDeviceId === deviceId &&
-        state.status !== "recording" && state.status !== "processing";
+      return current() && !isDictationActive(state.status) && state.selectedDeviceId === deviceId;
     };
     if (!inactive()) return false;
     try {
@@ -668,15 +659,13 @@ export function App() {
   const openSettings = useCallback(async (section: PanelSection = "General") => {
     const requestVersion = panelRequestVersionRef.current + 1;
     panelRequestVersionRef.current = requestVersion;
-    const currentStatus = useStore.getState().status;
-    if (isDictationActive(currentStatus)) {
+    if (isDictationActive(useStore.getState().status) || dictationInProgress()) {
       return;
     }
     await refreshPanelState();
-    const latestStatus = useStore.getState().status;
     if (
       panelRequestVersionRef.current !== requestVersion ||
-      isDictationActive(latestStatus)
+      isDictationActive(useStore.getState().status) || dictationInProgress()
     ) {
       return;
     }
@@ -685,10 +674,10 @@ export function App() {
       id: current.id + 1,
     }));
     setSurface("settings");
-  }, [refreshPanelState, setSurface]);
+  }, [dictationInProgress, refreshPanelState, setSurface]);
 
   const showPopover = useCallback(
-    async (anchor: TrayPopoverAnchor, toggleVisibility: boolean) => {
+    async () => {
       const requestVersion = panelRequestVersionRef.current + 1;
       panelRequestVersionRef.current = requestVersion;
       const state = useStore.getState();
@@ -696,25 +685,20 @@ export function App() {
         setCloseRequestId((request) => request + 1);
         return;
       }
-      if (isDictationActive(state.status)) {
-        return;
-      }
-      trayPopoverAnchorRef.current = anchor;
-      if (toggleVisibility && state.surface === "popover") {
-        dismissInteractiveSurface();
+      if (isDictationActive(state.status) || dictationInProgress()) {
         return;
       }
       await refreshPanelState();
       const latestState = useStore.getState();
       if (
         panelRequestVersionRef.current !== requestVersion ||
-        isDictationActive(latestState.status)
+        isDictationActive(latestState.status) || dictationInProgress()
       ) {
         return;
       }
       setSurface("popover");
     },
-    [dismissInteractiveSurface, refreshPanelState, setSurface],
+    [dictationInProgress, refreshPanelState, setSurface],
   );
 
   const applyConfigPatch = useCallback(
@@ -924,7 +908,6 @@ export function App() {
       }
       if (surface === "hidden") {
         await currentWindow.setAlwaysOnTop(true).catch(() => {});
-        await currentWindow.setDecorations(false).catch(() => {});
         await currentWindow.setSkipTaskbar(true).catch(() => {});
         await currentWindow.setResizable(false).catch(() => {});
         await currentWindow.setMinSize(null).catch(() => {});
@@ -945,31 +928,18 @@ export function App() {
       if (surface === "popover") {
         await currentWindow.setIgnoreCursorEvents(false).catch(() => {});
         await currentWindow.setAlwaysOnTop(true).catch(() => {});
-        await currentWindow.setDecorations(false).catch(() => {});
         await currentWindow.setSkipTaskbar(false).catch(() => {});
         await currentWindow.setResizable(false).catch(() => {});
         await currentWindow.setMinSize(null).catch(() => {});
         if (!isCurrentRequest()) {
           return;
         }
-        const anchor = trayPopoverAnchorRef.current;
-        const hasAnchor = anchor && (anchor.rectWidth > 0 || anchor.rectHeight > 0);
-        const monitors = await availableMonitors().catch(() => []);
-        const targetMonitor = (hasAnchor
-          ? monitors.find((monitor) =>
-            anchor.rectPositionX >= monitor.position.x &&
-            anchor.rectPositionX < monitor.position.x + monitor.size.width &&
-            anchor.rectPositionY >= monitor.position.y &&
-            anchor.rectPositionY < monitor.position.y + monitor.size.height)
-          : await currentMonitor().catch(() => null)) ?? monitors[0];
+        const targetMonitor = await currentMonitor().catch(() => null) ??
+          (await availableMonitors().catch(() => []))[0];
         const scaleFactor = targetMonitor?.scaleFactor ??
           await currentWindow.scaleFactor().catch(() => window.devicePixelRatio || 1);
         const workArea = targetMonitor?.workArea;
         const placement = placeTrayPopover(
-          hasAnchor ? {
-            x: anchor.rectPositionX, y: anchor.rectPositionY,
-            width: anchor.rectWidth, height: anchor.rectHeight,
-          } : null,
           {
             x: workArea?.position.x ?? targetMonitor?.position.x ?? 0,
             y: workArea?.position.y ?? targetMonitor?.position.y ?? 0,
@@ -997,7 +967,6 @@ export function App() {
 
       await currentWindow.setIgnoreCursorEvents(false).catch(() => {});
       await currentWindow.setAlwaysOnTop(false).catch(() => {});
-      await currentWindow.setDecorations(false).catch(() => {});
       await currentWindow.setSkipTaskbar(false).catch(() => {});
       await currentWindow.setMinSize(PANEL_MIN_SIZE).catch(() => {});
       await currentWindow.setResizable(true).catch(() => {});
@@ -1072,14 +1041,14 @@ export function App() {
     return cleanupDeferredListener(
       getCurrentWindow().listen("voco:open-review", () => {
         const state = useStore.getState();
-        if (startRequestRef.current || isDictationActive(state.status)) return;
+        if (startRequestRef.current || isDictationActive(state.status) || dictationInProgress()) return;
         if (!dismissInteractiveSurface()) return;
         setSurface("review");
         setActivationRequest(value => value + 1);
       }),
       "review event listener",
     );
-  }, [dismissInteractiveSurface, setSurface]);
+  }, [dictationInProgress, dismissInteractiveSurface, setSurface]);
 
   useEffect(() => {
     if (!initComplete) return;
@@ -1087,7 +1056,7 @@ export function App() {
     const activate = async () => {
       if (!(await takeLauncherActivation().catch(() => false)) || !alive) return;
       const state = useStore.getState();
-      if (startRequestRef.current || isDictationActive(state.status)) {
+      if (startRequestRef.current || isDictationActive(state.status) || dictationInProgress()) {
         void traceHotkeyEvent("launcher_activation_preserved_capture").catch(() => {});
         return;
       }
@@ -1099,7 +1068,7 @@ export function App() {
       void activate();
     }).then(unlisten => { if (alive) void activate(); return unlisten; }), "launcher activation listener");
     return () => { alive = false; cleanup(); };
-  }, [initComplete, setSurface]);
+  }, [dictationInProgress, initComplete, setSurface]);
 
   useEffect(() => {
     return cleanupDeferredListener(
@@ -1112,24 +1081,9 @@ export function App() {
 
   useEffect(() => {
     return cleanupDeferredListener(
-      getCurrentWindow().listen<TrayPopoverAnchor>(
-        "voco:toggle-popover",
-        (event) => {
-        void showPopover(event.payload, true);
-        },
-      ),
-      "tray popover toggle listener",
-    );
-  }, [showPopover]);
-
-  useEffect(() => {
-    return cleanupDeferredListener(
-      getCurrentWindow().listen<TrayPopoverAnchor>(
-        "voco:show-popover",
-        (event) => {
-        void showPopover(event.payload, false);
-        },
-      ),
+      getCurrentWindow().listen("voco:show-popover", () => {
+        void showPopover();
+      }),
       "tray popover show listener",
     );
   }, [showPopover]);
@@ -1218,9 +1172,6 @@ export function App() {
         runtimeDiagnostics={runtimeDiagnostics}
         dictationStatus={status}
         captureNotice={captureNotice}
-        canCancelDictation={canCancel}
-        cancellationPending={cancellationPending}
-        onCancelDictation={() => void cancelRecording()}
         onPrepareDictation={() => void handlePrepareDictation()}
         onDraftStateChange={handleDraftStateChange}
         onShortcutCaptureChange={handleShortcutCaptureChange}

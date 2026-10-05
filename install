@@ -6,12 +6,13 @@ set -euo pipefail
 #
 # VOCO release installer. It installs only the release named in VERSION.
 # Usage:
-#   wget https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.60/install -O voco-install
+#   wget https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.61/install -O voco-install
 #   bash voco-install
 
-VERSION="2026.0.60"
+VERSION="2026.0.61"
 RELEASE_TAG="voco.${VERSION}"
 DEB_URL="https://github.com/sergiopesch/voco/releases/download/${RELEASE_TAG}/voco_${VERSION}_amd64.deb"
+RPM_URL="https://github.com/sergiopesch/voco/releases/download/${RELEASE_TAG}/voco-${VERSION}-1.x86_64.rpm"
 CHECKSUMS_URL="https://github.com/sergiopesch/voco/releases/download/${RELEASE_TAG}/voco_checksums.txt"
 SIGNATURE_URL="${CHECKSUMS_URL}.asc"
 
@@ -21,21 +22,17 @@ VOCO_RELEASE_KEY_FINGERPRINT='B33C7C6AAEC8C20433A7A837540796453D8E3865'
 VOCO_RELEASE_KEY_BASE64='mDMEaq1NqxYJKwYBBAHaRw8BAQdAIcImavoX/+NqEo8iX/ETdvQQ7f0mDfyTqCOm0K4LiT+0N1NlcmdpbyBQZXNjaGllcmEgKFZPQ08gcmVsZWFzZXMpIDxzcGVzY2hpZXJhQGdtYWlsLmNvbT6ImQQTFgoAQRYhBLM8fGquyMIEM6eoN1QHlkU9jjhlBQJqrU2rAhsDBQkDwmcABQsJCAcCAiICBhUKCQgLAgQWAgMBAh4HAheAAAoJEFQHlkU9jjhlCIsBAKoU2eWKTm6mdHLtzT2PKcQSUK1AM11FdLlOw1zpVRsHAP9HIYd/NZgSY+EXy/e+tcN9fD9Oqige9hJtQkhMxgYeDA=='
 
 # ─── Colors ─────────────────────────────────────────────
-BOLD='\033[1m'
 DIM='\033[2m'
-GRAPHITE='\033[38;2;122;128;138m'
-GRAPHITE_SOFT='\033[38;2;199;204;212m'
 GREEN='\033[32m'
 YELLOW='\033[33m'
 RED='\033[31m'
-WHITE='\033[37m'
 NC='\033[0m'
 
 VOCO_TERMINAL_MOTION=false
 if [[ -t 1 && "${TERM:-dumb}" != dumb && -z "${NO_COLOR+x}" && "${VOCO_INSTALL_PLAIN:-0}" != 1 && "${BASH_VERSINFO[0]}" -ge 5 ]]; then
   VOCO_TERMINAL_MOTION=true
 else
-  BOLD='' DIM='' GRAPHITE='' GRAPHITE_SOFT='' GREEN='' YELLOW='' RED='' WHITE='' NC=''
+  DIM='' GREEN='' YELLOW='' RED='' NC=''
 fi
 
 ok() {
@@ -60,280 +57,10 @@ dim() {
   else printf "  ${DIM}%s${NC}\n" "$*"; fi
 }
 
-voco_escape_json_string() {
-  local value="${1:-}"
-  value="${value//\\/\\\\}"
-  value="${value//\"/\\\"}"
-  printf '%s' "${value}"
-}
-
-voco_trim() {
-  local value="${1:-}"
-  value="${value#"${value%%[![:space:]]*}"}"
-  value="${value%"${value##*[![:space:]]}"}"
-  printf '%s' "${value}"
-}
-
-voco_canonical_hotkey_key() {
-  local token="${1:-}"
-  local upper
-  local LC_ALL=C
-
-  case "${token}" in
-    '`') upper="BACKQUOTE" ;;
-    "\\") upper="BACKSLASH" ;;
-    '[') upper="BRACKETLEFT" ;;
-    ']') upper="BRACKETRIGHT" ;;
-    ',') upper="COMMA" ;;
-    '=') upper="EQUAL" ;;
-    '-') upper="MINUS" ;;
-    '.') upper="PERIOD" ;;
-    "'") upper="QUOTE" ;;
-    ';') upper="SEMICOLON" ;;
-    '/') upper="SLASH" ;;
-    *) upper="${token^^}" ;;
-  esac
-
-  if [[ "${upper}" =~ ^KEY([A-Z])$ ]]; then
-    printf 'KEY%s' "${BASH_REMATCH[1]}"
-    return 0
-  fi
-  if [[ "${upper}" =~ ^[A-Z]$ ]]; then
-    printf 'KEY%s' "${upper}"
-    return 0
-  fi
-  if [[ "${upper}" =~ ^DIGIT([0-9])$ ]]; then
-    printf 'DIGIT%s' "${BASH_REMATCH[1]}"
-    return 0
-  fi
-  if [[ "${upper}" =~ ^[0-9]$ ]]; then
-    printf 'DIGIT%s' "${upper}"
-    return 0
-  fi
-  if [[ "${upper}" =~ ^F([1-9]|1[0-9]|2[0-4])$ ]]; then
-    printf '%s' "${upper}"
-    return 0
-  fi
-
-  case "${upper}" in
-    BACKQUOTE|BACKSLASH|BRACKETLEFT|BRACKETRIGHT|COMMA|EQUAL|MINUS|PERIOD|QUOTE|SEMICOLON|SLASH)
-      printf '%s' "${upper}"
-      ;;
-    PAUSE|PAUSEBREAK)
-      printf 'PAUSE'
-      ;;
-    BACKSPACE|CAPSLOCK|ENTER|SPACE|TAB|DELETE|END|HOME|INSERT|PAGEDOWN|PAGEUP|PRINTSCREEN|SCROLLLOCK|NUMLOCK)
-      printf '%s' "${upper}"
-      ;;
-    ARROWDOWN|DOWN)
-      printf 'ARROWDOWN'
-      ;;
-    ARROWLEFT|LEFT)
-      printf 'ARROWLEFT'
-      ;;
-    ARROWRIGHT|RIGHT)
-      printf 'ARROWRIGHT'
-      ;;
-    ARROWUP|UP)
-      printf 'ARROWUP'
-      ;;
-    NUMPAD[0-9])
-      printf '%s' "${upper}"
-      ;;
-    NUM[0-9])
-      printf 'NUMPAD%s' "${upper#NUM}"
-      ;;
-    NUMPADADD|NUMADD|NUMPADPLUS|NUMPLUS)
-      printf 'NUMPADADD'
-      ;;
-    NUMPADDECIMAL|NUMDECIMAL)
-      printf 'NUMPADDECIMAL'
-      ;;
-    NUMPADDIVIDE|NUMDIVIDE)
-      printf 'NUMPADDIVIDE'
-      ;;
-    NUMPADENTER|NUMENTER)
-      printf 'NUMPADENTER'
-      ;;
-    NUMPADEQUAL|NUMEQUAL)
-      printf 'NUMPADEQUAL'
-      ;;
-    NUMPADMULTIPLY|NUMMULTIPLY)
-      printf 'NUMPADMULTIPLY'
-      ;;
-    NUMPADSUBTRACT|NUMSUBTRACT)
-      printf 'NUMPADSUBTRACT'
-      ;;
-    ESCAPE|ESC)
-      printf 'ESCAPE'
-      ;;
-    AUDIOVOLUMEDOWN|VOLUMEDOWN)
-      printf 'AUDIOVOLUMEDOWN'
-      ;;
-    AUDIOVOLUMEUP|VOLUMEUP)
-      printf 'AUDIOVOLUMEUP'
-      ;;
-    AUDIOVOLUMEMUTE|VOLUMEMUTE)
-      printf 'AUDIOVOLUMEMUTE'
-      ;;
-    MEDIAPLAY|MEDIAPAUSE|MEDIAPLAYPAUSE|MEDIASTOP|MEDIATRACKNEXT)
-      printf '%s' "${upper}"
-      ;;
-    MEDIATRACKPREV|MEDIATRACKPREVIOUS)
-      printf 'MEDIATRACKPREVIOUS'
-      ;;
-    *)
-      return 1
-      ;;
-  esac
-}
-
-voco_validate_hotkey() {
-  local raw_hotkey="${1:-}"
-  local hotkey
-  local raw_token
-  local token
-  local upper
-  local canonical_key
-  local key=""
-  local key_seen=false
-  local has_shift=false
-  local has_control=false
-  local has_alt=false
-  local has_super=false
-  local -a tokens=()
-  local LC_ALL=C
-
-  VOCO_HOTKEY_VALIDATION_ERROR=""
-  hotkey="$(voco_trim "${raw_hotkey}")"
-  if [[ -z "${hotkey}" ]]; then
-    VOCO_HOTKEY_VALIDATION_ERROR="Hotkey cannot be empty."
-    return 1
-  fi
-  if [[ "${hotkey}" == +* || "${hotkey}" == *+ ]]; then
-    VOCO_HOTKEY_VALIDATION_ERROR="Hotkey contains an empty key or modifier."
-    return 1
-  fi
-
-  IFS='+' read -r -a tokens <<< "${hotkey}"
-  for raw_token in "${tokens[@]}"; do
-    token="$(voco_trim "${raw_token}")"
-    if [[ -z "${token}" ]]; then
-      VOCO_HOTKEY_VALIDATION_ERROR="Hotkey contains an empty key or modifier."
-      return 1
-    fi
-    if [[ "${key_seen}" == true ]]; then
-      VOCO_HOTKEY_VALIDATION_ERROR="Put modifiers first and use exactly one main key."
-      return 1
-    fi
-
-    upper="${token^^}"
-    case "${upper}" in
-      OPTION|ALT)
-        has_alt=true
-        ;;
-      CONTROL|CTRL|COMMANDORCONTROL|COMMANDORCTRL|CMDORCTRL|CMDORCONTROL)
-        has_control=true
-        ;;
-      COMMAND|CMD|SUPER)
-        has_super=true
-        ;;
-      SHIFT)
-        has_shift=true
-        ;;
-      *)
-        if ! canonical_key="$(voco_canonical_hotkey_key "${token}")"; then
-          VOCO_HOTKEY_VALIDATION_ERROR="Unsupported key '${token}'."
-          return 1
-        fi
-        key="${canonical_key}"
-        key_seen=true
-        ;;
-    esac
-  done
-
-  if [[ "${key_seen}" != true ]]; then
-    VOCO_HOTKEY_VALIDATION_ERROR="Hotkey must include one main key."
-    return 1
-  fi
-  if [[ "${has_alt}" == false && "${has_control}" == false && "${has_super}" == false ]]; then
-    VOCO_HOTKEY_VALIDATION_ERROR="Hotkey must include Alt, Control, or Super in addition to the main key."
-    return 1
-  fi
-
-  return 0
-}
-
-voco_read_configured_hotkey() {
-  local config_file="$1"
-
-  if command -v python3 >/dev/null 2>&1; then
-    python3 -I - "${config_file}" <<'PY'
-import json
-import pathlib
-import sys
-
-data = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
-hotkey = data.get("hotkey") if isinstance(data, dict) else None
-if not isinstance(hotkey, str) or not hotkey.strip():
-    raise SystemExit(1)
-print(hotkey, end="")
-PY
-    return
-  fi
-
-  sed -nE 's/.*"hotkey"[[:space:]]*:[[:space:]]*"([^"\\]*)".*/\1/p' "${config_file}" | head -n 1
-}
-
-voco_migrate_legacy_config() {
-  local legacy_config_dir="$1"
-  local legacy_config_file="$2"
-  local config_dir="$3"
-  local config_file="$4"
-  local current_uid
-  local temp_file
-
-  if [[ -e "${config_file}" || -L "${config_file}" ]]; then
-    return 1
-  fi
-  if [[ -L "${legacy_config_dir}" || ! -d "${legacy_config_dir}" || -L "${legacy_config_file}" || ! -f "${legacy_config_file}" ]]; then
-    return 1
-  fi
-
-  current_uid="$(id -u)" || return 1
-  if [[ "$(stat -c '%u' -- "${legacy_config_file}" 2>/dev/null)" != "${current_uid}" ]]; then
-    return 1
-  fi
-
-  if [[ -L "${config_dir}" || ( -e "${config_dir}" && ! -d "${config_dir}" ) ]]; then
-    return 1
-  fi
-  mkdir -p -m 0700 -- "${config_dir}" || return 1
-  if [[ -L "${config_dir}" || ! -d "${config_dir}" || "$(stat -c '%u' -- "${config_dir}" 2>/dev/null)" != "${current_uid}" ]]; then
-    return 1
-  fi
-  chmod 0700 -- "${config_dir}" || return 1
-
-  temp_file="$(mktemp "${config_dir}/.config.json.migrate.XXXXXX")" || return 1
-  chmod 0600 -- "${temp_file}" || {
-    rm -f -- "${temp_file}"
-    return 1
-  }
-  if ! dd if="${legacy_config_file}" of="${temp_file}" iflag=nofollow oflag=nofollow conv=fsync status=none; then
-    rm -f -- "${temp_file}"
-    return 1
-  fi
-  if ! ln -T -- "${temp_file}" "${config_file}"; then
-    rm -f -- "${temp_file}"
-    return 1
-  fi
-  rm -f -- "${temp_file}"
-
-  if [[ -L "${config_file}" || ! -f "${config_file}" || "$(stat -c '%u:%a:%h' -- "${config_file}" 2>/dev/null)" != "${current_uid}:600:1" ]]; then
-    return 1
-  fi
-  return 0
-}
+# BEGIN EMBEDDED INSTALL STEPS
+#!/usr/bin/env bash
+# Install steps that setup.sh sources, embedded into the standalone installer
+# by sync-installer-ui.py.
 
 voco_verify_installed_package() {
   local expected_version="$1"
@@ -380,19 +107,6 @@ voco_install_deb_package() {
   VOCO_INSTALL_ERROR=""
   deb_file="$(realpath -- "${deb_file}")" || return 1
   packages=("${deb_file}")
-  # These are optional in package metadata so X11-only distributions can install.
-  # Wayland needs both, even when APT recommendations are disabled by the owner.
-  if [[ "${XDG_SESSION_TYPE:-x11}" == wayland ]]; then
-    packages+=(ydotool ydotoold)
-    # APT downloaded and checked these in parallel with VOCO. Supplying the local
-    # archives lets the final dependency transaction reuse them without root cache writes.
-    if [[ -n "${4:-}" ]]; then
-      local helper_deb
-      for helper_deb in "$4"/ydotool_*.deb "$4"/ydotoold_*.deb; do
-        [[ -f "$helper_deb" && ! -L "$helper_deb" ]] && packages+=("$helper_deb")
-      done
-    fi
-  fi
   local -a install_command=(sudo apt-get install -y --)
   if declare -F voco_run_apt >/dev/null; then install_command=(voco_run_apt); fi
   if ! "${install_command[@]}" "${packages[@]}"; then
@@ -402,168 +116,101 @@ voco_install_deb_package() {
   voco_verify_installed_package "${expected_version}" "${expected_architecture}"
 }
 
+voco_detect_package_manager() {
+  # Ubuntu and Debian install the .deb with APT, Fedora the RPM with DNF. A
+  # system with both tools keeps APT, as before.
+  VOCO_PACKAGE_MANAGER=""
+  if command -v apt-get >/dev/null 2>&1 && command -v dpkg-query >/dev/null 2>&1; then
+    VOCO_PACKAGE_MANAGER="apt"
+  elif command -v dnf >/dev/null 2>&1 && command -v rpm >/dev/null 2>&1; then
+    VOCO_PACKAGE_MANAGER="dnf"
+  else
+    return 1
+  fi
+}
+
+voco_check_platform_floors() {
+  # Both packages need glibc_floor (check-devops.sh keeps it equal to theirs), and
+  # the speech engine is built for AVX2, FMA and F16C with no fallback. Refuse only
+  # a version or flag list that was read and falls short; leave anything unreadable
+  # to the package manager.
+  local cpuinfo="${1:-/proc/cpuinfo}" glibc_floor=2.39 version flags feature missing=""
+  VOCO_PLATFORM_ERROR=""
+  version="$(getconf GNU_LIBC_VERSION 2>/dev/null)" || version=""
+  if [[ "${version}" =~ ^glibc\ ([0-9]+)\.([0-9]+) ]] &&
+    (( 10#${BASH_REMATCH[1]} * 1000 + 10#${BASH_REMATCH[2]} < ${glibc_floor%.*} * 1000 + ${glibc_floor#*.} )); then
+    VOCO_PLATFORM_ERROR="VOCO needs glibc ${glibc_floor} or later, as on Ubuntu 24.04 and 26.04, Debian 13 and Fedora 44; this system has ${version}."
+    return 1
+  fi
+  flags="$(grep -m 1 '^flags' "${cpuinfo}" 2>/dev/null)" || return 0
+  for feature in avx2 fma f16c; do
+    [[ " ${flags#*:} " == *" ${feature} "* ]] || missing+="${missing:+, }${feature^^}"
+  done
+  if [[ -n "${missing}" ]]; then
+    VOCO_PLATFORM_ERROR="VOCO's speech recognition needs a processor with AVX2, FMA and F16C; this one lacks ${missing}. In a virtual machine, pass the host CPU through."
+    return 1
+  fi
+}
+
+voco_verify_installed_rpm() {
+  local expected_version="$1"
+  local expected_architecture="$2"
+  local package_record
+  local installed_version
+  local installed_architecture
+  local unexpected_field
+
+  VOCO_INSTALL_ERROR=""
+  # rpm records only completed installations; expected_version is VERSION-RELEASE.
+  if ! package_record="$(LC_ALL=C rpm -q --queryformat '%{VERSION}-%{RELEASE}\t%{ARCH}\n' voco 2>/dev/null)"; then
+    VOCO_INSTALL_ERROR="Package 'voco' is not installed after the package operation."
+    return 1
+  fi
+  if [[ "${package_record}" == *$'\n'* ]]; then
+    VOCO_INSTALL_ERROR="More than one VOCO package is installed. Remove the extra ones with DNF, then run the installer again."
+    return 1
+  fi
+
+  IFS=$'\t' read -r installed_version installed_architecture unexpected_field <<< "${package_record}"
+  if [[ -n "${unexpected_field}" || -z "${installed_version}" || -z "${installed_architecture}" ]]; then
+    VOCO_INSTALL_ERROR="Package manager returned an incomplete VOCO installation record."
+    return 1
+  fi
+  if [[ "${installed_version}" != "${expected_version}" ]]; then
+    VOCO_INSTALL_ERROR="Installed VOCO version is ${installed_version}; expected ${expected_version}."
+    return 1
+  fi
+  if [[ "${installed_architecture}" != "${expected_architecture}" ]]; then
+    VOCO_INSTALL_ERROR="Installed VOCO architecture is ${installed_architecture}; expected ${expected_architecture}."
+    return 1
+  fi
+
+  return 0
+}
+
+voco_install_rpm_package() {
+  local rpm_file="$1"
+  local expected_version="$2"
+  local expected_architecture="$3"
+
+  VOCO_INSTALL_ERROR=""
+  rpm_file="$(realpath -- "${rpm_file}")" || return 1
+  local -a install_command=(sudo dnf install -y --)
+  if declare -F voco_run_dnf >/dev/null; then install_command=(voco_run_dnf); fi
+  if ! "${install_command[@]}" "${rpm_file}"; then
+    VOCO_INSTALL_ERROR="DNF could not install VOCO and its desktop dependencies. Resolve the error above, then run the installer again."
+    return 1
+  fi
+  voco_verify_installed_rpm "${expected_version}" "${expected_architecture}"
+}
+
 voco_verify_desktop_input() {
   VOCO_INPUT_ERROR=""
   if ! VOCO_INPUT_ERROR="$(/usr/bin/voco --check-desktop-input 2>&1)"; then
     return 1
   fi
 }
-
-voco_wayland_device_access() {
-  [[ -c /dev/uinput && -w /dev/uinput ]]
-}
-
-voco_start_wayland_service() {
-  [[ "${XDG_SESSION_TYPE:-x11}" == wayland ]] || return 0
-  # The application holds its instance lock across the owned-service migration.
-  # An open app must be closed explicitly; package hooks never restart a session.
-  if ! VOCO_INPUT_ERROR="$(/usr/bin/voco --setup-desktop-input 2>&1)"; then
-    return 1
-  fi
-  # Reuse a working service, including a distribution/admin-managed daemon.
-  voco_verify_desktop_input && return 0
-  if ! voco_wayland_device_access; then
-    VOCO_INPUT_ERROR="This login cannot access /dev/uinput. Complete the Wayland device-permission setup before starting the input service."
-    return 1
-  fi
-  if pgrep -x ydotoold >/dev/null 2>&1; then
-    VOCO_INPUT_ERROR="An existing ydotoold is running but is unavailable to this login. Check its socket permissions; VOCO will not replace that service."
-    return 1
-  fi
-  local service_detail service_status=0
-  service_detail="$(systemctl --user enable --now voco-ydotoold.service 2>&1)" || service_status=$?
-  if [[ -n "${VOCO_INSTALL_LOG:-}" ]]; then
-    printf '%s\n' "$service_detail" >> "$VOCO_INSTALL_LOG"
-  elif (( service_status != 0 )); then
-    printf '%s\n' "$service_detail" >&2
-  fi
-  if (( service_status != 0 )); then
-    VOCO_INPUT_ERROR="Could not start the VOCO input service. Check: systemctl --user status voco-ydotoold.service"
-    return 1
-  fi
-  local attempt
-  for attempt in {1..10}; do
-    if voco_verify_desktop_input; then return 0; fi
-    sleep 0.2
-  done
-  return 1
-}
-
-voco_write_default_config() {
-  local config_file="$1"
-  local hotkey="$2"
-  local escaped_hotkey
-  local temp_file
-
-  escaped_hotkey="$(voco_escape_json_string "${hotkey}")"
-  temp_file="$(mktemp "${config_file}.new.XXXXXX")" || return 1
-  if ! cat > "${temp_file}" << EOF
-{
-  "hotkey": "${escaped_hotkey}",
-  "selectedMic": null
-}
-EOF
-  then
-    rm -f -- "${temp_file}"
-    return 1
-  fi
-  # Publish only if the destination is still absent. Never overwrite a config
-  # created by the app, another installer, or a symlink during setup.
-  local result=0
-  ln -T -- "${temp_file}" "${config_file}" 2>/dev/null || result=$?
-  rm -f -- "${temp_file}"
-  return "$result"
-}
-
-voco_run_hotkey_setup() {
-  local hotkey="${1:-Alt+D}"
-  local config_base="${HOME}/.config"
-  # Match dirs::config_dir(): an XDG override must be absolute.
-  if [[ "${XDG_CONFIG_HOME:-}" == /* ]]; then config_base="$XDG_CONFIG_HOME"; fi
-  local config_dir="${config_base}/voco"
-  local config_file="${config_dir}/config.json"
-  local existing_hotkey=""
-  local existing_hotkey_valid=false
-  local config_exists=false
-  local config_path_safe=true
-  local legacy_config_dir="${config_base}/voice"
-  local legacy_config_file="${legacy_config_dir}/config.json"
-  local legacy_config_present=false
-  local legacy_config_migrated=false
-  local legacy_config_skipped=false
-
-  if [[ -L "${config_dir}" || ( -e "${config_dir}" && ! -d "${config_dir}" ) || -L "${config_file}" || ( -e "${config_file}" && ! -f "${config_file}" ) ]]; then
-    config_exists=true
-    config_path_safe=false
-  else
-    if [[ ! -e "${config_file}" ]]; then
-      if [[ -L "${legacy_config_dir}" ]]; then
-        legacy_config_present=true
-      elif [[ -d "${legacy_config_dir}" ]]; then
-        if [[ -L "${legacy_config_file}" || -e "${legacy_config_file}" ]]; then
-          legacy_config_present=true
-        fi
-      elif [[ -e "${legacy_config_dir}" ]]; then
-        legacy_config_present=true
-      fi
-
-      if [[ "${legacy_config_present}" == true ]]; then
-        if voco_migrate_legacy_config "${legacy_config_dir}" "${legacy_config_file}" "${config_dir}" "${config_file}"; then
-          legacy_config_migrated=true
-        else
-          legacy_config_skipped=true
-        fi
-      fi
-    fi
-
-    if [[ -f "${config_file}" ]]; then
-      config_exists=true
-      if existing_hotkey="$(voco_read_configured_hotkey "${config_file}" 2>/dev/null)" && voco_validate_hotkey "${existing_hotkey}"; then
-        existing_hotkey="$(voco_trim "${existing_hotkey}")"
-        hotkey="${existing_hotkey}"
-        existing_hotkey_valid=true
-      fi
-    fi
-  fi
-
-  if [[ "${config_path_safe}" != true ]]; then
-    echo
-    warn "Existing VOCO config path is a symlink or is not a regular file; it was preserved without modification."
-    VOCO_SELECTED_HOTKEY="${hotkey}"
-    VOCO_CONFIG_FILE="${config_file}"
-    return 0
-  fi
-
-  if [[ "${legacy_config_migrated}" == true ]]; then
-    echo
-    dim "Legacy Voice settings migrated to ${config_file}"
-  elif [[ "${legacy_config_skipped}" == true ]]; then
-    echo
-    warn "Legacy Voice config is a symlink, is not a regular user-owned file, or could not be copied; it was preserved without modification."
-  fi
-
-  if [[ "${config_exists}" == true ]]; then
-    if [[ "${existing_hotkey_valid}" == true ]]; then
-      ok "Shortcut: ${hotkey} (existing settings kept)"
-    else
-      warn "Existing config preserved; VOCO will validate its hotkey on launch."
-    fi
-    VOCO_SELECTED_HOTKEY="${hotkey}"
-    VOCO_CONFIG_FILE="${config_file}"
-    return 0
-  else
-    ok "Shortcut: ${hotkey}"
-  fi
-
-  mkdir -p -m 0700 "${config_dir}"
-  chmod 0700 "${config_dir}"
-  if ! voco_write_default_config "${config_file}" "${hotkey}"; then
-    warn "Could not create default settings; existing files were preserved. VOCO will validate its settings on launch."
-  fi
-
-  VOCO_SELECTED_HOTKEY="${hotkey}"
-  VOCO_CONFIG_FILE="${config_file}"
-}
+# END EMBEDDED INSTALL STEPS
 
 # BEGIN EMBEDDED INSTALLER UI
 #!/usr/bin/env bash
@@ -599,7 +246,7 @@ voco_ui_configure() {
   local columns="${VOCO_TERMINAL_COLUMNS:-80}" rows="${VOCO_TERMINAL_ROWS:-24}"
   if [[ "${VOCO_INSTALL_PLAIN:-0}" == 1 || ! "$columns" =~ ^[0-9]+$ || "$columns" -lt 64 || ! "$rows" =~ ^[0-9]+$ || "$rows" -lt 12 ]]; then
     VOCO_TERMINAL_MOTION=false
-    BOLD='' DIM='' GRAPHITE='' GRAPHITE_SOFT='' GREEN='' YELLOW='' RED='' WHITE='' NC=''
+    DIM='' GREEN='' YELLOW='' RED='' NC=''
   fi
   if [[ "${VOCO_INSTALL_NO_MOTION:-0}" == 1 ]]; then
     VOCO_UI_NO_MOTION=true
@@ -734,9 +381,9 @@ voco_ui_release() {
 voco_ui_download_observer() {
   trap - EXIT
   trap 'exit 0' TERM INT
-  local destination="$1" initial="$2" start="$3" bytes="$2" now delta rate elapsed tick=0 mark detail shine
+  local destination="$1" start="$2" bytes=0 now delta rate elapsed tick=0 mark detail shine
   local glyphs=(▁ ▂ ▃ ▄ ▅ ▆ ▇ █) value
-  VOCO_UI_LAST_BYTES=$initial
+  VOCO_UI_LAST_BYTES=0
   VOCO_UI_LAST_TIME=${EPOCHREALTIME/./}
   while :; do
     # Sample at 4 Hz; the short entry sweep uses only shell builtins between samples.
@@ -751,7 +398,7 @@ voco_ui_download_observer() {
       elapsed=$((SECONDS-start))
       voco_ui_size "$bytes"; detail="$VOCO_UI_SIZE received"
       if (( elapsed > 0 )); then
-        voco_ui_size "$(((bytes>initial?bytes-initial:0)/elapsed))"; detail+=" · $VOCO_UI_SIZE/s avg"
+        voco_ui_size "$((bytes/elapsed))"; detail+=" · $VOCO_UI_SIZE/s avg"
       fi
       mark=''
       if [[ "$VOCO_UI_NO_MOTION" == true ]]; then mark='↓'; else
@@ -826,6 +473,16 @@ voco_run_apt() {
     dim "Installation details: $VOCO_INSTALL_LOG"
   fi
   return "$result"
+}
+
+voco_run_dnf() {
+  # DNF keeps its own presentation, prompts included; VOCO only hands it a
+  # clear terminal and says who is asking for the password.
+  voco_ui_release
+  if ! sudo -n -v >/dev/null 2>&1; then
+    dim 'VOCO · Fedora needs your permission to install.'
+  fi
+  sudo dnf install -y -- "$@"
 }
 
 voco_apt_display() {
@@ -1028,20 +685,19 @@ VOCO_APT_PY
 
 # Download output is measured from bytes received, never simulated percentages.
 DOWNLOAD_PID=""
-HELPER_DOWNLOAD_PID=""
-HELPER_DOWNLOAD_READY=""
 CHECKSUM_DOWNLOAD_PID=""
 SIGNATURE_DOWNLOAD_PID=""
 VOCO_INSTALL_LOG=""
 VOCO_KEEP_LOG=false
 voco_download() {
   local label="$1" destination="$2" url="$3"
-  local started=$SECONDS bytes elapsed detail initial_bytes result=0
-  initial_bytes=$(stat -c %s "$destination" 2>/dev/null || printf '0')
+  local started=$SECONDS bytes elapsed detail result=0
   if [[ -z "$VOCO_INSTALL_LOG" ]]; then
     VOCO_INSTALL_LOG=$(mktemp "${TMPDIR:-/tmp}/voco-install.XXXXXX.log")
   fi
   # Suppress wget's per-chunk dot log; retain its response summary and errors.
+  # Keep --continue: without it Fedora's wget2 restarts a failed transfer and
+  # appends the whole file to the partial one.
   wget --no-verbose --continue --tries=3 --waitretry=2 --timeout=30 -O "$destination" "$url" >> "$VOCO_INSTALL_LOG" 2>&1 &
   DOWNLOAD_PID=$!
   if [[ "$VOCO_TERMINAL_MOTION" == true ]]; then
@@ -1050,7 +706,7 @@ voco_download() {
     if [[ "$VOCO_TERMINAL_MOTION" == true ]]; then
       # Inherit the log descriptor at fork, including the pre-trap shutdown window.
       {
-        voco_ui_download_observer "$destination" "$initial_bytes" "$started" &
+        voco_ui_download_observer "$destination" "$started" &
         VOCO_UI_PID=$!
       } 2>> "$VOCO_INSTALL_LOG"
     fi
@@ -1123,55 +779,6 @@ voco_verify_release_signature() {
     err 'The release signer does not match VOCO. Nothing was installed.'
   fi
   ok 'Publisher signature verified'
-}
-
-# Only the Wayland helpers are prefetched. APT still resolves the complete
-# application transaction after VOCO's checksum has passed. No sudo or install here.
-voco_start_helper_prefetch() {
-  [[ "${XDG_SESSION_TYPE:-x11}" == wayland ]] || return 0
-  command -v setsid >/dev/null 2>&1 || return 0
-  local helper status
-  local -a missing=()
-  for helper in ydotool ydotoold; do
-    status=$(dpkg-query -W -f='${Status}' "$helper" 2>/dev/null || true)
-    [[ "$status" == 'install ok installed' ]] || missing+=("$helper")
-  done
-  (( ${#missing[@]} > 0 )) || return 0
-  mkdir -m 755 "$VOCO_DOWNLOAD_DIR/helpers"
-  if [[ -z "$VOCO_INSTALL_LOG" ]]; then
-    VOCO_INSTALL_LOG=$(mktemp "${TMPDIR:-/tmp}/voco-install.XXXXXX.log")
-  fi
-  dim "Downloading desktop helpers alongside VOCO."
-  (
-    cd "$VOCO_DOWNLOAD_DIR/helpers"
-    umask 022
-    exec setsid apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=20 \
-      -o Acquire::https::Timeout=20 download "${missing[@]}"
-  ) >> "$VOCO_INSTALL_LOG" 2>&1 &
-  HELPER_DOWNLOAD_PID=$!
-}
-
-voco_finish_helper_prefetch() {
-  [[ -n "$HELPER_DOWNLOAD_PID" ]] || return 0
-  # This is speculative work, not a prerequisite. Do not wait for a slow mirror
-  # after the verified VOCO payload is ready; the real APT transaction can retry.
-  if kill -0 "$HELPER_DOWNLOAD_PID" 2>/dev/null; then
-    # This child only downloads into disposable staging. Stop the complete
-    # isolated group, including APT acquire workers; no package DB is being changed.
-    kill -KILL -- "-$HELPER_DOWNLOAD_PID" "$HELPER_DOWNLOAD_PID" 2>/dev/null || true
-    wait "$HELPER_DOWNLOAD_PID" 2>/dev/null || true
-    HELPER_DOWNLOAD_PID=""
-    dim 'APT will fetch any remaining desktop helpers during installation.'
-    return 0
-  fi
-  if wait "$HELPER_DOWNLOAD_PID"; then
-    HELPER_DOWNLOAD_READY="$VOCO_DOWNLOAD_DIR/helpers"
-    ok "Desktop helpers downloaded"
-  else
-    VOCO_KEEP_LOG=true
-    dim "APT will fetch any remaining desktop helpers during installation."
-  fi
-  HELPER_DOWNLOAD_PID=""
 }
 
 voco_launch_installed_app() {
@@ -1261,10 +868,6 @@ voco_install_cleanup() {
     kill "$SIGNATURE_DOWNLOAD_PID" 2>/dev/null || true
     wait "$SIGNATURE_DOWNLOAD_PID" 2>/dev/null || true
   fi
-  if [[ -n "$HELPER_DOWNLOAD_PID" ]]; then
-    kill -KILL -- "-$HELPER_DOWNLOAD_PID" "$HELPER_DOWNLOAD_PID" 2>/dev/null || true
-    wait "$HELPER_DOWNLOAD_PID" 2>/dev/null || true
-  fi
   if [[ -n "$DOWNLOAD_PID" ]]; then
     kill "$DOWNLOAD_PID" 2>/dev/null || true
     wait "$DOWNLOAD_PID" 2>/dev/null || true
@@ -1292,32 +895,49 @@ if [[ "$(uname)" != "Linux" ]]; then
   err "VOCO only supports Linux. Detected: $(uname)"
 fi
 
-if [[ "$(dpkg --print-architecture 2>/dev/null)" != "amd64" ]]; then
-  err "Only amd64 (x86_64) is supported. Detected: $(dpkg --print-architecture 2>/dev/null || uname -m)"
+if ! voco_detect_package_manager; then
+  err "VOCO installs with APT on Ubuntu and Debian, or with DNF on Fedora. Neither was found."
+fi
+# Each package manager names the architecture its own way.
+if [[ "$VOCO_PACKAGE_MANAGER" == dnf ]]; then
+  PACKAGE_NAME="voco-${VERSION}-1.x86_64.rpm"
+  PACKAGE_URL="$RPM_URL"
+  PACKAGE_TOOLS=(dnf rpm)
+  if [[ "$(uname -m)" != "x86_64" ]]; then
+    err "Only amd64 (x86_64) is supported. Detected: $(uname -m)"
+  fi
+else
+  PACKAGE_NAME="voco_${VERSION}_amd64.deb"
+  PACKAGE_URL="$DEB_URL"
+  PACKAGE_TOOLS=(apt-get dpkg-query)
+  if [[ "$(dpkg --print-architecture 2>/dev/null)" != "amd64" ]]; then
+    err "Only amd64 (x86_64) is supported. Detected: $(dpkg --print-architecture 2>/dev/null || uname -m)"
+  fi
 fi
 
-for prerequisite in wget sha256sum base64 gpgv stat apt-get sudo dpkg-query; do
+for prerequisite in wget sha256sum base64 gpgv stat sudo "${PACKAGE_TOOLS[@]}"; do
   command -v "$prerequisite" >/dev/null 2>&1 || err "$prerequisite is required before downloading VOCO."
 done
+# Stop before the download on a system VOCO can't run on.
+voco_check_platform_floors || err "$VOCO_PLATFORM_ERROR"
 ok "Linux · x86_64"
 
-# APT resolves package dependencies in the install stage. Readiness is checked
-# after installation, when helpers and services can actually be available.
+# APT or DNF resolves package dependencies in the install stage. Readiness is
+# checked after installation, when helpers and services can actually be available.
 dim "Desktop dependencies are checked during installation."
 
 # ─── Download ───────────────────────────────────────────
 voco_ui_stage 1 'Bringing VOCO to your desktop.' 'English speech recognition, on this computer.'
 
 VOCO_DOWNLOAD_DIR=$(mktemp -d)
-DEB_FILE="${VOCO_DOWNLOAD_DIR}/voco_${VERSION}_amd64.deb"
+PACKAGE_FILE="${VOCO_DOWNLOAD_DIR}/${PACKAGE_NAME}"
 CHECKSUM_FILE="${VOCO_DOWNLOAD_DIR}/voco_checksums.txt"
 SIGNATURE_FILE="${CHECKSUM_FILE}.asc"
-DEB_CHECKSUM_FILE="${VOCO_DOWNLOAD_DIR}/voco_${VERSION}_amd64.deb.sha256"
+PACKAGE_CHECKSUM_FILE="${VOCO_DOWNLOAD_DIR}/${PACKAGE_NAME}.sha256"
 
 dim "Includes English speech recognition. Speech stays on this computer."
-voco_start_helper_prefetch
 voco_start_release_metadata_downloads
-voco_download "VOCO v${VERSION}" "$DEB_FILE" "$DEB_URL" || exit 1
+voco_download "VOCO v${VERSION}" "$PACKAGE_FILE" "$PACKAGE_URL" || exit 1
 voco_ui_stage 2 'Checking your download.' 'Waiting for signed release checksums.'
 if ! voco_finish_release_metadata_downloads; then
   exit 1
@@ -1326,11 +946,11 @@ voco_ui_sweep 'Checking your download.' 'Checking the publisher signature.'
 voco_verify_release_signature
 voco_ui_sweep 'Checking your download.' 'Checking the package checksum.'
 
-if ! grep -F "  $(basename "$DEB_FILE")" "$CHECKSUM_FILE" > "$DEB_CHECKSUM_FILE"; then
-  err "Could not find a checksum entry for $(basename "$DEB_FILE")"
+if ! grep -F "  $(basename "$PACKAGE_FILE")" "$CHECKSUM_FILE" > "$PACKAGE_CHECKSUM_FILE"; then
+  err "Could not find a checksum entry for $(basename "$PACKAGE_FILE")"
 fi
 
-if (cd "$VOCO_DOWNLOAD_DIR" && sha256sum --check "$(basename "$DEB_CHECKSUM_FILE")" >/dev/null 2>&1); then
+if (cd "$VOCO_DOWNLOAD_DIR" && sha256sum --check "$(basename "$PACKAGE_CHECKSUM_FILE")" >/dev/null 2>&1); then
   voco_ui_pause
   if [[ "$VOCO_TERMINAL_MOTION" == true ]]; then voco_ui_frame 'Your download checks out.' 'Package checksum verified.' '✓'; else ok "Package checksum verified"; fi
 else
@@ -1344,22 +964,33 @@ voco_ui_stage 3 'Setting up VOCO.' 'Preparing the verified package.'
 # Only this owned staging directory contains public release files. Let APT's
 # unprivileged download user read the verified package without widening user dirs.
 chmod 755 "$VOCO_DOWNLOAD_DIR"
-chmod 644 "$DEB_FILE"
-voco_finish_helper_prefetch
-if voco_install_deb_package "$DEB_FILE" "$VERSION" "amd64" "$HELPER_DOWNLOAD_READY"; then
+chmod 644 "$PACKAGE_FILE"
+if [[ "$VOCO_PACKAGE_MANAGER" == dnf ]]; then
+  VOCO_INSTALL_PACKAGE=(voco_install_rpm_package "$PACKAGE_FILE" "${VERSION}-1" "x86_64")
+else
+  VOCO_INSTALL_PACKAGE=(voco_install_deb_package "$PACKAGE_FILE" "$VERSION" "amd64")
+fi
+if "${VOCO_INSTALL_PACKAGE[@]}"; then
   voco_ui_stage 3 'Finishing desktop setup.' 'VOCO is installed. Checking desktop integration.'
 else
   err "Installation failed: ${VOCO_INSTALL_ERROR}"
 fi
 
 rm -rf "$VOCO_DOWNLOAD_DIR"
-voco_run_hotkey_setup "Alt+D"
-HOTKEY="${VOCO_SELECTED_HOTKEY}"
+# Shown only, and decided before VOCO first starts and writes its settings. VOCO
+# copies a legacy Voice config when it has none, and keeps the shortcut it finds.
+config_base="${HOME}/.config"
+# Match dirs::config_dir(): an XDG override must be absolute.
+if [[ "${XDG_CONFIG_HOME:-}" == /* ]]; then config_base="$XDG_CONFIG_HOME"; fi
+HOTKEY="Alt+D"
+for saved_config in "${config_base}/voco/config.json" "${config_base}/voice/config.json"; do
+  if [[ -e "$saved_config" || -L "$saved_config" ]]; then HOTKEY="unchanged"; fi
+done
 
-if ! voco_start_wayland_service || ! voco_verify_desktop_input; then
+if ! voco_verify_desktop_input; then
   warn "VOCO is installed. Desktop setup needs one more step."
   dim "${VOCO_INPUT_ERROR}"
-  dim "Setup instructions: https://github.com/sergiopesch/voco/blob/master/docs/platform/README.md#ydotoold-ydotool-daemon"
+  dim "Setup instructions: https://github.com/sergiopesch/voco/blob/master/docs/platform/README.md#wayland-paste-keys"
   dim "After setup, run: voco --check-desktop-input"
   if [[ -n "${VOCO_INSTALL_LOG:-}" ]]; then
     VOCO_KEEP_LOG=true
@@ -1372,7 +1003,8 @@ ok "Desktop input prerequisites verified"
 dim "Setting up VOCO's live panel for this desktop."
 if VOCO_PANEL_DETAIL="$(/usr/bin/voco --setup-panel 2>&1)"; then
   dim "$VOCO_PANEL_DETAIL"
-elif [[ "$VOCO_PANEL_DETAIL" == *'Panel enabled. Sign out and back in'* ]]; then
+elif [[ "$VOCO_PANEL_DETAIL" == *'Panel enabled. Sign out and back in'* || "$VOCO_PANEL_DETAIL" == *'Panel update installed.'* ]]; then
+  # Setup enabled the panel, or an upgrade left GNOME running the previous one.
   VOCO_UI_NOTE='Panel: sign out and back in to load it. Save your work first.'
   if [[ "$VOCO_TERMINAL_MOTION" != true ]]; then warn "$VOCO_UI_NOTE"; fi
 else

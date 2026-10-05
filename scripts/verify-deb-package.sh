@@ -45,7 +45,7 @@ PACKAGE_DEPENDS="$(dpkg-deb -f "${DEB_PATH}" Depends)"
   exit 1
 }
 
-for dependency in ibus python3 python3-gi gir1.2-ibus-1.0 python3-numpy python3-psutil procps libsentencepiece0 libpulse0 libnotify-bin xclip xdotool wl-clipboard; do
+for dependency in ibus python3 python3-gi gir1.2-ibus-1.0 python3-numpy libsentencepiece0 libpulse0 libnotify-bin xclip xdotool wl-clipboard; do
   if ! grep -Eq "(^|, )${dependency}( \\([^)]*\\))?(,|$)" <<<"${PACKAGE_DEPENDS}"; then
     echo "Debian package is missing dependency: ${dependency}" >&2
     exit 1
@@ -59,8 +59,8 @@ for floor in 'libc6 (>= 2.39)' 'libstdc++6 (>= 13.2.0)'; do
   fi
 done
 
-if [[ "$(dpkg-deb -f "${DEB_PATH}" Recommends)" != "ydotool, ydotoold" ]]; then
-  echo "Debian package must recommend the session-specific Wayland input helper." >&2
+if [[ -n "$(dpkg-deb -f "${DEB_PATH}" Recommends)" ]]; then
+  echo "Debian package must not recommend packages; VOCO pastes through its own virtual keyboard." >&2
   exit 1
 fi
 
@@ -92,11 +92,8 @@ assert_entry /usr/bin/voco -rwxr-xr-x
 for file in metadata.json extension.js model.js stylesheet.css voco-symbol.png; do
   assert_entry "/usr/share/gnome-shell/extensions/voco-panel@voco.local/${file}" -rw-r--r--
 done
-assert_entry /usr/lib/systemd/user/voco-ydotoold.service -rw-r--r--
-assert_entry /usr/libexec/voco/ydotool-launcher -rwxr-xr-x
-assert_entry /usr/libexec/voco/ydotool-legacy/ydotoold -rwxr-xr-x
-assert_entry /usr/libexec/voco/ydotool-legacy/MANIFEST.json -rw-r--r--
-assert_entry /usr/libexec/voco/ydotool-legacy/qualified-client.json -rw-r--r--
+assert_entry /usr/lib/udev/rules.d/70-voco-uinput.rules -rw-r--r--
+assert_entry /usr/lib/modules-load.d/voco-uinput.conf -rw-r--r--
 assert_entry /usr/share/doc/voco/THIRD-PARTY-NOTICES.txt -rw-r--r--
 assert_entry /usr/share/doc/voco/copyright -rw-r--r--
 assert_entry /usr/libexec/voco-browser-host -rwxr-xr-x
@@ -138,10 +135,12 @@ done
 cmp "${ROOT_DIR}/vendor/THIRD-PARTY-NOTICES.txt" "${EXTRACT_ROOT}/usr/share/doc/voco/THIRD-PARTY-NOTICES.txt"
 tail -n "$(wc -l < "${ROOT_DIR}/LICENSE")" "${EXTRACT_ROOT}/usr/share/doc/voco/copyright" \
   | cmp - "${ROOT_DIR}/LICENSE"
-cmp "${ROOT_DIR}/packaging/systemd/voco-ydotoold.service" "${EXTRACT_ROOT}/usr/lib/systemd/user/voco-ydotoold.service"
-cmp "${ROOT_DIR}/packaging/ydotool/voco-ydotool-launcher" "${EXTRACT_ROOT}/usr/libexec/voco/ydotool-launcher"
-cmp "${ROOT_DIR}/packaging/ydotool/qualified-client.json" "${EXTRACT_ROOT}/usr/libexec/voco/ydotool-legacy/qualified-client.json"
-python3 "${ROOT_DIR}/scripts/verify-legacy-input-package.py" "${EXTRACT_ROOT}"
+cmp "${ROOT_DIR}/packaging/udev/70-voco-uinput.rules" "${EXTRACT_ROOT}/usr/lib/udev/rules.d/70-voco-uinput.rules"
+cmp "${ROOT_DIR}/packaging/udev/voco-uinput.conf" "${EXTRACT_ROOT}/usr/lib/modules-load.d/voco-uinput.conf"
+if [[ -e "${EXTRACT_ROOT}/usr/libexec/voco" || -e "${EXTRACT_ROOT}/usr/lib/systemd/user/voco-ydotoold.service" ]]; then
+  echo "Debian package still ships the retired ydotoold service or launcher." >&2
+  exit 1
+fi
 
 mapfile -t packaged_desktop_files < <(
   find "${EXTRACT_ROOT}/usr/share/applications" -maxdepth 1 -type f -name '*.desktop' -print
@@ -231,23 +230,5 @@ python3 "${ROOT_DIR}/scripts/verify-speech-payload.py" "${EXTRACT_ROOT}" "${EXPE
 desktop-file-validate "${EXTRACT_ROOT}${DESKTOP_PATH}"
 appstreamcli validate "${APPSTREAM_OPTIONS[@]}" "${EXTRACT_ROOT}${METAINFO_PATH}"
 appstreamcli validate-tree "${APPSTREAM_OPTIONS[@]}" "${EXTRACT_ROOT}"
-
-[[ "$(stat -c '%a' "${EXTRACT_ROOT}/usr/libexec/voco-ibus-engine")" == "755" ]]
-for path in \
-  "${EXTRACT_ROOT}/usr/bin/voco" \
-  "${EXTRACT_ROOT}${DESKTOP_PATH}" \
-  "${EXTRACT_ROOT}${METAINFO_PATH}" \
-  "${EXTRACT_ROOT}/usr/share/icons/hicolor/32x32/apps/voco.png" \
-  "${EXTRACT_ROOT}/usr/share/icons/hicolor/128x128/apps/voco.png" \
-  "${EXTRACT_ROOT}/usr/share/icons/hicolor/256x256@2/apps/voco.png" \
-  "${EXTRACT_ROOT}/usr/share/ibus/component/voco.xml" \
-  "${EXTRACT_ROOT}/usr/lib/voco/ibus/voco_ibus_engine.py" \
-  "${EXTRACT_ROOT}/usr/lib/voco/ibus/voco_ibus_protocol.py"; do
-  expected_mode=644
-  if [[ "${path}" == "${EXTRACT_ROOT}/usr/bin/voco" ]]; then
-    expected_mode=755
-  fi
-  [[ "$(stat -c '%a' "${path}")" == "${expected_mode}" ]]
-done
 
 echo "Verified VOCO ${PACKAGE_VERSION} Debian package, desktop/AppStream identity, icons, persistent IBus payload, and exact-field browser integration."

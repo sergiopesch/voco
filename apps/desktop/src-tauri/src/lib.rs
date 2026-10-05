@@ -11,8 +11,6 @@ mod browser_socket;
 mod config;
 mod crash_recovery;
 #[cfg(target_os = "linux")]
-mod desktop_input_setup;
-#[cfg(target_os = "linux")]
 mod desktop_notifications;
 mod digest_hex;
 #[cfg(target_os = "linux")]
@@ -32,6 +30,8 @@ mod single_instance;
 mod speech_stream;
 mod tray_icons;
 mod trigger_socket;
+#[cfg(target_os = "linux")]
+mod virtual_keyboard;
 
 /// Check input prerequisites without launching a window or sending keys.
 pub fn check_desktop_input() -> Result<String, String> {
@@ -41,19 +41,6 @@ pub fn check_desktop_input() -> Result<String, String> {
     } else {
         Err(status.detail)
     }
-}
-
-/// Set up the packaged helper only while this process owns the app's idle boundary.
-pub fn setup_desktop_input() -> Result<String, String> {
-    #[cfg(target_os = "linux")]
-    {
-        let guard = single_instance::acquire().map_err(|error| {
-            format!("Close VOCO before updating its desktop input service: {error}")
-        })?;
-        desktop_input_setup::migrate(&guard).map_err(|error| error.detail)
-    }
-    #[cfg(not(target_os = "linux"))]
-    Ok("Desktop input setup is only needed on Linux.".into())
 }
 
 /// Request one toggle from the running application without launching a window.
@@ -72,7 +59,7 @@ use config::{
 };
 use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
-use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, AtomicU8, Ordering};
 use std::sync::{LazyLock, Mutex};
 use std::time::Instant;
 use tauri::{Emitter, Manager};
@@ -85,16 +72,14 @@ static RENDERER_EPOCH: AtomicU64 = AtomicU64::new(1);
 // without eating legitimate quick user toggles.
 static LAST_TOGGLE_MS: AtomicI64 = AtomicI64::new(-1);
 
-// Evdev hotkey mode: 0 = Alt+D, 1 = Alt+Shift+D, 255 = custom (disabled)
-static EVDEV_HOTKEY_MODE: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
+// The evdev listener's preset, encoded by `Preset::encode`; a custom shortcut disables it.
+static EVDEV_PRESET: AtomicU8 = AtomicU8::new(Preset::AltD as u8);
 static USE_EVDEV_HOTKEY: AtomicBool = AtomicBool::new(false);
 static SHORTCUT_OBSERVATIONS: LazyLock<shortcut_readiness::Observations> =
     LazyLock::new(shortcut_readiness::Observations::default);
 static IBUS_SHORTCUT_LEASE: shortcut_arbitration::ConsumingLease =
     shortcut_arbitration::ConsumingLease::new();
 static SHORTCUT_RENDERER_HEARTBEAT_MS: AtomicI64 = AtomicI64::new(-1);
-#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
-static EVDEV_LISTENER_STARTED: AtomicBool = AtomicBool::new(false);
 static HOTKEY_BINDING_VERSION: AtomicU64 = AtomicU64::new(0);
 static FRONTEND_HOTKEY_HANDLER_READY: AtomicBool = AtomicBool::new(false);
 static BROWSER_EVENT_DELIVERY: LazyLock<browser_event_delivery::BrowserEventDelivery> =
@@ -127,15 +112,6 @@ fn trace_modes(hotkey: Option<&str>, performance: Option<&str>) -> (bool, bool) 
     (hotkey == Some("1"), performance == Some("1"))
 }
 
-#[derive(Debug, Clone, Copy, Default, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct TrayPopoverAnchor {
-    pub rect_position_x: i32,
-    pub rect_position_y: i32,
-    pub rect_width: u32,
-    pub rect_height: u32,
-}
-
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ConfigSnapshot {
@@ -165,7 +141,9 @@ fn hotkey_trace_path() -> std::path::PathBuf {
     xdg_state_home().join("voco").join("hotkey-trace.jsonl")
 }
 
-fn session_type_label() -> &'static str {
+/// The trace and performance logs' session label. RuntimeDiagnostics reports
+/// insertion.rs's "wayland" or "x11-or-other" instead.
+fn trace_session_label() -> &'static str {
     match std::env::var("XDG_SESSION_TYPE") {
         Ok(value) if value.eq_ignore_ascii_case("wayland") => "Wayland",
         Ok(value) if value.eq_ignore_ascii_case("x11") => "X11",
@@ -204,7 +182,7 @@ fn trace_hotkey_event_with_fields(
         "event": event,
         "t_ms": monotonic_trace_ms(),
         "backend_used": backend,
-        "session_type": session_type_label(),
+        "session_type": trace_session_label(),
     });
     if let Some(fields) = frontend_fields {
         if let Some(selected_device_configured) = fields.selected_device_configured {
@@ -290,6 +268,14 @@ fn trace_frontend_hotkey_event(
         }
         _ => Err(format!("Unsupported hotkey trace event: {event}")),
     }
+}
+
+/// Both logs are opt-in. The renderer asks once, so it can skip the dictation
+/// traces and quality records Rust would only drop.
+#[tauri::command]
+fn diagnostic_logging() -> serde_json::Value {
+    let performance = performance::enabled();
+    serde_json::json!({"trace": TRACE_MODES.0 || performance, "performance": performance})
 }
 
 fn is_supported_dictation_trace_event(event: &str) -> bool {
@@ -381,23 +367,66 @@ fn has_pending_hotkey_toggle() -> bool {
         .unwrap_or(false)
 }
 
-fn hotkey_to_evdev_mode(hotkey: &str) -> u8 {
-    let Ok(shortcut) = hotkey.parse::<tauri_plugin_global_shortcut::Shortcut>() else {
-        return 255;
-    };
-    if "Alt+D"
-        .parse::<tauri_plugin_global_shortcut::Shortcut>()
-        .is_ok_and(|candidate| candidate == shortcut)
-    {
-        0
-    } else if "Alt+Shift+D"
-        .parse::<tauri_plugin_global_shortcut::Shortcut>()
-        .is_ok_and(|candidate| candidate == shortcut)
-    {
-        1
-    } else {
-        255
+/// The two shortcuts passive Wayland evdev observes and the GNOME companion grabs,
+/// in tray menu order. Every other shortcut is custom.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Preset {
+    AltD,
+    AltShiftD,
+}
+
+impl Preset {
+    const ALL: [Self; 2] = [Self::AltD, Self::AltShiftD];
+
+    /// The preset a shortcut names, in any spelling the parser accepts.
+    fn of(hotkey: &str) -> Option<Self> {
+        let shortcut = hotkey
+            .parse::<tauri_plugin_global_shortcut::Shortcut>()
+            .ok()?;
+        Self::ALL.into_iter().find(|preset| {
+            preset
+                .label()
+                .parse::<tauri_plugin_global_shortcut::Shortcut>()
+                .is_ok_and(|candidate| candidate == shortcut)
+        })
     }
+
+    fn label(self) -> &'static str {
+        match self {
+            Self::AltD => "Alt+D",
+            Self::AltShiftD => "Alt+Shift+D",
+        }
+    }
+
+    /// The GTK accelerator the companion grabs.
+    #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+    fn accelerator(self) -> &'static str {
+        match self {
+            Self::AltD => "<Alt>d",
+            Self::AltShiftD => "<Alt><Shift>d",
+        }
+    }
+
+    /// Whether the chord holds Shift; evdev matches the Shift state exactly.
+    #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+    fn shift(self) -> bool {
+        self == Self::AltShiftD
+    }
+
+    /// A preset is stored as its position in ALL; anything else means custom.
+    fn encode(preset: Option<Self>) -> u8 {
+        preset.map_or(u8::MAX, |preset| preset as u8)
+    }
+
+    fn decode(value: u8) -> Option<Self> {
+        Self::ALL.get(usize::from(value)).copied()
+    }
+}
+
+/// Read at every use: a shortcut change takes effect without restarting the
+/// evdev device workers.
+fn evdev_preset() -> Option<Preset> {
+    Preset::decode(EVDEV_PRESET.load(Ordering::SeqCst))
 }
 
 fn is_wayland_session() -> bool {
@@ -406,17 +435,23 @@ fn is_wayland_session() -> bool {
         .unwrap_or(false)
 }
 
-fn prefers_evdev_hotkey(session_is_wayland: bool, hotkey: &str) -> bool {
-    session_is_wayland && hotkey_to_evdev_mode(hotkey) != 255
+fn current_desktop() -> String {
+    std::env::var_os("XDG_CURRENT_DESKTOP")
+        .map(|value| value.to_string_lossy().into_owned())
+        .unwrap_or_default()
 }
 
-fn should_register_global_shortcut(use_evdev_hotkey: bool) -> bool {
-    !use_evdev_hotkey
+/// Whether an XDG_CURRENT_DESKTOP value names GNOME, alone or as in "ubuntu:GNOME".
+fn is_gnome_desktop(desktop: &str) -> bool {
+    desktop
+        .split(':')
+        .any(|name| name.eq_ignore_ascii_case("gnome"))
 }
 
-#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
-fn should_start_evdev_listener(use_evdev_hotkey: bool, listener_started: bool) -> bool {
-    use_evdev_hotkey && !listener_started
+/// On Wayland, the preset passive evdev observes and the companion grabs. X11's
+/// grab already consumes every valid shortcut.
+fn wayland_preset(session_is_wayland: bool, hotkey: &str) -> Option<Preset> {
+    Preset::of(hotkey).filter(|_| session_is_wayland)
 }
 
 fn validate_dictation_hotkey(hotkey: &str) -> Result<(), String> {
@@ -441,11 +476,41 @@ fn validate_loaded_config(config: &AppConfig) -> Result<(), String> {
     validate_dictation_hotkey(&config.hotkey)
 }
 
+fn config_writer() -> Result<std::sync::MutexGuard<'static, ()>, String> {
+    CONFIG_WRITE_LOCK
+        .lock()
+        .map_err(|_| "VOCO configuration writer is unavailable".to_string())
+}
+
+/// Call only after a committed write, while still holding `config_writer()`, so
+/// the config and its revision come from the same write.
+fn publish_config(app: &tauri::AppHandle, config: AppConfig, kind: &str) -> ConfigSnapshot {
+    let snapshot = ConfigSnapshot {
+        revision: CONFIG_REVISION.fetch_add(1, Ordering::SeqCst) + 1,
+        config,
+    };
+    if let Err(error) = app.emit_to("main", CONFIG_CHANGED_EVENT, snapshot.clone()) {
+        warn!("Failed to emit {kind} configuration update: {error}");
+    }
+    snapshot
+}
+
+/// Rebinds `previous` after a failed change and returns the error to report. It
+/// restores only the runtime binding; config.rs keeps or restores the file.
+fn restore_hotkey(
+    previous: &str,
+    error: String,
+    rebind: impl FnOnce(&str) -> Result<(), String>,
+) -> String {
+    match rebind(previous) {
+        Ok(()) => error,
+        Err(rollback) => format!("{error}; restoring {previous} also failed: {rollback}"),
+    }
+}
+
 #[tauri::command]
 fn get_config() -> Result<ConfigSnapshot, String> {
-    let _guard = CONFIG_WRITE_LOCK
-        .lock()
-        .map_err(|_| "VOCO configuration writer is unavailable".to_string())?;
+    let _guard = config_writer()?;
     let config = AppConfig::load().map_err(|error| error.to_string())?;
     validate_loaded_config(&config)?;
     Ok(ConfigSnapshot {
@@ -456,79 +521,39 @@ fn get_config() -> Result<ConfigSnapshot, String> {
 
 #[tauri::command]
 fn reload_config_from_disk(app: tauri::AppHandle) -> Result<ConfigSnapshot, String> {
-    let _guard = CONFIG_WRITE_LOCK
-        .lock()
-        .map_err(|_| "VOCO configuration writer is unavailable".to_string())?;
+    let _guard = config_writer()?;
     let previous_hotkey = tray::current_hotkey(&app)?;
     let config = AppConfig::load().map_err(|error| error.to_string())?;
     validate_loaded_config(&config)?;
-    if let Err(error) = apply_hotkey_runtime_state(&app, &config.hotkey, false) {
-        let rollback = apply_hotkey_runtime_state(&app, &previous_hotkey, false);
-        return match rollback {
-            Ok(()) => Err(format!(
-                "Could not apply the repaired hotkey {}: {error}",
-                config.hotkey
-            )),
-            Err(rollback_error) => Err(format!(
-                "Could not apply the repaired hotkey {}: {error}; restoring {previous_hotkey} also failed: {rollback_error}",
-                config.hotkey
-            )),
-        };
-    }
-
-    let snapshot = ConfigSnapshot {
-        revision: CONFIG_REVISION.fetch_add(1, Ordering::SeqCst) + 1,
-        config,
-    };
-    if let Err(error) = app.emit_to("main", CONFIG_CHANGED_EVENT, snapshot.clone()) {
-        warn!("Failed to emit reloaded configuration update: {error}");
-    }
-    Ok(snapshot)
+    apply_hotkey_runtime_state(&app, &config.hotkey).map_err(|error| {
+        let error = format!(
+            "Could not apply the repaired hotkey {}: {error}",
+            config.hotkey
+        );
+        restore_hotkey(&previous_hotkey, error, |hotkey| {
+            apply_hotkey_runtime_state(&app, hotkey)
+        })
+    })?;
+    Ok(publish_config(&app, config, "reloaded"))
 }
 
 #[tauri::command]
 fn reset_config_to_defaults(app: tauri::AppHandle) -> Result<ConfigSnapshot, String> {
-    let _guard = CONFIG_WRITE_LOCK
-        .lock()
-        .map_err(|_| "VOCO configuration writer is unavailable".to_string())?;
+    let _guard = config_writer()?;
     let previous_hotkey = tray::current_hotkey(&app)?;
-    let default_hotkey = AppConfig::default().hotkey;
-    if let Err(error) = apply_hotkey_runtime_state(&app, &default_hotkey, false) {
-        let rollback = apply_hotkey_runtime_state(&app, &previous_hotkey, false);
-        return match rollback {
-            Ok(()) => Err(format!(
-                "Could not bind the default hotkey before resetting settings: {error}"
-            )),
-            Err(rollback_error) => Err(format!(
-                "Could not bind the default hotkey before resetting settings: {error}; restoring {previous_hotkey} also failed: {rollback_error}"
-            )),
-        };
-    }
-    let config = match AppConfig::reset_to_defaults() {
-        Ok(config) => config,
-        Err(error) => {
-            let rollback = apply_hotkey_runtime_state(&app, &previous_hotkey, false);
-            return match rollback {
-                Ok(()) => Err(error.to_string()),
-                Err(rollback_error) => Err(format!(
-                    "{error}; restoring the previous hotkey also failed: {rollback_error}"
-                )),
-            };
-        }
-    };
-    let snapshot = ConfigSnapshot {
-        revision: CONFIG_REVISION.fetch_add(1, Ordering::SeqCst) + 1,
-        config,
-    };
-    if let Err(error) = app.emit_to("main", CONFIG_CHANGED_EVENT, snapshot.clone()) {
-        warn!("Failed to emit recovered configuration update: {error}");
-    }
-    Ok(snapshot)
+    let rebind = |hotkey: &str| apply_hotkey_runtime_state(&app, hotkey);
+    apply_hotkey_runtime_state(&app, &AppConfig::default().hotkey).map_err(|error| {
+        let error = format!("Could not bind the default hotkey before resetting settings: {error}");
+        restore_hotkey(&previous_hotkey, error, rebind)
+    })?;
+    let config = AppConfig::reset_to_defaults()
+        .map_err(|error| restore_hotkey(&previous_hotkey, error.to_string(), rebind))?;
+    Ok(publish_config(&app, config, "recovered"))
 }
 
 #[tauri::command]
 fn open_config_directory() -> Result<(), String> {
-    let directory = AppConfig::config_dir_for_recovery().map_err(|error| error.to_string())?;
+    let directory = AppConfig::config_dir_without_migration().map_err(|error| error.to_string())?;
     process_runner::spawn_desktop_launcher(process_runner::command("xdg-open").arg(&directory))
         .map_err(|error| format!("Failed to open {}: {error}", directory.display()))?;
     Ok(())
@@ -539,45 +564,28 @@ fn persist_config_patch(
     patch: AppConfigPatch,
     notify_hotkey_change: bool,
 ) -> Result<ConfigSnapshot, String> {
-    let _guard = CONFIG_WRITE_LOCK
-        .lock()
-        .map_err(|_| "VOCO configuration writer is unavailable".to_string())?;
+    let _guard = config_writer()?;
     let previous = AppConfig::load().map_err(|error| error.to_string())?;
     let mut config = previous.clone();
     patch.apply_to(&mut config);
     let hotkey_changed = previous.hotkey != config.hotkey;
+    let rebind = |hotkey: &str| apply_hotkey_runtime_state(app, hotkey);
 
     if hotkey_changed {
         validate_dictation_hotkey(&config.hotkey)?;
-        if let Err(error) = apply_hotkey_runtime_state(app, &config.hotkey, false) {
-            let rollback = apply_hotkey_runtime_state(app, &previous.hotkey, false);
-            return match rollback {
-                Ok(()) => Err(error),
-                Err(rollback_error) => Err(format!(
-                    "{error}; restoring the previous hotkey also failed: {rollback_error}"
-                )),
-            };
-        }
+        apply_hotkey_runtime_state(app, &config.hotkey)
+            .map_err(|error| restore_hotkey(&previous.hotkey, error, rebind))?;
     }
 
     if let Err(error) = config.save() {
-        if hotkey_changed {
-            if let Err(rollback_error) = apply_hotkey_runtime_state(app, &previous.hotkey, false) {
-                return Err(format!(
-                    "{error}; restoring the previous hotkey also failed: {rollback_error}"
-                ));
-            }
-        }
-        return Err(error.to_string());
+        return Err(if hotkey_changed {
+            restore_hotkey(&previous.hotkey, error.to_string(), rebind)
+        } else {
+            error.to_string()
+        });
     }
 
-    let snapshot = ConfigSnapshot {
-        revision: CONFIG_REVISION.fetch_add(1, Ordering::SeqCst) + 1,
-        config,
-    };
-    if let Err(error) = app.emit_to("main", CONFIG_CHANGED_EVENT, snapshot.clone()) {
-        warn!("Failed to emit authoritative configuration update: {error}");
-    }
+    let snapshot = publish_config(app, config, "authoritative");
     if hotkey_changed && notify_hotkey_change {
         send_notification(
             "Shortcut preference saved",
@@ -596,12 +604,13 @@ fn save_config_patch(
     persist_config_patch(&app, patch, false)
 }
 
-#[tauri::command]
+// Off the GTK main thread: the save syncs a file and its directory.
+#[tauri::command(async)]
 fn load_cached_update_state() -> Result<Option<CachedUpdateCheck>, String> {
     load_cached_update_check().map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn save_cached_update_state(cache: CachedUpdateCheck) -> Result<(), String> {
     save_cached_update_check(&cache).map_err(|e| e.to_string())
 }
@@ -702,21 +711,12 @@ fn get_desktop_paste_status() -> insertion::DesktopPasteStatus {
 
 fn stop_shortcut_setup_issue(app: &tauri::AppHandle) -> Option<String> {
     let hotkey = tray::current_hotkey(app).unwrap_or_else(|_| "Alt+D".into());
-    let session_type = std::env::var("XDG_SESSION_TYPE").unwrap_or_default();
-    if prefers_evdev_hotkey(session_type.eq_ignore_ascii_case("wayland"), &hotkey) {
-        let chord = if hotkey_to_evdev_mode(&hotkey) == 0 {
-            "Alt+D"
-        } else {
-            "Alt+Shift+D"
-        };
-        return panel_setup::stop_shortcut_setup_detail(
-            &session_type,
-            chord,
-            panel_setup::cached_check(),
-            panel::is_attached(),
-        );
-    }
-    None
+    let preset = wayland_preset(is_wayland_session(), &hotkey)?;
+    panel_setup::stop_shortcut_setup_detail(
+        preset.label(),
+        panel_setup::cached_check(),
+        panel::is_attached(),
+    )
 }
 
 #[tauri::command(async)]
@@ -819,6 +819,7 @@ fn shortcut_runtime_status(
         return unknown();
     };
     let now = shortcut_monotonic_ms();
+    let evdev_preset = evdev_preset();
     SHORTCUT_OBSERVATIONS.status(shortcut_readiness::Snapshot {
         hotkey: &config.hotkey,
         revision: CONFIG_REVISION.load(Ordering::SeqCst),
@@ -831,8 +832,9 @@ fn shortcut_runtime_status(
         consuming_lease: IBUS_SHORTCUT_LEASE.has_authority(now),
         plugin_hotkey: plugin.as_deref(),
         use_evdev: USE_EVDEV_HOTKEY.load(Ordering::SeqCst),
-        evdev_mode: EVDEV_HOTKEY_MODE.load(Ordering::SeqCst),
-        configured_evdev_mode: hotkey_to_evdev_mode(&config.hotkey),
+        evdev_preset,
+        evdev_keyboards: evdev_preset.and_then(evdev_keyboards_for),
+        configured_preset: Preset::of(&config.hotkey),
         bridge_available,
         panel_reserved,
     })
@@ -865,21 +867,6 @@ fn append_browser_field(
         session_id,
         &expected_committed_text,
         &append_text,
-        false,
-    )
-}
-
-#[tauri::command(async)]
-fn finish_browser_field(
-    browser: tauri::State<'_, BrowserIntegration>,
-    session_id: u64,
-    expected_committed_text: String,
-) -> Result<browser_broker::BrowserStatus, String> {
-    browser.session(session_id).ok_or(NO_BROWSER_FIELD)?.append(
-        session_id,
-        &expected_committed_text,
-        "",
-        true,
     )
 }
 
@@ -979,8 +966,13 @@ fn grant_webview_permissions(app: &tauri::App) {
 
 // --- Bundled speech-runtime readiness ---
 
+/// Help's desktop setup link. The renderer and the installer carry the same URL,
+/// and its anchor names a heading of docs/platform/README.md; a test checks both.
+const DESKTOP_SETUP_GUIDE: &str =
+    "https://github.com/sergiopesch/voco/blob/master/docs/platform/README.md#wayland-paste-keys";
+
 fn is_allowed_external_url(url: &str) -> bool {
-    url == "https://github.com/sergiopesch/voco/blob/master/docs/platform/README.md#ydotoold-ydotool-daemon"
+    url == DESKTOP_SETUP_GUIDE
         || url
             .strip_prefix("https://github.com/sergiopesch/voco/releases/tag/")
             .is_some_and(|tag| !tag.is_empty() && !tag.contains(['\r', '\n', '\\']))
@@ -1044,8 +1036,12 @@ fn refresh_shortcut_config(
     Ok(())
 }
 
-fn should_register_shortcut_fallback(use_evdev: bool, consuming_context: bool) -> bool {
-    should_register_global_shortcut(use_evdev) && !consuming_context
+/// The global-shortcut plugin grabs keys through X11, where XWayland would see
+/// them only over X11 apps. So it registers only outside Wayland, and only while
+/// no IBus engine consumes the chord; a Wayland chord other than the evdev
+/// presets needs a desktop shortcut for `voco --toggle`.
+fn should_register_shortcut_fallback(session_is_wayland: bool, consuming_context: bool) -> bool {
+    !session_is_wayland && !consuming_context
 }
 
 fn schedule_shortcut_arbitration(
@@ -1054,7 +1050,7 @@ fn schedule_shortcut_arbitration(
     posts: &mut shortcut_arbitration::ArbitrationPosts,
 ) {
     let fallback = should_register_shortcut_fallback(
-        USE_EVDEV_HOTKEY.load(Ordering::SeqCst),
+        is_wayland_session(),
         IBUS_SHORTCUT_LEASE.has_authority(shortcut_monotonic_ms()),
     );
     if !posts.should_post(snapshot.revision, fallback, shortcut_monotonic_ms()) {
@@ -1073,7 +1069,7 @@ fn schedule_shortcut_arbitration(
             return;
         }
         let enable_plugin = should_register_shortcut_fallback(
-            USE_EVDEV_HOTKEY.load(Ordering::SeqCst),
+            is_wayland_session(),
             IBUS_SHORTCUT_LEASE.has_authority(shortcut_monotonic_ms()),
         );
         let result = sync_global_shortcut_binding(&handle, &hotkey, enable_plugin);
@@ -1124,78 +1120,44 @@ fn start_ibus_shortcut_listener(app_handle: tauri::AppHandle) {
             let state = app_handle.state::<ibus_shortcut::IbusShortcutService>();
             let observation_started = shortcut_monotonic_ms();
             SHORTCUT_OBSERVATIONS.begin_poll(observation_ticket);
-            IBUS_SHORTCUT_LEASE.begin_poll();
-            match state.poll_trigger(&snapshot.config.hotkey) {
-                Ok(poll) => {
-                    SHORTCUT_OBSERVATIONS.poll(
-                        observation_ticket,
-                        snapshot.revision,
-                        &snapshot.config.hotkey,
-                        observation_started,
-                        if poll.armed {
-                            shortcut_readiness::Poll::Armed
-                        } else {
-                            shortcut_readiness::Poll::Disarmed
-                        },
-                    );
-                    IBUS_SHORTCUT_LEASE.finish_poll(
-                        shortcut_monotonic_ms(),
-                        if poll.armed {
-                            shortcut_arbitration::PollOutcome::Armed
-                        } else {
-                            shortcut_arbitration::PollOutcome::Disarmed
-                        },
-                    );
-                    schedule_shortcut_arbitration(&app_handle, snapshot, &mut arbitration_posts);
-                    if CONFIG_REVISION.load(Ordering::SeqCst) != snapshot.revision {
-                        continue;
-                    }
-                    let Some(trigger) = poll.trigger else {
-                        continue;
-                    };
-                    let (event, last_toggle) = match trigger.mode.as_str() {
-                        "dictation" => (TOGGLE_DICTATION_EVENT, &LAST_TOGGLE_MS),
-                        _ => continue,
-                    };
-                    if !shortcut_arbitration::admit_toggle(
-                        last_toggle,
-                        shortcut_monotonic_ms(),
-                        TOGGLE_DEBOUNCE_MS,
-                    ) {
-                        continue;
-                    }
-                    if let Err(error) = app_handle.emit_to("main", event, &trigger) {
-                        error!("Failed to deliver owned IBus shortcut: {error}");
-                    } else {
-                        trace_hotkey_event("owned_shortcut_event_emitted", Some("ibus"));
-                    }
-                }
-                Err(error) => {
-                    SHORTCUT_OBSERVATIONS.poll(
-                        observation_ticket,
-                        snapshot.revision,
-                        &snapshot.config.hotkey,
-                        observation_started,
-                        if error.may_have_armed {
-                            shortcut_readiness::Poll::Uncertain
-                        } else {
-                            shortcut_readiness::Poll::Unavailable
-                        },
-                    );
-                    IBUS_SHORTCUT_LEASE.finish_poll(
-                        shortcut_monotonic_ms(),
-                        if error.may_have_armed {
-                            shortcut_arbitration::PollOutcome::Uncertain
-                        } else {
-                            shortcut_arbitration::PollOutcome::Unavailable
-                        },
-                    );
-                    schedule_shortcut_arbitration(&app_handle, snapshot, &mut arbitration_posts);
-                    std::thread::sleep(std::time::Duration::from_millis(450));
-                }
+            let result = state.poll_trigger(&snapshot.config.hotkey, || {
+                IBUS_SHORTCUT_LEASE.begin_poll();
+            });
+            let outcome = ibus_poll_outcome(&result);
+            SHORTCUT_OBSERVATIONS.poll(
+                observation_ticket,
+                snapshot.revision,
+                &snapshot.config.hotkey,
+                observation_started,
+                outcome,
+            );
+            IBUS_SHORTCUT_LEASE.finish_poll(shortcut_monotonic_ms(), outcome);
+            schedule_shortcut_arbitration(&app_handle, snapshot, &mut arbitration_posts);
+            let Ok(poll) = result else {
+                std::thread::sleep(std::time::Duration::from_millis(450));
+                continue;
+            };
+            if CONFIG_REVISION.load(Ordering::SeqCst) != snapshot.revision {
+                continue;
+            }
+            if poll.trigger.is_some_and(|t| t.mode == "dictation") {
+                eval_toggle_with_backend(&app_handle, "ibus");
             }
         }
     });
+}
+
+/// A failed poll is uncertain only when its request may have reached the engine.
+fn ibus_poll_outcome(
+    result: &Result<ibus_shortcut::ShortcutPoll, ibus_shortcut::ShortcutPollFailure>,
+) -> shortcut_arbitration::PollOutcome {
+    use shortcut_arbitration::PollOutcome;
+    match result {
+        Ok(poll) if poll.armed => PollOutcome::Armed,
+        Ok(_) => PollOutcome::Disarmed,
+        Err(failure) if failure.may_have_armed => PollOutcome::Uncertain,
+        Err(_) => PollOutcome::Unavailable,
+    }
 }
 
 // --- Toggle dictation via window event ---
@@ -1369,7 +1331,7 @@ fn register_global_shortcut_listener(app: &tauri::AppHandle, hotkey: &str) -> Re
     let gesture = shortcut_arbitration::PluginGesture::new();
     // A root X11 passive grab sends keyboard input to VOCO while the chord is
     // held. Toggle on release so the following paste keys reach the focused app.
-    let complete_on_release = cfg!(target_os = "linux") && !is_wayland_session();
+    let complete_on_release = cfg!(target_os = "linux");
 
     app.global_shortcut()
         .on_shortcut(shortcut, move |_app, _shortcut, event| {
@@ -1437,29 +1399,23 @@ fn sync_global_shortcut_binding(
     Ok(())
 }
 
-fn apply_hotkey_runtime_state(
-    app: &tauri::AppHandle,
-    new_hotkey: &str,
-    notify: bool,
-) -> Result<(), String> {
-    let use_evdev_hotkey = prefers_evdev_hotkey(is_wayland_session(), new_hotkey);
+fn apply_hotkey_runtime_state(app: &tauri::AppHandle, new_hotkey: &str) -> Result<(), String> {
+    let session_is_wayland = is_wayland_session();
+    let use_evdev_hotkey = wayland_preset(session_is_wayland, new_hotkey).is_some();
 
     #[cfg(target_os = "linux")]
-    if should_start_evdev_listener(
-        use_evdev_hotkey,
-        EVDEV_LISTENER_STARTED.load(Ordering::SeqCst),
-    ) {
+    if use_evdev_hotkey {
         ensure_evdev_hotkey_listener(app);
     }
 
     let enable_plugin = should_register_shortcut_fallback(
-        use_evdev_hotkey,
+        session_is_wayland,
         IBUS_SHORTCUT_LEASE.has_authority(shortcut_monotonic_ms()),
     );
     sync_global_shortcut_binding(app, new_hotkey, enable_plugin)?;
 
     USE_EVDEV_HOTKEY.store(use_evdev_hotkey, Ordering::SeqCst);
-    EVDEV_HOTKEY_MODE.store(hotkey_to_evdev_mode(new_hotkey), Ordering::SeqCst);
+    EVDEV_PRESET.store(Preset::encode(Preset::of(new_hotkey)), Ordering::SeqCst);
 
     tray::update_hotkey_display(app, new_hotkey);
     info!("Hotkey changed to {new_hotkey}");
@@ -1467,17 +1423,12 @@ fn apply_hotkey_runtime_state(
         "Hotkey runtime backend preference: {}",
         if use_evdev_hotkey {
             "evdev"
+        } else if session_is_wayland {
+            "voco --toggle"
         } else {
             "global-shortcut"
         }
     );
-
-    if notify {
-        send_notification(
-            "Shortcut preference saved",
-            &format!("Preferred shortcut: {new_hotkey}"),
-        );
-    }
 
     Ok(())
 }
@@ -1579,10 +1530,13 @@ fn start_socket_listener(app_handle: tauri::AppHandle) {
 
 // --- evdev hotkey listener (passive Wayland shortcut) ---
 
+/// Synthetic keyboards: VOCO's own paste keys, and another tool's ydotoold, must
+/// never count as the person holding a shortcut or a modifier.
 #[cfg(target_os = "linux")]
 fn is_ignored_evdev_device_name(name: &str) -> bool {
     let normalized = name.to_ascii_lowercase();
-    normalized.contains("ydotoold virtual device")
+    normalized == virtual_keyboard::DEVICE_NAME.to_ascii_lowercase()
+        || normalized.contains("ydotoold virtual device")
 }
 
 #[cfg(target_os = "linux")]
@@ -1603,7 +1557,7 @@ fn supports_evdev_hotkey_parts(
     };
     let has_alt =
         keys.contains(evdev::KeyCode::KEY_LEFTALT) || keys.contains(evdev::KeyCode::KEY_RIGHTALT);
-    has_alt && (keys.contains(evdev::KeyCode::KEY_D) || keys.contains(evdev::KeyCode::KEY_R))
+    has_alt && keys.contains(evdev::KeyCode::KEY_D)
 }
 
 #[cfg(target_os = "linux")]
@@ -1624,17 +1578,14 @@ fn mark_evdev_path_watched(path: &std::path::Path) -> bool {
 }
 
 #[cfg(target_os = "linux")]
-fn spawn_supported_evdev_device_workers(
-    app_handle: &tauri::AppHandle,
-    key_state: &std::sync::Arc<Mutex<hotkey_state::HotkeyState>>,
-) -> usize {
+fn spawn_supported_evdev_device_workers(app_handle: &tauri::AppHandle) -> usize {
     let mut discovered = 0;
 
     for path in supported_evdev_keyboard_paths() {
         if mark_evdev_path_watched(&path) {
             discovered += 1;
             info!("Discovered evdev keyboard: {}", path.display());
-            spawn_evdev_device_worker(app_handle.clone(), path, key_state.clone());
+            spawn_evdev_device_worker(app_handle.clone(), path);
         }
     }
 
@@ -1642,28 +1593,40 @@ fn spawn_supported_evdev_device_workers(
 }
 
 #[cfg(target_os = "linux")]
-fn spawn_evdev_device_worker(
-    app_handle: tauri::AppHandle,
-    path: std::path::PathBuf,
-    key_state: std::sync::Arc<Mutex<hotkey_state::HotkeyState>>,
-) {
+fn spawn_evdev_device_worker(app_handle: tauri::AppHandle, path: std::path::PathBuf) {
     use evdev::raw_stream::RawDevice;
 
+    // However the worker ends, even by panicking, its keys go with it: they must
+    // never count as a live keyboard or a held modifier.
+    struct Detach<'a>(&'a std::path::Path);
+    impl Drop for Detach<'_> {
+        fn drop(&mut self) {
+            if let Ok(mut state) = EVDEV_KEYS.lock() {
+                state.detach(self.0);
+            }
+        }
+    }
+
     std::thread::spawn(move || {
+        let _detach = Detach(&path);
         let mut reopen_logged = false;
 
         loop {
-            let mut dev = match RawDevice::open(&path) {
+            let (mut dev, shift) = match RawDevice::open(&path) {
                 Ok(device) => {
                     // event paths are reused after unplug. Recheck capabilities
                     // and the virtual-device exclusion on every open.
                     if !supports_evdev_hotkey_parts(device.name(), device.supported_keys()) {
-                        if let Ok(mut state) = key_state.lock() {
+                        if let Ok(mut state) = EVDEV_KEYS.lock() {
                             state.detach(&path);
                         }
                         std::thread::sleep(std::time::Duration::from_secs(2));
                         continue;
                     }
+                    let shift = device.supported_keys().is_some_and(|keys| {
+                        keys.contains(evdev::KeyCode::KEY_LEFTSHIFT)
+                            || keys.contains(evdev::KeyCode::KEY_RIGHTSHIFT)
+                    });
                     let held_keys = match device.get_key_state() {
                         Ok(keys) => keys,
                         Err(error) => {
@@ -1672,8 +1635,8 @@ fn spawn_evdev_device_worker(
                             continue;
                         }
                     };
-                    if let Ok(mut state) = key_state.lock() {
-                        state.attach(&path, held_keys.iter());
+                    if let Ok(mut state) = EVDEV_KEYS.lock() {
+                        state.attach(&path, held_keys.iter(), shift);
                     } else {
                         error!("Failed to lock evdev keyboard state");
                         return;
@@ -1682,7 +1645,7 @@ fn spawn_evdev_device_worker(
                         info!("Reconnected evdev keyboard at {}", path.display());
                         reopen_logged = false;
                     }
-                    device
+                    (device, shift)
                 }
                 Err(e) => {
                     if !reopen_logged {
@@ -1703,14 +1666,6 @@ fn spawn_evdev_device_worker(
                 path.display()
             );
             trace_hotkey_event("evdev_device_worker_started", Some("evdev"));
-            let keys = dev.supported_keys();
-            let mut readiness = SHORTCUT_OBSERVATIONS.device(
-                keys.is_some_and(|keys| keys.contains(evdev::KeyCode::KEY_D)),
-                keys.is_some_and(|keys| {
-                    keys.contains(evdev::KeyCode::KEY_LEFTSHIFT)
-                        || keys.contains(evdev::KeyCode::KEY_RIGHTSHIFT)
-                }),
-            );
 
             loop {
                 // RawDevice exposes SYN_DROPPED. The synchronized wrapper can
@@ -1722,49 +1677,30 @@ fn spawn_evdev_device_worker(
                 };
                 match events {
                     Ok(events) => {
-                        if events.iter().any(|event| {
-                            matches!(
-                                event.destructure(),
-                                evdev::EventSummary::Synchronization(
-                                    _,
-                                    evdev::SynchronizationCode::SYN_DROPPED,
-                                    _
-                                )
-                            )
-                        }) {
-                            readiness.unsynchronized();
-                        }
-                        let (actions, synchronize_after_batch) = match key_state.lock() {
-                            Ok(mut state) => state.batch(
-                                &path,
-                                &events,
-                                EVDEV_HOTKEY_MODE.load(Ordering::SeqCst),
-                            ),
+                        let (toggles, synchronize_after_batch) = match EVDEV_KEYS.lock() {
+                            Ok(mut state) => state.batch(&path, &events, evdev_preset()),
                             Err(_) => {
                                 error!("Failed to lock evdev keyboard state");
                                 return;
                             }
                         };
-                        for action in actions {
-                            match action {
-                                hotkey_state::HotkeyAction::Dictation => {
-                                    trace_hotkey_event(
-                                        "hotkey_event_received_evdev",
-                                        Some("evdev"),
-                                    );
-                                    eval_toggle_with_backend(&app_handle, "evdev");
-                                }
-                            }
+                        for _ in 0..toggles {
+                            trace_hotkey_event("hotkey_event_received_evdev", Some("evdev"));
+                            eval_toggle_with_backend(&app_handle, "evdev");
                         }
                         if synchronize_after_batch {
                             match dev.get_key_state() {
                                 Ok(keys) => {
-                                    if let Ok(mut state) = key_state.lock() {
-                                        state.attach(&path, keys.iter());
-                                        readiness.synchronized();
+                                    if let Ok(mut state) = EVDEV_KEYS.lock() {
+                                        state.attach(&path, keys.iter(), shift);
                                     }
                                 }
                                 Err(error) => {
+                                    // Left resynchronizing, a keyboard that is gone
+                                    // would block the chord on every other one.
+                                    if let Ok(mut state) = EVDEV_KEYS.lock() {
+                                        state.detach(&path);
+                                    }
                                     warn!(
                                         "Failed to resynchronize keyboard {}: {error}",
                                         path.display()
@@ -1775,7 +1711,7 @@ fn spawn_evdev_device_worker(
                         }
                     }
                     Err(e) => {
-                        if let Ok(mut state) = key_state.lock() {
+                        if let Ok(mut state) = EVDEV_KEYS.lock() {
                             state.detach(&path);
                         }
                         warn!(
@@ -1787,19 +1723,15 @@ fn spawn_evdev_device_worker(
                 }
             }
 
-            drop(readiness);
             std::thread::sleep(std::time::Duration::from_millis(500));
         }
     });
 }
 
 #[cfg(target_os = "linux")]
-fn spawn_evdev_polling_supervisor(
-    app_handle: tauri::AppHandle,
-    key_state: std::sync::Arc<Mutex<hotkey_state::HotkeyState>>,
-) {
+fn spawn_evdev_polling_supervisor(app_handle: tauri::AppHandle) {
     std::thread::spawn(move || loop {
-        let discovered = spawn_supported_evdev_device_workers(&app_handle, &key_state);
+        let discovered = spawn_supported_evdev_device_workers(&app_handle);
         if discovered > 0 {
             info!(
                 "evdev polling fallback discovered {} new keyboard path(s)",
@@ -1812,10 +1744,7 @@ fn spawn_evdev_polling_supervisor(
 }
 
 #[cfg(target_os = "linux")]
-fn spawn_evdev_device_watcher(
-    app_handle: tauri::AppHandle,
-    key_state: std::sync::Arc<Mutex<hotkey_state::HotkeyState>>,
-) {
+fn spawn_evdev_device_watcher(app_handle: tauri::AppHandle) {
     use inotify::{EventMask, Inotify, WatchMask};
 
     std::thread::spawn(move || {
@@ -1825,7 +1754,7 @@ fn spawn_evdev_device_watcher(
                 warn!(
                     "Failed to initialize inotify for /dev/input watching: {e}. Falling back to polling."
                 );
-                spawn_evdev_polling_supervisor(app_handle, key_state);
+                spawn_evdev_polling_supervisor(app_handle);
                 return;
             }
         };
@@ -1839,7 +1768,7 @@ fn spawn_evdev_device_watcher(
                 | WatchMask::MOVE_SELF,
         ) {
             warn!("Failed to watch /dev/input for hotkey devices: {e}. Falling back to polling.");
-            spawn_evdev_polling_supervisor(app_handle, key_state);
+            spawn_evdev_polling_supervisor(app_handle);
             return;
         }
 
@@ -1851,7 +1780,7 @@ fn spawn_evdev_device_watcher(
                 Ok(events) => events.collect::<Vec<_>>(),
                 Err(e) => {
                     warn!("evdev device watcher failed: {e}. Falling back to polling discovery.");
-                    spawn_evdev_polling_supervisor(app_handle, key_state);
+                    spawn_evdev_polling_supervisor(app_handle);
                     return;
                 }
             };
@@ -1868,7 +1797,7 @@ fn spawn_evdev_device_watcher(
             });
 
             if should_rescan {
-                let discovered = spawn_supported_evdev_device_workers(&app_handle, &key_state);
+                let discovered = spawn_supported_evdev_device_workers(&app_handle);
                 if discovered > 0 {
                     info!(
                         "evdev watcher discovered {} new keyboard path(s)",
@@ -1882,8 +1811,7 @@ fn spawn_evdev_device_watcher(
 
 // Shared with desktop paste, which waits for physical modifiers to be released.
 #[cfg(target_os = "linux")]
-static EVDEV_KEYS: LazyLock<std::sync::Arc<Mutex<hotkey_state::HotkeyState>>> =
-    LazyLock::new(Default::default);
+static EVDEV_KEYS: LazyLock<Mutex<hotkey_state::HotkeyState>> = LazyLock::new(Default::default);
 
 /// Whether a physical keyboard modifier is held; None without a complete view.
 #[cfg(target_os = "linux")]
@@ -1896,14 +1824,30 @@ pub(crate) fn evdev_modifiers_held() -> Option<bool> {
     None
 }
 
+/// Open, synchronized keyboards that can type a preset's chord; None when the
+/// key state is unavailable.
 #[cfg(target_os = "linux")]
-fn start_hotkey_listener(app_handle: tauri::AppHandle) -> bool {
-    let key_state = std::sync::Arc::clone(&EVDEV_KEYS);
+fn evdev_keyboards_for(preset: Preset) -> Option<usize> {
+    Some(EVDEV_KEYS.lock().ok()?.keyboards_for(preset))
+}
 
-    let initial_discovered = spawn_supported_evdev_device_workers(&app_handle, &key_state);
+#[cfg(not(target_os = "linux"))]
+fn evdev_keyboards_for(_preset: Preset) -> Option<usize> {
+    Some(0)
+}
+
+/// One discovery supervisor per process; it keeps watching /dev/input itself.
+#[cfg(target_os = "linux")]
+fn ensure_evdev_hotkey_listener(app_handle: &tauri::AppHandle) {
+    static STARTED: AtomicBool = AtomicBool::new(false);
+    if STARTED.swap(true, Ordering::SeqCst) {
+        return;
+    }
+
+    let initial_discovered = spawn_supported_evdev_device_workers(app_handle);
     if initial_discovered == 0 {
         warn!(
-            "No keyboard found for evdev at startup. Add user to 'input' group if needed; VOCO will keep watching for devices."
+            "No readable keyboard for the passive shortcut at startup; VOCO keeps watching. The GNOME panel or a desktop shortcut for voco --toggle needs no keyboard access."
         );
     } else {
         info!(
@@ -1915,23 +1859,117 @@ fn start_hotkey_listener(app_handle: tauri::AppHandle) -> bool {
     info!("evdev device discovery supervisor started");
     trace_hotkey_event("evdev_listener_started", Some("evdev"));
 
-    spawn_evdev_device_watcher(app_handle, key_state);
-
-    true
+    spawn_evdev_device_watcher(app_handle.clone());
+    // Without a readable keyboard, the panel or IBus, the chord does nothing at
+    // all. Give the panel its usual time to attach, then say how to fix it.
+    let app = app_handle.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_secs(20));
+        notify_unreachable_shortcut(&app);
+    });
 }
 
 #[cfg(target_os = "linux")]
-fn ensure_evdev_hotkey_listener(app_handle: &tauri::AppHandle) {
-    if EVDEV_LISTENER_STARTED
-        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
-        .is_err()
+fn notify_unreachable_shortcut(app: &tauri::AppHandle) {
+    let Some(preset) = evdev_preset() else {
+        return;
+    };
+    let unreachable = USE_EVDEV_HOTKEY.load(Ordering::SeqCst)
+        && evdev_keyboards_for(preset) == Some(0)
+        && !panel::is_attached()
+        && !app
+            .state::<ibus_shortcut::IbusShortcutService>()
+            .status()
+            .available;
+    if !unreachable {
+        return;
+    }
+    if let Some(detail) =
+        panel_setup::unreachable_shortcut_detail(preset.label(), panel_setup::cached_check(), false)
+    {
+        send_notification("Your shortcut can't reach VOCO yet", &detail);
+    }
+}
+
+/// Without the companion or a StatusNotifier host, which stock Debian and
+/// Fedora GNOME both lack, VOCO has nothing in the top bar. After the panel's
+/// usual attach time, say so once and how to add one.
+#[cfg(target_os = "linux")]
+fn notify_missing_top_bar_presence() {
+    std::thread::spawn(|| {
+        std::thread::sleep(std::time::Duration::from_secs(20));
+        if panel::is_attached() || status_notifier_host_present() != Some(false) {
+            return;
+        }
+        let detail = if is_gnome_desktop(&current_desktop()) {
+            "Open VOCO from the app menu, choose Enable live panel in Help, then sign out and back in."
+        } else {
+            "Your desktop shows no tray icons. Open VOCO from the app menu for Settings and Review."
+        };
+        send_notification("VOCO has no icon in the top bar", detail);
+    });
+}
+
+/// Whether a tray host owns the StatusNotifierWatcher name; None when unknown.
+#[cfg(target_os = "linux")]
+fn status_notifier_host_present() -> Option<bool> {
+    use glib::variant::ToVariant;
+    use webkit2gtk::gio;
+    let bus = gio::bus_get_sync(gio::BusType::Session, gio::Cancellable::NONE).ok()?;
+    bus.call_sync(
+        Some("org.freedesktop.DBus"),
+        "/org/freedesktop/DBus",
+        "org.freedesktop.DBus",
+        "NameHasOwner",
+        Some(&("org.kde.StatusNotifierWatcher",).to_variant()),
+        None,
+        gio::DBusCallFlags::NONE,
+        500,
+        gio::Cancellable::NONE,
+    )
+    .ok()?
+    .get::<(bool,)>()
+    .map(|(owned,)| owned)
+}
+
+/// VOCO 2026.0.60 and earlier pasted through `voco-ydotoold.service`. After the
+/// upgrade its unit file is gone, but this login's enablement link remains and
+/// an instance can keep running or restarting until sign-out. Retire only
+/// VOCO's own unit: the link must point at the file the old package shipped.
+#[cfg(target_os = "linux")]
+fn retire_legacy_input_service() {
+    const UNIT: &str = "voco-ydotoold.service";
+    let Some(config) = dirs::config_dir() else {
+        return;
+    };
+    let link = config
+        .join("systemd/user/graphical-session.target.wants")
+        .join(UNIT);
+    let ours = std::fs::read_link(&link)
+        .is_ok_and(|target| target == std::path::Path::new("/usr/lib/systemd/user").join(UNIT));
+    if !ours
+        || std::path::Path::new("/usr/lib/systemd/user")
+            .join(UNIT)
+            .exists()
     {
         return;
     }
-
-    if !start_hotkey_listener(app_handle.clone()) {
-        EVDEV_LISTENER_STARTED.store(false, Ordering::SeqCst);
+    if let Err(error) = std::fs::remove_file(&link) {
+        warn!("Could not remove the retired input service link: {error}");
+        return;
     }
+    // Off the startup path; the manager may no longer know the unit at all.
+    std::thread::spawn(|| {
+        for arguments in [
+            ["--user", "stop", UNIT].as_slice(),
+            ["--user", "daemon-reload"].as_slice(),
+        ] {
+            let _ = process_runner::command("systemctl")
+                .args(arguments)
+                .status();
+        }
+        info!("Retired VOCO's previous Wayland input service");
+    });
 }
 
 pub fn run() -> Result<(), String> {
@@ -1949,14 +1987,16 @@ pub fn run() -> Result<(), String> {
         .init();
 
     #[cfg(target_os = "linux")]
-    if let Err(error) = desktop_input_setup::migrate(&single_instance_guard) {
-        if error.service_may_change {
-            return Err(error.detail);
+    if is_wayland_session() {
+        retire_legacy_input_service();
+        // Created now so the compositor has added the device long before the
+        // first paste; a failure stays visible through desktop setup status.
+        if let Err(detail) = virtual_keyboard::ensure() {
+            warn!("{detail}");
         }
-        // A desktop setup failure must remain visible, but browser dictation and
-        // explicit local recovery can still work without this optional helper.
-        warn!("{}", error.detail);
     }
+    #[cfg(target_os = "linux")]
+    notify_missing_top_bar_presence();
 
     #[cfg(target_os = "linux")]
     install_socket_cleanup_signal_handler();
@@ -1966,6 +2006,11 @@ pub fn run() -> Result<(), String> {
         warn!("Crash recovery is unavailable: {error}");
     }
     native_capture_commands::initialize();
+
+    // Written before Tauri starts, in the directory this process has locked, so
+    // a full or unwritable one takes the ordinary startup-failure path.
+    let tray_icons = tray_icons::TrayIcons::new(single_instance_guard.directory())
+        .map_err(|error| format!("could not write the tray icons: {error}"))?;
 
     tauri::Builder::default()
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
@@ -2025,13 +2070,13 @@ pub fn run() -> Result<(), String> {
             refresh_shortcut_heartbeat,
             ack_browser_stop,
             append_browser_field,
-            finish_browser_field,
             cancel_browser_field,
             release_browser_recording,
             begin_runtime_status_session,
             sync_runtime_status,
             sync_panel_level,
             trace_frontend_hotkey_event,
+            diagnostic_logging,
             has_pending_hotkey_toggle,
             hide_status_overlay,
             show_notification,
@@ -2069,9 +2114,9 @@ pub fn run() -> Result<(), String> {
             let configured_hotkey = configured_hotkey();
             let hotkey = configured_hotkey.hotkey;
             let app_handle = app.handle().clone();
-            EVDEV_HOTKEY_MODE.store(hotkey_to_evdev_mode(&hotkey), Ordering::SeqCst);
+            EVDEV_PRESET.store(Preset::encode(Preset::of(&hotkey)), Ordering::SeqCst);
             let wayland_session = is_wayland_session();
-            let use_evdev_hotkey = prefers_evdev_hotkey(wayland_session, &hotkey);
+            let use_evdev_hotkey = wayland_preset(wayland_session, &hotkey).is_some();
             USE_EVDEV_HOTKEY.store(use_evdev_hotkey, Ordering::SeqCst);
             trace_hotkey_event(
                 "hotkey_backend_selected",
@@ -2093,16 +2138,19 @@ pub fn run() -> Result<(), String> {
                 let _ = hide_overlay_window(&window);
             }
 
+            // No IBus engine has answered yet, so only the session decides.
             if let Err(e) = sync_global_shortcut_binding(
                 &app_handle,
                 &hotkey,
-                should_register_global_shortcut(use_evdev_hotkey),
+                should_register_shortcut_fallback(wayland_session, false),
             ) {
                 warn!("{e}");
             }
 
             if use_evdev_hotkey {
                 info!("evdev hotkey backend selected for {hotkey}");
+            } else if wayland_session {
+                info!("{hotkey} on Wayland needs a desktop shortcut for voco --toggle");
             } else {
                 info!("global shortcut backend selected for {hotkey}");
             }
@@ -2123,9 +2171,9 @@ pub fn run() -> Result<(), String> {
                 ensure_evdev_hotkey_listener(&app_handle);
             }
 
-            if let Err(e) = tray::setup_tray(app, &hotkey) {
-                error!("Failed to setup tray: {e}");
-            }
+            // The renderer, the model thread and the companion all assume the
+            // tray state exists, so a VOCO without it stops here.
+            tray::setup_tray(app, &hotkey, tray_icons)?;
             #[cfg(target_os = "linux")]
             panel::setup(app.handle());
             if let Some((title, notice)) = configured_hotkey.notice {
@@ -2147,7 +2195,7 @@ pub fn run() -> Result<(), String> {
             Ok(())
         })
         .build(tauri::generate_context!())
-        .expect("error while building tauri application")
+        .map_err(|error| error.to_string())?
         .run(|app, event| {
             if let tauri::RunEvent::Exit = event {
                 crash_recovery::clean_exit();
@@ -2175,9 +2223,7 @@ mod tests {
 
     #[test]
     fn external_url_allowlist_accepts_voco_releases_and_exact_setup_guide() {
-        assert!(is_allowed_external_url(
-            "https://github.com/sergiopesch/voco/blob/master/docs/platform/README.md#ydotoold-ydotool-daemon"
-        ));
+        assert!(is_allowed_external_url(DESKTOP_SETUP_GUIDE));
         assert!(!is_allowed_external_url(
             "https://github.com/sergiopesch/voco/blob/master/docs/platform/README.md?redirect=elsewhere"
         ));
@@ -2193,6 +2239,44 @@ mod tests {
         assert!(!is_allowed_external_url(
             "http://github.com/sergiopesch/voco/releases/tag/voco.2026.0.16"
         ));
+    }
+
+    #[test]
+    fn desktop_setup_guide_matches_the_renderer_the_installer_and_the_docs() {
+        let renderer = include_str!("../../src/components/ControlPanel.tsx");
+        assert!(renderer.contains(&format!(
+            "const DESKTOP_SETUP_GUIDE = \"{DESKTOP_SETUP_GUIDE}\";"
+        )));
+        let installer = include_str!("../../../../install");
+        assert!(installer.contains(&format!("Setup instructions: {DESKTOP_SETUP_GUIDE}\"")));
+        let (path, anchor) = DESKTOP_SETUP_GUIDE
+            .strip_prefix("https://github.com/sergiopesch/voco/blob/master/")
+            .and_then(|page| page.split_once('#'))
+            .expect("a section of a page on master");
+        assert_eq!(path, "docs/platform/README.md");
+        // GitHub's heading anchors, outside fenced code.
+        let mut fenced = false;
+        let anchors: Vec<String> = include_str!("../../../../docs/platform/README.md")
+            .lines()
+            .filter(|line| {
+                fenced ^= line.starts_with("```");
+                !fenced && line.starts_with('#')
+            })
+            .map(|heading| {
+                let title = heading.trim_start_matches('#').trim().to_lowercase();
+                title
+                    .chars()
+                    .filter_map(|c| match c {
+                        ' ' => Some('-'),
+                        c if c.is_alphanumeric() || c == '-' || c == '_' => Some(c),
+                        _ => None,
+                    })
+                    .collect()
+            })
+            .collect();
+        assert!(anchors.iter().any(|known| known == anchor), "{anchor}");
+        let security = include_str!("../../../../docs/security/README.md");
+        assert!(security.contains(&format!("(../platform/README.md#{anchor})")));
     }
 
     #[test]
@@ -2230,6 +2314,24 @@ mod tests {
         assert!(!should_register_shortcut_fallback(false, true));
         assert!(!should_register_shortcut_fallback(true, true));
         assert!(!should_register_shortcut_fallback(true, false));
+    }
+
+    #[test]
+    fn ibus_poll_failure_is_uncertain_only_when_the_poll_may_have_armed() {
+        use shortcut_arbitration::PollOutcome;
+        let poll = |armed| -> Result<_, ibus_shortcut::ShortcutPollFailure> {
+            Ok(ibus_shortcut::ShortcutPoll {
+                armed,
+                trigger: None,
+            })
+        };
+        let failure = |may_have_armed| -> Result<ibus_shortcut::ShortcutPoll, _> {
+            Err(ibus_shortcut::ShortcutPollFailure { may_have_armed })
+        };
+        assert_eq!(ibus_poll_outcome(&poll(true)), PollOutcome::Armed);
+        assert_eq!(ibus_poll_outcome(&poll(false)), PollOutcome::Disarmed);
+        assert_eq!(ibus_poll_outcome(&failure(true)), PollOutcome::Uncertain);
+        assert_eq!(ibus_poll_outcome(&failure(false)), PollOutcome::Unavailable);
     }
 
     #[test]
@@ -2317,12 +2419,35 @@ mod tests {
     }
 
     #[test]
-    fn hotkey_modes() {
-        assert_eq!(hotkey_to_evdev_mode("Alt+D"), 0);
-        assert_eq!(hotkey_to_evdev_mode("Alt+Shift+D"), 1);
-        assert_eq!(hotkey_to_evdev_mode("alt + d"), 0);
-        assert_eq!(hotkey_to_evdev_mode("SHIFT+ALT+KEYD"), 1);
-        assert_eq!(hotkey_to_evdev_mode("Ctrl+Shift+V"), 255);
+    fn hotkey_presets() {
+        assert_eq!(Preset::of("Alt+D"), Some(Preset::AltD));
+        assert_eq!(Preset::of("Alt+Shift+D"), Some(Preset::AltShiftD));
+        assert_eq!(Preset::of("alt + d"), Some(Preset::AltD));
+        assert_eq!(Preset::of("SHIFT+ALT+KEYD"), Some(Preset::AltShiftD));
+        assert_eq!(Preset::of("Ctrl+Shift+V"), None);
+        assert_eq!(Preset::of("not a shortcut"), None);
+    }
+
+    #[test]
+    fn presets_keep_their_labels_accelerators_and_shift_state() {
+        let pinned = [
+            (Preset::AltD, "Alt+D", "<Alt>d", false),
+            (Preset::AltShiftD, "Alt+Shift+D", "<Alt><Shift>d", true),
+        ];
+        assert_eq!(Preset::ALL, pinned.map(|(preset, ..)| preset));
+        for (preset, label, accelerator, shift) in pinned {
+            assert_eq!(
+                (preset.label(), preset.accelerator(), preset.shift()),
+                (label, accelerator, shift)
+            );
+            assert_eq!(Preset::of(label), Some(preset));
+        }
+        for preset in [None, Some(Preset::AltD), Some(Preset::AltShiftD)] {
+            assert_eq!(Preset::decode(Preset::encode(preset)), preset);
+        }
+        assert_eq!(Preset::encode(Some(Preset::AltD)), 0);
+        assert_eq!(Preset::decode(2), None);
+        assert_eq!(Preset::decode(u8::MAX), None);
     }
 
     #[test]
@@ -2333,6 +2458,23 @@ mod tests {
                     .unwrap_err()
                     .contains("must include Alt, Control, or Super"),
                 "unsafe hotkey was not rejected: {hotkey}"
+            );
+        }
+    }
+
+    #[test]
+    fn settings_record_keys_produces_shortcuts_this_parser_checks() {
+        // ControlPanel.test.tsx asserts the renderer records exactly these strings.
+        let cases: Vec<serde_json::Value> =
+            serde_json::from_str(include_str!("../../src/components/recordedShortcuts.json"))
+                .expect("recorder cases are JSON");
+        assert!(!cases.is_empty());
+        for case in cases {
+            let shortcut = case["shortcut"].as_str().expect("recorded shortcut");
+            assert_eq!(
+                validate_dictation_hotkey(shortcut).is_ok(),
+                case["accepted"].as_bool().expect("expected outcome"),
+                "{shortcut}"
             );
         }
     }
@@ -2386,29 +2528,77 @@ mod tests {
     }
 
     #[test]
+    fn hotkey_rollback_rebinds_the_previous_hotkey_and_names_a_failed_restore() {
+        let mut rebound = Vec::new();
+        let restored = restore_hotkey("Alt+D", "save failed".into(), |hotkey| {
+            rebound.push(hotkey.to_string());
+            Ok(())
+        });
+        assert_eq!(restored, "save failed");
+        let failed = restore_hotkey("Alt+D", "save failed".into(), |hotkey| {
+            rebound.push(hotkey.to_string());
+            Err("grab refused".into())
+        });
+        assert_eq!(
+            failed,
+            "save failed; restoring Alt+D also failed: grab refused"
+        );
+        assert_eq!(rebound, ["Alt+D", "Alt+D"]);
+    }
+
+    #[test]
     fn evdev_hotkey_backend_only_handles_supported_wayland_shortcuts() {
-        assert!(prefers_evdev_hotkey(true, "Alt+D"));
-        assert!(prefers_evdev_hotkey(true, "Alt+Shift+D"));
-        assert!(!prefers_evdev_hotkey(true, "Ctrl+Shift+V"));
-        assert!(!prefers_evdev_hotkey(false, "Alt+D"));
+        assert_eq!(wayland_preset(true, "Alt+D"), Some(Preset::AltD));
+        assert_eq!(wayland_preset(true, "Alt+Shift+D"), Some(Preset::AltShiftD));
+        assert_eq!(wayland_preset(true, "Ctrl+Shift+V"), None);
+        assert_eq!(wayland_preset(true, "Control+Space"), None);
+        assert_eq!(wayland_preset(false, "Alt+D"), None);
+        assert_eq!(wayland_preset(false, "Alt+Shift+D"), None);
     }
 
     #[test]
-    fn global_shortcut_registration_depends_on_backend_selection() {
-        assert!(should_register_global_shortcut(false));
-        assert!(!should_register_global_shortcut(true));
-    }
-
-    #[test]
-    fn evdev_listener_only_starts_once_for_supported_runtime_hotkeys() {
-        assert!(should_start_evdev_listener(true, false));
-        assert!(!should_start_evdev_listener(true, true));
-        assert!(!should_start_evdev_listener(false, false));
+    fn the_x11_grab_registers_only_outside_wayland() {
+        let backends = |wayland, hotkey| {
+            (
+                wayland_preset(wayland, hotkey).is_some(),
+                should_register_shortcut_fallback(wayland, false),
+            )
+        };
+        assert_eq!(backends(true, "Alt+D"), (true, false));
+        // VOCO registers nothing: it needs a desktop shortcut for voco --toggle.
+        assert_eq!(backends(true, "Ctrl+Shift+V"), (false, false));
+        assert_eq!(backends(false, "Ctrl+Shift+V"), (false, true));
+        assert_eq!(backends(false, "Alt+D"), (false, true));
     }
 
     #[cfg(target_os = "linux")]
     #[test]
-    fn evdev_hotkey_ignores_ydotool_virtual_device() {
+    fn evdev_watches_only_real_keyboards_that_can_type_alt_d() {
+        use evdev::{AttributeSet, KeyCode};
+        let keys = |codes: &[KeyCode]| codes.iter().copied().collect::<AttributeSet<KeyCode>>();
+        let alt_d = keys(&[KeyCode::KEY_LEFTALT, KeyCode::KEY_D]);
+        let right_alt_d = keys(&[KeyCode::KEY_RIGHTALT, KeyCode::KEY_D]);
+        assert!(supports_evdev_hotkey_parts(
+            Some("AT Translated Set 2 keyboard"),
+            Some(&*alt_d)
+        ));
+        assert!(supports_evdev_hotkey_parts(None, Some(&*right_alt_d)));
+        for unable in [
+            keys(&[KeyCode::KEY_LEFTALT, KeyCode::KEY_R]),
+            keys(&[KeyCode::KEY_D]),
+        ] {
+            assert!(!supports_evdev_hotkey_parts(None, Some(&*unable)));
+        }
+        assert!(!supports_evdev_hotkey_parts(None, None));
+        for synthetic in ["VOCO virtual keyboard", "ydotoold virtual device"] {
+            assert!(!supports_evdev_hotkey_parts(Some(synthetic), Some(&*alt_d)));
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn evdev_hotkey_ignores_synthetic_keyboards() {
+        assert!(is_ignored_evdev_device_name("VOCO virtual keyboard"));
         assert!(is_ignored_evdev_device_name("ydotoold virtual device"));
         assert!(is_ignored_evdev_device_name("YDOTOOLD Virtual Device"));
         assert!(!is_ignored_evdev_device_name(

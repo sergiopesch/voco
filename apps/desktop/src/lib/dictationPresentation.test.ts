@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   deriveCursorSetupState,
+  deriveNativeMicrophoneReady,
   deriveStatusLabel,
 } from "@/lib/dictationPresentation";
 
@@ -13,14 +14,6 @@ describe("status label presentation", () => {
     microphonePermission: "granted" as const,
     microphoneReady: true,
   };
-
-  it("shows startup without claiming the microphone is listening", () => {
-    expect(deriveStatusLabel({ ...ready, dictationStatus: "starting" })).toBe("Starting microphone");
-  });
-
-  it("shows one listening label for every recording", () => {
-    expect(deriveStatusLabel({ ...ready, dictationStatus: "recording" })).toBe("Listening");
-  });
 
   it("keeps desktop setup pending until the first diagnostics settle", () => {
     const pending = deriveCursorSetupState({ desktopInputReady: false, diagnosticsLoaded: false, diagnosticsFailed: false });
@@ -75,5 +68,41 @@ describe("status label presentation", () => {
         microphoneReady: false,
       }),
     ).toBe("Microphone needs permission");
+  });
+});
+
+describe("native microphone readiness", () => {
+  const idle = {
+    configurationError: false,
+    cursorRequired: false,
+    cursorSetupState: "ready" as const,
+    dictationStatus: "idle" as const,
+    microphonePermission: "unknown" as const,
+  };
+
+  it("lets Start pick the system default when no microphone is chosen", () => {
+    const unchosen = deriveNativeMicrophoneReady({ mode: "native", selected: false, lost: false, microphoneReady: false, defaultAvailable: true });
+    expect(unchosen).toBeNull();
+    expect(deriveStatusLabel({ ...idle, nativeMicrophoneReady: unchosen, microphoneReady: false }))
+      .toBe("Ready — microphone checks on first use");
+  });
+
+  it("asks for setup only when there is no usable microphone", () => {
+    const none = deriveNativeMicrophoneReady({ mode: "native", selected: false, lost: false, microphoneReady: false, defaultAvailable: false });
+    expect(none).toBe(false);
+    expect(deriveStatusLabel({ ...idle, nativeMicrophoneReady: none, microphoneReady: false })).toBe("Microphone setup required");
+    expect(deriveNativeMicrophoneReady({ mode: "pending", selected: false, lost: false, microphoneReady: false, defaultAvailable: true })).toBe(false);
+  });
+
+  it("keeps a chosen microphone that failed or disappeared not ready until a new choice", () => {
+    const lost = deriveNativeMicrophoneReady({ mode: "native", selected: false, lost: true, microphoneReady: false, defaultAvailable: true });
+    expect(lost).toBe(false);
+    expect(deriveStatusLabel({ ...idle, nativeMicrophoneReady: lost, microphoneReady: false })).toBe("Microphone setup required");
+  });
+
+  it("is ready with a chosen microphone and leaves WebKit to its permission prompt", () => {
+    expect(deriveNativeMicrophoneReady({ mode: "native", selected: true, lost: false, microphoneReady: true, defaultAvailable: false })).toBe(true);
+    expect(deriveNativeMicrophoneReady({ mode: "native", selected: true, lost: false, microphoneReady: false, defaultAvailable: true })).toBe(false);
+    expect(deriveNativeMicrophoneReady({ mode: "webkit", selected: false, lost: true, microphoneReady: false, defaultAvailable: false })).toBeNull();
   });
 });

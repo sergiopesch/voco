@@ -14,9 +14,3 @@ Vendored global-hotkey 0.8.0, MIT / Apache-2.0
 Source: https://github.com/tauri-apps/global-hotkey
 Local change: event-driven X11 shortcut actor.
 Full licenses and provenance: vendor/global-hotkey/LICENSE-MIT, LICENSE-APACHE, VOCO-UPSTREAM.json, VOCO-PATCH.md.
-
-Private ydotoold from ydotool 0.1.8 and libuInputPlus 0.1.4, MIT licenses
-Source: Ubuntu noble source packages ydotool 0.1.8 and libuinputplus 0.1.4
-Local changes: socket lifecycle fixes and fewer header dependencies; see vendor/ydotool-legacy/README.md.
-Installed as /usr/libexec/voco/ydotool-legacy/ydotoold.
-Full licenses, build receipts and the notices of the system headers and libraries it uses: vendor/ydotool-legacy/.

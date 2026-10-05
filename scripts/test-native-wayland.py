@@ -20,7 +20,7 @@ if len(sys.argv) > 2 and sys.argv[2] == '--manifest':
         'finishedAt': datetime.datetime.now(datetime.timezone.utc).isoformat(),
         'exitCode': int(sys.argv[3]),
         'files': {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(evidence.iterdir()) if p.is_file()},
-        'sourceHashes': {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in [Path(__file__), Path(__file__).with_suffix('.sh')]},
+        'sourceHashes': {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in [Path(__file__), Path(__file__).with_suffix('.sh'), Path(__file__).with_name('lib') / 'test-sandbox.sh', Path(__file__).with_name('native_tray_app.py')]},
     }, indent=2) + '\n')
     sys.exit(0)
 if len(sys.argv) > 2:
@@ -108,6 +108,7 @@ try:
         import gi
         gi.require_version('Atspi', '2.0')
         from gi.repository import Gio, GLib, Atspi
+        import native_tray_app as tray
         items = []
         bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
         xml = '<node><interface name="org.kde.StatusNotifierWatcher"><method name="RegisterStatusNotifierItem"><arg type="s" direction="in"/></method><method name="RegisterStatusNotifierHost"><arg type="s" direction="in"/></method><property name="RegisteredStatusNotifierItems" type="as" access="read"/><property name="IsStatusNotifierHostRegistered" type="b" access="read"/><property name="ProtocolVersion" type="i" access="read"/></interface></node>'
@@ -132,17 +133,7 @@ try:
         def activate(label):
             name, path = items[-1]
             menu = call(name, path, 'org.freedesktop.DBus.Properties', 'Get', GLib.Variant('(ss)', ('org.kde.StatusNotifierItem', 'Menu')))[0]
-            layout = call(name, menu, 'com.canonical.dbusmenu', 'GetLayout', GLib.Variant('(iias)', (0, -1, ['label'])))[1]
-            def find(node):
-                if node[1].get('label') == label:
-                    return node[0]
-                for child in node[2]:
-                    found = find(child)
-                    if found is not None:
-                        return found
-            item = find(layout)
-            assert item is not None, label
-            call(name, menu, 'com.canonical.dbusmenu', 'Event', GLib.Variant('(isvu)', (item, 'clicked', GLib.Variant('s', ''), 0)))
+            tray.dbusmenu_activate(call, name, menu, label)
         pump(.2)
         model = root / 'speech/models/nemotron-speech-streaming-en-0.6b.q8_0.gguf'
         report['model'] = {'provided': model.exists()}

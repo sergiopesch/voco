@@ -1,4 +1,7 @@
 //! Test-only synthetic acceptance driver; never included in application packages.
+// The library's unit tests already run these modules' tests; `cargo test
+// --all-targets` would otherwise run them again in this example.
+#![cfg(not(test))]
 #[path = "../src/browser_broker.rs"]
 #[allow(dead_code)]
 mod browser_broker;
@@ -44,7 +47,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .session_id
         .ok_or("claim omitted session identity")?;
     std::thread::sleep(Duration::from_millis(delay));
-    let result = broker.append(session_id, "", "Native café 🦀 你好.", true);
+    let result = broker.append(session_id, "", "Native café 🦀 你好.");
     writeln!(
         file,
         "{}",

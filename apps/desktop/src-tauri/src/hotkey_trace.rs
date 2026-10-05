@@ -108,7 +108,7 @@ fn private_directory(path: &Path) -> io::Result<File> {
         .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
         .open(path)?;
     let metadata = directory.metadata()?;
-    if !metadata.is_dir() || metadata.uid() != unsafe { libc::geteuid() } {
+    if !metadata.is_dir() || metadata.uid() != crate::browser_socket::effective_uid() {
         return Err(io::Error::other(
             "hotkey trace directory must be an owned directory, not a symlink",
         ));
@@ -142,7 +142,9 @@ fn private_file(directory: &File) -> io::Result<File> {
     }
     let file = unsafe { File::from_raw_fd(fd) };
     let metadata = file.metadata()?;
-    if !metadata.is_file() || metadata.uid() != unsafe { libc::geteuid() } || metadata.nlink() != 1
+    if !metadata.is_file()
+        || metadata.uid() != crate::browser_socket::effective_uid()
+        || metadata.nlink() != 1
     {
         return Err(io::Error::other(
             "hotkey trace must be an owned regular file with one link",
@@ -176,7 +178,9 @@ fn private_previous(directory: &File, limit: u64) -> io::Result<Option<File>> {
     }
     let file = unsafe { File::from_raw_fd(fd) };
     let metadata = file.metadata()?;
-    if !metadata.is_file() || metadata.uid() != unsafe { libc::geteuid() } || metadata.nlink() != 1
+    if !metadata.is_file()
+        || metadata.uid() != crate::browser_socket::effective_uid()
+        || metadata.nlink() != 1
     {
         return Err(io::Error::other(
             "previous hotkey trace must be an owned regular file with one link",

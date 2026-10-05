@@ -26,7 +26,9 @@ if wayland:
     assert os.environ['WAYLAND_DISPLAY'] == 'voco-delivery'
 else:
     assert os.environ['DISPLAY'] == ':0'
-assert not any(Path(path).exists() for path in ('/dev/input', '/dev/uinput', '/dev/snd'))
+assert not any(Path(path).exists() for path in ('/dev/input', '/dev/snd'))
+# Only production paste on Wayland types, through VOCO's real virtual keyboard.
+assert Path('/dev/uinput').is_char_device() == (wayland and bool(os.environ.get('VOCO_FIXTURE_PASTE_BINARY')))
 fixtures = Path(__file__).with_name('fixtures')
 results = []; processes = []; windows = []
 SCREENSHOT = """import sys

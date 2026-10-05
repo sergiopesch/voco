@@ -16,6 +16,10 @@ const PATH = '/org/voco/Panel';
 const INTERFACE = 'org.voco.Panel1';
 const INPUT_PATH = '/org/voco/PanelInput';
 const INPUT_XML = '<node><interface name="org.voco.PanelInput1"><method name="ModifiersClear"><arg type="b" direction="out"/></method></interface></node>';
+// GNOME 50 removed X11 sessions together with Meta.is_wayland_compositor(). The
+// metadata admits only tested majors, and on each of them a missing function
+// means a Wayland-only Shell.
+const isWayland = () => Meta.is_wayland_compositor?.() ?? true;
 
 // Holds the meter at its natural size against the microphone, so opening and
 // closing uncover it in place: only the pill's outer edge moves.
@@ -67,6 +71,16 @@ export default class VocoPanel extends Extension {
         this._button = new St.Button({style_class: 'voco-panel-button',
             can_focus: true, accessible_name: 'VOCO'});
         this._indicator.add_child(this._button);
+        // GNOME 50's panel button opens its menu from a click gesture that wins
+        // any press, which would cancel the pill's own primary click. Leave
+        // primary presses and touches to the pill. Earlier Shells open the menu
+        // from the press event, which the pill already stops.
+        for (const gesture of this._indicator.get_actions()) {
+            if (Clutter.ClickGesture && gesture instanceof Clutter.ClickGesture) {
+                gesture.connect('should-handle-sequence', (_gesture, event) =>
+                    event.type() !== Clutter.EventType.TOUCH_BEGIN && event.get_button() !== Clutter.BUTTON_PRIMARY);
+            }
+        }
         this._box = new St.BoxLayout();
         this._button.set_child(this._box);
         this._button.connect('clicked', () => this._action(this._state?.canStop ? 'stop' : 'open'));
@@ -122,12 +136,8 @@ export default class VocoPanel extends Extension {
         this._watch = Gio.bus_watch_name(Gio.BusType.SESSION, NAME, Gio.BusNameWatcherFlags.NONE,
             (_connection, _name, owner) => {
                 this._owner = owner;
-                const generation = ++this._generation;
-                this._call('Attach', null, (result) => {
-                    if (generation !== this._generation) return;
-                    this._attached = result.deep_unpack()[0] === true;
-                    if (this._attached) this._beginPolling();
-                });
+                this._generation++;
+                this._attach();
             }, () => { this._owner = null; this._disconnect(); });
     }
 
@@ -147,6 +157,7 @@ export default class VocoPanel extends Extension {
 
     _call(method, parameters, done, failed = () => this._retry()) {
         // Pin calls to the unique owner; an in-flight request cannot hit a replacement app.
+        // A reply from an earlier attachment generation is dropped here, before done.
         const cancellable = this._cancellable;
         const generation = this._generation;
         Gio.DBus.session.call(this._owner, PATH, INTERFACE, method, parameters, null,
@@ -155,6 +166,13 @@ export default class VocoPanel extends Extension {
                 try { done?.(connection.call_finish(result)); }
                 catch (error) { failed(error); }
             });
+    }
+
+    _attach() {
+        this._call('Attach', null, result => {
+            this._attached = result.deep_unpack()[0] === true;
+            if (this._attached) this._beginPolling();
+        });
     }
 
     _beginPolling() {
@@ -169,9 +187,8 @@ export default class VocoPanel extends Extension {
         if (this._polling) { this._refreshQueued = true; return; }
         this._polling = true;
         if (this._timer) { GLib.source_remove(this._timer); this._timer = 0; }
-        const generation = this._generation;
         this._call('GetState', null, result => {
-            if (generation !== this._generation || !this._attached) return;
+            if (!this._attached) return;
             this._polling = false;
             this._state = presentation(JSON.parse(result.deep_unpack()[0]));
             this._syncShortcut();
@@ -254,7 +271,7 @@ export default class VocoPanel extends Extension {
     _syncShortcut() {
         // Consume the chord whenever attached, idle included, so the focused app
         // never also acts on it. X11 keeps VOCO's own exclusive global shortcut.
-        const accelerator = this._attached && Meta.is_wayland_compositor()
+        const accelerator = this._attached && isWayland()
             ? this._state?.shortcutAccelerator ?? null : null;
         if (accelerator === this._accelerator) return;
         this._releaseShortcut();
@@ -314,12 +331,7 @@ export default class VocoPanel extends Extension {
         if (!this._alive || !this._owner) return;
         this._timer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 2000, () => {
             this._timer = 0;
-            const generation = this._generation;
-            this._call('Attach', null, result => {
-                if (generation !== this._generation) return;
-                this._attached = result.deep_unpack()[0] === true;
-                if (this._attached) this._beginPolling();
-            });
+            this._attach();
             return GLib.SOURCE_REMOVE;
         });
     }

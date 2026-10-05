@@ -3,13 +3,20 @@
 from pathlib import Path
 import argparse
 import hashlib
+import importlib.util
+import sys
 import zipfile
 parser = argparse.ArgumentParser()
 parser.add_argument('output', type=Path)
 args = parser.parse_args()
 root = Path(__file__).resolve().parents[1]
 source = root / 'integrations/gnome/voco-panel@voco.local'
-files = ['extension.js', 'metadata.json', 'model.js', 'stylesheet.css', 'voco-symbol.png']
+# The setup helper lists the runtime files; sorted, the archive stays byte-identical.
+sys.dont_write_bytecode = True
+spec = importlib.util.spec_from_file_location('panel_setup', root / 'apps/desktop/src-tauri/resources/voco_gnome_panel.py')
+panel = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(panel)
+files = sorted(panel.FILES)
 assert (source / 'voco-symbol.png').read_bytes() == (root / 'assets/voco-symbol-ui.png').read_bytes(), 'VOCO icon must match the branding asset'
 with args.output.open('xb') as output:
     with zipfile.ZipFile(output, 'w', compression=zipfile.ZIP_DEFLATED) as archive:

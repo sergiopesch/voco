@@ -3,12 +3,10 @@ import {
   collectAudioSamplesRange,
   type AudioCaptureBuffer,
 } from "@/lib/audioCaptureBuffer";
-import { captureSampleLimit } from "@/lib/dictationRecovery";
+import { captureSampleLimit, MAX_RECORDING_SECONDS } from "@/lib/dictationRecovery";
 import { AudioCaptureFlushError } from "@/lib/audioCaptureFlush";
 import type { NativeCaptureSession } from "@/lib/nativeCapture";
 import type { NativeCaptureTerminalOutcome } from "@/lib/nativeCaptureAudit";
-
-export const MAX_AUDIO_SECONDS = 600;
 
 export type Ref<T> = { current: T };
 
@@ -21,7 +19,7 @@ export interface DesktopCaptureTailEnv {
   audioBufferRef: Ref<AudioCaptureBuffer>;
   dictationStreamRef: Ref<DictationStreamInput | null>;
   desktopStreamedSampleCountRef: Ref<number>;
-  phaseRef: Ref<string>;
+  isRecording: () => boolean;
   captureHealthRef: Ref<{ samplesReceived(): void; dispose(): void } | null>;
   nativeCaptureRef: Ref<NativeCaptureSession | null>;
   cancelledRef: Ref<string | null>;
@@ -47,7 +45,7 @@ export interface DesktopCaptureTailEnv {
  * retained tail that live delivery has not already offered.
  */
 export function createDesktopCaptureTail(env: DesktopCaptureTailEnv) {
-  const maxAudioSeconds = env.maxAudioSeconds ?? MAX_AUDIO_SECONDS;
+  const maxAudioSeconds = env.maxAudioSeconds ?? MAX_RECORDING_SECONDS;
   const collectRange = env.collectAudioSamplesRange ?? collectAudioSamplesRange;
 
   function enqueueDesktopPhrase(end: number) {
@@ -78,19 +76,16 @@ export function createDesktopCaptureTail(env: DesktopCaptureTailEnv) {
       samples,
       maxSamples,
     );
-    // The production worker owns streaming boundaries; queue existence is the
-    // only live-delivery gate. Stop-drained samples are forwarded at finalization.
+    // The production worker owns streaming boundaries. Live samples reach the
+    // queue only while recording; Stop forwards its drained tail at finalization.
     const queue = env.dictationStreamRef.current;
-    if (queue && env.phaseRef.current === "recording") {
+    if (queue && env.isRecording()) {
       const accepted = samples.subarray(0, appendResult.appendedSampleCount);
       queue.pushAudio(accepted, sampleRate);
       env.desktopStreamedSampleCountRef.current += accepted.length;
     }
 
-    if (
-      env.phaseRef.current === "recording" &&
-      appendResult.reachedLimit
-    ) {
+    if (env.isRecording() && appendResult.reachedLimit) {
       env.traceDictationEvent("dictation_recording_limit_reached", {
         durationMs: maxAudioSeconds * 1000,
       }).catch(() => {});

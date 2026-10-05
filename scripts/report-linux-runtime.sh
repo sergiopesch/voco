@@ -36,29 +36,14 @@ detect_input_group() {
   fi
 }
 
-detect_ydotoold_status() {
-  if ! command -v ydotoold >/dev/null 2>&1; then
-    if command -v ydotool >/dev/null 2>&1; then
-      echo "not installed (only required for ydotool v1.x)"
-    else
-      echo "not installed"
-    fi
-    return
-  fi
-
-  if command -v systemctl >/dev/null 2>&1; then
-    local unit_state
-    unit_state="$(systemctl --user is-active ydotoold 2>/dev/null || true)"
-    if [[ -n "${unit_state}" ]]; then
-      echo "${unit_state}"
-      return
-    fi
-  fi
-
-  if pgrep -x ydotoold >/dev/null 2>&1; then
-    echo "running"
+# Wayland paste keys go through VOCO's own virtual keyboard on /dev/uinput.
+detect_uinput_access() {
+  if [[ ! -e /dev/uinput ]]; then
+    echo "missing (uinput module not loaded)"
+  elif [[ -r /dev/uinput && -w /dev/uinput ]]; then
+    echo "read and write"
   else
-    echo "installed, not detected"
+    echo "no access for this login"
   fi
 }
 
@@ -76,8 +61,7 @@ print_row "Input group" "$(detect_input_group)"
 print_row "Automatic text delivery" "Shift+Insert paste into the focused app"
 echo
 echo "Desktop paste helpers (voco --check-desktop-input checks readiness):"
-print_row "ydotool" "$(command_path_or_missing ydotool)"
-print_row "ydotoold" "$(detect_ydotoold_status)"
+print_row "/dev/uinput" "$(detect_uinput_access)"
 print_row "wl-copy" "$(command_path_or_missing wl-copy)"
 print_row "wl-paste" "$(command_path_or_missing wl-paste)"
 print_row "xdotool" "$(command_path_or_missing xdotool)"

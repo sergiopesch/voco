@@ -84,7 +84,7 @@ def private_trial(output, tools, args):
     for fn in ('vc_free', 'vc_tick', 'vc_stop'):
         getattr(lib, fn).argtypes, getattr(lib, fn).restype = [C.c_void_p], None
     lib.vc_enumerate.argtypes = [C.c_void_p, C.POINTER(Catalog)]
-    lib.vc_begin.argtypes = [C.c_void_p, C.POINTER(Source), C.c_uint64]
+    lib.vc_begin.argtypes = [C.c_void_p, C.POINTER(Source)]
     lib.vc_get_status.argtypes = [C.c_void_p, C.POINTER(Status)]
     lib.vc_get_status.restype = None
     lib.vc_ack.argtypes = [C.c_void_p, C.c_uint32]
@@ -154,7 +154,7 @@ def private_trial(output, tools, args):
         assert lib.vc_enumerate(handle, C.byref(catalog)) == 0
         assert catalog.count <= 128
         selected = next(s for s in catalog.sources[:catalog.count] if s.name == b'voco_fixture')
-        assert lib.vc_begin(handle, C.byref(selected), catalog.revision) == 0
+        assert lib.vc_begin(handle, C.byref(selected)) == 0
         deadline = time.monotonic() + 5
         while not tick().ready:
             assert time.monotonic() < deadline, 'Capture did not become ready'

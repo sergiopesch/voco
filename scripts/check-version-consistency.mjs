@@ -64,6 +64,14 @@ const sources = [
     value: expectMatch("install", /^VERSION="([^"]+)"/m, "install script version"),
   },
   {
+    label: "install usage line",
+    value: expectMatch(
+      "install",
+      /raw\.githubusercontent\.com\/sergiopesch\/voco\/voco\.([^/]+)\/install/,
+      "install usage tag",
+    ),
+  },
+  {
     label: "AppStream release",
     value: expectMatch(
       "packaging/tauri/com.sergiopesch.voco.metainfo.xml",

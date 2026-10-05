@@ -4,7 +4,7 @@ import { admitsDictationTrigger, canStopOnboardingTest, cancelsPendingStart } fr
 describe("directed browser recording triggers", () => {
   it("never treats a second start as a stop", () => {
     expect(admitsDictationTrigger("idle", undefined, "browser:a", "start")).toBe(true);
-    for (const phase of ["starting", "recording", "stopping", "processing", "finalizing"] as const) {
+    for (const phase of ["starting", "recording", "stopping"] as const) {
       expect(admitsDictationTrigger(phase, "browser:a", "browser:a", "start")).toBe(false);
     }
   });
@@ -14,7 +14,7 @@ describe("directed browser recording triggers", () => {
       expect(admitsDictationTrigger(phase, "browser:a", "browser:b", "stop")).toBe(false);
       expect(admitsDictationTrigger(phase, undefined, "browser:a", "stop")).toBe(false);
     }
-    for (const phase of ["idle", "error", "stopping", "processing", "finalizing"] as const) {
+    for (const phase of ["idle", "error", "stopping"] as const) {
       expect(admitsDictationTrigger(phase, "browser:a", "browser:a", "stop")).toBe(false);
     }
   });
@@ -34,7 +34,7 @@ describe("directed browser recording triggers", () => {
       for (const phase of ["starting", "recording"] as const) {
         expect(admitsDictationTrigger(phase, origin, "tray:stop", "stop")).toBe(true);
       }
-      for (const phase of ["idle", "error", "stopping", "processing", "finalizing"] as const) {
+      for (const phase of ["idle", "error", "stopping"] as const) {
         expect(admitsDictationTrigger(phase, origin, "tray:stop", "stop")).toBe(false);
         expect(admitsDictationTrigger(phase, origin, "tray:stop", "start")).toBe(false);
       }
