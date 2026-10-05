@@ -13,6 +13,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `main.rs` — Command-line entry point; see [Command line](#command-line).
 - `speech_stream.rs` — The speech worker process and the `speech_stream` command: NDJSON requests, deadlines, size limits and restarting a dead idle worker.
 - `insertion.rs` — Desktop paste and copy: helper and `/dev/uinput` checks, the clipboard transaction, Shift+Insert and the three failure outcomes.
+- `desktop_session.rs` — Retains the originating graphical login and checks its active seat before Wayland paste; bounded logind discovery supports user-manager app launches.
 - `virtual_keyboard.rs` — VOCO's uinput keyboard for Wayland paste keys: one device per process, Shift+Insert led by an optional joining Space, 12 ms between key events.
 - `config.rs` — Settings file, field-level updates, the copy from the legacy `voice` directory and the update cache.
 - `crash_recovery.rs` — Text-only crash journal and the Review store.

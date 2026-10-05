@@ -104,9 +104,14 @@ change.
   exists before the clipboard copy, so a missing device is a `no-mutation`
   failure; after an emit error, release Shift and drop it so the next paste
   recreates it.
-- Keys reach whichever session owns the seat, so send them only while logind
-  reports this user's graphical session active: check before the clipboard copy
-  (`no-mutation`) and again just before the keys. Unknown state doesn't block.
+- Keys reach seat0's active session. Bind the originating local graphical login
+  at startup through process membership, a validated session ID, or a unique
+  graphical user session for apps launched by the user manager. Never select
+  logind's elected user Display or whichever login is active. Retain that identity
+  for the process; a departed, ambiguous, foreign or wrong-seat origin rejects.
+  Check before the clipboard copy (`no-mutation`) and again just before keys.
+  Resolution has a 16-session cap and a 750 ms logind lookup budget. Genuine
+  unavailable logind state retains the existing fail-open policy.
 - The paste check opens `/dev/uinput`; it never creates the device, sends keys or
   starts a process. The evdev listener ignores the virtual keyboard by name (and
   another tool's `ydotoold virtual device`), so its keys never count as the

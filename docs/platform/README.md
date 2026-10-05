@@ -230,8 +230,10 @@ polling, and keeps watching when none is readable at startup.
 - Text reaches only apps that paste on Shift+Insert. A passing desktop input
   check can't show that an app accepts it, and VOCO can't tell whether a paste
   landed.
-- On Wayland, VOCO pastes only into the active local session. A user signed in
-  only remotely has no access to `/dev/uinput`.
+- On Wayland, VOCO checks its originating desktop session before copying and
+  sending keys. An inactive result stops the paste; unavailable status permits
+  it, and a later session switch can still redirect keys. A user signed in only
+  remotely has no access to `/dev/uinput`.
 - On GNOME, apps that inhibit system shortcuts, such as virtual machines and
   remote desktops, receive the companion's chord. In Shell menus and dialogs it
   does nothing.
