@@ -784,8 +784,8 @@
         "text": "If a helper is missing, or on Wayland the virtual keyboard can't be used, the recording doesn't start. VOCO shows \"Dictation setup incomplete\" with the reason."
       },
       {
-        "title": "Only the active session types",
-        "text": "A virtual keyboard types into whichever login owns the screen. So on Wayland VOCO asks logind before the copy and again just before the keys. When logind reports this session as not active, as after switching to another user, VOCO reports \"This desktop session isn't the active one, so VOCO sent no paste keys.\" If logind can't answer, VOCO doesn't block."
+        "title": "Checking the originating session",
+        "text": "A virtual keyboard types into whichever login owns the screen. On Wayland VOCO checks the desktop session it started in before the copy and again just before the keys. When logind reports that session as not active, as after switching to another user, VOCO reports \"This desktop session isn't the active local session for VOCO's keyboard, so VOCO sent no paste keys.\" If logind can't answer, VOCO doesn't block. These checks don't lock the session: switching after the last check can still redirect keys."
       },
       {
         "title": "VOCO steps aside",
@@ -808,6 +808,10 @@
       {
         "path": "apps/desktop/src-tauri/src/virtual_keyboard.rs",
         "why": "VOCO's own keyboard for the Wayland paste keys."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/desktop_session.rs",
+        "why": "Tracks the originating desktop session and asks logind whether it is active."
       },
       {
         "path": "apps/desktop/src/lib/dictationRecording.ts",
@@ -1235,7 +1239,11 @@
       },
       {
         "path": "apps/desktop/src-tauri/src/virtual_keyboard.rs",
-        "why": "The virtual keyboard and the active-session check."
+        "why": "Creates the virtual keyboard and sends its keys."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/desktop_session.rs",
+        "why": "The originating desktop session and its active-state check."
       },
       {
         "path": "apps/desktop/src-tauri/tauri.conf.json",
@@ -1325,7 +1333,7 @@
       },
       {
         "title": "Paste keys for one person",
-        "text": "The package's uaccess rule gives /dev/uinput to the user of the active local session alone, with no group, daemon or socket. VOCO's keyboard can press only Shift, Insert and Space, and VOCO sends keys only while its own session is the active one."
+        "text": "The package's uaccess rule gives /dev/uinput to the user of the active local session alone, with no group, daemon or socket. VOCO's keyboard can press only Shift, Insert and Space. Before copying and before sending keys, VOCO checks its originating session. An inactive result stops the paste; an unavailable result permits it. A switch after the check can still redirect keys."
       },
       {
         "title": "Same user, not same program",
@@ -1375,7 +1383,11 @@
       },
       {
         "path": "apps/desktop/src-tauri/src/virtual_keyboard.rs",
-        "why": "Three keys only, sent only while this session is active."
+        "why": "Creates a keyboard with only Shift, Insert and Space."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/desktop_session.rs",
+        "why": "Checks the originating session, allowing pastes when logind cannot answer."
       },
       {
         "path": "packaging/udev/70-voco-uinput.rules",
@@ -2200,8 +2212,8 @@
         "text": "The package's udev rule gives the user of the active local session access to /dev/uinput. To check it, voco --check-desktop-input only opens /dev/uinput; it never creates the device or sends keys. Without access it says \"VOCO can't open /dev/uinput, so it can't send the paste keys. Sign out and back in once after installing VOCO; if that doesn't help, see Platform support: Access to /dev/uinput.\""
       },
       {
-        "title": "Only this session types",
-        "text": "Keys reach whichever login owns the seat, so VOCO asks logind before the copy and again just before the keys, and sends nothing while logind reports this session as not active."
+        "title": "Check before the paste",
+        "text": "Keys reach whichever login owns the seat, so VOCO asks logind about its originating desktop session before the copy and again just before the keys. An inactive result stops the paste. If logind can't answer, pasting is allowed. The check doesn't lock the session against a later switch."
       },
       {
         "title": "After a key error",
@@ -2219,7 +2231,11 @@
       },
       {
         "path": "apps/desktop/src-tauri/src/virtual_keyboard.rs",
-        "why": "VOCO's keyboard: three keys, 12 ms apart, only in the active session."
+        "why": "VOCO's keyboard: three keys, 12 ms apart."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/desktop_session.rs",
+        "why": "Binds the originating desktop session and checks its active state."
       },
       {
         "path": "apps/desktop/src-tauri/src/lib.rs",
@@ -2274,13 +2290,13 @@
         [
           "GNOME on Wayland",
           "The companion's Shell grab of Alt+D or Alt+Shift+D when attached; otherwise VOCO reads the keyboards for those presets, and the focused app also sees them; for another chord, a desktop binding that runs voco --toggle",
-          "VOCO virtual keyboard, after the modifier wait, only while this session is active",
+          "VOCO virtual keyboard, after the modifier wait and session check; unavailable session status permits keys",
           "xclip through XWayland when DISPLAY is set, otherwise wl-copy"
         ],
         [
           "Other Wayland desktops",
           "VOCO reads the keyboards for Alt+D and Alt+Shift+D, and the focused app also sees them; for another chord, a desktop binding that runs voco --toggle",
-          "VOCO virtual keyboard, after the modifier wait, only while this session is active",
+          "VOCO virtual keyboard, after the modifier wait and session check; unavailable session status permits keys",
           "wl-copy"
         ],
         [
@@ -2299,6 +2315,6 @@
       "scope": "Code paths at the commit this guide records. A session whose XDG_SESSION_TYPE isn't wayland takes the X11 path.",
       "limits": "Pasting replaces CLIPBOARD and PRIMARY and leaves the words there. Keys go to whichever app has focus. Each desktop and app still needs its own testing."
     },
-    "sourceNote": "The table follows insertion.rs (helpers and keys), virtual_keyboard.rs (the Wayland keys), lib.rs (shortcut routes) and extension.js (the GNOME grab). It describes code paths, not a compatibility promise."
+    "sourceNote": "The table follows insertion.rs (helpers and keys), virtual_keyboard.rs (the Wayland keys), desktop_session.rs (the session check), lib.rs (shortcut routes) and extension.js (the GNOME grab). It describes code paths, not a compatibility promise."
   }
 ]
