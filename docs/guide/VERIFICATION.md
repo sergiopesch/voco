@@ -33,9 +33,11 @@ start the real server on a free loopback port and check that:
 - `site/chapters.json` is exactly what `tools/write_lessons.py` writes;
 - there are 20 chapters with unique ids, five steps each, a valid quiz answer and
   only cited files that are in the catalog;
-- only the desktops chapter has a comparison table, the table names wl-copy,
-  xclip, xdotool and ydotool, `insertion.rs` at the recorded commit uses all four,
-  and no chapter uses the release-history words the test lists.
+- only the desktops chapter has a comparison table, and the table names wl-copy,
+  xclip, xdotool and VOCO virtual keyboard. At the recorded commit,
+  `insertion.rs` uses the three helpers and sends Wayland keys through
+  `virtual_keyboard.rs`, which names its device VOCO virtual keyboard. No
+  chapter uses the release-history words the test lists.
 
 ## Content review
 

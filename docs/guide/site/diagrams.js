@@ -222,7 +222,7 @@ export function lab(type) {
     area.append(
       node("label", {}, copied, "1. Clipboard helper started"),
       node("label", {}, released, "2. Shortcut keys released within 1.5 s"),
-      node("label", {}, clean, "3. Paste helper finished cleanly"),
+      node("label", {}, clean, "3. Paste keys sent without an error"),
     );
     draw();
   }
