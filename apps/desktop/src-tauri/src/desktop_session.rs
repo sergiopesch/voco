@@ -132,8 +132,10 @@ fn resolve(sessions: &impl Sessions, uid: u32, hint: Option<&str>) -> (Binding, 
     for (id, path) in candidates {
         let session = match sessions.read(&path) {
             Ok(session) => session,
+            // A login known to have departed cannot be replaced on a later check.
+            Err(LookupError::Missing) => return (Binding::Refused, false),
             // An incomplete enumeration cannot establish a unique origin.
-            Err(_) => return (Binding::Unresolved, true),
+            Err(LookupError::Unavailable) => return (Binding::Unresolved, true),
         };
         if session.uid != uid || !session.graphical_user() {
             continue;
@@ -557,6 +559,21 @@ mod tests {
         assert!(!binding.check(&f, 1000, None));
         f.process = Err(LookupError::Unavailable);
         assert!(!binding.check(&f, 1000, None));
+    }
+
+    #[test]
+    fn an_origin_missing_during_enumeration_is_never_replaced() {
+        let mut f = Fixture::new();
+        let path = f.add("origin", true);
+        f.sessions.get_mut().remove(&path);
+        let mut binding = Binding::Unresolved;
+        assert!(!binding.check(&f, 1000, None));
+        assert_eq!(binding, Binding::Refused);
+
+        f.listed.clear();
+        f.add("replacement", true);
+        assert!(!binding.check(&f, 1000, None));
+        assert_eq!(binding, Binding::Refused);
     }
 
     #[test]
