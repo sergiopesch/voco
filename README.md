@@ -23,21 +23,18 @@ where you are typing.
 
 ## Get started
 
-The last verified public release is 2026.0.59, for Ubuntu 24.04. Install it
-from a terminal in your desktop session:
+Install VOCO 2026.0.61 from a terminal in your desktop session:
 
 ```bash
-wget -qO voco-install https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.59/install && bash voco-install
+wget -qO voco-install https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.61/install && bash voco-install
 ```
 
-That installer checks the release signature and package checksum, installs with
-APT, checks desktop input, turns on the GNOME panel and opens VOCO.
-
-This source tree describes the **2026.0.61 candidate**, which adds the systems
-below and DNF installation on Fedora. Use its
-[release instructions](docs/releases/2026.0.61.md#upgrade) once the signed
-2026.0.61 packages are published. For version-specific setup, verification and
-removal, see [Install VOCO](docs/install.md).
+The installer checks the release signature and package checksum, installs the
+Debian package with APT on Ubuntu and Debian or the RPM with DNF on Fedora,
+checks desktop input, turns on the GNOME panel and opens VOCO. To upgrade from an
+earlier version, follow the [upgrade steps](docs/releases/2026.0.61.md#upgrade).
+For manual installation, verification and removal, see
+[Install VOCO](docs/install.md).
 
 ## Your first dictation
 
@@ -56,8 +53,8 @@ Text goes to whichever window has keyboard focus. See
 
 ## Requirements
 
-The 2026.0.61 candidate supports these systems on 64-bit Intel and AMD
-processors with AVX2, FMA and F16C:
+VOCO supports these systems on 64-bit Intel and AMD processors with AVX2, FMA
+and F16C:
 
 | System | Desktop | Sessions | Package |
 | --- | --- | --- | --- |
