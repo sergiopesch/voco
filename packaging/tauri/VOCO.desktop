@@ -6,5 +6,5 @@ Exec=voco
 Icon=voco
 Terminal=false
 Categories=AudioVideo;Audio;
-StartupNotify=true
+StartupNotify=false
 StartupWMClass=voco

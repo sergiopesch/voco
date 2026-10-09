@@ -32,8 +32,13 @@ def classify(version, installed, info, enabled, globally_disabled):
         if info.get('version') != COMPANION_VERSION:
             return result('restart', 'Panel update installed. Save your work, then sign out and back in to load the current panel and shortcut.')
         return result('active', 'Live panel bars and Stop are active.')
-    if info.get('state') in (3, 4):
+    if info.get('state') == 3:
         return result('error', 'GNOME could not load the VOCO panel. Sign out and back in, then check Extensions.')
+    # Out of date: Shell read an older companion's metadata at login, before this
+    # one replaced it (after a distribution upgrade, for example). The supported
+    # majors match the installed metadata, so the next login loads this one.
+    if info.get('state') == 4 and enabled:
+        return result('restart', 'Panel update installed. Save your work, then sign out and back in to load the current panel and shortcut.')
     if enabled:
         return result('restart', 'Panel enabled. Sign out and back in to load it; saving your work first is recommended.')
     return result('disabled', 'Enable live microphone bars and the VOCO menu in your top panel.', True)

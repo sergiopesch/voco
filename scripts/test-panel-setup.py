@@ -33,10 +33,21 @@ class PanelSetupTests(unittest.TestCase):
         self.assertEqual(metadata['version'], panel.COMPANION_VERSION)
 
     def test_missing_package_and_shell_errors_do_not_offer_false_activation(self):
-        for installed, state, expected in [(False, 1, 'missing'), (True, 3, 'error'), (True, 4, 'error')]:
+        for installed, state, expected in [(False, 1, 'missing'), (True, 3, 'error')]:
             result = panel.classify('46.0', installed, {'state': state}, False, False)
             self.assertEqual(result['status'], expected)
             self.assertFalse(result['canEnable'])
+
+    def test_out_of_date_companion_from_before_an_upgrade_is_replaced_at_next_login(self):
+        old = {'state': 4, 'version': panel.COMPANION_VERSION - 3}
+        disabled = panel.classify('50.1', True, old, False, False)
+        self.assertEqual(disabled['status'], 'disabled')
+        self.assertTrue(disabled['canEnable'])
+        enabled = panel.classify('50.1', True, old, True, False)
+        self.assertEqual(enabled['status'], 'restart')
+        self.assertFalse(enabled['canEnable'])
+        self.assertIn('sign out and back in', enabled['detail'])
+        self.assertEqual(panel.classify('50.1', False, old, True, False)['status'], 'missing')
 
     def test_global_policy_and_unsupported_shell_are_preserved(self):
         self.assertEqual(panel.classify('46.0', True, {'state': 1}, True, True)['status'], 'blocked')

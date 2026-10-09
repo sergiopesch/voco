@@ -1444,7 +1444,7 @@ lesson(
         ),
         (
             "Setup messages",
-            "Active: \"Live panel bars and Stop are active.\" Disabled: \"Enable live microphone bars and the VOCO menu in your top panel.\" After enabling: \"Panel enabled. Sign out and back in to load it; saving your work first is recommended.\"",
+            "Active: \"Live panel bars and Stop are active.\" Disabled: \"Enable live microphone bars and the VOCO menu in your top panel.\" After enabling: \"Panel enabled. Sign out and back in to load it; saving your work first is recommended.\" After an update, including a copy the Shell marked out of date at login: \"Panel update installed. Save your work, then sign out and back in to load the current panel and shortcut.\"",
         ),
         (
             "Other desktops",

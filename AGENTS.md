@@ -15,6 +15,9 @@ setup and pull requests.
   The optional Chromium exact field uses the same recognizer with its own delivery.
 - No assistant, conversation, enhancement, appearance or per-app settings.
 - Tray first. Respect system accessibility preferences such as reduced motion.
+  The desktop entry keeps `StartupNotify=false`: VOCO usually starts without a
+  window, so it can't complete a launcher's startup sequence, and GNOME would
+  show its busy cursor until a 15 s timeout.
 - Settings are the microphone, the shortcut and the update channel. Onboarding
   state and the installation method are stored alongside them.
 - A normal session keeps nothing. Review only holds text that survived a crash, or
@@ -178,7 +181,9 @@ change.
 - Bump the companion metadata and the setup contract together when loaded code
   must change, and compare GNOME's loaded metadata so an in-place upgrade can't
   report old code as current. After an upgrade, users re-run panel setup and sign
-  out and back in.
+  out and back in. A copy Shell marked out of date at login (after a
+  distribution upgrade, for example) awaits that login: setup may enable it and
+  reports `restart`, never a load error.
 - The diagnostics poll, the setup input check and the once-per-launch shortcut
   notice may reuse a companion check for up to 20 s, or 2 s after a failed or
   unavailable check. Attach, Detach, name loss and explicit enabling clear it;

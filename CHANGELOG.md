@@ -6,7 +6,7 @@ use Semantic Versioning: a version has the form `YYYY.0.N`, the year and then a
 number that grows with each release, and its signed Git tag is `voco.<version>`.
 The [release process](docs/release-process.md) describes how a release is made.
 
-## [2026.0.61] - 2026-10-04
+## [2026.0.61] - 2026-10-09
 
 VOCO types on Wayland through its own virtual keyboard and supports Ubuntu 24.04
 and 26.04, Debian 13 and Fedora 44. This release also brings the changes prepared
@@ -188,6 +188,14 @@ Review keeps a dictation VOCO couldn't finish. The
 
 ### Fixed
 
+- Opening VOCO from the app menu left GNOME's busy cursor spinning for about 15
+  seconds after every start, because the desktop entry asked for startup
+  notification, which a tray app that starts without a window never completes.
+  The entry now turns it off.
+- After a distribution upgrade to a newer GNOME, panel setup reported the old
+  copy GNOME had marked out of date as **GNOME could not load the VOCO panel** and
+  couldn't turn the panel on, so setup had to be run again after signing in. It now
+  turns the panel on and says to sign out and back in.
 - After an upgrade to Ubuntu 26.04, whose `ydotool` package starts its own
   `ydotool.service`, VOCO's input service could restart in a loop and VOCO
   refused to start, saying the service had a pending transition. VOCO no longer
