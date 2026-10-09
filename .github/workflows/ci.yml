@@ -51,7 +51,9 @@ jobs:
 
   check:
     name: Frontend Checks
-    timeout-minutes: 30
+    # A slow Azure apt mirror has taken 25 minutes to install the packages, and
+    # the job needs about 6 more.
+    timeout-minutes: 45
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -436,7 +438,8 @@ jobs:
 
   gnome-50:
     name: GNOME 50 Companion
-    timeout-minutes: 15
+    # Room for a slow apt mirror, as in Frontend Checks.
+    timeout-minutes: 30
     runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
