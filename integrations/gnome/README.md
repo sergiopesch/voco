@@ -45,6 +45,8 @@ turns off all extensions.
 A Shell that started before the files arrived finds them at the next login, so
 after installing, save your work and sign out and back in. After an upgrade
 that changes the companion, Shell keeps the loaded copy until you do the same.
+After a distribution upgrade to a newer GNOME, Shell marks the old copy out of
+date; setup then turns the new one on if needed and reports `restart`.
 `voco --check-panel` reports the status and changes nothing:
 
 | Status | Meaning | Exit status |

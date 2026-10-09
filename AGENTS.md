@@ -181,7 +181,9 @@ change.
 - Bump the companion metadata and the setup contract together when loaded code
   must change, and compare GNOME's loaded metadata so an in-place upgrade can't
   report old code as current. After an upgrade, users re-run panel setup and sign
-  out and back in.
+  out and back in. A copy Shell marked out of date at login (after a
+  distribution upgrade, for example) awaits that login: setup may enable it and
+  reports `restart`, never a load error.
 - The diagnostics poll, the setup input check and the once-per-launch shortcut
   notice may reuse a companion check for up to 20 s, or 2 s after a failed or
   unavailable check. Attach, Detach, name loss and explicit enabling clear it;
