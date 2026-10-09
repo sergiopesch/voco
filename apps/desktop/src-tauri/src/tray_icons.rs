@@ -193,17 +193,17 @@ mod tests {
                 .collect();
             for (index, pixels) in icons.iter().enumerate() {
                 assert_eq!(pixels.len(), (size * size * 4) as usize);
-                assert!(pixels.chunks_exact(4).any(|pixel| pixel[3] == 0));
-                assert!(pixels.chunks_exact(4).any(|pixel| pixel[3] == 255));
+                let (rgba, _) = pixels.as_chunks::<4>();
+                assert!(rgba.iter().any(|pixel| pixel[3] == 0));
+                assert!(rgba.iter().any(|pixel| pixel[3] == 255));
                 for prior in &icons[..index] {
                     assert_ne!(
                         pixels, prior,
                         "Every tray state must remain visually distinct"
                     );
                     assert!(
-                        pixels
-                            .chunks_exact(4)
-                            .zip(prior.chunks_exact(4))
+                        rgba.iter()
+                            .zip(prior.as_chunks::<4>().0)
                             .any(|(pixel, other)| pixel[3] != other[3]),
                         "State outlines must differ independently of color"
                     );
@@ -263,7 +263,10 @@ mod tests {
     fn volume_frames_are_distinct_bounded_and_transparent() {
         let frames: Vec<_> = (0..METER_FRAMES).map(meter_rgba).collect();
         assert!(frames.windows(2).all(|pair| pair[0] != pair[1]));
-        let ink = |pixels: &[u8]| pixels.chunks_exact(4).map(|p| u64::from(p[3])).sum::<u64>();
+        let ink = |pixels: &[u8]| {
+            let (rgba, _) = pixels.as_chunks::<4>();
+            rgba.iter().map(|pixel| u64::from(pixel[3])).sum::<u64>()
+        };
         assert!(frames.windows(2).all(|pair| ink(&pair[0]) < ink(&pair[1])));
         for frame in frames {
             assert_eq!(frame.len(), 4096);

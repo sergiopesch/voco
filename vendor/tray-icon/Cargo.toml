@@ -11,12 +11,13 @@
 
 [package]
 edition = "2021"
-rust-version = "1.73"
+rust-version = "1.90"
 name = "tray-icon"
-version = "0.24.2"
-build = false
+version = "0.25.1"
+build = "build.rs"
 include = [
     "README.md",
+    "build.rs",
     "src/**/*.rs",
     "Cargo.toml",
     "LICENSE-APACHE",
@@ -36,19 +37,28 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/tauri-apps/tray-icon"
 
 [features]
-common-controls-v6 = ["muda/common-controls-v6"]
 default = [
-    "libxdo",
-    "gtk",
+    "muda-libxdo",
+    "libappindicator",
 ]
-gtk = [
-    "muda/gtk",
+ksni = [
+    "dep:ksni",
+    "muda-snapshot",
+]
+libappindicator = [
+    "dep:dirs",
     "dep:libappindicator",
+    "muda-gtk3",
 ]
-libxdo = ["muda/libxdo"]
+muda-common-controls-v6 = ["muda/common-controls-v6"]
+muda-gtk3 = ["muda/gtk3"]
+muda-gtk4 = ["muda/gtk4"]
+muda-libxdo = ["muda/libxdo"]
+muda-serde = ["muda/serde"]
+muda-snapshot = ["muda/snapshot"]
 serde = [
-    "muda/serde",
     "dep:serde",
+    "muda-serde",
 ]
 
 [lib]
@@ -59,7 +69,7 @@ path = "src/lib.rs"
 version = "0.5"
 
 [dependencies.muda]
-version = "0.19.1"
+version = "0.20"
 default-features = false
 
 [dependencies.once_cell]
@@ -84,13 +94,23 @@ default-features = false
 version = "1"
 
 [dev-dependencies.tao]
-version = "0.34"
+version = "0.37"
 
 [dev-dependencies.winit]
 version = "0.30"
 
 [target.'cfg(any(target_os = "linux", target_os = "dragonfly", target_os = "freebsd", target_os = "netbsd", target_os = "openbsd"))'.dependencies.dirs]
-version = "6"
+version = "7"
+optional = true
+
+[target.'cfg(any(target_os = "linux", target_os = "dragonfly", target_os = "freebsd", target_os = "netbsd", target_os = "openbsd"))'.dependencies.ksni]
+version = "0.3.6"
+features = [
+    "async-io",
+    "blocking",
+]
+optional = true
+default-features = false
 
 [target.'cfg(any(target_os = "linux", target_os = "dragonfly", target_os = "freebsd", target_os = "netbsd", target_os = "openbsd"))'.dependencies.libappindicator]
 version = "0.9"
@@ -106,7 +126,7 @@ version = "0.18"
 version = "0.6"
 
 [target.'cfg(target_os = "macos")'.dependencies.objc2-app-kit]
-version = "0.3"
+version = "0.3.2"
 features = [
     "std",
     "objc2-core-foundation",
@@ -127,7 +147,7 @@ features = [
 default-features = false
 
 [target.'cfg(target_os = "macos")'.dependencies.objc2-core-foundation]
-version = "0.3"
+version = "0.3.2"
 features = [
     "std",
     "CFCGTypes",
@@ -136,7 +156,7 @@ features = [
 default-features = false
 
 [target.'cfg(target_os = "macos")'.dependencies.objc2-core-graphics]
-version = "0.3"
+version = "0.3.2"
 features = [
     "std",
     "CGDirectDisplay",
@@ -144,7 +164,7 @@ features = [
 default-features = false
 
 [target.'cfg(target_os = "macos")'.dependencies.objc2-foundation]
-version = "0.3"
+version = "0.3.2"
 features = [
     "std",
     "block2",

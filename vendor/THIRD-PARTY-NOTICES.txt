@@ -5,7 +5,7 @@ Source: https://github.com/gtk-rs/gtk-rs-core
 Local change: upstream RUSTSEC-2024-0429 iterator out-pointer safety backport.
 Full license and provenance: vendor/glib/LICENSE, VOCO-UPSTREAM.json, VOCO-PATCH.md.
 
-Vendored tray-icon 0.24.2, MIT / Apache-2.0
+Vendored tray-icon 0.25.1, MIT / Apache-2.0
 Source: https://github.com/tauri-apps/tray-icon
 Local change: additive caller-owned immutable Linux icon path API.
 Full licenses and provenance: vendor/tray-icon/LICENSE-MIT, LICENSE-APACHE, UPSTREAM-SHA256.json, VOCO-PATCH.md.

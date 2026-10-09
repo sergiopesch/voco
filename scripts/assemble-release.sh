@@ -14,7 +14,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 REPOSITORY="sergiopesch/voco"
 FINGERPRINT="B33C7C6AAEC8C20433A7A837540796453D8E3865"
-TAURI_CLI_VERSION="2.10.1"
+TAURI_CLI_VERSION="2.12.1"
 
 fail() {
   echo "assemble-release: $*" >&2

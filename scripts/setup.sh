@@ -208,9 +208,9 @@ if [[ "$INSTALL_MODE" == true ]]; then
 
   # The same pin as scripts/assemble-release.sh.
   if ! TAURI_CLI=$(cargo tauri --version 2>/dev/null); then
-    run_step "Tauri CLI 2.10.1" cargo install tauri-cli --version "2.10.1" --locked
-  elif [[ "$TAURI_CLI" != "tauri-cli 2.10.1" ]]; then
-    warn "Found ${TAURI_CLI}; releases use 2.10.1: cargo install tauri-cli --version 2.10.1 --locked"
+    run_step "Tauri CLI 2.12.1" cargo install tauri-cli --version "2.12.1" --locked
+  elif [[ "$TAURI_CLI" != "tauri-cli 2.12.1" ]]; then
+    warn "Found ${TAURI_CLI}; releases use 2.12.1: cargo install tauri-cli --version 2.12.1 --locked"
   fi
 
   # Remove stale bundle artifacts so install picks the package from this build only.

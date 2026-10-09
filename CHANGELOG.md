@@ -6,6 +6,24 @@ use Semantic Versioning: a version has the form `YYYY.0.N`, the year and then a
 number that grows with each release, and its signed Git tag is `voco.<version>`.
 The [release process](docs/release-process.md) describes how a release is made.
 
+## [2026.0.62] - 2026-10-10
+
+VOCO's app framework and build tools are up to date, and VOCO works as 2026.0.61
+does. The [release notes](docs/releases/2026.0.62.md) explain how to upgrade.
+
+### Changed
+
+- Tauri 2.12.2, tauri-build 2.7.1 and tauri-plugin-global-shortcut 2.4.0. Tauri
+  2.12 uses tray-icon 0.25 and muda 0.20, so the vendored tray-icon is now 0.25.1,
+  with the same patch for fixed, caller-owned icon files.
+- Rust 1.99.0, CI's toolchain, and Tauri CLI 2.12.1, which builds the Debian
+  package.
+- `@tauri-apps/api` 2.12.1, Vite 8.3.3, `@vitejs/plugin-react` 6.1.2, ESLint
+  10.12.0, typescript-eslint 8.71.1 and Vitest 5.0.3.
+- CI pulls its Debian 13 image from Docker's mirror on Amazon ECR Public, because
+  Docker Hub rate-limits hosted runners, and Frontend Checks and GNOME 50 Companion
+  allow for a slow apt mirror.
+
 ## [2026.0.61] - 2026-10-09
 
 VOCO types on Wayland through its own virtual keyboard and supports Ubuntu 24.04
@@ -264,4 +282,5 @@ Review keeps a dictation VOCO couldn't finish. The
 The [GitHub releases](https://github.com/sergiopesch/voco/releases) page lists the
 releases before 2026.0.61, each with its signed tag and assets.
 
+[2026.0.62]: https://github.com/sergiopesch/voco/compare/voco.2026.0.61...voco.2026.0.62
 [2026.0.61]: https://github.com/sergiopesch/voco/compare/voco.2026.0.59...voco.2026.0.61

@@ -28,11 +28,11 @@ VOCO builds on x86-64 Linux. Ubuntu 24.04 is the reference system, and CI runs o
 it.
 
 - Node.js 24, as `.nvmrc` pins. `package.json` requires 24 or later.
-- Rust 1.94.0 through [rustup](https://rustup.rs), with clippy and rustfmt. It
+- Rust 1.99.0 through [rustup](https://rustup.rs), with clippy and rustfmt. It
   matches `rust-version` in `apps/desktop/src-tauri/Cargo.toml` and the CI
   toolchain.
-- Tauri CLI 2.10.1, which `npm run dev` and packaging use:
-  `cargo install tauri-cli --version 2.10.1 --locked`.
+- Tauri CLI 2.12.1, which `npm run dev` and packaging use:
+  `cargo install tauri-cli --version 2.12.1 --locked`.
 - System Python at `/usr/bin/python3`, with python3-gi and gir1.2-ibus-1.0 for
   the IBus tests, python3-numpy for the speech worker, and python3-psutil for
   its evaluation tool. `scripts/setup.sh` installs all four.
@@ -77,7 +77,7 @@ package with the provisioned runtime, verifies it and installs it with APT. It
 then runs `voco --check-desktop-input`. Its package check leaves the AppStream
 URLs to CI and release assembly. It refreshes APT's package lists, adds
 binutils, desktop-file-utils and appstream to the APT list, installs
-Tauri CLI 2.10.1 when no Tauri CLI is installed and warns about any other
+Tauri CLI 2.12.1 when no Tauri CLI is installed and warns about any other
 version, and exits with status 2 when desktop input still needs setup.
 
 ## Checks

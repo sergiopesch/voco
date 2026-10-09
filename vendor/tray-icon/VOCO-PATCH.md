@@ -1,6 +1,6 @@
 # Immutable Linux tray icons
 
-Upstream: tray-icon 0.24.2 (MIT / Apache-2.0), selected by the pinned Tauri
+Upstream: tray-icon 0.25.1 (MIT / Apache-2.0), selected by the pinned Tauri
 dependency in `apps/desktop/src-tauri/Cargo.toml` and `Cargo.lock`.
 `VOCO-UPSTREAM.json` records the registry archive checksum and source commit.
 `UPSTREAM-SHA256.json` records the unmodified crate files. Only `src/lib.rs` and
@@ -13,7 +13,9 @@ open any previously advertised filename. No icon cache or unbounded update histo
 is introduced; the upstream image API and other platforms are unchanged.
 
 VOCO uses Tauri's `with_inner_tray_icon` to call this method. The rest of the
-upstream Linux implementation is unchanged. `scripts/verify-tray-backport.py`
+upstream Linux implementation is unchanged. Tauri enables the AppIndicator backend
+(`libappindicator`), the only one with this method; the optional KSNI backend is
+not compiled. `scripts/verify-tray-backport.py`
 rejects a second tray-icon version or a registry copy that would bypass the patch.
 An isolated GNOME regression watches the exported icon names and file reads from
 startup onwards. The fallback tray's labels use the existing title API.

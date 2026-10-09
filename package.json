@@ -1,6 +1,6 @@
 {
   "name": "voco",
-  "version": "2026.0.61",
+  "version": "2026.0.62",
   "description": "Local English dictation for Linux",
   "license": "MIT",
   "homepage": "https://github.com/sergiopesch/voco#readme",
@@ -53,6 +53,6 @@
   },
   "devDependencies": {
     "playwright": "1.63.0",
-    "vite": "^8.3.1"
+    "vite": "^8.3.3"
   }
 }

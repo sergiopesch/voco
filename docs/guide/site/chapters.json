@@ -121,7 +121,7 @@
     "facts": [
       {
         "title": "Pinned toolchains",
-        "text": "CI builds with Rust 1.94.0 and the Node version in .nvmrc, which is 24. Cargo.toml pins Tauri to exactly 2.11.6."
+        "text": "CI builds with Rust 1.99.0 and the Node version in .nvmrc, which is 24. Cargo.toml pins Tauri to exactly 2.12.2."
       },
       {
         "title": "Messages, not shared memory",
@@ -1811,7 +1811,7 @@
       },
       {
         "label": "tray-icon",
-        "detail": "0.24.2 with a Linux call that sets icons by file path."
+        "detail": "0.25.1 with a Linux call that sets icons by file path."
       },
       {
         "label": "Ship",
