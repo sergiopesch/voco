@@ -112,6 +112,8 @@ expected_desktop_fields = {
     "Exec": "voco",
     "Icon": "voco",
     "Terminal": "false",
+    # Tray first: VOCO can't complete a launcher's startup sequence (AGENTS.md).
+    "StartupNotify": "false",
 }
 for field, expected_value in expected_desktop_fields.items():
     if desktop_fields.get(field) != expected_value:
