@@ -20,7 +20,7 @@ path = "src/main.rs"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
-cc = "=1.4.7"
+cc = "=1.6.0"
 pkg-config = "=0.3.34"
 
 [features]
@@ -29,7 +29,7 @@ custom-protocol = ["tauri/custom-protocol"]
 native-capture = []
 
 [dependencies]
-tauri = { version = "=2.11.6", features = ["tray-icon"] }
+tauri = { version = "=2.12.2", features = ["tray-icon"] }
 tauri-plugin-global-shortcut = "2"
 log = "0.4"
 env_logger = "0.11"

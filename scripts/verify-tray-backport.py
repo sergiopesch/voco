@@ -10,7 +10,7 @@ manifest = json.loads((crate / 'UPSTREAM-SHA256.json').read_text())
 provenance = json.loads((crate / 'VOCO-UPSTREAM.json').read_text())
 package = tomllib.loads((crate / 'Cargo.toml').read_text())['package']
 assert package['name'] == provenance['crate'] == 'tray-icon'
-assert package['version'] == provenance['version'] == '0.24.2'
+assert package['version'] == provenance['version'] == '0.25.1'
 changed = []
 for name, digest in manifest.items():
     actual = hashlib.sha256((crate / name).read_bytes()).hexdigest()

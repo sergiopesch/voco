@@ -186,7 +186,7 @@ records:
 | --- | --- | --- |
 | glib 0.18.5 | [Backport](../../vendor/glib/VOCO-PATCH.md) of the RUSTSEC-2024-0429 fix | `scripts/verify-glib-backport.py`, in CI and packaging |
 | global-hotkey 0.8.0 | [Event-driven X11 key grab](../../vendor/global-hotkey/VOCO-PATCH.md) | `scripts/verify-shortcut-backport.py`, in `npm test` |
-| tray-icon 0.24.2 | [Fixed, caller-owned icon paths](../../vendor/tray-icon/VOCO-PATCH.md) | `scripts/verify-tray-backport.py`, in `npm test` |
+| tray-icon 0.25.1 | [Fixed, caller-owned icon paths](../../vendor/tray-icon/VOCO-PATCH.md) | `scripts/verify-tray-backport.py`, in `npm test` |
 
 CI runs `cargo audit` on the Rust lockfile and `npm run verify:security`, which
 is `npm audit` at the moderate level. Scanners that match only version numbers

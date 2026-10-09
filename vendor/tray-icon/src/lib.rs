@@ -10,16 +10,21 @@
 //!
 //! - Windows
 //! - macOS
-//! - Linux (gtk Only)
+//! - Linux and BSD (AppIndicator or KSNI)
 //!
 //! # Platform-specific notes:
 //!
-//! - On Windows and Linux, an event loop must be running on the thread, on Windows, a win32 event loop and on Linux, a gtk event loop. It doesn't need to be the main thread but you have to create the tray icon on the same thread as the event loop.
+//! - On Windows and the Linux/BSD AppIndicator backend, an event loop must be running on the thread. The
+//!   KSNI backend runs its D-Bus service on a worker thread and does not require a GTK event loop.
+//! - When both the `libappindicator` and `ksni` features are enabled on Linux or BSD, tray-icon
+//!   uses the KSNI backend and emits a Cargo warning.
 //! - On macOS, an event loop must be running on the main thread so you also need to create the tray icon on the main thread. You must make sure that the event loop is already running and not just created before creating a TrayIcon to prevent issues with fullscreen apps. In Winit for example the earliest you can create icons is on [`StartCause::Init`](https://docs.rs/winit/latest/winit/event/enum.StartCause.html#variant.Init).
 //!
-//! # Dependencies (Linux Only)
+//! # Dependencies (Linux/BSD)
 //!
-//! On Linux, `gtk`, `libxdo` is used to make the predfined `Copy`, `Cut`, `Paste` and `SelectAll` menu items work and `libappindicator` or `libayatnat-appindicator` are used to create the tray icon, so make sure to install them on your system.
+//! The default Linux backend uses GTK, `libxdo`, and `libappindicator` or
+//! `libayatana-appindicator`. The `ksni` backend does not require these system libraries unless a
+//!  GTK backend is also enabled.
 //!
 //! #### Arch Linux / Manjaro:
 //!
@@ -94,7 +99,7 @@
 //! You should use [`TrayIconEvent::set_event_handler`] and forward
 //! the tray icon events to the event loop by using [`EventLoopProxy`]
 //! so that the event loop is awakened on each tray icon event.
-//! Same can be done for menu events using [`MenuEvent::set_event_handler`].
+//! Same can be done for menu events using [`crate::menu::MenuEvent::set_event_handler`].
 //!
 //! ```no_run
 //! # use winit::event_loop::EventLoop;
@@ -120,6 +125,18 @@
 //! [winit]: https://docs.rs/winit
 //! [tao]: https://docs.rs/tao
 
+#[cfg(all(
+    any(
+        target_os = "linux",
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "netbsd",
+        target_os = "openbsd"
+    ),
+    not(any(feature = "libappindicator", feature = "ksni"))
+))]
+compile_error!("either the `libappindicator` or `ksni` feature must be enabled on Linux and BSD");
+
 use std::{
     cell::RefCell,
     path::{Path, PathBuf},
@@ -140,7 +157,7 @@ pub use self::error::*;
 pub use self::icon::{BadIcon, Icon};
 pub use self::tray_icon_id::TrayIconId;
 
-/// Re-export of [muda](::muda) crate and used for tray context menu.
+/// Re-export of the [muda] crate and used for tray context menu.
 pub mod menu {
     pub use muda::*;
 }
@@ -154,25 +171,25 @@ pub struct TrayIconAttributes {
     ///
     /// ## Platform-specific:
     ///
-    /// - **Linux:** Unsupported.
+    /// - **Linux/BSD AppIndicator backend:** Unsupported.
     pub tooltip: Option<String>,
 
     /// Tray menu
     ///
     /// ## Platform-specific:
     ///
-    /// - **Linux**: once a menu is set, it cannot be removed.
+    /// - **Linux/BSD AppIndicator backend:** Once a menu is set, it cannot be removed.
     pub menu: Option<Box<dyn menu::ContextMenu>>,
 
     /// Tray icon
     ///
     /// ## Platform-specific:
     ///
-    /// - **Linux:** Sometimes the icon won't be visible unless a menu is set.
+    /// - **Linux/BSD AppIndicator backend:** Sometimes the icon won't be visible unless a menu is set.
     ///   Setting an empty [`Menu`](crate::menu::Menu) is enough.
     pub icon: Option<Icon>,
 
-    /// Tray icon temp dir path. **Linux only**.
+    /// Tray icon temp dir path. **Linux/BSD AppIndicator backend only**.
     pub temp_dir_path: Option<PathBuf>,
 
     /// Use the icon as a [template](https://developer.apple.com/documentation/appkit/nsimage/1520017-template?language=objc). **macOS only**.
@@ -196,13 +213,34 @@ pub struct TrayIconAttributes {
     ///
     /// ## Platform-specific
     ///
-    /// - **Linux:** The title will not be shown unless there is an icon
+    /// - **Linux/BSD AppIndicator backend:** The title will not be shown unless there is an icon
     ///   as well.  The title is useful for numerical and other frequently
     ///   updated information.  In general, it shouldn't be shown unless a
     ///   user requests it as it can take up a significant amount of space
     ///   on the user's panel.  This may not be shown in all visualizations.
     /// - **Windows:** Unsupported.
     pub title: Option<String>,
+
+    /// A stable identity for the tray icon, as a UUID in `u128` form. **Windows only**.
+    ///
+    /// Windows remembers per-icon user settings (most importantly whether the
+    /// icon is pinned to the taskbar or hidden in the overflow) keyed on the
+    /// icon's identity. Without a GUID that identity is the executable path
+    /// plus a per-process counter, so the setting is lost whenever the binary
+    /// moves - for example every update of an installer that uses versioned
+    /// directories. With a GUID, and an executable that is Authenticode-signed
+    /// by the same publisher across versions, the setting survives.
+    ///
+    /// Use one fixed GUID per tray icon your application creates, and never
+    /// share it between two icons that can be alive at the same time. See
+    /// <https://learn.microsoft.com/windows/win32/api/shellapi/ns-shellapi-notifyicondataw#troubleshooting>
+    /// for the rules Windows applies (the GUID is bound to the binary's path
+    /// unless the binary is signed).
+    ///
+    /// ## Platform-specific:
+    ///
+    /// - **Linux / macOS:** Ignored.
+    pub guid: Option<u128>,
 }
 
 impl Default for TrayIconAttributes {
@@ -216,6 +254,7 @@ impl Default for TrayIconAttributes {
             menu_on_left_click: true,
             menu_on_right_click: true,
             title: None,
+            guid: None,
         }
     }
 }
@@ -248,7 +287,8 @@ impl TrayIconBuilder {
     ///
     /// ## Platform-specific:
     ///
-    /// - **Linux**: once a menu is set, it cannot be removed or replaced but you can change its content.
+    /// - **Linux/BSD AppIndicator backend:** Once a menu is set, it cannot be removed or replaced, but its
+    ///   content can be changed.
     pub fn with_menu(mut self, menu: Box<dyn menu::ContextMenu>) -> Self {
         self.attrs.menu = Some(menu);
         self
@@ -258,7 +298,7 @@ impl TrayIconBuilder {
     ///
     /// ## Platform-specific:
     ///
-    /// - **Linux:** Sometimes the icon won't be visible unless a menu is set.
+    /// - **Linux/BSD AppIndicator backend:** Sometimes the icon won't be visible unless a menu is set.
     ///   Setting an empty [`Menu`](crate::menu::Menu) is enough.
     pub fn with_icon(mut self, icon: Icon) -> Self {
         self.attrs.icon = Some(icon);
@@ -269,7 +309,7 @@ impl TrayIconBuilder {
     ///
     /// ## Platform-specific:
     ///
-    /// - **Linux:** Unsupported.
+    /// - **Linux/BSD AppIndicator backend:** Unsupported.
     pub fn with_tooltip<S: AsRef<str>>(mut self, s: S) -> Self {
         self.attrs.tooltip = Some(s.as_ref().to_string());
         self
@@ -279,7 +319,7 @@ impl TrayIconBuilder {
     ///
     /// ## Platform-specific
     ///
-    /// - **Linux:** The title will not be shown unless there is an icon
+    /// - **Linux/BSD AppIndicator backend:** The title will not be shown unless there is an icon
     ///   as well.  The title is useful for numerical and other frequently
     ///   updated information.  In general, it shouldn't be shown unless a
     ///   user requests it as it can take up a significant amount of space
@@ -290,7 +330,7 @@ impl TrayIconBuilder {
         self
     }
 
-    /// Set tray icon temp dir path. **Linux only**.
+    /// Set tray icon temp dir path. **Linux/BSD AppIndicator backend only**.
     ///
     /// On Linux, we need to write the icon to the disk and usually it will
     /// be `$XDG_RUNTIME_DIR/tray-icon` or `$TEMP/tray-icon`.
@@ -325,6 +365,14 @@ impl TrayIconBuilder {
         self
     }
 
+    /// Set a stable identity GUID for this tray icon. **Windows only**.
+    ///
+    /// See [`TrayIconAttributes::guid`] for why and how to pick one.
+    pub fn with_guid(mut self, guid: u128) -> Self {
+        self.attrs.guid = Some(guid);
+        self
+    }
+
     /// Access the unique id that will be assigned to the tray icon
     /// this builder will create.
     pub fn id(&self) -> &TrayIconId {
@@ -351,7 +399,7 @@ impl TrayIcon {
     ///
     /// ## Platform-specific:
     ///
-    /// - **Linux:** Sometimes the icon won't be visible unless a menu is set.
+    /// - **Linux/BSD AppIndicator backend:** Sometimes the icon won't be visible unless a menu is set.
     ///   Setting an empty [`Menu`](crate::menu::Menu) is enough.
     pub fn new(attrs: TrayIconAttributes) -> Result<Self> {
         let id = TrayIconId::new_unique();
@@ -385,7 +433,17 @@ impl TrayIcon {
 
     /// Select a caller-owned, immutable PNG. The caller keeps every advertised
     /// path readable for the tray lifetime; this method never removes it.
-    #[cfg(all(unix, not(target_os = "macos")))]
+    #[cfg(all(
+        any(
+            target_os = "linux",
+            target_os = "dragonfly",
+            target_os = "freebsd",
+            target_os = "netbsd",
+            target_os = "openbsd"
+        ),
+        feature = "libappindicator",
+        not(feature = "ksni")
+    ))]
     pub fn set_icon_path(&self, path: impl AsRef<std::path::Path>) -> Result<()> {
         self.tray.borrow_mut().set_icon_path(path.as_ref())
     }
@@ -399,7 +457,8 @@ impl TrayIcon {
     ///
     /// ## Platform-specific:
     ///
-    /// - **Linux**: once a menu is set it cannot be removed so `None` has no effect
+    /// - **Linux/BSD AppIndicator backend:** Once a menu is set it cannot be removed, so `None` has no
+    ///   effect.
     pub fn set_menu(&self, menu: Option<Box<dyn menu::ContextMenu>>) {
         self.tray.borrow_mut().set_menu(menu)
     }
@@ -408,7 +467,7 @@ impl TrayIcon {
     ///
     /// ## Platform-specific:
     ///
-    /// - **Linux:** Unsupported
+    /// - **Linux/BSD AppIndicator backend:** Unsupported.
     pub fn set_tooltip<S: AsRef<str>>(&self, tooltip: Option<S>) -> Result<()> {
         self.tray.borrow_mut().set_tooltip(tooltip)
     }
@@ -417,7 +476,7 @@ impl TrayIcon {
     ///
     /// ## Platform-specific:
     ///
-    /// - **Linux:** The title will not be shown unless there is an icon
+    /// - **Linux/BSD AppIndicator backend:** The title will not be shown unless there is an icon
     ///   as well.  The title is useful for numerical and other frequently
     ///   updated information.  In general, it shouldn't be shown unless a
     ///   user requests it as it can take up a significant amount of space
@@ -432,7 +491,7 @@ impl TrayIcon {
         self.tray.borrow_mut().set_visible(visible)
     }
 
-    /// Sets the tray icon temp dir path. **Linux only**.
+    /// Sets the tray icon temp dir path. **Linux/BSD AppIndicator backend only**.
     ///
     /// On Linux, we need to write the icon to the disk and usually it will
     /// be `$XDG_RUNTIME_DIR/tray-icon` or `$TEMP/tray-icon`.
@@ -539,12 +598,18 @@ impl TrayIcon {
         self.tray.borrow().ns_status_item().cloned()
     }
 
-    /// Get the tray icon's underlying [AppIndicator](libappindicator::AppIndicator) **Linux only**.
+    /// Get the tray icon's underlying [AppIndicator](libappindicator::AppIndicator).
+    /// **Linux/BSD AppIndicator backend only**.
     ///
     /// # Safety
     ///
     /// The returned pointer is valid as long as the `TrayIcon` is.
-    #[cfg(all(unix, not(target_os = "macos")))]
+    #[cfg(all(
+        unix,
+        not(target_os = "macos"),
+        feature = "libappindicator",
+        not(feature = "ksni")
+    ))]
     pub unsafe fn app_indicator(&self) -> *const libappindicator::AppIndicator {
         self.tray.borrow().app_indicator() as *const _
     }
@@ -554,8 +619,11 @@ impl TrayIcon {
 ///
 /// ## Platform-specific:
 ///
-/// - **Linux**: Unsupported. The event is not emmited even though the icon is shown
-///   and will still show a context menu on right click.
+/// - **Linux/BSD AppIndicator backend:** Unsupported. The event is not emitted even though the icon is
+///   shown and will still show a context menu on right click.
+/// - **Linux/BSD KSNI backend:** Emits left- and middle-click activation events. The StatusNotifier
+///   host handles right clicks itself and does not expose them to the application. The protocol
+///   does not provide the icon rectangle, so `rect` is empty.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(tag = "type"))]
