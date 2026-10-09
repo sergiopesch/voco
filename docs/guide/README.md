@@ -16,7 +16,7 @@ Then open http://127.0.0.1:8785, and press Ctrl+C to stop the server. `--port`
 picks another port. There is nothing to build or install, and studying needs no
 account, key or internet connection.
 
-The code tour follows the 2026.0.61 source commit recorded in `site/catalog.json`.
+The code tour follows the 2026.0.62 source commit recorded in `site/catalog.json`.
 The server reads that commit from your clone, so the clone needs it in its
 history. If the commit is missing, the server doesn't start.
 

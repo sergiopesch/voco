@@ -143,7 +143,7 @@ lesson(
     [
         (
             "Pinned toolchains",
-            "CI builds with Rust 1.94.0 and the Node version in .nvmrc, which is 24. Cargo.toml pins Tauri to exactly 2.11.6.",
+            "CI builds with Rust 1.99.0 and the Node version in .nvmrc, which is 24. Cargo.toml pins Tauri to exactly 2.12.2.",
         ),
         (
             "Messages, not shared memory",
@@ -1274,7 +1274,7 @@ lesson(
     [
         ("glib", "0.18.5 with the two-line upstream fix for RUSTSEC-2024-0429."),
         ("global-hotkey", "0.8.0 with an event-driven X11 actor."),
-        ("tray-icon", "0.24.2 with a Linux call that sets icons by file path."),
+        ("tray-icon", "0.25.1 with a Linux call that sets icons by file path."),
         (
             "Ship",
             "package-nvidia.py copies each crate's licenses, patch notes and provenance into /usr/share/doc/voco/vendor, and stops if one is missing.",
