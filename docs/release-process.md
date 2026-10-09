@@ -22,7 +22,7 @@ On the Linux computer that signs releases:
 2. Sign tags with it:
    `git config user.signingkey B33C7C6AAEC8C20433A7A837540796453D8E3865`.
 3. Install what [CONTRIBUTING.md](../CONTRIBUTING.md#prerequisites) lists,
-   including Tauri CLI 2.10.1, run `bash scripts/setup.sh`, and add the packaging
+   including Tauri CLI 2.12.1, run `bash scripts/setup.sh`, and add the packaging
    tools: `sudo apt install binutils desktop-file-utils appstream rpm`. The `rpm`
    package provides `rpmbuild`. The assembler also needs `gpgv` and names any
    command it can't find; the upload needs `gh`.
@@ -85,7 +85,7 @@ The output directory must be outside the repository and must not exist yet. The
 script stops unless the tag is annotated, points at `HEAD` and is signed by the
 release key, `KEYS` holds exactly that key, its secret half is present, the
 versions agree, `install` pins the key, the release notes and runtime exist, the
-Tauri CLI is 2.10.1 and CI passed. It builds with `SOURCE_DATE_EPOCH` set to the
+Tauri CLI is 2.12.1 and CI passed. It builds with `SOURCE_DATE_EPOCH` set to the
 commit time and stops if the build changed a tracked file. From one staged tree
 it builds the Debian package and the RPM, verifies both, the RPM also against
 the Debian package, and runs the worker protocol checks against the packaged

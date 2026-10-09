@@ -102,8 +102,10 @@ fn parse(body: &InvokeBody) -> Result<(Metadata, &[u8]), String> {
     // Full source fields are type-checked here and matched to the native witness offline.
     let _ = (source.index, source.label, source.is_monitor);
     if pcm
-        .chunks_exact(4)
-        .any(|bytes| !f32::from_le_bytes(bytes.try_into().expect("exact float bytes")).is_finite())
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .any(|bytes| !f32::from_le_bytes(*bytes).is_finite())
     {
         return Err("Native retained-source evidence contains non-finite samples".into());
     }
