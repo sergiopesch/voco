@@ -16,7 +16,8 @@ without an account, a subscription or cloud transcription.
 | Brand line | The voice layer for Linux. | Banner, installer header, social cards, video end cards |
 | Manifesto | Dictation is the first step. We're building the voice layer for Linux: private, local, and under your control. | README, release pages, launch posts |
 | Summary | The voice layer for Linux, starting with dictation | Package, AppStream and desktop entry summaries, the GitHub description |
-| Today | Press a shortcut, speak, and your words appear where you are typing. | Wherever readers need to know what VOCO does now |
+| Today | Today: private dictation for Linux. Press a shortcut, speak, and your words appear where you are typing, while you speak. | Directly after the brand line or manifesto |
+| Today, short | Today: private dictation. | Where space is tight: the banner, the installer header, the release page |
 
 Each pillar names only what is true today:
 
@@ -34,6 +35,11 @@ VOCO's code is open source under the MIT license. Its speech model is NVIDIA
 Nemotron, under the NVIDIA Open Model License, which isn't an open-source licence:
 say "open source" only of the app, and name the model's licence wherever the model
 is credited.
+
+Lead with the mission, and say where VOCO is today in the same breath. The summary
+does both in one line ("starting with dictation"). Everywhere else the Today line
+follows the brand line or the manifesto directly, in its short form where space
+is tight, so no reader mistakes the direction for what ships.
 
 The brand line and the manifesto are VOCO's only statements of direction.
 Everything else describes what VOCO does now, and a capability is named only

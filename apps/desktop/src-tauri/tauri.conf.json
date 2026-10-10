@@ -38,7 +38,7 @@
     ],
     "category": "Utility",
     "shortDescription": "The voice layer for Linux, starting with dictation",
-    "longDescription": "Dictation is the first step. VOCO is building the voice layer for Linux: private, local, and under your control. Press a shortcut, speak, and VOCO pastes your words into the app you are typing in. Speech is recognized on your computer, with no account, subscription or cloud service. VOCO listens only when you start it and never presses Enter. VOCO stays in the system tray, or in the GNOME top bar with live microphone bars. Pasting depends on your desktop session and the app you type in. Words VOCO cannot paste are copied to the clipboard when you stop, and Review recovers dictation after a crash.",
+    "longDescription": "Dictation is the first step. VOCO is building the voice layer for Linux: private, local, and under your control. Today it's private dictation: press a shortcut, speak, and VOCO pastes your words into the app you are typing in, while you speak. Speech is recognized on your computer, with no account, subscription or cloud service. VOCO listens only when you start it and never presses Enter. VOCO stays in the system tray, or in the GNOME top bar with live microphone bars. Pasting depends on your desktop session and the app you type in. Words VOCO cannot paste are copied to the clipboard when you stop, and Review recovers dictation after a crash.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

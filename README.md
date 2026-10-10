@@ -1,5 +1,5 @@
 <!-- markdownlint-disable MD033 MD041 -->
-<p align="center"><img src="assets/voco-readme-banner.svg" alt="VOCO, the voice layer for Linux" width="560"></p>
+<p align="center"><img src="assets/voco-readme-banner.svg" alt="VOCO, the voice layer for Linux. Today: private dictation." width="560"></p>
 
 # VOCO
 
@@ -9,8 +9,8 @@
 Dictation is the first step. We're building the voice layer for Linux: private,
 local, and under your control.
 
-Today VOCO is dictation. Press a shortcut, speak, and your words appear where
-you are typing.
+**Today: private dictation for Linux.** Press a shortcut, speak, and your words
+appear where you are typing, while you speak.
 
 - **Private.** Your speech stays on your computer. There's no account,
   subscription, telemetry or cloud transcription.
