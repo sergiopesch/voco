@@ -79,10 +79,11 @@ covers each system and how it is tested.
 
 ## Privacy
 
-- Recognition runs on your computer. Audio never leaves it, and VOCO doesn't
-  save audio in normal use.
+- Recognition runs on your computer, in a worker that can't open network
+  sockets. Audio never leaves it, and VOCO doesn't save audio in normal use.
 - VOCO has no account and no telemetry. Its only network request checks GitHub
-  for new releases. It never downloads or installs updates.
+  for new releases, and you can turn the automatic check off. It never
+  downloads or installs updates.
 - Each phrase passes through the clipboard, and the last one stays there.
   Clipboard managers may keep a copy.
 - While you dictate, VOCO keeps a private copy of the text so it can recover it

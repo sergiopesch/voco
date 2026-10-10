@@ -23,16 +23,15 @@ PASTE_SETTLE_S = .15
 def replica(text):
     # paste_text: ASCII controls, including line endings, become spaces.
     routed = re.sub('[\x00-\x1f\x7f]', ' ', text)
-    # desktop_paste_payload: a single joining space is sent as its own key.
-    leading = len(routed) > 1 and routed[0] == ' ' and not routed[1].isspace()
-    payload = routed[1:] if leading else routed
+    # The joining space travels inside the paste, never as a key.
+    payload = routed
     for selection in ('clipboard', 'primary'):
         # Without -quiet, xclip forks and serves the selection it now owns.
         subprocess.run(['xclip', '-selection', selection, '-in'], input=payload.encode(),
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True, timeout=5)
     keyboard = {name: value for name, value in os.environ.items() if name != 'XAUTHORITY'}
     keyboard['DISPLAY'] = os.environ['VOCO_DELIVERY_KEYBOARD_DISPLAY']
-    subprocess.run(['xdotool', 'key', '--clearmodifiers', *(['space'] if leading else []), 'shift+Insert'],
+    subprocess.run(['xdotool', 'key', '--clearmodifiers', 'shift+Insert'],
                    env=keyboard, check=True, timeout=5)
 
 

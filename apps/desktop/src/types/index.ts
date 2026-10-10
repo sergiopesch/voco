@@ -7,6 +7,7 @@ export interface AppConfig {
   selectedMic: string | null;
   onboardingCompleted: boolean;
   updateChannel: UpdateChannel;
+  automaticUpdateChecks: boolean;
   installChannel: InstallChannel;
 }
 

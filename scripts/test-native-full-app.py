@@ -163,6 +163,25 @@ def tray_click(label):
     item = tray_menus()[label]
     call(item['name'], item['menu'], 'com.canonical.dbusmenu', 'Event', GLib.Variant('(isvu)', (item['id'], 'clicked', GLib.Variant('s', ''), 0)))
 
+def seccomp_state(proc):
+    fields = dict(line.split(':', 1) for line in (proc / 'status').read_text().splitlines() if ':' in line)
+    return dict(noNewPrivs=fields['NoNewPrivs'].strip(), seccompFilters=int(fields['Seccomp_filters']))
+
+
+def worker_confinement():
+    # The warm speech worker as the kernel reports it: its interpreter flags,
+    # and one seccomp filter more than the app that started it.
+    for proc in Path('/proc').glob('[0-9]*'):
+        try:
+            argv = (proc / 'cmdline').read_bytes().split(b'\0')
+            if any(arg.endswith(b'/stream_worker.py') for arg in argv):
+                return dict(flags=[arg.decode() for arg in argv[1:4]], worker=seccomp_state(proc),
+                            app=seccomp_state(Path('/proc', str(app.pid))))
+        except OSError:
+            continue
+    return None
+
+
 def screenshot(name):
     Gdk.pixbuf_get_from_window(Gdk.get_default_root_window(), 0, 0, 1280, 900).savev(str(root / 'evidence' / name), 'png', [], [])
 
@@ -217,11 +236,14 @@ log = (root / 'evidence/full-app.log').open('w')
 app_hash = hashlib.sha256((root / 'voco').read_bytes()).hexdigest()
 app = subprocess.Popen([str(root / 'voco')], stdout=log, stderr=subprocess.STDOUT, env={**os.environ, 'RUST_LOG': 'info', 'VOCO_HOTKEY_TRACE': '1'})
 passed, failure, window_id, before_switch = False, None, None, None
-selections, tray_state, popup, popover, diagnostic_errors = {}, None, None, None, []
+selections, tray_state, popup, popover, diagnostic_errors, confinement = {}, None, None, None, [], None
 try:
     assert shutil.which('xclip') and shutil.which('xdotool'), 'X11 paste needs xclip and xdotool on PATH'
     wait_for(lambda: (root / 'runtime/voco.sock').exists(), 'application control socket')
     wait_for(app_ready, 'frontend and model readiness', timeout=30)
+    confinement = worker_confinement()
+    assert confinement and confinement['flags'] == ['-E', '-s', '-B'] and confinement['worker']['noNewPrivs'] == '1' \
+        and confinement['worker']['seccompFilters'] == confinement['app']['seccompFilters'] + 1, 'The speech worker is not confined: %r' % (confinement,)
     window.present()
     window_id = subprocess.check_output(['xdotool', 'search', '--name', '^VOCO private full application acceptance$'], text=True).strip().splitlines()[0]
     subprocess.run(['xdotool', 'windowfocus', '--sync', window_id], check=True)
@@ -270,8 +292,8 @@ try:
     for label in ('A', 'B'):
         history = [''] + [m['text'] for m in changes if m['field'] == label]
         assert all(after.startswith(before) and len(after) > len(before) for before, after in zip(history, history[1:])), 'Field %s changed other than by appended paste' % label
-    # xdotool sends at most one joining Space and one Shift+Insert per dispatched chunk.
-    assert len(changes) <= 2 * c['dictation_desktop_paste_dispatched'], 'Fields changed more often than VOCO dispatched pastes'
+    # xdotool sends one Shift+Insert per dispatched chunk, joining space included.
+    assert len(changes) <= c['dictation_desktop_paste_dispatched'], 'Fields changed more often than VOCO dispatched pastes'
     if case == 'delivery':
         assert other_text == '' and not any(m['field'] == 'B' for m in changes), 'Unfocused field B received text'
         assert words(text) == expected, 'Focused field A did not receive the dictation exactly once: %r' % text
@@ -335,13 +357,13 @@ finally:
                   mutations=[dict(m, t=round(m['t'] - t0, 3)) for m in mutations], preedits=[dict(p, t=round(p['t'] - t0, 3)) for p in preedits],
                   selections=selections, traceCounts=dict(sorted(c.items())), captureRoute=capture, focus=focus_log, harnessWindow=window_id,
                   tray=tray_state, popoverWindow=popup, popover=popover, helpers={name: bool(shutil.which(name)) for name in ['xclip', 'xdotool']},
-                  diagnosticErrors=diagnostic_errors,
+                  diagnosticErrors=diagnostic_errors, workerConfinement=confinement,
                   engineSourceHashes={p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in root.glob('voco_ibus_*.py')},
                   fixtureSha256=hashlib.sha256(sound.read_bytes()).hexdigest(),
                   appSha256=app_hash,
                   modelSha256=hashlib.sha256(model.read_bytes()).hexdigest(),
                   boundary=' / '.join([{'webkit-audio-worklet': 'real WebKit capture', 'native': 'real native capture'}.get(capture, 'capture not established'),
-                                       'private PulseAudio fixture', 'Tauri binary IPC', 'pinned Nemotron', 'xclip CLIPBOARD+PRIMARY',
+                                       'private PulseAudio fixture', 'Tauri binary IPC', 'pinned Nemotron in a seccomp-filtered worker', 'xclip CLIPBOARD+PRIMARY',
                                        'xdotool Shift+Insert into the focused GTK entry', 'no IBus text mutation', 'private X11 without a window manager']))
     (root / 'evidence/full-app.json').write_text(json.dumps(report, indent=2) + '\n')
     if trace_path.exists():

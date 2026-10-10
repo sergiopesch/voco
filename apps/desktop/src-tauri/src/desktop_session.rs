@@ -1,6 +1,8 @@
-//! Bind Wayland paste to its originating login, not logind's elected user display.
+//! Bind Wayland paste to its originating login, not logind's elected user display,
+//! and follow that login's screen lock.
 use std::collections::HashMap;
-use std::sync::{LazyLock, Mutex};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, LazyLock, Mutex};
 use std::task::Poll;
 use std::time::{Duration, Instant};
 
@@ -14,6 +16,9 @@ const MAX_SESSIONS: usize = 16;
 // VOCO's device has no custom ID_SEAT rule, so libinput assigns it to seat0.
 const KEYBOARD_SEAT: &str = "seat0";
 const REFUSED: &str = "This desktop session isn't the active local session for VOCO's keyboard, so VOCO sent no paste keys.";
+pub const LOCKED_DETAIL: &str = "The screen is locked, so VOCO sent no paste keys.";
+/// The originating login's LockedHint, as logind last reported it.
+static SESSION_LOCKED: AtomicBool = AtomicBool::new(false);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum LookupError {
@@ -30,9 +35,15 @@ struct Session {
     remote: bool,
     seat: String,
     active: bool,
+    locked: bool,
 }
 
 impl Session {
+    /// Keys may reach this login: it is in the foreground and not locked.
+    fn usable(&self) -> bool {
+        self.active && !self.locked
+    }
+
     fn graphical_user(&self) -> bool {
         matches!(self.kind.as_str(), "wayland" | "x11") && self.class == "user"
     }
@@ -75,7 +86,7 @@ impl Binding {
             return *self == Self::Unresolved;
         };
         match sessions.read(&origin.path) {
-            Ok(session) if session.id == origin.id && session.eligible(uid) => session.active,
+            Ok(session) if session.id == origin.id && session.eligible(uid) => session.usable(),
             Ok(_) | Err(LookupError::Missing) => {
                 // A known departed/changed origin never becomes a different login.
                 *self = Self::Refused;
@@ -93,12 +104,13 @@ fn bind(sessions: &impl Sessions, path: String, uid: u32, id: Option<&str>) -> (
                 && session.eligible(uid)
                 && id.is_none_or(|id| id == session.id) =>
         {
+            let usable = session.usable();
             (
                 Binding::Bound(Origin {
                     id: session.id,
                     path,
                 }),
-                session.active,
+                usable,
             )
         }
         Ok(_) | Err(LookupError::Missing) => (Binding::Refused, false),
@@ -145,7 +157,7 @@ fn resolve(sessions: &impl Sessions, uid: u32, hint: Option<&str>) -> (Binding, 
         if !session.eligible(uid) || session.id.is_empty() || session.id != id || origin.is_some() {
             return (Binding::Refused, false);
         }
-        origin = Some((Origin { id, path }, session.active));
+        origin = Some((Origin { id, path }, session.usable()));
     }
     origin.map_or((Binding::Unresolved, true), |(origin, active)| {
         (Binding::Bound(origin), active)
@@ -159,6 +171,9 @@ static SESSION_HINT: LazyLock<Option<String>> =
 /// Called at Wayland startup and before both the copy and keyboard dispatch.
 /// Once identified, the originating session remains bound for this process.
 pub fn require_active() -> Result<(), String> {
+    if is_locked() {
+        return Err(LOCKED_DETAIL.into());
+    }
     let mut binding = BINDING.lock().unwrap_or_else(|error| error.into_inner());
     if *binding == Binding::Refused {
         return Err(REFUSED.into());
@@ -171,6 +186,82 @@ pub fn require_active() -> Result<(), String> {
     } else {
         Err(REFUSED.into())
     }
+}
+
+/// Whether the originating login's screen is locked. Without logind or a
+/// bound login this reads as unlocked, the same fail-open policy as paste.
+pub fn is_locked() -> bool {
+    SESSION_LOCKED.load(Ordering::SeqCst)
+}
+
+/// Follow the originating login's LockedHint for the life of the process.
+/// `on_lock` runs on the GTK main thread each time the screen locks. Without
+/// logind or a bound login nothing is watched.
+pub fn watch_lock(on_lock: impl Fn() + Send + Sync + 'static) {
+    std::thread::spawn(move || {
+        let Some(logind) = Logind::connect() else {
+            return;
+        };
+        let path = {
+            let mut binding = BINDING.lock().unwrap_or_else(|error| error.into_inner());
+            if *binding == Binding::Unresolved {
+                let uid = unsafe { libc::geteuid() };
+                *binding = resolve(&logind, uid, SESSION_HINT.as_deref()).0;
+            }
+            match &*binding {
+                Binding::Bound(origin) => origin.path.clone(),
+                _ => return,
+            }
+        };
+        let on_lock = Arc::new(on_lock);
+        let (bus, signal_path, signal_lock) = (logind.bus.clone(), path.clone(), on_lock.clone());
+        let (subscribed, ready) = std::sync::mpsc::channel();
+        // Signals are delivered on the context that subscribed: GTK's.
+        glib::MainContext::default().invoke(move || {
+            let _subscription = bus.signal_subscribe(
+                Some("org.freedesktop.login1"),
+                Some("org.freedesktop.DBus.Properties"),
+                Some("PropertiesChanged"),
+                Some(&signal_path),
+                Some(SESSION_INTERFACE),
+                gio::DBusSignalFlags::NONE,
+                move |_, _, _, _, _, parameters| {
+                    if let Some(locked) = locked_hint_change(parameters) {
+                        note_lock(&SESSION_LOCKED, locked, &*signal_lock);
+                    }
+                },
+            );
+            // A subscription lasts as long as its connection, and GIO keeps the
+            // shared system bus only while something holds it: hold it for good.
+            std::mem::forget(bus);
+            let _ = subscribed.send(());
+        });
+        // Read the state only once the match rule is queued: the bus handles one
+        // connection's messages in order, so a change can't fall between the two.
+        // A lock seen here stops a dictation that started meanwhile.
+        if ready.recv().is_ok() {
+            if let Some(session) = Logind::connect().and_then(|logind| logind.read(&path).ok()) {
+                note_lock(&SESSION_LOCKED, session.locked, &*on_lock);
+            }
+        }
+    });
+}
+
+/// Record a lock state from the signal or the first read. Only the change to
+/// locked stops dictation, so seeing one lock twice stops it once.
+fn note_lock(state: &AtomicBool, locked: bool, on_lock: &dyn Fn()) {
+    if !locked {
+        state.store(false, Ordering::SeqCst);
+    } else if !state.swap(true, Ordering::SeqCst) {
+        on_lock();
+    }
+}
+
+/// LockedHint's new value in a logind session PropertiesChanged signal.
+fn locked_hint_change(parameters: &glib::Variant) -> Option<bool> {
+    let (_, changed, _) =
+        parameters.get::<(String, HashMap<String, glib::Variant>, Vec<String>)>()?;
+    changed.get("LockedHint")?.get::<bool>()
 }
 
 struct Logind {
@@ -333,6 +424,11 @@ fn decode_session(properties: HashMap<String, glib::Variant>) -> Result<Session,
         remote: boolean("Remote")?,
         seat,
         active: boolean("Active")?,
+        // logind has reported it since v230; an older one never locks here.
+        locked: properties
+            .get("LockedHint")
+            .and_then(|value| value.get::<bool>())
+            .unwrap_or(false),
     })
 }
 
@@ -352,6 +448,62 @@ mod tests {
             ("Remote".into(), false.to_variant()),
             ("Active".into(), true.to_variant()),
         ])
+    }
+
+    #[test]
+    fn locked_hint_decodes_and_an_old_logind_without_it_reads_unlocked() {
+        let session = decode_session(properties()).unwrap();
+        assert!(!session.locked && session.usable());
+        let mut locked = properties();
+        locked.insert("LockedHint".into(), true.to_variant());
+        let session = decode_session(locked).unwrap();
+        assert!(session.locked && session.active && !session.usable());
+    }
+
+    #[test]
+    fn only_the_change_to_locked_stops_dictation() {
+        let state = AtomicBool::new(false);
+        let stops = std::cell::Cell::new(0);
+        let stop = || stops.set(stops.get() + 1);
+        // The first read and the signal can both report the same lock.
+        note_lock(&state, true, &stop);
+        note_lock(&state, true, &stop);
+        assert_eq!(stops.get(), 1);
+        note_lock(&state, false, &stop);
+        assert!(!state.load(Ordering::SeqCst));
+        note_lock(&state, true, &stop);
+        assert_eq!(stops.get(), 2);
+    }
+
+    #[test]
+    fn properties_changed_reports_only_a_locked_hint_value() {
+        let changed = |props: HashMap<String, glib::Variant>| {
+            (SESSION_INTERFACE, props, Vec::<String>::new()).to_variant()
+        };
+        let lock = changed(HashMap::from([("LockedHint".into(), true.to_variant())]));
+        assert_eq!(locked_hint_change(&lock), Some(true));
+        let unlock = changed(HashMap::from([("LockedHint".into(), false.to_variant())]));
+        assert_eq!(locked_hint_change(&unlock), Some(false));
+        let other = changed(HashMap::from([("IdleHint".into(), true.to_variant())]));
+        assert_eq!(locked_hint_change(&other), None);
+        assert_eq!(locked_hint_change(&"unexpected".to_variant()), None);
+    }
+
+    #[test]
+    fn a_locked_origin_refuses_keys_and_unlocking_allows_them_again() {
+        let mut fixture = Fixture::new();
+        let path = fixture.add("origin", true);
+        fixture.process = Ok(path.clone());
+        let mut binding = Binding::default();
+        assert!(binding.check(&fixture, 1000, None));
+        fixture.change(&path, |session| session.locked = true);
+        assert!(!binding.check(&fixture, 1000, None));
+        assert!(
+            matches!(binding, Binding::Bound(_)),
+            "a lock never unbinds the origin"
+        );
+        fixture.change(&path, |session| session.locked = false);
+        assert!(binding.check(&fixture, 1000, None));
     }
 
     #[test]
@@ -437,6 +589,7 @@ mod tests {
                     remote: false,
                     seat: "seat0".into(),
                     active,
+                    locked: false,
                 }),
             );
             path

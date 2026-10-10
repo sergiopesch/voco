@@ -255,7 +255,6 @@ fn speech_quality_payload(request: &Value) -> Option<Value> {
         "changed",
         "finish_responded",
         "accepted_equals_dispatched",
-        "leading_separator",
         "clipboard_changed",
     ] {
         if let Some(value) = request[key].as_bool() {

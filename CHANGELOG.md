@@ -8,17 +8,40 @@ The [release process](docs/release-process.md) describes how a release is made.
 
 ## [2026.0.62] - 2026-10-10
 
-VOCO introduces itself as the voice layer for Linux, starting with dictation. Its
-app framework and build tools are up to date, and dictation works as in 2026.0.61.
-The [release notes](docs/releases/2026.0.62.md) explain how to upgrade.
+VOCO introduces itself as the voice layer for Linux, starting with dictation.
+Locking the screen now stops dictation, the speech worker can't open network
+sockets, and update checks can wait until you ask. VOCO's app framework and
+build tools are up to date. The [release notes](docs/releases/2026.0.62.md)
+explain how to upgrade.
+
+### Added
+
+- VOCO follows the screen lock of the session it started in, through logind's
+  `LockedHint`. Locking the screen stops a dictation with "Dictation stopped",
+  and while the screen is locked VOCO sends no paste keys and no shortcut starts
+  dictation.
+- The speech worker runs confined. Python starts with `-E -s -B`, so it ignores
+  `PYTHON*` variables and the user's site-packages and writes no bytecode; every
+  descriptor beyond the worker's pipes closes on exec; and a seccomp filter
+  refuses io_uring and every socket except a Unix one. The full-application test
+  checks the running worker's filter.
+- **Update checks** on the **Updates** page: **When VOCO starts**, the default,
+  or **Only when I choose**, which asks GitHub only when you choose **Check for
+  updates**.
 
 ### Changed
 
 - VOCO's message is "Dictation is the first step. We're building the voice layer
-  for Linux: private, local, and under your control." The README, the banner,
-  the installer header, the release page and the package, AppStream and desktop
-  entry descriptions use it, and the desktop entry gains search keywords:
-  dictation, voice, speech, speech-to-text and typing.
+  for Linux: private, local, and under your control.", followed by where VOCO is
+  today: private dictation. The README, the banner, the installer header, the
+  release page and the package, AppStream and desktop entry descriptions use it,
+  and the desktop entry gains search keywords: dictation, voice, speech,
+  speech-to-text and typing.
+- The space that joins a phrase to the previous one is pasted with the words,
+  not sent as its own Space key, so VOCO's virtual keyboard declares only Shift
+  and Insert. A Space key press can activate a focused button or checkbox; a
+  paste can't. Chromium's address bar trims the pasted space, so there a
+  continuing phrase now joins the previous word.
 
 - Tauri 2.12.2, tauri-build 2.7.1 and tauri-plugin-global-shortcut 2.4.0. Tauri
   2.12 uses tray-icon 0.25 and muda 0.20, so the vendored tray-icon is now 0.25.1,

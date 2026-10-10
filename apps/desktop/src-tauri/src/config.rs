@@ -18,6 +18,10 @@ pub struct AppConfig {
     pub onboarding_completed: bool,
     #[serde(default)]
     pub update_channel: UpdateChannel,
+    /// Check GitHub's public release list at startup. Off, VOCO checks only
+    /// when you choose Check for updates.
+    #[serde(default = "default_automatic_update_checks")]
+    pub automatic_update_checks: bool,
     #[serde(default)]
     pub install_channel: InstallChannel,
 }
@@ -37,6 +41,8 @@ pub struct AppConfigPatch {
     pub onboarding_completed: PatchField<bool>,
     #[serde(default)]
     pub update_channel: PatchField<UpdateChannel>,
+    #[serde(default)]
+    pub automatic_update_checks: PatchField<bool>,
     #[serde(default)]
     pub install_channel: PatchField<InstallChannel>,
 }
@@ -81,6 +87,9 @@ impl AppConfigPatch {
         if let PatchField::Set(value) = self.update_channel {
             config.update_channel = value;
         }
+        if let PatchField::Set(value) = self.automatic_update_checks {
+            config.automatic_update_checks = value;
+        }
         if let PatchField::Set(value) = self.install_channel {
             config.install_channel = value;
         }
@@ -116,6 +125,10 @@ pub struct ReleaseInfo {
 
 fn default_hotkey() -> String {
     "Alt+D".to_string()
+}
+
+fn default_automatic_update_checks() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -155,6 +168,7 @@ impl Default for AppConfig {
             selected_mic: None,
             onboarding_completed: false,
             update_channel: UpdateChannel::default(),
+            automatic_update_checks: default_automatic_update_checks(),
             install_channel: InstallChannel::default(),
         }
     }
@@ -829,8 +843,29 @@ mod tests {
                 "selectedMic": "usb-mic",
                 "onboardingCompleted": true,
                 "updateChannel": "beta",
+                "automaticUpdateChecks": true,
                 "installChannel": "github-release",
             })
+        );
+    }
+
+    #[test]
+    fn update_checks_start_on_and_only_a_patch_that_names_them_turns_them_off() {
+        let mut config: AppConfig = serde_json::from_str(r#"{"hotkey":"Super+D"}"#).unwrap();
+        assert!(config.automatic_update_checks);
+        assert!(AppConfig::default().automatic_update_checks);
+        let off: AppConfigPatch =
+            serde_json::from_str(r#"{"automaticUpdateChecks":false}"#).unwrap();
+        off.apply_to(&mut config);
+        let other: AppConfigPatch = serde_json::from_str(r#"{"hotkey":"Alt+D"}"#).unwrap();
+        other.apply_to(&mut config);
+        assert!(!config.automatic_update_checks);
+        assert_eq!(
+            serde_json::to_value(&config).unwrap()["automaticUpdateChecks"],
+            false
+        );
+        assert!(
+            serde_json::from_str::<AppConfigPatch>(r#"{"automaticUpdateChecks":null}"#).is_err()
         );
     }
 

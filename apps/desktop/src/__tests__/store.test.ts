@@ -78,6 +78,7 @@ describe("useStore", () => {
       selectedMic: null,
       onboardingCompleted: false,
       updateChannel: "stable" as const,
+      automaticUpdateChecks: true,
       installChannel: "github-release" as const,
     };
     useStore.getState().setConfig(config);
@@ -91,6 +92,7 @@ describe("useStore", () => {
       selectedMic: null,
       onboardingCompleted: true,
       updateChannel: "stable" as const,
+      automaticUpdateChecks: true,
       installChannel: "github-release" as const,
     };
 
@@ -102,6 +104,7 @@ describe("useStore", () => {
     useStore.getState().setConfig({
       ...config,
       updateChannel: "beta",
+      automaticUpdateChecks: true,
     });
 
     expect(useStore.getState().surface).toBe("settings");
@@ -113,6 +116,7 @@ describe("useStore", () => {
       selectedMic: null,
       onboardingCompleted: false,
       updateChannel: "stable" as const,
+      automaticUpdateChecks: true,
       installChannel: "github-release" as const,
     };
 

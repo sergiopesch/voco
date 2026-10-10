@@ -34,7 +34,6 @@ pub struct PasteMetrics {
     pub modifier_wait_ms: u64,
     pub clipboard_ms: u64,
     pub keyboard_ms: u64,
-    pub leading_separator: bool,
     pub routed_utf8_bytes: usize,
     pub payload_utf8_bytes: usize,
     pub payload_unicode_scalars: usize,
@@ -75,7 +74,6 @@ pub fn correlated_desktop_paste(
                 record["outcome"] = serde_json::json!("dispatched");
                 record["settle_ms"] = serde_json::json!(metrics.settle_ms);
                 record["modifier_wait_ms"] = serde_json::json!(metrics.modifier_wait_ms);
-                record["leading_separator"] = serde_json::json!(metrics.leading_separator);
                 record["routed_utf8_bytes"] = serde_json::json!(metrics.routed_utf8_bytes);
                 record["payload_utf8_bytes"] = serde_json::json!(metrics.payload_utf8_bytes);
                 record["payload_unicode_scalars"] =
@@ -285,6 +283,13 @@ fn settle(last_paste: Option<Instant>) -> u64 {
 /// emulators. Terminals paste PRIMARY, so both selections get the same text.
 pub fn desktop_paste(text: &str) -> Result<InsertionResult, InsertionError> {
     validate_text(text)?;
+    // Behind a locked screen keys would reach the lock screen, not the app.
+    #[cfg(target_os = "linux")]
+    if crate::desktop_session::is_locked() {
+        return Err(InsertionError::no_mutation(
+            crate::desktop_session::LOCKED_DETAIL,
+        ));
+    }
     let mut last_paste = delivery_slot();
     let started = Instant::now();
     let preflight = input_preflight();
@@ -300,7 +305,9 @@ pub fn desktop_paste(text: &str) -> Result<InsertionResult, InsertionError> {
         ensure_virtual_keyboard().map_err(InsertionError::no_mutation)?;
     }
     let routed = paste_text(text);
-    let (payload, leading_separator) = desktop_paste_payload(&routed);
+    // A joining space travels inside the paste, never as a Space key: on a
+    // focused button, checkbox or terminal prompt a Space key would act.
+    let payload = routed.as_str();
     let (mut clipboard, mut primary) = copy_commands();
     let preflight_ms = elapsed_ms(started);
     let settle_ms = settle(*last_paste);
@@ -321,7 +328,7 @@ pub fn desktop_paste(text: &str) -> Result<InsertionResult, InsertionError> {
             modifier_wait_ms = wait_for_modifier_release(MODIFIER_RELEASE_TIMEOUT, held)?;
             Ok(())
         },
-        || send_paste_keys(wayland, leading_separator),
+        || send_paste_keys(wayland),
     );
     // Also after an uncertain failure: some keys may have been sent.
     *last_paste = Some(Instant::now());
@@ -333,7 +340,6 @@ pub fn desktop_paste(text: &str) -> Result<InsertionResult, InsertionError> {
             modifier_wait_ms,
             clipboard_ms,
             keyboard_ms,
-            leading_separator,
             routed_utf8_bytes: routed.len(),
             payload_utf8_bytes: payload.len(),
             payload_unicode_scalars: payload.chars().count(),
@@ -480,18 +486,17 @@ fn virtual_keyboard_access() -> Result<(), String> {
 }
 
 /// Shift+Insert through VOCO's virtual keyboard on Wayland, or xdotool on X11.
-fn send_paste_keys(wayland: bool, leading_separator: bool) -> Result<(), InsertionError> {
+fn send_paste_keys(wayland: bool) -> Result<(), InsertionError> {
     if wayland {
         #[cfg(target_os = "linux")]
-        return crate::virtual_keyboard::paste(leading_separator)
-            .map_err(InsertionError::uncertain);
+        return crate::virtual_keyboard::paste().map_err(InsertionError::uncertain);
         #[cfg(not(target_os = "linux"))]
         return Err(InsertionError::no_mutation(
             "Wayland paste keys need Linux.",
         ));
     }
     let mut paste = process_runner::command("xdotool");
-    paste.args(x11_paste_arguments(leading_separator));
+    paste.args(X11_PASTE_ARGUMENTS);
     run_helper(&mut paste, None, Duration::from_secs(5))
 }
 
@@ -675,24 +680,9 @@ fn run_helper(
     Ok(())
 }
 
-fn desktop_paste_payload(text: &str) -> (&str, bool) {
-    // Chromium's address bar strips a pasted chunk's leading whitespace. Send
-    // VOCO's single joining space as a key in the same ordered paste gesture.
-    // Preserve other whitespace verbatim rather than normalizing user content.
-    match text.strip_prefix(' ') {
-        Some(rest) if rest.starts_with(|ch: char| !ch.is_whitespace()) => (rest, true),
-        _ => (text, false),
-    }
-}
-
-fn x11_paste_arguments(leading_separator: bool) -> Vec<&'static str> {
-    let mut args = vec!["key", "--clearmodifiers"];
-    if leading_separator {
-        args.push("space");
-    }
-    args.push("shift+Insert");
-    args
-}
+/// One Shift+Insert. Chromium's address bar trims a pasted chunk's leading
+/// space, the price of never sending a Space key.
+const X11_PASTE_ARGUMENTS: [&str; 3] = ["key", "--clearmodifiers", "shift+Insert"];
 
 /// GUI toolkits paste CLIPBOARD on Shift+Insert and terminals paste PRIMARY.
 /// PRIMARY is best effort because some compositors do not provide it.
@@ -801,31 +791,25 @@ mod tests {
     fn correlation_lengths_distinguish_units_without_exporting_text() {
         let mut record = serde_json::json!({});
         add_text_lengths(&mut record, "input", " é😀");
-        let (payload, split) = desktop_paste_payload(" é😀");
-        add_text_lengths(&mut record, "payload", payload);
-        assert!(split);
+        add_text_lengths(&mut record, "payload", &paste_text(" é😀"));
         assert_eq!(record["input_utf8_bytes"], 7);
         assert_eq!(record["input_unicode_scalars"], 3);
         assert_eq!(record["input_utf16_units"], 4);
-        assert_eq!(record["payload_utf8_bytes"], 6);
-        assert_eq!(record["payload_unicode_scalars"], 2);
-        assert_eq!(record["payload_utf16_units"], 3);
+        // The joining space stays in the payload.
+        assert_eq!(record["payload_utf8_bytes"], 7);
+        assert_eq!(record["payload_unicode_scalars"], 3);
+        assert_eq!(record["payload_utf16_units"], 4);
         assert!(!record.to_string().contains("é"));
     }
 
     #[test]
-    fn streaming_separator_is_an_ordered_key_before_paste() {
-        assert_eq!(desktop_paste_payload(" next words"), ("next words", true));
-        for text in ["First words", ".", " ", "  indented", "\nparagraph", ""] {
-            assert_eq!(desktop_paste_payload(text), (text, false));
-        }
+    fn joining_space_travels_inside_the_paste_never_as_a_key() {
+        // The payload is the routed text itself, joining space included.
+        assert_eq!(paste_text(" next words"), " next words");
+        assert_eq!(paste_text("  indented"), "  indented");
         assert_eq!(
-            x11_paste_arguments(false),
+            X11_PASTE_ARGUMENTS,
             ["key", "--clearmodifiers", "shift+Insert"]
-        );
-        assert_eq!(
-            x11_paste_arguments(true),
-            ["key", "--clearmodifiers", "space", "shift+Insert"]
         );
     }
 

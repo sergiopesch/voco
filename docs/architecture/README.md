@@ -67,9 +67,14 @@ the Stop tail, and clears them when the recording ends.
 ### Recognition
 
 `speech_stream.rs` owns one worker process behind a mutex. It runs
-`/usr/bin/python3 /usr/lib/voco/speech/stream_worker.py`, which
-`VOCO_STREAM_PYTHON` and `VOCO_STREAM_WORKER` can override. The worker has 30
-seconds to report ready and 10 seconds for each response, and a response line
+`/usr/bin/python3 -E -s -B /usr/lib/voco/speech/stream_worker.py`, whose
+interpreter and script `VOCO_STREAM_PYTHON` and `VOCO_STREAM_WORKER` can
+override. The flags make Python ignore `PYTHON*` variables and your own
+site-packages, and write no bytecode. Just before Python starts,
+`worker_sandbox.rs` marks every descriptor beyond the worker's pipes
+close-on-exec and installs a seccomp filter: the worker can open Unix sockets,
+but no network socket and no io_uring. If any of that fails, the worker doesn't
+start. The worker has 30 seconds to report ready and 10 seconds for each response, and a response line
 may be at most 1 MiB. VOCO warms the worker at startup before it reports ready.
 A worker that died while idle is replaced at the next warmup or start, never
 during a recording.
@@ -89,8 +94,8 @@ behind, recognition stops for that recording.
 
 Each new suffix goes to `insertion.rs`, one paste at a time:
 
-1. VOCO checks the clipboard helper, plus `xdotool` on X11 or access to
-   `/dev/uinput` on Wayland. On Wayland it also makes sure its virtual keyboard
+1. VOCO checks that the screen isn't locked, then the clipboard helper, plus
+   `xdotool` on X11 or access to `/dev/uinput` on Wayland. On Wayland it also makes sure its virtual keyboard
    exists, so a missing device fails before the clipboard changes.
 2. ASCII control characters, including newlines and tabs, become spaces, so a
    terminal never receives Enter.
@@ -106,12 +111,19 @@ Each new suffix goes to `insertion.rs`, one paste at a time:
    `xdotool key --clearmodifiers` on X11. Toolkits paste CLIPBOARD and terminals
    paste PRIMARY.
 
-When a suffix starts with VOCO's single joining space, that space goes out as
-its own Space key before Shift+Insert, because Chromium's address bar strips
-pasted leading whitespace. VOCO never restores the previous clipboard.
+When a suffix starts with VOCO's single joining space, the space is part of the
+pasted text; VOCO never types it as a key. Chromium's address bar strips pasted
+leading whitespace, so there a continuing phrase joins the previous word. VOCO
+never restores the previous clipboard.
+
+`desktop_session.rs` follows the screen lock of the session VOCO started in,
+through logind's `LockedHint`. While the screen is locked, a paste fails with no
+change and no shortcut starts dictation. When the screen locks during a
+dictation, VOCO stops it and notifies "Dictation stopped"; words it couldn't
+type go to the clipboard as after any Stop.
 
 `virtual_keyboard.rs` keeps one uinput keyboard per process, "VOCO virtual
-keyboard", with only Shift, Insert and Space. VOCO creates it at startup in a
+keyboard", with only Shift and Insert. VOCO creates it at startup in a
 Wayland session: the compositor sees a new device only after udev and libinput
 add it, so a device made for each paste could lose its first keys. A keyboard
 created later waits until it is 500 ms old before its first key. Each key event

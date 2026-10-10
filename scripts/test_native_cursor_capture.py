@@ -221,7 +221,7 @@ def run_cursor(root, app, pump, native_windows, activate):
                     pump(.65)
                     overlaps.append({'heldFor': time.monotonic() - began,
                                      'textStable': text() == before, 'input': input_state()})
-                    assert not input_state()['windowMenuOpen'], 'Streaming joining Space opened a GNOME window menu'
+                    assert not input_state()['windowMenuOpen'], 'A streaming paste opened a GNOME window menu'
                     keys('keyup', 'Alt_L')
                     pump(.35)
                 trial['heldAltStreaming'] = overlaps
@@ -334,8 +334,8 @@ def run_cursor(root, app, pump, native_windows, activate):
             trial['passed'] = True
         assert not bridged('error'), ('The uinput bridge rejected or lost paste keys', bridged('error'))
         events = dispatches()
-        if not baseline:
-            assert any('space' in event['keys'] for event in events), 'No joining Space dispatch was exercised'
+        # A joining space travels inside the paste; VOCO's keyboard never sends Space.
+        assert all('space' not in event['keys'] for event in events), 'A paste dispatch sent a Space key'
         assert all(not event['input']['windowMenuOpen'] for event in events)
         assert all((event['input']['modifiers'] & (1 | 4 | 8 | 64 | 128)) == 0 for event in events), \
             'A physical modifier reached a streaming paste dispatch'
