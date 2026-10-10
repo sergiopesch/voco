@@ -1564,8 +1564,8 @@
     ],
     "facts": [
       {
-        "title": "Seven CI jobs",
-        "text": "Code Guide, RustSec Audit, Frontend Checks, Rust Check & Test, Application, GNOME 50 Companion, and a runtime job that runs once for Debian 13 and once for Fedora 44."
+        "title": "Eight CI jobs",
+        "text": "Code Guide, RustSec Audit, Frontend Checks, Rust Check & Test, Application, GNOME 50 Companion, GNOME 51 Companion, and a runtime job that runs once for Debian 13 and once for Fedora 44."
       },
       {
         "title": "Private sessions",
@@ -1580,8 +1580,8 @@
         "text": "The Wayland delivery suites give their private session /dev/uinput but no /dev/input. A test-only bridge outside the session grabs each device named VOCO virtual keyboard, so its keys reach no real desktop, and replays them in order into the session's display. It accepts only the paste gesture and refuses to run beside a graphical login."
       },
       {
-        "title": "GNOME 50, headless",
-        "text": "GNOME 50 has no nested mode, so the companion regression runs Shell headless on Ubuntu 26.04 and sends keys and clicks through a private RemoteDesktop session."
+        "title": "GNOME 50 and 51, headless",
+        "text": "GNOME 50 and 51 have no nested mode, so the companion regression runs Shell headless and sends keys and clicks through a private RemoteDesktop session: GNOME 50 on Ubuntu 26.04, and GNOME 51 in rootless Podman, from a digest-pinned Fedora 45 image."
       },
       {
         "title": "Each distribution's names",
@@ -1623,7 +1623,11 @@
       },
       {
         "path": "scripts/test-gnome-panel.py",
-        "why": "Runs GNOME Shell nested, or headless on GNOME 50."
+        "why": "Runs GNOME Shell nested, or headless from GNOME 50."
+      },
+      {
+        "path": "scripts/test-gnome-panel-container.sh",
+        "why": "Runs the companion suite on a Fedora image's GNOME Shell in rootless Podman."
       },
       {
         "path": "runtime/speech/test_worker_protocol.py",
@@ -2040,7 +2044,7 @@
     "title": "A microphone in the top bar.",
     "intro": "On GNOME, VOCO can live in the top bar near the clock, with bars that move while you speak.",
     "story": [
-      "The optional companion for GNOME 46, 48 and 50 shows VOCO's microphone in the top bar. While you dictate, a seven-bar meter opens on its left when there is room beside the clock.",
+      "The optional companion for GNOME 46, 48, 50 and 51 shows VOCO's microphone in the top bar. While you dictate, a seven-bar meter opens on its left when there is room beside the clock.",
       "The installer runs voco --setup-panel, and VOCO's setup and Help offer Enable live panel. Enabling adds only this extension, may need you to sign out and back in, and never restarts the Shell. The package alone never enables it, and voco --check-panel changes nothing.",
       "Once the companion attaches, VOCO hides its tray icon. On Wayland the companion grabs Alt+D or Alt+Shift+D inside the Shell, so other apps never see the shortcut."
     ],
@@ -2093,11 +2097,11 @@
       },
       {
         "title": "Other desktops",
-        "text": "On other GNOME versions: \"The VOCO panel supports GNOME 46, 48 and 50. Dictation still works, but without the panel the focused app also receives Alt+D and Alt+Shift+D. To avoid that, choose another shortcut in VOCO and configure it in your desktop to run voco --toggle.\" On other desktops: \"Use the VOCO tray menu for status and Stop. Labels depend on your desktop.\""
+        "text": "On other GNOME versions: \"The VOCO panel supports GNOME 46, 48, 50 and 51. Dictation still works, but without the panel the focused app also receives Alt+D and Alt+Shift+D. To avoid that, choose another shortcut in VOCO and configure it in your desktop to run voco --toggle.\" On other desktops: \"Use the VOCO tray menu for status and Stop. Labels depend on your desktop.\""
       },
       {
-        "title": "On GNOME 50",
-        "text": "GNOME 50 has no Meta.is_wayland_compositor, so the companion treats a Shell without it as Wayland. Its panel button opens the menu from a click gesture, so the companion leaves primary presses and touches to the pill, and a primary click still stops dictation or opens VOCO."
+        "title": "From GNOME 50",
+        "text": "GNOME 50 and 51 have no Meta.is_wayland_compositor, so the companion treats a Shell without it as Wayland. Their panel button opens the menu from a click gesture, so the companion leaves primary presses and touches to the pill, and a primary click still stops dictation or opens VOCO."
       },
       {
         "title": "No icon at all",
@@ -2123,7 +2127,7 @@
       },
       {
         "path": "integrations/gnome/voco-panel@voco.local/metadata.json",
-        "why": "Declares GNOME 46, 48 and 50 and companion version 15."
+        "why": "Declares GNOME 46, 48, 50 and 51 and companion version 15."
       },
       {
         "path": "apps/desktop/src-tauri/src/panel.rs",
@@ -2170,7 +2174,7 @@
         "why": "Builds a reproducible extension zip without installing it."
       }
     ],
-    "caution": "The companion is optional and supports GNOME 46, 48 and 50. Elsewhere, use the tray menu and, for another chord, a desktop binding that runs voco --toggle.",
+    "caution": "The companion is optional and supports GNOME 46, 48, 50 and 51. Elsewhere, use the tray menu and, for another chord, a desktop binding that runs voco --toggle.",
     "quiz": {
       "question": "GNOME Shell stops calling GetState. What does VOCO do?",
       "answers": [
