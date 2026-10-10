@@ -1537,7 +1537,7 @@
     "intro": "A test is a promise written as code: when this happens, VOCO does that. Running the tests checks that the promises still hold.",
     "story": [
       "npm test runs scripts/test-unit.sh, the fast checks that need no microphone, speech model or desktop session.",
-      "CI runs on every push and pull request to master, in seven jobs. Some start the real app in private desktop sessions and paste into real applications, and one runs the speech runtime in Debian 13 and Fedora 44 containers.",
+      "CI runs on every push and pull request to master, in eight jobs. Some start the real app in private desktop sessions and paste into real applications, and one runs the speech runtime in Debian 13 and Fedora 44 containers.",
       "Tests use only public or synthetic audio. No personal recording is part of any test."
     ],
     "steps": [
@@ -1603,7 +1603,7 @@
       },
       {
         "path": ".github/workflows/ci.yml",
-        "why": "The seven CI jobs."
+        "why": "The eight CI jobs."
       },
       {
         "path": "scripts/test-private-ibus-engine-hosted.sh",

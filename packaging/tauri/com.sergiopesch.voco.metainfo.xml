@@ -30,13 +30,13 @@
   <releases>
     <release version="2026.0.62" date="2026-10-10">
       <description>
-        <p>VOCO introduces itself as the voice layer for Linux, starting with dictation. Its app framework and build tools are up to date, and dictation works as before on Ubuntu 24.04 and 26.04, Debian 13 and Fedora 44.</p>
+        <p>VOCO introduces itself as the voice layer for Linux, starting with dictation. Locking the screen now stops dictation, the speech worker can't open network sockets, update checks can wait until you ask, and the GNOME top-bar panel also runs on GNOME 51. VOCO supports Ubuntu 24.04 and 26.04, Debian 13 and Fedora 44, and its app framework and build tools are up to date.</p>
       </description>
     </release>
     <release version="2026.0.61" date="2026-10-09">
       <description>
         <p>Dictation pastes into whatever app has keyboard focus. On Wayland VOCO types the paste keys through its own virtual keyboard, so there is no input service to set up. If pasting stops, VOCO keeps listening and copies the words it could not paste when you stop, and Review keeps dictation after a crash.</p>
-        <p>VOCO supports Ubuntu 24.04 and 26.04, Debian 13 and Fedora 44, and its GNOME top-bar panel runs on GNOME 46, 48, 50 and 51. After upgrading, run panel setup again, then sign out and back in.</p>
+        <p>VOCO supports Ubuntu 24.04 and 26.04, Debian 13 and Fedora 44, and its GNOME top-bar panel runs on GNOME 46, 48 and 50. After upgrading, run panel setup again, then sign out and back in.</p>
       </description>
     </release>
     <release version="2026.0.59" date="2026-09-23">
