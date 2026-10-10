@@ -151,7 +151,7 @@ lesson(
         ),
         (
             "A clean Python process",
-            "Rust starts the worker with PYTHONDONTWRITEBYTECODE=1, so Python writes no cache files next to the installed code.",
+            "Rust starts the worker as python3 -E -s -B, so Python ignores PYTHON variables and your own site-packages, and writes no cache files next to the installed code.",
         ),
         (
             "Where each part lives",
@@ -438,7 +438,7 @@ lesson(
     [
         (
             "Launch",
-            "Rust runs /usr/bin/python3 with stream_worker.py. VOCO_STREAM_PYTHON and VOCO_STREAM_WORKER may name other absolute local files. The worker has 30 seconds to load the model and report ready.",
+            "Rust runs /usr/bin/python3 -E -s -B with stream_worker.py. VOCO_STREAM_PYTHON and VOCO_STREAM_WORKER may name other absolute local files. The worker has 30 seconds to load the model and report ready.",
         ),
         ("Start", "A start names the session, 1 to 80 characters long, and a number that is 0 or more."),
         (
@@ -461,6 +461,10 @@ lesson(
             "stream_worker.py keeps library messages off the protocol, so only answers travel on the worker's output.",
         ),
         (
+            "No network for the worker",
+            "Just before Python starts, worker_sandbox.rs marks every descriptor beyond the worker's pipes close-on-exec, so it inherits no socket, and installs a seccomp filter. The worker can open Unix sockets, but any other socket, and io_uring, fails with permission denied. If the filter can't be installed, the worker doesn't start.",
+        ),
+        (
             "The thread rule",
             "The worker uses one less than the processors it may run on, between 1 and 4, to leave room for capture, the compositor and the app you are typing into. NEMO_SPEECH_CPU_THREADS overrides it.",
         ),
@@ -475,6 +479,7 @@ lesson(
     ],
     [
         (B + "speech_stream.rs", "Starts the worker, enforces time limits and never replays a request."),
+        (B + "worker_sandbox.rs", "Confines the worker: close-on-exec descriptors and the seccomp filter."),
         (R + "stream_worker.py", "The worker's entry point; keeps library output off the protocol."),
         (R + "worker_main.py", "Checks every request and answers one line at a time."),
         (R + "streaming.py", "Checks audio packets and runs the silence gate."),
@@ -598,8 +603,8 @@ lesson(
     ],
     [
         (
-            "A separate leading space",
-            "When new words start with VOCO's joining space, that space goes out as its own Space key before the paste, because Chromium's address bar strips pasted leading spaces.",
+            "A joining space inside the paste",
+            "When new words start with VOCO's joining space, the space is part of the pasted text, never a key. Chromium's address bar strips pasted leading spaces, so there a continuing phrase joins the previous word.",
         ),
         (
             "Three failure outcomes",
@@ -612,6 +617,10 @@ lesson(
         (
             "Checking the originating session",
             "A virtual keyboard types into whichever login owns the screen. On Wayland VOCO checks the desktop session it started in before the copy and again just before the keys. When logind reports that session as not active, as after switching to another user, VOCO reports \"This desktop session isn't the active local session for VOCO's keyboard, so VOCO sent no paste keys.\" If logind can't answer, VOCO doesn't block. These checks don't lock the session: switching after the last check can still redirect keys.",
+        ),
+        (
+            "Nothing while the screen is locked",
+            "VOCO follows logind's LockedHint for the session it started in. While the screen is locked, a paste fails with \"The screen is locked, so VOCO sent no paste keys.\" and no shortcut starts dictation. Locking the screen during a dictation stops it, and VOCO shows \"Dictation stopped\" with \"VOCO stopped listening when the screen locked.\"",
         ),
         (
             "VOCO steps aside",
@@ -629,7 +638,7 @@ lesson(
     [
         (B + "insertion.rs", "Checks helpers, copies both selections and presses Shift+Insert."),
         (B + "virtual_keyboard.rs", "VOCO's own keyboard for the Wayland paste keys."),
-        (B + "desktop_session.rs", "Tracks the originating desktop session and asks logind whether it is active."),
+        (B + "desktop_session.rs", "Tracks the originating desktop session and asks logind whether it is active and locked."),
         (F + "lib/dictationRecording.ts", "Checks paste readiness before a recording starts."),
         (F + "App.tsx", "Hides VOCO's window before dictation into another app."),
         (F + "lib/dictationStream.ts", "Hands new words to delivery one group at a time."),
@@ -817,11 +826,11 @@ lesson(
     [
         (
             "Five fields",
-            "hotkey, which defaults to Alt+D; selectedMic; onboardingCompleted; updateChannel; and installChannel.",
+            "hotkey, which defaults to Alt+D; selectedMic; onboardingCompleted; updateChannel; automaticUpdateChecks, which defaults to true; and installChannel.",
         ),
         (
             "Update checks",
-            "VOCO checks after startup and when you change the update channel. It reuses an answer younger than 6 hours, and otherwise asks GitHub for the 12 newest releases, with a 15-second timeout. Check for updates in Settings always asks.",
+            "VOCO checks after startup and when you change the update channel, unless Update checks is set to Only when I choose. It reuses an answer younger than 6 hours, and otherwise asks GitHub for the 12 newest releases, with a 15-second timeout. Check for updates in Settings always asks.",
         ),
         (
             "Only a notice",
@@ -977,7 +986,7 @@ lesson(
         ),
         (
             "Paste keys for one person",
-            "The package's uaccess rule gives /dev/uinput to the user of the active local session alone, with no group, daemon or socket. VOCO's keyboard can press only Shift, Insert and Space. Before copying and before sending keys, VOCO checks its originating session. An inactive result stops the paste; an unavailable result permits it. A switch after the check can still redirect keys.",
+            "The package's uaccess rule gives /dev/uinput to the user of the active local session alone, with no group, daemon or socket. VOCO's keyboard can press only Shift and Insert. Before copying and before sending keys, VOCO checks its originating session. An inactive or locked result stops the paste; an unavailable result permits it. A switch after the check can still redirect keys.",
         ),
         (
             "Same user, not same program",
@@ -995,8 +1004,9 @@ lesson(
         (B + "browser_socket.rs", "The browser host's owner-only socket, and the one helper that reads a caller's user ID."),
         (B + "native_capture/audit.rs", "Debug audio, off unless three variables are set."),
         (B + "native_capture/private_bundle.rs", "Writes the owner-only debug bundle."),
-        (B + "virtual_keyboard.rs", "Creates a keyboard with only Shift, Insert and Space."),
-        (B + "desktop_session.rs", "Checks the originating session, allowing pastes when logind cannot answer."),
+        (B + "virtual_keyboard.rs", "Creates a keyboard with only Shift and Insert."),
+        (B + "worker_sandbox.rs", "Keeps the speech worker off the network."),
+        (B + "desktop_session.rs", "Checks the originating session and its screen lock, allowing pastes when logind cannot answer."),
         ("packaging/udev/70-voco-uinput.rules", "Who may create input devices."),
         ("integrations/chromium/content.js", "The field rules inside web pages."),
     ],
@@ -1515,7 +1525,7 @@ lesson(
         ),
         (
             "Keys",
-            "On Wayland VOCO presses Shift+Insert, after a joining Space when one is needed, through its virtual keyboard. X11 uses xdotool.",
+            "On Wayland VOCO presses Shift+Insert through its virtual keyboard. X11 uses xdotool.",
         ),
         ("Clipboard", "xclip on X11 and on GNOME with DISPLAY set, wl-copy on other Wayland sessions."),
         ("Paste", "Every path ends with Shift+Insert into the focused app."),
@@ -1526,8 +1536,8 @@ lesson(
             "VOCO creates the keyboard at startup and keeps it until it quits, never one per paste. The compositor adds a new device late and could miss its first keys, so a keyboard younger than 500 ms waits before it types. When VOCO exits, the kernel removes the device and releases any key it held.",
         ),
         (
-            "Three keys, one at a time",
-            "The keyboard declares only Shift, Insert and Space. Each press and release goes out in its own report, 12 ms apart, so every toolkit sees the chord in order and a paste still takes under 100 ms.",
+            "Two keys, one at a time",
+            "The keyboard declares only Shift and Insert. Each press and release goes out in its own report, 12 ms apart, so every toolkit sees the chord in order and a paste still takes under 100 ms.",
         ),
         (
             "Access without a helper",
@@ -1535,7 +1545,7 @@ lesson(
         ),
         (
             "Check before the paste",
-            "Keys reach whichever login owns the seat, so VOCO asks logind about its originating desktop session before the copy and again just before the keys. An inactive result stops the paste. If logind can't answer, pasting is allowed. The check doesn't lock the session against a later switch.",
+            "Keys reach whichever login owns the seat, so VOCO asks logind about its originating desktop session before the copy and again just before the keys. An inactive result stops the paste, and so does a locked screen. If logind can't answer, pasting is allowed. The check doesn't lock the session against a later switch.",
         ),
         (
             "After a key error",
@@ -1548,8 +1558,8 @@ lesson(
     ],
     [
         (B + "insertion.rs", "Chooses the clipboard helper and the paste keys for each session."),
-        (B + "virtual_keyboard.rs", "VOCO's keyboard: three keys, 12 ms apart."),
-        (B + "desktop_session.rs", "Binds the originating desktop session and checks its active state."),
+        (B + "virtual_keyboard.rs", "VOCO's keyboard: two keys, 12 ms apart."),
+        (B + "desktop_session.rs", "Binds the originating desktop session and checks whether it is active and locked."),
         (B + "lib.rs", "Shortcut routes for each session, and the keyboard created at startup."),
         ("integrations/gnome/voco-panel@voco.local/extension.js", "The GNOME grab on Wayland."),
         ("packaging/udev/70-voco-uinput.rules", "Gives the active session's user access to /dev/uinput."),
