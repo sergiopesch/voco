@@ -32,6 +32,11 @@ phrase on the clipboard and the primary selection, then presses Shift+Insert.
 - VOCO never presses Enter. It turns line breaks and tabs into spaces, so a
   phrase can't run a terminal command. Read terminal text before you press
   Enter.
+- Don't dictate while a terminal program is waiting for an answer, such as a
+  coding agent's permission prompt. The terminal passes your words to the
+  program, and unless the program turns on bracketed paste, it reads them as
+  typed keys: a phrase that starts with "y" or a digit can answer the prompt.
+  Some prompts take a short paste as an answer even with bracketed paste on.
 
 ### If a paste fails
 

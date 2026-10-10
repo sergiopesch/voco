@@ -131,6 +131,14 @@ When a paste fails, VOCO shows **VOCO stopped typing** and keeps listening. At
 Stop, it copies the words it didn't type to the clipboard. See
 [If a paste fails](everyday-use.md#if-a-paste-fails).
 
+## A terminal prompt took your words as an answer
+
+A terminal passes VOCO's paste to the program running in it. A program that
+doesn't turn on bracketed paste reads the words as typed keys, so a phrase that
+starts with "y" or a digit can answer a one-key prompt, such as a coding agent's
+permission prompt. Some prompts take a short paste as an answer even with
+bracketed paste on. Answer a waiting prompt yourself, then dictate.
+
 ## Dictation interrupted
 
 VOCO stops transcribing and shows **Dictation interrupted** when it can't trust
