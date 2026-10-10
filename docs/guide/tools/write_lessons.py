@@ -461,6 +461,10 @@ lesson(
             "stream_worker.py keeps library messages off the protocol, so only answers travel on the worker's output.",
         ),
         (
+            "Your spelling",
+            "Each session start carries the saved spelling. spelling.py converts the whole hypothesis with a table of unambiguous VarCon forms and emits only text that can no longer change, so pasting stays append-only. Names and words whose spelling depends on meaning are left alone.",
+        ),
+        (
             "No network for the worker",
             "Just before Python starts, worker_sandbox.rs marks every descriptor beyond the worker's pipes close-on-exec, so it inherits no socket, and installs a seccomp filter. The worker can open Unix sockets, but any other socket, and io_uring, fails with permission denied. If the filter can't be installed, the worker doesn't start.",
         ),
@@ -483,6 +487,7 @@ lesson(
         (R + "stream_worker.py", "The worker's entry point; keeps library output off the protocol."),
         (R + "worker_main.py", "Checks every request and answers one line at a time."),
         (R + "streaming.py", "Checks audio packets and runs the silence gate."),
+        (R + "spelling.py", "British or American spelling, emitted only once it can't change."),
         (R + "test_worker_protocol.py", "Tests for the rulebook."),
         (R + "test_cpu_threads.py", "Tests for the thread rule."),
     ],
@@ -825,8 +830,8 @@ lesson(
     ],
     [
         (
-            "Five fields",
-            "hotkey, which defaults to Alt+D; selectedMic; onboardingCompleted; updateChannel; automaticUpdateChecks, which defaults to true; and installChannel.",
+            "Seven fields",
+            "hotkey, which defaults to Alt+D; selectedMic; onboardingCompleted; updateChannel; automaticUpdateChecks, which defaults to true; englishSpelling, unset until chosen, which means British; and installChannel.",
         ),
         (
             "Update checks",
