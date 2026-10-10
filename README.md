@@ -1,8 +1,6 @@
 <!-- markdownlint-disable MD033 MD041 -->
 <p align="center"><img src="assets/voco-readme-banner.svg" alt="VOCO, the voice layer for Linux. Today: private dictation." width="560"></p>
 
-# VOCO
-
 [![CI](https://github.com/sergiopesch/voco/actions/workflows/ci.yml/badge.svg)](https://github.com/sergiopesch/voco/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
