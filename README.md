@@ -22,7 +22,9 @@ appear where you are typing, while you speak.
   NVIDIA Nemotron, is under the [NVIDIA Open Model License](runtime/notices/NVIDIA-OPEN-MODEL-LICENSE.html),
   which isn't an open-source licence.
 - **Types into the app you are using,** browsers and terminals included. Words
-  appear while you speak, with punctuation and capital letters.
+  appear while you speak, with punctuation and capital letters. In a terminal,
+  don't dictate while a program waits for an answer, such as a coding agent's
+  permission prompt: it may [read your words as keys](docs/everyday-use.md#where-your-words-go).
 - **One shortcut.** Press `Alt+D` to start and again to finish.
 - **Stays out of the way** in the system tray, or in the GNOME top bar with live
   microphone bars.
