@@ -162,7 +162,8 @@ response lines of up to 1 MiB, and the worker reads request lines of up to
 4 MiB; a longer line ends the exchange. The worker keeps library output off the
 protocol, keeps request data and transcripts out of its diagnostics, and refuses
 a model whose SHA-256 doesn't match the pinned value, including one named by
-`VOCO_NEMOTRON_MODEL`.
+`VOCO_NEMOTRON_MODEL`. Spelling conversion reads only the packaged
+`spelling-varcon.tsv` at startup and runs on text the worker already holds.
 
 The worker can't open a network socket. Before its Python starts, VOCO marks
 every descriptor beyond the worker's pipes close-on-exec, so it inherits no

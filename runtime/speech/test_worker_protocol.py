@@ -39,6 +39,9 @@ def run(output):
                 check('duplicate sequence rejected','error' in exchange('push','three',0,audio=[0.]*800,rate=16000))
                 check('invalid rate rejected','error' in exchange('push','three',1,audio=[0.]*800,rate=0))
                 check('active cancel','error' not in exchange('cancel','three',2))
+                check('spelling start',exchange('start','four',0,spelling='british')['text'] is None)
+                check('spelling session final',exchange('finish','four',1)['text']=='')
+                check('unknown spelling rejected','error' in exchange('start','five',0,spelling='klingon'))
                 child.stdin.close();child.wait(timeout=10)
                 check('EOF exits and reaps',child.returncode==0)
                 logs=[json.loads(x) for x in (Path(state)/'voco/stream-performance/worker.jsonl').read_text().splitlines()]

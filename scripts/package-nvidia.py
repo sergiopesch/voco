@@ -24,8 +24,9 @@ VENDORED_NOTICES = {
 UNPACKAGED_DOCS = {"guide", "testing"}
 COPYRIGHT_PREFACE = """\
 VOCO is distributed under the MIT License below. The speech runtime, speech
-model and patched libraries in this package keep their own licenses and notices:
-see nvidia/, vendor/ and THIRD-PARTY-NOTICES.txt in this folder.
+model, spelling data and patched libraries in this package keep their own
+licenses and notices: see nvidia/, vendor/ and THIRD-PARTY-NOTICES.txt in this
+folder.
 
 """
 
@@ -127,8 +128,8 @@ def stage_payload(base, stage, version, package_version):
     speech = stage / "usr/lib/voco/speech"
     speech.mkdir(parents=True)
     source = ROOT / "runtime/speech"
-    for name in ("stream_worker.py", "worker_main.py", "streaming.py", "adapters.py",
-                 "MODEL-IDENTITY.json", "NATIVE-BUILD.json", "libbench_nemo_pool.so"):
+    for name in ("stream_worker.py", "worker_main.py", "streaming.py", "adapters.py", "spelling.py",
+                 "spelling-varcon.tsv", "MODEL-IDENTITY.json", "NATIVE-BUILD.json", "libbench_nemo_pool.so"):
         shutil.copy2(source / name, speech / name)
     for name in ("lib", "models"):
         shutil.copytree(source / name, speech / name, symlinks=True)
