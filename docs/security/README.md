@@ -263,6 +263,10 @@ commit passed CI, then uploads it as a draft to check before publishing.
   files, the paste helpers and `/dev/uinput`.
 - Pasted text goes to whatever has focus when the paste happens, and VOCO
   can't tell whether it landed.
+- In a terminal, pasted text reaches the program running there. A program that
+  doesn't turn on bracketed paste reads it as typed keys, so dictating at a
+  prompt that takes one-key answers, such as a coding agent's permission
+  prompt, can answer it.
 - On X11, every client in the session can read the selections and observe
   keyboard input.
 - Dictated text stays in the crash journal until the recording finishes, and
