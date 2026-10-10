@@ -1,6 +1,9 @@
 export type UpdateChannel = "stable" | "beta";
 /** Only chooses which update instructions Settings shows. */
 export type InstallChannel = "github-release" | "source";
+/** How the speech worker spells words British and American English spell
+ * differently. It changes spelling only. */
+export type EnglishSpelling = "british" | "american" | "as-recognised";
 
 export interface AppConfig {
   hotkey: string;
@@ -9,6 +12,8 @@ export interface AppConfig {
   updateChannel: UpdateChannel;
   automaticUpdateChecks: boolean;
   installChannel: InstallChannel;
+  /** null until someone chooses; dictation then spells British. */
+  englishSpelling: EnglishSpelling | null;
 }
 
 export interface ConfigSnapshot {

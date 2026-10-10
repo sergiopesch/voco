@@ -9,6 +9,7 @@ import type {
   AudioDeviceOption,
   DictationStatus,
   DesktopInputStatus,
+  EnglishSpelling,
   MicrophonePermission,
   RuntimeDiagnostics,
   UpdateCheckState,
@@ -27,6 +28,8 @@ import type { NativeMicrophoneControls } from "@/hooks/useNativeCaptureSettings"
 import { SettingsIcon } from "@/components/SettingsIcon";
 import { useGlassPointer } from "@/hooks/useGlassPointer";
 import { isWaylandSession } from "@/lib/windowRemap";
+import { englishSpelling } from "@/lib/englishSpelling";
+import { EnglishSpellingChoice, EnglishSpellingNotice, EnglishSpellingStep } from "@/components/EnglishSpellingChoice";
 import vocoBrandImage from "../../../../assets/voco-symbol-ui.png";
 
 interface ControlPanelProps {
@@ -209,6 +212,13 @@ export function ControlPanel({
   const desktopSetupError = desktopInput?.available === false ? desktopInput.detail : null;
   const testPassed = useStore(state => state.onboardingTestPassed);
   const testPurpose = useStore(state => state.dictationPurpose);
+  const spellingConfirmed = useStore(state => state.onboardingSpellingConfirmed);
+  // The choice shows at once; a failed save puts the saved one back.
+  const [spelling, setSpelling] = useState(() => englishSpelling(config));
+  const [spellingSaveError, setSpellingSaveError] = useState<string | null>(null);
+  const spellingSaveRequest = useRef(0);
+  const askedSpelling = useRef(false);
+  const spellingNotice = isPopover && config.onboardingCompleted && config.englishSpelling === null;
   const hotkeyDirty = hotkeyDraft !== config.hotkey;
   const dictationBusy = isDictationActive(dictationStatus);
   // The live level goes straight to the meter; a state update per animation
@@ -366,6 +376,13 @@ export function ControlPanel({
     setHotkeyError(null);
   }, [config.hotkey]);
 
+  // Wait for queued saves, so a quick second choice never flickers back.
+  useEffect(() => { if (!saving) setSpelling(englishSpelling({ englishSpelling: config.englishSpelling })); }, [config.englishSpelling, saving]);
+
+  useEffect(() => {
+    if (isOnboarding && !spellingConfirmed) askedSpelling.current = true;
+  }, [isOnboarding, spellingConfirmed]);
+
   useEffect(() => {
     const shouldPreview = shouldOpenMicrophonePreview(surface, activeSection, dictationBusy);
     if (!shouldPreview || nativePreviewDisabled) {
@@ -491,6 +508,23 @@ export function ControlPanel({
       setMicrophoneSaveError(result.message);
     }
     return result.ok;
+  }
+
+  async function chooseSpelling(value: EnglishSpelling): Promise<boolean> {
+    const request = ++spellingSaveRequest.current;
+    setSpelling(value);
+    setSpellingSaveError(null);
+    const result = await savePatch({ englishSpelling: value });
+    if (request === spellingSaveRequest.current && !result.ok) {
+      setSpelling(englishSpelling(useStore.getState().config ?? config));
+      setSpellingSaveError(result.message);
+    }
+    return result.ok;
+  }
+
+  async function confirmSpelling() {
+    if (useStore.getState().config?.englishSpelling !== spelling && !(await chooseSpelling(spelling))) return;
+    useStore.getState().confirmOnboardingSpelling();
   }
 
   async function retryMicrophonePreview() {
@@ -688,9 +722,10 @@ export function ControlPanel({
 
         {isPopover ? (
           <section className="voco-popover" data-priority={statusHeading.length > 30 ? "status" : undefined}>
-            <div className="voco-lens">
+            {spellingNotice ? <EnglishSpellingNotice disabled={saving} onChoose={value => void chooseSpelling(value)} /> : <div className="voco-lens">
               <img src={vocoBrandImage} alt="" />
-            </div>
+            </div>}
+            {spellingNotice && spellingSaveError ? <p className="voco-inline-note voco-inline-note--error" role="alert">{spellingSaveError}</p> : null}
             <div className="voco-popover__state">
               <div className="voco-popover__state-main">
                 <strong role="status" aria-live="polite"><StatusMark state={desktopSetupError || dictationStatus === "error" ? "attention" : "idle"} />{statusHeading}</strong>
@@ -711,8 +746,13 @@ export function ControlPanel({
             </div>
             {microphoneSaveError ? <p className="voco-inline-note voco-inline-note--error" role="alert">{microphoneSaveError}</p> : null}
           </section>
+        ) : isOnboarding && !spellingConfirmed ? (
+          <EnglishSpellingStep value={spelling} saving={saving} error={spellingSaveError}
+            onChange={value => void chooseSpelling(value)} onContinue={() => void confirmSpelling()} />
         ) : isOnboarding ? (
           <Onboarding
+            spelling={spelling}
+            focusPrimary={askedSpelling.current}
             microphone={nativeMicrophone?.mode === "native"
               ? nativeMicrophone.selected?.label || nativeMicrophone.sources?.sources.find(source => source.selectionToken === nativeMicrophone.sources?.defaultSelectionToken)?.label || "System default"
               : selectedDeviceLabel}
@@ -791,6 +831,15 @@ export function ControlPanel({
                     </div>
                   </div>}
                   </>}
+                  <h3 className="voco-preferences__group-title" id="voco-settings-spelling">Spelling</h3>
+                  <div className="voco-preferences__group">
+                    <div className="voco-preferences__card voco-preferences__form">
+                      <EnglishSpellingChoice value={spelling} labelledBy="voco-settings-spelling" offerAsRecognised compact
+                        onChange={value => void chooseSpelling(value)} />
+                      <p className="voco-preferences__helper">Changes spelling only, never names or meaning. It applies from your next dictation.</p>
+                      {spellingSaveError ? <div className="voco-inline-note voco-inline-note--error" role="alert">{spellingSaveError}</div> : null}
+                    </div>
+                  </div>
                 </section>
               ) : null}
 

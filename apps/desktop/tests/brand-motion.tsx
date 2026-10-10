@@ -24,7 +24,9 @@ const sources: NativeCaptureSource[] = [
   ...Array.from({ length: 12 }, (_, i) => ({ selectionToken: `device-${i}`, name: `device-${i}`, label: `External audio interface ${i + 1} — rear microphone input with a long device name`, index: i + 4, objectSerial: String(i + 4), isMonitor: false })),
 ];
 const sampleTranscript = "A quiet space for your voice. Your words stay on this computer.";
+const askSpelling = params.get("spelling") === "ask";
 useStore.setState({ audioLevel: initial === "recording" ? .65 : 0, dictationPurpose: initial === "idle" ? "cursor" : "onboarding", onboardingTestPassed: initial === "success",
+  onboardingSpellingConfirmed: !askSpelling,
   transcript: initial === "recording" || initial === "success" || initial === "error" ? sampleTranscript : "" });
 const noop = async () => {};
 function Fixture() {
@@ -32,7 +34,7 @@ function Fixture() {
   const [status, setStatus] = useState<DictationStatus>(["starting", "recording", "processing", "error"].includes(initial) ? initial as DictationStatus : "idle");
   const [selected, setSelected] = useState<NativeCaptureSource | null>(params.get("surface") === "popover" ? sources[0] ?? null : null);
   const [section, setSection] = useState<ComponentProps<typeof ControlPanel>["requestedSection"]>("Audio");
-  const [config, setConfig] = useState<ComponentProps<typeof ControlPanel>["config"]>({ hotkey: "Alt+D", selectedMic: null, onboardingCompleted: false, updateChannel: "stable", automaticUpdateChecks: true, installChannel: "github-release" });
+  const [config, setConfig] = useState<ComponentProps<typeof ControlPanel>["config"]>({ hotkey: "Alt+D", selectedMic: null, onboardingCompleted: false, updateChannel: "stable", automaticUpdateChecks: true, installChannel: "github-release", englishSpelling: askSpelling ? null : "british" });
   return <ControlPanel surface={surface} config={config} dictationStatus={status}
     statusLabel={status === "error" ? "Needs attention" : "Ready to listen"}
     errorMessage={initial === "error" ? "The test could not finish. Try again when your microphone is ready." : null}

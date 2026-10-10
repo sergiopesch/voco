@@ -96,6 +96,8 @@ def run_onboarding(root, app, pump, native_windows):
         baseline_sources = sources()
         result['baselinePulseSources'] = baseline_sources
         baseline_ids = {source['index'] for source in baseline_sources}
+        # A new setup asks which English to write first; British is preselected.
+        press('Continue')
         press('Start test')
         wait(lambda: any(r.get('event') == 'recording_state_active' for r in rows()), 'native onboarding capture')
         active_sources = wait(lambda: [source for source in sources() if source['index'] not in baseline_ids and source.get('corked') is False], 'uncorked private audio source')

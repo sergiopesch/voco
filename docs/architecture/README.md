@@ -90,6 +90,21 @@ sends one request at a time. It accepts only results that extend the previous
 one. If the recognizer revises earlier words, or falls more than three seconds
 behind, recognition stops for that recording.
 
+Each start carries `spelling`: `british`, `american` or `as-recognised`.
+`speech_stream.rs` sets it from the saved settings, read without the writer lock
+or a save, so the webview can't choose another; a start without one is as
+recognised. `spelling.py` converts the whole hypothesis with
+`spelling-varcon.tsv`, the unambiguous forms of VarCon 2020.12.07, about 3,300
+each way. A word keeps its case; names, code-like tokens and words whose
+spelling depends on meaning stay. A push returns only text no later hypothesis
+can change: an open word goes out up to the first letter where a table word
+starting with it is spelled differently, and a capitalised first word waits for
+the next word's case. Finish returns the converted final text, which extends
+every push, so `DictationStream`'s append-only check still holds, and a
+converter fault would stop the recording rather than paste a revision.
+`test_spelling.py` replays the [engine benchmark](../../research/engine-benchmark-2026-10/README.md)'s
+hypotheses to check that few words wait.
+
 ### Delivery
 
 Each new suffix goes to `insertion.rs`, one paste at a time:
@@ -220,9 +235,11 @@ can't be created, dictation continues and VOCO notifies you.
 
 ## Configuration
 
-Settings live in `$XDG_CONFIG_HOME/voco/config.json` with five fields:
+Settings live in `$XDG_CONFIG_HOME/voco/config.json` with seven fields:
 `hotkey` (default `Alt+D`), `selectedMic`, `onboardingCompleted`,
-`updateChannel` (`stable` or `beta`) and `installChannel`. Fields that older
+`updateChannel` (`stable` or `beta`), `automaticUpdateChecks`, `installChannel`
+and `englishSpelling` (`british`, `american` or `as-recognised`, and `null`
+until someone chooses, which spells British). Fields that older
 files carry are ignored and dropped at the next save, while a settings update
 that names an unknown field is refused. The directory is 0700 and the file
 0600, written atomically. If the file doesn't exist, VOCO copies

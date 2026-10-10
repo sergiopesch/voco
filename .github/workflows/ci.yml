@@ -116,6 +116,11 @@ jobs:
         env:
           VOCO_RENDERER_EVIDENCE_DIR: ${{ runner.temp }}/voco-dictation-renderer
 
+      - name: English spelling choice regression
+        run: npm run test:english-spelling-renderer
+        env:
+          VOCO_RENDERER_EVIDENCE_DIR: ${{ runner.temp }}/voco-english-spelling-renderer
+
       - name: Microphone refresh and retry regression
         run: npm run test:microphone-renderer
         env:
@@ -176,6 +181,7 @@ jobs:
             ${{ runner.temp }}/voco-native-desktop/
             ${{ runner.temp }}/voco-native-wayland/
             ${{ runner.temp }}/voco-dictation-renderer/
+            ${{ runner.temp }}/voco-english-spelling-renderer/
             ${{ runner.temp }}/voco-microphone-${{ github.run_id }}-${{ github.run_attempt }}/
             ${{ runner.temp }}/voco-native-capture-renderer/
             ${{ runner.temp }}/voco-onboarding-renderer/

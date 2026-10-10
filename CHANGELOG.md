@@ -25,6 +25,12 @@ explain how to upgrade.
   descriptor beyond the worker's pipes closes on exec; and a seccomp filter
   refuses io_uring and every socket except a Unix one. The full-application test
   checks the running worker's filter.
+- **English spelling.** Setup first asks which English you write, with British
+  preselected, and the **Settings** page can change it to American or leave
+  words as recognised. The speech worker changes only VarCon 2020.12.07's
+  unambiguous forms, never names or words whose spelling depends on meaning, and
+  pastes only text that can no longer change, so dictation stays append-only.
+  Earlier setups spell British too, and the popover says so once.
 - **Update checks** on the **Updates** page: **When VOCO starts**, the default,
   or **Only when I choose**, which asks GitHub only when you choose **Check for
   updates**.

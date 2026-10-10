@@ -74,6 +74,28 @@ try {
         assert.deepEqual(await page.evaluate(() => window.__fixtureViolations), []);
       };
       await page.setViewportSize({width:850,height:680});
+      // Setup asks which English to write first; arrow keys choose between native radios.
+      await load('surface=onboarding&spelling=ask');
+      const spelling = page.getByRole('radiogroup', { name: 'Which English do you write?' });
+      assert.equal(await spelling.getByRole('radio', { name: 'British English' }).isChecked(), true);
+      assert.equal(await page.getByRole('button', { name: 'Start test', exact: true }).count(), 0);
+      await capture('onboarding-spelling');
+      await spelling.getByRole('radio', { name: 'British English' }).focus();
+      await page.keyboard.press('ArrowRight');
+      await page.waitForFunction(() => document.querySelector('input[value="american"]')?.checked);
+      assert.equal(await page.locator('.voco-spelling__card').nth(1).evaluate(card => getComputedStyle(card).outlineStyle), 'solid');
+      await page.getByText('organized', { exact: true }).waitFor();
+      await capture('onboarding-spelling-american-focus');
+      await page.setViewportSize({width:760,height:560});
+      assert.equal(await page.locator('.voco-setup').evaluate(el => el.scrollHeight <= el.clientHeight + 1), true,
+        'The spelling question and Continue must fit the minimum canvas without scrolling');
+      await capture('onboarding-spelling-minimum');
+      await page.setViewportSize({width:850,height:680});
+      await page.getByRole('button', { name: 'Continue', exact: true }).click();
+      await page.getByRole('button', { name: 'Start test', exact: true }).waitFor();
+      assert.equal(await page.getByRole('button', { name: 'Start test', exact: true }).evaluate(el => el === document.activeElement), true);
+      await page.getByText('Try saying “My favorite color is blue.”', { exact: true }).waitFor();
+      results.push({ engine: name, check: 'spelling question, keyboard choice and its voice test sentence', passed: true });
       await load('surface=onboarding');
       await capture('onboarding-idle');
       assert.equal(await page.getByRole('button', { name: 'Done', exact: true }).count(), 0);

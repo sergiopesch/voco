@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "./preferences.css";
 @import "./motion.css";
+@import "./english-spelling.css";
 
 :root {
   --voco-radius-window: 28px;
