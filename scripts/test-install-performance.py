@@ -2,14 +2,17 @@
 """Installer concurrency, presentation and prompt regression tests; no host install."""
 import fcntl
 import http.server
+import importlib.util
 import os
 from pathlib import Path
 import pty
 import re
 import select
+import shutil
 import signal
 import struct
 import subprocess
+import sys
 import tempfile
 import termios
 import threading
@@ -19,6 +22,8 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 PREFIX = (ROOT / 'install').read_text().split('# ─── Header', 1)[0]
 APT_UI = ROOT / 'scripts/lib/install-apt-ui.py'
+# The wordmark's lit cell, drawn only while a shine passes.
+GLOW = b'\x1b[38;2;255;255;255;48;2;238;241;245m'
 
 
 def terminal(command, env, reply=None, timeout=10, columns=80, rows=24):
@@ -88,9 +93,12 @@ kill -0 "$DOWNLOAD_PID"
                 os.kill(int((Path(folder) / 'tracked.pid').read_text()), 0)
 
     def test_wordmark_fits_and_canvas_release_matches_its_height(self):
-        for columns, rows, height in ((80, 24, 14), (64, 16, 14), (80, 12, 10)):
-            with self.subTest(columns=columns, rows=rows), tempfile.TemporaryDirectory() as folder:
-                env = {**os.environ, 'TERM': 'xterm-256color', 'TMPDIR': folder, 'VOCO_INSTALL_NO_MOTION': '1'}
+        # The card needs 24-bit colour and 23 rows; everything else gets the compact canvas.
+        for columns, rows, colour, height in ((80, 24, 'truecolor', 21), (64, 23, '24bit', 21), (64, 22, 'truecolor', 10),
+                                              (80, 30, '', 10), (80, 12, 'truecolor', 10)):
+            with self.subTest(columns=columns, rows=rows, colour=colour), tempfile.TemporaryDirectory() as folder:
+                env = {**os.environ, 'TERM': 'xterm-256color', 'TMPDIR': folder, 'VOCO_INSTALL_NO_MOTION': '1',
+                       'COLORTERM': colour}
                 env.pop('NO_COLOR', None)
                 body = f'''
 VOCO_DOWNLOAD_DIR=$(mktemp -d)
@@ -105,25 +113,33 @@ printf 'PROMPT REMAINS VISIBLE\\n'
                 self.assertEqual(code, 0, output)
                 self.assertIn(f'\033[{height}A'.encode(), output)
                 plain = re.sub(r'\x1b\[[0-9;]*[A-Za-z]', '', output.decode())
-                self.assertEqual(sum('█' in line for line in plain.splitlines()), 5 if height == 14 else 0)
+                # The card's eleven rows and its lower edge use upper half blocks.
+                self.assertEqual(sum('▀' in line for line in plain.splitlines()), 12 if height == 21 else 0)
+                self.assertEqual(plain.count('V O C O'), 0 if height == 21 else 1)
                 self.assertTrue(all(len(line) < columns for line in plain.splitlines()))
                 self.assertIn(b'PROMPT REMAINS VISIBLE', output)
-                self.assertNotIn(b'\x1b[38;2;241;243;246m', output, 'Reduced motion must not highlight letters')
+                self.assertNotIn(GLOW, output, 'Reduced motion must not light the wordmark')
 
-    def test_apt_uses_the_same_large_static_wordmark_and_releases_for_prompt(self):
-        with tempfile.TemporaryDirectory() as folder:
-            env = {**os.environ, 'TERM': 'xterm-256color'}
-            (Path(folder) / 'apt.log').touch(mode=0o600)
-            # Feed status separately from a delayed prompt, allowing the real
-            # renderer to paint before it gives terminal output back.
-            command = ['bash', '-c', '({ printf "pmstatus:voco:20:Unpacking\\n"; sleep .2; printf "Confirm package option: "; }) | /usr/bin/python3 "$1" "$2" true',
-                       'fixture', str(APT_UI), str(Path(folder) / 'apt.log')]
-            code, output = terminal(command, env, columns=64, rows=16)
-            self.assertEqual(code, 0, output)
-            self.assertIn('██    ██'.encode(), output)
-            self.assertIn(b'\x1b[14A', output)
-            self.assertIn(b'Confirm package option: ', output)
-            self.assertNotIn(b'\x1b[38;2;241;243;246m', output)
+    def test_apt_uses_the_same_static_canvas_and_releases_for_prompt(self):
+        for lines in ('21', '10'):
+            with self.subTest(lines=lines), tempfile.TemporaryDirectory() as folder:
+                env = {**os.environ, 'TERM': 'xterm-256color'}
+                (Path(folder) / 'apt.log').touch(mode=0o600)
+                # Feed status separately from a delayed prompt, allowing the real
+                # renderer to paint before it gives terminal output back.
+                command = ['bash', '-c', '({ printf "pmstatus:voco:20:Unpacking\\n"; sleep .2; printf "Confirm package option: "; }) | /usr/bin/python3 "$1" "$2" true joined 2026.0.62 "$3"',
+                           'fixture', str(APT_UI), str(Path(folder) / 'apt.log'), lines]
+                code, output = terminal(command, env, columns=64, rows=24)
+                self.assertEqual(code, 0, output)
+                self.assertIn(f'\x1b[{lines}A'.encode(), output)
+                plain = re.sub(r'\x1b\[[0-9;]*[A-Za-z]', '', output.decode())
+                if lines == '21':
+                    self.assertIn('▗', plain)
+                    self.assertIn('v2026.0.62', plain)
+                else:
+                    self.assertIn('V O C O', plain)
+                self.assertIn(b'Confirm package option: ', output)
+                self.assertNotIn(GLOW, output)
 
     def test_embedded_apt_ui_ignores_untrusted_python_import_paths(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -271,7 +287,7 @@ exit "$FIXTURE_EXIT"
 
     def test_no_motion_has_no_signal_history_or_sweep(self):
         with tempfile.TemporaryDirectory() as folder:
-            env={**os.environ,'TERM':'xterm-256color','TMPDIR':folder,'VOCO_INSTALL_NO_MOTION':'1'}
+            env={**os.environ,'TERM':'xterm-256color','TMPDIR':folder,'VOCO_INSTALL_NO_MOTION':'1','COLORTERM':'truecolor'}
             env.pop('NO_COLOR',None)
             body='''
 VOCO_DOWNLOAD_DIR=$(mktemp -d)
@@ -288,6 +304,7 @@ voco_ui_pause
             self.assertIn('↓'.encode(),output)
             self.assertNotIn('▁'.encode(),output)
             self.assertNotIn(b'\x1b[37mV',output)
+            self.assertNotIn(GLOW,output)
 
     def test_restricted_sudo_policy_uses_ordinary_apt(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -307,6 +324,94 @@ voco_ui_pause
             self.assertEqual(run.returncode,0,run.stderr)
             self.assertIn(b'Could not save installation details',run.stdout)
             self.assertIn(b'Unfamiliar package message',run.stdout)
+
+
+class InstallerArtTests(unittest.TestCase):
+    """The art canvas: one card, drawn the same by bash and by the APT display."""
+
+    def bash(self, body, motion=True, columns=80, rows=24):
+        with tempfile.TemporaryDirectory() as folder:
+            env = {**os.environ, 'TERM': 'xterm-256color', 'TMPDIR': folder, 'COLORTERM': 'truecolor',
+                   'VOCO_INSTALL_NO_MOTION': '0' if motion else '1'}
+            env.pop('NO_COLOR', None)
+            setup = f'VOCO_TERMINAL_COLUMNS={columns}\nVOCO_TERMINAL_ROWS={rows}\nvoco_ui_configure\n'
+            code, output = terminal(['bash', '-c', PREFIX + setup + body], env, columns=columns, rows=rows)
+            self.assertEqual(code, 0, output)
+            return output.decode()
+
+    def test_the_microphone_comes_from_the_symbol(self):
+        if not shutil.which('ffmpeg'):
+            self.skipTest('ffmpeg is unavailable, so the microphone was not redrawn from the symbol')
+        subprocess.run([sys.executable, str(ROOT / 'scripts/generate-installer-art.py'), '--check'], check=True)
+
+    def test_bash_and_the_apt_display_draw_the_same_card(self):
+        drawn = self.bash('voco_ui_card\nprintf "%s" "$VOCO_UI_CARD_TEXT"\n', motion=False)
+        spec = importlib.util.spec_from_file_location('apt_ui', APT_UI)
+        apt_ui = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(apt_ui)
+        version = re.search(r'^VERSION="([^"]+)"', (ROOT / 'install').read_text(), re.M).group(1)
+        expected = ''.join('\r\x1b[K  ' + line + '\n' for line in apt_ui.card_lines(version))
+        self.assertEqual(drawn.replace('\r\n', '\n'), expected)
+        for shine in (0, 140, 279):
+            with self.subTest(shine=shine):
+                lit = self.bash(f'voco_ui_card_at "$VOCO_UI_INTRO_MS" {shine}\nprintf "%s" "$VOCO_UI_CARD_TEXT"\n')
+                expected = ''.join('\r\x1b[K  ' + line + '\n' for line in apt_ui.card_lines(version, shine))
+                self.assertEqual(lit.replace('\r\n', '\n'), expected)
+
+    def test_every_intro_frame_keeps_the_card_inside_its_canvas(self):
+        times = (0, 40, 120, 240, 330, 480, 600, 840, 900, 1000, 1100, 1200, 1300)
+        body = ''.join(f'voco_ui_card_at {t} {s}\nprintf "%s@@\\n" "$VOCO_UI_CARD_TEXT"\n'
+                       for t in times for s in (-1, 100))
+        frames = self.bash(body).replace('\r\n', '\n').split('@@\n')[:-1]
+        self.assertEqual(len(frames), len(times) * 2)
+        for frame in frames:
+            lines = frame.split('\n')[:-1]
+            self.assertEqual(len(lines), 13)
+            for line in lines:
+                self.assertTrue(line.startswith('\r\x1b[K  ') and line.endswith('\x1b[0m'), repr(line))
+                visible = re.sub(r'\x1b\[[0-9;]*[A-Za-z]', '', line.replace('\r', ''))
+                self.assertLessEqual(len(visible), 60, repr(visible))
+        plain = [re.sub(r'\x1b\[[0-9;]*[A-Za-z]', '', frame) for frame in frames]
+        # At the start only the sweep's leading edge shows; the microphone follows
+        # it in, and the tagline writes itself in last.
+        self.assertFalse(any('▀' in line for line in plain[0].split('\n')[1:12]), plain[0])
+        self.assertTrue(all('▀' in line for line in plain[times.index(480) * 2].split('\n')[1:12]))
+        self.assertNotIn('The voice', plain[times.index(840) * 2])
+        self.assertIn('The voice layer for Linux.', plain[-2])
+        self.assertIn('Today: private dictation.', plain[-2])
+
+    def test_the_intro_ends_and_reduced_motion_never_starts_it(self):
+        moving = self.bash('voco_ui_now_ms\nVOCO_UI_INTRO_START=$VOCO_UI_NOW\n'
+                           'voco_ui_animating && printf moving\nsleep 1.4\nvoco_ui_animating || printf rested\n')
+        self.assertIn('moving', moving)
+        self.assertIn('rested', moving)
+        still = self.bash('voco_ui_now_ms\nVOCO_UI_INTRO_START=$VOCO_UI_NOW\nVOCO_UI_SHINE_START=$VOCO_UI_NOW\n'
+                          'voco_ui_animating || printf still\n', motion=False)
+        self.assertIn('still', still)
+
+    def test_interrupting_the_intro_leaves_a_clean_terminal(self):
+        with tempfile.TemporaryDirectory() as folder:
+            env = {**os.environ, 'TERM': 'xterm-256color', 'TMPDIR': folder, 'COLORTERM': 'truecolor',
+                   'VOCO_INSTALL_NO_MOTION': '0'}
+            env.pop('NO_COLOR', None)
+            body = ('VOCO_TERMINAL_COLUMNS=80\nVOCO_TERMINAL_ROWS=24\nvoco_ui_init\n'
+                    'voco_ui_sweep First detail\nprintf "%s" "$VOCO_UI_PID" > "$TMPDIR/animator"\n'
+                    'sleep .3\nkill -INT $$\nsleep 2\n')
+            code, output = terminal(['bash', '-c', PREFIX + body], env)
+            self.assertEqual(code, 130, output)
+            # Every frame is whole, so the terminal is left with its own colours.
+            sgr = re.findall(rb'\x1b\[[0-9;]*m', output)
+            self.assertTrue(sgr and sgr[-1] == b'\x1b[0m', sgr[-3:])
+            with self.assertRaises(ProcessLookupError):
+                os.kill(int((Path(folder) / 'animator').read_text()), 0)
+
+    def test_a_resting_card_is_not_drawn_again(self):
+        output = self.bash('VOCO_DOWNLOAD_DIR=$(mktemp -d)\nvoco_ui_init\nvoco_ui_begin test detail\n'
+                           'voco_ui_frame test detail "—" progress\nvoco_ui_close\n', motion=False)
+        # One full canvas, then only the eight progress lines.
+        self.assertEqual(output.count('\x1b[21A'), 1)
+        self.assertEqual(output.count('\x1b[8A'), 1)
+        self.assertEqual(output.count('▗'), 1)
 
 
 if __name__ == '__main__':

@@ -39,6 +39,11 @@ explain how to upgrade.
 
 ### Changed
 
+- In terminals with 24-bit colour, the guided installer opens with VOCO's
+  microphone and name on a graphite card: the microphone, drawn from the brand
+  symbol, appears behind a silver line, the letters glide in and the tagline
+  writes itself in, while the checks and the download carry on. Other terminals
+  keep the compact view.
 - VOCO's message is "Dictation is the first step. We're building the voice layer
   for Linux: private, local, and under your control.", followed by where VOCO is
   today: private dictation. The README, the banner, the installer header, the
