@@ -1,5 +1,5 @@
 <!-- markdownlint-disable MD033 MD041 -->
-<p align="center"><img src="assets/voco-readme-banner.svg" alt="VOCO, the voice layer for Linux" width="560"></p>
+<p align="center"><img src="assets/voco-readme-banner.svg" alt="VOCO, the voice layer for Linux. Today: private dictation." width="560"></p>
 
 # VOCO
 

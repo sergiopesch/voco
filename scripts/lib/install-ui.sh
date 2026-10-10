@@ -64,7 +64,7 @@ voco_ui_size() {
 # One bounded canvas is shared by every normal installation stage.
 voco_ui_frame() {
   [[ "$VOCO_TERMINAL_MOTION" == true ]] || return 0
-  local title="$1" detail="$2" mark="${3:-—}" shine="${4:--1}" width wordmark='V O C O' i row color
+  local title="$1" detail="$2" mark="${3:-—}" shine="${4:--1}" width wordmark='V O C O' i row color version
   local stages='' frame='' part='' symbol line2='' rule='────────────────────────────────────────────────────────'
   local -a labels=(Check Download Verify Install)
   width=$((${VOCO_TERMINAL_COLUMNS:-80}-5))
@@ -88,12 +88,14 @@ voco_ui_frame() {
         if (( i == shine )) && [[ "$VOCO_UI_NO_MOTION" != true ]]; then color="$VOCO_UI_SHINE"; fi
         wordmark+="${color}${VOCO_UI_GLYPHS[row*4+i]} "
       done
-      printf -v part '\r\033[K  %b%b\n' "$wordmark" "$NC"
+      version=''
+      (( row < 4 )) || version="  v${VERSION:-}"
+      printf -v part '\r\033[K  %b%b%s\n' "$wordmark" "$NC" "$version"
       frame+="$part"
     done
-    printf -v part '\r\033[K  The voice layer for Linux.  ·  v%s\n' "${VERSION:-}"
+    printf -v part '\r\033[K  The voice layer for Linux. Today: private dictation.\n'
   else
-    printf -v part '\r\033[K  %bV O C O%b  v%s\n\r\033[K  The voice layer for Linux.\n' "$VOCO_UI_SILVER" "$NC" "${VERSION:-}"
+    printf -v part '\r\033[K  %bV O C O%b  v%s\n\r\033[K  The voice layer for Linux. Today: private dictation.\n' "$VOCO_UI_SILVER" "$NC" "${VERSION:-}"
   fi
   frame+="$part"
   color="$VOCO_UI_SILVER"
