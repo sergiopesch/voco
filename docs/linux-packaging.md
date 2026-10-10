@@ -71,10 +71,11 @@ Installing either package applies its `/dev/uinput` rule and turns nothing else 
 The GNOME companion stays off until the guided installer or you enable it, and
 the IBus input source and the Chromium extension stay off until you add them.
 
-The desktop entry sets `StartupNotify=false`. VOCO usually starts in the tray
-without a window, so a launcher could never see it finish starting: GNOME would
-show its busy cursor for about 15 seconds after every start from the app menu.
-The windows VOCO does open, such as setup and the tray menu, still take focus.
+The desktop entry sets `StartupNotify=false`. VOCO often starts in the tray
+without a window, so a launcher couldn't count on seeing it finish starting:
+GNOME would show its busy cursor for about 15 seconds. A start from the app menu
+opens the popover once VOCO is ready, and the windows VOCO opens, such as setup
+and the tray menu, still take focus.
 
 ## Documentation and licenses
 

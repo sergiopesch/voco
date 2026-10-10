@@ -28,7 +28,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `hotkey_state.rs` — Physical key state per evdev device for the passive shortcut listener, and the count of live keyboards that shortcut status reports.
 - `hotkey_trace.rs` — Opt-in shortcut timing trace, enabled with `VOCO_HOTKEY_TRACE=1`.
 - `trigger_socket.rs` — Owner-only trigger socket `voco.sock`, with its `voice.sock` alias, that `voco --toggle` connects to.
-- `activation.rs` — Owner-only launcher socket `voco-activate.sock`; it presents the window and never toggles capture.
+- `activation.rs` — Owner-only launcher socket `voco-activate.sock`, and the check that a launcher click started VOCO; either presents the window, and neither toggles capture.
 - `single_instance.rs` — Process lock that allows one VOCO per user.
 - `desktop_notifications.rs` — Notifications that keep their D-Bus sender for the app's lifetime, because GNOME removes notifications whose sender disappears.
 - `performance.rs` — Opt-in performance metadata log, enabled with `VOCO_PERFORMANCE_LOG=1`.

@@ -21,7 +21,11 @@ setup and pull requests.
   The optional Chromium exact field uses the same recognizer with its own delivery.
 - No assistant, conversation, enhancement, appearance or per-app settings.
 - Tray first. Respect system accessibility preferences such as reduced motion.
-  The desktop entry keeps `StartupNotify=false`: VOCO usually starts without a
+  A click on VOCO's launcher opens the popover whether or not VOCO was running:
+  `activation.rs` counts a start as a launcher click only when GIO names
+  `VOCO.desktop` and this process, and reads that before GTK removes
+  `DESKTOP_AUTOSTART_ID`. A start from a terminal or a login autostart stays in
+  the tray. The desktop entry keeps `StartupNotify=false`: a tray start shows no
   window, so it can't complete a launcher's startup sequence, and GNOME would
   show its busy cursor until a 15 s timeout.
 - Settings are the microphone, the shortcut, the update channel and whether VOCO

@@ -1204,6 +1204,10 @@
         "text": "voco accepts --toggle, --check-desktop-input, --check-panel, --setup-panel, --version and --help. Unknown arguments exit with code 2."
       },
       {
+        "title": "A launcher click opens VOCO",
+        "text": "When VOCO's own launcher starts it, GIO names VOCO.desktop and this process, so VOCO shows its popover as it would for a second launch. A start from a terminal or a login autostart stays in the tray."
+      },
+      {
         "title": "A hidden window",
         "text": "With native capture VOCO really hides its window. On X11, where WebKit records, VOCO instead shrinks the window to 1 by 1 pixel and moves it off-screen."
       },
@@ -1239,7 +1243,7 @@
       },
       {
         "path": "apps/desktop/src-tauri/src/activation.rs",
-        "why": "Brings the running copy forward."
+        "why": "Brings the running copy forward, or the copy its launcher started."
       },
       {
         "path": "apps/desktop/src-tauri/src/desktop_notifications.rs",

@@ -1997,6 +1997,8 @@ pub fn run() -> Result<(), String> {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
         .format_timestamp_millis()
         .init();
+    // Before GTK starts: it removes DESKTOP_AUTOSTART_ID from the environment.
+    activation::note_launch();
 
     #[cfg(target_os = "linux")]
     if is_wayland_session() {
