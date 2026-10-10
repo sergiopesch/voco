@@ -8,8 +8,8 @@ cat <<EOF_BODY
 # VOCO ${VERSION}
 
 Dictation is the first step. We're building the voice layer for Linux: private,
-local, and under your control. Speak, and VOCO pastes your words into the app you
-are typing in.
+local, and under your control. Today: private dictation. Speak, and VOCO pastes
+your words into the app you are typing in.
 
 - Recognition runs on your computer with NVIDIA's Nemotron model. There is no
   account or cloud service, and nothing is downloaded after installation.
