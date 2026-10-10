@@ -24,6 +24,7 @@ GROUPS = [
     ("integrations/gnome/", "GNOME companion", "The optional GNOME Shell top-bar companion: meter, menu and Wayland shortcut grab."),
     ("integrations/chromium/", "Browser field route", "The optional Chromium extension that writes into one exact text field."),
     ("scripts/", "Engineering tools", "A build, test, packaging, verification or measurement program."),
+    ("research/", "Research records", "A dated study: its report, the harness that produced it and its raw results; not kept current."),
     ("tests/", "Test fixtures", "Public test inputs such as speech clips and installer fixtures; no personal recordings."),
     ("docs/guide/", "This guide", "Inside VOCO itself: the local server, site, lesson generator and tests."),
     ("docs/", "Documentation", "Written guidance. When a document and the code disagree, the code wins."),

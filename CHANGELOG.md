@@ -33,6 +33,9 @@ explain how to upgrade.
   suite passed on GNOME Shell 51.0. A GNOME 51 Companion CI job builds that Shell
   from a digest-pinned Fedora 45 image and runs the suite in rootless Podman, and
   AGENTS.md now asks for each new GNOME major within four weeks of its release.
+- The [engine benchmark](research/engine-benchmark-2026-10/README.md) behind
+  VOCO's choice of Nemotron English at a 160 ms step: the report, the harness
+  and every run's per-utterance results, on 311 public utterances.
 
 ### Changed
 

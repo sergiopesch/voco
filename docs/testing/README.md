@@ -197,6 +197,12 @@ logs without audio or text. Without `--output-dir` it writes into `runtime/speec
 into the worker to compare changes, as [TypeSafe evaluation](typesafe-evaluation.md)
 describes. Neither `npm test` nor CI runs it.
 
+The [engine benchmark](../../research/engine-benchmark-2026-10/README.md) compares Nemotron
+English with Parakeet TDT, Whisper large-v3-turbo and Nemotron 3.5 on 311 public
+utterances, outside VOCO's worker. It records why VOCO keeps its engine and its
+160 ms step, with the harness and every run's per-utterance results. Neither
+`npm test` nor CI runs it.
+
 ## Suites CI doesn't run
 
 These need programs or permissions that CI doesn't have. A run is evidence only

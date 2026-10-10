@@ -24,6 +24,7 @@ dictation. Start with the [project README](../README.md) for a quick overview.
 | [Code map](architecture/code-map.md) | Where each feature lives in the source |
 | [Inside VOCO](guide/README.md) | A visual tour from spoken word to source code |
 | [Testing](testing/README.md) | Automated and manual checks |
+| [Research records](../research/README.md) | Dated studies behind VOCO's choices, with their harnesses and results |
 | [Linux packaging](linux-packaging.md) | Building the Debian package and the Fedora RPM |
 | [Release process](release-process.md) | Signing and publishing a release |
 | [Security model](security/README.md) | Threat model, permissions and local data |

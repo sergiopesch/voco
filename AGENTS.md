@@ -303,7 +303,10 @@ behaviour: user-visible behaviour in the README, `docs/everyday-use.md` and
 internals in `docs/architecture/`; security in `docs/security/README.md`; packaging
 and releases in `docs/linux-packaging.md` and `docs/release-process.md`. Keep dates,
 run IDs, superseded designs and test narratives out of the docs; they belong in pull
-request descriptions. Summarize each release in `CHANGELOG.md` and
+request descriptions. Dated studies, such as the engine benchmark, live in
+`research/` with the harness and raw results behind them; correct one with a dated
+note, never by rewriting its results, and link to it from the docs instead of
+restating it. Summarize each release in `CHANGELOG.md` and
 `docs/releases/<version>.md`. The [code guide](docs/guide/README.md) is pinned to a
 commit; re-pin and regenerate it when the code it cites changes.
 

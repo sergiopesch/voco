@@ -1,0 +1,10 @@
+cffi==2.1.1
+indic_numtowords==1.1.0
+more-itertools==11.1.0
+numpy==2.5.3
+pyarrow==26.0.0
+pycparser==3.11
+regex==2026.9.29
+soundfile==0.14.0
+typing_extensions==4.16.0
+whisper_normalizer==0.1.12
