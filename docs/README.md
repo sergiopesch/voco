@@ -1,7 +1,7 @@
 # VOCO documentation
 
-VOCO is a private dictation app for Linux. Start with the
-[project README](../README.md) for a quick overview.
+VOCO is building the voice layer for Linux, starting with private, local
+dictation. Start with the [project README](../README.md) for a quick overview.
 
 ## Using VOCO
 

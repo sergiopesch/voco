@@ -271,7 +271,7 @@ voco_ui_close
                 self.assertNotIn('██', screen)
             else:
                 self.assertEqual(sum('█' in line for line in screen.splitlines()), 5, screen)
-                self.assertEqual(screen.count('Your voice, typed.'), 1, screen)
+                self.assertEqual(screen.count('The voice layer for Linux.'), 1, screen)
             if mode == 'password':
                 self.assertIn('Fixture password: fixture', screen)
             if mode == 'prompt':

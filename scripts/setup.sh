@@ -91,7 +91,7 @@ echo -e "  ${GRAPHITE_SOFT}${BOLD}╚██╗ ██╔╝██║   ██║
 echo -e "  ${GRAPHITE}${BOLD} ╚████╔╝ ╚██████╔╝╚██████╗╚██████╔╝${NC}"
 echo -e "  ${GRAPHITE}${BOLD}  ╚═══╝   ╚═════╝  ╚═════╝ ╚═════╝ ${NC}"
 echo
-echo -e "  ${DIM}Your voice, typed. Built for Linux.${NC}"
+echo -e "  ${DIM}The voice layer for Linux.${NC}"
 echo -e "  ${DIM}────────────────────────────────────────────────────────────${NC}"
 echo
 

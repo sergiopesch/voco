@@ -1,21 +1,26 @@
 <!-- markdownlint-disable MD033 MD041 -->
-<p align="center"><img src="assets/voco-readme-banner.svg" alt="VOCO" width="560"></p>
+<p align="center"><img src="assets/voco-readme-banner.svg" alt="VOCO, the voice layer for Linux" width="560"></p>
 
 # VOCO
 
 [![CI](https://github.com/sergiopesch/voco/actions/workflows/ci.yml/badge.svg)](https://github.com/sergiopesch/voco/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Private dictation for Linux. Press a shortcut, speak, and your words appear
-where you are typing.
+Dictation is the first step. We're building the voice layer for Linux: private,
+local, and under your control.
 
-- **Speech stays on your computer.** An English speech model runs on your
-  processor. You don't need a GPU, an account or a cloud service.
-- **Types into the app you are using.** VOCO pastes into whichever app has
-  keyboard focus, including browsers and terminals.
-- **Words appear while you speak,** with punctuation and capital letters.
-- **One shortcut.** Press `Alt+D` to start and again to finish. VOCO never
-  presses Enter.
+Today VOCO is dictation. Press a shortcut, speak, and your words appear where
+you are typing.
+
+- **Private.** Your speech stays on your computer. There's no account,
+  subscription, telemetry or cloud transcription.
+- **Local.** An English speech model runs on your processor. You don't need a
+  GPU or a cloud service.
+- **Under your control.** VOCO listens only when you start it, shows that it's
+  listening and never presses Enter. It's open source under the MIT license.
+- **Types into the app you are using,** browsers and terminals included. Words
+  appear while you speak, with punctuation and capital letters.
+- **One shortcut.** Press `Alt+D` to start and again to finish.
 - **Stays out of the way** in the system tray, or in the GNOME top bar with live
   microphone bars.
 - **Keeps your words.** If a paste fails, VOCO copies the rest of your words to

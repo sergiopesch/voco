@@ -73,9 +73,9 @@ def main():
         reset = '\033[0m'
         if canvas_lines == 14:
             heading = [' '.join(BRAND_COLORS['shine' if i == position else 'silver'] + letter for i, letter in enumerate(row)) + reset for row in BRAND_ROWS]
-            heading.append('Your voice, typed.  ·  v' + version)
+            heading.append('The voice layer for Linux.  ·  v' + version)
         else:
-            heading = [BRAND_COLORS['silver'] + 'V O C O' + reset + '  v' + version, 'Your voice, typed.']
+            heading = [BRAND_COLORS['silver'] + 'V O C O' + reset + '  v' + version, 'The voice layer for Linux.']
         if not canvas_open:
             write(b'\n' * canvas_lines)
             canvas_open = True

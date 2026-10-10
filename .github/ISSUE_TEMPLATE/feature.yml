@@ -1,11 +1,11 @@
 name: Improvement idea
-description: Suggest a focused improvement to local dictation.
+description: Suggest a focused improvement to VOCO.
 labels: [enhancement]
 body:
   - type: textarea
     id: problem
     attributes:
       label: What would this help you do?
-      description: Describe the problem and the outcome you want. VOCO stays a small, local dictation app.
+      description: Describe the problem and the outcome you want. VOCO grows one focused step at a time and stays private, local and under your control.
     validations:
       required: true

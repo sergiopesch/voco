@@ -8,10 +8,17 @@ The [release process](docs/release-process.md) describes how a release is made.
 
 ## [2026.0.62] - 2026-10-10
 
-VOCO's app framework and build tools are up to date, and VOCO works as 2026.0.61
-does. The [release notes](docs/releases/2026.0.62.md) explain how to upgrade.
+VOCO introduces itself as the voice layer for Linux, starting with dictation. Its
+app framework and build tools are up to date, and dictation works as in 2026.0.61.
+The [release notes](docs/releases/2026.0.62.md) explain how to upgrade.
 
 ### Changed
+
+- VOCO's message is "Dictation is the first step. We're building the voice layer
+  for Linux: private, local, and under your control." The README, the banner,
+  the installer header, the release page and the package, AppStream and desktop
+  entry descriptions use it, and the desktop entry gains search keywords:
+  dictation, voice, speech, speech-to-text and typing.
 
 - Tauri 2.12.2, tauri-build 2.7.1 and tauri-plugin-global-shortcut 2.4.0. Tauri
   2.12 uses tray-icon 0.25 and muda 0.20, so the vendored tray-icon is now 0.25.1,

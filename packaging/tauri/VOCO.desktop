@@ -1,7 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=VOCO
-Comment=Turn speech into text at your cursor with local dictation
+Comment=The voice layer for Linux, starting with dictation
+Keywords=dictation;voice;speech;speech-to-text;typing;
 Exec=voco
 Icon=voco
 Terminal=false

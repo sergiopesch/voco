@@ -2,7 +2,7 @@
 <component type="desktop-application">
   <id>com.sergiopesch.voco</id>
   <name>VOCO</name>
-  <summary>Turn speech into text at your cursor with local dictation</summary>
+  <summary>The voice layer for Linux, starting with dictation</summary>
   <metadata_license>MIT</metadata_license>
   <project_license>MIT</project_license>
   <developer id="com.sergiopesch">
@@ -10,7 +10,7 @@
   </developer>
   <launchable type="desktop-id">VOCO.desktop</launchable>
   <description>
-    <p>Your voice, typed. Built for Linux. Press a shortcut, speak, and VOCO pastes your words into the app you are typing in. Speech is recognized on your computer, with no account, subscription or cloud service.</p>
+    <p>Dictation is the first step. VOCO is building the voice layer for Linux: private, local, and under your control. Press a shortcut, speak, and VOCO pastes your words into the app you are typing in. Speech is recognized on your computer, with no account, subscription or cloud service. VOCO listens only when you start it and never presses Enter.</p>
     <p>VOCO stays in the system tray, or in the GNOME top bar with live microphone bars. Pasting depends on your desktop session and the app you type in.</p>
     <ul>
       <li>Local English speech recognition with NVIDIA Nemotron</li>
@@ -30,7 +30,7 @@
   <releases>
     <release version="2026.0.62" date="2026-10-10">
       <description>
-        <p>VOCO's app framework and build tools are up to date. VOCO works as before, on Ubuntu 24.04 and 26.04, Debian 13 and Fedora 44.</p>
+        <p>VOCO introduces itself as the voice layer for Linux, starting with dictation. Its app framework and build tools are up to date, and dictation works as before on Ubuntu 24.04 and 26.04, Debian 13 and Fedora 44.</p>
       </description>
     </release>
     <release version="2026.0.61" date="2026-10-09">
