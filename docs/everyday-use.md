@@ -92,7 +92,7 @@ If your saved shortcut isn't valid, VOCO sets it back to `Alt+D` and shows
 | Desktop | How the shortcut reaches VOCO |
 | --- | --- |
 | X11 | VOCO registers the shortcut with the desktop. |
-| GNOME 46, 48 or 50 on Wayland | The [VOCO panel](install.md#gnome-panel) handles an `Alt+D` or `Alt+Shift+D` shortcut and keeps it from the app you are typing in. |
+| GNOME 46, 48, 50 or 51 on Wayland | The [VOCO panel](install.md#gnome-panel) handles an `Alt+D` or `Alt+Shift+D` shortcut and keeps it from the app you are typing in. |
 | Other Wayland desktops | Bind a key to `voco --toggle`, as described in [Wayland compositor shortcuts](install.md#wayland-compositor-shortcuts). |
 
 On Wayland without the panel, VOCO can still watch for `Alt+D` and
@@ -167,7 +167,7 @@ rm -rf ~/.config/voco ~/.local/state/voco ~/.local/share/com.sergiopesch.voco
 - If recognition falls more than three seconds behind, or revises words it has
   already given, VOCO stops transcribing and shows **Dictation interrupted**.
 - On Wayland, typing needs access to `/dev/uinput`, which the package gives only
-  the user of the active local session. Outside GNOME 46, 48 and 50, the
+  the user of the active local session. Outside GNOME 46, 48, 50 and 51, the
   shortcut also needs a desktop binding.
 - Apps that remap Shift+Insert, remote desktops and virtual machines may not
   accept the paste.

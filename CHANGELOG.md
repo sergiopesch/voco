@@ -10,8 +10,8 @@ The [release process](docs/release-process.md) describes how a release is made.
 
 VOCO introduces itself as the voice layer for Linux, starting with dictation.
 Locking the screen now stops dictation, the speech worker can't open network
-sockets, and update checks can wait until you ask. VOCO's app framework and
-build tools are up to date. The [release notes](docs/releases/2026.0.62.md)
+sockets, update checks can wait until you ask, and the GNOME panel runs on GNOME
+51. VOCO's app framework and build tools are up to date. The [release notes](docs/releases/2026.0.62.md)
 explain how to upgrade.
 
 ### Added
@@ -28,6 +28,11 @@ explain how to upgrade.
 - **Update checks** on the **Updates** page: **When VOCO starts**, the default,
   or **Only when I choose**, which asks GitHub only when you choose **Check for
   updates**.
+- The GNOME panel supports GNOME 51, which Fedora 45 ships. Its code is
+  unchanged; the metadata and setup admit the new major after the companion
+  suite passed on GNOME Shell 51.0. A GNOME 51 Companion CI job builds that Shell
+  from a digest-pinned Fedora 45 image and runs the suite in rootless Podman, and
+  AGENTS.md now asks for each new GNOME major within four weeks of its release.
 
 ### Changed
 

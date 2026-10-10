@@ -5,7 +5,8 @@
   "shell-version": [
     "46",
     "48",
-    "50"
+    "50",
+    "51"
   ],
   "version": 15,
   "url": "https://github.com/sergiopesch/voco"

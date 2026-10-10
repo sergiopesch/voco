@@ -52,7 +52,7 @@ date; setup then turns the new one on if needed and reports `restart`.
 | Status | Meaning | Exit status |
 | --- | --- | --- |
 | `active` | Loaded and current. | 0 |
-| `other-desktop`, `unsupported` | Not GNOME, or a GNOME other than 46, 48 or 50. VOCO uses its tray. | 0 |
+| `other-desktop`, `unsupported` | Not GNOME, or a GNOME other than 46, 48, 50 or 51. VOCO uses its tray. | 0 |
 | `disabled`, `restart` | Off, or turned on or upgraded but not loaded yet. | 2 |
 | `missing`, `blocked`, `error`, `pending`, `unavailable` | Files missing, extensions off or forbidden, a load failure, activation in progress, or no answer. The message says which. | 2 |
 
@@ -129,8 +129,8 @@ writes a reproducible archive of the five files, attached to each release.
 - `scripts/test-gnome-panel.sh` runs the installed GNOME Shell on Wayland in
   bubblewrap, with its own D-Bus, XDG directories and display, against a
   synthetic VOCO service. GNOME 46 and 48 run nested in a private Xvfb, driven
-  with `xdotool`. GNOME 50, which has no nested mode, runs headless on a virtual
-  monitor of the same 800×600 size, driven through Mutter's RemoteDesktop API
+  with `xdotool`. GNOME 50 and 51, which have no nested mode, run headless on a
+  virtual monitor of the same 800×600 size, driven through Mutter's RemoteDesktop API
   and captured with GNOME's own screenshot API; its panel also shows GNOME's
   screen-sharing indicator. Set `VOCO_PANEL_EVIDENCE_DIR` to a new directory
   and, for the nested mode, `VOCO_NATIVE_DEPS` to a root with `bin/Xvfb`.
@@ -142,7 +142,7 @@ writes a reproducible archive of the five files, attached to each release.
 
 ## Known limits
 
-- Only GNOME 46, 48 and 50 load the companion. Elsewhere VOCO uses its tray,
+- Only GNOME 46, 48, 50 and 51 load the companion. Elsewhere VOCO uses its tray,
   which on GNOME needs an AppIndicator extension.
 - The grab covers Alt+D and Alt+Shift+D only. Apps that inhibit system
   shortcuts, such as virtual machines and remote desktops, receive the chord.

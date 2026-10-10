@@ -13,6 +13,11 @@ case "${1:-}" in
     : "${VOCO_PANEL_EVIDENCE_DIR:?Set a fresh directory for GNOME evidence}"
     TEST_SCRIPT="test-gnome-panel.sh"
     ;;
+  --gnome-panel-container)
+    : "${VOCO_PANEL_IMAGE:?Set a Fedora image pinned by digest}"
+    : "${VOCO_PANEL_EVIDENCE_DIR:?Set a fresh directory for GNOME evidence}"
+    TEST_SCRIPT="test-gnome-panel-container.sh"
+    ;;
   --native-desktop) TEST_SCRIPT="test-native-desktop.sh" ;;
   --native-pulse-latency)
     : "${VOCO_NATIVE_PULSE_EVIDENCE_DIR:?Set a fresh directory for native Pulse evidence}"

@@ -187,7 +187,7 @@ VOCO's shortcut combines Alt, Control or Super with a key, Alt+D by default.
 
 | Desktop | How the shortcut reaches VOCO |
 | --- | --- |
-| GNOME 46, 48 or 50 on Wayland, [companion](../../integrations/gnome/README.md) attached | Shell grabs Alt+D or Alt+Shift+D, so the focused app never sees it. |
+| GNOME 46, 48, 50 or 51 on Wayland, [companion](../../integrations/gnome/README.md) attached | Shell grabs Alt+D or Alt+Shift+D, so the focused app never sees it. |
 | Wayland with Alt+D or Alt+Shift+D, no companion | Passive evdev. The focused app also acts on the chord. |
 | Wayland with any other shortcut | A desktop keybinding that runs `voco --toggle`. |
 | X11 | VOCO's root-window grab, for any shortcut it accepts. It toggles on release, so the paste keys reach the app. |
@@ -243,13 +243,14 @@ polling, and keeps watching when none is readable at startup.
 - On GNOME, apps that inhibit system shortcuts, such as virtual machines and
   remote desktops, receive the companion's chord. In Shell menus and dialogs it
   does nothing.
-- The companion supports GNOME 46, 48 and 50, and `voco --check-panel` reports
+- The companion supports GNOME 46, 48, 50 and 51, and `voco --check-panel` reports
   other versions as unsupported. Elsewhere VOCO uses the tray, which on GNOME
   needs an AppIndicator extension. Debian 13 and Fedora 44 don't turn one on.
 - Automated tests use synthetic audio in private X11, Wayland, GNOME and
   Chromium sessions, not physical microphones, other desktops or other apps.
   Hosted CI runs the desktop suites on Ubuntu 24.04 with GNOME 46, and only the
-  companion on GNOME 50. On Debian 13 and Fedora 44 it checks the dependencies
-  and the speech runtime, not a desktop.
+  companion on GNOME 50 and 51; GNOME 51 comes from a Fedora 45 container. On
+  Debian 13 and Fedora 44 it checks the dependencies and the speech runtime, not
+  a desktop.
 - The RPM carries no OpenPGP signature of its own; the release's signed checksum
   lists authenticate it, as [Install VOCO](../install.md#fedora) shows.
