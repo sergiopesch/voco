@@ -62,7 +62,9 @@ place in the top bar.
 
 Settings has four pages: **Settings** for your microphone, **Shortcut**,
 **Updates** and **Help**, which has setup steps and runtime checks. Opening
-VOCO from your app menu shows the popover, except while you dictate. The panel
+VOCO from your app menu shows the popover, even when VOCO wasn't running, except
+while you dictate. Started from a terminal or by your desktop's startup apps,
+VOCO stays in the tray. The panel
 menu has no quit item, so with the panel, finish dictating and run
 `pkill -x voco` to quit VOCO.
 

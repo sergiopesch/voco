@@ -62,6 +62,13 @@ explain how to upgrade.
   Docker Hub rate-limits hosted runners, and Frontend Checks and GNOME 50 Companion
   allow for a slow apt mirror.
 
+### Fixed
+
+- Opening VOCO from the app menu when it isn't running shows its popover, as it
+  does when VOCO is running. Before, VOCO started silently in the tray, so the
+  click seemed to do nothing. A start from a terminal or a login autostart still
+  stays in the tray.
+
 ## [2026.0.61] - 2026-10-09
 
 VOCO types on Wayland through its own virtual keyboard and supports Ubuntu 24.04
