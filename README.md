@@ -16,7 +16,7 @@ you are typing.
   subscription, telemetry or cloud transcription.
 - **Local.** An English speech model runs on your processor. You don't need a
   GPU or a cloud service.
-- **Under your control.** Nothing happens that you didn't ask for. VOCO listens
+- **Under your control.** VOCO acts in your apps only when you ask. It listens
   only when you start it, shows that it's listening and never presses Enter.
 - **Open source app, NVIDIA model.** VOCO's code is MIT-licensed. Its speech model,
   NVIDIA Nemotron, is under the [NVIDIA Open Model License](runtime/notices/NVIDIA-OPEN-MODEL-LICENSE.html),
