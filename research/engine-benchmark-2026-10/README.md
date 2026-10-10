@@ -20,7 +20,8 @@ punctuation.
 
 The harness that produced these numbers is in [harness/](harness/), and every
 run's per-utterance results are in [results/](results/). Neither `npm test` nor
-CI runs it.
+CI runs it. This record describes the measurements of 9 October 2026; VOCO's
+documentation describes how it works now.
 
 ## Setup
 
@@ -175,6 +176,7 @@ utterances, [`analyze.py`](harness/analyze.py)):
 | `results/runs/<config>.jsonl.xz` | One JSON record per utterance: each step's processing time and text, and the final text. `nemo-en-r1-paced` is the real-time paced check. Decompress with `xz -d` |
 | `results/corpus-manifest.jsonl` | The 311 utterances: set, speaker, duration and the plain and punctuated references |
 | `results/python-packages.txt` | The scoring environment's Python packages |
+| `results/run-all.log` | When each configuration started and finished, and its exit status |
 
 ## Reproduce
 
@@ -185,7 +187,7 @@ at that commit.
 
 ```bash
 sudo install -d /opt/bench/tools
-sudo cp docs/testing/engine-benchmark-2026-10/harness/* /opt/bench/tools/
+sudo cp research/engine-benchmark-2026-10/harness/* /opt/bench/tools/
 cd /opt/bench
 sudo tools/setup-box.sh tools && sudo tools/setup-box.sh models && sudo tools/setup-box.sh data
 sudo tools/run-all.sh   # every configuration, one at a time, then score.py
@@ -194,7 +196,11 @@ venv/bin/python tools/analyze.py --corpus corpus results/nemo-en-r1.jsonl result
 ```
 
 The full plan took just under 3 hours on the machine above. Run nothing else on
-it while it measures.
+it while it measures. `run-all.sh` scores only the configurations it ran, first
+runs `parakeet-offline` when its word times are missing, and exits 1 if a
+configuration failed or left no complete record, which then stays out of the
+summary. Those safeguards were added after publication review; in this run
+every configuration exited 0 and left a complete record.
 
 ## Data and licences
 
