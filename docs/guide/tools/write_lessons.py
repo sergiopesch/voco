@@ -898,6 +898,10 @@ lesson(
             "voco accepts --toggle, --check-desktop-input, --check-panel, --setup-panel, --version and --help. Unknown arguments exit with code 2.",
         ),
         (
+            "A launcher click opens VOCO",
+            "When VOCO's own launcher starts it, GIO names VOCO.desktop and this process, so VOCO shows its popover as it would for a second launch. A start from a terminal or a login autostart stays in the tray.",
+        ),
+        (
             "A hidden window",
             "With native capture VOCO really hides its window. On X11, where WebKit records, VOCO instead shrinks the window to 1 by 1 pixel and moves it off-screen.",
         ),
@@ -922,7 +926,7 @@ lesson(
         (B + "main.rs", "Command-line options and their exit codes."),
         (B + "lib.rs", "Startup, the window and the keyboard reader."),
         (B + "single_instance.rs", "The lock that keeps one copy per login."),
-        (B + "activation.rs", "Brings the running copy forward."),
+        (B + "activation.rs", "Brings the running copy forward, or the copy its launcher started."),
         (B + "desktop_notifications.rs", "Notifications over D-Bus."),
         (B + "trigger_socket.rs", "The owner-only sockets behind voco --toggle."),
         (B + "virtual_keyboard.rs", "Creates the virtual keyboard and sends its keys."),
