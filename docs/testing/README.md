@@ -221,6 +221,7 @@ pull requests into it. Evidence artifacts upload even after a failure and stay 7
 | Rust Check & Test | `cargo fmt`, Clippy, the glib checks, `cargo test`, the C callbacks and native capture latency; then it provisions the runtime and runs the speech baseline and the worker protocol | `speech-regression-evidence` |
 | Application | The release build of `voco` and `voco-browser-host` with the runtime, then the tray bridge on GNOME, `--full-application`, both delivery suites on `gnome-wayland` through the release build's production paste and the uinput bridge, the Wayland lifecycle, `--browser-application` and `--browser-toolbar` | `application-evidence` |
 | GNOME 50 Companion | On `ubuntu-26.04`, the companion regression headless on GNOME Shell 50 | `gnome50-panel-evidence` |
+| GNOME 51 Companion | The same regression on GNOME Shell 51, built from a digest-pinned Fedora 45 image and run in rootless Podman | `gnome51-panel-evidence` |
 | Debian 13 Runtime, Fedora 44 Runtime | In digest-pinned containers, VOCO's package dependencies by that distribution's names, then the speech runtime, IBus and worker protocol tests and the speech baseline on its Python | None |
 
 ## Manual acceptance
@@ -235,7 +236,7 @@ account, because dictation replaces the clipboard, and made-up sentences.
    `bash scripts/setup.sh --install` in a checkout with the runtime. On Wayland,
    sign out and back in once so the [paste keys](../install.md#wayland-paste-keys)
    get their access.
-2. Run `voco --version` and `voco --check-desktop-input`. On GNOME 46, 48 or 50,
+2. Run `voco --version` and `voco --check-desktop-input`. On GNOME 46, 48, 50 or 51,
    run `voco --setup-panel`, sign out and back in, then run `voco --check-panel`.
 3. Start VOCO from the app menu. On a first start it opens setup: run the voice
    test, check that your words appear, and finish desktop setup.

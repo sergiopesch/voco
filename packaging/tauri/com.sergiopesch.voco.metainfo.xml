@@ -30,7 +30,7 @@
   <releases>
     <release version="2026.0.62" date="2026-10-10">
       <description>
-        <p>VOCO introduces itself as the voice layer for Linux, starting with dictation. Its app framework and build tools are up to date, and dictation works as before on Ubuntu 24.04 and 26.04, Debian 13 and Fedora 44.</p>
+        <p>VOCO introduces itself as the voice layer for Linux, starting with dictation. Locking the screen now stops dictation, the speech worker can't open network sockets, update checks can wait until you ask, and the GNOME top-bar panel also runs on GNOME 51. VOCO supports Ubuntu 24.04 and 26.04, Debian 13 and Fedora 44, and its app framework and build tools are up to date.</p>
       </description>
     </release>
     <release version="2026.0.61" date="2026-10-09">

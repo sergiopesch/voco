@@ -471,6 +471,34 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  gnome-51:
+    name: GNOME 51 Companion
+    # Room for a slow package mirror while the Shell image builds.
+    timeout-minutes: 30
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # No hosted runner ships GNOME 51, and Fedora 45 does: the harness builds
+      # Shell from the pinned image and runs the suite in rootless Podman.
+      - name: GNOME 51 companion shortcut and lifecycle regression
+        timeout-minutes: 15
+        env:
+          VOCO_PANEL_IMAGE: registry.fedoraproject.org/fedora:45@sha256:cf60308d4ae9603f74d8be2ab8dc252a9fcc4fad6570417363af7748f23d053e
+          VOCO_PANEL_EVIDENCE_DIR: ${{ runner.temp }}/voco-panel-gnome51
+        run: bash scripts/test-private-ibus-engine-hosted.sh --gnome-panel-container
+
+      - name: Retain GNOME 51 companion evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: gnome51-panel-evidence
+          path: ${{ runner.temp }}/voco-panel-gnome51/
+          if-no-files-found: ignore
+          retention-days: 7
+
   distro-runtime:
     name: ${{ matrix.name }} Runtime
     timeout-minutes: 30

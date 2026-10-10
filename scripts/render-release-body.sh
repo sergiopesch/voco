@@ -70,7 +70,7 @@ the GNOME panel, upgrades and removal.
 
 The packages require x86-64 with AVX2, FMA and F16C, and glibc 2.39 or later.
 The Debian package is for Ubuntu 24.04 and 26.04 LTS and Debian 13, and the RPM
-for Fedora 44. The GNOME panel supports GNOME 46, 48 and 50; Debian and Fedora
+for Fedora 44. The GNOME panel supports GNOME 46, 48, 50 and 51; Debian and Fedora
 don't turn on an AppIndicator extension, so there the panel is VOCO's place in
 the top bar.
 Pasting replaces the clipboard's text. The bundled model is English only.

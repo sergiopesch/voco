@@ -51,12 +51,14 @@ class PanelSetupTests(unittest.TestCase):
 
     def test_global_policy_and_unsupported_shell_are_preserved(self):
         self.assertEqual(panel.classify('46.0', True, {'state': 1}, True, True)['status'], 'blocked')
-        for version in ['45.9', '47.0', '49.2', '51.0']:
+        for version in ['45.9', '47.0', '49.2', '52.0']:
             status = panel.classify(version, True, {}, False, False)
             self.assertEqual(status['status'], 'unsupported')
             self.assertFalse(status['canEnable'])
             self.assertIn('Dictation still works', status['detail'])
             self.assertIn('configure it in your desktop to run voco --toggle', status['detail'])
+        for major in panel.SUPPORTED_SHELLS:
+            self.assertTrue(panel.classify(major + '.0', True, {}, False, False)['canEnable'], major)
 
     def test_debian_maps_every_runtime_extension_file(self):
         import json

@@ -11,7 +11,7 @@ dictation. Start with the [project README](../README.md) for a quick overview.
 | [Everyday use](everyday-use.md) | Dictating, controls, shortcuts, Review, what VOCO keeps, limits |
 | [Troubleshooting](troubleshooting.md) | Diagnostics, fixes by symptom, logs and bug reports |
 | [Platform support](platform/README.md) | Supported systems and how they are tested, sessions and input helpers |
-| [GNOME panel](../integrations/gnome/README.md) | The optional top-bar companion for GNOME 46, 48 and 50 |
+| [GNOME panel](../integrations/gnome/README.md) | The optional top-bar companion for GNOME 46, 48, 50 and 51 |
 | [Chromium extension](../integrations/chromium/README.md) | The optional browser extension for single text fields |
 
 ## Contributing

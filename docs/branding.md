@@ -182,7 +182,7 @@ dictation reads Stop after microphone starts.
 
 ### GNOME companion
 
-On GNOME 46, 48 and 50 the [companion](../integrations/gnome/README.md)
+On GNOME 46, 48, 50 and 51 the [companion](../integrations/gnome/README.md)
 replaces the tray icon. It is one pill (3 px vertical margin, 11 px side
 padding, fully rounded) that shares GNOME's hover, focus and open-menu
 highlight, tinted `rgba(190, 198, 208, 0.14)` whenever VOCO isn't idle. The

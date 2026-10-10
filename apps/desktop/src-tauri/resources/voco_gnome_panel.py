@@ -18,12 +18,12 @@ def result(status, detail, can_enable=False):
 
 
 # Tested Shell majors; keep in step with the companion's metadata.json.
-SUPPORTED_SHELLS = ('46', '48', '50')
+SUPPORTED_SHELLS = ('46', '48', '50', '51')
 
 
 def classify(version, installed, info, enabled, globally_disabled):
     if version.split('.')[0] not in SUPPORTED_SHELLS:
-        return result('unsupported', 'The VOCO panel supports GNOME 46, 48 and 50. Dictation still works, but without the panel the focused app also receives Alt+D and Alt+Shift+D. To avoid that, choose another shortcut in VOCO and configure it in your desktop to run voco --toggle.')
+        return result('unsupported', 'The VOCO panel supports GNOME 46, 48, 50 and 51. Dictation still works, but without the panel the focused app also receives Alt+D and Alt+Shift+D. To avoid that, choose another shortcut in VOCO and configure it in your desktop to run voco --toggle.')
     if not installed:
         return result('missing', 'The VOCO panel files are missing. Reinstall the complete VOCO package.')
     if globally_disabled:

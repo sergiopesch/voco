@@ -13,7 +13,7 @@ so VOCO needs no downloads after installation.
 | Desktop | A Wayland or X11 session. GNOME 50 has no X11 session, so on Ubuntu 26.04 and Fedora 44 VOCO runs on Wayland. |
 | Audio | A microphone, with PipeWire's PulseAudio service (`pipewire-pulse`), which the supported systems include. PulseAudio itself works only on X11 (see [Microphone problems](troubleshooting.md#microphone-problems)) |
 | Wayland typing | Access to `/dev/uinput`, which the package gives the user of the active local session (see [Wayland paste keys](#wayland-paste-keys)) |
-| Wayland shortcut | Outside GNOME 46, 48 and 50, a desktop shortcut that runs `voco --toggle` (see [Wayland compositor shortcuts](#wayland-compositor-shortcuts)) |
+| Wayland shortcut | Outside GNOME 46, 48, 50 and 51, a desktop shortcut that runs `voco --toggle` (see [Wayland compositor shortcuts](#wayland-compositor-shortcuts)) |
 
 To check the processor, run this command. It must print all three names.
 
@@ -43,7 +43,7 @@ The installer asks for your password when APT or DNF needs it, and:
 4. Installs the package with APT or DNF, then checks that exactly this release
    is installed.
 5. Runs `voco --check-desktop-input` to check [desktop input](#desktop-input).
-6. Runs `voco --setup-panel`, which on GNOME 46, 48 and 50 turns on the
+6. Runs `voco --setup-panel`, which on GNOME 46, 48, 50 and 51 turns on the
    [VOCO panel](#gnome-panel) for your account.
 7. Opens VOCO for a short voice test. As root or over SSH it skips this, so
    open VOCO from your desktop.
@@ -210,7 +210,7 @@ explains the rule, how to check it and how to use a different policy.
 
 ## GNOME panel
 
-On GNOME 46, 48 and 50, VOCO includes an optional top-bar panel with live
+On GNOME 46, 48, 50 and 51, VOCO includes an optional top-bar panel with live
 microphone bars, a menu and a Stop control. On Wayland it also keeps your
 `Alt+D` or `Alt+Shift+D` shortcut from reaching the app you are typing in. The
 guided installer turns it on. Otherwise, run `voco --setup-panel` or choose

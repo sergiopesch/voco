@@ -188,11 +188,11 @@ change.
 
 ### GNOME companion and tray
 
-- Both packages bundle the companion for GNOME 46, 48 and 50. Its metadata's
+- Both packages bundle the companion for GNOME 46, 48, 50 and 51. Its metadata's
   `shell-version` and `SUPPORTED_SHELLS` in `voco_gnome_panel.py` name the same
   majors, and setup reports any other as `unsupported`; admit a major only after
-  testing it. A Shell without `Meta.is_wayland_compositor()` (GNOME 50) is
-  Wayland-only. Enable the companion only through the user-run setup
+  testing it. A Shell without `Meta.is_wayland_compositor()` (GNOME 50 and later)
+  is Wayland-only. Enable the companion only through the user-run setup
   (`voco --setup-panel`); package hooks never change enabled extensions. Keep
   "sign out and back in" feedback distinct from active status.
 - Bump the companion metadata and the setup contract together when loaded code
@@ -208,8 +208,14 @@ change.
 - While the companion is attached, VOCO hides its fallback tray icon. The
   companion's menu is Settings, Review and Stop dictation. On every supported
   Shell a primary click on the pill stops or opens Settings, and other buttons,
-  Menu and Shift+F10 open the menu: GNOME 50's panel click gesture must leave
-  primary presses and touches to the pill.
+  Menu and Shift+F10 open the menu: from GNOME 50, the panel's click gesture must
+  leave primary presses and touches to the pill.
+- Support each new GNOME major within four weeks of its release, ahead of other
+  feature work. Run the companion suite on it in CI (a job like GNOME 51
+  Companion builds a digest-pinned image when no hosted runner ships that
+  Shell), fix what breaks, then admit the major in the metadata,
+  `SUPPORTED_SHELLS` and the docs together. Dictation keeps working without the
+  companion until then.
 - On GNOME the fallback tray needs an AppIndicator extension. Ubuntu turns one
   on; Debian 13 and Fedora 44 don't, so there the companion is VOCO's only
   top-bar presence. When 20 s after startup neither the companion is attached nor

@@ -91,7 +91,7 @@ it, before DNF started. After a manual install, the checks in
    dictation starts, the problem is the shortcut.
 3. Open **Help**, then **My shortcut is not working**. It says how the shortcut
    reaches VOCO and whether that works.
-4. On Wayland outside GNOME 46, 48 and 50, bind a key to `voco --toggle`, as
+4. On Wayland outside GNOME 46, 48, 50 and 51, bind a key to `voco --toggle`, as
    described in [Wayland compositor shortcuts](install.md#wayland-compositor-shortcuts).
 
 If `voco --toggle` prints `Could not reach VOCO's private control socket`, VOCO
@@ -107,7 +107,7 @@ launch with **Your shortcut also reached the app**. If VOCO can't read any
 keyboard either, the shortcut does nothing, and shortly after VOCO starts it
 says **Your shortcut can't reach VOCO yet**. Fix either one of these ways:
 
-- On GNOME 46, 48 or 50, choose **Enable live panel** on the **Help** page, or
+- On GNOME 46, 48, 50 or 51, choose **Enable live panel** on the **Help** page, or
   run `voco --setup-panel`. Then sign out and back in.
 - Elsewhere, choose another shortcut in VOCO and bind it to `voco --toggle` in
   your desktop's keyboard settings.
@@ -167,7 +167,7 @@ is in [Review](everyday-use.md#review).
 
 ## The GNOME panel doesn't appear
 
-The panel works on GNOME 46, 48 and 50, and shows only while VOCO is running.
+The panel works on GNOME 46, 48, 50 and 51, and shows only while VOCO is running.
 Run `voco --check-panel` and follow the line it prints. It exits with status 2
 when the panel needs a step.
 
@@ -178,7 +178,7 @@ when the panel needs a step.
   policy blocks them, ask your administrator.
 - If the panel files are missing, reinstall the VOCO package.
 - On other GNOME versions, `voco --check-panel` says that the panel supports
-  GNOME 46, 48 and 50. There and on other desktops, use the tray menu.
+  GNOME 46, 48, 50 and 51. There and on other desktops, use the tray menu.
 
 On Debian 13 and Fedora 44, VOCO's tray icon needs an AppIndicator extension,
 which they don't turn on, so until the panel loads VOCO has no icon in the top

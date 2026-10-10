@@ -203,7 +203,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 
 - `voco-panel@voco.local/extension.js` — Panel pill, meter, menu, shortcut grab and the D-Bus client.
 - `voco-panel@voco.local/model.js` — Presentation model shared with the Node tests.
-- `voco-panel@voco.local/metadata.json` — Extension metadata for GNOME Shell 46, 48 and 50.
+- `voco-panel@voco.local/metadata.json` — Extension metadata for GNOME Shell 46, 48, 50 and 51.
 - `voco-panel@voco.local/stylesheet.css` — Pill and meter styles.
 - `voco-panel@voco.local/voco-symbol.png` — Microphone symbol.
 - `package.json` — Marks the directory as ES modules for the tests.
@@ -349,8 +349,8 @@ can't take its single-instance lock or reach the running instance, it prints
 | --- | --- | --- |
 | `--toggle` | Asks the VOCO running in this session to start or stop. It doesn't launch VOCO, change focus or confirm the recording state. | 1 if VOCO's socket can't be reached |
 | `--check-desktop-input` | Checks the paste prerequisites: the clipboard helper, plus `xdotool` on X11 or access to `/dev/uinput` on Wayland. It doesn't launch VOCO, create a keyboard or send keys. | 1 on failure |
-| `--check-panel` | Checks the GNOME companion without changing settings. | 2 unless the companion is active, the desktop isn't GNOME, or GNOME isn't 46, 48 or 50; 1 on error |
-| `--setup-panel` | Enables the packaged GNOME companion for this user, on GNOME 46, 48 or 50. It may need a sign-out and never restarts Shell. | As for `--check-panel` |
+| `--check-panel` | Checks the GNOME companion without changing settings. | 2 unless the companion is active, the desktop isn't GNOME, or GNOME isn't 46, 48, 50 or 51; 1 on error |
+| `--setup-panel` | Enables the packaged GNOME companion for this user, on GNOME 46, 48, 50 or 51. It may need a sign-out and never restarts Shell. | As for `--check-panel` |
 | `--version` | Prints `VOCO` and the version. | 0 |
 | `--help`, `-h` | Prints usage. | 0 |
 
