@@ -2,7 +2,7 @@
 //! and follow that login's screen lock.
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{LazyLock, Mutex};
+use std::sync::{Arc, LazyLock, Mutex};
 use std::task::Poll;
 use std::time::{Duration, Instant};
 
@@ -197,7 +197,7 @@ pub fn is_locked() -> bool {
 /// Follow the originating login's LockedHint for the life of the process.
 /// `on_lock` runs on the GTK main thread each time the screen locks. Without
 /// logind or a bound login nothing is watched.
-pub fn watch_lock(on_lock: impl Fn() + Send + 'static) {
+pub fn watch_lock(on_lock: impl Fn() + Send + Sync + 'static) {
     std::thread::spawn(move || {
         let Some(logind) = Logind::connect() else {
             return;
@@ -213,34 +213,48 @@ pub fn watch_lock(on_lock: impl Fn() + Send + 'static) {
                 _ => return,
             }
         };
-        if let Ok(session) = logind.read(&path) {
-            SESSION_LOCKED.store(session.locked, Ordering::SeqCst);
-        }
-        let bus = logind.bus.clone();
+        let on_lock = Arc::new(on_lock);
+        let (bus, signal_path, signal_lock) = (logind.bus.clone(), path.clone(), on_lock.clone());
+        let (subscribed, ready) = std::sync::mpsc::channel();
         // Signals are delivered on the context that subscribed: GTK's.
         glib::MainContext::default().invoke(move || {
             let _subscription = bus.signal_subscribe(
                 Some("org.freedesktop.login1"),
                 Some("org.freedesktop.DBus.Properties"),
                 Some("PropertiesChanged"),
-                Some(&path),
+                Some(&signal_path),
                 Some(SESSION_INTERFACE),
                 gio::DBusSignalFlags::NONE,
                 move |_, _, _, _, _, parameters| {
                     if let Some(locked) = locked_hint_change(parameters) {
-                        if locked && !SESSION_LOCKED.swap(true, Ordering::SeqCst) {
-                            on_lock();
-                        } else if !locked {
-                            SESSION_LOCKED.store(false, Ordering::SeqCst);
-                        }
+                        note_lock(&SESSION_LOCKED, locked, &*signal_lock);
                     }
                 },
             );
             // A subscription lasts as long as its connection, and GIO keeps the
             // shared system bus only while something holds it: hold it for good.
             std::mem::forget(bus);
+            let _ = subscribed.send(());
         });
+        // Read the state only once the match rule is queued: the bus handles one
+        // connection's messages in order, so a change can't fall between the two.
+        // A lock seen here stops a dictation that started meanwhile.
+        if ready.recv().is_ok() {
+            if let Some(session) = Logind::connect().and_then(|logind| logind.read(&path).ok()) {
+                note_lock(&SESSION_LOCKED, session.locked, &*on_lock);
+            }
+        }
     });
+}
+
+/// Record a lock state from the signal or the first read. Only the change to
+/// locked stops dictation, so seeing one lock twice stops it once.
+fn note_lock(state: &AtomicBool, locked: bool, on_lock: &dyn Fn()) {
+    if !locked {
+        state.store(false, Ordering::SeqCst);
+    } else if !state.swap(true, Ordering::SeqCst) {
+        on_lock();
+    }
 }
 
 /// LockedHint's new value in a logind session PropertiesChanged signal.
@@ -444,6 +458,21 @@ mod tests {
         locked.insert("LockedHint".into(), true.to_variant());
         let session = decode_session(locked).unwrap();
         assert!(session.locked && session.active && !session.usable());
+    }
+
+    #[test]
+    fn only_the_change_to_locked_stops_dictation() {
+        let state = AtomicBool::new(false);
+        let stops = std::cell::Cell::new(0);
+        let stop = || stops.set(stops.get() + 1);
+        // The first read and the signal can both report the same lock.
+        note_lock(&state, true, &stop);
+        note_lock(&state, true, &stop);
+        assert_eq!(stops.get(), 1);
+        note_lock(&state, false, &stop);
+        assert!(!state.load(Ordering::SeqCst));
+        note_lock(&state, true, &stop);
+        assert_eq!(stops.get(), 2);
     }
 
     #[test]
