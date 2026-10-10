@@ -80,6 +80,8 @@ VOCO_DOWNLOAD_DIR=$(mktemp -d)
 VOCO_TERMINAL_COLUMNS=80
 VOCO_TERMINAL_ROWS=24
 voco_ui_init
+# Frames show the card at rest, so a whole card is easy to count.
+voco_ui_settle
 printf 'PRESERVED BEFORE CANVAS\n'
 voco_ui_begin 'First stage' 'Initial frame'
 (
@@ -87,11 +89,11 @@ voco_ui_begin 'First stage' 'Initial frame'
   trap 'exit 0' TERM
   printf() {
     builtin printf "$@"
-    # Interrupt immediately after the first write containing a logo glyph.
-    # The original per-row renderer leaves a partial canvas here.
-    if [[ "$1" != -v && "$*" == *'█'* ]]; then kill -TERM "$BASHPID"; fi
+    # Interrupt immediately after the first write containing the card.
+    # A per-row renderer would leave a partial canvas here.
+    if [[ "$1" != -v && "$*" == *'▀'* ]]; then kill -TERM "$BASHPID"; fi
   }
-  voco_ui_frame 'Sweep stage' 'Interrupted frame' '—' 0
+  voco_ui_frame 'Sweep stage' 'Interrupted frame' '—'
 ) &
 VOCO_UI_PID=$!
 wait "$VOCO_UI_PID" || true
@@ -100,14 +102,15 @@ voco_ui_frame 'Final stage' 'Ready' '✓'
 voco_ui_close
 """
         with tempfile.TemporaryDirectory() as folder:
-            env = {**os.environ, 'TERM': 'xterm-256color', 'TMPDIR': folder}
+            env = {**os.environ, 'TERM': 'xterm-256color', 'TMPDIR': folder, 'COLORTERM': 'truecolor'}
             for key in ('NO_COLOR', 'VOCO_INSTALL_PLAIN', 'VOCO_INSTALL_NO_MOTION'):
                 env.pop(key, None)
             code, output = fixture.terminal(['bash', '-c', prefix + body], env)
             self.assertEqual(code, 0, output)
             screen = visible_terminal(output)
             self.assertIn('PRESERVED BEFORE CANVAS', screen)
-            self.assertEqual(sum('█' in line for line in screen.splitlines()), 5, screen)
+            # One card: its eleven rows and lower edge use upper half blocks.
+            self.assertEqual(sum('▀' in line for line in screen.splitlines()), 12, screen)
             self.assertIn('Final stage', screen)
             self.assertNotIn('Interrupted frame', screen)
 
@@ -214,7 +217,9 @@ voco_ui_close
                    'FIXTURE_PACKAGE_URL': str(root / 'package-url'), 'FIXTURE_CPUINFO': str(root / 'cpuinfo'),
                    'FIXTURE_GLIBC': '2.36' if platform_case == 'old-glibc' else '2.39',
                    'FIXTURE_DPKG_CALL': str(root / 'dpkg-called'),
-                   'FIXTURE_PANEL_DETAIL': PANEL_RESTARTS[panel_result]['detail']}
+                   'FIXTURE_PANEL_DETAIL': PANEL_RESTARTS[panel_result]['detail'],
+                   # Without 24-bit colour the compact canvas stands in for the card.
+                   'COLORTERM': '' if mode == 'compact' else 'truecolor'}
             env.pop('NO_COLOR', None)
             if mode == 'plain':
                 env['VOCO_INSTALL_PLAIN'] = '1'
@@ -268,10 +273,16 @@ voco_ui_close
                 (Path(directory) / 'journey.txt').write_text(screen)
             if mode in ('plain', 'narrow', 'short'):
                 self.assertEqual(screen.count('VOCO · v'), 1, screen)
-                self.assertNotIn('██', screen)
-            else:
-                self.assertEqual(sum('█' in line for line in screen.splitlines()), 5, screen)
+                self.assertNotIn('▀', screen)
+            elif mode == 'compact':
+                self.assertEqual(screen.count('V O C O'), 1, screen)
+                self.assertNotIn('▀', screen)
                 self.assertEqual(screen.count('The voice layer for Linux.'), 1, screen)
+            else:
+                self.assertEqual(sum('▀' in line for line in screen.splitlines()), 12, screen)
+                self.assertEqual(screen.count('The voice layer for Linux.'), 1, screen)
+                self.assertEqual(screen.count('Today: private dictation.'), 1, screen)
+                self.assertEqual(screen.count(f'v{version}'), 1, screen)
             if mode == 'password':
                 self.assertIn('Fixture password: fixture', screen)
             if mode == 'prompt':
@@ -359,7 +370,7 @@ voco_ui_close
                 self.run_journey('plain', signature_case, manager='dnf')
 
     def test_complete_journey_has_one_final_canvas(self):
-        for mode in ('animated', 'no-motion', 'password', 'prompt', 'plain', 'narrow', 'short'):
+        for mode in ('animated', 'no-motion', 'password', 'prompt', 'compact', 'plain', 'narrow', 'short'):
             with self.subTest(mode=mode):
                 self.run_journey(mode)
 

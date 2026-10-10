@@ -203,20 +203,36 @@ something to stop, Stop dictation.
 
 ### Installer
 
-`scripts/lib/install-brand.json` defines the installer's four-glyph, five-row
-wordmark and its palette: silver `199,204,212`, shine `241,243,246`, muted
-`122,128,138`, complete `165,217,178` and active `239,206,131`. After editing it,
-run `python3 scripts/sync-installer-ui.py`; `npm run verify:devops` fails if the
+`scripts/lib/install-brand.json` holds the installer's look: the card's graphite
+`17,19,24`; the microphone; the four-glyph, five-row wordmark with its ten-step
+satin gradient from `244,246,249` to `143,150,161`; the shine, sweep and text
+colours; the progress palette (silver `199,204,212`, muted `122,128,138`,
+complete `165,217,178` and active `239,206,131`); and the easing as 21 steps of
+`cubic-bezier(.2, .8, .2, 1)`. `scripts/generate-installer-art.py` draws the
+microphone from `assets/voco-symbol.png`: ffmpeg composites it onto the
+graphite and scales it to 14 × 22 pixels, two to each half-block cell, so the
+installer never reads an image. After editing either, run
+`python3 scripts/sync-installer-ui.py`; `npm run verify:devops` fails if the
 installer is out of sync.
 
 | Terminal | Output |
 | --- | --- |
-| A terminal with colour, Bash 5 or later, at least 64 × 12 | A progress canvas: 14 lines with the block wordmark and "The voice layer for Linux." from 16 rows, otherwise 10 lines with "V O C O" |
-| Anything else, `NO_COLOR`, `TERM=dumb` or `VOCO_INSTALL_PLAIN=1` | Plain lines under "VOCO · v<version>" and "The voice layer for Linux." |
+| 24-bit colour (`COLORTERM` is `truecolor` or `24bit`), Bash 5 or later, at least 64 × 23 | The card: the microphone and the wordmark on graphite, with the version, "The voice layer for Linux." and "Today: private dictation.", above the progress lines; 21 lines in all |
+| Any other colour terminal with Bash 5 or later, at least 64 × 12 | 10 lines under "V O C O" and "The voice layer for Linux. Today: private dictation." |
+| Anything else, `NO_COLOR`, `TERM=dumb` or `VOCO_INSTALL_PLAIN=1` | Plain lines under "VOCO · v<version>" and "The voice layer for Linux. Today: private dictation." |
+
+The card is graphite on every terminal background, with rounded edges. When it
+first appears, a silver line crosses it and leaves the microphone behind it,
+the letters glide in from the right and lock on the easing above, one shine
+passes across them, and the tagline writes itself in: 1.3 s in all. The intro
+only paints frames, about 30 a second, while the checks and the download go
+on; an install that finishes sooner ends on the card at rest. Each later stage,
+and the start of the download, passes one shine across the letters. The
+microphone itself never changes colour, and once the card is at rest only the
+progress lines are drawn again.
 
 The canvas marks stages with ✓ in green when done, › in amber while active and
-○ in grey while waiting: Check, Download, Verify and Install. When a stage
-begins, a brighter silver passes across the block letters, one every 125 ms. Downloads
+○ in grey while waiting: Check, Download, Verify and Install. Downloads
 sample four times a second and show seven bars on a fixed log scale, the bytes
 received and the average rate, without a percentage or time estimate. APT output
 repaints at most every 0.1 s; DNF keeps its own output, and the canvas clears
@@ -232,6 +248,7 @@ From the repository root, with Python 3.10 or later and ffmpeg:
 python3 scripts/prepare-brand-masters.py
 python3 scripts/generate-icons.py
 python3 scripts/generate-brand-banner.py
+python3 scripts/generate-installer-art.py && python3 scripts/sync-installer-ui.py
 ```
 
 The first script keys the green background out of the sources in
