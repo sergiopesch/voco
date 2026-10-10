@@ -28,22 +28,49 @@ PANEL_RESTARTS = {
 }
 
 
-def visible_terminal(data, width=80):
-    """Small VT screen reader for the CSI sequences emitted by this installer.
+def visible_terminal(data, width=80, images=None):
+    """Small VT screen reader for the sequences emitted by this installer.
 
     Keep scrollback: a stale frame is a failure even above the visible viewport.
     This does not discard earlier output when a later progress frame appears.
+    IMAGES, when given, receives the kitty image placements left at the end:
+    (image, placement) -> (row, column, columns, rows).
     """
     rows = [[]]
     row = column = 0
-    tokens = re.split(r'(\x1b\[[0-9;?]*[A-Za-z])', data.decode('utf-8', 'replace'))
+    saved = (0, 0)
+    placements = {}
+    tokens = re.split(r'(\x1b\[[0-9;?]*[A-Za-z]|\x1b_[^\x1b]*\x1b\\|\x1b[78\\])', data.decode('utf-8', 'replace'))
     for token in tokens:
+        if token.startswith('\x1b_G'):
+            keys, _, _ = token[3:-2].partition(';')
+            keys = dict(item.split('=', 1) for item in keys.split(',') if '=' in item)
+            if keys.get('a') == 'p':
+                placements[keys['i'], keys.get('p')] = (row, column, int(keys['c']), int(keys['r']))
+            elif keys.get('a') == 'd':
+                for key in [key for key in placements if key[0] == keys.get('i') and
+                            (keys.get('d') == 'I' or keys.get('p') in (None, key[1]))]:
+                    del placements[key]
+            continue
+        if token in ('\x1b7', '\x1b8', '\x1b\\'):
+            if token == '\x1b7':
+                saved = (row, column)
+            elif token == '\x1b8':
+                row, column = saved
+            continue
         if token.startswith('\x1b['):
             command, amount = token[-1], token[2:-1]
-            if command == 'm':
+            if command in 'mtc':
+                # Colours, and the probe's questions to the terminal.
                 continue
             if command == 'A':
                 row = max(0, row - int(amount or '1'))
+            elif command == 'B':
+                row += int(amount or '1')
+                while len(rows) <= row:
+                    rows.append([])
+            elif command == 'G':
+                column = int(amount or '1') - 1
             elif command == 'K':
                 if amount == '2':
                     rows[row] = []
@@ -69,6 +96,8 @@ def visible_terminal(data, width=80):
                     rows[row].append(' ')
                 rows[row][column] = char
                 column += 1
+    if images is not None:
+        images.update(placements)
     return '\n'.join(''.join(line).rstrip() for line in rows)
 
 
@@ -102,15 +131,13 @@ voco_ui_frame 'Final stage' 'Ready' '✓'
 voco_ui_close
 """
         with tempfile.TemporaryDirectory() as folder:
-            env = {**os.environ, 'TERM': 'xterm-256color', 'TMPDIR': folder, 'COLORTERM': 'truecolor'}
-            for key in ('NO_COLOR', 'VOCO_INSTALL_PLAIN', 'VOCO_INSTALL_NO_MOTION'):
-                env.pop(key, None)
+            env = fixture.art_env(folder, VOCO_INSTALL_ART='quadrant')
+            env.pop('VOCO_INSTALL_NO_MOTION')
             code, output = fixture.terminal(['bash', '-c', prefix + body], env)
             self.assertEqual(code, 0, output)
             screen = visible_terminal(output)
             self.assertIn('PRESERVED BEFORE CANVAS', screen)
-            # One card: its eleven rows and lower edge use upper half blocks.
-            self.assertEqual(sum('▀' in line for line in screen.splitlines()), 12, screen)
+            self.assertEqual(screen.count(fixture.TOP_EDGE), 1, screen)
             self.assertIn('Final stage', screen)
             self.assertNotIn('Interrupted frame', screen)
 
@@ -206,9 +233,12 @@ voco_ui_close
             '''
             # Package, input, panel and app activation terminate at synthetic seams.
             body = body.replace('/usr/bin/voco --setup-panel', 'fixture_panel')
-            env = {**os.environ, 'TERM': 'xterm-256color', 'PATH': folder + ':' + os.environ['PATH'],
+            # Nothing tells the installer which terminal this is, unless the mode does.
+            env = {key: value for key, value in os.environ.items() if key not in fixture.TERMINAL_HINTS}
+            env.update({'TERM': 'xterm-256color', 'PATH': folder + ':' + os.environ['PATH'],
                    'TMPDIR': folder, 'HOME': str(root / 'home'), 'XDG_CONFIG_HOME': str(root / 'config'),
-                   'XDG_SESSION_TYPE': 'wayland', 'XDG_CURRENT_DESKTOP': '', 'VOCO_INSTALL_NO_MOTION': '0' if mode == 'animated' else '1',
+                   'XDG_SESSION_TYPE': 'wayland', 'XDG_CURRENT_DESKTOP': '',
+                   'VOCO_INSTALL_NO_MOTION': '0' if mode in ('animated', 'kitty', 'probe') else '1',
                    'FIXTURE_SIGNATURE_CASE': signature_case, 'FIXTURE_SIGNATURE': str(SIGNED_SIGNATURE),
                    'FIXTURE_INSTALL_CASE': install_case, 'FIXTURE_LAUNCH_CASE': launch_case,
                    'FIXTURE_MANIFEST': str(SIGNED_MANIFEST), 'FIXTURE_PACKAGE': str(ROOT / 'KEYS'),
@@ -219,11 +249,15 @@ voco_ui_close
                    'FIXTURE_DPKG_CALL': str(root / 'dpkg-called'),
                    'FIXTURE_PANEL_DETAIL': PANEL_RESTARTS[panel_result]['detail'],
                    # Without 24-bit colour the compact canvas stands in for the card.
-                   'COLORTERM': '' if mode == 'compact' else 'truecolor'}
-            env.pop('NO_COLOR', None)
+                   'COLORTERM': '' if mode == 'compact' else 'truecolor'})
             if mode == 'plain':
                 env['VOCO_INSTALL_PLAIN'] = '1'
-            code, raw = fixture.terminal(['bash', '-c', prefix + stubs + '# ─── Header' + body], env, columns=40 if mode == 'narrow' else 80, rows=8 if mode == 'short' else 24, reply={'prompt': (b'Fixture choice [y/N]: ', b'yes\n'), 'password': (b'Fixture password: ', b'fixture\n')}.get(mode))
+            if mode == 'kitty':
+                env['VOCO_INSTALL_ART'] = 'kitty'
+            # The probe journey's terminal answers it as Ghostty does; the others stay silent.
+            reply = {'prompt': (b'Fixture choice [y/N]: ', b'yes\n'), 'password': (b'Fixture password: ', b'fixture\n'),
+                     'probe': (b'\x1b[c', fixture.GHOSTTY)}.get(mode)
+            code, raw = fixture.terminal(['bash', '-c', prefix + stubs + '# ─── Header' + body], env, columns=40 if mode == 'narrow' else 80, rows=8 if mode == 'short' else 24, reply=reply)
             refused = platform_case != 'supported' or signature_case != 'valid' or install_case == 'package-failure'
             expected_code = 1 if refused else 2 if install_case == 'readiness-failure' else 0
             self.assertEqual(code, expected_code, raw.decode(errors='replace'))
@@ -265,7 +299,8 @@ voco_ui_close
                     self.assertIn('DNF could not install' if manager == 'dnf' else 'APT could not install',
                                   raw.decode(errors='replace'))
                 return
-            screen = visible_terminal(raw, width=40 if mode == 'narrow' else 80)
+            images = {}
+            screen = visible_terminal(raw, width=40 if mode == 'narrow' else 80, images=images)
             if directory := os.environ.get('VOCO_JOURNEY_EVIDENCE_DIR'):
                 directory = str(Path(directory) / mode)
                 Path(directory).mkdir(parents=True, exist_ok=True)
@@ -279,10 +314,28 @@ voco_ui_close
                 self.assertNotIn('▀', screen)
                 self.assertEqual(screen.count('The voice layer for Linux.'), 1, screen)
             else:
-                self.assertEqual(sum('▀' in line for line in screen.splitlines()), 12, screen)
+                self.assertEqual(screen.count(fixture.TOP_EDGE), 1, screen)
                 self.assertEqual(screen.count('The voice layer for Linux.'), 1, screen)
                 self.assertEqual(screen.count('Today: private dictation.'), 1, screen)
                 self.assertEqual(screen.count(f'v{version}'), 1, screen)
+            text = raw.decode(errors='replace')
+            if mode in ('kitty', 'probe'):
+                # The image is sent once and ends up over the final card's
+                # microphone cells, and only there.
+                self.assertEqual(text.count('\x1b_Ga=t,'), 1)
+                card = screen.splitlines().index(next(line for line in screen.splitlines() if fixture.TOP_EDGE in line))
+                self.assertEqual(images, {('8626', '1'): (card + 1, 4, 14, 11)}, screen)
+                # Every canvas release takes the image away first.
+                releases = [match.start() for match in re.finditer(r'\x1b\[21A(?:\r\x1b\[K\r\n){21}', text)]
+                self.assertTrue(releases)
+                for start in releases:
+                    self.assertTrue(text[:start].endswith('\x1b_Ga=d,d=i,i=8626,p=1,q=2\x1b\\'), text[start - 60:start])
+                # The terminal's answers never reach the screen.
+                self.assertNotIn('62;22c', screen)
+                self.assertNotIn('^[', screen)
+            elif mode not in ('plain', 'narrow', 'short', 'compact'):
+                self.assertEqual(images, {})
+                self.assertNotIn('\x1b_Ga=t,', text)
             if mode == 'password':
                 self.assertIn('Fixture password: fixture', screen)
             if mode == 'prompt':
@@ -370,7 +423,7 @@ voco_ui_close
                 self.run_journey('plain', signature_case, manager='dnf')
 
     def test_complete_journey_has_one_final_canvas(self):
-        for mode in ('animated', 'no-motion', 'password', 'prompt', 'compact', 'plain', 'narrow', 'short'):
+        for mode in ('animated', 'no-motion', 'password', 'prompt', 'compact', 'plain', 'narrow', 'short', 'kitty', 'probe'):
             with self.subTest(mode=mode):
                 self.run_journey(mode)
 

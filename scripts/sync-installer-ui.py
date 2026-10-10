@@ -2,6 +2,8 @@
 """Keep the downloaded single-file installer identical to its maintainable sources:
 the install steps setup.sh also sources, and the UI."""
 import argparse
+import base64
+import importlib.util
 import json
 import shlex
 from pathlib import Path
@@ -15,19 +17,34 @@ def rgb_valid(rgb):
     return len(rgb) == 3 and all(type(value) is int and 0 <= value <= 255 for value in rgb)
 
 
-def microphone(brand):
-    """The art canvas's microphone: rows of 'r;g;b' pixels, two to each cell."""
-    mic = brand['mic']
-    width, height, rows = mic['width'], mic['height'], mic['rows']
-    if width != 14 or height != 22 or len(rows) != height:
-        raise ValueError('The installer microphone must be 14 × 22 pixels')
-    pixels = []
-    for row in rows:
-        values = row.split(' ')
-        if len(values) != width or any(len(value) != 6 for value in values):
-            raise ValueError('Each microphone row needs 14 six-digit hex pixels')
-        pixels.append([';'.join(str(byte) for byte in bytes.fromhex(value)) for value in values])
-    return pixels
+def art_sources(brand):
+    """The microphone: its palette, its three mosaics and its image, checked."""
+    art = brand['art']
+    spec = importlib.util.spec_from_file_location('installer_art', ROOT / 'scripts/generate-installer-art.py')
+    generator = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(generator)
+    palette = art['palette']
+    if art['columns'] != 14 or art['rows'] != 11 or not 2 <= len(palette) <= 256 or \
+            any(len(value) != 6 or set(value) - set('0123456789abcdef') for value in palette):
+        raise ValueError('The installer microphone needs 14 × 11 cells and a palette of hex colours')
+    mosaics = {}
+    for kind in ('octant', 'sextant', 'quadrant'):
+        rows, allowed = art['mosaic'][kind], set(generator.symbols(kind)) | {' '}
+        cells = [cell for row in rows for cell in row]
+        if len(rows) != 11 or any(len(row) != 14 for row in rows) or any(
+                cell[:-4] not in allowed or int(cell[-4:-2], 16) >= len(palette) or
+                int(cell[-2:], 16) >= len(palette) for cell in cells):
+            raise ValueError(f'The {kind} mosaic needs 14 × 11 cells of its own symbols and palette colours')
+        mosaics[kind] = rows
+    image = art['image']
+    blob = base64.b64decode(image['png'], validate=True)
+    width, height = image['width'], image['height']
+    left, top, mic_width, mic_height = image['mic']
+    if not blob.startswith(b'\x89PNG\r\n\x1a\n') or len(blob) > 16384 or \
+            not (0 <= left and 0 <= top and left + mic_width <= width and top + mic_height <= height):
+        raise ValueError('The installer image must be a PNG of at most 16 KiB around its microphone')
+    rgb = [';'.join(str(byte) for byte in bytes.fromhex(value)) for value in palette]
+    return rgb, mosaics, image
 
 
 def brand_sources():
@@ -45,7 +62,7 @@ def brand_sources():
         raise ValueError('Invalid installer art colours')
     if len(ease) != 21 or ease[0] != 0 or ease[-1] != 1000 or ease != sorted(ease):
         raise ValueError('The installer easing table needs 21 rising steps from 0 to 1000')
-    pixels = microphone(brand)
+    mic_palette, mosaics, image = art_sources(brand)
     triple = lambda rgb: ';'.join(map(str, rgb))
     shell = 'VOCO_UI_GLYPHS=(\n' + ''.join('  ' + ' '.join(shlex.quote(letter) for letter in row) + '\n' for row in rows) + ')\n'
     for name, rgb in palette.items():
@@ -57,15 +74,21 @@ def brand_sources():
     for name, rgb in text.items():
         shell += f"VOCO_UI_TEXT_{name.upper()}='{triple(rgb)}'\n"
     shell += 'VOCO_UI_EASE=(' + ' '.join(map(str, ease)) + ')\n'
-    shell += '# The microphone, from ' + brand['mic']['source'] + ' by generate-installer-art.py.\n'
-    shell += 'VOCO_UI_MIC=(\n' + ''.join('  ' + ' '.join(f"'{pixel}'" for pixel in row) + '\n' for row in pixels) + ')\n'
+    shell += ('# The microphone, from ' + brand['art']['source'] + ' by generate-installer-art.py: its\n'
+              '# palette, a mosaic of block symbols for each kind of terminal, and its image.\n')
+    shell += 'VOCO_UI_PALETTE=(' + ' '.join(f"'{rgb}'" for rgb in mic_palette) + ')\n'
+    for kind, lines in mosaics.items():
+        shell += f'VOCO_UI_MOSAIC_{kind.upper()}=(\n' + ''.join(
+            '  ' + ' '.join(shlex.quote(cell) for cell in line) + '\n' for line in lines) + ')\n'
+    shell += f"VOCO_UI_IMAGE_SIZE=({image['width']} {image['height']})\n"
+    shell += 'VOCO_UI_IMAGE_MIC=(' + ' '.join(map(str, image['mic'])) + ')\n'
+    shell += f"VOCO_UI_IMAGE_PNG='{image['png']}'\n"
     python = 'BRAND_ROWS = ' + repr(rows) + '\n'
     python += 'BRAND_COLORS = ' + repr({name: '\033[38;2;' + ';'.join(map(str, rgb)) + 'm' for name, rgb in palette.items()}) + '\n'
     python += 'BRAND_CARD = ' + repr(triple(brand['card'])) + '\n'
     python += 'BRAND_WORDMARK = ' + repr([triple(rgb) for rgb in gradient]) + '\n'
     python += 'BRAND_WORDMARK_SHINE = ' + repr([triple(rgb) for rgb in shine]) + '\n'
     python += 'BRAND_TEXT = ' + repr({name: triple(rgb) for name, rgb in text.items()}) + '\n'
-    python += 'BRAND_MIC = [\n' + ''.join('    ' + repr(row) + ',\n' for row in pixels) + ']\n'
     return shell, python
 
 
