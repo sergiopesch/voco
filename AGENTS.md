@@ -1,7 +1,7 @@
 # VOCO agent guide
 
-VOCO is local English dictation for Linux: press a shortcut, speak, and the words
-are pasted into whichever app has keyboard focus. This guide is for coding agents
+VOCO is building the voice layer for Linux, and dictation is the first step: press
+a shortcut, speak, and the words are pasted into whichever app has keyboard focus. This guide is for coding agents
 and maintainers. Before changing code, read the [README](README.md), the
 [architecture overview](docs/architecture/README.md) and the
 [code map](docs/architecture/code-map.md). [CONTRIBUTING](CONTRIBUTING.md) covers
@@ -9,6 +9,11 @@ setup and pull requests.
 
 ## Product contract
 
+- Direction: the voice layer for Linux, private, local and under the user's
+  control ([branding](docs/branding.md)). The rest of this contract is today's
+  product, dictation. A capability beyond it, such as voice editing or commands,
+  first changes this contract in its own reviewed pull request, with its safety
+  rules, before any code.
 - No account, subscription, telemetry or cloud transcription. Update checks read
   GitHub's public releases API and never download or install anything.
 - One output path: streaming dictation pasted into whatever has keyboard focus.

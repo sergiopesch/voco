@@ -7,8 +7,9 @@ SOURCE="https://github.com/sergiopesch/voco/blob/${TAG_NAME}"
 cat <<EOF_BODY
 # VOCO ${VERSION}
 
-Private English dictation for Linux. Speak, and VOCO pastes your words into the
-app you are typing in.
+Dictation is the first step. We're building the voice layer for Linux: private,
+local, and under your control. Speak, and VOCO pastes your words into the app you
+are typing in.
 
 - Recognition runs on your computer with NVIDIA's Nemotron model. There is no
   account or cloud service, and nothing is downloaded after installation.

@@ -1,8 +1,38 @@
 # VOCO branding
 
-VOCO's lead message is **Your voice, typed. Built for Linux.** VOCO is local
-English dictation: speech becomes text where you are typing, without an account,
-a subscription or cloud transcription.
+VOCO is **the voice layer for Linux**. Its manifesto says where VOCO is going and
+where it starts:
+
+> Dictation is the first step. We're building the voice layer for Linux:
+> private, local, and under your control.
+
+Today VOCO is local English dictation: speech becomes text where you are typing,
+without an account, a subscription or cloud transcription.
+
+## Message
+
+| Line | Text | Where |
+| --- | --- | --- |
+| Brand line | The voice layer for Linux. | Banner, installer header, social cards, video end cards |
+| Manifesto | Dictation is the first step. We're building the voice layer for Linux: private, local, and under your control. | README, release pages, launch posts |
+| Summary | The voice layer for Linux, starting with dictation | Package, AppStream and desktop entry summaries, the GitHub description |
+| Today | Press a shortcut, speak, and your words appear where you are typing. | Wherever readers need to know what VOCO does now |
+
+Each pillar names only what is true today:
+
+- **Private.** Speech stays on the computer. There's no account, subscription,
+  telemetry or cloud transcription, and update checks only read GitHub's public
+  releases.
+- **Local.** The speech model runs on the processor, with no GPU, and nothing is
+  downloaded after installation.
+- **Under your control.** VOCO listens only when you start it, shows that it's
+  listening, never presses Enter, and is open source under the MIT license.
+
+The brand line and the manifesto are VOCO's only statements of direction.
+Everything else describes what VOCO does now, and a capability is named only
+once it ships with evidence (see the claims rule in [AGENTS.md](../AGENTS.md)).
+Never call VOCO the first, fastest or most accurate voice software, and don't
+compare it with voice assistants.
 
 ## Voice
 
@@ -32,8 +62,8 @@ the aspect ratio, and don't add transparent padding. Check the 16, 24, 32, 48 an
 128 px sizes on both light and dark backgrounds.
 
 The banner is a 560 × 184 graphite card (`#111318`, 22 px corners) with the 256 px
-launcher icon drawn at 152 px, "BUILT FOR LINUX" in `#aeb5bf`, "VOCO" in
-`#f1f3f6` and "Your voice, typed." in `#c7ccd4`. Its font falls back from Geist to
+launcher icon drawn at 152 px, "PRIVATE · LOCAL · UNDER YOUR CONTROL" in `#aeb5bf`,
+"VOCO" in `#f1f3f6` and "The voice layer for Linux." in `#c7ccd4`. Its font falls back from Geist to
 Inter, then the system sans serif.
 
 Two third-party icon sets ship unmodified. The settings and chevron icons come
@@ -168,8 +198,8 @@ installer is out of sync.
 
 | Terminal | Output |
 | --- | --- |
-| A terminal with colour, Bash 5 or later, at least 64 × 12 | A progress canvas: 14 lines with the block wordmark from 16 rows, otherwise 10 lines with "V O C O" |
-| Anything else, `NO_COLOR`, `TERM=dumb` or `VOCO_INSTALL_PLAIN=1` | Plain lines under "VOCO · v<version>" and "Your voice, typed." |
+| A terminal with colour, Bash 5 or later, at least 64 × 12 | A progress canvas: 14 lines with the block wordmark and "The voice layer for Linux." from 16 rows, otherwise 10 lines with "V O C O" |
+| Anything else, `NO_COLOR`, `TERM=dumb` or `VOCO_INSTALL_PLAIN=1` | Plain lines under "VOCO · v<version>" and "The voice layer for Linux." |
 
 The canvas marks stages with ✓ in green when done, › in amber while active and
 ○ in grey while waiting: Check, Download, Verify and Install. When a stage

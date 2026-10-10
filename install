@@ -306,9 +306,9 @@ voco_ui_frame() {
       printf -v part '\r\033[K  %b%b\n' "$wordmark" "$NC"
       frame+="$part"
     done
-    printf -v part '\r\033[K  Your voice, typed.  ·  v%s\n' "${VERSION:-}"
+    printf -v part '\r\033[K  The voice layer for Linux.  ·  v%s\n' "${VERSION:-}"
   else
-    printf -v part '\r\033[K  %bV O C O%b  v%s\n\r\033[K  Your voice, typed.\n' "$VOCO_UI_SILVER" "$NC" "${VERSION:-}"
+    printf -v part '\r\033[K  %bV O C O%b  v%s\n\r\033[K  The voice layer for Linux.\n' "$VOCO_UI_SILVER" "$NC" "${VERSION:-}"
   fi
   frame+="$part"
   color="$VOCO_UI_SILVER"
@@ -563,9 +563,9 @@ def main():
         reset = '\033[0m'
         if canvas_lines == 14:
             heading = [' '.join(BRAND_COLORS['shine' if i == position else 'silver'] + letter for i, letter in enumerate(row)) + reset for row in BRAND_ROWS]
-            heading.append('Your voice, typed.  ·  v' + version)
+            heading.append('The voice layer for Linux.  ·  v' + version)
         else:
-            heading = [BRAND_COLORS['silver'] + 'V O C O' + reset + '  v' + version, 'Your voice, typed.']
+            heading = [BRAND_COLORS['silver'] + 'V O C O' + reset + '  v' + version, 'The voice layer for Linux.']
         if not canvas_open:
             write(b'\n' * canvas_lines)
             canvas_open = True
@@ -885,7 +885,7 @@ VOCO_TERMINAL_COLUMNS="$(tput cols 2>/dev/null || printf '80')"
 VOCO_TERMINAL_ROWS="$(tput lines 2>/dev/null || printf '24')"
 voco_ui_configure
 if [[ "$VOCO_TERMINAL_MOTION" != true ]]; then
-  printf '\n  VOCO · v%s\n  Your voice, typed.\n\n' "$VERSION"
+  printf '\n  VOCO · v%s\n  The voice layer for Linux.\n\n' "$VERSION"
 fi
 
 # ─── Checks ─────────────────────────────────────────────

@@ -1,6 +1,7 @@
 # Contributing to VOCO
 
-VOCO is local English dictation for Linux. It is a Tauri 2 app: a Rust shell, a
+VOCO is building the voice layer for Linux, starting with local English
+dictation. It is a Tauri 2 app: a Rust shell, a
 React interface in WebKitGTK, and a Python worker that runs NVIDIA Nemotron
 Speech Streaming on the CPU. Bug reports, fixes, documentation and test fixtures
 are welcome. VOCO is released under the [MIT License](LICENSE), and so are

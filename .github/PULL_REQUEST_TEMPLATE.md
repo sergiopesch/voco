@@ -10,4 +10,4 @@ remove personal recordings, transcripts, credentials and local machine paths.
 ## Documentation
 
 Update affected setup, behaviour or architecture docs. Keep changes focused and
-preserve the local, minimal dictation contract in [AGENTS.md](https://github.com/sergiopesch/voco/blob/master/AGENTS.md).
+preserve the private, local product contract in [AGENTS.md](https://github.com/sergiopesch/voco/blob/master/AGENTS.md).

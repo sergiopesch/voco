@@ -91,9 +91,9 @@ voco_ui_frame() {
       printf -v part '\r\033[K  %b%b\n' "$wordmark" "$NC"
       frame+="$part"
     done
-    printf -v part '\r\033[K  Your voice, typed.  ·  v%s\n' "${VERSION:-}"
+    printf -v part '\r\033[K  The voice layer for Linux.  ·  v%s\n' "${VERSION:-}"
   else
-    printf -v part '\r\033[K  %bV O C O%b  v%s\n\r\033[K  Your voice, typed.\n' "$VOCO_UI_SILVER" "$NC" "${VERSION:-}"
+    printf -v part '\r\033[K  %bV O C O%b  v%s\n\r\033[K  The voice layer for Linux.\n' "$VOCO_UI_SILVER" "$NC" "${VERSION:-}"
   fi
   frame+="$part"
   color="$VOCO_UI_SILVER"
