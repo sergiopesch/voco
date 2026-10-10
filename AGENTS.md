@@ -20,6 +20,10 @@ setup and pull requests.
 - One output path: streaming dictation pasted into whatever has keyboard focus.
   The optional Chromium exact field uses the same recognizer with its own delivery.
 - No assistant, conversation, enhancement, appearance or per-app settings.
+- Spelling is the one change to recognized words. The worker writes British
+  (the default) or American spelling for VarCon's unambiguous forms only, or
+  leaves words as recognized. It never changes names, words whose spelling
+  depends on meaning, or word choice.
 - Tray first. Respect system accessibility preferences such as reduced motion.
   A click on VOCO's launcher opens the popover whether or not VOCO was running:
   `activation.rs` counts a start as a launcher click only when GIO names
@@ -28,8 +32,8 @@ setup and pull requests.
   the tray. The desktop entry keeps `StartupNotify=false`: a tray start shows no
   window, so it can't complete a launcher's startup sequence, and GNOME would
   show its busy cursor until a 15 s timeout.
-- Settings are the microphone, the shortcut, the update channel and whether VOCO
-  checks for updates at startup. Onboarding state and the installation method
+- Settings are the microphone, the shortcut, English spelling, the update channel
+  and whether VOCO checks for updates at startup. Onboarding state and the installation method
   are stored alongside them.
 - A normal session keeps nothing. Review only holds text that survived a crash, or
   that a Stop could neither paste nor copy.
@@ -58,7 +62,8 @@ differs. `.editorconfig` sets the formatting basics. Keep Vite 8 and the React p
 together, keep explicit output targets, and keep root renderer fixtures on the
 desktop's Vite resolution. Check both dev rendering and packaged WebKit.
 
-The config (`config.rs`) holds the shortcut, the microphone, onboarding state,
+The config (`config.rs`) holds the shortcut, the microphone, English spelling
+(null until someone chooses; dictation then spells British), onboarding state,
 the update channel, the startup update check and the installation method. Retired keys are ignored on read
 and dropped on the next save, and patches that name them are rejected. Retired
 package channels read as GitHub Release. VOCO never overwrites a config it cannot
@@ -95,6 +100,13 @@ change.
   delivery.
 - VOCO never recognizes audio a second time. A failed recording notifies and
   returns to idle; the voice test's "Test again" records anew.
+- Spelling never breaks append-only delivery. `speech_stream.rs` adds the saved
+  spelling to each session start, and a start without one is as recognized. The
+  worker converts the whole hypothesis (`spelling.py`), a push returns only text
+  no later hypothesis can change, and finish converts the final text, which
+  extends every push. Generate `spelling-varcon.tsv` only with
+  `scripts/generate-spelling-table.py` from the pinned VarCon file, and keep its
+  notices and those in `vendor/THIRD-PARTY-NOTICES.txt`.
 - Select the default microphone automatically only on an explicit Start test or
   recording when no microphone is chosen. No idle recording, and no silent device
   switching during capture.
@@ -239,6 +251,9 @@ change.
 
 ### Onboarding
 
+- Setup first asks which English to write, British preselected, unless a choice
+  is saved; Run setup again asks again. A choice saves at once, and the voice
+  test shows it.
 - The voice test uses the production recognition queue with local-only output.
   Never paste or copy onboarding output. The test keeps its local retry.
 - Finish must flush capture and recognition successfully. Check the desktop input
