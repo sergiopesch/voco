@@ -25,6 +25,7 @@ const config: AppConfig = {
   selectedMic: null,
   onboardingCompleted: true,
   updateChannel: "stable",
+  automaticUpdateChecks: true,
   installChannel: "github-release",
 };
 

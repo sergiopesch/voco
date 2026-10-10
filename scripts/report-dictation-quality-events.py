@@ -21,7 +21,7 @@ NUMBERS |= {f'{prefix}_{unit}' for prefix in ('recognized', 'previous', 'committ
             for unit in ('utf8_bytes', 'unicode_scalars', 'utf16_units')}
 DURATIONS = {'duration_ms', 'queue_age_ms', 'max_queue_age_ms', 'pending_age_ms', 'latest_age_ms',
              'settle_ms', 'modifier_wait_ms'}
-BOOLS = {'append_only', 'changed', 'finish_responded', 'accepted_equals_dispatched', 'leading_separator', 'clipboard_changed'}
+BOOLS = {'append_only', 'changed', 'finish_responded', 'accepted_equals_dispatched', 'clipboard_changed'}
 OUTCOMES = {'finished', 'incomplete', 'cancelled', 'failed', 'dispatched', 'rejected', 'no-mutation', 'uncertain'}
 
 
@@ -115,11 +115,11 @@ def stream_summary(events, envelope_incomplete):
             if None in values or values[0] != values[1]:
                 reasons.add('native_input_length_mismatch_or_unavailable')
         payload, routed = native_event.get('payload_utf8_bytes'), native_event.get('routed_utf8_bytes')
-        split = native_event.get('leading_separator')
-        if payload is None or routed is None or split is None or routed != payload + int(split):
+        # The payload is the routed text itself, joining space included.
+        if payload is None or routed is None or routed != payload:
             reasons.add('payload_transformation_unavailable_or_inconsistent')
         # Paste replaces each ASCII control with one ASCII space, so the routed
-        # text keeps the input byte length before leading-space splitting.
+        # text keeps the input byte length.
         if routed is None or native_event.get('input_utf8_bytes') is None or routed != native_event['input_utf8_bytes']:
             reasons.add('routed_input_length_mismatch_or_unavailable')
     terminal = stages['terminal'][0] if len(stages['terminal']) == 1 else None
@@ -162,7 +162,6 @@ def stream_summary(events, envelope_incomplete):
                 'native_dispatch_duration': timing(stages['native_dispatch'], 'duration_ms'),
                 'native_settle': timing(stages['native_dispatch'], 'settle_ms'),
                 'native_modifier_wait': timing(stages['native_dispatch'], 'modifier_wait_ms')},
-            'native_leading_separator_count': sum(e.get('leading_separator') is True for e in stages['native_dispatch']),
             'sample_observation_scope': 'queue_ingress',
             'destination_content_observation': 'unavailable'}
 

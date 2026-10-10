@@ -28,7 +28,7 @@ def fixture():
                     changed=True, append_only=True, **lengths('recognized')),
             quality('delivery_requested', quality_seq=1, quality_dropped=0, delivery_seq=1, hypothesis_seq=1, **lengths('suffix'), **lengths('target'), **lengths('committed', 0)),
             quality('native_dispatch', delivery_seq=1, hypothesis_seq=1, outcome='dispatched', settle_ms=0, modifier_wait_ms=12,
-                    routed_utf8_bytes=5, leading_separator=False, **lengths('input'), **lengths('payload')),
+                    routed_utf8_bytes=5, **lengths('input'), **lengths('payload')),
             quality('delivery_dispatched', quality_seq=2, quality_dropped=0, delivery_seq=1, hypothesis_seq=1, **lengths('committed')),
             quality('hypothesis', quality_seq=3, quality_dropped=0, hypothesis_seq=2, previous_hypothesis_seq=1,
                     changed=False, append_only=True, **lengths('recognized')),
@@ -105,11 +105,9 @@ class QualityEventsTest(unittest.TestCase):
         self.assertEqual(result['status'], 'incomplete')
         self.assertIn('routed_input_length_mismatch_or_unavailable', result['runs'][0]['streams'][0]['reasons'])
 
-    def test_leading_space_key_is_a_traceable_transformation(self):
+    def test_payload_shorter_than_the_routed_text_is_inconsistent(self):
         rows = fixture()
-        rows[3].update(leading_separator=True, payload_utf8_bytes=4)
-        self.assertEqual(self.run_report(rows)['status'], 'reconciled_dispatch_metadata')
-        rows[3]['payload_utf8_bytes'] = 5
+        rows[3].update(payload_utf8_bytes=4)
         result = self.run_report(rows)
         self.assertEqual(result['status'], 'incomplete')
         self.assertIn('payload_transformation_unavailable_or_inconsistent', result['runs'][0]['streams'][0]['reasons'])

@@ -46,7 +46,7 @@ export const takeLauncherActivation = async () => false;
 export const getDesktopPasteStatus = async () => ({enabled:Boolean(window.desktopPaste),streamingEnabled:Boolean(window.desktopStream),available:!window.pasteUnavailable,detail:'Paste helper unavailable'});
 // Model the native paste and clipboard contract; no desktop input is touched.
 const bytes = text => new TextEncoder().encode(text).length;
-export const pasteDesktopText = async (text) => { calls.push(['pasteDesktopText',text]); if(window.failPaste) throw {outcome:window.pasteOutcome ?? 'uncertain',message:'Uncertain paste dispatch',clipboardChanged:true}; return {outcome:'dispatched',pasteMetrics:{preflightMs:5,settleMs:0,modifierWaitMs:12,clipboardMs:8,keyboardMs:350,leadingSeparator:false,routedUtf8Bytes:bytes(text),payloadUtf8Bytes:bytes(text),payloadUnicodeScalars:Array.from(text).length,payloadUtf16Units:text.length}}; };
+export const pasteDesktopText = async (text) => { calls.push(['pasteDesktopText',text]); if(window.failPaste) throw {outcome:window.pasteOutcome ?? 'uncertain',message:'Uncertain paste dispatch',clipboardChanged:true}; return {outcome:'dispatched',pasteMetrics:{preflightMs:5,settleMs:0,modifierWaitMs:12,clipboardMs:8,keyboardMs:350,routedUtf8Bytes:bytes(text),payloadUtf8Bytes:bytes(text),payloadUnicodeScalars:Array.from(text).length,payloadUtf16Units:text.length}}; };
 export const copyDesktopText = async (text) => { calls.push(['copyDesktopText',text]); if(window.failCopy) throw {outcome:'uncertain',message:'Clipboard helper failed',clipboardChanged:false}; };
 export const cancelBrowserField = async (...args) => { calls.push(['cancelBrowserField',...args]); return state(); };
 export const releaseBrowserRecording = async (triggerId) => { calls.push(['releaseBrowserRecording',triggerId]); };
@@ -76,7 +76,7 @@ const {useStore} = await import(storeImport);
 for (const weight of [400,500,600,700]) await import('/@fs/' + ${JSON.stringify(root)} + '/node_modules/@fontsource/geist/latin-' + weight + '.css');
 await import('/src/styles.css');
 window.store = useStore;
-const config = {hotkey:'Alt+D',selectedMic:null,onboardingCompleted:true,updateChannel:'stable',installChannel:'github-release'};
+const config = {hotkey:'Alt+D',selectedMic:null,onboardingCompleted:true,updateChannel:'stable',automaticUpdateChecks:true,installChannel:'github-release'};
 useStore.getState().setConfig(config); useStore.getState().setSurface('popover');
 const noop = async () => {};
 function Harness() {

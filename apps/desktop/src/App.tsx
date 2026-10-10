@@ -396,7 +396,10 @@ export function App() {
       ).catch(() => {});
       return true;
     }
-    toggle(triggerId, action);
+    const stopped = toggle(triggerId, action);
+    if (triggerId === "session:locked" && stopped) {
+      await showNotification("Dictation stopped", "VOCO stopped listening when the screen locked.").catch(() => {});
+    }
     return true;
   }, [dictationSessionId, dismissInteractiveSurface, nativeMicrophone.ensureDefault, runtimeStatusEpoch, setError, toggle]);
   const handleStartTest = useCallback(async () => {
@@ -793,7 +796,7 @@ export function App() {
       traceHotkeyEvent("frontend_init_complete").catch(() => {});
       await refreshDevices();
       await refreshRuntimeDiagnostics();
-      await runUpdateCheck(loadedConfig.updateChannel, appVersion);
+      if (loadedConfig.automaticUpdateChecks) await runUpdateCheck(loadedConfig.updateChannel, appVersion);
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : String(cause);
       setStatus("error");
@@ -838,7 +841,7 @@ export function App() {
   }, [applyAuthoritativeConfig, retryCaptureSetup, setError, setStatus, setSurface]);
 
   useEffect(() => {
-    if (!initComplete || !config?.updateChannel) {
+    if (!initComplete || !config?.updateChannel || !config.automaticUpdateChecks) {
       return;
     }
     if (updateCheckCoordinator.lastCheckedChannel === config.updateChannel) {
@@ -846,7 +849,7 @@ export function App() {
     }
 
     void runUpdateCheck(config.updateChannel);
-  }, [config?.updateChannel, initComplete, runUpdateCheck, updateCheckCoordinator]);
+  }, [config?.automaticUpdateChecks, config?.updateChannel, initComplete, runUpdateCheck, updateCheckCoordinator]);
 
   useEffect(() => {
     if (runtimeStatusEpoch === null || status !== "recording") return;

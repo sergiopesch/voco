@@ -553,9 +553,8 @@ try:
     assert not inspect()['windowMenuOpen'], 'held chord opened a window menu without paste'
     keys('keyup','d','keyup','Alt_L');pump(.2)
     assert modifiers_clear(), 'released chord must permit delivery'
-    keys('key', 'space');pump(.1)
-    assert not inspect()['windowMenuOpen'], 'joining separator must not open the GNOME window menu'
-    assert entry.get_text() == 'Keep my dictated words ', entry.get_text()
+    assert not inspect()['windowMenuOpen'], 'a released chord must not leave the GNOME window menu open'
+    assert entry.get_text() == 'Keep my dictated words', entry.get_text()
     assert actions[before:] == [('shortcut', '')], 'release must not send another action'
     # Presentation revisions and every status keep the same grab and toggle.
     for status in ('starting', 'recording', 'processing', 'attention', 'idle'):
@@ -628,7 +627,7 @@ try:
     shortcut_state('idle', None)
     assert press('alt+shift+d') == released and press('alt+d') == released, 'no supported chord must release the grab'
     assert not stop_reservations, 'the companion must not use the v10 Stop reservation'
-    assert entry.get_text() == 'Keep my dictated words ', entry.get_text()
+    assert entry.get_text() == 'Keep my dictated words', entry.get_text()
     # Super may open the overview; test it only after all focused-field checks.
     for modifier in ('Alt_L', 'Alt_R', 'Control_L', 'Control_R', 'Shift_L', 'Shift_R', 'Super_L', 'Super_R'):
         keys('keydown', modifier);pump(.03)

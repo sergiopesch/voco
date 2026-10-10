@@ -31,7 +31,7 @@ export function shouldProcessHotkeyEvent(
   action?: DictationTriggerAction,
   stopSession?: string,
 ): boolean {
-  return canHandleHotkey || (action === "stop" && (isBrowserTrigger(triggerId) ||
+  return canHandleHotkey || (action === "stop" && (isBrowserTrigger(triggerId) || triggerId === "session:locked" ||
     (triggerId === "tray:stop" && typeof stopSession === "string" && stopSession.length > 0)));
 }
 

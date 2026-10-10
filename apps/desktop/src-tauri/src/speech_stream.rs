@@ -83,14 +83,19 @@ impl Worker {
     }
 
     fn start() -> Result<Self, String> {
-        let mut child = Command::new(configured_path("VOCO_STREAM_PYTHON")?)
+        let mut command = Command::new(configured_path("VOCO_STREAM_PYTHON")?);
+        // Ignore PYTHON* variables and the user's site-packages, and write no
+        // bytecode. -I would also drop the script's directory, which holds
+        // the worker's own modules.
+        command
+            .args(["-E", "-s", "-B"])
             .arg(configured_path("VOCO_STREAM_WORKER")?)
-            .env("PYTHONDONTWRITEBYTECODE", "1")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::inherit())
-            .spawn()
-            .map_err(|_| "worker spawn failed")?;
+            .stderr(Stdio::inherit());
+        #[cfg(target_os = "linux")]
+        crate::worker_sandbox::deny_network(&mut command);
+        let mut child = command.spawn().map_err(|_| "worker spawn failed")?;
         let mut input = child.stdin.take().ok_or("worker stdin missing")?;
         let mut output = BufReader::new(child.stdout.take().ok_or("worker stdout missing")?);
         let (request_tx, request_rx) = mpsc::sync_channel::<Value>(1);

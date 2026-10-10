@@ -16,6 +16,10 @@ tray icon and can stop a dictation, but you start with the shortcut. If a VOCO
 window is open when you press the shortcut, VOCO hides it instead of starting.
 Click in your app and press the shortcut again.
 
+Locking your screen stops a dictation, and VOCO shows **Dictation stopped**.
+Words it hadn't typed go to the clipboard, as when you stop. While the screen
+is locked, the shortcut doesn't start VOCO.
+
 ## Where your words go
 
 VOCO pastes each phrase into the window that has keyboard focus. It puts the
@@ -141,7 +145,9 @@ folder, which your system clears when you sign out.
 
 VOCO's only network request asks GitHub which releases exist. It runs when VOCO
 starts, reusing an answer for up to six hours, and when you choose
-**Check for updates**. VOCO never downloads or installs updates. To upgrade,
+**Check for updates**. To check only when you choose, set **Update checks** on
+the **Updates** page to **Only when I choose**. VOCO never downloads or installs
+updates. To upgrade,
 see [Upgrade](install.md#upgrade).
 
 After you [remove VOCO](install.md#remove), delete its folders to remove your
@@ -165,3 +171,5 @@ rm -rf ~/.config/voco ~/.local/state/voco ~/.local/share/com.sergiopesch.voco
   shortcut also needs a desktop binding.
 - Apps that remap Shift+Insert, remote desktops and virtual machines may not
   accept the paste.
+- In Chromium's address bar, a phrase that continues the previous one joins its
+  last word, because the address bar trims the pasted space.

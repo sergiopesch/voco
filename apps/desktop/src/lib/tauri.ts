@@ -78,7 +78,6 @@ export interface DesktopPasteMetrics {
   modifierWaitMs: number;
   clipboardMs: number;
   keyboardMs: number;
-  leadingSeparator: boolean;
   routedUtf8Bytes: number;
   payloadUtf8Bytes: number;
   payloadUnicodeScalars: number;

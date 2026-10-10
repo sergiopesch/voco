@@ -15,7 +15,8 @@ setup and pull requests.
   first changes this contract in its own reviewed pull request, with its safety
   rules, before any code.
 - No account, subscription, telemetry or cloud transcription. Update checks read
-  GitHub's public releases API and never download or install anything.
+  GitHub's public releases API and never download or install anything. The
+  automatic check at startup has an off switch.
 - One output path: streaming dictation pasted into whatever has keyboard focus.
   The optional Chromium exact field uses the same recognizer with its own delivery.
 - No assistant, conversation, enhancement, appearance or per-app settings.
@@ -23,8 +24,9 @@ setup and pull requests.
   The desktop entry keeps `StartupNotify=false`: VOCO usually starts without a
   window, so it can't complete a launcher's startup sequence, and GNOME would
   show its busy cursor until a 15 s timeout.
-- Settings are the microphone, the shortcut and the update channel. Onboarding
-  state and the installation method are stored alongside them.
+- Settings are the microphone, the shortcut, the update channel and whether VOCO
+  checks for updates at startup. Onboarding state and the installation method
+  are stored alongside them.
 - A normal session keeps nothing. Review only holds text that survived a crash, or
   that a Stop could neither paste nor copy.
 
@@ -53,7 +55,7 @@ together, keep explicit output targets, and keep root renderer fixtures on the
 desktop's Vite resolution. Check both dev rendering and packaged WebKit.
 
 The config (`config.rs`) holds the shortcut, the microphone, onboarding state,
-the update channel and the installation method. Retired keys are ignored on read
+the update channel, the startup update check and the installation method. Retired keys are ignored on read
 and dropped on the next save, and patches that name them are rejected. Retired
 package channels read as GitHub Release. VOCO never overwrites a config it cannot
 read: Settings shows a recovery panel, and only Reset renames the file to a
@@ -71,6 +73,11 @@ change.
 ### Recognition and capture
 
 - Warm the selected worker before reporting readiness; imports don't start it.
+- Start the worker as `python3 -E -s -B`, never `-I`, which drops the script's
+  directory and with it the worker's own modules. `worker_sandbox.rs` marks every
+  descriptor beyond its pipes close-on-exec and installs a seccomp filter that
+  refuses io_uring and every socket except a Unix one; a step that fails fails the
+  spawn. Never give the worker a network path.
 - Flush Stop audio into the same live stream before finishing; never copy or
   replay a whole recording. Recreate a dead worker only at a session boundary.
 - Keep bounded queues, deadlines and sequence/sample accounting. Worker IPC groups
@@ -95,9 +102,10 @@ change.
   setup checks the paste prerequisites, never a caret or an app.
 - Copy CLIPBOARD, then PRIMARY (best effort; a failure only warns), then send one
   Shift+Insert: toolkits paste CLIPBOARD and terminals paste PRIMARY. A leading
-  joining space is its own Space key, because Chromium's address bar trims pasted
-  leading whitespace. ASCII controls become spaces. Never send Enter and never
-  restore the previous clipboard.
+  joining space travels inside the paste, never as a key, so Chromium's address
+  bar, which trims pasted leading whitespace, joins it to the previous word: a
+  known limit. ASCII controls become spaces. Never send Enter and never restore
+  the previous clipboard.
 - Wayland paste keys are raw key events, so wait at most 1.5 s for the shortcut's
   modifiers to be released (evdev, else the companion's `ModifiersClear`). Unknown
   state doesn't block; a timeout sends no keys. On X11 the passive grab takes every
@@ -107,8 +115,8 @@ change.
   (`virtual_keyboard.rs`); X11 keeps `xdotool`. Keep one device per process,
   created at startup and reused for the process lifetime, never one per paste:
   the compositor adds a new device late and could lose its first keys, so a
-  device younger than 500 ms waits before its first key. It declares only Shift,
-  Insert and Space and sends each event in its own report, 12 ms apart. Ensure it
+  device younger than 500 ms waits before its first key. It declares only Shift
+  and Insert and sends each event in its own report, 12 ms apart. Ensure it
   exists before the clipboard copy, so a missing device is a `no-mutation`
   failure; after an emit error, release Shift and drop it so the next paste
   recreates it.
@@ -120,6 +128,10 @@ change.
   Check before the clipboard copy (`no-mutation`) and again just before keys.
   Resolution has a 16-session cap and a 750 ms logind lookup budget. Genuine
   unavailable logind state retains the existing fail-open policy.
+- A locked origin rejects too. Read logind's `LockedHint` with `Active` and
+  follow its changes: while it is set, both checks reject (`no-mutation`) and no
+  shortcut route starts dictation, and the change to locked stops a running one.
+  A logind without the property reads as unlocked.
 - The paste check opens `/dev/uinput`; it never creates the device, sends keys or
   starts a process. The evdev listener ignores the virtual keyboard by name (and
   another tool's `ydotoold virtual device`), so its keys never count as the

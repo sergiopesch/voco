@@ -34,6 +34,8 @@ mod tray_icons;
 mod trigger_socket;
 #[cfg(target_os = "linux")]
 mod virtual_keyboard;
+#[cfg(target_os = "linux")]
+mod worker_sandbox;
 
 /// Check input prerequisites without launching a window or sending keys.
 pub fn check_desktop_input() -> Result<String, String> {
@@ -1235,6 +1237,14 @@ fn replay_pending_browser_stops(app_handle: &tauri::AppHandle) {
 fn eval_toggle_with_backend(app_handle: &tauri::AppHandle, backend_used: &str) {
     trace_hotkey_event("eval_toggle_entered", Some(backend_used));
 
+    // A passive listener still hears the chord on the lock screen; never start
+    // a dictation behind it. The lock itself stopped any dictation in progress.
+    #[cfg(target_os = "linux")]
+    if desktop_session::is_locked() {
+        trace_hotkey_event("eval_toggle_suppressed_locked", Some(backend_used));
+        return;
+    }
+
     if suppress_passive_shortcut(app_handle, backend_used) {
         return;
     }
@@ -2116,6 +2126,20 @@ pub fn run() -> Result<(), String> {
                 *pending_backend = None;
             }
             trace_hotkey_event("app_start", Some("internal"));
+            #[cfg(target_os = "linux")]
+            {
+                let lock_app = app.handle().clone();
+                // A stop-only request: the renderer admits it for a running
+                // dictation and ignores it otherwise, so a lock never starts one.
+                desktop_session::watch_lock(move || {
+                    trace_hotkey_event("session_locked_stop", Some("logind"));
+                    let stop =
+                        serde_json::json!({ "triggerId": "session:locked", "action": "stop" });
+                    if let Err(error) = lock_app.emit_to("main", TOGGLE_DICTATION_EVENT, stop) {
+                        error!("Could not stop dictation for the screen lock: {error}");
+                    }
+                });
+            }
             start_ibus_shortcut_listener(app.handle().clone());
             let configured_hotkey = configured_hotkey();
             let hotkey = configured_hotkey.hotkey;

@@ -41,6 +41,20 @@ describe("directed browser recording triggers", () => {
     }
   });
 
+  it("admits the screen lock's Stop only while capture can stop, and never Start", () => {
+    for (const origin of [undefined, "browser:a", "onboarding:test"]) {
+      for (const phase of ["starting", "recording"] as const) {
+        expect(admitsDictationTrigger(phase, origin, "session:locked", "stop")).toBe(true);
+        expect(admitsDictationTrigger(phase, origin, "session:locked", "start")).toBe(false);
+      }
+      for (const phase of ["idle", "error", "stopping"] as const) {
+        expect(admitsDictationTrigger(phase, origin, "session:locked", "stop")).toBe(false);
+        expect(admitsDictationTrigger(phase, origin, "session:locked", "start")).toBe(false);
+      }
+    }
+    expect(cancelsPendingStart("onboarding:test", "session:locked", "stop")).toBe(true);
+  });
+
   it("cancels pending admission only for a matching browser Stop", () => {
     expect(cancelsPendingStart("browser:current", "browser:current", "stop")).toBe(true);
     expect(cancelsPendingStart("browser:current", "browser:old", "stop")).toBe(false);

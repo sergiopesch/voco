@@ -36,11 +36,10 @@ import time
 DEVICE_NAME = 'VOCO virtual keyboard'
 EV_SYN, EV_KEY, SYN_DROPPED = 0, 1, 3
 # Kernel key codes and the X keysyms they replay as.
-KEYS = {42: ('Shift_L', 0xffe1), 110: ('Insert', 0xff63), 57: ('space', 0x20)}
+KEYS = {42: ('Shift_L', 0xffe1), 110: ('Insert', 0xff63)}
 PASTE = ((42, 1), (110, 1), (110, 0), (42, 0))
-# A gesture's first event decides which of the two it is.
-GESTURES = {(42, 1): (PASTE, ['shift+Insert']),
-            (57, 1): (((57, 1), (57, 0)) + PASTE, ['space', 'shift+Insert'])}
+# The only gesture VOCO's keyboard sends: Shift+Insert. Any other key is an error.
+GESTURES = {(42, 1): (PASTE, ['shift+Insert'])}
 INPUT_EVENT = struct.Struct('@llHHi')
 EVIOCGNAME = 0x81004506  # _IOC(_IOC_READ, 'E', 0x06, 256)
 EVIOCGRAB = 0x40044590

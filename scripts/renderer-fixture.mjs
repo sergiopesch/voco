@@ -214,6 +214,7 @@ export const installRendererMocks = (page, { worklet = false } = {}) => page.add
         selectedMic: null,
         onboardingCompleted: false,
         updateChannel: 'stable',
+        automaticUpdateChecks: true,
         installChannel: 'github-release',
     };
     window.nativeHandlers = {};

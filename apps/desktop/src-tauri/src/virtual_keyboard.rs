@@ -43,11 +43,9 @@ fn slot() -> MutexGuard<'static, Option<Keyboard>> {
 
 fn create() -> std::io::Result<VirtualDevice> {
     let mut keys = AttributeSet::<KeyCode>::new();
-    for key in [
-        KeyCode::KEY_LEFTSHIFT,
-        KeyCode::KEY_INSERT,
-        KeyCode::KEY_SPACE,
-    ] {
+    // Shift and Insert only: the kernel drops any key a device didn't declare,
+    // so this keyboard can't press Enter, Space or anything else that acts.
+    for key in [KeyCode::KEY_LEFTSHIFT, KeyCode::KEY_INSERT] {
         keys.insert(key);
     }
     VirtualDevice::builder()?
@@ -89,25 +87,18 @@ pub fn check_access() -> Result<(), String> {
         .map_err(|_| ACCESS_HELP.to_string())
 }
 
-/// The ordered key steps of one paste: a joining Space first when the chunk
-/// continues the previous one, then Shift+Insert.
-fn paste_steps(leading_space: bool) -> Vec<(KeyCode, i32)> {
-    let mut steps = Vec::with_capacity(6);
-    if leading_space {
-        steps.extend([(KeyCode::KEY_SPACE, 1), (KeyCode::KEY_SPACE, 0)]);
-    }
-    steps.extend([
-        (KeyCode::KEY_LEFTSHIFT, 1),
-        (KeyCode::KEY_INSERT, 1),
-        (KeyCode::KEY_INSERT, 0),
-        (KeyCode::KEY_LEFTSHIFT, 0),
-    ]);
-    steps
-}
+/// The ordered key steps of one paste: Shift+Insert. A joining space travels
+/// inside the pasted text, never as a key.
+const PASTE_STEPS: [(KeyCode, i32); 4] = [
+    (KeyCode::KEY_LEFTSHIFT, 1),
+    (KeyCode::KEY_INSERT, 1),
+    (KeyCode::KEY_INSERT, 0),
+    (KeyCode::KEY_LEFTSHIFT, 0),
+];
 
 /// Send one paste gesture. The caller has already copied the text and waited
 /// for the shortcut's modifiers to be released.
-pub fn paste(leading_space: bool) -> Result<(), String> {
+pub fn paste() -> Result<(), String> {
     let mut keyboard = slot();
     if keyboard.is_none() {
         drop(keyboard);
@@ -124,7 +115,7 @@ pub fn paste(leading_space: bool) -> Result<(), String> {
     // Checked again after the copy and the modifier wait: the session may
     // have switched since the caller's check.
     require_active_session()?;
-    for (index, (key, value)) in paste_steps(leading_space).into_iter().enumerate() {
+    for (index, (key, value)) in PASTE_STEPS.into_iter().enumerate() {
         if index > 0 {
             std::thread::sleep(KEY_GAP);
         }
@@ -150,10 +141,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn paste_is_shift_insert_led_by_one_joining_space() {
-        let plain = paste_steps(false);
+    fn paste_is_shift_insert_and_nothing_else() {
         assert_eq!(
-            plain,
+            PASTE_STEPS,
             [
                 (KeyCode::KEY_LEFTSHIFT, 1),
                 (KeyCode::KEY_INSERT, 1),
@@ -161,28 +151,14 @@ mod tests {
                 (KeyCode::KEY_LEFTSHIFT, 0),
             ]
         );
-        let joined = paste_steps(true);
-        assert_eq!(
-            joined[..2],
-            [(KeyCode::KEY_SPACE, 1), (KeyCode::KEY_SPACE, 0)]
-        );
-        assert_eq!(joined[2..], plain[..]);
-    }
-
-    #[test]
-    fn every_pressed_key_is_released_and_nothing_else_is_sent() {
-        for leading_space in [false, true] {
-            let steps = paste_steps(leading_space);
-            for (key, value) in &steps {
-                assert!(matches!(
-                    *key,
-                    KeyCode::KEY_LEFTSHIFT | KeyCode::KEY_INSERT | KeyCode::KEY_SPACE
-                ));
-                if *value == 1 {
-                    assert!(steps.contains(&(*key, 0)), "{key:?} is never released");
-                }
+        for (key, value) in &PASTE_STEPS {
+            assert!(matches!(*key, KeyCode::KEY_LEFTSHIFT | KeyCode::KEY_INSERT));
+            if *value == 1 {
+                assert!(
+                    PASTE_STEPS.contains(&(*key, 0)),
+                    "{key:?} is never released"
+                );
             }
-            assert!(steps.iter().all(|(key, _)| *key != KeyCode::KEY_ENTER));
         }
     }
 
@@ -216,13 +192,15 @@ mod tests {
             }
         };
         assert_eq!(reader.name(), Some(DEVICE_NAME));
+        let declared: Vec<KeyCode> = reader.supported_keys().unwrap().iter().collect();
+        assert_eq!(declared, [KeyCode::KEY_LEFTSHIFT, KeyCode::KEY_INSERT]);
         reader.grab().unwrap();
         std::thread::sleep(ADD_SETTLE);
-        for leading_space in [true, false] {
+        for _ in 0..2 {
             let sent = Instant::now();
-            paste(leading_space).unwrap();
+            paste().unwrap();
             let elapsed = sent.elapsed();
-            let expected = paste_steps(leading_space);
+            let expected = PASTE_STEPS.to_vec();
             let mut received = Vec::new();
             while received.len() < expected.len() {
                 for event in reader.fetch_events().unwrap() {

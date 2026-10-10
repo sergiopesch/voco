@@ -116,15 +116,16 @@ message under **My words are not appearing**.
 
 On Wayland, VOCO presses the paste keys through its own virtual keyboard, a
 device named "VOCO virtual keyboard" that it creates on `/dev/uinput`, the
-kernel's interface for virtual input devices. The keyboard has three keys:
-Shift, Insert and Space. VOCO creates it when it starts in a Wayland session, so
+kernel's interface for virtual input devices. The keyboard has two keys: Shift
+and Insert. VOCO creates it when it starts in a Wayland session, so
 the compositor has added it long before the first paste, and keeps it until VOCO
 quits; the kernel then removes it and releases any key it still held. If VOCO
 can't create it at startup, it tries again before each paste. X11 sessions use
 `xdotool` instead.
 
-Each paste is Shift+Insert, led by its own Space key when the phrase continues
-the previous one, sent as separate key events 12 ms apart. Passive evdev ignores
+Each paste is Shift+Insert, sent as separate key events 12 ms apart. When a
+phrase continues the previous one, its joining space is part of the pasted
+text. Passive evdev ignores
 VOCO's keyboard, so its keys never count as your shortcut or a held modifier.
 
 No daemon, service, socket or group is involved. VOCO needs only read and write
@@ -234,6 +235,11 @@ polling, and keeps watching when none is readable at startup.
   sending keys. An inactive result stops the paste; unavailable status permits
   it, and a later session switch can still redirect keys. A user signed in only
   remotely has no access to `/dev/uinput`.
+- While the screen is locked, VOCO sends no keys and its shortcut doesn't start
+  dictation, and locking the screen stops a dictation. VOCO knows about the lock
+  only when the desktop reports it to logind, as GNOME does.
+- Chromium's address bar trims the leading space of a pasted phrase, so a phrase
+  that continues the previous one joins its last word there.
 - On GNOME, apps that inhibit system shortcuts, such as virtual machines and
   remote desktops, receive the companion's chord. In Shell menus and dialogs it
   does nothing.

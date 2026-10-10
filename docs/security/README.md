@@ -60,8 +60,8 @@ weren't typed go to the clipboard, or to Review if the copy fails.
 
 On Wayland, VOCO sends its paste keys through its own virtual keyboard on
 `/dev/uinput`, the kernel's interface for creating input devices. It is the only
-device VOCO creates: it has only Shift, Insert and Space, and VOCO keeps it while
-it runs. No daemon, socket or service stands between VOCO and the kernel.
+device VOCO creates: it has only Shift and Insert, and VOCO keeps it while it
+runs. No daemon, socket or service stands between VOCO and the kernel.
 
 The package's udev rule tags `/dev/uinput` with `uaccess`, so logind gives the
 user of the active local session read and write access through an ACL, and
@@ -77,7 +77,9 @@ asks logind whether the desktop session it started in is active, before copying
 a phrase and again before sending keys. If logind reports that session inactive,
 VOCO stops the paste and sends no keys. When logind can't answer, VOCO permits
 the paste. These checks do not lock the session: a switch after the last check
-can still redirect the keys.
+can still redirect the keys. VOCO also follows the screen lock that logind
+reports for that session: while the screen is locked it sends no keys and its
+shortcut starts nothing, and locking the screen stops a dictation.
 
 A typing daemon that runs as you needs this same access, and adds a socket that
 every program running as you can write to. The `input` group grants far more:
@@ -146,18 +148,29 @@ releases API for the 12 newest releases, unless its cached answer is younger
 than 6 hours. **Check for updates** in Settings always asks. The request
 carries no account or device identifier, though GitHub sees your IP address.
 VOCO only tells you a release exists; it never downloads or installs anything.
-There is no setting that turns the check off.
+To make no request unless you ask, set **Update checks** on the **Updates** page
+to **Only when I choose**.
 
 ## Speech worker
 
-VOCO starts `/usr/bin/python3 /usr/lib/voco/speech/stream_worker.py` with pipes
-for its input and output. `VOCO_STREAM_PYTHON` and `VOCO_STREAM_WORKER` can
-name other absolute files, which then run with your permissions. VOCO reads
+VOCO starts `/usr/bin/python3 -E -s -B /usr/lib/voco/speech/stream_worker.py`
+with pipes for its input and output. `VOCO_STREAM_PYTHON` and
+`VOCO_STREAM_WORKER` can name other absolute files, which then run with your
+permissions. The flags make Python ignore `PYTHON*` variables and your own
+site-packages, so neither can load other code into the worker. VOCO reads
 response lines of up to 1 MiB, and the worker reads request lines of up to
 4 MiB; a longer line ends the exchange. The worker keeps library output off the
 protocol, keeps request data and transcripts out of its diagnostics, and refuses
 a model whose SHA-256 doesn't match the pinned value, including one named by
 `VOCO_NEMOTRON_MODEL`.
+
+The worker can't open a network socket. Before its Python starts, VOCO marks
+every descriptor beyond the worker's pipes close-on-exec, so it inherits no
+socket, sets no-new-privileges and installs a seccomp filter. The filter refuses
+every new socket except a Unix one, and io_uring, which can open sockets without
+the socket call, with "permission denied". If VOCO can't install the filter, the
+worker doesn't start. Unix sockets stay open to the worker, so a program that
+listens on one and relays to the network could still carry data out.
 
 ## Chromium extension
 
