@@ -360,5 +360,5 @@ release rehearsal.
   doesn't cover DNF, so try the RPM on Fedora 44 before publishing.
 - Userspace checks, native install and removal, physical audio and
   compositor/application behaviour are distinct evidence levels, and each covers
-  only the system and GNOME version it ran on. Never claim fastest, most
-  accurate, universal compatibility or stability from a limited test corpus.
+  only the system and GNOME version it ran on. Never claim first, only, fastest,
+  most accurate, universal compatibility or stability from a limited test corpus.

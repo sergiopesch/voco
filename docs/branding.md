@@ -25,14 +25,21 @@ Each pillar names only what is true today:
   releases.
 - **Local.** The speech model runs on the processor, with no GPU, and nothing is
   downloaded after installation.
-- **Under your control.** VOCO listens only when you start it, shows that it's
-  listening, never presses Enter, and is open source under the MIT license.
+- **Under your control.** VOCO acts in your apps only when you ask. Today that
+  means it listens only when you start it, shows that it's listening and never
+  presses Enter. The principle stays as VOCO grows; its proof grows with each
+  capability's safety rules.
+
+VOCO's code is open source under the MIT license. Its speech model is NVIDIA
+Nemotron, under the NVIDIA Open Model License, which isn't an open-source licence:
+say "open source" only of the app, and name the model's licence wherever the model
+is credited.
 
 The brand line and the manifesto are VOCO's only statements of direction.
 Everything else describes what VOCO does now, and a capability is named only
 once it ships with evidence (see the claims rule in [AGENTS.md](../AGENTS.md)).
-Never call VOCO the first, fastest or most accurate voice software, and don't
-compare it with voice assistants.
+Never call VOCO the first, only, fastest or most accurate voice software, and
+don't compare it with voice assistants.
 
 ## Voice
 
