@@ -85,10 +85,10 @@ change.
 - Start the worker as `python3 -E -s -B`, never `-I`, which drops the script's
   directory and with it the worker's own modules. `worker_sandbox.rs` marks every
   descriptor beyond its standard streams close-on-exec and installs a seccomp
-  filter that refuses every socket and io_uring, allowing only a Unix socket pair,
-  which connects the worker to itself; a step that fails fails the spawn. Never
-  give the worker a network path, not even a Unix socket, which reaches services
-  that can start unconfined processes.
+  filter that refuses every socket, socket pair and io_uring; a step that fails
+  fails the spawn. Never give the worker a network path, not even a Unix socket,
+  which reaches services that can start unconfined processes, or a Unix datagram
+  pair, which can still address other sockets.
 - Flush Stop audio into the same live stream before finishing; never copy or
   replay a whole recording. Recreate a dead worker only at a session boundary.
 - Keep bounded queues, deadlines and sequence/sample accounting. Worker IPC groups
@@ -151,8 +151,9 @@ change.
   shortcut route starts dictation, a toggle that waited for the renderer is
   dropped, and the change to locked stops a running one. Subscribe, then read
   the first value on the same main context, so the read can't undo a newer
-  change. While logind doesn't answer or the origin isn't bound yet, keep trying,
-  up to every 30 s. A logind without the property reads as unlocked.
+  change. While logind doesn't answer, or the origin isn't bound yet, keep
+  trying, up to every 30 s. A logind that answers without the property reads as
+  unlocked.
 - The paste check opens `/dev/uinput`; it never creates the device, sends keys or
   starts a process. The evdev listener ignores the virtual keyboard by name (and
   another tool's `ydotoold virtual device`), so its keys never count as the

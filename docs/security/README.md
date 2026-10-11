@@ -169,12 +169,12 @@ a model whose SHA-256 doesn't match the pinned value, including one named by
 The worker can't open a socket. Before its Python starts, VOCO marks every
 descriptor beyond the worker's standard streams close-on-exec, so it inherits
 only its two pipes and VOCO's own standard error, sets no-new-privileges and
-installs a seccomp filter. The filter refuses every socket, Unix ones included,
-and io_uring, which can open sockets without the socket call, with "permission
-denied"; it allows only a Unix socket pair, which connects the worker to itself.
-A Unix socket would reach the session bus and your user's service manager, which
-can start processes outside the filter. If VOCO can't install the filter, the
-worker doesn't start.
+installs a seccomp filter. The filter refuses every socket and socket pair, Unix
+ones included, and io_uring, which can open sockets without the socket call,
+with "permission denied". A Unix socket would reach the session bus and your
+user's service manager, which can start processes outside the filter, and a
+Unix datagram pair can still send to other sockets. If VOCO can't install the
+filter, the worker doesn't start.
 
 The filter keeps the worker's own code and libraries off the network. It doesn't
 contain a worker that something has taken over: that worker still runs as you,
