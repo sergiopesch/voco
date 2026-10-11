@@ -336,6 +336,8 @@ pub const MY_WORDS_MAX_HEARD: usize = 5;
 /// Checks a My words list before it is saved. The worker skips an entry
 /// that breaks these rules rather than failing dictation, so a hand-edited
 /// config can't stop it.
+///
+/// Normalizes to NFC first, so decomposed accents (NFD) behave like precomposed (NFC).
 pub fn validate_my_words(words: &[String]) -> Result<(), String> {
     if words.len() > MY_WORDS_MAX_TERMS {
         return Err(format!(
@@ -344,35 +346,50 @@ pub fn validate_my_words(words: &[String]) -> Result<(), String> {
     }
     let mut seen = std::collections::HashSet::new();
     for term in words {
-        if listable_word_count(term).is_none() {
+        let normalized = normalize_nfc(term);
+        if listable_word_count(&normalized).is_none() {
             return Err(format!(
                 "\u{201c}{term}\u{201d} can use letters, digits, single spaces, hyphens, \
                  apostrophes and full stops, and must start with a letter or digit."
             ));
         }
-        if !listable(term) {
+        if !listable(&normalized) {
             return Err(format!(
                 "\u{201c}{term}\u{201d} is too long: an entry has at most \
                  {MY_WORDS_MAX_WORDS} words and {MY_WORDS_MAX_CHARS} characters."
             ));
         }
-        if !seen.insert(my_words_key(term)) {
+        if !seen.insert(my_words_key(&normalized)) {
             return Err(format!("\u{201c}{term}\u{201d} is already in My words."));
         }
     }
     Ok(())
 }
 
+/// Normalizes text to NFC (precomposed Unicode form), so decomposed accents
+/// like U+0301 combine with their base letter. A name typed in Settings or
+/// at setup goes through this, and so does a hand-edited config.
+fn normalize_nfc(text: &str) -> String {
+    use unicode_normalization::UnicodeNormalization;
+    text.nfc().collect()
+}
+
 /// Checks the taught versions against the list they belong to before they are
 /// saved, by the rules the worker reads them with: each writes an entry, or one
 /// word of it, that it doesn't already match, matches no entry or other
 /// version, and an entry keeps at most `MY_WORDS_MAX_HEARD`.
+///
+/// Normalizes to NFC first, like `validate_my_words`.
 pub fn validate_my_words_heard(words: &[String], heard: &[HeardVersion]) -> Result<(), String> {
-    let mut taken: std::collections::HashSet<String> =
-        words.iter().map(|term| my_words_key(term)).collect();
+    let mut taken: std::collections::HashSet<String> = words
+        .iter()
+        .map(|term| my_words_key(&normalize_nfc(term)))
+        .collect();
     let mut counts = std::collections::HashMap::new();
     for version in heard {
-        if !heard_listable(&version.heard) {
+        let heard_normalized = normalize_nfc(&version.heard);
+        let writes_normalized = normalize_nfc(&version.writes);
+        if !heard_listable(&heard_normalized) {
             return Err(format!(
                 "VOCO can't learn \u{201c}{}\u{201d}: a version is up to {MY_WORDS_MAX_WORDS} words \
                  and {MY_WORDS_MAX_CHARS} characters, of letters, digits, apostrophes, single \
@@ -384,15 +401,15 @@ pub fn validate_my_words_heard(words: &[String], heard: &[HeardVersion]) -> Resu
         // entry with that word, as the worker reads it.
         let entry = words
             .iter()
-            .position(|term| *term == version.writes)
+            .position(|term| normalize_nfc(term) == writes_normalized)
             .or_else(|| {
-                words
-                    .iter()
-                    .position(|term| term_words(term).any(|word| word == version.writes))
+                words.iter().position(|term| {
+                    term_words(&normalize_nfc(term)).any(|word| word == writes_normalized)
+                })
             })
             .ok_or_else(|| format!("\u{201c}{}\u{201d} isn't in My words.", version.writes))?;
-        let key = my_words_key(&version.heard);
-        if key == my_words_key(&version.writes) {
+        let key = my_words_key(&heard_normalized);
+        if key == my_words_key(&writes_normalized) {
             return Err(format!(
                 "VOCO already writes \u{201c}{}\u{201d} for it.",
                 version.writes
@@ -418,17 +435,22 @@ pub fn validate_my_words_heard(words: &[String], heard: &[HeardVersion]) -> Resu
     // not clash with one that writes anything else.
     let mut writes: std::collections::HashMap<String, &str> = words
         .iter()
-        .map(|term| (my_words_key(term), term.as_str()))
+        .map(|term| (my_words_key(&normalize_nfc(term)), term.as_str()))
         .collect();
     for version in heard {
-        writes.insert(my_words_key(&version.heard), version.writes.as_str());
+        let heard_normalized = normalize_nfc(&version.heard);
+        let writes_normalized = normalize_nfc(&version.writes);
+        writes.insert(my_words_key(&heard_normalized), version.writes.as_str());
     }
     for version in heard {
-        let heard_key = my_words_key(&version.heard);
+        let heard_key = my_words_key(&normalize_nfc(&version.heard));
+        let writes_normalized = normalize_nfc(&version.writes);
         for term in words.iter().filter(|term| {
-            **term != version.writes && term_words(term).any(|word| word == version.writes)
+            let term_normalized = normalize_nfc(term);
+            term_normalized != writes_normalized
+                && term_words(&term_normalized).any(|word| word == writes_normalized)
         }) {
-            let whole = key_with(term, &version.writes, &heard_key);
+            let whole = key_with(&normalize_nfc(term), &writes_normalized, &heard_key);
             if *writes.entry(whole).or_insert(term.as_str()) != term.as_str() {
                 return Err(format!(
                     "\u{201c}{}\u{201d} would make another of your words write differently.",
@@ -586,16 +608,22 @@ fn my_words_at(path: &std::path::Path) -> (Vec<String>, Vec<HeardVersion>) {
         return Default::default();
     };
     // A hand-edited config can't send the worker more, or longer, entries or
-    // versions than Settings can save; the worker checks the rest.
+    // versions than Settings can save; the worker checks the rest. Normalize
+    // to NFC so NFD and NFC behave the same.
     let words = config
         .my_words
         .into_iter()
+        .map(|term| normalize_nfc(&term))
         .filter(|term| listable(term))
         .take(MY_WORDS_MAX_TERMS)
         .collect();
     let heard = config
         .my_words_heard
         .into_iter()
+        .map(|version| HeardVersion {
+            heard: normalize_nfc(&version.heard),
+            writes: normalize_nfc(&version.writes),
+        })
         .filter(|version| heard_listable(&version.heard) && listable(&version.writes))
         .take(MY_WORDS_MAX_TERMS * MY_WORDS_MAX_HEARD)
         .collect();

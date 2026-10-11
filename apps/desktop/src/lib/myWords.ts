@@ -20,20 +20,20 @@ const CASEFOLD: Record<string, string> = {
 
 /** A word without case or accents, with one apostrophe for both. */
 export function plainWord(word: string): string {
-  return word.normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase()
+  return word.normalize("NFC").normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase()
     .replace(/[ßςᲀ-ᲈ]/gu, letter => CASEFOLD[letter] ?? letter).replace(/’/g, "'");
 }
 
 /** What the worker matches: the words without case, accents or what separates them,
  * with one apostrophe for both. */
 export function myWordsKey(term: string): string {
-  return (term.normalize("NFKD").replace(/\p{M}/gu, "").match(WORD) ?? []).join("").toLowerCase()
+  return (term.normalize("NFC").normalize("NFKD").replace(/\p{M}/gu, "").match(WORD) ?? []).join("").toLowerCase()
     .replace(/[ßςᲀ-ᲈ]/gu, letter => CASEFOLD[letter] ?? letter).replace(/’/g, "'");
 }
 
 /** A term's words, as the worker splits them. */
 export function termWords(term: string): string[] {
-  return term.match(WORD) ?? [];
+  return term.normalize("NFC").match(WORD) ?? [];
 }
 
 /** Typed text as an entry: composed accents and single spaces. */
