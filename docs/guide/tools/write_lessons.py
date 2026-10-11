@@ -462,7 +462,7 @@ lesson(
         ),
         (
             "Your spelling",
-            "Each session start carries the saved spelling. spelling.py converts the whole hypothesis with a table of unambiguous VarCon forms and emits only text that can no longer change, so pasting stays append-only. Names and words whose spelling depends on meaning are left alone.",
+            "Each session start carries the saved spelling. spelling.py converts the whole hypothesis with a table of unambiguous VarCon forms and emits only text that can no longer change, so pasting stays append-only. Only lowercase words change, so names stay, and so do words whose spelling depends on meaning.",
         ),
         (
             "No network for the worker",
