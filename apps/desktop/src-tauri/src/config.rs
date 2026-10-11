@@ -1588,12 +1588,14 @@ mod tests {
         let nfc_expected = "Siobhán Kelly"; // NFC (precomposed)
         
         // Create a config with NFD input
-        let mut config = AppConfig::default();
-        config.my_words = vec![nfd_input.to_string()];
-        config.my_words_heard = vec![HeardVersion {
-            heard: nfd_input.to_string(),
-            writes: nfd_input.to_string(),
-        }];
+        let mut config = AppConfig {
+            my_words: vec![nfd_input.to_string()],
+            my_words_heard: vec![HeardVersion {
+                heard: nfd_input.to_string(),
+                writes: nfd_input.to_string(),
+            }],
+            ..Default::default()
+        };
         
         // Normalize as persist_config_patch does
         normalize_my_words(&mut config);
