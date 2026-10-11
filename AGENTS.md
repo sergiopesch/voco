@@ -31,8 +31,9 @@ setup and pull requests.
   empty list leaves recognition exactly as it is without the feature.
 - Say it checks one entry: VOCO listens once and shows, in its own window only,
   what it heard. When it heard the entry wrong, the user can teach VOCO that
-  version, up to five for each entry, each at most four words and 40 characters
-  of letters, digits, apostrophes, single spaces and hyphens. A version that
+  version, without the punctuation around it or a pause's comma inside: up to
+  five for each entry, each at most four words and 40 characters of letters,
+  digits, apostrophes, single spaces and hyphens. A version that
   matches another entry or version is refused before it is saved, so no text
   has two spellings. The worker then writes the entry, or the one word of it
   VOCO misheard, wherever the recognizer writes a taught version, matching it as
