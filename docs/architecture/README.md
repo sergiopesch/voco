@@ -254,7 +254,10 @@ the recovery panel offers Retry, Open and Reset; only Reset keeps a backup copy.
 After startup, and when you change the update channel, the renderer reuses
 an answer younger than 6 hours from `update-cache.json`, which Rust reads and
 writes. Otherwise it asks the GitHub releases API for the 12 newest releases,
-with a 15-second timeout. **Check for updates** in Settings always asks. VOCO
+with a 15-second timeout. Both of those automatic checks happen only while
+`automaticUpdateChecks` is on: with **Only when I choose**, neither runs, and
+turning automatic checks back on checks at once. **Check for updates** in
+Settings always asks. VOCO
 only tells you a release exists; it never downloads or installs anything.
 
 ## Logs

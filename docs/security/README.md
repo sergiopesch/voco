@@ -148,8 +148,8 @@ releases API for the 12 newest releases, unless its cached answer is younger
 than 6 hours. **Check for updates** in Settings always asks. The request
 carries no account or device identifier, though GitHub sees your IP address.
 VOCO only tells you a release exists; it never downloads or installs anything.
-To make no request unless you ask, set **Update checks** on the **Updates** page
-to **Only when I choose**.
+To make no request unless you ask, open **Update settings** on the **Updates**
+page and set **Update checks** to **Only when I choose**.
 
 ## Speech worker
 

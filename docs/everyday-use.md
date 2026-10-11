@@ -172,10 +172,10 @@ folder, which your system clears when you sign out.
 
 VOCO's only network request asks GitHub which releases exist. It runs when VOCO
 starts, reusing an answer for up to six hours, and when you choose
-**Check for updates**. To check only when you choose, set **Update checks** on
-the **Updates** page to **Only when I choose**. VOCO never downloads or installs
-updates. To upgrade,
-see [Upgrade](install.md#upgrade).
+**Check for updates**. To check only when you choose, open **Update settings**
+on the **Updates** page and set **Update checks** to **Only when I choose**.
+VOCO never downloads or installs updates. To upgrade, see
+[Upgrade](install.md#upgrade).
 
 After you [remove VOCO](install.md#remove), delete its folders to remove your
 data:

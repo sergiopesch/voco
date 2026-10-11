@@ -121,6 +121,11 @@ jobs:
         env:
           VOCO_RENDERER_EVIDENCE_DIR: ${{ runner.temp }}/voco-english-spelling-renderer
 
+      - name: Update checks off switch regression
+        run: npm run test:update-checks-renderer
+        env:
+          VOCO_RENDERER_EVIDENCE_DIR: ${{ runner.temp }}/voco-update-checks-renderer
+
       - name: Microphone refresh and retry regression
         run: npm run test:microphone-renderer
         env:
@@ -182,6 +187,7 @@ jobs:
             ${{ runner.temp }}/voco-native-wayland/
             ${{ runner.temp }}/voco-dictation-renderer/
             ${{ runner.temp }}/voco-english-spelling-renderer/
+            ${{ runner.temp }}/voco-update-checks-renderer/
             ${{ runner.temp }}/voco-microphone-${{ github.run_id }}-${{ github.run_attempt }}/
             ${{ runner.temp }}/voco-native-capture-renderer/
             ${{ runner.temp }}/voco-onboarding-renderer/
