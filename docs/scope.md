@@ -93,8 +93,9 @@ copied in the meantime.
 The package installs one udev rule, which lets the user of the active local
 session type through VOCO's virtual keyboard. VOCO runs no daemon or service. It
 never changes users, groups or other device permissions, and it never touches a
-service someone else set up. Package scripts never enable GNOME extensions; you
-turn the VOCO panel on yourself.
+service someone else set up. Package scripts never enable GNOME extensions. The
+guided installer turns the VOCO panel on; if you install the package another
+way, you turn it on yourself.
 
 VOCO also never quietly replaces a desktop shortcut you already have.
 
