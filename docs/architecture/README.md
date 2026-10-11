@@ -74,7 +74,9 @@ site-packages, and write no bytecode. Just before Python starts,
 `worker_sandbox.rs` marks every descriptor beyond the worker's standard streams
 close-on-exec and installs a seccomp filter: the worker can open no socket or
 socket pair, not even a Unix one, and no io_uring. If any of that fails, the
-worker doesn't start. The worker has 30 seconds to report ready and 10 seconds for each response, and a response line
+worker doesn't start. The worker gets only the variables it reads (`ENVIRONMENT`
+in `worker_sandbox.rs`), none of the session's bus, display or agent addresses;
+the full-application test checks the running worker's environment and filter. The worker has 30 seconds to report ready and 10 seconds for each response, and a response line
 may be at most 1 MiB. VOCO warms the worker at startup before it reports ready.
 A worker that died while idle is replaced at the next warmup or start, never
 during a recording.
