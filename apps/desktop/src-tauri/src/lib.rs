@@ -1211,16 +1211,29 @@ fn buffer_toggle_until_frontend_ready(backend_used: &str) {
     trace_hotkey_event("toggle_event_buffered", Some(backend_used));
 }
 
-fn replay_pending_toggle(app_handle: &tauri::AppHandle) {
-    let pending_backend = match PENDING_TOGGLE_BACKEND.lock() {
+/// The toggle that waited for the renderer, unless the screen is locked now: a
+/// lock between the toggle and the replay must not start a dictation behind it.
+fn take_pending_toggle(pending: &Mutex<Option<String>>, locked: bool) -> Option<String> {
+    let backend_used = match pending.lock() {
         Ok(mut pending_backend) => pending_backend.take(),
         Err(error) => {
             error!("Failed to lock pending toggle state: {error}");
             None
         }
-    };
+    }?;
+    if locked {
+        trace_hotkey_event("pending_toggle_dropped_locked", Some(&backend_used));
+        return None;
+    }
+    Some(backend_used)
+}
 
-    if let Some(backend_used) = pending_backend {
+fn replay_pending_toggle(app_handle: &tauri::AppHandle) {
+    #[cfg(target_os = "linux")]
+    let locked = desktop_session::is_locked();
+    #[cfg(not(target_os = "linux"))]
+    let locked = false;
+    if let Some(backend_used) = take_pending_toggle(&PENDING_TOGGLE_BACKEND, locked) {
         trace_hotkey_event("pending_toggle_replayed", Some(&backend_used));
         emit_toggle_event(app_handle, &backend_used);
     }
@@ -2135,6 +2148,10 @@ pub fn run() -> Result<(), String> {
                 // dictation and ignores it otherwise, so a lock never starts one.
                 desktop_session::watch_lock(move || {
                     trace_hotkey_event("session_locked_stop", Some("logind"));
+                    // A toggle still waiting for the renderer came before the lock.
+                    if let Ok(mut pending_backend) = PENDING_TOGGLE_BACKEND.lock() {
+                        *pending_backend = None;
+                    }
                     let stop =
                         serde_json::json!({ "triggerId": "session:locked", "action": "stop" });
                     if let Err(error) = lock_app.emit_to("main", TOGGLE_DICTATION_EVENT, stop) {
@@ -2244,6 +2261,19 @@ pub fn run() -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_lock_drops_the_toggle_that_waited_for_the_renderer() {
+        let pending = Mutex::new(Some("evdev".to_string()));
+        assert_eq!(take_pending_toggle(&pending, true), None);
+        assert_eq!(*pending.lock().unwrap(), None);
+        *pending.lock().unwrap() = Some("evdev".to_string());
+        assert_eq!(
+            take_pending_toggle(&pending, false).as_deref(),
+            Some("evdev")
+        );
+        assert_eq!(take_pending_toggle(&pending, false), None);
+    }
 
     #[test]
     fn hotkey_trace_requires_explicit_opt_in() {

@@ -283,13 +283,6 @@ fn settle(last_paste: Option<Instant>) -> u64 {
 /// emulators. Terminals paste PRIMARY, so both selections get the same text.
 pub fn desktop_paste(text: &str) -> Result<InsertionResult, InsertionError> {
     validate_text(text)?;
-    // Behind a locked screen keys would reach the lock screen, not the app.
-    #[cfg(target_os = "linux")]
-    if crate::desktop_session::is_locked() {
-        return Err(InsertionError::no_mutation(
-            crate::desktop_session::LOCKED_DETAIL,
-        ));
-    }
     let mut last_paste = delivery_slot();
     let started = Instant::now();
     let preflight = input_preflight();
@@ -311,6 +304,14 @@ pub fn desktop_paste(text: &str) -> Result<InsertionResult, InsertionError> {
     let (mut clipboard, mut primary) = copy_commands();
     let preflight_ms = elapsed_ms(started);
     let settle_ms = settle(*last_paste);
+    // Behind a locked screen keys would reach the lock screen, not the app.
+    // Checked after the waits, just before the copy, and again before keys.
+    #[cfg(target_os = "linux")]
+    if crate::desktop_session::is_locked() {
+        return Err(InsertionError::no_mutation(
+            crate::desktop_session::LOCKED_DETAIL,
+        ));
+    }
     let mut modifier_wait_ms = 0;
     // Wayland keys are raw events: a still-held shortcut modifier would turn
     // Shift+Insert into another chord. xdotool clears modifiers itself, but
@@ -326,7 +327,7 @@ pub fn desktop_paste(text: &str) -> Result<InsertionResult, InsertionError> {
         &mut primary,
         || {
             modifier_wait_ms = wait_for_modifier_release(MODIFIER_RELEASE_TIMEOUT, held)?;
-            Ok(())
+            check_before_keys(wayland)
         },
         || send_paste_keys(wayland),
     );
@@ -483,6 +484,27 @@ fn virtual_keyboard_access() -> Result<(), String> {
 #[cfg(not(target_os = "linux"))]
 fn virtual_keyboard_access() -> Result<(), String> {
     Err("Wayland paste keys need Linux.".into())
+}
+
+/// The check just before keys, after the copy and the modifier wait: the screen
+/// may have locked, or the session switched, meanwhile. Nothing is typed yet,
+/// so a refusal here keeps the text for the next try.
+fn check_before_keys(wayland: bool) -> Result<(), InsertionError> {
+    #[cfg(target_os = "linux")]
+    {
+        if wayland {
+            return crate::virtual_keyboard::require_active_session()
+                .map_err(InsertionError::no_mutation);
+        }
+        if crate::desktop_session::is_locked() {
+            return Err(InsertionError::no_mutation(
+                crate::desktop_session::LOCKED_DETAIL,
+            ));
+        }
+    }
+    #[cfg(not(target_os = "linux"))]
+    let _ = wayland;
+    Ok(())
 }
 
 /// Shift+Insert through VOCO's virtual keyboard on Wayland, or xdotool on X11.
@@ -990,6 +1012,26 @@ mod tests {
         .unwrap_err();
         assert_eq!(error.outcome, DeliveryOutcome::Uncertain);
         assert!(started.elapsed() < Duration::from_secs(2));
+    }
+
+    #[test]
+    fn a_refusal_just_before_keys_stays_no_mutation() {
+        let directory = scratch_directory("clipboard-refusal");
+        let (clipboard, primary) = (directory.join("clipboard"), directory.join("primary"));
+        let refused = clipboard_transaction(
+            "intended transcript\n",
+            &mut copy_to(&clipboard),
+            &mut copy_to(&primary),
+            || Err(InsertionError::no_mutation("The screen is locked.")),
+            || panic!("no key may follow a refusal"),
+        )
+        .unwrap_err();
+        // Nothing was typed, so the text stays for the next try, but the copy
+        // already replaced the clipboard.
+        assert_eq!(refused.outcome, DeliveryOutcome::NoMutation);
+        assert!(refused.clipboard_changed);
+        assert_eq!(refused.message, "The screen is locked.");
+        std::fs::remove_dir_all(directory).unwrap();
     }
 
     #[test]

@@ -132,10 +132,13 @@ leading whitespace, so there a continuing phrase joins the previous word. VOCO
 never restores the previous clipboard.
 
 `desktop_session.rs` follows the screen lock of the session VOCO started in,
-through logind's `LockedHint`. While the screen is locked, a paste fails with no
-change and no shortcut starts dictation. When the screen locks during a
-dictation, VOCO stops it and notifies "Dictation stopped"; words it couldn't
-type go to the clipboard as after any Stop.
+through logind's `LockedHint`: it subscribes to the session's changes, then
+reads the first value on the same main context. While logind doesn't answer at
+startup, it keeps trying, up to every 30 s. While the screen is locked, a paste
+fails with no change, checked before the copy and again just before keys, and
+no shortcut starts dictation. When the screen locks during a dictation, VOCO
+stops it and notifies "Dictation stopped"; words it couldn't type go to the
+clipboard as after any Stop.
 
 `virtual_keyboard.rs` keeps one uinput keyboard per process, "VOCO virtual
 keyboard", with only Shift and Insert. VOCO creates it at startup in a
