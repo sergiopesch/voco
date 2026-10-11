@@ -45,7 +45,7 @@ fn create() -> std::io::Result<VirtualDevice> {
     let mut keys = AttributeSet::<KeyCode>::new();
     // Shift and Insert only: the kernel drops any key a device didn't declare,
     // so this keyboard can't press Enter, Space or anything else that acts.
-    for key in [KeyCode::KEY_LEFTSHIFT, KeyCode::KEY_INSERT] {
+    for key in [KeyCode::KEY_LEFTSHIFT, KeyCode::KEY_INSERT, KeyCode::KEY_SPACE] {
         keys.insert(key);
     }
     VirtualDevice::builder()?
