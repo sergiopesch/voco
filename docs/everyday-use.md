@@ -103,8 +103,11 @@ dictation.
 - Words that sound different in each variety stay as you said them, such as
   aluminium, maths and learnt.
 - VOCO pastes a word only once its spelling can't change, so the end of a word
-  such as "recognise" can appear a moment after the rest. One or two words in a
-  hundred wait like this.
+  such as "recognise" can appear a moment after the rest. Fewer than one word in
+  200 waits like this, and the most common words, such as a, he, must and will,
+  never do. For that, a few rare words keep the recognizer's spelling: British
+  English leaves hemoglobin and the other hem- words, mustache and willful as
+  recognised, and American English leaves aetiology and callisthenics.
 
 ## Shortcut
 

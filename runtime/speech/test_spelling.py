@@ -21,6 +21,15 @@ UNCHANGED = ('program programs check checks practice license licenses tire tires
              'judgment aging inquiry toward towards learned learnt spoilt mom moms math maths '
              'airplane aeroplane aluminum aluminium specialty speciality whiskey whiskeys '
              'groin groins').split()
+# The most common words never wait: holding one back would paste a fragment,
+# such as "h" for "he", whenever the speaker pauses. The words that do wait, for
+# a conversion worth a moment's delay, are listed with that conversion.
+COMMON = ('a an and are as at be but by call can do for from had has have he her his i if in is it its '
+          'just like may me must my no not of on or our out said she so that the their them then there '
+          'they this to up was we were what when which who will with would you your check practice '
+          'judge').split()
+WAITS = {'british': {'check': 'chequebook, chequered', 'practice': 'practised'},
+         'american': {'judge': 'judgment'}}
 
 
 def appended(converter, steps):
@@ -142,6 +151,20 @@ class StreamingTests(unittest.TestCase):
         self.assertEqual(BRITISH.final('the catalog'), 'the catalogue')
         self.assertEqual(BRITISH.stable('the plain words'), 'the plain words')
 
+    def test_common_words_never_wait(self):
+        for converter in (BRITISH, AMERICAN):
+            for word in COMMON:
+                with self.subTest(mode=converter.mode, word=word):
+                    self.assertNotIn(word, converter.words)
+                    text = f'I said {word}'
+                    self.assertEqual(converter.stable(text) != text, word in WAITS[converter.mode])
+        self.assertEqual(AMERICAN.stable('I have a'), 'I have a')
+        for text in ('Then he', 'You must', 'It will'):
+            self.assertEqual(BRITISH.stable(text), text)
+        # The rare conversions that held them are left out of the table.
+        self.assertEqual(BRITISH.final('hemoglobin, a mustache, willful'), 'hemoglobin, a mustache, willful')
+        self.assertEqual(AMERICAN.final('aetiology and callisthenics'), 'aetiology and callisthenics')
+
     def test_capitalized_open_words_never_wait(self):
         for text in ('Color', 'Color ', 'COLOR', "Honor I'm", 'The Colo'):
             self.assertEqual(BRITISH.stable(text), text)
@@ -194,8 +217,8 @@ class BenchmarkTests(unittest.TestCase):
                     held += out_step > raw_step
             self.assertEqual(changed, changes, converter.mode)
             self.assertEqual(words, 6377)
-            # About 1.1% (British) and 1.7% (American) of words wait for one more hypothesis.
-            self.assertLess(held / words, .025, converter.mode)
+            # 24 (British) and 9 (American) of the 6,377 words wait for one more hypothesis.
+            self.assertLess(held / words, .005, converter.mode)
 
 
 if __name__ == '__main__':
