@@ -250,16 +250,44 @@ bash scripts/provision-ci-speech.sh
 The script downloads a published VOCO package from GitHub Releases, checks it
 against the SHA-256 written in the script and extracts it with `dpkg-deb`. It
 verifies the speech payload with `scripts/verify-speech-payload.py`, checks that
-the package's `MODEL-IDENTITY.json` and `NATIVE-BUILD.json` equal the checkout's
-copies, and copies `models/`, `lib/` and `libbench_nemo_pool.so` into
-`runtime/speech/`. Any mismatch stops it; it never falls back to another
-download. It needs curl, dpkg-deb, python3 and network access. CI runs it in the
-Rust Check & Test and Application jobs.
+the package's `NATIVE-BUILD.json` equals the checkout's, and copies `models/`,
+`lib/` and `libbench_nemo_pool.so` into `runtime/speech/`. Any mismatch stops
+it; it never falls back to another download. It needs curl, dpkg-deb, python3
+and network access. CI runs it in the Rust Check & Test and Application jobs
+and in the Debian 13 and Fedora 44 runtime jobs.
+
+The model VOCO ships is NVIDIA's GGUF with one metadata entry added:
+`asr.tokenizer.spm_model`, the SentencePiece tokenizer from NVIDIA's checkpoint
+at the same revision. NeMo-Speech.cpp needs it to turn phrases into the model's
+pieces for boosting, and NVIDIA's GGUF carries only the decoder's vocabulary.
+`MODEL-IDENTITY.json` pins all three files: `model_sha256` is the model VOCO
+ships, `base_model_sha256` is NVIDIA's GGUF, and `tokenizer` gives the
+checkpoint archive, the tokenizer's tar member, its offset, size and SHA-256.
+
+The published package's `MODEL-IDENTITY.json` must name either that model or
+NVIDIA's GGUF, with every other field equal to the checkout's. The pinned
+package carries NVIDIA's GGUF, so the script then runs
+`scripts/graft-model-tokenizer.py` on the copied model:
+
+- It reads the tokenizer's tar header and bytes from the checkpoint at the
+  pinned revision on Hugging Face, in one range request, never the 2.5 GB
+  archive. It checks the header's name, size and checksum and the tokenizer's
+  SHA-256.
+- It checks that the tokenizer's pieces equal the model's vocabulary.
+- It appends the entry and copies every other entry, every tensor description
+  and all tensor data unchanged. Then it checks that the result differs from
+  NVIDIA's file only by that entry and has the pinned SHA-256.
+- It replaces the file only then.
+
+A model that already has the pinned SHA-256, from a package that carries it, is
+left as it is, and any other model is refused. `--tokenizer FILE` uses a local
+copy of the tokenizer instead, which must have the pinned SHA-256 too.
 
 To rebuild the native libraries instead, follow
 [Native runtime](../runtime/native/README.md). A rebuild replaces `lib/`,
 `libbench_nemo_pool.so` and `NATIVE-BUILD.json` together. The recipe doesn't
-convert the model, so the model always comes from a published package.
+convert the model, so the model always comes from a published package, with the
+tokenizer added as above.
 
 ## Package checks
 
@@ -279,7 +307,9 @@ python3 and readelf. It checks:
   byte, and that neither `/usr/libexec/voco/` nor `voco-ydotoold.service` is
   shipped;
 - the speech payload, with `verify-speech-payload.py`, which compares every file
-  and link with `MANIFEST.json` and the two identity receipts;
+  and link with `MANIFEST.json` and the two identity receipts, and that both
+  receipts equal the checkout's, so the package carries the pinned model and
+  native runtime;
 - that the host manifest allows only the extension ID derived from the
   extension's key, and that the host refuses any other origin;
 - the AppStream ID, the launchable and the first release entry's version, then

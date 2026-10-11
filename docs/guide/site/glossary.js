@@ -81,6 +81,7 @@ export const glossary = [
   ["Staged tree", "The complete set of package files, prepared once in a folder. VOCO builds both its Debian package and its RPM from it."],
   ["State machine", "A map of allowed states and the moves between them. VOCO’s dictation status is idle, starting, recording, processing or error."],
   ["Tauri", "The desktop framework that connects VOCO’s web-based window to its Rust core."],
+  ["Tokenizer", "The rules that split text into a model’s pieces. VOCO’s model file holds the SentencePiece tokenizer from NVIDIA’s checkpoint of that model, which the recognizer needs to turn phrases into pieces."],
   ["Tray host", "The part of a desktop that shows apps’ tray icons. It owns the D-Bus name org.kde.StatusNotifierWatcher. On GNOME it is an AppIndicator extension, which Debian and Fedora don’t turn on."],
   ["Trust boundary", "A point where incoming data or authority needs to be checked again."],
   ["uinput", "The Linux interface, /dev/uinput, that lets a program create a virtual input device. On Wayland, VOCO creates its virtual keyboard through it."],

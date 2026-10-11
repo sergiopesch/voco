@@ -82,7 +82,11 @@ A worker that died while idle is replaced at the next warmup or start, never
 during a recording.
 
 The worker loads `nemotron-speech-streaming-en-0.6b.q8_0.gguf` and rejects it
-if its SHA-256 doesn't match the pinned value. It sets `NEMO_SPEECH_CPU_THREADS`
+if its SHA-256 doesn't match the pinned value. That file is NVIDIA's GGUF plus
+one metadata entry, `asr.tokenizer.spm_model`: the SentencePiece tokenizer from
+NVIDIA's checkpoint, which NeMo-Speech.cpp needs to turn boost phrases into the
+model's pieces ([runtime provisioning](../linux-packaging.md#runtime-provisioning)).
+The worker sets `NEMO_SPEECH_CPU_THREADS`
 to one less than the CPUs it may run on, between 1 and 4. The default
 digital-silence gate skips long runs of exact zeros but keeps 640 ms before
 sound and 1.5 seconds after it.

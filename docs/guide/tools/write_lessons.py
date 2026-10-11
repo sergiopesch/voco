@@ -552,6 +552,10 @@ lesson(
             "The recognizer always receives the original samples at the capture rate, and each push names that rate.",
         ),
         (
+            "The tokenizer inside",
+            "NVIDIA's GGUF holds the decoder's vocabulary but not the SentencePiece tokenizer the recognizer needs to turn phrases into the model's pieces. VOCO's copy adds that tokenizer from NVIDIA's checkpoint as one metadata entry. Every weight and every other entry stays as NVIDIA published it, and the pinned fingerprint is that of the result.",
+        ),
+        (
             "Turning the gate off",
             "VOCO_SILENCE_GATE=off disables the gate. The default mode, zero, treats a packet as quiet only when every sample is exactly zero. Any other value stops the worker before the model loads.",
         ),
@@ -561,7 +565,8 @@ lesson(
         (R + "nemo_bridge.cpp", "The bridge into NeMo-Speech.cpp."),
         (R + "streaming.py", "The warmup, the silence gate and frame joining."),
         (R + "worker_main.py", "The request loop and the thread rule."),
-        (R + "MODEL-IDENTITY.json", "The model's source, revision and fingerprint."),
+        (R + "MODEL-IDENTITY.json", "The model's source, revision and fingerprint, and those of the NVIDIA file and tokenizer it is built from."),
+        ("scripts/graft-model-tokenizer.py", "Adds the tokenizer to NVIDIA's GGUF and checks every pin."),
         (R + "NATIVE-BUILD.json", "Pinned revisions, patch digests and processor flags."),
         ("runtime/native/build.py", "Builds the native recognizer from pinned source."),
         ("runtime/native/thread-pool.patch", "Bounded threads that sleep between steps."),
