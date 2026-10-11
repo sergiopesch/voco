@@ -77,13 +77,23 @@ jobs:
             xvfb xdotool xclip gir1.2-gtk-3.0 gir1.2-webkit2-4.1 gir1.2-atspi-2.0 at-spi2-core \
             weston libweston-13-0 wayland-utils gir1.2-gtk-4.0 gir1.2-webkit-6.0 \
             gnome-text-editor gnome-terminal nano gnome-shell gnome-shell-extension-appindicator xwayland \
-            ffmpeg
+            ffmpeg locales
 
       - name: Install Node dependencies
         run: npm ci
 
       - name: DevOps preflight
         run: npm run verify:devops
+
+      # Bash writes times with the locale's decimal separator, so the installer
+      # runs again where it is a comma.
+      - name: Installer in a decimal-comma locale
+        run: |
+          mkdir -p "$RUNNER_TEMP/locales"
+          localedef -i de_DE -f UTF-8 "$RUNNER_TEMP/locales/de_DE.UTF-8"
+          export LOCPATH="$RUNNER_TEMP/locales" LC_ALL=de_DE.UTF-8
+          python3 scripts/test-install-journey.py
+          python3 scripts/test-install-performance.py
 
       - name: Spelling table matches pinned VarCon
         run: |

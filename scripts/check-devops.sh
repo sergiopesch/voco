@@ -260,6 +260,8 @@ if not images or any(not re.search(r"@sha256:[0-9a-f]{64}$", image) for image in
 for suite in ("english-spelling", "update-checks"):
     if commands.count(f"run: npm run test:{suite}-renderer") != 1:
         raise SystemExit(f"{workflow_path} must run the {suite} renderer gate exactly once")
+if 'export LOCPATH="$RUNNER_TEMP/locales" LC_ALL=de_DE.UTF-8' not in commands:
+    raise SystemExit(f"{workflow_path} must run the installer suites in a decimal-comma locale")
 if 'python3 scripts/generate-spelling-table.py --check "$RUNNER_TEMP/varcon.txt"' not in commands:
     raise SystemExit(f"{workflow_path} must check the spelling table against the pinned VarCon file")
 if commands.count("run: npm run test:chromium-exact-field") != 1:
