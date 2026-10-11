@@ -1,12 +1,13 @@
 #!/usr/bin/python3
 """TEST ONLY: a minimal org.freedesktop.login1 on a private system bus.
 
-  fake-logind.py BUS_ADDRESS READY_FILE
+  fake-logind.py BUS_ADDRESS READY_FILE [--locked]
 
 It serves one local graphical X11 session of this user on seat0, as VOCO's
-binding expects, and writes READY_FILE once it owns the name. SIGUSR1 locks the
-screen and SIGUSR2 unlocks it: each sets LockedHint and emits PropertiesChanged,
-as logind does. It answers only what VOCO asks.
+binding expects, and writes READY_FILE once it owns the name. With --locked the
+session starts locked, so a reader sees the lock without any change signal.
+SIGUSR1 locks the screen and SIGUSR2 unlocks it: each sets LockedHint and emits
+PropertiesChanged, as logind does. It answers only what VOCO asks.
 """
 import os
 from pathlib import Path
@@ -41,7 +42,7 @@ NODE = Gio.DBusNodeInfo.new_for_xml('''<node>
     <property name="Sessions" type="a(so)" access="read"/>
   </interface>
 </node>''')
-state = {'locked': False}
+state = {'locked': sys.argv[3:] == ['--locked']}
 
 
 def manager_call(connection, sender, path, interface, method, parameters, invocation):

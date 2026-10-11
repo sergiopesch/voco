@@ -257,14 +257,14 @@ if case == 'lock':
         time.sleep(.02)
     assert socket_path.exists(), 'The private system bus did not start'
     app_env['DBUS_SYSTEM_BUS_ADDRESS'] = 'unix:path=%s' % socket_path
+    # Locked before VOCO starts, with no change signal: only its first read can see it.
     logind = subprocess.Popen(['/usr/bin/python3', str(repo / 'scripts/fixtures/fake-logind.py'), app_env['DBUS_SYSTEM_BUS_ADDRESS'],
-                               str(root / 'logind.ready')], stdout=log, stderr=subprocess.STDOUT)
+                               str(root / 'logind.ready'), '--locked'], stdout=log, stderr=subprocess.STDOUT)
     for _ in range(250):
         if (root / 'logind.ready').exists():
             break
         time.sleep(.02)
     assert (root / 'logind.ready').exists(), 'The fake logind did not start'
-    logind.send_signal(signal.SIGUSR1)  # locked before VOCO starts
 app_hash = hashlib.sha256((root / 'voco').read_bytes()).hexdigest()
 app = subprocess.Popen([str(root / 'voco')], stdout=log, stderr=subprocess.STDOUT, env=app_env)
 passed, failure, window_id, before_switch = False, None, None, None
@@ -312,8 +312,10 @@ try:
         mutations.clear()
         # The rest is a delivery case.
     note_focus('before-start')
+    # The lock case already ran one recording: wait for this one's events.
+    before = counts()
     subprocess.run(['xdotool', 'key', '--clearmodifiers', 'alt+d'], check=True)
-    wait_for(lambda: counts()['recording_state_active'] > 0, 'actual capture')
+    wait_for(lambda: counts()['recording_state_active'] > before['recording_state_active'], 'actual capture')
     note_focus('recording')
     pulse_outputs = subprocess.check_output([os.environ['VOCO_NATIVE_PACTL'], 'list', 'source-outputs'], text=True)
     observable_fields = ('Source Output #', 'Driver:', 'Source:', 'Sample Specification:', 'Corked:', 'Mute:', 'application.name =', 'application.process.binary =')
@@ -335,7 +337,7 @@ try:
     pump(.6)
     note_focus('before-stop')
     subprocess.run(['xdotool', 'key', '--clearmodifiers', 'alt+d'], check=True)
-    wait_for(lambda: counts()['dictation_stop_to_idle'] > 0, 'successful recording returned to idle', timeout=35)
+    wait_for(lambda: counts()['dictation_stop_to_idle'] > before['dictation_stop_to_idle'], 'successful recording returned to idle', timeout=35)
     wait_for(lambda: quiet(.5), 'the last paste to land', timeout=5)
     note_focus('delivered')
     screenshot('delivered.png')
