@@ -552,6 +552,17 @@ class InstallerArtTests(unittest.TestCase):
                 change(art)
                 self.assertFalse(generator.fresh(art, drawn, pixels, samples))
 
+    def test_the_card_is_the_same_in_any_locale(self):
+        # Bash slices strings by character only in a UTF-8 locale, so nothing
+        # that draws the card may slice a string holding block symbols.
+        body = CARD_TEXT + ''.join(f'voco_ui_card_at {t} {s}\ncard_text\n' for t, s in
+                                   ((0, -1), (330, -1), (600, -1), (1300, -1), (1300, 140)))
+        for mode in self.MODES:
+            with self.subTest(mode=mode):
+                drawn = [self.drawn(body, mode, motion=True, LC_ALL=locale)[0] for locale in ('C', 'C.UTF-8')]
+                self.assertEqual(drawn[0], drawn[1])
+                self.assertIn('▀', drawn[0])
+
     def test_bash_and_the_apt_display_draw_the_same_card(self):
         apt_ui = load('apt_ui', APT_UI)
         for mode in self.MODES:
