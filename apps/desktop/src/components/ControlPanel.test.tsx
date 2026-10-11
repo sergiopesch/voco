@@ -1,5 +1,5 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ControlPanel,
   saveErrorMessage,
@@ -27,7 +27,11 @@ const config: AppConfig = {
   updateChannel: "stable",
   automaticUpdateChecks: true,
   installChannel: "github-release",
+  englishSpelling: "british",
 };
+
+// Setup's spelling question has its own tests; the rest start at the voice test.
+beforeEach(() => { useStore.setState({ onboardingSpellingConfirmed: true }); });
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -341,5 +345,61 @@ describe("dictation-only product", () => {
   });
   it("provides a dedicated accessible window move surface", () => {
     expect(renderPanel({ surface: "settings" })).toContain('aria-label="Move VOCO window"');
+  });
+});
+
+describe("English spelling", () => {
+  beforeEach(() => { useStore.setState({ onboardingSpellingConfirmed: false }); });
+  const radios = (markup: string) => [...markup.matchAll(/<input type="radio"[^>]*>/g)].map(([input]) => ({
+    value: /value="([^"]+)"/.exec(input)?.[1], checked: input.includes("checked"), label: /aria-label="([^"]+)"/.exec(input)?.[1],
+  }));
+
+  it("opens setup with the question, British preselected and its sample sentence", () => {
+    const markup = renderPanel({ surface: "onboarding", config: { ...config, onboardingCompleted: false, englishSpelling: null } });
+    expect(markup).toContain("Which English do you write?");
+    expect(markup).toContain('role="radiogroup" aria-labelledby="voco-spelling-title"');
+    expect(radios(markup)).toEqual([
+      { value: "british", checked: true, label: "British English" },
+      { value: "american", checked: false, label: "American English" },
+    ]);
+    expect(markup).toContain('src="/flags/gb.svg"');
+    expect(markup).toContain('src="/flags/us.svg"');
+    expect(markup).toContain("<mark>organised</mark>");
+    expect(markup).toContain('aria-live="polite"');
+    expect(markup).toContain("never changes names or what you mean");
+    expect(markup).toContain(">Continue</button>");
+    expect(markup).not.toContain("Start test");
+  });
+
+  it("keeps an American choice and spells the voice test's sentence in it", () => {
+    const american = { ...config, onboardingCompleted: false, englishSpelling: "american" as const };
+    expect(radios(renderPanel({ surface: "onboarding", config: american })).find(radio => radio.checked)?.value).toBe("american");
+    expect(renderPanel({ surface: "onboarding", config: american })).toContain("<mark>organized</mark>");
+    useStore.setState({ onboardingSpellingConfirmed: true });
+    const test = renderPanel({ surface: "onboarding", config: american, onStartTest: vi.fn() });
+    expect(test).toContain("Try saying “My favorite color is blue.”");
+    expect(renderPanel({ surface: "onboarding", config: { ...american, englishSpelling: "british" } }))
+      .toContain("Try saying “My favourite colour is blue.”");
+  });
+
+  it("offers all three spellings in Settings with what the choice changes", () => {
+    const markup = renderPanel({ surface: "settings", config: { ...config, englishSpelling: "as-recognised" } });
+    expect(markup).toContain('id="voco-settings-spelling">Spelling</h3>');
+    expect(radios(markup).map(({ value, checked }) => [value, checked])).toEqual([
+      ["british", false], ["american", false], ["as-recognised", true],
+    ]);
+    expect(markup).toContain("Changes spelling only, never names or meaning.");
+    expect(radios(renderPanel({ surface: "settings", config: { ...config, englishSpelling: null } }))[0]?.checked).toBe(true);
+  });
+
+  it("tells someone set up before the choice existed, once, in place of the lens", () => {
+    const earlier = renderPanel({ config: { ...config, englishSpelling: null } });
+    expect(earlier).toContain("VOCO now spells in British English.");
+    expect(earlier).toContain(">Use American English</button>");
+    expect(earlier).toContain(">Keep British</button>");
+    expect(earlier).not.toContain('class="voco-lens"');
+    const chosen = renderPanel({ config: { ...config, englishSpelling: "british" } });
+    expect(chosen).not.toContain("VOCO now spells in British English.");
+    expect(chosen).toContain('class="voco-lens"');
   });
 });

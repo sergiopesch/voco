@@ -148,11 +148,13 @@ Settings and Shortcut, then Updates and Help. The microphone controls are on the
 Settings page. Hide to tray sits at the top right, with Back to setup beside it
 until setup is complete.
 
-**Setup** opens with "Say something. See it here." and a voice test: Start test,
-then Finish test. The words appear only in that window. When desktop input needs
-work, Done becomes Check desktop setup; only verified readiness shows "Your
-voice, ready.", the shortcut and Done. Each phase moves keyboard focus to its
-main action.
+**Setup** opens with "Which English do you write?": two flag cards, British
+English preselected, a sample sentence in the chosen spelling, and Continue.
+The question takes focus. Then comes "Say something. See it here." and a voice
+test: Start test, then Finish test. The words appear only in that window. When
+desktop input needs work, Done becomes Check desktop setup; only verified
+readiness shows "Your voice, ready.", the shortcut and Done. Each later phase
+moves keyboard focus to its main action.
 
 ## Status
 

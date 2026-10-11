@@ -11,7 +11,7 @@ curl --fail --location --retry 3 --max-time 600 \
   --output "$state/runtime.deb"
 echo "7164521ff55c59fc00310db5bea051cdfad020371e52abcbf202c15eb8d34743  $state/runtime.deb" | sha256sum --check --strict
 dpkg-deb --extract "$state/runtime.deb" "$state/package"
-python3 "$root/scripts/verify-speech-payload.py" "$state/package" 2026.0.47
+python3 "$root/scripts/verify-speech-payload.py" "$state/package" 2026.0.47 --native-only
 payload="$state/package/usr/lib/voco/speech"
 cmp "$root/runtime/speech/MODEL-IDENTITY.json" "$payload/MODEL-IDENTITY.json"
 cmp "$root/runtime/speech/NATIVE-BUILD.json" "$payload/NATIVE-BUILD.json"

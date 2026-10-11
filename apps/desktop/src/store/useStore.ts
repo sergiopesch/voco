@@ -41,6 +41,10 @@ interface AppState {
   loseNativeCaptureSource: () => void;
   dictationPurpose: "cursor" | "onboarding";
   onboardingTestPassed: boolean;
+  /** Setup asks which English to write until this is set; a saved choice
+   * skips the question, and Run setup again asks it again. */
+  onboardingSpellingConfirmed: boolean;
+  confirmOnboardingSpelling: () => void;
   setDictationPurpose: (purpose: "cursor" | "onboarding") => void;
   setOnboardingTestPassed: (passed: boolean) => void;
   status: DictationStatus;
@@ -94,6 +98,8 @@ export const useStore = create<AppState>((set) => ({
   })),
   dictationPurpose: "cursor",
   onboardingTestPassed: false,
+  onboardingSpellingConfirmed: false,
+  confirmOnboardingSpelling: () => set({ onboardingSpellingConfirmed: true }),
   setDictationPurpose: (dictationPurpose) => set({ dictationPurpose }),
   setOnboardingTestPassed: (onboardingTestPassed) => set({ onboardingTestPassed }),
   status: "idle",
@@ -123,12 +129,17 @@ export const useStore = create<AppState>((set) => ({
   setError: (error) => set({ error }),
   setAudioLevel: (level) => set({ audioLevel: level }),
   setConfig: (config) =>
-    set((state) => ({
-      config,
-      selectedDeviceId: config.selectedMic,
-      onboardingTestPassed: state.config?.onboardingCompleted && !config.onboardingCompleted ? false : state.onboardingTestPassed,
-      surface: deriveSurfaceForConfig(state.surface, state.config, config),
-    })),
+    set((state) => {
+      const setupRestarted = Boolean(state.config?.onboardingCompleted && !config.onboardingCompleted);
+      return {
+        config,
+        selectedDeviceId: config.selectedMic,
+        onboardingTestPassed: setupRestarted ? false : state.onboardingTestPassed,
+        onboardingSpellingConfirmed: setupRestarted ? false
+          : state.config ? state.onboardingSpellingConfirmed : config.englishSpelling !== null,
+        surface: deriveSurfaceForConfig(state.surface, state.config, config),
+      };
+    }),
   setSurface: (surface) => set({ surface }),
   setAvailableDevices: (devices) => set({ availableDevices: devices }),
   setSelectedDeviceId: (selectedDeviceId) => set({ selectedDeviceId }),

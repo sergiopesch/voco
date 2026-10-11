@@ -46,13 +46,16 @@ For manual installation, verification and removal, see
 
 ## Your first dictation
 
-VOCO opens with a short voice test.
+VOCO asks which English you write, then runs a short voice test.
 
-1. Choose **Start test** and say a sentence. Your words appear in the window.
-2. Choose **Finish test**.
-3. Choose **Done**. If the button says **Check desktop setup**, choose it first
+1. Choose **British English** or **American English**, then **Continue**.
+   British is preselected.
+2. Choose **Start test** and say a sentence. Your words appear in the window, in
+   your spelling.
+3. Choose **Finish test**.
+4. Choose **Done**. If the button says **Check desktop setup**, choose it first
    and follow any instructions VOCO shows.
-4. Click where you want the text in another app, press `Alt+D` and speak. Press
+5. Click where you want the text in another app, press `Alt+D` and speak. Press
    `Alt+D` again to finish.
 
 VOCO pastes through the clipboard, so dictation replaces what you copied last.

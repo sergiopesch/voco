@@ -24,6 +24,10 @@ pub struct AppConfig {
     pub automatic_update_checks: bool,
     #[serde(default)]
     pub install_channel: InstallChannel,
+    /// None until someone chooses, in setup or Settings; dictation then
+    /// spells British.
+    #[serde(default)]
+    pub english_spelling: Option<EnglishSpelling>,
 }
 
 /// A field-level configuration update sent by the frontend.
@@ -45,6 +49,9 @@ pub struct AppConfigPatch {
     pub automatic_update_checks: PatchField<bool>,
     #[serde(default)]
     pub install_channel: PatchField<InstallChannel>,
+    /// A choice, once made, can change but not be cleared.
+    #[serde(default)]
+    pub english_spelling: PatchField<EnglishSpelling>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -92,6 +99,9 @@ impl AppConfigPatch {
         }
         if let PatchField::Set(value) = self.install_channel {
             config.install_channel = value;
+        }
+        if let PatchField::Set(value) = self.english_spelling {
+            config.english_spelling = Some(value);
         }
     }
 }
@@ -150,6 +160,28 @@ pub enum InstallChannel {
     Source,
 }
 
+/// How the speech worker spells words that British and American English spell
+/// differently (`runtime/speech/spelling.py`). It changes spelling only.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum EnglishSpelling {
+    #[default]
+    British,
+    American,
+    AsRecognised,
+}
+
+impl EnglishSpelling {
+    /// The worker protocol's name for this spelling.
+    pub fn protocol_name(self) -> &'static str {
+        match self {
+            Self::British => "british",
+            Self::American => "american",
+            Self::AsRecognised => "as-recognised",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum UpdateCheckStatus {
@@ -170,6 +202,7 @@ impl Default for AppConfig {
             update_channel: UpdateChannel::default(),
             automatic_update_checks: default_automatic_update_checks(),
             install_channel: InstallChannel::default(),
+            english_spelling: None,
         }
     }
 }
@@ -239,6 +272,23 @@ impl AppConfig {
         let path = Self::config_dir_without_migration()?.join("config.json");
         reset_config_file(&path)
     }
+
+    /// The spelling a new dictation uses. It takes no lock and never saves:
+    /// every write replaces the file atomically, so a read sees one whole
+    /// version. A file VOCO can't read spells British, like a new one.
+    pub fn english_spelling_for_dictation() -> EnglishSpelling {
+        Self::config_dir_without_migration()
+            .map(|directory| english_spelling_at(&directory.join("config.json")))
+            .unwrap_or_default()
+    }
+}
+
+fn english_spelling_at(path: &std::path::Path) -> EnglishSpelling {
+    let read = || -> Result<Option<EnglishSpelling>, Box<dyn std::error::Error>> {
+        secure_private_regular_file(path)?;
+        Ok(serde_json::from_str::<AppConfig>(&fs::read_to_string(path)?)?.english_spelling)
+    };
+    read().ok().flatten().unwrap_or_default()
 }
 
 fn reset_config_file(path: &std::path::Path) -> Result<AppConfig, Box<dyn std::error::Error>> {
@@ -845,8 +895,71 @@ mod tests {
                 "updateChannel": "beta",
                 "automaticUpdateChecks": true,
                 "installChannel": "github-release",
+                "englishSpelling": null,
             })
         );
+    }
+
+    #[test]
+    fn english_spelling_round_trips_and_an_earlier_config_spells_british() {
+        let mut config: AppConfig =
+            serde_json::from_str(r#"{"hotkey":"Alt+D","onboardingCompleted":true}"#).unwrap();
+        assert_eq!(config.english_spelling, None);
+        assert_eq!(
+            config.english_spelling.unwrap_or_default(),
+            EnglishSpelling::British
+        );
+        for (name, spelling) in [
+            ("american", EnglishSpelling::American),
+            ("as-recognised", EnglishSpelling::AsRecognised),
+            ("british", EnglishSpelling::British),
+        ] {
+            let patch: AppConfigPatch =
+                serde_json::from_value(serde_json::json!({"englishSpelling": name})).unwrap();
+            patch.apply_to(&mut config);
+            assert_eq!(config.english_spelling, Some(spelling));
+            assert_eq!(spelling.protocol_name(), name);
+            let saved = serde_json::to_string(&config).unwrap();
+            let loaded: AppConfig = serde_json::from_str(&saved).unwrap();
+            assert_eq!(loaded.english_spelling, Some(spelling));
+            assert_eq!(
+                serde_json::to_value(&loaded).unwrap()["englishSpelling"],
+                name
+            );
+        }
+        let unrelated: AppConfigPatch = serde_json::from_str(r#"{"hotkey":"Super+D"}"#).unwrap();
+        unrelated.apply_to(&mut config);
+        assert_eq!(config.english_spelling, Some(EnglishSpelling::British));
+        for rejected in [
+            r#"{"englishSpelling":null}"#,
+            r#"{"englishSpelling":"canadian"}"#,
+        ] {
+            assert!(serde_json::from_str::<AppConfigPatch>(rejected).is_err());
+        }
+    }
+
+    #[test]
+    fn dictation_reads_the_saved_spelling_and_otherwise_spells_british() {
+        let test_dir = std::env::temp_dir().join(format!(
+            "voco-config-spelling-test-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&test_dir).unwrap();
+        let path = test_dir.join("config.json");
+        assert_eq!(english_spelling_at(&path), EnglishSpelling::British);
+        atomic_write(&path, r#"{"hotkey":"Alt+D","englishSpelling":"american"}"#).unwrap();
+        assert_eq!(english_spelling_at(&path), EnglishSpelling::American);
+        atomic_write(&path, r#"{"hotkey":"Alt+D"}"#).unwrap();
+        assert_eq!(english_spelling_at(&path), EnglishSpelling::British);
+        atomic_write(&path, "{not valid json").unwrap();
+        assert_eq!(english_spelling_at(&path), EnglishSpelling::British);
+        assert_eq!(fs::read_to_string(&path).unwrap(), "{not valid json");
+
+        let _ = fs::remove_dir_all(&test_dir);
     }
 
     #[test]

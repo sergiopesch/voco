@@ -28,7 +28,7 @@ def error_code(error):
         'audio shape': 'invalid_audio', 'inactive session': 'inactive_session',
         'Model integrity mismatch': 'model_integrity', 'unsupported context': 'invalid_context',
         'unsupported backend': 'invalid_backend', 'Model path must be absolute': 'invalid_model_path',
-        'gate mode': 'invalid_gate',
+        'gate mode': 'invalid_gate', 'spelling': 'invalid_spelling', 'spelling table': 'invalid_spelling_table',
     }
     if str(error) in known:
         return known[str(error)]
@@ -63,7 +63,13 @@ def metadata(request):
     }
 
 
-def serve(protocol, source, model, metrics):
+def serve(protocol, source, model, metrics, spellings=None):
+    # Text goes out in the session's spelling, so the desktop, its quality
+    # reports and the crash journal all see the same words.
+    if spellings is None:
+        from spelling import Spelling
+        spellings = Spelling()
+    spelling = spellings.converter('as-recognised')
     active = None
     last_request = -1
     emitted_text = None
@@ -95,6 +101,8 @@ def serve(protocol, source, model, metrics):
                 metrics.emit('stale_cancel_ignored', **metadata(request))
                 continue
             if op == 'start':
+                # Requests without a spelling come from older clients and fixtures.
+                spelling = spellings.converter(request.get('spelling', 'as-recognised'))
                 model.start()
                 active, last_request, emitted_text = session, seq, None
                 text = None
@@ -106,8 +114,12 @@ def serve(protocol, source, model, metrics):
                 last_request = seq
                 if op == 'push':
                     text = model.push(request['audio'], request['rate'])
+                    if text is not None:
+                        text = spelling.stable(text)
                 elif op == 'finish':
                     text = model.finish()
+                    if text is not None:
+                        text = spelling.final(text)
                     active = None
                 else:
                     model.cancel()
@@ -126,7 +138,7 @@ def serve(protocol, source, model, metrics):
             metrics.emit('request_completed', op=op, total_ms=timing, audio_s=model.audio_s,
                          processed_audio_s=model.gate.processed_s, skipped_audio_s=model.gate.skipped_s,
                          buffered_audio_s=model.gate.pending_n / (model.rate or 16000),
-                         has_text=bool(text), fresh_hypothesis=fresh, **fields, **model.metrics)
+                         has_text=bool(text), fresh_hypothesis=fresh, spelling=spelling.mode, **fields, **model.metrics)
             print(json.dumps({'session': session, 'seq': seq, 'text': text, 'mode': 'append-only'}), file=protocol, flush=True)
         except Exception as error:
             # No arbitrary exception message, request data or transcript in diagnostics.
@@ -139,6 +151,7 @@ def main(protocol):
     configure_cpu_threads()
     try:
         from streaming import StreamingSession, Metrics
+        from spelling import Spelling
     except Exception as error:
         # Dependencies may fail before the rotating diagnostics are available.
         print(json.dumps({'event': 'worker_startup_failed', 'stage': 'runtime_import',
@@ -152,6 +165,12 @@ def main(protocol):
     try:
         started = time.monotonic()
         try:
+            spellings = Spelling()
+        except Exception as error:
+            metrics.emit('worker_startup_failed', stage='spelling_table', error_type=type(error).__name__, error_code=error_code(error))
+            print(json.dumps({'ready': False, 'error': 'local speech runtime could not initialize'}), file=protocol, flush=True)
+            return 1
+        try:
             model = StreamingSession(os.environ.get('VOCO_SILENCE_GATE', 'zero'))
         except Exception as error:
             metrics.emit('worker_startup_failed', stage='model_initialize', error_type=type(error).__name__, error_code=error_code(error), elapsed_ms=(time.monotonic()-started)*1000)
@@ -162,7 +181,7 @@ def main(protocol):
                      backend=os.environ.get('VOCO_NEMO_BACKEND', 'pool'), runtime_revision=RUNTIME_REVISION,
                      model_sha256=model.model.sha256,
                      parent_pid=os.getppid(), load_ms=model.load_ms, warmup_ms=model.warmup_ms, gate=model.mode)
-        return serve(protocol, sys.stdin.buffer, model, metrics)
+        return serve(protocol, sys.stdin.buffer, model, metrics, spellings)
     finally:
         if model is not None:
             model.close()

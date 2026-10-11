@@ -151,6 +151,21 @@ fn request_metadata(request: &Value) -> Value {
     })
 }
 
+/// Settings own the spelling: every session start carries the saved choice, so
+/// desktop and Chromium exact-field dictation spell alike, and a start from the
+/// webview can't name another.
+fn with_configured_spelling(
+    mut request: Value,
+    configured: impl FnOnce() -> crate::config::EnglishSpelling,
+) -> Value {
+    if request["op"] == "start" {
+        if let Some(fields) = request.as_object_mut() {
+            fields.insert("spelling".into(), configured().protocol_name().into());
+        }
+    }
+    request
+}
+
 fn exchange(request: Value) -> Result<Value, String> {
     let mut guard = WORKER.lock().map_err(|_| "worker lock failed")?;
     exchange_with_worker(request, &mut guard, Worker::start)
@@ -238,6 +253,10 @@ pub async fn speech_stream(request: Value) -> Result<Value, String> {
         return Ok(serde_json::json!({"logged":true}));
     }
     tauri::async_runtime::spawn_blocking(move || {
+        let request = with_configured_spelling(
+            request,
+            crate::config::AppConfig::english_spelling_for_dictation,
+        );
         let metadata = request_metadata(&request);
         let started = Instant::now();
         let result = exchange(request);
@@ -313,6 +332,33 @@ mod tests {
         );
         assert_eq!(received[0]["audio"].as_array().unwrap().len(), 960);
         assert_eq!(received[0]["audio"][959], 0.25);
+    }
+
+    #[test]
+    fn only_a_session_start_carries_the_configured_spelling() {
+        use crate::config::EnglishSpelling;
+        let start = with_configured_spelling(
+            serde_json::json!({"op":"start", "session":"fixture", "seq":0, "spelling":"klingon"}),
+            || EnglishSpelling::American,
+        );
+        assert_eq!(start["spelling"], "american");
+        assert_eq!(start["session"], "fixture");
+        let start = with_configured_spelling(
+            serde_json::json!({"op":"start", "session":"fixture", "seq":0}),
+            EnglishSpelling::default,
+        );
+        assert_eq!(start["spelling"], "british");
+        for op in ["push", "finish", "cancel", "warmup"] {
+            let request = with_configured_spelling(
+                serde_json::json!({"op":op, "session":"fixture", "seq":1}),
+                || panic!("{op} must not read settings"),
+            );
+            assert!(request.get("spelling").is_none());
+        }
+        let invalid = with_configured_spelling(serde_json::json!("start"), || {
+            panic!("a non-object request must not read settings")
+        });
+        assert_eq!(invalid, serde_json::json!("start"));
     }
 
     #[test]
