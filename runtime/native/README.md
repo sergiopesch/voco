@@ -15,9 +15,9 @@ The package installs the runtime in `/usr/lib/voco/speech/`:
 | --- | --- |
 | `lib/` | `libggml-base`, `libggml-cpu`, `libggml`, `libnemo_speech_asr` and `libnemo_speech_asr_c`, with their version links |
 | `libbench_nemo_pool.so` | The bridge built from [`nemo_bridge.cpp`](../speech/nemo_bridge.cpp), which the worker loads with `ctypes` |
-| `models/nemotron-speech-streaming-en-0.6b.q8_0.gguf` | Nemotron Speech Streaming 0.6B as 8-bit GGUF |
+| `models/nemotron-speech-streaming-en-0.6b.q8_0.gguf` | Nemotron Speech Streaming 0.6B as 8-bit GGUF, with the checkpoint's SentencePiece tokenizer added |
 | `NATIVE-BUILD.json` | Commits, patch and bridge hashes, CMake options, compiler and CMake versions, the hash of every native file and the target of every link |
-| `MODEL-IDENTITY.json` | The model's source, revision and SHA-256 |
+| `MODEL-IDENTITY.json` | The model's source, revision and SHA-256, and those of the NVIDIA GGUF and tokenizer it is built from |
 
 The bridge creates a CPU-only recognizer and opens streams with interim results
 and automatic punctuation. The worker refuses a model whose SHA-256 differs from
@@ -80,7 +80,8 @@ the verifier checks.
 ## Known limits
 
 - The recipe doesn't convert the NVIDIA model to GGUF, so the pinned model
-  bytes come from a published package.
+  bytes come from a published package, with NVIDIA's tokenizer added by
+  `scripts/graft-model-tokenizer.py`.
 - Nothing checks that a rebuild reproduces the recorded hashes. They depend on
   the toolchain and the system SentencePiece, and the receipt records only the
   compiler and CMake versions.

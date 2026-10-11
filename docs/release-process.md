@@ -73,7 +73,9 @@ bash scripts/provision-ci-speech.sh
 ```
 
 This fills `runtime/speech/` with the pinned model and native libraries, which Git
-ignores; see [runtime provisioning](linux-packaging.md#runtime-provisioning).
+ignores; see [runtime provisioning](linux-packaging.md#runtime-provisioning). It
+adds NVIDIA's tokenizer to the published model, so it needs to reach Hugging
+Face as well as GitHub.
 
 ### 6. Assemble and try the packages
 

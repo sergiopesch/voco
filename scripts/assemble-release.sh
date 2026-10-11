@@ -68,6 +68,12 @@ for runtime in runtime/speech/models/nemotron-speech-streaming-en-0.6b.q8_0.gguf
   runtime/speech/libbench_nemo_pool.so; do
   [[ -e "${runtime}" ]] || fail "The speech runtime is missing ${runtime}. Run: bash scripts/provision-ci-speech.sh"
 done
+# NVIDIA's GGUF without the tokenizer is the most likely stale model here.
+python3 -c 'import hashlib, json, sys
+pinned = json.load(open("runtime/speech/MODEL-IDENTITY.json"))["model_sha256"]
+with open("runtime/speech/models/nemotron-speech-streaming-en-0.6b.q8_0.gguf", "rb") as model:
+    sys.exit(hashlib.file_digest(model, "sha256").hexdigest() != pinned)' \
+  || fail "The speech model isn't the one MODEL-IDENTITY.json pins. Run: bash scripts/provision-ci-speech.sh"
 [[ "$(cargo tauri --version 2>/dev/null)" == "tauri-cli ${TAURI_CLI_VERSION}" ]] \
   || fail "Install the pinned Tauri CLI: cargo install tauri-cli --version ${TAURI_CLI_VERSION} --locked"
 
