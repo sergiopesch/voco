@@ -226,6 +226,11 @@ if release is None or release.attrib.get("version") != expected_version:
 PY
 
 python3 "${ROOT_DIR}/scripts/verify-speech-payload.py" "${EXTRACT_ROOT}" "${EXPECTED_VERSION}"
+# The receipts are this checkout's, so the package carries the pinned model, with
+# its tokenizer, and the pinned native runtime.
+for receipt in MODEL-IDENTITY.json NATIVE-BUILD.json; do
+  cmp "${ROOT_DIR}/runtime/speech/${receipt}" "${EXTRACT_ROOT}/usr/lib/voco/speech/${receipt}"
+done
 
 desktop-file-validate "${EXTRACT_ROOT}${DESKTOP_PATH}"
 appstreamcli validate "${APPSTREAM_OPTIONS[@]}" "${EXTRACT_ROOT}${METAINFO_PATH}"

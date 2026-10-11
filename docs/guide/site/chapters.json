@@ -700,6 +700,10 @@
         "text": "The recognizer always receives the original samples at the capture rate, and each push names that rate."
       },
       {
+        "title": "The tokenizer inside",
+        "text": "NVIDIA's GGUF holds the decoder's vocabulary but not the SentencePiece tokenizer the recognizer needs to turn phrases into the model's pieces. VOCO's copy adds that tokenizer from NVIDIA's checkpoint as one metadata entry. Every weight and every other entry stays as NVIDIA published it, and the pinned fingerprint is that of the result."
+      },
+      {
         "title": "Turning the gate off",
         "text": "VOCO_SILENCE_GATE=off disables the gate. The default mode, zero, treats a packet as quiet only when every sample is exactly zero. Any other value stops the worker before the model loads."
       }
@@ -723,7 +727,11 @@
       },
       {
         "path": "runtime/speech/MODEL-IDENTITY.json",
-        "why": "The model's source, revision and fingerprint."
+        "why": "The model's source, revision and fingerprint, and those of the NVIDIA file and tokenizer it is built from."
+      },
+      {
+        "path": "scripts/graft-model-tokenizer.py",
+        "why": "Adds the tokenizer to NVIDIA's GGUF and checks every pin."
       },
       {
         "path": "runtime/speech/NATIVE-BUILD.json",
