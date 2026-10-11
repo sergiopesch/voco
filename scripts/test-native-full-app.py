@@ -143,8 +143,17 @@ def app_windows(*flags):
     return found
 
 def popover_shown():
-    # WebKit capture keeps the hidden window mapped at 1x1 off-screen; the popover is far larger.
-    return any(w['width'] * w['height'] >= 40000 for w in app_windows('--onlyvisible'))
+    # WebKit capture keeps the hidden window mapped off-screen, where X11 shows it at
+    # least 200 px square; the popover is larger, and inside a workarea.
+    return any(w['width'] * w['height'] >= 40000 and inside(w) for w in app_windows('--onlyvisible'))
+
+window_history = []
+def note_windows():
+    """Record each change of VOCO's visible windows, for a launch case's evidence."""
+    windows = sorted((w['x'], w['y'], w['width'], w['height']) for w in app_windows('--onlyvisible'))
+    if not window_history or window_history[-1]['windows'] != windows:
+        window_history.append(dict(t=round(time.monotonic() - t0, 3), windows=windows))
+    return False
 
 def check_ready_popover(description):
     """The Ready popover inside its workarea, every control usable, no failure or recovery UI."""
@@ -305,16 +314,20 @@ selections, tray_state, popup, popover, diagnostic_errors, confinement = {}, Non
 try:
     assert shutil.which('xclip') and shutil.which('xdotool'), 'X11 paste needs xclip and xdotool on PATH'
     wait_for(lambda: (root / 'runtime/voco.sock').exists(), 'application control socket')
-    wait_for(app_ready, 'frontend and model readiness', timeout=30)
+    # The launch cases record VOCO's windows from the start: a launcher start presents early.
+    wait_for(lambda: (note_windows() if case in LAUNCH else False) or app_ready(), 'frontend and model readiness', timeout=30)
     if case in LAUNCH:
         requested = [x.get('backend_used') for x in traces() if x.get('event') == 'launcher_activation_requested']
         if case == 'launcher':
             assert requested == ['launch'], 'The launcher start was not taken as a launcher click: %r' % requested
             wait_for(lambda: counts()['launcher_activation_presented'] > 0, 'the launcher start to present VOCO')
+            wait_for(lambda: note_windows() or popover_shown(), 'the launcher start to show the popover', timeout=20)
             check_ready_popover('a launcher start')
         else:
             # Well past the frontend's readiness, when a launcher start has already opened.
-            pump(3)
+            for _ in range(30):
+                note_windows()
+                pump(.1)
             assert not requested and not counts()['launcher_activation_presented'], 'A login autostart was taken as a launcher click'
             assert not popover_shown(), 'A login autostart opened the popover'
             wait_for(lambda: any(label.startswith('VOCO — Ready') for label in tray_menus()), 'the tray to report Ready', timeout=5)
@@ -467,7 +480,7 @@ finally:
                   mutations=[dict(m, t=round(m['t'] - t0, 3)) for m in mutations], preedits=[dict(p, t=round(p['t'] - t0, 3)) for p in preedits],
                   selections=selections, traceCounts=dict(sorted(c.items())), captureRoute=capture, focus=focus_log, harnessWindow=window_id,
                   tray=tray_state, popoverWindow=popup, popover=popover, helpers={name: bool(shutil.which(name)) for name in ['xclip', 'xdotool']},
-                  diagnosticErrors=diagnostic_errors, workerConfinement=confinement,
+                  diagnosticErrors=diagnostic_errors, workerConfinement=confinement, windowHistory=window_history,
                   engineSourceHashes={p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in root.glob('voco_ibus_*.py')},
                   fixtureSha256=None if case in LAUNCH else hashlib.sha256(sound.read_bytes()).hexdigest(),
                   appSha256=app_hash,
