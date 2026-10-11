@@ -5,7 +5,7 @@ import unittest
 from mywords import MAX_CHARS, MAX_TERMS, Words, accepted
 from spelling import Spelling
 
-LIST = ['GitHub', 'PipeWire', 'GTK', 'Zoë', 'Málaga', 'New Zealand', 'Siobhán', 'router']
+LIST = ['GitHub', 'PipeWire', 'GTK', 'Zoë', 'Málaga', 'New Zealand', 'Siobhán', 'router', 'Kubernetes']
 
 
 def written(words, text):
@@ -25,6 +25,7 @@ class RestoreTests(unittest.TestCase):
             'malaga is on my list': 'Málaga is on my list',
             'New zealand sent me a message': 'New Zealand sent me a message',
             'the Git-hub setup': 'the GitHub setup',
+            'we run k u b e r n e t e s': 'we run Kubernetes',
             "Siobhan's notes": "Siobhán's notes",
         }
         for heard, expected in cases.items():
@@ -33,6 +34,8 @@ class RestoreTests(unittest.TestCase):
 
     def test_a_lowercase_entry_keeps_sentence_case_and_only_whole_words_match(self):
         self.assertEqual(written(self.words, 'My Router broke. router says no'), 'My router broke. Router says no')
+        mixed = Words(['iPhone', 'eBay'])
+        self.assertEqual(written(mixed, 'Iphone is ready. ebay too'), 'iPhone is ready. eBay too')
         for heard in ('Pipe. Wire', 'Pipe, wire', 'routers', 'GitHubs', 'pipewiring'):
             with self.subTest(heard=heard):
                 self.assertEqual(written(self.words, heard), heard)
@@ -111,11 +114,13 @@ class ListRuleTests(unittest.TestCase):
         self.assertEqual(len(accepted([f'term{index}' for index in range(MAX_TERMS)])), MAX_TERMS)
         self.assertEqual(accepted(['Ma\u0301laga']), ['Málaga'])  # decomposed accents compose
 
-    def test_unusable_entries_and_later_duplicates_are_skipped(self):
+    def test_unusable_entries_are_skipped_and_the_first_of_two_alike_is_written(self):
         unusable = ['', ' GitHub', 'GitHub ', 'two  spaces', 'x' * (MAX_CHARS + 1), 'one two three four five',
                     'C++', 'a_b', 'tab\there', 'Line\nbreak', '-dash', 'end-']
-        words = Words(unusable + ['Zoë', 'zoe', 'Git Hub', 'github', 'Straße', 'STRASSE'])
-        self.assertEqual(words.terms, ['Zoë', 'Git Hub', 'Straße'])
+        alike = ['Zoë', 'zoe', 'Git Hub', 'github', 'Straße', 'STRASSE']
+        words = Words(unusable + alike)
+        self.assertEqual(words.terms, alike)
+        self.assertEqual(written(words, 'zoe and github and strasse'), 'Zoë and Git Hub and Straße')
         self.assertEqual(len(Words([f'term{index}' for index in range(MAX_TERMS + 5)]).terms), MAX_TERMS)
 
     def test_a_malformed_list_rejects_the_start(self):

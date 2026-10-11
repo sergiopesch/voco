@@ -27,9 +27,10 @@ class WorkerMyWordsTests(unittest.TestCase):
         self.assertEqual([response['text'] for response in responses][1:], self.HYPOTHESES + [self.FINAL])
 
     def test_unusable_entries_are_skipped_and_a_malformed_list_rejects_the_start(self):
+        # Of two entries that match alike, both are boosted and the first one's spelling is written.
         responses, rows = session(['the git hub'], 'the git hub', words=['C++', 'GitHub', 'github'])
         self.assertEqual(responses[-1]['text'], 'the GitHub')
-        self.assertEqual(session.model.phrases, ['GitHub'])
+        self.assertEqual(session.model.phrases, ['GitHub', 'github'])
         for words in ('GitHub', [3], None):
             with self.subTest(words=words):
                 responses, rows = session(['the color'], 'the color', words=words)

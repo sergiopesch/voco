@@ -117,8 +117,9 @@ hypotheses to check that few words wait.
 
 Each start also carries `words`, the saved My words list, which
 `speech_stream.rs` reads the same way and filters to what Settings could save.
-`mywords.py` skips any entry that still breaks the list rules, and later
-duplicates, so a hand-edited config can't stop dictation. With entries left,
+`mywords.py` skips any entry that still breaks the list rules, so a
+hand-edited config can't stop dictation, and of two entries that match alike
+it writes the first one's spelling. With entries left,
 `adapters.py` starts the stream through the C API's own recognition options with
 one speech context: the phrases and a pinned boost. NeMo-Speech.cpp tokenizes
 them with the model's embedded SentencePiece tokenizer and, during greedy

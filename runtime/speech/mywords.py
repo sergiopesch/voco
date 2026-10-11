@@ -19,8 +19,6 @@ import unicodedata
 MAX_TERMS = 100
 MAX_WORDS = 4
 MAX_CHARS = 40
-# How many recognized words one listed term may span, for spelled-out letters.
-MAX_SPAN = 8
 # The recognizer's boost for listed phrases: on development data the strongest
 # that added no wrong words or capitals, and the one the My words gates passed.
 BOOST = 0.5
@@ -48,24 +46,23 @@ def accepted(terms):
 
     The desktop checks the same rules when saving. An entry that slips past
     them, a hand-edited config for example, is skipped rather than failing
-    dictation, and so is a later duplicate or anything beyond MAX_TERMS.
+    dictation, and so is anything beyond MAX_TERMS.
     """
     if not isinstance(terms, list) or not all(isinstance(term, str) for term in terms):
         raise ValueError('words')
-    usable, keys = [], set()
-    for term in terms:
-        term = unicodedata.normalize('NFC', term)
-        if (len(usable) < MAX_TERMS and 1 <= len(term) <= MAX_CHARS and TERM.fullmatch(term)
-                and len(SPELLED.findall(term)) <= MAX_WORDS and key(term) not in keys):
-            usable.append(term)
-            keys.add(key(term))
-    return usable
+    usable = [unicodedata.normalize('NFC', term) for term in terms]
+    return [term for term in usable if 1 <= len(term) <= MAX_CHARS and TERM.fullmatch(term)
+            and len(SPELLED.findall(term)) <= MAX_WORDS][:MAX_TERMS]
 
 
 class Words:
     def __init__(self, terms):
         self.terms = accepted(terms)
-        self.spellings = {key(term): term for term in self.terms}
+        # Settings saves no two entries that match alike; in a hand-edited
+        # list, the first one's spelling is written.
+        self.spellings = {}
+        for term in self.terms:
+            self.spellings.setdefault(key(term), term)
         self.dotted = any('.' in term for term in self.terms)
         self.prefixes = {k[:end] for k in self.spellings for end in range(1, len(k) + 1)}
         self.longest = max(map(len, self.spellings), default=0)
@@ -88,42 +85,63 @@ class Words:
                 out.append(text[last:spans[i][0]])
                 written += spans[i][0] - last
                 return ''.join(out), protected, written
-            for count in range(min(MAX_SPAN, len(spans) - i), 0, -1):
-                group = spans[i:i + count]
-                separators = [text[a[1]:b[0]] for a, b in zip(group, group[1:])]
-                if not all(JOINABLE.fullmatch(s) or DOTTED.fullmatch(s) for s in separators):
-                    continue
-                joined, suffix = ''.join(plain(text[s:e]) for s, e in group), ''
-                if joined not in self.spellings and re.search(r"['’]s$", text[group[-1][0]:group[-1][1]]):
-                    joined, suffix = joined[:-2], text[group[-1][1] - 2:group[-1][1]]
-                spelling = self.spellings.get(joined)
-                if spelling is None or ('.' not in spelling and not all(map(JOINABLE.fullmatch, separators))):
-                    continue
-                end = group[-1][1]
-                if spelling.endswith('.') and not suffix and text[end:end + 1] == '.':
-                    end += 1  # the listed full stop takes the place of the one heard
-                start = group[0][0]
-                if spelling[:1].islower() and SENTENCE_START.search(text[:start]):
-                    spelling = spelling[:1].upper() + spelling[1:]
-                out.append(text[last:start])
-                written += start - last
-                protected.append((written, written + len(spelling)))
-                out.append(spelling + suffix)
-                written += len(spelling) + len(suffix)
-                last, i = end, i + count
-                break
-            else:
+            found = self.match_at(text, spans, i)
+            if found is None:
                 i += 1
+                continue
+            spelling, count, end, suffix = found
+            if spelling.endswith('.') and not suffix and text[end:end + 1] == '.':
+                end += 1  # the listed full stop takes the place of the one heard
+            start = spans[i][0]
+            # An ordinary lower-case entry starts a sentence with a capital;
+            # one such as iPhone keeps its own.
+            if spelling.islower() and SENTENCE_START.search(text[:start]):
+                spelling = spelling[:1].upper() + spelling[1:]
+            out.append(text[last:start])
+            written += start - last
+            protected.append((written, written + len(spelling)))
+            out.append(spelling + suffix)
+            written += len(spelling) + len(suffix)
+            last, i = end + len(suffix), i + count
         out.append(text[last:])
         restored = ''.join(out)
         return restored, protected, len(restored)
+
+    def match_at(self, text, spans, index):
+        """The longest listed term from the word at index: (spelling, words, end, suffix) or None.
+
+        Words join across spaces and hyphens, and across full stops into a term
+        listed with one, while they still begin a listed term.
+        """
+        best, joined, dotted = None, '', False
+        for at in range(index, len(spans)):
+            if at > index:
+                separator = text[spans[at - 1][1]:spans[at][0]]
+                if DOTTED.fullmatch(separator):
+                    dotted = True
+                elif not JOINABLE.fullmatch(separator):
+                    break
+            word = text[spans[at][0]:spans[at][1]]
+            folded = plain(word)
+            # A possessive 's after a listed term stays as it was heard.
+            if re.search(r"['’]s$", word) and joined + folded[:-2] in self.spellings:
+                spelling = self.spellings[joined + folded[:-2]]
+                if '.' in spelling or not dotted:
+                    best = (spelling, at - index + 1, spans[at][1] - 2, word[-2:])
+            joined += folded
+            spelling = self.spellings.get(joined)
+            if spelling is not None and ('.' in spelling or not dotted):
+                best = (spelling, at - index + 1, spans[at][1], '')
+            if joined not in self.prefixes:
+                break
+        return best
 
     def open_from(self, text, spans, index):
         """Whether the words from index to the end could still become a listed term."""
         group = spans[index:]
         joins = (lambda s: JOINABLE.fullmatch(s) or DOTTED.fullmatch(s)) if self.dotted else JOINABLE.fullmatch
         rest = text[group[-1][1]:]
-        if len(group) > MAX_SPAN or (rest and not joins(rest)):
+        if len(group) > self.longest or (rest and not joins(rest)):
             return False
         if not all(joins(text[a[1]:b[0]]) for a, b in zip(group, group[1:])):
             return False

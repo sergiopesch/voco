@@ -343,9 +343,9 @@ fn listable(term: &str) -> bool {
         && listable_word_count(term).is_some_and(|count| count <= MY_WORDS_MAX_WORDS)
 }
 
-/// Two entries the worker would match alike, apart from accents: Settings
-/// compares those too, and the worker skips a later entry that differs only
-/// in them. Case compares as the worker's casefold does.
+/// Two entries the worker would match alike, apart from accents, which
+/// Settings compares too; case compares as the worker's casefold does. Of
+/// two that slip through, the worker writes the first one's spelling.
 fn my_words_key(term: &str) -> String {
     let mut key = String::new();
     let letters = term
@@ -427,11 +427,10 @@ fn my_words_at(path: &std::path::Path) -> Vec<String> {
     };
     // A hand-edited config can't send the worker more, or longer, entries
     // than Settings can save.
-    let mut seen = std::collections::HashSet::new();
     read()
         .unwrap_or_default()
         .into_iter()
-        .filter(|term| listable(term) && seen.insert(my_words_key(term)))
+        .filter(|term| listable(term))
         .take(MY_WORDS_MAX_TERMS)
         .collect()
 }
@@ -1179,7 +1178,7 @@ mod tests {
         let edited = serde_json::json!({"hotkey": "Alt+D", "myWords": [
             "GitHub", "C++", "github", "x".repeat(5000), "New Zealand"]});
         atomic_write(&path, &edited.to_string()).unwrap();
-        assert_eq!(my_words_at(&path), ["GitHub", "New Zealand"]);
+        assert_eq!(my_words_at(&path), ["GitHub", "github", "New Zealand"]);
         let many: Vec<String> = (0..MY_WORDS_MAX_TERMS + 20)
             .map(|index| format!("term{index}"))
             .collect();
