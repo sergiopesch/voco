@@ -20,20 +20,20 @@ const CASEFOLD: Record<string, string> = {
 
 /** A word without case or accents, with one apostrophe for both. */
 export function plainWord(word: string): string {
-  return word.normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase()
+  return word.normalize("NFC").normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase()
     .replace(/[ßςᲀ-ᲈ]/gu, letter => CASEFOLD[letter] ?? letter).replace(/’/g, "'");
 }
 
 /** What the worker matches: the words without case, accents or what separates them,
  * with one apostrophe for both. */
 export function myWordsKey(term: string): string {
-  return (term.normalize("NFKD").replace(/\p{M}/gu, "").match(WORD) ?? []).join("").toLowerCase()
+  return (term.normalize("NFC").normalize("NFKD").replace(/\p{M}/gu, "").match(WORD) ?? []).join("").toLowerCase()
     .replace(/[ßςᲀ-ᲈ]/gu, letter => CASEFOLD[letter] ?? letter).replace(/’/g, "'");
 }
 
 /** A term's words, as the worker splits them. */
 export function termWords(term: string): string[] {
-  return term.match(WORD) ?? [];
+  return term.normalize("NFC").match(WORD) ?? [];
 }
 
 /** Typed text as an entry: composed accents and single spaces. */
@@ -43,15 +43,16 @@ export function tidyMyWord(input: string): string {
 
 /** Why an entry can't join the list, or null when it can. */
 export function myWordProblem(term: string, words: readonly string[], heard: readonly HeardVersion[] = []): string | null {
-  if (!TERM.test(term)) {
+  const normalized = term.normalize("NFC");
+  if (!TERM.test(normalized)) {
     return "Use letters, digits, single spaces, hyphens, apostrophes and full stops, starting with a letter or digit.";
   }
-  if ([...term].length > MY_WORDS_MAX_CHARS || termWords(term).length > MY_WORDS_MAX_WORDS) {
+  if ([...normalized].length > MY_WORDS_MAX_CHARS || termWords(term).length > MY_WORDS_MAX_WORDS) {
     return `Keep each entry to ${MY_WORDS_MAX_WORDS} words and ${MY_WORDS_MAX_CHARS} characters.`;
   }
-  const existing = words.find(word => myWordsKey(word) === myWordsKey(term));
+  const existing = words.find(word => myWordsKey(word) === myWordsKey(normalized));
   if (existing) return `“${existing}” is already in My words.`;
-  const taught = heard.find(version => myWordsKey(version.heard) === myWordsKey(term));
+  const taught = heard.find(version => myWordsKey(version.heard) === myWordsKey(normalized));
   if (taught) return `VOCO already writes “${taught.writes}” when it hears “${taught.heard}”.`;
   if (words.length >= MY_WORDS_MAX_TERMS) {
     return `My words holds up to ${MY_WORDS_MAX_TERMS} entries. Remove one to add another.`;
