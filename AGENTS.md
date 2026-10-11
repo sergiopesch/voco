@@ -20,10 +20,17 @@ setup and pull requests.
 - One output path: streaming dictation pasted into whatever has keyboard focus.
   The optional Chromium exact field uses the same recognizer with its own delivery.
 - No assistant, conversation, enhancement, appearance or per-app settings.
-- Spelling is the one change to recognized words. The worker writes British
-  (the default) or American spelling for VarCon's unambiguous forms only, or
-  leaves words as recognized. It never changes names, words whose spelling
-  depends on meaning, or word choice.
+- English spelling and My words are the only changes to recognized words.
+  Spelling writes British (the default) or American spelling for VarCon's
+  unambiguous forms only, or leaves words as recognized. It never changes names,
+  words whose spelling depends on meaning, or word choice.
+- My words is the user's list of up to 100 names and terms, each at most four
+  words. The recognizer leans toward the listed words, and the worker writes
+  each occurrence the way it is listed, matching without case, accents, or the
+  spaces and hyphens inside a term. Spelling never converts a listed word. An
+  empty list leaves recognition exactly as it is without the feature. The list
+  stays in the owner-only config and never reaches logs, metrics, the crash
+  journal or Review.
 - Tray first. Respect system accessibility preferences such as reduced motion.
   A click on VOCO's launcher opens the popover whether or not VOCO was running:
   `activation.rs` counts a start as a launcher click only when GIO names
@@ -32,8 +39,8 @@ setup and pull requests.
   the tray. The desktop entry keeps `StartupNotify=false`: a tray start shows no
   window, so it can't complete a launcher's startup sequence, and GNOME would
   show its busy cursor until a 15 s timeout.
-- Settings are the microphone, the shortcut, English spelling, the update channel
-  and whether VOCO checks for updates at startup. Onboarding state and the installation method
+- Settings are the microphone, the shortcut, English spelling, My words, the
+  update channel and whether VOCO checks for updates at startup. Onboarding state and the installation method
   are stored alongside them.
 - A normal session keeps nothing. Review only holds text that survived a crash, or
   that a Stop could neither paste nor copy.
@@ -63,7 +70,8 @@ together, keep explicit output targets, and keep root renderer fixtures on the
 desktop's Vite resolution. Check both dev rendering and packaged WebKit.
 
 The config (`config.rs`) holds the shortcut, the microphone, English spelling
-(null until someone chooses; dictation then spells British), onboarding state,
+(null until someone chooses; dictation then spells British), My words (empty
+until the user adds one), onboarding state,
 the update channel, the startup update check and the installation method. Retired keys are ignored on read
 and dropped on the next save, and patches that name them are rejected. Retired
 package channels read as GitHub Release. VOCO never overwrites a config it cannot
@@ -109,6 +117,19 @@ change.
   extends every push. Generate `spelling-varcon.tsv` only with
   `scripts/generate-spelling-table.py` from the pinned VarCon file, and keep its
   notices and those in `vendor/THIRD-PARTY-NOTICES.txt`.
+- My words never breaks append-only delivery either. `speech_stream.rs` adds the
+  saved list to each session start, and a start without one is as recognized.
+  The worker boosts the listed phrases in the recognizer at a pinned strength and
+  writes listed occurrences into the whole hypothesis. A push holds back any word
+  that a later word could still join to a listed term, and finish rewrites the
+  final text, which extends every push. Boosting needs the model's own
+  SentencePiece tokenizer: the shipped model is NVIDIA's pinned file with only
+  that metadata key added, and its other entries and every tensor copied
+  unchanged.
+- Before a change to the boost, the phrases sent to the recognizer or the list
+  limits ships, rerun the My words gates on public audio. An empty list must give
+  identical output. Listed words must gain. Wrong words, wrong capitals and
+  invented terms must stay within the pinned bar.
 - Select the default microphone automatically only on an explicit Start test or
   recording when no microphone is chosen. No idle recording, and no silent device
   switching during capture.
@@ -280,7 +301,7 @@ change.
 ### Privacy and logs
 
 - Logs are optional, private and bounded. Performance logs never contain dictated
-  text, audio, clipboard values, URLs or window titles. Reject unsafe log and
+  text, audio, My words, clipboard values, URLs or window titles. Reject unsafe log and
   socket targets.
 - The developer capture audit needs all three flags (`VOCO_DEV_NATIVE_CAPTURE`,
   `VOCO_DEBUG_CAPTURE_AUDIO`, `VOCO_DEBUG_NATIVE_CAPTURE`) and completed private

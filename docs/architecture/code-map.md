@@ -189,11 +189,11 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `spelling-varcon.tsv` — The spelling table, generated from VarCon 2020.12.07 by `scripts/generate-spelling-table.py`, with VarCon's notices.
 - `adapters.py` — Loads the native library and the model, and checks the model's SHA-256.
 - `nemo_bridge.cpp` — C++ bridge between the worker and NeMo-Speech.cpp.
-- `MODEL-IDENTITY.json` — Model source, revision, hash and CPU requirement.
+- `MODEL-IDENTITY.json` — Model source, revision, hash and CPU requirement, and the NVIDIA GGUF and tokenizer the model is built from.
 - `NATIVE-BUILD.json` — Build receipt for the pinned native library.
 - `test_cpu_threads.py` — Default thread count.
 - `test_diagnostics.py` — Protocol framing, diagnostics and private metrics logs.
-- `test_model_identity.py` — The model integrity check, the worker's native revision and the NVIDIA notice match the pinned identity files.
+- `test_model_identity.py` — The model integrity check, the worker's native revision and the NVIDIA notice match the pinned identity files, the NVIDIA GGUF and the tokenizer included.
 - `test_spelling.py` — The table and its notices, conversion rules, append-only streaming and the benchmark replay.
 - `test_streaming.py` — Silence gate accounting and log privacy.
 - `test_timing.py` — Timing instrumentation keeps sample order and transcripts.
@@ -246,6 +246,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `rpm_package.py` — Renders the RPM spec for the staged tree and runs rpmbuild, and holds the RPM checks: scriptlets, folder ownership, requirements, and file and dependency parity with the Debian package.
 - `package-gnome-panel.py` — Builds a reproducible companion zip.
 - `provision-ci-speech.sh` — Copies the speech payload of a checksum-pinned published package into `runtime/speech/` for CI.
+- `graft-model-tokenizer.py` — Adds NVIDIA's SentencePiece tokenizer to NVIDIA's GGUF, giving the pinned model; `provision-ci-speech.sh` runs it.
 - `generate-spelling-table.py` — Generates, or with `--check` verifies, `runtime/speech/spelling-varcon.tsv` from the pinned VarCon file.
 - `debian_maintainer.py` — Generates and checks the maintainer script.
 - `sync-installer-ui.py`, `lib/install-ui.sh`, `lib/install-apt-ui.py`, `lib/install-brand.json` — Installer interface sources, and the script that embeds them and the install steps in `install`.
@@ -308,6 +309,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `test-dictation-renderer.mjs`, `test-microphone-app-renderer.mjs`, `test-english-spelling-renderer.mjs`, `test-update-checks-renderer.mjs`, `renderer-fixture.mjs`, `test-brand-motion.mjs`, `audio-worklet-capture.test.mjs` — Renderer and AudioWorklet.
 - `test-speech-package.py`, `test-speech-worker.py`, `test-audio-continuity.py` — Speech packaging and worker pipes.
 - `test-rpm-package.py` — The RPM's file list, spec, header policy and parity checks; with rpmbuild installed, a real build.
+- `test-model-tokenizer.py` — The tokenizer graft adds one metadata entry, keeps every tensor byte, fetches one bounded range and replaces a model only with the pinned result.
 - `test-install-apt.py`, `test-install-common.sh`, `test-install-journey.py`, `test-install-launch.py`, `test-install-performance.py`, `test-install-presentation.py` — Installer.
 - `test-glib-variant.py`, `test-debian-maintainer.py`, `test-check-shell-syntax.py`, `test-report-dictation-quality-events.py`, `test-report-performance.py`, `test-report-speech-timing.py`, `test-typesafe-evaluation.py` — Other checks.
 - `fixtures/*` — Test-only helpers: synthetic fields, probe extensions, a `wl-copy` and an input-state relay through the private Shell probe, the [uinput bridge](../testing/README.md#the-uinput-bridge) that replays VOCO's virtual keyboard on a private Xvfb, and a fake logind whose session the full-application suite locks. None is installed.

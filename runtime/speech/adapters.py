@@ -7,7 +7,7 @@ import time
 import numpy as np
 ROOT=Path(__file__).resolve().parent
 # MODEL-IDENTITY.json names the same digest; test_model_identity.py keeps them equal.
-MODEL_SHA256='d9a01898d2a611c8764e23a1c2f45e70bbd5a425dc4de93692ac951dd603812d'
+MODEL_SHA256='926495522ccd2626d8665283b4c9225f704ed2b45e82158984d1823f7e528b52'
 class Nemotron:
     def __init__(self,context=1):
         self.stream=None

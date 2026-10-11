@@ -64,6 +64,10 @@ panel runs on GNOME 51. VOCO's app framework and build tools are up to date. The
   and Insert. A Space key press can activate a focused button or checkbox; a
   paste can't. Chromium's address bar trims the pasted space, so there a
   continuing phrase now joins the previous word.
+- The model file carries the SentencePiece tokenizer from NVIDIA's checkpoint
+  of the same model, as its `asr.tokenizer.spm_model` entry, which the
+  recognizer needs to boost phrases. The weights and every other entry are
+  NVIDIA's, and recognition is unchanged.
 
 - Tauri 2.12.2, tauri-build 2.7.1 and tauri-plugin-global-shortcut 2.4.0. Tauri
   2.12 uses tray-icon 0.25 and muda 0.20, so the vendored tray-icon is now 0.25.1,

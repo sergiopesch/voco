@@ -2,5 +2,10 @@ Licensed by NVIDIA Corporation under the NVIDIA Open Model License
 
 Source model: https://huggingface.co/nvidia/nemotron-speech-streaming-en-0.6b
 Pinned revision: ebe59e5a817142986528bbbee5dba8db7b38ed50
-GGUF SHA-256: d9a01898d2a611c8764e23a1c2f45e70bbd5a425dc4de93692ac951dd603812d
-Model weights unchanged. VOCO modifies runtime scheduling and transport.
+GGUF SHA-256: 926495522ccd2626d8665283b4c9225f704ed2b45e82158984d1823f7e528b52
+NVIDIA GGUF SHA-256: d9a01898d2a611c8764e23a1c2f45e70bbd5a425dc4de93692ac951dd603812d
+Tokenizer SHA-256: 07d4e5a63840a53ab2d4d106d2874768143fb3fbdd47938b3910d2da05bfb0a9
+Model weights unchanged. VOCO adds the SentencePiece tokenizer from the same
+revision's checkpoint, nemotron-speech-streaming-en-0.6b.nemo, to NVIDIA's GGUF
+as its asr.tokenizer.spm_model metadata entry, and modifies runtime scheduling
+and transport.
