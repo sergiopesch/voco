@@ -19,10 +19,11 @@ appear where you are typing, while you speak.
 - **Open source app, NVIDIA model.** VOCO's code is MIT-licensed. Its speech model,
   NVIDIA Nemotron, is under the [NVIDIA Open Model License](runtime/notices/NVIDIA-OPEN-MODEL-LICENSE.html),
   which isn't an open-source licence.
-- **Types into the app you are using,** browsers and terminals included. Words
-  appear while you speak, with punctuation and capital letters. In a terminal,
-  don't dictate while a program waits for an answer, such as a coding agent's
-  permission prompt: it may [read your words as keys](docs/everyday-use.md#where-your-words-go).
+- **Types into the app you are using,** where it pastes on Shift+Insert.
+  Browsers and terminals included. Words appear while you speak, with
+  punctuation and capital letters. In a terminal, don't dictate while a program
+  waits for an answer, such as a coding agent's permission prompt: it may
+  [read your words as keys](docs/everyday-use.md#where-your-words-go).
 - **One shortcut.** Press `Alt+D` to start and again to finish.
 - **Writes your words your way.** List names and terms on the **My words** page,
   and VOCO writes them as you typed them, with their capitals and accents. Say a
@@ -77,8 +78,10 @@ and F16C:
 | --- | --- | --- | --- |
 | Ubuntu 24.04 LTS | GNOME 46 | Wayland, X11 | Debian package, with APT |
 | Ubuntu 26.04 LTS | GNOME 50 | Wayland | Debian package, with APT |
-| Debian 13 | GNOME 48 | Wayland, X11 | Debian package, with APT |
-| Fedora 44 Workstation | GNOME 50 | Wayland | RPM, with DNF |
+| Debian 13 † | GNOME 48 | Wayland, X11 | Debian package, with APT |
+| Fedora 44 Workstation † | GNOME 50 | Wayland | RPM, with DNF |
+
+† Not tested on a real desktop
 
 You also need a microphone. On Wayland, VOCO needs access to `/dev/uinput`,
 which the package gives the user of the active local session. On GNOME 46, 48,
@@ -107,6 +110,7 @@ See [What VOCO keeps](docs/everyday-use.md#what-voco-keeps) and the
 - [Documentation index](docs/README.md)
 - [Install VOCO](docs/install.md)
 - [Everyday use](docs/everyday-use.md)
+- [What VOCO doesn't do](docs/scope.md)
 - [Troubleshooting](docs/troubleshooting.md)
 - [Platform support](docs/platform/README.md)
 - [Inside VOCO: a visual tour](docs/guide/README.md)

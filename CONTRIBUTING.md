@@ -15,7 +15,8 @@ issue. Bugs and feature ideas go in the issue forms on GitHub.
 
 - Read [AGENTS.md](AGENTS.md). It sets the product contract, such as local
   recognition, one output path and a short list of settings, and the rules each
-  change must keep.
+  change must keep. [What VOCO doesn't do](docs/scope.md) describes the product
+  choices behind it.
 - The [architecture overview](docs/architecture/README.md) follows one recording
   from the microphone to the paste. The [code map](docs/architecture/code-map.md)
   shows where each feature lives.
@@ -134,7 +135,8 @@ The docs describe how VOCO works, in the present tense. Update them in the same
 pull request as the behaviour:
 
 - user-visible behaviour: [README.md](README.md),
-  [Everyday use](docs/everyday-use.md) and [Troubleshooting](docs/troubleshooting.md);
+  [Everyday use](docs/everyday-use.md), [What VOCO doesn't do](docs/scope.md)
+  and [Troubleshooting](docs/troubleshooting.md);
 - setup: [Install](docs/install.md) and [Platform support](docs/platform/README.md);
 - internals: [Architecture](docs/architecture/README.md) and the code map;
 - security: [Security](docs/security/README.md);
