@@ -3,7 +3,7 @@
 from pathlib import Path
 import argparse, hashlib, json, re, subprocess
 
-DEFAULT_COMMIT = "61c2b91"
+DEFAULT_COMMIT = "281c4aa"
 GROUPS = [
     # First match wins, so specific prefixes come before the areas that contain them.
     ("apps/desktop/src-tauri/native/", "Native audio bridge", "The C shim that opens one PulseAudio or PipeWire recording stream for native capture."),
