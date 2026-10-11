@@ -76,13 +76,29 @@ jobs:
             ibus ibus-gtk3 python3 python3-numpy python3-gi gir1.2-ibus-1.0 bubblewrap \
             xvfb xdotool xclip gir1.2-gtk-3.0 gir1.2-webkit2-4.1 gir1.2-atspi-2.0 at-spi2-core \
             weston libweston-13-0 wayland-utils gir1.2-gtk-4.0 gir1.2-webkit-6.0 \
-            gnome-text-editor gnome-terminal nano gnome-shell gnome-shell-extension-appindicator xwayland
+            gnome-text-editor gnome-terminal nano gnome-shell gnome-shell-extension-appindicator xwayland \
+            ffmpeg locales
 
       - name: Install Node dependencies
         run: npm ci
 
       - name: DevOps preflight
         run: npm run verify:devops
+
+      # Bash writes times with the locale's decimal separator, so the installer
+      # runs again where it is a comma.
+      - name: Installer in a decimal-comma locale
+        run: |
+          mkdir -p "$RUNNER_TEMP/locales"
+          localedef -i de_DE -f UTF-8 "$RUNNER_TEMP/locales/de_DE.UTF-8"
+          export LOCPATH="$RUNNER_TEMP/locales" LC_ALL=de_DE.UTF-8
+          python3 scripts/test-install-journey.py
+          python3 scripts/test-install-performance.py
+
+      - name: Spelling table matches pinned VarCon
+        run: |
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/varcon.txt" https://raw.githubusercontent.com/en-wl/wordlist/rel-2020.12.07/varcon/varcon.txt
+          python3 scripts/generate-spelling-table.py --check "$RUNNER_TEMP/varcon.txt"
 
       - name: Dependency security audit
         run: npm run verify:security
@@ -120,6 +136,11 @@ jobs:
         run: npm run test:english-spelling-renderer
         env:
           VOCO_RENDERER_EVIDENCE_DIR: ${{ runner.temp }}/voco-english-spelling-renderer
+
+      - name: Update checks off switch regression
+        run: npm run test:update-checks-renderer
+        env:
+          VOCO_RENDERER_EVIDENCE_DIR: ${{ runner.temp }}/voco-update-checks-renderer
 
       - name: Microphone refresh and retry regression
         run: npm run test:microphone-renderer
@@ -182,6 +203,7 @@ jobs:
             ${{ runner.temp }}/voco-native-wayland/
             ${{ runner.temp }}/voco-dictation-renderer/
             ${{ runner.temp }}/voco-english-spelling-renderer/
+            ${{ runner.temp }}/voco-update-checks-renderer/
             ${{ runner.temp }}/voco-microphone-${{ github.run_id }}-${{ github.run_attempt }}/
             ${{ runner.temp }}/voco-native-capture-renderer/
             ${{ runner.temp }}/voco-onboarding-renderer/

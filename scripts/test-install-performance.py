@@ -407,6 +407,32 @@ exit "$FIXTURE_EXIT"
                     process.kill(); process.wait()
                 process.stdout.close(); process.stderr.close()
 
+    def test_a_download_without_a_frame_timer_waits_quietly(self):
+        # Where TMPDIR refuses FIFOs there is no frame timer, and an observer
+        # without one would redraw and log an error as fast as it could.
+        for motion in ('0', '1'):
+            with self.subTest(no_motion=motion), tempfile.TemporaryDirectory() as folder:
+                root = Path(folder)
+                (root / 'mkfifo').write_text('#!/bin/bash\nexit 1\n')
+                (root / 'wget').write_text('#!/bin/bash\nwhile [[ $# -gt 0 ]]; do [[ $1 == -O ]] && out=$2; shift; done\n'
+                                           'printf x > "$out"; sleep 1; printf y >> "$out"\n')
+                for tool in ('mkfifo', 'wget'):
+                    (root / tool).chmod(0o755)
+                env = art_env(folder, VOCO_INSTALL_ART='quadrant', VOCO_INSTALL_NO_MOTION=motion,
+                              PATH=f'{folder}:{os.environ["PATH"]}')
+                body = '''
+VOCO_DOWNLOAD_DIR=$(mktemp -d)
+voco_download 'The fixture.' "$VOCO_DOWNLOAD_DIR/data" https://example.invalid/data
+printf '\\nTIMER=%s SIZE=%s\\n' "${VOCO_UI_TIMER_FD:-none}" "$(stat -c %s "$VOCO_DOWNLOAD_DIR/data")"
+cat "$VOCO_INSTALL_LOG"
+'''
+                code, output = terminal(['bash', '-c', PREFIX + body], env)
+                self.assertEqual(code, 0, output)
+                self.assertIn(b'TIMER=none SIZE=2', output)
+                self.assertNotIn(b'file descriptor', output)
+                # The first frame, and the one that says the download is complete.
+                self.assertLessEqual(len(re.findall(rb'\x1b\[\d+A', output)), 2, output[-1500:])
+
     def test_no_motion_has_no_signal_history_or_sweep(self):
         with tempfile.TemporaryDirectory() as folder:
             env=art_env(folder,VOCO_INSTALL_ART='quadrant')
@@ -511,14 +537,20 @@ class InstallerArtTests(unittest.TestCase):
         return {'mode': mode.decode(), 'graphics': graphics.decode(), 'cell': (int(width), int(height)),
                 'ms': int(elapsed), 'terminal': state.decode()}, output
 
+    def require_ffmpeg(self):
+        if shutil.which('ffmpeg'):
+            return
+        # CI installs ffmpeg, so a microphone that no longer matches the symbol fails there.
+        if os.environ.get('GITHUB_ACTIONS') == 'true':
+            self.fail('ffmpeg is missing, so the installer art was not checked against the symbol')
+        self.skipTest('ffmpeg is unavailable, so the microphone was not redrawn from the symbol')
+
     def test_the_microphone_comes_from_the_symbol(self):
-        if not shutil.which('ffmpeg'):
-            self.skipTest('ffmpeg is unavailable, so the microphone was not redrawn from the symbol')
+        self.require_ffmpeg()
         subprocess.run([sys.executable, str(ROOT / 'scripts/generate-installer-art.py'), '--check'], check=True)
 
     def test_the_freshness_check_covers_the_image_and_every_mosaic(self):
-        if not shutil.which('ffmpeg'):
-            self.skipTest('ffmpeg is unavailable, so the microphone was not redrawn from the symbol')
+        self.require_ffmpeg()
         generator = load('installer_art', ROOT / 'scripts/generate-installer-art.py')
         brand = json.loads((ROOT / 'scripts/lib/install-brand.json').read_text())
         drawn, pixels, samples = generator.draw(shutil.which('ffmpeg'), brand['card'])
@@ -862,14 +894,26 @@ class InstallerArtTests(unittest.TestCase):
                 self.assertEqual(run.returncode, 0, run.stderr)
                 self.assertEqual(run.stdout, b'MODE=')
 
-    def test_inside_tmux_or_screen_only_an_answer_brings_the_image(self):
+    def test_inside_tmux_or_screen_nothing_is_asked(self):
+        # A multiplexer answers for the terminal and takes the query for a title.
         for name, extra in (('tmux', {'TMUX': '/tmp/tmux-1000/default,4242,0'}), ('screen', {'STY': '4242.pts-0.host'}),
-                            ('screen term', {'TERM': 'screen-256color'})):
+                            ('screen term', {'TERM': 'screen-256color'}), ('tmux term', {'TERM': 'tmux-256color'})):
             with self.subTest(multiplexer=name):
-                result, _ = self.probe(VTE, VTE_VERSION='8402', **extra)
-                self.assertEqual(result['mode'], 'quadrant')
-                result, _ = self.probe(GHOSTTY, **extra)
-                self.assertEqual(result['mode'], 'kitty')
+                for answer in (VTE, GHOSTTY):
+                    result, output = self.probe(answer, VTE_VERSION='8402', **extra)
+                    self.assertEqual(result['mode'], 'quadrant')
+                    self.assertNotIn(QUERY, output)
+                    self.assertLess(result['ms'], 50)
+
+    def test_the_clock_reads_microseconds_in_any_locale(self):
+        # Bash writes EPOCHREALTIME with the locale's decimal separator. Once
+        # unset it is an ordinary variable, so a test can give it either form.
+        for value in ('1760140800.123456', '1760140800,123456'):
+            with self.subTest(value=value):
+                run = subprocess.run(['bash', '-c', PREFIX + f'unset EPOCHREALTIME\nEPOCHREALTIME={value}\n'
+                                      'voco_ui_now_ms\nprintf "%s" "$VOCO_UI_NOW"\n'],
+                                     capture_output=True, timeout=5)
+                self.assertEqual(run.stdout, b'1760140800123', run.stderr)
 
     def test_the_mosaic_follows_what_the_terminal_draws(self):
         # VTE draws sextants from 0.64 and octants from 0.78.

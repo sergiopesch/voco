@@ -75,8 +75,8 @@ and F16C:
 | Fedora 44 Workstation | GNOME 50 | Wayland | RPM, with DNF |
 
 You also need a microphone. On Wayland, VOCO needs access to `/dev/uinput`,
-which the package gives the user of the active local session. On GNOME 46, 48
-and 50 the VOCO panel handles the shortcut; on other Wayland desktops, bind a
+which the package gives the user of the active local session. On GNOME 46, 48,
+50 and 51 the VOCO panel handles the shortcut; on other Wayland desktops, bind a
 keyboard shortcut to `voco --toggle`. [Platform support](docs/platform/README.md)
 covers each system and how it is tested.
 

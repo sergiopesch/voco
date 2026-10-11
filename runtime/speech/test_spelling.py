@@ -194,7 +194,7 @@ class BenchmarkTests(unittest.TestCase):
                     held += out_step > raw_step
             self.assertEqual(changed, changes, converter.mode)
             self.assertEqual(words, 6377)
-            # About 1.2% (British) and 1.7% (American) of words wait for one more hypothesis.
+            # About 1.1% (British) and 1.7% (American) of words wait for one more hypothesis.
             self.assertLess(held / words, .025, converter.mode)
 
 

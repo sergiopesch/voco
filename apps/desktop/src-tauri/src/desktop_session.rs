@@ -195,56 +195,143 @@ pub fn is_locked() -> bool {
 }
 
 /// Follow the originating login's LockedHint for the life of the process.
-/// `on_lock` runs on the GTK main thread each time the screen locks. Without
-/// logind or a bound login nothing is watched.
+/// `on_lock` runs on the GTK main thread each time the screen locks. While
+/// logind doesn't answer or the login isn't bound yet, the watch tries again,
+/// waiting up to 30 s between tries; a refused binding has no lock to follow.
 pub fn watch_lock(on_lock: impl Fn() + Send + Sync + 'static) {
     std::thread::spawn(move || {
-        let Some(logind) = Logind::connect() else {
-            return;
-        };
-        let path = {
-            let mut binding = BINDING.lock().unwrap_or_else(|error| error.into_inner());
-            if *binding == Binding::Unresolved {
-                let uid = unsafe { libc::geteuid() };
-                *binding = resolve(&logind, uid, SESSION_HINT.as_deref()).0;
+        let tries = std::cell::Cell::new(0);
+        let watched = until_bound(
+            || {
+                tries.set(tries.get() + 1);
+                bound_session()
+            },
+            |delay| {
+                if tries.get() == 1 {
+                    log::warn!("VOCO can't follow the screen lock yet, so it will try again.");
+                }
+                std::thread::sleep(delay);
+            },
+        );
+        if let Some((bus, path)) = watched {
+            if tries.get() > 1 {
+                log::info!("VOCO follows the screen lock after {} tries.", tries.get());
             }
-            match &*binding {
-                Binding::Bound(origin) => origin.path.clone(),
-                _ => return,
-            }
-        };
-        let on_lock = Arc::new(on_lock);
-        let (bus, signal_path, signal_lock) = (logind.bus.clone(), path.clone(), on_lock.clone());
-        let (subscribed, ready) = std::sync::mpsc::channel();
-        // Signals are delivered on the context that subscribed: GTK's.
-        glib::MainContext::default().invoke(move || {
-            let _subscription = bus.signal_subscribe(
-                Some("org.freedesktop.login1"),
-                Some("org.freedesktop.DBus.Properties"),
-                Some("PropertiesChanged"),
-                Some(&signal_path),
-                Some(SESSION_INTERFACE),
-                gio::DBusSignalFlags::NONE,
-                move |_, _, _, _, _, parameters| {
-                    if let Some(locked) = locked_hint_change(parameters) {
-                        note_lock(&SESSION_LOCKED, locked, &*signal_lock);
-                    }
-                },
-            );
-            // A subscription lasts as long as its connection, and GIO keeps the
-            // shared system bus only while something holds it: hold it for good.
-            std::mem::forget(bus);
-            let _ = subscribed.send(());
-        });
-        // Read the state only once the match rule is queued: the bus handles one
-        // connection's messages in order, so a change can't fall between the two.
-        // A lock seen here stops a dictation that started meanwhile.
-        if ready.recv().is_ok() {
-            if let Some(session) = Logind::connect().and_then(|logind| logind.read(&path).ok()) {
-                note_lock(&SESSION_LOCKED, session.locked, &*on_lock);
-            }
+            follow_lock(bus, path, Arc::new(on_lock));
         }
     });
+}
+
+enum Watch<T> {
+    Ready(T),
+    Later,
+    Never,
+}
+
+/// Run `attempt` until it is ready or never can be, sleeping 1 s after the
+/// first try and twice as long after each later one, up to 30 s.
+fn until_bound<T>(
+    mut attempt: impl FnMut() -> Watch<T>,
+    mut sleep: impl FnMut(Duration),
+) -> Option<T> {
+    let mut delay = Duration::from_secs(1);
+    loop {
+        match attempt() {
+            Watch::Ready(value) => return Some(value),
+            Watch::Never => return None,
+            Watch::Later => sleep(delay),
+        }
+        delay = longer(delay);
+    }
+}
+
+/// The system bus and the originating login's path, once the login is bound.
+fn bound_session() -> Watch<(gio::DBusConnection, String)> {
+    let Some(logind) = Logind::connect() else {
+        return Watch::Later;
+    };
+    let mut binding = BINDING.lock().unwrap_or_else(|error| error.into_inner());
+    if *binding == Binding::Unresolved {
+        let uid = unsafe { libc::geteuid() };
+        *binding = resolve(&logind, uid, SESSION_HINT.as_deref()).0;
+    }
+    match &*binding {
+        Binding::Bound(origin) => Watch::Ready((logind.bus.clone(), origin.path.clone())),
+        Binding::Unresolved => Watch::Later,
+        Binding::Refused => Watch::Never,
+    }
+}
+
+/// Subscribe to the login's LockedHint changes, then read its current value,
+/// both on GTK's main context. The bus delivers the reply and the signals there
+/// in the order logind sent them, so the first read can't undo a newer change.
+fn follow_lock(bus: gio::DBusConnection, path: String, on_lock: Arc<dyn Fn() + Send + Sync>) {
+    glib::MainContext::default().invoke(move || {
+        let signal_lock = on_lock.clone();
+        let _subscription = bus.signal_subscribe(
+            Some("org.freedesktop.login1"),
+            Some("org.freedesktop.DBus.Properties"),
+            Some("PropertiesChanged"),
+            Some(&path),
+            Some(SESSION_INTERFACE),
+            gio::DBusSignalFlags::NONE,
+            move |_, _, _, _, _, parameters| {
+                if let Some(locked) = locked_hint_change(parameters) {
+                    note_lock(&SESSION_LOCKED, locked, &*signal_lock);
+                }
+            },
+        );
+        // A lock seen here stops a dictation that started meanwhile.
+        read_locked_hint(bus.clone(), path, on_lock, Duration::from_secs(1));
+        // A subscription lasts as long as its connection, and GIO keeps the
+        // shared system bus only while something holds it: hold it for good.
+        std::mem::forget(bus);
+    });
+}
+
+/// Read the login's LockedHint, on GTK's main context. A logind that answers
+/// without the property reads as unlocked. One that doesn't answer is asked
+/// again after `delay`, then twice as long each time up to 30 s, so a screen
+/// locked before VOCO started is still seen.
+fn read_locked_hint(
+    bus: gio::DBusConnection,
+    path: String,
+    on_lock: Arc<dyn Fn() + Send + Sync>,
+    delay: Duration,
+) {
+    let again = path.clone();
+    bus.clone().call(
+        Some("org.freedesktop.login1"),
+        &path,
+        "org.freedesktop.DBus.Properties",
+        "Get",
+        Some(&(SESSION_INTERFACE, "LockedHint").to_variant()),
+        None,
+        gio::DBusCallFlags::NO_AUTO_START,
+        5_000,
+        gio::Cancellable::NONE,
+        move |reply| match reply {
+            Ok(reply) => {
+                let locked = reply
+                    .get::<(glib::Variant,)>()
+                    .and_then(|(value,)| value.get::<bool>());
+                if let Some(locked) = locked {
+                    note_lock(&SESSION_LOCKED, locked, &*on_lock);
+                }
+            }
+            Err(error) if remote_error(&error).is_none() => {
+                glib::timeout_add_local_once(delay, move || {
+                    read_locked_hint(bus, again, on_lock, longer(delay));
+                });
+            }
+            Err(_) => {}
+        },
+    );
+}
+
+/// The next wait between tries: twice as long, up to 30 s.
+fn longer(delay: Duration) -> Duration {
+    (delay * 2).min(Duration::from_secs(30))
 }
 
 /// Record a lock state from the signal or the first read. Only the change to
@@ -331,16 +418,20 @@ impl Logind {
     }
 }
 
-fn lookup_error(error: &glib::Error) -> LookupError {
+/// The D-Bus error name logind answered with, or None when it didn't answer.
+fn remote_error(error: &glib::Error) -> Option<glib::GString> {
     // GIO 0.18 exposes this through its C binding. The returned string is newly
     // allocated; GString takes and frees ownership.
-    let remote: Option<glib::GString> = unsafe {
+    unsafe {
         from_glib_full(gio::ffi::g_dbus_error_get_remote_error(
             error.to_glib_none().0,
         ))
-    };
+    }
+}
+
+fn lookup_error(error: &glib::Error) -> LookupError {
     if matches!(
-        remote.as_deref(),
+        remote_error(error).as_deref(),
         Some(
             "org.freedesktop.login1.NoSessionForPID"
                 | "org.freedesktop.login1.NoSuchSession"
@@ -810,5 +901,36 @@ mod tests {
         let mut binding = Binding::Unresolved;
         assert!(binding.check(&f, 1000, None));
         assert_eq!(binding, Binding::Unresolved);
+    }
+
+    #[test]
+    fn the_lock_watch_tries_again_until_the_login_is_bound() {
+        let mut tries = [Watch::Later, Watch::Later, Watch::Ready("origin")].into_iter();
+        let mut slept = Vec::new();
+        let bound = until_bound(|| tries.next().unwrap(), |delay| slept.push(delay));
+        assert_eq!(bound, Some("origin"));
+        assert_eq!(slept, [Duration::from_secs(1), Duration::from_secs(2)]);
+        // A refused binding has no lock to follow, so nothing waits.
+        let mut slept = Vec::new();
+        assert_eq!(
+            until_bound(|| Watch::<()>::Never, |delay| slept.push(delay)),
+            None
+        );
+        assert!(slept.is_empty());
+        // The wait doubles up to 30 s.
+        let (mut count, mut slept) = (0, Vec::new());
+        let bound = until_bound(
+            || {
+                count += 1;
+                if count > 7 {
+                    Watch::Ready(())
+                } else {
+                    Watch::Later
+                }
+            },
+            |delay| slept.push(delay.as_secs()),
+        );
+        assert_eq!(bound, Some(()));
+        assert_eq!(slept, [1, 2, 4, 8, 16, 30, 30]);
     }
 }

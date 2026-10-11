@@ -142,7 +142,7 @@ its keys reach no compositor or console, and replays every press and release in
 order, with VOCO's gaps between them, as XTest on the private Xvfb, reached
 through the namespace's shared `/tmp/.X11-unix`. The nested GNOME Shell passes
 them to its focused window. Keyboards come and go with each VOCO process. Only
-Shift+Insert, optionally led by one Space, is accepted. Any other key, a dropped
+Shift+Insert is accepted. Any other key, a dropped
 event, or a keyboard that leaves before its grab or in the middle of a paste is
 rejected; the bridge then replays nothing more and the suite fails.
 
@@ -216,14 +216,14 @@ for the host it ran on. Where you don't run them, record them as unavailable.
 
 ## CI jobs
 
-`.github/workflows/ci.yml` runs five jobs on Ubuntu 24.04 for pushes to `master` and
-pull requests into it. Evidence artifacts upload even after a failure and stay 7 days.
+`.github/workflows/ci.yml` runs these jobs for pushes to `master` and pull
+requests into it, on Ubuntu 24.04 unless the table says otherwise. Evidence artifacts upload even after a failure and stay 7 days.
 
 | Job | Runs | Artifact |
 | --- | --- | --- |
 | Code Guide | The [Inside VOCO](../guide/README.md) guide's server, catalog and lesson tests | None |
 | RustSec Audit | `cargo audit` with cargo-audit 0.22.2 | None |
-| Frontend Checks | `verify:devops`, `verify:security`, `check`, `lint` and `npm test`; the renderer suites, the panel model and the exact-field suite; the GNOME companion; both delivery suites on `x11`; the IBus engine, native desktop and native Wayland suites; the frontend build, and desktop entry and AppStream validation | `native-desktop-evidence` |
+| Frontend Checks | `verify:devops`, `verify:security`, `check`, `lint` and `npm test`; the installer suites again in a German locale, where Bash writes times with a decimal comma; the spelling table against the pinned VarCon file; the renderer suites, the panel model and the exact-field suite; the GNOME companion; both delivery suites on `x11`; the IBus engine, native desktop and native Wayland suites; the frontend build, and desktop entry and AppStream validation | `native-desktop-evidence` |
 | Rust Check & Test | `cargo fmt`, Clippy, the glib checks, `cargo test`, the C callbacks and native capture latency; then it provisions the runtime and runs the speech baseline and the worker protocol | `speech-regression-evidence` |
 | Application | The release build of `voco` and `voco-browser-host` with the runtime, then the tray bridge on GNOME, `--full-application`, both delivery suites on `gnome-wayland` through the release build's production paste and the uinput bridge, the Wayland lifecycle, `--browser-application` and `--browser-toolbar` | `application-evidence` |
 | GNOME 50 Companion | On `ubuntu-26.04`, the companion regression headless on GNOME Shell 50 | `gnome50-panel-evidence` |

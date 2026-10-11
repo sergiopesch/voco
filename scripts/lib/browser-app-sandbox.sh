@@ -41,7 +41,11 @@ MANIFEST
   voco_stage_test_speech "$test_root"
   cp --reflink=auto "${VOCO_BROWSER_HOST_BINARY:-${CARGO_TARGET_DIR:-$repo/apps/desktop/src-tauri/target}/debug/voco-browser-host}" "$test_root/voco-browser-host"
 
-  printf '%s\n' '{"onboardingCompleted":true,"hotkey":"Alt+D"}' > "$test_root/config/voco/config.json"
+  # The long accuracy run scores recognition against LibriSpeech's American
+  # references, so its words stay as recognised.
+  config='{"onboardingCompleted":true,"hotkey":"Alt+D"}'
+  [[ ${VOCO_BROWSER_LONG_CAPTURE:-0} != 1 ]] || config='{"onboardingCompleted":true,"hotkey":"Alt+D","englishSpelling":"as-recognised"}'
+  printf '%s\n' "$config" > "$test_root/config/voco/config.json"
   if [[ ${VOCO_BROWSER_LONG_CAPTURE:-0} == 1 ]]; then
     /usr/bin/python3 - "$repo/tests/fixtures/speech/manifest.json" "$test_root/long.wav" "$test_root/evidence/playback-manifest.json" "${VOCO_BROWSER_LONG_FIXTURE:-natural}" <<'PYWAV'
 import hashlib, json, pathlib, sys, wave

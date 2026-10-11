@@ -252,6 +252,18 @@ application = workflow.split("\n  application:\n", 1)[1]
 release_build = "cargo build --locked --release --features custom-protocol --bin voco --bin voco-browser-host"
 if release_build not in application or application.index(release_build) > application.index("--full-application"):
     raise SystemExit("The application job must test the release build of both executables")
+if commands.count(hosted + " --gnome-panel-container") != 1:
+    raise SystemExit(f"{workflow_path} must run the GNOME companion suite on a newer Shell exactly once")
+images = [image for image in re.findall(r"(?:VOCO_PANEL_IMAGE|image): (\S+)", workflow) if not image.startswith("${{")]
+if not images or any(not re.search(r"@sha256:[0-9a-f]{64}$", image) for image in images):
+    raise SystemExit(f"{workflow_path} container images must be pinned by digest: {images}")
+for suite in ("english-spelling", "update-checks"):
+    if commands.count(f"run: npm run test:{suite}-renderer") != 1:
+        raise SystemExit(f"{workflow_path} must run the {suite} renderer gate exactly once")
+if 'export LOCPATH="$RUNNER_TEMP/locales" LC_ALL=de_DE.UTF-8' not in commands:
+    raise SystemExit(f"{workflow_path} must run the installer suites in a decimal-comma locale")
+if 'python3 scripts/generate-spelling-table.py --check "$RUNNER_TEMP/varcon.txt"' not in commands:
+    raise SystemExit(f"{workflow_path} must check the spelling table against the pinned VarCon file")
 if commands.count("run: npm run test:chromium-exact-field") != 1:
     raise SystemExit(f"{workflow_path} must run the Chromium recipient and background lifecycle gates")
 if not all(re.search(rf"\s{helper}\s", workflow) for helper in ("xdotool", "xclip")):

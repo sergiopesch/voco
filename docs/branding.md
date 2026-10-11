@@ -76,8 +76,9 @@ the aspect ratio, and don't add transparent padding. Check the 16, 24, 32, 48 an
 
 The banner is a 560 × 184 graphite card (`#111318`, 22 px corners) with the 256 px
 launcher icon drawn at 152 px, "PRIVATE · LOCAL · UNDER YOUR CONTROL" in `#aeb5bf`,
-"VOCO" in `#f1f3f6` and "The voice layer for Linux." in `#c7ccd4`. Its font falls back from Geist to
-Inter, then the system sans serif.
+"VOCO" in `#f1f3f6`, "The voice layer for Linux." in `#c7ccd4` and "Today:
+private dictation." in `#aeb5bf`. Its font falls back from Geist to Inter, then
+the system sans serif.
 
 Two third-party icon sets ship unmodified. The settings and chevron icons come
 from GNOME's Adwaita theme, with `apps/desktop/public/icons/ADWAITA-LICENSE.txt`.
@@ -242,14 +243,15 @@ Before it draws the card, the installer asks the terminal whether it shows
 images through the kitty graphics protocol, and how big its cells are. It reads
 the answers from `/dev/tty` with echo off and gives the terminal its settings
 back. It stops at the answer to DA1, which terminals send last, or after
-200 ms. It only asks from the foreground and never over SSH.
+200 ms. It only asks from the foreground, and never over SSH or inside tmux or
+screen, which answer for the terminal themselves.
 
 | The terminal | The microphone |
 | --- | --- |
 | Answers the kitty graphics query: Ghostty, kitty, WezTerm and Konsole | The image, sent once and placed over the microphone cells without moving the cursor |
 | VTE 0.78 or later: GNOME Terminal, Ptyxis and other VTE terminals | The octant mosaic |
 | VTE 0.64 to 0.76, or Ghostty, kitty, WezTerm or foot without the image | The sextant mosaic |
-| Inside tmux or screen without an answer, or any other terminal | The quadrant mosaic, which every terminal font draws |
+| Inside tmux or screen, or any other terminal | The quadrant mosaic, which every terminal font draws |
 
 These terminals draw octants and sextants themselves, so no font can lack them.
 `VOCO_INSTALL_ART` skips the question: `kitty`, `octant`, `sextant` or

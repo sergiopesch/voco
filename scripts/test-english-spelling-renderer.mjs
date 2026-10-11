@@ -22,6 +22,10 @@ try {
         window.config = { ...window.config, ...JSON.parse(new URLSearchParams(location.search).get('config') || '{}') };
         window.saves = [];
         window.nativeHandlers.saveConfigPatch = ([patch]) => {
+            if (window.failNextSave) {
+                window.failNextSave = false;
+                throw new Error('No space left on device');
+            }
             window.saves.push(patch);
             window.config = { ...window.config, ...patch };
             return { revision: 2 + window.saves.length, config: window.config };
@@ -41,6 +45,12 @@ try {
         await page.screenshot({ path: path.join(out, name + '.png') });
     };
     const saves = () => page.evaluate(() => window.saves);
+    const reopenPopover = async () => {
+        await page.evaluate(() => window.store.getState().setSurface('hidden'));
+        await page.waitForFunction(() => !document.querySelector('.voco-popover'));
+        await page.evaluate(() => window.store.getState().setSurface('popover'));
+        await page.locator('.voco-popover').waitFor();
+    };
 
     // A new person: the question comes first, British preselected.
     await load({ onboardingCompleted: false, englishSpelling: null });
@@ -79,6 +89,21 @@ try {
     await page.getByText('Try saying “My favorite color is blue.”', { exact: true }).waitFor();
     await shot('setup-voice-test-american');
     results.push({ case: 'continue-reaches-the-voice-test-in-the-chosen-spelling', passed: true });
+
+    // A failed save puts the saved choice back and says why. Continue saves the
+    // shown choice again, so the voice test starts without the old error.
+    await load({ onboardingCompleted: false, englishSpelling: null });
+    await page.locator('.voco-spelling__card').nth(1).click();
+    await page.waitForFunction(() => window.saves.at(-1)?.englishSpelling === 'american');
+    await page.evaluate(() => { window.failNextSave = true; });
+    await page.locator('.voco-spelling__card').nth(0).click();
+    await page.getByRole('alert').filter({ hasText: 'No space left on device' }).waitFor();
+    assert.equal(await page.getByRole('radio', { name: 'American English' }).isChecked(), true);
+    await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    await page.getByRole('button', { name: 'Start test', exact: true }).waitFor();
+    assert.equal(await page.getByText('Failed to save settings', { exact: false }).count(), 0);
+    assert.deepEqual((await saves()).at(-1), { englishSpelling: 'american' });
+    results.push({ case: 'a-failed-save-reverts-and-continue-saves-again', passed: true });
 
     // The smallest window shows every control without scrolling, after a save too.
     await load({ onboardingCompleted: false, englishSpelling: null });
@@ -123,18 +148,36 @@ try {
     await shot('settings-spelling');
     results.push({ case: 'settings-offers-three-spellings', passed: true, saves: await saves() });
 
-    // Someone set up before the choice existed sees one note in the popover.
+    // For an earlier setup, choosing the preselected British in Settings saves it.
+    await load({ onboardingCompleted: true, englishSpelling: null }, 'settings');
+    const preselected = page.getByRole('radiogroup', { name: 'Spelling' });
+    await preselected.waitFor();
+    await preselected.getByText('British English', { exact: true }).click();
+    await page.waitForFunction(() => window.saves.at(-1)?.englishSpelling === 'british');
+    results.push({ case: 'settings-saves-the-preselected-british-for-earlier-setups', passed: true });
+
+    // Someone set up before the choice existed sees a note in the popover until
+    // they choose.
     await load({ onboardingCompleted: true, englishSpelling: null }, 'popover');
     await page.getByText('VOCO now spells in British English.', { exact: true }).waitFor();
     assert.equal(await page.locator('.voco-lens').count(), 0);
     await shot('popover-spelling-notice', { width: 420, height: 380 });
     const footer = await page.locator('.voco-popover__footer').evaluate(element => element.getBoundingClientRect().bottom);
     assert.ok(footer <= 380, 'The note keeps the popover footer inside the window');
-    await page.getByRole('button', { name: 'Use American English', exact: true }).click();
+    await reopenPopover();
+    await page.getByText('VOCO now spells in British English.', { exact: true }).waitFor();
+    // An answer by keyboard is confirmed where the note was, and focus moves on.
+    await page.getByRole('button', { name: 'Use American English', exact: true }).focus();
+    await page.keyboard.press('Enter');
     await page.waitForFunction(() => window.saves.at(-1)?.englishSpelling === 'american');
+    await page.getByRole('status').filter({ hasText: 'VOCO spells in American English.' }).waitFor();
+    assert.equal(await page.getByRole('button', { name: 'Hide to tray', exact: true }).evaluate(button => button === document.activeElement), true);
+    await shot('popover-spelling-answered', { width: 420, height: 380 });
+    // The next time the popover opens, the lens is back.
+    await reopenPopover();
     await page.locator('.voco-lens').waitFor();
-    assert.equal(await page.getByText('VOCO now spells in British English.', { exact: true }).count(), 0);
-    results.push({ case: 'popover-note-once-for-earlier-setups', passed: true });
+    assert.equal(await page.getByText('VOCO spells in American English.', { exact: true }).count(), 0);
+    results.push({ case: 'popover-note-until-earlier-setups-choose', passed: true });
 
     assert.deepEqual(errors, []);
     await save('RESULTS.json', { passed: true, results, errors, mockedPlatform: true });

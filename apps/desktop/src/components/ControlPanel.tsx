@@ -28,7 +28,7 @@ import type { NativeMicrophoneControls } from "@/hooks/useNativeCaptureSettings"
 import { SettingsIcon } from "@/components/SettingsIcon";
 import { useGlassPointer } from "@/hooks/useGlassPointer";
 import { isWaylandSession } from "@/lib/windowRemap";
-import { englishSpelling } from "@/lib/englishSpelling";
+import { englishSpelling, type EnglishVariety } from "@/lib/englishSpelling";
 import { EnglishSpellingChoice, EnglishSpellingNotice, EnglishSpellingStep } from "@/components/EnglishSpellingChoice";
 import vocoBrandImage from "../../../../assets/voco-symbol-ui.png";
 
@@ -218,7 +218,12 @@ export function ControlPanel({
   const [spellingSaveError, setSpellingSaveError] = useState<string | null>(null);
   const spellingSaveRequest = useRef(0);
   const askedSpelling = useRef(false);
-  const spellingNotice = isPopover && config.onboardingCompleted && config.englishSpelling === null;
+  // The popover's note for earlier setups stays until they choose, then says
+  // what they chose until the popover closes.
+  const [spellingAnswer, setSpellingAnswer] = useState<EnglishVariety | null>(null);
+  const hideToTrayRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => { if (!isPopover) setSpellingAnswer(null); }, [isPopover]);
+  const spellingNotice = isPopover && config.onboardingCompleted && (config.englishSpelling === null || spellingAnswer !== null);
   const hotkeyDirty = hotkeyDraft !== config.hotkey;
   const dictationBusy = isDictationActive(dictationStatus);
   // The live level goes straight to the meter; a state update per animation
@@ -523,8 +528,18 @@ export function ControlPanel({
   }
 
   async function confirmSpelling() {
-    if (useStore.getState().config?.englishSpelling !== spelling && !(await chooseSpelling(spelling))) return;
+    // After a failed save, saving the shown choice again clears that error, or
+    // keeps the person here with its reason.
+    const saved = useStore.getState().config?.englishSpelling;
+    if ((saved !== spelling || spellingSaveError) && !(await chooseSpelling(spelling))) return;
     useStore.getState().confirmOnboardingSpelling();
+  }
+
+  async function answerSpellingNotice(value: EnglishVariety) {
+    if (!(await chooseSpelling(value))) return;
+    setSpellingAnswer(value);
+    // The answered note has no buttons left, so focus moves on.
+    hideToTrayRef.current?.focus();
   }
 
   async function retryMicrophonePreview() {
@@ -722,7 +737,7 @@ export function ControlPanel({
 
         {isPopover ? (
           <section className="voco-popover" data-priority={statusHeading.length > 30 ? "status" : undefined}>
-            {spellingNotice ? <EnglishSpellingNotice disabled={saving} onChoose={value => void chooseSpelling(value)} /> : <div className="voco-lens">
+            {spellingNotice ? <EnglishSpellingNotice answer={spellingAnswer} disabled={saving} onChoose={value => void answerSpellingNotice(value)} /> : <div className="voco-lens">
               <img src={vocoBrandImage} alt="" />
             </div>}
             {spellingNotice && spellingSaveError ? <p className="voco-inline-note voco-inline-note--error" role="alert">{spellingSaveError}</p> : null}
@@ -735,7 +750,7 @@ export function ControlPanel({
             </div>
             {captureNotice ? <div className="voco-inline-note" role="status">{captureNotice}</div> : null}
             <div className="voco-popover__actions">
-              <button {...glassPointer} className="voco-button voco-glass voco-glass--primary" disabled={saving}
+              <button {...glassPointer} ref={hideToTrayRef} className="voco-button voco-glass voco-glass--primary" disabled={saving}
                 onClick={prepareDictation}>Hide to tray</button>
             </div>
             <div className="voco-popover__footer">
@@ -835,7 +850,7 @@ export function ControlPanel({
                   <div className="voco-preferences__group">
                     <div className="voco-preferences__card voco-preferences__form">
                       <EnglishSpellingChoice value={spelling} labelledBy="voco-settings-spelling" offerAsRecognised compact
-                        onChange={value => void chooseSpelling(value)} />
+                        unsaved={config.englishSpelling === null} onChange={value => void chooseSpelling(value)} />
                       <p className="voco-preferences__helper">Changes spelling only, never names or meaning. It applies from your next dictation.</p>
                       {spellingSaveError ? <div className="voco-inline-note voco-inline-note--error" role="alert">{spellingSaveError}</div> : null}
                     </div>

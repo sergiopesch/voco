@@ -387,8 +387,11 @@ voco_ui_configure() {
   [[ "$VOCO_TERMINAL_MOTION" == true ]] || return 0
 }
 
+# Bash writes EPOCHREALTIME with the locale's decimal separator, a comma in
+# German or French, and always six digits after it: its digits alone are the
+# microseconds since the epoch.
 voco_ui_now_ms() {
-  VOCO_UI_NOW=$(( ${EPOCHREALTIME/./} / 1000 ))
+  VOCO_UI_NOW=$(( ${EPOCHREALTIME//[!0-9]/} / 1000 ))
 }
 
 # How the card shows the microphone. A terminal that answers the kitty graphics
@@ -400,8 +403,12 @@ voco_ui_art_mode() {
     text) voco_ui_mosaic ;;
     *)
       # Over SSH an answer can arrive after the probe stops waiting and reach a
-      # later prompt, so only a local terminal is asked.
-      [[ -n "${SSH_CONNECTION:-}${SSH_TTY:-}" ]] || voco_ui_probe "$1" "$2"
+      # later prompt. tmux and screen answer for the terminal themselves and take
+      # the query for a title. So only a local terminal outside them is asked.
+      case "${SSH_CONNECTION:-}${SSH_TTY:-}${TMUX:-}${STY:-}:${TERM:-}" in
+        ?*:*|:screen*|:tmux*) ;;
+        *) voco_ui_probe "$1" "$2" ;;
+      esac
       if [[ "$VOCO_UI_GRAPHICS" == kitty ]]; then VOCO_UI_MIC_MODE=kitty; else voco_ui_mosaic; fi
       ;;
   esac
@@ -962,19 +969,19 @@ voco_ui_download_observer() {
   local destination="$1" start="$2" bytes=0 now delta rate elapsed mark='' detail='' sampled=0 card=full
   local glyphs=(▁ ▂ ▃ ▄ ▅ ▆ ▇ █) value
   VOCO_UI_LAST_BYTES=0
-  VOCO_UI_LAST_TIME=${EPOCHREALTIME/./}
+  VOCO_UI_LAST_TIME=${EPOCHREALTIME//[!0-9]/}
   voco_ui_now_ms
   # The download lights the wordmark once, unless the intro is still playing.
   if [[ "$VOCO_UI_NO_MOTION" != true ]] && (( VOCO_UI_INTRO_START == 0 || VOCO_UI_NOW - VOCO_UI_INTRO_START >= VOCO_UI_INTRO_MS )); then
     VOCO_UI_SHINE_START=$VOCO_UI_NOW
   fi
   while :; do
-    now=${EPOCHREALTIME/./}
+    now=${EPOCHREALTIME//[!0-9]/}
     # Sample at 4 Hz, whatever the frame rate; only shell builtins run between samples.
     if (( now - sampled >= 250000 )); then
       sampled=$now
       bytes=$(stat -c %s -- "$destination" 2>/dev/null || printf '0')
-      now=${EPOCHREALTIME/./}
+      now=${EPOCHREALTIME//[!0-9]/}
       delta=$((now-VOCO_UI_LAST_TIME))
       rate=0
       if (( delta > 0 && bytes >= VOCO_UI_LAST_BYTES )); then rate=$(((bytes-VOCO_UI_LAST_BYTES)*1000000/delta)); fi
@@ -1382,7 +1389,9 @@ voco_download() {
   if [[ "$VOCO_TERMINAL_MOTION" == true ]]; then
     if [[ -z "$VOCO_UI_TIMER_FD" ]]; then voco_ui_init; fi
     voco_ui_begin 'Bringing VOCO to your desktop.' "$label" '↓'
-    if [[ "$VOCO_TERMINAL_MOTION" == true ]]; then
+    # The observer waits on the frame timer between frames. Where TMPDIR can't
+    # hold the timer's FIFO there is none, and this frame stays until the end.
+    if [[ "$VOCO_TERMINAL_MOTION" == true && -n "$VOCO_UI_TIMER_FD" ]]; then
       # Inherit the log descriptor at fork, including the pre-trap shutdown window.
       {
         voco_ui_download_observer "$destination" "$started" &
@@ -1695,9 +1704,9 @@ fi
 # ─── Done ───────────────────────────────────────────────
 voco_ui_pause
 if VOCO_LAUNCH_DETAIL="$(voco_launch_installed_app)"; then
-  VOCO_NEXT_STEP="Opening VOCO → Start test → Finish test → Done."
+  VOCO_NEXT_STEP="Opening VOCO → choose your English → Start test → Finish test → Done."
 else
-  VOCO_NEXT_STEP="${VOCO_LAUNCH_DETAIL:-Open VOCO from your desktop.} Start test → Finish test → Done."
+  VOCO_NEXT_STEP="${VOCO_LAUNCH_DETAIL:-Open VOCO from your desktop.} Choose your English → Start test → Finish test → Done."
 fi
 VOCO_UI_STAGE=4
 if [[ "$VOCO_TERMINAL_MOTION" == true ]]; then

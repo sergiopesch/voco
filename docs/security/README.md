@@ -115,16 +115,17 @@ denials.
 | Interface | Used by | Checks |
 | --- | --- | --- |
 | `$XDG_RUNTIME_DIR/voco.sock` and `voice.sock` | `voco --toggle` and desktop bindings | Private directory, socket 0600, peer user ID must match. Each connection is one toggle. |
+| `$XDG_RUNTIME_DIR/voco-activate.sock` | A second `voco` launch, such as a click on VOCO's launcher | The same directory, mode and peer check as the trigger socket. Each connection only presents VOCO's window; it never starts or stops dictation. |
 | `$XDG_RUNTIME_DIR/voco/ibus-engine.sock` | VOCO, talking to its IBus engine | Directory 0700, socket 0600, peer checks on both sides, 1-second timeout, requests up to 65,536 bytes and replies up to 64,000. Protocol 6 rejects every text operation. |
 | `$XDG_RUNTIME_DIR/voco-browser/exact-field.sock` | `voco-browser-host` | Directory 0700 and a socket owned by you with no group or other access; peer user ID must match. |
 | `org.voco.Panel1` on the session bus | The GNOME companion | `Attach` succeeds only for the current owner of `org.gnome.Shell`. Every other method answers only the attached connection. |
 
-Peer checks use `SO_PEERCRED`. Without `XDG_RUNTIME_DIR`, the trigger socket
-moves to `voco-<uid>` in the temporary directory, which must be private to you,
-or owned by root, sticky and world-writable. The IBus and browser sockets have
-no such fallback. When VOCO exits, it removes the trigger socket only if the
-file is still the one it created. Any process running as you can use these
-interfaces; they keep other accounts out, not your own programs.
+Peer checks use `SO_PEERCRED`. Without `XDG_RUNTIME_DIR`, the trigger and
+activation sockets move to `voco-<uid>` in the temporary directory, which must
+be private to you, or owned by root, sticky and world-writable. The IBus and
+browser sockets have no such fallback. When VOCO exits, it removes the trigger
+socket only if the file is still the one it created. Any process running as you
+can use these interfaces; they keep other accounts out, not your own programs.
 
 ## The app window
 
@@ -148,8 +149,8 @@ releases API for the 12 newest releases, unless its cached answer is younger
 than 6 hours. **Check for updates** in Settings always asks. The request
 carries no account or device identifier, though GitHub sees your IP address.
 VOCO only tells you a release exists; it never downloads or installs anything.
-To make no request unless you ask, set **Update checks** on the **Updates** page
-to **Only when I choose**.
+To make no request unless you ask, open **Update settings** on the **Updates**
+page and set **Update checks** to **Only when I choose**.
 
 ## Speech worker
 
@@ -165,13 +166,20 @@ a model whose SHA-256 doesn't match the pinned value, including one named by
 `VOCO_NEMOTRON_MODEL`. Spelling conversion reads only the packaged
 `spelling-varcon.tsv` at startup and runs on text the worker already holds.
 
-The worker can't open a network socket. Before its Python starts, VOCO marks
-every descriptor beyond the worker's pipes close-on-exec, so it inherits no
-socket, sets no-new-privileges and installs a seccomp filter. The filter refuses
-every new socket except a Unix one, and io_uring, which can open sockets without
-the socket call, with "permission denied". If VOCO can't install the filter, the
-worker doesn't start. Unix sockets stay open to the worker, so a program that
-listens on one and relays to the network could still carry data out.
+The worker can't open a socket. Before its Python starts, VOCO marks every
+descriptor beyond the worker's standard streams close-on-exec, so it inherits
+only its two pipes and VOCO's own standard error, sets no-new-privileges and
+installs a seccomp filter. The filter refuses every socket and socket pair, Unix
+ones included, and io_uring, which can open sockets without the socket call,
+with "permission denied". A Unix socket would reach the session bus and your
+user's service manager, which can start processes outside the filter, and a
+Unix datagram pair can still send to other sockets. If VOCO can't install the
+filter, the worker doesn't start.
+
+The filter keeps the worker's own code and libraries off the network. It doesn't
+contain a worker that something has taken over: that worker still runs as you,
+reads and writes your files, and could leave a program for your next login to
+start.
 
 ## Chromium extension
 
@@ -205,14 +213,11 @@ records:
 CI runs `cargo audit` on the Rust lockfile and `npm run verify:security`, which
 is `npm audit` at the moderate level. Scanners that match only version numbers
 may still flag glib 0.18.5, because the fix is a backport. `cargo audit` also
-warns, without failing, about seven unmaintained crates and about rand 0.7.3
-([RUSTSEC-2026-0097](https://rustsec.org/advisories/RUSTSEC-2026-0097.html)),
-which is unsound only with a custom logger that calls the thread RNG while it
-reseeds. rand 0.7.3 runs only in the build script of `selectors`, through
-`phf_codegen` and `phf_generator` 0.8.0, whose generator uses a seeded
-`SmallRng`, and VOCO has no such logger. Check both again when the lockfile
-changes. A clean audit doesn't show that every dependency is maintained or free
-of defects. Both packages install the third-party notices in `/usr/share/doc/voco/`.
+warns, without failing, that `proc-macro-error` is unmaintained
+([RUSTSEC-2024-0370](https://rustsec.org/advisories/RUSTSEC-2024-0370.html)); it
+is a procedural-macro helper that runs only while VOCO builds. Check the warnings
+again when the lockfile changes. A clean audit doesn't show that every dependency
+is maintained or free of defects. Both packages install the third-party notices in `/usr/share/doc/voco/`.
 
 ## Release signing
 

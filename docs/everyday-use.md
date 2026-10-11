@@ -94,7 +94,9 @@ dictation.
 
 - Only words spelled one way in each variety change. Words whose spelling
   depends on meaning stay as recognised, such as program, check, practice,
-  licence, tyre, kerb, storey, metre and gray.
+  licence, kerb, storey and gray. American English still turns cheque into
+  check, tyre into tire and metre into meter, because American spells each of
+  them one way in every meaning.
 - Names stay too. A word with a capital letter never changes, because it may
   be a name, so Pearl Harbor stays. That includes the first word of a sentence:
   a sentence that starts with "Color" keeps that spelling.
@@ -172,10 +174,10 @@ folder, which your system clears when you sign out.
 
 VOCO's only network request asks GitHub which releases exist. It runs when VOCO
 starts, reusing an answer for up to six hours, and when you choose
-**Check for updates**. To check only when you choose, set **Update checks** on
-the **Updates** page to **Only when I choose**. VOCO never downloads or installs
-updates. To upgrade,
-see [Upgrade](install.md#upgrade).
+**Check for updates**. To check only when you choose, open **Update settings**
+on the **Updates** page and set **Update checks** to **Only when I choose**.
+VOCO never downloads or installs updates. To upgrade, see
+[Upgrade](install.md#upgrade).
 
 After you [remove VOCO](install.md#remove), delete its folders to remove your
 data:

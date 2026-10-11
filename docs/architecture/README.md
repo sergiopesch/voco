@@ -71,10 +71,10 @@ the Stop tail, and clears them when the recording ends.
 interpreter and script `VOCO_STREAM_PYTHON` and `VOCO_STREAM_WORKER` can
 override. The flags make Python ignore `PYTHON*` variables and your own
 site-packages, and write no bytecode. Just before Python starts,
-`worker_sandbox.rs` marks every descriptor beyond the worker's pipes
-close-on-exec and installs a seccomp filter: the worker can open Unix sockets,
-but no network socket and no io_uring. If any of that fails, the worker doesn't
-start. The worker has 30 seconds to report ready and 10 seconds for each response, and a response line
+`worker_sandbox.rs` marks every descriptor beyond the worker's standard streams
+close-on-exec and installs a seccomp filter: the worker can open no socket or
+socket pair, not even a Unix one, and no io_uring. If any of that fails, the
+worker doesn't start. The worker has 30 seconds to report ready and 10 seconds for each response, and a response line
 may be at most 1 MiB. VOCO warms the worker at startup before it reports ready.
 A worker that died while idle is replaced at the next warmup or start, never
 during a recording.
@@ -132,10 +132,13 @@ leading whitespace, so there a continuing phrase joins the previous word. VOCO
 never restores the previous clipboard.
 
 `desktop_session.rs` follows the screen lock of the session VOCO started in,
-through logind's `LockedHint`. While the screen is locked, a paste fails with no
-change and no shortcut starts dictation. When the screen locks during a
-dictation, VOCO stops it and notifies "Dictation stopped"; words it couldn't
-type go to the clipboard as after any Stop.
+through logind's `LockedHint`: it subscribes to the session's changes, then
+reads the first value on the same main context. While logind doesn't answer, it
+keeps trying, up to every 30 s. While the screen is locked, a paste
+fails with no change, checked before the copy and again just before keys, and
+no shortcut starts dictation. When the screen locks during a dictation, VOCO
+stops it and notifies "Dictation stopped"; words it couldn't type go to the
+clipboard as after any Stop.
 
 `virtual_keyboard.rs` keeps one uinput keyboard per process, "VOCO virtual
 keyboard", with only Shift and Insert. VOCO creates it at startup in a
@@ -251,7 +254,10 @@ the recovery panel offers Retry, Open and Reset; only Reset keeps a backup copy.
 After startup, and when you change the update channel, the renderer reuses
 an answer younger than 6 hours from `update-cache.json`, which Rust reads and
 writes. Otherwise it asks the GitHub releases API for the 12 newest releases,
-with a 15-second timeout. **Check for updates** in Settings always asks. VOCO
+with a 15-second timeout. Both of those automatic checks happen only while
+`automaticUpdateChecks` is on: with **Only when I choose**, neither runs, and
+turning automatic checks back on checks at once. **Check for updates** in
+Settings always asks. VOCO
 only tells you a release exists; it never downloads or installs anything.
 
 ## Logs
@@ -278,7 +284,7 @@ records.
 - **Paste instead of typed keys.** One Shift+Insert works across GTK, Qt,
   Chromium, Firefox, Electron and terminals, for any Unicode text. Control
   characters become spaces, so VOCO never submits a form or command.
-- **VOCO's own virtual keyboard on Wayland.** A three-key uinput device in the
+- **VOCO's own virtual keyboard on Wayland.** A two-key uinput device in the
   app needs no daemon, socket or service, and the package's `uaccess` rule
   limits `/dev/uinput` to the user of the active local session, without a group.
 - **xclip on GNOME's XWayland.** GNOME lacks the wlroots data-control protocol,

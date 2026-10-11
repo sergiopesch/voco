@@ -11,7 +11,7 @@ The [release process](docs/release-process.md) describes how a release is made.
 VOCO introduces itself as the voice layer for Linux, starting with dictation. It
 writes British or American spelling, and the installer opens with VOCO's
 microphone and name. Locking the screen now stops dictation, the speech worker
-can't open network sockets, update checks can wait until you ask, and the GNOME
+can't open sockets, update checks can wait until you ask, and the GNOME
 panel runs on GNOME 51. VOCO's app framework and build tools are up to date. The
 [release notes](docs/releases/2026.0.62.md) explain how to upgrade.
 
@@ -23,15 +23,15 @@ panel runs on GNOME 51. VOCO's app framework and build tools are up to date. The
   dictation.
 - The speech worker runs confined. Python starts with `-E -s -B`, so it ignores
   `PYTHON*` variables and the user's site-packages and writes no bytecode; every
-  descriptor beyond the worker's pipes closes on exec; and a seccomp filter
-  refuses io_uring and every socket except a Unix one. The full-application test
-  checks the running worker's filter.
+  descriptor beyond the worker's standard streams closes on exec; and a seccomp
+  filter refuses every socket and socket pair, Unix ones included, and io_uring.
+  The full-application test checks the running worker's filter.
 - **English spelling.** Setup first asks which English you write, with British
   preselected, and the **Settings** page can change it to American or leave
   words as recognised. The speech worker changes only VarCon 2020.12.07's
   unambiguous forms, never names or words whose spelling depends on meaning, and
   pastes only text that can no longer change, so dictation stays append-only.
-  Earlier setups spell British too, and the popover says so once.
+  Earlier setups spell British too, and the popover says so until they choose.
 - **Update checks** on the **Updates** page: **When VOCO starts**, the default,
   or **Only when I choose**, which asks GitHub only when you choose **Check for
   updates**.

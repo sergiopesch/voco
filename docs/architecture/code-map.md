@@ -59,7 +59,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `styles.css` — Base styles and window surfaces.
 - `preferences.css` — Settings window layout.
 - `motion.css` — Shared motion styles.
-- `english-spelling.css` — The spelling cards, the sample sentence and the popover's one-time note.
+- `english-spelling.css` — The spelling cards, the sample sentence and the popover's note for earlier setups.
 - `vite-env.d.ts` — Vite type references.
 
 ### Components: `components/`
@@ -67,7 +67,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `ControlPanel.tsx` — Settings window with the Settings, Microphone, Shortcut, Updates and Help sections.
 - `ControlPanel.test.tsx` — Settings guidance and controls.
 - `recordedShortcuts.json` — Key presses, the shortcut **Record keys** makes of each and whether Rust accepts it; `ControlPanel.test.tsx` and `lib.rs` both check it.
-- `EnglishSpellingChoice.tsx` — Setup's spelling question, the Settings spelling cards and the one-time popover note for earlier setups.
+- `EnglishSpellingChoice.tsx` — Setup's spelling question, the Settings spelling cards and the popover note that earlier setups see until they choose.
 - `Onboarding.tsx` — First-run voice test, after the spelling question, and desktop setup check. Its text stays in the window.
 - `Onboarding.test.tsx` — Onboarding states.
 - `CrashReview.tsx` — Review window: copy or discard interrupted dictations.
@@ -295,6 +295,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `test-private-ibus-engine-hosted.sh` — Entry point for the private desktop suites in CI.
 - `test-private-ibus-engine.py`, `test-private-ibus-engine.sh` — IBus engine on a headless IBus daemon.
 - `test-gnome-panel.py`, `test-gnome-panel.sh`, `test-panel-model.mjs`, `test-panel-setup.py` — GNOME companion.
+- `test-gnome-panel-container.sh` — The companion suite on a GNOME Shell no hosted runner ships, in a digest-pinned Fedora image under rootless Podman.
 - `test-application-delivery.py`, `test-application-delivery.sh` — Paste into real applications on a private desktop.
 - `test-browser-delivery.mjs`, `test-browser-full-app.mjs`, `test-browser-full-app.sh`, `test-browser-toolbar-app.mjs`, `test-browser-toolbar-app.sh`, `test-browser-toolbar-action.py`, `browser-app-harness.mjs` — Chromium paste, exact field and toolbar.
 - `test-chromium-exact-field.mjs`, `chromium-background.test.cjs`, `chromium-content-lifecycle.test.cjs` — Extension scripts.
@@ -304,7 +305,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `native_tray_app.py` — The tray app helpers the GNOME, KDE and Wayland suites share: readiness, the registered tray item and its menu.
 - `test-native-kde.py`, `test-native-kde.sh`, `test-native-kde-identity.py` — KWin and Plasma in a private session.
 - `test-native-capture-callbacks.py`, `test-native-capture-pulse-latency.py`, `native-capture-lifecycle.test.c`, `test-native-capture-renderer.mjs`, `test_verify_native_capture_audit.py` — Native capture.
-- `test-dictation-renderer.mjs`, `test-microphone-app-renderer.mjs`, `test-english-spelling-renderer.mjs`, `renderer-fixture.mjs`, `test-brand-motion.mjs`, `audio-worklet-capture.test.mjs` — Renderer and AudioWorklet.
+- `test-dictation-renderer.mjs`, `test-microphone-app-renderer.mjs`, `test-english-spelling-renderer.mjs`, `test-update-checks-renderer.mjs`, `renderer-fixture.mjs`, `test-brand-motion.mjs`, `audio-worklet-capture.test.mjs` — Renderer and AudioWorklet.
 - `test-speech-package.py`, `test-speech-worker.py`, `test-audio-continuity.py` — Speech packaging and worker pipes.
 - `test-rpm-package.py` — The RPM's file list, spec, header policy and parity checks; with rpmbuild installed, a real build.
 - `test-install-apt.py`, `test-install-common.sh`, `test-install-journey.py`, `test-install-launch.py`, `test-install-performance.py`, `test-install-presentation.py` — Installer.
@@ -314,6 +315,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 ### Brand
 
 - `generate-icons.py`, `generate-brand-banner.py`, `prepare-brand-masters.py` — Icons, the README banner and brand masters.
+- `generate-installer-art.py` — Draws the installer's microphone from the brand symbol into `lib/install-brand.json`: an indexed image and three mosaics; `--check` verifies them.
 
 ## Test fixtures: `tests/`
 

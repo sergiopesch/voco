@@ -1,7 +1,10 @@
 //! Keep the speech worker off the network. Just before its Python starts, the
-//! worker's process marks every descriptor beyond its pipes close-on-exec, so
-//! it inherits no socket, and installs a seccomp filter that refuses every new
-//! socket except a local Unix one. Recognition needs no network.
+//! worker's process marks every descriptor beyond its standard streams
+//! close-on-exec, so it inherits only its pipes and VOCO's standard error, and
+//! installs a seccomp filter that refuses every socket, socket pair and
+//! io_uring. Recognition needs none: even a Unix socket reaches the session bus,
+//! whose services can start processes this filter doesn't confine, and a Unix
+//! datagram pair can still address other sockets.
 
 use std::io;
 use std::os::unix::process::CommandExt;
@@ -18,17 +21,15 @@ const LOAD: u16 = (libc::BPF_LD | libc::BPF_W | libc::BPF_ABS) as u16;
 const IS: u16 = (libc::BPF_JMP | libc::BPF_JEQ | libc::BPF_K) as u16;
 const AT_LEAST: u16 = (libc::BPF_JMP | libc::BPF_JGE | libc::BPF_K) as u16;
 const RETURN: u16 = (libc::BPF_RET | libc::BPF_K) as u16;
-// Offsets into struct seccomp_data; ARG0 is the low half of args[0].
+// Offsets into struct seccomp_data.
 const NR: u32 = 0;
 const ARCH: u32 = 4;
-const ARG0: u32 = 16;
 const X32_SYSCALL_BIT: u32 = 0x4000_0000;
 const REFUSE: u32 = libc::SECCOMP_RET_ERRNO | libc::EACCES as u32;
 
 // The instructions that jumps land on.
-const FAMILY: usize = 7;
-const ALLOWED: usize = 9;
-const REFUSED: usize = 10;
+const ALLOWED: usize = 7;
+const REFUSED: usize = 8;
 
 const fn op(code: u16, k: u32) -> libc::sock_filter {
     libc::sock_filter {
@@ -49,17 +50,15 @@ const fn jump(at: usize, code: u16, k: u32, then: usize, otherwise: usize) -> li
     }
 }
 
-static FILTER: [libc::sock_filter; 11] = [
+static FILTER: [libc::sock_filter; 9] = [
     op(LOAD, ARCH),
     jump(1, IS, AUDIT_ARCH, 2, REFUSED), // another ABI's calls
     op(LOAD, NR),
     jump(3, AT_LEAST, X32_SYSCALL_BIT, REFUSED, 4), // x32 calls
-    jump(4, IS, libc::SYS_socket as u32, FAMILY, 5),
-    jump(5, IS, libc::SYS_socketpair as u32, FAMILY, 6),
+    jump(4, IS, libc::SYS_socket as u32, REFUSED, 5),
+    jump(5, IS, libc::SYS_socketpair as u32, REFUSED, 6),
     // io_uring can open a socket without socket(2).
     jump(6, IS, libc::SYS_io_uring_setup as u32, REFUSED, ALLOWED),
-    op(LOAD, ARG0), // FAMILY
-    jump(8, IS, libc::AF_UNIX as u32, ALLOWED, REFUSED),
     op(RETURN, libc::SECCOMP_RET_ALLOW), // ALLOWED
     op(RETURN, REFUSE),                  // REFUSED
 ];
@@ -129,11 +128,10 @@ mod tests {
     }
 
     #[test]
-    fn only_local_sockets_are_allowed_and_every_other_call_passes() {
+    fn no_socket_or_socket_pair_opens_and_every_other_call_passes() {
         let allow = libc::SECCOMP_RET_ALLOW;
-        assert_eq!(call(libc::SYS_socket, libc::AF_UNIX), allow);
-        assert_eq!(call(libc::SYS_socketpair, libc::AF_UNIX), allow);
         for family in [
+            libc::AF_UNIX,
             libc::AF_INET,
             libc::AF_INET6,
             libc::AF_NETLINK,
@@ -142,10 +140,6 @@ mod tests {
             assert_eq!(call(libc::SYS_socket, family), REFUSE, "{family}");
             assert_eq!(call(libc::SYS_socketpair, family), REFUSE, "{family}");
         }
-        // The kernel reads the family as an int, so only the low half counts.
-        let high = 1_u64 << 32;
-        let inet = high | libc::AF_INET as u64;
-        assert_eq!(verdict(AUDIT_ARCH, libc::SYS_socket as u32, inet), REFUSE);
         assert_eq!(call(libc::SYS_io_uring_setup, 1), REFUSE);
         for nr in [
             libc::SYS_read,
@@ -186,9 +180,8 @@ libc = ctypes.CDLL(None, use_errno=True)
 params = ctypes.create_string_buffer(120)
 ring = libc.syscall(ctypes.c_long(425), ctypes.c_long(1), params)
 print("io_uring", "opened" if ring >= 0 else errno.errorcode[ctypes.get_errno()])
-socket.socketpair()
-socket.socket(socket.AF_UNIX).close()
-print("unix opened")
+print("unix", outcome(lambda: socket.socket(socket.AF_UNIX).close()))
+print("pair", outcome(lambda: [end.close() for end in socket.socketpair()]))
 print("inherited", outcome(lambda: os.fstat(int(sys.argv[1]))))
 "#;
 
@@ -210,7 +203,7 @@ print("inherited", outcome(lambda: os.fstat(int(sys.argv[1]))))
     /// The real filter on the real interpreter. Without it, the same probe
     /// opens a network socket and sees the inherited descriptor.
     #[test]
-    fn the_worker_interpreter_gets_no_network_socket_and_inherits_no_descriptor() {
+    fn the_worker_interpreter_gets_no_socket_and_inherits_no_descriptor() {
         // SAFETY: plain descriptor calls. The duplicate lacks close-on-exec, so
         // children inherit it, and sits too high for Python to reuse by chance.
         let inherited = unsafe {
@@ -226,7 +219,7 @@ print("inherited", outcome(lambda: os.fstat(int(sys.argv[1]))))
         unsafe { libc::close(inherited) };
         assert_eq!(
             confined,
-            "EACCES EACCES EACCES EACCES\nio_uring EACCES\nunix opened\ninherited EBADF\n"
+            "EACCES EACCES EACCES EACCES\nio_uring EACCES\nunix EACCES\npair EACCES\ninherited EBADF\n"
         );
         assert!(open.starts_with("opened "), "{open}");
         assert!(open.ends_with("\ninherited opened\n"), "{open}");
