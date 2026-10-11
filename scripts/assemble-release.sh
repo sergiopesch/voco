@@ -153,7 +153,7 @@ step "Running the packaged speech worker"
 dpkg-deb -x "${ASSETS}/${DEB}" "${WORK}/package"
 cp runtime/speech/test_worker_protocol.py "${WORK}/package/usr/lib/voco/speech/"
 PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 "${WORK}/package/usr/lib/voco/speech/test_worker_protocol.py" \
-  --output-dir "${WORK}/worker"
+  --output-dir "${WORK}/worker" --fixtures "${ROOT_DIR}/tests/fixtures/speech"
 
 step "Writing the source archive, companion and records"
 git archive --format=tar.gz --prefix="voco-${VERSION}/" --output="${ASSETS}/voco_${VERSION}_source.tar.gz" "${TAG}"

@@ -18,9 +18,10 @@ NATIVE_LINKS["lib/libnemo_speech_asr_c.so"] = "libnemo_speech_asr_c.so.1"
 REQUIRED = {"stream_worker.py", "worker_main.py", "streaming.py", "adapters.py",
             "MODEL-IDENTITY.json", "NATIVE-BUILD.json", "libbench_nemo_pool.so",
             "models/nemotron-speech-streaming-en-0.6b.q8_0.gguf"}
-# Packages since 2026.0.62 add these. CI provisions only the native files of the
-# 2026.0.47 package, which predates them; its worker comes from the checkout.
-SPELLING_FILES = {"spelling.py", "spelling-varcon.tsv"}
+# Packages since 2026.0.62 add these: spelling and My words. CI provisions only
+# the native files of the 2026.0.47 package, which predates them; its worker
+# comes from the checkout.
+LATER_FILES = {"spelling.py", "spelling-varcon.tsv", "mywords.py"}
 
 
 def digest(path):
@@ -49,7 +50,7 @@ def verify(root, version, native_only=False):
     manifest = json.loads(manifest_path.read_text())
     if manifest["version"] != version:
         raise ValueError("Speech manifest version differs from package")
-    required = REQUIRED if native_only else REQUIRED | SPELLING_FILES
+    required = REQUIRED if native_only else REQUIRED | LATER_FILES
     if not (required | NATIVE_FILES).issubset(manifest["files"]):
         raise ValueError("Incomplete speech runtime manifest")
     if any(manifest.get("symlinks", {}).get(name) != target for name, target in NATIVE_LINKS.items()):

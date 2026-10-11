@@ -119,6 +119,13 @@ def copy_vendored_notices(source_root, doc):
             shutil.copy2(source_root / "vendor" / crate / name, destination / name)
 
 
+# Every file the speech worker needs from runtime/speech, besides lib/ and
+# models/. test-speech-package.py checks that it names every worker module.
+WORKER_FILES = ("stream_worker.py", "worker_main.py", "streaming.py", "adapters.py", "spelling.py",
+                "spelling-varcon.tsv", "mywords.py", "MODEL-IDENTITY.json", "NATIVE-BUILD.json",
+                "libbench_nemo_pool.so")
+
+
 def stage_payload(base, stage, version, package_version):
     """Stage the complete package tree once: the base package plus the speech
     runtime, documentation and licenses. Both package formats are built from it."""
@@ -128,8 +135,7 @@ def stage_payload(base, stage, version, package_version):
     speech = stage / "usr/lib/voco/speech"
     speech.mkdir(parents=True)
     source = ROOT / "runtime/speech"
-    for name in ("stream_worker.py", "worker_main.py", "streaming.py", "adapters.py", "spelling.py",
-                 "spelling-varcon.tsv", "MODEL-IDENTITY.json", "NATIVE-BUILD.json", "libbench_nemo_pool.so"):
+    for name in WORKER_FILES:
         shutil.copy2(source / name, speech / name)
     for name in ("lib", "models"):
         shutil.copytree(source / name, speech / name, symlinks=True)
