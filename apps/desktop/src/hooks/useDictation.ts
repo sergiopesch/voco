@@ -11,6 +11,7 @@ import {
 import { BrowserStreamDelivery } from "@/lib/browserStreamDelivery";
 import { retainedSampleRate,type CaptureDescriptor,type CaptureSelection } from "@/lib/captureDescriptor";
 import { monitorCaptureHealth } from "@/lib/captureHealth";
+import { isDictationActive } from "@/lib/activityMode";
 import { createDesktopCaptureTail } from "@/lib/desktopCaptureTail";
 import { createDictationRecording } from "@/lib/dictationRecording";
 import {
@@ -546,7 +547,11 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
   }, []);
 
   const finishOnboardingTest = useCallback(async () => {
-    if (useStore.getState().dictationPurpose !== "onboarding") return false;
+    const purpose = useStore.getState().dictationPurpose;
+    // After the voice test, setup's Say it checks may have recorded since; the
+    // test's result stands once they have finished, whatever they heard.
+    if (purpose === "words") return !isDictationActive(useStore.getState().status) && useStore.getState().onboardingTestPassed;
+    if (purpose !== "onboarding") return false;
     if (sessionRef.current.phase === "recording") {
       sessionRef.current = requestSessionToggle(sessionRef.current).state;
       await stopRecording();

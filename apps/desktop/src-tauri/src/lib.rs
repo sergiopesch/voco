@@ -555,6 +555,21 @@ fn reset_config_to_defaults(app: tauri::AppHandle) -> Result<ConfigSnapshot, Str
     Ok(publish_config(&app, config, "recovered"))
 }
 
+/// The account's full name, which setup offers as the first entry of My words.
+/// None when the account has no name that could be one.
+#[tauri::command]
+fn get_account_name() -> Option<String> {
+    #[cfg(target_os = "linux")]
+    {
+        // GLib reads the passwd entry's full name, without its other GECOS fields.
+        let name = glib::real_name().to_string_lossy().trim().to_string();
+        let login = glib::user_name().to_string_lossy().to_string();
+        config::account_name_entry(&name, &login)
+    }
+    #[cfg(not(target_os = "linux"))]
+    None
+}
+
 #[tauri::command]
 fn open_config_directory() -> Result<(), String> {
     let directory = AppConfig::config_dir_without_migration().map_err(|error| error.to_string())?;
@@ -574,6 +589,11 @@ fn persist_config_patch(
     patch.apply_to(&mut config);
     if previous.my_words != config.my_words {
         config::validate_my_words(&config.my_words)?;
+    }
+    // A version belongs to an entry, so removing the entry removes it in the
+    // same patch.
+    if previous.my_words != config.my_words || previous.my_words_heard != config.my_words_heard {
+        config::validate_my_words_heard(&config.my_words, &config.my_words_heard)?;
     }
     let hotkey_changed = previous.hotkey != config.hotkey;
     let rebind = |hotkey: &str| apply_hotkey_runtime_state(app, hotkey);
@@ -2116,6 +2136,7 @@ pub fn run() -> Result<(), String> {
             show_notification,
             open_external_url,
             open_config_directory,
+            get_account_name,
         ])
         .setup(|app| {
             let browser_app = app.handle().clone();

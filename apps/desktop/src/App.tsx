@@ -10,6 +10,7 @@ import { useStore } from "@/store/useStore";
 import { errorMessage } from "@/lib/dictationRecovery";
 import {
   getConfig,
+  getAccountName,
   beginRuntimeStatusSession,
   getRuntimeDiagnostics,
   hasPendingHotkeyToggle,
@@ -273,7 +274,9 @@ export function App() {
   const dismissInteractiveSurface = useCallback((): boolean => {
     const state = useStore.getState();
     const currentSurface = state.surface;
-    if (currentSurface === "onboarding" && (startRequestRef.current || isDictationActive(state.status))) return false;
+    // The voice test and a Say it check finish before their window hides.
+    if ((currentSurface === "onboarding" || state.dictationPurpose === "words") &&
+        (startRequestRef.current || isDictationActive(state.status))) return false;
     if (draftsDirtyRef.current && (currentSurface === "settings" || currentSurface === "onboarding")) {
       setCloseRequestId((request) => request + 1);
       return false;
@@ -351,6 +354,15 @@ export function App() {
       toggle("onboarding:test", "stop");
       return true;
     }
+    // The shortcut ends a Say it check the way it ends dictation.
+    if (currentState.dictationPurpose === "words" && isDictationActive(currentState.status)) {
+      if (!canStopOnboardingTest(triggerId)) {
+        rejectBrowserStart();
+        return true;
+      }
+      toggle("words:check", "stop");
+      return true;
+    }
     const currentSurface = currentState.surface;
     if (currentSurface !== "hidden" && action !== "stop") {
       rejectBrowserStart();
@@ -421,6 +433,35 @@ export function App() {
       setTestPreparing(false);
     }
   }, [discardRecovery, nativeMicrophone.ensureDefault, setError, toggle]);
+
+  // Say it, in setup's words step or Settings: resolves to why it couldn't
+  // start, or null once the check is starting.
+  const handleStartWordsCheck = useCallback(async (current: () => boolean): Promise<string | null> => {
+    const state = useStore.getState();
+    if (startRequestRef.current || isDictationActive(state.status)) return "VOCO is already listening.";
+    if (state.surface !== "onboarding" && state.surface !== "settings") return "Open My words to check a word.";
+    const request = { cancelled: false, triggerId: "words:check" };
+    startRequestRef.current = request;
+    try {
+      await nativeMicrophone.ensureDefault();
+      const surface = useStore.getState().surface;
+      if (request.cancelled || !current() || (surface !== "onboarding" && surface !== "settings")) return "The check was cancelled.";
+      return toggle("words:check", "start") ? null : "VOCO couldn't start listening. Try again.";
+    } catch (cause) {
+      return request.cancelled ? "The check was cancelled." : errorMessage(cause);
+    } finally {
+      startRequestRef.current = null;
+    }
+  }, [nativeMicrophone.ensureDefault, toggle]);
+  const handleStopWordsCheck = useCallback(() => { toggle("words:check", "stop"); }, [toggle]);
+  // Setup offers the account's name as the first word VOCO should know.
+  const [accountName, setAccountName] = useState<string | null>(null);
+  useEffect(() => {
+    if (surface !== "onboarding") return;
+    let current = true;
+    void getAccountName().then(name => { if (current) setAccountName(typeof name === "string" && name.trim() ? name : null); }).catch(() => {});
+    return () => { current = false; };
+  }, [surface]);
 
   const prepareNotifiedRef = useRef(false);
   const handlePrepareDictation = useCallback(async () => {
@@ -1171,6 +1212,9 @@ export function App() {
         onStartTest={() => void handleStartTest()}
         onStopTest={() => toggle("onboarding:test", "stop")}
         onFinishTest={finishOnboardingTest}
+        onStartWordsCheck={handleStartWordsCheck}
+        onStopWordsCheck={handleStopWordsCheck}
+        accountName={accountName}
         testPreparing={testPreparing || !initComplete}
         surface={surface}
         config={config}

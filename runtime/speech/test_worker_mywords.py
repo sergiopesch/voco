@@ -26,6 +26,21 @@ class WorkerMyWordsTests(unittest.TestCase):
         self.assertEqual(session.model.phrases, [])
         self.assertEqual([response['text'] for response in responses][1:], self.HYPOTHESES + [self.FINAL])
 
+    def test_taught_versions_are_written_but_never_boosted(self):
+        responses, rows = session(['I met shi', 'I met shivon', 'I met shivon at the'],
+                                  'I met Shivon at the theater.', spelling='british', words=['Siobhán'],
+                                  heard=[{'heard': 'Shivon', 'writes': 'Siobhán'}])
+        self.assertEqual(session.model.phrases, ['Siobhán'])
+        self.assertEqual([response['text'] for response in responses][1:],
+                         ['I met ', None, 'I met Siobhán at the', 'I met Siobhán at the theatre.'])
+        self.assertFalse(any(name in str(value) for row in rows for value in row.values()
+                             for name in ('Shivon', 'Siobhán')))
+        for heard in ('Shivon', None, [3]):
+            with self.subTest(heard=heard):
+                responses, rows = session(['the color'], 'the color', words=['Siobhán'], heard=heard)
+                self.assertTrue(all('error' in response for response in responses))
+                self.assertEqual(rows[0]['error_code'], 'invalid_words')
+
     def test_unusable_entries_are_skipped_and_a_malformed_list_rejects_the_start(self):
         # Of two entries that match alike, both are boosted and the first one's spelling is written.
         responses, rows = session(['the git hub'], 'the git hub', words=['C++', 'GitHub', 'github'])

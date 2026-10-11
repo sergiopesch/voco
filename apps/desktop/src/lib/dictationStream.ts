@@ -123,6 +123,8 @@ export class DictationStream {
     private onPreview: (event: DesktopStreamEvent, durationMs?: number) => void,
     private dictationSessionId?: number,
     private recordDeliveryQuality = true,
+    /** A Say it check, which Rust starts as recognized, without spelling. */
+    private wordsCheck = false,
   ) {
     this.schedule("start");
   }
@@ -164,7 +166,8 @@ export class DictationStream {
         const queueAgeMs = performance.now() - queuedAt;
         this.maxQueueAgeMs = Math.max(this.maxQueueAgeMs, queueAgeMs);
         const response = await invoke<{ text: string | null; mode: string; session: string; seq: number }>("speech_stream", {
-          request: { op, audio, rate, session: this.session, seq, dictation_session_id: this.dictationSessionId, queue_age_ms: queueAgeMs, sample_start: sampleStart, sample_end: sampleEnd },
+          request: { op, audio, rate, session: this.session, seq, dictation_session_id: this.dictationSessionId, queue_age_ms: queueAgeMs, sample_start: sampleStart, sample_end: sampleEnd,
+            ...(op === "start" && this.wordsCheck ? { words_check: true } : {}) },
         });
         if (this.cancelled) return;
         phase = "response_invalid";

@@ -27,6 +27,11 @@ export async function openConfigDirectory(): Promise<void> {
   return invoke("open_config_directory");
 }
 
+/** The account's full name, for setup's first My words entry; null without one. */
+export async function getAccountName(): Promise<string | null> {
+  return invoke<string | null>("get_account_name");
+}
+
 export async function saveConfigPatch(
   patch: Partial<AppConfig>,
 ): Promise<ConfigSnapshot> {

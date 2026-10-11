@@ -141,6 +141,9 @@ change.
   SentencePiece tokenizer: the shipped model is NVIDIA's pinned file with only
   that metadata key added, and its other entries and every tensor copied
   unchanged.
+- Generate `everyday-words.txt` only with `scripts/generate-everyday-words.py`
+  from the pinned 12dicts files, and keep its notices and those in
+  `vendor/THIRD-PARTY-NOTICES.txt`.
 - Before a change to the boost, the phrases sent to the recognizer or the list
   limits ships, rerun the My words gates on public audio. An empty list must give
   identical output. Listed words must gain. Wrong words, wrong capitals and

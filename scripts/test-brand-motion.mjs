@@ -127,16 +127,25 @@ try {
       assert.equal(focus.buttonBorder, 'rgba(0, 0, 0, 0)', 'Do not draw a second pill inside the voice control');
       await page.getByRole('button', { name: 'Finish test', exact: true }).click();
       assert.equal(await page.getByRole('meter', { name: 'Microphone signal' }).count(), 0);
-      await page.getByRole('button', { name: 'Done', exact: true }).waitFor();
-      assert.equal(await page.getByRole('button', { name: 'Done', exact: true }).isEnabled(), true);
-      assert.equal(await page.getByRole('button', { name: 'Done', exact: true }).evaluate(el=>el===document.activeElement),true);
+      // The passed test continues to setup's words step.
+      await page.getByRole('button', { name: 'Continue', exact: true }).waitFor();
+      assert.equal(await page.getByRole('button', { name: 'Continue', exact: true }).isEnabled(), true);
+      assert.equal(await page.getByRole('button', { name: 'Continue', exact: true }).evaluate(el=>el===document.activeElement),true);
       assert.equal(await page.getByText('Voice test complete.', { exact: true }).count(), 1);
       await capture('onboarding-success');
       results.push({ engine: name, check: 'onboarding start/stop, level, explicit completion', passed: true });
       await page.evaluate(()=>window.__panelStatus={status:'disabled',detail:'Enable live bars, Listening and Stop in your top panel.',canEnable:true});
-      // Remount only the ready phase so its panel check uses the disabled fixture.
-      await page.getByRole('button',{name:'Test again',exact:true}).click();
-      await page.getByRole('button',{name:'Finish test',exact:true}).click();
+      await page.getByRole('button',{name:'Continue',exact:true}).click();
+      await page.getByRole('heading',{name:'Will VOCO get your name right?'}).waitFor();
+      await capture('onboarding-words');
+      await page.setViewportSize({width:760,height:560});
+      assert.equal(await page.locator('.voco-setup').evaluate(el => el.scrollHeight <= el.clientHeight + 1), true,
+        'The words step and Continue must fit the minimum canvas without scrolling');
+      await capture('onboarding-words-minimum');
+      await page.setViewportSize({width:850,height:680});
+      // Its handoff mounts the panel check after the step, with the disabled fixture.
+      await page.getByRole('button',{name:'Skip for now',exact:true}).click();
+      await page.getByRole('button',{name:'Done',exact:true}).waitFor();
       // A control disabled while focused can drop keyboard focus, so a keyboard
       // enable keeps the panel button focused and enabled while it runs and after.
       await page.evaluate(()=>{window.__holdPanel=new Promise(resolve=>{window.__releasePanel=resolve;});});

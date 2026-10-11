@@ -104,9 +104,10 @@ def serve(protocol, source, model, metrics, spellings=None):
                 metrics.emit('stale_cancel_ignored', **metadata(request))
                 continue
             if op == 'start':
-                # Requests without a spelling or words come from older clients and fixtures.
+                # Requests without a spelling, words or taught versions come from older
+                # clients and fixtures.
                 spelling = spellings.converter(request.get('spelling', 'as-recognised'))
-                words = Words(request.get('words', []))
+                words = Words(request.get('words', []), request.get('heard', []))
                 model.start(words.phrases(), BOOST)
                 active, last_request, emitted_text = session, seq, None
                 text = None

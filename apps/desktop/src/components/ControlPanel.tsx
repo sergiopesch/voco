@@ -10,6 +10,7 @@ import type {
   DictationStatus,
   DesktopInputStatus,
   EnglishSpelling,
+  HeardVersion,
   MicrophonePermission,
   RuntimeDiagnostics,
   UpdateCheckState,
@@ -31,6 +32,8 @@ import { isWaylandSession } from "@/lib/windowRemap";
 import { englishSpelling, type EnglishVariety } from "@/lib/englishSpelling";
 import { EnglishSpellingChoice, EnglishSpellingNotice, EnglishSpellingStep } from "@/components/EnglishSpellingChoice";
 import { MyWords } from "@/components/MyWords";
+import { SetupWords } from "@/components/SetupWords";
+import type { StartWordCheck } from "@/hooks/useWordCheck";
 import vocoBrandImage from "../../../../assets/voco-symbol-ui.png";
 
 interface ControlPanelProps {
@@ -38,6 +41,11 @@ interface ControlPanelProps {
   onStartTest?: () => void;
   onStopTest?: () => void;
   onFinishTest?: () => Promise<boolean>;
+  /** Say it in setup and My words: resolves to why it couldn't start, or null. */
+  onStartWordsCheck?: StartWordCheck;
+  onStopWordsCheck?: () => void;
+  /** The account's full name, setup's first My words entry. */
+  accountName?: string | null;
   testPreparing?: boolean;
   surface: "onboarding" | "settings" | "popover";
   config: AppConfig;
@@ -67,6 +75,10 @@ interface ControlPanelProps {
 }
 
 const DESKTOP_SETUP_GUIDE = "https://github.com/sergiopesch/voco/blob/master/docs/platform/README.md#wayland-paste-keys";
+const noWordsCheck = async () => "Say it isn't available here.";
+const noop = () => {};
+// Setup's steps, for its progress: spelling, the voice test, your words, ready.
+const SETUP_STEPS = 4;
 
 export type PanelSection = "General" | "Audio" | "Words" | "Hotkeys" | "Updates" | "Advanced";
 
@@ -135,6 +147,9 @@ export function ControlPanel({
   onStartTest,
   onStopTest,
   onFinishTest,
+  onStartWordsCheck = noWordsCheck,
+  onStopWordsCheck = noop,
+  accountName = null,
   testPreparing = false,
   surface,
   config,
@@ -215,6 +230,11 @@ export function ControlPanel({
   const testPassed = useStore(state => state.onboardingTestPassed);
   const testPurpose = useStore(state => state.dictationPurpose);
   const spellingConfirmed = useStore(state => state.onboardingSpellingConfirmed);
+  const wordsConfirmed = useStore(state => state.onboardingWordsConfirmed);
+  const wordsChecked = useStore(state => state.onboardingWordsChecked);
+  // The words step opens from the passed voice test; leaving it confirms it.
+  const [wordsStepOpen, setWordsStepOpen] = useState(false);
+  const setupStep = !spellingConfirmed ? 1 : wordsConfirmed ? 4 : wordsStepOpen ? 3 : 2;
   // The choice shows at once; a failed save puts the saved one back.
   const [spelling, setSpelling] = useState(() => englishSpelling(config));
   const [spellingSaveError, setSpellingSaveError] = useState<string | null>(null);
@@ -503,8 +523,8 @@ export function ControlPanel({
     }
   }
 
-  async function saveMyWords(words: string[]): Promise<string | null> {
-    const result = await savePatch({ myWords: words });
+  async function saveMyWords(words: string[], heard: HeardVersion[]): Promise<string | null> {
+    const result = await savePatch({ myWords: words, myWordsHeard: heard });
     return result.ok ? null : result.message;
   }
 
@@ -708,7 +728,7 @@ export function ControlPanel({
               />
             </div> : null}
             <div>
-              {isOnboarding ? <p className="voco-panel__eyebrow">Setup</p> : null}
+              {isOnboarding ? <p className="voco-panel__eyebrow">Setup<SetupProgress step={setupStep} /></p> : null}
               <h1 className="voco-panel__title">VOCO</h1>
             </div>
           </div>
@@ -735,7 +755,7 @@ export function ControlPanel({
             <button className="voco-button voco-button--ghost" onClick={keepEditing}>Keep editing</button>
           </div>
         </section> : null}
-          {errorMessage && !isOnboarding ? (
+          {errorMessage && !isOnboarding && !(testPurpose === "words" && dictationBusy) ? (
             <section className="voco-panel__error" aria-live="polite">
               {errorMessage}
             </section>
@@ -771,10 +791,17 @@ export function ControlPanel({
         ) : isOnboarding && !spellingConfirmed ? (
           <EnglishSpellingStep value={spelling} saving={saving} error={spellingSaveError}
             onChange={value => void chooseSpelling(value)} onContinue={() => void confirmSpelling()} />
+        ) : isOnboarding && wordsStepOpen && !wordsConfirmed ? (
+          <SetupWords accountName={accountName} words={config.myWords} heard={config.myWordsHeard} saving={saving}
+            onSave={saveMyWords} onStartCheck={onStartWordsCheck} onStopCheck={onStopWordsCheck}
+            onContinue={checked => useStore.getState().confirmOnboardingWords(checked)} />
         ) : isOnboarding ? (
           <Onboarding
             spelling={spelling}
-            focusPrimary={askedSpelling.current}
+            focusPrimary={askedSpelling.current || wordsConfirmed}
+            wordsDone={wordsConfirmed}
+            wordsChecked={wordsChecked && config.myWords.length > 0}
+            onContinue={() => setWordsStepOpen(true)}
             microphone={nativeMicrophone?.mode === "native"
               ? nativeMicrophone.selected?.label || nativeMicrophone.sources?.sources.find(source => source.selectionToken === nativeMicrophone.sources?.defaultSelectionToken)?.label || "System default"
               : selectedDeviceLabel}
@@ -820,7 +847,7 @@ export function ControlPanel({
             </aside>
 
             <div className="voco-preferences__content">
-              <div className="voco-preferences__window-actions" onPointerDown={(event) => void handleHeaderPointerDown(event)} aria-label="Move VOCO window">{!config.onboardingCompleted ? <button className="voco-button voco-button--ghost voco-button--compact" disabled={saving || dictationBusy || hotkeyDirty} onClick={() => onSurfaceChange("onboarding")}>Back to setup</button> : null}<button className="voco-button voco-button--ghost voco-button--compact" onClick={requestHide}>Hide to tray</button></div>
+              <div className="voco-preferences__window-actions" onPointerDown={(event) => void handleHeaderPointerDown(event)} aria-label="Move VOCO window">{!config.onboardingCompleted ? <button className="voco-button voco-button--ghost voco-button--compact" disabled={saving || dictationBusy || hotkeyDirty} onClick={() => onSurfaceChange("onboarding")}>Back to setup</button> : null}<button className="voco-button voco-button--ghost voco-button--compact" disabled={testPurpose === "words" && dictationBusy} onClick={requestHide}>Hide to tray</button></div>
               {mainSettings ? <div className="voco-preferences__heading"><h2 tabIndex={-1}>Settings</h2></div> : null}
               {mainSettings ? <>
                   {desktopSetupError ? <div className="voco-inline-note" role="status">Desktop setup needed. <button className="voco-button voco-button--ghost" onClick={() => setActiveSection("Advanced")}>Open Help</button></div>
@@ -869,7 +896,9 @@ export function ControlPanel({
               {activeSection === "Words" ? (
                 <section className="voco-preferences__page">
                   <div className="voco-preferences__heading"><h2 tabIndex={-1}>My words</h2></div>
-                  <MyWords words={config.myWords} disabled={saving} onSave={saveMyWords} />
+                  <MyWords words={config.myWords} heard={config.myWordsHeard} disabled={saving}
+                    listeningElsewhere={dictationBusy && testPurpose !== "words"} onSave={saveMyWords}
+                    onStartCheck={onStartWordsCheck} onStopCheck={onStopWordsCheck} />
                 </section>
               ) : null}
 
@@ -974,4 +1003,13 @@ export function ControlPanel({
       </section>
     </main>
   );
+}
+
+/** Where setup is: one mark for each step, the ones done and the current one lit. */
+function SetupProgress({ step }: { step: number }) {
+  return <span className="voco-setup-progress">
+    <span className="voco-visually-hidden">, step {step} of {SETUP_STEPS}</span>
+    {Array.from({ length: SETUP_STEPS }, (_, index) =>
+      <span key={index} aria-hidden="true" data-state={index + 1 < step ? "done" : index + 1 === step ? "current" : "next"} />)}
+  </span>;
 }

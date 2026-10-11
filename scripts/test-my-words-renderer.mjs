@@ -2,21 +2,32 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import { prepareEvidence, productionShell, openRenderer, routeTauriModules, routeAppShell, installRendererMocks } from './renderer-fixture.mjs';
 // My words in the actual App, with packaged fonts and CSS: adding and removing
-// entries, the rules Settings checks before saving, a failed save, a full list
-// and where focus goes. Every native boundary is mocked; no microphone, model
-// or desktop is touched.
+// entries, the rules Settings checks before saving, a failed save, a full list,
+// where focus goes, and Say it: teaching VOCO what it heard, forgetting a
+// version, and an entry's versions going with it. Every native boundary is
+// mocked, the speech worker is a scripted double and capture the mocked WebKit
+// worklet; no microphone, model or desktop is touched, and nothing is pasted.
 const { out, save } = await prepareEvidence(import.meta.url, [
-    'src/App.tsx', 'src/components/ControlPanel.tsx', 'src/components/MyWords.tsx', 'src/store/useStore.ts',
-    'src/preferences.css',
+    'src/App.tsx', 'src/components/ControlPanel.tsx', 'src/components/MyWords.tsx', 'src/components/WordCheck.tsx',
+    'src/hooks/useWordCheck.ts', 'src/lib/myWords.ts', 'src/store/useStore.ts', 'src/preferences.css', 'src/my-words.css',
 ]);
 const shell = await productionShell(out);
 const results = [], errors = [];
 let server, browser, page, origin;
 try {
     ({ server, browser, page, origin } = await openRenderer(errors));
-    await routeTauriModules(page, 'export async function invoke(name) { if (name === "native_capture_capabilities") return {enabled:false}; if(name === "get_crash_journal_epoch") return 1; if(name.endsWith("_crash_journal")) return; throw new Error("Unexpected native command: " + name); }');
+    await routeTauriModules(page, `export async function invoke(name, args) {
+        if (name === "native_capture_capabilities") return { enabled: false };
+        if (name === "get_crash_journal_epoch") return 1;
+        if (name.endsWith("_crash_journal")) return;
+        if (name !== "speech_stream") throw new Error("Unexpected native command: " + name);
+        const { request } = args;
+        (window.speechRequests ??= []).push(request);
+        if (["warmup", "quality", "diagnostic"].includes(request.op)) return {};
+        return { session: request.session, seq: request.seq, mode: "append-only", text: request.op === "finish" ? (window.heardNext ?? "") : null };
+    }`);
     await routeAppShell(page, shell);
-    await installRendererMocks(page);
+    await installRendererMocks(page, { worklet: true });
     // Each load names its saved settings in the URL; saves update them.
     await page.addInitScript(() => {
         window.config = { ...window.config, ...JSON.parse(new URLSearchParams(location.search).get('config') || '{}') };
@@ -29,6 +40,15 @@ try {
             window.saves.push(patch);
             window.config = { ...window.config, ...patch };
             return { revision: 2 + window.saves.length, config: window.config };
+        };
+        // A word said, then quiet, through the mocked capture worklet.
+        window.say = async () => {
+            const batch = (loud) => Float32Array.from({ length: 1600 }, (_, i) => loud ? Math.sin(i / 20) * 0.2 : 0);
+            for (let at = 0; at < 0.6; at += 0.1) { window.captureWorklet?.port.onmessage?.({ data: { type: 'samples', data: batch(true) } }); await new Promise(resolve => setTimeout(resolve, 100)); }
+            for (let at = 0; at < 2.5 && window.store.getState().status === 'recording'; at += 0.1) {
+                window.captureWorklet?.port.onmessage?.({ data: { type: 'samples', data: batch(false) } });
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
         };
     });
     const load = async (config) => {
@@ -49,7 +69,7 @@ try {
     const field = () => page.getByRole('textbox', { name: 'Word or name' });
     const feedback = () => page.locator('#voco-my-words-feedback');
     const entries = () => page.getByRole('list', { name: 'My words' }).getByRole('listitem').evaluateAll(items =>
-        items.map(item => item.querySelector('span').textContent));
+        items.map(item => item.querySelector('.voco-my-words__word').textContent));
     const add = async (text, how = 'button') => {
         await field().fill(text);
         if (how === 'enter') await field().press('Enter');
@@ -60,7 +80,8 @@ try {
     await load({ onboardingCompleted: true, englishSpelling: 'british', myWords: [] });
     await page.getByText('No words yet.', { exact: true }).waitFor();
     assert.equal(await feedback().textContent(), '0 of 100');
-    await page.getByText('The list stays on this computer.', { exact: false }).waitFor();
+    await page.getByText('How My words works', { exact: true }).click();
+    await page.getByText('Your words, and the versions VOCO learns, stay on this computer.', { exact: true }).waitFor();
     assert.equal(await page.getByRole('button', { name: 'Add', exact: true }).isDisabled(), true, 'Add waits for a word');
     await shot('settings-my-words-empty');
     results.push({ case: 'empty-list', passed: true });
@@ -72,7 +93,7 @@ try {
     await page.waitForFunction(() => window.saves.length === 2);
     await add('Ma\u0301laga');
     await page.waitForFunction(() => window.saves.length === 3);
-    assert.deepEqual((await saves()).at(-1), { myWords: ['Siobhán', 'Pipe Wire', 'Málaga'] });
+    assert.deepEqual((await saves()).at(-1), { myWords: ['Siobhán', 'Pipe Wire', 'Málaga'], myWordsHeard: [] });
     assert.deepEqual(await entries(), ['Siobhán', 'Pipe Wire', 'Málaga']);
     assert.equal(await field().inputValue(), '', 'The field clears after a save');
     assert.equal(await field().evaluate(input => input === document.activeElement), true, 'Focus stays in the field');
@@ -113,7 +134,7 @@ try {
     // Removing an entry saves at once and moves focus to the one that took its place.
     await page.getByRole('button', { name: 'Remove Pipe Wire', exact: true }).click();
     await page.waitForFunction(() => window.saves.length === 5);
-    assert.deepEqual((await saves()).at(-1), { myWords: ['Siobhán', 'Málaga', 'Kubernetes'] });
+    assert.deepEqual((await saves()).at(-1), { myWords: ['Siobhán', 'Málaga', 'Kubernetes'], myWordsHeard: [] });
     await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'Remove Málaga');
     await page.getByRole('button', { name: 'Remove Kubernetes', exact: true }).click();
     await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'Remove Málaga');
@@ -125,6 +146,57 @@ try {
     await page.getByText('No words yet.', { exact: true }).waitFor();
     await page.waitForFunction(() => document.activeElement?.matches('.voco-my-words__add input'));
     results.push({ case: 'removes-and-moves-focus', passed: true, saves: await saves() });
+
+    // Say it in Settings: VOCO shows what it heard, learns the version it's taught,
+    // shows it under the entry, and forgets it when asked.
+    await load({ onboardingCompleted: true, englishSpelling: 'british', myWords: ['Siobhán', 'GitHub'], myWordsHeard: [] });
+    const siobhan = page.getByRole('list', { name: 'My words' }).getByRole('listitem').filter({ hasText: 'Siobhán' });
+    await page.evaluate(() => { window.heardNext = 'Shivon.'; });
+    await page.getByRole('button', { name: 'Say it: Siobhán' }).click();
+    await page.waitForFunction(() => window.store.getState().status === 'recording');
+    assert.equal(await page.getByRole('button', { name: 'Say it: GitHub' }).isDisabled(), true, 'One check at a time');
+    await page.evaluate(() => window.say());
+    await siobhan.getByText('VOCO heard “Shivon”.').waitFor();
+    await shot('settings-my-words-heard');
+    await siobhan.getByRole('button', { name: 'Teach VOCO', exact: true }).click();
+    await siobhan.getByText('VOCO learned “Shivon”.').waitFor();
+    assert.deepEqual((await saves()).at(-1), { myWords: ['Siobhán', 'GitHub'], myWordsHeard: [{ heard: 'Shivon', writes: 'Siobhán' }] });
+    await siobhan.getByRole('group', { name: 'Versions VOCO learned for Siobhán' }).getByText('Shivon', { exact: true }).waitFor();
+    await page.evaluate(() => { window.heardNext = 'Siobhán.'; });
+    await page.getByRole('button', { name: 'Say it again: Siobhán' }).click();
+    await page.waitForFunction(() => window.store.getState().status === 'recording');
+    await page.evaluate(() => window.say());
+    await siobhan.getByText('VOCO writes “Siobhán”.').waitFor();
+    await shot('settings-my-words-taught');
+    // No check pastes, copies or keeps a crash journal, and each starts as recognized.
+    assert.equal(await page.evaluate(() => window.calls.filter(call => ['pasteDesktopText', 'copyDesktopText'].includes(call[0])).length), 0);
+    assert.ok(await page.evaluate(() => window.speechRequests.filter(request => request.op === 'start').every(request => request.words_check === true)));
+    // A failed save while teaching says why and keeps the versions as saved.
+    await page.evaluate(() => { window.heardNext = 'Gitthub.'; });
+    await page.getByRole('button', { name: 'Say it: GitHub' }).click();
+    await page.waitForFunction(() => window.store.getState().status === 'recording');
+    await page.evaluate(() => window.say());
+    const github = page.getByRole('list', { name: 'My words' }).getByRole('listitem').filter({ hasText: 'GitHub' });
+    await github.getByText('VOCO heard “Gitthub”.').waitFor();
+    await page.evaluate(() => { window.failNextSave = true; });
+    await github.getByRole('button', { name: 'Teach VOCO', exact: true }).click();
+    await github.getByRole('alert').filter({ hasText: 'No space left on device' }).waitFor();
+    assert.deepEqual(await page.evaluate(() => window.config.myWordsHeard), [{ heard: 'Shivon', writes: 'Siobhán' }]);
+    // Forgetting a version saves at once.
+    await siobhan.getByRole('button', { name: 'Forget “Shivon”' }).click();
+    await page.waitForFunction(() => window.config.myWordsHeard.length === 0);
+    // Removing an entry removes its versions in the same save.
+    await load({ onboardingCompleted: true, englishSpelling: 'british', myWords: ['Siobhán Kelly', 'GitHub'],
+        myWordsHeard: [{ heard: 'Shivon', writes: 'Siobhán' }, { heard: 'get hub', writes: 'GitHub' }] });
+    await page.getByRole('group', { name: 'Versions VOCO learned for Siobhán Kelly' }).getByText('→ Siobhán', { exact: false }).waitFor();
+    await shot('settings-my-words-versions');
+    // A word VOCO already writes for a version can't be listed as well.
+    await add('Get Hub');
+    await page.getByRole('alert').filter({ hasText: 'VOCO already writes “GitHub” when it hears “get hub”.' }).waitFor();
+    await page.getByRole('button', { name: 'Remove Siobhán Kelly', exact: true }).click();
+    await page.waitForFunction(() => window.saves.length === 1);
+    assert.deepEqual((await saves()).at(-1), { myWords: ['GitHub'], myWordsHeard: [{ heard: 'get hub', writes: 'GitHub' }] });
+    results.push({ case: 'say-it-teaches-and-forgets-versions', passed: true, saves: await saves() });
 
     // A full list explains why nothing more is added.
     const full = Array.from({ length: 100 }, (_, index) => `term${index}`);

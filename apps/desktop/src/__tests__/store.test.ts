@@ -82,6 +82,7 @@ describe("useStore", () => {
       installChannel: "github-release" as const,
       englishSpelling: null,
       myWords: [],
+      myWordsHeard: [],
     };
     useStore.getState().setConfig(config);
     expect(useStore.getState().config).toEqual(config);
@@ -98,6 +99,7 @@ describe("useStore", () => {
       installChannel: "github-release" as const,
       englishSpelling: null,
       myWords: [],
+      myWordsHeard: [],
     };
 
     useStore.setState({
@@ -124,6 +126,7 @@ describe("useStore", () => {
       installChannel: "github-release" as const,
       englishSpelling: null,
       myWords: [],
+      myWordsHeard: [],
     };
 
     expect(
@@ -163,6 +166,7 @@ describe("useStore", () => {
       automaticUpdateChecks: true,
       installChannel: "github-release" as const,
       myWords: [],
+      myWordsHeard: [],
     };
     useStore.setState({ config: null, onboardingSpellingConfirmed: false });
     useStore.getState().setConfig({ ...base, englishSpelling: null });
@@ -179,5 +183,23 @@ describe("useStore", () => {
     useStore.setState({ config: null, onboardingSpellingConfirmed: false });
     useStore.getState().setConfig({ ...base, englishSpelling: "british" });
     expect(useStore.getState().onboardingSpellingConfirmed).toBe(true);
+  });
+
+  it("offers My words every time setup runs, and remembers whether a word was said", () => {
+    const base = {
+      hotkey: "Alt+D", selectedMic: null, onboardingCompleted: false, updateChannel: "stable" as const,
+      automaticUpdateChecks: true, installChannel: "github-release" as const, englishSpelling: "british" as const,
+      myWords: ["Siobhán"], myWordsHeard: [],
+    };
+    useStore.setState({ config: null, onboardingWordsConfirmed: false, onboardingWordsChecked: false });
+    useStore.getState().setConfig(base);
+    expect(useStore.getState().onboardingWordsConfirmed).toBe(false);
+    useStore.getState().confirmOnboardingWords(true);
+    expect(useStore.getState()).toMatchObject({ onboardingWordsConfirmed: true, onboardingWordsChecked: true });
+    // A saved list doesn't skip the step: Run setup again offers it again.
+    useStore.getState().setConfig({ ...base, onboardingCompleted: true });
+    expect(useStore.getState().onboardingWordsConfirmed).toBe(true);
+    useStore.getState().setConfig(base);
+    expect(useStore.getState()).toMatchObject({ onboardingWordsConfirmed: false, onboardingWordsChecked: false });
   });
 });

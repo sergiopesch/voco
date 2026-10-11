@@ -2,6 +2,7 @@
 @import "./preferences.css";
 @import "./motion.css";
 @import "./english-spelling.css";
+@import "./my-words.css";
 
 :root {
   --voco-radius-window: 28px;

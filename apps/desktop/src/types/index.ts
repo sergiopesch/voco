@@ -16,6 +16,15 @@ export interface AppConfig {
   englishSpelling: EnglishSpelling | null;
   /** Names and terms dictation writes as listed; empty until the user adds one. */
   myWords: string[];
+  /** The versions of entries the user taught VOCO, the way it heard them. */
+  myWordsHeard: HeardVersion[];
+}
+
+/** What the recognizer wrote when the user said an entry, and the entry, or
+ * the one word of it, dictation writes instead. */
+export interface HeardVersion {
+  heard: string;
+  writes: string;
 }
 
 export interface ConfigSnapshot {
