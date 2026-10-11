@@ -14,9 +14,13 @@ The [release process](docs/release-process.md) describes how a release is made.
   finished. Ubuntu 26.04's sudo, sudo-rs, runs a command whose output feeds a
   pipe in the background of its own terminal and passes it no input. APT reads
   the terminal just before dpkg starts, so its child was stopped (SIGTTIN), and
-  sudo-rs continued only the command it started. Under sudo-rs the installer now
-  runs APT on the terminal, showing APT's own progress, so dpkg and package
-  scripts can still ask. Classic sudo keeps the installer's display.
+  sudo-rs continued only the command it started. Under sudo-rs APT now reads
+  nothing from the terminal, so the installer keeps its display: debconf takes
+  its defaults and dpkg keeps a configuration file someone changed. If APT
+  fails, it runs again on the terminal, where it can ask.
+- The installer's display no longer gives way to the routine messages of
+  update-alternatives and needrestart. They go to the installation log; their
+  warnings, a pending kernel or services to restart, still show.
 
 ## [2026.0.62] - 2026-10-11
 
