@@ -8,9 +8,16 @@ export const MY_WORDS_MAX_CHARS = 40;
 const TERM = /^[\p{L}\p{N}]+(?:['’][\p{L}\p{N}]+)*(?:(?:[ -]|\. ?)[\p{L}\p{N}]+(?:['’][\p{L}\p{N}]+)*)*\.?$/u;
 const WORD = /[\p{L}\p{N}]+(?:['’][\p{L}\p{N}]+)*/gu;
 
+// After accents go and case is lowered, the few letters Python's casefold
+// still folds further, so two entries match here exactly when they do there.
+const CASEFOLD: Record<string, string> = {
+  "ß": "ss", "ς": "σ", "ᲀ": "в", "ᲁ": "д", "ᲂ": "о", "ᲃ": "с", "ᲄ": "т", "ᲅ": "т", "ᲆ": "ъ", "ᲇ": "ѣ", "ᲈ": "ꙋ",
+};
+
 /** What the worker matches: the words without case, accents or what separates them. */
 export function myWordsKey(term: string): string {
-  return (term.normalize("NFKD").replace(/\p{M}/gu, "").match(WORD) ?? []).join("").toLowerCase();
+  return (term.normalize("NFKD").replace(/\p{M}/gu, "").match(WORD) ?? []).join("").toLowerCase()
+    .replace(/[ßςᲀ-ᲈ]/gu, letter => CASEFOLD[letter] ?? letter);
 }
 
 /** Typed text as an entry: composed accents and single spaces. */

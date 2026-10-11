@@ -37,6 +37,22 @@ class RestoreTests(unittest.TestCase):
             with self.subTest(heard=heard):
                 self.assertEqual(written(self.words, heard), heard)
 
+    def test_full_stops_join_only_terms_listed_with_them(self):
+        words = Words(['St. Ives', 'Acme Inc.', 'GitHub'])
+        cases = {
+            'we met at st. ives today': 'we met at St. Ives today',
+            'we met at St Ives today': 'we met at St. Ives today',
+            'Acme inc. makes tea': 'Acme Inc. makes tea',
+            'we work at acme inc.': 'we work at Acme Inc.',
+            'acme inc makes tea': 'Acme Inc. makes tea',
+            'I use git. Hub is new': 'I use git. Hub is new',
+        }
+        for heard, expected in cases.items():
+            with self.subTest(heard=heard):
+                self.assertEqual(written(words, heard), expected)
+        restored, _, settled = words.restore('we met at St.', final=False)
+        self.assertEqual(restored[:settled], 'we met at ')
+
     def test_listed_spans_protect_their_words_from_spelling(self):
         words = Words(['Color Run', 'harbor'])
         restored, listed, _ = words.restore('the color run by the harbor and the color', final=True)
@@ -53,11 +69,11 @@ class RestoreTests(unittest.TestCase):
 class StabilityTests(unittest.TestCase):
     words = Words(LIST)
 
-    def pushes(self, final):
+    def pushes(self, final, words=None):
         """What each growing hypothesis may push: its settled restored text."""
         out = []
         for end in range(1, len(final) + 1):
-            restored, _, settled = self.words.restore(final[:end].rstrip(), final=False)
+            restored, _, settled = (words or self.words).restore(final[:end].rstrip(), final=False)
             out.append(restored[:settled])
         return out
 
@@ -74,16 +90,17 @@ class StabilityTests(unittest.TestCase):
     def test_every_push_extends_the_last_and_the_final_extends_them_all(self):
         rng = random.Random(62)
         vocabulary = ['git', 'hub', 'Git', 'Hub', 'pipe', 'wire', 'G', 'T', 'K', 'zoe', 'Zoë', 'malaga', 'new', 'New',
-                      'zealand', 'Zealand', 'siobhan', 'router', 'the', 'a', 'and']
+                      'zealand', 'Zealand', 'siobhan', 'router', 'the', 'a', 'and', 'st', 'St', 'ives', 'acme', 'inc']
         punctuation = ['', '', '', ',', '.', '?']
-        for _ in range(400):
-            final = ' '.join(rng.choice(vocabulary) + rng.choice(punctuation) for _ in range(rng.randint(1, 9)))
-            done = written(self.words, final)
-            previous = ''
-            for pushed in self.pushes(final):
-                self.assertTrue(pushed.startswith(previous), (final, previous, pushed))
-                self.assertTrue(done.startswith(pushed), (final, pushed, done))
-                previous = pushed
+        for words in (self.words, Words(LIST + ['St. Ives', 'Acme Inc.'])):
+            for _ in range(400):
+                final = ' '.join(rng.choice(vocabulary) + rng.choice(punctuation) for _ in range(rng.randint(1, 9)))
+                done = written(words, final)
+                previous = ''
+                for pushed in self.pushes(final, words):
+                    self.assertTrue(pushed.startswith(previous), (final, previous, pushed))
+                    self.assertTrue(done.startswith(pushed), (final, pushed, done))
+                    previous = pushed
 
 
 class ListRuleTests(unittest.TestCase):
@@ -94,12 +111,11 @@ class ListRuleTests(unittest.TestCase):
         self.assertEqual(len(accepted([f'term{index}' for index in range(MAX_TERMS)])), MAX_TERMS)
         self.assertEqual(accepted(['Ma\u0301laga']), ['Málaga'])  # decomposed accents compose
 
-    def test_unusable_entries_are_skipped_and_counted(self):
+    def test_unusable_entries_and_later_duplicates_are_skipped(self):
         unusable = ['', ' GitHub', 'GitHub ', 'two  spaces', 'x' * (MAX_CHARS + 1), 'one two three four five',
                     'C++', 'a_b', 'tab\there', 'Line\nbreak', '-dash', 'end-']
-        words = Words(unusable + ['Zoë', 'zoe', 'Git Hub', 'github'])
-        self.assertEqual(words.terms, ['Zoë', 'Git Hub'])
-        self.assertEqual(words.skipped, len(unusable) + 2)
+        words = Words(unusable + ['Zoë', 'zoe', 'Git Hub', 'github', 'Straße', 'STRASSE'])
+        self.assertEqual(words.terms, ['Zoë', 'Git Hub', 'Straße'])
         self.assertEqual(len(Words([f'term{index}' for index in range(MAX_TERMS + 5)]).terms), MAX_TERMS)
 
     def test_a_malformed_list_rejects_the_start(self):

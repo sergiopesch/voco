@@ -8,7 +8,9 @@ possessive 's stays.
 
 Delivery is append-only, so a push holds back a tail that later text could
 still turn into a listed term: "New" waits for "Zealand", and the open last
-word waits while it could grow into one. Finish writes the whole final text,
+word waits while it could grow into one. Full stops join words only into a
+term listed with them ("St. Ives"), and a listed final one takes the place of
+the one heard ("Acme Inc."). Finish writes the whole final text,
 which extends every push. Spelling never converts a listed occurrence.
 """
 import re
@@ -27,6 +29,8 @@ SPELLED = re.compile(r"[^\W_]+(?:['’][^\W_]+)*")
 # A listed term: words separated by single spaces, hyphens or full stops.
 TERM = re.compile(r"[^\W_]+(?:['’][^\W_]+)*(?:(?:[ -]|\. ?)[^\W_]+(?:['’][^\W_]+)*)*\.?")
 JOINABLE = re.compile(r'[ \t-]+')
+# A full stop between words joins them only into a term listed with one.
+DOTTED = re.compile(r'\.[ \t]*')
 SENTENCE_START = re.compile(r'(?:^|[.?!…]\s+)$')
 
 
@@ -61,8 +65,8 @@ def accepted(terms):
 class Words:
     def __init__(self, terms):
         self.terms = accepted(terms)
-        self.skipped = len(terms) - len(self.terms)
         self.spellings = {key(term): term for term in self.terms}
+        self.dotted = any('.' in term for term in self.terms)
         self.prefixes = {k[:end] for k in self.spellings for end in range(1, len(k) + 1)}
         self.longest = max(map(len, self.spellings), default=0)
 
@@ -86,14 +90,18 @@ class Words:
                 return ''.join(out), protected, written
             for count in range(min(MAX_SPAN, len(spans) - i), 0, -1):
                 group = spans[i:i + count]
-                if not all(JOINABLE.fullmatch(text[a[1]:b[0]]) for a, b in zip(group, group[1:])):
+                separators = [text[a[1]:b[0]] for a, b in zip(group, group[1:])]
+                if not all(JOINABLE.fullmatch(s) or DOTTED.fullmatch(s) for s in separators):
                     continue
                 joined, suffix = ''.join(plain(text[s:e]) for s, e in group), ''
                 if joined not in self.spellings and re.search(r"['’]s$", text[group[-1][0]:group[-1][1]]):
                     joined, suffix = joined[:-2], text[group[-1][1] - 2:group[-1][1]]
                 spelling = self.spellings.get(joined)
-                if spelling is None:
+                if spelling is None or ('.' not in spelling and not all(map(JOINABLE.fullmatch, separators))):
                     continue
+                end = group[-1][1]
+                if spelling.endswith('.') and not suffix and text[end:end + 1] == '.':
+                    end += 1  # the listed full stop takes the place of the one heard
                 start = group[0][0]
                 if spelling[:1].islower() and SENTENCE_START.search(text[:start]):
                     spelling = spelling[:1].upper() + spelling[1:]
@@ -102,7 +110,7 @@ class Words:
                 protected.append((written, written + len(spelling)))
                 out.append(spelling + suffix)
                 written += len(spelling) + len(suffix)
-                last, i = group[-1][1], i + count
+                last, i = end, i + count
                 break
             else:
                 i += 1
@@ -113,9 +121,11 @@ class Words:
     def open_from(self, text, spans, index):
         """Whether the words from index to the end could still become a listed term."""
         group = spans[index:]
-        if len(group) > MAX_SPAN or text[group[-1][1]:].strip(' \t-'):
+        joins = (lambda s: JOINABLE.fullmatch(s) or DOTTED.fullmatch(s)) if self.dotted else JOINABLE.fullmatch
+        rest = text[group[-1][1]:]
+        if len(group) > MAX_SPAN or (rest and not joins(rest)):
             return False
-        if not all(JOINABLE.fullmatch(text[a[1]:b[0]]) for a, b in zip(group, group[1:])):
+        if not all(joins(text[a[1]:b[0]]) for a, b in zip(group, group[1:])):
             return False
         joined = ''.join(plain(text[s:e]) for s, e in group)
         return len(joined) <= self.longest and joined in self.prefixes

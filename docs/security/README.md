@@ -166,8 +166,8 @@ a model whose SHA-256 doesn't match the pinned value, including one named by
 `VOCO_NEMOTRON_MODEL`. Spelling conversion reads only the packaged
 `spelling-varcon.tsv` at startup and runs on text the worker already holds.
 My words reaches the worker in each session start and stays in its memory for
-that session. Its diagnostics count the entries but never name them, and the
-list never enters the crash journal or Review.
+that session. Its diagnostics never mention the list, and it never enters the
+crash journal or Review.
 
 The worker can't open a socket. Before its Python starts, VOCO marks every
 descriptor beyond the worker's standard streams close-on-exec, so it inherits

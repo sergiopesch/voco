@@ -343,13 +343,31 @@ fn listable(term: &str) -> bool {
         && listable_word_count(term).is_some_and(|count| count <= MY_WORDS_MAX_WORDS)
 }
 
-/// Two entries the worker would match alike, apart from accents, which it
-/// also ignores.
+/// Two entries the worker would match alike, apart from accents: Settings
+/// compares those too, and the worker skips a later entry that differs only
+/// in them. Case compares as the worker's casefold does.
 fn my_words_key(term: &str) -> String {
-    term.chars()
+    let mut key = String::new();
+    let letters = term
+        .chars()
         .filter(|c| c.is_alphanumeric() || matches!(c, '\'' | '\u{2019}'))
-        .flat_map(char::to_lowercase)
-        .collect()
+        .flat_map(char::to_lowercase);
+    for letter in letters {
+        match letter {
+            'ß' => key.push_str("ss"),
+            'ς' => key.push('σ'),
+            '\u{1c80}' => key.push('в'),
+            '\u{1c81}' => key.push('д'),
+            '\u{1c82}' => key.push('о'),
+            '\u{1c83}' => key.push('с'),
+            '\u{1c84}' | '\u{1c85}' => key.push('т'),
+            '\u{1c86}' => key.push('ъ'),
+            '\u{1c87}' => key.push('ѣ'),
+            '\u{1c88}' => key.push('ꙋ'),
+            other => key.push(other),
+        }
+    }
+    key
 }
 
 /// The number of words in a listable term, or None when it isn't one: words
@@ -1142,6 +1160,7 @@ mod tests {
             .collect();
         assert!(validate_my_words(&over).is_err());
         assert!(validate_my_words(&["Git Hub".into(), "github".into()]).is_err());
+        assert!(validate_my_words(&["Straße".into(), "STRASSE".into()]).is_err());
     }
 
     #[test]

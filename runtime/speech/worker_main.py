@@ -144,8 +144,7 @@ def serve(protocol, source, model, metrics, spellings=None):
             metrics.emit('request_completed', op=op, total_ms=timing, audio_s=model.audio_s,
                          processed_audio_s=model.gate.processed_s, skipped_audio_s=model.gate.skipped_s,
                          buffered_audio_s=model.gate.pending_n / (model.rate or 16000),
-                         has_text=bool(text), fresh_hypothesis=fresh, spelling=spelling.mode,
-                         my_words=len(words.terms), my_words_skipped=words.skipped, **fields, **model.metrics)
+                         has_text=bool(text), fresh_hypothesis=fresh, spelling=spelling.mode, **fields, **model.metrics)
             print(json.dumps({'session': session, 'seq': seq, 'text': text, 'mode': 'append-only'}), file=protocol, flush=True)
         except Exception as error:
             # No arbitrary exception message, request data or transcript in diagnostics.
