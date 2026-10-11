@@ -80,6 +80,7 @@ describe("useStore", () => {
       updateChannel: "stable" as const,
       automaticUpdateChecks: true,
       installChannel: "github-release" as const,
+      englishSpelling: null,
     };
     useStore.getState().setConfig(config);
     expect(useStore.getState().config).toEqual(config);
@@ -94,6 +95,7 @@ describe("useStore", () => {
       updateChannel: "stable" as const,
       automaticUpdateChecks: true,
       installChannel: "github-release" as const,
+      englishSpelling: null,
     };
 
     useStore.setState({
@@ -118,6 +120,7 @@ describe("useStore", () => {
       updateChannel: "stable" as const,
       automaticUpdateChecks: true,
       installChannel: "github-release" as const,
+      englishSpelling: null,
     };
 
     expect(
@@ -146,5 +149,31 @@ describe("useStore", () => {
     useStore.getState().setUpdateState(updateState);
 
     expect(useStore.getState().updateState).toEqual(updateState);
+  });
+
+  it("asks the spelling question until a choice is saved, and again on Run setup again", () => {
+    const base = {
+      hotkey: "Alt+D",
+      selectedMic: null,
+      onboardingCompleted: false,
+      updateChannel: "stable" as const,
+      automaticUpdateChecks: true,
+      installChannel: "github-release" as const,
+    };
+    useStore.setState({ config: null, onboardingSpellingConfirmed: false });
+    useStore.getState().setConfig({ ...base, englishSpelling: null });
+    expect(useStore.getState().onboardingSpellingConfirmed).toBe(false);
+    // Saving the choice mid-step keeps the step open until Continue.
+    useStore.getState().setConfig({ ...base, englishSpelling: "american" });
+    expect(useStore.getState().onboardingSpellingConfirmed).toBe(false);
+    useStore.getState().confirmOnboardingSpelling();
+    useStore.getState().setConfig({ ...base, onboardingCompleted: true, englishSpelling: "american" });
+    expect(useStore.getState().onboardingSpellingConfirmed).toBe(true);
+    useStore.getState().setConfig({ ...base, englishSpelling: "american" });
+    expect(useStore.getState().onboardingSpellingConfirmed).toBe(false);
+
+    useStore.setState({ config: null, onboardingSpellingConfirmed: false });
+    useStore.getState().setConfig({ ...base, englishSpelling: "british" });
+    expect(useStore.getState().onboardingSpellingConfirmed).toBe(true);
   });
 });

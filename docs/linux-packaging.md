@@ -82,11 +82,11 @@ and the tray menu, still take focus.
 `/usr/share/doc/voco/` holds:
 
 - `copyright`: a short preface followed by VOCO's MIT License. The preface says
-  that the speech runtime, the model and the patched libraries keep their own
-  licenses, and points to the files below.
+  that the speech runtime, the model, the spelling data and the patched
+  libraries keep their own licenses, and points to the files below.
 - `THIRD-PARTY-NOTICES.txt`: a summary of the vendored glib, tray-icon and
-  global-hotkey sources, their licenses and VOCO's changes, from
-  `vendor/THIRD-PARTY-NOTICES.txt`.
+  global-hotkey sources, their licenses and VOCO's changes, and the notices of
+  the VarCon spelling data, from `vendor/THIRD-PARTY-NOTICES.txt`.
 - `nvidia/`: the model license and card and the runtime notices, from
   `runtime/notices/`.
 - `vendor/`: the license, patch and upstream record of each vendored crate.

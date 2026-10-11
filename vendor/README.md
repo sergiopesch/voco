@@ -11,8 +11,9 @@ provenance record, and a script checks it against upstream.
 
 `provenance/` holds the original glib crate archive that its check rebuilds
 from. [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt) summarizes these
-notices. The package installs it, with each directory's licenses and patch
-notes, in `/usr/share/doc/voco/`.
+notices and carries those of the speech worker's spelling table, which is
+generated from VarCon. The package installs it, with each directory's licenses
+and patch notes, in `/usr/share/doc/voco/`.
 
 Speech recognition uses the pinned [Nemotron runtime](../runtime/native/README.md).
 The application compiles in no other recognizer.

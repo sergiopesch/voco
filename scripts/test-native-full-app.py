@@ -10,6 +10,8 @@ delivery: A keeps focus and receives the fixture words exactly once; B stays emp
 focus-switch: the fixture plays with A focused; once A's streamed text settles, focus moves
 to B and the fixture plays again, all in one recording. A keeps only text pasted while it
 had focus; B receives the rest, including whatever Stop flushes.
+spelling: settings without a spelling choice, as an earlier setup has, spell British. The
+recognizer writes the fixture's "honor" the American way; A must receive "honour".
 Both cases fail on IBus preedit or commit, a non-append field change, paste refusal or
 failure, a copied remainder, recovery or fallback capture, then check the real tray menu and
 the Ready popover through AT-SPI.
@@ -35,11 +37,11 @@ assert os.environ['XDG_RUNTIME_DIR'] == str(root / 'runtime')
 assert os.environ['PULSE_SERVER'] == 'unix:' + str(root / 'runtime/pulse.sock')
 assert os.environ['DISPLAY'] == ':0'
 case = os.environ.get('VOCO_NATIVE_APP_CASE', 'delivery')
-assert case in ['delivery', 'focus-switch'], 'Unsupported native application case'
+assert case in ['delivery', 'focus-switch', 'spelling'], 'Unsupported native application case'
 trace_path = root / 'state/voco/hotkey-trace.jsonl'
 model = root / 'speech/models/nemotron-speech-streaming-en-0.6b.q8_0.gguf'
-sound = repo / 'tests/fixtures/speech/84-121123-0000.wav'
-EXPECTED = ['go', 'do', 'you', 'hear']
+sound = repo / 'tests/fixtures/speech' / ('1673-143396-0000.wav' if case == 'spelling' else '84-121123-0000.wav')
+EXPECTED = ['honour'] if case == 'spelling' else ['go', 'do', 'you', 'hear']
 # focus-switch speaks the fixture once per field.
 expected = EXPECTED * (2 if case == 'focus-switch' else 1)
 # Every successful paste session traces these. Trace writes are unordered IPC: count, never order.
@@ -297,6 +299,10 @@ try:
     if case == 'delivery':
         assert other_text == '' and not any(m['field'] == 'B' for m in changes), 'Unfocused field B received text'
         assert words(text) == expected, 'Focused field A did not receive the dictation exactly once: %r' % text
+    elif case == 'spelling':
+        assert other_text == '' and not any(m['field'] == 'B' for m in changes), 'Unfocused field B received text'
+        assert 'honour' in words(text) and 'honor' not in words(text), 'British spelling did not reach field A: %r' % text
+        assert len(words(text)) >= 20, 'Field A did not receive the whole fixture: %r' % text
     else:
         switch = next(index for index, m in enumerate(mutations) if m['field'] == 'switch')
         assert text == before_switch and all(index < switch for index, m in enumerate(mutations) if m['field'] == 'A'), 'Field A changed after focus moved to B'

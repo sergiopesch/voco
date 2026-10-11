@@ -15,6 +15,12 @@ NATIVE_LINKS = {f"lib/lib{name}.so.0": f"lib{name}.so.0.12.0"
 NATIVE_LINKS.update({f"lib/lib{name}.so": f"lib{name}.so.0"
                      for name in ("ggml-base", "ggml-cpu", "ggml")})
 NATIVE_LINKS["lib/libnemo_speech_asr_c.so"] = "libnemo_speech_asr_c.so.1"
+REQUIRED = {"stream_worker.py", "worker_main.py", "streaming.py", "adapters.py",
+            "MODEL-IDENTITY.json", "NATIVE-BUILD.json", "libbench_nemo_pool.so",
+            "models/nemotron-speech-streaming-en-0.6b.q8_0.gguf"}
+# Packages since 2026.0.62 add these. CI provisions only the native files of the
+# 2026.0.47 package, which predates them; its worker comes from the checkout.
+SPELLING_FILES = {"spelling.py", "spelling-varcon.tsv"}
 
 
 def digest(path):
@@ -22,7 +28,7 @@ def digest(path):
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
-def verify(root, version):
+def verify(root, version, native_only=False):
     speech = root / "usr/lib/voco/speech"
     # Inspect the extracted tree itself. Resolving a linked parent could validate
     # bytes outside the package, and following a FIFO could block verification.
@@ -43,9 +49,7 @@ def verify(root, version):
     manifest = json.loads(manifest_path.read_text())
     if manifest["version"] != version:
         raise ValueError("Speech manifest version differs from package")
-    required = {"stream_worker.py", "worker_main.py", "streaming.py", "adapters.py",
-                "MODEL-IDENTITY.json", "NATIVE-BUILD.json", "libbench_nemo_pool.so",
-                "models/nemotron-speech-streaming-en-0.6b.q8_0.gguf"}
+    required = REQUIRED if native_only else REQUIRED | SPELLING_FILES
     if not (required | NATIVE_FILES).issubset(manifest["files"]):
         raise ValueError("Incomplete speech runtime manifest")
     if any(manifest.get("symlinks", {}).get(name) != target for name, target in NATIVE_LINKS.items()):
@@ -80,4 +84,6 @@ def verify(root, version):
 
 
 if __name__ == "__main__":
-    print(json.dumps(verify(Path(sys.argv[1]), sys.argv[2])))
+    if len(sys.argv) not in (3, 4) or sys.argv[3:] not in ([], ["--native-only"]):
+        raise SystemExit("usage: verify-speech-payload.py ROOT VERSION [--native-only]")
+    print(json.dumps(verify(Path(sys.argv[1]), sys.argv[2], native_only=sys.argv[3:] == ["--native-only"])))

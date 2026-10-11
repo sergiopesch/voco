@@ -60,7 +60,7 @@ On GNOME the tray icon needs an AppIndicator extension. Ubuntu includes one;
 Debian 13 and Fedora 44 don't turn one on, so there the GNOME panel is VOCO's
 place in the top bar.
 
-Settings has four pages: **Settings** for your microphone, **Shortcut**,
+Settings has four pages: **Settings** for your microphone and spelling, **Shortcut**,
 **Updates** and **Help**, which has setup steps and runtime checks. Opening
 VOCO from your app menu shows the popover, even when VOCO wasn't running, except
 while you dictate. Started from a terminal or by your desktop's startup apps,
@@ -83,6 +83,26 @@ VOCO uses your system's default microphone unless you choose another on the
 VOCO has no volume control, so set the input level in your system's sound
 settings. If the microphone disconnects or stops sending audio while you
 dictate, VOCO stops and tells you.
+
+## Spelling
+
+VOCO writes British spelling unless you choose otherwise, at setup or on the
+**Settings** page: **British English** (colour, organise, travelling),
+**American English** (color, organize, traveling) or **Leave spelling as
+recognised**, the recognizer's own mix. A change applies from your next
+dictation.
+
+- Only words spelled one way in each variety change. Words whose spelling
+  depends on meaning stay as recognised, such as program, check, practice,
+  licence, tyre, kerb, storey, metre and gray.
+- Names stay too. A word with a capital letter never changes, because it may
+  be a name, so Pearl Harbor stays. That includes the first word of a sentence:
+  a sentence that starts with "Color" keeps that spelling.
+- Words that sound different in each variety stay as you said them, such as
+  aluminium, maths and learnt.
+- VOCO pastes a word only once its spelling can't change, so the end of a word
+  such as "recognise" can appear a moment after the rest. One or two words in a
+  hundred wait like this.
 
 ## Shortcut
 

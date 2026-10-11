@@ -216,6 +216,8 @@ export const installRendererMocks = (page, { worklet = false } = {}) => page.add
         updateChannel: 'stable',
         automaticUpdateChecks: true,
         installChannel: 'github-release',
+        // A saved choice skips setup's spelling question, which its own suite covers.
+        englishSpelling: 'british',
     };
     window.nativeHandlers = {};
     window.nativeCall = async (name, args) => {

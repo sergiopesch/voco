@@ -28,8 +28,9 @@ class SpeechPackageTests(unittest.TestCase):
         self.root = Path(self.temp.name)
         self.speech = self.root / "usr/lib/voco/speech"
         (self.speech / "models").mkdir(parents=True)
-        for name in ("stream_worker.py", "worker_main.py", "streaming.py", "adapters.py",
-                     "libbench_nemo_pool.so", "models/nemotron-speech-streaming-en-0.6b.q8_0.gguf"):
+        for name in ("stream_worker.py", "worker_main.py", "streaming.py", "adapters.py", "spelling.py",
+                     "spelling-varcon.tsv", "libbench_nemo_pool.so",
+                     "models/nemotron-speech-streaming-en-0.6b.q8_0.gguf"):
             (self.speech / name).write_bytes(b"fixture")
         (self.speech / "MODEL-IDENTITY.json").write_text(json.dumps({"model_sha256":
             package.digest(self.speech / "models/nemotron-speech-streaming-en-0.6b.q8_0.gguf")}))
@@ -111,6 +112,14 @@ class SpeechPackageTests(unittest.TestCase):
         manifest.symlink_to(external)
         with self.assertRaisesRegex(ValueError, "manifest must be a regular file"):
             self.verify()
+
+    def test_spelling_files_are_required_except_for_the_native_payload_ci_uses(self):
+        for name in sorted(validator.SPELLING_FILES):
+            (self.speech / name).unlink()
+        self.save_manifest()
+        with self.assertRaisesRegex(ValueError, "Incomplete speech runtime manifest"):
+            self.verify()
+        self.assertEqual(validator.verify(self.root, "2026.0.34+rc1", native_only=True)["version"], "2026.0.34+rc1")
 
     def test_missing_model(self):
         (self.speech / "models/nemotron-speech-streaming-en-0.6b.q8_0.gguf").unlink()

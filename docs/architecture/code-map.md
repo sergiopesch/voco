@@ -59,6 +59,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `styles.css` — Base styles and window surfaces.
 - `preferences.css` — Settings window layout.
 - `motion.css` — Shared motion styles.
+- `english-spelling.css` — The spelling cards, the sample sentence and the popover's one-time note.
 - `vite-env.d.ts` — Vite type references.
 
 ### Components: `components/`
@@ -66,7 +67,8 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `ControlPanel.tsx` — Settings window with the Settings, Microphone, Shortcut, Updates and Help sections.
 - `ControlPanel.test.tsx` — Settings guidance and controls.
 - `recordedShortcuts.json` — Key presses, the shortcut **Record keys** makes of each and whether Rust accepts it; `ControlPanel.test.tsx` and `lib.rs` both check it.
-- `Onboarding.tsx` — First-run voice test and desktop setup check. Its text stays in the window.
+- `EnglishSpellingChoice.tsx` — Setup's spelling question, the Settings spelling cards and the one-time popover note for earlier setups.
+- `Onboarding.tsx` — First-run voice test, after the spelling question, and desktop setup check. Its text stays in the window.
 - `Onboarding.test.tsx` — Onboarding states.
 - `CrashReview.tsx` — Review window: copy or discard interrupted dictations.
 - `crashReview.css` — Review styles.
@@ -92,6 +94,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 
 ### Library: `lib/`
 
+- `englishSpelling.ts` — The two spellings' labels, flags, examples and sample sentences; `test_spelling.py` checks that the converter turns each into the other.
 - `dictationStream.ts` — `DictationStream`: 100 ms packets, one request at a time, append-only results, paste outcomes and Stop retries.
 - `dictationStream.test.ts` — Append-only results, backlog limit and delivery outcomes.
 - `dictationStream.startup.test.ts` — Importing the module leaves model warmup to Rust.
@@ -160,6 +163,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `index.html`, `vite.config.ts`, `tsconfig.json`, `eslint.config.js` — Renderer build and lint configuration.
 - `public/audio-processor.js` — AudioWorklet that captures WebKit audio on X11 and confirms each flush.
 - `public/tray/*.png` — Tray state icons.
+- `public/flags/` — The British and American flags, drawn from their official proportions.
 - `public/icons/`, `public/textures/`, `public/favicon.png` — Interface icons and textures, with their licences.
 - `tests/brand-motion.html`, `tests/brand-motion.tsx` — Isolated presentation fixture for the motion test.
 - `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock` — Rust dependencies. `native-capture` is the default feature, and `[patch.crates-io]` points glib, global-hotkey and tray-icon at `vendor/`.
@@ -181,6 +185,8 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `stream_worker.py` — Worker entry point; keeps native library output away from the JSON protocol.
 - `worker_main.py` — Protocol loop: ready line, request size limit, default thread count and request dispatch.
 - `streaming.py` — Streaming session: sample-rate checks, silence gate, frame batching and the opt-in timing log.
+- `spelling.py` — British or American spelling for the whole hypothesis; a push returns only text that can't change.
+- `spelling-varcon.tsv` — The spelling table, generated from VarCon 2020.12.07 by `scripts/generate-spelling-table.py`, with VarCon's notices.
 - `adapters.py` — Loads the native library and the model, and checks the model's SHA-256.
 - `nemo_bridge.cpp` — C++ bridge between the worker and NeMo-Speech.cpp.
 - `MODEL-IDENTITY.json` — Model source, revision, hash and CPU requirement.
@@ -188,9 +194,11 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `test_cpu_threads.py` — Default thread count.
 - `test_diagnostics.py` — Protocol framing, diagnostics and private metrics logs.
 - `test_model_identity.py` — The model integrity check, the worker's native revision and the NVIDIA notice match the pinned identity files.
+- `test_spelling.py` — The table and its notices, conversion rules, append-only streaming and the benchmark replay.
 - `test_streaming.py` — Silence gate accounting and log privacy.
 - `test_timing.py` — Timing instrumentation keeps sample order and transcripts.
 - `test_worker_protocol.py` — Protocol and lifecycle checks against the real model.
+- `test_worker_spelling.py` — Each session's spelling in the protocol loop, and a missing table failing startup.
 
 ## Native runtime and notices: `runtime/`
 
@@ -238,6 +246,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `rpm_package.py` — Renders the RPM spec for the staged tree and runs rpmbuild, and holds the RPM checks: scriptlets, folder ownership, requirements, and file and dependency parity with the Debian package.
 - `package-gnome-panel.py` — Builds a reproducible companion zip.
 - `provision-ci-speech.sh` — Copies the speech payload of a checksum-pinned published package into `runtime/speech/` for CI.
+- `generate-spelling-table.py` — Generates, or with `--check` verifies, `runtime/speech/spelling-varcon.tsv` from the pinned VarCon file.
 - `debian_maintainer.py` — Generates and checks the maintainer script.
 - `sync-installer-ui.py`, `lib/install-ui.sh`, `lib/install-apt-ui.py`, `lib/install-brand.json` — Installer interface sources, and the script that embeds them and the install steps in `install`.
 - `lib/install-common.sh` — Install steps that `setup.sh --install` sources and `sync-installer-ui.py` embeds in `install`: package manager detection, the glibc and processor check, the APT and DNF installs and their checks, and the desktop input check. `test-install-common.sh` tests them.
@@ -295,7 +304,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `native_tray_app.py` — The tray app helpers the GNOME, KDE and Wayland suites share: readiness, the registered tray item and its menu.
 - `test-native-kde.py`, `test-native-kde.sh`, `test-native-kde-identity.py` — KWin and Plasma in a private session.
 - `test-native-capture-callbacks.py`, `test-native-capture-pulse-latency.py`, `native-capture-lifecycle.test.c`, `test-native-capture-renderer.mjs`, `test_verify_native_capture_audit.py` — Native capture.
-- `test-dictation-renderer.mjs`, `test-microphone-app-renderer.mjs`, `renderer-fixture.mjs`, `test-brand-motion.mjs`, `audio-worklet-capture.test.mjs` — Renderer and AudioWorklet.
+- `test-dictation-renderer.mjs`, `test-microphone-app-renderer.mjs`, `test-english-spelling-renderer.mjs`, `renderer-fixture.mjs`, `test-brand-motion.mjs`, `audio-worklet-capture.test.mjs` — Renderer and AudioWorklet.
 - `test-speech-package.py`, `test-speech-worker.py`, `test-audio-continuity.py` — Speech packaging and worker pipes.
 - `test-rpm-package.py` — The RPM's file list, spec, header policy and parity checks; with rpmbuild installed, a real build.
 - `test-install-apt.py`, `test-install-common.sh`, `test-install-journey.py`, `test-install-launch.py`, `test-install-performance.py`, `test-install-presentation.py` — Installer.

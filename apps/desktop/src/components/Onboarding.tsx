@@ -4,8 +4,9 @@ import { SettingsIcon } from "./SettingsIcon";
 import { PanelSetup } from "./PanelSetup";
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import type { DictationStatus } from "@/types";
+import type { DictationStatus, EnglishSpelling } from "@/types";
 import { useStore } from "@/store/useStore";
+import { ENGLISH_VARIETIES } from "@/lib/englishSpelling";
 
 interface OnboardingProps {
   microphone: string;
@@ -28,12 +29,16 @@ interface OnboardingProps {
   onStart: () => void;
   onStop: () => void;
   onFinish: () => Promise<void>;
+  /** The test's suggested sentence shows this spelling. */
+  spelling?: EnglishSpelling;
+  /** After the spelling question, focus moves straight to Start test. */
+  focusPrimary?: boolean;
 }
 
 export function Onboarding({ microphone, status, passed,
   failed, preparing, saving, blocked, hotkey, microphoneControls, desktopReady = false,
   onStart, onStop, onFinish, attempted, setupError, onRetrySetup, desktopSetupError,
-  checkingDesktopSetup, onCheckDesktopSetup, onOpenDesktopSetupGuide }: OnboardingProps) {
+  checkingDesktopSetup, onCheckDesktopSetup, onOpenDesktopSetupGuide, spelling = "british", focusPrimary = false }: OnboardingProps) {
   // Only this view shows recognition text, so only it re-renders per hypothesis.
   const transcript = useStore((state) => state.dictationPurpose === "onboarding" ? state.transcript : "");
   const [changingMicrophone, setChangingMicrophone] = useState(false);
@@ -48,6 +53,9 @@ export function Onboarding({ microphone, status, passed,
     if (previousPhase.current && previousPhase.current !== phase && !busy) primaryRef.current?.focus();
     previousPhase.current = phase;
   }, [phase, busy]);
+  const initialFocus = useRef(focusPrimary);
+  useEffect(() => { if (initialFocus.current) primaryRef.current?.focus(); }, []);
+  const suggestion = spelling === "as-recognised" ? "This is my voice, typed." : ENGLISH_VARIETIES[spelling].prompt;
   const problem = setupError || (failed || status === "error" ? "The voice test couldn't finish. Try again." : null);
   const statusText = checkingDesktopSetup ? "Checking desktop setup…"
     : preparing || status === "starting" ? "Getting ready…"
@@ -75,7 +83,7 @@ export function Onboarding({ microphone, status, passed,
     {desktopSetupError ? <details className="voco-setup__details"><summary>Details</summary><p>{desktopSetupError}</p></details> : null}
     {desktopSetupError && onOpenDesktopSetupGuide ? <button className="voco-button voco-button--ghost" onClick={onOpenDesktopSetupGuide}>Open setup instructions</button> : null}
     <div className="voco-setup__transcript" role="region" aria-label="Test transcript" tabIndex={0}>
-      {transcript && transcript !== "(no speech detected)" ? transcript : <span>Try saying “This is my voice, typed.”</span>}
+      {transcript && transcript !== "(no speech detected)" ? transcript : <span>Try saying “{suggestion}”</span>}
     </div>
     {ready ? <div className="voco-setup__handoff">
       <p>Click where you want the text and press <kbd className="voco-glass voco-shortcut">{hotkey}</kbd>. Press again to finish.</p>
