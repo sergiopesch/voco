@@ -6,7 +6,7 @@ use Semantic Versioning: a version has the form `YYYY.0.N`, the year and then a
 number that grows with each release, and its signed Git tag is `voco.<version>`.
 The [release process](docs/release-process.md) describes how a release is made.
 
-## [2026.0.62] - 2026-10-10
+## [2026.0.62] - 2026-10-11
 
 VOCO introduces itself as the voice layer for Linux, starting with dictation. It
 writes British or American spelling and the names and terms you list in My
