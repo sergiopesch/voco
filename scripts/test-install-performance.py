@@ -468,6 +468,23 @@ voco_ui_pause
             self.assertEqual(code,0,output)
             self.assertIn(b'ORDINARY APT: apt-get install -y -- /synthetic.deb',output)
 
+    def test_sudo_rs_gives_apt_the_terminal(self):
+        # sudo-rs would run a piped APT in the background of its pty, where the
+        # first read of the terminal stops it for good. The policy here would
+        # otherwise allow the presented wrapper.
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder)
+            sudo=root/'sudo'
+            sudo.write_text('#!/bin/bash\n[[ "$1" == --version ]] && { echo "sudo-rs 0.2.13-0ubuntu1.2"; exit 0; }\n'
+                            '[[ "$1" == -v || "$1" == -n ]] && exit 0\nprintf "ORDINARY APT: %s\\n" "$*"\n[[ "$1" == apt-get ]]\n')
+            sudo.chmod(0o755)
+            env={**os.environ,'PATH':folder+':'+os.environ['PATH'],'TMPDIR':folder,'TERM':'xterm-256color'}
+            env.pop('NO_COLOR',None)
+            code,output=terminal(['bash','-c',PREFIX+'\nVOCO_DOWNLOAD_DIR=$(mktemp -d)\nvoco_run_apt /synthetic.deb\n'],env)
+            self.assertEqual(code,0,output)
+            self.assertIn(b'ORDINARY APT: apt-get install -y -- /synthetic.deb',output)
+            self.assertNotIn(b'ORDINARY APT: sh -c',output)
+
     def test_logging_failure_does_not_break_output_or_process_status(self):
         with tempfile.TemporaryDirectory() as folder:
             run=subprocess.run(['/usr/bin/python3',str(APT_UI),str(Path(folder)/'missing/log'),'true'],input=b'Unfamiliar package message\n',capture_output=True,timeout=2)

@@ -54,6 +54,12 @@ you set it, and only your account can read it.
 | A key, signature, signer or checksum error | Nothing was installed. Run the installer again. If the check fails again, don't install the file another way, and report it as described in [SECURITY.md](../SECURITY.md). |
 | `Installation failed:` | APT or DNF couldn't install the package. Fix the error it shows, then run the installer again. |
 
+On Ubuntu 26.04, the installer of 2026.0.62 or earlier can stop at **Package
+setup** and stay there. Ubuntu 26.04's `sudo`, sudo-rs, stops APT when APT reads
+the terminal behind the installer's progress display. In another terminal, run
+`sudo pkill -CONT apt-get`, and the installer carries on. Later installers give
+APT the terminal there, so it shows its own progress instead.
+
 Exit status 2 means VOCO is installed but can't paste yet. The installer names
 the problem. The most common ones are:
 

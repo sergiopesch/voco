@@ -1041,6 +1041,16 @@ voco_run_apt() {
     sudo apt-get install -y -- "$@"
     return $?
   fi
+  # sudo-rs, Ubuntu 26.04's sudo, runs a command whose output feeds a pipe in
+  # the background of its own terminal and passes it no input. APT stops the
+  # first time it, dpkg or a package script reads the terminal (SIGTTIN), and
+  # sudo-rs continues only the command it started, so the install never ends.
+  # There APT gets the terminal and shows its own progress, and can still ask.
+  if sudo --version 2>/dev/null | grep -q '^sudo-rs'; then
+    voco_ui_release
+    sudo apt-get install -y -- "$@"
+    return $?
+  fi
   if ! sudo -n -v >/dev/null 2>&1; then
     voco_ui_release
     dim 'VOCO · Ubuntu needs your permission to install.'

@@ -6,6 +6,18 @@ use Semantic Versioning: a version has the form `YYYY.0.N`, the year and then a
 number that grows with each release, and its signed Git tag is `voco.<version>`.
 The [release process](docs/release-process.md) describes how a release is made.
 
+## [Unreleased]
+
+### Fixed
+
+- On Ubuntu 26.04 the guided installer stopped at "Package setup" and never
+  finished. Ubuntu 26.04's sudo, sudo-rs, runs a command whose output feeds a
+  pipe in the background of its own terminal and passes it no input. APT reads
+  the terminal just before dpkg starts, so its child was stopped (SIGTTIN), and
+  sudo-rs continued only the command it started. Under sudo-rs the installer now
+  runs APT on the terminal, showing APT's own progress, so dpkg and package
+  scripts can still ask. Classic sudo keeps the installer's display.
+
 ## [2026.0.62] - 2026-10-11
 
 VOCO introduces itself as the voice layer for Linux, starting with dictation. It
