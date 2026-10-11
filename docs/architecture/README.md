@@ -74,7 +74,9 @@ site-packages, and write no bytecode. Just before Python starts,
 `worker_sandbox.rs` marks every descriptor beyond the worker's standard streams
 close-on-exec and installs a seccomp filter: the worker can open no socket or
 socket pair, not even a Unix one, and no io_uring. If any of that fails, the
-worker doesn't start. The worker has 30 seconds to report ready and 10 seconds for each response, and a response line
+worker doesn't start. The worker gets only the variables it reads (`ENVIRONMENT`
+in `worker_sandbox.rs`), none of the session's bus, display or agent addresses;
+the full-application test checks the running worker's environment and filter. The worker has 30 seconds to report ready and 10 seconds for each response, and a response line
 may be at most 1 MiB. VOCO warms the worker at startup before it reports ready.
 A worker that died while idle is replaced at the next warmup or start, never
 during a recording.
@@ -98,11 +100,15 @@ Each start carries `spelling`: `british`, `american` or `as-recognised`.
 `speech_stream.rs` sets it from the saved settings, read without the writer lock
 or a save, so the webview can't choose another; a start without one is as
 recognised. `spelling.py` converts the whole hypothesis with
-`spelling-varcon.tsv`, the unambiguous forms of VarCon 2020.12.07, about 3,300
+`spelling-varcon.tsv`, the unambiguous forms of VarCon 2020.12.07, about 3,200
 each way. Only lowercase words convert, so names stay even at the start of a
 sentence, as do code-like tokens and words whose spelling depends on meaning. A
 push returns only text no later hypothesis can change: an open word goes out up
 to the first letter where a table word starting with it is spelled differently.
+The generator leaves out any conversion that would make one of the most common
+words wait (`NEVER_HELD`), so "he", "must", "will", "a" and "call" never do;
+British keeps "hemoglobin" and the other hem- words, "mustache" and "willful" as
+recognised, and American keeps "aetiology" and "callisthenics".
 Finish returns the converted final text, which extends every push, so
 `DictationStream`'s append-only check still holds, and a converter fault would
 stop the recording rather than paste a revision.

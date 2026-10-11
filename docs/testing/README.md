@@ -158,7 +158,10 @@ through the namespace's shared `/tmp/.X11-unix`. The nested GNOME Shell passes
 them to its focused window. Keyboards come and go with each VOCO process. Only
 Shift+Insert is accepted. Any other key, a dropped
 event, or a keyboard that leaves before its grab or in the middle of a paste is
-rejected; the bridge then replays nothing more and the suite fails.
+rejected; the bridge then replays nothing more and the suite fails. So is a
+keyboard that declares any key but Shift and Insert: the bridge reads each
+device's key bitmap (`EVIOCGBIT`) as it grabs it, so an extra key fails the suite
+even if VOCO never sends it.
 
 The bridge refuses to run without `VOCO_UINPUT_BRIDGE=1`, or while `DISPLAY`,
 `WAYLAND_DISPLAY` or a logind graphical session exists, because a keyboard it
@@ -167,9 +170,10 @@ running the suite needs read and write access to `/dev/uinput` and read access t
 VOCO's event nodes: CI loads `uinput`, gives the runner an ACL on `/dev/uinput`,
 and adds a udev rule that gives it one on each VOCO event node.
 
-`uinput-bridge.jsonl` uses `CLOCK_MONOTONIC` times. It records each grab and
-removal, each key with when VOCO sent it and when it was replayed, and a
-`dispatch` and a `completed` record for each gesture. In the cursor journey those
+`uinput-bridge.jsonl` uses `CLOCK_MONOTONIC` times. It records each grab, with
+the keys the device declares, and each removal; each key, with when VOCO sent it
+and when it was replayed; and a `dispatch` and a `completed` record for each
+gesture. In the cursor journey those
 two records also hold the Shell's modifiers and whether its window menu is open,
 just before the first key and after the last, which `shell-probe-input-state.py`
 relays from inside the namespace. There `wl-copy` is `shell-probe-wl-copy.py`,
