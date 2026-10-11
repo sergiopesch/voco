@@ -888,14 +888,26 @@ class InstallerArtTests(unittest.TestCase):
                 self.assertEqual(run.returncode, 0, run.stderr)
                 self.assertEqual(run.stdout, b'MODE=')
 
-    def test_inside_tmux_or_screen_only_an_answer_brings_the_image(self):
+    def test_inside_tmux_or_screen_nothing_is_asked(self):
+        # A multiplexer answers for the terminal and takes the query for a title.
         for name, extra in (('tmux', {'TMUX': '/tmp/tmux-1000/default,4242,0'}), ('screen', {'STY': '4242.pts-0.host'}),
-                            ('screen term', {'TERM': 'screen-256color'})):
+                            ('screen term', {'TERM': 'screen-256color'}), ('tmux term', {'TERM': 'tmux-256color'})):
             with self.subTest(multiplexer=name):
-                result, _ = self.probe(VTE, VTE_VERSION='8402', **extra)
-                self.assertEqual(result['mode'], 'quadrant')
-                result, _ = self.probe(GHOSTTY, **extra)
-                self.assertEqual(result['mode'], 'kitty')
+                for answer in (VTE, GHOSTTY):
+                    result, output = self.probe(answer, VTE_VERSION='8402', **extra)
+                    self.assertEqual(result['mode'], 'quadrant')
+                    self.assertNotIn(QUERY, output)
+                    self.assertLess(result['ms'], 50)
+
+    def test_the_clock_reads_microseconds_in_any_locale(self):
+        # Bash writes EPOCHREALTIME with the locale's decimal separator. Once
+        # unset it is an ordinary variable, so a test can give it either form.
+        for value in ('1760140800.123456', '1760140800,123456'):
+            with self.subTest(value=value):
+                run = subprocess.run(['bash', '-c', PREFIX + f'unset EPOCHREALTIME\nEPOCHREALTIME={value}\n'
+                                      'voco_ui_now_ms\nprintf "%s" "$VOCO_UI_NOW"\n'],
+                                     capture_output=True, timeout=5)
+                self.assertEqual(run.stdout, b'1760140800123', run.stderr)
 
     def test_the_mosaic_follows_what_the_terminal_draws(self):
         # VTE draws sextants from 0.64 and octants from 0.78.
