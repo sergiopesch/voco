@@ -4,8 +4,11 @@
 //! installs a seccomp filter that refuses every socket, socket pair and
 //! io_uring. Recognition needs none: even a Unix socket reaches the session bus,
 //! whose services can start processes this filter doesn't confine, and a Unix
-//! datagram pair can still address other sockets.
+//! datagram pair can still address other sockets. The worker also starts with
+//! only the variables it reads, so nothing tells it where the session bus, the
+//! display or an agent socket is.
 
+use std::ffi::OsString;
 use std::io;
 use std::os::unix::process::CommandExt;
 use std::process::Command;
@@ -62,6 +65,35 @@ static FILTER: [libc::sock_filter; 9] = [
     op(RETURN, libc::SECCOMP_RET_ALLOW), // ALLOWED
     op(RETURN, REFUSE),                  // REFUSED
 ];
+
+/// The variables the worker reads, and the only ones it gets: its home and
+/// state directory for the metadata log, the locale, the native thread count
+/// and its own settings.
+const ENVIRONMENT: [&str; 11] = [
+    "HOME",
+    "XDG_STATE_HOME",
+    "LANG",
+    "LC_ALL",
+    "LC_CTYPE",
+    "NEMO_SPEECH_CPU_THREADS",
+    "VOCO_NEMOTRON_CONTEXT",
+    "VOCO_NEMOTRON_MODEL",
+    "VOCO_NEMO_BACKEND",
+    "VOCO_PERFORMANCE_LOG",
+    "VOCO_SILENCE_GATE",
+];
+
+/// Start `command` with only the worker's variables from `environment`.
+pub fn keep_worker_environment(
+    command: &mut Command,
+    environment: impl IntoIterator<Item = (OsString, OsString)>,
+) {
+    command.env_clear().envs(
+        environment
+            .into_iter()
+            .filter(|(name, _)| ENVIRONMENT.iter().any(|allowed| name == allowed)),
+    );
+}
 
 /// Confine `command`'s child. Any step that fails fails the spawn, so the
 /// worker never runs unconfined.
@@ -198,6 +230,45 @@ print("inherited", outcome(lambda: os.fstat(int(sys.argv[1]))))
             String::from_utf8_lossy(&output.stderr)
         );
         String::from_utf8(output.stdout).unwrap()
+    }
+
+    #[test]
+    fn the_worker_starts_with_only_the_variables_it_reads() {
+        let session = [
+            ("DBUS_SESSION_BUS_ADDRESS", "unix:path=/run/user/1000/bus"),
+            ("DISPLAY", ":0"),
+            ("WAYLAND_DISPLAY", "wayland-0"),
+            ("XDG_RUNTIME_DIR", "/run/user/1000"),
+            ("SSH_AUTH_SOCK", "/run/user/1000/ssh-agent.socket"),
+            ("PATH", "/usr/local/bin:/usr/bin:/bin"),
+            ("HOME", "/home/someone"),
+            // A locale every glibc has, so Python doesn't coerce it and add LC_CTYPE.
+            ("LANG", "C.UTF-8"),
+            ("NEMO_SPEECH_CPU_THREADS", "2"),
+            ("VOCO_NEMOTRON_CONTEXT", "1"),
+        ];
+        let mut command = Command::new("/usr/bin/python3");
+        command.args([
+            "-E",
+            "-s",
+            "-B",
+            "-c",
+            "import os\nfor name in sorted(os.environ): print(name, os.environ[name])",
+        ]);
+        keep_worker_environment(
+            &mut command,
+            session.map(|(name, value)| (name.into(), value.into())),
+        );
+        let output = command.output().expect("python3 runs");
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert_eq!(
+            String::from_utf8(output.stdout).unwrap(),
+            "HOME /home/someone\nLANG C.UTF-8\nNEMO_SPEECH_CPU_THREADS 2\nVOCO_NEMOTRON_CONTEXT 1\n"
+        );
     }
 
     /// The real filter on the real interpreter. Without it, the same probe

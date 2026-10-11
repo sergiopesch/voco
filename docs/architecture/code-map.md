@@ -12,7 +12,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `lib.rs` — App setup and most Tauri commands: startup order (on Wayland, warming the virtual keyboard and retiring the old `voco-ydotoold.service` link), shortcut routes, `admit_toggle` and its 120 ms debounce, the evdev listener and the CLI checks.
 - `main.rs` — Command-line entry point; see [Command line](#command-line).
 - `speech_stream.rs` — The speech worker process and the `speech_stream` command: NDJSON requests, deadlines, size limits and restarting a dead idle worker.
-- `worker_sandbox.rs` — Confines the speech worker before its Python starts: close-on-exec descriptors, no-new-privileges and a seccomp filter that refuses network sockets and io_uring.
+- `worker_sandbox.rs` — Confines the speech worker before its Python starts: only the variables it reads, close-on-exec descriptors, no-new-privileges and a seccomp filter that refuses network sockets and io_uring.
 - `insertion.rs` — Desktop paste and copy: helper and `/dev/uinput` checks, the clipboard transaction, Shift+Insert and the three failure outcomes.
 - `desktop_session.rs` — Retains the originating graphical login and checks its active seat before Wayland paste, and follows its screen lock through logind's `LockedHint`; bounded logind discovery supports user-manager app launches.
 - `virtual_keyboard.rs` — VOCO's uinput keyboard for Wayland paste keys: one device per process with only Shift and Insert, 12 ms between key events.

@@ -175,15 +175,26 @@ def seccomp_state(proc):
     return dict(noNewPrivs=fields['NoNewPrivs'].strip(), seccompFilters=int(fields['Seccomp_filters']))
 
 
+# The variables the worker reads (worker_sandbox.rs), and the only ones it may get.
+WORKER_ENVIRONMENT = {'HOME', 'XDG_STATE_HOME', 'LANG', 'LC_ALL', 'LC_CTYPE', 'NEMO_SPEECH_CPU_THREADS',
+                      'VOCO_NEMOTRON_CONTEXT', 'VOCO_NEMOTRON_MODEL', 'VOCO_NEMO_BACKEND', 'VOCO_PERFORMANCE_LOG',
+                      'VOCO_SILENCE_GATE'}
+
+
+def environment_names(proc):
+    return sorted(entry.split(b'=', 1)[0].decode() for entry in (proc / 'environ').read_bytes().split(b'\0') if entry)
+
+
 def worker_confinement():
     # The warm speech worker as the kernel reports it: its interpreter flags,
-    # and one seccomp filter more than the app that started it.
+    # one seccomp filter more than the app that started it, and the variables
+    # it started with.
     for proc in Path('/proc').glob('[0-9]*'):
         try:
             argv = (proc / 'cmdline').read_bytes().split(b'\0')
             if any(arg.endswith(b'/stream_worker.py') for arg in argv):
                 return dict(flags=[arg.decode() for arg in argv[1:4]], worker=seccomp_state(proc),
-                            app=seccomp_state(Path('/proc', str(app.pid))))
+                            app=seccomp_state(Path('/proc', str(app.pid))), environment=environment_names(proc))
         except OSError:
             continue
     return None
@@ -276,6 +287,10 @@ try:
     confinement = worker_confinement()
     assert confinement and confinement['flags'] == ['-E', '-s', '-B'] and confinement['worker']['noNewPrivs'] == '1' \
         and confinement['worker']['seccompFilters'] == confinement['app']['seccompFilters'] + 1, 'The speech worker is not confined: %r' % (confinement,)
+    # The app has this session's bus, display and runtime directory; the worker gets none of them.
+    assert {'DBUS_SESSION_BUS_ADDRESS', 'DISPLAY', 'XDG_RUNTIME_DIR', 'VOCO_NEMOTRON_MODEL'} <= set(environment_names(Path('/proc', str(app.pid))))
+    assert set(confinement['environment']) <= WORKER_ENVIRONMENT and 'VOCO_NEMOTRON_MODEL' in confinement['environment'], \
+        'The speech worker got other variables: %r' % sorted(set(confinement['environment']) - WORKER_ENVIRONMENT)
     window.present()
     window_id = subprocess.check_output(['xdotool', 'search', '--name', '^VOCO private full application acceptance$'], text=True).strip().splitlines()[0]
     subprocess.run(['xdotool', 'windowfocus', '--sync', window_id], check=True)
