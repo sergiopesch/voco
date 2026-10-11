@@ -25,7 +25,14 @@ ROUTINE = re.compile(
     r'\d+ upgraded, \d+ newly installed,|Need to get |After this operation, |'
     r'Get:\d+ |Fetched |Selecting previously unselected package |'
     r'\(Reading database|Preparing to unpack |Unpacking |Setting up |Processing triggers for |'
-    r'debconf: delaying package configuration, since apt-utils is not installed$)'
+    r'debconf: delaying package configuration, since apt-utils is not installed$|'
+    # What update-alternatives and needrestart say when there is nothing to do.
+    # Their warnings, a pending kernel or services to restart stay visible.
+    r'update-alternatives: using .+ to provide .+ in auto mode$|'
+    r'Scanning (?:processes|candidates|processor microcode|linux images)\.\.\.$|'
+    r'Running kernel seems to be up-to-date\.$|No services need to be restarted\.$|'
+    r'No containers need to be restarted\.$|No user sessions are running outdated binaries\.$|'
+    r'No VM guests are running outdated hypervisor \(qemu\) binaries on this host\.$)'
 )
 STATUS = re.compile(r'^(pmstatus|dlstatus):([^:]*):([0-9]+(?:\.[0-9]+)?):(.*)$')
 # install-ui.sh's art canvas: the card's size, and its shine.

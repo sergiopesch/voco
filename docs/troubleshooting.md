@@ -57,8 +57,9 @@ you set it, and only your account can read it.
 On Ubuntu 26.04, the installer of 2026.0.62 or earlier can stop at **Package
 setup** and stay there. Ubuntu 26.04's `sudo`, sudo-rs, stops APT when APT reads
 the terminal behind the installer's progress display. In another terminal, run
-`sudo pkill -CONT apt-get`, and the installer carries on. Later installers give
-APT the terminal there, so it shows its own progress instead.
+`sudo pkill -CONT apt-get`, and the installer carries on. Later installers keep
+APT off the terminal under sudo-rs, so it can't stop there. If APT fails, they
+run it again on the terminal, where it can ask.
 
 Exit status 2 means VOCO is installed but can't paste yet. The installer names
 the problem. The most common ones are:
