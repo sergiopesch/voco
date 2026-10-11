@@ -41,6 +41,16 @@ def key(term):
     return ''.join(plain(word) for word in SPELLED.findall(term))
 
 
+def stops(term):
+    """The places in a term's key where a full stop joins two of its words."""
+    places, length, words = set(), 0, list(SPELLED.finditer(term))
+    for word, following in zip(words, words[1:]):
+        length += len(plain(word[0]))
+        if '.' in term[word.end():following.start()]:
+            places.add(length)
+    return places
+
+
 def accepted(terms):
     """The usable entries of the desktop's list, in order.
 
@@ -63,6 +73,8 @@ class Words:
         self.spellings = {}
         for term in self.terms:
             self.spellings.setdefault(key(term), term)
+        # Where, in each term's key, a full stop joins two of its words.
+        self.stops = {k: stops(term) for k, term in self.spellings.items()}
         self.dotted = any('.' in term for term in self.terms)
         self.prefixes = {k[:end] for k in self.spellings for end in range(1, len(k) + 1)}
         self.longest = max(map(len, self.spellings), default=0)
@@ -113,25 +125,24 @@ class Words:
         Words join across spaces and hyphens, and across full stops into a term
         listed with one, while they still begin a listed term.
         """
-        best, joined, dotted = None, '', False
+        best, joined, heard = None, '', set()
         for at in range(index, len(spans)):
             if at > index:
                 separator = text[spans[at - 1][1]:spans[at][0]]
                 if DOTTED.fullmatch(separator):
-                    dotted = True
+                    heard.add(len(joined))
                 elif not JOINABLE.fullmatch(separator):
                     break
             word = text[spans[at][0]:spans[at][1]]
             folded = plain(word)
             # A possessive 's after a listed term stays as it was heard.
-            if re.search(r"['’]s$", word) and joined + folded[:-2] in self.spellings:
-                spelling = self.spellings[joined + folded[:-2]]
-                if '.' in spelling or not dotted:
-                    best = (spelling, at - index + 1, spans[at][1] - 2, word[-2:])
+            possessed = joined + folded[:-2]
+            if re.search(r"['’]s$", word) and possessed in self.spellings and heard <= self.stops[possessed]:
+                best = (self.spellings[possessed], at - index + 1, spans[at][1] - 2, word[-2:])
             joined += folded
-            spelling = self.spellings.get(joined)
-            if spelling is not None and ('.' in spelling or not dotted):
-                best = (spelling, at - index + 1, spans[at][1], '')
+            # A full stop heard between words must be one the term is listed with.
+            if joined in self.spellings and heard <= self.stops[joined]:
+                best = (self.spellings[joined], at - index + 1, spans[at][1], '')
             if joined not in self.prefixes:
                 break
         return best
@@ -141,9 +152,12 @@ class Words:
         group = spans[index:]
         joins = (lambda s: JOINABLE.fullmatch(s) or DOTTED.fullmatch(s)) if self.dotted else JOINABLE.fullmatch
         rest = text[group[-1][1]:]
-        if len(group) > self.longest or (rest and not joins(rest)):
+        # An apostrophe after the last word may still join it ("can'" becomes "can't").
+        if len(group) > self.longest or (rest and not joins(rest) and rest not in ("'", "’")):
             return False
         if not all(joins(text[a[1]:b[0]]) for a, b in zip(group, group[1:])):
             return False
         joined = ''.join(plain(text[s:e]) for s, e in group)
-        return len(joined) <= self.longest and joined in self.prefixes
+        # A possessive on the open last word may not be the end of it.
+        possessive = re.search(r"['’]s$", text[group[-1][0]:group[-1][1]]) and joined[:-2] in self.prefixes
+        return bool(possessive) or (len(joined) <= self.longest and joined in self.prefixes)

@@ -49,12 +49,22 @@ class RestoreTests(unittest.TestCase):
             'we work at acme inc.': 'we work at Acme Inc.',
             'acme inc makes tea': 'Acme Inc. makes tea',
             'I use git. Hub is new': 'I use git. Hub is new',
+            'we met acme. inc is here': 'we met acme. inc is here',
+            's t. ives': 'St. Ives',
         }
         for heard, expected in cases.items():
             with self.subTest(heard=heard):
                 self.assertEqual(written(words, heard), expected)
         restored, _, settled = words.restore('we met at St.', final=False)
         self.assertEqual(restored[:settled], 'we met at ')
+
+    def test_an_apostrophe_after_a_listed_word_waits_for_what_follows(self):
+        words = Words(['can', 'GitHub'])
+        for hypothesis in ("I can'", "github'", "github's"):
+            with self.subTest(hypothesis=hypothesis):
+                restored, _, settled = words.restore(hypothesis, final=False)
+                self.assertNotIn("'", restored[:settled])
+        self.assertEqual(written(words, "I can't use github's api"), "I can't use GitHub's api")
 
     def test_listed_spans_protect_their_words_from_spelling(self):
         words = Words(['Color Run', 'harbor'])
@@ -95,7 +105,8 @@ class StabilityTests(unittest.TestCase):
         vocabulary = ['git', 'hub', 'Git', 'Hub', 'pipe', 'wire', 'G', 'T', 'K', 'zoe', 'Zoë', 'malaga', 'new', 'New',
                       'zealand', 'Zealand', 'siobhan', 'router', 'the', 'a', 'and', 'st', 'St', 'ives', 'acme', 'inc']
         punctuation = ['', '', '', ',', '.', '?']
-        for words in (self.words, Words(LIST + ['St. Ives', 'Acme Inc.'])):
+        vocabulary += ["can't", "github's", "can"]
+        for words in (self.words, Words(LIST + ['St. Ives', 'Acme Inc.', 'can'])):
             for _ in range(400):
                 final = ' '.join(rng.choice(vocabulary) + rng.choice(punctuation) for _ in range(rng.randint(1, 9)))
                 done = written(words, final)
