@@ -35,12 +35,13 @@ setup and pull requests.
   five for each entry, each at most four words and 40 characters of letters,
   digits, apostrophes, single spaces and hyphens. Whichever is saved second, a
   version that matches an entry or another version, or an entry that matches a
-  version, is refused before it is saved, so no text has two spellings. The worker then writes the entry, or the one word of it
-  VOCO misheard, wherever the recognizer writes a taught version, matching it as
-  it matches the entry. Taught versions are never boosted, and VOCO warns before
-  teaching one made only of everyday words, which it would then change whenever
-  the user says them. The list and its taught versions stay in the owner-only
-  config and never reach logs, metrics, the crash journal or Review.
+  version, is refused before it is saved, so no text has two spellings. The
+  worker then writes the entry, or the one word of it VOCO misheard, wherever
+  the recognizer writes a taught version, matching it as it matches the entry.
+  Taught versions are never boosted, and VOCO warns before teaching one made
+  only of everyday words, which it would then change whenever the user says
+  them. The list and its taught versions stay in the owner-only config and never
+  reach logs, metrics, the crash journal or Review.
 - Tray first. Respect system accessibility preferences such as reduced motion.
   A click on VOCO's launcher opens the popover whether or not VOCO was running:
   `activation.rs` counts a start as a launcher click only when GIO names
