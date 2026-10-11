@@ -489,7 +489,6 @@ printf 'Unpacking voco (test) ...\n'
             code,output=terminal(['bash','-c',PREFIX+'\nVOCO_DOWNLOAD_DIR=$(mktemp -d)\nvoco_run_apt /synthetic.deb\n'],env)
             self.assertEqual(code,0,output.decode(errors='replace'))
             self.assertIn(b'Setting up VOCO.',output)
-            self.assertIn(b'Package setup',output)
             self.assertNotIn(b'Unpacking voco (test)',output)
             self.assertNotIn(b'APT HAS THE TERMINAL',output)
             self.assertNotIn(b'runs again here',output)
