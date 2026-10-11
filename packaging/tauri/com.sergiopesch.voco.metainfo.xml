@@ -28,7 +28,7 @@
   <url type="vcs-browser">https://github.com/sergiopesch/voco</url>
   <content_rating type="oars-1.1" />
   <releases>
-    <release version="2026.0.62" date="2026-10-10">
+    <release version="2026.0.62" date="2026-10-11">
       <description>
         <p>VOCO introduces itself as the voice layer for Linux, starting with dictation. It writes British or American spelling, and the installer opens with VOCO's microphone and name. Locking the screen now stops dictation, the speech worker can't open sockets, update checks can wait until you ask, and the GNOME top-bar panel also runs on GNOME 51. VOCO supports Ubuntu 24.04 and 26.04, Debian 13 and Fedora 44, and its app framework and build tools are up to date.</p>
       </description>
