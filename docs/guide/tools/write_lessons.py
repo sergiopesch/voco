@@ -466,7 +466,7 @@ lesson(
         ),
         (
             "No network for the worker",
-            "Just before Python starts, worker_sandbox.rs marks every descriptor beyond the worker's pipes close-on-exec, so it inherits no socket, and installs a seccomp filter. The worker can open Unix sockets, but any other socket, and io_uring, fails with permission denied. If the filter can't be installed, the worker doesn't start.",
+            "Just before Python starts, worker_sandbox.rs marks every descriptor beyond the worker's standard streams close-on-exec, so it inherits no socket of VOCO's, and installs a seccomp filter. Every socket, a Unix one included, and io_uring fail with permission denied; only a Unix socket pair, which connects the worker to itself, opens. If the filter can't be installed, the worker doesn't start.",
         ),
         (
             "The thread rule",

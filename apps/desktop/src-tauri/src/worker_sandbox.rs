@@ -1,7 +1,10 @@
 //! Keep the speech worker off the network. Just before its Python starts, the
-//! worker's process marks every descriptor beyond its pipes close-on-exec, so
-//! it inherits no socket, and installs a seccomp filter that refuses every new
-//! socket except a local Unix one. Recognition needs no network.
+//! worker's process marks every descriptor beyond its standard streams
+//! close-on-exec, so it inherits only its pipes and VOCO's standard error, and
+//! installs a seccomp filter that refuses every socket and io_uring. Only a Unix
+//! socket pair, which connects the worker to itself, is allowed. Recognition
+//! needs no socket: even a Unix one reaches the session bus, whose services can
+//! start processes this filter doesn't confine.
 
 use std::io;
 use std::os::unix::process::CommandExt;
@@ -54,7 +57,7 @@ static FILTER: [libc::sock_filter; 11] = [
     jump(1, IS, AUDIT_ARCH, 2, REFUSED), // another ABI's calls
     op(LOAD, NR),
     jump(3, AT_LEAST, X32_SYSCALL_BIT, REFUSED, 4), // x32 calls
-    jump(4, IS, libc::SYS_socket as u32, FAMILY, 5),
+    jump(4, IS, libc::SYS_socket as u32, REFUSED, 5),
     jump(5, IS, libc::SYS_socketpair as u32, FAMILY, 6),
     // io_uring can open a socket without socket(2).
     jump(6, IS, libc::SYS_io_uring_setup as u32, REFUSED, ALLOWED),
@@ -129,10 +132,10 @@ mod tests {
     }
 
     #[test]
-    fn only_local_sockets_are_allowed_and_every_other_call_passes() {
+    fn only_a_unix_socket_pair_is_allowed_and_every_other_call_passes() {
         let allow = libc::SECCOMP_RET_ALLOW;
-        assert_eq!(call(libc::SYS_socket, libc::AF_UNIX), allow);
         assert_eq!(call(libc::SYS_socketpair, libc::AF_UNIX), allow);
+        assert_eq!(call(libc::SYS_socket, libc::AF_UNIX), REFUSE);
         for family in [
             libc::AF_INET,
             libc::AF_INET6,
@@ -144,8 +147,15 @@ mod tests {
         }
         // The kernel reads the family as an int, so only the low half counts.
         let high = 1_u64 << 32;
-        let inet = high | libc::AF_INET as u64;
-        assert_eq!(verdict(AUDIT_ARCH, libc::SYS_socket as u32, inet), REFUSE);
+        let pair = libc::SYS_socketpair as u32;
+        assert_eq!(
+            verdict(AUDIT_ARCH, pair, high | libc::AF_INET as u64),
+            REFUSE
+        );
+        assert_eq!(
+            verdict(AUDIT_ARCH, pair, high | libc::AF_UNIX as u64),
+            allow
+        );
         assert_eq!(call(libc::SYS_io_uring_setup, 1), REFUSE);
         for nr in [
             libc::SYS_read,
@@ -186,9 +196,8 @@ libc = ctypes.CDLL(None, use_errno=True)
 params = ctypes.create_string_buffer(120)
 ring = libc.syscall(ctypes.c_long(425), ctypes.c_long(1), params)
 print("io_uring", "opened" if ring >= 0 else errno.errorcode[ctypes.get_errno()])
-socket.socketpair()
-socket.socket(socket.AF_UNIX).close()
-print("unix opened")
+print("unix", outcome(lambda: socket.socket(socket.AF_UNIX).close()))
+print("pair", outcome(lambda: [end.close() for end in socket.socketpair()]))
 print("inherited", outcome(lambda: os.fstat(int(sys.argv[1]))))
 "#;
 
@@ -210,7 +219,7 @@ print("inherited", outcome(lambda: os.fstat(int(sys.argv[1]))))
     /// The real filter on the real interpreter. Without it, the same probe
     /// opens a network socket and sees the inherited descriptor.
     #[test]
-    fn the_worker_interpreter_gets_no_network_socket_and_inherits_no_descriptor() {
+    fn the_worker_interpreter_gets_no_socket_and_inherits_no_descriptor() {
         // SAFETY: plain descriptor calls. The duplicate lacks close-on-exec, so
         // children inherit it, and sits too high for Python to reuse by chance.
         let inherited = unsafe {
@@ -226,7 +235,7 @@ print("inherited", outcome(lambda: os.fstat(int(sys.argv[1]))))
         unsafe { libc::close(inherited) };
         assert_eq!(
             confined,
-            "EACCES EACCES EACCES EACCES\nio_uring EACCES\nunix opened\ninherited EBADF\n"
+            "EACCES EACCES EACCES EACCES\nio_uring EACCES\nunix EACCES\npair opened\ninherited EBADF\n"
         );
         assert!(open.starts_with("opened "), "{open}");
         assert!(open.ends_with("\ninherited opened\n"), "{open}");

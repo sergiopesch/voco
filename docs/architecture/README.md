@@ -71,10 +71,10 @@ the Stop tail, and clears them when the recording ends.
 interpreter and script `VOCO_STREAM_PYTHON` and `VOCO_STREAM_WORKER` can
 override. The flags make Python ignore `PYTHON*` variables and your own
 site-packages, and write no bytecode. Just before Python starts,
-`worker_sandbox.rs` marks every descriptor beyond the worker's pipes
-close-on-exec and installs a seccomp filter: the worker can open Unix sockets,
-but no network socket and no io_uring. If any of that fails, the worker doesn't
-start. The worker has 30 seconds to report ready and 10 seconds for each response, and a response line
+`worker_sandbox.rs` marks every descriptor beyond the worker's standard streams
+close-on-exec and installs a seccomp filter: the worker can open no socket, not
+even a Unix one, and no io_uring, only a Unix socket pair that connects it to
+itself. If any of that fails, the worker doesn't start. The worker has 30 seconds to report ready and 10 seconds for each response, and a response line
 may be at most 1 MiB. VOCO warms the worker at startup before it reports ready.
 A worker that died while idle is replaced at the next warmup or start, never
 during a recording.

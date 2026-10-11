@@ -84,9 +84,11 @@ change.
 - Warm the selected worker before reporting readiness; imports don't start it.
 - Start the worker as `python3 -E -s -B`, never `-I`, which drops the script's
   directory and with it the worker's own modules. `worker_sandbox.rs` marks every
-  descriptor beyond its pipes close-on-exec and installs a seccomp filter that
-  refuses io_uring and every socket except a Unix one; a step that fails fails the
-  spawn. Never give the worker a network path.
+  descriptor beyond its standard streams close-on-exec and installs a seccomp
+  filter that refuses every socket and io_uring, allowing only a Unix socket pair,
+  which connects the worker to itself; a step that fails fails the spawn. Never
+  give the worker a network path, not even a Unix socket, which reaches services
+  that can start unconfined processes.
 - Flush Stop audio into the same live stream before finishing; never copy or
   replay a whole recording. Recreate a dead worker only at a session boundary.
 - Keep bounded queues, deadlines and sequence/sample accounting. Worker IPC groups

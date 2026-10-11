@@ -23,8 +23,9 @@ panel runs on GNOME 51. VOCO's app framework and build tools are up to date. The
   dictation.
 - The speech worker runs confined. Python starts with `-E -s -B`, so it ignores
   `PYTHON*` variables and the user's site-packages and writes no bytecode; every
-  descriptor beyond the worker's pipes closes on exec; and a seccomp filter
-  refuses io_uring and every socket except a Unix one. The full-application test
+  descriptor beyond the worker's standard streams closes on exec; and a seccomp
+  filter refuses every socket, Unix ones included, and io_uring, allowing only a
+  socket pair, which connects the worker to itself. The full-application test
   checks the running worker's filter.
 - **English spelling.** Setup first asks which English you write, with British
   preselected, and the **Settings** page can change it to American or leave

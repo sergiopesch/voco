@@ -95,7 +95,11 @@ impl Worker {
             .stderr(Stdio::inherit());
         #[cfg(target_os = "linux")]
         crate::worker_sandbox::deny_network(&mut command);
-        let mut child = command.spawn().map_err(|_| "worker spawn failed")?;
+        let mut child = command.spawn().map_err(|error| {
+            // A sandbox step that fails, fails the spawn: keep the system's reason.
+            log::warn!("Speech worker spawn failed: {error}");
+            "worker spawn failed"
+        })?;
         let mut input = child.stdin.take().ok_or("worker stdin missing")?;
         let mut output = BufReader::new(child.stdout.take().ok_or("worker stdout missing")?);
         let (request_tx, request_rx) = mpsc::sync_channel::<Value>(1);
