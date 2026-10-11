@@ -81,6 +81,7 @@ describe("useStore", () => {
       automaticUpdateChecks: true,
       installChannel: "github-release" as const,
       englishSpelling: null,
+      myWords: [],
     };
     useStore.getState().setConfig(config);
     expect(useStore.getState().config).toEqual(config);
@@ -96,6 +97,7 @@ describe("useStore", () => {
       automaticUpdateChecks: true,
       installChannel: "github-release" as const,
       englishSpelling: null,
+      myWords: [],
     };
 
     useStore.setState({
@@ -121,6 +123,7 @@ describe("useStore", () => {
       automaticUpdateChecks: true,
       installChannel: "github-release" as const,
       englishSpelling: null,
+      myWords: [],
     };
 
     expect(
@@ -159,6 +162,7 @@ describe("useStore", () => {
       updateChannel: "stable" as const,
       automaticUpdateChecks: true,
       installChannel: "github-release" as const,
+      myWords: [],
     };
     useStore.setState({ config: null, onboardingSpellingConfirmed: false });
     useStore.getState().setConfig({ ...base, englishSpelling: null });

@@ -11,7 +11,7 @@ from streaming import Metrics
 from worker_main import identity, metadata, serve, main
 
 class FakeModel:
-    def start(self): pass
+    def start(self, phrases=(), boost=None): pass
 
 class FakeMetrics:
     run_id='fixture'

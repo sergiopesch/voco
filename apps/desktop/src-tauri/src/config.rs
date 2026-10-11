@@ -28,6 +28,10 @@ pub struct AppConfig {
     /// spells British.
     #[serde(default)]
     pub english_spelling: Option<EnglishSpelling>,
+    /// Names and terms that dictation writes as listed
+    /// (`runtime/speech/mywords.py`). Empty until the user adds one.
+    #[serde(default)]
+    pub my_words: Vec<String>,
 }
 
 /// A field-level configuration update sent by the frontend.
@@ -52,6 +56,9 @@ pub struct AppConfigPatch {
     /// A choice, once made, can change but not be cleared.
     #[serde(default)]
     pub english_spelling: PatchField<EnglishSpelling>,
+    /// The whole list, replacing the saved one; `validate_my_words` checks it.
+    #[serde(default)]
+    pub my_words: PatchField<Vec<String>>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -102,6 +109,9 @@ impl AppConfigPatch {
         }
         if let PatchField::Set(value) = self.english_spelling {
             config.english_spelling = Some(value);
+        }
+        if let PatchField::Set(value) = self.my_words {
+            config.my_words = value;
         }
     }
 }
@@ -203,6 +213,7 @@ impl Default for AppConfig {
             automatic_update_checks: default_automatic_update_checks(),
             install_channel: InstallChannel::default(),
             english_spelling: None,
+            my_words: Vec::new(),
         }
     }
 }
@@ -281,6 +292,125 @@ impl AppConfig {
             .map(|directory| english_spelling_at(&directory.join("config.json")))
             .unwrap_or_default()
     }
+
+    /// The My words list a new dictation uses, read the same way as its
+    /// spelling. A file VOCO can't read gives an empty list.
+    pub fn my_words_for_dictation() -> Vec<String> {
+        Self::config_dir_without_migration()
+            .map(|directory| my_words_at(&directory.join("config.json")))
+            .unwrap_or_default()
+    }
+}
+
+/// The most entries My words holds, the most words and characters in one,
+/// as `runtime/speech/mywords.py` reads them.
+pub const MY_WORDS_MAX_TERMS: usize = 100;
+pub const MY_WORDS_MAX_WORDS: usize = 4;
+pub const MY_WORDS_MAX_CHARS: usize = 40;
+
+/// Checks a My words list before it is saved. The worker skips an entry
+/// that breaks these rules rather than failing dictation, so a hand-edited
+/// config can't stop it.
+pub fn validate_my_words(words: &[String]) -> Result<(), String> {
+    if words.len() > MY_WORDS_MAX_TERMS {
+        return Err(format!(
+            "My words holds at most {MY_WORDS_MAX_TERMS} entries."
+        ));
+    }
+    let mut seen = std::collections::HashSet::new();
+    for term in words {
+        if listable_word_count(term).is_none() {
+            return Err(format!(
+                "\u{201c}{term}\u{201d} can use letters, digits, single spaces, hyphens, \
+                 apostrophes and full stops, and must start with a letter or digit."
+            ));
+        }
+        if !listable(term) {
+            return Err(format!(
+                "\u{201c}{term}\u{201d} is too long: an entry has at most \
+                 {MY_WORDS_MAX_WORDS} words and {MY_WORDS_MAX_CHARS} characters."
+            ));
+        }
+        if !seen.insert(my_words_key(term)) {
+            return Err(format!("\u{201c}{term}\u{201d} is already in My words."));
+        }
+    }
+    Ok(())
+}
+
+fn listable(term: &str) -> bool {
+    term.chars().count() <= MY_WORDS_MAX_CHARS
+        && listable_word_count(term).is_some_and(|count| count <= MY_WORDS_MAX_WORDS)
+}
+
+/// Two entries the worker would match alike, apart from accents, which
+/// Settings compares too; case compares as the worker's casefold does. Of
+/// two that slip through, the worker writes the first one's spelling.
+fn my_words_key(term: &str) -> String {
+    let mut key = String::new();
+    let letters = term
+        .chars()
+        .filter(|c| c.is_alphanumeric() || matches!(c, '\'' | '\u{2019}'))
+        .flat_map(char::to_lowercase);
+    for letter in letters {
+        match letter {
+            'ß' => key.push_str("ss"),
+            'ς' => key.push('σ'),
+            '\u{1c80}' => key.push('в'),
+            '\u{1c81}' => key.push('д'),
+            '\u{1c82}' => key.push('о'),
+            '\u{1c83}' => key.push('с'),
+            '\u{1c84}' | '\u{1c85}' => key.push('т'),
+            '\u{1c86}' => key.push('ъ'),
+            '\u{1c87}' => key.push('ѣ'),
+            '\u{1c88}' => key.push('ꙋ'),
+            '\u{2019}' => key.push('\''),
+            other => key.push(other),
+        }
+    }
+    key
+}
+
+/// The number of words in a listable term, or None when it isn't one: words
+/// of letters and digits, perhaps joined by apostrophes, separated by one
+/// space, one hyphen, or a full stop and at most one space, with an optional
+/// final full stop.
+fn listable_word_count(term: &str) -> Option<usize> {
+    let chars: Vec<char> = term.chars().collect();
+    let (mut index, mut words) = (0, 0);
+    loop {
+        let start = index;
+        while index < chars.len() && chars[index].is_alphanumeric() {
+            index += 1;
+        }
+        if index == start {
+            return None;
+        }
+        while index + 1 < chars.len()
+            && matches!(chars[index], '\'' | '\u{2019}')
+            && chars[index + 1].is_alphanumeric()
+        {
+            index += 1;
+            while index < chars.len() && chars[index].is_alphanumeric() {
+                index += 1;
+            }
+        }
+        words += 1;
+        match chars.get(index) {
+            None => return Some(words),
+            Some(' ' | '-') => index += 1,
+            Some('.') => {
+                index += 1;
+                if index == chars.len() {
+                    return Some(words);
+                }
+                if chars[index] == ' ' {
+                    index += 1;
+                }
+            }
+            Some(_) => return None,
+        }
+    }
 }
 
 fn english_spelling_at(path: &std::path::Path) -> EnglishSpelling {
@@ -289,6 +419,21 @@ fn english_spelling_at(path: &std::path::Path) -> EnglishSpelling {
         Ok(serde_json::from_str::<AppConfig>(&fs::read_to_string(path)?)?.english_spelling)
     };
     read().ok().flatten().unwrap_or_default()
+}
+
+fn my_words_at(path: &std::path::Path) -> Vec<String> {
+    let read = || -> Result<Vec<String>, Box<dyn std::error::Error>> {
+        secure_private_regular_file(path)?;
+        Ok(serde_json::from_str::<AppConfig>(&fs::read_to_string(path)?)?.my_words)
+    };
+    // A hand-edited config can't send the worker more, or longer, entries
+    // than Settings can save.
+    read()
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|term| listable(term))
+        .take(MY_WORDS_MAX_TERMS)
+        .collect()
 }
 
 fn reset_config_file(path: &std::path::Path) -> Result<AppConfig, Box<dyn std::error::Error>> {
@@ -896,6 +1041,7 @@ mod tests {
                 "automaticUpdateChecks": true,
                 "installChannel": "github-release",
                 "englishSpelling": null,
+                "myWords": [],
             })
         );
     }
@@ -936,6 +1082,118 @@ mod tests {
         ] {
             assert!(serde_json::from_str::<AppConfigPatch>(rejected).is_err());
         }
+    }
+
+    #[test]
+    fn my_words_round_trip_and_an_earlier_config_has_none() {
+        let mut config: AppConfig =
+            serde_json::from_str(r#"{"hotkey":"Alt+D","onboardingCompleted":true}"#).unwrap();
+        assert!(config.my_words.is_empty());
+        let patch: AppConfigPatch = serde_json::from_value(
+            serde_json::json!({"myWords": ["GitHub", "New Zealand", "Málaga"]}),
+        )
+        .unwrap();
+        patch.apply_to(&mut config);
+        let loaded: AppConfig =
+            serde_json::from_str(&serde_json::to_string(&config).unwrap()).unwrap();
+        assert_eq!(loaded.my_words, ["GitHub", "New Zealand", "Málaga"]);
+        let unrelated: AppConfigPatch = serde_json::from_str(r#"{"hotkey":"Super+D"}"#).unwrap();
+        unrelated.apply_to(&mut config);
+        assert_eq!(config.my_words.len(), 3);
+        let cleared: AppConfigPatch = serde_json::from_str(r#"{"myWords":[]}"#).unwrap();
+        cleared.apply_to(&mut config);
+        assert!(config.my_words.is_empty());
+        for rejected in [
+            r#"{"myWords":null}"#,
+            r#"{"myWords":"GitHub"}"#,
+            r#"{"myWords":[3]}"#,
+        ] {
+            assert!(serde_json::from_str::<AppConfigPatch>(rejected).is_err());
+        }
+    }
+
+    #[test]
+    fn my_words_validation_matches_the_worker_rules() {
+        let valid: Vec<String> = [
+            "GitHub",
+            "New Zealand",
+            "O'Neill",
+            "O\u{2019}Neill Ltd",
+            "St. Ives",
+            "Jean-Luc",
+            "GTK",
+            "Málaga",
+            "R2D2",
+            "Acme Inc.",
+            "one two three four",
+        ]
+        .map(String::from)
+        .to_vec();
+        assert_eq!(validate_my_words(&valid), Ok(()));
+        assert_eq!(validate_my_words(&["x".repeat(MY_WORDS_MAX_CHARS)]), Ok(()));
+        let full: Vec<String> = (0..MY_WORDS_MAX_TERMS)
+            .map(|index| format!("term{index}"))
+            .collect();
+        assert_eq!(validate_my_words(&full), Ok(()));
+        for invalid in [
+            "",
+            " GitHub",
+            "GitHub ",
+            "two  spaces",
+            "one two three four five",
+            "C++",
+            "a_b",
+            "tab\there",
+            "-dash",
+            "end-",
+            "end'",
+            "St..Ives",
+        ] {
+            assert!(
+                validate_my_words(&[invalid.to_string()]).is_err(),
+                "{invalid:?}"
+            );
+        }
+        assert!(validate_my_words(&["x".repeat(MY_WORDS_MAX_CHARS + 1)]).is_err());
+        let over: Vec<String> = (0..=MY_WORDS_MAX_TERMS)
+            .map(|index| format!("term{index}"))
+            .collect();
+        assert!(validate_my_words(&over).is_err());
+        assert!(validate_my_words(&["Git Hub".into(), "github".into()]).is_err());
+        assert!(validate_my_words(&["Straße".into(), "STRASSE".into()]).is_err());
+        assert!(validate_my_words(&["O'Neill".into(), "O\u{2019}Neill".into()]).is_err());
+    }
+
+    #[test]
+    fn dictation_reads_only_entries_settings_could_save() {
+        let test_dir = std::env::temp_dir().join(format!(
+            "voco-config-my-words-test-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&test_dir).unwrap();
+        let path = test_dir.join("config.json");
+        assert!(my_words_at(&path).is_empty());
+        let edited = serde_json::json!({"hotkey": "Alt+D", "myWords": [
+            "GitHub", "C++", "github", "x".repeat(5000), "New Zealand"]});
+        atomic_write(&path, &edited.to_string()).unwrap();
+        assert_eq!(my_words_at(&path), ["GitHub", "github", "New Zealand"]);
+        let many: Vec<String> = (0..MY_WORDS_MAX_TERMS + 20)
+            .map(|index| format!("term{index}"))
+            .collect();
+        atomic_write(
+            &path,
+            &serde_json::json!({"hotkey": "Alt+D", "myWords": many}).to_string(),
+        )
+        .unwrap();
+        assert_eq!(my_words_at(&path).len(), MY_WORDS_MAX_TERMS);
+        atomic_write(&path, "{not valid json").unwrap();
+        assert!(my_words_at(&path).is_empty());
+
+        let _ = fs::remove_dir_all(&test_dir);
     }
 
     #[test]

@@ -137,6 +137,11 @@ jobs:
         env:
           VOCO_RENDERER_EVIDENCE_DIR: ${{ runner.temp }}/voco-english-spelling-renderer
 
+      - name: My words regression
+        run: npm run test:my-words-renderer
+        env:
+          VOCO_RENDERER_EVIDENCE_DIR: ${{ runner.temp }}/voco-my-words-renderer
+
       - name: Update checks off switch regression
         run: npm run test:update-checks-renderer
         env:
@@ -203,6 +208,7 @@ jobs:
             ${{ runner.temp }}/voco-native-wayland/
             ${{ runner.temp }}/voco-dictation-renderer/
             ${{ runner.temp }}/voco-english-spelling-renderer/
+            ${{ runner.temp }}/voco-my-words-renderer/
             ${{ runner.temp }}/voco-update-checks-renderer/
             ${{ runner.temp }}/voco-microphone-${{ github.run_id }}-${{ github.run_attempt }}/
             ${{ runner.temp }}/voco-native-capture-renderer/

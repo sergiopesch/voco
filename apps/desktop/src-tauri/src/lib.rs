@@ -572,6 +572,9 @@ fn persist_config_patch(
     let previous = AppConfig::load().map_err(|error| error.to_string())?;
     let mut config = previous.clone();
     patch.apply_to(&mut config);
+    if previous.my_words != config.my_words {
+        config::validate_my_words(&config.my_words)?;
+    }
     let hotkey_changed = previous.hotkey != config.hotkey;
     let rebind = |hotkey: &str| apply_hotkey_runtime_state(app, hotkey);
 

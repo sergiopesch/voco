@@ -29,6 +29,7 @@ def error_code(error):
         'Model integrity mismatch': 'model_integrity', 'unsupported context': 'invalid_context',
         'unsupported backend': 'invalid_backend', 'Model path must be absolute': 'invalid_model_path',
         'gate mode': 'invalid_gate', 'spelling': 'invalid_spelling', 'spelling table': 'invalid_spelling_table',
+        'words': 'invalid_words', 'speech context layout': 'invalid_speech_context_layout',
     }
     if str(error) in known:
         return known[str(error)]
@@ -64,12 +65,14 @@ def metadata(request):
 
 
 def serve(protocol, source, model, metrics, spellings=None):
-    # Text goes out in the session's spelling, so the desktop, its quality
-    # reports and the crash journal all see the same words.
+    # Text goes out with My words as listed and in the session's spelling, so
+    # the desktop, its quality reports and the crash journal all see the same words.
+    from mywords import BOOST, Words
     if spellings is None:
         from spelling import Spelling
         spellings = Spelling()
     spelling = spellings.converter('as-recognised')
+    words = Words([])
     active = None
     last_request = -1
     emitted_text = None
@@ -101,9 +104,10 @@ def serve(protocol, source, model, metrics, spellings=None):
                 metrics.emit('stale_cancel_ignored', **metadata(request))
                 continue
             if op == 'start':
-                # Requests without a spelling come from older clients and fixtures.
+                # Requests without a spelling or words come from older clients and fixtures.
                 spelling = spellings.converter(request.get('spelling', 'as-recognised'))
-                model.start()
+                words = Words(request.get('words', []))
+                model.start(words.phrases(), BOOST)
                 active, last_request, emitted_text = session, seq, None
                 text = None
                 first_text = False
@@ -115,11 +119,13 @@ def serve(protocol, source, model, metrics, spellings=None):
                 if op == 'push':
                     text = model.push(request['audio'], request['rate'])
                     if text is not None:
-                        text = spelling.stable(text)
+                        restored, listed, settled = words.restore(text, final=False)
+                        text = spelling.stable(restored[:settled], listed)
                 elif op == 'finish':
                     text = model.finish()
                     if text is not None:
-                        text = spelling.final(text)
+                        restored, listed, _ = words.restore(text, final=True)
+                        text = spelling.final(restored, listed)
                     active = None
                 else:
                     model.cancel()

@@ -84,8 +84,8 @@ class StreamingSession:
             self.model.push(np.zeros(16000, np.float32), 16000)
             self.model.finish()
             self.warmup_ms = (time.monotonic()-started)*1000
-    def start(self):
-        self.model.start(); self.gate = SilenceGate(self.mode)
+    def start(self, phrases=(), boost=None):
+        self.model.start(phrases, boost); self.gate = SilenceGate(self.mode)
         self.rate = None; self.audio_s = 0.; self.active = True
         self.metrics = {}; self.first_nonzero_audio_s = None
     def push(self, data, rate):

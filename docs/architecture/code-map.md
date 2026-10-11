@@ -16,7 +16,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `insertion.rs` — Desktop paste and copy: helper and `/dev/uinput` checks, the clipboard transaction, Shift+Insert and the three failure outcomes.
 - `desktop_session.rs` — Retains the originating graphical login and checks its active seat before Wayland paste, and follows its screen lock through logind's `LockedHint`; bounded logind discovery supports user-manager app launches.
 - `virtual_keyboard.rs` — VOCO's uinput keyboard for Wayland paste keys: one device per process with only Shift and Insert, 12 ms between key events.
-- `config.rs` — Settings file, field-level updates, the copy from the legacy `voice` directory and the update cache.
+- `config.rs` — Settings file, field-level updates, the My words rules, the copy from the legacy `voice` directory and the update cache.
 - `crash_recovery.rs` — Text-only crash journal and the Review store.
 - `tray.rs` — Tray icon, menu, status line and meter animation.
 - `tray_icons.rs` — Writes the state icons and 64 meter frames once, to paths that stay valid for the process lifetime, after removing the ones an earlier VOCO left behind.
@@ -64,10 +64,11 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 
 ### Components: `components/`
 
-- `ControlPanel.tsx` — Settings window with the Settings, Microphone, Shortcut, Updates and Help sections.
+- `ControlPanel.tsx` — Settings window with the Settings, Microphone, My words, Shortcut, Updates and Help sections.
 - `ControlPanel.test.tsx` — Settings guidance and controls.
 - `recordedShortcuts.json` — Key presses, the shortcut **Record keys** makes of each and whether Rust accepts it; `ControlPanel.test.tsx` and `lib.rs` both check it.
 - `EnglishSpellingChoice.tsx` — Setup's spelling question, the Settings spelling cards and the popover note that earlier setups see until they choose.
+- `MyWords.tsx` — The My words page: adding and removing entries, and the list rules it checks before saving.
 - `Onboarding.tsx` — First-run voice test, after the spelling question, and desktop setup check. Its text stays in the window.
 - `Onboarding.test.tsx` — Onboarding states.
 - `CrashReview.tsx` — Review window: copy or discard interrupted dictations.
@@ -186,18 +187,21 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `worker_main.py` — Protocol loop: ready line, request size limit, default thread count and request dispatch.
 - `streaming.py` — Streaming session: sample-rate checks, silence gate, frame batching and the opt-in timing log.
 - `spelling.py` — British or American spelling for the whole hypothesis; a push returns only text that can't change.
+- `mywords.py` — My words: the list rules, the phrases the recognizer boosts, and each listed occurrence written as listed, append-only.
 - `spelling-varcon.tsv` — The spelling table, generated from VarCon 2020.12.07 by `scripts/generate-spelling-table.py`, with VarCon's notices.
-- `adapters.py` — Loads the native library and the model, and checks the model's SHA-256.
+- `adapters.py` — Loads the native library and the model, checks the model's SHA-256, and starts a stream with My words' phrases through the C API's options.
 - `nemo_bridge.cpp` — C++ bridge between the worker and NeMo-Speech.cpp.
 - `MODEL-IDENTITY.json` — Model source, revision, hash and CPU requirement, and the NVIDIA GGUF and tokenizer the model is built from.
 - `NATIVE-BUILD.json` — Build receipt for the pinned native library.
 - `test_cpu_threads.py` — Default thread count.
 - `test_diagnostics.py` — Protocol framing, diagnostics and private metrics logs.
 - `test_model_identity.py` — The model integrity check, the worker's native revision and the NVIDIA notice match the pinned identity files, the NVIDIA GGUF and the tokenizer included.
+- `test_mywords.py` — Listed spellings, the list rules, and pushes that only ever extend.
 - `test_spelling.py` — The table and its notices, conversion rules, append-only streaming and the benchmark replay.
 - `test_streaming.py` — Silence gate accounting and log privacy.
 - `test_timing.py` — Timing instrumentation keeps sample order and transcripts.
 - `test_worker_protocol.py` — Protocol and lifecycle checks against the real model.
+- `test_worker_mywords.py` — Each session's My words in the protocol loop: the boosted phrases, listed spellings and content-free diagnostics.
 - `test_worker_spelling.py` — Each session's spelling in the protocol loop, and a missing table failing startup.
 
 ## Native runtime and notices: `runtime/`
@@ -306,7 +310,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `native_tray_app.py` — The tray app helpers the GNOME, KDE and Wayland suites share: readiness, the registered tray item and its menu.
 - `test-native-kde.py`, `test-native-kde.sh`, `test-native-kde-identity.py` — KWin and Plasma in a private session.
 - `test-native-capture-callbacks.py`, `test-native-capture-pulse-latency.py`, `native-capture-lifecycle.test.c`, `test-native-capture-renderer.mjs`, `test_verify_native_capture_audit.py` — Native capture.
-- `test-dictation-renderer.mjs`, `test-microphone-app-renderer.mjs`, `test-english-spelling-renderer.mjs`, `test-update-checks-renderer.mjs`, `renderer-fixture.mjs`, `test-brand-motion.mjs`, `audio-worklet-capture.test.mjs` — Renderer and AudioWorklet.
+- `test-dictation-renderer.mjs`, `test-microphone-app-renderer.mjs`, `test-english-spelling-renderer.mjs`, `test-my-words-renderer.mjs`, `test-update-checks-renderer.mjs`, `renderer-fixture.mjs`, `test-brand-motion.mjs`, `audio-worklet-capture.test.mjs` — Renderer and AudioWorklet.
 - `test-speech-package.py`, `test-speech-worker.py`, `test-audio-continuity.py` — Speech packaging and worker pipes.
 - `test-rpm-package.py` — The RPM's file list, spec, header policy and parity checks; with rpmbuild installed, a real build.
 - `test-model-tokenizer.py` — The tokenizer graft adds one metadata entry, keeps every tensor byte, fetches one bounded range and replaces a model only with the pinned result.

@@ -28,6 +28,7 @@ const config: AppConfig = {
   automaticUpdateChecks: true,
   installChannel: "github-release",
   englishSpelling: "british",
+  myWords: [],
 };
 
 // Setup's spelling question has its own tests; the rest start at the voice test.

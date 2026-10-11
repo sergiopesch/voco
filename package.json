@@ -31,6 +31,7 @@
     "test:dictation-renderer": "node scripts/test-dictation-renderer.mjs",
     "test:microphone-renderer": "node scripts/test-microphone-app-renderer.mjs",
     "test:english-spelling-renderer": "node scripts/test-english-spelling-renderer.mjs",
+    "test:my-words-renderer": "node scripts/test-my-words-renderer.mjs",
     "test:update-checks-renderer": "node scripts/test-update-checks-renderer.mjs",
     "test:private-ibus": "PYTHONDONTWRITEBYTECODE=1 bash scripts/test-private-ibus-engine.sh",
     "test:native-desktop": "PYTHONDONTWRITEBYTECODE=1 bash scripts/test-native-desktop.sh",
