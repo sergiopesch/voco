@@ -796,7 +796,6 @@ export function App() {
       traceHotkeyEvent("frontend_init_complete").catch(() => {});
       await refreshDevices();
       await refreshRuntimeDiagnostics();
-      if (loadedConfig.automaticUpdateChecks) await runUpdateCheck(loadedConfig.updateChannel, appVersion);
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : String(cause);
       setStatus("error");
@@ -804,7 +803,7 @@ export function App() {
       throw cause;
     }
   }, [nativeMicrophone.initialize, prepareAudioEngine, primeRecordingStream, refreshDevices,
-    refreshRuntimeDiagnostics, runUpdateCheck, setError, setStatus, setUpdateState]);
+    refreshRuntimeDiagnostics, setError, setStatus, setUpdateState]);
 
   useEffect(() => {
     if (initStartedRef.current) {
@@ -840,6 +839,8 @@ export function App() {
     void init();
   }, [applyAuthoritativeConfig, retryCaptureSetup, setError, setStatus, setSurface]);
 
+  // The automatic check at startup is this effect's first run, once init
+  // completes; later runs follow a change of channel.
   useEffect(() => {
     if (!initComplete || !config?.updateChannel || !config.automaticUpdateChecks) {
       return;

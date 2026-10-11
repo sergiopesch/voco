@@ -51,11 +51,10 @@ try {
     assert.equal(requests.length, 1, 'Turning automatic checks back on asks once');
     results.push({ case: 'turning-automatic-checks-on-asks-once', passed: true, requests: requests.length });
 
-    // With nothing cached, startup can ask twice: once when init completes and
-    // once at the end of init. Both are this one setting's checks.
+    // Startup asks once, even with nothing cached.
     await load({ onboardingCompleted: true, automaticUpdateChecks: true, updateChannel: 'stable' });
     await settle();
-    assert.ok(requests.length >= 2, 'The default asks at startup');
+    assert.equal(requests.length, 2, 'The default asks once at startup');
     results.push({ case: 'when-voco-starts-asks-at-startup', passed: true, requests: requests.length });
 
     assert.deepEqual(errors, []);
