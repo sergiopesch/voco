@@ -327,6 +327,14 @@ impl AppConfig {
 
 /// The most entries My words holds, the most words and characters in one,
 /// as `runtime/speech/mywords.py` reads them.
+/// Normalizes text to NFC (precomposed Unicode form), so decomposed accents
+/// like U+0301 combine with their base letter.
+pub(crate) fn normalize_nfc(text: &str) -> String {
+    use icu_normalizer::ComposingNormalizer;
+    let normalizer = ComposingNormalizer::new_nfc();
+    normalizer.normalize(text).into_owned()
+}
+
 pub const MY_WORDS_MAX_TERMS: usize = 100;
 pub const MY_WORDS_MAX_WORDS: usize = 4;
 pub const MY_WORDS_MAX_CHARS: usize = 40;
@@ -336,8 +344,6 @@ pub const MY_WORDS_MAX_HEARD: usize = 5;
 /// Checks a My words list before it is saved. The worker skips an entry
 /// that breaks these rules rather than failing dictation, so a hand-edited
 /// config can't stop it.
-///
-/// Normalizes to NFC first, so decomposed accents (NFD) behave like precomposed (NFC).
 pub fn validate_my_words(words: &[String]) -> Result<(), String> {
     if words.len() > MY_WORDS_MAX_TERMS {
         return Err(format!(
@@ -346,51 +352,35 @@ pub fn validate_my_words(words: &[String]) -> Result<(), String> {
     }
     let mut seen = std::collections::HashSet::new();
     for term in words {
-        let normalized = normalize_nfc(term);
-        if listable_word_count(&normalized).is_none() {
+        if listable_word_count(term).is_none() {
             return Err(format!(
                 "\u{201c}{term}\u{201d} can use letters, digits, single spaces, hyphens, \
                  apostrophes and full stops, and must start with a letter or digit."
             ));
         }
-        if !listable(&normalized) {
+        if !listable(term) {
             return Err(format!(
                 "\u{201c}{term}\u{201d} is too long: an entry has at most \
                  {MY_WORDS_MAX_WORDS} words and {MY_WORDS_MAX_CHARS} characters."
             ));
         }
-        if !seen.insert(my_words_key(&normalized)) {
+        if !seen.insert(my_words_key(term)) {
             return Err(format!("\u{201c}{term}\u{201d} is already in My words."));
         }
     }
     Ok(())
 }
 
-/// Normalizes text to NFC (precomposed Unicode form), so decomposed accents
-/// like U+0301 combine with their base letter. A name typed in Settings or
-/// at setup goes through this, and so does a hand-edited config.
-fn normalize_nfc(text: &str) -> String {
-    use icu_normalizer::ComposingNormalizer;
-    let normalizer = ComposingNormalizer::new_nfc();
-    normalizer.normalize(text).into_owned()
-}
-
 /// Checks the taught versions against the list they belong to before they are
 /// saved, by the rules the worker reads them with: each writes an entry, or one
 /// word of it, that it doesn't already match, matches no entry or other
 /// version, and an entry keeps at most `MY_WORDS_MAX_HEARD`.
-///
-/// Normalizes to NFC first, like `validate_my_words`.
 pub fn validate_my_words_heard(words: &[String], heard: &[HeardVersion]) -> Result<(), String> {
-    let mut taken: std::collections::HashSet<String> = words
-        .iter()
-        .map(|term| my_words_key(&normalize_nfc(term)))
-        .collect();
+    let mut taken: std::collections::HashSet<String> =
+        words.iter().map(|term| my_words_key(term)).collect();
     let mut counts = std::collections::HashMap::new();
     for version in heard {
-        let heard_normalized = normalize_nfc(&version.heard);
-        let writes_normalized = normalize_nfc(&version.writes);
-        if !heard_listable(&heard_normalized) {
+        if !heard_listable(&version.heard) {
             return Err(format!(
                 "VOCO can't learn \u{201c}{}\u{201d}: a version is up to {MY_WORDS_MAX_WORDS} words \
                  and {MY_WORDS_MAX_CHARS} characters, of letters, digits, apostrophes, single \
@@ -402,15 +392,15 @@ pub fn validate_my_words_heard(words: &[String], heard: &[HeardVersion]) -> Resu
         // entry with that word, as the worker reads it.
         let entry = words
             .iter()
-            .position(|term| normalize_nfc(term) == writes_normalized)
+            .position(|term| *term == version.writes)
             .or_else(|| {
-                words.iter().position(|term| {
-                    term_words(&normalize_nfc(term)).any(|word| word == writes_normalized)
-                })
+                words
+                    .iter()
+                    .position(|term| term_words(term).any(|word| word == version.writes))
             })
             .ok_or_else(|| format!("\u{201c}{}\u{201d} isn't in My words.", version.writes))?;
-        let key = my_words_key(&heard_normalized);
-        if key == my_words_key(&writes_normalized) {
+        let key = my_words_key(&version.heard);
+        if key == my_words_key(&version.writes) {
             return Err(format!(
                 "VOCO already writes \u{201c}{}\u{201d} for it.",
                 version.writes
@@ -436,21 +426,17 @@ pub fn validate_my_words_heard(words: &[String], heard: &[HeardVersion]) -> Resu
     // not clash with one that writes anything else.
     let mut writes: std::collections::HashMap<String, &str> = words
         .iter()
-        .map(|term| (my_words_key(&normalize_nfc(term)), term.as_str()))
+        .map(|term| (my_words_key(term), term.as_str()))
         .collect();
     for version in heard {
-        let heard_normalized = normalize_nfc(&version.heard);
-        writes.insert(my_words_key(&heard_normalized), version.writes.as_str());
+        writes.insert(my_words_key(&version.heard), version.writes.as_str());
     }
     for version in heard {
-        let heard_key = my_words_key(&normalize_nfc(&version.heard));
-        let writes_normalized = normalize_nfc(&version.writes);
+        let heard_key = my_words_key(&version.heard);
         for term in words.iter().filter(|term| {
-            let term_normalized = normalize_nfc(term);
-            term_normalized != writes_normalized
-                && term_words(&term_normalized).any(|word| word == writes_normalized)
+            **term != version.writes && term_words(term).any(|word| word == version.writes)
         }) {
-            let whole = key_with(&normalize_nfc(term), &writes_normalized, &heard_key);
+            let whole = key_with(term, &version.writes, &heard_key);
             if *writes.entry(whole).or_insert(term.as_str()) != term.as_str() {
                 return Err(format!(
                     "\u{201c}{}\u{201d} would make another of your words write differently.",
@@ -608,8 +594,7 @@ fn my_words_at(path: &std::path::Path) -> (Vec<String>, Vec<HeardVersion>) {
         return Default::default();
     };
     // A hand-edited config can't send the worker more, or longer, entries or
-    // versions than Settings can save; the worker checks the rest. Normalize
-    // to NFC so NFD and NFC behave the same.
+    // versions than Settings can save; the worker checks the rest.
     let words = config
         .my_words
         .into_iter()
@@ -1516,23 +1501,51 @@ mod tests {
 
     #[test]
     fn shared_fixture_validates_nfc_and_nfd_alike() {
-        // NFD (decomposed) and NFC (precomposed) accents behave the same after normalization
-        let nfd_siobhan = "Siobha\u{0301}n Kelly"; // U+0301 combining acute
-        let nfc_siobhan = "Siobhán Kelly"; // U+00E1 precomposed
-        
-        assert_eq!(validate_my_words(&[nfd_siobhan.to_string()]), Ok(()));
-        assert_eq!(validate_my_words(&[nfc_siobhan.to_string()]), Ok(()));
-        
-        let nfd_zoe = "Zoe\u{0308}"; // U+0308 combining diaeresis
-        let nfc_zoe = "Zoë"; // U+00EB precomposed
-        
-        assert_eq!(validate_my_words(&[nfd_zoe.to_string()]), Ok(()));
-        assert_eq!(validate_my_words(&[nfc_zoe.to_string()]), Ok(()));
-        
-        // Yoruba name with combining mark that has no precomposed form stays rejected
-        let yoruba = "Adé\u{1e63}\u{1ecd}\u{0300}lá"; // ọ̀ = ọ + U+0300
-        assert!(validate_my_words(&[yoruba.to_string()]).is_err());
+        use serde::Deserialize;
+        #[derive(Deserialize)]
+        struct FixtureCase {
+            label: String,
+            input: String,
+            #[serde(rename = "expectedVerdict")]
+            expected_verdict: String,
+            #[serde(rename = "expectedWordCount")]
+            expected_word_count: Option<usize>,
+        }
+        let fixture = std::fs::read_to_string("../../../tests/fixtures/mywords/entries.json")
+            .expect("fixture exists");
+        let cases: Vec<FixtureCase> = serde_json::from_str(&fixture).expect("valid JSON");
+        for case in cases {
+            // Normalize at the boundary, as the real code does
+            let normalized = normalize_nfc(&case.input);
+            let result = validate_my_words(&[normalized.clone()]);
+            if case.expected_verdict == "accept" {
+                assert!(
+                    result.is_ok(),
+                    "{}: expected accept but got {:?}",
+                    case.label,
+                    result
+                );
+                if let Some(expected_count) = case.expected_word_count {
+                    let actual = listable_word_count(&normalized);
+                    assert_eq!(
+                        actual,
+                        Some(expected_count),
+                        "{}: expected {} words but got {:?}",
+                        case.label,
+                        expected_count,
+                        actual
+                    );
+                }
+            } else {
+                assert!(
+                    result.is_err(),
+                    "{}: expected reject but got Ok",
+                    case.label
+                );
+            }
+        }
     }
+
 
     #[test]
     fn dictation_reads_only_entries_settings_could_save() {
