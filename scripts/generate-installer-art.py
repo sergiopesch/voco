@@ -43,7 +43,7 @@ ALPHA_FLOOR = 32
 IMAGE_HEIGHT = 400
 CELL_SHAPES = (0.40, 0.65)
 # Colours in the image's palette, which the mosaics share.
-COLORS = 40
+COLORS = 36
 # Each mosaic cell is judged on 8 × 24 samples, which every symbol divides evenly.
 SAMPLE_WIDTH = 8
 SAMPLE_HEIGHT = 24
