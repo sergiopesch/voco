@@ -152,9 +152,9 @@ and no trailing period, for example "Ship a Debian copyright file with the
 package". Use the body to explain why.
 
 Open pull requests against `master` and fill in the template's Change, Validation
-and Documentation sections. Keep each pull request to one concern. CI runs five
-jobs on every pull request and every push to `master`: Code Guide, RustSec Audit,
-Frontend Checks, Rust Check & Test, and Application. CODEOWNERS requests review
+and Documentation sections. Keep each pull request to one concern. CI runs the
+jobs in [Testing](docs/testing/README.md#ci-jobs) on every pull request and every
+push to `master`. CODEOWNERS requests review
 from the maintainer. A release is assembled only from a `master` commit on which
 every job passed.
 

@@ -76,8 +76,9 @@ the aspect ratio, and don't add transparent padding. Check the 16, 24, 32, 48 an
 
 The banner is a 560 × 184 graphite card (`#111318`, 22 px corners) with the 256 px
 launcher icon drawn at 152 px, "PRIVATE · LOCAL · UNDER YOUR CONTROL" in `#aeb5bf`,
-"VOCO" in `#f1f3f6` and "The voice layer for Linux." in `#c7ccd4`. Its font falls back from Geist to
-Inter, then the system sans serif.
+"VOCO" in `#f1f3f6`, "The voice layer for Linux." in `#c7ccd4` and "Today:
+private dictation." in `#aeb5bf`. Its font falls back from Geist to Inter, then
+the system sans serif.
 
 Two third-party icon sets ship unmodified. The settings and chevron icons come
 from GNOME's Adwaita theme, with `apps/desktop/public/icons/ADWAITA-LICENSE.txt`.

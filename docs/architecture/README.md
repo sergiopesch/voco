@@ -284,7 +284,7 @@ records.
 - **Paste instead of typed keys.** One Shift+Insert works across GTK, Qt,
   Chromium, Firefox, Electron and terminals, for any Unicode text. Control
   characters become spaces, so VOCO never submits a form or command.
-- **VOCO's own virtual keyboard on Wayland.** A three-key uinput device in the
+- **VOCO's own virtual keyboard on Wayland.** A two-key uinput device in the
   app needs no daemon, socket or service, and the package's `uaccess` rule
   limits `/dev/uinput` to the user of the active local session, without a group.
 - **xclip on GNOME's XWayland.** GNOME lacks the wlroots data-control protocol,

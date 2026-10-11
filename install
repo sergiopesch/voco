@@ -1704,9 +1704,9 @@ fi
 # ─── Done ───────────────────────────────────────────────
 voco_ui_pause
 if VOCO_LAUNCH_DETAIL="$(voco_launch_installed_app)"; then
-  VOCO_NEXT_STEP="Opening VOCO → Start test → Finish test → Done."
+  VOCO_NEXT_STEP="Opening VOCO → choose your English → Start test → Finish test → Done."
 else
-  VOCO_NEXT_STEP="${VOCO_LAUNCH_DETAIL:-Open VOCO from your desktop.} Start test → Finish test → Done."
+  VOCO_NEXT_STEP="${VOCO_LAUNCH_DETAIL:-Open VOCO from your desktop.} Choose your English → Start test → Finish test → Done."
 fi
 VOCO_UI_STAGE=4
 if [[ "$VOCO_TERMINAL_MOTION" == true ]]; then

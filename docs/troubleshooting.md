@@ -63,7 +63,7 @@ the problem. The most common ones are:
 | `Pasting on … requires: …` | Install the package that provides the named program, such as `wl-clipboard` for `wl-copy`. |
 
 When `voco --check-desktop-input` passes, run `voco --setup-panel` on GNOME 46,
-48 or 50, then open VOCO. See [Wayland paste keys](install.md#wayland-paste-keys).
+48, 50 or 51, then open VOCO. See [Wayland paste keys](install.md#wayland-paste-keys).
 
 ## DNF says it skipped OpenPGP checks
 

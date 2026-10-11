@@ -8,8 +8,8 @@ exactly "VOCO virtual keyboard" as it appears, so its keys reach no compositor
 or console, and replays every press and release in order, with the gaps VOCO
 sent them at, as XTest on the private Xvfb socket it is given. A nested Shell on
 that Xvfb passes them to its focused client. Devices come and go with VOCO
-processes. Only the paste gesture is accepted, Shift+Insert optionally led by
-one Space; anything else is rejected loudly and nothing more is replayed.
+processes. Only the paste gesture, Shift+Insert, is accepted; anything else is
+rejected loudly and nothing more is replayed.
 
 Evidence is JSONL with CLOCK_MONOTONIC times. With --input-state, each gesture
 also records the private Shell's input state before its first key ("dispatch")

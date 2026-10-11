@@ -142,7 +142,7 @@ its keys reach no compositor or console, and replays every press and release in
 order, with VOCO's gaps between them, as XTest on the private Xvfb, reached
 through the namespace's shared `/tmp/.X11-unix`. The nested GNOME Shell passes
 them to its focused window. Keyboards come and go with each VOCO process. Only
-Shift+Insert, optionally led by one Space, is accepted. Any other key, a dropped
+Shift+Insert is accepted. Any other key, a dropped
 event, or a keyboard that leaves before its grab or in the middle of a paste is
 rejected; the bridge then replays nothing more and the suite fails.
 
@@ -216,8 +216,8 @@ for the host it ran on. Where you don't run them, record them as unavailable.
 
 ## CI jobs
 
-`.github/workflows/ci.yml` runs five jobs on Ubuntu 24.04 for pushes to `master` and
-pull requests into it. Evidence artifacts upload even after a failure and stay 7 days.
+`.github/workflows/ci.yml` runs these jobs for pushes to `master` and pull
+requests into it, on Ubuntu 24.04 unless the table says otherwise. Evidence artifacts upload even after a failure and stay 7 days.
 
 | Job | Runs | Artifact |
 | --- | --- | --- |

@@ -11,7 +11,7 @@ The [release process](docs/release-process.md) describes how a release is made.
 VOCO introduces itself as the voice layer for Linux, starting with dictation. It
 writes British or American spelling, and the installer opens with VOCO's
 microphone and name. Locking the screen now stops dictation, the speech worker
-can't open network sockets, update checks can wait until you ask, and the GNOME
+can't open sockets, update checks can wait until you ask, and the GNOME
 panel runs on GNOME 51. VOCO's app framework and build tools are up to date. The
 [release notes](docs/releases/2026.0.62.md) explain how to upgrade.
 
