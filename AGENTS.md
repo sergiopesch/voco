@@ -303,8 +303,9 @@ change.
   default entry: the full name of their account, read locally, when it could be
   an entry; otherwise the name starts empty. It is saved only if they keep it
   and continue, or say it, and a name they edit is checked like any entry.
-  Anything else is theirs to type; setup suggests no kinds of words. With
-  nothing listed, setup says they can personalise VOCO in Settings later.
+  Anything else is theirs to type; setup suggests no kinds of words. If they
+  say no word, or leave nothing listed, setup says they can personalise VOCO in
+  Settings later.
 - Say it, in setup and Settings, uses the same queue with local-only output and
   the saved list, as recognized, without spelling. Never paste or copy it.
 - Finish must flush capture and recognition successfully. Check the desktop input
