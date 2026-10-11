@@ -240,6 +240,22 @@ class ListRuleTests(unittest.TestCase):
         self.assertEqual(len(accepted([f'term{index}' for index in range(MAX_TERMS)])), MAX_TERMS)
         self.assertEqual(accepted(['Ma\u0301laga']), ['Málaga'])  # decomposed accents compose
 
+    def test_nfd_and_nfc_accents_behave_alike(self):
+        """NFD (decomposed) and NFC (precomposed) accents behave the same after normalization."""
+        nfd_siobhan = 'Siobha\u0301n Kelly'  # U+0301 combining acute
+        nfc_siobhan = 'Siobhán Kelly'  # U+00E1 precomposed
+        self.assertEqual(accepted([nfd_siobhan]), [nfc_siobhan])
+        self.assertEqual(accepted([nfc_siobhan]), [nfc_siobhan])
+        
+        nfd_zoe = 'Zoe\u0308'  # U+0308 combining diaeresis
+        nfc_zoe = 'Zoë'  # U+00EB precomposed
+        self.assertEqual(accepted([nfd_zoe]), [nfc_zoe])
+        self.assertEqual(accepted([nfc_zoe]), [nfc_zoe])
+        
+        # Yoruba name with combining mark that has no precomposed form stays rejected
+        yoruba = 'Adé\u1e63\u1ecd\u0300lá'  # ọ̀ = ọ + U+0300
+        self.assertEqual(accepted([yoruba]), [])
+
     def test_unusable_entries_are_skipped_and_the_first_of_two_alike_is_written(self):
         unusable = ['', ' GitHub', 'GitHub ', 'two  spaces', 'x' * (MAX_CHARS + 1), 'one two three four five',
                     'C++', 'a_b', 'tab\there', 'Line\nbreak', '-dash', 'end-']

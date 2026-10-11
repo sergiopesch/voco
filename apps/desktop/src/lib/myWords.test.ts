@@ -31,6 +31,23 @@ describe("My words rules", () => {
     const full = Array.from({ length: MY_WORDS_MAX_TERMS }, (_, index) => `term${index}`);
     expect(myWordProblem("Kubernetes", full)).toMatch(/^My words holds up to 100 entries/);
   });
+
+  it("handles NFD and NFC accents alike after normalization", () => {
+    const nfd_siobhan = "Siobha\u0301n Kelly";
+    const nfc_siobhan = "Siobhán Kelly";
+    expect(myWordProblem(nfd_siobhan, [])).toBeNull();
+    expect(myWordProblem(nfc_siobhan, [])).toBeNull();
+    expect(myWordsKey(nfd_siobhan)).toBe(myWordsKey(nfc_siobhan));
+    
+    const nfd_zoe = "Zoe\u0308";
+    const nfc_zoe = "Zoë";
+    expect(myWordProblem(nfd_zoe, [])).toBeNull();
+    expect(myWordProblem(nfc_zoe, [])).toBeNull();
+    expect(myWordsKey(nfd_zoe)).toBe(myWordsKey(nfc_zoe));
+    
+    const yoruba = "Adé\u1e63\u1ecd\u0300lá";
+    expect(myWordProblem(yoruba, [])).not.toBeNull();
+  });
 });
 
 describe("Say it", () => {

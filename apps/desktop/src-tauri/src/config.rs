@@ -370,8 +370,9 @@ pub fn validate_my_words(words: &[String]) -> Result<(), String> {
 /// like U+0301 combine with their base letter. A name typed in Settings or
 /// at setup goes through this, and so does a hand-edited config.
 fn normalize_nfc(text: &str) -> String {
-    use unicode_normalization::UnicodeNormalization;
-    text.nfc().collect()
+    use icu_normalizer::ComposingNormalizer;
+    let normalizer = ComposingNormalizer::new_nfc();
+    normalizer.normalize(text).into_owned()
 }
 
 /// Checks the taught versions against the list they belong to before they are
@@ -439,7 +440,6 @@ pub fn validate_my_words_heard(words: &[String], heard: &[HeardVersion]) -> Resu
         .collect();
     for version in heard {
         let heard_normalized = normalize_nfc(&version.heard);
-        let writes_normalized = normalize_nfc(&version.writes);
         writes.insert(my_words_key(&heard_normalized), version.writes.as_str());
     }
     for version in heard {
@@ -1512,6 +1512,26 @@ mod tests {
         assert!(validate_my_words(&["Git Hub".into(), "github".into()]).is_err());
         assert!(validate_my_words(&["Straße".into(), "STRASSE".into()]).is_err());
         assert!(validate_my_words(&["O'Neill".into(), "O\u{2019}Neill".into()]).is_err());
+    }
+
+    #[test]
+    fn shared_fixture_validates_nfc_and_nfd_alike() {
+        // NFD (decomposed) and NFC (precomposed) accents behave the same after normalization
+        let nfd_siobhan = "Siobha\u{0301}n Kelly"; // U+0301 combining acute
+        let nfc_siobhan = "Siobhán Kelly"; // U+00E1 precomposed
+        
+        assert_eq!(validate_my_words(&[nfd_siobhan.to_string()]), Ok(()));
+        assert_eq!(validate_my_words(&[nfc_siobhan.to_string()]), Ok(()));
+        
+        let nfd_zoe = "Zoe\u{0308}"; // U+0308 combining diaeresis
+        let nfc_zoe = "Zoë"; // U+00EB precomposed
+        
+        assert_eq!(validate_my_words(&[nfd_zoe.to_string()]), Ok(()));
+        assert_eq!(validate_my_words(&[nfc_zoe.to_string()]), Ok(()));
+        
+        // Yoruba name with combining mark that has no precomposed form stays rejected
+        let yoruba = "Adé\u{1e63}\u{1ecd}\u{0300}lá"; // ọ̀ = ọ + U+0300
+        assert!(validate_my_words(&[yoruba.to_string()]).is_err());
     }
 
     #[test]
