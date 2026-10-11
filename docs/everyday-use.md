@@ -94,7 +94,9 @@ dictation.
 
 - Only words spelled one way in each variety change. Words whose spelling
   depends on meaning stay as recognised, such as program, check, practice,
-  licence, tyre, kerb, storey, metre and gray.
+  licence, kerb, storey and gray. American English still turns cheque into
+  check, tyre into tire and metre into meter, because American spells each of
+  them one way in every meaning.
 - Names stay too. A word with a capital letter never changes, because it may
   be a name, so Pearl Harbor stays. That includes the first word of a sentence:
   a sentence that starts with "Color" keeps that spelling.

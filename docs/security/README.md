@@ -115,16 +115,17 @@ denials.
 | Interface | Used by | Checks |
 | --- | --- | --- |
 | `$XDG_RUNTIME_DIR/voco.sock` and `voice.sock` | `voco --toggle` and desktop bindings | Private directory, socket 0600, peer user ID must match. Each connection is one toggle. |
+| `$XDG_RUNTIME_DIR/voco-activate.sock` | A second `voco` launch, such as a click on VOCO's launcher | The same directory, mode and peer check as the trigger socket. Each connection only presents VOCO's window; it never starts or stops dictation. |
 | `$XDG_RUNTIME_DIR/voco/ibus-engine.sock` | VOCO, talking to its IBus engine | Directory 0700, socket 0600, peer checks on both sides, 1-second timeout, requests up to 65,536 bytes and replies up to 64,000. Protocol 6 rejects every text operation. |
 | `$XDG_RUNTIME_DIR/voco-browser/exact-field.sock` | `voco-browser-host` | Directory 0700 and a socket owned by you with no group or other access; peer user ID must match. |
 | `org.voco.Panel1` on the session bus | The GNOME companion | `Attach` succeeds only for the current owner of `org.gnome.Shell`. Every other method answers only the attached connection. |
 
-Peer checks use `SO_PEERCRED`. Without `XDG_RUNTIME_DIR`, the trigger socket
-moves to `voco-<uid>` in the temporary directory, which must be private to you,
-or owned by root, sticky and world-writable. The IBus and browser sockets have
-no such fallback. When VOCO exits, it removes the trigger socket only if the
-file is still the one it created. Any process running as you can use these
-interfaces; they keep other accounts out, not your own programs.
+Peer checks use `SO_PEERCRED`. Without `XDG_RUNTIME_DIR`, the trigger and
+activation sockets move to `voco-<uid>` in the temporary directory, which must
+be private to you, or owned by root, sticky and world-writable. The IBus and
+browser sockets have no such fallback. When VOCO exits, it removes the trigger
+socket only if the file is still the one it created. Any process running as you
+can use these interfaces; they keep other accounts out, not your own programs.
 
 ## The app window
 
