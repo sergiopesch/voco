@@ -94,7 +94,10 @@ impl Worker {
             .stdout(Stdio::piped())
             .stderr(Stdio::inherit());
         #[cfg(target_os = "linux")]
-        crate::worker_sandbox::deny_network(&mut command);
+        {
+            crate::worker_sandbox::keep_worker_environment(&mut command, std::env::vars_os());
+            crate::worker_sandbox::deny_network(&mut command);
+        }
         let mut child = command.spawn().map_err(|error| {
             // A sandbox step that fails, fails the spawn: keep the system's reason.
             log::warn!("Speech worker spawn failed: {error}");

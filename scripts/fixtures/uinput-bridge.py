@@ -9,7 +9,8 @@ or console, and replays every press and release in order, with the gaps VOCO
 sent them at, as XTest on the private Xvfb socket it is given. A nested Shell on
 that Xvfb passes them to its focused client. Devices come and go with VOCO
 processes. Only the paste gesture, Shift+Insert, is accepted; anything else is
-rejected loudly and nothing more is replayed.
+rejected loudly and nothing more is replayed. A keyboard that declares any key
+but Shift and Insert fails the run too, even if it never sends one.
 
 Evidence is JSONL with CLOCK_MONOTONIC times. With --input-state, each gesture
 also records the private Shell's input state before its first key ("dispatch")
@@ -42,6 +43,8 @@ PASTE = ((42, 1), (110, 1), (110, 0), (42, 0))
 GESTURES = {(42, 1): (PASTE, ['shift+Insert'])}
 INPUT_EVENT = struct.Struct('@llHHi')
 EVIOCGNAME = 0x81004506  # _IOC(_IOC_READ, 'E', 0x06, 256)
+KEY_BYTES = 0x300 // 8  # KEY_CNT bits
+EVIOCGBIT_KEY = 0x80604521  # _IOC(_IOC_READ, 'E', 0x20 + EV_KEY, KEY_BYTES)
 EVIOCGRAB = 0x40044590
 EVIOCSCLOCKID = 0x400445a0
 CLOCK_MONOTONIC = 1
@@ -69,6 +72,11 @@ def refuse_unless_disposable():
         if fields.get('TYPE') in ('x11', 'wayland', 'mir'):
             sys.exit(f'uinput-bridge: refusing to run beside graphical login session {path.name} '
                      f'({fields["TYPE"]}, {fields.get("USER", "unknown user")})')
+
+
+def declared_keys(bits):
+    """The key codes set in an EVIOCGBIT(EV_KEY) bitmap."""
+    return {index * 8 + bit for index, byte in enumerate(bits) for bit in range(8) if byte >> bit & 1}
 
 
 class XError(Exception):
@@ -231,6 +239,8 @@ class Bridge:
                 raise OSError(errno.ENODEV, f'the node now belongs to {label!r}')
             fcntl.ioctl(fd, EVIOCSCLOCKID, struct.pack('i', CLOCK_MONOTONIC))
             fcntl.ioctl(fd, EVIOCGRAB, 1)
+            # What the device can send, not only what it sent: VOCO declares just the paste keys.
+            declared = declared_keys(fcntl.ioctl(fd, EVIOCGBIT_KEY, bytes(KEY_BYTES)))
         except OSError as error:
             os.close(fd)
             if error.errno == errno.ENODEV:
@@ -244,7 +254,11 @@ class Bridge:
         self.seen.add(name)
         self.keyboards.append(Keyboard(name, node, fd))
         self.counts['devices'] += 1
-        self.log('grabbed', device=name, node=node, id=identity, after=time.monotonic() - first)
+        self.log('grabbed', device=name, node=node, id=identity, keys=sorted(declared), after=time.monotonic() - first)
+        if declared != set(KEYS):
+            # Still grabbed, so whatever it sends reaches nothing.
+            self.error(f'VOCO keyboard {name} declares keys {sorted(declared)}; it may declare only '
+                       'Shift (42) and Insert (110)', device=name)
 
     def lost(self, name):
         """A VOCO keyboard that left before its grab may have typed into the console."""

@@ -470,7 +470,7 @@ lesson(
         ),
         (
             "No network for the worker",
-            "Just before Python starts, worker_sandbox.rs marks every descriptor beyond the worker's standard streams close-on-exec, so it inherits no socket of VOCO's, and installs a seccomp filter. Every socket and socket pair, Unix ones included, and io_uring fail with permission denied. If the filter can't be installed, the worker doesn't start.",
+            "Just before Python starts, worker_sandbox.rs marks every descriptor beyond the worker's standard streams close-on-exec, so it inherits no socket of VOCO's, and installs a seccomp filter. Every socket and socket pair, Unix ones included, and io_uring fail with permission denied. If the filter can't be installed, the worker doesn't start. The worker also gets only the environment variables it reads, so nothing tells it where the session bus, the display or an agent socket is.",
         ),
         (
             "The thread rule",

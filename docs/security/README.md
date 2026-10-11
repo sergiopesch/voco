@@ -179,6 +179,13 @@ user's service manager, which can start processes outside the filter, and a
 Unix datagram pair can still send to other sockets. If VOCO can't install the
 filter, the worker doesn't start.
 
+VOCO also starts the worker with only the variables it reads: `HOME`,
+`XDG_STATE_HOME`, the locale (`LANG`, `LC_ALL` and `LC_CTYPE`),
+`NEMO_SPEECH_CPU_THREADS` and its own `VOCO_NEMOTRON_CONTEXT`,
+`VOCO_NEMOTRON_MODEL`, `VOCO_NEMO_BACKEND`, `VOCO_PERFORMANCE_LOG` and
+`VOCO_SILENCE_GATE`. So it isn't told where the session bus, the display, the
+runtime directory or an SSH agent is.
+
 The filter keeps the worker's own code and libraries off the network. It doesn't
 contain a worker that something has taken over: that worker still runs as you,
 reads and writes your files, and could leave a program for your next login to
