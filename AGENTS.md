@@ -28,9 +28,21 @@ setup and pull requests.
   words. The recognizer leans toward the listed words, and the worker writes
   each occurrence the way it is listed, matching without case, accents, or the
   spaces and hyphens inside a term. Spelling never converts a listed word. An
-  empty list leaves recognition exactly as it is without the feature. The list
-  stays in the owner-only config and never reaches logs, metrics, the crash
-  journal or Review.
+  empty list leaves recognition exactly as it is without the feature.
+- Say it checks one entry: VOCO listens once and shows, in its own window only,
+  what it heard. When it heard the entry wrong, the user can teach VOCO that
+  version, without the punctuation around it: up to five for each entry, each at
+  most four words and 40 characters of letters, digits, apostrophes, single
+  spaces and hyphens. A version never spans a pause's comma, which the worker
+  doesn't match across; VOCO asks the user to say it again instead. Whichever is
+  saved second, a version that matches an entry or another version, or an entry
+  that matches a version, is refused before it is saved, so no text has two
+  spellings. The worker then writes the entry, or the one word of it VOCO
+  misheard, wherever the recognizer writes a taught version, matching it as it
+  matches the entry. Taught versions are never boosted, and VOCO warns before
+  teaching one made only of everyday words, which it would then change whenever
+  the user says them. The list and its taught versions stay in the owner-only
+  config and never reach logs, metrics, the crash journal or Review.
 - Tray first. Respect system accessibility preferences such as reduced motion.
   A click on VOCO's launcher opens the popover whether or not VOCO was running:
   `activation.rs` counts a start as a launcher click only when GIO names
@@ -39,8 +51,8 @@ setup and pull requests.
   the tray. The desktop entry keeps `StartupNotify=false`: a tray start shows no
   window, so it can't complete a launcher's startup sequence, and GNOME would
   show its busy cursor until a 15 s timeout.
-- Settings are the microphone, the shortcut, English spelling, My words, the
-  update channel and whether VOCO checks for updates at startup. Onboarding state and the installation method
+- Settings are the microphone, the shortcut, English spelling, My words with
+  its taught versions, the update channel and whether VOCO checks for updates at startup. Onboarding state and the installation method
   are stored alongside them.
 - A normal session keeps nothing. Review only holds text that survived a crash, or
   that a Stop could neither paste nor copy.
@@ -70,8 +82,8 @@ together, keep explicit output targets, and keep root renderer fixtures on the
 desktop's Vite resolution. Check both dev rendering and packaged WebKit.
 
 The config (`config.rs`) holds the shortcut, the microphone, English spelling
-(null until someone chooses; dictation then spells British), My words (empty
-until the user adds one), onboarding state,
+(null until someone chooses; dictation then spells British), My words and its
+taught versions (empty until the user adds one), onboarding state,
 the update channel, the startup update check and the installation method. Retired keys are ignored on read
 and dropped on the next save, and patches that name them are rejected. Retired
 package channels read as GitHub Release. VOCO never overwrites a config it cannot
@@ -120,10 +132,11 @@ change.
   `scripts/generate-spelling-table.py` from the pinned VarCon file, and keep its
   notices and those in `vendor/THIRD-PARTY-NOTICES.txt`.
 - My words never breaks append-only delivery either. `speech_stream.rs` adds the
-  saved list to each session start, and a start without one is as recognized.
-  The worker boosts the listed phrases in the recognizer at a pinned strength and
-  writes listed occurrences into the whole hypothesis. A push holds back any word
-  that a later word could still join to a listed term, and finish rewrites the
+  saved list and its taught versions to each session start, and a start without
+  them is as recognized. The worker boosts the listed phrases in the recognizer
+  at a pinned strength and writes listed occurrences and taught versions into the
+  whole hypothesis. A push holds back any word that a later word could still join
+  to a listed term or a taught version, and finish rewrites the
   final text, which extends every push. Boosting needs the model's own
   SentencePiece tokenizer: the shipped model is NVIDIA's pinned file with only
   that metadata key added, and its other entries and every tensor copied
@@ -131,9 +144,11 @@ change.
 - Before a change to the boost, the phrases sent to the recognizer or the list
   limits ships, rerun the My words gates on public audio. An empty list must give
   identical output. Listed words must gain. Wrong words, wrong capitals and
-  invented terms must stay within the pinned bar.
-- Select the default microphone automatically only on an explicit Start test or
-  recording when no microphone is chosen. No idle recording, and no silent device
+  invented terms must stay within the pinned bar. Taught versions never change
+  what the recognizer hears, and a list without them gives the output it gave
+  before.
+- Select the default microphone automatically only on an explicit Start test,
+  Say it or recording when no microphone is chosen. No idle recording, and no silent device
   switching during capture.
 
 ### Delivery
@@ -285,6 +300,17 @@ change.
   test shows it.
 - The voice test uses the production recognition queue with local-only output.
   Never paste or copy onboarding output. The test keeps its local retry.
+- After the voice test, setup offers My words with the user's name as its
+  default entry: the full name of their account, read locally, when the list
+  could take it; otherwise the name starts empty. It is saved only if they keep
+  it and continue, or say it, and a name they edit is checked like any entry.
+  Run setup again keeps the saved list and its versions: a name already listed
+  shows as saved, and the step changes only the name and the words added in it,
+  never the rest of the list. Anything else is theirs to type; setup suggests no
+  kinds of words. If they say no word, or leave nothing listed, setup says they
+  can personalise VOCO in Settings later.
+- Say it, in setup and Settings, uses the same queue with local-only output and
+  the saved list, as recognized, without spelling. Never paste or copy it.
 - Finish must flush capture and recognition successfully. Check the desktop input
   prerequisites without sending keys or changing the clipboard; only then save
   completion. Done returns straight to the hidden tray surface without presenting
@@ -303,7 +329,8 @@ change.
 ### Privacy and logs
 
 - Logs are optional, private and bounded. Performance logs never contain dictated
-  text, audio, My words, clipboard values, URLs or window titles. Reject unsafe log and
+  text, audio, My words or its taught versions, the account's name, clipboard
+  values, URLs or window titles. Reject unsafe log and
   socket targets.
 - The developer capture audit needs all three flags (`VOCO_DEV_NATIVE_CAPTURE`,
   `VOCO_DEBUG_CAPTURE_AUDIO`, `VOCO_DEBUG_NATIVE_CAPTURE`) and completed private
