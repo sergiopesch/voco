@@ -268,8 +268,12 @@ try {
         if (await page.getByRole('button',{name:'Finish test',exact:true}).count()) { await page.getByRole('button',{name:'Finish test',exact:true}).click(); await page.waitForFunction(()=>window.store.getState().onboardingTestPassed); }
         await page.waitForFunction(()=>window.store.getState().status==='idle');
         assert.equal(await page.evaluate(()=>window.config.onboardingCompleted),false,problem+' must block completion');
+        // The words step comes first; the last screen checks desktop setup before Done.
+        await page.getByText('Your voice test worked. Desktop setup needs one more step.',{exact:true}).waitFor();
+        await page.getByRole('button',{name:'Continue',exact:true}).click();
+        await page.getByRole('button',{name:'Skip for now',exact:true}).click();
         await page.getByRole('button',{name:'Check desktop setup',exact:true}).waitFor();
-        assert.equal(await page.getByRole('button',{name:/^(Continue|Done)$/}).count(),0);
+        assert.equal(await page.getByRole('button',{name:'Done',exact:true}).count(),0);
         assert.equal(await page.getByText('VOCO stays in your tray.',{exact:true}).count(),0);
         assert.equal(await page.evaluate(()=>window.store.getState().onboardingTestPassed),true);
         if (problem === 'missing-helper') {
@@ -280,9 +284,7 @@ try {
         await noOutput();
         await page.evaluate(()=>{window.setupRepaired=true;});
         await page.getByRole('button',{name:'Check desktop setup',exact:true}).click();
-        await page.getByRole('button',{name:'Continue',exact:true}).waitFor();
-        if (await page.getByRole('button',{name:'Finish test',exact:true}).count()) { await page.getByRole('button',{name:'Finish test',exact:true}).click(); await page.waitForFunction(()=>window.store.getState().onboardingTestPassed); }
-        await finishSetup();
+        await page.getByRole('button',{name:'Done',exact:true}).click();
         await assertOnboardingHidden();
         await noOutput();
         results.push({case:'onboarding-blocks-'+problem+'-and-finishes-after-repair-without-external-cursor',passed:true});

@@ -54,11 +54,16 @@ export function Onboarding({ microphone, status, passed,
   const previousPhase = useRef("");
   const recording = status === "recording";
   const busy = Boolean(checkingDesktopSetup || preparing || status === "starting" || status === "processing" || saving);
-  const ready = passed && desktopReady && !failed && !setupError && !recording && !busy;
-  // The last screen hands off; before the words step, the passed test moves on to it.
+  const tested = passed && !failed && !setupError && !recording && !busy;
+  const ready = tested && desktopReady;
+  // A passed test moves on to the words step whatever desktop setup needs; the
+  // last screen checks it before Done hands off.
+  const toWords = tested && !wordsDone;
   const handoff = ready && wordsDone;
-  const choosing = changingMicrophone && !ready;
-  const phase = choosing ? "microphone" : handoff ? "ready" : ready ? "passed" : busy ? "working" : recording ? "listening" : desktopSetupError ? "desktop" : "test";
+  // The test's own words and controls, until the words step is behind.
+  const testing = !wordsDone || !passed;
+  const choosing = changingMicrophone && !ready && !toWords;
+  const phase = choosing ? "microphone" : handoff ? "ready" : toWords ? "passed" : busy ? "working" : recording ? "listening" : desktopSetupError ? "desktop" : "test";
   useEffect(() => {
     if (previousPhase.current && previousPhase.current !== phase && !busy) primaryRef.current?.focus();
     previousPhase.current = phase;
@@ -79,8 +84,9 @@ export function Onboarding({ microphone, status, passed,
   const state = problem || desktopSetupError ? "attention" : busy ? "working" : recording ? "listening" : passed ? "success" : "idle";
 
   return <section className="voco-panel__content voco-setup" aria-label="Voice setup" data-phase={phase}>
-    <div className="voco-setup__intro"><h2>{choosing ? "Choose your microphone." : handoff ? "Your voice, ready." : ready ? "VOCO heard you." : "Say something. See it here."}</h2></div>
-    {!ready ? <div className="voco-setup__devices">
+    <div className="voco-setup__intro"><h2>{choosing ? "Choose your microphone." : handoff ? "Your voice, ready." : toWords ? "VOCO heard you."
+      : wordsDone && passed ? "One more step." : "Say something. See it here."}</h2></div>
+    {!ready && !toWords && !wordsDone ? <div className="voco-setup__devices">
       <div><span className="voco-setup__device-label">Microphone</span><strong>{microphone}</strong></div>
       {microphoneControls ? <button className="voco-button voco-button--ghost" disabled={recording || busy}
         aria-expanded={changingMicrophone} aria-controls="voco-setup-microphone"
@@ -92,7 +98,7 @@ export function Onboarding({ microphone, status, passed,
     </div>
     {desktopSetupError ? <details className="voco-setup__details"><summary>Details</summary><p>{desktopSetupError}</p></details> : null}
     {desktopSetupError && onOpenDesktopSetupGuide ? <button className="voco-button voco-button--ghost" onClick={onOpenDesktopSetupGuide}>Open setup instructions</button> : null}
-    {!handoff ? <div className="voco-setup__transcript" role="region" aria-label="Test transcript" tabIndex={0}>
+    {testing ? <div className="voco-setup__transcript" role="region" aria-label="Test transcript" tabIndex={0}>
       {transcript && transcript !== "(no speech detected)" ? transcript : <span>Try saying “{suggestion}”</span>}
     </div> : null}
     {handoff ? <div className="voco-setup__handoff">
@@ -100,13 +106,13 @@ export function Onboarding({ microphone, status, passed,
       <p>VOCO stays in your tray. You can reopen it from your app launcher.</p>
       <PanelSetup disabled={busy || blocked} />
       {!wordsChecked ? <p className="voco-setup__later">You can always come back and personalise VOCO in Settings, under My words.</p> : null}
-    </div> : <p className="voco-setup__privacy">{!passed && !recording && !busy ? "Start test turns on your microphone. " : ""}Speech stays on this computer; this test only displays words here.</p>}
+    </div> : testing ? <p className="voco-setup__privacy">{!passed && !recording && !busy ? "Start test turns on your microphone. " : ""}Speech stays on this computer; this test only displays words here.</p> : null}
     <div className="voco-setup__actions">
       {passed && !recording ? <>
         <button ref={primaryRef} className="voco-button voco-button--primary" disabled={busy || blocked || failed || Boolean(setupError)}
-          onClick={handoff ? () => void onFinish() : ready ? onContinue : onCheckDesktopSetup}>
-          {saving ? "Saving…" : checkingDesktopSetup ? "Checking setup…" : handoff ? "Done" : ready ? "Continue" : "Check desktop setup"}</button>
-        {!handoff ? <button className="voco-button voco-button--ghost" disabled={busy || blocked} onClick={onStart}>Test again</button> : null}
+          onClick={handoff ? () => void onFinish() : toWords ? onContinue : onCheckDesktopSetup}>
+          {saving ? "Saving…" : checkingDesktopSetup ? "Checking setup…" : handoff ? "Done" : toWords ? "Continue" : "Check desktop setup"}</button>
+        {!wordsDone ? <button className="voco-button voco-button--ghost" disabled={busy || blocked} onClick={onStart}>Test again</button> : null}
       </> : <div className="voco-voice-control" data-recording={recording}>
         <button ref={primaryRef} className="voco-button voco-button--primary voco-voice-pill" disabled={recording ? busy : busy || blocked}
           onClick={recording ? onStop : problem && onRetrySetup ? onRetrySetup : onStart}><SettingsIcon name="microphone" /><span>{status === "processing" ? "Finishing…" : busy ? "Preparing…" : recording ? "Finish test" : problem && onRetrySetup ? "Retry microphone setup" : attempted || problem ? "Test again" : "Start test"}</span></button>

@@ -152,15 +152,16 @@ until setup is complete.
 **Setup** opens with "Which English do you write?": two flag cards, British
 English preselected, a sample sentence in the chosen spelling, and Continue.
 The question takes focus. Then comes "Say something. See it here." and a voice
-test: Start test, then Finish test. The words appear only in that window. When
-desktop input needs work, Continue becomes Check desktop setup; verified
-readiness shows "VOCO heard you." and Continue. Next, "Will VOCO get your name
+test: Start test, then Finish test. The words appear only in that window. A
+passed test shows "VOCO heard you." and Continue, with a note when desktop input
+still needs work. Next, "Will VOCO get your name
 right?": a card with the account's name as a large, editable title and a Say it
 voice pill, then "Anything else VOCO should know?" with a field and Add, and
 Continue with Skip for now. What VOCO heard appears under the word it checked, a
 silver mark for a note and a red one only when a check couldn't finish, with the
 misheard part highlighted like the spelling sample. Last, "Your voice, ready.",
-the shortcut and Done. Four short marks beside Setup show the step, the current
+the shortcut and Done; when desktop input needs work, "One more step." and
+Check desktop setup come first, and only verified readiness shows Done. Four short marks beside Setup show the step, the current
 one longest. Each later phase moves keyboard focus to its main action.
 
 ## Status

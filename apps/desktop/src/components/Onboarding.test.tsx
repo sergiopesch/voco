@@ -73,3 +73,23 @@ it("moves a passed test on to the words step, then hands off with Done", () => {
   const skipped = renderToStaticMarkup(<Onboarding {...props} wordsDone wordsChecked={false} />);
   expect(skipped).toContain("You can always come back and personalise VOCO in Settings, under My words.");
 });
+
+it("reaches the words step before desktop setup is ready, and checks it before Done", () => {
+  const props = {
+    microphone: "System default", status: "idle" as const, passed: true, failed: false, attempted: true,
+    setupError: null, desktopSetupError: "Sign out and back in once after installing VOCO.", checkingDesktopSetup: false,
+    preparing: false, saving: false, blocked: false, hotkey: "Alt+D", desktopReady: false,
+    onStart: vi.fn(), onStop: vi.fn(), onFinish: vi.fn(async () => {}),
+  };
+  const passed = renderToStaticMarkup(<Onboarding {...props} wordsDone={false} onContinue={vi.fn()} />);
+  expect(passed).toContain("VOCO heard you.");
+  expect(passed).toContain(">Continue</button>");
+  expect(passed).toContain("Desktop setup needs one more step.");
+  expect(passed).not.toContain("Check desktop setup");
+  const last = renderToStaticMarkup(<Onboarding {...props} wordsDone />);
+  expect(last).toContain("One more step.");
+  expect(last).toContain("Check desktop setup");
+  expect(last).not.toContain(">Done</button>");
+  expect(last).not.toContain("Test transcript");
+  expect(last).not.toContain("Test again");
+});

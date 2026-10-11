@@ -178,13 +178,13 @@ only show your words in the VOCO window.
    British is preselected.
 2. Choose **Start test** and say a sentence. Your words appear as you speak, in
    your spelling.
-3. Choose **Finish test**, then **Continue**. If the button says
-   **Check desktop setup**, fix what VOCO shows, then choose it again.
+3. Choose **Finish test**, then **Continue**.
 4. VOCO shows the name on your account. Change it if you like, choose
    **Say it** and say your name. If VOCO heard it wrong, choose **Teach VOCO**.
    Add any other word VOCO should know, then choose **Continue**, or
    **Skip for now**. See [Say it](everyday-use.md#say-it).
-5. Choose **Done**.
+5. Choose **Done**. If the button says **Check desktop setup**, fix what VOCO
+   shows, then choose it again.
 
 To dictate, click where you want the text, press `Alt+D` and speak. Press
 `Alt+D` again to finish. See [Everyday use](everyday-use.md).

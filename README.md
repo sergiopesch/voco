@@ -56,11 +56,11 @@ check that it writes your name right.
    British is preselected.
 2. Choose **Start test** and say a sentence. Your words appear in the window, in
    your spelling.
-3. Choose **Finish test**, then **Continue**. If the button says
-   **Check desktop setup**, choose it first and follow any instructions VOCO
-   shows.
+3. Choose **Finish test**, then **Continue**.
 4. Choose **Say it** and say your name, or **Skip for now**. If VOCO heard it
-   wrong, choose **Teach VOCO**. Then choose **Continue** and **Done**.
+   wrong, choose **Teach VOCO**. Then choose **Continue** and **Done**. If the
+   button says **Check desktop setup**, choose it first and follow any
+   instructions VOCO shows.
 5. Click where you want the text in another app, press `Alt+D` and speak. Press
    `Alt+D` again to finish.
 
