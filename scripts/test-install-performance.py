@@ -468,22 +468,53 @@ voco_ui_pause
             self.assertEqual(code,0,output)
             self.assertIn(b'ORDINARY APT: apt-get install -y -- /synthetic.deb',output)
 
-    def test_sudo_rs_gives_apt_the_terminal(self):
-        # sudo-rs would run a piped APT in the background of its pty, where the
-        # first read of the terminal stops it for good. The policy here would
-        # otherwise allow the presented wrapper.
+    def test_sudo_rs_keeps_the_display_and_apt_never_reads_the_terminal(self):
+        # sudo-rs runs a piped APT in the background of its pty, where the first
+        # read of the terminal stops it for good, so APT gets no terminal input.
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder)
-            sudo=root/'sudo'
-            sudo.write_text('#!/bin/bash\n[[ "$1" == --version ]] && { echo "sudo-rs 0.2.13-0ubuntu1.2"; exit 0; }\n'
-                            '[[ "$1" == -v || "$1" == -n ]] && exit 0\nprintf "ORDINARY APT: %s\\n" "$*"\n[[ "$1" == apt-get ]]\n')
-            sudo.chmod(0o755)
-            env={**os.environ,'PATH':folder+':'+os.environ['PATH'],'TMPDIR':folder,'TERM':'xterm-256color'}
+            (root/'sudo').write_text('#!/bin/bash\n[[ "$1" == --version ]] && { echo "sudo-rs 0.2.13-0ubuntu1.2"; exit 0; }\n'
+                                     'if [[ "$1" == -v || "$1" == -n ]]; then exit 0; fi\nexec "$@"\n')
+            (root/'apt-get').write_text('''#!/bin/bash
+[[ -t 0 ]] && { echo "APT HAS THE TERMINAL"; exit 66; }
+[[ "$DEBIAN_FRONTEND" == noninteractive ]] || exit 67
+[[ " $* " == *" Dpkg::Options::=--force-confdef "* && " $* " == *" Dpkg::Options::=--force-confold "* ]] || exit 68
+printf 'pmstatus:voco:20:Unpacking voco\n' >&3
+printf 'Unpacking voco (test) ...\n'
+''')
+            for path in root.iterdir():
+                path.chmod(0o755)
+            env={**os.environ,'TMPDIR':folder,'PATH':folder+':'+os.environ['PATH'],'TERM':'xterm-256color'}
             env.pop('NO_COLOR',None)
             code,output=terminal(['bash','-c',PREFIX+'\nVOCO_DOWNLOAD_DIR=$(mktemp -d)\nvoco_run_apt /synthetic.deb\n'],env)
-            self.assertEqual(code,0,output)
-            self.assertIn(b'ORDINARY APT: apt-get install -y -- /synthetic.deb',output)
-            self.assertNotIn(b'ORDINARY APT: sh -c',output)
+            self.assertEqual(code,0,output.decode(errors='replace'))
+            self.assertIn(b'Setting up VOCO.',output)
+            self.assertIn(b'Package setup',output)
+            self.assertNotIn(b'Unpacking voco (test)',output)
+            self.assertNotIn(b'APT HAS THE TERMINAL',output)
+            self.assertNotIn(b'runs again here',output)
+
+    def test_sudo_rs_runs_apt_again_on_the_terminal_when_it_must_ask(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder)
+            (root/'sudo').write_text('#!/bin/bash\n[[ "$1" == --version ]] && { echo "sudo-rs 0.2.13-0ubuntu1.2"; exit 0; }\n'
+                                     'if [[ "$1" == -v || "$1" == -n ]]; then exit 0; fi\nexec "$@"\n')
+            (root/'apt-get').write_text('''#!/bin/bash
+[[ -t 0 ]] || { printf 'pmstatus:voco:20:Unpacking voco\n' >&3; exit 100; }
+printf 'Fixture choice [y/N]: '
+read -r answer
+[[ "$answer" == yes ]] || exit 55
+printf '\nChoice accepted\n'
+''')
+            for path in root.iterdir():
+                path.chmod(0o755)
+            env={**os.environ,'TMPDIR':folder,'PATH':folder+':'+os.environ['PATH'],'TERM':'xterm-256color'}
+            env.pop('NO_COLOR',None)
+            code,output=terminal(['bash','-c',PREFIX+'\nVOCO_DOWNLOAD_DIR=$(mktemp -d)\nvoco_run_apt /synthetic.deb\n'],env,
+                                 reply=(b'Fixture choice [y/N]: ',b'yes\n'))
+            self.assertEqual(code,0,output.decode(errors='replace'))
+            self.assertIn(b'APT runs again here, where it can ask you.',output)
+            self.assertIn(b'Choice accepted',output)
 
     def test_logging_failure_does_not_break_output_or_process_status(self):
         with tempfile.TemporaryDirectory() as folder:

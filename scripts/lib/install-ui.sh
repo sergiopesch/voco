@@ -815,7 +815,7 @@ voco_ui_close() {
 }
 
 voco_run_apt() {
-  local result=0
+  local result=0 sudo_rs=false
   local wrapper='exec 3>&1 1>&2; exec apt-get -q=2 -o APT::Status-Fd=3 -o Dpkg::Use-Pty=0 install -y -- "$@"'
   local output_fd fifo="$VOCO_DOWNLOAD_DIR/apt-output"
   local -a statuses
@@ -827,14 +827,15 @@ voco_run_apt() {
     return $?
   fi
   # sudo-rs, Ubuntu 26.04's sudo, runs a command whose output feeds a pipe in
-  # the background of its own terminal and passes it no input. APT stops the
-  # first time it, dpkg or a package script reads the terminal (SIGTTIN), and
-  # sudo-rs continues only the command it started, so the install never ends.
-  # There APT gets the terminal and shows its own progress, and can still ask.
+  # the background of its own terminal and passes it no input. The first read
+  # of the terminal by APT, dpkg or a package script stops it (SIGTTIN), and
+  # sudo-rs continues only the command it started. So under sudo-rs APT reads
+  # nothing from the terminal: stdin is /dev/null, debconf doesn't ask, and dpkg
+  # keeps a configuration file someone changed. If APT fails, it runs again on
+  # the terminal, where it can ask.
   if sudo --version 2>/dev/null | grep -q '^sudo-rs'; then
-    voco_ui_release
-    sudo apt-get install -y -- "$@"
-    return $?
+    sudo_rs=true
+    wrapper='exec 3>&1 1>&2 </dev/null; exec env DEBIAN_FRONTEND=noninteractive apt-get -q=2 -o APT::Status-Fd=3 -o Dpkg::Use-Pty=0 -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold install -y -- "$@"'
   fi
   if ! sudo -n -v >/dev/null 2>&1; then
     voco_ui_release
@@ -871,6 +872,11 @@ voco_run_apt() {
   VOCO_UI_APT_DRAWING=false
   exec {output_fd}>&-
   voco_ui_release
+  if (( result != 0 )) && [[ "$sudo_rs" == true ]]; then
+    dim 'VOCO · APT runs again here, where it can ask you.'
+    sudo apt-get install -y -- "$@"
+    result=$?
+  fi
   if (( result != 0 )); then
     VOCO_KEEP_LOG=true
     dim "Installation details: $VOCO_INSTALL_LOG"
