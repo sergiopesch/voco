@@ -382,6 +382,25 @@ exit "$FIXTURE_EXIT"
                 if logs:
                     self.assertIn('Unpacking voco', logs[0].read_text())
 
+    def test_routine_update_alternatives_and_needrestart_lines_stay_in_the_log(self):
+        routine = (b'update-alternatives: using /usr/lib/x86_64-linux-gnu/blas/libblas.so.3 to provide '
+                   b'/usr/lib/x86_64-linux-gnu/libblas.so.3 (libblas.so.3-x86_64-linux-gnu) in auto mode\n'
+                   b'Scanning processes...\nScanning linux images...\nRunning kernel seems to be up-to-date.\n'
+                   b'No services need to be restarted.\nNo containers need to be restarted.\n'
+                   b'No user sessions are running outdated binaries.\n'
+                   b'No VM guests are running outdated hypervisor (qemu) binaries on this host.\n')
+        with tempfile.TemporaryDirectory() as folder:
+            log = Path(folder)/'apt.log'
+            log.touch(mode=0o600)
+            run = subprocess.run(['/usr/bin/python3',str(APT_UI),str(log),'true'],
+                                 input=b'pmstatus:voco:60:Setting up\n'+routine+b'update-alternatives: warning: fixture\n',
+                                 capture_output=True,timeout=5)
+            self.assertEqual(run.returncode,0,run.stderr)
+            for line in routine.splitlines():
+                self.assertNotIn(line,run.stdout)
+                self.assertIn(line,log.read_bytes())
+            self.assertIn(b'update-alternatives: warning: fixture',run.stdout)
+
     def test_unknown_lines_and_non_newline_prompts_are_never_hidden(self):
         with tempfile.TemporaryDirectory() as folder:
             log = Path(folder)/'apt.log'
