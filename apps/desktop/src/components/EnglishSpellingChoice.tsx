@@ -11,6 +11,8 @@ interface EnglishSpellingChoiceProps {
   disabled?: boolean;
   /** Settings also offers the recognizer's own, mixed spelling. */
   offerAsRecognised?: boolean;
+  /** No choice is saved yet, so choosing the preselected card saves it too. */
+  unsaved?: boolean;
   compact?: boolean;
   onChange: (value: EnglishSpelling) => void;
 }
@@ -18,7 +20,7 @@ interface EnglishSpellingChoiceProps {
 /** Native radios in two flag cards: arrow keys move between them, and each
  * reads as its variety with the example words as its description. */
 export function EnglishSpellingChoice({ value, labelledBy, disabled = false, offerAsRecognised = false,
-  compact = false, onChange }: EnglishSpellingChoiceProps) {
+  unsaved = false, compact = false, onChange }: EnglishSpellingChoiceProps) {
   const name = useId();
   return <div className="voco-spelling" role="radiogroup" aria-labelledby={labelledBy} data-compact={compact}>
     <div className="voco-spelling__cards">
@@ -27,7 +29,8 @@ export function EnglishSpellingChoice({ value, labelledBy, disabled = false, off
         const examples = `${name}-${variety}`;
         return <label key={variety} className="voco-spelling__card" data-checked={value === variety} data-disabled={disabled}>
           <input type="radio" name={name} value={variety} checked={value === variety} disabled={disabled}
-            aria-label={option.label} aria-describedby={examples} onChange={() => onChange(variety)} />
+            aria-label={option.label} aria-describedby={examples} onChange={() => onChange(variety)}
+            onClick={() => { if (unsaved && value === variety) onChange(variety); }} />
           <img className="voco-spelling__flag" src={option.flag} alt="" />
           <span className="voco-spelling__name">{option.label}</span>
           <span className="voco-spelling__examples" id={examples}>
@@ -94,17 +97,26 @@ export function EnglishSpellingStep({ value, saving, error, onChange, onContinue
   </section>;
 }
 
+interface EnglishSpellingNoticeProps {
+  /** What they chose, once they have; the note then confirms it. */
+  answer: EnglishVariety | null;
+  disabled: boolean;
+  onChoose: (value: EnglishVariety) => void;
+}
+
 /** For someone set up before VOCO had a spelling choice; either answer saves it. */
-export function EnglishSpellingNotice({ disabled, onChoose }: { disabled: boolean; onChoose: (value: EnglishVariety) => void }) {
+export function EnglishSpellingNotice({ answer, disabled, onChoose }: EnglishSpellingNoticeProps) {
   return <section className="voco-spelling-notice" aria-labelledby="voco-spelling-notice-title">
-    <img className="voco-spelling__flag" src={ENGLISH_VARIETIES.british.flag} alt="" />
-    <div className="voco-spelling-notice__copy">
-      <strong id="voco-spelling-notice-title">VOCO now spells in British English.</strong>
-      <span>{ENGLISH_VARIETIES.british.examples.join(", ")}</span>
+    <img className="voco-spelling__flag" src={ENGLISH_VARIETIES[answer ?? "british"].flag} alt="" />
+    <div className="voco-spelling-notice__copy" role="status">
+      <strong id="voco-spelling-notice-title">
+        {answer ? `VOCO spells in ${ENGLISH_VARIETIES[answer].label}.` : "VOCO now spells in British English."}
+      </strong>
+      <span>{answer ? "You can change this in Settings." : ENGLISH_VARIETIES.british.examples.join(", ")}</span>
     </div>
-    <div className="voco-spelling-notice__actions">
+    {answer ? null : <div className="voco-spelling-notice__actions">
       <button className="voco-button voco-button--secondary voco-button--compact" disabled={disabled} onClick={() => onChoose("american")}>Use American English</button>
       <button className="voco-button voco-button--ghost voco-button--compact" disabled={disabled} onClick={() => onChoose("british")}>Keep British</button>
-    </div>
+    </div>}
   </section>;
 }

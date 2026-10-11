@@ -392,7 +392,7 @@ describe("English spelling", () => {
     expect(radios(renderPanel({ surface: "settings", config: { ...config, englishSpelling: null } }))[0]?.checked).toBe(true);
   });
 
-  it("tells someone set up before the choice existed, once, in place of the lens", () => {
+  it("tells someone set up before the choice existed, until they choose, in place of the lens", () => {
     const earlier = renderPanel({ config: { ...config, englishSpelling: null } });
     expect(earlier).toContain("VOCO now spells in British English.");
     expect(earlier).toContain(">Use American English</button>");

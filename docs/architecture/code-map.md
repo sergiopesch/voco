@@ -59,7 +59,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `styles.css` — Base styles and window surfaces.
 - `preferences.css` — Settings window layout.
 - `motion.css` — Shared motion styles.
-- `english-spelling.css` — The spelling cards, the sample sentence and the popover's one-time note.
+- `english-spelling.css` — The spelling cards, the sample sentence and the popover's note for earlier setups.
 - `vite-env.d.ts` — Vite type references.
 
 ### Components: `components/`
@@ -67,7 +67,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `ControlPanel.tsx` — Settings window with the Settings, Microphone, Shortcut, Updates and Help sections.
 - `ControlPanel.test.tsx` — Settings guidance and controls.
 - `recordedShortcuts.json` — Key presses, the shortcut **Record keys** makes of each and whether Rust accepts it; `ControlPanel.test.tsx` and `lib.rs` both check it.
-- `EnglishSpellingChoice.tsx` — Setup's spelling question, the Settings spelling cards and the one-time popover note for earlier setups.
+- `EnglishSpellingChoice.tsx` — Setup's spelling question, the Settings spelling cards and the popover note that earlier setups see until they choose.
 - `Onboarding.tsx` — First-run voice test, after the spelling question, and desktop setup check. Its text stays in the window.
 - `Onboarding.test.tsx` — Onboarding states.
 - `CrashReview.tsx` — Review window: copy or discard interrupted dictations.

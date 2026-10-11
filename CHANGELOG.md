@@ -32,7 +32,7 @@ panel runs on GNOME 51. VOCO's app framework and build tools are up to date. The
   words as recognised. The speech worker changes only VarCon 2020.12.07's
   unambiguous forms, never names or words whose spelling depends on meaning, and
   pastes only text that can no longer change, so dictation stays append-only.
-  Earlier setups spell British too, and the popover says so once.
+  Earlier setups spell British too, and the popover says so until they choose.
 - **Update checks** on the **Updates** page: **When VOCO starts**, the default,
   or **Only when I choose**, which asks GitHub only when you choose **Check for
   updates**.
