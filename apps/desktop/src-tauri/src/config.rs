@@ -327,14 +327,6 @@ impl AppConfig {
 
 /// The most entries My words holds, the most words and characters in one,
 /// as `runtime/speech/mywords.py` reads them.
-/// Normalizes text to NFC (precomposed Unicode form), so decomposed accents
-/// like U+0301 combine with their base letter.
-pub(crate) fn normalize_nfc(text: &str) -> String {
-    use icu_normalizer::ComposingNormalizer;
-    let normalizer = ComposingNormalizer::new_nfc();
-    normalizer.normalize(text).into_owned()
-}
-
 pub const MY_WORDS_MAX_TERMS: usize = 100;
 pub const MY_WORDS_MAX_WORDS: usize = 4;
 pub const MY_WORDS_MAX_CHARS: usize = 40;
@@ -533,6 +525,30 @@ fn my_words_key(term: &str) -> String {
     key
 }
 
+/// Normalizes to NFC (precomposed Unicode form).
+pub(crate) fn normalize_nfc(text: &str) -> String {
+    use icu_normalizer::ComposingNormalizer;
+    let normalizer = ComposingNormalizer::new_nfc();
+    normalizer.normalize(text).into_owned()
+}
+
+/// Normalizes My words entries and taught versions to NFC.
+pub(crate) fn normalize_my_words(config: &mut AppConfig) {
+    config.my_words = config
+        .my_words
+        .iter()
+        .map(|term| normalize_nfc(term))
+        .collect();
+    config.my_words_heard = config
+        .my_words_heard
+        .iter()
+        .map(|version| HeardVersion {
+            heard: normalize_nfc(&version.heard),
+            writes: normalize_nfc(&version.writes),
+        })
+        .collect();
+}
+
 /// The number of words in a listable term, or None when it isn't one: words
 /// of letters and digits, perhaps joined by apostrophes, separated by one
 /// space, one hyphen, or a full stop and at most one space, with an optional
@@ -590,25 +606,22 @@ fn my_words_at(path: &std::path::Path) -> (Vec<String>, Vec<HeardVersion>) {
             path,
         )?)?)
     };
-    let Ok(config) = read() else {
+    let Ok(mut config) = read() else {
         return Default::default();
     };
+    // Normalize to NFC at the boundary where config is loaded
+    normalize_my_words(&mut config);
     // A hand-edited config can't send the worker more, or longer, entries or
     // versions than Settings can save; the worker checks the rest.
     let words = config
         .my_words
         .into_iter()
-        .map(|term| normalize_nfc(&term))
         .filter(|term| listable(term))
         .take(MY_WORDS_MAX_TERMS)
         .collect();
     let heard = config
         .my_words_heard
         .into_iter()
-        .map(|version| HeardVersion {
-            heard: normalize_nfc(&version.heard),
-            writes: normalize_nfc(&version.writes),
-        })
         .filter(|version| heard_listable(&version.heard) && listable(&version.writes))
         .take(MY_WORDS_MAX_TERMS * MY_WORDS_MAX_HEARD)
         .collect();
@@ -1511,22 +1524,41 @@ mod tests {
             #[serde(rename = "expectedWordCount")]
             expected_word_count: Option<usize>,
         }
-        let fixture = std::fs::read_to_string("../../../tests/fixtures/mywords/entries.json")
-            .expect("fixture exists");
+        let fixture_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../tests/fixtures/mywords/entries.json");
+        let fixture = std::fs::read_to_string(&fixture_path).expect("fixture exists");
         let cases: Vec<FixtureCase> = serde_json::from_str(&fixture).expect("valid JSON");
+        
+        let test_dir = std::env::temp_dir().join(format!(
+            "voco-config-fixture-test-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&test_dir).unwrap();
+        let config_path = test_dir.join("config.json");
+        
         for case in cases {
-            // Normalize at the boundary, as the real code does
-            let normalized = normalize_nfc(&case.input);
-            let result = validate_my_words(std::slice::from_ref(&normalized));
+            // Write the fixture input into a temp config and read through my_words_at boundary
+            let config_json = serde_json::json!({
+                "hotkey": "Alt+D",
+                "myWords": [case.input.clone()]
+            });
+            atomic_write(&config_path, &config_json.to_string()).unwrap();
+            let (words, _) = my_words_at(&config_path);
+            
             if case.expected_verdict == "accept" {
-                assert!(
-                    result.is_ok(),
-                    "{}: expected accept but got {:?}",
+                assert_eq!(
+                    words.len(),
+                    1,
+                    "{}: expected accept but got {} words",
                     case.label,
-                    result
+                    words.len()
                 );
                 if let Some(expected_count) = case.expected_word_count {
-                    let actual = listable_word_count(&normalized);
+                    let actual = listable_word_count(&words[0]);
                     assert_eq!(
                         actual,
                         Some(expected_count),
@@ -1537,13 +1569,39 @@ mod tests {
                     );
                 }
             } else {
-                assert!(
-                    result.is_err(),
-                    "{}: expected reject but got Ok",
-                    case.label
+                assert_eq!(
+                    words.len(),
+                    0,
+                    "{}: expected reject but got {} words",
+                    case.label,
+                    words.len()
                 );
             }
         }
+        
+        let _ = fs::remove_dir_all(&test_dir);
+    }
+
+    #[test]
+    fn persist_config_patch_normalizes_nfd_to_nfc() {
+        let nfd_input = "Siobha\u{0301}n Kelly"; // NFD (decomposed)
+        let nfc_expected = "Siobhán Kelly"; // NFC (precomposed)
+        
+        // Create a config with NFD input
+        let mut config = AppConfig::default();
+        config.my_words = vec![nfd_input.to_string()];
+        config.my_words_heard = vec![HeardVersion {
+            heard: nfd_input.to_string(),
+            writes: nfd_input.to_string(),
+        }];
+        
+        // Normalize as persist_config_patch does
+        normalize_my_words(&mut config);
+        
+        // Verify NFD was normalized to NFC
+        assert_eq!(config.my_words, vec![nfc_expected]);
+        assert_eq!(config.my_words_heard[0].heard, nfc_expected);
+        assert_eq!(config.my_words_heard[0].writes, nfc_expected);
     }
 
 

@@ -588,19 +588,7 @@ fn persist_config_patch(
     let mut config = previous.clone();
     patch.apply_to(&mut config);
     // Normalize to NFC at the boundary where config enters Rust
-    config.my_words = config
-        .my_words
-        .into_iter()
-        .map(|term| config::normalize_nfc(&term))
-        .collect();
-    config.my_words_heard = config
-        .my_words_heard
-        .into_iter()
-        .map(|version| config::HeardVersion {
-            heard: config::normalize_nfc(&version.heard),
-            writes: config::normalize_nfc(&version.writes),
-        })
-        .collect();
+    config::normalize_my_words(&mut config);
     if previous.my_words != config.my_words {
         config::validate_my_words(&config.my_words)?;
     }
