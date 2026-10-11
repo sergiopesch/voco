@@ -10,6 +10,7 @@
 set -euo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 : "${VOCO_PANEL_IMAGE:?Set a Fedora image, pinned by digest}"
+[[ $VOCO_PANEL_IMAGE == *@sha256:* ]] || { echo 'Pin VOCO_PANEL_IMAGE by digest' >&2; exit 1; }
 : "${VOCO_PANEL_EVIDENCE_DIR:?Set a fresh evidence directory}"
 [[ ! -e $VOCO_PANEL_EVIDENCE_DIR ]] || { echo 'Evidence directory exists' >&2; exit 1; }
 evidence_parent=$(dirname "$VOCO_PANEL_EVIDENCE_DIR")

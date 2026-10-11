@@ -537,14 +537,20 @@ class InstallerArtTests(unittest.TestCase):
         return {'mode': mode.decode(), 'graphics': graphics.decode(), 'cell': (int(width), int(height)),
                 'ms': int(elapsed), 'terminal': state.decode()}, output
 
+    def require_ffmpeg(self):
+        if shutil.which('ffmpeg'):
+            return
+        # CI installs ffmpeg, so a microphone that no longer matches the symbol fails there.
+        if os.environ.get('GITHUB_ACTIONS') == 'true':
+            self.fail('ffmpeg is missing, so the installer art was not checked against the symbol')
+        self.skipTest('ffmpeg is unavailable, so the microphone was not redrawn from the symbol')
+
     def test_the_microphone_comes_from_the_symbol(self):
-        if not shutil.which('ffmpeg'):
-            self.skipTest('ffmpeg is unavailable, so the microphone was not redrawn from the symbol')
+        self.require_ffmpeg()
         subprocess.run([sys.executable, str(ROOT / 'scripts/generate-installer-art.py'), '--check'], check=True)
 
     def test_the_freshness_check_covers_the_image_and_every_mosaic(self):
-        if not shutil.which('ffmpeg'):
-            self.skipTest('ffmpeg is unavailable, so the microphone was not redrawn from the symbol')
+        self.require_ffmpeg()
         generator = load('installer_art', ROOT / 'scripts/generate-installer-art.py')
         brand = json.loads((ROOT / 'scripts/lib/install-brand.json').read_text())
         drawn, pixels, samples = generator.draw(shutil.which('ffmpeg'), brand['card'])
