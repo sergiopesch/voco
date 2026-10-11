@@ -13,6 +13,18 @@ echo "7164521ff55c59fc00310db5bea051cdfad020371e52abcbf202c15eb8d34743  $state/r
 dpkg-deb --extract "$state/runtime.deb" "$state/package"
 python3 "$root/scripts/verify-speech-payload.py" "$state/package" 2026.0.47 --native-only
 payload="$state/package/usr/lib/voco/speech"
-cmp "$root/runtime/speech/MODEL-IDENTITY.json" "$payload/MODEL-IDENTITY.json"
+# The package names either this checkout's model or the NVIDIA GGUF it is built
+# from, which 2026.0.47 carries; graft-model-tokenizer.py then adds the tokenizer.
+python3 - "$root/runtime/speech/MODEL-IDENTITY.json" "$payload/MODEL-IDENTITY.json" <<'EOF'
+import json
+import sys
+
+pinned, packaged = (json.load(open(path)) for path in sys.argv[1:])
+base = {key: value for key, value in pinned.items() if key not in ("base_model_sha256", "tokenizer")}
+base["model_sha256"] = pinned["base_model_sha256"]
+if packaged not in (pinned, base):
+    raise SystemExit("The package's MODEL-IDENTITY.json names neither this checkout's model nor its NVIDIA GGUF")
+EOF
 cmp "$root/runtime/speech/NATIVE-BUILD.json" "$payload/NATIVE-BUILD.json"
 cp -a "$payload/models" "$payload/lib" "$payload/libbench_nemo_pool.so" "$root/runtime/speech/"
+python3 "$root/scripts/graft-model-tokenizer.py" "$root/runtime/speech/models/nemotron-speech-streaming-en-0.6b.q8_0.gguf"
