@@ -215,7 +215,7 @@ complete `165,217,178` and active `239,206,131`); and the easing as 21 steps of
 composites the master onto the graphite and averages it down; the rest is plain
 Python, so the installer never reads an image or runs ffmpeg.
 
-- **The image:** an indexed PNG of 40 colours, with the microphone 400 pixels
+- **The image:** an indexed PNG of 36 colours, with the microphone 400 pixels
   tall, about twice its size on a HiDPI screen. Graphite room around it lets
   the installer crop it to any cell shape from 0.40 to 0.65 (width over
   height), so it fills the card's 14 × 11 microphone cells without stretching.
@@ -260,10 +260,12 @@ one shine passes across them, and the tagline writes itself in: 1.3 s in all.
 The intro only paints frames, about 30 a second, while the checks and the
 download go on; an install that finishes sooner ends on the card at rest. Each
 later stage, and the start of the download, passes one shine across the
-letters. The microphone itself never changes, and once the card is at rest
-only the progress lines are drawn again. Every frame that draws the card places
-the image again, and the image comes off before the canvas clears, so it never
-stays behind on its own. After the install it stays on the card.
+letters. The microphone itself never changes. A frame draws again only the
+lines that changed, and once the sweep has passed the microphone only the rest
+of each row, so the microphone and the image over it stay untouched; once the
+card is at rest, only the progress lines change. The image is placed again
+whenever its cells are drawn, and comes off before the canvas clears, so it
+never stays behind on its own. After the install it stays on the card.
 
 The canvas marks stages with ✓ in green when done, › in amber while active and
 ○ in grey while waiting: Check, Download, Verify and Install. Downloads
