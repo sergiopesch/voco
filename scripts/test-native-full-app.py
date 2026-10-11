@@ -62,6 +62,8 @@ REQUIRED = ['dictation_desktop_paste_session_started', 'dictation_desktop_stream
 FATAL = {'dictation_desktop_paste_unavailable', 'dictation_desktop_stream_failed', 'dictation_desktop_remainder_copied',
          'dictation_desktop_remainder_kept', 'dictation_desktop_snapshot_revised', 'recording_script_processor_connected',
          'dictation_capture_health_interrupted', 'dictation_recovery_retained'}
+# The launch cases start VOCO as a launcher or a login autostart would, and never dictate.
+LAUNCH = {'launcher': 'popover-opened-by-a-launcher-start', 'autostart': 'stayed-in-the-tray'}
 t0 = time.monotonic()
 
 def pump(duration=.05):
@@ -289,7 +291,7 @@ if case == 'lock':
     assert (root / 'logind.ready').exists(), 'The fake logind did not start'
 app_hash = hashlib.sha256((root / 'voco').read_bytes()).hexdigest()
 command = [str(root / 'voco')]
-if case in ('launcher', 'autostart'):
+if case in LAUNCH:
     # As GIO launches a desktop entry: it names the entry and the process it started.
     # The shell's own PID becomes VOCO's through exec, so the two match.
     app_env['GIO_LAUNCHED_DESKTOP_FILE'] = '/usr/share/applications/VOCO.desktop'
@@ -304,7 +306,7 @@ try:
     assert shutil.which('xclip') and shutil.which('xdotool'), 'X11 paste needs xclip and xdotool on PATH'
     wait_for(lambda: (root / 'runtime/voco.sock').exists(), 'application control socket')
     wait_for(app_ready, 'frontend and model readiness', timeout=30)
-    if case in ('launcher', 'autostart'):
+    if case in LAUNCH:
         requested = [x.get('backend_used') for x in traces() if x.get('event') == 'launcher_activation_requested']
         if case == 'launcher':
             assert requested == ['launch'], 'The launcher start was not taken as a launcher click: %r' % requested
@@ -434,7 +436,9 @@ except Exception as error:
 finally:
     # Show the app's state in the final screenshot when the gate stopped earlier.
     try:
-        if popover is None and app.poll() is None and not popover_shown() and tray_menus().get('Open VOCO', {}).get('enabled'):
+        # An autostart that stayed in the tray already shows its true state.
+        if case != 'autostart' and popover is None and app.poll() is None and not popover_shown() \
+                and tray_menus().get('Open VOCO', {}).get('enabled'):
             tray_click('Open VOCO')
             pump(1)
     except Exception as error:
@@ -447,21 +451,28 @@ finally:
             diagnostic_errors.append('%s: %s' % (name, error))
     c = counts()
     capture = 'webkit-audio-worklet' if c['recording_worklet_connected'] else 'webkit-script-processor' if c['recording_script_processor_connected'] else 'native' if c['recording_state_active'] else None
-    report = dict(passed=passed, failure=failure, expectedOutcome='pasted-into-focused-field', case=case,
+    if case in LAUNCH:
+        boundary = ["the release binary started with GIO's launch variables for VOCO.desktop"
+                    + (' and DESKTOP_AUTOSTART_ID' if case == 'autostart' else ''), 'the real renderer and its launch check',
+                    'the Ready popover through AT-SPI' if case == 'launcher' else 'the tray menu through a private StatusNotifierWatcher',
+                    'no dictation', 'private X11 without a window manager']
+    else:
+        boundary = [{'webkit-audio-worklet': 'real WebKit capture', 'native': 'real native capture'}.get(capture, 'capture not established'),
+                    'private PulseAudio fixture', 'Tauri binary IPC', 'pinned Nemotron in a seccomp-filtered worker', 'xclip CLIPBOARD+PRIMARY',
+                    'xdotool Shift+Insert into the focused GTK entry', 'no IBus text mutation', 'private X11 without a window manager']
+    report = dict(passed=passed, failure=failure, expectedOutcome=LAUNCH.get(case, 'pasted-into-focused-field'), case=case,
                   buildRole=os.environ.get('VOCO_NATIVE_BUILD_ROLE', 'preflight'),
-                  callbackTraceInstrumented=os.environ.get('VOCO_NATIVE_TRACE') == '1', expectedWords=expected,
+                  callbackTraceInstrumented=os.environ.get('VOCO_NATIVE_TRACE') == '1', expectedWords=[] if case in LAUNCH else expected,
                   text=field.get_text(), otherText=other.get_text(), textBeforeSwitch=before_switch,
                   mutations=[dict(m, t=round(m['t'] - t0, 3)) for m in mutations], preedits=[dict(p, t=round(p['t'] - t0, 3)) for p in preedits],
                   selections=selections, traceCounts=dict(sorted(c.items())), captureRoute=capture, focus=focus_log, harnessWindow=window_id,
                   tray=tray_state, popoverWindow=popup, popover=popover, helpers={name: bool(shutil.which(name)) for name in ['xclip', 'xdotool']},
                   diagnosticErrors=diagnostic_errors, workerConfinement=confinement,
                   engineSourceHashes={p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in root.glob('voco_ibus_*.py')},
-                  fixtureSha256=hashlib.sha256(sound.read_bytes()).hexdigest(),
+                  fixtureSha256=None if case in LAUNCH else hashlib.sha256(sound.read_bytes()).hexdigest(),
                   appSha256=app_hash,
                   modelSha256=hashlib.sha256(model.read_bytes()).hexdigest(),
-                  boundary=' / '.join([{'webkit-audio-worklet': 'real WebKit capture', 'native': 'real native capture'}.get(capture, 'capture not established'),
-                                       'private PulseAudio fixture', 'Tauri binary IPC', 'pinned Nemotron in a seccomp-filtered worker', 'xclip CLIPBOARD+PRIMARY',
-                                       'xdotool Shift+Insert into the focused GTK entry', 'no IBus text mutation', 'private X11 without a window manager']))
+                  boundary=' / '.join(boundary))
     (root / 'evidence/full-app.json').write_text(json.dumps(report, indent=2) + '\n')
     if trace_path.exists():
         shutil.copyfile(trace_path, root / 'evidence/full-app-trace.jsonl')
