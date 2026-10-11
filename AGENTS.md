@@ -31,13 +31,15 @@ setup and pull requests.
   empty list leaves recognition exactly as it is without the feature.
 - Say it checks one entry: VOCO listens once and shows, in its own window only,
   what it heard. When it heard the entry wrong, the user can teach VOCO that
-  version, up to five for each entry. The worker then writes the entry, or the
-  one word of it VOCO misheard, wherever the recognizer writes a taught version,
-  matching it as it matches the entry. Taught versions are never boosted, and
-  VOCO warns before teaching one made only of everyday words, which it would
-  then change whenever the user says them. The list and its taught versions
-  stay in the owner-only config and never reach logs, metrics, the crash
-  journal or Review.
+  version, up to five for each entry, each at most four words and 40 characters
+  of letters, digits, apostrophes, single spaces and hyphens. A version that
+  matches another entry or version is refused before it is saved, so no text
+  has two spellings. The worker then writes the entry, or the one word of it
+  VOCO misheard, wherever the recognizer writes a taught version, matching it as
+  it matches the entry. Taught versions are never boosted, and VOCO warns before
+  teaching one made only of everyday words, which it would then change whenever
+  the user says them. The list and its taught versions stay in the owner-only
+  config and never reach logs, metrics, the crash journal or Review.
 - Tray first. Respect system accessibility preferences such as reduced motion.
   A click on VOCO's launcher opens the popover whether or not VOCO was running:
   `activation.rs` counts a start as a launcher click only when GIO names
@@ -296,10 +298,11 @@ change.
 - The voice test uses the production recognition queue with local-only output.
   Never paste or copy onboarding output. The test keeps its local retry.
 - After the voice test, setup offers My words with the user's name as its
-  default entry: the full name of their account, read locally. It is saved only
-  if they keep it and continue, or say it. Anything else is theirs to type; setup
-  suggests no kinds of words. With nothing listed, setup says they can personalise
-  VOCO in Settings later.
+  default entry: the full name of their account, read locally, when it could be
+  an entry; otherwise the name starts empty. It is saved only if they keep it
+  and continue, or say it, and a name they edit is checked like any entry.
+  Anything else is theirs to type; setup suggests no kinds of words. With
+  nothing listed, setup says they can personalise VOCO in Settings later.
 - Say it, in setup and Settings, uses the same queue with local-only output and
   the saved list, as recognized, without spelling. Never paste or copy it.
 - Finish must flush capture and recognition successfully. Check the desktop input
