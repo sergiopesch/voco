@@ -25,6 +25,8 @@ export function MyWords({ words, heard, disabled, listeningElsewhere, onSave, on
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
   const check = useWordCheck(onStartCheck, onStopCheck);
+  // While a check listens, the list it started with stays as it is.
+  const frozen = disabled || check.active;
 
   async function add() {
     const term = tidyMyWord(draft);
@@ -90,11 +92,11 @@ export function MyWords({ words, heard, disabled, listeningElsewhere, onSave, on
         </p>
         <form className="voco-my-words__add" onSubmit={event => { event.preventDefault(); void add(); }}>
           <label className="voco-field"><span>Word or name</span>
-            <input ref={inputRef} value={draft} disabled={disabled} placeholder="Type a word or name"
+            <input ref={inputRef} value={draft} disabled={frozen} placeholder="Type a word or name"
               aria-invalid={Boolean(problem)} aria-describedby="voco-my-words-feedback"
               onChange={event => { setDraft(event.target.value); setProblem(null); }} />
           </label>
-          <button className="voco-button voco-button--secondary" type="submit" disabled={disabled || !draft.trim()}>Add</button>
+          <button className="voco-button voco-button--secondary" type="submit" disabled={frozen || !draft.trim()}>Add</button>
         </form>
         <p id="voco-my-words-feedback" className={problem ? "voco-inline-note voco-inline-note--error" : "voco-preferences__helper"}
           role={problem ? "alert" : undefined}>
@@ -110,10 +112,10 @@ export function MyWords({ words, heard, disabled, listeningElsewhere, onSave, on
                     disabled={disabled || listeningElsewhere || (check.active && !("entry" in check.state && check.state.entry === word))}
                     onSay={() => say(word)} onDone={check.end} />
                   <button className="voco-button voco-button--ghost voco-button--compact voco-my-words__remove" type="button"
-                    disabled={disabled || ("entry" in check.state && check.state.entry === word && check.active)}
+                    disabled={frozen}
                     aria-label={`Remove ${word}`} onClick={() => void remove(index)}>Remove</button>
                 </div>
-                <TaughtVersions versions={versionsOf(words, heard, index)} entry={word} disabled={disabled} onForget={version => void forget(version, word)} />
+                <TaughtVersions versions={versionsOf(words, heard, index)} entry={word} disabled={frozen} onForget={version => void forget(version, word)} />
                 <CheckResult state={check.state} entry={word} words={words} heard={heard} saving={disabled} error={checkError}
                   onTeach={teaching => void teach(word, teaching)} onSayAgain={() => say(word)} />
               </li>

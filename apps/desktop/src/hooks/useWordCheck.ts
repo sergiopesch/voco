@@ -109,8 +109,11 @@ export function useWordCheck(start: StartWordCheck, stop: () => void) {
         return;
       }
       const transcript = store.transcript;
-      void loadEverydayWords().catch(() => new Set<string>())
-        .then(everyday => finish({ phase: "heard", entry, transcript, everyday }));
+      // Without the list VOCO can't warn about everyday words, so it teaches
+      // nothing. A chunk that failed to load stays failed until VOCO restarts.
+      void loadEverydayWords().then(
+        everyday => finish({ phase: "heard", entry, transcript, everyday }),
+        () => finish({ phase: "failed", entry, message: "VOCO couldn't read its list of everyday words. Restart VOCO, then try again." }));
     }, 50);
     return () => window.clearInterval(timer);
   }, [activeRun, entry, stop]);

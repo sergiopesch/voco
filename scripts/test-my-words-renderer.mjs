@@ -155,6 +155,11 @@ try {
     await page.getByRole('button', { name: 'Say it: Siobhán' }).click();
     await page.waitForFunction(() => window.store.getState().status === 'recording');
     assert.equal(await page.getByRole('button', { name: 'Say it: GitHub' }).isDisabled(), true, 'One check at a time');
+    // The list the check started with stays as it is until the check ends.
+    for (const name of ['Remove Siobhán', 'Remove GitHub', 'Add']) {
+        assert.equal(await page.getByRole('button', { name, exact: true }).isDisabled(), true, name);
+    }
+    assert.equal(await field().isDisabled(), true);
     await page.evaluate(() => window.say());
     await siobhan.getByText('VOCO heard “Shivon”.').waitFor();
     await shot('settings-my-words-heard');
@@ -171,6 +176,22 @@ try {
     // No check pastes, copies or keeps a crash journal, and each starts as recognized.
     assert.equal(await page.evaluate(() => window.calls.filter(call => ['pasteDesktopText', 'copyDesktopText'].includes(call[0])).length), 0);
     assert.ok(await page.evaluate(() => window.speechRequests.filter(request => request.op === 'start').every(request => request.words_check === true)));
+    // Without its list of everyday words, a check teaches nothing; a restart reads it again.
+    await page.route('**/everyday-words.txt*', route => route.abort());
+    await load({ onboardingCompleted: true, englishSpelling: 'british', myWords: ['Siobhán', 'GitHub'], myWordsHeard: [{ heard: 'Shivon', writes: 'Siobhán' }] });
+    await page.evaluate(() => { window.heardNext = 'Shivonne.'; });
+    await page.getByRole('button', { name: 'Say it: Siobhán' }).click();
+    await page.waitForFunction(() => window.store.getState().status === 'recording');
+    await page.evaluate(() => window.say());
+    await siobhan.getByText("VOCO couldn't read its list of everyday words. Restart VOCO, then try again.", { exact: false }).waitFor();
+    assert.equal(await siobhan.getByRole('button', { name: /Teach/ }).count(), 0);
+    await page.unroute('**/everyday-words.txt*');
+    await load({ onboardingCompleted: true, englishSpelling: 'british', myWords: ['Siobhán', 'GitHub'], myWordsHeard: [{ heard: 'Shivon', writes: 'Siobhán' }] });
+    await page.evaluate(() => { window.heardNext = 'Shivonne.'; });
+    await page.getByRole('button', { name: 'Say it: Siobhán' }).click();
+    await page.waitForFunction(() => window.store.getState().status === 'recording');
+    await page.evaluate(() => window.say());
+    await siobhan.getByText('VOCO heard “Shivonne”.').waitFor();
     // A failed save while teaching says why and keeps the versions as saved.
     await page.evaluate(() => { window.heardNext = 'Gitthub.'; });
     await page.getByRole('button', { name: 'Say it: GitHub' }).click();
