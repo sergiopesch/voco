@@ -148,13 +148,36 @@ export function judgeCheck(transcript: string, words: readonly string[], heard: 
   else if (!misheard && termWords(version).length < termWords(entry).length) return { kind: "partial", heard: shown };
   else if (!unbroken(version)) return { kind: "unclear", heard: shown, pause: true };
   else teaching = { heard: version, writes: entry, everyday: allEveryday(version) };
-  const key = myWordsKey(teaching.heard);
-  const other = words.find(term => myWordsKey(term) === key)
-    ?? heard.find(taught => myWordsKey(taught.heard) === key)?.writes;
-  if (other !== undefined) return { kind: "taken", heard: shown, other };
+  // Every way the list already matches, and what each writes: entries,
+  // versions, and each version of one word inside the entries with it. The new
+  // version, and each match it makes inside an entry, may only repeat one that
+  // writes the same.
+  const matches = new Map<string, string>(words.map(term => [myWordsKey(term), term]));
+  for (const taught of heard) matches.set(myWordsKey(taught.heard), taught.writes);
+  for (const taught of heard) {
+    for (const [key, term] of within(words, taught)) if (!matches.has(key)) matches.set(key, term);
+  }
+  const clash = ([[myWordsKey(teaching.heard), teaching.writes], ...within(words, teaching)] as [string, string][])
+    .find(([key, writes]) => matches.has(key) && matches.get(key) !== writes);
+  if (clash) return { kind: "taken", heard: shown, other: matches.get(clash[0])! };
   // The version counts against the entry it will belong to.
   if (versionsOf(words, heard, entryOf(words, teaching.writes)).length >= MY_WORDS_MAX_HEARD) return { kind: "full", heard: shown };
   return { kind: "teach", heard: shown, teaching };
+}
+
+/** The keys a version of one word stands for inside each entry with that word,
+ * as the worker matches them. */
+function within(words: readonly string[], version: HeardVersion): [string, string][] {
+  const heardKey = myWordsKey(version.heard);
+  return words.filter(term => term !== version.writes && termWords(term).includes(version.writes)).map(term => {
+    let swapped = false;
+    const key = termWords(term).map(word => {
+      if (swapped || word !== version.writes) return myWordsKey(word);
+      swapped = true;
+      return heardKey;
+    }).join("");
+    return [key, term];
+  });
 }
 
 /** When the version differs from the entry in one word of it only, that word

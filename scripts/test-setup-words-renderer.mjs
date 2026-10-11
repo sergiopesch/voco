@@ -261,7 +261,13 @@ try {
     await load({ config: { myWords: ['Siobhán Kelly', 'GitHub'], myWordsHeard: [{ heard: 'Shivon', writes: 'Siobhán' }] } });
     assert.equal(await nameField().inputValue(), 'Siobhán Kelly');
     assert.equal(await page.getByRole('button', { name: 'Skip for now', exact: true }).count(), 0);
-    results.push({ case: 'setup-again-keeps-the-saved-name', passed: true });
+    // A name changed in an earlier setup isn't offered beside the account's again.
+    await load({ config: { myWords: ['Shiv Kelly'] } });
+    assert.equal(await nameField().inputValue(), '');
+    await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    await page.getByRole('heading', { name: 'Your voice, ready.' }).waitFor();
+    assert.deepEqual(await saves(), []);
+    results.push({ case: 'setup-again-keeps-the-saved-list', passed: true });
 
     // The smallest window keeps the name card and Continue on screen.
     await load();

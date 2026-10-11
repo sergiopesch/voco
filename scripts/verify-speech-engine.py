@@ -11,8 +11,10 @@ manifests = {"package.json", "package-lock.json", "apps/desktop/package.json",
              "apps/desktop/src-tauri/Cargo.toml", "apps/desktop/src-tauri/Cargo.lock"}
 failures = []
 retired = (b"whisper", b"base.en", b"transcribe_partial_audio", b"download_model")
+# My words' list of everyday English words, where "whisper" is just a word.
+words = "apps/desktop/src/lib/everyday-words.txt"
 for name in paths:
-    if not (name.startswith(prefixes) or name in manifests):
+    if not (name.startswith(prefixes) or name in manifests) or name == words:
         continue
     path = root / name
     if not path.is_file():

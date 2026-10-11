@@ -413,7 +413,46 @@ pub fn validate_my_words_heard(words: &[String], heard: &[HeardVersion]) -> Resu
             ));
         }
     }
+    // A version of one word also stands for it inside each entry with that
+    // word. Such a match may repeat one that writes the same entry, but must
+    // not clash with one that writes anything else.
+    let mut writes: std::collections::HashMap<String, &str> = words
+        .iter()
+        .map(|term| (my_words_key(term), term.as_str()))
+        .collect();
+    for version in heard {
+        writes.insert(my_words_key(&version.heard), version.writes.as_str());
+    }
+    for version in heard {
+        let heard_key = my_words_key(&version.heard);
+        for term in words.iter().filter(|term| {
+            **term != version.writes && term_words(term).any(|word| word == version.writes)
+        }) {
+            let whole = key_with(term, &version.writes, &heard_key);
+            if *writes.entry(whole).or_insert(term.as_str()) != term.as_str() {
+                return Err(format!(
+                    "\u{201c}{}\u{201d} would make another of your words write differently.",
+                    version.heard
+                ));
+            }
+        }
+    }
     Ok(())
+}
+
+/// A term's key with the first of its words that is `word` heard as `heard_key`.
+fn key_with(term: &str, word: &str, heard_key: &str) -> String {
+    let mut swapped = false;
+    term_words(term)
+        .map(|each| {
+            if !swapped && each == word {
+                swapped = true;
+                heard_key.to_string()
+            } else {
+                my_words_key(each)
+            }
+        })
+        .collect()
 }
 
 /// An account's full name as a My words entry: None when GLib had none to
@@ -1356,6 +1395,38 @@ mod tests {
         let mut six = five.clone();
         six.push(version("Shivonne", "Kelly"));
         assert!(validate_my_words_heard(&words, &six).is_err());
+        // A version of one word mustn't make another entry, said in full,
+        // match two ways. (Accents compare in Settings and the worker.)
+        let names: Vec<String> = ["Foo", "José Garcia", "José Kelly"]
+            .map(String::from)
+            .to_vec();
+        assert!(validate_my_words_heard(
+            &names,
+            &[version("Hosay Garcia", "Foo"), version("Hosay", "José")]
+        )
+        .is_err());
+        assert!(validate_my_words_heard(
+            &names,
+            &[version("Hosay", "José"), version("Hosay Garcia", "Foo")]
+        )
+        .is_err());
+        assert_eq!(
+            validate_my_words_heard(&names, &[version("Hosay", "José")]),
+            Ok(())
+        );
+        let clash: Vec<String> = ["José Garcia", "Hosay Garcia"].map(String::from).to_vec();
+        assert!(validate_my_words_heard(&clash, &[version("Hosay", "José")]).is_err());
+        // A match that writes the same entry another way is no clash.
+        assert_eq!(
+            validate_my_words_heard(
+                &["Siobhán Kelly".into()],
+                &[
+                    version("Shivon Kelly", "Siobhán Kelly"),
+                    version("Shivon", "Siobhán")
+                ]
+            ),
+            Ok(())
+        );
         // A version belongs to the entry it writes whole, so it counts there.
         let both: Vec<String> = ["Siobhán Kelly", "Siobhán"].map(String::from).to_vec();
         let mut whole = five.clone();

@@ -106,6 +106,14 @@ describe("Say it", () => {
     expect(judge("Shivon", ["Siobhán", "Shauna"], [{ heard: "shi von", writes: "Shauna" }])).toEqual({ kind: "taken", heard: "Shivon", other: "Shauna" });
     const five = Array.from({ length: MY_WORDS_MAX_HEARD }, (_, index) => ({ heard: `version${index}`, writes: "Siobhán" }));
     expect(judge("Shivon", ["Siobhán"], five)).toEqual({ kind: "full", heard: "Shivon" });
+    // A version of one word stands for it inside the whole entry, and that mustn't clash either.
+    const names = ["Foo", "José García", "José Kelly"];
+    expect(judge("Hosay Garcia", names, [{ heard: "Hosay", writes: "José" }], 0))
+      .toEqual({ kind: "taken", heard: "Hosay Garcia", other: "José García" });
+    expect(judge("Hosay Garcia", names, [{ heard: "Hosay Garcia", writes: "Foo" }], 1))
+      .toEqual({ kind: "taken", heard: "Hosay Garcia", other: "Foo" });
+    expect(judge("Hosay Garcia", ["José García", "Hosay Garcia"], [], 0))
+      .toEqual({ kind: "taken", heard: "Hosay Garcia", other: "Hosay Garcia" });
   });
 });
 

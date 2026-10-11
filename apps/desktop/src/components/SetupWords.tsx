@@ -26,11 +26,12 @@ type SaveError = { entry: string | null; message: string };
  * words they choose. Nothing is saved until they say a word or continue with it. */
 export function SetupWords({ accountName, words, heard, saving, onSave, onStartCheck, onStopCheck, onContinue }: SetupWordsProps) {
   const check = useWordCheck(onStartCheck, onStopCheck);
-  // Run setup again keeps the list: a name saved before is the one shown, as
-  // saved, and an account name the list couldn't take, because it isn't an
-  // entry, a version already writes it, or the list is full, isn't offered.
+  // Run setup again keeps the list: an account name it holds shows as saved.
+  // Otherwise the name is offered only to an empty list, so a setup run again
+  // never adds it beside a name the person changed it to, and only when it
+  // could be an entry.
   const listed = (name: string | null) => name ? words.find(word => myWordsKey(word) === myWordsKey(name)) ?? null : null;
-  const offered = (name: string | null) => name && myWordProblem(tidyMyWord(name), words, heard) === null ? tidyMyWord(name) : null;
+  const offered = (name: string | null) => name && !words.length && myWordProblem(tidyMyWord(name), [], []) === null ? tidyMyWord(name) : null;
   const [savedName, setSavedName] = useState<string | null>(() => listed(accountName));
   const [name, setName] = useState(() => savedName ?? offered(accountName) ?? "");
   const [nameProblem, setNameProblem] = useState<string | null>(null);

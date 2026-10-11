@@ -304,14 +304,14 @@ change.
 - The voice test uses the production recognition queue with local-only output.
   Never paste or copy onboarding output. The test keeps its local retry.
 - After the voice test, setup offers My words with the user's name as its
-  default entry: the full name of their account, read locally, when the list
-  could take it; otherwise the name starts empty. It is saved only if they keep
-  it and continue, or say it, and a name they edit is checked like any entry.
-  Run setup again keeps the saved list and its versions: a name already listed
-  shows as saved, and the step changes only the name and the words added in it,
-  never the rest of the list. Anything else is theirs to type; setup suggests no
-  kinds of words. If they say no word, or leave nothing listed, setup says they
-  can personalise VOCO in Settings later.
+  default entry: the full name of their account, read locally, when the list is
+  empty and the name could be an entry; otherwise the name starts empty. It is
+  saved only if they keep it and continue, or say it, and a name they edit is
+  checked like any entry. Run setup again keeps the saved list and its versions:
+  the account's name, if listed, shows as saved, and the step changes only the
+  name and the words added in it, never the rest of the list. Anything else is
+  theirs to type; setup suggests no kinds of words. If they say no word, or
+  leave nothing listed, setup says they can personalise VOCO in Settings later.
 - Say it, in setup and Settings, uses the same queue with local-only output and
   the saved list, as recognized, without spelling. Never paste or copy it.
 - Finish must flush capture and recognition successfully. Check the desktop input
