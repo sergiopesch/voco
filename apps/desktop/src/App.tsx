@@ -780,7 +780,11 @@ export function App() {
     try {
       await nativeMicrophone.initialize();
       const appVersion = await getVersion();
-      setUpdateState({ status: "idle", currentVersion: appVersion, latestRelease: null, lastCheckedAt: null, error: null });
+      // A retry of capture setup keeps an update result already shown: the
+      // automatic check ran once and won't run again for the same channel.
+      if (useStore.getState().updateState.currentVersion !== appVersion) {
+        setUpdateState({ status: "idle", currentVersion: appVersion, latestRelease: null, lastCheckedAt: null, error: null });
+      }
       if (loadedConfig.onboardingCompleted && (await hasPendingHotkeyToggle().catch(() => false))) {
         void primeRecordingStream();
       }
@@ -796,7 +800,6 @@ export function App() {
       traceHotkeyEvent("frontend_init_complete").catch(() => {});
       await refreshDevices();
       await refreshRuntimeDiagnostics();
-      if (loadedConfig.automaticUpdateChecks) await runUpdateCheck(loadedConfig.updateChannel, appVersion);
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : String(cause);
       setStatus("error");
@@ -804,7 +807,7 @@ export function App() {
       throw cause;
     }
   }, [nativeMicrophone.initialize, prepareAudioEngine, primeRecordingStream, refreshDevices,
-    refreshRuntimeDiagnostics, runUpdateCheck, setError, setStatus, setUpdateState]);
+    refreshRuntimeDiagnostics, setError, setStatus, setUpdateState]);
 
   useEffect(() => {
     if (initStartedRef.current) {
@@ -840,6 +843,8 @@ export function App() {
     void init();
   }, [applyAuthoritativeConfig, retryCaptureSetup, setError, setStatus, setSurface]);
 
+  // The automatic check at startup is this effect's first run, once init
+  // completes; later runs follow a change of channel.
   useEffect(() => {
     if (!initComplete || !config?.updateChannel || !config.automaticUpdateChecks) {
       return;

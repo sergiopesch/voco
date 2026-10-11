@@ -82,6 +82,8 @@ panel runs on GNOME 51. VOCO's app framework and build tools are up to date. The
   does when VOCO is running. Before, VOCO started silently in the tray, so the
   click seemed to do nothing. A start from a terminal or a login autostart still
   stays in the tray.
+- VOCO asks GitHub about releases once at startup. With nothing cached, it used
+  to ask twice: when it finished starting and again a moment later.
 
 ## [2026.0.61] - 2026-10-09
 
