@@ -100,10 +100,18 @@ engine, native desktop and delivery suites. `VOCO_NATIVE_DEPS` and
 The full-application, Wayland and browser suites run the release build with the
 [provisioned runtime](../linux-packaging.md#runtime-provisioning), checked
 against `MODEL-IDENTITY.json` and `NATIVE-BUILD.json`. `--full-application` has
-two cases: in `delivery`, one field keeps focus and gets the words exactly once;
-in `focus-switch`, focus moves mid-recording and each field keeps only what was
-pasted while it had focus. Any IBus preedit or commit, refused paste, copied
-remainder or fallback capture fails them. `--browser-application` runs a short
+four cases:
+- **`delivery`:** one field keeps focus and gets the words exactly once.
+- **`focus-switch`:** focus moves mid-recording, and each field keeps only what
+  was pasted while it had focus.
+- **`spelling`:** settings without a spelling choice write British.
+- **`lock`:** a fake logind on a private system bus (`fixtures/fake-logind.py`)
+  serves the session, locked when VOCO starts. The shortcut starts nothing until
+  it unlocks. A lock then stops a running dictation, the clip reaches no field,
+  and after unlocking a dictation delivers as in `delivery`.
+
+Any IBus preedit or commit, refused paste, copied remainder or fallback capture
+fails them. `--browser-application` runs a short
 recording and, with `VOCO_BROWSER_LONG_CAPTURE=1`, a long one.
 
 ### Delivery suites

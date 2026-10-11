@@ -12,7 +12,11 @@ to B and the fixture plays again, all in one recording. A keeps only text pasted
 had focus; B receives the rest, including whatever Stop flushes.
 spelling: settings without a spelling choice, as an earlier setup has, spell British. The
 recognizer writes the fixture's "honor" the American way; A must receive "honour".
-Both cases fail on IBus preedit or commit, a non-append field change, paste refusal or
+lock: a fake logind on a private system bus serves this session, locked when VOCO starts,
+so its first read must see the lock and the shortcut starts nothing. After unlocking, a
+lock stops a running dictation, the fixture then reaches no field, and the shortcut again
+starts nothing; a dictation after unlocking delivers as in delivery.
+Every case fails on IBus preedit or commit, a non-append field change, paste refusal or
 failure, a copied remainder, recovery or fallback capture, then check the real tray menu and
 the Ready popover through AT-SPI.
 """
@@ -23,6 +27,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import signal
 import subprocess
 import time
 import gi
@@ -37,7 +42,7 @@ assert os.environ['XDG_RUNTIME_DIR'] == str(root / 'runtime')
 assert os.environ['PULSE_SERVER'] == 'unix:' + str(root / 'runtime/pulse.sock')
 assert os.environ['DISPLAY'] == ':0'
 case = os.environ.get('VOCO_NATIVE_APP_CASE', 'delivery')
-assert case in ['delivery', 'focus-switch', 'spelling'], 'Unsupported native application case'
+assert case in ['delivery', 'focus-switch', 'spelling', 'lock'], 'Unsupported native application case'
 trace_path = root / 'state/voco/hotkey-trace.jsonl'
 model = root / 'speech/models/nemotron-speech-streaming-en-0.6b.q8_0.gguf'
 sound = repo / 'tests/fixtures/speech' / ('1673-143396-0000.wav' if case == 'spelling' else '84-121123-0000.wav')
@@ -235,8 +240,33 @@ tray_bus.register_object('/StatusNotifierWatcher', Gio.DBusNodeInfo.new_for_xml(
 Gio.bus_own_name_on_connection(tray_bus, 'org.kde.StatusNotifierWatcher', Gio.BusNameOwnerFlags.NONE, None, None)
 pump(.1)
 log = (root / 'evidence/full-app.log').open('w')
+app_env = {**os.environ, 'RUST_LOG': 'info', 'VOCO_HOTKEY_TRACE': '1'}
+system_bus = logind = None
+if case == 'lock':
+    # A private system bus whose only service is a fake logind; the sandbox has no real one.
+    socket_path = root / 'runtime/system_bus_socket'
+    (root / 'system-bus.conf').write_text(
+        '<busconfig><type>session</type><listen>unix:path=%s</listen><auth>EXTERNAL</auth><apparmor mode="disabled"/>'
+        '<policy context="default"><allow user="*"/><allow own="*"/><allow send_destination="*" eavesdrop="true"/>'
+        '<allow eavesdrop="true"/></policy></busconfig>\n' % socket_path)
+    system_bus = subprocess.Popen(['dbus-daemon', '--nofork', '--config-file=%s' % (root / 'system-bus.conf')],
+                                  stdout=log, stderr=subprocess.STDOUT)
+    for _ in range(100):
+        if socket_path.exists():
+            break
+        time.sleep(.02)
+    assert socket_path.exists(), 'The private system bus did not start'
+    app_env['DBUS_SYSTEM_BUS_ADDRESS'] = 'unix:path=%s' % socket_path
+    logind = subprocess.Popen(['/usr/bin/python3', str(repo / 'scripts/fixtures/fake-logind.py'), app_env['DBUS_SYSTEM_BUS_ADDRESS'],
+                               str(root / 'logind.ready')], stdout=log, stderr=subprocess.STDOUT)
+    for _ in range(250):
+        if (root / 'logind.ready').exists():
+            break
+        time.sleep(.02)
+    assert (root / 'logind.ready').exists(), 'The fake logind did not start'
+    logind.send_signal(signal.SIGUSR1)  # locked before VOCO starts
 app_hash = hashlib.sha256((root / 'voco').read_bytes()).hexdigest()
-app = subprocess.Popen([str(root / 'voco')], stdout=log, stderr=subprocess.STDOUT, env={**os.environ, 'RUST_LOG': 'info', 'VOCO_HOTKEY_TRACE': '1'})
+app = subprocess.Popen([str(root / 'voco')], stdout=log, stderr=subprocess.STDOUT, env=app_env)
 passed, failure, window_id, before_switch = False, None, None, None
 selections, tray_state, popup, popover, diagnostic_errors, confinement = {}, None, None, None, [], None
 try:
@@ -256,6 +286,31 @@ try:
     field.set_position(-1)
     pump(1)
     assert not mutations and field.get_text() == other.get_text() == '', 'A GTK field changed before dictation'
+    if case == 'lock':
+        def refused_while_locked(attempt):
+            started = counts()['recording_state_active']
+            subprocess.run(['xdotool', 'key', '--clearmodifiers', 'alt+d'], check=True)
+            wait_for(lambda: counts()['eval_toggle_suppressed_locked'] >= attempt, 'the shortcut to be refused while locked')
+            pump(1)
+            assert counts()['recording_state_active'] == started, 'The shortcut started a dictation while the screen was locked'
+        # VOCO started locked: its first read of LockedHint must have seen it.
+        pump(2)
+        refused_while_locked(1)
+        logind.send_signal(signal.SIGUSR2)
+        pump(.5)
+        subprocess.run(['xdotool', 'key', '--clearmodifiers', 'alt+d'], check=True)
+        wait_for(lambda: counts()['recording_state_active'] > 0, 'capture after unlocking')
+        logind.send_signal(signal.SIGUSR1)
+        wait_for(lambda: counts()['session_locked_stop'] > 0, 'the lock to stop the dictation')
+        wait_for(lambda: counts()['dictation_stop_to_idle'] > 0, 'the stopped dictation to return to idle', timeout=15)
+        play('fixture playback while locked')
+        pump(1)
+        assert field.get_text() == other.get_text() == '', 'Text reached a field while the screen was locked'
+        refused_while_locked(2)
+        logind.send_signal(signal.SIGUSR2)
+        pump(.5)
+        mutations.clear()
+        # The rest is a delivery case.
     note_focus('before-start')
     subprocess.run(['xdotool', 'key', '--clearmodifiers', 'alt+d'], check=True)
     wait_for(lambda: counts()['recording_state_active'] > 0, 'actual capture')
@@ -296,7 +351,7 @@ try:
         assert all(after.startswith(before) and len(after) > len(before) for before, after in zip(history, history[1:])), 'Field %s changed other than by appended paste' % label
     # xdotool sends one Shift+Insert per dispatched chunk, joining space included.
     assert len(changes) <= c['dictation_desktop_paste_dispatched'], 'Fields changed more often than VOCO dispatched pastes'
-    if case == 'delivery':
+    if case in ('delivery', 'lock'):
         assert other_text == '' and not any(m['field'] == 'B' for m in changes), 'Unfocused field B received text'
         assert words(text) == expected, 'Focused field A did not receive the dictation exactly once: %r' % text
     elif case == 'spelling':
@@ -384,6 +439,10 @@ finally:
     except subprocess.TimeoutExpired:
         app.kill()
         app.wait()
+    for helper in (logind, system_bus):
+        if helper is not None:
+            helper.terminate()
+            helper.wait(timeout=5)
     performance = root / 'state/voco/performance'
     if performance.exists():
         shutil.copytree(performance, root / 'evidence/performance', dirs_exist_ok=True)
