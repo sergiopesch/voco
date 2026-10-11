@@ -19,8 +19,9 @@ class ScriptedModel:
     def __init__(self, hypotheses, final):
         self.hypotheses, self.final = hypotheses, final
 
-    def start(self):
+    def start(self, phrases=(), boost=None):
         self.queue = list(self.hypotheses)
+        self.phrases, self.boost = phrases, boost
 
     def push(self, audio, rate):
         return self.queue.pop(0)
@@ -49,7 +50,9 @@ def session(hypotheses, final, **start):
     requests.append({'op': 'finish', 'session': 'one', 'seq': len(hypotheses) + 1})
     output, metrics = io.StringIO(), FakeMetrics()
     source = io.BytesIO(''.join(json.dumps(request) + '\n' for request in requests).encode())
-    serve(output, source, ScriptedModel(hypotheses, final), metrics)
+    model = ScriptedModel(hypotheses, final)
+    serve(output, source, model, metrics)
+    session.model = model
     return [json.loads(line) for line in output.getvalue().splitlines()][1:], metrics.rows
 
 

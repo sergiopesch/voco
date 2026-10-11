@@ -257,7 +257,7 @@ if commands.count(hosted + " --gnome-panel-container") != 1:
 images = [image for image in re.findall(r"(?:VOCO_PANEL_IMAGE|image): (\S+)", workflow) if not image.startswith("${{")]
 if not images or any(not re.search(r"@sha256:[0-9a-f]{64}$", image) for image in images):
     raise SystemExit(f"{workflow_path} container images must be pinned by digest: {images}")
-for suite in ("english-spelling", "update-checks"):
+for suite in ("english-spelling", "my-words", "update-checks"):
     if commands.count(f"run: npm run test:{suite}-renderer") != 1:
         raise SystemExit(f"{workflow_path} must run the {suite} renderer gate exactly once")
 if 'export LOCPATH="$RUNNER_TEMP/locales" LC_ALL=de_DE.UTF-8' not in commands:

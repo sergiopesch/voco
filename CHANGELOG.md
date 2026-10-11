@@ -9,8 +9,8 @@ The [release process](docs/release-process.md) describes how a release is made.
 ## [2026.0.62] - 2026-10-10
 
 VOCO introduces itself as the voice layer for Linux, starting with dictation. It
-writes British or American spelling, and the installer opens with VOCO's
-microphone and name. Locking the screen now stops dictation, the speech worker
+writes British or American spelling and the names and terms you list in My
+words, and the installer opens with VOCO's microphone and name. Locking the screen now stops dictation, the speech worker
 can't open sockets, update checks can wait until you ask, and the GNOME
 panel runs on GNOME 51. VOCO's app framework and build tools are up to date. The
 [release notes](docs/releases/2026.0.62.md) explain how to upgrade.
@@ -33,6 +33,12 @@ panel runs on GNOME 51. VOCO's app framework and build tools are up to date. The
   unambiguous forms, never names or words whose spelling depends on meaning, and
   pastes only text that can no longer change, so dictation stays append-only.
   Earlier setups spell British too, and the popover says so until they choose.
+- **My words**, a Settings page for up to 100 names and terms. The recognizer
+  leans toward them through NeMo-Speech.cpp's word boosting, at a pinned
+  strength, and the speech worker writes each occurrence as listed, matching
+  without case or accents and joining words it split. Spelling never converts a
+  listed word, an empty list leaves recognition unchanged, delivery stays
+  append-only, and the list never reaches logs, metrics or Review.
 - **Update checks** on the **Updates** page: **When VOCO starts**, the default,
   or **Only when I choose**, which asks GitHub only when you choose **Check for
   updates**.

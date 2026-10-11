@@ -115,6 +115,23 @@ stop the recording rather than paste a revision.
 `test_spelling.py` replays the [engine benchmark](../../research/engine-benchmark-2026-10/README.md)'s
 hypotheses to check that few words wait.
 
+Each start also carries `words`, the saved My words list, which
+`speech_stream.rs` reads the same way and filters to what Settings could save.
+`mywords.py` skips any entry that still breaks the list rules, so a
+hand-edited config can't stop dictation, and of two entries that match alike
+it writes the first one's spelling. With entries left,
+`adapters.py` starts the stream through the C API's own recognition options with
+one speech context: the phrases and a pinned boost. NeMo-Speech.cpp tokenizes
+them with the model's embedded SentencePiece tokenizer and, during greedy
+decoding, adds a bias to the pieces that continue a listed phrase. Without
+entries the start goes through `bench_start` as before, so recognition is
+unchanged. The worker then writes each listed occurrence as listed, comparing
+words without case or accents and joining words the recognizer split, before
+spelling, which never converts a listed occurrence. A push holds back any tail
+that later text could still turn into a listed term, and the open last word
+while it could grow into one; finish writes the final text, which extends
+every push.
+
 ### Delivery
 
 Each new suffix goes to `insertion.rs`, one paste at a time:
@@ -248,11 +265,15 @@ can't be created, dictation continues and VOCO notifies you.
 
 ## Configuration
 
-Settings live in `$XDG_CONFIG_HOME/voco/config.json` with seven fields:
+Settings live in `$XDG_CONFIG_HOME/voco/config.json` with eight fields:
 `hotkey` (default `Alt+D`), `selectedMic`, `onboardingCompleted`,
-`updateChannel` (`stable` or `beta`), `automaticUpdateChecks`, `installChannel`
-and `englishSpelling` (`british`, `american` or `as-recognised`, and `null`
-until someone chooses, which spells British). Fields that older
+`updateChannel` (`stable` or `beta`), `automaticUpdateChecks`, `installChannel`,
+`englishSpelling` (`british`, `american` or `as-recognised`, and `null`
+until someone chooses, which spells British) and `myWords`, the My words list,
+empty until the user adds one. A save checks the list against the worker's
+rules: at most 100 entries of at most four words and 40 characters, letters and
+digits with single spaces, hyphens, apostrophes and full stops, and no two that
+match alike. Fields that older
 files carry are ignored and dropped at the next save, while a settings update
 that names an unknown field is refused. The directory is 0700 and the file
 0600, written atomically. If the file doesn't exist, VOCO copies

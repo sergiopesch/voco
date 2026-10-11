@@ -465,6 +465,10 @@ lesson(
             "Each session start carries the saved spelling. spelling.py converts the whole hypothesis with a table of unambiguous VarCon forms and emits only text that can no longer change, so pasting stays append-only. Only lowercase words change, so names stay, and so do words whose spelling depends on meaning.",
         ),
         (
+            "Your words",
+            "Each start also carries the My words list. mywords.py skips any entry that breaks the list rules: at most 100, each at most four words and 40 characters. adapters.py hands the rest to NeMo-Speech.cpp as one speech context at a boost of 0.5, and the worker writes each listed occurrence as listed, ignoring case, accents and the spaces inside it. A push holds back any tail that later text could still turn into a listed term, and spelling never converts a listed word.",
+        ),
+        (
             "No network for the worker",
             "Just before Python starts, worker_sandbox.rs marks every descriptor beyond the worker's standard streams close-on-exec, so it inherits no socket of VOCO's, and installs a seccomp filter. Every socket and socket pair, Unix ones included, and io_uring fail with permission denied. If the filter can't be installed, the worker doesn't start. The worker also gets only the environment variables it reads, so nothing tells it where the session bus, the display or an agent socket is.",
         ),
@@ -488,6 +492,7 @@ lesson(
         (R + "worker_main.py", "Checks every request and answers one line at a time."),
         (R + "streaming.py", "Checks audio packets and runs the silence gate."),
         (R + "spelling.py", "British or American spelling, emitted only once it can't change."),
+        (R + "mywords.py", "My words: the list rules, the boosted phrases and each listed occurrence written as listed."),
         (R + "test_worker_protocol.py", "Tests for the rulebook."),
         (R + "test_cpu_threads.py", "Tests for the thread rule."),
     ],
@@ -835,8 +840,8 @@ lesson(
     ],
     [
         (
-            "Seven fields",
-            "hotkey, which defaults to Alt+D; selectedMic; onboardingCompleted; updateChannel; automaticUpdateChecks, which defaults to true; englishSpelling, unset until chosen, which means British; and installChannel.",
+            "Eight fields",
+            "hotkey, which defaults to Alt+D; selectedMic; onboardingCompleted; updateChannel; automaticUpdateChecks, which defaults to true; englishSpelling, unset until chosen, which means British; myWords, empty until you add a word; and installChannel.",
         ),
         (
             "Update checks",

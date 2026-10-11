@@ -6,7 +6,7 @@ import streaming
 
 class Model:
     def __init__(self, *_): self.frames=[];self.metrics={};self.released=0
-    def start(self): self.frames=[]
+    def start(self, phrases=(), boost=None): self.frames=[]
     def release_stream(self): self.released+=1
     def push(self,audio,rate):
         self.frames.append(audio.copy());self.metrics={'recognizer_push_ms':2.,'result_drain_ms':.25}

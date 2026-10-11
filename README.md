@@ -24,6 +24,8 @@ appear where you are typing, while you speak.
   don't dictate while a program waits for an answer, such as a coding agent's
   permission prompt: it may [read your words as keys](docs/everyday-use.md#where-your-words-go).
 - **One shortcut.** Press `Alt+D` to start and again to finish.
+- **Writes your words your way.** List names and terms on the **My words** page,
+  and VOCO writes them as you typed them, with their capitals and accents.
 - **Stays out of the way** in the system tray, or in the GNOME top bar with live
   microphone bars.
 - **Keeps your words.** If a paste fails, VOCO copies the rest of your words to

@@ -49,14 +49,18 @@ class Converter:
                 prefix = word[:end]
                 self.safe[prefix] = min(self.safe.get(prefix, keep), keep)
 
-    def stable(self, text):
-        """The longest start of the converted text that later text can't change."""
-        return self.render(text, final=False) if self.words else text
+    def stable(self, text, protected=()):
+        """The longest start of the converted text that later text can't change.
 
-    def final(self, text):
-        return self.render(text, final=True) if self.words else text
+        Words starting inside a protected span, My words' listed occurrences,
+        stay as they are.
+        """
+        return self.render(text, False, protected) if self.words else text
 
-    def render(self, text, final):
+    def final(self, text, protected=()):
+        return self.render(text, True, protected) if self.words else text
+
+    def render(self, text, final, protected=()):
         output = []
         position = 0
         # A word reaching this index, perhaps before an apostrophe that may
@@ -65,7 +69,8 @@ class Converter:
         for match in WORD.finditer(text):
             start, end = match.span()
             token = match[0]
-            if not token.islower() or joined(text, start - 1) or text[start - 1:start] in ('-', '.'):
+            if (not token.islower() or joined(text, start - 1) or text[start - 1:start] in ('-', '.')
+                    or any(low <= start < high for low, high in protected)):
                 continue
             output.append(text[position:start])
             position = start
