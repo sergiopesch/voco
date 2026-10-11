@@ -407,6 +407,32 @@ exit "$FIXTURE_EXIT"
                     process.kill(); process.wait()
                 process.stdout.close(); process.stderr.close()
 
+    def test_a_download_without_a_frame_timer_waits_quietly(self):
+        # Where TMPDIR refuses FIFOs there is no frame timer, and an observer
+        # without one would redraw and log an error as fast as it could.
+        for motion in ('0', '1'):
+            with self.subTest(no_motion=motion), tempfile.TemporaryDirectory() as folder:
+                root = Path(folder)
+                (root / 'mkfifo').write_text('#!/bin/bash\nexit 1\n')
+                (root / 'wget').write_text('#!/bin/bash\nwhile [[ $# -gt 0 ]]; do [[ $1 == -O ]] && out=$2; shift; done\n'
+                                           'printf x > "$out"; sleep 1; printf y >> "$out"\n')
+                for tool in ('mkfifo', 'wget'):
+                    (root / tool).chmod(0o755)
+                env = art_env(folder, VOCO_INSTALL_ART='quadrant', VOCO_INSTALL_NO_MOTION=motion,
+                              PATH=f'{folder}:{os.environ["PATH"]}')
+                body = '''
+VOCO_DOWNLOAD_DIR=$(mktemp -d)
+voco_download 'The fixture.' "$VOCO_DOWNLOAD_DIR/data" https://example.invalid/data
+printf '\\nTIMER=%s SIZE=%s\\n' "${VOCO_UI_TIMER_FD:-none}" "$(stat -c %s "$VOCO_DOWNLOAD_DIR/data")"
+cat "$VOCO_INSTALL_LOG"
+'''
+                code, output = terminal(['bash', '-c', PREFIX + body], env)
+                self.assertEqual(code, 0, output)
+                self.assertIn(b'TIMER=none SIZE=2', output)
+                self.assertNotIn(b'file descriptor', output)
+                # The first frame, and the one that says the download is complete.
+                self.assertLessEqual(len(re.findall(rb'\x1b\[\d+A', output)), 2, output[-1500:])
+
     def test_no_motion_has_no_signal_history_or_sweep(self):
         with tempfile.TemporaryDirectory() as folder:
             env=art_env(folder,VOCO_INSTALL_ART='quadrant')

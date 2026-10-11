@@ -1382,7 +1382,9 @@ voco_download() {
   if [[ "$VOCO_TERMINAL_MOTION" == true ]]; then
     if [[ -z "$VOCO_UI_TIMER_FD" ]]; then voco_ui_init; fi
     voco_ui_begin 'Bringing VOCO to your desktop.' "$label" '↓'
-    if [[ "$VOCO_TERMINAL_MOTION" == true ]]; then
+    # The observer waits on the frame timer between frames. Where TMPDIR can't
+    # hold the timer's FIFO there is none, and this frame stays until the end.
+    if [[ "$VOCO_TERMINAL_MOTION" == true && -n "$VOCO_UI_TIMER_FD" ]]; then
       # Inherit the log descriptor at fork, including the pre-trap shutdown window.
       {
         voco_ui_download_observer "$destination" "$started" &
