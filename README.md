@@ -19,10 +19,10 @@ appear where you are typing, while you speak.
 - **Open source app, NVIDIA model.** VOCO's code is MIT-licensed. Its speech model,
   NVIDIA Nemotron, is under the [NVIDIA Open Model License](runtime/notices/NVIDIA-OPEN-MODEL-LICENSE.html),
   which isn't an open-source licence.
-- **Types into the app you are using,** where it pastes on Shift+Insert.
-  Browsers and terminals included. Words appear while you speak, with
-  punctuation and capital letters. In a terminal, don't dictate while a program
-  waits for an answer, such as a coding agent's permission prompt: it may
+- **Types into any app that pastes on Shift+Insert,** browsers and terminals
+  included. Words appear while you speak, with punctuation and capital letters.
+  In a terminal, don't dictate while a program waits for an answer, such as a
+  coding agent's permission prompt: it may
   [read your words as keys](docs/everyday-use.md#where-your-words-go).
 - **One shortcut.** Press `Alt+D` to start and again to finish.
 - **Writes your words your way.** List names and terms on the **My words** page,
