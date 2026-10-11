@@ -532,7 +532,7 @@ pub(crate) fn normalize_nfc(text: &str) -> String {
     normalizer.normalize(text).into_owned()
 }
 
-/// Normalizes My words entries and taught versions to NFC.
+/// Normalizes My words entries and versions to NFC at config boundaries.
 pub(crate) fn normalize_my_words(config: &mut AppConfig) {
     config.my_words = config
         .my_words
@@ -1528,7 +1528,7 @@ mod tests {
             .join("../../../tests/fixtures/mywords/entries.json");
         let fixture = std::fs::read_to_string(&fixture_path).expect("fixture exists");
         let cases: Vec<FixtureCase> = serde_json::from_str(&fixture).expect("valid JSON");
-        
+
         let test_dir = std::env::temp_dir().join(format!(
             "voco-config-fixture-test-{}-{}",
             std::process::id(),
@@ -1539,7 +1539,7 @@ mod tests {
         ));
         fs::create_dir_all(&test_dir).unwrap();
         let config_path = test_dir.join("config.json");
-        
+
         for case in cases {
             // Write the fixture input into a temp config and read through my_words_at boundary
             let config_json = serde_json::json!({
@@ -1548,7 +1548,7 @@ mod tests {
             });
             atomic_write(&config_path, &config_json.to_string()).unwrap();
             let (words, _) = my_words_at(&config_path);
-            
+
             if case.expected_verdict == "accept" {
                 assert_eq!(
                     words.len(),
@@ -1578,7 +1578,7 @@ mod tests {
                 );
             }
         }
-        
+
         let _ = fs::remove_dir_all(&test_dir);
     }
 
@@ -1586,7 +1586,7 @@ mod tests {
     fn persist_config_patch_normalizes_nfd_to_nfc() {
         let nfd_input = "Siobha\u{0301}n Kelly"; // NFD (decomposed)
         let nfc_expected = "Siobhán Kelly"; // NFC (precomposed)
-        
+
         // Create a config with NFD input
         let mut config = AppConfig {
             my_words: vec![nfd_input.to_string()],
@@ -1596,16 +1596,15 @@ mod tests {
             }],
             ..Default::default()
         };
-        
+
         // Normalize as persist_config_patch does
         normalize_my_words(&mut config);
-        
+
         // Verify NFD was normalized to NFC
         assert_eq!(config.my_words, vec![nfc_expected]);
         assert_eq!(config.my_words_heard[0].heard, nfc_expected);
         assert_eq!(config.my_words_heard[0].writes, nfc_expected);
     }
-
 
     #[test]
     fn dictation_reads_only_entries_settings_could_save() {
