@@ -780,7 +780,11 @@ export function App() {
     try {
       await nativeMicrophone.initialize();
       const appVersion = await getVersion();
-      setUpdateState({ status: "idle", currentVersion: appVersion, latestRelease: null, lastCheckedAt: null, error: null });
+      // A retry of capture setup keeps an update result already shown: the
+      // automatic check ran once and won't run again for the same channel.
+      if (useStore.getState().updateState.currentVersion !== appVersion) {
+        setUpdateState({ status: "idle", currentVersion: appVersion, latestRelease: null, lastCheckedAt: null, error: null });
+      }
       if (loadedConfig.onboardingCompleted && (await hasPendingHotkeyToggle().catch(() => false))) {
         void primeRecordingStream();
       }
