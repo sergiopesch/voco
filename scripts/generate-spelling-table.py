@@ -51,6 +51,22 @@ KEEP_AS_SAID = {
 # Unverified clusters keep only -our, -ise and -ll- pairs; their other pairs
 # include junk such as "perv" to "prev" and "mantes" to "mantoes".
 REGULAR = (("our", "or"), ("is", "iz"), ("ll", "l"))
+# Words too common to wait. Delivery holds an open word back from the first
+# letter where a longer table word that starts with it is spelled differently,
+# so British "hemoglobin" would hold every "he" at "h", and a pause would paste
+# that "h" alone. A conversion that would hold one of these words is dropped,
+# and its word stays as recognized. British drops the haem- words, "willful"
+# and "mustache"; American drops "aetiology" and "callisthenics".
+NEVER_HELD = frozenset("""
+    a about after all also an and any are as at back be because been before but
+    by call can come could day did do does down even first for from get give go
+    good had has have he her here him his how i if in into is it its just know
+    like look make man may me might more most must my new no not now of on one
+    only or other our out over people said say see she should so some take than
+    that the their them then there these they think this those time to two up
+    us use very want was way we well were what when which who will with work
+    would year you your
+""".split())
 NOTICE = """\
 # VOCO spelling table: modified from VarCon 2020.12.07.
 #
@@ -172,6 +188,11 @@ def regular(american, british):
     return canonical(american) == canonical(british)
 
 
+def first_difference(word, spelling):
+    return next((index for index, (left, right) in enumerate(zip(word, spelling)) if left != right),
+                min(len(word), len(spelling)))
+
+
 def build(clusters, source, target):
     """Forms preferred in `source`, unlisted in `target`, with one target spelling."""
     lines = collections.defaultdict(list)
@@ -204,7 +225,11 @@ def build(clusters, source, target):
             if (spelling == spelling.lower() and spelling not in kept
                     and (verified or regular(american, british))):
                 table[word] = spelling
-    return table
+    if NEVER_HELD & table.keys():
+        raise ValueError(f"Common words convert: {sorted(NEVER_HELD & table.keys())}")
+    return {word: spelling for word, spelling in table.items()
+            if not any(word.startswith(common) and first_difference(word, spelling) < len(common)
+                       for common in NEVER_HELD)}
 
 
 def render(clusters):

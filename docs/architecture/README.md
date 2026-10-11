@@ -98,11 +98,15 @@ Each start carries `spelling`: `british`, `american` or `as-recognised`.
 `speech_stream.rs` sets it from the saved settings, read without the writer lock
 or a save, so the webview can't choose another; a start without one is as
 recognised. `spelling.py` converts the whole hypothesis with
-`spelling-varcon.tsv`, the unambiguous forms of VarCon 2020.12.07, about 3,300
+`spelling-varcon.tsv`, the unambiguous forms of VarCon 2020.12.07, about 3,200
 each way. Only lowercase words convert, so names stay even at the start of a
 sentence, as do code-like tokens and words whose spelling depends on meaning. A
 push returns only text no later hypothesis can change: an open word goes out up
 to the first letter where a table word starting with it is spelled differently.
+The generator leaves out any conversion that would make one of the most common
+words wait (`NEVER_HELD`), so "he", "must", "will", "a" and "call" never do;
+British keeps "hemoglobin" and the other hem- words, "mustache" and "willful" as
+recognised, and American keeps "aetiology" and "callisthenics".
 Finish returns the converted final text, which extends every push, so
 `DictationStream`'s append-only check still holds, and a converter fault would
 stop the recording rather than paste a revision.
