@@ -140,13 +140,18 @@ Stop, it copies the words it didn't type to the clipboard. See
 
 ## A word on My words comes out wrong
 
+- Choose **Say it** beside the word on the **My words** page. If VOCO heard
+  something else, choose **Teach VOCO**, and it writes your word whenever it
+  hears that version. See [Say it](everyday-use.md#say-it).
 - Check the entry on the **My words** page: VOCO writes it exactly as listed, so
   a typo there appears in your text.
 - An ordinary word typed with a capital, such as "Router", gets that capital
   everywhere. Type it in lower case.
 - A word that sounds exactly like another, such as Stephen and Steven, can still
-  come out as the other, and so can a word VOCO hears as a different one. The
-  list makes VOCO lean toward your words; it can't guarantee them.
+  come out as the other. The list makes VOCO lean toward your words, and a
+  taught version covers what VOCO heard; neither can guarantee them.
+- A word VOCO heard as everyday words, and you taught anyway, also changes
+  those words when you mean them. Forget that version under **Heard as**.
 - A change applies from your next dictation, not one already running.
 
 ## A terminal prompt took your words as an answer

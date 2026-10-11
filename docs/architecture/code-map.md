@@ -60,6 +60,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `preferences.css` — Settings window layout.
 - `motion.css` — Shared motion styles.
 - `english-spelling.css` — The spelling cards, the sample sentence and the popover's note for earlier setups.
+- `my-words.css` — Setup's words step and progress marks, Say it, what VOCO heard, and the My words list with its taught versions.
 - `vite-env.d.ts` — Vite type references.
 
 ### Components: `components/`
@@ -68,7 +69,9 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `ControlPanel.test.tsx` — Settings guidance and controls.
 - `recordedShortcuts.json` — Key presses, the shortcut **Record keys** makes of each and whether Rust accepts it; `ControlPanel.test.tsx` and `lib.rs` both check it.
 - `EnglishSpellingChoice.tsx` — Setup's spelling question, the Settings spelling cards and the popover note that earlier setups see until they choose.
-- `MyWords.tsx` — The My words page: adding and removing entries, and the list rules it checks before saving.
+- `MyWords.tsx` — The My words page: adding and removing entries, Say it for each, and the versions VOCO learned.
+- `SetupWords.tsx` — Setup's words step: the account's name, Say it, and any other words the person adds.
+- `WordCheck.tsx` — Say it's button and what VOCO heard, with Teach VOCO, and the taught versions under an entry.
 - `Onboarding.tsx` — First-run voice test, after the spelling question, and desktop setup check. Its text stays in the window.
 - `Onboarding.test.tsx` — Onboarding states.
 - `CrashReview.tsx` — Review window: copy or discard interrupted dictations.
@@ -89,6 +92,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `useDictation.desktopLifecycle.test.ts` — Start, Stop and cancel against a delayed paste.
 - `useDictation.desktopTail.test.ts` — Stop tail accounting with deterministic capture and worker IPC.
 - `useGlobalShortcut.ts` — Receives toggles and browser triggers from Rust and reports renderer readiness.
+- `useWordCheck.ts` — One Say it check: starts it, ends it when the person stops speaking, and returns what VOCO heard.
 - `useNativeCaptureSettings.ts` — Native microphone list and selection.
 - `useGlassPointer.ts` — Pointer highlight on buttons.
 - `useGlassPointer.test.ts` — Pointer highlight.
@@ -96,6 +100,10 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 ### Library: `lib/`
 
 - `englishSpelling.ts` — The two spellings' labels, flags, examples and sample sentences; `test_spelling.py` checks that the converter turns each into the other.
+- `myWords.ts` — The My words rules, the taught versions of each entry, and `judgeCheck`, what a Say it check heard and what to teach.
+- `myWords.test.ts` — The list rules, checks and taught versions.
+- `everydayWords.ts` — Loads `everyday-words.txt`, the everyday words Say it warns about, in its own chunk.
+- `everyday-words.txt` — Everyday English words, generated from 12dicts 2020.12.07 by `scripts/generate-everyday-words.py`, with their notices.
 - `dictationStream.ts` — `DictationStream`: 100 ms packets, one request at a time, append-only results, paste outcomes and Stop retries.
 - `dictationStream.test.ts` — Append-only results, backlog limit and delivery outcomes.
 - `dictationStream.startup.test.ts` — Importing the module leaves model warmup to Rust.
@@ -252,6 +260,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `provision-ci-speech.sh` — Copies the speech payload of a checksum-pinned published package into `runtime/speech/` for CI.
 - `graft-model-tokenizer.py` — Adds NVIDIA's SentencePiece tokenizer to NVIDIA's GGUF, giving the pinned model; `provision-ci-speech.sh` runs it.
 - `generate-spelling-table.py` — Generates, or with `--check` verifies, `runtime/speech/spelling-varcon.tsv` from the pinned VarCon file.
+- `generate-everyday-words.py` — Generates, or with `--check` verifies, `apps/desktop/src/lib/everyday-words.txt` from the pinned 12dicts files.
 - `debian_maintainer.py` — Generates and checks the maintainer script.
 - `sync-installer-ui.py`, `lib/install-ui.sh`, `lib/install-apt-ui.py`, `lib/install-brand.json` — Installer interface sources, and the script that embeds them and the install steps in `install`.
 - `lib/install-common.sh` — Install steps that `setup.sh --install` sources and `sync-installer-ui.py` embeds in `install`: package manager detection, the glibc and processor check, the APT and DNF installs and their checks, and the desktop input check. `test-install-common.sh` tests them.
@@ -310,7 +319,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `native_tray_app.py` — The tray app helpers the GNOME, KDE and Wayland suites share: readiness, the registered tray item and its menu.
 - `test-native-kde.py`, `test-native-kde.sh`, `test-native-kde-identity.py` — KWin and Plasma in a private session.
 - `test-native-capture-callbacks.py`, `test-native-capture-pulse-latency.py`, `native-capture-lifecycle.test.c`, `test-native-capture-renderer.mjs`, `test_verify_native_capture_audit.py` — Native capture.
-- `test-dictation-renderer.mjs`, `test-microphone-app-renderer.mjs`, `test-english-spelling-renderer.mjs`, `test-my-words-renderer.mjs`, `test-update-checks-renderer.mjs`, `renderer-fixture.mjs`, `test-brand-motion.mjs`, `audio-worklet-capture.test.mjs` — Renderer and AudioWorklet.
+- `test-dictation-renderer.mjs`, `test-microphone-app-renderer.mjs`, `test-english-spelling-renderer.mjs`, `test-my-words-renderer.mjs`, `test-setup-words-renderer.mjs`, `test-update-checks-renderer.mjs`, `renderer-fixture.mjs`, `test-brand-motion.mjs`, `audio-worklet-capture.test.mjs` — Renderer and AudioWorklet.
 - `test-speech-package.py`, `test-speech-worker.py`, `test-audio-continuity.py` — Speech packaging and worker pipes.
 - `test-rpm-package.py` — The RPM's file list, spec, header policy and parity checks; with rpmbuild installed, a real build.
 - `test-model-tokenizer.py` — The tokenizer graft adds one metadata entry, keeps every tensor byte, fetches one bounded range and replaces a model only with the pinned result.

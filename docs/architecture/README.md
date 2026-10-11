@@ -115,8 +115,9 @@ stop the recording rather than paste a revision.
 `test_spelling.py` replays the [engine benchmark](../../research/engine-benchmark-2026-10/README.md)'s
 hypotheses to check that few words wait.
 
-Each start also carries `words`, the saved My words list, which
-`speech_stream.rs` reads the same way and filters to what Settings could save.
+Each start also carries `words`, the saved My words list, and `heard`, its
+taught versions, which `speech_stream.rs` reads the same way and filters to what
+Settings could save.
 `mywords.py` skips any entry that still breaks the list rules, so a
 hand-edited config can't stop dictation, and of two entries that match alike
 it writes the first one's spelling. With entries left,
@@ -127,10 +128,28 @@ decoding, adds a bias to the pieces that continue a listed phrase. Without
 entries the start goes through `bench_start` as before, so recognition is
 unchanged. The worker then writes each listed occurrence as listed, comparing
 words without case or accents and joining words the recognizer split, before
-spelling, which never converts a listed occurrence. A push holds back any tail
-that later text could still turn into a listed term, and the open last word
-while it could grow into one; finish writes the final text, which extends
-every push.
+spelling, which never converts a listed occurrence. A taught version matches
+the same way and writes its entry, or the one word of it it was taught for; it
+is never boosted, and full stops never join its words. Of the versions a list
+can't hold, a hand-edited one or one that matches an entry or an earlier
+version, the worker skips each. A push holds back any tail
+that later text could still turn into a listed term or a taught version, and
+the open last word while it could grow into one; finish writes the final text,
+which extends every push.
+
+Say it, in setup's words step and on the My words page, records like setup's
+voice test: the `words:check` trigger keeps its text in VOCO's window, with no
+paste, copy or crash journal, and its start asks for `words_check`, which
+`speech_stream.rs` turns into a start with the saved list and taught versions
+but no spelling, so the window shows what the recognizer heard.
+`useWordCheck.ts` ends the check once the level has shown speech and then
+quiet, once the words stop changing, or after eight seconds, and the shortcut
+ends it too. `judgeCheck` in `lib/myWords.ts` then reads the text: the entry as
+listed, nothing, part of it, something it can't learn, or a version to teach,
+which is the one misheard word of a longer entry unless that word is an
+everyday one, then the whole entry. `everyday-words.txt`, which
+`scripts/generate-everyday-words.py` generates from the pinned 12dicts files,
+says which words are everyday; it loads in its own chunk on the first check.
 
 ### Delivery
 
@@ -265,15 +284,19 @@ can't be created, dictation continues and VOCO notifies you.
 
 ## Configuration
 
-Settings live in `$XDG_CONFIG_HOME/voco/config.json` with eight fields:
+Settings live in `$XDG_CONFIG_HOME/voco/config.json` with nine fields:
 `hotkey` (default `Alt+D`), `selectedMic`, `onboardingCompleted`,
 `updateChannel` (`stable` or `beta`), `automaticUpdateChecks`, `installChannel`,
 `englishSpelling` (`british`, `american` or `as-recognised`, and `null`
-until someone chooses, which spells British) and `myWords`, the My words list,
-empty until the user adds one. A save checks the list against the worker's
-rules: at most 100 entries of at most four words and 40 characters, letters and
-digits with single spaces, hyphens, apostrophes and full stops, and no two that
-match alike. Fields that older
+until someone chooses, which spells British), `myWords`, the My words list,
+empty until the user adds one, and `myWordsHeard`, its taught versions, each a
+`heard` version and the entry or word it `writes`. A save checks the list
+against the worker's rules: at most 100 entries of at most four words and 40
+characters, letters and digits with single spaces, hyphens, apostrophes and full
+stops, and no two that match alike. It checks the versions too: each writes an
+entry or one of its words, has the same limits without full stops, matches no
+entry or other version, and an entry keeps at most five. The versions have their
+own key, so an earlier VOCO still reads the file. Fields that older
 files carry are ignored and dropped at the next save, while a settings update
 that names an unknown field is refused. The directory is 0700 and the file
 0600, written atomically. If the file doesn't exist, VOCO copies
