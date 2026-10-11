@@ -7,10 +7,10 @@ export const MY_WORDS_MAX_WORDS = 4;
 export const MY_WORDS_MAX_CHARS = 40;
 /** Taught versions an entry keeps. */
 export const MY_WORDS_MAX_HEARD = 5;
-const TERM = /^[\p{L}\p{N}]+(?:['’][\p{L}\p{N}]+)*(?:(?:[ -]|\. ?)[\p{L}\p{N}]+(?:['’][\p{L}\p{N}]+)*)*\.?$/u;
+const TERM = /^[\p{L}\p{N}]+(?:[''][\p{L}\p{N}]+)*(?:(?:[ -]|\. ?)[\p{L}\p{N}]+(?:[''][\p{L}\p{N}]+)*)*\.?$/u;
 // A taught version: words separated by single spaces or hyphens, never full stops.
-const HEARD = /^[\p{L}\p{N}]+(?:['’][\p{L}\p{N}]+)*(?:[ -][\p{L}\p{N}]+(?:['’][\p{L}\p{N}]+)*)*$/u;
-const WORD = /[\p{L}\p{N}]+(?:['’][\p{L}\p{N}]+)*/gu;
+const HEARD = /^[\p{L}\p{N}]+(?:[''][\p{L}\p{N}]+)*(?:[ -][\p{L}\p{N}]+(?:[''][\p{L}\p{N}]+)*)*$/u;
+const WORD = /[\p{L}\p{N}]+(?:[''][\p{L}\p{N}]+)*/gu;
 
 // After accents go and case is lowered, the few letters Python's casefold
 // still folds further, so two entries match here exactly when they do there.
@@ -18,20 +18,20 @@ const CASEFOLD: Record<string, string> = {
   "ß": "ss", "ς": "σ", "ᲀ": "в", "ᲁ": "д", "ᲂ": "о", "ᲃ": "с", "ᲄ": "т", "ᲅ": "т", "ᲆ": "ъ", "ᲇ": "ѣ", "ᲈ": "ꙋ",
 };
 
-/** A word without case or accents, with one apostrophe for both. */
+/** A word without case or accents, with one apostrophe for both. Normalizes to NFC first. */
 export function plainWord(word: string): string {
   return word.normalize("NFC").normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase()
-    .replace(/[ßςᲀ-ᲈ]/gu, letter => CASEFOLD[letter] ?? letter).replace(/’/g, "'");
+    .replace(/[ßςᲀ-ᲈ]/gu, letter => CASEFOLD[letter] ?? letter).replace(/'/g, "'");
 }
 
 /** What the worker matches: the words without case, accents or what separates them,
- * with one apostrophe for both. */
+ * with one apostrophe for both. Normalizes to NFC first so NFD and NFC behave the same. */
 export function myWordsKey(term: string): string {
   return (term.normalize("NFC").normalize("NFKD").replace(/\p{M}/gu, "").match(WORD) ?? []).join("").toLowerCase()
-    .replace(/[ßςᲀ-ᲈ]/gu, letter => CASEFOLD[letter] ?? letter).replace(/’/g, "'");
+    .replace(/[ßςᲀ-ᲈ]/gu, letter => CASEFOLD[letter] ?? letter).replace(/'/g, "'");
 }
 
-/** A term's words, as the worker splits them. */
+/** A term's words, as the worker splits them. Normalizes to NFC first. */
 export function termWords(term: string): string[] {
   return term.normalize("NFC").match(WORD) ?? [];
 }
@@ -41,18 +41,19 @@ export function tidyMyWord(input: string): string {
   return input.normalize("NFC").trim().replace(/\s+/g, " ");
 }
 
-/** Why an entry can't join the list, or null when it can. */
+/** Why an entry can't join the list, or null when it can. Normalizes to NFC first. */
 export function myWordProblem(term: string, words: readonly string[], heard: readonly HeardVersion[] = []): string | null {
-  if (!TERM.test(term)) {
+  const normalized = term.normalize("NFC");
+  if (!TERM.test(normalized)) {
     return "Use letters, digits, single spaces, hyphens, apostrophes and full stops, starting with a letter or digit.";
   }
-  if ([...term].length > MY_WORDS_MAX_CHARS || termWords(term).length > MY_WORDS_MAX_WORDS) {
+  if ([...normalized].length > MY_WORDS_MAX_CHARS || termWords(normalized).length > MY_WORDS_MAX_WORDS) {
     return `Keep each entry to ${MY_WORDS_MAX_WORDS} words and ${MY_WORDS_MAX_CHARS} characters.`;
   }
-  const existing = words.find(word => myWordsKey(word) === myWordsKey(term));
-  if (existing) return `“${existing}” is already in My words.`;
-  const taught = heard.find(version => myWordsKey(version.heard) === myWordsKey(term));
-  if (taught) return `VOCO already writes “${taught.writes}” when it hears “${taught.heard}”.`;
+  const existing = words.find(word => myWordsKey(word) === myWordsKey(normalized));
+  if (existing) return `"${existing}" is already in My words.`;
+  const taught = heard.find(version => myWordsKey(version.heard) === myWordsKey(normalized));
+  if (taught) return `VOCO already writes "${taught.writes}" when it hears "${taught.heard}".`;
   if (words.length >= MY_WORDS_MAX_TERMS) {
     return `My words holds up to ${MY_WORDS_MAX_TERMS} entries. Remove one to add another.`;
   }
@@ -102,7 +103,7 @@ export function writesEntry(transcript: string, entry: string): boolean {
   const first = entry.charAt(0);
   const pattern = entry === entry.toLowerCase() && first.toUpperCase() !== first
     ? `[${first}${first.toUpperCase()}]${escaped.slice(1)}` : escaped;
-  return new RegExp(`(?<![\\p{L}\\p{N}'’])${pattern}(?![\\p{L}\\p{N}])`, "u").test(transcript.normalize("NFC"));
+  return new RegExp(`(?<![\\p{L}\\p{N}''])${pattern}(?![\\p{L}\\p{N}])`, "u").test(transcript.normalize("NFC"));
 }
 
 export interface Teaching extends HeardVersion {
@@ -135,7 +136,7 @@ export function judgeCheck(transcript: string, words: readonly string[], heard: 
   if (!heardAs) return { kind: "unclear", heard: said };
   const { shown } = heardAs;
   // A possessive belongs to the sentence, not the word.
-  const version = /['’]s$/u.test(heardAs.text) && !/['’]s$/u.test(entry) ? heardAs.text.slice(0, -2) : heardAs.text;
+  const version = /['']s$/u.test(heardAs.text) && !/['']s$/u.test(entry) ? heardAs.text.slice(0, -2) : heardAs.text;
   // The entry's own words, which the worker didn't join across a pause.
   if (myWordsKey(version) === myWordsKey(entry)) return { kind: "unclear", heard: shown, pause: true };
   const allEveryday = (text: string) => termWords(text).every(word => everyday(plainWord(word)));
