@@ -1517,7 +1517,7 @@ mod tests {
         for case in cases {
             // Normalize at the boundary, as the real code does
             let normalized = normalize_nfc(&case.input);
-            let result = validate_my_words(&[normalized.clone()]);
+            let result = validate_my_words(std::slice::from_ref(&normalized));
             if case.expected_verdict == "accept" {
                 assert!(
                     result.is_ok(),
