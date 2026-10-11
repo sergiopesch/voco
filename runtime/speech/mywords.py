@@ -33,8 +33,8 @@ SENTENCE_START = re.compile(r'(?:^|[.?!…]\s+)$')
 
 
 def plain(text):
-    """Without case or accents."""
-    return ''.join(c for c in unicodedata.normalize('NFKD', text) if not unicodedata.combining(c)).casefold()
+    """Without case or accents, and with one apostrophe for both."""
+    return ''.join(c for c in unicodedata.normalize('NFKD', text) if not unicodedata.combining(c)).casefold().replace('’', "'")
 
 
 def key(term):

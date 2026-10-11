@@ -34,6 +34,7 @@ class RestoreTests(unittest.TestCase):
 
     def test_a_lowercase_entry_keeps_sentence_case_and_only_whole_words_match(self):
         self.assertEqual(written(self.words, 'My Router broke. router says no'), 'My router broke. Router says no')
+        self.assertEqual(written(Words(['O’Neill']), "o'neill said"), 'O’Neill said')
         mixed = Words(['iPhone', 'eBay'])
         self.assertEqual(written(mixed, 'Iphone is ready. ebay too'), 'iPhone is ready. eBay too')
         for heard in ('Pipe. Wire', 'Pipe, wire', 'routers', 'GitHubs', 'pipewiring'):

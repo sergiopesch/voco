@@ -364,6 +364,7 @@ fn my_words_key(term: &str) -> String {
             '\u{1c86}' => key.push('ъ'),
             '\u{1c87}' => key.push('ѣ'),
             '\u{1c88}' => key.push('ꙋ'),
+            '\u{2019}' => key.push('\''),
             other => key.push(other),
         }
     }
@@ -1160,6 +1161,7 @@ mod tests {
         assert!(validate_my_words(&over).is_err());
         assert!(validate_my_words(&["Git Hub".into(), "github".into()]).is_err());
         assert!(validate_my_words(&["Straße".into(), "STRASSE".into()]).is_err());
+        assert!(validate_my_words(&["O'Neill".into(), "O\u{2019}Neill".into()]).is_err());
     }
 
     #[test]

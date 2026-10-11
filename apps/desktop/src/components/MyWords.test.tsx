@@ -8,6 +8,7 @@ describe("My words rules", () => {
     expect(myWordsKey("Straße")).toBe(myWordsKey("STRASSE"));
     expect(myWordsKey("Jean-Luc")).toBe(myWordsKey("jean luc"));
     expect(myWordsKey("O'Neill")).not.toBe(myWordsKey("ONeill"));
+    expect(myWordsKey("O’Neill")).toBe(myWordsKey("o'neill"));
   });
 
   it("tidies typed text into an entry", () => {

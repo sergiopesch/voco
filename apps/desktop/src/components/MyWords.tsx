@@ -14,10 +14,11 @@ const CASEFOLD: Record<string, string> = {
   "ß": "ss", "ς": "σ", "ᲀ": "в", "ᲁ": "д", "ᲂ": "о", "ᲃ": "с", "ᲄ": "т", "ᲅ": "т", "ᲆ": "ъ", "ᲇ": "ѣ", "ᲈ": "ꙋ",
 };
 
-/** What the worker matches: the words without case, accents or what separates them. */
+/** What the worker matches: the words without case, accents or what separates them,
+ * with one apostrophe for both. */
 export function myWordsKey(term: string): string {
   return (term.normalize("NFKD").replace(/\p{M}/gu, "").match(WORD) ?? []).join("").toLowerCase()
-    .replace(/[ßςᲀ-ᲈ]/gu, letter => CASEFOLD[letter] ?? letter);
+    .replace(/[ßςᲀ-ᲈ]/gu, letter => CASEFOLD[letter] ?? letter).replace(/’/g, "'");
 }
 
 /** Typed text as an entry: composed accents and single spaces. */
