@@ -12,6 +12,73 @@ VOCO_UI_LAST_BYTES=0
 VOCO_UI_LAST_TIME=0
 VOCO_UI_RATES=(0 0 0 0 0 0 0)
 VOCO_UI_LINES=10
+# The art canvas: a graphite card holding the microphone and the wordmark, above
+# eight progress lines. Card columns: 2 padding, 14 microphone, 3 gap, 37 for the
+# wordmark and text, 2 padding; 11 rows between its rounded top and bottom edges.
+VOCO_UI_ART=false
+VOCO_UI_ART_BUILT=false
+VOCO_UI_CARD_WIDTH=58
+VOCO_UI_CARD_ROWS=11
+VOCO_UI_ART_RIGHT=19
+VOCO_UI_PROGRESS_LINES=8
+# How the card shows the microphone: kitty, as an image through the kitty
+# graphics protocol, or a mosaic of the octant, sextant or quadrant symbols the
+# terminal draws itself. VOCO_INSTALL_ART picks one instead of asking.
+VOCO_UI_MIC_MODE=''
+# The terminal's answers: whether it shows kitty images, and its cell size in
+# pixels, or 0 when it didn't say. The probe waits for them at most
+# VOCO_UI_PROBE_MS, and keeps the terminal's settings to restore if interrupted.
+VOCO_UI_GRAPHICS=''
+VOCO_UI_CELL_WIDTH=0
+VOCO_UI_CELL_HEIGHT=0
+VOCO_UI_PROBE_MS=200
+VOCO_UI_PROBE_TTY=''
+# The image's fixed id ("VOCO" on a phone keypad), its placement once the sweep
+# has revealed 1 to 14 of its columns, and the command that takes it away.
+VOCO_UI_IMAGE_ID=8626
+VOCO_UI_PLACE=()
+VOCO_UI_UNPLACE=''
+# True while the APT display draws, which an interrupt can stop mid-sequence.
+VOCO_UI_APT_DRAWING=false
+# The intro, in milliseconds after the canvas opens: a silver line crosses the
+# card and leaves the microphone behind it, the letters glide in and lock, one
+# shine passes, then the tagline writes itself in. It only ever paints frames;
+# the installer never waits for it.
+VOCO_UI_SWEEP_MS=480
+VOCO_UI_GLIDE_AT=240
+VOCO_UI_GLIDE_STEP=100
+VOCO_UI_GLIDE_MS=360
+VOCO_UI_GLIDE_COLUMNS=12
+VOCO_UI_SHINE_AT=900
+VOCO_UI_SHINE_MS=280
+VOCO_UI_BRAND_AT=900
+VOCO_UI_TODAY_AT=1050
+VOCO_UI_VERSION_AT=1150
+VOCO_UI_INTRO_MS=1300
+VOCO_UI_INTRO_START=0
+VOCO_UI_SHINE_START=0
+VOCO_UI_NOW=0
+VOCO_UI_FINAL_TOP=''
+VOCO_UI_CARD_LEFT=()
+VOCO_UI_CARD_RIGHT=()
+VOCO_UI_CARD_REVEAL=0
+VOCO_UI_CARD_SWEEP=0
+VOCO_UI_CARD_KINDS=()
+VOCO_UI_APT_CARD=''
+VOCO_UI_APT_SHINE=''
+VOCO_UI_SHOWN_SWEEP=-1
+VOCO_UI_SHOWN_LEFT=-1
+VOCO_UI_SHOWN_RIGHT=()
+VOCO_UI_SHOWN_REVEAL=-1
+VOCO_UI_SHOWN_RESTS=false
+VOCO_UI_SHOWN_HEADING=''
+VOCO_UI_SHOWN_LINES=()
+VOCO_UI_SHOWN_PROGRESS=''
+VOCO_UI_CARD_RESTS=false
+VOCO_UI_PROGRESS=()
+VOCO_UI_PROGRESS_KEY=''
+VOCO_UI_BRAND_LINE='The voice layer for Linux.'
+VOCO_UI_TODAY_LINE='Today: private dictation.'
 # BEGIN GENERATED INSTALLER BRAND
 VOCO_UI_GLYPHS=(
   '██    ██' ' ██████ ' ' ██████ ' ' ██████ '
@@ -21,10 +88,62 @@ VOCO_UI_GLYPHS=(
   '   ██   ' ' ██████ ' ' ██████ ' ' ██████ '
 )
 VOCO_UI_SILVER='\033[38;2;199;204;212m'
-VOCO_UI_SHINE='\033[38;2;241;243;246m'
 VOCO_UI_MUTED='\033[38;2;122;128;138m'
 VOCO_UI_COMPLETE='\033[38;2;165;217;178m'
 VOCO_UI_ACTIVE='\033[38;2;239;206;131m'
+VOCO_UI_CARD='17;19;24'
+VOCO_UI_WORDMARK=('244;246;249' '233;236;240' '222;225;230' '210;214;221' '199;204;212' '188;193;202' '177;182;192' '165;172;181' '154;161;171' '143;150;161')
+VOCO_UI_WORDMARK_SHINE=('255;255;255' '238;241;245')
+VOCO_UI_SWEEP=('93;99;109' '225;229;236')
+VOCO_UI_TEXT_BRAND='199;204;212'
+VOCO_UI_TEXT_TODAY='174;181;191'
+VOCO_UI_TEXT_VERSION='140;146;156'
+VOCO_UI_EASE=(0 202 397 560 682 767 828 871 903 928 946 960 971 980 986 991 995 997 999 1000 1000)
+# The microphone, from assets/voco-symbol.png by generate-installer-art.py: its
+# palette, a mosaic of block symbols for each kind of terminal, and its image.
+VOCO_UI_PALETTE=('17;19;24' '20;21;24' '27;27;30' '36;35;35' '42;40;40' '49;47;47' '53;52;52' '58;56;56' '60;59;59' '71;68;70' '83;79;81' '96;92;94' '107;103;104' '117;113;114' '128;124;124' '136;133;133' '144;141;141' '151;148;148' '157;154;154' '164;161;161' '171;168;167' '178;175;174' '185;182;181' '191;188;188' '196;193;193' '200;197;197' '205;202;202' '210;207;207' '214;211;211' '218;215;215' '222;220;219' '226;224;224' '231;229;228' '236;234;234' '242;240;240' '247;246;245')
+VOCO_UI_MOSAIC_OCTANT=(
+  ' 0000' ▁0100 🬆0319 𜴖1607 ▅071d ▕101e ▅061e ▅061e ▏0f1d ▅071c 𜴤1708 🬊031b ▏0200 ' 0000'
+  ' 0000' ▕1602 ▊1e05 𜴂0708 ▕0407 ▕0a20 ▏0608 ▕0607 ▏051f ▏0807 ▌0807 ▍0920 ▏1b02 ' 0000'
+  ' 0000' ▕1602 ▋200a ▗0808 ▕0407 ▕0a20 ▏0508 ▕0608 ▏051f ▏0808 ▋0807 ▍091e ▎1200 ' 0000'
+  ' 0000' ▕1502 ▋1f0a 🬏0708 ▕0407 ▕091e ▏0508 ▕0607 ▏051d ▍0708 ▌0807 ▍091c ▎1200 ' 0000'
+  🬭1c00 🬏1406 ▋1c09 𜶻0707 ▕0407 ▕091c ▏0507 ▕0507 ▏051b ▎0607 🬆0706 ▍081a 🬞1607 🬭1e00
+  ▏1520 ▎1c0b 𜴡0c1b ▂1e05 ▂2005 ▕0c1d ▂2005 ▂1f05 ▏0a1b ▂1d05 ▂1a05 ▍0b1a ▊0c21 ▕141f
+  ▏151f ▎180a ▂0e15 🬭141d 🬭1a22 🬭1b22 🬭181f 🬭141b 🬭1217 ▂0f15 ▂0e13 ▂1118 ▊0a1f ▕131e
+  ▏0e1d ▎1803 🬏0a12 𜴡1b15 🬏1c21 𜷋2022 ▌1f1c ▌1a18 𜴍1615 𜴍1413 ▊1214 🬞0b15 ▊031e ▕0e1b
+  𜴢1503 🬁0518 𜴷1303 𜶻0212 ▁0815 ▀1b13 ▅151a 𜴼1612 🬂1311 ▁0711 𜷋0212 𜵱1303 🬀0417 𜴏1303
+  ' 0000' 🬁1703 𜶻0317 𜴳190a 🬂0117 ▅1608 ▔111f 𜵈1810 ▅1308 🬂0116 𜴳170a 𜷋0216 🬀1603 ' 0000'
+  ' 0000' ' 0000' ' 0000' 🬦0f05 🬂0115 🬀081b ▁1a21 🬠1419 🬁0912 🬂0112 🬓1206 ' 0000' ' 0000' ' 0000'
+)
+VOCO_UI_MOSAIC_SEXTANT=(
+  ' 0000' ▁0100 🬆0319 🬅180a ▅071d ▕101e ▅061e ▅061e ▏0f1d ▅071c 🬈180b 🬊031b ▏0200 ' 0000'
+  ' 0000' ▕1602 ▊1e05 ▆0807 ▕0407 ▕0a20 ▏0608 ▕0607 ▏051f ▏0807 ▌0807 ▍0920 ▏1b02 ' 0000'
+  ' 0000' ▕1602 ▋200a ▗0808 ▕0407 ▕0a20 ▏0508 ▕0608 ▏051f ▏0808 ▋0807 ▍091e ▎1200 ' 0000'
+  ' 0000' ▕1502 ▋1f0a 🬏0708 ▕0407 ▕091e ▏0508 ▕0607 ▏051d ▍0708 ▌0807 ▍091c ▎1200 ' 0000'
+  🬭1c00 🬏1406 ▋1c09 ▖0607 ▕0407 ▕091c ▏0507 ▕0507 ▏051b ▎0607 🬆0706 ▍081a 🬞1607 🬭1e00
+  ▏1520 ▎1c0b ▋1b0c ▂1e05 ▂2005 ▕0c1d ▂2005 ▂1f05 ▏0a1b ▂1d05 ▂1a05 ▍0b1a ▊0c21 ▕141f
+  ▏151f ▎180a ▂0e15 🬭141d 🬭1a22 🬭1b22 🬭181f 🬭141b 🬭1217 ▂0f15 ▂0e13 ▂1118 ▊0a1f ▕131e
+  ▏0e1d ▎1803 🬏0a12 🬉1b15 🬏1c21 ▂2021 ▌1f1c ▌1a18 🬄1615 🬄1413 ▊1214 🬞0b15 ▊031e ▕0e1b
+  🬉1908 🬁0518 🬑1002 ▃0411 ▁0815 ▀1b13 ▅151a ▅1316 🬂1311 ▁0711 ▃0312 🬟1002 🬀0417 🬄1707
+  ' 0000' 🬁1703 ▃0317 🬋190c 🬂0117 ▅1608 ▔111f 🬓1811 ▅1308 🬂0116 🬋170c ▃0315 🬀1603 ' 0000'
+  ' 0000' ' 0000' ' 0000' 🬦0f05 🬂0115 🬀081b ▁1a21 🬠1419 🬁0912 🬂0112 🬓1206 ' 0000' ' 0000' ' 0000'
+)
+VOCO_UI_MOSAIC_QUADRANT=(
+  ' 0000' ▁0100 ▀0516 ▃0713 ▅071d ▕101e ▅061e ▅061e ▏0f1d ▅071c ▃0813 ▅1503 ▏0200 ' 0000'
+  ' 0000' ▕1602 ▊1e05 ▆0807 ▕0407 ▕0a20 ▏0608 ▕0607 ▏051f ▏0807 ▌0807 ▍0920 ▏1b02 ' 0000'
+  ' 0000' ▕1602 ▋200a ▗0808 ▕0407 ▕0a20 ▏0508 ▕0608 ▏051f ▏0808 ▋0807 ▍091e ▎1200 ' 0000'
+  ' 0000' ▕1502 ▋1f0a ▖0708 ▕0407 ▕091e ▏0508 ▕0607 ▏051d ▍0708 ▌0807 ▍091c ▎1200 ' 0000'
+  ▃1800 ▕1408 ▋1c09 ▖0607 ▕0407 ▕091c ▏0507 ▕0507 ▏051b ▎0607 ▃0607 ▍081a ▏1509 ▃1900
+  ▏1520 ▎1c0b ▋1b0c ▂1e05 ▂2005 ▕0c1d ▂2005 ▂1f05 ▏0a1b ▂1d05 ▂1a05 ▍0b1a ▊0c21 ▕141f
+  ▏151f ▎180a ▂0e15 ▂141c ▃1b22 ▃1c22 ▃181f ▂141a ▂1117 ▂0f15 ▂0e13 ▂1118 ▊0a1f ▕131e
+  ▏0e1d ▎1803 ▖0c12 ▌151a ▖1d21 ▂2021 ▌1f1c ▌1a18 ▌1615 ▌1413 ▊1214 ▗0c16 ▊031e ▕0e1b
+  ▝1b09 ▝0919 ▚020c ▃0411 ▁0815 ▀1b13 ▅151a ▅1316 ▅1113 ▁0711 ▃0312 ▚0c02 ▘0918 ▘1909
+  ' 0000' ▅010e ▃0317 ▔0212 ▅1703 ▅1608 ▔111f ▔0c14 ▅1308 ▅1603 ▔0211 ▃0315 ▘1002 ' 0000'
+  ' 0000' ' 0000' ' 0000' ▅0c01 ▅1502 ▅1e0d ▁1a21 ▌1a15 ▅140c ▅1302 ▅0e01 ' 0000' ' 0000' ' 0000'
+)
+VOCO_UI_IMAGE_SIZE=(331 496)
+VOCO_UI_IMAGE_MIC=(39 48 252 400)
+VOCO_UI_IMAGE_PNG='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'
 # END GENERATED INSTALLER BRAND
 
 voco_ui_configure() {
@@ -41,18 +160,388 @@ voco_ui_configure() {
     fi
   fi
   VOCO_UI_LINES=10
-  if [[ "$VOCO_TERMINAL_MOTION" == true && "$rows" -ge 16 ]]; then VOCO_UI_LINES=14; fi
+  VOCO_UI_ART=false
+  # The card needs 24-bit colour and room for its 21 lines; other terminals keep
+  # the compact canvas, which names VOCO in one line.
+  if [[ "$VOCO_TERMINAL_MOTION" == true && "$rows" -ge 23 && "${COLORTERM:-}" =~ ^(truecolor|24bit)$ ]]; then
+    VOCO_UI_ART=true
+    VOCO_UI_LINES=$((VOCO_UI_CARD_ROWS + 2 + VOCO_UI_PROGRESS_LINES))
+    voco_ui_art_mode "$columns" "$rows"
+    voco_ui_art_build
+  fi
   [[ "$VOCO_TERMINAL_MOTION" == true ]] || return 0
+}
+
+voco_ui_now_ms() {
+  VOCO_UI_NOW=$(( ${EPOCHREALTIME/./} / 1000 ))
+}
+
+# How the card shows the microphone. A terminal that answers the kitty graphics
+# query gets the image, any other a mosaic of the symbols it draws itself.
+voco_ui_art_mode() {
+  [[ -z "$VOCO_UI_MIC_MODE" ]] || return 0
+  case "${VOCO_INSTALL_ART:-}" in
+    kitty|octant|sextant|quadrant) VOCO_UI_MIC_MODE=$VOCO_INSTALL_ART ;;
+    text) voco_ui_mosaic ;;
+    *)
+      # Over SSH an answer can arrive after the probe stops waiting and reach a
+      # later prompt, so only a local terminal is asked.
+      [[ -n "${SSH_CONNECTION:-}${SSH_TTY:-}" ]] || voco_ui_probe "$1" "$2"
+      if [[ "$VOCO_UI_GRAPHICS" == kitty ]]; then VOCO_UI_MIC_MODE=kitty; else voco_ui_mosaic; fi
+      ;;
+  esac
+}
+
+# Ask the terminal whether it shows kitty images and how big its cells are. It
+# answers DA1 last, and every terminal answers DA1, so the probe ends once the
+# answers are in, or after VOCO_UI_PROBE_MS. Echo stays off meanwhile, so no
+# answer reaches the screen, and the terminal gets its own settings back.
+voco_ui_probe() {
+  local columns="$1" rows="$2" pid=$BASHPID process tty saved reply='' char remaining wait deadline
+  local -a stat
+  local kitty=$'\e_G[^;\e]*i='"$VOCO_UI_IMAGE_ID"$'[^;\e]*;OK\e' da1=$'\e\\[\\?[0-9;]*c'
+  local cell=$'\e\\[6;([0-9]+);([0-9]+)t' area=$'\e\\[4;([0-9]+);([0-9]+)t'
+  # The whole probe, its setup and restore included, takes at most
+  # VOCO_UI_PROBE_MS; the restore needs about 2 of them.
+  voco_ui_now_ms
+  deadline=$((VOCO_UI_NOW + VOCO_UI_PROBE_MS - 5))
+  # Only the foreground job may use the terminal: a background one would stop.
+  # The process group and the terminal's foreground group follow the command name.
+  { read -r process < "/proc/$pid/stat"; } 2>/dev/null || return 0
+  read -r -a stat <<< "${process##*) }"
+  [[ -n "${stat[5]:-}" && "${stat[2]}" == "${stat[5]}" ]] || return 0
+  { exec {tty}<> /dev/tty; } 2>/dev/null || return 0
+  if saved=$(stty -g <&"$tty" 2>/dev/null); then
+    VOCO_UI_PROBE_TTY=$saved
+    trap '' TTIN TTOU
+    stty -echo -icanon min 1 time 0 <&"$tty" 2>/dev/null || true
+    printf '\033_Gi=%d,s=1,v=1,a=q,t=d,f=24;AAAA\033\\\033[16t\033[14t\033[c' "$VOCO_UI_IMAGE_ID" >&"$tty" || true
+    # Each read runs to a "c", which ends DA1, so an answer takes one or two reads.
+    while voco_ui_now_ms; remaining=$((deadline - VOCO_UI_NOW)); (( remaining > 0 )); do
+      printf -v wait '%d.%03d' $((remaining / 1000)) $((remaining % 1000))
+      if IFS= read -r -d c -t "$wait" char <&"$tty"; then reply+=${char}c; else reply+=$char; break; fi
+      [[ ! "$reply" =~ $da1 ]] || break
+    done
+    stty "$saved" <&"$tty" 2>/dev/null || true
+    VOCO_UI_PROBE_TTY=''
+    trap - TTIN TTOU
+  fi
+  exec {tty}>&-
+  [[ ! "$reply" =~ $kitty ]] || VOCO_UI_GRAPHICS=kitty
+  if [[ "$reply" =~ $cell ]]; then
+    VOCO_UI_CELL_HEIGHT=${BASH_REMATCH[1]} VOCO_UI_CELL_WIDTH=${BASH_REMATCH[2]}
+  elif [[ "$reply" =~ $area ]]; then
+    VOCO_UI_CELL_HEIGHT=$((BASH_REMATCH[1] / rows)) VOCO_UI_CELL_WIDTH=$((BASH_REMATCH[2] / columns))
+  fi
+}
+
+# The mosaic for a terminal that shows no images: octants or sextants where the
+# terminal draws them itself, so its font can't lack them, otherwise quadrants,
+# which every terminal font has. Inside tmux or screen the terminal is unknown.
+voco_ui_mosaic() {
+  local vte="${VTE_VERSION:-0}"
+  [[ "$vte" =~ ^[0-9]+$ ]] || vte=0
+  VOCO_UI_MIC_MODE=quadrant
+  case "${TMUX:-}${STY:-}:${TERM:-}" in
+    ?*:*|:screen*|:tmux*) return 0 ;;
+  esac
+  if (( vte >= 7800 )); then
+    VOCO_UI_MIC_MODE=octant
+  elif (( vte >= 6400 )); then
+    VOCO_UI_MIC_MODE=sextant
+  else
+    case "${TERM_PROGRAM:-}:${TERM:-}" in
+      ghostty:*|WezTerm:*|*:xterm-kitty|*:foot|*:foot-extra) VOCO_UI_MIC_MODE=sextant ;;
+    esac
+  fi
+}
+
+# The image goes to the terminal once. The card then places it over the
+# microphone's cells, cropped to the shape of the terminal's cells around the
+# microphone, so it fills them without stretching. Cells of unknown size are
+# taken to be twice as tall as they are wide.
+voco_ui_image_build() {
+  local cw=$VOCO_UI_CELL_WIDTH ch=$VOCO_UI_CELL_HEIGHT width=${VOCO_UI_IMAGE_SIZE[0]} height=${VOCO_UI_IMAGE_SIZE[1]}
+  local left=${VOCO_UI_IMAGE_MIC[0]} top=${VOCO_UI_IMAGE_MIC[1]} mw=${VOCO_UI_IMAGE_MIC[2]} mh=${VOCO_UI_IMAGE_MIC[3]}
+  local w h x y k i=0 data=$VOCO_UI_IMAGE_PNG keys send=''
+  (( cw > 0 && ch > 0 )) || { cw=1; ch=2; }
+  # The microphone cells are 14 cell widths by 11 cell heights.
+  if (( mw * 11 * ch >= mh * 14 * cw )); then
+    w=$mw h=$(( (mw * 11 * ch + 7 * cw) / (14 * cw) ))
+  else
+    h=$mh w=$(( (mh * 14 * cw + 11 * ch / 2) / (11 * ch) ))
+  fi
+  (( w <= width )) || w=$width
+  (( h <= height )) || h=$height
+  x=$(( left + mw / 2 - w / 2 )) y=$(( top + mh / 2 - h / 2 ))
+  (( x >= 0 )) || x=0
+  (( x <= width - w )) || x=$((width - w))
+  (( y >= 0 )) || y=0
+  (( y <= height - h )) || y=$((height - h))
+  # From just after the card, up to its first row and the microphone's column.
+  # The cursor is saved around it, in case a terminal moves it anyway.
+  VOCO_UI_PLACE=('')
+  for ((k=1; k<=14; k++)); do
+    VOCO_UI_PLACE+=($'\e7\e[12A\e[5G\e_Ga=p,i='"$VOCO_UI_IMAGE_ID,p=1,x=$x,y=$y,w=$(( (w * k + 7) / 14 )),h=$h,c=$k,r=11,C=1,q=2"$'\e\\\e8')
+  done
+  VOCO_UI_UNPLACE=$'\e_Ga=d,d=i,i='"$VOCO_UI_IMAGE_ID"$',p=1,q=2\e\\'
+  # In chunks of at most 4096 bytes, as the protocol asks; q=2 keeps the
+  # terminal from answering.
+  keys="a=t,t=d,f=100,i=$VOCO_UI_IMAGE_ID,q=2,"
+  while (( i < ${#data} )); do
+    send+=$'\e_G'"${keys}m=$(( i + 4096 < ${#data} ? 1 : 0 ));${data:i:4096}"$'\e\\'
+    keys='q=2,'
+    i=$((i + 4096))
+  done
+  printf '%s' "$send"
+}
+
+# The card's pieces, built once from the generated brand data. A line has an SGR
+# sequence only where its colour changes, which keeps frames small, and each row
+# splits after the microphone, at card column 16, into a left and a right part
+# that each start with their colour: a frame can redraw the right part alone,
+# leaving the microphone and any image over it untouched.
+voco_ui_art_build() {
+  [[ "$VOCO_UI_ART_BUILT" != true ]] || return 0
+  local r x cell glyph sgr last line
+  local -a sgrs=() chars=()
+  declare -gA VOCO_UI_RUNS_SEEN=()
+  VOCO_UI_GRAPHITE=$'\e[48;2;'"$VOCO_UI_CARD"'m'
+  VOCO_UI_EDGE=$'\e[38;2;'"$VOCO_UI_CARD"';49m'
+  printf -v VOCO_UI_SPACES '%58s' ''
+  VOCO_UI_ZEROS=${VOCO_UI_SPACES// /0} VOCO_UI_TEES=${VOCO_UI_SPACES// /t}
+  if [[ "$VOCO_UI_MIC_MODE" == octant || "$VOCO_UI_MIC_MODE" == sextant || "$VOCO_UI_MIC_MODE" == quadrant ]]; then
+    # Each cell: its symbol, then its foreground and background palette indices.
+    local -n mosaic="VOCO_UI_MOSAIC_${VOCO_UI_MIC_MODE^^}"
+    for cell in "${mosaic[@]}"; do
+      glyph=${cell%????} sgr=${VOCO_UI_PALETTE[16#${cell: -2}]}
+      if [[ "$glyph" == ' ' ]]; then sgrs+=($'\e[48;2;'"$sgr"'m')
+      else sgrs+=($'\e[38;2;'"${VOCO_UI_PALETTE[16#${cell: -4:2}]}"';48;2;'"$sgr"'m'); fi
+      chars+=("$glyph")
+    done
+  else
+    # Graphite, under the image the card places over these cells.
+    for ((x=0; x<VOCO_UI_CARD_ROWS*14; x++)); do sgrs+=("$VOCO_UI_GRAPHITE") chars+=(' '); done
+    [[ "$VOCO_UI_MIC_MODE" != kitty ]] || voco_ui_image_build
+  fi
+  # Each row's left part, two graphite cells and the microphone's fourteen, and
+  # every shorter one the sweep shows on its way across.
+  VOCO_UI_LEFT=() VOCO_UI_LEFT_CUT=()
+  for ((r=0; r<VOCO_UI_CARD_ROWS; r++)); do
+    line=$VOCO_UI_GRAPHITE' ' last=$VOCO_UI_GRAPHITE
+    VOCO_UI_LEFT_CUT+=('' "$line" "$line ")
+    line+=' '
+    for ((x=0; x<14; x++)); do
+      sgr=${sgrs[r*14+x]}
+      [[ "$sgr" == "$last" ]] || line+=$sgr
+      last=$sgr line+=${chars[r*14+x]}
+      VOCO_UI_LEFT_CUT+=("$line")
+    done
+    VOCO_UI_LEFT+=("$line")
+  done
+  # Rounded edges: the card begins and ends half a cell in, on any background.
+  VOCO_UI_TOP_CHARS=(▗) VOCO_UI_BOTTOM_CHARS=(▝)
+  for ((x=2; x<VOCO_UI_CARD_WIDTH; x++)); do VOCO_UI_TOP_CHARS+=(▄) VOCO_UI_BOTTOM_CHARS+=(▀); done
+  VOCO_UI_TOP_CHARS+=(▖) VOCO_UI_BOTTOM_CHARS+=(▘)
+  printf -v VOCO_UI_EDGE_TOP '%s' "$VOCO_UI_EDGE" "${VOCO_UI_TOP_CHARS[@]}"
+  printf -v VOCO_UI_EDGE_BOTTOM '%s' "$VOCO_UI_EDGE" "${VOCO_UI_BOTTOM_CHARS[@]}"
+  # The wordmark rows' colours, the shine's, and each letter's row as lit (1)
+  # and empty (0) cells; the tagline's lines, when they start and their colours.
+  VOCO_UI_WM_LIT=() VOCO_UI_WM_PATTERN=()
+  for ((r=0; r<5; r++)); do
+    VOCO_UI_WM_LIT+=($'\e[38;2;'"${VOCO_UI_WORDMARK[2*r]}"';48;2;'"${VOCO_UI_WORDMARK[2*r+1]}"'m')
+  done
+  VOCO_UI_WM_GLOW=$'\e[38;2;'"${VOCO_UI_WORDMARK_SHINE[0]}"';48;2;'"${VOCO_UI_WORDMARK_SHINE[1]}"'m'
+  for glyph in "${VOCO_UI_GLYPHS[@]}"; do
+    glyph=${glyph//█/1}
+    VOCO_UI_WM_PATTERN+=("${glyph// /0}")
+  done
+  VOCO_UI_TAGLINE=("$VOCO_UI_BRAND_LINE" "$VOCO_UI_TODAY_LINE") VOCO_UI_TAGLINE_AT=("$VOCO_UI_BRAND_AT" "$VOCO_UI_TODAY_AT")
+  VOCO_UI_TAGLINE_SGR=()
+  for sgr in "$VOCO_UI_TEXT_BRAND" "$VOCO_UI_TEXT_TODAY" "$VOCO_UI_TEXT_VERSION"; do
+    VOCO_UI_TAGLINE_SGR+=($'\e[38;2;'"$sgr"';48;2;'"$VOCO_UI_CARD"'m')
+  done
+  VOCO_UI_SWEEP_GLOW=$'\e[48;2;'"${VOCO_UI_SWEEP[0]}"'m '
+  VOCO_UI_SWEEP_BAR=$'\e[48;2;'"${VOCO_UI_SWEEP[1]}"'m '
+  VOCO_UI_SWEEP_TOP=$'\e[38;2;'"${VOCO_UI_SWEEP[1]}"';49m▄'
+  VOCO_UI_SWEEP_BOTTOM=$'\e[38;2;'"${VOCO_UI_SWEEP[1]}"';49m▀'
+  VOCO_UI_ART_BUILT=true
+}
+
+# A row's right part in VOCO_UI_RIGHT, from KINDS, a character for each cell from
+# card column 16: 0 graphite, 1 a letter cell in the row's colour LIT, 2 a letter
+# cell the shine lights, t a cell of TEXT, aligned to KINDS, in TEXT_SGR. Each run
+# of one kind takes one SGR.
+voco_ui_runs() {
+  local kinds="$1" text="$2" text_sgr="$3" lit="$4" kind run n at=0 out='' key="$1|$2|$3|$4"
+  # Most rows repeat from one frame to the next.
+  if [[ -n "${VOCO_UI_RUNS_SEEN[$key]+set}" ]]; then VOCO_UI_RIGHT=${VOCO_UI_RUNS_SEEN[$key]}; return; fi
+  while [[ -n "$kinds" ]]; do
+    kind=${kinds:0:1}
+    run=${kinds%%[!$kind]*}
+    n=${#run}
+    case $kind in
+      0) out+=$VOCO_UI_GRAPHITE${VOCO_UI_SPACES:0:n} ;;
+      t) out+=$text_sgr${text:at:n} ;;
+      *)
+        run=${VOCO_UI_SPACES:0:n}
+        if [[ "$kind" == 1 ]]; then out+=$lit; else out+=$VOCO_UI_WM_GLOW; fi
+        out+=${run// /▀}
+        ;;
+    esac
+    at=$((at + n)) kinds=${kinds:n}
+  done
+  VOCO_UI_RIGHT=$out VOCO_UI_RUNS_SEEN[$key]=$out
+}
+
+# The card T milliseconds into the intro, with the shine S milliseconds in, or
+# none when S is negative: VOCO_UI_CARD_TOP and _BOTTOM, the rows' _LEFT and
+# _RIGHT parts, the sweep's position and how many microphone columns it revealed.
+voco_ui_card_at() {
+  local t="$1" s="$2" IFS=
+  local W=$VOCO_UI_CARD_WIDTH R=$VOCO_UI_ART_RIGHT sweep=$VOCO_UI_CARD_WIDTH band=-100 cut glow=''
+  local r gr i start p offset at kinds text sgr lit count seg label="v${VERSION:-}" n
+  (( t >= VOCO_UI_SWEEP_MS )) || sweep=$(( t * (W + 1) / VOCO_UI_SWEEP_MS ))
+  # The shine is a slanted band, three columns wide, crossing the wordmark.
+  (( s < 0 )) || band=$(( -8 + s * 51 / VOCO_UI_SHINE_MS ))
+  # Before the sweep's glow and bar, it shows CUT cells of each row.
+  cut=$((sweep - 1))
+  (( sweep < 1 )) || glow=$VOCO_UI_SWEEP_GLOW
+  if (( sweep >= W )); then
+    VOCO_UI_CARD_TOP=$VOCO_UI_EDGE_TOP VOCO_UI_CARD_BOTTOM=$VOCO_UI_EDGE_BOTTOM
+  elif (( sweep > 0 )); then
+    VOCO_UI_CARD_TOP=$VOCO_UI_EDGE"${VOCO_UI_TOP_CHARS[*]:0:sweep}"$VOCO_UI_SWEEP_TOP
+    VOCO_UI_CARD_BOTTOM=$VOCO_UI_EDGE"${VOCO_UI_BOTTOM_CHARS[*]:0:sweep}"$VOCO_UI_SWEEP_BOTTOM
+  else
+    VOCO_UI_CARD_TOP=$VOCO_UI_SWEEP_TOP VOCO_UI_CARD_BOTTOM=$VOCO_UI_SWEEP_BOTTOM
+  fi
+  for ((r=0; r<VOCO_UI_CARD_ROWS; r++)); do
+    kinds=${VOCO_UI_ZEROS:0:42} text='' sgr='' lit=''
+    if (( r == 0 && t >= VOCO_UI_VERSION_AT )); then
+      n=${#label} at=$((R + 37 - ${#label} - 16))
+      kinds=${VOCO_UI_ZEROS:0:at}${VOCO_UI_TEES:0:n}${VOCO_UI_ZEROS:0:42-at-n}
+      text=${VOCO_UI_SPACES:0:at}$label sgr=${VOCO_UI_TAGLINE_SGR[2]}
+    elif (( r >= 2 && r <= 6 )); then
+      gr=$((r - 2)) lit=${VOCO_UI_WM_LIT[r-2]}
+      for ((i=0; i<4; i++)); do
+        start=$((VOCO_UI_GLIDE_AT + i * VOCO_UI_GLIDE_STEP))
+        (( t >= start )) || continue
+        p=$(( (t - start) * 20 / VOCO_UI_GLIDE_MS )); (( p <= 20 )) || p=20
+        offset=$(( VOCO_UI_GLIDE_COLUMNS * (1000 - VOCO_UI_EASE[p]) / 1000 ))
+        at=$((R + i * 9 + offset - 16))
+        (( at < 40 )) || continue
+        kinds=${kinds:0:at}${VOCO_UI_WM_PATTERN[gr*4+i]}${kinds:at+8}
+      done
+      # Cells from W - 2 on are the card's padding, never a letter.
+      kinds=${kinds:0:40}00
+      VOCO_UI_CARD_KINDS[gr]=$kinds
+      if (( band > -100 )); then
+        at=$((band + 7 - gr)) count=3
+        if (( at < 0 )); then count=$((3 + at)) at=0; fi
+        if (( count > 0 && at < 42 )); then
+          seg=${kinds:at:count}
+          kinds=${kinds:0:at}${seg//1/2}${kinds:at+count}
+        fi
+      fi
+    elif (( (r == 8 || r == 9) && t > VOCO_UI_TAGLINE_AT[r-8] )); then
+      # Typed in, a character every 10 ms.
+      text=${VOCO_UI_TAGLINE[r-8]} count=$(( (t - VOCO_UI_TAGLINE_AT[r-8]) / 10 ))
+      (( count <= ${#text} )) || count=${#text}
+      kinds=000${VOCO_UI_TEES:0:count}${VOCO_UI_ZEROS:0:39-count} text="   ${text:0:count}" sgr=${VOCO_UI_TAGLINE_SGR[r-8]}
+    fi
+    if (( sweep >= W )); then
+      VOCO_UI_CARD_LEFT[r]=${VOCO_UI_LEFT[r]}
+      voco_ui_runs "$kinds" "$text" "$sgr" "$lit"
+      VOCO_UI_CARD_RIGHT[r]=$VOCO_UI_RIGHT
+    elif (( cut < 16 )); then
+      VOCO_UI_CARD_LEFT[r]=${VOCO_UI_LEFT_CUT[r*17+(cut > 0 ? cut : 0)]}$glow$VOCO_UI_SWEEP_BAR
+      VOCO_UI_CARD_RIGHT[r]=''
+    else
+      VOCO_UI_CARD_LEFT[r]=${VOCO_UI_LEFT[r]}
+      voco_ui_runs "${kinds:0:cut-16}" "$text" "$sgr" "$lit"
+      VOCO_UI_CARD_RIGHT[r]=$VOCO_UI_RIGHT$glow$VOCO_UI_SWEEP_BAR
+    fi
+  done
+  # The image covers the microphone cells the sweep has passed.
+  VOCO_UI_CARD_SWEEP=$sweep VOCO_UI_CARD_REVEAL=$(( sweep >= W ? 14 : sweep - 3 ))
+  (( VOCO_UI_CARD_REVEAL <= 14 )) || VOCO_UI_CARD_REVEAL=14
+  (( VOCO_UI_CARD_REVEAL >= 0 )) || VOCO_UI_CARD_REVEAL=0
+}
+
+# The card at rest, and the wordmark rows the APT display's shine draws again:
+# the graphite and shine colours, then each row's colour and kinds.
+voco_ui_apt_card() {
+  local r
+  VOCO_UI_APT_CARD='' VOCO_UI_APT_SHINE=''
+  [[ "$VOCO_UI_ART" == true ]] || return 0
+  voco_ui_card_at "$VOCO_UI_INTRO_MS" -1
+  VOCO_UI_APT_CARD=$VOCO_UI_CARD_TOP
+  for ((r=0; r<VOCO_UI_CARD_ROWS; r++)); do
+    VOCO_UI_APT_CARD+=$'\n'"${VOCO_UI_CARD_LEFT[r]}"$'\t'"${VOCO_UI_CARD_RIGHT[r]}"
+  done
+  VOCO_UI_APT_CARD+=$'\n'$VOCO_UI_CARD_BOTTOM
+  VOCO_UI_APT_SHINE=$VOCO_UI_GRAPHITE$'\n'$VOCO_UI_WM_GLOW
+  for ((r=0; r<5; r++)); do
+    VOCO_UI_APT_SHINE+=$'\n'"${VOCO_UI_WM_LIT[r]}"$'\t'"${VOCO_UI_CARD_KINDS[r]}"
+  done
+}
+
+# The card for now: its final state once the intro and any shine are done,
+# built once and kept.
+voco_ui_card() {
+  local t=$VOCO_UI_INTRO_MS s=-1
+  if [[ "$VOCO_UI_NO_MOTION" != true ]]; then
+    voco_ui_now_ms
+    if (( VOCO_UI_INTRO_START > 0 && VOCO_UI_NOW - VOCO_UI_INTRO_START < VOCO_UI_INTRO_MS )); then
+      t=$((VOCO_UI_NOW - VOCO_UI_INTRO_START))
+    fi
+    if (( t >= VOCO_UI_SHINE_AT && t < VOCO_UI_SHINE_AT + VOCO_UI_SHINE_MS )); then
+      s=$((t - VOCO_UI_SHINE_AT))
+    elif (( VOCO_UI_SHINE_START > 0 && VOCO_UI_NOW - VOCO_UI_SHINE_START < VOCO_UI_SHINE_MS )); then
+      s=$((VOCO_UI_NOW - VOCO_UI_SHINE_START))
+    fi
+  fi
+  VOCO_UI_CARD_RESTS=false
+  (( t < VOCO_UI_INTRO_MS || s >= 0 )) || VOCO_UI_CARD_RESTS=true
+  if [[ "$VOCO_UI_CARD_RESTS" == true && -n "$VOCO_UI_FINAL_TOP" ]]; then
+    VOCO_UI_CARD_TOP=$VOCO_UI_FINAL_TOP VOCO_UI_CARD_BOTTOM=$VOCO_UI_FINAL_BOTTOM
+    VOCO_UI_CARD_SWEEP=$VOCO_UI_CARD_WIDTH VOCO_UI_CARD_REVEAL=14
+    VOCO_UI_CARD_LEFT=("${VOCO_UI_LEFT[@]}") VOCO_UI_CARD_RIGHT=("${VOCO_UI_FINAL_RIGHT[@]}")
+    return
+  fi
+  voco_ui_card_at "$t" "$s"
+  if [[ "$VOCO_UI_CARD_RESTS" == true ]]; then
+    VOCO_UI_FINAL_TOP=$VOCO_UI_CARD_TOP VOCO_UI_FINAL_BOTTOM=$VOCO_UI_CARD_BOTTOM
+    VOCO_UI_FINAL_RIGHT=("${VOCO_UI_CARD_RIGHT[@]}")
+  fi
+}
+
+# What this process last drew, so a frame redraws only what changed: the sweep's
+# position, which sets the edges and left parts, the right parts, the image's
+# reveal, whether the card rests, the heading and the progress lines. Unknown
+# once the canvas opens or clears, or another process drew.
+voco_ui_forget() {
+  VOCO_UI_SHOWN_SWEEP=-1 VOCO_UI_SHOWN_LEFT=-1 VOCO_UI_SHOWN_RIGHT=() VOCO_UI_SHOWN_REVEAL=-1
+  VOCO_UI_SHOWN_RESTS=false VOCO_UI_SHOWN_HEADING='' VOCO_UI_SHOWN_LINES=() VOCO_UI_SHOWN_PROGRESS=''
+}
+
+# True while the intro or a shine is still moving.
+voco_ui_animating() {
+  [[ "$VOCO_UI_ART" == true && "$VOCO_UI_NO_MOTION" != true ]] || return 1
+  voco_ui_now_ms
+  (( (VOCO_UI_INTRO_START > 0 && VOCO_UI_NOW - VOCO_UI_INTRO_START < VOCO_UI_INTRO_MS) ||
+     (VOCO_UI_SHINE_START > 0 && VOCO_UI_NOW - VOCO_UI_SHINE_START < VOCO_UI_SHINE_MS) ))
 }
 
 voco_ui_init() {
   voco_ui_configure
-  [[ "$VOCO_TERMINAL_MOTION" == true ]] || return 0
-  # An owned, unlinked FIFO gives read -t a timer without a sleep subprocess.
-  local fifo="$VOCO_DOWNLOAD_DIR/ui-timer"
-  mkfifo -m 600 "$fifo"
-  exec {VOCO_UI_TIMER_FD}<>"$fifo"
-  rm -f -- "$fifo"
+  [[ "$VOCO_TERMINAL_MOTION" == true && -z "$VOCO_UI_TIMER_FD" ]] || return 0
+  # An owned, unlinked FIFO gives read -t a timer without a sleep subprocess. It
+  # lives in its own private directory, so the intro can play before downloads.
+  local folder
+  folder=$(mktemp -d) || return 0
+  if mkfifo -m 600 "$folder/ui-timer"; then exec {VOCO_UI_TIMER_FD}<>"$folder/ui-timer"; fi
+  rm -rf -- "$folder"
 }
 
 voco_ui_size() {
@@ -61,48 +550,99 @@ voco_ui_size() {
   printf -v VOCO_UI_SIZE '%d.%d %s' "$((bytes/divisor))" "$((bytes%divisor*10/divisor))" "$unit"
 }
 
-# One bounded canvas is shared by every normal installation stage.
+# One bounded canvas is shared by every normal installation stage. A frame
+# redraws only the lines that changed since this process last drew them, and of
+# a card row only its right part when that is all that changed, which leaves the
+# microphone, and any image over it, untouched. With "progress" as the fourth
+# argument a resting card isn't even built, and only the progress lines change.
 voco_ui_frame() {
   [[ "$VOCO_TERMINAL_MOTION" == true ]] || return 0
-  local title="$1" detail="$2" mark="${3:-—}" shine="${4:--1}" width wordmark='V O C O' i row color version
-  local stages='' frame='' part='' symbol line2='' rule='────────────────────────────────────────────────────────'
+  local title="$1" detail="$2" mark="${3:-—}" card="${4:-full}" width i r color symbol line2='' stages=''
+  local key frame left heading=''
+  local rule='────────────────────────────────────────────────────────'
   local -a labels=(Check Download Verify Install)
   width=$((${VOCO_TERMINAL_COLUMNS:-80}-5))
   if (( ${#detail} > width )); then
-    local first="${detail:0:width}"
-    if [[ "$first" == *' '* ]]; then first="${first% *}"; fi
-    line2="${detail:${#first}}"; line2="${line2# }"; detail="$first"
+    local head="${detail:0:width}"
+    if [[ "$head" == *' '* ]]; then head="${head% *}"; fi
+    line2="${detail:${#head}}"; line2="${line2# }"; detail="$head"
   fi
-  for i in 0 1 2 3; do
-    symbol='○'; color="$VOCO_UI_MUTED"
-    if (( i < VOCO_UI_STAGE )); then symbol='✓'; color="$VOCO_UI_COMPLETE"
-    elif (( i == VOCO_UI_STAGE )); then symbol='›'; color="$VOCO_UI_ACTIVE"; fi
-    stages+="${color}${symbol} ${labels[i]}${NC}   "
-  done
-  printf -v frame '\033[%dA' "$VOCO_UI_LINES"
-  if (( VOCO_UI_LINES == 14 )); then
-    for row in 0 1 2 3 4; do
-      wordmark=''
-      for i in 0 1 2 3; do
-        color="$VOCO_UI_SILVER"
-        if (( i == shine )) && [[ "$VOCO_UI_NO_MOTION" != true ]]; then color="$VOCO_UI_SHINE"; fi
-        wordmark+="${color}${VOCO_UI_GLYPHS[row*4+i]} "
-      done
-      version=''
-      (( row < 4 )) || version="  v${VERSION:-}"
-      printf -v part '\r\033[K  %b%b%s\n' "$wordmark" "$NC" "$version"
-      frame+="$part"
+  key="$title|$detail|$mark|$VOCO_UI_STAGE|$VOCO_UI_NOTE|$width"
+  if [[ "$key" != "$VOCO_UI_PROGRESS_KEY" ]]; then
+    for i in 0 1 2 3; do
+      symbol='○'; color="$VOCO_UI_MUTED"
+      if (( i < VOCO_UI_STAGE )); then symbol='✓'; color="$VOCO_UI_COMPLETE"
+      elif (( i == VOCO_UI_STAGE )); then symbol='›'; color="$VOCO_UI_ACTIVE"; fi
+      stages+="${color}${symbol} ${labels[i]}${NC}   "
     done
-    printf -v part '\r\033[K  The voice layer for Linux. Today: private dictation.\n'
-  else
-    printf -v part '\r\033[K  %bV O C O%b  v%s\n\r\033[K  The voice layer for Linux. Today: private dictation.\n' "$VOCO_UI_SILVER" "$NC" "${VERSION:-}"
+    color="$VOCO_UI_SILVER"
+    [[ "$mark" != '✓' ]] || color="$VOCO_UI_COMPLETE"
+    VOCO_UI_PROGRESS=($'\r\e[K')
+    printf -v 'VOCO_UI_PROGRESS[1]' '\r\033[K  %b%s%b' "$color" "$mark" "$NC"
+    printf -v 'VOCO_UI_PROGRESS[2]' '\r\033[K  %s' "${title:0:width}"
+    printf -v 'VOCO_UI_PROGRESS[3]' '\r\033[K  %s' "$detail"
+    printf -v 'VOCO_UI_PROGRESS[4]' '\r\033[K  %s' "${line2:0:width}"
+    printf -v 'VOCO_UI_PROGRESS[5]' '\r\033[K  %s' "${rule:0:width}"
+    printf -v 'VOCO_UI_PROGRESS[6]' '\r\033[K  %b' "$stages"
+    printf -v 'VOCO_UI_PROGRESS[7]' '\r\033[K  %s' "${VOCO_UI_NOTE:0:width}"
+    VOCO_UI_PROGRESS_KEY=$key
   fi
-  frame+="$part"
-  color="$VOCO_UI_SILVER"
-  [[ "$mark" != '✓' ]] || color="$VOCO_UI_COMPLETE"
-  printf -v part '\r\033[K\n\r\033[K  %b%s%b\n\r\033[K  %s\n\r\033[K  %s\n\r\033[K  %s\n\r\033[K  %s\n\r\033[K  %b\n\r\033[K  %s\n' \
-    "$color" "$mark" "$NC" "${title:0:width}" "$detail" "${line2:0:width}" "${rule:0:width}" "$stages" "${VOCO_UI_NOTE:0:width}"
-  frame+="$part"
+  if [[ "$VOCO_UI_ART" == true && ( "$card" == progress || "$VOCO_UI_SHOWN_RESTS" == true ) ]] && ! voco_ui_animating; then
+    printf -v frame '\033[%dA' "$VOCO_UI_PROGRESS_LINES"
+  elif [[ "$VOCO_UI_ART" == true ]]; then
+    voco_ui_card
+    VOCO_UI_SHOWN_RESTS=$VOCO_UI_CARD_RESTS
+    printf -v frame '\033[%dA' "$VOCO_UI_LINES"
+    # The edges follow the sweep, and the rows' left parts follow it until it is
+    # past the microphone; only the right parts change after that.
+    left=$(( VOCO_UI_CARD_SWEEP < 17 ? VOCO_UI_CARD_SWEEP : 17 ))
+    if [[ "$VOCO_UI_CARD_SWEEP" != "$VOCO_UI_SHOWN_SWEEP" ]]; then
+      frame+=$'\r\e[K  '"$VOCO_UI_CARD_TOP"$'\e[0m\n'
+    else
+      frame+=$'\n'
+    fi
+    for ((r=0; r<VOCO_UI_CARD_ROWS; r++)); do
+      if [[ "$left" != "$VOCO_UI_SHOWN_LEFT" ]]; then
+        frame+=$'\r\e[K  '"${VOCO_UI_CARD_LEFT[r]}${VOCO_UI_CARD_RIGHT[r]}"$'\e[0m\n'
+      elif [[ "${VOCO_UI_CARD_RIGHT[r]}" != "${VOCO_UI_SHOWN_RIGHT[r]}" ]]; then
+        # Column 19 is the card's column 16, after the microphone.
+        frame+=$'\e[19G'"${VOCO_UI_CARD_RIGHT[r]}"$'\e[0m\e[K\n'
+      else
+        frame+=$'\n'
+      fi
+    done
+    if [[ "$VOCO_UI_CARD_SWEEP" != "$VOCO_UI_SHOWN_SWEEP" ]]; then
+      frame+=$'\r\e[K  '"$VOCO_UI_CARD_BOTTOM"$'\e[0m\n'
+    else
+      frame+=$'\n'
+    fi
+    # The image goes over the microphone cells again whenever they were drawn,
+    # from just after the card.
+    if [[ "$VOCO_UI_MIC_MODE" == kitty ]] &&
+        [[ "$left" != "$VOCO_UI_SHOWN_LEFT" || "$VOCO_UI_CARD_REVEAL" != "$VOCO_UI_SHOWN_REVEAL" ]]; then
+      (( VOCO_UI_CARD_REVEAL < 1 )) || frame+=${VOCO_UI_PLACE[VOCO_UI_CARD_REVEAL]}
+      VOCO_UI_SHOWN_REVEAL=$VOCO_UI_CARD_REVEAL
+    fi
+    VOCO_UI_SHOWN_RIGHT=("${VOCO_UI_CARD_RIGHT[@]}") VOCO_UI_SHOWN_LEFT=$left VOCO_UI_SHOWN_SWEEP=$VOCO_UI_CARD_SWEEP
+  else
+    printf -v frame '\033[%dA' "$VOCO_UI_LINES"
+    printf -v heading '\r\033[K  %bV O C O%b  v%s\n\r\033[K  The voice layer for Linux. Today: private dictation.\n' \
+      "$VOCO_UI_SILVER" "$NC" "${VERSION:-}"
+    if [[ "$heading" != "$VOCO_UI_SHOWN_HEADING" ]]; then frame+=$heading; else frame+=$'\n\n'; fi
+    VOCO_UI_SHOWN_HEADING=$heading
+  fi
+  if [[ "$key" != "$VOCO_UI_SHOWN_PROGRESS" ]]; then
+    for ((i=0; i<VOCO_UI_PROGRESS_LINES; i++)); do
+      if [[ "${VOCO_UI_PROGRESS[i]}" != "${VOCO_UI_SHOWN_LINES[i]-}" || -z "$VOCO_UI_SHOWN_PROGRESS" ]]; then
+        frame+=${VOCO_UI_PROGRESS[i]}$'\n'
+      else
+        frame+=$'\n'
+      fi
+    done
+    VOCO_UI_SHOWN_LINES=("${VOCO_UI_PROGRESS[@]}") VOCO_UI_SHOWN_PROGRESS=$key
+  else
+    frame+=$'\n\n\n\n\n\n\n\n'
+  fi
   # A terminating sweep may stop while building the frame, but must never leave
   # the cursor between rows. Bash runs the termination trap after this builtin.
   printf '%s' "$frame"
@@ -112,12 +652,49 @@ voco_ui_begin() {
   [[ "$VOCO_TERMINAL_MOTION" == true ]] || return 0
   voco_ui_pause
   if [[ "$VOCO_UI_OPEN" != true ]]; then
-    local line
-    for ((line=0;line<VOCO_UI_LINES;line++)); do printf '\n'; done
+    local lines
+    printf -v lines '%*s' "$VOCO_UI_LINES" ''
+    printf '%s' "${lines// /$'\n'}"
     VOCO_UI_OPEN=true
+    voco_ui_forget
+    # The intro plays once, the first time the canvas opens.
+    if [[ "$VOCO_UI_ART" == true && "$VOCO_UI_NO_MOTION" != true ]] && (( VOCO_UI_INTRO_START == 0 )); then
+      voco_ui_now_ms
+      VOCO_UI_INTRO_START=$VOCO_UI_NOW
+    fi
   fi
   VOCO_UI_TITLE="$1"
   voco_ui_frame "$1" "${2:-}" "${3:-—}"
+}
+
+# Keep the intro or a shine moving after a frame: about 30 frames a second, in the
+# background, until both are done. Every foreground frame pauses it first.
+voco_ui_animate() {
+  [[ -n "$VOCO_UI_TIMER_FD" ]] && voco_ui_animating || return 0
+  (
+    trap - EXIT
+    trap 'exit 0' TERM INT
+    while voco_ui_animating; do
+      voco_ui_frame "$1" "$2" "$3"
+      IFS= read -r -t .033 -u "$VOCO_UI_TIMER_FD" _ || true
+    done
+    voco_ui_frame "$1" "$2" "$3"
+  ) &
+  VOCO_UI_PID=$!
+}
+
+# End any intro or shine now, so the next frame shows the card at rest. The last
+# frame of a fast install uses this instead of waiting for the intro.
+voco_ui_settle() {
+  voco_ui_pause
+  VOCO_UI_INTRO_START=1 VOCO_UI_SHINE_START=0
+}
+
+# A foreground frame that leaves any intro or shine still moving.
+voco_ui_show() {
+  voco_ui_pause
+  voco_ui_frame "$1" "$2" "${3:-—}"
+  voco_ui_animate "$1" "$2" "${3:-—}"
 }
 
 voco_ui_stage() {
@@ -133,17 +710,12 @@ voco_ui_stage() {
 voco_ui_sweep() {
   voco_ui_begin "$1" "$2"
   [[ "$VOCO_TERMINAL_MOTION" == true && "$VOCO_UI_NO_MOTION" != true ]] || return 0
-  (
-    trap - EXIT
-    trap 'exit 0' TERM INT
-    local shine
-    for shine in 0 1 2 3; do
-      voco_ui_frame "$1" "$2" '—' "$shine"
-      IFS= read -r -t .125 -u "$VOCO_UI_TIMER_FD" _ || true
-    done
-    voco_ui_frame "$1" "$2" '—'
-  ) &
-  VOCO_UI_PID=$!
+  voco_ui_now_ms
+  # Each stage lights the wordmark once, unless the intro is still playing.
+  if (( VOCO_UI_INTRO_START == 0 || VOCO_UI_NOW - VOCO_UI_INTRO_START >= VOCO_UI_INTRO_MS )); then
+    VOCO_UI_SHINE_START=$VOCO_UI_NOW
+  fi
+  voco_ui_animate "$1" "$2" '—'
 }
 
 voco_ui_pause() {
@@ -151,30 +723,41 @@ voco_ui_pause() {
     kill "$VOCO_UI_PID" 2>/dev/null || true
     wait "$VOCO_UI_PID" 2>/dev/null || true
     VOCO_UI_PID=""
+    # Its frames changed the canvas behind this process's back.
+    voco_ui_forget
   fi
 }
 
 voco_ui_release() {
   voco_ui_pause
   if [[ "$VOCO_UI_OPEN" == true ]]; then
-    printf '\033[%dA' "$VOCO_UI_LINES"
-    local line
-    for ((line=0;line<VOCO_UI_LINES;line++)); do printf '\r\033[K\n'; done
-    printf '\033[%dA\r' "$VOCO_UI_LINES"
+    # The image would stay where the canvas was, so it goes first.
+    local lines unplace=''
+    [[ "$VOCO_UI_ART" != true ]] || unplace=$VOCO_UI_UNPLACE
+    printf -v lines '%*s' "$VOCO_UI_LINES" ''
+    printf '%s\033[%dA%s\033[%dA\r' "$unplace" "$VOCO_UI_LINES" "${lines// /$'\r\e[K\n'}" "$VOCO_UI_LINES"
   fi
   VOCO_UI_OPEN=false
+  voco_ui_forget
 }
 
 voco_ui_download_observer() {
   trap - EXIT
   trap 'exit 0' TERM INT
-  local destination="$1" start="$2" bytes=0 now delta rate elapsed tick=0 mark detail shine
+  local destination="$1" start="$2" bytes=0 now delta rate elapsed mark='' detail='' sampled=0 card=full
   local glyphs=(▁ ▂ ▃ ▄ ▅ ▆ ▇ █) value
   VOCO_UI_LAST_BYTES=0
   VOCO_UI_LAST_TIME=${EPOCHREALTIME/./}
+  voco_ui_now_ms
+  # The download lights the wordmark once, unless the intro is still playing.
+  if [[ "$VOCO_UI_NO_MOTION" != true ]] && (( VOCO_UI_INTRO_START == 0 || VOCO_UI_NOW - VOCO_UI_INTRO_START >= VOCO_UI_INTRO_MS )); then
+    VOCO_UI_SHINE_START=$VOCO_UI_NOW
+  fi
   while :; do
-    # Sample at 4 Hz; the short entry sweep uses only shell builtins between samples.
-    if (( tick % 2 == 0 )); then
+    now=${EPOCHREALTIME/./}
+    # Sample at 4 Hz, whatever the frame rate; only shell builtins run between samples.
+    if (( now - sampled >= 250000 )); then
+      sampled=$now
       bytes=$(stat -c %s -- "$destination" 2>/dev/null || printf '0')
       now=${EPOCHREALTIME/./}
       delta=$((now-VOCO_UI_LAST_TIME))
@@ -199,16 +782,28 @@ voco_ui_download_observer() {
         done
       fi
     fi
-    shine=-1
-    if (( tick < 4 )); then shine=$tick; fi
-    if (( tick < 6 || tick % 2 == 0 )); then voco_ui_frame 'Bringing VOCO to your desktop.' "$detail" "$mark" "$shine"; fi
-    IFS= read -r -t .125 -u "$VOCO_UI_TIMER_FD" _ || true
-    tick=$((tick+1))
+    if voco_ui_animating; then
+      voco_ui_frame 'Bringing VOCO to your desktop.' "$detail" "$mark"
+      card=full
+      IFS= read -r -t .033 -u "$VOCO_UI_TIMER_FD" _ || true
+    else
+      # Once the card has drawn at rest, it stays on screen untouched.
+      voco_ui_frame 'Bringing VOCO to your desktop.' "$detail" "$mark" "$card"
+      card=progress
+      IFS= read -r -t .25 -u "$VOCO_UI_TIMER_FD" _ || true
+    fi
   done
 }
 
 voco_ui_close() {
   voco_ui_pause
+  # An interrupted probe leaves echo off: give the terminal its settings back.
+  if [[ -n "$VOCO_UI_PROBE_TTY" ]]; then
+    stty "$VOCO_UI_PROBE_TTY" 2>/dev/null < /dev/tty || true
+    VOCO_UI_PROBE_TTY=''
+  fi
+  # An APT display stopped mid-write can leave an escape sequence open: ST ends it.
+  [[ "$VOCO_UI_APT_DRAWING" != true ]] || printf '\033\\'
   if [[ -n "$VOCO_UI_TIMER_FD" ]]; then exec {VOCO_UI_TIMER_FD}>&-; VOCO_UI_TIMER_FD=""; fi
 }
 
@@ -245,14 +840,18 @@ voco_run_apt() {
   # APT marks its status descriptor close-on-exec before dpkg starts. A dedicated
   # fd is essential: using stdout would close maintainer-script output. Create fd
   # 3 AFTER sudo, with a fixed wrapper and separate arguments (never interpolation).
+  voco_ui_apt_card
+  VOCO_UI_APT_DRAWING=true
   if sudo sh -c "$wrapper" voco-apt "$@" 2>&"$output_fd" |
-      voco_apt_display "$VOCO_INSTALL_LOG" "$VOCO_UI_NO_MOTION" separate "${VERSION:-}" 4<&"$output_fd"; then
+      voco_apt_display "$VOCO_INSTALL_LOG" "$VOCO_UI_NO_MOTION" separate "${VERSION:-}" "$VOCO_UI_LINES" \
+        "$VOCO_UI_APT_CARD" "$VOCO_UI_APT_SHINE" "${VOCO_UI_PLACE[14]:-}" "$VOCO_UI_UNPLACE" 4<&"$output_fd"; then
     result=0
   else
     statuses=("${PIPESTATUS[@]}")
     result=${statuses[0]}
     (( result != 0 )) || result=${statuses[1]}
   fi
+  VOCO_UI_APT_DRAWING=false
   exec {output_fd}>&-
   voco_ui_release
   if (( result != 0 )); then

@@ -318,16 +318,26 @@ you want them gone.
 
 ## Installer output
 
-In a colour terminal at least 64 columns wide and 12 rows tall, the installer
-shows an animated progress view. It prints plain lines instead when its output
-isn't a terminal, `NO_COLOR` is set or `TERM` is `dumb`. GNOME's
-reduced-animation setting turns the animation off. On Fedora the view steps
-aside while DNF installs, and DNF shows its own output. You can also choose:
+In a terminal that shows 24-bit colour, as GNOME's terminals do, and at least
+64 columns by 23 rows, the installer opens with VOCO's microphone and name on a
+graphite card and shows its progress beneath it. Terminals that show images
+through the kitty graphics protocol, such as Ghostty, kitty and WezTerm, show
+the microphone as a picture; others draw it in block symbols. Other colour
+terminals at least 64 × 12 get a compact progress view. The installer prints
+plain lines instead when its output isn't a terminal, `NO_COLOR` is set or
+`TERM` is `dumb`. GNOME's reduced-animation setting keeps either view still. On
+Fedora the view steps aside while DNF installs, and DNF shows its own output.
+You can also choose:
 
 ```bash
 VOCO_INSTALL_PLAIN=1 bash voco-install      # plain lines without colour
 VOCO_INSTALL_NO_MOTION=1 bash voco-install  # progress view without animation
+VOCO_INSTALL_ART=quadrant bash voco-install # the microphone in the plainest block symbols
 ```
+
+To choose how the card shows the microphone, the installer briefly asks the
+terminal what it can draw. [Branding](branding.md#installer) describes the
+choices.
 
 ## Build from source
 

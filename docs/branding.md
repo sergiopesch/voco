@@ -205,20 +205,72 @@ something to stop, Stop dictation.
 
 ### Installer
 
-`scripts/lib/install-brand.json` defines the installer's four-glyph, five-row
-wordmark and its palette: silver `199,204,212`, shine `241,243,246`, muted
-`122,128,138`, complete `165,217,178` and active `239,206,131`. After editing it,
-run `python3 scripts/sync-installer-ui.py`; `npm run verify:devops` fails if the
-installer is out of sync.
+`scripts/lib/install-brand.json` holds the installer's look: the card's graphite
+`17,19,24`; the microphone; the four-glyph, five-row wordmark with its ten-step
+satin gradient from `244,246,249` to `143,150,161`; the shine, sweep and text
+colours; the progress palette (silver `199,204,212`, muted `122,128,138`,
+complete `165,217,178` and active `239,206,131`); and the easing as 21 steps of
+`cubic-bezier(.2, .8, .2, 1)`.
+
+`scripts/generate-installer-art.py` draws the microphone from
+`assets/voco-symbol.png`, once for each way a terminal can show it. ffmpeg
+composites the master onto the graphite and averages it down; the rest is plain
+Python, so the installer never reads an image or runs ffmpeg.
+
+- **The image:** an indexed PNG of 36 colours, with the microphone 400 pixels
+  tall, about twice its size on a HiDPI screen. Graphite room around it lets
+  the installer crop it to any cell shape from 0.40 to 0.65 (width over
+  height), so it fills the card's 14 × 11 microphone cells without stretching.
+- **The mosaics:** the microphone in those 14 × 11 cells, for terminals that
+  show no images. Each cell gets the block symbol and the two colours from the
+  same palette that come closest to the image, as chafa chooses them. One
+  mosaic uses octants, one sextants and one only quadrants, halves and eighths,
+  for each kind of terminal.
+
+`--check` draws everything again and fails if the image or any mosaic no longer
+matches the master; `npm run verify:devops` runs it where ffmpeg is installed.
+After editing either file, run `python3 scripts/sync-installer-ui.py`;
+`npm run verify:devops` fails if the installer is out of sync.
 
 | Terminal | Output |
 | --- | --- |
-| A terminal with colour, Bash 5 or later, at least 64 × 12 | A progress canvas: 14 lines with the block wordmark and "The voice layer for Linux." from 16 rows, otherwise 10 lines with "V O C O" |
-| Anything else, `NO_COLOR`, `TERM=dumb` or `VOCO_INSTALL_PLAIN=1` | Plain lines under "VOCO · v<version>" and "The voice layer for Linux." |
+| 24-bit colour (`COLORTERM` is `truecolor` or `24bit`), Bash 5 or later, at least 64 × 23 | The card: the microphone and the wordmark on graphite, with the version, "The voice layer for Linux." and "Today: private dictation.", above the progress lines; 21 lines in all |
+| Any other colour terminal with Bash 5 or later, at least 64 × 12 | 10 lines under "V O C O" and "The voice layer for Linux. Today: private dictation." |
+| Anything else, `NO_COLOR`, `TERM=dumb` or `VOCO_INSTALL_PLAIN=1` | Plain lines under "VOCO · v<version>" and "The voice layer for Linux. Today: private dictation." |
+
+Before it draws the card, the installer asks the terminal whether it shows
+images through the kitty graphics protocol, and how big its cells are. It reads
+the answers from `/dev/tty` with echo off and gives the terminal its settings
+back. It stops at the answer to DA1, which terminals send last, or after
+200 ms. It only asks from the foreground and never over SSH.
+
+| The terminal | The microphone |
+| --- | --- |
+| Answers the kitty graphics query: Ghostty, kitty, WezTerm and Konsole | The image, sent once and placed over the microphone cells without moving the cursor |
+| VTE 0.78 or later: GNOME Terminal, Ptyxis and other VTE terminals | The octant mosaic |
+| VTE 0.64 to 0.76, or Ghostty, kitty, WezTerm or foot without the image | The sextant mosaic |
+| Inside tmux or screen without an answer, or any other terminal | The quadrant mosaic, which every terminal font draws |
+
+These terminals draw octants and sextants themselves, so no font can lack them.
+`VOCO_INSTALL_ART` skips the question: `kitty`, `octant`, `sextant` or
+`quadrant` picks one way, and `text` picks the mosaic for the terminal.
+
+The card is graphite on every terminal background, with rounded edges. When it
+first appears, a silver line crosses it and leaves the microphone behind it,
+cell by cell, the letters glide in from the right and lock on the easing above,
+one shine passes across them, and the tagline writes itself in: 1.3 s in all.
+The intro only paints frames, about 30 a second, while the checks and the
+download go on; an install that finishes sooner ends on the card at rest. Each
+later stage, and the start of the download, passes one shine across the
+letters. The microphone itself never changes. A frame draws again only the
+lines that changed, and once the sweep has passed the microphone only the rest
+of each row, so the microphone and the image over it stay untouched; once the
+card is at rest, only the progress lines change. The image is placed again
+whenever its cells are drawn, and comes off before the canvas clears, so it
+never stays behind on its own. After the install it stays on the card.
 
 The canvas marks stages with ✓ in green when done, › in amber while active and
-○ in grey while waiting: Check, Download, Verify and Install. When a stage
-begins, a brighter silver passes across the block letters, one every 125 ms. Downloads
+○ in grey while waiting: Check, Download, Verify and Install. Downloads
 sample four times a second and show seven bars on a fixed log scale, the bytes
 received and the average rate, without a percentage or time estimate. APT output
 repaints at most every 0.1 s; DNF keeps its own output, and the canvas clears
@@ -234,6 +286,7 @@ From the repository root, with Python 3.10 or later and ffmpeg:
 python3 scripts/prepare-brand-masters.py
 python3 scripts/generate-icons.py
 python3 scripts/generate-brand-banner.py
+python3 scripts/generate-installer-art.py && python3 scripts/sync-installer-ui.py
 ```
 
 The first script keys the green background out of the sources in
