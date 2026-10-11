@@ -332,6 +332,11 @@ try:
             assert not popover_shown(), 'A login autostart opened the popover'
             wait_for(lambda: any(label.startswith('VOCO — Ready') for label in tray_menus()), 'the tray to report Ready', timeout=5)
             tray_state = dict(status=[label for label in tray_menus() if label.startswith('VOCO — ')])
+        # No idle recording: opening VOCO, or starting it in the tray, never captures.
+        c = counts()
+        started = {event: c[event] for event in ('recording_state_active', 'recording_worklet_connected',
+                                                  'recording_script_processor_connected', 'dictation_desktop_paste_session_started') if c[event]}
+        assert not started, 'A launch case started recording: %r' % started
         passed = True
         # Neither launch case dictates; finally still records the evidence and stops VOCO.
         raise SystemExit(0)
