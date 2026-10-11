@@ -33,9 +33,9 @@ setup and pull requests.
   what it heard. When it heard the entry wrong, the user can teach VOCO that
   version, without the punctuation around it or a pause's comma inside: up to
   five for each entry, each at most four words and 40 characters of letters,
-  digits, apostrophes, single spaces and hyphens. A version that
-  matches another entry or version is refused before it is saved, so no text
-  has two spellings. The worker then writes the entry, or the one word of it
+  digits, apostrophes, single spaces and hyphens. Whichever is saved second, a
+  version that matches an entry or another version, or an entry that matches a
+  version, is refused before it is saved, so no text has two spellings. The worker then writes the entry, or the one word of it
   VOCO misheard, wherever the recognizer writes a taught version, matching it as
   it matches the entry. Taught versions are never boosted, and VOCO warns before
   teaching one made only of everyday words, which it would then change whenever
