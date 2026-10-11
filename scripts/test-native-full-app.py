@@ -16,9 +16,13 @@ lock: a fake logind on a private system bus serves this session, locked when VOC
 so its first read must see the lock and the shortcut starts nothing. After unlocking, a
 lock stops a running dictation, the fixture then reaches no field, and the shortcut again
 starts nothing; a dictation after unlocking delivers as in delivery.
-Every case fails on IBus preedit or commit, a non-append field change, paste refusal or
-failure, a copied remainder, recovery or fallback capture, then check the real tray menu and
-the Ready popover through AT-SPI.
+Every dictation case fails on IBus preedit or commit, a non-append field change, paste
+refusal or failure, a copied remainder, recovery or fallback capture, then checks the real
+tray menu and the Ready popover through AT-SPI.
+launcher: VOCO starts as GIO launches its desktop entry, naming VOCO.desktop and this
+process, and must open the Ready popover by itself once it is ready, with no second launch.
+autostart: the same start with DESKTOP_AUTOSTART_ID, as a login autostart has, must stay in
+the tray. Neither dictates.
 """
 import collections
 import hashlib
@@ -42,7 +46,7 @@ assert os.environ['XDG_RUNTIME_DIR'] == str(root / 'runtime')
 assert os.environ['PULSE_SERVER'] == 'unix:' + str(root / 'runtime/pulse.sock')
 assert os.environ['DISPLAY'] == ':0'
 case = os.environ.get('VOCO_NATIVE_APP_CASE', 'delivery')
-assert case in ['delivery', 'focus-switch', 'spelling', 'lock'], 'Unsupported native application case'
+assert case in ['delivery', 'focus-switch', 'spelling', 'lock', 'launcher', 'autostart'], 'Unsupported native application case'
 trace_path = root / 'state/voco/hotkey-trace.jsonl'
 model = root / 'speech/models/nemotron-speech-streaming-en-0.6b.q8_0.gguf'
 sound = repo / 'tests/fixtures/speech' / ('1673-143396-0000.wav' if case == 'spelling' else '84-121123-0000.wav')
@@ -139,6 +143,24 @@ def app_windows(*flags):
 def popover_shown():
     # WebKit capture keeps the hidden window mapped at 1x1 off-screen; the popover is far larger.
     return any(w['width'] * w['height'] >= 40000 for w in app_windows('--onlyvisible'))
+
+def check_ready_popover(description):
+    """The Ready popover inside its workarea, every control usable, no failure or recovery UI."""
+    global popup, popover
+    wait_for(popover_shown, description, timeout=10)
+    pump(1)
+    popup = max(app_windows('--onlyvisible'), key=lambda w: w['width'] * w['height'])
+    assert inside(popup), 'The popover extends outside its workarea'
+    probe = subprocess.Popen(['/usr/bin/python3', str(Path(__file__).with_name('test-native-recovery-controls.py'))], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    wait_for(lambda: probe.poll() is not None, 'the popover accessibility probe', timeout=30)
+    output, errors = probe.communicate()
+    assert probe.returncode == 0, errors.strip() or 'The popover accessibility probe failed'
+    popover = json.loads(output)
+    assert popover['ready'], 'The popover is not Ready after ' + description
+    assert not popover['forbidden'], 'The popover presents failure, recovery or Copy UI after %s: %s' % (description, ', '.join(popover['forbidden']))
+    for name, anchor in popover['anchors'].items():
+        assert anchor['enabled'] and anchor['showing'] and inside(anchor), 'Popover control %s is disabled, hidden or outside its workarea' % name
+    screenshot('popover.png')
 
 def inside(bounds):
     return any(bounds['x'] >= m['workarea'][0] and bounds['y'] >= m['workarea'][1]
@@ -266,13 +288,38 @@ if case == 'lock':
         time.sleep(.02)
     assert (root / 'logind.ready').exists(), 'The fake logind did not start'
 app_hash = hashlib.sha256((root / 'voco').read_bytes()).hexdigest()
-app = subprocess.Popen([str(root / 'voco')], stdout=log, stderr=subprocess.STDOUT, env=app_env)
+command = [str(root / 'voco')]
+if case in ('launcher', 'autostart'):
+    # As GIO launches a desktop entry: it names the entry and the process it started.
+    # The shell's own PID becomes VOCO's through exec, so the two match.
+    app_env['GIO_LAUNCHED_DESKTOP_FILE'] = '/usr/share/applications/VOCO.desktop'
+    command = ['/bin/sh', '-c', 'export GIO_LAUNCHED_DESKTOP_FILE_PID=$$; exec "$0"', str(root / 'voco')]
+    if case == 'autostart':
+        # A login autostart's mark, which GTK removes from the environment once it starts.
+        app_env['DESKTOP_AUTOSTART_ID'] = 'voco-private-autostart'
+app = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT, env=app_env)
 passed, failure, window_id, before_switch = False, None, None, None
 selections, tray_state, popup, popover, diagnostic_errors, confinement = {}, None, None, None, [], None
 try:
     assert shutil.which('xclip') and shutil.which('xdotool'), 'X11 paste needs xclip and xdotool on PATH'
     wait_for(lambda: (root / 'runtime/voco.sock').exists(), 'application control socket')
     wait_for(app_ready, 'frontend and model readiness', timeout=30)
+    if case in ('launcher', 'autostart'):
+        requested = [x.get('backend_used') for x in traces() if x.get('event') == 'launcher_activation_requested']
+        if case == 'launcher':
+            assert requested == ['launch'], 'The launcher start was not taken as a launcher click: %r' % requested
+            wait_for(lambda: counts()['launcher_activation_presented'] > 0, 'the launcher start to present VOCO')
+            check_ready_popover('a launcher start')
+        else:
+            # Well past the frontend's readiness, when a launcher start has already opened.
+            pump(3)
+            assert not requested and not counts()['launcher_activation_presented'], 'A login autostart was taken as a launcher click'
+            assert not popover_shown(), 'A login autostart opened the popover'
+            wait_for(lambda: any(label.startswith('VOCO — Ready') for label in tray_menus()), 'the tray to report Ready', timeout=5)
+            tray_state = dict(status=[label for label in tray_menus() if label.startswith('VOCO — ')])
+        passed = True
+        # Neither launch case dictates; finally still records the evidence and stops VOCO.
+        raise SystemExit(0)
     confinement = worker_confinement()
     assert confinement and confinement['flags'] == ['-E', '-s', '-B'] and confinement['worker']['noNewPrivs'] == '1' \
         and confinement['worker']['seccompFilters'] == confinement['app']['seccompFilters'] + 1, 'The speech worker is not confined: %r' % (confinement,)
@@ -379,20 +426,7 @@ try:
     tray_state = dict(status=[label for label in menus if label.startswith('VOCO — ')], openEnabled=menus.get('Open VOCO', {}).get('enabled'))
     assert tray_state['openEnabled'], 'The tray has no enabled Open VOCO item after dictation'
     tray_click('Open VOCO')
-    wait_for(popover_shown, 'the tray to open the popover', timeout=10)
-    pump(1)
-    popup = max(app_windows('--onlyvisible'), key=lambda w: w['width'] * w['height'])
-    assert inside(popup), 'The popover extends outside its workarea'
-    probe = subprocess.Popen(['/usr/bin/python3', str(Path(__file__).with_name('test-native-recovery-controls.py'))], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    wait_for(lambda: probe.poll() is not None, 'the popover accessibility probe', timeout=30)
-    output, errors = probe.communicate()
-    assert probe.returncode == 0, errors.strip() or 'The popover accessibility probe failed'
-    popover = json.loads(output)
-    assert popover['ready'], 'The popover is not Ready after a pasted dictation'
-    assert not popover['forbidden'], 'The popover presents failure, recovery or Copy UI after success: ' + ', '.join(popover['forbidden'])
-    for name, anchor in popover['anchors'].items():
-        assert anchor['enabled'] and anchor['showing'] and inside(anchor), 'Popover control %s is disabled, hidden or outside its workarea' % name
-    screenshot('popover.png')
+    check_ready_popover('a pasted dictation')
     passed = True
 except Exception as error:
     failure = '%s: %s' % (type(error).__name__, error)

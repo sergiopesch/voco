@@ -31,6 +31,9 @@ try {
         } });
         window.nativeCommands=[];window.auditUploads=[];
         window.captureScenario=new URL(location.href).searchParams.get('scenario')||'enabled';
+        // A launch noted before the renderer loads, as a cold launch from the launcher has.
+        if(new URL(location.href).searchParams.get('onboarded')==='1')window.config.onboardingCompleted=true;
+        if(new URL(location.href).searchParams.get('launcher')==='pending')window.activationPending=true;
         window.source={selectionToken:'token-1',name:'fixture-source',label:'Public fixture source',index:62,objectSerial:'62',isMonitor:false};
         window.catalog={revision:'r1',sources:[window.source],defaultSelectionToken:'token-1'};
         window.nativeInvoke=async(name,args)=>{
@@ -351,6 +354,17 @@ try {
       await page.waitForFunction(()=>window.calls.some(c=>c[0]==='showNotification'&&c[1]==='Dictation setup incomplete'));
       assert.equal(await page.evaluate(()=>window.store.getState().surface),'hidden');
       results.push({case:'launcher-reopens-idle-and-preserves-capture-focus',passed:true});
+      // A cold launch sends no voco:activate: only the listener's first check of the pending
+      // launch can open VOCO, and without one it stays in the tray.
+      for (const launch of ['pending', 'none']) {
+        await page.goto(origin + '/app-microphone-check?scenario=enabled&onboarded=1&launcher=' + launch);
+        await page.waitForFunction(()=>window.calls?.some(c=>c[0]==='takeLauncherActivation'));
+        if (launch === 'pending') await page.waitForFunction(()=>window.store.getState().surface==='popover');
+        else await page.evaluate(()=>new Promise(resolve=>setTimeout(resolve,300)));
+        assert.equal(await page.evaluate(()=>window.store.getState().surface),launch === 'pending' ? 'popover' : 'hidden',launch);
+        assert.equal(await page.evaluate(()=>window.calls.some(c=>c[0]==='traceHotkeyEvent'&&c[1]==='launcher_activation_presented')),launch === 'pending',launch);
+      }
+      results.push({case:'cold-launch-opens-the-popover-only-for-a-pending-launch',passed:true});
       await page.setViewportSize({width:1100,height:800});
       await loadTest();
       await page.evaluate(()=>window.silentFixture=true);
