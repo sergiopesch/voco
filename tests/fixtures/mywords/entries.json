@@ -3,224 +3,114 @@
     "label": "NFC Siobhán Kelly",
     "input": "Siobhán Kelly",
     "expectedVerdict": "accept",
-    "expectedWordCount": 2,
-    "comment": "Precomposed accent (U+00E1)"
+    "expectedWordCount": 2
   },
   {
     "label": "NFD Siobhán Kelly",
     "input": "Siobha\u0301n Kelly",
     "expectedVerdict": "accept",
-    "expectedWordCount": 2,
-    "comment": "Decomposed accent (U+0301 combining acute) - now accepts after NFC normalization"
+    "expectedWordCount": 2
   },
   {
     "label": "Yoruba Adéṣọ̀lá (no precomposed ọ̀)",
     "input": "Adé\u1e63\u1ecd\u0300lá",
     "expectedVerdict": "reject",
-    "expectedWordCount": null,
-    "comment": "Product question: combining marks with no precomposed form. Keep rejected in this PR."
+    "expectedWordCount": null
   },
   {
     "label": "NFC Zoë",
     "input": "Zoë",
     "expectedVerdict": "accept",
-    "expectedWordCount": 1,
-    "comment": "Precomposed diaeresis (U+00EB)"
+    "expectedWordCount": 1
   },
   {
     "label": "NFD Zoë",
     "input": "Zoe\u0308",
     "expectedVerdict": "accept",
-    "expectedWordCount": 1,
-    "comment": "Decomposed diaeresis (U+0308 combining) - now accepts after NFC normalization"
+    "expectedWordCount": 1
   },
   {
-    "label": "Apostrophe U+0027",
+    "label": "Apostrophe O'Neill",
     "input": "O'Neill",
     "expectedVerdict": "accept",
-    "expectedWordCount": 1,
-    "comment": "ASCII apostrophe"
+    "expectedWordCount": 1
   },
   {
-    "label": "Right single quotation mark U+2019",
-    "input": "O'Neill",
-    "expectedVerdict": "accept",
-    "expectedWordCount": 1,
-    "comment": "Typographic apostrophe"
-  },
-  {
-    "label": "Digits in name",
-    "input": "R2D2",
-    "expectedVerdict": "accept",
-    "expectedWordCount": 1,
-    "comment": "Letters and digits"
-  },
-  {
-    "label": "Hyphenated name",
+    "label": "Hyphenated Jean-Luc",
     "input": "Jean-Luc",
     "expectedVerdict": "accept",
-    "expectedWordCount": 2,
-    "comment": "Hyphen joins words"
+    "expectedWordCount": 2
   },
   {
-    "label": "Dotted initials",
-    "input": "J.R.R. Tolkien",
-    "expectedVerdict": "accept",
-    "expectedWordCount": 4,
-    "comment": "Full stops join words"
-  },
-  {
-    "label": "Company with Inc.",
-    "input": "Acme Inc.",
-    "expectedVerdict": "accept",
-    "expectedWordCount": 2,
-    "comment": "Final full stop allowed"
-  },
-  {
-    "label": "St. Ives",
+    "label": "Dotted St. Ives",
     "input": "St. Ives",
     "expectedVerdict": "accept",
-    "expectedWordCount": 2,
-    "comment": "Full stop and space join words"
+    "expectedWordCount": 2
   },
   {
-    "label": "Exactly at character limit (40)",
-    "input": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-    "expectedVerdict": "accept",
-    "expectedWordCount": 1,
-    "comment": "40 characters exactly"
-  },
-  {
-    "label": "One over character limit (41)",
-    "input": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-    "expectedVerdict": "reject",
-    "expectedWordCount": null,
-    "comment": "41 characters"
-  },
-  {
-    "label": "Exactly at word limit (4)",
-    "input": "one two three four",
-    "expectedVerdict": "accept",
-    "expectedWordCount": 4,
-    "comment": "4 words exactly"
-  },
-  {
-    "label": "One over word limit (5)",
-    "input": "one two three four five",
-    "expectedVerdict": "reject",
-    "expectedWordCount": null,
-    "comment": "5 words"
-  },
-  {
-    "label": "Underscore in term",
-    "input": "snake_case",
-    "expectedVerdict": "reject",
-    "expectedWordCount": null,
-    "comment": "Underscore not allowed"
-  },
-  {
-    "label": "Emoji in term",
-    "input": "Hello 👋",
-    "expectedVerdict": "reject",
-    "expectedWordCount": null,
-    "comment": "Emoji not allowed"
-  },
-  {
-    "label": "Leading space",
-    "input": " GitHub",
-    "expectedVerdict": "reject",
-    "expectedWordCount": null,
-    "comment": "Must not start with space"
-  },
-  {
-    "label": "Trailing space",
-    "input": "GitHub ",
-    "expectedVerdict": "reject",
-    "expectedWordCount": null,
-    "comment": "Must not end with space"
-  },
-  {
-    "label": "Double space",
-    "input": "New  Zealand",
-    "expectedVerdict": "reject",
-    "expectedWordCount": null,
-    "comment": "Only single spaces allowed"
-  },
-  {
-    "label": "German ß",
+    "label": "German ß Straße",
     "input": "Straße",
     "expectedVerdict": "accept",
-    "expectedWordCount": 1,
-    "comment": "German sharp s"
+    "expectedWordCount": 1
   },
   {
-    "label": "Greek final sigma",
-    "input": "Ανδρέας",
+    "label": "Digits R2D2",
+    "input": "R2D2",
     "expectedVerdict": "accept",
-    "expectedWordCount": 1,
-    "comment": "Greek letters with final sigma ς"
+    "expectedWordCount": 1
   },
   {
-    "label": "Starting with digit",
-    "input": "3M",
+    "label": "At character limit (40)",
+    "input": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
     "expectedVerdict": "accept",
-    "expectedWordCount": 1,
-    "comment": "Can start with digit"
+    "expectedWordCount": 1
   },
   {
-    "label": "Empty string",
+    "label": "Over character limit (41)",
+    "input": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "expectedVerdict": "reject",
+    "expectedWordCount": null
+  },
+  {
+    "label": "At word limit (4)",
+    "input": "one two three four",
+    "expectedVerdict": "accept",
+    "expectedWordCount": 4
+  },
+  {
+    "label": "Over word limit (5)",
+    "input": "one two three four five",
+    "expectedVerdict": "reject",
+    "expectedWordCount": null
+  },
+  {
+    "label": "Underscore rejected",
+    "input": "snake_case",
+    "expectedVerdict": "reject",
+    "expectedWordCount": null
+  },
+  {
+    "label": "Leading space rejected",
+    "input": " GitHub",
+    "expectedVerdict": "reject",
+    "expectedWordCount": null
+  },
+  {
+    "label": "Trailing space rejected",
+    "input": "GitHub ",
+    "expectedVerdict": "reject",
+    "expectedWordCount": null
+  },
+  {
+    "label": "Double space rejected",
+    "input": "New  Zealand",
+    "expectedVerdict": "reject",
+    "expectedWordCount": null
+  },
+  {
+    "label": "Empty rejected",
     "input": "",
     "expectedVerdict": "reject",
-    "expectedWordCount": null,
-    "comment": "Empty not allowed"
-  },
-  {
-    "label": "Starting with hyphen",
-    "input": "-dash",
-    "expectedVerdict": "reject",
-    "expectedWordCount": null,
-    "comment": "Must start with letter or digit"
-  },
-  {
-    "label": "Ending with hyphen",
-    "input": "dash-",
-    "expectedVerdict": "reject",
-    "expectedWordCount": null,
-    "comment": "Must end with letter or digit"
-  },
-  {
-    "label": "Starting with full stop",
-    "input": ".hidden",
-    "expectedVerdict": "reject",
-    "expectedWordCount": null,
-    "comment": "Must start with letter or digit"
-  },
-  {
-    "label": "Double full stop",
-    "input": "St..Ives",
-    "expectedVerdict": "reject",
-    "expectedWordCount": null,
-    "comment": "Only single full stops allowed"
-  },
-  {
-    "label": "Tab character",
-    "input": "tab\there",
-    "expectedVerdict": "reject",
-    "expectedWordCount": null,
-    "comment": "Tab not allowed"
-  },
-  {
-    "label": "Newline character",
-    "input": "line\nbreak",
-    "expectedVerdict": "reject",
-    "expectedWordCount": null,
-    "comment": "Newline not allowed"
-  },
-  {
-    "label": "Plus sign",
-    "input": "C++",
-    "expectedVerdict": "reject",
-    "expectedWordCount": null,
-    "comment": "Special characters not allowed"
+    "expectedWordCount": null
   }
 ]

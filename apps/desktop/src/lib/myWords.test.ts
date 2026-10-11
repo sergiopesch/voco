@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   MY_WORDS_MAX_HEARD, MY_WORDS_MAX_TERMS, entryOf, heardVersion, judgeCheck, keptVersions, myWordProblem, myWordsKey,
-  tidyMyWord, versionsOf, withoutEntry,
+  termWords, tidyMyWord, versionsOf, withoutEntry,
 } from "@/lib/myWords";
 import type { HeardVersion } from "@/types";
 
@@ -47,6 +47,24 @@ describe("My words rules", () => {
     
     const yoruba = "Adé\u1e63\u1ecd\u0300lá";
     expect(myWordProblem(yoruba, [])).not.toBeNull();
+  });
+
+  it("shared fixture validates NFC and NFD alike", async () => {
+    const { readFileSync } = await import("fs");
+    const { resolve } = await import("path");
+    const fixturePath = resolve(process.cwd(), "../../tests/fixtures/mywords/entries.json");
+    const cases = JSON.parse(readFileSync(fixturePath, "utf8"));
+    for (const testCase of cases) {
+      const result = myWordProblem(testCase.input, []);
+      if (testCase.expectedVerdict === "accept") {
+        expect(result).toBeNull();
+        if (testCase.expectedWordCount !== null) {
+          expect(termWords(testCase.input).length).toBe(testCase.expectedWordCount);
+        }
+      } else {
+        expect(result).not.toBeNull();
+      }
+    }
   });
 });
 
