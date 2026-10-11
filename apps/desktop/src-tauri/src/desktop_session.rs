@@ -241,7 +241,7 @@ fn until_bound<T>(
             Watch::Never => return None,
             Watch::Later => sleep(delay),
         }
-        delay = (delay * 2).min(Duration::from_secs(30));
+        delay = longer(delay);
     }
 }
 
@@ -281,32 +281,57 @@ fn follow_lock(bus: gio::DBusConnection, path: String, on_lock: Arc<dyn Fn() + S
                 }
             },
         );
-        // A lock seen here stops a dictation that started meanwhile. A logind
-        // without the property, or no answer, reads as unlocked.
-        bus.call(
-            Some("org.freedesktop.login1"),
-            &path,
-            "org.freedesktop.DBus.Properties",
-            "Get",
-            Some(&(SESSION_INTERFACE, "LockedHint").to_variant()),
-            None,
-            gio::DBusCallFlags::NO_AUTO_START,
-            5_000,
-            gio::Cancellable::NONE,
-            move |reply| {
-                let locked = reply
-                    .ok()
-                    .and_then(|reply| reply.get::<(glib::Variant,)>())
-                    .and_then(|(value,)| value.get::<bool>());
-                if let Some(locked) = locked {
-                    note_lock(&SESSION_LOCKED, locked, &*on_lock);
-                }
-            },
-        );
+        // A lock seen here stops a dictation that started meanwhile.
+        read_locked_hint(bus.clone(), path, on_lock, Duration::from_secs(1));
         // A subscription lasts as long as its connection, and GIO keeps the
         // shared system bus only while something holds it: hold it for good.
         std::mem::forget(bus);
     });
+}
+
+/// Read the login's LockedHint, on GTK's main context. A logind that answers
+/// without the property reads as unlocked. One that doesn't answer is asked
+/// again after `delay`, then twice as long each time up to 30 s, so a screen
+/// locked before VOCO started is still seen.
+fn read_locked_hint(
+    bus: gio::DBusConnection,
+    path: String,
+    on_lock: Arc<dyn Fn() + Send + Sync>,
+    delay: Duration,
+) {
+    let again = path.clone();
+    bus.clone().call(
+        Some("org.freedesktop.login1"),
+        &path,
+        "org.freedesktop.DBus.Properties",
+        "Get",
+        Some(&(SESSION_INTERFACE, "LockedHint").to_variant()),
+        None,
+        gio::DBusCallFlags::NO_AUTO_START,
+        5_000,
+        gio::Cancellable::NONE,
+        move |reply| match reply {
+            Ok(reply) => {
+                let locked = reply
+                    .get::<(glib::Variant,)>()
+                    .and_then(|(value,)| value.get::<bool>());
+                if let Some(locked) = locked {
+                    note_lock(&SESSION_LOCKED, locked, &*on_lock);
+                }
+            }
+            Err(error) if remote_error(&error).is_none() => {
+                glib::timeout_add_local_once(delay, move || {
+                    read_locked_hint(bus, again, on_lock, longer(delay));
+                });
+            }
+            Err(_) => {}
+        },
+    );
+}
+
+/// The next wait between tries: twice as long, up to 30 s.
+fn longer(delay: Duration) -> Duration {
+    (delay * 2).min(Duration::from_secs(30))
 }
 
 /// Record a lock state from the signal or the first read. Only the change to
@@ -393,16 +418,20 @@ impl Logind {
     }
 }
 
-fn lookup_error(error: &glib::Error) -> LookupError {
+/// The D-Bus error name logind answered with, or None when it didn't answer.
+fn remote_error(error: &glib::Error) -> Option<glib::GString> {
     // GIO 0.18 exposes this through its C binding. The returned string is newly
     // allocated; GString takes and frees ownership.
-    let remote: Option<glib::GString> = unsafe {
+    unsafe {
         from_glib_full(gio::ffi::g_dbus_error_get_remote_error(
             error.to_glib_none().0,
         ))
-    };
+    }
+}
+
+fn lookup_error(error: &glib::Error) -> LookupError {
     if matches!(
-        remote.as_deref(),
+        remote_error(error).as_deref(),
         Some(
             "org.freedesktop.login1.NoSessionForPID"
                 | "org.freedesktop.login1.NoSuchSession"
