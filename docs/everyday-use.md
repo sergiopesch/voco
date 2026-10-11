@@ -60,8 +60,8 @@ On GNOME the tray icon needs an AppIndicator extension. Ubuntu includes one;
 Debian 13 and Fedora 44 don't turn one on, so there the GNOME panel is VOCO's
 place in the top bar.
 
-Settings has four pages: **Settings** for your microphone and spelling, **Shortcut**,
-**Updates** and **Help**, which has setup steps and runtime checks. Opening
+Settings has five pages: **Settings** for your microphone and spelling, **My words**,
+**Shortcut**, **Updates** and **Help**, which has setup steps and runtime checks. Opening
 VOCO from your app menu shows the popover, even when VOCO wasn't running, except
 while you dictate. Started from a terminal or by your desktop's startup apps,
 VOCO stays in the tray. The panel
@@ -105,6 +105,27 @@ dictation.
 - VOCO pastes a word only once its spelling can't change, so the end of a word
   such as "recognise" can appear a moment after the rest. One or two words in a
   hundred wait like this.
+
+## My words
+
+On the **My words** page, list the names and terms you want VOCO to write your
+way: people, products, places. Add each one as you want it written, with its
+capitals and accents. The list holds up to 100 entries of up to four words each,
+and a change applies from your next dictation.
+
+- VOCO listens out for the words on your list and writes each one as listed,
+  whether it hears "git hub", "Github" or "GitHub". It joins letters you spell
+  out, so "G T K" becomes GTK, and it writes the accents you typed, so "Zoe"
+  becomes Zoë.
+- Type an ordinary word in lower case, like "router", so it keeps its usual
+  capitals. VOCO still capitalises it at the start of a sentence.
+- A word that sounds exactly like another, such as Stephen and Steven, can still
+  come out as the other, and so can a word VOCO hears as a different one.
+- Spelling never changes a word on your list.
+- A word that might still become part of a listed name waits for the next word,
+  so with New Zealand on your list, "New" appears once the next word does.
+- The list stays in your settings file on this computer. VOCO never logs it or
+  sends it anywhere.
 
 ## Shortcut
 

@@ -42,6 +42,21 @@ def run(output):
                 check('spelling start',exchange('start','four',0,spelling='british')['text'] is None)
                 check('spelling session final',exchange('finish','four',1)['text']=='')
                 check('unknown spelling rejected','error' in exchange('start','five',0,spelling='klingon'))
+                # A public LibriSpeech clip in which the model writes "etcetera":
+                # the list's spelling comes back, and the pinned model carries
+                # the tokenizer the recognizer needs to boost listed phrases.
+                fixture=ROOT.parents[1]/'tests/fixtures/speech/1462-170138-0000.wav'
+                audio=np.frombuffer(fixture.read_bytes()[44:],dtype='<i2').astype(np.float32)/32768
+                def dictate(session,**start):
+                    exchange('start',session,0,**start)
+                    for seq,offset in enumerate(range(0,len(audio),1600),start=1):
+                        response=exchange('push',session,seq,audio=audio[offset:offset+1600].tolist(),rate=16000)
+                        assert 'error' not in response,response
+                    return exchange('finish',session,seq+1)['text']
+                plain=dictate('six')
+                listed=dictate('seven',words=['Dowson','et cetera'])
+                check('listed words written as listed','et cetera' in listed and 'etcetera' not in listed and 'Dowson' in listed)
+                check('an empty list changes nothing',dictate('eight',words=[])==plain)
                 child.stdin.close();child.wait(timeout=10)
                 check('EOF exits and reaps',child.returncode==0)
                 logs=[json.loads(x) for x in (Path(state)/'voco/stream-performance/worker.jsonl').read_text().splitlines()]
@@ -50,7 +65,24 @@ def run(output):
                 check('ready logs the verified model and thread count',any(row.get('event')=='worker_ready'
                       and row['model_sha256']==identity['model_sha256'] and type(row['cpu_threads']) is int
                       and 1<=row['cpu_threads']<=16 for row in logs))
-                check('content-free logs',all(not ({'audio','text','transcript','app_name'} & x.keys()) for x in logs))
+                check('content-free logs',all(not ({'audio','text','transcript','app_name','words','phrases'} & x.keys()) for x in logs))
+                check('logs never name listed words','Dowson' not in json.dumps(logs))
+                errors.flush()
+                check('the model carries the tokenizer for boosting','no phrases could be tokenized' not in (output/'worker-protocol.stderr').read_text())
+                # The adapter hands phrases to the decoder: at the runtime's
+                # strongest boost, a listed phrase overrides what the model hears
+                # ("lotable") in another public clip.
+                from adapters import Nemotron
+                clip=np.frombuffer((ROOT.parents[1]/'tests/fixtures/speech/1673-143396-0000.wav').read_bytes()[44:],dtype='<i2').astype(np.float32)/32768
+                model=Nemotron(1)
+                def recognise(*start):
+                    model.start(*start)
+                    for offset in range(0,len(clip),1600):model.push(clip[offset:offset+1600],16000)
+                    return model.finish().lower()
+                try:
+                    check('a phrase reaches the decoder','laudable' not in recognise() and 'laudable' in recognise(['a laudable'],5.0))
+                finally:
+                    model.close()
                 (output/'worker-protocol-metrics.json').write_text(json.dumps(logs,indent=2)+'\n')
             finally:
                 if child.poll() is None:child.kill();child.wait()

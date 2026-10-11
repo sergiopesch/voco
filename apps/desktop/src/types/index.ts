@@ -14,6 +14,8 @@ export interface AppConfig {
   installChannel: InstallChannel;
   /** null until someone chooses; dictation then spells British. */
   englishSpelling: EnglishSpelling | null;
+  /** Names and terms dictation writes as listed; empty until the user adds one. */
+  myWords: string[];
 }
 
 export interface ConfigSnapshot {

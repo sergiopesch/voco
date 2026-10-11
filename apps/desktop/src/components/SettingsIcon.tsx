@@ -1,6 +1,7 @@
 const settingsIcons = {
   General: "house",
   Audio: "mic",
+  Words: "book-a",
   Hotkeys: "keyboard",
   Updates: "download",
   Advanced: "life-buoy",

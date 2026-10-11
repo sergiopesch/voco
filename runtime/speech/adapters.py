@@ -8,6 +8,18 @@ import numpy as np
 ROOT=Path(__file__).resolve().parent
 # MODEL-IDENTITY.json names the same digest; test_model_identity.py keeps them equal.
 MODEL_SHA256='926495522ccd2626d8665283b4c9225f704ed2b45e82158984d1823f7e528b52'
+class SpeechContext(c.Structure):
+    # nemo_speech_asr_speech_context of the pinned NeMo-Speech.cpp revision.
+    _fields_=[('size',c.c_size_t),('phrases',c.POINTER(c.c_char_p)),('phrase_count',c.c_size_t),('boost',c.c_float)]
+class RecognitionOptions(c.Structure):
+    # nemo_speech_asr_recognition_options; Nemotron checks the library's size.
+    _fields_=[('size',c.c_size_t),('request_id',c.c_char_p),('language_code',c.c_char_p),
+              ('interim_results',c.c_bool),('enable_word_time_offsets',c.c_bool),
+              ('enable_automatic_punctuation',c.c_bool),('verbatim_transcripts',c.c_bool),
+              ('profanity_filter',c.c_bool),('stop_history_eou_ms',c.c_int32),
+              ('speech_contexts',c.POINTER(SpeechContext)),('speech_context_count',c.c_size_t),
+              ('max_alternatives',c.c_int32),('enable_speaker_diarization',c.c_bool),
+              ('max_speaker_count',c.c_int32)]
 class Nemotron:
     def __init__(self,context=1):
         self.stream=None
@@ -19,6 +31,10 @@ class Nemotron:
         self.error=fn('nemo_speech_asr_last_error',[],c.c_char_p)
         create=fn('bench_create',[c.c_char_p,c.c_int],c.c_void_p)
         self.open=fn('bench_start',[c.c_void_p],c.c_void_p)
+        # A start with My words passes its phrases through the C API's own options.
+        self.defaults=fn('nemo_speech_asr_recognition_options_default',[],RecognitionOptions)
+        self.recognize=fn('nemo_speech_asr_streaming_recognize',[c.c_void_p,c.POINTER(RecognitionOptions),c.POINTER(c.c_void_p)],c.c_int)
+        if self.defaults().size != c.sizeof(RecognitionOptions): raise ValueError('speech context layout')
         self.push_f=fn('nemo_speech_asr_stream_push_f32',[c.c_void_p,c.POINTER(c.c_float),c.c_size_t,c.c_int32],c.c_int)
         self.next=fn('nemo_speech_asr_stream_next',[c.c_void_p,c.POINTER(c.c_void_p)],c.c_int)
         self.finish_f=fn('nemo_speech_asr_stream_finish',[c.c_void_p],c.c_int)
@@ -45,10 +61,21 @@ class Nemotron:
             self.destroy_recognizer(self.recognizer); self.recognizer=None
     def check(self,code):
         if code: raise RuntimeError(self.error())
-    def start(self):
+    def start(self,phrases=(),boost=None):
         self.release_stream()
-        self.stream=self.open(self.recognizer); self.done='';self.last=''
+        self.stream=self.open_boosted(phrases,boost) if phrases else self.open(self.recognizer)
+        self.done='';self.last=''
         if not self.stream:raise RuntimeError(self.error())
+    def open_boosted(self,phrases,boost):
+        """bench_start's options plus one speech context; the runtime copies the phrases."""
+        options=self.defaults()
+        options.interim_results=options.enable_automatic_punctuation=options.verbatim_transcripts=True
+        encoded=(c.c_char_p*len(phrases))(*[phrase.encode() for phrase in phrases])
+        context=SpeechContext(c.sizeof(SpeechContext),encoded,len(phrases),boost)
+        options.speech_contexts=c.pointer(context);options.speech_context_count=1
+        stream=c.c_void_p()
+        self.check(self.recognize(self.recognizer,c.byref(options),c.byref(stream)))
+        return stream.value
     def drain(self):
         result=None
         while True:

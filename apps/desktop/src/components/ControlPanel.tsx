@@ -30,6 +30,7 @@ import { useGlassPointer } from "@/hooks/useGlassPointer";
 import { isWaylandSession } from "@/lib/windowRemap";
 import { englishSpelling, type EnglishVariety } from "@/lib/englishSpelling";
 import { EnglishSpellingChoice, EnglishSpellingNotice, EnglishSpellingStep } from "@/components/EnglishSpellingChoice";
+import { MyWords } from "@/components/MyWords";
 import vocoBrandImage from "../../../../assets/voco-symbol-ui.png";
 
 interface ControlPanelProps {
@@ -67,7 +68,7 @@ interface ControlPanelProps {
 
 const DESKTOP_SETUP_GUIDE = "https://github.com/sergiopesch/voco/blob/master/docs/platform/README.md#wayland-paste-keys";
 
-export type PanelSection = "General" | "Audio" | "Hotkeys" | "Updates" | "Advanced";
+export type PanelSection = "General" | "Audio" | "Words" | "Hotkeys" | "Updates" | "Advanced";
 
 export function shouldOpenMicrophonePreview(
   surface: ControlPanelProps["surface"],
@@ -80,6 +81,7 @@ export function shouldOpenMicrophonePreview(
 const PANEL_SECTION_LABELS: Record<PanelSection, string> = {
   General: "Settings",
   Audio: "Microphone",
+  Words: "My words",
   Hotkeys: "Shortcut",
   Updates: "Updates",
   Advanced: "Help",
@@ -501,6 +503,11 @@ export function ControlPanel({
     }
   }
 
+  async function saveMyWords(words: string[]): Promise<string | null> {
+    const result = await savePatch({ myWords: words });
+    return result.ok ? null : result.message;
+  }
+
   async function selectMicrophone(deviceId: string | null): Promise<boolean> {
     const requestId = microphoneSaveRequestRef.current + 1;
     microphoneSaveRequestRef.current = requestId;
@@ -804,6 +811,7 @@ export function ControlPanel({
               </div>
               <nav className="voco-preferences__nav" aria-label="Settings sections">
                 {renderSettingsNavigation("General")}
+                {renderSettingsNavigation("Words")}
                 {renderSettingsNavigation("Hotkeys")}
               </nav>
               <nav className="voco-preferences__nav-bottom" aria-label="App settings">
@@ -855,6 +863,13 @@ export function ControlPanel({
                       {spellingSaveError ? <div className="voco-inline-note voco-inline-note--error" role="alert">{spellingSaveError}</div> : null}
                     </div>
                   </div>
+                </section>
+              ) : null}
+
+              {activeSection === "Words" ? (
+                <section className="voco-preferences__page">
+                  <div className="voco-preferences__heading"><h2 tabIndex={-1}>My words</h2></div>
+                  <MyWords words={config.myWords} disabled={saving} onSave={saveMyWords} />
                 </section>
               ) : null}
 
