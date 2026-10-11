@@ -83,17 +83,18 @@ class ConversionTests(unittest.TestCase):
         self.assertEqual(AMERICAN.final('defence and offence; the traveller paid by cheque'),
                          'defense and offense; the traveler paid by check')
 
-    def test_words_keep_their_case(self):
-        self.assertEqual(BRITISH.final('Color is bold. COLOR is BOLD.'), 'Colour is bold. COLOUR is BOLD.')
-        self.assertEqual(BRITISH.final('the color COLOR'), 'the colour COLOR')
-        self.assertEqual(BRITISH.final('a colorScheme'), 'a colorScheme')
-
-    def test_names_and_capitalized_words_mid_sentence_stay(self):
-        for text in ('We went to Pearl Harbor.', 'It was Labor Day.', 'At One World Trade Center we met.',
-                     'Labor Day is here.', 'Center Parcs opens.'):
+    def test_only_lowercase_words_convert(self):
+        for text in ('Color is bold. COLOR is BOLD.', 'a colorScheme', 'Organization matters.'):
             self.assertEqual(BRITISH.final(text), text)
-        self.assertEqual(BRITISH.final('Labor costs rose. Honor matters.'), 'Labour costs rose. Honour matters.')
-        self.assertEqual(BRITISH.final("Color I like. Color? Honor"), "Colour I like. Colour? Honour")
+        self.assertEqual(BRITISH.final('the color COLOR'), 'the colour COLOR')
+        self.assertEqual(AMERICAN.final('Colour me in, the colour'), 'Colour me in, the color')
+
+    def test_names_stay_even_first_in_a_sentence(self):
+        for text in ('We went to Pearl Harbor.', 'It was Labor Day.', 'At One World Trade Center we met.',
+                     'Labor Day is here.', 'Center Parcs opens.', 'Honor is speaking.',
+                     'Color is a software package.', "Color I like. Color? Honor"):
+            self.assertEqual(BRITISH.final(text), text)
+        self.assertEqual(BRITISH.final('The color. Honor said so.'), 'The colour. Honor said so.')
 
     def test_code_numbers_and_other_scripts_stay(self):
         for text in ('--color and -color', 'foo_color color_name', 'style.color', 'color2 2color', 'a/color',
@@ -141,15 +142,10 @@ class StreamingTests(unittest.TestCase):
         self.assertEqual(BRITISH.final('the catalog'), 'the catalogue')
         self.assertEqual(BRITISH.stable('the plain words'), 'the plain words')
 
-    def test_capitalized_first_word_waits_for_the_next_word(self):
-        self.assertEqual(BRITISH.stable('Color'), 'Colo')
-        self.assertEqual(BRITISH.stable('Color '), 'Colo')
-        self.assertEqual(BRITISH.stable('Color i'), 'Colour i')
-        self.assertEqual(BRITISH.stable('Color D'), 'Color D')
-        self.assertEqual(BRITISH.stable('Color I'), 'Colo')
-        self.assertEqual(BRITISH.stable("Color I'm"), 'Colo')
-        self.assertEqual(BRITISH.stable("Color I'm "), "Colour I'm ")
-        self.assertEqual(BRITISH.final('Color'), 'Colour')
+    def test_capitalized_open_words_never_wait(self):
+        for text in ('Color', 'Color ', 'COLOR', "Honor I'm", 'The Colo'):
+            self.assertEqual(BRITISH.stable(text), text)
+        self.assertEqual(BRITISH.final('Color'), 'Color')
 
     def test_random_word_piece_growth_is_append_only(self):
         rng = random.Random(62)

@@ -95,9 +95,9 @@ dictation.
 - Only words spelled one way in each variety change. Words whose spelling
   depends on meaning stay as recognised, such as program, check, practice,
   licence, tyre, kerb, storey, metre and gray.
-- Names stay too. A capitalised word in the middle of a sentence never changes,
-  so Pearl Harbor stays; the first word of a sentence changes once the next word
-  starts in lowercase.
+- Names stay too. A word with a capital letter never changes, because it may
+  be a name, so Pearl Harbor stays. That includes the first word of a sentence:
+  a sentence that starts with "Color" keeps that spelling.
 - Words that sound different in each variety stay as you said them, such as
   aluminium, maths and learnt.
 - VOCO pastes a word only once its spelling can't change, so the end of a word

@@ -95,13 +95,13 @@ Each start carries `spelling`: `british`, `american` or `as-recognised`.
 or a save, so the webview can't choose another; a start without one is as
 recognised. `spelling.py` converts the whole hypothesis with
 `spelling-varcon.tsv`, the unambiguous forms of VarCon 2020.12.07, about 3,300
-each way. A word keeps its case; names, code-like tokens and words whose
-spelling depends on meaning stay. A push returns only text no later hypothesis
-can change: an open word goes out up to the first letter where a table word
-starting with it is spelled differently, and a capitalised first word waits for
-the next word's case. Finish returns the converted final text, which extends
-every push, so `DictationStream`'s append-only check still holds, and a
-converter fault would stop the recording rather than paste a revision.
+each way. Only lowercase words convert, so names stay even at the start of a
+sentence, as do code-like tokens and words whose spelling depends on meaning. A
+push returns only text no later hypothesis can change: an open word goes out up
+to the first letter where a table word starting with it is spelled differently.
+Finish returns the converted final text, which extends every push, so
+`DictationStream`'s append-only check still holds, and a converter fault would
+stop the recording rather than paste a revision.
 `test_spelling.py` replays the [engine benchmark](../../research/engine-benchmark-2026-10/README.md)'s
 hypotheses to check that few words wait.
 
