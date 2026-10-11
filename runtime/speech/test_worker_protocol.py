@@ -11,7 +11,7 @@ import numpy as np
 ROOT=Path(__file__).resolve().parent
 
 
-def run(output):
+def run(output, fixtures=ROOT.parents[1]/'tests/fixtures/speech'):
     output.mkdir(parents=True, exist_ok=True)
     results=[]
     with tempfile.TemporaryDirectory() as state:
@@ -45,7 +45,7 @@ def run(output):
                 # A public LibriSpeech clip in which the model writes "etcetera":
                 # the list's spelling comes back, and the pinned model carries
                 # the tokenizer the recognizer needs to boost listed phrases.
-                fixture=ROOT.parents[1]/'tests/fixtures/speech/1462-170138-0000.wav'
+                fixture=fixtures/'1462-170138-0000.wav'
                 audio=np.frombuffer(fixture.read_bytes()[44:],dtype='<i2').astype(np.float32)/32768
                 def dictate(session,**start):
                     exchange('start',session,0,**start)
@@ -73,7 +73,7 @@ def run(output):
                 # strongest boost, a listed phrase overrides what the model hears
                 # ("lotable") in another public clip.
                 from adapters import Nemotron
-                clip=np.frombuffer((ROOT.parents[1]/'tests/fixtures/speech/1673-143396-0000.wav').read_bytes()[44:],dtype='<i2').astype(np.float32)/32768
+                clip=np.frombuffer((fixtures/'1673-143396-0000.wav').read_bytes()[44:],dtype='<i2').astype(np.float32)/32768
                 model=Nemotron(1)
                 def recognise(*start):
                     model.start(*start)
@@ -94,4 +94,7 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", type=Path, default=ROOT)
-    run(parser.parse_args().output_dir)
+    # A packaged worker has no fixtures beside it; release assembly names the checkout's.
+    parser.add_argument("--fixtures", type=Path, default=ROOT.parents[1]/"tests/fixtures/speech")
+    arguments = parser.parse_args()
+    run(arguments.output_dir, arguments.fixtures)

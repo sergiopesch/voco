@@ -29,7 +29,7 @@ class SpeechPackageTests(unittest.TestCase):
         self.speech = self.root / "usr/lib/voco/speech"
         (self.speech / "models").mkdir(parents=True)
         for name in ("stream_worker.py", "worker_main.py", "streaming.py", "adapters.py", "spelling.py",
-                     "spelling-varcon.tsv", "libbench_nemo_pool.so",
+                     "spelling-varcon.tsv", "mywords.py", "libbench_nemo_pool.so",
                      "models/nemotron-speech-streaming-en-0.6b.q8_0.gguf"):
             (self.speech / name).write_bytes(b"fixture")
         (self.speech / "MODEL-IDENTITY.json").write_text(json.dumps({"model_sha256":
@@ -113,8 +113,18 @@ class SpeechPackageTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "manifest must be a regular file"):
             self.verify()
 
-    def test_spelling_files_are_required_except_for_the_native_payload_ci_uses(self):
-        for name in sorted(validator.SPELLING_FILES):
+    def test_the_package_carries_every_worker_module(self):
+        # A module the worker imports but the package lacks would fail only once
+        # packaged, since every other test runs the worker from the checkout.
+        speech = Path(__file__).resolve().parents[1] / "runtime/speech"
+        modules = {path.name for path in speech.glob("*.py") if not path.name.startswith("test_")}
+        self.assertLessEqual(modules, set(package.WORKER_FILES))
+        # The payload check requires each of them too.
+        self.assertLessEqual({name for name in package.WORKER_FILES if name.endswith(".py")},
+                             validator.REQUIRED | validator.LATER_FILES)
+
+    def test_later_files_are_required_except_for_the_native_payload_ci_uses(self):
+        for name in sorted(validator.LATER_FILES):
             (self.speech / name).unlink()
         self.save_manifest()
         with self.assertRaisesRegex(ValueError, "Incomplete speech runtime manifest"):
