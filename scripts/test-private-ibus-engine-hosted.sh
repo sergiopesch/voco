@@ -100,7 +100,7 @@ elif [[ "${1:-}" == --native-pulse-latency ]]; then
     "${VOCO_NATIVE_PULSE_EVIDENCE_DIR}/starved/result.json"
 elif [[ "${1:-}" == --full-application ]]; then
   application_evidence="${VOCO_NATIVE_EVIDENCE_DIR}"
-  for app_case in delivery focus-switch spelling; do
+  for app_case in delivery focus-switch spelling lock; do
     VOCO_NATIVE_APP_CASE="${app_case}" VOCO_NATIVE_EVIDENCE_DIR="${application_evidence}/${app_case}" \
       PYTHONDONTWRITEBYTECODE=1 bash "${ROOT_DIR}/scripts/${TEST_SCRIPT}"
   done
